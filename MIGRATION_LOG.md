@@ -23,6 +23,38 @@ is not finished.
 
 ---
 
+## Smoke test for 0003 — a cut-short BAY job took a bay, for the first time
+
+Targeted, bounded, and **not** a substitute for the V4–V7 certification run (still owed).
+Run `0003bee5-0000-4000-8000-000000000003`, depot `1111…1111`, sim clock 16:00:00.
+Cron 10 and 12 were paused for the window and **restored and verified afterwards**
+(both `active=true`; 16 subsequent runs of job 12 and 8 of job 10, **all `succeeded`,
+zero failures**). Evidence preserved in `public.mig0003_smoke_receipt_decisions` /
+`…_bookings` — the `ottoq_*` originals are purged when the next run starts.
+
+**The scenario reproduces the exact deadlock, not a convenient one.** Vehicle
+`00cc3d0a` was given a detail-bay job that had been booked, started at 15:40 and cut
+short at 15:41:25 (`cut_short_at` + `reopened_at` on the atom, `meta->'reopen'` on the
+row) — and its cadence profile was then reset to *spotless*, which is what the twin
+does when it credits an interrupted job as complete. Battery was set to 99% so the
+charge path was never involved: this tests the bay lane and nothing else.
+
+| Check | Result |
+|---|---|
+| **The card, pre-0003 behaviour** | `cabin_urgency = 'ok'`, `overall_urgency = 'ok'` — the cadence clock says the car is clean. Before this migration `must_do_now` would have been empty and the bay loop would never have looked at it again. |
+| **The card, with the ledger detector** | `must_do_now = {interior_deep_clean}`, `owed_bay_svcs = {interior_deep_clean}`, `owed_bay_min = 25`, `rebook_owed = true`, `must_do_legs = {detail}`. **The second witness fires while the cadence clock still says "ok" — that is the whole fix, observed directly.** |
+| **The decision** | one `decide_tick` call: 2 built, 2 enacted, **0 errored**. The bay row: `resolved_action_context='stall_assignment'`, `outcome='enacted'`, `source='needs_card'`, `need='interior_deep_clean'`, **`resumed_bay_work=true`**, `resumed_need='interior_deep_clean'`, `bay_booked=true`, `is_resume=true`, **`eff_urgency_rank=3`** (the `due` floor doing its job, against a cadence urgency of `ok`), `fresh_waiting_lane=0`, `resume_cap_lane=1` (budget correctly did not bite with no fresh competition). |
+| **The bay it HELD** | a real `wash_bay` stall, `purpose='detail'`, `state='held'`, window **16:00 → 16:25 = 25.00 min** (matching the 25 owed minutes), `booked_at_sim` in the SIM domain, `source='needs_card'`, `need_code='interior_deep_clean'`. Not a paper booking: `stalls.current_vehicle_id` = the vehicle, `vehicles.current_stall_id` = the stall, `current_state='in_detail_bay'`. |
+| **Cleanup** | vehicle released through the engine's own `ottoq_release_vacated_spaces`; 0 bookings left open, 0 bays left occupied, 0 runs left running, synthetic ledger row deleted. All four replaced objects still md5-identical to the `0003_bay_work_recovery_post` snapshot, so the smoke test changed no code. |
+
+**What this does and does not prove.** It proves the mechanism end to end — ledger
+detector → card → `decide_tick` (4b) → enacted assignment → a booking that holds a real
+bay — on the precise failure shape that measured 0-of-5. It does **not** yet give the
+P0 rate under load, nor V5 (fresh arrivals not starved), V6 (charge path flat) or V7
+(0002 protect list intact). Those still need the ≥139 sim-min bounded run.
+
+---
+
 ## Certification run for 0002 — V4/V5/V6 closed, and the falsifier resolved
 
 Run `093c20f4-cf2d-4a6c-ab1c-693b98e51c0c` (seq 906), `busy_day`, seed 424242, live/3.0x,
