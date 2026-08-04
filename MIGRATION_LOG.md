@@ -22,6 +22,82 @@ is not finished.
 
 ---
 
+## Certification run for 0002 — V4/V5/V6 closed, and the falsifier resolved
+
+Run `093c20f4-cf2d-4a6c-ab1c-693b98e51c0c` (seq 906), `busy_day`, seed 424242, live/3.0x,
+depot `1111…1111`. **179.781 sim-min** (13:00:00 → 15:59:46.847), 733 ticks, auto-stopped by
+the cron-12 metronome at its 60 real-min ceiling. Protocol floor of 139 sim-min cleared by
+40.8 min. Run started 14:21:57 UTC, **after** the migration was applied at 14:09:58 UTC.
+Evidence preserved in `public.phase13_*_424242`. All figures below were **re-derived
+independently from live rows** in an adversarial pass, not copied from the capture harness.
+
+| Test | Result |
+|---|---|
+| **V4 — cut-short work re-booked into a space it HELD** | **PASS, first time in four phases. 7 of 17 = 41.2%** (baseline 0 of 38, and 0 of 52 the phase before). Charging subset **7 of 12 = 58.3%** (baseline 0 of 33). Measured in the SIM domain (`b2.booked_at_sim > interrupted.released_at`). Every one of the 7 genuinely occupied its stall: held durations **12.2 / 15.0 / 27.5 / 36.0 / 52.5 / 72.0 / 79.3 sim-min** (median 36.0), clipped to the run window — 3 ended `done` / `window_elapsed_occupied`. None is a paper booking. The phase-11 failure mode "attempt fires, then finds no window" went **14 of 38 → 0 of 17**. |
+| **V5 — tow retrieval fires end-to-end** | **PASS.** `vehicle.tow_retrieved_staged` fired **11 times**; it had never once fired. The paired sim-vs-real clock fix is proven at runtime. |
+| **Approvals — absorbing state gone** | **PASS, in-run.** 48 `indepot_reassign` created, **48 decided, 0 pending, 0 expired** (baseline 7 created, 0 decided ever). Table-wide across all types and all runs: **0 pending**. No vehicle ends the run waiting on an unanswered question. |
+| **Gate latency is non-zero (not cosmetic)** | **PASS with a caveat.** 44 of 48 went through the auto-gate with real latency: min 3.51, **median 8.28**, max 8.80 sim-min, computed purely in-domain (`payload.decision.decided_at_sim − payload.requested_at_sim`). Median lands on the dial `indepot_reassign_auto_decide_min = 8`. **Caveat:** 2 of 48 are *born-approved* at zero latency by the pre-existing `vehicle_fault_critical_immobilizing` safety carve-out — a deliberate safety path, not the decider. See the defect note below. |
+| **Nemotron doctrine** | **HELD.** `copilot_seen=false`, `copilot_binding=false`, no `payload.copilot` on all 48. Nemotron was unreachable and the system still resolved every row, failing **closed** (decline = protect the atomic visit). Nemotron decided nothing. |
+| **Re-routes still gated** | **HELD.** The readmit exclusion was narrowed, not removed: a pending `tech_greenlight`, or a pending `indepot_reassign` that is *not* a fault deferral, still bars readmission. Only the vehicle's own fault deferral is ignored. This run contained **0 genuine re-routes** (all 48 were `deferred_awaiting_tech` or `critical_immobilizing`), so nothing slipped through — but see the coverage gap below. |
+| **V6 — protect list** | See below. Both hard-fail triggers pass. |
+
+### Protect list, re-measured independently
+
+**0 double-bookings** over 361 in-scope bookings (`held/active/done/interrupted`, self-joined
+on `stall_id` with `&&` on `during`) — reproduced with my own query, not the harness's.
+**0 starvation**: 7 of 112 arrivals returned under 85% SoC (min 79.9) and **none** ended the
+run without a charge booking. Emission invariant **1.000** (17 interrupted bookings ↔ 17
+`booking_interrupted` events). Phantoms **0 of 254**, reverse coverage **100%**,
+inspection-zone parking **0.0%**, bay no-show **1 of 49** with grace verified still at 15.
+Arrivals 112 vs baseline 117 (−4.3%) — a passed workload gate, not a collapse.
+
+### The migration's own falsifier — RESOLVED, it did not trip
+
+§10 V6 of `0002` said: if `gate_mode='deferred_awaiting_tech'` evictions start destroying
+minutes, "the assumption is wrong and this migration is wrong." They went **0.00 → 245.37
+minutes**. That looks damning and it is **not** a regression:
+
+- **Phase 11 stamped a hardcoded zero.** In `phase11_eviction_evidence_424242`, all **45 of 45**
+  deferred evictions carry `interrupted_with_min_remaining = 0.00` — while **38 of them** are
+  `was_mid_service = true`. Forty-five mid-service evictions each destroying *exactly* zero
+  minutes is not a measurement; it is a constant. §0002 line 1396 documents the constant and
+  removes it.
+- **The workload did not shift.** Mid-service deferred evictions: **38 in phase 11, 38 in this
+  run.** Identical. What changed is that the number is now computed from the booking's real
+  remaining window instead of being stamped `0`.
+- **`declined` and `pending` really are indistinguishable to the eviction path.** The only
+  status test in the resume branch is `a.status = 'approved'`; both `pending` and `declined`
+  fail it identically and fall through to the same budget check. The migration's stated
+  assumption **holds** on code reading.
+
+**Therefore the two "regressed" protect figures are not comparable to their baselines.**
+"Evictions cutting live work 20.3% → 31.8%" and "gate protection 90.0% → 84.4%" both have
+numerators that depend on `interrupted_with_min_remaining > 0`, which phase 11 forced to zero
+on the deferred path. Phase 11's true figures were worse, not better — reconstructed at
+~1,359.78 destroyed minutes against **276.78** now. The honest read is a **−56.8% improvement
+in minutes destroyed**, and the first trustworthy version of the rate. These two figures should
+be **re-baselined off this run**, not treated as a regression.
+
+### Open items — not blockers, but do not let them rot
+
+1. **Zero-latency safety carve-out (2 of 48).** `vehicle_fault_critical_immobilizing` inserts
+   its approval already `approved`, `decided_at = now()`. Defensible — a vehicle that cannot
+   safely continue in place should not wait 8 minutes — but it stamps `decided_at` in the
+   **REAL** domain while `payload.requested_at_sim` is **SIM**, and it writes no
+   `payload.decision` object. Consequence: any latency computed as
+   `decided_at − requested_at_sim` on those rows is meaningless. That is exactly where the
+   capture harness's reported "min 0.01 / max 22.18 sim-min" came from — **both are
+   clock-domain artifacts and should not be quoted.** Fix: stamp `p_sim_clock` and add the
+   audit object, same shape as the auto-gate.
+2. **Untested branches.** The decider's *approve* path (`zone_c_reopener_*`) and the narrowed
+   readmit gate's *still-barred* path were both **unexercised** — this run produced no genuine
+   re-route. Needs a scenario that raises an `indepot_reassign` for optimisation or congestion.
+3. **cuOpt share is not certifiable from this run.** The harness's own supply-honesty invariant
+   reads `cuopt_free_stall_undercount = 36 of 78` against a target of 0. Unrelated to this
+   migration; do not quote 36.6%.
+
+---
+
 ## Objects created outside a migration — declared, not hidden
 
 The drift check counts routines, so a plain table created by hand is invisible to
