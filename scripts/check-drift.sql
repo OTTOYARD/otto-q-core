@@ -86,7 +86,7 @@ cut(baseline_through, baseline_rows) AS (
 repo_manifest(version, name, file) AS (
   VALUES
 -- >>> BEGIN GENERATED MANIFEST — do not edit by hand; run scripts/gen-drift-sql.sh
-    (NULL::text, NULL::text, NULL::text)  -- placeholder: repo holds no migration files yet
+    ('20260804140958'::text, 'approval_gate_decider'::text, '0002_approval_gate_decider.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
@@ -128,8 +128,20 @@ mismatch AS (
 ),
 
 -- D. Backstop: live routine counts vs the counts db/baseline/ recorded.
+--
+-- These are EXPECTED counts, not frozen ones. A migration that legitimately adds
+-- or removes a routine must move the number here in the same commit, or the smoke
+-- alarm cries wolf forever and people learn to ignore it.
+--
+-- Change log for this line — every edit needs a reason and a committed file:
+--   2026-08-04  public 336 -> 337.  db/migrations/0002_approval_gate_decider.sql
+--               (ledger version 20260804140958) added exactly one routine,
+--               public.ottoq_decide_indepot_approvals. VERIFIED by diffing the live
+--               public routine list against db/baseline/functions_public.sql: one
+--               name added, zero names removed. The other five functions that
+--               migration replaced were CREATE OR REPLACE, so they do not move a count.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 336), ('ottoq', 48), ('twin', 71)
+  VALUES ('public', 337), ('ottoq', 48), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n

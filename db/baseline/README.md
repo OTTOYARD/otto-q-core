@@ -82,6 +82,29 @@ SELECT count(*) FROM supabase_migrations.schema_migrations;
 
 Edge-function count came from the Supabase management API function list.
 
+## Drift since this snapshot — read before trusting a body in here
+
+This folder is a photograph taken on 2026-08-04. Migrations applied *after* that
+moment are real in the database and are **not** reflected in these `.sql` files.
+The photograph has not been re-exported; it has been annotated instead, so that
+nobody reads a stale body believing it is current.
+
+| Applied | Migration | Effect on this folder |
+|---|---|---|
+| 2026-08-04 | `20260804140958_approval_gate_decider` (`db/migrations/0002_approval_gate_decider.sql`) | `functions_public.sql`: 1 routine **added** (`ottoq_decide_indepot_approvals`), 1 body **stale** (`ottoq_indepot_reassignment_guard`). `functions_ottoq.sql`: 2 bodies **stale** (`ottoq_readmit_reopened_needs`, `ottoq_readmit_resumed_visits`). `functions_twin.sql`: 2 bodies **stale** (`ottoq_opportunistic_scan`, `ottoq_sim_vehicle_exception_handler`). |
+
+**Current live routine counts** (the numbers `scripts/check-drift.sql` Section D
+compares against): `public` **337**, `ottoq` 48, `twin` 71 — total **456**.
+
+The pre- and post-change bodies for every function migration 0002 touched are
+stored in the database itself, under
+`public.ottoq_schema_snapshots` with labels `0002_approval_gate_decider_pre` and
+`0002_approval_gate_decider_post`. Those are authoritative for that migration;
+these files are not.
+
+Re-export this folder when the annotation table above stops being short enough to
+read at a glance.
+
 ## The gap this repo closes
 
 The live database has **621 applied migrations** in its ledger. The founder's
