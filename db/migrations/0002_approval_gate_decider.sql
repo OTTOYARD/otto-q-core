@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260804140958
 -- migration-name:    approval_gate_decider
 
 -- ============================================================================
