@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260804183836
 -- migration-name:    bay_work_recovery
 
 -- ============================================================================
