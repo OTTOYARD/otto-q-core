@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260804232058
 -- migration-name:    close_ledger_loop
 
 -- ============================================================================

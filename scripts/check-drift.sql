@@ -87,7 +87,8 @@ repo_manifest(version, name, file) AS (
   VALUES
 -- >>> BEGIN GENERATED MANIFEST — do not edit by hand; run scripts/gen-drift-sql.sh
     ('20260804140958'::text, 'approval_gate_decider'::text, '0002_approval_gate_decider.sql'::text),
-    ('20260804183836'::text, 'bay_work_recovery'::text, '0003_bay_work_recovery.sql'::text)
+    ('20260804183836'::text, 'bay_work_recovery'::text, '0003_bay_work_recovery.sql'::text),
+    ('20260804232058'::text, 'close_ledger_loop'::text, '0004_close_ledger_loop.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
