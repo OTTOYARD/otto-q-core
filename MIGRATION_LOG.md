@@ -131,6 +131,109 @@ be **re-baselined off this run**, not treated as a regression.
 
 ---
 
+## Certification run for 0003 — the P0 headline is REFUTED, the two P1 fixes are PROVEN
+
+Run `fc1ad933-c5c2-44e1-9cd1-e724a81d3d3e` (seq 908), `busy_day`, seed 424242, playback `live`,
+`speed_x` 3.0, `run_by` operator_demo, depot `1111…1111`. Sim window 13:48:00 → 16:48:10.352 =
+**180.173 sim-min** (protocol floor 139 cleared by 41.2), 781 ticks, 60.01 real-min, **109 arrivals**
+(baseline 112, −2.7%). Auto-stopped by the cron-12 metronome at its 60-real-minute ceiling; cron 12
+and 10 were never paused. **All numbers captured after `status='completed'`, SIM domain only.**
+Evidence preserved out of the `ottoq_*` namespace: `phase14_bookings_424242` (736),
+`phase14_decisions_424242` (10,738), `phase14_dispatches_424242` (112), `phase14_visit_needs_424242`
+(110), `phase14_approvals_424242` (63), `phase14_gate_latency_424242` (51), `phase14_runrow_424242`,
+and the full narrative in `phase14_cert_424242` (20 rows).
+
+### V4 — ⭐ THE P0 NUMBER: **BAY WORK RECOVERED 0 OF 2. THE HEADLINE DOES NOT HOLD.**
+
+2 bay bookings reached `state='interrupted'` (detail ×2); **0** received a replacement — unchanged
+from the baseline's 0 of 4. The migration's own instrument is unambiguous: across 10,738 decisions
+and 781 ticks, **`resume_candidates_seen = 0` and `bay_work_resumed = 0`. The new code path never
+executed once.**
+
+**Root cause, isolated to two independent gates — both measured, not assumed:**
+
+1. **The `must_do` clause in the §3 ledger CTE.** Of 107 open/in-progress `ottoq_visit_needs` rows,
+   **32** carry interruption evidence, **14** of those have a bay-lane atom, **13** still have that
+   atom open — but only **1** has `must_do = true`. The owed bay atoms are `mechanical_pm` ×8,
+   `interior_deep_clean` ×3, `sensor_calibration` ×2, `cosmetic_repair` ×1 — all `must_do = false`;
+   the lone `fault_repair` is the only one that qualifies. `AND COALESCE((a.value->>'must_do')::boolean,
+   false)` collapses the detector **14 → 1, a 93% loss.** The file states this as doctrine
+   ("deferrable work does not get to jump a scarce bay"); the measured consequence is that the P0 fix
+   is inert for 12 of 13 real cases.
+2. **The `staged_awaiting_service` gate in `ottoq_decide_tick` (4b).** The one surviving candidate
+   (`96b10b07`, `fault_repair`, `must_do=true`, `owed_bay_min` 114) spent the rest of the run in
+   `charging_l2` and never entered `staged_awaiting_service`, so the bay cursor never saw it. The
+   migration's own charge carve-out could not rescue it either — that exception requires **no free
+   charger**, and this vehicle was *on* one.
+
+**Honest denominator:** of the 2 bay interruptions, `b2222222` released as
+`vehicle_fault_eviction_deferred_resumed` and has **zero** open needs rows — its work resumed in
+place, nothing was owed. The genuinely-lost bay denominator is therefore **1**, and recovery is 0 of 1.
+
+**The numbers were not flattered by shrinking the denominator.** Bay jobs *started* = 46 bookings /
+109 arrivals = **0.422 per arrival** vs the baseline's 49 / 112 = **0.4375**. Flat. Bay work was
+attempted at the same rate; the smaller interruption count (2 vs 4) is workload variance.
+
+### V5 / V6 — fresh work not starved; charge path not moved by this migration
+
+`fresh_displaced_by_resumed = 0`, but **trivially** — no resumed row was ever enacted, so the
+anti-starvation budget (`bay_resume_share_max`, resolved live at 0.5) is **untested at runtime.**
+13 fresh bay admissions enacted, 5 refused on genuine scarcity.
+
+Charging recovery is **not re-certified and not a regression**: 7 of 16 same-purpose = 43.8% (baseline
+7 of 12 = 58.3%); on a same-class basis (dcfc↔l2 both count) 10 of 16 = 62.5% (baseline 8 of 12 =
+66.7%). The **numerator is identical (7)**; the denominator grew. Not attributable to 0003 — a
+line-level diff of the pre/post `ottoq_decide_tick` snapshots shows **all 22 removed lines lie inside
+section 4b**, with nothing removed from the charge path, cuOpt, or Gate B, and
+`ottoq.ottoq_enact_space_assignment` still hard-refuses `dcfc`/`l2`. All 7 replacements genuinely
+**held** their stall: 2.21 / 9.91 / 24.33 / 34.54 / 35.79 / 49.40 / 56.87 sim-min, median 34.54.
+**There was not one bay replacement to trace.**
+
+### P1(a) and P1(b) — both CONFIRMED FIXED at runtime
+
+- **P1(a)** 4 born-approved fast-path rows, **all** `clock_domain='sim'`, **all**
+  `has_audit_object=true`, reason `zone_c_reopener_vehicle_fault_service_cannot_continue_in_place`,
+  `decided_at_sim == requested_at_sim`, latency 0.00. Baseline had 2 such rows with no audit object
+  and a REAL `decided_at`.
+- **P1(b)** all **49 decided** gate rows are `clock_domain='sim'`. Declines (41) min 8.00 / **median
+  8.21** / max 9.03 sim-min, landing on the dial `indepot_reassign_auto_decide_min = 8`. The bogus
+  "0.01 – 22.18" range is impossible by construction. The 2 `unmeasurable` rows are `pending`, aged
+  **7.18 and 5.13 sim-min** at the stop — *below* the 8-min dial, i.e. in flight at truncation, not
+  stranded.
+
+### P1(c) — §7's arithmetic verified, and a claimed correction to it REFUTED
+
+Independent reconstruction from `phase11_eviction_evidence_424242`: 45 deferred resumes, **24** closed
+a booking, 24 live at close, raw 1,631.48, **net 1,359.77** — matching §7's recorded 1,359.78 to the
+decimal. A figure of ~815.77 does **not** reproduce. Verified live: the two twin handlers carry 4
+emission sites and **zero** hardcoded `interrupted_with_min_remaining = 0`.
+
+### Protect list
+
+**HELD** — emission invariant 19/19/19 = 1.000 · real double-bookings **0 of 325** in scope (partly
+structural: `ottoq_stall_bookings_no_overlap_v3` enforces exactly this scope) · inspection-zone
+parking 0 · starvation 0 (on a denominator of **one** low-SoC arrival) · churn 5 (baseline 19).
+
+**MOVED AGAINST, recorded rather than buried, and not attributable to a migration that never fired** —
+bay no-show 5 of 46 = 10.9% (baseline 1 of 49 = 2.0%; grace verified unchanged at 15; all 5 are
+planner reservations with `source IS NULL`, not enacted admissions) · evictions cutting live work
+19 of 43 = 44.2% (baseline 31.8%) · minutes destroyed 560.60 (baseline 276.78) · gate protection
+71 of 90 = 78.9% (baseline 84.4%) · enacted ex-inspect per arrival 1.183 (baseline 1.295) · work done
+per arrival 2.807 (baseline 3.071).
+
+### Verdict — **do not revert, do not advertise the P0 as fixed**
+
+No hard-fail occurred: no starvation, no double-booking, no fresh arrival displaced by resumed work.
+The change is additive and **inert**: it removed nothing from the charge path, left all four guarded
+objects md5-identical to the `0003_bay_work_recovery_post` snapshot, raised no engine warning
+(`decide_tick` never failed; the only log warnings are the pre-existing
+`ottoq_world_advance: no running production run`), and `check-drift.sql` re-run live after the run
+reports **CLEAN** with routine counts public 337 / ottoq 48 / twin 71 all matching. Reverting would
+discard two runtime-proven fixes and buy nothing. **Migration 0004 should relax exactly the two gates
+named in V4 and re-certify.**
+
+---
+
 ## Objects created outside a migration — declared, not hidden
 
 The drift check counts routines, so a plain table created by hand is invisible to
@@ -139,6 +242,7 @@ it. Anything created outside the migration path gets declared here instead.
 | Date | Object | Why it exists | Safe to drop? |
 |---|---|---|---|
 | 2026-08-04 | `public.pre0002_approvals_evidence` (58 rows) | Snapshot of `ottoq_ops_approvals` for `approval_type='indepot_reassign'` taken **immediately before** migration 0002's decider was first run, so the pre-fix state of the 55 stranded rows survives. It is what the 27→0 readmission-reachability before/after was measured against. Deliberately **not** `ottoq`-prefixed, so starting a run cannot purge it. | Yes, once the ≥139 sim-min certification run for V4–V6 is done and its results are logged. It holds no brain logic — it is evidence. |
+| 2026-08-04 | `public.phase14_*_424242` — `bookings_424242` (736), `decisions_424242` (10,738), `dispatches_424242` (112), `visit_needs_424242` (110), `approvals_424242` (63), `gate_latency_424242` (51), `runrow_424242` (1), `cert_424242` (20) | Raw evidence for the 0003 certification run `fc1ad933` (180.173 sim-min, 109 arrivals), preserved **immediately after** `status='completed'` and before any subsequent run start, since `ottoq_start_demo_run` purges the prior run. `phase14_cert_424242` carries the full narrative including the two-gate root cause of the 0-of-2 bay recovery. Deliberately **not** `ottoq`-prefixed. | Not until migration 0004 has re-certified bay recovery — this is the only surviving record of *why* 0003 never fired. |
 
 ---
 
