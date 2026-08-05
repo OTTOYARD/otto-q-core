@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260805020029
 -- migration-name:    inspection_and_condition_resets
 
 -- ============================================================================
