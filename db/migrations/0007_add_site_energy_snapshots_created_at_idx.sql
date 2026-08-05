@@ -1,0 +1,54 @@
+-- migration-version: 20260805032907
+-- migration-name:    add_site_energy_snapshots_created_at_idx
+
+-- ============================================================================
+-- 0007_add_site_energy_snapshots_created_at_idx.sql
+--
+-- ⚠️ THIS IS A RETROACTIVE RECORD, NOT A NEW CHANGE. READ BEFORE RUNNING IT.
+--
+-- This index was applied to the live database on 2026-08-05 at 03:29:07 UTC
+-- (ledger version 20260805032907, name `add_site_energy_snapshots_created_at_idx`)
+-- by something that was NOT this repo. It wrote a ledger row but left no committed
+-- file, which is precisely the condition Section A of scripts/check-drift.sql exists
+-- to catch, and it is what check-drift was reporting as CRITICAL drift:
+--
+--     A. IN DATABASE, NOT IN REPO
+--     20260805032907  add_site_energy_snapshots_created_at_idx
+--        -> write db/migrations/NNNN_add_site_energy_snapshots_created_at_idx.sql TODAY
+--
+-- This file is that write-up. It was created while applying 0006 and is the drift
+-- check's own prescribed remedy: capture what ran, commit it, and let the manifest
+-- account for it. NOTHING NEW IS APPLIED BY THIS FILE -- the index already exists.
+--
+-- ⚠️ THE NUMBERING IS OUT OF ORDER ON PURPOSE. Its ledger version (20260805032907,
+--    03:29 UTC) is EARLIER than 0006's (20260805142711, 14:27 UTC), because 0006 was
+--    already written, committed and applied under the number 0006 by the time this
+--    orphan was found. File numbers order the repo; the `migration-version` header
+--    orders reality. Where they disagree, the header is the truth.
+--
+-- ⚠️ FOR THE FOUNDER: the interesting fact here is not the index -- it is one line of
+--    DDL and it is harmless. The interesting fact is that SOMETHING APPLIED DDL TO
+--    THE BRAIN OUTSIDE THIS REPO on the morning of 2026-08-05, roughly eleven hours
+--    before 0006. It is worth knowing which agent or session did that, because the
+--    next one might not be a harmless index.
+--
+-- WHAT IT DOES, AND WHY IT IS BENIGN
+--   A btree on public.site_energy_snapshots (created_at DESC). It speeds up
+--   "most recent snapshot first" reads, which is how the energy series is fetched
+--   for the cockpits. It adds no constraint, changes no row, and alters no decision
+--   path. It is not on the 0006 storage-and-retention critical path in any way; it
+--   is recorded here only so the repo is once again the source of truth.
+--
+-- VERBATIM SOURCE
+--   The statement below is copied byte-for-byte out of the ledger row's
+--   `statements[1]`, so this file says exactly what the database was told:
+--     SELECT statements[1] FROM supabase_migrations.schema_migrations
+--      WHERE version = '20260805032907';
+--
+-- SAFE TO RE-RUN
+--   IF NOT EXISTS makes it a no-op against the live database, which is what makes
+--   recording it after the fact honest rather than a second, different change.
+-- ============================================================================
+
+CREATE INDEX IF NOT EXISTS idx_site_energy_snapshots_created_at
+  ON public.site_energy_snapshots USING btree (created_at DESC);

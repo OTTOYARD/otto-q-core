@@ -88,7 +88,10 @@ repo_manifest(version, name, file) AS (
 -- >>> BEGIN GENERATED MANIFEST — do not edit by hand; run scripts/gen-drift-sql.sh
     ('20260804140958'::text, 'approval_gate_decider'::text, '0002_approval_gate_decider.sql'::text),
     ('20260804183836'::text, 'bay_work_recovery'::text, '0003_bay_work_recovery.sql'::text),
-    ('20260804232058'::text, 'close_ledger_loop'::text, '0004_close_ledger_loop.sql'::text)
+    ('20260804232058'::text, 'close_ledger_loop'::text, '0004_close_ledger_loop.sql'::text),
+    ('20260805020029'::text, 'inspection_and_condition_resets'::text, '0005_inspection_and_condition_resets.sql'::text),
+    ('20260805142711'::text, 'slim_writes_and_arm_retention'::text, '0006_slim_writes_and_arm_retention.sql'::text),
+    ('20260805032907'::text, 'add_site_energy_snapshots_created_at_idx'::text, '0007_add_site_energy_snapshots_created_at_idx.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
@@ -142,8 +145,24 @@ mismatch AS (
 --               public routine list against db/baseline/functions_public.sql: one
 --               name added, zero names removed. The other five functions that
 --               migration replaced were CREATE OR REPLACE, so they do not move a count.
+--   2026-08-05  public 337 -> 339.  db/migrations/0006_slim_writes_and_arm_retention.sql
+--               (ledger version 20260805142711) added exactly two routines:
+--                 public.ottoq_events_slim_new_state  -- the BEFORE INSERT trigger fn
+--                                                        that stops re-writing new_state
+--                 public.ottoq_event_new_state(uuid)  -- the rebuild-on-read reader
+--               VERIFIED BY NAME, not by arithmetic. The live public routine list was
+--               diffed against db/baseline/functions_public.sql (332 distinct names):
+--               live 335, ADDED = {ottoq_decide_indepot_approvals (0002),
+--               ottoq_event_new_state, ottoq_events_slim_new_state}, REMOVED = {} .
+--               Zero names removed is the load-bearing half of that check -- 0006
+--               drops nothing, and this proves it rather than asserting it.
+--               The three routines 0006 REPLACED (ottoq_purge_prior_runs,
+--               ottoq_retention_purge_worker 4-arg, ottoq_events_block_mutation) were
+--               CREATE OR REPLACE and do not move a count. The 3-arg overload of
+--               ottoq_retention_purge_worker was deliberately left in place (never
+--               drop), so the procedure count is unchanged at 2 overloads.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 337), ('ottoq', 48), ('twin', 71)
+  VALUES ('public', 339), ('ottoq', 48), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n
