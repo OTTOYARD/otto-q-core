@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260805230731
 -- migration-name:    soil_gate_and_retention_walk
 
 -- ============================================================================
