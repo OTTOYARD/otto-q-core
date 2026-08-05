@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260805142711
 -- migration-name:    slim_writes_and_arm_retention
 
 -- ============================================================================
