@@ -18,6 +18,38 @@
 -- USAGE
 --   psql "$DATABASE_URL" -f db/checks/depot_geometry_guard.sql
 --   Every result set should come back with status = 'PASS'.
+--
+-- ----------------------------------------------------------------------------
+-- MEASURABILITY -- read this before editing any geometry check below.
+--
+-- A stall with NULL width, depth or coordinates has NO FOOTPRINT. It cannot be
+-- overlapped, enclosed or fenced, because there is nothing there to test. It is
+-- not a passing stall, it is an UNTESTED one, and the two must never print the
+-- same way.
+--
+-- This is not hypothetical. It is the exact defect that made 0010 necessary, and
+-- the first version of THIS FILE got it wrong. LEAST() and GREATEST() in Postgres
+-- SKIP nulls rather than propagating them, so LEAST(NULL, c.x1) returns c.x1 --
+-- a stall with no dimensions silently adopted its neighbour's edges and collided
+-- with everything. Measured on the live pre-0010 database, check 3 reported
+--
+--     779 overlapping pairs per depot
+--
+-- when the true figure at the declared footprints is
+--
+--      54 overlapping pairs across 76 of 150 stalls   <- the audit's headline
+--
+-- The other 725 were phantoms manufactured by the five NULL-dimension bays. And
+-- the error is not always inflationary: in check 5, `b.x0 < f.x0` with a NULL x0
+-- yields NULL, so those same five stalls were dropped from the fence test
+-- entirely -- a NULL-dimension stall sitting outside the fence would not have
+-- been reported at all.
+--
+-- So every geometry CTE below is restricted to MEASURABLE stalls, and every
+-- geometry check carries a `not_assessed` column and reports FAIL whenever that
+-- column is non-zero. A check that quietly skips its hardest input is worse than
+-- no check, because it reports confidence it has not earned.
+-- ----------------------------------------------------------------------------
 -- ============================================================================
 
 \echo '=== 1. counts per depot (expect staging 115, l2 30, dcfc 10, wash_bay 3, service_bay 2) ==='
@@ -48,15 +80,25 @@ SELECT CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
 \echo ''
 \echo '=== 3. zero overlapping stall pairs ==='
 -- heading 0/180 puts the vehicle LENGTH on y; 90/270 puts it on x.
+-- Restricted to measurable stalls -- see the MEASURABILITY note in the header.
 WITH b AS (
   SELECT depot_id, stall_code,
          relative_x - (CASE WHEN heading_degrees IN (0,180) THEN stall_width_ft ELSE stall_depth_ft END)/2 AS x0,
          relative_x + (CASE WHEN heading_degrees IN (0,180) THEN stall_width_ft ELSE stall_depth_ft END)/2 AS x1,
          relative_y - (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y0,
          relative_y + (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y1
-    FROM public.stalls)
-SELECT CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    FROM public.stalls
+   WHERE stall_width_ft IS NOT NULL AND stall_depth_ft IS NOT NULL
+     AND stall_width_ft > 0 AND stall_depth_ft > 0
+     AND relative_x IS NOT NULL AND relative_y IS NOT NULL),
+skipped AS (
+  SELECT count(*) AS n FROM public.stalls
+   WHERE stall_width_ft IS NULL OR stall_depth_ft IS NULL
+      OR stall_width_ft <= 0 OR stall_depth_ft <= 0
+      OR relative_x IS NULL OR relative_y IS NULL)
+SELECT CASE WHEN count(*) = 0 AND (SELECT n FROM skipped) = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
        count(*) AS overlapping_pairs,
+       (SELECT n FROM skipped) AS not_assessed,
        left(coalesce(string_agg(a.stall_code || ' <-> ' || c.stall_code ||
               ' (' || round(LEAST(LEAST(a.x1,c.x1)-GREATEST(a.x0,c.x0),
                                   LEAST(a.y1,c.y1)-GREATEST(a.y0,c.y0))::numeric, 2) || ' ft)',
@@ -78,9 +120,18 @@ WITH b AS (
          relative_x + (CASE WHEN heading_degrees IN (0,180) THEN stall_width_ft ELSE stall_depth_ft END)/2 AS x1,
          relative_y - (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y0,
          relative_y + (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y1
-    FROM public.stalls)
-SELECT CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    FROM public.stalls
+   WHERE stall_width_ft IS NOT NULL AND stall_depth_ft IS NOT NULL
+     AND stall_width_ft > 0 AND stall_depth_ft > 0
+     AND relative_x IS NOT NULL AND relative_y IS NOT NULL),
+skipped AS (
+  SELECT count(*) AS n FROM public.stalls
+   WHERE stall_width_ft IS NULL OR stall_depth_ft IS NULL
+      OR stall_width_ft <= 0 OR stall_depth_ft <= 0
+      OR relative_x IS NULL OR relative_y IS NULL)
+SELECT CASE WHEN count(*) = 0 AND (SELECT n FROM skipped) = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
        count(*) AS buried_stalls,
+       (SELECT n FROM skipped) AS not_assessed,
        left(coalesce(string_agg(b.stall_code || ' in ' || t.structure_code ||
                                 ' (' || t.structure_kind || ')', ', ' ORDER BY b.stall_code), ''), 1500) AS detail
   FROM b
@@ -106,9 +157,18 @@ WITH f AS (SELECT depot_id, origin_x_ft x0, origin_y_ft y0,
          relative_x + (CASE WHEN heading_degrees IN (0,180) THEN stall_width_ft ELSE stall_depth_ft END)/2 AS x1,
          relative_y - (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y0,
          relative_y + (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y1
-    FROM public.stalls)
-SELECT CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
+    FROM public.stalls
+   WHERE stall_width_ft IS NOT NULL AND stall_depth_ft IS NOT NULL
+     AND stall_width_ft > 0 AND stall_depth_ft > 0
+     AND relative_x IS NOT NULL AND relative_y IS NOT NULL),
+skipped AS (
+  SELECT count(*) AS n FROM public.stalls
+   WHERE stall_width_ft IS NULL OR stall_depth_ft IS NULL
+      OR stall_width_ft <= 0 OR stall_depth_ft <= 0
+      OR relative_x IS NULL OR relative_y IS NULL)
+SELECT CASE WHEN count(*) = 0 AND (SELECT n FROM skipped) = 0 THEN 'PASS' ELSE 'FAIL' END AS status,
        count(*) AS outside_fence,
+       (SELECT n FROM skipped) AS not_assessed,
        left(coalesce(string_agg(b.stall_code, ', ' ORDER BY b.stall_code), ''), 1200) AS stall_codes
   FROM b JOIN f ON f.depot_id = b.depot_id
  WHERE b.x0 < f.x0 - 0.000001 OR b.y0 < f.y0 - 0.000001
