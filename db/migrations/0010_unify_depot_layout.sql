@@ -62,15 +62,31 @@
 --      capacity or utilisation figure measured BEFORE this migration used a
 --      denominator that was 5 chargers too generous.
 --
---   2. NINETEEN STALL ROWS ARE DELETED, AND THAT CAN FAIL ON PURPOSE.
---      5 phantom L2 stalls, 12 north staging spaces (the renderer keeps the north
---      apron clear so cars can swing out of the pull-through bays), and 2 spaces
---      trimmed from the temp block. Rows, not columns and not tables -- nothing is
---      DROPped anywhere in this file.
---      If any of those 19 stalls is still referenced by history -- a past charging
---      session, a dispatch command, a state log entry -- this migration ABORTS and
---      names them. That is deliberate. Deleting a stall out from under its own
---      history would orphan the record. Clear the history first, then re-run.
+--   2. NINETEEN CODES LEAVE THE LAYOUT: 14 ARE RE-HOMED, 5 ARE DELETED.
+--      True set difference per depot, measured against the live 150-stall layout:
+--      131 codes preserved, 29 minted, 19 leaving.
+--
+--      A stall ROW may only be DELETED if NOTHING references it. Otherwise it is
+--      RE-HOMED -- UPDATEd onto a surviving position, keeping its id and therefore
+--      its whole history. Staging is fungible; its bookings are not.
+--
+--        * 14 staging codes are RE-HOMED (12 north apron spaces the renderer keeps
+--          clear for bay-rear swing-out, plus 2 trimmed from the temp block). All 14
+--          land on minted staging positions -- 29 are available for 14.
+--        * 5 phantom L2 stalls are DELETED. There is no spare L2 code to re-home
+--          onto, and they are referenced by nothing.
+--
+--      This is a CORRECTION to an earlier draft of this migration, which deleted all
+--      19. On the live database at the time, 13 of the doomed staging rows carried
+--      released bookings and 3 more carried 11 vehicle_state_log rows. Because
+--      ottoq_stall_bookings.stall_id is ON DELETE CASCADE, that draft would not have
+--      errored -- it would have silently destroyed 13 rows of the booking ledger.
+--
+--      Rows, not columns and not tables -- nothing is DROPped anywhere in this file.
+--      If any stall in the DELETE set is still referenced, this migration ABORTS and
+--      names the referencing table, column and delete action. It checks twice: once
+--      up front (section 1.5) and once at apply time against the same temp table the
+--      DELETE reads (section 5.2), so the two cannot drift apart.
 --
 --   3. EVERY STALL MOVES. The whole site is re-plotted into the renderer's frame.
 --      Two conversions are involved and both have bitten this project before:
@@ -187,8 +203,12 @@ BEGIN
       v_names;
   END IF;
 
-  ------------------------------------------------- 1.4 doomed stalls are not in use
-  -- The 19 codes this migration deletes must not be occupied or held.
+  ------------------------------------------------- 1.4 leaving stalls are not in use
+  -- All 19 codes that leave the layout -- the 14 re-homed AND the 5 deleted -- must be
+  -- empty. Occupancy is checked for BOTH, not just the deleted ones: a re-homed stall
+  -- keeps its row but its position jumps across the site, so a car sitting in one
+  -- would silently teleport. Emptiness is the precondition for moving a space, not
+  -- just for removing it.
   SELECT count(*), string_agg(DISTINCT stall_code, ', ' ORDER BY stall_code)
     INTO v_n, v_names
     FROM public.stalls
@@ -208,15 +228,38 @@ BEGIN
       'Release them first.', v_n, v_names;
   END IF;
 
-  --------------------------------------- 1.5 doomed stalls are not referenced by history
-  -- Walk the catalogue rather than a hardcoded list, so this stays correct as
-  -- foreign keys are added. Only NO ACTION / RESTRICT keys can block a delete;
-  -- CASCADE and SET NULL keys resolve themselves.
+  --------------------------------------- 1.5 doomed stalls are not referenced by ANYTHING
+  --
+  -- THIS CHECK USED TO FILTER confdeltype IN ('a','r') -- NO ACTION and RESTRICT
+  -- only -- on the reasoning that "CASCADE and SET NULL keys resolve themselves."
+  -- They do not resolve themselves. They resolve SILENTLY, which is worse:
+  --
+  --   * 3 of the 17 keys are ON DELETE CASCADE, and one of them is
+  --     ottoq_stall_bookings.stall_id. Deleting a referenced stall does not raise --
+  --     it deletes the booking ledger rows with it, with no error and no trace.
+  --   * 4 more are ON DELETE SET NULL (vehicles.current_stall_id,
+  --     ottow_missions.destination_stall_id, progression_decisions.from/to), which
+  --     silently blanks the history instead of destroying it.
+  --
+  -- Only the remaining 10 would actually have raised. So the earlier version of this
+  -- check reported confidence it had not earned: when this migration was first
+  -- prepared, the 12 NASH-STG-N008..N019 rows plus NASH-STG-B014 held 13 released
+  -- bookings, and this check was structurally incapable of seeing them. What halted
+  -- the apply was 11 vehicle_state_log rows -- a NO ACTION key, caught by luck. Had
+  -- that table been empty, 0010 would have applied cleanly and eaten the ledger.
+  --
+  -- Now: every key, every delete action. A row that anything points at is not
+  -- deletable, full stop -- it gets re-homed instead (section 5.2).
+  --
+  -- The delete set is also much smaller than it was. Staging is fungible, so the 14
+  -- staging codes that leave the layout are re-homed and are NOT in this list; only
+  -- the 5 phantom L2 stalls are actually deleted.
   FOR v_fk IN
     SELECT c.conname,
            n.nspname  AS child_schema,
            cl.relname AS child_table,
-           a.attname  AS child_column
+           a.attname  AS child_column,
+           c.confdeltype AS del_action
       FROM pg_constraint c
       JOIN pg_class      cl ON cl.oid = c.conrelid
       JOIN pg_namespace  n  ON n.oid  = cl.relnamespace
@@ -224,7 +267,6 @@ BEGIN
       JOIN pg_attribute  a  ON a.attrelid = c.conrelid AND a.attnum = k.attnum
      WHERE c.contype = 'f'
        AND c.confrelid = 'public.stalls'::regclass
-       AND c.confdeltype IN ('a', 'r')      -- NO ACTION, RESTRICT
      ORDER BY 2, 3, 4
   LOOP
     EXECUTE format(
@@ -234,22 +276,24 @@ BEGIN
       INTO v_hits
       USING ARRAY[
         'NASH-L2-STALL-21','NASH-L2-STALL-22','NASH-L2-STALL-23','NASH-L2-STALL-24',
-        'NASH-L2-STALL-25',
-        'NASH-STG-N008','NASH-STG-N009','NASH-STG-N010','NASH-STG-N011','NASH-STG-N012',
-        'NASH-STG-N013','NASH-STG-N014','NASH-STG-N015','NASH-STG-N016','NASH-STG-N017',
-        'NASH-STG-N018','NASH-STG-N019',
-        'NASH-STG-I014','NASH-STG-B014'];
+        'NASH-L2-STALL-25'];
     IF v_hits > 0 THEN
-      v_blocked := v_blocked || format('%s.%s.%s: %s row(s); ',
-        v_fk.child_schema, v_fk.child_table, v_fk.child_column, v_hits);
+      v_blocked := v_blocked || format('%s.%s.%s [on delete %s]: %s row(s); ',
+        v_fk.child_schema, v_fk.child_table, v_fk.child_column,
+        CASE v_fk.del_action WHEN 'c' THEN 'CASCADE -- WOULD HAVE BEEN DESTROYED SILENTLY'
+                             WHEN 'n' THEN 'SET NULL -- WOULD HAVE BEEN BLANKED SILENTLY'
+                             WHEN 'r' THEN 'RESTRICT' ELSE 'NO ACTION' END,
+        v_hits);
     END IF;
   END LOOP;
 
   IF v_blocked <> '' THEN
     RAISE EXCEPTION
-      '0010 ABORT: the 19 stalls being retired are still referenced by history that '
-      'would be orphaned -- %. Nothing has been written. Purge or re-point that '
-      'history first (ottoq_purge_prior_runs clears run-scoped rows), then re-run.',
+      '0010 ABORT: a stall this migration would DELETE is still referenced -- %. '
+      'Nothing has been written. A referenced stall must be RE-HOMED (updated onto a '
+      'surviving position, keeping its id and its history), never deleted. Move it '
+      'into ottoq_layout_seed_rehome in ottoyarddepot-sim/scripts/buildLayoutSeed.mjs '
+      'and regenerate, or purge the referencing history first.',
       v_blocked;
   END IF;
 
@@ -317,7 +361,8 @@ $mig$;
 --
 -- Stalls:     160  (staging 115, l2 30, dcfc 10, wash 3, service 2)
 -- Structures: 26
--- Retired stall codes:     19
+-- Re-homed stall codes:    14  (staging; row + id + history kept, position moved)
+-- Deleted stall codes:     5  (must be referenced by nothing)
 -- Retired structure codes: 2  (CANOPY-04, METAL-CANOPY-PERIM)
 --
 -- SEED MD5: 89943752f32f98da4ef80b6baedb3174
@@ -564,32 +609,65 @@ VALUES
   ('SIGN-OTTOYARD-FRONT', 'sign', 'OTTOYARD Front Wall Signage', 196.0630, 3.0000, 60.0000, 1.0000, 8.0000, 0.0000, 'active', 36.13970962, -86.77203097, '{"mount":"concrete_wall","illuminated":true}'::jsonb),
   ('WASH-01-BLDG', 'wash_building', 'Wash & Detail Building', 241.7618, 235.4823, 81.6339, 47.0965, 18.0000, 0.0000, 'active', 36.14041162, -86.77183872, '{"encloses_stall_codes":["NASH-WSH-01","NASH-WSH-02","NASH-WSH-03"],"enclosure_intentional":true,"wash_bays":[{"code":"NASH-WSH-01","drive_through":true},{"code":"NASH-WSH-02","drive_through":true},{"code":"NASH-WSH-03","drive_through":true}]}'::jsonb);
 
--- Codes the database holds today that this layout no longer uses.
+-- The divided ring, as the four straight runs the geometry guard tests. Emitted
+-- from sitePlan.ts so the migration never hardcodes a lane coordinate -- the
+-- single-source rule that applies to stalls applies to lanes too. Each run is a
+-- lane BODY (one design vehicle wide) offset from its centreline; no stall
+-- footprint may intersect one. Gate-approach diagonals are NOT modelled here.
+CREATE TEMP TABLE ottoq_layout_seed_lanes (
+  lane_name text PRIMARY KEY,
+  x0 numeric NOT NULL, y0 numeric NOT NULL,
+  x1 numeric NOT NULL, y1 numeric NOT NULL
+) ON COMMIT DROP;
+
+INSERT INTO ottoq_layout_seed_lanes (lane_name, x0, y0, x1, y1) VALUES
+  ('west avenue northbound', 39.4008, 53.3760, 46.0008, 207.2244),
+  ('west avenue southbound', 29.3535, 53.3760, 35.9535, 207.2244),
+  ('east avenue northbound', 419.7047, 53.3760, 426.3047, 207.2244),
+  ('east avenue southbound', 409.6574, 53.3760, 416.2574, 207.2244),
+  ('north collector eastbound', 37.6772, 208.9480, 417.9811, 215.5480),
+  ('north collector westbound', 37.6772, 198.9008, 417.9811, 205.5008),
+  ('south collector eastbound', 37.6772, 55.0996, 417.9811, 61.6996),
+  ('south collector westbound', 37.6772, 45.0524, 417.9811, 51.6524);
+
+-- Staging codes that leave the layout. These rows are RE-HOMED, never deleted:
+-- the row keeps its id, so every booking / state-log line / mission that points
+-- at it survives. Staging is fungible, so the position is what changes.
+CREATE TEMP TABLE ottoq_layout_seed_rehome (
+  from_code text PRIMARY KEY,
+  to_code   text NOT NULL UNIQUE,
+  reason    text NOT NULL
+) ON COMMIT DROP;
+
+INSERT INTO ottoq_layout_seed_rehome (from_code, to_code, reason) VALUES
+  ('NASH-STG-B014', 'NASH-STG-E018', 'staging_buffer resized 14 -> 13 to match temp block column TW'),
+  ('NASH-STG-I014', 'NASH-STG-E019', 'arrival_inspection resized 14 -> 13 to match temp block column TE'),
+  ('NASH-STG-N008', 'NASH-STG-E020', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N009', 'NASH-STG-E021', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N010', 'NASH-STG-E022', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N011', 'NASH-STG-E023', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N012', 'NASH-STG-E024', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N013', 'NASH-STG-E025', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N014', 'NASH-STG-S020', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N015', 'NASH-STG-S021', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N016', 'NASH-STG-S022', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N017', 'NASH-STG-S023', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N018', 'NASH-STG-S024', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
+  ('NASH-STG-N019', 'NASH-STG-S025', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7');
+
+-- Codes DELETED outright. Only rows referenced by NOTHING may appear here; the
+-- migration re-counts all 17 foreign keys at apply time and RAISEs on any hit.
 CREATE TEMP TABLE ottoq_layout_seed_retired (
   stall_code text PRIMARY KEY,
   reason     text NOT NULL
 ) ON COMMIT DROP;
 
 INSERT INTO ottoq_layout_seed_retired (stall_code, reason) VALUES
-  ('NASH-L2-STALL-21', 'phantom L2 capacity: overran canopy 2 to the south, 10 of the 54 overlapping pairs, one stacked on a staging space'),
-  ('NASH-L2-STALL-22', 'phantom L2 capacity: overran canopy 2 to the south, 10 of the 54 overlapping pairs, one stacked on a staging space'),
-  ('NASH-L2-STALL-23', 'phantom L2 capacity: overran canopy 2 to the south, 10 of the 54 overlapping pairs, one stacked on a staging space'),
-  ('NASH-L2-STALL-24', 'phantom L2 capacity: overran canopy 2 to the south, 10 of the 54 overlapping pairs, one stacked on a staging space'),
-  ('NASH-L2-STALL-25', 'phantom L2 capacity: overran canopy 2 to the south, 10 of the 54 overlapping pairs, one stacked on a staging space'),
-  ('NASH-STG-N008', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N009', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N010', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N011', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N012', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N013', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N014', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N015', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N016', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N017', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N018', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-N019', 'north apron kept clear for pull-through bay-rear maneuvering; run N1 holds 7'),
-  ('NASH-STG-I014', 'arrival_inspection resized 14 -> 13 to match temp block column TE'),
-  ('NASH-STG-B014', 'staging_buffer resized 14 -> 13 to match temp block column TW');
+  ('NASH-L2-STALL-21', 'phantom L2 capacity: overran canopy 2 to the south, was among the overlapping pairs, one stacked on a staging space. Deleted not closed: ottoq_plan_overnight_wave counts stall_type=l2 with no status filter, so a closed row would keep broadcasting capacity. Provably unreferenced across all 17 FK columns.'),
+  ('NASH-L2-STALL-22', 'phantom L2 capacity: overran canopy 2 to the south, was among the overlapping pairs, one stacked on a staging space. Deleted not closed: ottoq_plan_overnight_wave counts stall_type=l2 with no status filter, so a closed row would keep broadcasting capacity. Provably unreferenced across all 17 FK columns.'),
+  ('NASH-L2-STALL-23', 'phantom L2 capacity: overran canopy 2 to the south, was among the overlapping pairs, one stacked on a staging space. Deleted not closed: ottoq_plan_overnight_wave counts stall_type=l2 with no status filter, so a closed row would keep broadcasting capacity. Provably unreferenced across all 17 FK columns.'),
+  ('NASH-L2-STALL-24', 'phantom L2 capacity: overran canopy 2 to the south, was among the overlapping pairs, one stacked on a staging space. Deleted not closed: ottoq_plan_overnight_wave counts stall_type=l2 with no status filter, so a closed row would keep broadcasting capacity. Provably unreferenced across all 17 FK columns.'),
+  ('NASH-L2-STALL-25', 'phantom L2 capacity: overran canopy 2 to the south, was among the overlapping pairs, one stacked on a staging space. Deleted not closed: ottoq_plan_overnight_wave counts stall_type=l2 with no status filter, so a closed row would keep broadcasting capacity. Provably unreferenced across all 17 FK columns.');
 
 CREATE TEMP TABLE ottoq_layout_seed_retired_structures (
   structure_code text PRIMARY KEY,
@@ -599,6 +677,7 @@ CREATE TEMP TABLE ottoq_layout_seed_retired_structures (
 INSERT INTO ottoq_layout_seed_retired_structures (structure_code, reason) VALUES
   ('CANOPY-04', 'the renderer has 3 canopies, not 4; canopy 4 sheltered no chargers. Row RETAINED (never dropped) and marked decommissioned; its geometry stays in the superseded pre-0010 frame and is void. ottoq_canopy_state is DELIBERATELY untouched, so solar output does not change.'),
   ('METAL-CANOPY-PERIM', 'replaced by five real carports (CARPORT-W/E/S1/S2/S3). This row claimed to cover 100 stalls with width_ft and length_ft both NULL.');
+
 
 -- ============================================================================
 -- <<< SEED END
@@ -671,10 +750,14 @@ DECLARE
   v_depot   uuid;
   v_stalls  bigint := 0;
   v_del     bigint := 0;
+  v_rehomed bigint := 0;
   v_struct  bigint := 0;
   v_lot_x   numeric;
   v_lot_y   numeric;
   v_acres   numeric;
+  v_fk      record;
+  v_hits    bigint;
+  v_blocked text := '';
 BEGIN
   SELECT width_ft, length_ft INTO v_lot_x, v_lot_y
     FROM ottoq_layout_seed_structures WHERE structure_code = 'FENCE-PERIMETER';
@@ -683,6 +766,25 @@ BEGIN
   FOR v_depot IN
     SELECT DISTINCT depot_id FROM public.stalls ORDER BY 1
   LOOP
+    ------------------------------------------------- 5.0 RE-HOME, don't retire
+    -- Staging rows are fungible; their HISTORY is not. A staging code that leaves
+    -- the layout keeps its row and its id -- and therefore its bookings, its
+    -- vehicle_state_log lines, its missions -- and is simply renamed onto one of the
+    -- staging positions this layout mints. 5.1 then moves it to the right place.
+    --
+    -- This runs BEFORE 5.1 so the upsert matches on the NEW code and updates the
+    -- existing row in place, rather than minting a fresh uuid beside it.
+    --
+    -- Guarded: if a re-home target is somehow already present as its own row, the
+    -- unique index on (depot_id, stall_code) raises rather than merging two rows.
+    UPDATE public.stalls s
+       SET stall_code = r.to_code,
+           updated_at = now()
+      FROM ottoq_layout_seed_rehome r
+     WHERE s.depot_id = v_depot
+       AND s.stall_code = r.from_code;
+    GET DIAGNOSTICS v_rehomed = ROW_COUNT;
+
     ---------------------------------------------------------------- 5.1 stalls
     INSERT INTO public.stalls (
       id, depot_id, stall_code, stall_type, display_name,
@@ -740,9 +842,54 @@ BEGIN
       updated_at      = now();
     GET DIAGNOSTICS v_stalls = ROW_COUNT;
 
-    -------------------------------------------------- 5.2 retire the phantom stalls
-    -- Section 1.5 already proved nothing references these. Rows only -- no table,
-    -- column or function is dropped anywhere in this file.
+    -------------------------------------------------- 5.2 delete the phantom stalls
+    -- Section 1.5 checked this before anything was written. Check it AGAIN, here,
+    -- against the actual delete set, one statement before the delete fires.
+    --
+    -- Why twice: 1.5 runs against a hardcoded list at the top of the file, and the
+    -- delete runs off ottoq_layout_seed_rehome/_retired, which are generated. If the
+    -- two ever drift, the hardcoded check passes and the generated delete still eats
+    -- a referenced row. This guard reads the SAME temp table the DELETE reads, so it
+    -- cannot drift from it, and it walks every foreign key regardless of delete
+    -- action -- CASCADE keys included, since those are the ones that fail silently.
+    --
+    -- This is the guard whose absence let 13 booking rows sit one apply away from
+    -- being cascaded into nothing without an error.
+    v_blocked := '';
+    FOR v_fk IN
+      SELECT n.nspname AS child_schema, cl.relname AS child_table,
+             a.attname AS child_column, c.confdeltype AS del_action
+        FROM pg_constraint c
+        JOIN pg_class     cl ON cl.oid = c.conrelid
+        JOIN pg_namespace n  ON n.oid  = cl.relnamespace
+        JOIN unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+        JOIN pg_attribute a  ON a.attrelid = c.conrelid AND a.attnum = k.attnum
+       WHERE c.contype = 'f' AND c.confrelid = 'public.stalls'::regclass
+       ORDER BY 1, 2, 3
+    LOOP
+      EXECUTE format(
+        'SELECT count(*) FROM %I.%I ch
+           JOIN public.stalls s ON s.id = ch.%I
+           JOIN ottoq_layout_seed_retired r ON r.stall_code = s.stall_code
+          WHERE s.depot_id = $1',
+        v_fk.child_schema, v_fk.child_table, v_fk.child_column)
+        INTO v_hits USING v_depot;
+      IF v_hits > 0 THEN
+        v_blocked := v_blocked || format('%s.%s.%s [on delete %s]: %s row(s); ',
+          v_fk.child_schema, v_fk.child_table, v_fk.child_column,
+          CASE v_fk.del_action WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
+                               WHEN 'r' THEN 'RESTRICT' ELSE 'NO ACTION' END, v_hits);
+      END IF;
+    END LOOP;
+
+    IF v_blocked <> '' THEN
+      RAISE EXCEPTION
+        '0010 ABORT at apply time, depot %: a stall in the delete set is referenced -- %. '
+        'The whole transaction rolls back; nothing is written. Re-home this row instead '
+        'of deleting it.', v_depot, v_blocked;
+    END IF;
+
+    -- Rows only -- no table, column or function is dropped anywhere in this file.
     DELETE FROM public.stalls s
       USING ottoq_layout_seed_retired r
       WHERE s.depot_id = v_depot AND s.stall_code = r.stall_code;
@@ -822,8 +969,9 @@ BEGIN
              'rendering_source','renderer sitePlan v2 (human reviewed)')
      WHERE d.id = v_depot;
 
-    RAISE NOTICE '0010 depot %: % stall row(s) written, % retired, % structure row(s) written.',
-      v_depot, v_stalls, v_del, v_struct;
+    RAISE NOTICE '0010 depot %: % stall row(s) written, % re-homed (id + history kept), '
+                 '% deleted, % structure row(s) written.',
+      v_depot, v_stalls, v_rehomed, v_del, v_struct;
   END LOOP;
 END
 $mig$;
@@ -844,10 +992,11 @@ $mig$;
 
 DO $mig$
 DECLARE
-  v_bad   text;
-  v_n     bigint;
-  v_lot_x numeric;
-  v_lot_y numeric;
+  v_bad      text;
+  v_n        bigint;
+  v_measured bigint;
+  v_lot_x    numeric;
+  v_lot_y    numeric;
 BEGIN
   ------------------------------------------------------------------ 6.1 counts
   SELECT string_agg(msg, '; ' ORDER BY msg) INTO v_bad FROM (
@@ -932,17 +1081,203 @@ BEGIN
   END IF;
 
   -------------------------------------------------------------- 6.5 the parcel
+  --
+  -- HOLE CLOSED: this used to read ONE fence row with `LIMIT 1`, unscoped by depot.
+  -- Exactly one FENCE-PERIMETER row existed and it belonged to depot 1111...; depot
+  -- 2222... had no site_structures rows at all. So the fence check -- and the
+  -- "nothing buried in a building" check above it, which INNER JOINs structures --
+  -- read depot 1's geometry, found it good, and PASSED for a depot they had never
+  -- looked at. A check that cannot see a depot must say NOT ESTABLISHED, not PASS.
+  --
+  -- Assert one fence per depot, and that every depot's fence is the right parcel.
+  SELECT count(*) INTO v_n
+    FROM public.depots d
+   WHERE NOT EXISTS (
+     SELECT 1 FROM public.ottoq_site_structures t
+      WHERE t.depot_id = d.id AND t.structure_code = 'FENCE-PERIMETER');
+  IF v_n > 0 THEN
+    RAISE EXCEPTION
+      '0010 ABORT: % depot(s) have no FENCE-PERIMETER row, so their geometry is NOT '
+      'ESTABLISHED -- the fence and buried-stall checks cannot see them and must not '
+      'report a pass.', v_n;
+  END IF;
+
+  SELECT count(*), string_agg(t.depot_id::text || ' has ' || c::text, ', ')
+    INTO v_n, v_bad
+    FROM (SELECT depot_id, count(*) AS c
+            FROM public.ottoq_site_structures
+           WHERE structure_code = 'FENCE-PERIMETER'
+           GROUP BY depot_id) t
+   WHERE t.c <> 1;
+  IF v_n > 0 THEN
+    RAISE EXCEPTION '0010 ABORT: % depot(s) do not have exactly one fence row: %', v_n, v_bad;
+  END IF;
+
+  SELECT count(*), string_agg(depot_id::text || ': ' ||
+                              round(width_ft)::text || ' x ' || round(length_ft)::text, ', ')
+    INTO v_n, v_bad
+    FROM public.ottoq_site_structures
+   WHERE structure_code = 'FENCE-PERIMETER'
+     AND (round(width_ft) <> 452 OR round(length_ft) <> 314);
+  IF v_n > 0 THEN
+    RAISE EXCEPTION '0010 ABORT: % depot fence(s) are not 452 x 314 ft -- %', v_n, v_bad;
+  END IF;
+
   SELECT width_ft, length_ft INTO v_lot_x, v_lot_y
     FROM public.ottoq_site_structures
    WHERE structure_code = 'FENCE-PERIMETER' LIMIT 1;
-  IF round(v_lot_x) <> 452 OR round(v_lot_y) <> 314 THEN
-    RAISE EXCEPTION '0010 ABORT: fence is % x % ft, expected 452 x 314.', v_lot_x, v_lot_y;
-  END IF;
 
   SELECT count(*) INTO v_n FROM public.depots
    WHERE round(site_length_ft) <> 452 OR round(site_width_ft) <> 314;
   IF v_n > 0 THEN
     RAISE EXCEPTION '0010 ABORT: % depot(s) still record the old parcel size.', v_n;
+  END IF;
+
+  ------------------------------------------------------- 6.6 drivable aisle
+  --
+  -- HOLE CLOSED: minimum aisle width was measured ONLY source-side, in
+  -- checkLayoutGeometry.mjs. That makes it ESTABLISHED for the seed file and NOT
+  -- ESTABLISHED for the database -- which is the thing that actually drives the
+  -- depot. Ported here so the database asserts it about itself.
+  --
+  -- Founder-accepted two-tier standard, NOT raised: >= 24 ft two-way (charging
+  -- stalls, the ones the audit caught at 12 ft), >= 20 ft one-way (everything else).
+  --
+  -- Same method as the JS: a stall is reachable if ANY ONE of its four faces has a
+  -- clear run, because this layout serves stalls from different sides (charging is
+  -- gas-pump/sidestep, perimeter staging is served from behind, bays are
+  -- pull-through). Measuring only out of the nose would flag the car parked ahead in
+  -- the same column as a blockage. An obstruction counts only if it covers at least
+  -- a design vehicle's width (6.6 ft) of the face -- a 1.5 ft light pole beside a
+  -- 10 ft mouth does not stop a car.
+  WITH b AS (
+    SELECT depot_id, stall_code, stall_type,
+           relative_x - (CASE WHEN heading_degrees IN (0,180) THEN stall_width_ft ELSE stall_depth_ft END)/2 AS x0,
+           relative_x + (CASE WHEN heading_degrees IN (0,180) THEN stall_width_ft ELSE stall_depth_ft END)/2 AS x1,
+           relative_y - (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y0,
+           relative_y + (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y1
+      FROM public.stalls),
+  fence AS (
+    SELECT depot_id, origin_x_ft AS fx0, origin_y_ft AS fy0,
+           origin_x_ft + width_ft AS fx1, origin_y_ft + length_ft AS fy1
+      FROM public.ottoq_site_structures WHERE structure_code = 'FENCE-PERIMETER'),
+  solid AS (
+    SELECT depot_id, structure_code AS code, origin_x_ft AS x0, origin_y_ft AS y0,
+           origin_x_ft + width_ft AS x1, origin_y_ft + length_ft AS y1
+      FROM public.ottoq_site_structures
+     WHERE status = 'active'
+       AND width_ft IS NOT NULL AND length_ft IS NOT NULL
+       AND structure_kind NOT IN ('fence_segment','gate','lane_marker','sign',
+                                  'solar_canopy','metal_canopy','lighting_pole')),
+  -- every obstruction, as a rectangle, per depot
+  obs AS (
+    SELECT depot_id, stall_code AS code, x0, y0, x1, y1 FROM b
+    UNION ALL
+    SELECT depot_id, code, x0, y0, x1, y1 FROM solid),
+  faces AS (
+    SELECT b.*, f.name, f.dx, f.dy
+      FROM b CROSS JOIN (VALUES ('E',1,0),('W',-1,0),('N',0,1),('S',0,-1)) AS f(name,dx,dy)),
+  -- clear run on each face: distance to the fence, or to the nearest obstruction
+  -- that covers >= a design vehicle's width of that face
+  runs AS (
+    SELECT fa.depot_id, fa.stall_code, fa.stall_type, fa.name,
+           LEAST(
+             -- fence
+             CASE WHEN fa.dx = 1 THEN fe.fx1 - fa.x1 WHEN fa.dx = -1 THEN fa.x0 - fe.fx0
+                  WHEN fa.dy = 1 THEN fe.fy1 - fa.y1 ELSE fa.y0 - fe.fy0 END,
+             COALESCE((
+               SELECT min(CASE WHEN fa.dx = 1 THEN o.x0 - fa.x1 WHEN fa.dx = -1 THEN fa.x0 - o.x1
+                               WHEN fa.dy = 1 THEN o.y0 - fa.y1 ELSE fa.y0 - o.y1 END)
+                 FROM obs o
+                WHERE o.depot_id = fa.depot_id AND o.code <> fa.stall_code
+                  -- covers enough of the face to actually stop a car
+                  AND CASE WHEN fa.dx <> 0
+                           THEN LEAST(fa.y1,o.y1) - GREATEST(fa.y0,o.y0)
+                           ELSE LEAST(fa.x1,o.x1) - GREATEST(fa.x0,o.x0) END >= 6.6 - 1e-6
+                  -- in front of the face, not behind it
+                  AND CASE WHEN fa.dx = 1 THEN o.x0 - fa.x1 WHEN fa.dx = -1 THEN fa.x0 - o.x1
+                           WHEN fa.dy = 1 THEN o.y0 - fa.y1 ELSE fa.y0 - o.y1 END >= -1e-6
+             ), 1e9)) AS clear
+      FROM faces fa JOIN fence fe ON fe.depot_id = fa.depot_id),
+  best AS (
+    SELECT depot_id, stall_code, stall_type, max(clear) AS clear
+      FROM runs GROUP BY 1,2,3)
+  -- Violations AND coverage in ONE pass. Coverage matters as much as the verdict:
+  -- `runs` inner-joins the fence, so a depot with no fence row contributes zero rows
+  -- and this check would report a clean pass for a depot it never looked at -- the
+  -- same shape of hole 6.5 just closed. On the live pre-0010 database that was not
+  -- hypothetical: this identical query measured 145 of 300 stalls, because only one
+  -- depot had structures. 6.5 asserts a fence per depot; this asserts the consequence.
+  SELECT count(*) FILTER (
+           WHERE clear < CASE WHEN stall_type IN ('dcfc','l2') THEN 24.0 ELSE 20.0 END - 1e-6),
+         string_agg(stall_code || ' (' || stall_type::text || '): ' ||
+                    round(clear::numeric,1)::text || ' ft, needs ' ||
+                    CASE WHEN stall_type IN ('dcfc','l2') THEN '24' ELSE '20' END, ', ' ORDER BY clear)
+           FILTER (WHERE clear < CASE WHEN stall_type IN ('dcfc','l2') THEN 24.0 ELSE 20.0 END - 1e-6),
+         -- count(clear), NOT count(*): a stall whose footprint is NULL yields a NULL
+         -- clearance, which no `<` test can ever flag. That is an UNMEASURED stall,
+         -- not a passing one, and it must fail coverage rather than slip through.
+         count(clear)
+    INTO v_n, v_bad, v_measured
+    FROM best;
+
+  IF v_measured <> (SELECT count(*) FROM public.stalls) THEN
+    RAISE EXCEPTION
+      '0010 ABORT: aisle check measured % stall(s) but the depots hold % -- clearance '
+      'is NOT ESTABLISHED for the difference and must not report a pass.',
+      v_measured, (SELECT count(*) FROM public.stalls);
+  END IF;
+
+  IF v_n > 0 THEN
+    RAISE EXCEPTION
+      '0010 ABORT: % stall(s) below the minimum drivable aisle (24 ft two-way for '
+      'charging, 20 ft one-way otherwise): %', v_n, left(v_bad, 900);
+  END IF;
+
+  ------------------------------------------------- 6.7 stall vs LANE clearance
+  --
+  -- HOLE CLOSED: 6.3 tests stall-vs-stall and 6.4 tests stall-vs-structure, but
+  -- nothing tested stall-vs-LANE. A travel lane could be routed straight through a
+  -- parked car and every check above would still pass. That was live: the east
+  -- avenue's northbound lane cut 2.41 ft into 18 E-column stalls on every pass,
+  -- because EAST_AISLE_X sat at 275 with a 3.2-unit lane offset.
+  --
+  -- The renderer's fix (EAST_AISLE_X -> 272.25, centring the avenue in its corridor)
+  -- moves no stall, so it does not change the seed md5. This check is what stops the
+  -- geometry drifting back.
+  --
+  -- The lane rectangles come from ottoq_layout_seed_lanes, which the generator emits
+  -- from sitePlan.ts. No lane coordinate is hardcoded here -- the single-source rule
+  -- that applies to stalls applies to lanes too, so the renderer and this check
+  -- cannot drift apart. Gate-approach diagonals are NOT modelled and are NOT claimed
+  -- to be tested. Bar is OVERLAP: a lane may abut a stall -- that is what a parking
+  -- aisle does -- but it must never cut into one.
+  SELECT count(*) INTO v_n FROM ottoq_layout_seed_lanes;
+  IF v_n <> 8 THEN
+    RAISE EXCEPTION
+      '0010 ABORT: expected 8 lane runs in the seed, found % -- stall-vs-lane clearance '
+      'is NOT ESTABLISHED and must not report a pass.', v_n;
+  END IF;
+
+  WITH b AS (
+    SELECT depot_id, stall_code,
+           relative_x - (CASE WHEN heading_degrees IN (0,180) THEN stall_width_ft ELSE stall_depth_ft END)/2 AS x0,
+           relative_x + (CASE WHEN heading_degrees IN (0,180) THEN stall_width_ft ELSE stall_depth_ft END)/2 AS x1,
+           relative_y - (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y0,
+           relative_y + (CASE WHEN heading_degrees IN (0,180) THEN stall_depth_ft ELSE stall_width_ft END)/2 AS y1
+      FROM public.stalls)
+  SELECT count(*), string_agg(b.stall_code || ' cuts ' || l.lane_name || ' by ' ||
+           round(LEAST(LEAST(b.x1,l.x1)-GREATEST(b.x0,l.x0),
+                       LEAST(b.y1,l.y1)-GREATEST(b.y0,l.y0))::numeric, 2)::text || ' ft',
+           ', ' ORDER BY b.stall_code)
+    INTO v_n, v_bad
+    FROM b JOIN ottoq_layout_seed_lanes l
+      ON LEAST(b.x1,l.x1) - GREATEST(b.x0,l.x0) > 1e-6
+     AND LEAST(b.y1,l.y1) - GREATEST(b.y0,l.y0) > 1e-6;
+  IF v_n > 0 THEN
+    RAISE EXCEPTION
+      '0010 ABORT: % stall/lane overlap(s) -- a travel lane cuts into a parked car: %',
+      v_n, left(v_bad, 900);
   END IF;
 
   RAISE NOTICE '0010 OK: 160 stalls per depot, 0 overlaps, 0 buried stalls, '
@@ -1030,8 +1365,10 @@ $mig$;
 --       FROM public.ottoq_layout_backup_0010_depots b WHERE b.id = d.id;
 --   COMMIT;
 --
---   Restoring stalls re-creates the 19 retired rows with their ORIGINAL ids, so any
---   history that pointed at them lines back up. The structures added by 0010
+--   Restoring stalls re-creates the 5 deleted rows with their ORIGINAL ids and puts
+--   the 14 re-homed rows back under their ORIGINAL stall_codes, so any history that
+--   pointed at them lines back up. (The re-homed rows never lost their ids in the
+--   first place -- only their code and position changed.) The structures added by 0010
 --   (CARPORT-*, LIGHT-*) are left behind by this rollback; delete them by
 --   structure_code if you want the pre-0010 set exactly.
 -- ============================================================================
