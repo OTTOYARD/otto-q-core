@@ -109,6 +109,73 @@
 BEGIN;
 
 -- ════════════════════════════════════════════════════════════════════════════════════════
+-- (0) SNAPSHOT + MD5 GUARD (APPLYING.md step 2)
+-- ════════════════════════════════════════════════════════════════════════════════════════
+-- Every definition this file replaces is captured VERBATIM first, and then asserted to be
+-- the definition this change was written against. If someone hotfixed one of these in the
+-- SQL editor since this file was written, the guard raises and the whole transaction rolls
+-- back rather than silently deleting their fix.
+--
+-- To restore any of them by hand:
+--   SELECT definition FROM public.ottoq_schema_snapshots
+--    WHERE label = '0011_forward_bay_reservation_pre' AND object_name = '<fn>';
+INSERT INTO public.ottoq_schema_snapshots
+       (label, object_kind, schema_name, object_name, definition, def_md5)
+SELECT '0011_forward_bay_reservation_pre',
+       CASE p.prokind WHEN 'p' THEN 'procedure' ELSE 'function' END,
+       n.nspname, p.proname,
+       pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE (n.nspname = 'ottoq'  AND p.proname IN ('ottoq_book_appointment',
+                                               'ottoq_book_workflow',
+                                               'ottoq_release_expired_bookings',
+                                               'ottoq_book_stall',
+                                               'ottoq_find_and_book_stall',
+                                               'ottoq_stall_free_between'))
+    OR (n.nspname = 'public' AND p.proname IN ('ottoq_plan_visit_itinerary',
+                                               'ottoq_svc_to_leg_type'));
+-- ottoq_book_stall / ottoq_find_and_book_stall / ottoq_stall_free_between / ottoq_svc_to_leg_type
+-- are snapshotted as CONTEXT only. This file does not touch them; it depends on them, and
+-- capturing them makes the audit trail self-contained.
+
+DO $guard$
+DECLARE v_m text; v_n int;
+BEGIN
+  -- No live run. This file replaces four functions on the tick path; replacing a function
+  -- mid-tick is a needless race. NEVER disable cron 12 to satisfy this -- stop the run.
+  SELECT count(*) INTO v_n FROM public.ottoq_sim_runs WHERE status = 'running';
+  IF v_n > 0 THEN
+    RAISE EXCEPTION 'GUARD: % sim run(s) are running. Stop the run, then re-apply. Nothing has been changed.', v_n;
+  END IF;
+
+  SELECT md5(pg_get_functiondef(p.oid)) INTO v_m FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='ottoq' AND p.proname='ottoq_book_appointment';
+  IF v_m IS DISTINCT FROM 'e7954cdfc616e7e1b584d22f0ef19ca0' THEN
+    RAISE EXCEPTION 'GUARD: ottoq.ottoq_book_appointment is not the definition 0011 was written against (live md5=%). Re-read it before replacing it.', v_m;
+  END IF;
+
+  SELECT md5(pg_get_functiondef(p.oid)) INTO v_m FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='ottoq' AND p.proname='ottoq_book_workflow';
+  IF v_m IS DISTINCT FROM '51b3cfc83f2058bf46b7ddae7de51205' THEN
+    RAISE EXCEPTION 'GUARD: ottoq.ottoq_book_workflow is not the definition 0011 was written against (live md5=%).', v_m;
+  END IF;
+
+  SELECT md5(pg_get_functiondef(p.oid)) INTO v_m FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='ottoq' AND p.proname='ottoq_release_expired_bookings';
+  IF v_m IS DISTINCT FROM '86625fd7671ef2712d3eed46215e5c1f' THEN
+    RAISE EXCEPTION 'GUARD: ottoq.ottoq_release_expired_bookings is not the definition 0011 was written against (live md5=%).', v_m;
+  END IF;
+
+  SELECT md5(pg_get_functiondef(p.oid)) INTO v_m FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='public' AND p.proname='ottoq_plan_visit_itinerary';
+  IF v_m IS DISTINCT FROM 'eb444b75724698be815c60d6bc2e86ba' THEN
+    RAISE EXCEPTION 'GUARD: public.ottoq_plan_visit_itinerary is not the definition 0011 was written against (live md5=%).', v_m;
+  END IF;
+END
+$guard$;
+
+
+-- ════════════════════════════════════════════════════════════════════════════════════════
 -- (1) ONE ITINERARY PER VISIT -- the fact the guard was missing
 -- ════════════════════════════════════════════════════════════════════════════════════════
 -- ottoq_vehicle_itineraries had no idea WHICH visit it was planning for, so
@@ -1008,5 +1075,105 @@ BEGIN
                             'bay_reservation', v_bays);
 END;
 $function$;
+
+
+-- ════════════════════════════════════════════════════════════════════════════════════════
+-- (8) POST-SNAPSHOT + TOOK-EFFECT ASSERTIONS
+-- ════════════════════════════════════════════════════════════════════════════════════════
+INSERT INTO public.ottoq_schema_snapshots
+       (label, object_kind, schema_name, object_name, definition, def_md5)
+SELECT '0011_forward_bay_reservation_post',
+       CASE p.prokind WHEN 'p' THEN 'procedure' ELSE 'function' END,
+       n.nspname, p.proname,
+       pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE (n.nspname = 'ottoq'  AND p.proname IN ('ottoq_book_appointment',
+                                               'ottoq_book_workflow',
+                                               'ottoq_book_workflow_legs',
+                                               'ottoq_reserve_inbound_bays',
+                                               'ottoq_release_expired_bookings',
+                                               'ottoq_svc_to_stall_type'))
+    OR (n.nspname = 'public' AND p.proname = 'ottoq_plan_visit_itinerary');
+
+DO $post$
+DECLARE v_src text; v_n int; v_t text;
+BEGIN
+  -- the new objects exist
+  IF NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                  WHERE n.nspname='ottoq' AND p.proname='ottoq_reserve_inbound_bays') THEN
+    RAISE EXCEPTION 'POST: ottoq_reserve_inbound_bays was not created';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                  WHERE n.nspname='ottoq' AND p.proname='ottoq_book_workflow_legs') THEN
+    RAISE EXCEPTION 'POST: ottoq_book_workflow_legs was not created';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='ottoq_vehicle_itineraries'
+                    AND column_name='visit_id') THEN
+    RAISE EXCEPTION 'POST: ottoq_vehicle_itineraries.visit_id was not added';
+  END IF;
+
+  -- the return signal now knows the word "bay"
+  SELECT pg_get_functiondef(p.oid) INTO v_src FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='ottoq' AND p.proname='ottoq_book_appointment';
+  IF v_src NOT LIKE '%ottoq_reserve_inbound_bays%' THEN
+    RAISE EXCEPTION 'POST: ottoq_book_appointment does not call ottoq_reserve_inbound_bays';
+  END IF;
+
+  -- the guard is scoped, not deleted: the double-plan protection must still be in there
+  SELECT pg_get_functiondef(p.oid) INTO v_src FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='public' AND p.proname='ottoq_plan_visit_itinerary';
+  IF v_src NOT LIKE '%stale_itinerary_unblocks_replan%' THEN
+    RAISE EXCEPTION 'POST: ottoq_plan_visit_itinerary is missing the scoped guard';
+  END IF;
+  IF v_src NOT LIKE '%status = ''planned''%' THEN
+    RAISE EXCEPTION 'POST: ottoq_plan_visit_itinerary lost its double-plan protection';
+  END IF;
+
+  -- the leak closer is armed
+  SELECT pg_get_functiondef(p.oid) INTO v_src FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='ottoq' AND p.proname='ottoq_release_expired_bookings';
+  IF v_src NOT LIKE '%return_signal_prearrival%' THEN
+    RAISE EXCEPTION 'POST: the pre-arrival no-show sweep is not wired into the closer';
+  END IF;
+
+  -- TOTALITY of the new requirement resolver: every live twin service resolves, and
+  -- unknown vocabulary lands on NULL rather than raising.
+  FOR v_t IN SELECT svc FROM public.service_cadence_policy WHERE is_active LOOP
+    PERFORM ottoq.ottoq_svc_to_stall_type(v_t, '11111111-1111-1111-1111-111111111111'::uuid);
+  END LOOP;
+  IF ottoq.ottoq_svc_to_stall_type('a_service_the_twin_invents_tomorrow') IS NOT NULL THEN
+    RAISE EXCEPTION 'POST: unknown service must resolve to NULL (no bay), not to a stall type';
+  END IF;
+  IF ottoq.ottoq_svc_to_stall_type(NULL) IS NOT NULL THEN
+    RAISE EXCEPTION 'POST: NULL service must resolve to NULL';
+  END IF;
+  IF ottoq.ottoq_svc_to_stall_type('exterior_wash') <> 'wash_bay'
+     OR ottoq.ottoq_svc_to_stall_type('interior_deep_clean') <> 'wash_bay'
+     OR ottoq.ottoq_svc_to_stall_type('mechanical_pm') <> 'service_bay'
+     OR ottoq.ottoq_svc_to_stall_type('fault_repair') <> 'service_bay'
+     OR ottoq.ottoq_svc_to_stall_type('sensor_calibration') <> 'service_bay'
+     OR ottoq.ottoq_svc_to_stall_type('cosmetic_repair') <> 'service_bay' THEN
+    RAISE EXCEPTION 'POST: bay requirement resolution is wrong';
+  END IF;
+  IF ottoq.ottoq_svc_to_stall_type('charge') IS NOT NULL
+     OR ottoq.ottoq_svc_to_stall_type('interior_tidy') IS NOT NULL
+     OR ottoq.ottoq_svc_to_stall_type('software_update') IS NOT NULL
+     OR ottoq.ottoq_svc_to_stall_type('readiness_check') IS NOT NULL THEN
+    RAISE EXCEPTION 'POST: non-bay work must not be allocated a bay';
+  END IF;
+
+  -- ottoq_book_workflow still behaves as its two existing callers expect: a vehicle with
+  -- no planned legs returns the zero-shaped result, not NULL and not an error.
+  SELECT (ottoq.ottoq_book_workflow(
+            '00000000-0000-0000-0000-000000000000'::uuid,
+            '00000000-0000-0000-0000-000000000000'::uuid,
+            '11111111-1111-1111-1111-111111111111'::uuid,
+            now())->>'booked')::int INTO v_n;
+  IF v_n IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'POST: ottoq_book_workflow delegate did not return the empty result (got %)', v_n;
+  END IF;
+END
+$post$;
 
 COMMIT;
