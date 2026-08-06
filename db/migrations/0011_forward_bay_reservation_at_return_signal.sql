@@ -1,5 +1,6 @@
 -- migration-version: 20260806231121
 -- 0011_forward_bay_reservation_at_return_signal.sql
+-- migration-name:    forward_bay_reservation_at_return_signal
 --
 -- ════════════════════════════════════════════════════════════════════════════════════════
 -- WHAT THIS CLOSES
