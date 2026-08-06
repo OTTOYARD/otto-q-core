@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260806231121
 -- 0011_forward_bay_reservation_at_return_signal.sql
 --
 -- ════════════════════════════════════════════════════════════════════════════════════════
