@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260806030248
 -- migration-name:    honest_completion_and_eta
 
 -- ============================================================================
