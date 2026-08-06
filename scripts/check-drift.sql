@@ -94,6 +94,7 @@ repo_manifest(version, name, file) AS (
     ('20260805032907'::text, 'add_site_energy_snapshots_created_at_idx'::text, '0007_add_site_energy_snapshots_created_at_idx.sql'::text),
     ('20260805230731'::text, 'soil_gate_and_retention_walk'::text, '0008_soil_gate_and_retention_walk.sql'::text),
     ('20260806030248'::text, 'honest_completion_and_eta'::text, '0009_honest_completion_and_eta.sql'::text)
+    ('20260806223619'::text, 'unify_depot_layout'::text, '0010_unify_depot_layout.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
