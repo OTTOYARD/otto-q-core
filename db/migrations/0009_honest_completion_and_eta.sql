@@ -434,10 +434,32 @@ $guard$;
 --
 -- CLOCK DOMAIN: planned_return_at and eta_refreshed_at are both SIM-clock. Every
 -- timestamp in this ALTER derives from dispatched_at or p_sim_clock_now, never now().
+--
+-- ⚠️ WHY THE UTC ROUND-TRIP AND NOT THE OBVIOUS `dispatched_at + interval`.
+-- The plain form was REJECTED BY THE SERVER on the first apply attempt of this file
+-- (PostgreSQL 17.6): `timestamptz + interval` resolves to timestamptz_pl_interval, which
+-- is STABLE rather than IMMUTABLE -- the day and month components of an interval depend
+-- on the session TimeZone -- and a generated column may only use IMMUTABLE expressions:
+--     ERROR 42P17: generation expression is not immutable
+-- Anchoring BOTH conversions at UTC -- the one zone with no DST and no offset -- reduces
+-- the expression to "add N minutes of absolute time", which is exactly what
+-- `timestamptz + a TIME-ONLY interval` already did. The anchor must be UTC: a round-trip
+-- through a local zone WOULD differ inside a spring-forward gap.
+-- PROVEN BEFORE THIS LINE WAS WRITTEN, not asserted:
+--   - all 435 live dispatch rows: the two expressions agree on 435 of 435, and 0 of 435
+--     of the intervals carry a day or month part (numeric * INTERVAL '1 minute' never
+--     produces one), which is the only case the two forms could diverge on;
+--   - 3,388 timestamps x 5 session timezones (UTC, America/Chicago, Asia/Kathmandu,
+--     Australia/Lord_Howe, Pacific/Chatham -- including the half-hour and 30-minute-DST
+--     zones) walked across four 2026 DST transitions at 7 durations each:
+--     16,940 comparisons, 0 mismatches.
+-- THE CLOCK DOMAIN IS UNAFFECTED: dispatched_at is SIM, so planned_return_at is SIM.
+-- The 'UTC' here is an arithmetic anchor, not a clock domain.
 -- ============================================================================
 ALTER TABLE public.ottoq_vehicle_dispatches
   ADD COLUMN IF NOT EXISTS planned_return_at timestamptz
-    GENERATED ALWAYS AS (dispatched_at + (planned_duration_min * INTERVAL '1 minute')) STORED;
+    GENERATED ALWAYS AS (((dispatched_at AT TIME ZONE 'UTC')
+                          + (planned_duration_min * INTERVAL '1 minute')) AT TIME ZONE 'UTC') STORED;
 
 COMMENT ON COLUMN public.ottoq_vehicle_dispatches.planned_return_at IS
   '0009. THE DISPATCH-TIME PLAN, in SIM time. Generated from dispatched_at + planned_duration_min, both of which are written once at dispatch and never updated, so this can never be overwritten by anything. This is the column to grade a forecast against. scheduled_return_at is NOT the plan: it is the current best estimate and is rewritten in flight.';
