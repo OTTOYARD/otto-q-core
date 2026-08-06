@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260806223619
 -- migration-name:    unify_depot_layout
 
 -- ============================================================================
