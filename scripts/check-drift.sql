@@ -92,7 +92,8 @@ repo_manifest(version, name, file) AS (
     ('20260805020029'::text, 'inspection_and_condition_resets'::text, '0005_inspection_and_condition_resets.sql'::text),
     ('20260805142711'::text, 'slim_writes_and_arm_retention'::text, '0006_slim_writes_and_arm_retention.sql'::text),
     ('20260805032907'::text, 'add_site_energy_snapshots_created_at_idx'::text, '0007_add_site_energy_snapshots_created_at_idx.sql'::text),
-    ('20260805230731'::text, 'soil_gate_and_retention_walk'::text, '0008_soil_gate_and_retention_walk.sql'::text)
+    ('20260805230731'::text, 'soil_gate_and_retention_walk'::text, '0008_soil_gate_and_retention_walk.sql'::text),
+    ('20260806030248'::text, 'honest_completion_and_eta'::text, '0009_honest_completion_and_eta.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
