@@ -1,3 +1,4 @@
+-- migration-version: 20260807005437
 -- migration-name:    bay_binding_witness
 -- 0014_bay_binding_witness.sql
 --
