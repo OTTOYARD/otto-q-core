@@ -1,6 +1,8 @@
+-- migration-version: PENDING
+-- migration-name:    early_activation_and_untagged_event_flood
+--
 -- ============================================================================
 -- 0015  EARLY ACTIVATION (Vehicle-First) + STOP THE UNTAGGED EVENT FLOOD
--- STATUS: PENDING
 -- ============================================================================
 --
 -- PART A -- A READY CAR NEVER WAITS ON A FORECAST.
@@ -167,6 +169,22 @@
 -- ============================================================================
 
 BEGIN;
+
+-- ---------------------------------------------------------------------------
+-- HOUSE RULE 1: SNAPSHOT BEFORE YOU REPLACE. Every function this file touches,
+-- captured with its md5, before it is touched. Nothing is DROPped anywhere in
+-- this file; every change is CREATE OR REPLACE.
+-- ---------------------------------------------------------------------------
+INSERT INTO public.ottoq_schema_snapshots
+       (label, object_kind, schema_name, object_name, definition, def_md5)
+SELECT '0015_early_activation_and_untagged_event_flood_pre', 'function',
+       n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE (n.nspname = 'ottoq'  AND p.proname IN ('ottoq_activate_due_bay_reservations',
+                                               'ottoq_reconcile_bay_reservations'))
+    OR (n.nspname = 'public' AND p.proname IN ('ottoq_vehicles_state_change',
+                                               'ottoq_stalls_state_change',
+                                               'ottoq_evaluate_rule_core'));
 
 -- ---------------------------------------------------------------------------
 -- A1. Readiness. TOTAL by construction: never throws, FALSE means "no early seat".
