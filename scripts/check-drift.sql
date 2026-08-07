@@ -181,8 +181,18 @@ mismatch AS (
 --               db/migrations/0013_metronome_guard_reads_the_real_timeout.sql
 --               (20260807002716) CREATE OR REPLACEs that same procedure again. Neither
 --               adds or removes a routine, so public stays 339 and twin stays 71.
+--   2026-08-07  ottoq 51 -> 52.  db/migrations/0014_bay_binding_witness.sql
+--               (20260807005437) adds exactly ONE routine to the ottoq schema:
+--                 ottoq.ottoq_witness_booking_transition()   -- AFTER UPDATE trigger fn
+--               VERIFIED BY NAME against the live catalogue, not inferred from a count.
+--               0014 is purely additive: it also creates one table
+--               (public.ottoq_bay_binding_witness), two indexes on it, and one trigger
+--               (ottoq_witness_booking_transition_trg on public.ottoq_stall_bookings).
+--               Tables, indexes and triggers are not routines, so ONLY the ottoq count
+--               moves. Nothing was dropped or replaced, so public stays 339 and twin
+--               stays 71.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 339), ('ottoq', 51), ('twin', 71)
+  VALUES ('public', 339), ('ottoq', 52), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n
