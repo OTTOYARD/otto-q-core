@@ -97,7 +97,9 @@ repo_manifest(version, name, file) AS (
     ('20260806223619'::text, 'unify_depot_layout'::text, '0010_unify_depot_layout.sql'::text),
     ('20260806231121'::text, 'forward_bay_reservation_at_return_signal'::text, '0011_forward_bay_reservation_at_return_signal.sql'::text),
     ('20260807001645'::text, 'tick_cost_and_metronome_ceiling'::text, '0012_tick_cost_and_metronome_ceiling.sql'::text),
-    ('20260807002716'::text, 'metronome_guard_reads_the_real_timeout'::text, '0013_metronome_guard_reads_the_real_timeout.sql'::text)
+    ('20260807002716'::text, 'metronome_guard_reads_the_real_timeout'::text, '0013_metronome_guard_reads_the_real_timeout.sql'::text),
+    ('20260807005437'::text, 'bay_binding_witness'::text, '0014_bay_binding_witness.sql'::text),
+    ('20260807013120'::text, 'early_activation_and_untagged_event_flood'::text, '0015_early_activation_and_untagged_event_flood.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

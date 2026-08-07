@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260807013120
 -- migration-name:    early_activation_and_untagged_event_flood
 --
 -- ============================================================================
