@@ -95,7 +95,12 @@ repo_manifest(version, name, file) AS (
     ('20260805230731'::text, 'soil_gate_and_retention_walk'::text, '0008_soil_gate_and_retention_walk.sql'::text),
     ('20260806030248'::text, 'honest_completion_and_eta'::text, '0009_honest_completion_and_eta.sql'::text),
     ('20260806223619'::text, 'unify_depot_layout'::text, '0010_unify_depot_layout.sql'::text),
-    ('20260806231121'::text, 'forward_bay_reservation_at_return_signal'::text, '0011_forward_bay_reservation_at_return_signal.sql'::text)
+    ('20260806231121'::text, 'forward_bay_reservation_at_return_signal'::text, '0011_forward_bay_reservation_at_return_signal.sql'::text),
+    ('20260807001645'::text, 'tick_cost_and_metronome_ceiling'::text, '0012_tick_cost_and_metronome_ceiling.sql'::text),
+    ('20260807002716'::text, 'metronome_guard_reads_the_real_timeout'::text, '0013_metronome_guard_reads_the_real_timeout.sql'::text),
+    ('20260807005437'::text, 'bay_binding_witness'::text, '0014_bay_binding_witness.sql'::text),
+    ('20260807013120'::text, 'early_activation_and_untagged_event_flood'::text, '0015_early_activation_and_untagged_event_flood.sql'::text),
+    ('20260807015854'::text, 'bay_seat_writes_the_twin_service_timer'::text, '0016_bay_seat_writes_the_twin_service_timer.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
@@ -165,8 +170,49 @@ mismatch AS (
 --               CREATE OR REPLACE and do not move a count. The 3-arg overload of
 --               ottoq_retention_purge_worker was deliberately left in place (never
 --               drop), so the procedure count is unchanged at 2 overloads.
+--   2026-08-07  ottoq 48 -> 51.  db/migrations/0011_forward_bay_reservation_at_return_signal.sql
+--               (ledger version 20260806231121) added exactly three routines, all in the
+--               ottoq schema:
+--                 ottoq.ottoq_book_workflow_legs(uuid,uuid,uuid,timestamptz,int,int,text[],timestamptz,text)
+--                 ottoq.ottoq_reserve_inbound_bays(uuid,uuid,uuid,timestamptz,timestamptz)
+--                 ottoq.ottoq_svc_to_stall_type(text,uuid)
+--               VERIFIED BY NAME. The 6-arg ottoq_book_workflow was NOT dropped — 0011
+--               turned it into a thin delegate via CREATE OR REPLACE, so it does not move
+--               a count. Everything else 0011 touched was CREATE OR REPLACE.
+--   2026-08-07  no count change.  db/migrations/0012_tick_cost_and_metronome_ceiling.sql
+--               (20260807001645) adds one INDEX and CREATE OR REPLACEs one procedure, and
+--               db/migrations/0013_metronome_guard_reads_the_real_timeout.sql
+--               (20260807002716) CREATE OR REPLACEs that same procedure again. Neither
+--               adds or removes a routine, so public stays 339 and twin stays 71.
+--   2026-08-07  ottoq 51 -> 52.  db/migrations/0014_bay_binding_witness.sql
+--               (20260807005437) adds exactly ONE routine to the ottoq schema:
+--                 ottoq.ottoq_witness_booking_transition()   -- AFTER UPDATE trigger fn
+--               VERIFIED BY NAME against the live catalogue, not inferred from a count.
+--               0014 is purely additive: it also creates one table
+--               (public.ottoq_bay_binding_witness), two indexes on it, and one trigger
+--               (ottoq_witness_booking_transition_trg on public.ottoq_stall_bookings).
+--               Tables, indexes and triggers are not routines, so ONLY the ottoq count
+--               moves. Nothing was dropped or replaced, so public stays 339 and twin
+--               stays 71.
+--   2026-08-07  ottoq 52 -> 54.  db/migrations/0015_early_activation_and_untagged_event_flood.sql
+--               (20260807013120) adds exactly TWO routines, both in the ottoq schema:
+--                 ottoq.ottoq_vehicle_bay_ready(uuid,uuid,timestamptz)  -- is the car
+--                       physically free to be seated in a bay right now (no unfinished
+--                       charge leg). This is what narrows the activation window gate.
+--                 ottoq.ottoq_active_sim_run_id()                       -- the live run,
+--                       memoised transaction-locally, so the row triggers can tag their
+--                       events with the run instead of writing them as production.
+--               VERIFIED BY NAME against the live catalogue, not inferred from a count:
+--               the live ottoq name list is 54 long, ADDED = {ottoq_active_sim_run_id,
+--               ottoq_vehicle_bay_ready}, REMOVED = {} — all 52 prior names are still
+--               present, including ottoq_svc_to_stall_type. The five functions 0015
+--               replaced (ottoq_activate_due_bay_reservations,
+--               ottoq_reconcile_bay_reservations, public.ottoq_vehicles_state_change,
+--               public.ottoq_stalls_state_change, public.ottoq_evaluate_rule_core) were
+--               CREATE OR REPLACE and do not move a count, so public stays 339 and twin
+--               stays 71. Nothing was dropped.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 339), ('ottoq', 48), ('twin', 71)
+  VALUES ('public', 339), ('ottoq', 54), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n
