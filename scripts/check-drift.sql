@@ -99,7 +99,8 @@ repo_manifest(version, name, file) AS (
     ('20260807001645'::text, 'tick_cost_and_metronome_ceiling'::text, '0012_tick_cost_and_metronome_ceiling.sql'::text),
     ('20260807002716'::text, 'metronome_guard_reads_the_real_timeout'::text, '0013_metronome_guard_reads_the_real_timeout.sql'::text),
     ('20260807005437'::text, 'bay_binding_witness'::text, '0014_bay_binding_witness.sql'::text),
-    ('20260807013120'::text, 'early_activation_and_untagged_event_flood'::text, '0015_early_activation_and_untagged_event_flood.sql'::text)
+    ('20260807013120'::text, 'early_activation_and_untagged_event_flood'::text, '0015_early_activation_and_untagged_event_flood.sql'::text),
+    ('20260807015854'::text, 'bay_seat_writes_the_twin_service_timer'::text, '0016_bay_seat_writes_the_twin_service_timer.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

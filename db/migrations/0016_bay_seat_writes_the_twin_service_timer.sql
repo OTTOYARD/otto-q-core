@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260807015854
 -- migration-name:    bay_seat_writes_the_twin_service_timer
 --
 -- ============================================================================
@@ -260,9 +260,3 @@ EXCEPTION WHEN OTHERS THEN
   RETURN 0;
 END
 $function$;
-
-
--- ---------------------------------------------------------------------------
--- A3. RECONCILE: stop shredding the hold the ready car is about to use, and break
---     the deploy_gate:need_service deadlock.
--- ---------------------------------------------------------------------------
