@@ -193,8 +193,25 @@ mismatch AS (
 --               Tables, indexes and triggers are not routines, so ONLY the ottoq count
 --               moves. Nothing was dropped or replaced, so public stays 339 and twin
 --               stays 71.
+--   2026-08-07  ottoq 52 -> 54.  db/migrations/0015_early_activation_and_untagged_event_flood.sql
+--               (20260807013120) adds exactly TWO routines, both in the ottoq schema:
+--                 ottoq.ottoq_vehicle_bay_ready(uuid,uuid,timestamptz)  -- is the car
+--                       physically free to be seated in a bay right now (no unfinished
+--                       charge leg). This is what narrows the activation window gate.
+--                 ottoq.ottoq_active_sim_run_id()                       -- the live run,
+--                       memoised transaction-locally, so the row triggers can tag their
+--                       events with the run instead of writing them as production.
+--               VERIFIED BY NAME against the live catalogue, not inferred from a count:
+--               the live ottoq name list is 54 long, ADDED = {ottoq_active_sim_run_id,
+--               ottoq_vehicle_bay_ready}, REMOVED = {} — all 52 prior names are still
+--               present, including ottoq_svc_to_stall_type. The five functions 0015
+--               replaced (ottoq_activate_due_bay_reservations,
+--               ottoq_reconcile_bay_reservations, public.ottoq_vehicles_state_change,
+--               public.ottoq_stalls_state_change, public.ottoq_evaluate_rule_core) were
+--               CREATE OR REPLACE and do not move a count, so public stays 339 and twin
+--               stays 71. Nothing was dropped.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 339), ('ottoq', 52), ('twin', 71)
+  VALUES ('public', 339), ('ottoq', 54), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n
