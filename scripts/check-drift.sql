@@ -167,8 +167,22 @@ mismatch AS (
 --               CREATE OR REPLACE and do not move a count. The 3-arg overload of
 --               ottoq_retention_purge_worker was deliberately left in place (never
 --               drop), so the procedure count is unchanged at 2 overloads.
+--   2026-08-07  ottoq 48 -> 51.  db/migrations/0011_forward_bay_reservation_at_return_signal.sql
+--               (ledger version 20260806231121) added exactly three routines, all in the
+--               ottoq schema:
+--                 ottoq.ottoq_book_workflow_legs(uuid,uuid,uuid,timestamptz,int,int,text[],timestamptz,text)
+--                 ottoq.ottoq_reserve_inbound_bays(uuid,uuid,uuid,timestamptz,timestamptz)
+--                 ottoq.ottoq_svc_to_stall_type(text,uuid)
+--               VERIFIED BY NAME. The 6-arg ottoq_book_workflow was NOT dropped — 0011
+--               turned it into a thin delegate via CREATE OR REPLACE, so it does not move
+--               a count. Everything else 0011 touched was CREATE OR REPLACE.
+--   2026-08-07  no count change.  db/migrations/0012_tick_cost_and_metronome_ceiling.sql
+--               (20260807001645) adds one INDEX and CREATE OR REPLACEs one procedure, and
+--               db/migrations/0013_metronome_guard_reads_the_real_timeout.sql
+--               (20260807002716) CREATE OR REPLACEs that same procedure again. Neither
+--               adds or removes a routine, so public stays 339 and twin stays 71.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 339), ('ottoq', 48), ('twin', 71)
+  VALUES ('public', 339), ('ottoq', 51), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n
