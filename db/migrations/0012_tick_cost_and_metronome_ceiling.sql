@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260807001645
 -- 0012_tick_cost_and_metronome_ceiling.sql
 -- migration-name:    tick_cost_and_metronome_ceiling
 --
