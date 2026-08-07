@@ -95,7 +95,9 @@ repo_manifest(version, name, file) AS (
     ('20260805230731'::text, 'soil_gate_and_retention_walk'::text, '0008_soil_gate_and_retention_walk.sql'::text),
     ('20260806030248'::text, 'honest_completion_and_eta'::text, '0009_honest_completion_and_eta.sql'::text),
     ('20260806223619'::text, 'unify_depot_layout'::text, '0010_unify_depot_layout.sql'::text),
-    ('20260806231121'::text, 'forward_bay_reservation_at_return_signal'::text, '0011_forward_bay_reservation_at_return_signal.sql'::text)
+    ('20260806231121'::text, 'forward_bay_reservation_at_return_signal'::text, '0011_forward_bay_reservation_at_return_signal.sql'::text),
+    ('20260807001645'::text, 'tick_cost_and_metronome_ceiling'::text, '0012_tick_cost_and_metronome_ceiling.sql'::text),
+    ('20260807002716'::text, 'metronome_guard_reads_the_real_timeout'::text, '0013_metronome_guard_reads_the_real_timeout.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
