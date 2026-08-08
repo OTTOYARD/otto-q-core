@@ -106,7 +106,8 @@ repo_manifest(version, name, file) AS (
     ('20260808153457'::text, 'rider_flag_holds_the_vehicle'::text, '0019_rider_flag_holds_the_vehicle.sql'::text),
     ('20260808165323'::text, 'rider_flag_consume_and_place_is_atomic'::text, '0020_rider_flag_consume_and_place_is_atomic.sql'::text),
     ('20260808170813'::text, 'one_vehicle_one_stall'::text, '0021_one_vehicle_one_stall.sql'::text),
-    ('20260808182226'::text, 'a_run_owns_its_rows'::text, '0022_a_run_owns_its_rows.sql'::text)
+    ('20260808182226'::text, 'a_run_owns_its_rows'::text, '0022_a_run_owns_its_rows.sql'::text),
+    ('20260808193142'::text, 'a_finished_run_is_read_only'::text, '0023_a_finished_run_is_read_only.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
@@ -274,8 +275,31 @@ mismatch AS (
 --               0022 also adds 45 FOREIGN KEY constraints, 2 tables
 --               (ottoq_run_scope_registry, p0022_orphan_quarantine) and 2 indexes;
 --               none of those are routines, so they move no count.
+--   2026-08-08  public 346 -> 349.  db/migrations/0023_a_finished_run_is_read_only.sql
+--               (20260808193142) adds exactly THREE routines, all in public:
+--                 public.ottoq_close_run_needs(uuid, text)  -- closes ONE run's own
+--                       still-open visit needs, scoped to the run named. This is the
+--                       write that replaces the old depot-wide cross-run supersede.
+--                 public.ottoq_tg_close_run_needs_on_terminal()  -- the trigger function
+--                       behind trigger ottoq_sim_runs_close_needs: a run's needs close
+--                       when the RUN ends, on every path out of a live status.
+--                 public.ottoq_build_decision_frame(uuid, uuid)  -- an OVERLOAD, not a
+--                       replacement. The 1-arg form is kept and now delegates to it with
+--                       ottoq_current_sim_run_id(), so run-blind callers are unchanged.
+--               VERIFIED BY NAME against the live catalogue, not inferred from a count:
+--               live public is 349, ADDED = {ottoq_close_run_needs,
+--               ottoq_tg_close_run_needs_on_terminal,
+--               ottoq_build_decision_frame(uuid,uuid)}, REMOVED = {}.
+--               The five routines 0023 REPLACED in place (ottoq_sim_run_scenario,
+--               ottoq_build_decision_frame(uuid), ottoq_capture_decision_snapshot,
+--               ottoq_api_twin_get_state, ottoq_score_run, ottoq_energy_cost_for_run)
+--               were all CREATE OR REPLACE under an md5 guard and move no count; their
+--               pre-images are in ottoq_schema_snapshots under label '0023_pre'.
+--               So ottoq stays 55 and twin stays 71. NOTHING WAS DROPPED.
+--               0023 also adds 1 trigger (ottoq_sim_runs_close_needs on
+--               public.ottoq_sim_runs); a trigger is not a routine and moves no count.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 346), ('ottoq', 55), ('twin', 71)
+  VALUES ('public', 349), ('ottoq', 55), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n
