@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260808182226
 -- migration-name:    a_run_owns_its_rows
 --
 -- 0022_a_run_owns_its_rows.sql
