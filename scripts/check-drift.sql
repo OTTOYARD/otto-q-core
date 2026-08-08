@@ -106,7 +106,8 @@ repo_manifest(version, name, file) AS (
     ('20260808153457'::text, 'rider_flag_holds_the_vehicle'::text, '0019_rider_flag_holds_the_vehicle.sql'::text),
     ('20260808165323'::text, 'rider_flag_consume_and_place_is_atomic'::text, '0020_rider_flag_consume_and_place_is_atomic.sql'::text),
     ('20260808170813'::text, 'one_vehicle_one_stall'::text, '0021_one_vehicle_one_stall.sql'::text),
-    ('20260808182226'::text, 'a_run_owns_its_rows'::text, '0022_a_run_owns_its_rows.sql'::text)
+    ('20260808182226'::text, 'a_run_owns_its_rows'::text, '0022_a_run_owns_its_rows.sql'::text),
+    ('20260808193142'::text, 'a_finished_run_is_read_only'::text, '0023_a_finished_run_is_read_only.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260808193142
 -- migration-name:    a_finished_run_is_read_only
 --
 -- 0023_a_finished_run_is_read_only.sql
