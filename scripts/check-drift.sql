@@ -102,7 +102,8 @@ repo_manifest(version, name, file) AS (
     ('20260807013120'::text, 'early_activation_and_untagged_event_flood'::text, '0015_early_activation_and_untagged_event_flood.sql'::text),
     ('20260807015854'::text, 'bay_seat_writes_the_twin_service_timer'::text, '0016_bay_seat_writes_the_twin_service_timer.sql'::text),
     ('PENDING'::text, 'stop_is_two_phase_so_a_run_can_always_be_stopped'::text, '0017_stop_is_two_phase_so_a_run_can_always_be_stopped.sql'::text),
-    ('20260808041455'::text, 'rider_flagged_cleaning_recall'::text, '0018_rider_flagged_cleaning_recall.sql'::text)
+    ('20260808041455'::text, 'rider_flagged_cleaning_recall'::text, '0018_rider_flagged_cleaning_recall.sql'::text),
+    ('20260808153457'::text, 'rider_flag_holds_the_vehicle'::text, '0019_rider_flag_holds_the_vehicle.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
