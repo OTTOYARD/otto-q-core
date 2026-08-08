@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260808153457
 -- migration-name:    rider_flag_holds_the_vehicle
 --
 -- 0019_rider_flag_holds_the_vehicle.sql
