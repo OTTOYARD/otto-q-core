@@ -190,7 +190,12 @@ COMMENT ON COLUMN public.service_cadence_policy.seed_phase_max IS
   'means rewriting a 12 kB hot-path function and was judged not worth the blast radius '
   'in this migration.';
 
-COMMIT;
+-- NOTE: deliberately NO commit here. The single BEGIN above spans the WHOLE
+-- migration and closes only after section 8's assertions have passed, so a failing
+-- assertion rolls back the new table, the new columns, the policy rows AND all three
+-- function replacements together. A half-applied vocabulary change is exactly how this
+-- codebase previously got one unmapped word aborting every decision every tick while
+-- cron reported success.
 
 -- ============================================================================
 -- 5. THE RUN-START DRAW  (public.ottoq_run_boot_draw)
@@ -1247,3 +1252,5 @@ BEGIN
   RAISE NOTICE '0018 ALL ASSERTIONS PASSED.';
 END
 $assert$;
+
+COMMIT;
