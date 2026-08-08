@@ -168,6 +168,26 @@ CREATE INDEX IF NOT EXISTS idx_rcf_run_status
 CREATE INDEX IF NOT EXISTS idx_rcf_vehicle
   ON public.ottoq_rider_cleaning_flags (vehicle_id, sim_run_id);
 
+-- RLS, matched to public.vehicle_need_profile -- the closest analogue, since that is
+-- also a table of per-vehicle variables drawn at run start. It carries RLS ON with a
+-- single service_role policy, so this does too. Explicitly NOT the 'public' role: 31
+-- tables in this database were once world-writable because a policy named "service
+-- role only" was in fact granted to public, and the lesson recorded from that incident
+-- is to read pg_policies.roles rather than the policy NAME. The writers here are all
+-- SECURITY DEFINER functions, which bypass RLS, so locking the table to service_role
+-- costs the twin nothing.
+ALTER TABLE public.ottoq_rider_cleaning_flags ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies
+                  WHERE schemaname='public' AND tablename='ottoq_rider_cleaning_flags'
+                    AND policyname='rcf_service_role_all') THEN
+    CREATE POLICY rcf_service_role_all ON public.ottoq_rider_cleaning_flags
+      FOR ALL TO service_role USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
 COMMENT ON TABLE public.ottoq_rider_cleaning_flags IS
   '0018: one row per rider-flagged cleaning recall, drawn at run start from the run '
   'seed. Lifecycle pending -> recalled (the manifest has put the cleaning atom on the '
