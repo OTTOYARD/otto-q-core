@@ -105,7 +105,8 @@ repo_manifest(version, name, file) AS (
     ('20260808041455'::text, 'rider_flagged_cleaning_recall'::text, '0018_rider_flagged_cleaning_recall.sql'::text),
     ('20260808153457'::text, 'rider_flag_holds_the_vehicle'::text, '0019_rider_flag_holds_the_vehicle.sql'::text),
     ('20260808165323'::text, 'rider_flag_consume_and_place_is_atomic'::text, '0020_rider_flag_consume_and_place_is_atomic.sql'::text),
-    ('20260808170813'::text, 'one_vehicle_one_stall'::text, '0021_one_vehicle_one_stall.sql'::text)
+    ('20260808170813'::text, 'one_vehicle_one_stall'::text, '0021_one_vehicle_one_stall.sql'::text),
+    ('20260808182226'::text, 'a_run_owns_its_rows'::text, '0022_a_run_owns_its_rows.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
@@ -254,8 +255,27 @@ mismatch AS (
 --               public: public.ottoq_stall_seat_is_exclusive. VERIFIED BY NAME.
 --               It replaces nothing and drops nothing, so ottoq stays 55 and twin
 --               stays 71. The trigger it installs is not a routine.
+--   2026-08-08  public 344 -> 346.  db/migrations/0022_a_run_owns_its_rows.sql
+--               (20260808182226) adds exactly TWO routines, both in public:
+--                 public.ottoq_check_run_scope_registry()  -- the run-scope drift guard:
+--                       one row per defect (unclassified run-scoped column, engine/stamp
+--                       table missing its FK, or an FK that has become ON DELETE CASCADE),
+--                       graded 'block' vs 'warn'.
+--                 public.ottoq_current_sim_run_id()        -- the run a run-blind reader
+--                       must scope to: the running run, else the most recently started.
+--               VERIFIED BY NAME against the live catalogue, not inferred from a count:
+--               live public is 346, ADDED = {ottoq_check_run_scope_registry,
+--               ottoq_current_sim_run_id}, REMOVED = {}.
+--               The three routines 0022 REPLACED (public.ottoq_purge_prior_runs,
+--               public.ottoq_build_decision_frame, public.ottoq_twin_snapshot) were all
+--               CREATE OR REPLACE and do not move a count — all three are still present.
+--               Their pre-images are in ottoq_schema_snapshots under label '0022_pre'.
+--               So ottoq stays 55 and twin stays 71. Nothing was dropped.
+--               0022 also adds 45 FOREIGN KEY constraints, 2 tables
+--               (ottoq_run_scope_registry, p0022_orphan_quarantine) and 2 indexes;
+--               none of those are routines, so they move no count.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 344), ('ottoq', 55), ('twin', 71)
+  VALUES ('public', 346), ('ottoq', 55), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n
