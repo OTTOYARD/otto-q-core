@@ -216,15 +216,23 @@ mismatch AS (
 --               public.ottoq_stalls_state_change, public.ottoq_evaluate_rule_core) were
 --               CREATE OR REPLACE and do not move a count, so public stays 339 and twin
 --               stays 71. Nothing was dropped.
---   2026-08-08  ottoq 54 -> 55, public 339 -> 343.  Two migrations land here, and the
---               numbers are VERIFIED BY NAME against the live routine list, not by
---               arithmetic -- the whole point of Section D is that arithmetic is what
---               a silent drop hides behind.
---
+--   2026-08-08  ottoq 54 -> 55, public 339 -> 340.
 --               db/migrations/0019_rider_flag_holds_the_vehicle.sql (20260808153457)
---               adds exactly TWO routines:
---                 ottoq.ottoq_rider_flag_indepot_sweep   (ottoq 54 -> 55)
---                 public.ottoq_rider_flag_due            (public 339 -> 340)
+--               adds exactly TWO routines, one in each schema:
+--                 public.ottoq_rider_flag_due(uuid,uuid,timestamptz)  -- the shared,
+--                       TOTAL predicate both dispatch gates consult: is this vehicle
+--                       carrying a rider cleaning flag that is pending AND due?
+--                 ottoq.ottoq_rider_flag_indepot_sweep(uuid,uuid,timestamptz) -- gives a
+--                       flag maturing on a PARKED car a path, by appending the cleaning
+--                       atom to the visit it is already having.
+--               VERIFIED BY NAME against the live catalogue, not inferred from a count.
+--               The four functions 0019 replaced (ottoq.ottoq_plan_dispatch_tick,
+--               twin.ottoq_sim_dispatch_vehicle, twin.ottoq_sim_auto_dispatch_tick,
+--               public.ottoq_evaluate_return_need) were CREATE OR REPLACE and do not move
+--               a count, so twin stays 71. Nothing was dropped.
+--               Until this bump, Section D read INVESTIGATE at +1/+1 on every run.
+--
+--               0020 and 0021 then move `public` again -- see below.
 --
 --               db/migrations/0020_rider_flag_consume_and_place_is_atomic.sql
 --               (20260808165323) adds exactly THREE routines, all trigger functions
