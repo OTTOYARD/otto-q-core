@@ -1,5 +1,32 @@
--- migration-version: PENDING
+-- migration-version: 20260808165323
 -- migration-name:    rider_flag_consume_and_place_is_atomic
+--
+-- ══ APPLIED-TEXT NOTE -- READ THIS, IT IS A DEVIATION ══
+--  Applied 2026-08-08 via Supabase MCP `apply_migration`, which is the only apply
+--  channel available in this session (no SUPABASE_ACCESS_TOKEN, no psql, no CLI).
+--  To fit that channel the NARRATIVE COMMENT PROSE below was condensed in the text
+--  that was submitted.  The executable SQL was not edited, but the submitted text
+--  is therefore NOT byte-identical to this file, and pretending otherwise would be
+--  exactly the kind of unearned claim this migration exists to stop.  So:
+--
+--    md5 of this file .................. 484c6c2f1c5264aa0c2e0afc6122252a
+--    md5 of what actually ran .......... 33d05b9ffced4740da25be36600cfa31
+--                                        (supabase_migrations.schema_migrations,
+--                                         version 20260808165323, statements[1])
+--
+--  WHAT IS PROVEN IDENTICAL: every routine this file creates or replaces, compared
+--  as `md5(pg_get_functiondef(oid))` against the same block extracted from this
+--  file.  All five matched exactly, including comments and line counts:
+--
+--    twin.ottoq_sim_generate_service_manifest         f64da76153215943a95a2d34d895adfd  (423 lines)
+--    ottoq.ottoq_rider_flag_indepot_sweep             434f1b1017269445921cda8cc7f5e81f  (201 lines)
+--    public.ottoq_rider_flag_placement_guard          03b9ffd7a1853132f12b36c81c017728  ( 59 lines)
+--    public.ottoq_rider_flag_mark_served              830ef02d8a4ca3bd66cf1746cd1cf0de  ( 29 lines)
+--    public.ottoq_reanchor_rider_flags_on_clock_rebase a00f73d3d7c53c572fa23bed4c19f19e  ( 31 lines)
+--
+--  So the BRAIN is this file.  The divergence is confined to migration commentary
+--  outside every function body, and is re-checkable at any time with the query in
+--  MIGRATION_LOG.md.  Recorded rather than quietly tidied away.
 --
 -- 0020_rider_flag_consume_and_place_is_atomic.sql
 -- ============================================================================

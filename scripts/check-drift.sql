@@ -103,7 +103,8 @@ repo_manifest(version, name, file) AS (
     ('20260807015854'::text, 'bay_seat_writes_the_twin_service_timer'::text, '0016_bay_seat_writes_the_twin_service_timer.sql'::text),
     ('PENDING'::text, 'stop_is_two_phase_so_a_run_can_always_be_stopped'::text, '0017_stop_is_two_phase_so_a_run_can_always_be_stopped.sql'::text),
     ('20260808041455'::text, 'rider_flagged_cleaning_recall'::text, '0018_rider_flagged_cleaning_recall.sql'::text),
-    ('20260808153457'::text, 'rider_flag_holds_the_vehicle'::text, '0019_rider_flag_holds_the_vehicle.sql'::text)
+    ('20260808153457'::text, 'rider_flag_holds_the_vehicle'::text, '0019_rider_flag_holds_the_vehicle.sql'::text),
+    ('20260808165323'::text, 'rider_flag_consume_and_place_is_atomic'::text, '0020_rider_flag_consume_and_place_is_atomic.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
@@ -214,8 +215,33 @@ mismatch AS (
 --               public.ottoq_stalls_state_change, public.ottoq_evaluate_rule_core) were
 --               CREATE OR REPLACE and do not move a count, so public stays 339 and twin
 --               stays 71. Nothing was dropped.
+--   2026-08-08  ottoq 54 -> 55, public 339 -> 343.  Two migrations land here, and the
+--               numbers are VERIFIED BY NAME against the live routine list, not by
+--               arithmetic -- the whole point of Section D is that arithmetic is what
+--               a silent drop hides behind.
+--
+--               db/migrations/0019_rider_flag_holds_the_vehicle.sql (20260808153457)
+--               adds exactly TWO routines:
+--                 ottoq.ottoq_rider_flag_indepot_sweep   (ottoq 54 -> 55)
+--                 public.ottoq_rider_flag_due            (public 339 -> 340)
+--
+--               db/migrations/0020_rider_flag_consume_and_place_is_atomic.sql
+--               (20260808165323) adds exactly THREE routines, all trigger functions
+--               in public (public 340 -> 343):
+--                 public.ottoq_rider_flag_placement_guard
+--                 public.ottoq_rider_flag_mark_served
+--                 public.ottoq_reanchor_rider_flags_on_clock_rebase
+--
+--               0020 also REPLACES twin.ottoq_sim_generate_service_manifest and
+--               ottoq.ottoq_rider_flag_indepot_sweep by CREATE OR REPLACE, which does
+--               not move a count, so twin stays 71.  Nothing was dropped.  The one
+--               object 0020 removes is a CONSTRAINT
+--               (ottoq_visit_needs_vehicle_id_visit_key_key, replaced by the
+--               run-scoped unique index ottoq_visit_needs_vehicle_visit_run_uk);
+--               constraints are not routines, so no count moves for it, and its exact
+--               definition is preserved in public.mig0020_prestate.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 339), ('ottoq', 54), ('twin', 71)
+  VALUES ('public', 343), ('ottoq', 55), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n
