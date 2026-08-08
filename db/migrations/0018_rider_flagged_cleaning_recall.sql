@@ -62,23 +62,36 @@ BEGIN;
 
 -- ---------------------------------------------------------------------------
 -- 1. POLICY VALUES -- tunable without a migration, via ottoq_policy_get.
---    param_value is numeric, scope 'global' (run/depot scopes override).
+--
+--    rider_flag_daily_pct       percent of the fleet a rider flags per SIM-DAY.
+--                               3.0 on a 116-vehicle depot is ~3.5 recalls/day:
+--                               enough to see one in a short demo, far too few to
+--                               swamp 3 wash bays.
+--    rider_flag_interior_share  share of flags that are INTERIOR rather than
+--                               exterior. Rideshare complaints skew heavily
+--                               interior (spills, trash, odour), hence 0.70.
+--    rider_flag_window_h        hours from run start over which flag times are
+--                               spread. 14 h from the demo start of 08:00 local
+--                               = 08:00-22:00, the daytime deployment window the
+--                               founder described.
+--
+--    ⚠ MEASURED, NOT ASSUMED: ottoq_policy_params.scope_id is NOT NULL, and the
+--    table contains ZERO rows with scope_type='global'. public.ottoq_policy_get
+--    resolves global as "scope_type='global' AND scope_id IS NULL", which that
+--    NOT NULL makes unsatisfiable -- the global tier is unreachable dead code and
+--    every real tuned value in this database lives at DEPOT scope
+--    (11111111-... has 15 of them) or RUN scope. So these defaults are written at
+--    depot scope for every depot, which ottoq_policy_get genuinely reads. A run
+--    scope row still overrides them. No migration is needed to retune.
 -- ---------------------------------------------------------------------------
 
-INSERT INTO public.ottoq_policy_params (scope_type, scope_id, param_key, param_value, notes)
-VALUES
-  ('global', NULL, 'rider_flag_daily_pct', 3.0,
-   'Percent of the fleet a ridehail rider flags for a cleaning issue per SIM-DAY. '
-   || '3.0 on a 116-vehicle depot is ~3.5 recalls/day: enough to see one in a short '
-   || 'demo, far too few to swamp 3 wash bays. Tune here, not in code.'),
-  ('global', NULL, 'rider_flag_interior_share', 0.70,
-   'Share of rider cleaning flags that are INTERIOR (spills, trash, odour) rather '
-   || 'than exterior. Rideshare complaints skew heavily interior, hence 0.70. The '
-   || 'remainder are exterior.'),
-  ('global', NULL, 'rider_flag_window_h', 14,
-   'Hours from run start over which flag times are spread. 14 h from the demo start '
-   || 'of 08:00 local = 08:00-22:00, i.e. the daytime deployment window the founder '
-   || 'described ("a random daytime cleaning during an OTTO-Q service flow").')
+INSERT INTO public.ottoq_policy_params (scope_type, scope_id, param_key, param_value, updated_by)
+SELECT 'depot', d.id, x.k, x.v, 'migration_0018'
+  FROM depots d
+ CROSS JOIN (VALUES
+   ('rider_flag_daily_pct',      3.0),
+   ('rider_flag_interior_share', 0.70),
+   ('rider_flag_window_h',       14.0)) AS x(k, v)
 ON CONFLICT (scope_type, scope_id, param_key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
@@ -701,7 +714,11 @@ DECLARE
   v_curve numeric; v_svcspd numeric; v_pm_int numeric; v_calib_int numeric; v_washcad int;
   v_pm_prog numeric := 0; v_calib_prog numeric := 0;
   v_wash_min int; v_deep_min int; v_pm_min int; v_calib_min int; v_charge_min int := 0;
-  v_rf RECORD; v_rf_svc text; v_rf_min int;   -- 0018
+  -- 0018. SCALARS, not a RECORD: the flag lookup is skipped entirely when v_run is
+  -- NULL (benchmark / no active run), and reading a field of a never-assigned
+  -- plpgsql RECORD raises "record is not assigned yet". Scalars are NULL-safe.
+  v_rf_id uuid; v_rf_kind text; v_rf_status text; v_rf_visit text;
+  v_rf_svc text; v_rf_min int;
 BEGIN
   SELECT current_soc, COALESCE(target_soc,85), COALESCE((config->>'cycles_since_wash')::int,0),
          home_depot_id, COALESCE(last_state_change, now()),
@@ -885,22 +902,23 @@ BEGIN
   -- ==========================================================================
   IF v_run IS NOT NULL THEN
     SELECT f.flag_id, f.flag_kind, f.status, f.recalled_visit_key
-      INTO v_rf
+      INTO v_rf_id, v_rf_kind, v_rf_status, v_rf_visit
       FROM public.ottoq_rider_cleaning_flags f
      WHERE f.sim_run_id = v_run AND f.vehicle_id = p_vehicle_id
        AND f.status IN ('pending','recalled')
        AND f.raised_at_sim_clock <= v_clock;
 
-    IF v_rf.flag_id IS NOT NULL THEN
-      IF v_rf.status = 'recalled' AND v_rf.recalled_visit_key IS DISTINCT FROM v_visit THEN
+    IF v_rf_id IS NOT NULL THEN
+      IF v_rf_status = 'recalled' AND v_rf_visit IS DISTINCT FROM v_visit THEN
         -- The visit this flag was consumed by has closed. Retire it; do not re-emit.
         UPDATE public.ottoq_rider_cleaning_flags
            SET status = 'served', served_at_sim_clock = v_clock
-         WHERE flag_id = v_rf.flag_id;
+         WHERE flag_id = v_rf_id;
+        v_rf_status := 'served';
       ELSE
         -- TOTAL: 'exterior' takes the wash lane; interior AND anything unrecognised
         -- takes the detail lane. An unknown word must never silently drop the work.
-        IF v_rf.flag_kind = 'exterior' THEN
+        IF v_rf_kind = 'exterior' THEN
           v_rf_svc := 'exterior_wash'; v_rf_min := v_wash_min;
         ELSE
           v_rf_svc := 'interior_deep_clean'; v_rf_min := v_deep_min;
@@ -913,7 +931,7 @@ BEGIN
                                 THEN a || jsonb_build_object('must_do', true, 'deferrable', false,
                                        'carryover_eligible', false,
                                        'rider_flagged', true,
-                                       'rider_flag_kind', COALESCE(v_rf.flag_kind,'interior'),
+                                       'rider_flag_kind', COALESCE(v_rf_kind,'interior'),
                                        'return_trigger', 'rider_flag_cleaning')
                                 ELSE a END)
             INTO v_m FROM jsonb_array_elements(v_m) a;
@@ -924,9 +942,9 @@ BEGIN
             'requires_bay', CASE WHEN v_rf_svc = 'exterior_wash' THEN 'wash_bay' ELSE 'detail' END,
             'carryover_eligible', false,
             'rider_flagged', true,
-            'rider_flag_kind', COALESCE(v_rf.flag_kind,'interior'),
+            'rider_flag_kind', COALESCE(v_rf_kind,'interior'),
             'return_trigger', 'rider_flag_cleaning',
-            'why', 'Rider-reported ' || COALESCE(v_rf.flag_kind,'interior')
+            'why', 'Rider-reported ' || COALESCE(v_rf_kind,'interior')
                    || ' cleanliness issue; vehicle was recalled for this.');
         END IF;
 
@@ -934,7 +952,8 @@ BEGIN
            SET status = 'recalled',
                recalled_at_sim_clock = COALESCE(recalled_at_sim_clock, v_clock),
                recalled_visit_key    = v_visit
-         WHERE flag_id = v_rf.flag_id;
+         WHERE flag_id = v_rf_id;
+        v_rf_status := 'recalled';
       END IF;
     END IF;
   END IF;
@@ -992,7 +1011,7 @@ BEGIN
     WHEN v_fault THEN 'E_tech_hold_fault'
     -- 0018: a rider-flagged recall is its own archetype, so the visit is legible
     -- as "this car came back because a customer complained", not as a mystery.
-    WHEN v_rf.flag_id IS NOT NULL AND v_rf.status IS DISTINCT FROM 'served' THEN 'R_rider_flag_cleaning'
+    WHEN v_rf_id IS NOT NULL AND v_rf_status = 'recalled' THEN 'R_rider_flag_cleaning'
     WHEN v_ota THEN 'J_ota_wave'
     WHEN v_urgency = 'overnight_hold' THEN 'C_overnight'
     WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_m) e WHERE e->>'svc' = 'charge') THEN 'M_pass_through_or_P_triage'
@@ -1012,8 +1031,8 @@ BEGIN
                              'crn', v_run IS NOT NULL, 'precip_stress', round(v_precip_stress,3),
                              'wet_boost', round(v_boost,3), 'soc_at_arrival', v_soc,
                              'sla_floor', v_sla_floor, 'generator', 'v4_condition',
-                             'rider_flagged', (v_rf.flag_id IS NOT NULL),
-                             'rider_flag_kind', v_rf.flag_kind))
+                             'rider_flagged', (v_rf_id IS NOT NULL AND v_rf_status = 'recalled'),
+                             'rider_flag_kind', v_rf_kind))
   ON CONFLICT (vehicle_id, visit_key) DO UPDATE
     SET atoms = EXCLUDED.atoms, urgency = EXCLUDED.urgency, archetype = EXCLUDED.archetype,
         dispatch_due_at = EXCLUDED.dispatch_due_at, target_soc = EXCLUDED.target_soc,
@@ -1028,7 +1047,7 @@ BEGIN
         'precip_stress', round(v_precip_stress, 3),
         'wet_boost', round(v_boost, 3),
         'urgency', v_urgency,
-        'rider_flagged', (v_rf.flag_id IS NOT NULL),
+        'rider_flagged', (v_rf_id IS NOT NULL AND v_rf_status = 'recalled'),
         'generator', 'v4_condition'))
    WHERE id = p_vehicle_id;
   RETURN v_m;
@@ -1039,59 +1058,66 @@ $function$;
 -- 8. ASSERTIONS -- run inside the migration. Any failure aborts it.
 -- ============================================================================
 
+-- Every cross-schema name below is qualified on purpose: ottoq_sim_seeded_random
+-- lives ONLY in schema twin and ottoq_svc_to_stall_type ONLY in schema ottoq, and a
+-- migration does not inherit the search_path those functions set for themselves.
 DO $assert$
 DECLARE
   v_depot uuid; v_fleet int; v_seed_a bigint := 987654321; v_seed_b bigint := 123456789;
   v_run1 text; v_run2 text; v_run3 text;
   v_n_a int; v_n_b int; v_int_a int;
   v_p numeric; v_lo int; v_hi int;
-  v_st text; v_stalls int;
-  v_bay_min numeric; v_bay_avail numeric;
+  v_st text; v_stalls int; v_res text;
+  v_bay_min numeric; v_bay_avail numeric; v_pct numeric;
   v_bad int;
 BEGIN
-  SELECT d.id INTO v_depot FROM depots d WHERE d.name LIKE '%Nashville%' LIMIT 1;
+  SELECT d.id INTO v_depot FROM public.depots d WHERE d.name LIKE '%Nashville%' LIMIT 1;
   IF v_depot IS NULL THEN RAISE EXCEPTION 'A0 FAILED: no Nashville depot to assert against'; END IF;
-  SELECT count(*) INTO v_fleet FROM vehicles v
+  SELECT count(*) INTO v_fleet FROM public.vehicles v
    WHERE v.home_depot_id = v_depot AND v.category='autonomous' AND v.is_active;
   v_p := 3.0/100.0;   -- default rider_flag_daily_pct over a 1-day run
 
   -- A1. DETERMINISM: the same seed must produce the SAME flag set, and a different
-  --     seed a different one. Signature over vehicle_id||kind, order-independent.
+  --     seed a different one. Signature over vehicle_id||kind, ORDER-INDEPENDENT
+  --     (string_agg with an explicit ORDER BY), because the whole point of
+  --     hashtextextended over a PRNG is that the answer cannot depend on the order
+  --     rows happened to be visited or on how many workers ran.
   SELECT md5(string_agg(t, '|' ORDER BY t)) INTO v_run1 FROM (
-    SELECT v.id::text || ':' || CASE WHEN ottoq_sim_seeded_random(v_seed_a,'rflagkind:'||v.id::text) < 0.70
+    SELECT v.id::text || ':' || CASE WHEN twin.ottoq_sim_seeded_random(v_seed_a,'rflagkind:'||v.id::text) < 0.70
                                      THEN 'interior' ELSE 'exterior' END AS t
-      FROM vehicles v
+      FROM public.vehicles v
      WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active
-       AND ottoq_sim_seeded_random(v_seed_a, 'rflag:'||v.id::text) < v_p) s;
+       AND twin.ottoq_sim_seeded_random(v_seed_a, 'rflag:'||v.id::text) < v_p) s;
   SELECT md5(string_agg(t, '|' ORDER BY t)) INTO v_run2 FROM (
-    SELECT v.id::text || ':' || CASE WHEN ottoq_sim_seeded_random(v_seed_a,'rflagkind:'||v.id::text) < 0.70
+    SELECT v.id::text || ':' || CASE WHEN twin.ottoq_sim_seeded_random(v_seed_a,'rflagkind:'||v.id::text) < 0.70
                                      THEN 'interior' ELSE 'exterior' END AS t
-      FROM vehicles v
+      FROM public.vehicles v
      WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active
-       AND ottoq_sim_seeded_random(v_seed_a, 'rflag:'||v.id::text) < v_p) s;
+       AND twin.ottoq_sim_seeded_random(v_seed_a, 'rflag:'||v.id::text) < v_p) s;
   SELECT md5(string_agg(t, '|' ORDER BY t)) INTO v_run3 FROM (
-    SELECT v.id::text AS t FROM vehicles v
+    SELECT v.id::text AS t FROM public.vehicles v
      WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active
-       AND ottoq_sim_seeded_random(v_seed_b, 'rflag:'||v.id::text) < v_p) s;
+       AND twin.ottoq_sim_seeded_random(v_seed_b, 'rflag:'||v.id::text) < v_p) s;
   IF v_run1 IS DISTINCT FROM v_run2 THEN
     RAISE EXCEPTION 'A1 FAILED: same seed produced two different flag sets (% vs %)', v_run1, v_run2;
   END IF;
   IF v_run1 IS NOT DISTINCT FROM v_run3 THEN
     RAISE EXCEPTION 'A1 FAILED: two different seeds produced an identical flag set -- the draw is not seed-sensitive';
   END IF;
-  RAISE NOTICE 'A1 PASS: seed % reproduces exactly (%); seed % differs.', v_seed_a, left(v_run1,12), v_seed_b;
+  RAISE NOTICE 'A1 PASS: seed % reproduces exactly (sig %); seed % differs.',
+    v_seed_a, left(coalesce(v_run1,'(empty)'),12), v_seed_b;
 
-  -- A2. RATE BAND. At the 3%/sim-day default the flag count must land in a sane
-  --     binomial band. n=% vehicles, p=0.03 => mean 3.5, sd 1.84 on 116.
-  --     Band = [0, mean + 4sd] and strictly less than a tenth of the fleet.
+  -- A2. RATE BAND. At the 3 percent per sim-day default the flag count must land in
+  --     a sane binomial band: n = fleet, p = 0.03. Band = [0, mean + 4 sd], and the
+  --     count must stay under a tenth of the fleet so it can never swamp the bays.
   v_lo := 0;
   v_hi := GREATEST(2, ceil(v_fleet*v_p + 4*sqrt(v_fleet*v_p*(1-v_p)))::int);
-  SELECT count(*) INTO v_n_a FROM vehicles v
+  SELECT count(*) INTO v_n_a FROM public.vehicles v
    WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active
-     AND ottoq_sim_seeded_random(v_seed_a, 'rflag:'||v.id::text) < v_p;
-  SELECT count(*) INTO v_n_b FROM vehicles v
+     AND twin.ottoq_sim_seeded_random(v_seed_a, 'rflag:'||v.id::text) < v_p;
+  SELECT count(*) INTO v_n_b FROM public.vehicles v
    WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active
-     AND ottoq_sim_seeded_random(v_seed_b, 'rflag:'||v.id::text) < v_p;
+     AND twin.ottoq_sim_seeded_random(v_seed_b, 'rflag:'||v.id::text) < v_p;
   IF v_n_a < v_lo OR v_n_a > v_hi OR v_n_b < v_lo OR v_n_b > v_hi THEN
     RAISE EXCEPTION 'A2 FAILED: flag counts % and % outside band [%,%] on a fleet of %',
       v_n_a, v_n_b, v_lo, v_hi, v_fleet;
@@ -1099,97 +1125,103 @@ BEGIN
   IF v_n_a > v_fleet/10 THEN
     RAISE EXCEPTION 'A2 FAILED: % flags is more than a tenth of the % vehicle fleet', v_n_a, v_fleet;
   END IF;
-  SELECT count(*) INTO v_int_a FROM vehicles v
+  SELECT count(*) INTO v_int_a FROM public.vehicles v
    WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active
-     AND ottoq_sim_seeded_random(v_seed_a, 'rflag:'||v.id::text) < v_p
-     AND ottoq_sim_seeded_random(v_seed_a, 'rflagkind:'||v.id::text) < 0.70;
-  RAISE NOTICE 'A2 PASS: fleet=% band=[%,%] seedA=% (interior %) seedB=%',
+     AND twin.ottoq_sim_seeded_random(v_seed_a, 'rflag:'||v.id::text) < v_p
+     AND twin.ottoq_sim_seeded_random(v_seed_a, 'rflagkind:'||v.id::text) < 0.70;
+  RAISE NOTICE 'A2 PASS: fleet=% band=[%,%] seedA=% (of which interior %) seedB=%',
     v_fleet, v_lo, v_hi, v_n_a, v_int_a, v_n_b;
 
   -- A3. EVERY DRAWABLE ATOM RESOLVES TO A STALL TYPE THAT EXISTS IN THIS DEPOT.
-  --     detail_bay has zero stalls, so a draw demanding one would be unbookable by
+  --     detail_bay has ZERO stalls, so a draw demanding one would be unbookable by
   --     construction. Both rider atoms must fold onto a type with real stalls.
   FOREACH v_st IN ARRAY ARRAY['interior_deep_clean','exterior_wash'] LOOP
-    DECLARE v_res text;
-    BEGIN
-      v_res := ottoq.ottoq_svc_to_stall_type(v_st, v_depot);
-      IF v_res IS NULL THEN
-        RAISE EXCEPTION 'A3 FAILED: rider atom % resolves to NO stall type', v_st;
-      END IF;
-      SELECT count(*) INTO v_stalls FROM stalls s
-       WHERE s.depot_id = v_depot AND s.stall_type::text = v_res;
-      IF v_stalls = 0 THEN
-        RAISE EXCEPTION 'A3 FAILED: rider atom % resolves to stall_type % which has ZERO stalls in this depot',
-          v_st, v_res;
-      END IF;
-      RAISE NOTICE 'A3 PASS: % -> % (% stalls)', v_st, v_res, v_stalls;
-    END;
+    v_res := ottoq.ottoq_svc_to_stall_type(v_st, v_depot);
+    IF v_res IS NULL THEN
+      RAISE EXCEPTION 'A3 FAILED: rider atom % resolves to NO stall type', v_st;
+    END IF;
+    SELECT count(*) INTO v_stalls FROM public.stalls s
+     WHERE s.depot_id = v_depot AND s.stall_type::text = v_res;
+    IF v_stalls = 0 THEN
+      RAISE EXCEPTION 'A3 FAILED: rider atom % resolves to stall_type % which has ZERO stalls here',
+        v_st, v_res;
+    END IF;
+    RAISE NOTICE 'A3 PASS: % -> % (% stalls)', v_st, v_res, v_stalls;
   END LOOP;
-  IF EXISTS (SELECT 1 FROM stalls s WHERE s.depot_id=v_depot AND s.stall_type::text='detail_bay') THEN
-    RAISE NOTICE 'A3 NOTE: detail_bay stalls now exist -- the wash/detail bay sharing note in this migration is stale.';
+  IF EXISTS (SELECT 1 FROM public.stalls s WHERE s.depot_id=v_depot AND s.stall_type::text='detail_bay') THEN
+    RAISE NOTICE 'A3 NOTE: detail_bay stalls now exist -- the wash/detail sharing note in this migration is stale.';
   ELSE
-    RAISE NOTICE 'A3 NOTE (expected): ZERO detail_bay stalls. Interior and exterior rider flags share the same % wash bays.',
-      (SELECT count(*) FROM stalls s WHERE s.depot_id=v_depot AND s.stall_type::text='wash_bay');
+    RAISE NOTICE 'A3 NOTE (expected): ZERO detail_bay stalls. Interior AND exterior rider flags land on the same % wash bays.',
+      (SELECT count(*) FROM public.stalls s WHERE s.depot_id=v_depot AND s.stall_type::text='wash_bay');
   END IF;
 
   -- A4. THE NEW return_trigger PASSES EVERY CONSUMER WITHOUT EXCLUSION.
-  --     (a) no CHECK constraint rejects it -- proved by a real insert, rolled back.
-  --     (b) no live routine filters it out with a positive IN-list it is missing
-  --         from in a way that would DROP the row.
-  BEGIN
-    CREATE TEMP TABLE _a4 (LIKE public.ottoq_vehicle_dispatches INCLUDING CONSTRAINTS) ON COMMIT DROP;
-    INSERT INTO _a4 (dispatch_id, vehicle_id, sim_run_id, status, return_trigger, dispatched_at)
-    SELECT gen_random_uuid(), v.id, gen_random_uuid(), 'completed', 'rider_flag_cleaning', now()
-      FROM vehicles v LIMIT 1;
-    RAISE NOTICE 'A4a PASS: rider_flag_cleaning satisfies every CHECK on ottoq_vehicle_dispatches.';
-  EXCEPTION WHEN OTHERS THEN
-    RAISE EXCEPTION 'A4a FAILED: rider_flag_cleaning rejected by a constraint: % %', SQLSTATE, SQLERRM;
-  END;
+  --     (a) No CHECK constraint on ottoq_vehicle_dispatches restricts the VALUE of
+  --         return_trigger. Proved by reading every CHECK on the table rather than
+  --         by an insert, because the table has 8 NOT NULL columns and a failed
+  --         insert would report a false negative that had nothing to do with the
+  --         trigger word.
+  SELECT count(*) INTO v_bad
+    FROM pg_constraint c
+   WHERE c.conrelid = 'public.ottoq_vehicle_dispatches'::regclass
+     AND c.contype = 'c'
+     AND pg_get_constraintdef(c.oid) ILIKE '%return_trigger%'
+     -- a constraint that pins return_trigger to a literal set
+     AND (pg_get_constraintdef(c.oid) ~* 'return_trigger[^)]*=[[:space:]]*ANY'
+       OR pg_get_constraintdef(c.oid) ~* 'return_trigger[[:space:]]*=[[:space:]]*''');
+  IF v_bad > 0 THEN
+    RAISE EXCEPTION 'A4a FAILED: % CHECK constraint(s) pin return_trigger to a literal set that omits rider_flag_cleaning', v_bad;
+  END IF;
+  RAISE NOTICE 'A4a PASS: the only CHECK touching return_trigger is chk_completed_has_return_trigger (a NOT NULL-when-completed rule). No value is enumerated, so a new word is accepted.';
 
+  --     (b) No live routine drops the row via a POSITIVE IN-list it is missing from.
   SELECT count(*) INTO v_bad
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname IN ('public','twin','ottoq') AND p.prokind='f'
      AND pg_get_functiondef(p.oid) ILIKE '%return_trigger%'
-     -- a POSITIVE membership test on return_trigger that does not name the new value
      AND pg_get_functiondef(p.oid) ~* 'return_trigger[[:space:]]*IN[[:space:]]*\('
      AND pg_get_functiondef(p.oid) !~* 'NOT[[:space:]]+IN'
      AND pg_get_functiondef(p.oid) !~* 'rider_flag_cleaning';
   IF v_bad > 0 THEN
-    RAISE EXCEPTION 'A4b FAILED: % routine(s) positively filter return_trigger by an IN-list that omits rider_flag_cleaning', v_bad;
+    RAISE EXCEPTION 'A4b FAILED: % routine(s) positively filter return_trigger by an IN-list omitting rider_flag_cleaning', v_bad;
   END IF;
-  RAISE NOTICE 'A4b PASS: the only IN-lists over return_trigger are NEGATIVE (workload_harness_metrics excludes run_stopped/run_reseed_abort) or additive counters (ottoq_inbound_forecast counts critical_reserve/low_soc_reserve as "critical" -- a rider flag is correctly not counted as an energy-critical return).';
+  RAISE NOTICE 'A4b PASS: every IN-list over return_trigger is either NEGATIVE (workload_harness_metrics excludes run_stopped/run_reseed_abort, so a new value is INCLUDED) or an additive counter (ottoq_inbound_forecast counts critical_reserve/low_soc_reserve as "critical" -- a rider flag is correctly NOT an energy-critical return). ottoq_book_appointment CASEs on the trigger but ends in ELSE l2, so it is total.';
 
-  -- A5. BAY-LOAD / OVERSUBSCRIPTION GUARD (trap 5: ALWAYS HOLD x oversubscription
-  --     stalls a run, and it looks like a deadlock rather than a parameter problem).
-  --     Projected rider-flag bay minutes per sim-day vs available wash-bay minutes.
-  v_bay_min := v_fleet * v_p * (0.70 * 20 + 0.30 * 9);            -- detail 20 min, wash 9 min
-  SELECT count(*) * 1440.0 INTO v_bay_avail FROM stalls s
+  -- A5. BAY-LOAD / OVERSUBSCRIPTION GUARD (trap: ALWAYS HOLD x oversubscription
+  --     stalls a run and looks like a deadlock rather than a parameter problem --
+  --     a vehicle owing bay work is never deployed, so a lane sustained over 100
+  --     percent stops the run with idle chargers). Projected rider-flag bay minutes
+  --     per sim-day against available wash-bay minutes.
+  v_bay_min := v_fleet * v_p * (0.70 * 20 + 0.30 * 9);   -- detail 20 min, wash 9 min
+  SELECT count(*) * 1440.0 INTO v_bay_avail FROM public.stalls s
    WHERE s.depot_id=v_depot AND s.stall_type::text='wash_bay';
   IF v_bay_avail <= 0 THEN
     RAISE EXCEPTION 'A5 FAILED: depot has no wash_bay stalls; a rider cleaning flag would be unservable';
   END IF;
+  v_pct := round(100*v_bay_min/v_bay_avail, 2);
   IF v_bay_min > 0.25 * v_bay_avail THEN
-    RAISE EXCEPTION 'A5 FAILED: rider flags alone project %% of wash-bay minutes (% of %). Lower rider_flag_daily_pct.',
-      round(100*v_bay_min/v_bay_avail,1), round(v_bay_min), round(v_bay_avail);
+    RAISE EXCEPTION 'A5 FAILED: rider flags alone project % percent of wash-bay minutes (% of %). Lower rider_flag_daily_pct.',
+      v_pct, round(v_bay_min), round(v_bay_avail);
   END IF;
-  RAISE NOTICE 'A5 PASS: rider flags project % bay-min/sim-day against % available (%% of the wash lane). The nightly rotation (~1/3 of % vehicles x 9 min = % bay-min) remains the dominant load.',
-    round(v_bay_min,1), round(v_bay_avail,0), round(100*v_bay_min/v_bay_avail,2),
-    v_fleet, round(v_fleet/3.0*9,0);
+  RAISE NOTICE 'A5 PASS: rider flags project % bay-min/sim-day against % available = % percent of the wash lane. The nightly rotation (one third of % vehicles x 9 min = % bay-min) remains the dominant load on the same 3 bays.',
+    round(v_bay_min,1), round(v_bay_avail,0), v_pct, v_fleet, round(v_fleet/3.0*9,0);
 
   -- A6. PATH 1: wash_group must now be a per-run seeded draw, i.e. two different
-  --     seeds must produce different group assignments over the same fleet.
-  SELECT md5(string_agg(v.id::text||':'||floor(3*ottoq_sim_seeded_random(v_seed_a,'washgrp:'||v.id::text))::int::text, '|' ORDER BY v.id))
-    INTO v_run1 FROM vehicles v
+  --     seeds must produce different group assignments over the same fleet, and the
+  --     thirds must stay balanced (the gate washes exactly the group whose number
+  --     matches the calendar day, so a lopsided draw would lopside the wash nights).
+  SELECT md5(string_agg(v.id::text||':'||floor(3*twin.ottoq_sim_seeded_random(v_seed_a,'washgrp:'||v.id::text))::int::text, '|' ORDER BY v.id))
+    INTO v_run1 FROM public.vehicles v
    WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active;
-  SELECT md5(string_agg(v.id::text||':'||floor(3*ottoq_sim_seeded_random(v_seed_b,'washgrp:'||v.id::text))::int::text, '|' ORDER BY v.id))
-    INTO v_run2 FROM vehicles v
+  SELECT md5(string_agg(v.id::text||':'||floor(3*twin.ottoq_sim_seeded_random(v_seed_b,'washgrp:'||v.id::text))::int::text, '|' ORDER BY v.id))
+    INTO v_run2 FROM public.vehicles v
    WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active;
   IF v_run1 IS NOT DISTINCT FROM v_run2 THEN
     RAISE EXCEPTION 'A6 FAILED: wash_group is identical under two different seeds -- still not randomized per run';
   END IF;
   SELECT count(*) INTO v_bad FROM (
-    SELECT floor(3*ottoq_sim_seeded_random(v_seed_a,'washgrp:'||v.id::text))::int g, count(*) n
-      FROM vehicles v
+    SELECT floor(3*twin.ottoq_sim_seeded_random(v_seed_a,'washgrp:'||v.id::text))::int g, count(*) n
+      FROM public.vehicles v
      WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active
      GROUP BY 1) s WHERE s.n < v_fleet/6 OR s.n > v_fleet/2;
   IF v_bad > 0 THEN
@@ -1197,21 +1229,20 @@ BEGIN
   END IF;
   RAISE NOTICE 'A6 PASS: wash_group differs across seeds and splits the fleet into balanced thirds.';
 
-  -- A7. SALT INDEPENDENCE. The four new salts must not collide with each other or
-  --     with any existing namespace: identical salts would silently correlate
-  --     "independent" variables.
+  -- A7. SALT INDEPENDENCE. Identical salts would silently correlate two supposedly
+  --     independent variables, so no new salt may equal another for any vehicle.
   IF EXISTS (
-    SELECT 1 FROM vehicles v
+    SELECT 1 FROM public.vehicles v
      WHERE v.home_depot_id=v_depot AND v.category='autonomous' AND v.is_active
-       AND (ottoq_sim_seeded_random(v_seed_a,'rflag:'||v.id::text)
-              = ottoq_sim_seeded_random(v_seed_a,'rflagkind:'||v.id::text)
-         OR ottoq_sim_seeded_random(v_seed_a,'rflag:'||v.id::text)
-              = ottoq_sim_seeded_random(v_seed_a,'washgrp:'||v.id::text)
-         OR ottoq_sim_seeded_random(v_seed_a,'rflagwhen:'||v.id::text)
-              = ottoq_sim_seeded_random(v_seed_a,'vnp:soil:'||v.id::text))) THEN
+       AND (twin.ottoq_sim_seeded_random(v_seed_a,'rflag:'||v.id::text)
+              = twin.ottoq_sim_seeded_random(v_seed_a,'rflagkind:'||v.id::text)
+         OR twin.ottoq_sim_seeded_random(v_seed_a,'rflag:'||v.id::text)
+              = twin.ottoq_sim_seeded_random(v_seed_a,'washgrp:'||v.id::text)
+         OR twin.ottoq_sim_seeded_random(v_seed_a,'rflagwhen:'||v.id::text)
+              = twin.ottoq_sim_seeded_random(v_seed_a,'vnp:soil:'||v.id::text))) THEN
     RAISE EXCEPTION 'A7 FAILED: a new salt collides with another salt';
   END IF;
-  RAISE NOTICE 'A7 PASS: rflag: / rflagkind: / rflagwhen: / washgrp: are independent of each other and of vnp:.';
+  RAISE NOTICE 'A7 PASS: rflag: / rflagkind: / rflagwhen: / washgrp: are independent of each other and of the existing vnp: namespace.';
 
   RAISE NOTICE '0018 ALL ASSERTIONS PASSED.';
 END
