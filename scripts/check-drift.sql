@@ -214,8 +214,23 @@ mismatch AS (
 --               public.ottoq_stalls_state_change, public.ottoq_evaluate_rule_core) were
 --               CREATE OR REPLACE and do not move a count, so public stays 339 and twin
 --               stays 71. Nothing was dropped.
+--   2026-08-08  ottoq 54 -> 55, public 339 -> 340.
+--               db/migrations/0019_rider_flag_holds_the_vehicle.sql (20260808153457)
+--               adds exactly TWO routines, one in each schema:
+--                 public.ottoq_rider_flag_due(uuid,uuid,timestamptz)  -- the shared,
+--                       TOTAL predicate both dispatch gates consult: is this vehicle
+--                       carrying a rider cleaning flag that is pending AND due?
+--                 ottoq.ottoq_rider_flag_indepot_sweep(uuid,uuid,timestamptz) -- gives a
+--                       flag maturing on a PARKED car a path, by appending the cleaning
+--                       atom to the visit it is already having.
+--               VERIFIED BY NAME against the live catalogue, not inferred from a count.
+--               The four functions 0019 replaced (ottoq.ottoq_plan_dispatch_tick,
+--               twin.ottoq_sim_dispatch_vehicle, twin.ottoq_sim_auto_dispatch_tick,
+--               public.ottoq_evaluate_return_need) were CREATE OR REPLACE and do not move
+--               a count, so twin stays 71. Nothing was dropped.
+--               Until this bump, Section D read INVESTIGATE at +1/+1 on every run.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 339), ('ottoq', 54), ('twin', 71)
+  VALUES ('public', 340), ('ottoq', 55), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n
