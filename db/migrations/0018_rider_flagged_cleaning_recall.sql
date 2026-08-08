@@ -1,3 +1,5 @@
+-- migration-version: 20260808041455
+-- migration-name:    rider_flagged_cleaning_recall
 -- ============================================================================
 -- 0018_rider_flagged_cleaning_recall.sql
 --
