@@ -222,4 +222,83 @@ stays deterministic.
 
 ## 8. Certification run
 
-*(filled in below from the live run)*
+`0a3c6910`, seed **20260822**, `normal_day`, depot `1111…`, started with
+`ottoq_sim_run_scenario('normal_day', 20260822, 'operator_demo')` — fixed playback,
+30 sim-min per tick, 48 ticks, **08:00 → 08:00 America/Chicago**.
+
+**Night verified, not assumed.** Night is 20:00–06:00 = ticks 24–44. The run was observed
+at tick 28 / sim 22:00, tick 41 / sim 04:30, and tick 45 / sim 06:30 — it crossed the whole
+of it.
+
+**Denominator raised on purpose, and restored immediately.** `rider_flag_daily_pct` 3.0 →
+12.0 and `rider_flag_interior_share` 0.70 → **0.35** at depot scope *before* run creation
+(the draw happens once, at boot), both restored to 3.0 / 0.70 in the very next statement and
+the pre-state preserved in `public.mig0020_policy_prestate`. The brief asked for a raised
+exterior share so the sample could discriminate: the draw came out **7 exterior / 4 interior
+(64% exterior)**, against 6 of 16 exterior in the run that reported the defect.
+
+### The result
+
+| flag kind | status | n | bound to a real `visit_id` | `served_at_sim_clock` stamped | atom genuinely `status:'done'` |
+|---|---|---|---|---|---|
+| exterior | `served` | **6** | 6 | 6 | **6** |
+| exterior | `recalled` | 1 | 1 | — | — |
+| interior | `served` | **3** | 3 | 3 | **3** |
+| interior | `recalled` | 1 | 1 | — | — |
+| **total** | | **11** | **11** | **9** | **9** |
+
+* **11 of 11 flags consumed, 0 left `pending`.** 0018 left 2 of 18 stuck pending.
+* **11 of 11 bound to a visit row that exists**, on the right vehicle, in the right run,
+  carrying a rider-flagged atom. **0 unbound. 0 violating the guard's invariant.**
+* **`served` and "atom actually done" agree exactly: 9 = 9.** That is the
+  `served_at_sim_clock` undercount closed — it was 6 counted against 11 actually done.
+* **The guard never fired.** No `OQ020` appears anywhere in the Postgres log for this run.
+* The 2 flags still `recalled` are the honest remainder: the atom is placed on a real visit
+  and had not reached a bay when the clock ran out. **Placed is not cleaned, and it is not
+  reported as cleaned.**
+* Exterior is no longer the failing kind — **6 of 7** exterior flags reached `done` at a 64%
+  exterior share, which is the discriminating sample the brief asked for.
+
+### What went wrong during certification, and what it found
+
+The run **froze at tick 5** and sat there for 20 consecutive metronome calls, each rolling
+the whole tick back on `idx_stalls_one_vehicle_per_stall`. `tick_count` stayed at 5 while
+`next_tick_due_at` kept advancing, so from the outside it looked alive.
+
+That is **not 0020**. It is a latent, seed-dependent deadlock in
+`twin.ottoq_sim_advance_service_flow` — see `db/migrations/0021_one_vehicle_one_stall.sql`
+for the full diagnosis, the `PG_EXCEPTION_CONTEXT` trace, and the three checks that rule
+0020 out. 0021 fixes it at the table; the run advanced on the first metronome call after it
+landed and completed the night.
+
+---
+
+## 9. PROTECT, re-measured after both migrations
+
+| line | result |
+|---|---|
+| double bookings | **0** pairs over **4,155** booking rows — own pairwise `during && during` on (run, stall) across `held`/`active`/`done`/`interrupted`, **not** the exclusion constraint |
+| orphaned FKs | **226** FKs in `public` (225 + 0020's new one), key lists generated from `pg_constraint`, **0 orphans** |
+| 0010 geometry | **PASS — 0 overlapping pairs, 0 `not_assessed`** on the heading-aware oriented footprint (`relative_x/y` read as FEET, no 1.5699 conversion). **160 stalls per depot = 115 staging / 30 l2 / 10 dcfc / 3 wash_bay / 2 service_bay, both depots** |
+| 0008 laundering | **0.** 114 pairs (one per vehicle, latest run — no fan-out); 16 naive value-equality flags, **all 16 are 0.000 = 0.000**; **0** under the directional `copied_after_wear` test |
+| 0009 `planned_return_at` | still raises **`428C9`** on UPDATE |
+| cron | **10 ON, 11 ON, 12 ON, 13 OFF** — unchanged. Cron 12 was never touched |
+| drift | manifest regenerated; baseline moved `ottoq` 54 → 55 and `public` 339 → 344, **verified by name** |
+
+### ALWAYS HOLD — stated with its definition, because the definitions differ
+
+The filed pre-existing breach (5/65–7/82) was diagnosed as vehicles seated by
+`twin.ottoq_sim_seed_fleet` **with no `ottoq_stall_bookings` row at all**. Measured on that
+definition, in this run:
+
+* seated vehicles: **69**
+* seated with **zero bookings anywhere in the run**: **0**
+* seated whose current seat was **never** booked in this run: **0**
+* the four recurring ids (`4cd2b777`, `9926e267`, `c433a36d`, `c98ef465`): **none is seated**
+
+**It did not get worse.** A looser reading — "no `held`/`active` booking covering the seat
+right now" — gives 58 of 69, but that counts every car parked overnight whose booking has
+legitimately closed to `done`, which is not the filed defect. **I do not have the exact query
+behind the 5/65–7/82 figures, so I am not claiming this is the same measurement**; both
+numbers are given with their definitions rather than one being presented as a comparison it
+is not.
