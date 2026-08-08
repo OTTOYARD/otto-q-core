@@ -376,14 +376,22 @@ $fk$;
 -- ---------------------------------------------------------------------------
 -- §4  THE DRIFT GUARD — a new run-scoped table cannot hide
 -- ---------------------------------------------------------------------------
+-- `severity` matters. 'block' = a corruption risk that must stop a purge:
+-- a registered engine table with no FK, or an FK that has become CASCADE.
+-- Neither can appear by accident. 'warn' = an unregistered run-scoped column,
+-- which is what EVERY new certification/scratch table looks like on the day it
+-- is created. Blocking on those would mean the next `cert0023_*` table someone
+-- creates stops the purge — and the purge is what run start calls, so that
+-- would take the START engine down. Warnings ride out in the purge receipt
+-- where a human sees them; they do not stop the engine.
 CREATE OR REPLACE FUNCTION public.ottoq_check_run_scope_registry()
-RETURNS TABLE (table_schema text, table_name text, column_name text, problem text)
+RETURNS TABLE (table_schema text, table_name text, column_name text, problem text, severity text)
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path TO 'twin','ottoq','public','extensions'
 AS $fn$
   -- (a) a run-scoped column that nobody has classified
   SELECT c.table_schema::text, c.table_name::text, c.column_name::text,
-         'unregistered run-scoped column'::text
+         'unregistered run-scoped column'::text, 'warn'::text
     FROM information_schema.columns c
     JOIN pg_class rc ON rc.relname = c.table_name
     JOIN pg_namespace nn ON nn.oid = rc.relnamespace AND nn.nspname = c.table_schema
@@ -395,24 +403,36 @@ AS $fn$
                         AND g.table_name   = c.table_name
                         AND g.column_name  = c.column_name)
   UNION ALL
-  -- (b) an engine table that lost its foreign key
-  SELECT g.table_schema, g.table_name, g.column_name, 'engine table has no FK to ottoq_sim_runs'
+  -- (b) an engine/stamp table that lost its foreign key, or went missing.
+  --     `to_regclass` (not a ::regclass cast) is deliberate: the cast RAISES on a
+  --     dropped table, and since ottoq_purge_prior_runs calls this guard, one
+  --     dropped scratch table would have made every run start fail. Evidence
+  --     tables are scratch and do get dropped; this must stay total.
+  SELECT g.table_schema, g.table_name, g.column_name,
+         CASE WHEN to_regclass(g.table_schema||'.'||g.table_name) IS NULL
+              THEN 'registered engine/stamp table no longer exists'
+              ELSE 'engine/stamp table has no FK to ottoq_sim_runs' END,
+         'block'
     FROM public.ottoq_run_scope_registry g
    WHERE g.class IN ('engine','stamp')
      AND NOT EXISTS (
        SELECT 1 FROM pg_constraint k
         WHERE k.contype = 'f'
-          AND k.conrelid = (g.table_schema||'.'||g.table_name)::regclass
+          AND k.conrelid = to_regclass(g.table_schema||'.'||g.table_name)
           AND k.confrelid = 'public.ottoq_sim_runs'::regclass)
   UNION ALL
-  -- (c) an engine FK that has become CASCADE — history one command from erasure
-  SELECT g.table_schema, g.table_name, g.column_name,
-         'FK to ottoq_sim_runs is ON DELETE CASCADE — history can be silently erased'
-    FROM public.ottoq_run_scope_registry g
-    JOIN pg_constraint k ON k.contype='f'
-     AND k.conrelid = (g.table_schema||'.'||g.table_name)::regclass
+  -- (c) any FK to the run table that has become CASCADE — history one command
+  --     from silent erasure. Read from the catalogue directly so it also catches
+  --     a CASCADE on a table nobody registered.
+  SELECT n.nspname::text, c.relname::text, 'sim_run_id'::text,
+         'FK to ottoq_sim_runs is ON DELETE CASCADE — history can be silently erased',
+         'block'
+    FROM pg_constraint k
+    JOIN pg_class c ON c.oid = k.conrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE k.contype = 'f'
      AND k.confrelid = 'public.ottoq_sim_runs'::regclass
-   WHERE k.confdeltype = 'c';
+     AND k.confdeltype = 'c';
 $fn$;
 
 COMMENT ON FUNCTION public.ottoq_check_run_scope_registry() IS
@@ -432,7 +452,8 @@ SET search_path TO 'twin','ottoq','public','extensions'
 AS $function$
 DECLARE
   r record; v_n bigint; v_total bigint := 0; v_runs int;
-  v_doomed uuid[]; v_unreg int; v_engine int; v_cleared jsonb := '{}'::jsonb;
+  v_doomed uuid[]; v_block int; v_engine int; v_cleared jsonb := '{}'::jsonb;
+  v_warn jsonb;
 BEGIN
   -- (1) ARM. Without this the append-only guards refuse every DELETE below.
   --     Transaction-local: it evaporates at COMMIT.
@@ -443,9 +464,13 @@ BEGIN
   --     accumulated 27,163 orphans it could never see. If anything carrying a
   --     run id is unclassified, stop — do not delete a parent we cannot fully
   --     clear.
-  SELECT count(*) INTO v_unreg FROM public.ottoq_check_run_scope_registry();
-  IF v_unreg > 0 THEN
-    RAISE EXCEPTION 'purge refused: % run-scope registry defect(s). Run SELECT * FROM ottoq_check_run_scope_registry();', v_unreg;
+  SELECT count(*) FILTER (WHERE severity = 'block'),
+         COALESCE(jsonb_agg(table_name || '.' || column_name)
+                  FILTER (WHERE severity = 'warn'), '[]'::jsonb)
+    INTO v_block, v_warn
+    FROM public.ottoq_check_run_scope_registry();
+  IF v_block > 0 THEN
+    RAISE EXCEPTION 'purge refused: % blocking run-scope defect(s). Run SELECT * FROM ottoq_check_run_scope_registry();', v_block;
   END IF;
 
   SELECT count(*) INTO v_engine FROM public.ottoq_run_scope_registry WHERE class='engine';
@@ -464,7 +489,8 @@ BEGIN
 
   IF v_doomed IS NULL OR cardinality(v_doomed) = 0 THEN
     RETURN jsonb_build_object('ok', true, 'kept', p_keep_run, 'rows_purged', 0,
-      'prior_runs_deleted', 0, 'cleared_by_table', v_cleared, 'retention_armed', true);
+      'prior_runs_deleted', 0, 'cleared_by_table', v_cleared,
+      'unregistered_run_scoped', v_warn, 'retention_armed', true);
   END IF;
 
   -- (4) CHILDREN FIRST, every engine table, NO exception swallowed. A failure
@@ -495,7 +521,7 @@ BEGIN
     'ok', true, 'kept', p_keep_run, 'rows_purged', v_total,
     'prior_runs_deleted', v_runs, 'cleared_by_table', v_cleared,
     'evidence_preserved', (SELECT count(*) FROM public.ottoq_run_scope_registry WHERE class='evidence'),
-    'retention_armed', true);
+    'unregistered_run_scoped', v_warn, 'retention_armed', true);
 END;
 $function$;
 
@@ -568,10 +594,14 @@ DECLARE
   n int; n2 int; v_run uuid; v_veh uuid; v_ok boolean; v_state text; v_sqlstate text;
 BEGIN
   ---- A1  the registry is total ---------------------------------------------
-  SELECT count(*) INTO n FROM public.ottoq_check_run_scope_registry();
-  IF n <> 0 THEN RAISE EXCEPTION 'A1 FAILED: % run-scope registry defect(s)', n; END IF;
+  -- Both severities must be zero right now: every run-scoped column in the
+  -- database has just been classified, so there is nothing to warn about either.
+  SELECT count(*) FILTER (WHERE severity='block'), count(*) FILTER (WHERE severity='warn')
+    INTO n, n2 FROM public.ottoq_check_run_scope_registry();
+  IF n <> 0 THEN RAISE EXCEPTION 'A1 FAILED: % blocking run-scope defect(s)', n; END IF;
+  IF n2 <> 0 THEN RAISE EXCEPTION 'A1 FAILED: % run-scoped column(s) left unclassified', n2; END IF;
   SELECT count(*) INTO n FROM public.ottoq_run_scope_registry;
-  RAISE NOTICE 'A1 PASSED: registry covers % run-scoped column(s), 0 defects', n;
+  RAISE NOTICE 'A1 PASSED: registry covers % run-scoped column(s); 0 blocking, 0 unclassified', n;
 
   ---- A2  every engine + stamp column now has an FK -------------------------
   SELECT count(*) INTO n FROM public.ottoq_run_scope_registry WHERE class IN ('engine','stamp');
