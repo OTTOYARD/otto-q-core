@@ -104,7 +104,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'stop_is_two_phase_so_a_run_can_always_be_stopped'::text, '0017_stop_is_two_phase_so_a_run_can_always_be_stopped.sql'::text),
     ('20260808041455'::text, 'rider_flagged_cleaning_recall'::text, '0018_rider_flagged_cleaning_recall.sql'::text),
     ('20260808153457'::text, 'rider_flag_holds_the_vehicle'::text, '0019_rider_flag_holds_the_vehicle.sql'::text),
-    ('20260808165323'::text, 'rider_flag_consume_and_place_is_atomic'::text, '0020_rider_flag_consume_and_place_is_atomic.sql'::text)
+    ('20260808165323'::text, 'rider_flag_consume_and_place_is_atomic'::text, '0020_rider_flag_consume_and_place_is_atomic.sql'::text),
+    ('20260808170813'::text, 'one_vehicle_one_stall'::text, '0021_one_vehicle_one_stall.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
@@ -240,8 +241,13 @@ mismatch AS (
 --               run-scoped unique index ottoq_visit_needs_vehicle_visit_run_uk);
 --               constraints are not routines, so no count moves for it, and its exact
 --               definition is preserved in public.mig0020_prestate.
+--   2026-08-08  public 343 -> 344.  db/migrations/0021_one_vehicle_one_stall.sql
+--               (20260808170813) adds exactly ONE routine, a trigger function in
+--               public: public.ottoq_stall_seat_is_exclusive. VERIFIED BY NAME.
+--               It replaces nothing and drops nothing, so ottoq stays 55 and twin
+--               stays 71. The trigger it installs is not a routine.
 baseline_counts(sch, n) AS (
-  VALUES ('public', 343), ('ottoq', 55), ('twin', 71)
+  VALUES ('public', 344), ('ottoq', 55), ('twin', 71)
 ),
 live_counts AS (
   SELECT n.nspname::text AS sch, count(*)::int AS n

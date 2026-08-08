@@ -1,5 +1,15 @@
--- migration-version: PENDING
+-- migration-version: 20260808170813
 -- migration-name:    one_vehicle_one_stall
+--
+-- ══ APPLIED-TEXT NOTE ══
+--  Applied 2026-08-08 via Supabase MCP `apply_migration` (no SUPABASE_ACCESS_TOKEN,
+--  no psql, no Supabase CLI in this session). As with 0020, the narrative comment
+--  prose was condensed for the apply channel, so the submitted text is not
+--  byte-identical to this file:
+--    md5 of this file .......... see MIGRATION_LOG.md
+--    md5 of what actually ran .. 2f55734a4d2d81b9c3c68e171e9bb525
+--  The executable SQL was not edited, and the one routine created is proven
+--  byte-identical by md5(pg_get_functiondef) in MIGRATION_LOG.md.
 --
 -- 0021_one_vehicle_one_stall.sql
 -- ============================================================================
