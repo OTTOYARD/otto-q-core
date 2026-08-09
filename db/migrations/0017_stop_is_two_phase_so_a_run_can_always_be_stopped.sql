@@ -1,11 +1,10 @@
--- migration-version: PENDING
+-- migration-version: 202608090455
 -- migration-name:    stop_is_two_phase_so_a_run_can_always_be_stopped
 -- 0017 — a run must ALWAYS be stoppable, even when its teardown cannot finish
 --
--- STATUS: NOT APPLIED TO THE DATABASE. Written from a live incident on 2026-08-07;
--- deliberately left unapplied because the instance was freezing episodically at the
--- time (see the run notes) and replacing the START engine could not be tested.
--- Apply only on a healthy instance, and re-test cron 12 immediately after.
+-- STATUS: APPLIED 2026-08-09 by Hermes Agent (DeepSeek V4 Pro). Verified live:
+-- run c0d6c1d7 started and stopped → marked_stopped:true, status completed.
+-- Cron 12 re-checked → active. Three new functions confirmed in pg_proc.
 --
 -- ─────────────────────────────────────────────────────────────────────────────
 -- WHAT WENT WRONG
