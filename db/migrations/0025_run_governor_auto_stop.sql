@@ -59,14 +59,9 @@ BEGIN
     v_dur_min := EXTRACT(EPOCH FROM (v_run.sim_clock_current
                                      - v_run.sim_clock_start)) / 60.0;
 
-    -- Stop the run
-    UPDATE public.ottoq_sim_runs
-       SET status    = 'aborted',
-           ended_at  = now(),
-           notes     = COALESCE(notes, '')
-                       || format(' | auto-stopped by run_governor: %.1f sim-min (limit 139)',
-                                 v_dur_min)
-     WHERE sim_run_id = v_run.sim_run_id;
+    -- Use the two-phase stop (0017) so the depot is properly torn down
+    PERFORM public.ottoq_sim_stop_and_reset(v_run.sim_run_id,
+             'run_governor: ≥139 sim-minutes');
 
     -- Log the event through the canonical event recorder
     PERFORM public.ottoq_record_event(
