@@ -255,12 +255,8 @@ BEGIN
                 IF v_stage_stall IS NOT NULL
                    AND ottoq_reserve_stall(v_stage_stall, v_req.vehicle_id, v_clock, 900) THEN
                   -- 0039: emit command instead of direct UPDATE
-                  INSERT INTO ottoq_vehicle_commands (sim_run_id, vehicle_id, verb, payload, status)
-                  VALUES (p_sim_run_id, v_req.vehicle_id, 'proceed_to_stall',
-                          jsonb_build_object('stall_id', v_stage_stall, 'new_state', 'staged_awaiting_service'),
-                          'issued');
-                  UPDATE stalls SET current_vehicle_id = v_req.vehicle_id, status = 'occupied'
-                   WHERE id = v_stage_stall;
+                  PERFORM ottoq.ottoq_emit_vehicle_command(p_sim_run_id, v_depot, v_req.vehicle_id, 'proceed_to_stall',
+                          jsonb_build_object('stall_id', v_stage_stall, 'new_state', 'staged_awaiting_service'), v_clock);
                 END IF;
               END IF;
             END IF;
@@ -282,14 +278,12 @@ BEGIN
         UPDATE stalls SET current_vehicle_id = NULL, reserved_by = NULL, reservation_expires_at = NULL, status = 'available'
          WHERE current_vehicle_id = v_req.vehicle_id AND id <> (v_action->>'stall_id')::uuid;
         -- 0039: emit charge command instead of direct UPDATE
-        INSERT INTO ottoq_vehicle_commands (sim_run_id, vehicle_id, verb, payload, status)
-        VALUES (p_sim_run_id, v_req.vehicle_id, 'begin_charge',
+        PERFORM ottoq.ottoq_emit_vehicle_command(p_sim_run_id, v_depot, v_req.vehicle_id, 'begin_charge',
                 jsonb_build_object(
                   'stall_id', (v_action->>'stall_id')::text,
                   'stall_type', v_action->>'stall_type',
                   'new_state', CASE WHEN v_action->>'stall_type'='dcfc' THEN 'charging_dcfc' ELSE 'charging_l2' END
-                ),
-                'issued');
+                ), v_clock);
       -- 0039: charge stall claim handled by twin on command confirmation
         PERFORM ottoq_claim_tick_kw(p_sim_run_id, v_tick, v_depot, (v_action->>'requested_kw')::numeric, v_req.vehicle_id);
         PERFORM ottoq_start_concurrent_atoms(v_req.vehicle_id, v_clock);
@@ -459,12 +453,7 @@ BEGIN
         -- inside the SAME atomic visit to what it does still need. Nothing is booked
         -- and no stall is claimed, so the calendar cannot over-report.
         -- 0039: emit staging command instead of direct UPDATE
-        INSERT INTO ottoq_vehicle_commands (sim_run_id, vehicle_id, verb, payload, status)
-        VALUES (p_sim_run_id, v_req.vehicle_id, 'proceed_to_stall',
-                jsonb_build_object('new_state', 'staged_awaiting_service',
-                                  'next_step', COALESCE(v_action->>'next_step','need_deploy')),
-                'issued');
-        PERFORM ottoq_emit_vehicle_command(p_sim_run_id, v_depot, v_req.vehicle_id, 'stage',
+        PERFORM ottoq.ottoq_emit_vehicle_command(p_sim_run_id, v_depot, v_req.vehicle_id, 'stage',
                 jsonb_build_object('reason','no_wash_need','next_step',COALESCE(v_action->>'next_step','need_deploy')), v_clock);
         v_action := COALESCE(v_action,'{}'::jsonb) || jsonb_build_object('bay_booked', false, 'bay_stall_type', 'none');
       ELSE
@@ -855,11 +844,7 @@ BEGIN
                        v_need.purpose, v_clock, v_bay_until, v_bay_leg_id, 'needs_card');
 
           IF COALESCE((v_space->>'assigned')::boolean, false) THEN
-               -- 0039: emit bay command instead of direct UPDATE
-               INSERT INTO ottoq_vehicle_commands (sim_run_id, vehicle_id, verb, payload, status)
-               VALUES (p_sim_run_id, v_req.vehicle_id, v_need.verb,
-                       jsonb_build_object('new_state', v_need.new_state, 'stall_id', (v_space->>'stall_id')),
-                       'issued');
+               -- 0039: bay entry handled by twin on command confirmation below
             IF v_need.stall_type = 'wash_bay' THEN
               v_wash_open := v_wash_open - 1;
               IF COALESCE(v_need.is_resume,false) THEN v_wash_res_used := v_wash_res_used + 1; END IF;
