@@ -6,7 +6,7 @@
 -- If validation fails, stamp the command as 'refused' instead of 'executed'.
 
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_confirm_commands(p_sim_run_id uuid, p_clock timestamp with time zone)
-RETURNS jsonb
+RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
@@ -100,12 +100,6 @@ BEGIN
     END IF;
   END LOOP;
   
-  RETURN jsonb_build_object(
-    'sim_run_id', p_sim_run_id,
-    'commands_processed', v_executed + v_refused,
-    'executed', v_executed,
-    'refused', v_refused,
-    'skipped', v_skipped
-  );
+  RETURN v_executed + v_refused;
 END;
 $fn$;
