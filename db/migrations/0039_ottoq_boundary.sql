@@ -524,7 +524,6 @@ BEGIN
         -- ENTRY AND CALENDAR ARE ONE ACT. A real wash bay has been claimed AND booked in
         -- this transaction, so the command names the stall, the booking and the leg.
       -- 0039: vehicle state update handled by twin on 'enter_wash' command confirmation
-               config=jsonb_set(COALESCE(config,'{}'::jsonb),'{svc_step}',to_jsonb('washing'::text)) WHERE id=v_req.vehicle_id;
         PERFORM ottoq_emit_vehicle_command(p_sim_run_id, v_depot, v_req.vehicle_id, 'enter_wash',
                 jsonb_build_object('stall_id',   v_space->>'stall_id',
                                    'booking_id', v_space->>'booking_id',
@@ -963,7 +962,6 @@ BEGIN
         END IF;
         IF COALESCE((v_space->>'assigned')::boolean, false) THEN
       -- 0039: vehicle state update handled by twin on 'enter_service' command confirmation
-                 config=jsonb_set(COALESCE(config,'{}'::jsonb),'{svc_step}',to_jsonb('servicing'::text)) WHERE id=v_req.vehicle_id;
           PERFORM ottoq_emit_vehicle_command(p_sim_run_id, v_depot, v_req.vehicle_id, 'enter_service',
                   jsonb_build_object('stall_id',   v_space->>'stall_id',
                                      'booking_id', v_space->>'booking_id',
@@ -994,7 +992,6 @@ BEGIN
         NULL;
       ELSE
       -- 0039: vehicle state update handled by twin on 'stage' command confirmation
-               config=jsonb_set(COALESCE(config,'{}'::jsonb),'{svc_step}',to_jsonb('ready'::text)) WHERE id=v_req.vehicle_id;
         PERFORM ottoq_emit_vehicle_command(p_sim_run_id, v_depot, v_req.vehicle_id, 'stage', jsonb_build_object('ready', true), v_clock);
       END IF;
     END IF;
