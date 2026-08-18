@@ -1,5 +1,7 @@
 # AGENTS.md — otto-q-core
 
+> **Build doctrine → [`CLAUDE.md`](CLAUDE.md) · Research doctrine → [`HERMES.md`](HERMES.md).**
+
 **This repo is the OTTO-Q brain, in files.** OTTO-Q is the orchestration layer for OTTOYARD's
 autonomous-vehicle depots — the software that decides which vehicle goes where, when, in what order,
 and **why**, and can prove the reasoning to an OEM auditor.
@@ -91,11 +93,11 @@ existing is not evidence it is unmerged — check
 (`/orgs/OTTOYARD/...` returns 404 — use `/user/repos`). And GitHub **rejects pushes authored as
 `chase@ottoyard.com`** — commit as a noreply identity.
 
-**The one database that matters is `gxdrcyphqjzjsuhxuqtg`.** ⚠️ **Every `supabase/config.toml` in
-every OTTOYARD repo points somewhere else** — at dead refs (`hfjaofyfxsyniohdfacg`,
-`odhpbdhnpcrjeaxvbrzd`), at OrchestrAV's legacy database (`ycsisvozzgmisboumfqc`), or at a
-placeholder. The real ref is hardcoded in client code instead. **Pass
-`--project-ref gxdrcyphqjzjsuhxuqtg` explicitly to any Supabase CLI command that writes.**
+**Three Supabase projects — the engine is `gxdrcyphqjzjsuhxuqtg` (otto-q-core).** ⚠️ **Every `supabase/config.toml` in every OTTOYARD repo points somewhere else** — at dead refs (`hfjaofyfxsyniohdfacg`,
+`odhpbdhnpcrjeaxvbrzd`), at the OTTOYARD MVP (`ycsisvozzgmisboumfqc`), at the INACTIVE Fleet
+Dashboard (`sovyxwtrqfmizelrammm`), or at a placeholder. The real ref is hardcoded in client code
+instead. **Pass `--project-ref gxdrcyphqjzjsuhxuqtg` explicitly to any Supabase CLI command that
+writes.**
 
 **Never disable pg_cron job 12** (`ottoq-demo-metronome`). It **is** the simulation run engine.
 Disabling it stops every run while everything still looks green.
