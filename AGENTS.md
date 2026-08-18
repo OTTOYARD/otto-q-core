@@ -16,15 +16,20 @@ applied migrations while the founder's working folder had 80 files with zero ove
 
 ## Before you touch anything
 
-1. **Read `MIGRATION_LOG.md`.** It is the best-written document in the project: one row per change,
-   with the symptom that started it, the objects touched, who applied it, and **the query that proves
-   the behaviour actually moved**. "Verified" never means "applied without error."
+1. **Read `MIGRATION_LOG.md`.** It is meant to be one row per change, with the symptom that started
+   it, the objects touched, who applied it, and **the query that proves the behaviour actually
+   moved**. "Verified" never means "applied without error." ⚠️ As of 2026-08-18 the log holds a
+   single row against 41 migration files — until it is backfilled, the migration-file headers are
+   the primary record.
 2. **Read `db/baseline/`** — `functions_public.sql`, `functions_ottoq.sql`, `functions_twin.sql`,
    `tables.sql`, `rls_policies.sql`, `cron_jobs.sql`. You can understand the whole brain without
    touching the database.
-3. **Migrations run 0001–0022.** All applied except `0017_stop_is_two_phase…`, deliberately held back
-   because it replaces the START engine and could not be safely tested. `0022` is applied but still
-   on branch `p0022-run-scope-integrity` — **the only unmerged branch in any OTTOYARD repo.**
+3. **Migrations run 0001–0042 (there is no `0024`).** Per their headers all are applied, including
+   `0017_stop_is_two_phase…` (initially held back, applied 2026-08-09 with live verification). No
+   unmerged branches remain on origin. ⚠️ Files `0026`–`0033` and `0035`–`0042` (except `0034`)
+   carry no `migration-version:` header, so `gen-drift-sql.sh` rejects them and
+   `check-drift.sql`'s manifest cannot see them — backfill headers before trusting a CLEAN drift
+   report. *(Reconciled 2026-08-18, Run 1 C1 — see `SYSTEM_TOPOLOGY.md`.)*
 
 ## Landmines specific to this repo
 
@@ -93,11 +98,15 @@ existing is not evidence it is unmerged — check
 (`/orgs/OTTOYARD/...` returns 404 — use `/user/repos`). And GitHub **rejects pushes authored as
 `chase@ottoyard.com`** — commit as a noreply identity.
 
-**Three Supabase projects — the engine is `gxdrcyphqjzjsuhxuqtg` (otto-q-core).** ⚠️ **Every `supabase/config.toml` in every OTTOYARD repo points somewhere else** — at dead refs (`hfjaofyfxsyniohdfacg`,
-`odhpbdhnpcrjeaxvbrzd`), at the OTTOYARD MVP (`ycsisvozzgmisboumfqc`), at the INACTIVE Fleet
-Dashboard (`sovyxwtrqfmizelrammm`), or at a placeholder. The real ref is hardcoded in client code
-instead. **Pass `--project-ref gxdrcyphqjzjsuhxuqtg` explicitly to any Supabase CLI command that
-writes.**
+**Three Supabase projects — the engine is `gxdrcyphqjzjsuhxuqtg` (otto-q-core, us-east-1).**
+`ycsisvozzgmisboumfqc` is the **OTTOYARD MVP** (us-east-2): the original demo backend, OrchestrAV's
+auth/billing/retail (`ottoq_ps_*`) home, and Hermes's live `intelligence_events` pipeline — active,
+never the engine. `sovyxwtrqfmizelrammm` (Fleet Dashboard) is INACTIVE with zero live callers.
+⚠️ **Every `supabase/config.toml` in every OTTOYARD repo points somewhere else** — at dead refs
+(`hfjaofyfxsyniohdfacg`, `odhpbdhnpcrjeaxvbrzd`), at the MVP, or at a placeholder. The real ref is
+hardcoded in client code instead. **Pass `--project-ref gxdrcyphqjzjsuhxuqtg` explicitly to any
+Supabase CLI command that writes.** *(DB labels reconciled 2026-08-18 by Run 1 C1 — see
+`SYSTEM_TOPOLOGY.md`.)*
 
 **Never disable pg_cron job 12** (`ottoq-demo-metronome`). It **is** the simulation run engine.
 Disabling it stops every run while everything still looks green.
