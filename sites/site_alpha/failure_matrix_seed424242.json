@@ -1,0 +1,791 @@
+{
+ "cells": [
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "fifo",
+   "run_id": "SA-6c9fc5b2f1cd",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "greedy",
+   "run_id": "SA-d3b0a25b2cff",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 676,
+    "total_tardy_min": 28,
+    "turns": 72
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-8261baccef4b",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 42,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-228bb50fe396",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 127,
+    "turns": 72
+   },
+   "note": "one DCFC + one wash bay blocked for the whole horizon",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 127,
+    "yard_logistics_B": 0
+   },
+   "policy": "fifo",
+   "run_id": "SA-84866abffcc1",
+   "scenario": "blocked_point",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "one DCFC + one wash bay blocked for the whole horizon",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "greedy",
+   "run_id": "SA-ea2480e962a5",
+   "scenario": "blocked_point",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 676,
+    "total_tardy_min": 43,
+    "turns": 72
+   },
+   "note": "one DCFC + one wash bay blocked for the whole horizon",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 15,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-430fe91cf2ad",
+   "scenario": "blocked_point",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 47,
+    "peak_site_kw": 551,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "one DCFC + one wash bay blocked for the whole horizon",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-925c79caf59f",
+   "scenario": "blocked_point",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 684,
+    "total_tardy_min": 101,
+    "turns": 72
+   },
+   "note": "30% of tenant-A returns overstay by 45 min (seeded pick)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 101,
+    "yard_logistics_B": 0
+   },
+   "policy": "fifo",
+   "run_id": "SA-348b2bf10202",
+   "scenario": "overstay",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 684,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "30% of tenant-A returns overstay by 45 min (seeded pick)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "greedy",
+   "run_id": "SA-51a7965bb72b",
+   "scenario": "overstay",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 680,
+    "total_tardy_min": 129,
+    "turns": 72
+   },
+   "note": "30% of tenant-A returns overstay by 45 min (seeded pick)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 101,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-30b0cb8e056a",
+   "scenario": "overstay",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 42,
+    "peak_site_kw": 640,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "30% of tenant-A returns overstay by 45 min (seeded pick)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-e8e9cc6a279d",
+   "scenario": "overstay",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 64,
+    "turns": 72
+   },
+   "note": "2 assets immobile on-point (+120 min point hold)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 64
+   },
+   "policy": "fifo",
+   "run_id": "SA-55502a591d27",
+   "scenario": "immobile_asset",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "2 assets immobile on-point (+120 min point hold)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "greedy",
+   "run_id": "SA-887b39e84de9",
+   "scenario": "immobile_asset",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 676,
+    "total_tardy_min": 92,
+    "turns": 72
+   },
+   "note": "2 assets immobile on-point (+120 min point hold)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 64
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-56dde94cb5ad",
+   "scenario": "immobile_asset",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 42,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "2 assets immobile on-point (+120 min point hold)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-c784c630ad84",
+   "scenario": "immobile_asset",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 228,
+    "turns": 72
+   },
+   "note": "3 DCFC fault at t=1100 (mid-surge) and stay down; sessions may not cross the fault",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 228,
+    "yard_logistics_B": 0
+   },
+   "policy": "fifo",
+   "run_id": "SA-d11d4d5b2505",
+   "scenario": "mid_session_charger_fault",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "3 DCFC fault at t=1100 (mid-surge) and stay down; sessions may not cross the fault",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "greedy",
+   "run_id": "SA-48ec074a6994",
+   "scenario": "mid_session_charger_fault",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 676,
+    "total_tardy_min": 315,
+    "turns": 72
+   },
+   "note": "3 DCFC fault at t=1100 (mid-surge) and stay down; sessions may not cross the fault",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 287,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-1578c6895565",
+   "scenario": "mid_session_charger_fault",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 44,
+    "peak_site_kw": 676,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "3 DCFC fault at t=1100 (mid-surge) and stay down; sessions may not cross the fault",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-c516b57c50be",
+   "scenario": "mid_session_charger_fault",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 11673,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "charging zone loses a feeder 1050-1230 (mid-surge): 350 kW available (cap-aware policies re-plan; cap-blind ones violate)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "fifo",
+   "run_id": "SA-4794f9330ee7",
+   "scenario": "zone_power_loss",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 11673,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "charging zone loses a feeder 1050-1230 (mid-surge): 350 kW available (cap-aware policies re-plan; cap-blind ones violate)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "greedy",
+   "run_id": "SA-63c9eb37a965",
+   "scenario": "zone_power_loss",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 11581,
+    "p95_wait_min": 31,
+    "peak_site_kw": 676,
+    "total_tardy_min": 28,
+    "turns": 72
+   },
+   "note": "charging zone loses a feeder 1050-1230 (mid-surge): 350 kW available (cap-aware policies re-plan; cap-blind ones violate)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-f6e37af9d1bd",
+   "scenario": "zone_power_loss",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 140,
+    "peak_site_kw": 504,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "charging zone loses a feeder 1050-1230 (mid-surge): 350 kW available (cap-aware policies re-plan; cap-blind ones violate)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-0c95b2ee3650",
+   "scenario": "zone_power_loss",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 680,
+    "total_tardy_min": 34,
+    "turns": 72
+   },
+   "note": "yard path closed 1100-1160 (mid-surge); move-ins may not cross the closure",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 34,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "fifo",
+   "run_id": "SA-2bb91b0b4d75",
+   "scenario": "human_path_crossing",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 680,
+    "total_tardy_min": 34,
+    "turns": 72
+   },
+   "note": "yard path closed 1100-1160 (mid-surge); move-ins may not cross the closure",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 34,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "greedy",
+   "run_id": "SA-73d55f881ebb",
+   "scenario": "human_path_crossing",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 45,
+    "peak_site_kw": 680,
+    "total_tardy_min": 62,
+    "turns": 72
+   },
+   "note": "yard path closed 1100-1160 (mid-surge); move-ins may not cross the closure",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 62,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-c2c17f2235e4",
+   "scenario": "human_path_crossing",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 53,
+    "peak_site_kw": 680,
+    "total_tardy_min": 36,
+    "turns": 72
+   },
+   "note": "yard path closed 1100-1160 (mid-surge); move-ins may not cross the closure",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 36,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-d9d9ccdffb8f",
+   "scenario": "human_path_crossing",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "swap dock jammed 400-700; tractors fall back to DCFC (their alternative)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "fifo",
+   "run_id": "SA-f35d71c38ab3",
+   "scenario": "swap_dock_jam",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "swap dock jammed 400-700; tractors fall back to DCFC (their alternative)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "greedy",
+   "run_id": "SA-c3d8c9dffe9c",
+   "scenario": "swap_dock_jam",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 676,
+    "total_tardy_min": 28,
+    "turns": 72
+   },
+   "note": "swap dock jammed 400-700; tractors fall back to DCFC (their alternative)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-2f2e9d388c03",
+   "scenario": "swap_dock_jam",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 42,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "swap dock jammed 400-700; tractors fall back to DCFC (their alternative)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-781aa2987563",
+   "scenario": "swap_dock_jam",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  },
+  {
+   "note": "NOT APPLICABLE: no tug resource in the packs on this site (vertiport paper pack, H3/C11)",
+   "policy": "fifo",
+   "run_id": "SA-05f1b1988034",
+   "scenario": "tug_unavailable",
+   "status": "not_applicable"
+  },
+  {
+   "note": "NOT APPLICABLE: no tug resource in the packs on this site (vertiport paper pack, H3/C11)",
+   "policy": "greedy",
+   "run_id": "SA-5d4a194cc231",
+   "scenario": "tug_unavailable",
+   "status": "not_applicable"
+  },
+  {
+   "note": "NOT APPLICABLE: no tug resource in the packs on this site (vertiport paper pack, H3/C11)",
+   "policy": "otto_q_asis",
+   "run_id": "SA-7d7853189fb8",
+   "scenario": "tug_unavailable",
+   "status": "not_applicable"
+  },
+  {
+   "note": "NOT APPLICABLE: no tug resource in the packs on this site (vertiport paper pack, H3/C11)",
+   "policy": "cpsat_alpha",
+   "run_id": "SA-74b8a8f83cf7",
+   "scenario": "tug_unavailable",
+   "status": "not_applicable"
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 616,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "25% of tenant-A recalls refused; asset returns 90 min late (first-class handling = C9)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "fifo",
+   "run_id": "SA-7f87c5df31ba",
+   "scenario": "work_side_recall_refusal",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 15,
+    "peak_site_kw": 616,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "25% of tenant-A recalls refused; asset returns 90 min late (first-class handling = C9)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "greedy",
+   "run_id": "SA-4b75b324042f",
+   "scenario": "work_side_recall_refusal",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 616,
+    "total_tardy_min": 28,
+    "turns": 72
+   },
+   "note": "25% of tenant-A recalls refused; asset returns 90 min late (first-class handling = C9)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-f482c40887b1",
+   "scenario": "work_side_recall_refusal",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 42,
+    "peak_site_kw": 551,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "25% of tenant-A recalls refused; asset returns 90 min late (first-class handling = C9)",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-62d38ed7df54",
+   "scenario": "work_side_recall_refusal",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  }
+ ],
+ "crn": "one draw per seed shared by every cell",
+ "seed": 424242,
+ "site": "site_alpha"
+}
