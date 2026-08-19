@@ -1,0 +1,10 @@
+{
+  "scenario_id": "C7.swap_dock_jam",
+  "name": "swap_dock_jam",
+  "description": "The battery-swap dock jams mid-swap",
+  "status": "provisional",
+  "seed_discipline": "run under a fixed seed; cite the run ID",
+  "mechanism": "NONE in the robotaxi pack (no swap operation). Becomes executable when the yard-logistics pack (C8 Site Alpha, C11) declares swap_dock points + battery_swap operation; the jam is then a blocked_point on the dock",
+  "provisional_gap": "yard-logistics pack data",
+  "expected_kernel_behavior": "swap sessions re-queue to charge as the alternative operation; the dock booking honours-or-replans"
+}

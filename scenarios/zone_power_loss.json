@@ -1,0 +1,18 @@
+{
+  "scenario_id": "C7.zone_power_loss",
+  "name": "zone_power_loss",
+  "description": "A power zone loses supply / site is capped",
+  "status": "partial",
+  "seed_discipline": "run under a fixed seed; cite the run ID",
+  "mechanism": "inject_fault {kind: grid_brownout} + inject_dr_call {cap_kw, duration_min} exist and are executable; ZONE-scoped loss (a subset of points) has no injector yet",
+  "injection": {
+    "api": {
+      "inject_dr_call": {
+        "cap_kw": 400,
+        "duration_min": 60
+      }
+    }
+  },
+  "provisional_gap": "per-zone breaker model; today the cap is site-wide",
+  "expected_kernel_behavior": "charge cursor respects the reduced cap (EN.001); power_loss/power_restored canonical events (0045) mark the window"
+}

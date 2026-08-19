@@ -1,0 +1,15 @@
+{
+  "scenario_id": "C7.immobile_asset",
+  "name": "immobile_asset",
+  "description": "An asset becomes immobile (breakdown / tow required)",
+  "status": "executable",
+  "seed_discipline": "run under a fixed seed; cite the run ID",
+  "mechanism": "calibrated incident draw (ottoq_sim_maybe_incident) with requires_tow; raise breakdown_rate profile; vehicle -> tow_requested, dispatch aborted",
+  "injection": {
+    "variability": {
+      "var_key": "breakdown_rate",
+      "rate_mult": 5.0
+    }
+  },
+  "expected_kernel_behavior": "tow_requested exits all cursors; stall it held is reconciled free; anomaly.critical_detected emitted; no assignment targets an immobile asset"
+}

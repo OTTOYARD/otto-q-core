@@ -1,0 +1,15 @@
+{
+  "scenario_id": "C7.overstay",
+  "name": "overstay",
+  "description": "An asset overstays its work window (late return)",
+  "status": "executable",
+  "seed_discipline": "run under a fixed seed; cite the run ID",
+  "mechanism": "variability eta_delay cards (ottoq_twin_deal_eta_card) \u2014 the twin's calibrated delay draw; raise the eta_delay profile rate",
+  "injection": {
+    "variability": {
+      "var_key": "eta_delay",
+      "rate_mult": 3.0
+    }
+  },
+  "expected_kernel_behavior": "scheduled_return_at slides with a recorded eta refresh (0009 discipline); forward bookings re-plan; p95_time_to_service reflects, never hides, the lateness"
+}

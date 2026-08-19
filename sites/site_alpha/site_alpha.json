@@ -1,0 +1,434 @@
+{
+ "name": "site_alpha",
+ "comment": "C8 Site Alpha (CLAUDE.md): the shared multi-tenant site. Runs on the C4/C5 harness (packs are data); live-twin conformance is C11's job. All times integer minutes over a 1740-min horizon (29h, covering the overnight tail); seed discipline: one draw per seed shared across every policy and configuration (CRN).",
+ "seed": 424242,
+ "horizon_min": 1740,
+ "site": {
+  "power_cap_kw_hard": 3000,
+  "power_soft_target_kw": 2200,
+  "dcfc_cooldown_min": 18,
+  "move_duration_min": 4,
+  "path_capacity": 2,
+  "cold_start_below_c": 5,
+  "cold_start_penalty_min": 12,
+  "onpeak_window_min": [
+   840,
+   1140
+  ]
+ },
+ "objective_weights": {
+  "tardiness_per_min": 10,
+  "onpeak_kw_min": 1,
+  "peak_excess_per_kw": 20,
+  "per_move": 15
+ },
+ "asset_classes": {
+  "waymo_jaguar_ipace_2024": {
+   "battery_kwh": 90,
+   "max_charge_kw": 100,
+   "inlet": "CCS",
+   "charge_kinds": [
+    "dcfc",
+    "l2"
+   ],
+   "energy_curve": [
+    {
+     "above_soc_pct": 0,
+     "accept_frac": 1.0
+    },
+    {
+     "above_soc_pct": 70,
+     "accept_frac": 0.6
+    },
+    {
+     "above_soc_pct": 85,
+     "accept_frac": 0.35
+    }
+   ]
+  },
+  "yard_tractor_e_2025": {
+   "battery_kwh": 220,
+   "max_charge_kw": 150,
+   "inlet": "CCS",
+   "charge_kinds": [
+    "dcfc",
+    "swap_dock"
+   ],
+   "swap_minutes": 10,
+   "energy_curve": [
+    {
+     "above_soc_pct": 0,
+     "accept_frac": 1.0
+    },
+    {
+     "above_soc_pct": 70,
+     "accept_frac": 0.6
+    },
+    {
+     "above_soc_pct": 85,
+     "accept_frac": 0.35
+    }
+   ]
+  },
+  "amr_pallet_2025": {
+   "battery_kwh": 12,
+   "max_charge_kw": 4,
+   "inlet": "PAD",
+   "charge_kinds": [
+    "amr_pad"
+   ],
+   "energy_curve": [
+    {
+     "above_soc_pct": 0,
+     "accept_frac": 1.0
+    },
+    {
+     "above_soc_pct": 80,
+     "accept_frac": 0.5
+    }
+   ]
+  }
+ },
+ "service_points": [
+  {
+   "id": "SA-DCFC-01",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-DCFC-02",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-DCFC-03",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-DCFC-04",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-DCFC-05",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-DCFC-06",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-DCFC-07",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-DCFC-08",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-DCFC-09",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-DCFC-10",
+   "kind": "dcfc",
+   "kw": 150,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-L2-01",
+   "kind": "l2",
+   "kw": 11,
+   "classes": [
+    "waymo_jaguar_ipace_2024"
+   ]
+  },
+  {
+   "id": "SA-L2-02",
+   "kind": "l2",
+   "kw": 11,
+   "classes": [
+    "waymo_jaguar_ipace_2024"
+   ]
+  },
+  {
+   "id": "SA-L2-03",
+   "kind": "l2",
+   "kw": 11,
+   "classes": [
+    "waymo_jaguar_ipace_2024"
+   ]
+  },
+  {
+   "id": "SA-L2-04",
+   "kind": "l2",
+   "kw": 11,
+   "classes": [
+    "waymo_jaguar_ipace_2024"
+   ]
+  },
+  {
+   "id": "SA-L2-05",
+   "kind": "l2",
+   "kw": 11,
+   "classes": [
+    "waymo_jaguar_ipace_2024"
+   ]
+  },
+  {
+   "id": "SA-L2-06",
+   "kind": "l2",
+   "kw": 11,
+   "classes": [
+    "waymo_jaguar_ipace_2024"
+   ]
+  },
+  {
+   "id": "SA-L2-07",
+   "kind": "l2",
+   "kw": 11,
+   "classes": [
+    "waymo_jaguar_ipace_2024"
+   ]
+  },
+  {
+   "id": "SA-L2-08",
+   "kind": "l2",
+   "kw": 11,
+   "classes": [
+    "waymo_jaguar_ipace_2024"
+   ]
+  },
+  {
+   "id": "SA-WASH-01",
+   "kind": "wash_bay",
+   "kw": 0,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-WASH-02",
+   "kind": "wash_bay",
+   "kw": 0,
+   "classes": [
+    "waymo_jaguar_ipace_2024",
+    "yard_tractor_e_2025"
+   ]
+  },
+  {
+   "id": "SA-CALIB-01",
+   "kind": "calibration",
+   "kw": 0,
+   "classes": [
+    "waymo_jaguar_ipace_2024"
+   ]
+  },
+  {
+   "id": "SA-AMRPAD-01",
+   "kind": "amr_pad",
+   "kw": 4,
+   "classes": [
+    "amr_pallet_2025"
+   ]
+  },
+  {
+   "id": "SA-AMRPAD-02",
+   "kind": "amr_pad",
+   "kw": 4,
+   "classes": [
+    "amr_pallet_2025"
+   ]
+  },
+  {
+   "id": "SA-AMRPAD-03",
+   "kind": "amr_pad",
+   "kw": 4,
+   "classes": [
+    "amr_pallet_2025"
+   ]
+  },
+  {
+   "id": "SA-AMRPAD-04",
+   "kind": "amr_pad",
+   "kw": 4,
+   "classes": [
+    "amr_pallet_2025"
+   ]
+  },
+  {
+   "id": "SA-AMRPAD-05",
+   "kind": "amr_pad",
+   "kw": 4,
+   "classes": [
+    "amr_pallet_2025"
+   ]
+  },
+  {
+   "id": "SA-AMRPAD-06",
+   "kind": "amr_pad",
+   "kw": 4,
+   "classes": [
+    "amr_pallet_2025"
+   ]
+  },
+  {
+   "id": "SA-SWAP-01",
+   "kind": "swap_dock",
+   "kw": 0,
+   "classes": [
+    "yard_tractor_e_2025"
+   ]
+  }
+ ],
+ "capabilities": {
+  "dcfc": [
+   "charge_dcfc"
+  ],
+  "l2": [
+   "charge_l2"
+  ],
+  "wash_bay": [
+   "wash"
+  ],
+  "calibration": [
+   "sensor_calibration"
+  ],
+  "amr_pad": [
+   "charge_amr"
+  ],
+  "swap_dock": [
+   "battery_swap"
+  ]
+ },
+ "parallel_ops_menu": {
+  "sensor_clean": {
+   "dur_min": 6
+  },
+  "interior_tidy": {
+   "dur_min": 10
+  },
+  "software_update": {
+   "dur_min": 25
+  }
+ },
+ "tenants": {
+  "robotaxi_operator_A": {
+   "class": "waymo_jaguar_ipace_2024",
+   "assets": 18,
+   "duty_cycle": "overnight_heavy",
+   "arrival_window_min": [
+    1020,
+    1200
+   ],
+   "ready_delta_min": [
+    180,
+    360
+   ],
+   "soc_range": [
+    10,
+    45
+   ],
+   "needs_wash_p": 0.6,
+   "needs_calibration_p": 0.15,
+   "parallel_ops_p": 0.6,
+   "cold_p": 0.15
+  },
+  "yard_logistics_B": {
+   "class": "yard_tractor_e_2025",
+   "assets": 6,
+   "duty_cycle": "daytime_waves",
+   "arrival_waves_min": [
+    [
+     360,
+     120
+    ],
+    [
+     780,
+     120
+    ]
+   ],
+   "ready_delta_min": [
+    90,
+    180
+   ],
+   "soc_range": [
+    15,
+    45
+   ],
+   "needs_wash_p": 0.3,
+   "needs_calibration_p": 0.0,
+   "parallel_ops_p": 0.0,
+   "cold_p": 0.0
+  },
+  "amr_fleet_C": {
+   "class": "amr_pallet_2025",
+   "assets": 24,
+   "visits_per_asset": 2,
+   "duty_cycle": "opportunity",
+   "target_soc": 80,
+   "arrival_window_min": [
+    300,
+    1200
+   ],
+   "ready_delta_min": [
+    90,
+    180
+   ],
+   "soc_range": [
+    20,
+    55
+   ],
+   "needs_wash_p": 0.0,
+   "needs_calibration_p": 0.0,
+   "parallel_ops_p": 0.0,
+   "cold_p": 0.0
+  }
+ }
+}

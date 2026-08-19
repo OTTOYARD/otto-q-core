@@ -1,0 +1,56 @@
+{
+ "artifact": "run3/C7 demonstration run \u2014 end-to-end into the C6 CLI",
+ "generated": "2026-08-19",
+ "sim_run_id": "6727b04e-b890-45e3-87c1-ac4c558e2a81",
+ "run_key": {
+  "policy_name": "otto_q",
+  "pack_id": "robotaxi",
+  "scenario": "normal_day",
+  "scenario_seed": 424242,
+  "config_hash": "b422ef9dfce1f7ef273ca5998d95ffdc"
+ },
+ "kpi_five": {
+  "peak_site_kw": 662.1,
+  "touch_events_per_turn": 0.059,
+  "p95_time_to_service_min": 0,
+  "asset_hours_available_per_day": {
+   "2026-08-19": 773.42,
+   "2026-08-20": 27.58
+  },
+  "service_point_turns_per_point_per_day": {
+   "2026-08-19": 1.84,
+   "2026-08-20": 1.92
+  }
+ },
+ "safety_cert_ottoq_certify_run": {
+  "ticks_examined": 21,
+  "unsafe_deploy_ticks": 0,
+  "over_stall_ticks": 2,
+  "charge_offline_ticks": 0,
+  "over_power_ticks": 0,
+  "over_power_measurable": 13,
+  "worst_dcfc_draw_kw": 264.53,
+  "dcfc_cap_kw": 1800,
+  "certified": false,
+  "note": "2/21 frames show a double-held stall (B1) \u2014 open finding, see TWIN_CORE.md \u00a71"
+ },
+ "determinism_pair": {
+  "arm_a": "6727b04e-b890-45e3-87c1-ac4c558e2a81",
+  "arm_b": "a1e3bdb3-8222-49eb-8094-a85518be8706",
+  "identical_ticks": "0 of 20 aligned",
+  "verdict": "FAIL pre-0045 \u2014 root cause and fix in TWIN_CORE.md \u00a71; re-certify after 0045 applies",
+  "ab_scores": {
+   "arm_a": {
+    "throughput_per_hr": 8.1,
+    "energy_peak_kw": 662.1,
+    "ticks": 23
+   },
+   "arm_b": {
+    "throughput_per_hr": 7.1,
+    "energy_peak_kw": 587.5,
+    "ticks": 21
+   }
+  }
+ },
+ "provenance": "all values read from ottoq_kpi_five(), ottoq_certify_run(), ottoq_ab_runs and the snapshot digest on gxdrcyphqjzjsuhxuqtg, 2026-08-19"
+}

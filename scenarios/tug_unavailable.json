@@ -1,0 +1,10 @@
+{
+  "scenario_id": "C7.tug_unavailable",
+  "name": "tug_unavailable",
+  "description": "The reposition tug is unavailable (vertiport)",
+  "status": "provisional",
+  "seed_discipline": "run under a fixed seed; cite the run ID",
+  "mechanism": "NONE in the robotaxi pack. Vertiport paper pack (H3) models tug-as-resource; unavailability is then a capacity-0 window on the tug resource",
+  "provisional_gap": "vertiport pack data (H3, C11 paper conformance)",
+  "expected_kernel_behavior": "reposition operations wait; ready-times slip visibly; no phantom moves"
+}

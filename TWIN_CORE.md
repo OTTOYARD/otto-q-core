@@ -1,0 +1,125 @@
+# TWIN_CORE.md — OTTO-Twin Core Hardening
+
+**Run 3, Phase C7 deliverable.** 2026-08-19.
+Artifacts: `db/migrations/0045_twin_determinism_and_playback.sql` (NOT yet applied — post-merge),
+`scenarios/` (the nine canonical failure files), `metrics/demo_run_6727b04e.json` (the
+end-to-end demonstration), and the nine freshly captured twin functions in `db/fn_current/`.
+
+The twin was formalized, not rebuilt: everything below wraps or extends machinery that already
+existed — the cert harness (`ottoq_cert_arm_start/step/finish`, the isolated benchmark depot
+`22222222…`, `ottoq_score_run`, `ottoq_certify_run`), the content-hashed decision snapshots, the
+132-type event catalog, and the itinerary-leg substrate.
+
+---
+
+## 1. Determinism certification (C7.1) — run, verdict, root cause, fix
+
+**Method.** Two arms on the benchmark depot through the *existing* cert harness, identical in
+every input: seed **424242**, policy `otto_q`, ab_group `c7de7e00-…424242`, 0 faults, identical
+step cadence (1+7+6+6), shielded from the metronome/governor via `run_by='cert_harness'` (the
+harness's own exemption). Canonical comparison: per-tick structural digest over the content-hashed
+decision snapshots (vehicle id/state/SoC/stall + stall occupancy + session kW), aligned by
+**sim-minute offset** so wall-clock anchoring cannot fake a diff.
+
+**Verdict: FAIL — the twin is not deterministic under fixed seed today.**
+
+| | Arm A `6727b04e` | Arm B `a1e3bdb3` |
+|---|---|---|
+| dispatches / commands issued / refused | 120 / 447 / 159 | 107 / 563 / 350 |
+| throughput/hr (ottoq_ab_runs) | 8.1 | 7.1 |
+| peak kW | 662.1 | 587.5 |
+| aligned ticks identical | **0 of 20** | |
+| first divergence | tick 2 (sim-min 60): 68/100 vehicle SoCs differ, 1 state, 0 stalls | |
+
+Both runs are archived and stamped (`ottoq_run_archives` + the 0044 reproducibility key); their
+`ottoq_ab_runs` scores are the first rows of the new era. **A same-seed pair currently shows a
+~14% throughput spread — until 0045 is applied and re-certified, no CRN comparison is fully
+paired, and every A/B claim must carry that caveat.**
+
+**Root cause (exact).** Eleven RNG-salt sites in nine twin functions salt
+`ottoq_sim_seeded_random`/`hashtextextended` with the **absolute sim clock**
+(`… || p_sim_clock_now::text`), and every run anchors its sim clock to real `now()` at start
+(`ottoq_cert_arm_start`, `twin.ottoq_sim_start_run`) — so two same-seed runs draw disjoint
+streams by construction. The seeded-random discipline was right; the **salt domain** was wrong.
+Offenders (all captured verbatim in `db/fn_current/`): `advance_deployed_telemetry` (the dominant
+SoC-drain divergence), `advance_grid`, `advance_site_energy`, `advance_weather_and_solar`,
+`bay_fault_handler`, `bess_step`, `dispatch_vehicle`, `emit_arrival_webhook` (×2),
+`vehicle_exception_handler`.
+
+**The fix (0045 §1–§2).** `twin.ottoq_sim_clock_salt(run, clock)` = whole seconds since the
+run's own `sim_clock_start` — identical across same-seed runs by construction, falling back to
+the old absolute text only when the run row is unknown. All 11 sites patched; every patched body
+is byte-identical to its capture except the salt expression.
+
+**The standing property test (0045 §3).** `ottoq_twin_run_digest(run)` +
+`ottoq_twin_determinism_verdict(run_a, run_b)`. Re-certification procedure (run after 0045 is
+applied): two arms exactly as above → `SELECT * FROM ottoq_twin_determinism_verdict(a, b)` →
+expect `deterministic = true`; if false, `first_divergence_sim_min` points at the next offender.
+One caveat stated up front: `ottoq_sample_calibrated` and the variability-card dealers are
+downstream of the same seeds and are *expected* to become deterministic with the salt fix, but
+only the re-cert can prove it — this test exists precisely so that claim is never hand-waved.
+
+**Bonus finding from the same runs:** `ottoq_certify_run` on arm A: `certified = false` —
+2 of 21 frames show a stall held by two vehicles (`over_stall_ticks=2`). The frame-level B1
+invariant is violated under the batch cuOpt enactment era; needs its own root-cause (candidate:
+frame capture mid-enactment vs. the EXCLUDE calendar, which cannot itself double-book).
+
+## 2. What 0045 changes when applied (post-merge)
+
+| § | Change | Risk |
+|---|---|---|
+| 1–2 | salt-domain fix, 9 functions | behavior of *individual draws* changes once (new stream); distributions unchanged; nothing reads the old salts |
+| 3 | digest + verdict fns | additive, read-only |
+| 4 | 5 canonical event types registered | additive catalog rows |
+| 5 | `ottoq_twin_playback_timeline` view | additive, read-only |
+| 6 | **decision surfaced for merge review:** `ottoq_ab_runs` reclassified engine → evidence (purge stops deleting A/B scores; the C4 mystery of the empty table) | A/B rows now outlive runs, as `ottoq_run_archives` already does |
+
+## 3. Canonical event vocabulary (C7.2) — the audit
+
+Catalog holds 132 types. Mapping to the canonical thirteen:
+
+| Canonical | Exists today as | 0045 action |
+|---|---|---|
+| arrival | `twin.vehicle_arrived` (+ `ottoq.arrival_forecast`, `fleet.arrival_delayed`) | none (mapped) |
+| op_start / op_end | `twin.service_started`, `charge.session_started/completed`, `task.state_changed` | none (mapped) |
+| fault | `charge.session_faulted`, `charge.fault_injected`, `twin.bay_fault_reroute` | none (mapped) |
+| point_blocked / point_cleared | `stall.state_changed` (+ bay_fault equipment_config lifecycle) | none (mapped) |
+| power_loss / power_restored | `twin.grid_brownout`, `twin.grid_voltage_sag`, `twin.grid_frequency_excursion` | none (mapped) |
+| **move_start / move_end** | — | **registered (0045)**; emitters follow with the playback adoption |
+| **recall_issued / recall_refused** | — (`early_recall_log` holds the concept) | **registered (0045)**; C9 emits |
+| **touch_event** | — (KPI-4 currently enumerates human actor types) | **registered (0045)**; supersedes the enumeration once emitters adopt |
+
+## 4. Failure-scenario library (C7.3)
+
+`scenarios/` — the canonical nine, each a committed data file with an honest `status`:
+**executable today** (blocked_point, overstay, immobile_asset, mid_session_charger_fault — each
+names its live injector: bay-fault policy knobs, eta_delay variability, breakdown-rate profile,
+cert-arm `fault_chargers` / `inject_fault`), **partial** (zone_power_loss — site-wide cap
+injectors exist, per-zone does not), and **provisional** with the unlocking work named
+(human_path_crossing → twin path-resource model; swap_dock_jam → yard-logistics pack;
+tug_unavailable → vertiport paper pack; work_side_recall_refusal → C9).
+
+## 5. Playback timeline (C7.4)
+
+`ottoq_twin_playback_timeline` (0045 §5): `(entity_id, event_type, t_start, t_end, from_pose,
+to_pose)` per itinerary leg, poses from stall geometry, `playback_schema_version = 'v1'`,
+security-invoker view, pure SQL. Zero Isaac imports in the path — this is the seam the in-house
+3D layer renders from and through which Track B can return (CLAUDE.md 2.8). Verified rendering
+rows on the scratch instance.
+
+## 6. Discipline check (C7.5)
+
+Nothing added carries a new run-scoped column (views and the salt helper are stateless; the five
+event types are catalog rows). `data_source` co-existence untouched. The one retention change
+(§6, ab_runs) is a *surfaced decision*, not a silent drift — merging 0045 is deciding it.
+
+## 7. The demonstration run, end-to-end into the C6 CLI (the deliverable's spine)
+
+Run **`6727b04e-b890-45e3-87c1-ac4c558e2a81`** (benchmark depot, `normal_day`, seed 424242,
+policy `otto_q`, 690 sim-minutes — over the 139-minute credibility floor): driven by the cert
+harness → scored into `ottoq_ab_runs` → archived (`ottoq_archive_run`) → stamped with the 0044
+reproducibility key → **`ottoq_kpi_five(run)` returns all five canonical KPIs** (committed
+verbatim in `metrics/demo_run_6727b04e.json`, with the safety-cert result and the determinism
+verdict alongside). Headline: peak_site_kw 662.1 · turns/point/day 1.84–1.92 ·
+touch_events_per_turn 0.059 · p95_time_to_service 0 min · asset-hours 773.4+27.6.
+Every number above traces to that run ID.

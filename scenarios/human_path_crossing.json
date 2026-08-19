@@ -1,0 +1,10 @@
+{
+  "scenario_id": "C7.human_path_crossing",
+  "name": "human_path_crossing",
+  "description": "A human crosses the yard path; moves must halt",
+  "status": "provisional",
+  "seed_discipline": "run under a fixed seed; cite the run ID",
+  "mechanism": "NONE today \u2014 inter-point moves consume no explicit path resource in the twin (they do in the C4 CP-SAT model). Requires a path-resource block injector",
+  "provisional_gap": "twin path-resource model; C8 exercises it on the CP-SAT side only",
+  "expected_kernel_behavior": "moves pause (move_start without move_end), never teleport; queued moves respect path capacity on resume"
+}

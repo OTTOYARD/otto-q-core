@@ -1,0 +1,137 @@
+{
+ "question": "what does tenant C's anti-correlated (opportunity) load do to shared-site peak kW and point turns?",
+ "rows": [
+  {
+   "config": "A+B+C",
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 676,
+    "total_tardy_min": 28,
+    "turns": 72
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-8cb08169ae10",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "config": "A+B+C",
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 42,
+    "peak_site_kw": 680,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-ccf0d53d24e9",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  },
+  {
+   "config": "A+B (no tenant C)",
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 0,
+    "peak_site_kw": 660,
+    "total_tardy_min": 0,
+    "turns": 24
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-2dda703dab0f",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 24
+  },
+  {
+   "config": "A+B (no tenant C)",
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 98,
+    "peak_site_kw": 560,
+    "total_tardy_min": 0,
+    "turns": 24
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-8293b8615c93",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 24
+  },
+  {
+   "config": "A+B+C phase-shifted (+240 min on C)",
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 31,
+    "peak_site_kw": 684,
+    "total_tardy_min": 28,
+    "turns": 72
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 28,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "otto_q_asis",
+   "run_id": "SA-998d9db48b3b",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "ok",
+   "visits": 72
+  },
+  {
+   "config": "A+B+C phase-shifted (+240 min on C)",
+   "metrics": {
+    "cap_violation_kw_min": 0,
+    "p95_wait_min": 47,
+    "peak_site_kw": 584,
+    "total_tardy_min": 0,
+    "turns": 72
+   },
+   "note": "no failure injected",
+   "per_tenant_tardy": {
+    "amr_fleet_C": 0,
+    "robotaxi_operator_A": 0,
+    "yard_logistics_B": 0
+   },
+   "policy": "cpsat_alpha",
+   "run_id": "SA-ee437869c4a1",
+   "scenario": "baseline",
+   "seed": 424242,
+   "status": "OPTIMAL",
+   "visits": 72
+  }
+ ],
+ "seed": 424242,
+ "site": "site_alpha"
+}
