@@ -1,0 +1,15 @@
+{
+  "scenario_id": "C7.blocked_point",
+  "name": "blocked_point",
+  "description": "A service point is physically blocked mid-run",
+  "status": "executable",
+  "seed_discipline": "run under a fixed seed; cite the run ID",
+  "mechanism": "policy knobs bay_fault_rate_per_tick / bay_fault_outage_min (twin.ottoq_sim_bay_fault_handler); direct form: stalls.equipment_config['bay_fault'] with repair_at",
+  "injection": {
+    "policy": {
+      "bay_fault_rate_per_tick": 0.05,
+      "bay_fault_outage_min": 60
+    }
+  },
+  "expected_kernel_behavior": "reconciliation sweep releases nothing it shouldn't; decide path routes around the blocked bay; bookings honour-or-replan slides reservations; no booking lands on the blocked point"
+}

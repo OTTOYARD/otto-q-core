@@ -1,0 +1,10 @@
+{
+  "scenario_id": "C7.work_side_recall_refusal",
+  "name": "work_side_recall_refusal",
+  "description": "The work side refuses a recall (mission overrun)",
+  "status": "provisional",
+  "seed_discipline": "run under a fixed seed; cite the run ID",
+  "mechanism": "recall_refused canonical event registered (0045); C9 makes refusal a first-class event that triggers re-solve. Executable the moment recall/ ships; the C8 refusal scenario exercises it",
+  "provisional_gap": "C9 recall/ implementation",
+  "expected_kernel_behavior": "refusal is NOT an error: the plan re-solves with the asset still deployed; recall re-evaluated next tick with escalating urgency (SoC ladder)"
+}

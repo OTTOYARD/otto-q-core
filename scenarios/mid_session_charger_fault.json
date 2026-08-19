@@ -1,0 +1,19 @@
+{
+  "scenario_id": "C7.mid_session_charger_fault",
+  "name": "mid_session_charger_fault",
+  "description": "A charger faults while a session is active",
+  "status": "executable",
+  "seed_discipline": "run under a fixed seed; cite the run ID",
+  "mechanism": "three live forms: cert-arm fault_chargers=N (STRESS_OUTAGE_CERT), twin.ottoq_report_charger_fault(charger_id), otto-twin-control POST inject_fault {kind: charger_offline, target_id}",
+  "injection": {
+    "cert_arm": {
+      "fault_chargers": 15
+    },
+    "or_api": {
+      "inject_fault": {
+        "kind": "charger_offline"
+      }
+    }
+  },
+  "expected_kernel_behavior": "session ends faulted; vehicle re-enters stall-assignment same tick (P0 reopened-need rule); certify_run B3 (charge-on-faulted) stays zero"
+}
