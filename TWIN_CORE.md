@@ -79,6 +79,22 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #4 (post-0049, 2026-08-19; arms `a4ce46d4` / `523f770e`, both verified
+tick_count=0 at start — the airtight-start procedure below).** 0049 verified applied; **no tick
+crashed** — the 0048/0049 state-machine fixes hold end-to-end. Verdict: **11 of 20 ticks
+identical, first divergence sim-min 360, and at that tick every one of the 100 vehicle SoCs was
+paired** — all seeded randomness is now deterministic. The residual diff is a pure
+**stall-assignment permutation**: the same stalls paired to a vehicle queue shifted by one.
+Root cause: **eleven per-tick processing cursors across five twin functions iterate with no
+ORDER BY** — physical heap order, which drifts between runs, decided who claimed a shared
+resource first. Fix: **0050** (post-merge) — run-stable ORDER BY (vehicle.id / stall.id; never
+per-run-random or real-clock keys) on all eleven; diff-proven additive-only.
+*Harness lessons now standing procedure:* (a) relabel `run_by='cert_harness'` immediately after
+arm_start **and verify `tick_count = 0` before the first step** — a metronome tick can land in
+even a 2-second window (it contaminated the first arm-B attempt, `94982168`, discarded); (b) a
+CTE combining arm_start with the relabel does NOT work (the outer UPDATE cannot see rows the
+CTE's function inserted in the same statement).
+
 **Re-certification #3 (post-0048, 2026-08-19; arm `5822181f`, correct `cert_harness` labeling).**
 0048 verified applied (md5 match). The 0048 reorder works — and the cert then surfaced the next
 gate mismatch, one layer deeper: a tick died on the **vehicle-side arm interlock** even though
