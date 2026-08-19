@@ -75,12 +75,14 @@ def _generate_assets(sc: dict) -> list[Asset]:
     rng = random.Random(sc["seed"])
     classes = sorted(sc["asset_classes"].keys())
     menu = sorted(sc["parallel_ops_menu"].keys())
+    aw = sc["assets_spec"].get("arrival_window_min", [0, 180])
+    rd = sc["assets_spec"].get("ready_delta_min", [150, 330])
     out = []
     for i in range(sc["assets_spec"]["count"]):
         cls = classes[i % len(classes)]
-        arrival = rng.randrange(0, 180)
+        arrival = rng.randrange(aw[0], aw[1])
         soc = rng.randrange(12, 55)
-        ready_by = arrival + rng.randrange(150, 330)
+        ready_by = arrival + rng.randrange(rd[0], rd[1])
         out.append(
             Asset(
                 aid=f"AV-{i:02d}",
