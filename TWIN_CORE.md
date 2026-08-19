@@ -79,6 +79,31 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #6 (post-0051, 2026-08-19; arms `eb5a5d37` / `1a576926`, both verified
+tick_count=0 at start).** 0051 verified applied (both md5s match the file-applied scratch).
+The gate-assignment permutation is GONE — the assigner fix holds. Verdict: **8 of 20 ticks
+identical, first divergence sim-min 270** — exactly the tick the sim clock crosses 22:00
+America/Chicago and the overnight recall window opens. The tick-9 frame diff is a **single
+swap**: a different deployed vehicle was recalled in each run (one `arrived_at_gate` in A,
+the other in B), everything else paired. The recall cursor itself is run-stable
+(`ORDER BY current_soc, id` — verified); the offender is its **eligibility filter**:
+`public.ottoq_is_overnight_holdout` hashes `p_run::text` — the per-run-random sim_run_id
+(the 0047 salt class) — so two same-seed runs hold out different vehicles by construction,
+at both call sites (`ottoq_plan_dispatch_tick` 'recall' and `ottoq_evaluate_return_need`
+rung 6). A sweep found the same class in `public.ottoq_comms_emit_telemetry` (run uuid +
+absolute clock on the dropout/latency draw; comms staleness feeds the rung-8 recall, so
+decision-path-reachable). `ottoq_book_appointment`'s stall picks were audited in the same
+pass and are already run-stable (every pick ends `…, s.id`). Fix: **0052** (post-merge) —
+holdout keyed on the run's random_seed (unknown-run callers byte-identical), comms seed on
+run seed + `ottoq_sim_clock_salt`; captures md5-verified, diff-proven to two changed sites.
+Re-certification #7 runs after 0052 is applied, expecting `deterministic = true`.
+*Standing harness caveat, made explicit:* `sim_clock_start` is real `now()` at arm, so
+hour-of-day and calendar-date expressions (deploy fraction by hour, night waves, wash-day
+rotation, the holdout date term) agree across a cert pair only because arms start minutes
+apart. **Cert arms must not straddle an hour boundary, midnight UTC, or 05:00
+America/Chicago**; pinning `sim_clock_start` to a canonical anchor in the cert harness is
+the recorded follow-up that would retire this caveat class entirely.
+
 **Re-certification #5 (post-0050, 2026-08-19; arms `8e8da5c5` / `0d920ed3`, both verified
 tick_count=0 at start).** 0050 verified applied (all five md5s match the file-applied scratch).
 The five patched advance functions are now deterministic — no crashes, 20v20 aligned, and the
