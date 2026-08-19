@@ -59,6 +59,26 @@ One caveat stated up front: `ottoq_sample_calibrated` and the variability-card d
 downstream of the same seeds and are *expected* to become deterministic with the salt fix, but
 only the re-cert can prove it — this test exists precisely so that claim is never hand-waved.
 
+**Re-certification #2 (post-0047, 2026-08-19; arms `7821c9a8` / `a59a1f08` / `44252690`).**
+Three findings, each caught by the cert doing its job:
+1. **Harness leak (procedural):** `ottoq_cert_arm_start` labels runs `run_by='benchmark'`, but the
+   metronome's exemption list is `('production_live','cert_harness')` — so cron ticks leak into
+   cert arms at wall-clock-random points, misaligning the pair (arms C/D: 23 vs 24 ticks for
+   identical 20-step procedures). **Every paired cert must set `run_by='cert_harness'` right
+   after arm_start** (re-added to the procedure below); this also retroactively explains part of
+   re-cert #1's residual divergence (arm A carried one stray tick).
+2. **Twin bug (0048 §1):** with the exemption fixed, arm E died mid-tick on
+   `idx_stalls_one_vehicle_per_stall`: both bay-admit blocks in
+   `twin.ottoq_sim_advance_service_flow` flip the vehicle to its in-bay state BEFORE vacating its
+   old stall; `trg_reassignment_guard` protects in-bay states, silently vetoes the release, and
+   the following place-statement kills the whole tick. This is the mechanism behind the open
+   B1 double-stall finding. Fix: handoff first, state write second (0048, post-merge).
+3. **More absolute-clock salts (0048 §2):** the wash/detail/maintenance duration-card scopes
+   (`ottoq_twin_deal`) key on `p_sim_clock_now::text` — the 0045/0047 defect class. Fixed the
+   same way.
+Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
+`next_tick_due_at` shield, expecting `deterministic = true`.
+
 **Re-certification #1 (post-0045, 2026-08-19; arms `2ab6ab11` / `e12faa29`, seed 424242).**
 The cert worked exactly as designed: **10 of 20 aligned ticks identical (was 0 of 20)**, and at
 the first divergence (sim-min 330) **all 100 vehicle SoCs were paired** — the 0045 salt fix
