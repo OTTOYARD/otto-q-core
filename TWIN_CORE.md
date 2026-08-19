@@ -59,6 +59,18 @@ One caveat stated up front: `ottoq_sample_calibrated` and the variability-card d
 downstream of the same seeds and are *expected* to become deterministic with the salt fix, but
 only the re-cert can prove it — this test exists precisely so that claim is never hand-waved.
 
+**Re-certification #1 (post-0045, 2026-08-19; arms `2ab6ab11` / `e12faa29`, seed 424242).**
+The cert worked exactly as designed: **10 of 20 aligned ticks identical (was 0 of 20)**, and at
+the first divergence (sim-min 330) **all 100 vehicle SoCs were paired** — the 0045 salt fix
+holds across every patched stream. The residual divergence is a *single vehicle* (charging in
+arm A, still at the gate in arm B): charge-session **rate noise** shifted one session's
+completion tick, which shifted a stall hand-off. Root cause: two salt sites the 0045 census
+missed — `twin.ottoq_sim_advance_charge_sessions` (×2) and `twin.ottoq_sim_start_charge_session`
+(×2) salt their noise with the per-run-random **session UUID** and the **absolute clock**.
+Fix: **0047** (committed, NOT yet applied — post-merge), same salt-domain treatment via
+`ottoq_sim_clock_salt` on (vehicle, run-relative offsets). Re-certification #2 runs after 0047
+is applied, expecting `deterministic = true`.
+
 **Bonus finding from the same runs:** `ottoq_certify_run` on arm A: `certified = false` —
 2 of 21 frames show a stall held by two vehicles (`over_stall_ticks=2`). The frame-level B1
 invariant is violated under the batch cuOpt enactment era; needs its own root-cause (candidate:
