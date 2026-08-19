@@ -79,6 +79,18 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #3 (post-0048, 2026-08-19; arm `5822181f`, correct `cert_harness` labeling).**
+0048 verified applied (md5 match). The 0048 reorder works — and the cert then surfaced the next
+gate mismatch, one layer deeper: a tick died on the **vehicle-side arm interlock** even though
+the admit path had asked `twin.ottoq_arm_refuse_move` first. The mirror and the backstop evaluate
+the tether in **two different clock domains, exactly one tick apart**: refuse_move used the
+caller's in-flight tick clock (persisted clock + 30 min), the interlock trigger uses the run's
+persisted `sim_clock_current` (advanced only at tick end). A demate expiring exactly on the tick
+boundary (vehicle `02f1a60b`, until = the new tick's own timestamp) was therefore "movable" to
+the mirror and "held" by the backstop. Fix: **0049** (post-merge) — refuse_move sources its
+clock from the guard's exact expression, making mirror and backstop provably consistent for
+every caller; the boundary case defers one tick. Re-certification #4 runs after 0049 is applied.
+
 **Re-certification #1 (post-0045, 2026-08-19; arms `2ab6ab11` / `e12faa29`, seed 424242).**
 The cert worked exactly as designed: **10 of 20 aligned ticks identical (was 0 of 20)**, and at
 the first divergence (sim-min 330) **all 100 vehicle SoCs were paired** — the 0045 salt fix
