@@ -79,6 +79,23 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #5 (post-0050, 2026-08-19; arms `8e8da5c5` / `0d920ed3`, both verified
+tick_count=0 at start).** 0050 verified applied (all five md5s match the file-applied scratch).
+The five patched advance functions are now deterministic — no crashes, 20v20 aligned, and the
+in-bay service flow no longer permutes. Verdict: **9 of 20 ticks identical, first divergence
+sim-min 300**, and the tick-10 frame diff is again a pure **vehicle↔stall matching permutation**,
+now isolated to the **gate-admission assigner**: same states, same SoCs, same stall set in use,
+different pairing. Root cause, two residual instances of already-fixed classes in
+`twin.ottoq_sim_auto_charge_assign_tick`: (1) its stall-shuffle seed hashes the **absolute sim
+clock** (`p_sim_clock_now::text` — the 0045 salt-domain class), so the seeded stall pick differs
+across same-seed runs; (2) its vehicle cursor is `ORDER BY current_soc` with **no tiebreak** —
+integer-SoC ties (measured: the 48/48 and 65/65 pairs at tick 10 are exactly the swapped
+vehicles) fall back to heap order (the 0050 class). A sweep found the same absolute-clock salt
+in `twin.ottoq_sim_auto_dispatch_tick`'s dispatch-ranking seed. Fix: **0051** (post-merge) —
+both seeds re-salted via `ottoq_sim_clock_salt`, plus the run-stable `id` tiebreak; captures
+md5-verified byte-exact against production, diff-proven to exactly three changed lines.
+Re-certification #6 runs after 0051 is applied, expecting `deterministic = true`.
+
 **Re-certification #4 (post-0049, 2026-08-19; arms `a4ce46d4` / `523f770e`, both verified
 tick_count=0 at start — the airtight-start procedure below).** 0049 verified applied; **no tick
 crashed** — the 0048/0049 state-machine fixes hold end-to-end. Verdict: **11 of 20 ticks
