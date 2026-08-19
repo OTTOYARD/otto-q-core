@@ -1,22 +1,25 @@
-# R-1 — ISO/DTS 25614: identification, scope, and overlap assessment
+# R-1 — ISO/DTS 25614-1: deep-dive on scope, series roadmap, and overlap with OTTO-Q
 
-Filed: 2026-08-19 · Requester: Claude Code (build track) · Priority: high — Chase has asked for a business-impact verdict; this request gates it.
+Filed: 2026-08-19 · Updated: 2026-08-19 (identification resolved; questions sharpened) · Requester: Claude Code (build track) · Priority: high
 
-## Context (why we need this)
+## Identification (preliminary — Chase authorized a general web search; verify all of it)
 
-Chase asked whether "ISO DTS 25614" causes any issues for OTTO-Q or the business model. The identifier appears nowhere in our repos or merged research (H8 covers OCPI / VDA 5050 / GMG only). The impact verdict hinges entirely on what this document actually standardizes — specifically whether it touches any of: depot/fleet charging orchestration, service-event data objects (our ServiceSession/SDR territory, brief §2.6), smart-charging profile publication, or return-to-base operations for autonomous assets.
+- **ISO/DTS 25614-1 — Intelligent transport systems — Orchestration of vehicles for fixed locations — Part 1: Reservation service** (iso.org/standard/90889.html), owned by **ISO/TC 204** (Intelligent transport systems).
+- Stage: DTS approval phase; search snippets indicate final text received / registered for formal approval ~2026-05-08, so publication as a TS is plausibly late 2026.
+- Scope (from catalogue snippet, unverified verbatim): defines the data and operating functions required to orchestrate the use of spaces (spots, bays) for road vehicles to stop for loading/unloading goods and passengers — space definition and vehicle requirements, space-to-vehicle matching, scheduling, reservation, delays, rescheduling, cancellation, queueing-in-motion. All automation levels, crewed and uncrewed; curbsides, parking lots, indoor and outdoor facilities.
+
+This is squarely adjacent to OTTO-Q's booking/assignment layer (stalls, `ottoq_stall_bookings`, supersede/reschedule, queueing). The preliminary read is: it standardizes the *reservation* commodity layer, not service events or settlement — which supports, not threatens, the §2.6 moat claim. The questions below are what the verdict still needs.
 
 ## Questions (precise, answerable)
 
-1. **Identification.** Exact document identifier and full title of ISO/DTS 25614. Which ISO technical committee and subcommittee owns it (e.g., TC 204, TC 22/SC 31, TC 69)? Current stage code on iso.org (DTS ballot open / approved / published as TS) and the stage date. Expected publication date if listed.
-2. **Scope statement.** The verbatim scope paragraph from the ISO catalogue page (iso.org/standard/…), plus the abstract if published.
-3. **Normative references.** The list of normative references — specifically whether ISO 15118 (any part), IEC 63110, ISO 17409, OCPP (via IEC 63110), or any OCPI/roaming document appears.
-4. **Data objects defined.** Does it define message sets, data models, or record formats? If yes: object names, field names, units, and serialization (JSON/XML/ASN.1). We need to test overlap against: charging session records, charge detail records (CDR analogues), service/maintenance event records, charging schedules/profiles, tariff structures.
-5. **Applicability.** Is it aimed at (a) vehicle↔charger, (b) charger↔backend, (c) operator↔operator, (d) fleet/depot management systems, or (e) something else entirely (note: 5-digit ISO numbers reuse ranges across unrelated TCs — confirm this is even transport/energy domain before deep-diving; if it is unrelated, e.g. materials or health informatics, say so in one line and stop).
-6. **Regulatory pull.** Is ISO/DTS 25614 referenced by any regulation or procurement requirement (EU AFIR delegated acts, NEVI, national grid codes) or by OCA/EVRoaming roadmaps? A TS only bites commercially if something mandates or benchmarks against it.
-7. **Conformance.** Does it define conformance/test requirements, and is there a certification program planned?
-8. **Overlap verdict inputs.** For each data object it defines (Q4), one line: nearest OCPI/OCPP analogue, and whether it covers non-energy service events (cleaning, calibration, inspection, swap) or energy only. This is the single most decision-relevant fact: our §2.6 moat claim is "nothing standardizes service events in any sector."
+1. **Verbatim scope.** The exact scope paragraph and abstract of ISO/DTS 25614-1 from the ISO catalogue (iso.org blocks our fetches; capture verbatim text).
+2. **Series roadmap — the decision-relevant question.** What other parts of ISO 25614 exist or are planned (registered work items, WG programme of work)? Specifically: does any planned part cover *servicing operations* at fixed locations (charging, turnaround, maintenance), service-event records, or settlement — anything that would move the series toward our ServiceSession/SDR territory? Which TC 204 working group owns it, and who proposed the NWIP (country/organization)?
+3. **Data model.** Does Part 1 define concrete message sets / data objects? If obtainable from public drafts or committee material: object names, field names, units, serialization. Nearest analogues to our objects (booking, ServiceLocation capability pairs, ServiceProfile).
+4. **Relationship to adjacent specs.** Stated or evident relationship to: Open Mobility Foundation Curb Data Specification (CDS), ISO 4448 (kerbside/pathway operations), Alliance for Parking Data Standards (APDS), ISO 15118/OCPP/OCPI. Does 25614-1 reference any of them normatively?
+5. **Regulatory / procurement pull.** Any regulation, municipal procurement framework, airport/port authority requirement, or OEM RFP language referencing 25614 or "smart loading zone" conformance? A voluntary TS only bites commercially where something benchmarks against it.
+6. **IP posture.** Any patent declarations lodged with ISO for 25614 (RAND terms)? Relevant only if we later implement the spec.
+7. **Participation path.** Which national mirror committee (e.g., US TAG to TC 204 via SAE/ANSI) would OTTO-Q join to see drafts and influence later parts, and roughly what does participation cost?
 
 ## Deliverable
 
-`docs/research/answers/R-1-iso-dts-25614.md` with sources (iso.org catalogue URL, TC page, any public drafts or committee press), verified-as-of date per H-file conventions.
+`docs/research/answers/R-1-iso-dts-25614.md` with sources (ISO catalogue URL, TC 204 programme of work, any public drafts/committee press), verified-as-of date per H-file conventions.
