@@ -1,0 +1,790 @@
+{
+ "comparison_sha256": "a758b31eee01e135ba43189d498016ad256164be1daa1ba8732b82c96caf01f6",
+ "crn_pairing": "one scenario draw per seed, shared by all policies",
+ "paired_delta_vs_fifo": {
+  "cpsat": {
+   "charge_point_turns": 0,
+   "makespan_min": 57,
+   "p95_wait_to_first_op_min": 91,
+   "peak_site_kw": 11,
+   "total_moves": 0,
+   "total_tardy_min": 239
+  },
+  "greedy": {
+   "charge_point_turns": 0,
+   "makespan_min": 0,
+   "p95_wait_to_first_op_min": 0,
+   "peak_site_kw": 0,
+   "total_moves": 0,
+   "total_tardy_min": 0
+  },
+  "otto_q_asis": {
+   "charge_point_turns": 0,
+   "makespan_min": 0,
+   "p95_wait_to_first_op_min": 0,
+   "peak_site_kw": 11,
+   "total_moves": 0,
+   "total_tardy_min": 229
+  }
+ },
+ "runs": [
+  {
+   "assets": {
+    "AV-00": {
+     "arrival": 1033,
+     "charge_end": 1067,
+     "charge_start": 1033,
+     "finish": 1083,
+     "moves": 1,
+     "ready_by": 1264,
+     "soc": 26,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-01": {
+     "arrival": 780,
+     "charge_end": 822,
+     "charge_start": 780,
+     "finish": 838,
+     "moves": 1,
+     "ready_by": 1033,
+     "soc": 34,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-02": {
+     "arrival": 8,
+     "charge_end": 47,
+     "charge_start": 8,
+     "finish": 63,
+     "moves": 1,
+     "ready_by": 208,
+     "soc": 23,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-03": {
+     "arrival": 874,
+     "charge_end": 899,
+     "charge_start": 874,
+     "finish": 915,
+     "moves": 1,
+     "ready_by": 1060,
+     "soc": 48,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-04": {
+     "arrival": 784,
+     "charge_end": 815,
+     "charge_start": 784,
+     "finish": 815,
+     "moves": 0,
+     "ready_by": 936,
+     "soc": 54,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-05": {
+     "arrival": 1158,
+     "charge_end": 1185,
+     "charge_start": 1158,
+     "finish": 1201,
+     "moves": 1,
+     "ready_by": 1365,
+     "soc": 50,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-06": {
+     "arrival": 673,
+     "charge_end": 722,
+     "charge_start": 673,
+     "finish": 722,
+     "moves": 0,
+     "ready_by": 928,
+     "soc": 19,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-07": {
+     "arrival": 60,
+     "charge_end": 101,
+     "charge_start": 60,
+     "finish": 141,
+     "moves": 2,
+     "ready_by": 376,
+     "soc": 36,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-08": {
+     "arrival": 1180,
+     "charge_end": 1219,
+     "charge_start": 1180,
+     "finish": 1235,
+     "moves": 1,
+     "ready_by": 1370,
+     "soc": 23,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-09": {
+     "arrival": 290,
+     "charge_end": 341,
+     "charge_start": 290,
+     "finish": 341,
+     "moves": 0,
+     "ready_by": 499,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-10": {
+     "arrival": 734,
+     "charge_end": 787,
+     "charge_start": 734,
+     "finish": 803,
+     "moves": 1,
+     "ready_by": 1004,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-11": {
+     "arrival": 34,
+     "charge_end": 71,
+     "charge_start": 34,
+     "finish": 87,
+     "moves": 1,
+     "ready_by": 356,
+     "soc": 29,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-12": {
+     "arrival": 689,
+     "charge_end": 724,
+     "charge_start": 689,
+     "finish": 740,
+     "moves": 1,
+     "ready_by": 967,
+     "soc": 24,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-13": {
+     "arrival": 617,
+     "charge_end": 663,
+     "charge_start": 617,
+     "finish": 679,
+     "moves": 1,
+     "ready_by": 906,
+     "soc": 48,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-14": {
+     "arrival": 648,
+     "charge_end": 674,
+     "charge_start": 648,
+     "finish": 674,
+     "moves": 0,
+     "ready_by": 906,
+     "soc": 54,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-15": {
+     "arrival": 380,
+     "charge_end": 431,
+     "charge_start": 380,
+     "finish": 431,
+     "moves": 0,
+     "ready_by": 614,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    }
+   },
+   "metrics": {
+    "charge_point_turns": 16,
+    "makespan_min": 1235,
+    "p95_wait_to_first_op_min": 0,
+    "peak_site_kw": 240,
+    "total_moves": 12,
+    "total_tardy_min": 0
+   },
+   "policy": "fifo"
+  },
+  {
+   "assets": {
+    "AV-00": {
+     "arrival": 1033,
+     "charge_end": 1067,
+     "charge_start": 1033,
+     "finish": 1083,
+     "moves": 1,
+     "ready_by": 1264,
+     "soc": 26,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-01": {
+     "arrival": 780,
+     "charge_end": 822,
+     "charge_start": 780,
+     "finish": 838,
+     "moves": 1,
+     "ready_by": 1033,
+     "soc": 34,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-02": {
+     "arrival": 8,
+     "charge_end": 47,
+     "charge_start": 8,
+     "finish": 63,
+     "moves": 1,
+     "ready_by": 208,
+     "soc": 23,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-03": {
+     "arrival": 874,
+     "charge_end": 899,
+     "charge_start": 874,
+     "finish": 915,
+     "moves": 1,
+     "ready_by": 1060,
+     "soc": 48,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-04": {
+     "arrival": 784,
+     "charge_end": 815,
+     "charge_start": 784,
+     "finish": 815,
+     "moves": 0,
+     "ready_by": 936,
+     "soc": 54,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-05": {
+     "arrival": 1158,
+     "charge_end": 1185,
+     "charge_start": 1158,
+     "finish": 1201,
+     "moves": 1,
+     "ready_by": 1365,
+     "soc": 50,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-06": {
+     "arrival": 673,
+     "charge_end": 722,
+     "charge_start": 673,
+     "finish": 722,
+     "moves": 0,
+     "ready_by": 928,
+     "soc": 19,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-07": {
+     "arrival": 60,
+     "charge_end": 101,
+     "charge_start": 60,
+     "finish": 141,
+     "moves": 2,
+     "ready_by": 376,
+     "soc": 36,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-08": {
+     "arrival": 1180,
+     "charge_end": 1219,
+     "charge_start": 1180,
+     "finish": 1235,
+     "moves": 1,
+     "ready_by": 1370,
+     "soc": 23,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-09": {
+     "arrival": 290,
+     "charge_end": 341,
+     "charge_start": 290,
+     "finish": 341,
+     "moves": 0,
+     "ready_by": 499,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-10": {
+     "arrival": 734,
+     "charge_end": 787,
+     "charge_start": 734,
+     "finish": 803,
+     "moves": 1,
+     "ready_by": 1004,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-11": {
+     "arrival": 34,
+     "charge_end": 71,
+     "charge_start": 34,
+     "finish": 87,
+     "moves": 1,
+     "ready_by": 356,
+     "soc": 29,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-12": {
+     "arrival": 689,
+     "charge_end": 724,
+     "charge_start": 689,
+     "finish": 740,
+     "moves": 1,
+     "ready_by": 967,
+     "soc": 24,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-13": {
+     "arrival": 617,
+     "charge_end": 663,
+     "charge_start": 617,
+     "finish": 679,
+     "moves": 1,
+     "ready_by": 906,
+     "soc": 48,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-14": {
+     "arrival": 648,
+     "charge_end": 674,
+     "charge_start": 648,
+     "finish": 674,
+     "moves": 0,
+     "ready_by": 906,
+     "soc": 54,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-15": {
+     "arrival": 380,
+     "charge_end": 431,
+     "charge_start": 380,
+     "finish": 431,
+     "moves": 0,
+     "ready_by": 614,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    }
+   },
+   "metrics": {
+    "charge_point_turns": 16,
+    "makespan_min": 1235,
+    "p95_wait_to_first_op_min": 0,
+    "peak_site_kw": 240,
+    "total_moves": 12,
+    "total_tardy_min": 0
+   },
+   "policy": "greedy"
+  },
+  {
+   "assets": {
+    "AV-00": {
+     "arrival": 1033,
+     "charge_end": 1067,
+     "charge_start": 1033,
+     "finish": 1083,
+     "moves": 1,
+     "ready_by": 1264,
+     "soc": 26,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-01": {
+     "arrival": 780,
+     "charge_end": 822,
+     "charge_start": 780,
+     "finish": 838,
+     "moves": 1,
+     "ready_by": 1033,
+     "soc": 34,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-02": {
+     "arrival": 8,
+     "charge_end": 47,
+     "charge_start": 8,
+     "finish": 63,
+     "moves": 1,
+     "ready_by": 208,
+     "soc": 23,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-03": {
+     "arrival": 874,
+     "charge_end": 899,
+     "charge_start": 874,
+     "finish": 915,
+     "moves": 1,
+     "ready_by": 1060,
+     "soc": 48,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-04": {
+     "arrival": 784,
+     "charge_end": 815,
+     "charge_start": 784,
+     "finish": 815,
+     "moves": 0,
+     "ready_by": 936,
+     "soc": 54,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-05": {
+     "arrival": 1158,
+     "charge_end": 1185,
+     "charge_start": 1158,
+     "finish": 1201,
+     "moves": 1,
+     "ready_by": 1365,
+     "soc": 50,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-06": {
+     "arrival": 673,
+     "charge_end": 722,
+     "charge_start": 673,
+     "finish": 722,
+     "moves": 0,
+     "ready_by": 928,
+     "soc": 19,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-07": {
+     "arrival": 60,
+     "charge_end": 452,
+     "charge_start": 60,
+     "finish": 492,
+     "moves": 2,
+     "ready_by": 376,
+     "soc": 36,
+     "tardy_min": 116,
+     "wait_min": 0
+    },
+    "AV-08": {
+     "arrival": 1180,
+     "charge_end": 1219,
+     "charge_start": 1180,
+     "finish": 1235,
+     "moves": 1,
+     "ready_by": 1370,
+     "soc": 23,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-09": {
+     "arrival": 290,
+     "charge_end": 341,
+     "charge_start": 290,
+     "finish": 341,
+     "moves": 0,
+     "ready_by": 499,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-10": {
+     "arrival": 734,
+     "charge_end": 787,
+     "charge_start": 734,
+     "finish": 803,
+     "moves": 1,
+     "ready_by": 1004,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-11": {
+     "arrival": 34,
+     "charge_end": 71,
+     "charge_start": 34,
+     "finish": 87,
+     "moves": 1,
+     "ready_by": 356,
+     "soc": 29,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-12": {
+     "arrival": 689,
+     "charge_end": 724,
+     "charge_start": 689,
+     "finish": 740,
+     "moves": 1,
+     "ready_by": 967,
+     "soc": 24,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-13": {
+     "arrival": 617,
+     "charge_end": 663,
+     "charge_start": 617,
+     "finish": 679,
+     "moves": 1,
+     "ready_by": 906,
+     "soc": 48,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-14": {
+     "arrival": 648,
+     "charge_end": 1019,
+     "charge_start": 648,
+     "finish": 1019,
+     "moves": 0,
+     "ready_by": 906,
+     "soc": 54,
+     "tardy_min": 113,
+     "wait_min": 0
+    },
+    "AV-15": {
+     "arrival": 380,
+     "charge_end": 431,
+     "charge_start": 380,
+     "finish": 431,
+     "moves": 0,
+     "ready_by": 614,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    }
+   },
+   "metrics": {
+    "charge_point_turns": 16,
+    "makespan_min": 1235,
+    "p95_wait_to_first_op_min": 0,
+    "peak_site_kw": 251,
+    "total_moves": 12,
+    "total_tardy_min": 229
+   },
+   "policy": "otto_q_asis"
+  },
+  {
+   "assets": {
+    "AV-00": {
+     "arrival": 1033,
+     "charge_end": 1174,
+     "charge_start": 1140,
+     "finish": 1190,
+     "moves": 1,
+     "ready_by": 1264,
+     "soc": 26,
+     "tardy_min": 0,
+     "wait_min": 107
+    },
+    "AV-01": {
+     "arrival": 780,
+     "charge_end": 822,
+     "charge_start": 780,
+     "finish": 838,
+     "moves": 1,
+     "ready_by": 1033,
+     "soc": 34,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-02": {
+     "arrival": 8,
+     "charge_end": 47,
+     "charge_start": 8,
+     "finish": 63,
+     "moves": 1,
+     "ready_by": 208,
+     "soc": 23,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-03": {
+     "arrival": 874,
+     "charge_end": 1170,
+     "charge_start": 874,
+     "finish": 1186,
+     "moves": 1,
+     "ready_by": 1060,
+     "soc": 48,
+     "tardy_min": 126,
+     "wait_min": 0
+    },
+    "AV-04": {
+     "arrival": 784,
+     "charge_end": 815,
+     "charge_start": 784,
+     "finish": 815,
+     "moves": 0,
+     "ready_by": 936,
+     "soc": 54,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-05": {
+     "arrival": 1158,
+     "charge_end": 1276,
+     "charge_start": 1249,
+     "finish": 1292,
+     "moves": 1,
+     "ready_by": 1365,
+     "soc": 50,
+     "tardy_min": 0,
+     "wait_min": 91
+    },
+    "AV-06": {
+     "arrival": 673,
+     "charge_end": 722,
+     "charge_start": 673,
+     "finish": 722,
+     "moves": 0,
+     "ready_by": 928,
+     "soc": 19,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-07": {
+     "arrival": 60,
+     "charge_end": 101,
+     "charge_start": 60,
+     "finish": 141,
+     "moves": 2,
+     "ready_by": 376,
+     "soc": 36,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-08": {
+     "arrival": 1180,
+     "charge_end": 1231,
+     "charge_start": 1192,
+     "finish": 1247,
+     "moves": 1,
+     "ready_by": 1370,
+     "soc": 23,
+     "tardy_min": 0,
+     "wait_min": 12
+    },
+    "AV-09": {
+     "arrival": 290,
+     "charge_end": 341,
+     "charge_start": 290,
+     "finish": 341,
+     "moves": 0,
+     "ready_by": 499,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-10": {
+     "arrival": 734,
+     "charge_end": 787,
+     "charge_start": 734,
+     "finish": 803,
+     "moves": 1,
+     "ready_by": 1004,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-11": {
+     "arrival": 34,
+     "charge_end": 156,
+     "charge_start": 119,
+     "finish": 172,
+     "moves": 1,
+     "ready_by": 356,
+     "soc": 29,
+     "tardy_min": 0,
+     "wait_min": 85
+    },
+    "AV-12": {
+     "arrival": 689,
+     "charge_end": 724,
+     "charge_start": 689,
+     "finish": 740,
+     "moves": 1,
+     "ready_by": 967,
+     "soc": 24,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-13": {
+     "arrival": 617,
+     "charge_end": 663,
+     "charge_start": 617,
+     "finish": 679,
+     "moves": 1,
+     "ready_by": 906,
+     "soc": 48,
+     "tardy_min": 0,
+     "wait_min": 0
+    },
+    "AV-14": {
+     "arrival": 648,
+     "charge_end": 1019,
+     "charge_start": 648,
+     "finish": 1019,
+     "moves": 0,
+     "ready_by": 906,
+     "soc": 54,
+     "tardy_min": 113,
+     "wait_min": 0
+    },
+    "AV-15": {
+     "arrival": 380,
+     "charge_end": 431,
+     "charge_start": 380,
+     "finish": 431,
+     "moves": 0,
+     "ready_by": 614,
+     "soc": 13,
+     "tardy_min": 0,
+     "wait_min": 0
+    }
+   },
+   "metrics": {
+    "charge_point_turns": 16,
+    "makespan_min": 1292,
+    "p95_wait_to_first_op_min": 91,
+    "peak_site_kw": 251,
+    "total_moves": 12,
+    "total_tardy_min": 239
+   },
+   "policy": "cpsat"
+  }
+ ],
+ "scenario": "reduced_canonical_nash_24h",
+ "seed": 424242
+}

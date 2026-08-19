@@ -1,0 +1,168 @@
+{
+  "name": "reduced_canonical_nash_24h",
+  "comment": "24-hour variant of the reduced canonical scenario for the C6 CI gate: same site, arrivals spread over 24 sim-hours, seed 424242. Generated assets use assets_spec windows.",
+  "seed": 424242,
+  "horizon_min": 1800,
+  "site": {
+    "power_cap_kw_hard": 1000,
+    "power_soft_target_kw": 700,
+    "dcfc_cooldown_min": 18,
+    "move_duration_min": 4,
+    "path_capacity": 2,
+    "cold_start_below_c": 5,
+    "cold_start_penalty_min": 12,
+    "onpeak_window_min": [
+      840,
+      1140
+    ]
+  },
+  "objective_weights": {
+    "tardiness_per_min": 10,
+    "onpeak_kw_min": 1,
+    "peak_excess_per_kw": 20,
+    "per_move": 15
+  },
+  "asset_classes": {
+    "waymo_jaguar_ipace_2024": {
+      "battery_kwh": 90,
+      "max_charge_kw": 100,
+      "inlet": "CCS",
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        },
+        {
+          "above_soc_pct": 70,
+          "accept_frac": 0.6
+        },
+        {
+          "above_soc_pct": 85,
+          "accept_frac": 0.35
+        }
+      ]
+    },
+    "zoox_robotaxi_2024": {
+      "battery_kwh": 110,
+      "max_charge_kw": 150,
+      "inlet": "CCS",
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        },
+        {
+          "above_soc_pct": 70,
+          "accept_frac": 0.6
+        },
+        {
+          "above_soc_pct": 85,
+          "accept_frac": 0.35
+        }
+      ]
+    },
+    "generic_robotaxi": {
+      "battery_kwh": 80,
+      "max_charge_kw": 120,
+      "inlet": "CCS",
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        },
+        {
+          "above_soc_pct": 70,
+          "accept_frac": 0.6
+        },
+        {
+          "above_soc_pct": 85,
+          "accept_frac": 0.35
+        }
+      ]
+    }
+  },
+  "service_points": [
+    {
+      "id": "NASH-DCFC-01",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "NASH-DCFC-02",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "NASH-DCFC-03",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "NASH-DCFC-04",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "NASH-L2-01",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "NASH-L2-02",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "NASH-WASH-01",
+      "kind": "wash_bay",
+      "kw": 0
+    },
+    {
+      "id": "NASH-WASH-02",
+      "kind": "wash_bay",
+      "kw": 0
+    },
+    {
+      "id": "NASH-SVC-01",
+      "kind": "service_bay",
+      "kw": 0
+    }
+  ],
+  "capabilities": {
+    "dcfc": [
+      "charge_dcfc"
+    ],
+    "l2": [
+      "charge_l2"
+    ],
+    "wash_bay": [
+      "wash"
+    ],
+    "service_bay": [
+      "inspect"
+    ]
+  },
+  "parallel_ops_menu": {
+    "sensor_clean": {
+      "dur_min": 6
+    },
+    "interior_tidy": {
+      "dur_min": 10
+    },
+    "software_update": {
+      "dur_min": 25
+    }
+  },
+  "assets_spec": {
+    "count": 16,
+    "arrival_window_min": [
+      0,
+      1320
+    ],
+    "ready_delta_min": [
+      150,
+      330
+    ],
+    "comment": "deterministic generation from seed; see model._generate_assets"
+  }
+}
