@@ -79,6 +79,71 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #16 (post-0061, 2026-08-20; arms `2010f408` / `c507bce2`, ab_group
+`…42425b`; two earlier arms discarded for metronome contamination — see the harness lessons
+below).** 0061 verified applied (post-md5 `1b88f383…`, sim-domain fallback present). Verdict:
+**11/20, first divergence sim-min 360**. This is NOT a regression against #15's 19/20:
+the two pairs started at different sim times, so they exercise different scenario slices and
+`ticks_identical` is a diagnostic, not a score. Both are FAIL; what matters is the residue.
+
+Residue: exactly ONE vehicle, `1520dd3c` — `arrived_at_gate` in A, `charging_dcfc` on stall
+`fc5d1dab` in B, SoC 32.0 in both. The vehicle-state stream shows arm B carrying one EXTRA
+transition with everything after it shifted by one (245 vs 246 transitions), so this is a
+**membership difference in a capacity-gated admission**, not an ordering difference.
+
+Ruled out this round, each by measurement: real-clock reads on the gate/stall/cooldown path
+(swept `now()`/`clock_timestamp()` across assign_tick/gate/admit/place_unplaced/
+book_appointment/stall_free/reserve_stall/cooldown — only `cuopt_log_gate`, logging only);
+explicit `last_state_change = now()` writers (only `ottoq_benchmark_reset`,
+`ottoq_sim_release_depot`, `ottoq_tick_invariance_reset_fleet`, `twin.ottoq_sim_seed_fleet` —
+all reset/seed paths, and their stamp is run-relative-consistent because each arm's sim clock
+is anchored to its own real start, so `sim_clock − last_state_change = 30·k` identically in
+both arms); cuOpt (quiesced, 20 `policy_disabled` + 8 `first_refusal_arm` per arm, identical);
+and the twin auto-assigner — there is **no `twin.auto_charge_assign` event for this vehicle in
+either arm**, so the seating came from the ENGINE's command path, not the twin's assigner.
+`ottoq_benchmark_reset` was also confirmed to clear `stalls.current_vehicle_id`, so both arms
+start with identical physical occupancy.
+
+**What the ledger actually shows.** In BOTH arms stall `fc5d1dab` was first reserved for
+`1520dd3c`. In arm B the vehicle was seated (`available→occupied`), charged 32→90, and
+released. In arm A no occupancy event ever fired: the reservation churned onward to five other
+vehicles (`14b02ad9`, `03812c6f`, `ad5abf3e`, `55a6bddc`, `983002e6`) before the vehicle could
+be seated, and its `begin_charge` commands were refused `target_occupied`. **The open question
+for #17 is therefore the reservation-churn path, upstream of the confirm walk** — not the
+assigner and not the confirm cursor.
+
+**A defect of our own, found en route → 0062.** 0060 replaced the supersede window's
+`command_id DESC` tiebreak with content keys `(command_type, stall_id)` because `command_id`
+is `gen_random_uuid()`. The reasoning was right; the replacement was not. Content keys do not
+uniquely identify a row, and the data contains genuine duplicates — this very vehicle has TWO
+`begin_charge` rows sharing vehicle, `issued_at`, `command_type` AND `stall_id` (arm A refused
+both `target_occupied`; arm B retired one `superseded` and executed the other). For such a pair
+the 0060 ordering is fully tied, so `dup_rn` — which decides which command counts as current
+intent — fell back to physical row order. **0060 turned "random but TOTAL" into "no total order
+at all," which is strictly worse.** 0062 restores totality: content keys still dominate,
+`payload::text` separates commands differing anywhere in payload, and `command_id` survives
+only as the last-resort tiebreak between byte-identical rows, for which the choice is
+interchangeable by construction. 0062 is a repair, and is **not** claimed to be the cause of
+#16's divergence.
+
+**Harness lessons (procedural, recorded so they stop costing rounds).**
+1. The window between `ottoq_cert_arm_start` and the shield UPDATE is the contamination risk;
+   under a flaky proxy two arms were lost this round to stray metronome ticks landing in that gap.
+2. The tempting atomic form **does not work**:
+   `WITH armed AS (SELECT ottoq_cert_arm_start(…)) UPDATE ottoq_sim_runs … FROM armed` returns
+   zero rows, because the run row the CTE's function inserts is not visible to the same
+   statement's UPDATE. Shield **by predicate** instead — `UPDATE … WHERE status='running' AND
+   depot_id='2222…'  RETURNING sim_run_id, tick_count` — which needs no id round-trip and was
+   the form that finally worked.
+3. BAND RULE: compute `min_to_midnight = 1440 − (UTC hour·60 + minute)`; both arms must share
+   `floor(min_to_midnight / 30)` and sit ≥2 min inside the band. 18:30:00 exactly (offset 330)
+   is ON the edge — never arm there.
+4. The MCP tool timeout is 60 s, so never `pg_sleep` more than ~45 s.
+5. On a step timeout, check `tick_count` AND `pg_stat_activity` for an active
+   `ottoq_cert_arm_step` before re-issuing — the batch may have landed.
+
+Re-certification #17 runs after 0062 is applied and targets the reservation-churn path.
+
 **Re-certification #15 (post-0060, 2026-08-20; arms `c5dbc377` / `943936c5`, started
 18:02:31 and 18:05:32 — deliberately held off the 18:00Z mark, where the midnight-UTC
 crossing would have landed exactly on a tick boundary and split the pair's day-keyed
