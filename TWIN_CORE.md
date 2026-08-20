@@ -79,6 +79,45 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #15 (post-0060, 2026-08-20; arms `c5dbc377` / `943936c5`, started
+18:02:31 and 18:05:32 — deliberately held off the 18:00Z mark, where the midnight-UTC
+crossing would have landed exactly on a tick boundary and split the pair's day-keyed
+draws).** 0060 verified applied (five post-md5s changed, no leftovers) and **proven
+working**: the two arms' command streams are byte-paired in run-relative time for the
+ENTIRE run, and the vehicle-state stream is paired for **312 of 313** transitions.
+Verdict: **19/20 — the best round by a wide margin** (was 13/20), and the sole divergence
+is the LAST tick, sim-min 600.
+
+The residue is a single extra transition in arm B: vehicle `964bd583`,
+`charge_complete_holding -> staged_for_departure`, correctly ordered ahead of
+`acba173d`'s identical transition, which both arms make. A **membership** difference in a
+cap-limited release, not an ordering one — both arms hold the vehicle in the same state at
+the same stream position, and only B admits it.
+
+ROOT CAUSE — **0057's guard has a blind spot, and this is the case that exposes it.** 0057
+stopped the trigger clobbering callers that pass a stamp DIFFERENT from the stored one.
+But inside a BEFORE UPDATE trigger, a caller passing the SAME value is indistinguishable
+from one passing nothing — and that is exactly what happens when a vehicle changes state
+**twice in one tick**: the second write carries the same sim clock the first one stored,
+the guard reads "unset", and `NOW()` lands in `last_state_change`. The divergent write's
+own event payload is the proof:
+
+```
+last_state_change: from 2026-08-21T04:05:32.269186+00   (the run's sim clock, tick 20)
+                     to 2026-08-20T18:06:36.269616+00   (wall clock)
+```
+
+Two decide-path fairness cursors and `twin.ottoq_sim_advance_service_flow`'s release
+cursor `ORDER BY` that column, so wall-clock ordering re-entered through the one door 0057
+left open, and the cap-limited release admitted a different member set per arm. Fix:
+**0061** (post-merge) — the guard's DEFAULT stamp becomes sim-domain whenever the
+vehicle's depot has a running sim run, so the equal-value case re-stamps the identical sim
+clock (a no-op) instead of a wall clock; production, having no running sim run, still
+falls back to `NOW()` exactly as before. A sweep of all four trigger functions that write
+`NEW.<col> := now()` found this is the only one writing a column anything orders by (the
+rest write `updated_at`). Re-certification #16 runs after 0061 is applied, expecting
+`deterministic = true`.
+
 **Re-certification #14 (post-0059, 2026-08-20; arms `1a505390` / `eea3a256`, both armed
 cleanly at first attempt — tethers cleared, tick_count=0 verified, starts 17:41:19 and
 17:43:38 inside the same 17:30–18:00Z band so both 600-sim-min spans cross every hour
