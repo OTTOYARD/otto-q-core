@@ -79,6 +79,25 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #11 (post-0056, 2026-08-20; arms `112fea03` / `5a209c14`, arm B restarted
+once for metronome contamination).** 0056 verified applied and **proven working**: the
+quiesce policy rows exist for both arms, the fire path logged **40 `policy_disabled` gate
+refusals** (ledger-honest, countable), there were **zero real cuOpt HTTP calls**, and the
+deferral holds were inert. Verdict: 3/20, first divergence sim-min 120 — one tick further
+again, states and SoCs fully paired at the divergence tick. The residue: the decide path's
+~104 `task_start` decisions per tick have a **fully scrambled processing order** across the
+pair. Those cursors order by `(last_state_change, id)` — and the offender is the vehicles
+trigger `public.log_vehicle_state_change` (`trg_vehicle_state_change`), which
+**unconditionally overwrites `NEW.last_state_change` with `NOW()`** on every state change,
+clobbering the sim-clock stamp that every twin write site deliberately passes (40+ sites
+swept: `p_sim_clock` / `v_clock` / `p_sim_clock_now`). `last_state_change` was therefore a
+REAL-clock column inside twin runs, and vehicle fairness order tracked wall-clock execution
+physics instead of the seed — **the `last_state_change` real-clock ordering finding parked
+since re-cert #4, now measured directly.** Fix: **0057** (post-merge) — one guard in the
+trigger: default to `NOW()` only when the UPDATE did not itself set the column (production
+callers byte-for-byte unchanged); preserve a caller-provided stamp. Re-certification #12
+runs after 0057 is applied, expecting `deterministic = true`.
+
 **Re-certification #10 (post-0055, 2026-08-20; arms `36adbeae` / `515526fe`, arms A and B
 each restarted once for metronome contamination — the airtight tick_count=0 check caught
 both; the metronome fires at the top of each minute, so arms started near :00 are the ones
