@@ -79,6 +79,30 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #9 (post-0054, 2026-08-20; arms `b982b594` / `1c552be5`, arm B restarted
+twice for metronome contamination — tick_count 2 then 1 — before a clean tick_count=0 start;
+the airtight procedure caught both).** 0054 applied (first attempt aborted safely — inserted
+`--` line comments swallowed ` LOOP` on single-line cursors; corrected to `/* */` block
+comments and re-applied); post-apply sweep shows ONLY the documented fence-audit skip
+remaining — **every per-tick cursor on the path is now provably ordered.** Verdict: 1/20,
+first divergence sim-min 60 — the SAME tick-2 signature as #8 (10 vehicles swap
+`charge_complete_holding` ↔ `staged_for_departure`, every SoC paired). With cursors
+eliminated, the offender is one level down: the wash-triage verdict is a **pure function of
+each vehicle's service manifest**, and `twin.ottoq_sim_generate_service_manifest` salts every
+one of its 21 seeded draws (fault, urgency, inspection, tidy, wash, PM, calibration, …) plus
+its 3 duration-card deals with `v_visit = vehicle || ':' || to_char(v_clock,
+'YYYYMMDDHH24MISS')` — the ABSOLUTE sim clock, the 0045 salt class, hiding inside the visit
+key; the function's own 0020 note documents the salt/key fusion as deliberate. Same-seed runs
+dealt different manifests by construction, so the triage staged different subsets. Fix:
+**0055** (post-merge) — the roles are split: `v_visit` stays the ledger key everywhere
+(visit_key, rider-flag binding, carryover, meta), the 24 draw/deal sites move to a
+run-relative `v_salt` (whole minutes since `sim_clock_start`, `GREATEST(0,…)` so the tick-1
+arrival batch — whose clock is the reset's wall clock, fractionally before `sim_clock_start`
+— lands in bucket 0 in every run); no-run callers keep the old absolute salt verbatim. All 6
+anchors pre-verified (counts 1/1/21/1/1/1 exact) under the 0054 mechanism extended with
+per-patch expected counts. Re-certification #10 runs after 0055 is applied, expecting
+`deterministic = true`.
+
 **Re-certification #8 (post-0053, 2026-08-20; arms `c1389c7b` / `5d986813`, both verified
 tick_count=0 at start, boundary-safe start minutes).** 0053 verified applied (md5 match); the
 config residue is gone. Verdict: **1 of 20 ticks identical, first divergence sim-min 60** —
