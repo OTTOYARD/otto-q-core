@@ -79,6 +79,29 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #8 (post-0053, 2026-08-20; arms `c1389c7b` / `5d986813`, both verified
+tick_count=0 at start, boundary-safe start minutes).** 0053 verified applied (md5 match); the
+config residue is gone. Verdict: **1 of 20 ticks identical, first divergence sim-min 60** —
+apparently a regression, actually the strongest signal yet: with the world truly identical at
+start and no stale charge plans staggering completions, many vehicles now finish charging
+simultaneously, and the tick-2 frame diff shows **9 vehicles swapping between
+`charge_complete_holding` and `staged_for_departure` with every SoC paired** — a
+capacity-limited promotion picking WHO advances in **heap order**. Proximate offender:
+`twin.ottoq_sim_wash_triage` (its cursor over `charge_complete_holding` has no ORDER BY). The
+full-catalog sweep 0050 never ran outside the five advance functions then found **21 unordered
+per-tick cursor sites across 16 functions**, including the decide path itself
+(`ottoq_decide_tick`'s gate router and BESS cursor) and its planning helpers
+(opportunistic charges, reservation re-optimizer, vacated-space release, pre-arrival
+contracts, unplaced-vehicle placer, comms advance, net-load forecast, and seven more twin
+functions). 2.5 names determinism under fixed seed a kernel requirement, so the decide-path
+sites are kernel-bug fixes: previously ARBITRARY orders made stable, semantics unchanged.
+Fix: **0054** (post-merge) — a new self-verifying mechanism sized to a 74KB function: per
+site, assert the pinned pre-image md5 and exactly-once anchor occurrence, single-site replace
+server-side, EXECUTE; atomic, transcription-free. All 21 anchors pre-verified read-only
+against production (every pin matches, every anchor unique).
+`public.ottoq_check_fence_containment` deliberately skipped (read-only geometry audit).
+Re-certification #9 runs after 0054 is applied, expecting `deterministic = true`.
+
 **Re-certification #7 (post-0052, 2026-08-19; arms `483954ce` / `4b626bb7`, both verified
 tick_count=0 at start, both start-minutes on the same side of every hour/date boundary).**
 0052 verified applied (both md5s match the file-applied scratch). The single-recall swap is
