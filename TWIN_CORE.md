@@ -79,6 +79,29 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #10 (post-0055, 2026-08-20; arms `36adbeae` / `515526fe`, arms A and B
+each restarted once for metronome contamination — the airtight tick_count=0 check caught
+both; the metronome fires at the top of each minute, so arms started near :00 are the ones
+it catches).** 0055 verified applied (post md5 `979dbe6a…`; 0 draws still salted with
+v_visit, 21 on v_salt). Verdict: 2/20, first divergence sim-min 90 — and the diff is a
+**milestone**: for the first time every STATE and every SoC is paired at the divergence
+tick; the entire residue is the stall-reservation pairing shifted by one down an ordered
+stall list. The decisions audit trail shows the two runs' very FIRST tick-3 decisions
+differ — and the mechanism is **architectural, not another salt**: the cuOpt proposer fired
+**33 times in each arm** (`cuopt_invocation_log`) and armed **50 vs 47**
+right-of-first-refusal deferrals (`ottoq_cuopt_deferrals`). The deferral holds a vehicle out
+of the local greedy path "while a solve is in flight" — and in-flight-ness is real pg_net
+HTTP timing, real debounce windows (`cuopt_debounce_s`, REAL domain by design), and real
+TTL clocks. Two same-seed runs therefore held DIFFERENT vehicles, and every downstream
+stall pairing shifted behind them. **The twin's own state machine is now fully
+deterministic; what remains is the deliberately real-async proposer.** Fix: **0056**
+(post-merge) — per-run policy `cuopt_propose_enabled` (default 1: production and demo
+behavior byte-identical): `ottoq_cuopt_refresh` refuses when 0 and logs the refusal as gate
+`policy_disabled` (the ledger rule: countable in both directions), `ottoq_cuopt_defer_hold`
+never holds when 0, and `ottoq_cert_arm_start` sets 0 for its own run. Nothing is removed —
+propose/dispose and the NVIDIA pipeline are untouched everywhere else. Re-certification #11
+runs after 0056 is applied, expecting `deterministic = true`.
+
 **Re-certification #9 (post-0054, 2026-08-20; arms `b982b594` / `1c552be5`, arm B restarted
 twice for metronome contamination — tick_count 2 then 1 — before a clean tick_count=0 start;
 the airtight procedure caught both).** 0054 applied (first attempt aborted safely — inserted
