@@ -169,6 +169,33 @@ Notes:
 | `ottoyard-field-ops` | `.env` (committed) + `supabase/config.toml` → `odhpbdhnpcrjeaxvbrzd` | Latent only: the `.env`-driven client has **zero importers**; all runtime traffic uses the hardcoded gxdrc client. But the config.toml misdirects any Supabase CLI use. |
 | `ottoyard-OTTO-Q` | `supabase/config.toml` → `ycsis…` | Correct *for this repo's own `supabase/` dir* (its migrations/functions genuinely describe MVP), but reinforces the trap that the fleet-data half of the app (gxdrc) has no source here. |
 
+### 5.2b The `ottoq-scheduler` question — closed 2026-08-20 (not duplication, not drift)
+
+Raised in the audit: AGENTS.md says the brain lives in `otto-q-core`, yet `ottoyard-OTTO-Q`
+ships a working `supabase/functions/ottoq-scheduler` (306 lines) plus ~2,000 lines of
+scheduling code in `src/services/`. Either the logic is duplicated across repos, or the
+deployed brain has diverged from what is committed. **Neither. It is a separate, older MVP
+demo scheduler that was never the engine.** Four checks, all measured:
+
+1. **Different database.** That repo's `supabase/config.toml` and its committed `.env` both
+   resolve to `ycsisvozzgmisboumfqc` (MVP). The engine is `gxdrcyphqjzjsuhxuqtg`.
+2. **Disjoint schema.** `ottoq-scheduler` reads and writes `ottoq_jobs` / `ottoq_resources`,
+   with its own vocabulary (`CHARGE`/`DETAILING`/`MAINTENANCE`/`DOWNTIME_PARK`;
+   `CHARGE_STALL`/`CLEAN_DETAIL_STALL`/`MAINTENANCE_BAY`). **Neither table exists in core**
+   (checked: 0 of 2), while core holds the real substrate — `ottoq_visit_needs`,
+   `ottoq_stall_bookings`, `ottoq_vehicle_commands` (3 of 3). The two share no table.
+3. **Not deployed on the engine.** Core's live edge functions (27 at the pull) are
+   `otto-q-api`, `otto-twin-control`, `ottoq-cuopt-propose`, `ottoq-orchestrate-tick`, … —
+   **no `ottoq-scheduler`.**
+4. **Not engine-grade by construction.** It draws job durations from `Math.random()` and has
+   no seed, no run ID and no decision ledger — none of the machinery every engine decision
+   passes through (§2.5, and the "no number ships without a run ID" rule).
+
+**Disposition:** AGENTS.md's canonical-brain claim stands and needs no correction. The residual
+risk is not divergence but **mining**: someone reading the MVP scheduler for "how OTTO-Q
+schedules" would be reading a demo. Anyone extracting scheduling logic must take it from the
+engine (core DB functions), never from this repo's `src/services/` or its `supabase/functions/`.
+
 ### 5.3 Pointed at MVP — deliberate vs. drift
 
 - **Deliberate (documented design, keep for now):** OrchestrAV auth/billing/`ottoq_ps_*` on MVP;
