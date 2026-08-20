@@ -79,6 +79,27 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #7 (post-0052, 2026-08-19; arms `483954ce` / `4b626bb7`, both verified
+tick_count=0 at start, both start-minutes on the same side of every hour/date boundary).**
+0052 verified applied (both md5s match the file-applied scratch). The single-recall swap is
+gone — the holdout fix holds. Verdict: **8 of 20 ticks identical, first divergence sim-min
+210** — once more the overnight-window tick. This one is **NOT an RNG bug: it is cross-run
+state leakage in the cert harness's world reset.** The proof is written in the vehicle config
+payloads (`ottoq_events.new_state`): arm A's `config->'charge_plan'->>'planned_at'` values
+carry the fractional-second sim-clock signature of the *previous* cert's arm B (`…:06.133086`
+= run `1a576926`), and arm B's carry arm A's (`…:05.932765` = run `483954ce`).
+`ottoq.ottoq_book_appointment` writes `config->'charge_plan'` on every booking (the charge
+doctrine); `public.ottoq_benchmark_reset` strips 13 config keys but not that one (nor
+`deploy_gate`, nor the `arm_fault_*` keys the emergency release writes), so **every arm
+starts with the previous run's plans** — invisible to the structural digest (which reads
+state/SoC/stall only) until the overnight charge-planning path reads the stale plans and the
+two arms plan differently. Fix: **0053** (post-merge) — the reset's strip list gains
+`charge_plan`, `deploy_gate`, and the three `arm_fault_*` keys; the function's own guard
+restricts it to benchmark depots. `config->'last_balance_charge_at'` is also run-written
+(balance-charge completions) but was identical across this pair — recorded as the next
+residue channel to check first if re-cert #8 still diverges. Re-certification #8 runs after
+0053 is applied, expecting `deterministic = true`.
+
 **Re-certification #6 (post-0051, 2026-08-19; arms `eb5a5d37` / `1a576926`, both verified
 tick_count=0 at start).** 0051 verified applied (both md5s match the file-applied scratch).
 The gate-assignment permutation is GONE — the assigner fix holds. Verdict: **8 of 20 ticks
