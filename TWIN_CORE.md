@@ -144,6 +144,28 @@ interchangeable by construction. 0062 is a repair, and is **not** claimed to be 
 
 Re-certification #17 runs after 0062 is applied and targets the reservation-churn path.
 
+**Reservation-churn follow-up (read-only, same evidence) → 0063.** Chasing #16's open question
+without waiting on a cert produced the answer. Ruled out first, by measurement:
+`public.ottoq_reserve_stall` is correctly guarded (it overwrites only when the stall is
+physically free AND unreserved | same-vehicle | expired) and **every one of its ~20 call sites
+passes the SIM clock**, never `now()` — so its `reservation_expires_at <= p_now` test never
+crosses clock domains. The ~20 `ORDER BY vn.created_at DESC LIMIT 1` picks over
+`ottoq_visit_needs` look like the same tie-prone class, but across both #16 arms there are
+**zero** `(vehicle_id, created_at)` tie groups — so those sites are effectively total and are
+deliberately left alone. **The negative result mattered: it stopped a 20-site migration that
+the data refutes.**
+
+The real seam is one table over. `ottoq_stall_bookings.booked_at` defaults to `now()` — one
+real-clock value per statement — and the same two arms hold **261 `(vehicle_id, booked_at)` tie
+groups, the largest with 15 bookings**. Two functions pick a single row out of exactly that tie
+with `ORDER BY b.booked_at DESC LIMIT 1`, and `booking_id` is `gen_random_uuid()`, so nothing
+run-stable remains: `ottoq.ottoq_enact_space_assignment` (which picks the PREFERRED STALL and
+calls `ottoq_reserve_stall` on it on the very next line — the churn seam itself) and
+`ottoq.ottoq_record_enacted_booking` (which picks which forward reservation to adopt rather than
+duplicate). **0063** applies the 0062 principle: `booked_at DESC` stays dominant, ties break on
+the booking window, stall and purpose, and `booking_id` goes last so the order is total.
+
+
 **Re-certification #15 (post-0060, 2026-08-20; arms `c5dbc377` / `943936c5`, started
 18:02:31 and 18:05:32 — deliberately held off the 18:00Z mark, where the midnight-UTC
 crossing would have landed exactly on a tick boundary and split the pair's day-keyed
