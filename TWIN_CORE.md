@@ -79,6 +79,33 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #12 (post-0057, 2026-08-20; arms `54ff816e` / `7015af46`, arm A restarted
+once for metronome contamination — armed at second :56 of the minute; the ~3s top-of-minute
+hazard window again).** 0057 verified applied (post md5 `b171ab31…`, changed=true). Verdict:
+**14/20 ticks identical — the best round yet** (was 3/20), first divergence pushed from
+sim-min 120 to **450** (tick 15). The stamp fix **holds**: `task_start` processing order is
+byte-paired through tick 14, and the tick-15 decisions stream is byte-paired through position
+16. The residue is exactly **two vehicles**: run B carries three extra decisions for vehicle
+`464c07e3` (a stall_assignment noop, a `promote_ready`, an `amend_plan`) and lacks A's
+`amend_plan` for `5b8524d6`. The variability-card ledger closes the case itself: 464c07e3's
+`eta_delay` card reads `will_delay=false` in arm A and `will_delay=true / 'accident' / 60 min
+/ applied=true` in arm B — same seed, same vehicle, same trip, **different card**, because
+`ottoq_twin_deal_eta_card` salts its three CRN draws with `p_dispatch_id`, and
+`ottoq_vehicle_dispatches.dispatch_id` is `gen_random_uuid()` — **the 0052 per-run-random-UUID
+salt class, hiding inside the card dealers.** The applied 60-minute delay held B's arrival;
+the shifted stall capacity then flipped vehicle `6e5c4806`'s deferrable-return booking
+(deployed in A, en_route in B) purely downstream. `ottoq_twin_deal_fault_card` has the
+identical defect (session scope; `ocpp_sessions.id` is `uuid_generate_v4()`); a function-wide
+sweep over `crn_draw`/`sample_calibrated`/`seeded_random` callers found **no third offender**.
+The playbook's 0057-guard check also ran clean: twin state writes pass distinct sim-clock
+stamps (paired +30-min deltas in the event payloads, anchored to each run's own start). Fix:
+**0058** (post-merge) — 0055's role split applied to both dealers: the UUID stays the ledger
+key (scope_instance, bucket_key, dedupe untouched); the draw scope moves to vehicle [+ stall]
++ whole sim-minutes of the dispatch/session start since the run's own `sim_clock_start`
+(sim-clock domain both sides, so the delta is an exact tick multiple in every arm); no-run and
+no-row callers keep the old UUID scope verbatim. Re-certification #13 runs after 0058 is
+applied, expecting `deterministic = true`.
+
 **Re-certification #11 (post-0056, 2026-08-20; arms `112fea03` / `5a209c14`, arm B restarted
 once for metronome contamination).** 0056 verified applied and **proven working**: the
 quiesce policy rows exist for both arms, the fire path logged **40 `policy_disabled` gate
