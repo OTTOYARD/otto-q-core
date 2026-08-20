@@ -79,6 +79,34 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #13 (post-0058, 2026-08-20; arms `bb74e241` / `0b490fb0`; a first attempt
+was aborted when the session's permission classifier blocked arm B's shield relabel past the
+16:00Z boundary window — orphan arm `f7502d7e` discarded with its ab_group `…424255`; one
+arm-B start was also discarded at tick_count=1 after a network timeout delayed the shield
+past the minute top — the airtight check caught it).** 0058 verified applied (post-md5s
+`06f17bf1…`/`149ad615…`, both byte-exact against locally built post-images) and **proven
+working**: the eta_delay card sets are behaviorally identical per vehicle across the arms
+(apparent diffs were multi-dispatch join artifacts; the one real single-card diff was
+`will_delay=false` in both arms — inert) and zero charger-fault cards dealt a fault in
+either arm. Verdict: 12/20, first divergence sim-min 390 (tick 13), all SoCs paired, four
+gate-cluster vehicles holding different stalls/admission states. NEW INSTRUMENT — the
+**full event-stream positional diff** (row_number over event_seq per run, sig =
+event_type|entity) pins the first divergent event exactly: at stream position 1148 run B
+emits two `stall.state_changed` reservations (stalls `67daf51e`, `891e775f`, reserved for
+vehicle `0bfd4d59`) immediately BEFORE the refusal-reactor batch, run A immediately AFTER
+it — same events, same run-relative reservation windows, opposite order. The reactor,
+`ottoq.ottoq_react_to_refusals`, walks refused commands with a capacity-consuming
+reserve-first walk, so its processing order decides WHO gets the free stalls and WHO
+escalates `no_capacity` — and its cursor orders by `issued_at` ALONE, which is the
+per-tick sim-clock batch stamp (measured: up to 72 commands share one value). Within a
+tick that ORDER BY is heap order — **the 0050/0054 unordered-cursor class with an
+insufficient key instead of a missing one; the 0054 sweep passed it because an ORDER BY
+was present.** Schema-wide re-sweep of `ottoq` found no other offender
+(`ottoq_stall_free_between` orders by distance+stall_code; `release_expired_bookings`'
+unordered loop is commutative). Fix: **0059** (post-merge) — one line, run-stable
+tiebreak `(issued_at, vehicle_id, command_type, payload->>'stall_id')`. Re-certification
+#14 runs after 0059 is applied, expecting `deterministic = true`.
+
 **Re-certification #12 (post-0057, 2026-08-20; arms `54ff816e` / `7015af46`, arm A restarted
 once for metronome contamination — armed at second :56 of the minute; the ~3s top-of-minute
 hazard window again).** 0057 verified applied (post md5 `b171ab31…`, changed=true). Verdict:
