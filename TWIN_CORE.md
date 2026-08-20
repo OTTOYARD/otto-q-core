@@ -79,6 +79,49 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**Re-certification #14 (post-0059, 2026-08-20; arms `1a505390` / `eea3a256`, both armed
+cleanly at first attempt — tethers cleared, tick_count=0 verified, starts 17:41:19 and
+17:43:38 inside the same 17:30–18:00Z band so both 600-sim-min spans cross every hour
+boundary and midnight UTC at the same tick index).** 0059 verified applied (post-md5
+`ea24d2ab…`) and **proven working**: at the divergent tick BOTH arms walk the refusal
+reactor in the new ascending-vehicle order (A: …ba70312c, c5a58859; B: …5dfd9db9,
+ba70312c — each ascending). What differs is not the order but the CONTENT of the queue:
+arm B carries one refused command arm A does not. Verdict: 13/20, first frame divergence
+sim-min 420.
+
+NEW INSTRUMENT — **command-stream alignment in run-relative time**. Aligning both arms'
+`ottoq_vehicle_commands` streams on `rel_min = issued_at - sim_clock_start` (ordered by
+content, not by id) puts the first real divergence at **sim-min 300 — four ticks before
+the frame digest sees it**, because a refused command changes no vehicle state until the
+reactor acts on it. At sim-min 300 arm A seated vehicle `ba70312c` in stall `45014fff`
+while arm B seated `5dfd9db9` in that same stall. This instrument now precedes the frame
+and decision diffs in the FAIL playbook: the frame digest reports where divergence
+becomes *visible*, the command stream reports where it *happened*.
+
+ROOT CAUSE — `twin.ottoq_sim_confirm_commands`, the confirm walk, carrying **both** known
+nondeterminism classes at once: (a) the **0059 class** — its main cursor orders by
+`c.issued_at` alone, the per-tick batch stamp, so within a tick it is heap order, and this
+loop does not merely observe but OCCUPIES the stall it validates, making it the sharpest
+capacity gate in the engine (whoever is confirmed first takes the stall; every later
+command for it is refused `stall_unavailable`); and (b) the **0058 class** — its
+preflight-supersede window breaks `issued_at` ties on `c.command_id`, which is
+`gen_random_uuid()`, so a per-run-random value chose which command counted as current
+intent and which were retired as `superseded`.
+
+**A systematic sweep replaced the one-site-at-a-time habit** that had cost three rounds:
+every `ORDER BY` in `public`/`twin`/`ottoq` was extracted and filtered for a sole key that
+is a per-tick timestamp or a random-UUID tiebreak, then each hit classified by tick-path
+membership (caller graph) and by whether it decides a scarce resource or a selection.
+Twelve candidates: **five fixed** in 0060 (the three confirm-walk sites plus
+`twin.ottoq_demand_rebook_after_eviction` and `ottoq.ottoq_rider_flag_indepot_sweep`,
+which pick a visit by `created_at` — `now()`, one value per tick — and
+`public.ottoq_active_charge_cap_kw` / `public.ottoq_l2_propose_bess`, which pick the
+active site power cap and BESS setpoint by `issued_at` alone); **seven reviewed and
+deliberately unchanged** and recorded in the 0060 header, including
+`ottoq_enact_cuopt_batch`, which is quiesced by 0056 in every cert run and has no
+in-database caller. Re-certification #15 runs after 0060 is applied, expecting
+`deterministic = true`.
+
 **Re-certification #13 (post-0058, 2026-08-20; arms `bb74e241` / `0b490fb0`; a first attempt
 was aborted when the session's permission classifier blocked arm B's shield relabel past the
 16:00Z boundary window — orphan arm `f7502d7e` discarded with its ab_group `…424255`; one
