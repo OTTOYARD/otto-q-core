@@ -79,6 +79,126 @@ Three findings, each caught by the cert doing its job:
 Re-certification #3 runs after 0048 is applied: arms with `run_by='cert_harness'` +
 `next_tick_due_at` shield, expecting `deterministic = true`.
 
+**The time-of-day confound, and what it does and does not invalidate (recorded 2026-08-21).**
+`public.ottoq_cert_arm_start` (md5 `7dbb6135…`) hardcodes the run's sim clock to `v_now`:
+`sim_clock_start = sim_clock_current = v_now`, `sim_clock_end = v_now + 24h`. So a cert pair
+does not sample "the scenario" — it samples the 10-sim-hour slice of `normal_day` that begins
+at whatever wall-clock time the round was armed. Measured across two consecutive rounds on the
+SAME code path: re-cert #17 armed 22:40Z carried 1,075 / 1,098 vehicle commands per arm; #18
+armed 00:32Z carried 1,562 / 1,598 — ~45% more work from the arrival curve alone.
+
+What this invalidates: **the cross-round `ticks_identical` trend**. Quoting "12/20 → 14/20 →
+9/20" as progress was wrong, and it was quoted that way in earlier records here; those numbers
+are per-round diagnostics, not a score, and the sentence in the #16 record already said so
+before the confound was understood.
+
+What this does **not** invalidate: **every within-round A-vs-B comparison, and therefore every
+bug found.** The two arms of a pair are armed ~2 minutes apart inside the same 30-minute band
+(the BAND RULE), so they sample the same slice under the same load. Each determinism verdict is
+a valid same-input comparison; no fix in 0045–0064 rests on a cross-round claim.
+
+The fix, when the founder greenlights it: `twin.ottoq_sim_start_run` (md5 `a8454174…`) **already
+accepts `p_sim_clock_start timestamptz DEFAULT NULL`** — the capability exists one layer down.
+Only `ottoq_cert_arm_start` fails to pass one. Pinning it is a cert-harness-only change with zero
+effect on production scheduling semantics.
+
+**Re-certification #18 (post-0064, 2026-08-21; arms `da724f40` / `97b5b360`, ab_group `…42425d`,
+armed 00:32:37Z / 00:34:15Z).** 0064 verified applied (`ottoq.ottoq_emit_vehicle_command`
+post-md5 `05785c84…`, patch present, and it is the ONLY function of that name in any schema —
+the unqualified call sites cannot resolve past it). Verdict: **4/20, first divergence sim-min
+150.** Per the confound above this is NOT comparable to #17's 9/20: this pair ran ~45% more
+commands.
+
+**0064 fires, and the ledger shows it working mechanically.** The `stall.state_changed` diffs
+carry the proof: contended stalls now reserve with `reservation_expires_at` **70 sim-minutes**
+past `reserved_at` instead of the `ottoq_reserve_stall` default TTL of 600 s = 10 sim-minutes.
+Since the confirm walk runs one tick (30 sim-min) after issue, the hold now genuinely outlives
+the command it serves. That was the whole claim of 0064 and it is satisfied.
+
+**0064's THROUGHPUT effect is unmeasured, and the reason is the confound, not a failure.**
+Absolute numbers got worse (#18 arm A: 12 `begin_charge` executed vs 1,179 refused; arm B: 5 vs
+1,277 — against #17's 22/832 and 14/918), but the load also rose ~45%, so the pairs cannot be
+differenced. Measuring 0064 honestly needs one pinned-clock pair WITH it and one WITHOUT —
+i.e. a deliberate temporary revert as an experiment. That is a founder call, not a unilateral one.
+
+**Two NEW findings, both product bugs, both found by reading the source rather than the verdict.**
+
+1. **The engine emits every `begin_charge` TWICE.** `public.ottoq_decide_tick` line 268 and line
+   323 sit inside the SAME `IF ottoq_reserve_stall(…) THEN` branch and both
+   `PERFORM …ottoq_emit_vehicle_command(…, 'begin_charge', …)` for the same vehicle, same stall,
+   same tick — differing only in payload (line 268 carries `new_state`, line 323 carries
+   `requested_kw`). The data confirms the lockstep exactly: in `da724f40`, 589 refusals on the
+   `new_state` variant and 584 on the `requested_kw` variant. Every stall enactment therefore
+   costs two commands, and the pair is byte-tied on (vehicle, `issued_at`, `command_type`,
+   `stall_id`) — **this is the source of the genuine duplicate rows that broke the supersede
+   ordering in #16 and forced 0062.** The duplicate is a defect in its own right; it also
+   roughly doubles every refusal count quoted in these records.
+
+2. **The depot livelocks on reservations, not on cars.** In `da724f40` the 1,173
+   `target_occupied` refusals span only **131 distinct (vehicle, stall) pairs over 17 ticks** —
+   ~9 refusals per pair, the same vehicles re-proposing the same stalls tick after tick and being
+   refused every time. Forty stalls are involved: **all 10 DCFC plus 30 L2**, and not one of them
+   ever seated a single command in the whole run (`proceed_to_stall` against them was refused 51
+   times too; zero executions). On those stalls the event stream carries **137 `reserved_by`
+   changes against 23 `current_vehicle_id` changes** — reservation churn outruns physical
+   occupancy 6:1 — and an as-of reconstruction of the confirm-time state attributes **291
+   refusals to another vehicle's LIVE reservation versus 50 to another car physically present**
+   (the remaining 832 the reconstruction cannot place, because `occurred_at` ordering does not
+   resolve within-tick sequence; the 6:1 ratio is the robust part). The stalls are locked to
+   vehicles that never arrive.
+
+   **The open question this raises about 0064.** 0064 lengthened exactly those locks, 10 → 70
+   sim-minutes. A hold that outlives its command is right; a hold that outlives a vehicle which
+   never shows up is a stall taken out of service for over an hour. The hypothesis for #19 is
+   that 0064 fixed the race it aimed at and deepened the livelock beside it, and the honest test
+   is the pinned-clock A/B above. **Stated as a hypothesis, not a finding** — the confound
+   forbids concluding it from #18's numbers.
+
+Re-certification #19 waits on the pinned-clock harness change; determinism work is not the
+bottleneck here — the reservation-lifetime policy is.
+
+**Re-certification #17 (post-0063, 2026-08-20; arms `ead7911f` / `35a907e7`, ab_group `…42425c`,
+armed 22:40:26Z / 22:42:23Z).** 0063 verified applied (post-md5s `92fdb5e9…` / `30174e9f…`).
+Verdict: **9/20, first divergence sim-min 300** — 0063 did NOT close the cert.
+
+**The ordering-totality work is nonetheless DONE, and this round is what proves it.** The first
+96 reservation events are IDENTICAL across the two arms, and vehicles receive their reservations
+in the SAME ORDER in both; only the stall each one lands on differs, shifted by one. That is no
+longer an ordering defect — every cursor and window in the path now has a total, run-stable key
+(0050, 0054, 0059, 0062, 0063). What remains is **availability at one instant**: the two arms
+disagree about which stalls are free at the moment the walk runs, not about who goes first.
+
+**The root cause, found here and fixed by 0064: a hold could expire between the tick that ISSUES
+a stall command and the tick that CONFIRMS it.** Vehicle `02734f04`, DCFC stall `906cbfff`:
+reserved at sim-min 210 with a 600 s (10 sim-min) TTL, expiring 280; `begin_charge` issued at
+270; hold expired at 280; at tick 300 the reassignment path and the confirm walk raced. Arm B
+seated the vehicle (charged 32→90); arm A had already reassigned the stall and refused both
+`begin_charge` rows `target_occupied`. The boundary case is systemic, not a one-off: **66 of 271
+holds (arm A) and 64 of 257 (arm B) expired EXACTLY on a tick boundary**, because the TTLs are
+exact multiples or halves of the 1,800 sim-second tick.
+
+**This is a product bug, not a test artifact,** and the cost on this pair (fleet of 100) is the
+depot-throughput collapse the founder saw in the 3D view before the ledger confirmed it: arm A
+819 `begin_charge` refused `target_occupied` against 22 executed, 34 vehicles parked in staging,
+80 of 100 hitting a stolen-stall refusal, and only 2 of 22 sessions on DCFC (the rest fell back
+to L2); arm B 909 against 14, 23 parked, 86 of 100. In production this is a charger given away
+while the vehicle is already under instruction to take it. → 0064.
+
+**The robotic arms are a RENDERER bug; the engine is correct.** Chased in the same round because
+the founder reported arms activating without extending. `twin.ottoq_sim_start_charge_session`
+gates `twin.ottoq_arm_begin_cycle(… 'mate' …)` on `stall_type = 'dcfc'` — deliberate, and
+documented in-code. Measured: arms fire on **100% of DCFC sessions** (arm A 2→2, arm B 5→5) and
+**0% of L2** (A 20→0, B 9→0). The engine starts exactly the arm cycles it should. The 3D layer
+in `ottoyarddepot-sim` animates an arm for L2 sessions where the engine correctly starts none.
+**Open, unticketed, belongs to depot-sim — do not change the engine gate to satisfy the
+renderer.**
+
+**A negative result worth recording, because it saved a 20-site migration.** The ~20
+`ORDER BY vn.created_at DESC LIMIT 1` picks over `ottoq_visit_needs` were left alone: the data
+shows **zero** `(vehicle_id, created_at)` tie groups across both arms, so those picks are already
+effectively total. Migrating 20 call sites on a hypothesis the data refutes would be churn, not
+a fix.
+
 **Re-certification #16 (post-0061, 2026-08-20; arms `2010f408` / `c507bce2`, ab_group
 `…42425b`; two earlier arms discarded for metronome contamination — see the harness lessons
 below).** 0061 verified applied (post-md5 `1b88f383…`, sim-domain fallback present). Verdict:
