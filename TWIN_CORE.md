@@ -102,6 +102,58 @@ accepts `p_sim_clock_start timestamptz DEFAULT NULL`** — the capability exists
 Only `ottoq_cert_arm_start` fails to pass one. Pinning it is a cert-harness-only change with zero
 effect on production scheduling semantics.
 
+**THE LIVELOCK, ROOT-CAUSED (2026-08-21). It is a drain-rate defect, not a race.**
+Found by following the founder's own question — *"if a vehicle missed an assignment because
+of timing, OTTO-Q should be aware of why and re-orchestrate because of that"* — to the
+function that is supposed to do exactly that: `ottoq.ottoq_react_to_refusals`. It exists, it
+is wired, and it is the bottleneck.
+
+Ruled out first, by reading the source rather than guessing: **staging does not steal
+chargers.** Both staging pickers filter explicitly — the gate-intake cursor in
+`ottoq_decide_tick` selects `WHERE s.stall_type = 'staging'`, and `ottoq.ottoq_book_hold_stall`
+constrains every one of its five tiers to `s.stall_type::text = 'staging'` over the
+staging-ring zones. The `proceed_to_stall` commands observed against DCFC/L2 stalls come from
+the reactor's own reroutes, not from parking.
+
+The reactor's cursor is `... ORDER BY issued_at, vehicle_id, command_type, payload->>'stall_id'
+LIMIT 20` — **twenty refusals per tick, a fixed cap with an unbounded queue behind it.** The
+ledger shows what that costs:
+
+| round / arm | refused | never reacted to | rerouted | escalated | of which `no_capacity` |
+|---|---|---|---|---|---|
+| #17 A | 904 | **624** | 18 | 262 | 261 |
+| #17 B | 1,005 | **725** | 17 | 263 | 260 |
+| #18 A | 1,286 | **926** | 22 | 338 | 331 |
+| #18 B | 1,404 | **1,044** | 42 | 318 | 315 |
+
+Two independent failures, and they compound:
+
+1. **72% of refusals are never examined at all.** 20 per tick × 17 ticks = a ceiling of 340;
+   #18 arm A handled 360 and left 926 with `reacted_at IS NULL` at the end of the run. The
+   backlog grows monotonically — every tick adds more refusals than the reactor can read. This
+   is the livelock: not a race between two arms, but a queue that fills faster than it drains.
+   It is also why the same 131 (vehicle, stall) pairs reappear ~9 times each: nothing ever
+   retires them.
+
+2. **Of the refusals it does examine, ~92% find nowhere to go** (`escalated` /
+   `no_capacity`: 331 of 338 in #18 A). The reroute path reserves its new stall for
+   `ottoq_reserve_stall(..., 3600)` and books it for a further 60 minutes, so each *successful*
+   reroute removes a stall from the pool for an hour — and each *failed* reroute leaves nothing
+   behind but an escalation. Combined with 0064's 70-minute holds, capacity drains faster than
+   vehicles are seated.
+
+**The duplicate emit (finding 1 above) is a multiplier on both.** Because
+`ottoq_decide_tick` emits `begin_charge` twice per enactment, roughly half of the reactor's
+20-per-tick budget is spent re-reading duplicate rows of a decision it has already handled.
+Fixing the duplicate does not just clean the audit trail; it doubles the reactor's effective
+throughput at zero cost.
+
+**What this changes about the 0064 hypothesis.** The earlier suspicion — that 0064's longer
+holds deepened the jam — is still plausible but is now clearly *second order*. The dominant
+term is the drain rate. A depot that never reads 72% of its own refusals will livelock at any
+hold length. The pinned-clock harness (0065) lands first precisely so the fixes that follow
+can be differenced rather than argued.
+
 **Re-certification #18 (post-0064, 2026-08-21; arms `da724f40` / `97b5b360`, ab_group `…42425d`,
 armed 00:32:37Z / 00:34:15Z).** 0064 verified applied (`ottoq.ottoq_emit_vehicle_command`
 post-md5 `05785c84…`, patch present, and it is the ONLY function of that name in any schema —
