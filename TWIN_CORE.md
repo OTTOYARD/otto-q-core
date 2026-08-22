@@ -102,6 +102,72 @@ accepts `p_sim_clock_start timestamptz DEFAULT NULL`** — the capability exists
 Only `ottoq_cert_arm_start` fails to pass one. Pinning it is a cert-harness-only change with zero
 effect on production scheduling semantics.
 
+**Re-certification #21 — MY HYPOTHESIS WAS FALSIFIED ON BOTH COUNTS, AND 0068 IS REVERTED**
+(post-0068, 2026-08-22; arms `9ea1a855` / `7e8bb433`, ab_group `…424260`, both
+`sim_clock_start = 2026-08-22 22:00:00+00`).
+
+0068 predicted two things in writing before the run: determinism would REMAIN true (confirming
+the tiebreak owned the certification), and throughput would recover toward #19's 60–62 sessions
+(confirming the sim-domain move owned the regression). The migration header also committed, in
+advance, that **if throughput did not recover the attribution was wrong and would be rewritten
+rather than defended.** It did not recover. This is that rewrite.
+
+| | #19 (pre-0067) | #20 (0067) | **#21 (0068)** |
+|---|---|---|---|
+| predicate | `expires <= now()` (real clock) | `expires <= p_sim_clock` | `reserved_by = v_veh.id` |
+| tiebreak | absent | present | present |
+| **deterministic** | false (10/20) | **TRUE (20/20)** | **false (15/20, first div 480)** |
+| charge sessions A / B | 62 / 49 | 41 / 41 | **23 / 23** |
+| vehicles charged | 60 / 47 | 41 / 41 | **23 / 23** |
+| DCFC sessions | 18 / 18 | 13 / 13 | **9 / 9** |
+| `begin_charge`/`target_occupied` | 80 / 128 | 219 / 219 | **328 / 328** |
+| reactor backlog | 0 / 2 | 68 / 69 | **177 / 177** |
+
+**0068 is strictly worse than 0067 on both axes** — it lost the certification *and* cut
+throughput almost in half again. It has been **reverted in production**, by reversing its own
+patch and asserting the result is byte-identical to 0067's post-image
+(`3d7fa12fec5fe860854d8416dd8e4840`, verified). Production is back in the last founder-merged
+state. The revert restores previously-authorised behaviour; it introduces nothing new.
+
+**TWO THINGS I GOT WRONG, STATED PLAINLY.**
+
+1. **"A tiebreak cannot move throughput."** This was the load-bearing claim behind the whole
+   attribution, and it is false. Compare #19 and #21: their reservation predicates are
+   *behaviourally equivalent* — #19's real-clock comparison sat ~21h behind the sim clock and so
+   was effectively always false, which is precisely "never reuse another vehicle's hold," which
+   is what #21 says explicitly. The only difference between those two rounds is the tiebreak,
+   and sessions went **62/49 → 23/23**. A tiebreak does not merely order indistinguishable
+   candidates: by always preferring the same member of a tied pair (`stall_code ASC`) it
+   systematically biases which stall is consumed first, and `v_used` plus downstream availability
+   propagates that bias through the rest of the tick. Heap order was accidentally spreading the
+   load across tied stalls; a deterministic order concentrates it.
+
+2. **"The tiebreak owns the certification."** Also false. #20 and #21 both carry the tiebreak;
+   #20 is deterministic and #21 is not. The sim-domain expiry predicate was contributing to
+   determinism too, and removing it exposed a *different*, deeper non-determinism — the first
+   divergence moved from sim-min 330 to 480, so it is not the same seed re-emerging.
+
+**WHAT THE EVIDENCE ACTUALLY SUPPORTS NOW.** Only one configuration has ever certified:
+0067's exact pair of changes together (tiebreak + sim-domain expiry), at 41 sessions. #19's 62
+was never a stable number — it is one arm of a *non-deterministic* pair whose sibling scored 49,
+so "62" was partly a coin flip, and the honest pre-fix figure is "somewhere between 49 and 62,
+irreproducible." The real open question is therefore not "how do we get 62 back" but:
+**can the depot reach ~60 sessions in a configuration that also certifies?** That is a genuine
+design problem — the tiebreak's load-concentration effect versus determinism's need for a total
+order — and not something to patch blind. A plausible direction is a tiebreak that is total but
+*load-aware* (e.g. order tied stalls by current utilisation, then `stall_code`, then `id`), which
+keeps a total order while restoring the spreading heap order was doing by accident. Untested;
+recorded as a hypothesis, not a plan.
+
+**Standing conclusion for C7.1:** the certification result from re-cert #20 stands — 20/20,
+`deterministic = TRUE` — and production is in exactly that state. The throughput cost of that
+configuration (41 sessions vs an irreproducible 49–62 before) is now a measured, documented
+trade-off rather than an unknown, which is the first time that has been true in this series.
+
+**Harness note:** arm B's first attempt was discarded at `tick_count = 1` (metronome contamination
+in the arm_start → shield gap) and re-armed clean at 26 seconds into a minute — the third time
+this has cost an arm, and the reason the `ottoq_cert_arm_finish` teardown fix is still owed.
+
 **Re-certification #20 — C7.1 PASSES (post-0067, 2026-08-22; arms `677bca9c` / `43fbecf4`,
 ab_group `…42425f`, both `sim_clock_start = 2026-08-22 22:00:00+00`).**
 
