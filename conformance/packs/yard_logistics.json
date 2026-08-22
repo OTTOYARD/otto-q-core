@@ -1,0 +1,235 @@
+{
+  "pack_id": "yard-logistics",
+  "status": "build",
+  "source": "CLAUDE.md 2.4 ('Yard-logistics adds: opportunity charging, battery swap, attachment change') + ottoq_vehicle_classes rows yard_tractor_e_2025 / amr_pallet_2025 (pack_id='yard-logistics', read 2026-08-22)",
+  "asset_classes": [
+    {
+      "code": "yard_tractor_e_2025",
+      "display_name": "Electric yard tractor",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "amr_pallet_2025",
+      "display_name": "AMR pallet mover",
+      "energy_kind": "electric"
+    }
+  ],
+  "operations": [
+    {
+      "operation_code": "arrive",
+      "display_name": "Arrive",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "depart",
+      "display_name": "Depart",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "taxi",
+      "display_name": "Inter-point move",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "stage",
+      "display_name": "Park / stage",
+      "category": "staging",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "charge_dcfc",
+      "display_name": "DC fast charge",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": true,
+      "emits_sdr": true,
+      "typical_min": 32.0,
+      "peak_kw": 150.0
+    },
+    {
+      "operation_code": "opportunity_charge",
+      "display_name": "Opportunity charge",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": true,
+      "emits_sdr": true,
+      "typical_min": 12.0,
+      "peak_kw": 4.0
+    },
+    {
+      "operation_code": "battery_swap",
+      "display_name": "Battery swap",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 5.0
+    },
+    {
+      "operation_code": "attachment_change",
+      "display_name": "Attachment change",
+      "category": "maintenance",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 15.0
+    },
+    {
+      "operation_code": "inspect",
+      "display_name": "Inspection",
+      "category": "inspection",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 20.0
+    },
+    {
+      "operation_code": "mechanical_pm",
+      "display_name": "Mechanical PM",
+      "category": "maintenance",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 70.0
+    }
+  ],
+  "service_points": [
+    {
+      "point_type": "dcfc",
+      "count": 10,
+      "exclusive": true,
+      "min_gap_min": 18.0,
+      "capabilities": [
+        [
+          "yard_tractor_e_2025",
+          "charge_dcfc"
+        ]
+      ]
+    },
+    {
+      "point_type": "amr_pad",
+      "count": 6,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "amr_pallet_2025",
+          "opportunity_charge"
+        ]
+      ]
+    },
+    {
+      "point_type": "swap_dock",
+      "count": 1,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "yard_tractor_e_2025",
+          "battery_swap"
+        ],
+        [
+          "amr_pallet_2025",
+          "battery_swap"
+        ]
+      ]
+    },
+    {
+      "point_type": "service_bay",
+      "count": 2,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "yard_tractor_e_2025",
+          "attachment_change"
+        ],
+        [
+          "yard_tractor_e_2025",
+          "inspect"
+        ],
+        [
+          "yard_tractor_e_2025",
+          "mechanical_pm"
+        ],
+        [
+          "amr_pallet_2025",
+          "attachment_change"
+        ],
+        [
+          "amr_pallet_2025",
+          "inspect"
+        ],
+        [
+          "amr_pallet_2025",
+          "mechanical_pm"
+        ]
+      ]
+    },
+    {
+      "point_type": "staging",
+      "count": 20,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "yard_tractor_e_2025",
+          "stage"
+        ],
+        [
+          "amr_pallet_2025",
+          "stage"
+        ]
+      ]
+    }
+  ],
+  "constraints": [
+    {
+      "code": "Y1_operation_needs_capable_point",
+      "description": "AMR pads serve AMRs; DCFC serves tractors. Cross-assignment is invalid.",
+      "mechanism": "capability_pair"
+    },
+    {
+      "code": "Y2_point_exclusive",
+      "description": "One asset per point.",
+      "mechanism": "exclusive_occupancy"
+    },
+    {
+      "code": "Y3_site_power_cap",
+      "description": "Tractor DCFC and AMR opportunity charging share one feeder.",
+      "mechanism": "site_power_cap"
+    },
+    {
+      "code": "Y4_swap_is_exclusive",
+      "description": "The swap dock is non-sharable for the swap duration.",
+      "mechanism": "exclusive_occupancy"
+    },
+    {
+      "code": "Y5_moves_are_operations",
+      "description": "Yard moves consume path resources.",
+      "mechanism": "movement_as_operation"
+    },
+    {
+      "code": "Y6_every_op_emits_sdr",
+      "description": "Battery swap and attachment change settle like any other operation.",
+      "mechanism": "sdr_termination"
+    }
+  ]
+}

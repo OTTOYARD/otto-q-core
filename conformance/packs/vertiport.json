@@ -1,0 +1,255 @@
+{
+  "pack_id": "vertiport",
+  "status": "paper",
+  "source": "docs/research/H3-vertiport-drone.md (merged) \u2014 Asset Profiles, Operation Catalog, Constraint Set (FAA EB 105A pad separation, AS6968 draft connector), and the three constraints H3 names as hardest",
+  "asset_classes": [
+    {
+      "code": "evtol_ccs",
+      "display_name": "eVTOL (CCS connector)",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "evtol_proprietary",
+      "display_name": "eVTOL (proprietary connector)",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "drone_in_a_box",
+      "display_name": "Drone-in-a-box",
+      "energy_kind": "electric"
+    }
+  ],
+  "operations": [
+    {
+      "operation_code": "land",
+      "display_name": "Land",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "takeoff",
+      "display_name": "Take off",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "reposition",
+      "display_name": "Reposition by tug",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "stage",
+      "display_name": "Park / stage",
+      "category": "staging",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "battery_cooldown",
+      "display_name": "Battery cooldown",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 20.0
+    },
+    {
+      "operation_code": "fast_charge",
+      "display_name": "Fast charge",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": true,
+      "emits_sdr": true,
+      "typical_min": 30.0,
+      "peak_kw": 350.0
+    },
+    {
+      "operation_code": "battery_swap",
+      "display_name": "Battery swap",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 8.0
+    },
+    {
+      "operation_code": "preflight_inspect",
+      "display_name": "Preflight inspection",
+      "category": "inspection",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 15.0
+    }
+  ],
+  "service_points": [
+    {
+      "point_type": "vertipad",
+      "count": 4,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "evtol_ccs",
+          "land"
+        ],
+        [
+          "evtol_ccs",
+          "takeoff"
+        ],
+        [
+          "evtol_ccs",
+          "preflight_inspect"
+        ],
+        [
+          "evtol_proprietary",
+          "land"
+        ],
+        [
+          "evtol_proprietary",
+          "takeoff"
+        ],
+        [
+          "evtol_proprietary",
+          "preflight_inspect"
+        ],
+        [
+          "drone_in_a_box",
+          "land"
+        ],
+        [
+          "drone_in_a_box",
+          "takeoff"
+        ],
+        [
+          "drone_in_a_box",
+          "preflight_inspect"
+        ]
+      ]
+    },
+    {
+      "point_type": "charge_stand_ccs",
+      "count": 2,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "evtol_ccs",
+          "fast_charge"
+        ],
+        [
+          "evtol_ccs",
+          "battery_cooldown"
+        ],
+        [
+          "drone_in_a_box",
+          "fast_charge"
+        ],
+        [
+          "drone_in_a_box",
+          "battery_cooldown"
+        ]
+      ]
+    },
+    {
+      "point_type": "charge_stand_proprietary",
+      "count": 2,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "evtol_proprietary",
+          "fast_charge"
+        ],
+        [
+          "evtol_proprietary",
+          "battery_cooldown"
+        ]
+      ]
+    },
+    {
+      "point_type": "swap_station",
+      "count": 1,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "evtol_ccs",
+          "battery_swap"
+        ],
+        [
+          "evtol_proprietary",
+          "battery_swap"
+        ],
+        [
+          "drone_in_a_box",
+          "battery_swap"
+        ]
+      ]
+    },
+    {
+      "point_type": "staging",
+      "count": 8,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "evtol_ccs",
+          "stage"
+        ],
+        [
+          "evtol_proprietary",
+          "stage"
+        ],
+        [
+          "drone_in_a_box",
+          "stage"
+        ]
+      ]
+    }
+  ],
+  "constraints": [
+    {
+      "code": "V1_Vertipad_Exclusive_Use",
+      "description": "One vertipad per aircraft during landing and takeoff.",
+      "mechanism": "exclusive_occupancy"
+    },
+    {
+      "code": "V2_Tug_As_Resource",
+      "description": "Only N tugs; repositioning queues behind them.",
+      "mechanism": "movement_as_operation",
+      "note": "2.3 already requires inter-point moves to consume path resources. A tug is that resource, named."
+    },
+    {
+      "code": "V3_Charger_Compatibility",
+      "description": "CCS or proprietary connector (AS6968 draft); the handshake means duration is not determined by power alone.",
+      "mechanism": "capability_pair",
+      "note": "PARTIAL, AND THE PACK SAYS SO. capability_pair expresses WHICH aircraft may use which stand. It does NOT express a duration that varies with a non-numeric handshake. The compatibility half conforms; the duration half is untested."
+    },
+    {
+      "code": "V4_Battery_Cooling",
+      "description": "20-minute cooldown before fast charge if SoC > 90% on landing. Physical state gates scheduling.",
+      "mechanism": null,
+      "finding_class": "DECLARATIVE",
+      "note": "THE KERNEL HAS min_gap_on_point (DCFC cooldown, 18 min, CLAUDE.md 2.5) \u2014 but that gap is a property of the POINT, between successive sessions. This gap is a property of the ASSET, between its own landing and its own charge, and is CONDITIONAL on SoC. No kernel mechanism expresses an asset-side conditional minimum gap. Classified DECLARATIVE because the shape is a mirror of one the kernel already has; that classification is a claim the harness reports, not a fact."
+    },
+    {
+      "code": "V5_Pad_Separation",
+      "description": "Minimum 1.5x aircraft diameter between active vertipads (FAA EB 105A).",
+      "mechanism": null,
+      "finding_class": "SOLVER_CHANGE",
+      "note": "A GEOMETRIC constraint coupling two points' simultaneous occupancy. Every kernel resource mechanism is per-point (exclusive_occupancy) or site-wide (site_power_cap). Nothing expresses 'these two points may not both be active', which is a pairwise spatial exclusion. This is the clearest candidate in the whole pack set for a genuine solver change."
+    }
+  ]
+}
