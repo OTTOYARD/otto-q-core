@@ -1,0 +1,283 @@
+{
+  "pack_id": "mining",
+  "status": "paper",
+  "source": "docs/research/H2-mining.md (merged) \u2014 Asset Profiles, Operation Catalog, Constraint Set, and the three constraints H2 names as likeliest kernel-breakers",
+  "asset_classes": [
+    {
+      "code": "haul_truck_diesel",
+      "display_name": "Haul truck (diesel)",
+      "energy_kind": "diesel"
+    },
+    {
+      "code": "haul_truck_trolley_electric",
+      "display_name": "Haul truck (trolley-assisted electric)",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "loader",
+      "display_name": "Loader",
+      "energy_kind": "diesel"
+    }
+  ],
+  "operations": [
+    {
+      "operation_code": "arrive",
+      "display_name": "Arrive",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "depart",
+      "display_name": "Depart",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "tram",
+      "display_name": "Inter-point tram",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false,
+      "consumes_path": [
+        "trolley_line"
+      ]
+    },
+    {
+      "operation_code": "stage",
+      "display_name": "Park / stage",
+      "category": "staging",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "refuel",
+      "display_name": "Refuel",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 20.0
+    },
+    {
+      "operation_code": "recharge",
+      "display_name": "Recharge",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": true,
+      "emits_sdr": true,
+      "typical_min": 45.0,
+      "peak_kw": 600.0
+    },
+    {
+      "operation_code": "tyre_change",
+      "display_name": "Heavy tyre change",
+      "category": "maintenance",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 180.0
+    },
+    {
+      "operation_code": "component_hour_pm",
+      "display_name": "Component-hour PM",
+      "category": "maintenance",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 240.0
+    },
+    {
+      "operation_code": "oil_analysis",
+      "display_name": "Oil analysis sample",
+      "category": "inspection",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 15.0
+    },
+    {
+      "operation_code": "payload_clearance",
+      "display_name": "Payload clearance and power-down",
+      "category": "inspection",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 10.0
+    }
+  ],
+  "service_points": [
+    {
+      "point_type": "fuel_bay",
+      "count": 2,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "haul_truck_diesel",
+          "refuel"
+        ],
+        [
+          "loader",
+          "refuel"
+        ]
+      ]
+    },
+    {
+      "point_type": "trolley_charge_segment",
+      "count": 1,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "haul_truck_trolley_electric",
+          "recharge"
+        ]
+      ]
+    },
+    {
+      "point_type": "tyre_bay",
+      "count": 1,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "haul_truck_diesel",
+          "tyre_change"
+        ],
+        [
+          "haul_truck_trolley_electric",
+          "tyre_change"
+        ],
+        [
+          "loader",
+          "tyre_change"
+        ]
+      ]
+    },
+    {
+      "point_type": "service_bay",
+      "count": 2,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "haul_truck_diesel",
+          "component_hour_pm"
+        ],
+        [
+          "haul_truck_diesel",
+          "oil_analysis"
+        ],
+        [
+          "haul_truck_trolley_electric",
+          "component_hour_pm"
+        ],
+        [
+          "haul_truck_trolley_electric",
+          "oil_analysis"
+        ],
+        [
+          "loader",
+          "component_hour_pm"
+        ],
+        [
+          "loader",
+          "oil_analysis"
+        ]
+      ]
+    },
+    {
+      "point_type": "clearance_pad",
+      "count": 2,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "haul_truck_diesel",
+          "payload_clearance"
+        ],
+        [
+          "haul_truck_trolley_electric",
+          "payload_clearance"
+        ],
+        [
+          "loader",
+          "payload_clearance"
+        ]
+      ]
+    },
+    {
+      "point_type": "staging",
+      "count": 10,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "haul_truck_diesel",
+          "stage"
+        ],
+        [
+          "haul_truck_trolley_electric",
+          "stage"
+        ],
+        [
+          "loader",
+          "stage"
+        ]
+      ]
+    }
+  ],
+  "constraints": [
+    {
+      "code": "C1_Asset_Must_Have_Clearance",
+      "description": "A machine must be empty of payload and powered down before entering a service bay.",
+      "mechanism": "movement_as_operation",
+      "note": "Modelled as a mandatory predecessor operation (payload_clearance) on its own point \u2014 an ordered prerequisite, which the flow-shop model already expresses."
+    },
+    {
+      "code": "C2_Resource_Sharing_Exclusive_Use",
+      "description": "A service bay is non-sharable for the operation's duration.",
+      "mechanism": "exclusive_occupancy"
+    },
+    {
+      "code": "C3_Energy_Resupply_Window",
+      "description": "SoC/fuel must be above a floor to begin return-to-base and below a ceiling to receive service.",
+      "mechanism": "threshold_ladder"
+    },
+    {
+      "code": "C4_Dynamic_Charging_Path_Dependency",
+      "description": "A trolley-assisted truck MUST follow a fixed physical line; its route is a hard infrastructure constraint, not an optimal path.",
+      "mechanism": "movement_as_operation",
+      "note": "Expressed by modelling the trolley segment as a service point with exclusive occupancy and 'recharge' capability, so route-as-constraint becomes point-as-resource. H2 predicted this needs an infrastructure network model; the pack asserts the weaker claim is sufficient. THE HARNESS TESTS IT, this note does not settle it."
+    },
+    {
+      "code": "C5_Maintenance_Scheduling_From_Threshold_Ranges",
+      "description": "Recall triggers when ANY of component hours, oil analysis, or TPMS crosses a threshold.",
+      "mechanism": "threshold_ladder",
+      "note": "RecallDecision is literally a first-hit-wins rung ladder over multi-signal AssetState. H2 rated this a kernel-breaker; the pack claims it is already supported. Layer 1 (ottoq_rules) is the second mechanism available here."
+    },
+    {
+      "code": "C6_Operator_Override_Overrules_System",
+      "description": "A human can override a scheduled service event and keep the truck on the hauling cycle. H2: 'anathema to a solver-based kernel'.",
+      "mechanism": "work_side_refusal",
+      "note": "EXERCISED AND ANSWERED (conformance/test_operator_override.py). The kernel DOES support the override: run_recall_cycle consults work_side_accepts and a refusal cancels the recall, emits recall_refused and triggers re-solve, exactly as 2.7 specifies. H2's prediction that this is 'anathema to a solver-based kernel' is WRONG in the direction it feared. It is right in a direction it did not name: the kernel cannot express the LIMIT of the override \u2014 see CONFORMANCE_FINDINGS.md \u00a71b. That is a kernel finding, not a pack failure, so the mechanism claim stands."
+    }
+  ],
+  "path_resources": [
+    {
+      "code": "trolley_line",
+      "capacity": 1,
+      "description": "Trolley-assisted electric drive line (H2 C4). A truck under trolley assist must follow this fixed physical path; only one may occupy a segment at a time."
+    }
+  ]
+}

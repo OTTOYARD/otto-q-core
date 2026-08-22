@@ -1,0 +1,1071 @@
+{
+  "pack_id": "robotaxi",
+  "status": "reference",
+  "source": "ottoq_operation_catalog WHERE pack_id='robotaxi' (23 rows, read 2026-08-22) + ottoq_vehicle_classes; durations from CLAUDE.md 2.4",
+  "asset_classes": [
+    {
+      "code": "generic_robotaxi",
+      "display_name": "generic_robotaxi",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "generic_passenger_av",
+      "display_name": "generic_passenger_av",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "generic_av_dcfc",
+      "display_name": "generic_av_dcfc",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "generic_av_l2",
+      "display_name": "generic_av_l2",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "tesla_model_y_robotaxi_2024",
+      "display_name": "tesla_model_y_robotaxi_2024",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "waymo_jaguar_ipace_2024",
+      "display_name": "waymo_jaguar_ipace_2024",
+      "energy_kind": "electric"
+    },
+    {
+      "code": "zoox_robotaxi_2024",
+      "display_name": "zoox_robotaxi_2024",
+      "energy_kind": "electric"
+    }
+  ],
+  "operations": [
+    {
+      "operation_code": "arrive",
+      "display_name": "Arrive",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "charge_dcfc",
+      "display_name": "DC fast charge",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": true,
+      "emits_sdr": true,
+      "typical_min": 32.0,
+      "peak_kw": 150.0
+    },
+    {
+      "operation_code": "charge_l2",
+      "display_name": "L2 charge",
+      "category": "energy",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": true,
+      "emits_sdr": true,
+      "typical_min": 300.0,
+      "peak_kw": 19.0
+    },
+    {
+      "operation_code": "cosmetic_repair",
+      "display_name": "Cosmetic repair",
+      "category": "maintenance",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "depart",
+      "display_name": "Depart",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "detail",
+      "display_name": "Detail",
+      "category": "clean",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "fault_repair",
+      "display_name": "Fault repair",
+      "category": "maintenance",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "generic_service",
+      "display_name": "Generic service",
+      "category": "maintenance",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "inspect",
+      "display_name": "Inspection",
+      "category": "inspection",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "interior_deep_clean",
+      "display_name": "Interior deep clean",
+      "category": "clean",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "interior_tidy",
+      "display_name": "Interior reset",
+      "category": "clean",
+      "parallel_with_charge": true,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 10.0
+    },
+    {
+      "operation_code": "item_retrieval",
+      "display_name": "Item retrieval",
+      "category": "clean",
+      "parallel_with_charge": true,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "mechanical_pm",
+      "display_name": "Mechanical PM",
+      "category": "maintenance",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 70.0
+    },
+    {
+      "operation_code": "readiness_check",
+      "display_name": "Readiness check",
+      "category": "inspection",
+      "parallel_with_charge": true,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "remote_diagnostics",
+      "display_name": "Remote diagnostics",
+      "category": "data",
+      "parallel_with_charge": true,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "sensor_calibration",
+      "display_name": "ADAS/sensor calibration",
+      "category": "maintenance",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 60.0
+    },
+    {
+      "operation_code": "sensor_clean",
+      "display_name": "Sensor clean",
+      "category": "clean",
+      "parallel_with_charge": true,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 5.0
+    },
+    {
+      "operation_code": "settle",
+      "display_name": "Settle",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "software_update",
+      "display_name": "Software update",
+      "category": "data",
+      "parallel_with_charge": true,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 37.0
+    },
+    {
+      "operation_code": "stage",
+      "display_name": "Park / stage",
+      "category": "staging",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "taxi",
+      "display_name": "Inter-point move",
+      "category": "movement",
+      "parallel_with_charge": false,
+      "is_movement": true,
+      "energy_bearing": false,
+      "emits_sdr": false
+    },
+    {
+      "operation_code": "triage_check",
+      "display_name": "Triage check",
+      "category": "inspection",
+      "parallel_with_charge": true,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true
+    },
+    {
+      "operation_code": "wash",
+      "display_name": "Exterior wash",
+      "category": "clean",
+      "parallel_with_charge": false,
+      "is_movement": false,
+      "energy_bearing": false,
+      "emits_sdr": true,
+      "typical_min": 11.0
+    }
+  ],
+  "service_points": [
+    {
+      "point_type": "dcfc",
+      "count": 10,
+      "exclusive": true,
+      "min_gap_min": 18.0,
+      "capabilities": [
+        [
+          "generic_robotaxi",
+          "charge_dcfc"
+        ],
+        [
+          "generic_robotaxi",
+          "sensor_clean"
+        ],
+        [
+          "generic_robotaxi",
+          "interior_tidy"
+        ],
+        [
+          "generic_robotaxi",
+          "item_retrieval"
+        ],
+        [
+          "generic_robotaxi",
+          "readiness_check"
+        ],
+        [
+          "generic_robotaxi",
+          "remote_diagnostics"
+        ],
+        [
+          "generic_robotaxi",
+          "software_update"
+        ],
+        [
+          "generic_robotaxi",
+          "triage_check"
+        ],
+        [
+          "generic_passenger_av",
+          "charge_dcfc"
+        ],
+        [
+          "generic_passenger_av",
+          "sensor_clean"
+        ],
+        [
+          "generic_passenger_av",
+          "interior_tidy"
+        ],
+        [
+          "generic_passenger_av",
+          "item_retrieval"
+        ],
+        [
+          "generic_passenger_av",
+          "readiness_check"
+        ],
+        [
+          "generic_passenger_av",
+          "remote_diagnostics"
+        ],
+        [
+          "generic_passenger_av",
+          "software_update"
+        ],
+        [
+          "generic_passenger_av",
+          "triage_check"
+        ],
+        [
+          "generic_av_dcfc",
+          "charge_dcfc"
+        ],
+        [
+          "generic_av_dcfc",
+          "sensor_clean"
+        ],
+        [
+          "generic_av_dcfc",
+          "interior_tidy"
+        ],
+        [
+          "generic_av_dcfc",
+          "item_retrieval"
+        ],
+        [
+          "generic_av_dcfc",
+          "readiness_check"
+        ],
+        [
+          "generic_av_dcfc",
+          "remote_diagnostics"
+        ],
+        [
+          "generic_av_dcfc",
+          "software_update"
+        ],
+        [
+          "generic_av_dcfc",
+          "triage_check"
+        ],
+        [
+          "generic_av_l2",
+          "charge_dcfc"
+        ],
+        [
+          "generic_av_l2",
+          "sensor_clean"
+        ],
+        [
+          "generic_av_l2",
+          "interior_tidy"
+        ],
+        [
+          "generic_av_l2",
+          "item_retrieval"
+        ],
+        [
+          "generic_av_l2",
+          "readiness_check"
+        ],
+        [
+          "generic_av_l2",
+          "remote_diagnostics"
+        ],
+        [
+          "generic_av_l2",
+          "software_update"
+        ],
+        [
+          "generic_av_l2",
+          "triage_check"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "charge_dcfc"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "sensor_clean"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "interior_tidy"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "item_retrieval"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "readiness_check"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "remote_diagnostics"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "software_update"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "triage_check"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "charge_dcfc"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "sensor_clean"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "interior_tidy"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "item_retrieval"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "readiness_check"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "remote_diagnostics"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "software_update"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "triage_check"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "charge_dcfc"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "sensor_clean"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "interior_tidy"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "item_retrieval"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "readiness_check"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "remote_diagnostics"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "software_update"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "triage_check"
+        ]
+      ]
+    },
+    {
+      "point_type": "l2",
+      "count": 8,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "generic_robotaxi",
+          "charge_l2"
+        ],
+        [
+          "generic_robotaxi",
+          "sensor_clean"
+        ],
+        [
+          "generic_robotaxi",
+          "interior_tidy"
+        ],
+        [
+          "generic_robotaxi",
+          "item_retrieval"
+        ],
+        [
+          "generic_robotaxi",
+          "readiness_check"
+        ],
+        [
+          "generic_robotaxi",
+          "remote_diagnostics"
+        ],
+        [
+          "generic_robotaxi",
+          "software_update"
+        ],
+        [
+          "generic_robotaxi",
+          "triage_check"
+        ],
+        [
+          "generic_passenger_av",
+          "charge_l2"
+        ],
+        [
+          "generic_passenger_av",
+          "sensor_clean"
+        ],
+        [
+          "generic_passenger_av",
+          "interior_tidy"
+        ],
+        [
+          "generic_passenger_av",
+          "item_retrieval"
+        ],
+        [
+          "generic_passenger_av",
+          "readiness_check"
+        ],
+        [
+          "generic_passenger_av",
+          "remote_diagnostics"
+        ],
+        [
+          "generic_passenger_av",
+          "software_update"
+        ],
+        [
+          "generic_passenger_av",
+          "triage_check"
+        ],
+        [
+          "generic_av_dcfc",
+          "charge_l2"
+        ],
+        [
+          "generic_av_dcfc",
+          "sensor_clean"
+        ],
+        [
+          "generic_av_dcfc",
+          "interior_tidy"
+        ],
+        [
+          "generic_av_dcfc",
+          "item_retrieval"
+        ],
+        [
+          "generic_av_dcfc",
+          "readiness_check"
+        ],
+        [
+          "generic_av_dcfc",
+          "remote_diagnostics"
+        ],
+        [
+          "generic_av_dcfc",
+          "software_update"
+        ],
+        [
+          "generic_av_dcfc",
+          "triage_check"
+        ],
+        [
+          "generic_av_l2",
+          "charge_l2"
+        ],
+        [
+          "generic_av_l2",
+          "sensor_clean"
+        ],
+        [
+          "generic_av_l2",
+          "interior_tidy"
+        ],
+        [
+          "generic_av_l2",
+          "item_retrieval"
+        ],
+        [
+          "generic_av_l2",
+          "readiness_check"
+        ],
+        [
+          "generic_av_l2",
+          "remote_diagnostics"
+        ],
+        [
+          "generic_av_l2",
+          "software_update"
+        ],
+        [
+          "generic_av_l2",
+          "triage_check"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "charge_l2"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "sensor_clean"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "interior_tidy"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "item_retrieval"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "readiness_check"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "remote_diagnostics"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "software_update"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "triage_check"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "charge_l2"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "sensor_clean"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "interior_tidy"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "item_retrieval"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "readiness_check"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "remote_diagnostics"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "software_update"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "triage_check"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "charge_l2"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "sensor_clean"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "interior_tidy"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "item_retrieval"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "readiness_check"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "remote_diagnostics"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "software_update"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "triage_check"
+        ]
+      ]
+    },
+    {
+      "point_type": "wash",
+      "count": 2,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "generic_robotaxi",
+          "wash"
+        ],
+        [
+          "generic_robotaxi",
+          "detail"
+        ],
+        [
+          "generic_robotaxi",
+          "interior_deep_clean"
+        ],
+        [
+          "generic_passenger_av",
+          "wash"
+        ],
+        [
+          "generic_passenger_av",
+          "detail"
+        ],
+        [
+          "generic_passenger_av",
+          "interior_deep_clean"
+        ],
+        [
+          "generic_av_dcfc",
+          "wash"
+        ],
+        [
+          "generic_av_dcfc",
+          "detail"
+        ],
+        [
+          "generic_av_dcfc",
+          "interior_deep_clean"
+        ],
+        [
+          "generic_av_l2",
+          "wash"
+        ],
+        [
+          "generic_av_l2",
+          "detail"
+        ],
+        [
+          "generic_av_l2",
+          "interior_deep_clean"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "wash"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "detail"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "interior_deep_clean"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "wash"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "detail"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "interior_deep_clean"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "wash"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "detail"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "interior_deep_clean"
+        ]
+      ]
+    },
+    {
+      "point_type": "calibration",
+      "count": 1,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "generic_robotaxi",
+          "sensor_calibration"
+        ],
+        [
+          "generic_robotaxi",
+          "inspect"
+        ],
+        [
+          "generic_passenger_av",
+          "sensor_calibration"
+        ],
+        [
+          "generic_passenger_av",
+          "inspect"
+        ],
+        [
+          "generic_av_dcfc",
+          "sensor_calibration"
+        ],
+        [
+          "generic_av_dcfc",
+          "inspect"
+        ],
+        [
+          "generic_av_l2",
+          "sensor_calibration"
+        ],
+        [
+          "generic_av_l2",
+          "inspect"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "sensor_calibration"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "inspect"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "sensor_calibration"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "inspect"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "sensor_calibration"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "inspect"
+        ]
+      ]
+    },
+    {
+      "point_type": "service_bay",
+      "count": 2,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "generic_robotaxi",
+          "mechanical_pm"
+        ],
+        [
+          "generic_robotaxi",
+          "fault_repair"
+        ],
+        [
+          "generic_robotaxi",
+          "cosmetic_repair"
+        ],
+        [
+          "generic_robotaxi",
+          "generic_service"
+        ],
+        [
+          "generic_passenger_av",
+          "mechanical_pm"
+        ],
+        [
+          "generic_passenger_av",
+          "fault_repair"
+        ],
+        [
+          "generic_passenger_av",
+          "cosmetic_repair"
+        ],
+        [
+          "generic_passenger_av",
+          "generic_service"
+        ],
+        [
+          "generic_av_dcfc",
+          "mechanical_pm"
+        ],
+        [
+          "generic_av_dcfc",
+          "fault_repair"
+        ],
+        [
+          "generic_av_dcfc",
+          "cosmetic_repair"
+        ],
+        [
+          "generic_av_dcfc",
+          "generic_service"
+        ],
+        [
+          "generic_av_l2",
+          "mechanical_pm"
+        ],
+        [
+          "generic_av_l2",
+          "fault_repair"
+        ],
+        [
+          "generic_av_l2",
+          "cosmetic_repair"
+        ],
+        [
+          "generic_av_l2",
+          "generic_service"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "mechanical_pm"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "fault_repair"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "cosmetic_repair"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "generic_service"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "mechanical_pm"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "fault_repair"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "cosmetic_repair"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "generic_service"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "mechanical_pm"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "fault_repair"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "cosmetic_repair"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "generic_service"
+        ]
+      ]
+    },
+    {
+      "point_type": "staging",
+      "count": 30,
+      "exclusive": true,
+      "capabilities": [
+        [
+          "generic_robotaxi",
+          "stage"
+        ],
+        [
+          "generic_passenger_av",
+          "stage"
+        ],
+        [
+          "generic_av_dcfc",
+          "stage"
+        ],
+        [
+          "generic_av_l2",
+          "stage"
+        ],
+        [
+          "tesla_model_y_robotaxi_2024",
+          "stage"
+        ],
+        [
+          "waymo_jaguar_ipace_2024",
+          "stage"
+        ],
+        [
+          "zoox_robotaxi_2024",
+          "stage"
+        ]
+      ]
+    }
+  ],
+  "constraints": [
+    {
+      "code": "R1_operation_needs_capable_point",
+      "description": "An operation may only run on a point declaring the (asset_class, operation) pair.",
+      "mechanism": "capability_pair"
+    },
+    {
+      "code": "R2_point_exclusive",
+      "description": "A service point runs one asset at a time.",
+      "mechanism": "exclusive_occupancy"
+    },
+    {
+      "code": "R3_parallel_during_charge",
+      "description": "Sensor clean, interior reset, data offload and software update run concurrently with charging.",
+      "mechanism": "parallel_within_point"
+    },
+    {
+      "code": "R4_site_power_cap",
+      "description": "Concurrent charging must fit the site power cap.",
+      "mechanism": "site_power_cap"
+    },
+    {
+      "code": "R5_dcfc_cooldown",
+      "description": "A DCFC point needs a minimum gap between sessions.",
+      "mechanism": "min_gap_on_point"
+    },
+    {
+      "code": "R6_moves_are_operations",
+      "description": "Inter-point moves have duration and consume path resources.",
+      "mechanism": "movement_as_operation"
+    },
+    {
+      "code": "R7_every_op_emits_sdr",
+      "description": "Every completed non-movement operation terminates in an SDR.",
+      "mechanism": "sdr_termination"
+    }
+  ]
+}
