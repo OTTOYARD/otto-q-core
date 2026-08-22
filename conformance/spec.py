@@ -46,6 +46,13 @@ KERNEL_MECHANISMS: dict[str, str] = {
     "forward_power_schedule":
         "schedule-shaped power publication — CLAUDE.md 2.5 boundary; "
         "adapters/base.py ForwardPowerSchedule (C10 Law 2)",
+    "layer1_rule":
+        "Layer 1 deterministic rules — ottoq_rules: 52 rows / 29 distinct codes, "
+        "versioned and tenant-parameterizable, 686,057 logged evaluations. Each "
+        "carries severity, enforcement (block|warn|log_only), override_allowed and "
+        "override_min_role. 36 are non-overridable (10 of them safety_critical); 5 "
+        "are overridable behind a named minimum role. CLAUDE.md 2.5 Layer 1, "
+        "'inviolable constraints including per-OEM SLAs'.",
     "sdr_termination":
         "every completed operation terminates in a ServiceDetailRecord — "
         "CLAUDE.md 2.6, made structural by migration 0043",

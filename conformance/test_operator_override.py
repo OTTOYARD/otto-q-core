@@ -105,3 +105,39 @@ def test_a_routine_recall_is_refusable_and_that_is_correct():
                          km_since_pm=1e9, home_site="mine-a")
     out = NaiveThresholdRecall().decide(routine, WORK, SITE)
     assert out.recall is True and out.deferrable is True and out.urgency == "routine"
+
+
+# --- the correction: the kernel DOES model override authority ------------------
+
+def test_the_refusal_callback_carries_no_actor_no_role_no_rule():
+    """§1b, corrected. The gap is WIRING, not modelling.
+
+    ottoq_rules already models override authority precisely: 52 rows, each with
+    severity, enforcement, override_allowed and override_min_role. 36 are
+    non-overridable (10 safety_critical); 5 are overridable behind a named role —
+    EN.004.demand_response_compliance needs command_center_operator,
+    SLA.006.maintenance_window and SLA.004.required_services_complete need
+    depot_supervisor. There is even SM.005.audit_note_required_on_overrides.
+
+    So the kernel CAN express "an operator may override a maintenance window but
+    not a sensor-liveness block". What it cannot currently do is APPLY that to a
+    recall refusal: `work_side_accepts` is a bare `Callable[[RecallOutcome], bool]`
+    — no actor, no role, no rule reference — so the refusal path has nothing to
+    check the Layer 1 authority model against.
+
+    This test pins the signature. When the refusal path learns to carry an actor
+    or consult a rule, it fails, and the finding is revisited rather than rotting.
+    """
+    import inspect
+    from recall import recall_decision
+
+    sig = inspect.signature(recall_decision.run_recall_cycle)
+    accepts = sig.parameters["work_side_accepts"]
+    assert "RecallOutcome], bool" in str(accepts.annotation), str(accepts.annotation)
+
+    src = inspect.getsource(recall_decision.run_recall_cycle)
+    for authority_concept in ("role", "override_allowed", "rule_code", "actor"):
+        assert authority_concept not in src, (
+            f"run_recall_cycle now references {authority_concept!r}. The wiring gap "
+            f"in CONFORMANCE_FINDINGS §1b may be closed — re-verify and update it."
+        )

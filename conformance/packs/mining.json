@@ -264,7 +264,7 @@
       "code": "C5_Maintenance_Scheduling_From_Threshold_Ranges",
       "description": "Recall triggers when ANY of component hours, oil analysis, or TPMS crosses a threshold.",
       "mechanism": "threshold_ladder",
-      "note": "RecallDecision is literally a first-hit-wins rung ladder over multi-signal AssetState. H2 rated this a kernel-breaker; the pack claims it is already supported."
+      "note": "RecallDecision is literally a first-hit-wins rung ladder over multi-signal AssetState. H2 rated this a kernel-breaker; the pack claims it is already supported. Layer 1 (ottoq_rules) is the second mechanism available here."
     },
     {
       "code": "C6_Operator_Override_Overrules_System",

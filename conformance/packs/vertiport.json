@@ -243,9 +243,8 @@
     {
       "code": "V4_Battery_Cooling",
       "description": "20-minute cooldown before fast charge if SoC > 90% on landing. Physical state gates scheduling.",
-      "mechanism": null,
-      "finding_class": "DECLARATIVE",
-      "note": "THE KERNEL HAS min_gap_on_point (DCFC cooldown, 18 min, CLAUDE.md 2.5) \u2014 but that gap is a property of the POINT, between successive sessions. This gap is a property of the ASSET, between its own landing and its own charge, and is CONDITIONAL on SoC. No kernel mechanism expresses an asset-side conditional minimum gap. Classified DECLARATIVE because the shape is a mirror of one the kernel already has; that classification is a claim the harness reports, not a fact."
+      "mechanism": "layer1_rule",
+      "note": "RECLASSIFIED 2026-08-22. Originally recorded as a finding with no mechanism, on the reasoning that min_gap_on_point is a property of the POINT while this gap belongs to the ASSET and is conditional on SoC. That reasoning was right about min_gap_on_point and wrong about the kernel: Layer 1 (ottoq_rules) is exactly a conditional, parameterizable, logged precondition engine \u2014 HW.002.charger_state_precondition is the same shape already in production. A 'block fast_charge for 20 min after landing when SoC > 90' rule is a row, not a code change. The omission was in the registry, not the engine."
     },
     {
       "code": "V5_Pad_Separation",

@@ -1,6 +1,6 @@
 # CONFORMANCE_FINDINGS.md — is OTTO-Q a platform, or N products?
 
-**Run 4 · Phase C11 · 2026-08-22.** Instrument: `conformance/`. 53 tests pass.
+**Run 4 · Phase C11 · 2026-08-22.** Instrument: `conformance/`. 56 tests pass.
 *Revised the same day: §3.1 below recorded a gap in the instrument; that gap has
 since been closed and the table re-measured. The original finding is kept rather
 than deleted — it is the reason the numbers moved.*
@@ -18,11 +18,12 @@ way."* What follows is written to that instruction.
 > to zero invariant violations with **zero kernel modification**. That is the
 > thesis's central claim and it survived the test.
 >
-> It is called *provisional* for the reasons named below. **Two are real holes in
-> the kernel** — vertiport pad separation (§1, a resource-model gap) and the
-> unbounded work-side override (§1b, found in the reference implementation itself).
-> The rest were gaps in the instrument, and the two largest have since been closed
-> and re-measured.
+> It is called *provisional* for the reasons named below. **Exactly one genuine
+> solver change was found across all four packs** — vertiport pad separation (§1), a
+> pairwise spatial exclusion the resource model cannot express. Everything else that
+> looked like a kernel hole turned out to be either a gap in this instrument or a
+> wiring gap between two kernel parts that both already exist (§1b). All of those
+> have been closed and re-measured; the numbers in the table above are post-correction.
 
 | Pack | Status | Loads | Solves | Findings | Unexercised claims |
 |---|---|---|---|---|---|
@@ -66,13 +67,17 @@ Per CLAUDE.md 2.2 this is a platform-thesis finding, and it is escalated here
 rather than absorbed. It does not falsify the thesis — one solver extension across
 four sectors is a good ratio — but it is the honest cost of entry to vertiport.
 
-## 1b. A KERNEL finding, surfaced by mining C6: the override has no limit
+## 1b. Mining C6 answered — and the finding is a WIRING gap, not a modelling one
+
+*This section was rewritten after further investigation. Its first version claimed
+the kernel could not express the limit of an operator override. That was wrong, and
+the corrected version is below. The error is left described rather than deleted,
+because it is the same mistake this document warns packs against: reasoning from
+one mechanism's shape to the kernel's whole capability.*
 
 H2 calls `C6_Operator_Override_Overrules_System` *"anathema to a solver-based
-kernel"* — a human overrules a scheduled service and keeps the truck hauling. The
-mining pack claimed `work_side_refusal` covers it. That claim has now been
-exercised against the real C9 primitive
-(`conformance/test_operator_override.py`, 4 tests).
+kernel"*. The claim has now been exercised against the real C9 primitive
+(`conformance/test_operator_override.py`, 5 tests).
 
 **H2's prediction is wrong in the direction it feared.** The kernel supports the
 override cleanly: `run_recall_cycle` consults `work_side_accepts`, and a refusal
@@ -80,53 +85,65 @@ cancels the recall, emits `recall_refused`, and triggers re-solve — exactly th
 first-class-event contract CLAUDE.md 2.7 specifies. A human override is a refusal
 with a human actor, and the kernel already bends.
 
-**It is right in a direction it did not name.** The override has *no limit*.
-`run_recall_cycle` consults `work_side_accepts` **unconditionally**. It never reads
-`outcome.deferrable`. Measured:
+**And the kernel models override AUTHORITY precisely — in Layer 1, already.**
+`ottoq_rules` (52 rows, 29 distinct codes, 686,057 logged evaluations) carries
+`severity`, `enforcement`, `override_allowed` and `override_min_role` per rule:
 
-| | |
-|---|---|
-| Asset | safety-critical fault (`worst_fault_rank = 0`) |
-| Ladder verdict | `recall=True`, `trigger=fault_safety_critical`, `urgency=critical`, `deferrable=False` |
-| Work side says | refuse |
-| **Result** | **recall cancelled** — `recall_refused` emitted, re-solve triggered |
+| | count | examples |
+|---|---|---|
+| non-overridable, `block`, **safety_critical** | 10 | `HW.001.connector_compatibility`, `HW.003.sensor_liveness`, `EN.001.grid_capacity_ceiling` |
+| non-overridable, `block`, critical | 26 | `HW.004.stall_single_vehicle`, `SLA.001.min_soc_at_deployment` |
+| **overridable, behind a named role** | 5 | `EN.004.demand_response_compliance` → `command_center_operator`; `SLA.006.maintenance_window` → `depot_supervisor` |
 
+There is even `SM.005.audit_note_required_on_overrides`. So the kernel can already
+express *"a supervisor may override a maintenance window but nobody may override a
+sensor-liveness block"* — which is precisely what a mine operator needs.
+
+**The actual finding, and it is narrower and more tractable than first stated:**
+
+> **The recall refusal path does not consult any of it.** `work_side_accepts` is a
+> bare `Callable[[RecallOutcome], bool]` — **no actor, no role, no rule reference**.
+> So the refusal has nothing to check the Layer 1 authority model against, and
+> `run_recall_cycle` never reads `outcome.deferrable` either.
+
+Measured consequence: an asset with a safety-critical fault yields
+`recall=True, urgency=critical, deferrable=False`, and a refusal cancels it anyway.
 The same holds for `critical_reserve` — a vehicle about to strand below reserve can
-be kept working by a refusal. The `deferrable` flag exists on `RecallOutcome`, the
-ladder sets it correctly (`False` for the critical rungs, `True` for routine), and
-**the call site simply does not consult it**. A test asserts that absence directly,
-so if `run_recall_cycle` ever learns to read it, this finding fails loudly rather
-than going stale.
+be kept working by a refusal.
 
-This matters because CLAUDE.md 2.5 says Layer 1 holds *"inviolable constraints
-including per-OEM SLAs."* The refusal path routes around that intent: nothing
-distinguishes a recall that may be deferred from one that may not.
-
-**Classification: `SOLVER_CHANGE`, and it is a KERNEL defect rather than a pack
-conformance failure** — mining's mechanism claim stands, because the mechanism does
-what the pack said. What is missing is a guard the kernel was always supposed to
-have. **This is the second solver change C11 has identified, and unlike V5 it was
-found in the reference implementation rather than in a paper pack.**
+**Classification: an INTEGRATION defect in the reference implementation, not a
+solver change and not a pack conformance failure.** Both halves exist — Layer 1
+knows who may override what, and the recall primitive knows the outcome is
+non-deferrable — and they are simply not connected. Two tests pin it: one asserts
+`run_recall_cycle` references no authority concept, another that its callback
+signature carries no actor. **Both fail loudly the moment someone wires it up**, so
+this finding cannot quietly rot.
 
 Not everything here is a defect, and the tests say so: refusing a *routine* recall
 is correct and intended, and is asserted as such.
 
 ---
 
-## 2. The one that looks harder than it is: **V4 — battery cooling**
+## 2. The one that looked like a second hole and was not: **V4 — battery cooling**
 
-A 20-minute cooldown before fast charge if SoC > 90% on landing. H3 rates this
-among the three hardest vertiport constraints.
+A 20-minute cooldown before fast charge if SoC > 90% on landing. H3 rates this among
+the three hardest vertiport constraints, and it was originally recorded here as a
+finding with **no kernel mechanism**, on the reasoning that `min_gap_on_point` is a
+property of the **point** while V4's gap belongs to the **asset** and is
+**conditional on SoC**.
 
-The kernel already has `min_gap_on_point` — the DCFC cooldown, 18 minutes in the
-throughput model (CLAUDE.md 2.5). But that gap is a property of the **point**,
-between successive sessions. V4's gap is a property of the **asset**, between its
-own landing and its own charge, and is **conditional on SoC**.
+**That reasoning was right about `min_gap_on_point` and wrong about the kernel.**
+Layer 1 (`ottoq_rules`) is exactly a conditional, parameterizable, logged
+precondition engine, and `HW.002.charger_state_precondition` is already the same
+shape in production. *"Block `fast_charge` for 20 minutes after landing when SoC >
+90"* is a **row**, not a code change.
 
-Classified `DECLARATIVE`: the shape mirrors one the kernel already implements, and
-an asset-side conditional gap looks like a new field plus a check, not a new
-scheduling concept. **That classification is a claim, not a result** — it is
-recorded as such so a later round can confirm or overturn it.
+**The omission was in this harness's mechanism registry, not in the engine.**
+`layer1_rule` has been added to the closed registry with its evidence, and V4
+reclassified to it. Recorded rather than quietly fixed, because a registry that
+grows silently is how a falsification test becomes a rubber stamp — and because the
+mistake is instructive: reasoning from *one* mechanism's shape to the kernel's whole
+capability is the same error this document warns packs against.
 
 ---
 

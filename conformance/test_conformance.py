@@ -143,10 +143,33 @@ def test_mining_c6_is_reported_as_an_unverified_claim():
     assert "C6_Operator_Override_Overrules_System" in codes, codes
 
 
-def test_vertiport_declares_the_two_constraints_the_kernel_cannot_express():
+def test_vertiport_has_exactly_one_constraint_the_kernel_cannot_express():
+    """V5 is the single genuine solver change across all four packs.
+
+    V4 (battery cooling) was originally a second finding, on the reasoning that
+    min_gap_on_point belongs to the POINT while V4's gap belongs to the ASSET. That
+    reasoning was right about min_gap_on_point and wrong about the kernel: Layer 1
+    (ottoq_rules) is a conditional, parameterizable, logged precondition engine and
+    HW.002.charger_state_precondition is already the same shape in production. The
+    omission was in this harness's mechanism registry, not in the engine.
+    """
     classes = {f["code"]: f["class"] for f in ALL["vertiport"].findings}
-    assert classes["V5_Pad_Separation"] == "SOLVER_CHANGE"
-    assert classes["V4_Battery_Cooling"] == "DECLARATIVE"
+    assert classes == {"V5_Pad_Separation": "SOLVER_CHANGE"}, classes
+
+
+def test_layer1_rules_are_in_the_registry_with_evidence():
+    # The registry entry that closed V4. It must name concrete engine objects, like
+    # every other entry — a registry that accepts vague entries is not closed.
+    from conformance.spec import KERNEL_MECHANISMS
+    entry = KERNEL_MECHANISMS["layer1_rule"]
+    for token in ("ottoq_rules", "override_allowed", "override_min_role", "safety_critical"):
+        assert token in entry, token
+
+
+def test_only_one_solver_change_across_all_four_packs():
+    solver_changes = [f["code"] for r in ALL.values() for f in r.findings
+                      if f["class"] == "SOLVER_CHANGE"]
+    assert solver_changes == ["V5_Pad_Separation"], solver_changes
 
 
 def test_paper_packs_are_accepted_as_paper():
