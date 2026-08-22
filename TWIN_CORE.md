@@ -102,6 +102,78 @@ accepts `p_sim_clock_start timestamptz DEFAULT NULL`** — the capability exists
 Only `ottoq_cert_arm_start` fails to pass one. Pinning it is a cert-harness-only change with zero
 effect on production scheduling semantics.
 
+**Re-certification #20 — C7.1 PASSES (post-0067, 2026-08-22; arms `677bca9c` / `43fbecf4`,
+ab_group `…42425f`, both `sim_clock_start = 2026-08-22 22:00:00+00`).**
+
+```
+ticks_compared 20 | ticks_identical 20 | ticks_divergent 0 | deterministic = TRUE
+```
+
+**Twenty rounds after the first attempt, the determinism certification passes.** Same seed, same
+scenario, same policy → byte-identical scored event stream across all 20 ticks. 0067 verified
+applied (post-md5 `3d7fa12fec5fe860854d8416dd8e4840`, matching its dry-run exactly).
+
+The root cause it fixed was the one predicted from the #19 baseline: the `greedy_constrained`
+stall pick had no tiebreak, so two L2 stalls at `distance_from_entrance = 176` scored identically
+and `LIMIT 1` returned heap order. The prediction was specific and it held — the tick-10 stall
+swap is gone, and with it every downstream divergence.
+
+The arms now agree on throughput as well as on the event stream: **523 / 523 commands,
+41 / 41 charge sessions, 41 / 41 vehicles charged, 13 / 13 DCFC sessions.** Compare re-cert #19,
+where the same two numbers were 60 and 47. **The 13-vehicle spread is closed.**
+
+**One residual asymmetry, recorded rather than glossed:** refusals are 310 vs 311 and
+never-reacted 68 vs 69 — a single row. The certified property (the scored event stream over 20
+ticks) is byte-identical, so this sits outside the digest window, most likely a trailing
+boundary command after the final tick. It is not covered by the passing verdict and should be
+chased before the certification is called complete.
+
+---
+
+**AND THE BASELINE IMMEDIATELY EARNED ITS KEEP: 0067 COSTS THROUGHPUT.**
+
+This is the first comparison in the whole series that is *valid across rounds* — #19 and #20 ran
+the same seed at the same pinned sim clock — and it says something I did not want it to say:
+
+| metric (arm A) | #19 (pre-0067) | #20 (post-0067) |
+|---|---|---|
+| charge sessions | **62** | **41** |
+| vehicles charged (of 100) | **60** | **41** |
+| DCFC sessions | 18 | 13 |
+| refusals, all types | 155 | 310 |
+| `begin_charge` / `target_occupied` | **80** | **219** |
+| refusals never examined | 0 | **68** |
+
+Determinism was bought at the cost of roughly a third of the depot's charging throughput, and
+the reactor backlog is back. **This is a regression introduced by 0067, caught by the very
+instrument built to catch it — 0065 exists for exactly this.**
+
+**The mechanism, and it is 0067's second half, not the tiebreak.** The tiebreak only orders
+stalls whose score was already identical; it cannot change *which* score wins, so it cannot
+move throughput. The sim-domain fix can and did. Before it, `reservation_expires_at <= now()`
+compared a sim-stamped column to a real clock ~21 hours behind, so the test was effectively
+always false and the proposer skipped **every** stall carrying any reservation. After it, the
+proposer correctly offers stalls whose sim reservation has expired — and those are precisely the
+contended ones. The proposer's own filter is satisfied at propose time (`current_vehicle_id IS
+NULL`, reservation expired), but the confirm walk runs a tick later (30 sim-min), by which point
+the stall has been taken: `begin_charge` / `target_occupied` nearly triples, 80 → 219.
+
+So the old behaviour was wrong *and* accidentally protective: by refusing to reuse any reserved
+stall it never handed away a hold that a vehicle was still travelling toward. The corrected
+domain test removes that accidental protection without replacing it — the same class of problem
+0064 addressed for the command-issuing path, now on the proposal path.
+
+**The fix is not to restore `now()`** — that comparison is simply wrong and would re-break the
+moment sim and real clocks diverge. The candidate is to make the proposer decline a stall still
+reserved to a *different* vehicle regardless of expiry (`reserved_by IS NULL OR reserved_by =
+v_veh.id`), which keeps the domain correct and restores the protection deliberately instead of
+by accident.
+
+**Next, in order:** (1) isolate — re-run with the tiebreak alone, reverting only the sim-domain
+half, to confirm the split above rather than assert it; the determinism win should survive; (2)
+then re-land the domain fix with the hold protection; (3) then the `ottoq_cert_arm_finish`
+tether teardown; (4) the reactor drain-rate change is un-deferred if the backlog stays.
+
 **Re-certification #19 — THE FIRST PINNED-CLOCK BASELINE (post-0065 + 0066, 2026-08-22; arms
 `88ed727f` / `81ee350d`, ab_group `…42425e`, both `sim_clock_start = 2026-08-22 22:00:00+00`).**
 0065 and 0066 verified applied (post-md5s `00314bb9…` — matching the locally computed post-image
