@@ -102,6 +102,59 @@ accepts `p_sim_clock_start timestamptz DEFAULT NULL`** — the capability exists
 Only `ottoq_cert_arm_start` fails to pass one. Pinning it is a cert-harness-only change with zero
 effect on production scheduling semantics.
 
+**THE ONE-ROW ASYMMETRY IN RE-CERT #20, RUN DOWN (2026-08-22, read-only).** Recorded because
+it changes how the passing certification should be *stated*, not just as a loose end.
+
+Re-cert #20 scored 20/20 with `deterministic = TRUE`, yet the two arms differed by one command
+(refusals 310 vs 311, never-reacted 68 vs 69). A full outer join of both arms' command streams,
+keyed `(vehicle_id, command_type, rank ordered by issued_at then payload)`, isolates **exactly
+one differing row in the entire run**:
+
+| | arm A | arm B |
+|---|---|---|
+| vehicle | `8e00a933` | `8e00a933` |
+| command | `stage` → staging stall `fa4f4d72` | `stage` → staging stall `fa4f4d72` |
+| issued | sim `2026-08-23 04:00:00` | sim `2026-08-23 04:00:00` |
+| **outcome** | **executed** | **refused `target_occupied`** |
+
+**My earlier guess was wrong and is corrected here.** I recorded this as "most likely a trailing
+boundary command after the final tick." It is not: 04:00 is **tick 12** of a run starting 22:00,
+squarely mid-run. The guess was never checked before being written down.
+
+**It is inert, and that is measured, not assumed.** A per-tick frame diff over
+`ottoq_decision_snapshots.frame->'vehicles'`, joined on vehicle id across all 20 ticks, returns
+**zero divergent vehicles** — no vehicle differs in state or stall at any tick in either arm.
+This vehicle's other two commands are byte-identical in both arms (`proceed_to_stall` → `1cc14b7f`
+at 06:30, → `94358f10` at 07:00, both executed). So the vehicle went to the same places at the
+same times in both arms; the disputed `stage` changed nothing observable.
+
+**WHAT IT ACTUALLY MEANS, STATED PRECISELY.** One instant of staging-stall occupancy — whether
+`fa4f4d72` was free at sim 04:00 — still differs between two same-seed arms. The digest does not
+score it, because the digest scores the frame (vehicle state) and this divergence never reaches
+the frame. So the certification claim must be stated as what was actually measured:
+
+> Same seed + scenario + policy produce an identical vehicle-state frame at every one of 20
+> ticks, and an identical scored event stream. **One command outcome out of ~523 differed
+> without affecting world state.**
+
+That is still a pass, and a strong one. It is not the same sentence as "every byte of the run is
+identical," and the record should not let those two be confused.
+
+**NOT CHASED FURTHER, deliberately.** There is a residual ordering seam upstream of staging-stall
+occupancy that is not yet total. It is benign in this scenario but there is no guarantee it stays
+benign in another — a divergence that does not propagate here could propagate under different
+load. It is left as a **known, precisely-signatured residue** rather than patched: the last
+confident one-shot fix (0068) cost a round and had to be reverted, and this one lacks the thing
+that made 0067's diagnosis solid — a measured mechanism. Anyone picking it up starts from
+vehicle `8e00a933`, stall `fa4f4d72`, sim `2026-08-23 04:00:00`, and asks what made that stall
+occupied in one arm and not the other.
+
+**Consequence for the harness itself, worth its own line:** the digest's coverage is narrower
+than the phrase "determinism certification" suggests. It compares frames, not command outcomes.
+Extending `ottoq_twin_run_digest` to fold in command status/reason_code would have caught this
+automatically instead of it surfacing as an unexplained row-count mismatch — a candidate
+improvement to C7.1's instrument, filed alongside the residue.
+
 **Re-certification #21 — MY HYPOTHESIS WAS FALSIFIED ON BOTH COUNTS, AND 0068 IS REVERTED**
 (post-0068, 2026-08-22; arms `9ea1a855` / `7e8bb433`, ab_group `…424260`, both
 `sim_clock_start = 2026-08-22 22:00:00+00`).
@@ -190,8 +243,9 @@ where the same two numbers were 60 and 47. **The 13-vehicle spread is closed.**
 
 **One residual asymmetry, recorded rather than glossed:** refusals are 310 vs 311 and
 never-reacted 68 vs 69 — a single row. The certified property (the scored event stream over 20
-ticks) is byte-identical, so this sits outside the digest window, most likely a trailing
-boundary command after the final tick. It is not covered by the passing verdict and should be
+ticks) is byte-identical, so this sits outside what the digest scores. **The guess originally
+recorded here — "most likely a trailing boundary command after the final tick" — was wrong, and
+is corrected in the run-down above: it is a mid-run `stage` command at tick 12.** It is not covered by the passing verdict and should be
 chased before the certification is called complete.
 
 ---
