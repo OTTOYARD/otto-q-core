@@ -270,7 +270,7 @@
       "code": "C6_Operator_Override_Overrules_System",
       "description": "A human can override a scheduled service event and keep the truck on the hauling cycle. H2: 'anathema to a solver-based kernel'.",
       "mechanism": "work_side_refusal",
-      "note": "CLAIMED, NOT PROVEN. 2.7 makes work-side refusal a first-class event triggering re-solve. If an override is a refusal with a human actor, this holds. If it must also INVALIDATE a constraint the solver treated as hard, work_side_refusal does not cover it and this becomes SOLVER_CHANGE. See CONFORMANCE_FINDINGS.md."
+      "note": "EXERCISED AND ANSWERED (conformance/test_operator_override.py). The kernel DOES support the override: run_recall_cycle consults work_side_accepts and a refusal cancels the recall, emits recall_refused and triggers re-solve, exactly as 2.7 specifies. H2's prediction that this is 'anathema to a solver-based kernel' is WRONG in the direction it feared. It is right in a direction it did not name: the kernel cannot express the LIMIT of the override \u2014 see CONFORMANCE_FINDINGS.md \u00a71b. That is a kernel finding, not a pack failure, so the mechanism claim stands."
     }
   ],
   "path_resources": [

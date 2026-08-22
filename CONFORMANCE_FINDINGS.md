@@ -1,6 +1,6 @@
 # CONFORMANCE_FINDINGS.md — is OTTO-Q a platform, or N products?
 
-**Run 4 · Phase C11 · 2026-08-22.** Instrument: `conformance/`. 49 tests pass.
+**Run 4 · Phase C11 · 2026-08-22.** Instrument: `conformance/`. 53 tests pass.
 *Revised the same day: §3.1 below recorded a gap in the instrument; that gap has
 since been closed and the table re-measured. The original finding is kept rather
 than deleted — it is the reason the numbers moved.*
@@ -18,9 +18,11 @@ way."* What follows is written to that instruction.
 > to zero invariant violations with **zero kernel modification**. That is the
 > thesis's central claim and it survived the test.
 >
-> It is called *provisional* for three specific reasons, each named below. Two are
-> gaps in the instrument, not in the kernel. One — vertiport pad separation — is a
-> real hole in the kernel's resource model.
+> It is called *provisional* for the reasons named below. **Two are real holes in
+> the kernel** — vertiport pad separation (§1, a resource-model gap) and the
+> unbounded work-side override (§1b, found in the reference implementation itself).
+> The rest were gaps in the instrument, and the two largest have since been closed
+> and re-measured.
 
 | Pack | Status | Loads | Solves | Findings | Unexercised claims |
 |---|---|---|---|---|---|
@@ -63,6 +65,53 @@ the first one this project has found that a declarative mechanism cannot close.*
 Per CLAUDE.md 2.2 this is a platform-thesis finding, and it is escalated here
 rather than absorbed. It does not falsify the thesis — one solver extension across
 four sectors is a good ratio — but it is the honest cost of entry to vertiport.
+
+## 1b. A KERNEL finding, surfaced by mining C6: the override has no limit
+
+H2 calls `C6_Operator_Override_Overrules_System` *"anathema to a solver-based
+kernel"* — a human overrules a scheduled service and keeps the truck hauling. The
+mining pack claimed `work_side_refusal` covers it. That claim has now been
+exercised against the real C9 primitive
+(`conformance/test_operator_override.py`, 4 tests).
+
+**H2's prediction is wrong in the direction it feared.** The kernel supports the
+override cleanly: `run_recall_cycle` consults `work_side_accepts`, and a refusal
+cancels the recall, emits `recall_refused`, and triggers re-solve — exactly the
+first-class-event contract CLAUDE.md 2.7 specifies. A human override is a refusal
+with a human actor, and the kernel already bends.
+
+**It is right in a direction it did not name.** The override has *no limit*.
+`run_recall_cycle` consults `work_side_accepts` **unconditionally**. It never reads
+`outcome.deferrable`. Measured:
+
+| | |
+|---|---|
+| Asset | safety-critical fault (`worst_fault_rank = 0`) |
+| Ladder verdict | `recall=True`, `trigger=fault_safety_critical`, `urgency=critical`, `deferrable=False` |
+| Work side says | refuse |
+| **Result** | **recall cancelled** — `recall_refused` emitted, re-solve triggered |
+
+The same holds for `critical_reserve` — a vehicle about to strand below reserve can
+be kept working by a refusal. The `deferrable` flag exists on `RecallOutcome`, the
+ladder sets it correctly (`False` for the critical rungs, `True` for routine), and
+**the call site simply does not consult it**. A test asserts that absence directly,
+so if `run_recall_cycle` ever learns to read it, this finding fails loudly rather
+than going stale.
+
+This matters because CLAUDE.md 2.5 says Layer 1 holds *"inviolable constraints
+including per-OEM SLAs."* The refusal path routes around that intent: nothing
+distinguishes a recall that may be deferred from one that may not.
+
+**Classification: `SOLVER_CHANGE`, and it is a KERNEL defect rather than a pack
+conformance failure** — mining's mechanism claim stands, because the mechanism does
+what the pack said. What is missing is a guard the kernel was always supposed to
+have. **This is the second solver change C11 has identified, and unlike V5 it was
+found in the reference implementation rather than in a paper pack.**
+
+Not everything here is a defect, and the tests say so: refusing a *routine* recall
+is correct and intended, and is asserted as such.
+
+---
 
 ## 2. The one that looks harder than it is: **V4 — battery cooling**
 
@@ -132,9 +181,9 @@ tested.**
 
 ### 3.2 Mining passes on five unexamined claims
 
-Mining reports zero findings, and that number is misleading on its own. **Three of
-its six constraints name a mechanism the run never reached** (five before §3.1 was
-closed), including the one H2 calls *"anathema to a solver-based kernel"*:
+Mining reports zero findings, and that number is misleading on its own. **Two of its six
+constraints name a mechanism the harness run never reached** (five before §3.1 was
+closed, three before C6 was exercised separately in §1b):
 
 | Constraint | Claims | Exercised? |
 |---|---|---|
@@ -142,7 +191,7 @@ closed), including the one H2 calls *"anathema to a solver-based kernel"*:
 | C3 energy resupply window | `threshold_ladder` | ❌ |
 | C4 trolley path dependency | `movement_as_operation` | ✅ *exercised, not stressed — see §3.1* |
 | C5 multi-threshold maintenance | `threshold_ladder` | ❌ |
-| **C6 operator override** | `work_side_refusal` | ❌ |
+| **C6 operator override** | `work_side_refusal` | ✅ **answered — see §1b** |
 | C2 exclusive bay use | `exclusive_occupancy` | ✅ |
 
 **C6 is the open question of this phase.** CLAUDE.md 2.7 makes work-side refusal a
