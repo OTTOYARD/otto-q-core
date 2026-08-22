@@ -69,18 +69,28 @@ A `point_conflicts(point_a, point_b, reason)` table consulted at admission.
 
 ### Option C — geometry, computed
 
-Store pad coordinates and diameters; derive conflicts from the FAA rule.
+Derive conflicts from coordinates and a separation rule.
 
-- Most faithful to the actual regulation; adapts automatically when a pad moves.
-- **Cost:** puts *geometry* in the kernel. CLAUDE.md 2.2 is explicit that
-  sector-specific concepts belong in packs, and "1.5× rotor diameter" is aviation.
-  A mining trolley line has no diameter. **This would be sector logic in the kernel
-  — the thing 2.2 says to escalate rather than absorb.** Recommend against.
+**Originally rejected here on kernel-purity grounds — that rejection was too
+quick, and §6 corrects it.** The objection was that this puts *geometry* in the
+kernel, and "1.5× rotor diameter" is aviation. The second half stands; the first
+does not, because **the kernel already stores the geometry** (§6).
 
-**Recommendation: A now, B only if an asymmetric case actually appears.** C is
-rejected on kernel-purity grounds, and that rejection is itself a C11-relevant
-finding: the *most natural* expression of the constraint is the one the platform
-thesis forbids.
+The correct split is finer than "geometry is sector logic":
+
+| Layer | Holds | Verdict |
+|---|---|---|
+| kernel | stall coordinates — `stalls.relative_x/relative_y`, `ottoq_site_structures` footprints | **already there, and sector-neutral** — a position is not an aviation concept |
+| **pack** | the separation *rule* — "1.5× rotor diameter", or a mine's trolley clearance, or a door-swing radius | **this is the sector-specific part** |
+
+So C becomes viable *if the rule lives in the pack and only the coordinates live in
+the kernel* — which is exactly the kernel/pack split CLAUDE.md 2.2 prescribes, and
+it produces the conflict SET that Option A then consumes as its resource groups.
+
+**Recommendation: A as the enforcement mechanism, with the conflict set derived
+pack-side (C) rather than hand-declared.** B only if an asymmetric case appears. A
+and C are complements, not alternatives — C decides *which* points conflict, A
+enforces it.
 
 ## 4. What must be true before any of this is written
 
@@ -99,8 +109,43 @@ Vertiport is a **paper** pack (CLAUDE.md 2.2) — no revenue depends on it today
 honest framing is that this is **the price of entry to a sector we have not yet
 entered**, discovered before committing engineering to it rather than after.
 
-Against that: the same mechanism is what any geometrically-real depot needs, and the
-robotaxi and yard-logistics sites modelled so far have simply not had interfering
-points. **The question to answer before building is whether Site Alpha or a real
-customer site has a conflicting pair today.** If yes, this stops being vertiport's
-bill. If no, it can wait — and waiting is the recommendation until that is checked.
+Against that: the same mechanism is what any geometrically-real depot needs. The
+question this section originally left open — *does a real site have a conflicting
+pair today?* — is now answered in §6. It does not. **Waiting is therefore the
+recommendation, on evidence rather than on instinct.**
+
+---
+
+## 6. The urgency question, answered empirically (2026-08-22)
+
+§5 said the deciding question was whether a real site has a conflicting pair today.
+Measured across every depot in `otto-q-core`:
+
+| | |
+|---|---|
+| stalls with coordinates | **319 of 319** — geometry is complete, not aspirational |
+| depots covered | 3 |
+| closest stall pair | **8.95 units** |
+| median pair distance | 189.23 units |
+| pairs closer than 1 unit | **0** |
+| coincident pairs | **0** |
+
+**No existing site has a stall pair close enough to plausibly interfere.** The
+closest two stalls anywhere are ~9 units apart against a median of ~189. V5 is
+therefore **not urgent**, and this is now a measurement rather than an assumption.
+
+Two consequences worth carrying forward:
+
+1. **The scoping recommendation stands, with evidence.** Do not build pairwise
+   exclusion yet. Revisit when a site is modelled whose points actually interfere —
+   and the check above is cheap to re-run as a gate on that.
+2. **The kernel already has the input Option C needs.** `stalls.relative_x/relative_y`
+   is populated for every stall, and `ottoq_site_structures` carries 54 footprints
+   with `width_ft`, `length_ft`, `rotation_deg` and lat/lng. Deriving a conflict set
+   is a query, not a data-collection project. That is what moved C from "rejected"
+   to "recommended as the derivation half" in §3.
+
+**Method note:** the first version of §3 rejected Option C by reasoning about what
+the kernel *ought* to contain, without checking what it *does* contain. That is the
+same error this phase has now made twice — §1b and §2 of `CONFORMANCE_FINDINGS.md`
+were both corrections of exactly that shape. Checking first is cheaper every time.
