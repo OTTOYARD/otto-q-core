@@ -212,14 +212,118 @@ order — and not something to patch blind. A plausible direction is a tiebreak 
 keeps a total order while restoring the spreading heap order was doing by accident. Untested;
 recorded as a hypothesis, not a plan.
 
-**Standing conclusion for C7.1:** the certification result from re-cert #20 stands — 20/20,
-`deterministic = TRUE` — and production is in exactly that state. The throughput cost of that
-configuration (41 sessions vs an irreproducible 49–62 before) is now a measured, documented
-trade-off rather than an unknown, which is the first time that has been true in this series.
+**Standing conclusion for C7.1:** the certification holds and is now reproduced. Re-cert #20
+(20/20) and re-cert #22 (20/20, hands-off, post-0069) both pass on the same production state,
+so the result no longer rests on a single sample. **What is certified is the within-session
+property — same seed + same session → byte-identical scored event stream.** #22 also showed that
+the same seed does *not* reproduce the same world across sessions (see the finding recorded with
+#22 below), so the earlier framing of the throughput cost as "41 sessions vs an irreproducible
+49–62" is withdrawn: those numbers were never comparable to each other. The trade-off is real but
+unmeasured, and measuring it requires a decision the founder owns.
 
 **Harness note:** arm B's first attempt was discarded at `tick_count = 1` (metronome contamination
 in the arm_start → shield gap) and re-armed clean at 26 seconds into a minute — the third time
-this has cost an arm, and the reason the `ottoq_cert_arm_finish` teardown fix is still owed.
+this has cost an arm, and the reason the `ottoq_cert_arm_finish` teardown fix was owed.
+**That fix is 0069, applied 2026-08-22 and proven by re-cert #22, which ran end-to-end with no
+manual sweep.** Mid-minute arming is still required; the metronome hazard is separate from the
+tether hazard and is not addressed by 0069.
+
+**Re-certification #22 — C7.1 PASSES AGAIN, AND THIS TIME HANDS-OFF (post-0069, 2026-08-22
+20:10–20:13Z; arms `288d24fc` / `914214a4`, ab_group `…424261`, both `sim_clock_start =
+2026-08-22 22:00:00+00`).**
+
+```
+ticks_compared 20 | ticks_identical 20 | ticks_divergent 0 | deterministic = TRUE
+```
+
+Every scored metric matches exactly across the two arms: **10 / 10 charge sessions, 89 / 89
+vehicles cycled, 1736 / 1736 decisions, 1205 / 1205 enacted, 589.30 / 589.30 peak kW,
+8.9 / 8.9 throughput per hour, 0 / 0 safety violations.**
+
+**This is the second certification the series has ever produced, and the first that needed no
+human hand in the middle.** Until now the certification rested on a single sample (#20).
+
+**0069 did what it was written to do, and the proof is the run itself.** Arm A ended with **one
+vehicle still tethered** — the exact condition that killed an arm in #19, #20 and #21. Teardown
+released it (0 tethered immediately after `ottoq_cert_arm_finish`), and **arm B armed clean with
+`tick_count = 0` and no manual `twin.ottoq_arm_emergency_release` sweep.** The sweep is retired.
+
+0069 was also exercised against real pre-existing residue before this pair ran: the stranded arm B
+of re-cert #21 (`7e8bb433`, left `running` for 18 hours) was finished under the new teardown, which
+released 2 tethers and closed the open `twin.arm_cycles` row with outcome `emergency_released`
+stamped at `2026-08-23 08:00:00+00` — **the run's own `sim_clock_current`, not the real clock.**
+That timestamp is the migration's whole point, and it is now observed rather than argued.
+
+Applied post-md5: **`02beeffec29daad712b8e19271c9adf4`**. Post-conditions re-verified against the
+live catalog after the apply, not only inside the DO block: exactly one release call, ordered
+before the `status='aborted'` flip, handed the run's own sim clock, filtered to
+`robotic_tether_until IS NOT NULL`.
+
+**Free evidence recovered along the way.** Finishing #21's stranded arm made its pair scorable for
+the first time: `9ea1a855` vs `7e8bb433` → **15/20, first divergence sim-min 480**. That is the
+number `MIGRATION_LOG` already records for 0068, reproduced independently 18 hours later from
+frames captured at 02:00Z and 02:02Z. Two things follow: the 0068 measurement was sound, and the
+frame digest is stable over time — it reads `ottoq_decision_snapshots`, which teardown does not
+touch. (Checked, not assumed: the divergent frames pre-date today's teardown call by 18 hours.)
+
+---
+
+### The finding this run turned up: determinism is session-local, and throughput numbers are not comparable across sessions
+
+**Same seed, same policy, same code — and #22 does not reproduce #20.** The decide path is
+byte-identical between them (`ottoq_l2_optimize_assignments` verified live at
+`3d7fa12fec5fe860854d8416dd8e4840` immediately before 0069; 0068 was applied and reverted to a
+byte-identical image in between; 0069 touches only harness teardown, which runs after the run).
+Yet:
+
+```
+#22 arm A vs #20 arm A: struct_hash differs at tick 1 and at every tick thereafter
+  stall side  ....... IDENTICAL
+  vehicle side ...... 30 / 100 vehicles in a different state
+                      81 / 100 vehicles at a different SoC
+                      mean SoC 90.2 vs 90.2 (distribution preserved)
+                      max per-vehicle delta 11.0 points
+  charge sessions ... 41 (#20) vs 10 (#22)
+```
+
+The divergence is present **in the very first frame**, before the decide path has had a chance to
+do anything. So it is an initial-condition difference, not a scheduling difference. The stall side
+resets cleanly; the fleet side does not come back to the same place.
+
+**What this costs us, stated plainly:**
+
+1. **The determinism certification is intact but narrower than the words suggest.** What #20 and
+   #22 each prove is *same seed + same session → identical*. Neither proves *same seed → same
+   world*, which is the property the founder has asked for and the property "no number ships
+   without a run ID" ultimately leans on. A run ID currently identifies a run, not a reproducible
+   world.
+2. **Every cross-session throughput comparison in this series is confounded**, including the one
+   this document and `MIGRATION_LOG` use to conclude that *"0068 is strictly worse than 0067 on
+   both axes."* The **determinism** half of that conclusion is a within-pair comparison and stands
+   untouched (15/20 vs 20/20). The **throughput** half — 41 → 23 — compared runs booted ~40
+   minutes apart from different fleet states, and cannot carry the weight put on it. Marked here
+   rather than deleted, and marked in `MIGRATION_LOG` at the same time. The 62 / 49 / 41 / 23 / 10
+   series is best read as *what the fleet happened to be carrying at arm time*, not as a ranking of
+   configurations.
+
+**What is already ruled out.** The per-vehicle condition draw in `ottoq_run_boot_draw` is
+clock-free: every draw is `ottoq_sim_seeded_random(v_seed, '<salt>:' || vehicle_id)`, a pure
+function of (seed, vehicle). `ottoq_benchmark_reset` sets all 100 autonomous vehicles to
+`current_soc = 30` and `current_state = 'arrived_at_gate'`, and all 100 vehicles at this depot are
+`category = 'autonomous'`, so the reset's category filter is not leaking anyone. The world day-0
+draw buckets on `sim_clock_start::date`, which is the same date for both runs. **The salt has not
+been found, and is deliberately not guessed at here.**
+
+**Not fixed, and not to be fixed without the founder's call** — the choice is a product decision,
+not a bug fix. Per-run variability is *intended* to be redrawn (that is the thesis: OTTO-Q
+orchestrates correctly whatever the world looks like). The open question is narrower: should a
+*pinned seed* also pin the fleet's boot state, so that a run ID reproduces a world? Answering yes
+buys reproducible benchmarks and costs nothing at the depot; answering no keeps the harness honest
+about variability but means throughput can only ever be compared within a session. Recorded as the
+sharpest form of the standing throughput question.
+
+
+---
 
 **Re-certification #20 — C7.1 PASSES (post-0067, 2026-08-22; arms `677bca9c` / `43fbecf4`,
 ab_group `…42425f`, both `sim_clock_start = 2026-08-22 22:00:00+00`).**
