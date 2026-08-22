@@ -102,6 +102,75 @@ accepts `p_sim_clock_start timestamptz DEFAULT NULL`** — the capability exists
 Only `ottoq_cert_arm_start` fails to pass one. Pinning it is a cert-harness-only change with zero
 effect on production scheduling semantics.
 
+**Re-certification #19 — THE FIRST PINNED-CLOCK BASELINE (post-0065 + 0066, 2026-08-22; arms
+`88ed727f` / `81ee350d`, ab_group `…42425e`, both `sim_clock_start = 2026-08-22 22:00:00+00`).**
+0065 and 0066 verified applied (post-md5s `00314bb9…` — matching the locally computed post-image
+byte-for-byte — and `c5caed3f…`). Verdict: **10/20, first divergence sim-min 330.** Still FAIL.
+**But this is the first round that can ever be differenced against another**, and from here
+`ticks_identical` becomes a real score rather than a diagnostic.
+
+**0065 is proven in operation, not just in the diff.** Both arms report
+`sim_clock_start = 2026-08-22 22:00:00+00` exactly, with `tick_count = 0` at shield time. The
+heartbeat trap the migration was written to close was real: after tick 1 of arm A, **40 chargers
+sat inside the proposer's `last_heartbeat_at >= sim_clock_current - 90s` window and
+`noop_no_candidate` was 0.** Without the `v_sim0` charger stamp both numbers would have been
+zero-and-everything, silently — the run would have looked like a scheduling collapse rather than
+a domain mismatch. An unplanned bonus: because the pin is absolute rather than arming-relative,
+the two arms of a pair now begin at an *identical* sim clock instead of ~2 minutes apart, which
+removes one more source of cross-arm variation.
+
+**The depot is no longer livelocked.** Against re-cert #18 (the last pre-fix round):
+
+| metric | #18 A | #18 B | **#19 A** | **#19 B** |
+|---|---|---|---|---|
+| vehicle commands | 1,562 | 1,598 | 627 | 485 |
+| `begin_charge` executed | 12 | 5 | **62** | **49** |
+| `begin_charge` refused | 1,179 | 1,277 | 81 | 128 |
+| refusals, all types | 1,286 | 1,404 | 155 | 219 |
+| **refusals never examined** | **926** | **1,044** | **0** | **2** |
+| rerouted | 22 | 42 | 16 | 14 |
+| `no_capacity` escalations | 331 | 315 | 81 | 159 |
+| charge sessions | 12 | 5 | 62 | 49 |
+| distinct vehicles charged (of 100) | — | — | **60** | **47** |
+| DCFC sessions | — | — | 18 | 18 |
+
+**The reactor backlog is gone.** 926 unexamined refusals became 0. At ~8 refusals per tick the
+`LIMIT 20` cursor drains completely, so the cap is no longer binding — **which is why 0067 (the
+drain-rate fix) is now deferred rather than shipped.** It would only matter again at the refusal
+volumes the duplicate emit was manufacturing. Holding it was the right call: shipping it here
+would have "fixed" a queue that no longer backs up and taken credit for it.
+
+**ATTRIBUTION, STATED HONESTLY.** The throughput jump cannot be assigned to 0066 alone: the slice
+also moved (pinned 22:00 versus #18's 00:32 arming), and 0065 and 0066 landed together. What is
+*not* confounded is the **within-round** comparison, and that is now the sharper finding:
+
+> **Non-determinism costs 13 charging sessions.** Two arms, same seed, same pinned clock, same
+> code: arm A charged 60 vehicles, arm B charged 47 — a 21% spread. DCFC sessions are identical
+> (18 / 18), so the DCFC path is stable and the divergence lives in the L2 / allocation path.
+
+That is a far better statement of why determinism matters than any tick count: the residual
+defect is not a cosmetic hash mismatch, it is a fifth of the depot's charging throughput.
+
+**A NEW HARNESS GAP, exposed by success (not by 0065).** Arming the second arm failed with
+`arm interlock: vehicle … is held by the arm at stall … refusing to move it to nowhere`.
+`ottoq_arm_interlock_guard` reads `vehicles.robotic_tether_until` and compares it against the sim
+clock of the *running* run — but between arms there is no running run, so it falls back to
+`now()`, and a sim-dated tether (`2026-08-23 08:02`) reads as far-future forever. Six vehicles
+were still tethered at the end of arm A (3 `charging/charging`, 3 `demate/unlatch`) and
+`twin.ottoq_arm_emergency_release` cleared all six.
+
+This never fired before because the depot was livelocked: with 5-12 charge sessions per run and
+almost none on DCFC, a run essentially never ended with a live mate. With 18 DCFC sessions per
+arm it fires every time. **`ottoq_cert_arm_finish` should release its run's tethers as part of
+teardown** — filed as the next harness fix, ahead of 0067.
+
+**Harness lesson 6 (procedural).** Arm B's first attempt was discarded at `tick_count = 2`: two
+stray metronome ticks landed in the arm_start → shield gap. Re-armed 27 seconds into a minute
+(mid-minute, away from the metronome's minute-top firing) and the retry shielded clean at
+`tick_count = 0`. The BAND RULE itself is now **obsolete** — it existed to keep both arms inside
+one 30-minute sim slice, and the pinned clock guarantees that by construction — but the
+mid-minute arming discipline still matters.
+
 **THE LIVELOCK, ROOT-CAUSED (2026-08-21). It is a drain-rate defect, not a race.**
 Found by following the founder's own question — *"if a vehicle missed an assignment because
 of timing, OTTO-Q should be aware of why and re-orchestrate because of that"* — to the
