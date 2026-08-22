@@ -45,7 +45,10 @@
       "parallel_with_charge": false,
       "is_movement": true,
       "energy_bearing": false,
-      "emits_sdr": false
+      "emits_sdr": false,
+      "consumes_path": [
+        "tug"
+      ]
     },
     {
       "operation_code": "stage",
@@ -250,6 +253,13 @@
       "mechanism": null,
       "finding_class": "SOLVER_CHANGE",
       "note": "A GEOMETRIC constraint coupling two points' simultaneous occupancy. Every kernel resource mechanism is per-point (exclusive_occupancy) or site-wide (site_power_cap). Nothing expresses 'these two points may not both be active', which is a pairwise spatial exclusion. This is the clearest candidate in the whole pack set for a genuine solver change."
+    }
+  ],
+  "path_resources": [
+    {
+      "code": "tug",
+      "capacity": 2,
+      "description": "Ground tugs (H3 'Tug-As-Resource'). Only N available; repositioning queues behind them."
     }
   ]
 }

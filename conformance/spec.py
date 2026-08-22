@@ -60,6 +60,24 @@ class PackValidationError(ValueError):
 
 
 @dataclass(frozen=True)
+class PathResource:
+    """A finite resource an inter-point MOVE consumes while it runs.
+
+    CLAUDE.md 2.3: inter-point moves "have duration, consume path resources, and
+    are where deadlock happens". This is that resource, declared. A trolley line
+    with capacity 1, a tug fleet with capacity 2, an aisle that fits three AMRs.
+
+    Declaring these is a PACK-level addition, not a kernel change: the mechanism
+    claimed is `movement_as_operation`, which CLAUDE.md 2.3 says the engine already
+    has. The harness gaining the ability to enforce it is the INSTRUMENT catching
+    up to the kernel, not the kernel being extended to suit a pack.
+    """
+    code: str
+    capacity: int = 1
+    description: str = ""
+
+
+@dataclass(frozen=True)
 class Operation:
     operation_code: str
     display_name: str
@@ -70,6 +88,9 @@ class Operation:
     emits_sdr: bool = True
     typical_min: float | None = None
     peak_kw: float | None = None
+    #: Path resources this operation occupies for its duration. Only meaningful
+    #: for movements; a non-movement declaring one is a spec violation.
+    consumes_path: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -99,6 +120,7 @@ class Pack:
     operations: tuple[Operation, ...]
     service_points: tuple[ServicePoint, ...]
     constraints: tuple[Constraint, ...]
+    path_resources: tuple[PathResource, ...] = ()
 
     def operation(self, code: str) -> Operation | None:
         return next((o for o in self.operations if o.operation_code == code), None)
@@ -148,6 +170,24 @@ def validate(pack: Pack) -> list[str]:
                 f"it could never be scheduled (PACK_SPEC §3 invariant 3)."
             )
 
+    # Path resources: declared codes must exist; only movements may consume them.
+    path_codes = {r.code for r in pack.path_resources}
+    for r in pack.path_resources:
+        if r.capacity < 1:
+            errors.append(f"path resource {r.code!r} has capacity {r.capacity}; must be >= 1")
+    for o in pack.operations:
+        for code in o.consumes_path:
+            if code not in path_codes:
+                errors.append(
+                    f"operation {o.operation_code!r} consumes undeclared path resource {code!r}"
+                )
+        if o.consumes_path and not o.is_movement:
+            errors.append(
+                f"operation {o.operation_code!r} consumes a path resource but is not a "
+                f"movement. CLAUDE.md 2.3 attaches path consumption to inter-point "
+                f"MOVES; a stationary operation occupying a path is a modelling error."
+            )
+
     # Constraints: mechanism must be registry-known, or null WITH a finding class.
     for c in pack.constraints:
         if c.mechanism is None:
@@ -174,7 +214,10 @@ def load(doc: dict[str, Any]) -> Pack:
             status=doc["status"],
             source=doc["source"],
             asset_classes=tuple(doc["asset_classes"]),
-            operations=tuple(Operation(**o) for o in doc["operations"]),
+            operations=tuple(
+                Operation(**{**o, "consumes_path": tuple(o.get("consumes_path", []))})
+                for o in doc["operations"]
+            ),
             service_points=tuple(
                 ServicePoint(
                     point_type=sp["point_type"],
@@ -186,6 +229,7 @@ def load(doc: dict[str, Any]) -> Pack:
                 for sp in doc["service_points"]
             ),
             constraints=tuple(Constraint(**c) for c in doc["constraints"]),
+            path_resources=tuple(PathResource(**r) for r in doc.get("path_resources", [])),
         )
     except (KeyError, TypeError) as exc:
         raise PackValidationError(f"pack does not match PACK_SPEC §2: {exc}") from exc

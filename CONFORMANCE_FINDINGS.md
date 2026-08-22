@@ -1,6 +1,9 @@
 # CONFORMANCE_FINDINGS.md — is OTTO-Q a platform, or N products?
 
-**Run 4 · Phase C11 · 2026-08-22.** Instrument: `conformance/`. 43 tests pass.
+**Run 4 · Phase C11 · 2026-08-22.** Instrument: `conformance/`. 49 tests pass.
+*Revised the same day: §3.1 below recorded a gap in the instrument; that gap has
+since been closed and the table re-measured. The original finding is kept rather
+than deleted — it is the reason the numbers moved.*
 CLAUDE.md instructs that this document be written *"willing to conclude either
 way."* What follows is written to that instruction.
 
@@ -21,10 +24,10 @@ way."* What follows is written to that instruction.
 
 | Pack | Status | Loads | Solves | Findings | Unexercised claims |
 |---|---|---|---|---|---|
-| robotaxi | reference | ✅ | ✅ 504 ops | none | 1 |
-| yard-logistics | build | ✅ | ✅ 40 ops | none | 1 |
-| mining | paper | ✅ | ✅ 60 ops | none | **5 of 6** |
-| vertiport | paper | ✅ | ✅ 48 ops | **2** | 1 |
+| robotaxi | reference | ✅ | ✅ 840 ops | none | **0 — fully evidenced** |
+| yard-logistics | build | ✅ | ✅ 64 ops | none | **0 — fully evidenced** |
+| mining | paper | ✅ | ✅ 96 ops | none | **3 of 6** |
+| vertiport | paper | ✅ | ✅ 84 ops | **2** | 1 |
 
 Zero power-cap violations, zero point overlaps, zero operations on incapable
 points, across all four packs. The verifier is not vacuous: it has negative tests
@@ -82,28 +85,62 @@ recorded as such so a later round can confirm or overturn it.
 
 Stated plainly, because a verdict is only as good as what produced it.
 
-### 3.1 `movement_as_operation` is claimed by four packs and exercised by none
+### 3.1 `movement_as_operation` — the gap, and its closure
 
-The harness schedules service operations; it does not schedule the inter-point
-moves between them. So the mechanism CLAUDE.md 2.3 calls one of the two places
-throughput lives — *"inter-point moves as scheduled operations… where deadlock
-happens"* — is **asserted by every pack and tested by nothing here**.
+**Original finding (kept for the record):** the harness scheduled service
+operations but not the inter-point moves between them, so the mechanism CLAUDE.md
+2.3 calls one of the two places throughput lives was *asserted by every pack and
+tested by nothing.*
 
-This matters most for **mining C4** (trolley-path dependency), whose entire
-conformance argument rests on modelling a trolley segment as a point that a move
-consumes. That argument is currently unexercised.
+**Closed.** The harness now schedules a move whenever an asset changes points, and
+`path_resources` were added to the pack spec: a named finite resource a move
+occupies for its duration (a trolley line of capacity 1, a tug fleet of capacity
+2). A **fourth invariant** — no path-resource over-subscription — is verified on the
+same concurrency sweep as the power cap.
+
+**This was not a kernel change.** `path_resources` is a pack-level declaration
+mapped to `movement_as_operation`, which 2.3 says the engine already has. The
+instrument caught up to the kernel; the kernel was not extended to suit a pack.
+
+**What it changed.** `movement_as_operation` is now exercised by all four packs.
+robotaxi and yard-logistics went from one unverified claim each to **fully
+evidenced — every mechanism they claim was actually reached.** Mining fell from
+five unverified claims to three.
+
+**And it produced a real result, not just a green tick.** Vertiport's
+`Tug-As-Resource` (capacity 2) is genuinely **stressed**: moves actually contend
+for tugs, the capacity check has to say no, and the schedule survives. That is a
+constraint H3 rates among the hardest for vertiports, now evidenced rather than
+assumed.
+
+**One honest weakness, reported by the instrument itself.** Mining's trolley line
+is *exercised but never stressed* — 36 moves, zero overlapping pairs, so the
+capacity check was reached but never had to reject anything. A pass under those
+conditions means very little, and `ConformanceResult.path_stressed` now says so in
+the output rather than letting it read as a strong result. The path checker is
+separately proven to fire: a negative test feeds it two concurrent trams against
+capacity 1 and asserts the rejection.
+
+**A limitation worth naming for whoever picks up mining C4.** Path consumption is
+declared **per operation**, not per `(asset_class, operation)`. Mining's trolley
+line binds only *trolley-assisted* trucks, but a pack can only say "the `tram`
+operation consumes the trolley line" — which would bind diesel trucks too. The
+declarative workaround is to split the operation (`tram` vs `tram_trolley`); that
+was not done here because it should be measured, not assumed to work. **This is the
+most likely place mining C4's conformance argument breaks, and it is not yet
+tested.**
 
 ### 3.2 Mining passes on five unexamined claims
 
-Mining reports zero findings, and that number is misleading on its own. **Five of
-its six constraints name a mechanism the run never reached**, including the one H2
-calls *"anathema to a solver-based kernel"*:
+Mining reports zero findings, and that number is misleading on its own. **Three of
+its six constraints name a mechanism the run never reached** (five before §3.1 was
+closed), including the one H2 calls *"anathema to a solver-based kernel"*:
 
 | Constraint | Claims | Exercised? |
 |---|---|---|
-| C1 clearance before bay entry | `movement_as_operation` | ❌ |
+| C1 clearance before bay entry | `movement_as_operation` | ✅ *(since §3.1 closed)* |
 | C3 energy resupply window | `threshold_ladder` | ❌ |
-| C4 trolley path dependency | `movement_as_operation` | ❌ |
+| C4 trolley path dependency | `movement_as_operation` | ✅ *exercised, not stressed — see §3.1* |
 | C5 multi-threshold maintenance | `threshold_ladder` | ❌ |
 | **C6 operator override** | `work_side_refusal` | ❌ |
 | C2 exclusive bay use | `exclusive_occupancy` | ✅ |
@@ -136,8 +173,9 @@ rather than the kernel's generality.
 
 In priority order, each a concrete next experiment rather than a direction:
 
-1. **Schedule movements in the harness.** Closes 3.1 and puts mining C4's central
-   argument under test. Largest evidence gain per unit of work.
+1. ~~**Schedule movements in the harness.**~~ **DONE** — see §3.1. Two packs went to
+   fully evidenced; vertiport's tug constraint is now genuinely stressed. Residual:
+   stress mining's trolley line, and test the per-class path split.
 2. **Model an operator override and run it against `refuse()`.** Settles mining C6
    — the single finding most likely to change this verdict.
 3. **Attempt a declarative asset-side conditional gap.** Confirms or overturns

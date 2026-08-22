@@ -45,7 +45,10 @@
       "parallel_with_charge": false,
       "is_movement": true,
       "energy_bearing": false,
-      "emits_sdr": false
+      "emits_sdr": false,
+      "consumes_path": [
+        "trolley_line"
+      ]
     },
     {
       "operation_code": "stage",
@@ -268,6 +271,13 @@
       "description": "A human can override a scheduled service event and keep the truck on the hauling cycle. H2: 'anathema to a solver-based kernel'.",
       "mechanism": "work_side_refusal",
       "note": "CLAIMED, NOT PROVEN. 2.7 makes work-side refusal a first-class event triggering re-solve. If an override is a refusal with a human actor, this holds. If it must also INVALIDATE a constraint the solver treated as hard, work_side_refusal does not cover it and this becomes SOLVER_CHANGE. See CONFORMANCE_FINDINGS.md."
+    }
+  ],
+  "path_resources": [
+    {
+      "code": "trolley_line",
+      "capacity": 1,
+      "description": "Trolley-assisted electric drive line (H2 C4). A truck under trolley assist must follow this fixed physical path; only one may occupy a segment at a time."
     }
   ]
 }

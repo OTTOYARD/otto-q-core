@@ -154,3 +154,55 @@ def test_paper_packs_are_accepted_as_paper():
     for pid in ("mining", "vertiport"):
         assert ALL[pid].status == "paper"
         assert ALL[pid].loads
+
+
+# --- movements and path resources (CONFORMANCE_FINDINGS §3.1, now closed) ------
+
+def test_movement_as_operation_is_now_exercised_by_every_pack():
+    """§3.1 recorded this mechanism as claimed-by-four, exercised-by-none."""
+    for pid, r in ALL.items():
+        assert "movement_as_operation" in r.mechanisms_used, pid
+
+
+def test_the_two_built_packs_are_fully_evidenced():
+    # Stronger than conforms: every mechanism they claim was actually reached.
+    assert ALL["robotaxi"].fully_evidenced, ALL["robotaxi"].unverified_claims
+    assert ALL["yard-logistics"].fully_evidenced, ALL["yard-logistics"].unverified_claims
+
+
+def test_path_capacity_check_actually_rejects():
+    """A checker that has never said no is not evidence."""
+    import json as _json
+    from pathlib import Path as _Path
+    pack = load(_json.loads((PACK_DIR / "mining.json").read_text()))
+    over = [ScheduledOp("t1", "haul_truck_trolley_electric", "tram", "__path__", 0, 0, 30, 0),
+            ScheduledOp("t2", "haul_truck_trolley_electric", "tram", "__path__", 0, 5, 35, 0)]
+    v = verify(pack, over)
+    assert any("PATH RESOURCE trolley_line" in x for x in v), v
+
+
+def test_path_stress_is_reported_honestly():
+    # vertiport's tugs genuinely contend (capacity 2); mining's trolley does not.
+    # The distinction must survive into the result, not be flattened into "passed".
+    assert ALL["vertiport"].path_stressed is True
+    assert ALL["mining"].path_stressed is False
+
+
+def test_validator_rejects_a_stationary_operation_consuming_a_path():
+    from conformance.spec import PathResource
+    p = _tiny_pack(
+        operations=(Operation("charge", "Charge", "energy", consumes_path=("aisle",)),),
+        service_points=(ServicePoint("p", (("a", "charge"),)),),
+    )
+    p = Pack(**{**p.__dict__, "path_resources": (PathResource("aisle", 1),)})
+    assert any("is not a movement" in e for e in validate(p))
+
+
+def test_validator_rejects_an_undeclared_path_resource():
+    p = _tiny_pack(
+        operations=(Operation("taxi", "Taxi", "movement", is_movement=True,
+                              consumes_path=("ghost",)),
+                    Operation("charge", "Charge", "energy")),
+        service_points=(ServicePoint("p", (("a", "charge"),)),),
+    )
+    assert any("undeclared path resource" in e for e in validate(p))

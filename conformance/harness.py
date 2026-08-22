@@ -70,6 +70,12 @@ class ConformanceResult:
     #: awkward constraint disappear by naming a plausible mechanism, and the
     #: harness rubber-stamps it. See ConformanceResult.unverified_claims.
     unverified_claims: list[dict[str, Any]] = field(default_factory=list)
+    #: True only if two path-consuming moves ever actually overlapped in this run.
+    #: A path constraint that is exercised but never STRESSED yields a pass that
+    #: means very little — the checker was reached but never had to say no. Making
+    #: that visible is the same discipline as unverified_claims: the instrument
+    #: reports the strength of its own evidence, not just its verdict.
+    path_stressed: bool = False
 
     @property
     def loads(self) -> bool:
@@ -99,6 +105,20 @@ class ConformanceResult:
 # ---------------------------------------------------------------------------
 # Scenario construction — from the pack's own declarations, nothing invented
 # ---------------------------------------------------------------------------
+
+def inter_point_move(pack: Pack) -> str | None:
+    """The pack's inter-point move operation, if it declares one.
+
+    Preference order is deliberate: an operation that CONSUMES a path resource is
+    the one CLAUDE.md 2.3 is about, so it wins over a bare movement.
+    """
+    movers = [o for o in pack.operations if o.is_movement and o.consumes_path]
+    if movers:
+        return sorted(movers, key=lambda o: o.operation_code)[0].operation_code
+    generic = [o for o in pack.operations
+               if o.is_movement and o.operation_code in ("taxi", "tram", "reposition")]
+    return sorted(generic, key=lambda o: o.operation_code)[0].operation_code if generic else None
+
 
 def build_scenario(pack: Pack, assets_per_class: int = 4) -> list[tuple[str, str, list[str]]]:
     """(asset_id, asset_class, [operation_code, ...]) — a deterministic manifest.
@@ -135,8 +155,16 @@ def _points(pack: Pack) -> list[tuple[str, int, ServicePoint]]:
 
 
 def schedule(pack: Pack, scenario) -> tuple[list[ScheduledOp], list[str], set[str]]:
-    """Earliest-fit under kernel mechanisms only. Returns (scheduled, unschedulable, used)."""
+    """Earliest-fit under kernel mechanisms only. Returns (scheduled, unschedulable, used).
+
+    Movements are scheduled BETWEEN consecutive service operations, because that is
+    what an inter-point move is. Until this existed, `movement_as_operation` was
+    claimed by every pack and exercised by none — the gap CONFORMANCE_FINDINGS §3.1
+    recorded against the instrument itself.
+    """
     points = _points(pack)
+    move_code = inter_point_move(pack)
+    move_op = pack.operation(move_code) if move_code else None
     busy: dict[tuple[str, int], list[tuple[float, float]]] = {(t, i): [] for t, i, _ in points}
     last_end: dict[tuple[str, int], float] = {}
     scheduled: list[ScheduledOp] = []
@@ -145,6 +173,7 @@ def schedule(pack: Pack, scenario) -> tuple[list[ScheduledOp], list[str], set[st
 
     for asset_id, cls, opcodes in scenario:
         cursor = 0.0
+        prev_point: tuple[str, int] | None = None
         for opcode in opcodes:
             o = pack.operation(opcode)
             if o is None:
@@ -175,10 +204,27 @@ def schedule(pack: Pack, scenario) -> tuple[list[ScheduledOp], list[str], set[st
                     continue
                 if sp.exclusive:
                     used.add("exclusive_occupancy")
+                # An inter-point MOVE precedes this operation if the asset is
+                # changing points. It has duration and occupies path resources.
+                if move_op is not None and prev_point is not None and prev_point != key:
+                    used.add("movement_as_operation")
+                    mdur = move_op.typical_min or 5.0
+                    mstart = max(cursor, t - mdur)
+                    if mstart + mdur > t:            # move must finish before arrival
+                        t = mstart + mdur
+                        clash = next((w for w in busy[key]
+                                      if not (t + dur <= w[0] or t >= w[1])), None)
+                        if clash is not None:
+                            t = clash[1]
+                    scheduled.append(ScheduledOp(
+                        asset_id, cls, move_op.operation_code, "__path__", 0,
+                        mstart, mstart + mdur, 0.0))
+
                 busy[key].append((t, t + dur))
                 last_end[key] = t + dur
                 scheduled.append(ScheduledOp(asset_id, cls, opcode, ptype, idx,
                                              t, t + dur, o.peak_kw or 0.0))
+                prev_point = key
                 if o.energy_bearing:
                     used.add("site_power_cap")
                 if o.emits_sdr:
@@ -206,6 +252,8 @@ def verify(pack: Pack, scheduled: list[ScheduledOp]) -> list[str]:
     # 3. no operation on an incapable point
     cap = {(sp.point_type, c, o) for sp in pack.service_points for c, o in sp.capabilities}
     for s in scheduled:
+        if s.point_type == "__path__":
+            continue                      # a move occupies a path, not a service point
         if (s.point_type, s.asset_class, s.operation_code) not in cap:
             violations.append(
                 f"INCAPABLE POINT: {s.operation_code} for {s.asset_class} on {s.point_type}"
@@ -214,6 +262,8 @@ def verify(pack: Pack, scheduled: list[ScheduledOp]) -> list[str]:
     # 2. no point overlap
     by_point: dict[tuple[str, int], list[ScheduledOp]] = {}
     for s in scheduled:
+        if s.point_type == "__path__":
+            continue                      # path contention is invariant 4, not 2
         by_point.setdefault((s.point_type, s.point_index), []).append(s)
     for key, ops in by_point.items():
         ops.sort(key=lambda s: s.start_min)
@@ -224,6 +274,28 @@ def verify(pack: Pack, scheduled: list[ScheduledOp]) -> list[str]:
                     f"[{a.start_min:.0f},{a.end_min:.0f}) vs {b.operation_code}"
                     f"[{b.start_min:.0f},{b.end_min:.0f})"
                 )
+
+    # 4. no path-resource over-subscription (CLAUDE.md 2.3 — "moves consume path
+    #    resources… and are where deadlock happens"). Checked on the same
+    #    concurrency sweep as the power cap, for the same reason: capacity is an
+    #    instantaneous property, so it must be evaluated at every change point.
+    cap_by_code = {r.code: r.capacity for r in pack.path_resources}
+    if cap_by_code:
+        moves = [s for s in scheduled
+                 if (op := pack.operation(s.operation_code)) and op.consumes_path]
+        medges = sorted({s.start_min for s in moves} | {s.end_min for s in moves})
+        for code, capacity in cap_by_code.items():
+            for t in medges:
+                n = sum(
+                    1 for s in moves
+                    if s.start_min <= t < s.end_min
+                    and code in (pack.operation(s.operation_code).consumes_path)
+                )
+                if n > capacity:
+                    violations.append(
+                        f"PATH RESOURCE {code}: {n} concurrent moves at t={t:.0f} "
+                        f"exceeds capacity {capacity}"
+                    )
 
     # 1. no power-cap violation — sweep the instants where concurrency changes
     edges = sorted({s.start_min for s in scheduled} | {s.end_min for s in scheduled})
@@ -269,6 +341,18 @@ def unverified_claims(pack: Pack, exercised: set[str]) -> list[dict[str, Any]]:
     return out
 
 
+def _path_was_stressed(pack: Pack, scheduled: list[ScheduledOp]) -> bool:
+    """Did two path-consuming moves ever overlap? If not, the capacity check
+    was reached but never had to reject anything."""
+    moves = [s for s in scheduled
+             if (o := pack.operation(s.operation_code)) and o.consumes_path]
+    for i, a in enumerate(moves):
+        for b in moves[i + 1:]:
+            if not (a.end_min <= b.start_min or b.end_min <= a.start_min):
+                return True
+    return False
+
+
 def run_pack(path: Path) -> ConformanceResult:
     doc = json.loads(path.read_text())
     pack = load(doc)
@@ -281,6 +365,7 @@ def run_pack(path: Path) -> ConformanceResult:
     res.violations = verify(pack, res.scheduled)
     res.findings = constraint_findings(pack)
     res.unverified_claims = unverified_claims(pack, res.mechanisms_used)
+    res.path_stressed = _path_was_stressed(pack, res.scheduled)
     return res
 
 
@@ -302,6 +387,9 @@ if __name__ == "__main__":
         print(f"    loads: {r.loads}   scheduled ops: {len(r.scheduled)}   "
               f"unschedulable: {len(r.unschedulable)}   violations: {len(r.violations)}")
         print(f"    mechanisms exercised: {', '.join(sorted(r.mechanisms_used)) or 'none'}")
+        if any(o.consumes_path for o in load(json.loads(
+                (PACK_DIR / f"{r.pack_id.replace('-', '_')}.json").read_text())).operations):
+            print(f"    path capacity: {'STRESSED' if r.path_stressed else 'exercised but NOT stressed'}")
         for e in r.load_errors:    print("    LOAD ERROR:", e)
         for u in r.unschedulable[:5]: print("    UNSCHEDULABLE:", u)
         for v in r.violations[:5]: print("    VIOLATION:", v)
