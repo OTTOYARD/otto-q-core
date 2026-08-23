@@ -36,6 +36,16 @@ Zero power-cap violations, zero point overlaps, zero operations on incapable
 points, across all four packs. The verifier is not vacuous: it has negative tests
 for each of the three invariants, and rejects each when deliberately broken.
 
+> **CORRECTION (2026-08-23) — the power-cap half of that sentence is vacuous and is
+> withdrawn.** No pack can reach the 3,000 kW cap even with every point drawing its rated
+> power simultaneously: mining tops out at 600 kW, vertiport 1,400, yard-logistics 1,524,
+> robotaxi 1,652. "Zero power-cap violations" was guaranteed by arithmetic before the
+> scheduler ran, so it is not evidence that the kernel holds the site constraint. The
+> *verifier* remains sound — `test_verifier_catches_power_cap_breach` constructs a deliberate
+> breach and asserts rejection — but the packs passing it prove nothing. The point-overlap
+> and incapable-point results are unaffected: those constraints do bind and are contested.
+> See `docs/BENCHMARK_CREDIBILITY.md`.
+
 ---
 
 ## 1. The one genuine solver change: **V5 — pad separation**
