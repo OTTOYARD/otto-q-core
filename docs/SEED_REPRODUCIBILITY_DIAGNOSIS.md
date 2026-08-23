@@ -167,3 +167,77 @@ meaningful; it does not perform it.
 vision — sliders, presets, replay against a benchmark — would run through the product's own
 run-start path, not `ottoq_cert_arm_start`. That path needs the same discipline applied
 separately, and is a larger piece of work that should not be bundled here.
+
+---
+
+# Addendum — 0070 applied, and a third cause it exposed
+
+**2026-08-23.** Migration `0070_cert_arm_start_pins_the_world.sql` applied on the founder's
+go-ahead. Post-md5 `75ec5e058a88ef6d4f5a7d53aea4635c`, matching its dry-run value exactly;
+`pg_proc` still holds exactly one `ottoq_cert_arm_start`, so the signature is unchanged and no
+overload was created.
+
+## Both diagnosed causes are fixed, and verified in operation
+
+The test was deliberately the hardest available: **two runs armed under *different* A/B groups
+with the same seed** — precisely the condition that used to produce different worlds.
+
+| | run `65f5a6c3` (group …424262) | run `90cbedb0` (group …424263) |
+|---|---|---|
+| `sim_clock_start` | 2026-08-22 22:00:00+00 | 2026-08-22 22:00:00+00 |
+| `v_wseed` | 2958203307709789271 | 2958203307709789271 |
+| initial wave | 85 | 85 |
+| same vehicles deployed | **85 / 85** | (was 70 / 85) |
+| same vehicle *and* SoC | **85 / 85** | (was 0 matching) |
+
+Both ran on **2026-08-23** and both pinned their world to **2026-08-22**, so cause (b) is
+confirmed live as well as by measurement. The frames now agree **through tick 17**, where
+before the fix they differed at **tick 1**.
+
+## The third cause, exposed rather than introduced
+
+The pair diverges at **tick 18 (sim-min 540)**: `17 / 20 identical, deterministic = false`.
+
+This is not a regression from 0070 — it is a pre-existing tie that only became reachable once
+runs agreed long enough to get to it. Under 0070 the two runs differ in nothing but real
+wall-clock time and their run UUIDs.
+
+**The frame diff is a clean two-vehicle swap**, the signature of an unordered pick at a
+capacity boundary:
+
+```
+tick 18   9926e267…  A: staged_awaiting_service   B: in_service_bay
+tick 18   a6e9c009…  A: in_service_bay            B: staged_awaiting_service
+```
+
+Both at SoC 100.0. One got the bay, the other waited, and which one is heap order.
+
+**Located.** `twin.ottoq_sim_advance_service_flow` admits vehicles to service under a
+capacity cap:
+
+```sql
+ORDER BY (q.booked_stall IS NULL), q.lsc  LIMIT GREATEST(0, v_svc_cap - v_in_svc)
+--        where  q.lsc = v.last_state_change,  and there is no tiebreak after it
+```
+
+The wash path immediately above it has the same shape:
+
+```sql
+ORDER BY (q.booked_stall IS NULL), q.ord  LIMIT GREATEST(0, LEAST(v_wash_cap, …) - v_in_wash)
+```
+
+**Why the tie is not rare but near-guaranteed:** 0065 stamps `last_state_change = v_sim0` for
+*every* autonomous vehicle at arm time, so the entire fleet enters the run sharing one
+`last_state_change` value. The ordering key is constant across the tied set by construction.
+
+**The fix pattern is already established in this codebase and these two sites are the
+outliers.** `ottoq.ottoq_bind_unbooked_bay_occupants`, doing the same kind of work, already
+orders `v.last_state_change NULLS FIRST, v.id`. 0067 fixed exactly this class on the stall
+pick by appending a total order.
+
+**Deliberately NOT fixed here.** 0067 also demonstrated that adding a tiebreak to a tied set is
+not throughput-neutral: always preferring the same member of a tied pair *concentrates* load
+where heap order had been spreading it by accident, and sessions moved materially. A tiebreak
+on the service-bay admission is the same kind of change and deserves the same treatment —
+proposed, measured against a baseline, and kept or reverted on the evidence. Recorded here as
+the next candidate, not slipped in alongside a fix that was authorized for something else.
