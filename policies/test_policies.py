@@ -82,3 +82,71 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ---- C5b: the cost dimension -----------------------------------------------------
+
+def test_cost_layer_does_not_disturb_the_committed_comparison():
+    """run_policy's return shape is frozen; the cost layer must not change the artifact."""
+    import json as _json
+    from pathlib import Path as _Path
+    from harness import run_comparison as _rc
+    sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
+    comp = _rc(sc)
+    blob = _json.dumps(comp, indent=1, sort_keys=True) + "\n"
+    committed = (_Path(__file__).parent / "comparison_seed424242.json").read_text()
+    assert blob == committed
+
+
+def test_cost_comparison_is_deterministic_and_matches_its_artifact():
+    import json as _json
+    from pathlib import Path as _Path
+    from cost import cost_comparison
+    here = _Path(__file__).parent
+    sc = here.parent / "solvers" / "cpsat" / "scenario_canonical.json"
+    a = cost_comparison(sc)
+    b = cost_comparison(sc)
+    assert a["cost_sha256"] == b["cost_sha256"]
+    blob = _json.dumps(a, indent=1, sort_keys=True) + "\n"
+    assert blob == (here / "cost_seed424242.json").read_text()
+
+
+def test_the_cheapest_policy_is_not_the_fastest():
+    """The tradeoff the single-axis comparison could not see.
+
+    Serving assets sooner means charging more of them at once, which raises the peak
+    interval the demand charge bills. If this ever stops holding, either the tariff has
+    stopped reaching the objective or a policy has genuinely learned to do both -- and
+    both are worth noticing deliberately rather than silently.
+    """
+    from pathlib import Path as _Path
+    from cost import cost_comparison
+    sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
+    t = cost_comparison(sc)["tradeoff"]
+    cheapest = min(t["monthly_total_usd"], key=lambda k: t["monthly_total_usd"][k])
+    fastest = min(t["total_tardy_min"], key=lambda k: t["total_tardy_min"][k])
+    assert cheapest != fastest
+    assert cheapest == "fifo"
+
+
+def test_dominated_policies_are_named():
+    """A policy beaten on BOTH axes is dominated -- no weighting would choose it."""
+    from pathlib import Path as _Path
+    from cost import cost_comparison
+    sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
+    t = cost_comparison(sc)["tradeoff"]
+    assert set(t["pareto_optimal"]) | set(t["dominated"]) == set(t["total_tardy_min"])
+    # As measured 2026-08-24 the CP-SAT prototype is dominated by greedy: worse on
+    # tardiness is not the issue -- it is beaten on tardiness AND on cost. Recorded so
+    # an improvement to the prototype shows up as this test failing.
+    assert "cpsat" in t["dominated"]
+
+
+def test_every_cost_artifact_states_its_assumptions():
+    from pathlib import Path as _Path
+    from cost import cost_comparison
+    sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
+    c = cost_comparison(sc)
+    assert len(c["assumptions"]) >= 4
+    assert any("repeats" in a for a in c["assumptions"])
+    assert any("power cap" in a for a in c["assumptions"])
