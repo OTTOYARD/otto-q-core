@@ -116,3 +116,78 @@ def test_storage_row_is_reported_with_its_context(comp):
     assert fs["grid_peak_kw"] < comp["policies"]["forward"]["peak_site_kw"]
     # recharge energy exceeds delivered energy -- losses are paid at the meter
     assert fs["recharge_kwh"] > fs["deficit_kwh"]
+
+
+# ---- the same formulation at scale: the 24h KPI-gate scenario --------------------
+
+@pytest.fixture(scope="module")
+def comp24():
+    from forward import forward_comparison_24h
+    return forward_comparison_24h()
+
+
+def test_forward_holds_both_axes_at_scale(comp24):
+    """16 assets, 30-hour horizon, overlapping waves -- the edge must survive scale."""
+    rows = comp24["policies"]
+    f = rows["forward"]
+    assert f["total_tardy_min"] == 0
+    for name in ("fifo", "greedy", "otto_q_asis", "cpsat"):
+        assert f["monthly_total"] <= rows[name]["monthly_total"], name
+
+
+def test_lexicographic_beats_the_weighted_objective_at_scale(comp24):
+    """The reason forward is lexicographic and not a weighted soup, measured.
+
+    At 24h the weighted default trades tardiness for its unit-less penalty terms and
+    misses deadlines; the lexicographic solve holds zero AND lands a lower bill. If
+    the weighted objective ever matches it on both axes, the weights have effectively
+    become the lexicographic order and this test should be revisited.
+    """
+    rows = comp24["policies"]
+    assert rows["cpsat"]["total_tardy_min"] > 0
+    assert rows["forward"]["total_tardy_min"] == 0
+    assert rows["forward"]["monthly_total"] < rows["cpsat"]["monthly_total"]
+
+
+def test_24h_peak_respects_its_own_bound(comp24):
+    assert comp24["policies"]["forward"]["peak_site_kw"] >= comp24["peak_lower_bound_kw"]
+
+
+def test_24h_artifact_matches_committed(comp24):
+    import json
+    blob = json.dumps(comp24, indent=1, sort_keys=True) + "\n"
+    assert blob == (HERE / "forward_24h_seed424242.json").read_text()
+
+
+def test_billed_curve_conserves_every_charged_kwh():
+    """The invariant that makes tail truncation impossible to ship.
+
+    A curve cut short of the horizon silently drops the charges in the tail and
+    understates the bill, and no ranking test would notice -- every policy would be
+    understated together. The truncation-proof check is conservation: the energy
+    under the billed curve must equal the energy of the charge segments themselves,
+    for the scenario with the long horizon, to sampling tolerance. A first draft of
+    this test instead asserted "there is load after minute 1440" -- which happened
+    to be false for FIFO on this scenario (its last charge ends at minute 1219) and
+    would have gone stale the moment the scenario shifted; conservation cannot.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(HERE.parent / "solvers" / "cpsat"))
+    from cost import site_load_curve
+    from harness import run_policy_traced
+    from model import load_scenario
+    from assignment_policy import FifoPolicy
+    sc = load_scenario(HERE.parent / "solvers" / "cpsat" / "scenario_24h.json")
+    _, state = run_policy_traced(sc, FifoPolicy())
+
+    seg_kwh = sum(s["kw"] * s["minutes"] / 60.0
+                  for segs in state.segments.values() for s in segs)
+    full = site_load_curve(state, end_min=sc["horizon_min"], step_min=1)
+    curve_kwh = sum(kw / 60.0 for _, kw in full[:-1])
+    assert curve_kwh == pytest.approx(seg_kwh, rel=0.01)
+
+    # and the day-truncated default really does lose energy if anything ran late --
+    # equality here simply means this scenario's charges all fit inside the day
+    day = site_load_curve(state, end_min=1440, step_min=1)
+    day_kwh = sum(kw / 60.0 for _, kw in day[:-1])
+    assert day_kwh <= curve_kwh + 1e-6

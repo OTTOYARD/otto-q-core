@@ -1,0 +1,60 @@
+{
+ "assumptions": [
+  "One reduced canonical day billed as a month -- a fair ranking and an indicative magnitude, not a bill forecast (see POLICY_COST_FINDING.md).",
+  "The ratchet uses each policy's own peak as history; the scenario has no 12-month billing history.",
+  "The storage row bills the Nashville tariff with the site's committed Megapack fleet; the no-storage rows bill the same tariff without it, so the two are comparable like-for-like."
+ ],
+ "formulation": "Lexicographic: pass 1 minimizes total tardiness (T*); pass 2 holds tardiness at T* and minimizes the instantaneous site peak, an upper bound on every billed interval average. Storage dispatch then holds the grid at the lowest ceiling the battery can sustain, recharge included, using the day-ahead curve only a forward scheduler possesses.",
+ "forward_sha256": "888b1f32c68920a0ad592d88637b1c8abd0b0f4b181db25a6dc9f40183d702ab",
+ "forward_with_storage": {
+  "deficit_kwh": 639.2,
+  "grid_peak_kw": 34.1,
+  "monthly_total": 2871.52,
+  "note": "grid held at 34.1 kW; battery supplies 639 kWh, recharges 666 kWh inside the same ceiling",
+  "recharge_kwh": 665.8,
+  "storage_site_id": "nashville_nes_gsa3_bess",
+  "supported": true
+ },
+ "month": 7,
+ "peak_lower_bound_kw": 50.5,
+ "policies": {
+  "cpsat": {
+   "annual_total": 77017.92,
+   "monthly_delta_vs_fifo": -855.38,
+   "monthly_total": 6418.16,
+   "peak_site_kw": 307.0,
+   "total_tardy_min": 121
+  },
+  "fifo": {
+   "annual_total": 87282.48,
+   "monthly_delta_vs_fifo": 0.0,
+   "monthly_total": 7273.54,
+   "peak_site_kw": 240.0,
+   "total_tardy_min": 0
+  },
+  "forward": {
+   "annual_total": 56489.16,
+   "monthly_delta_vs_fifo": -2566.11,
+   "monthly_total": 4707.43,
+   "peak_site_kw": 150.0,
+   "total_tardy_min": 0
+  },
+  "greedy": {
+   "annual_total": 87282.48,
+   "monthly_delta_vs_fifo": 0.0,
+   "monthly_total": 7273.54,
+   "peak_site_kw": 240.0,
+   "total_tardy_min": 0
+  },
+  "otto_q_asis": {
+   "annual_total": 90108.24,
+   "monthly_delta_vs_fifo": 235.48,
+   "monthly_total": 7509.02,
+   "peak_site_kw": 251.0,
+   "total_tardy_min": 229
+  }
+ },
+ "scenario": "canonical_24h_nash_v1",
+ "seed": 424242,
+ "site_id": "site_alpha"
+}

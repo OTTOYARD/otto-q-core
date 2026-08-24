@@ -41,12 +41,19 @@ DAY_MIN = 1440
 STEP_MIN = 15
 
 
-def site_load_curve(state, *, step_min: int = STEP_MIN) -> list[tuple[float, float]]:
-    """Reconstruct the site's kW draw over a full day from the run's charge segments.
+def site_load_curve(state, *, step_min: int = STEP_MIN,
+                    end_min: int = DAY_MIN) -> list[tuple[float, float]]:
+    """Reconstruct the site's kW draw from the run's charge segments.
 
     Sampled at `step_min` so the curve can be billed at any demand interval; the
     tariff engine averages within its own interval, so sampling finer than the meter
     is correct and sampling coarser would silently flatten peaks.
+
+    `end_min` must cover the scenario's horizon. The default (one day) matches the
+    canonical scenario and the committed cost artifact; the 24h scenario runs a
+    1,800-minute horizon, and truncating it at 1,440 would silently drop every
+    charge in the tail -- an understated bill that no test would flag as wrong,
+    which is exactly the kind of quiet error this file exists to prevent.
     """
     events: list[tuple[float, float]] = []
     for segs in state.segments.values():
@@ -56,10 +63,10 @@ def site_load_curve(state, *, step_min: int = STEP_MIN) -> list[tuple[float, flo
     events.sort()
 
     curve: list[tuple[float, float]] = []
-    for m in range(0, DAY_MIN, step_min):
+    for m in range(0, end_min, step_min):
         load = sum(d for t, d in events if t <= m)
         curve.append((float(m), max(0.0, load)))
-    curve.append((float(DAY_MIN), 0.0))
+    curve.append((float(end_min), 0.0))
     return curve
 
 
