@@ -111,35 +111,41 @@ def test_cost_comparison_is_deterministic_and_matches_its_artifact():
     assert blob == (here / "cost_seed424242.json").read_text()
 
 
-def test_the_cheapest_policy_is_not_the_fastest():
-    """The tradeoff the single-axis comparison could not see.
+def test_the_solver_now_holds_both_axes_at_once():
+    """DELIBERATELY REVISED 2026-08-24 -- the history matters, so it is recorded here.
 
-    Serving assets sooner means charging more of them at once, which raises the peak
-    interval the demand charge bills. If this ever stops holding, either the tariff has
-    stopped reaching the objective or a policy has genuinely learned to do both -- and
-    both are worth noticing deliberately rather than silently.
+    The first version of this test asserted the cheapest policy is NOT the fastest
+    (cheapest == fifo), with a note that if it ever stopped holding, a policy had
+    genuinely learned to do both and the revision should be deliberate. That happened
+    the same day: the model was forcing parallel ops to end INSIDE the charge window,
+    which pushed ops-heavy assets onto slow chargers (AV-05: 41 min of ops, 28 min of
+    DCFC, exiled to a 407-minute L2 session = 118 phantom tardy-minutes). With the
+    over-constraint removed, the joint solve holds tardiness at greedy's zero AND a
+    bill at-or-below FIFO's. The tradeoff was never physics -- it was an artifact of
+    the model, and this test now locks in that both axes are held together.
     """
     from pathlib import Path as _Path
     from cost import cost_comparison
     sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
     t = cost_comparison(sc)["tradeoff"]
-    cheapest = min(t["monthly_total_usd"], key=lambda k: t["monthly_total_usd"][k])
-    fastest = min(t["total_tardy_min"], key=lambda k: t["total_tardy_min"][k])
-    assert cheapest != fastest
-    assert cheapest == "fifo"
+    assert t["total_tardy_min"]["cpsat"] == 0
+    assert t["monthly_total_usd"]["cpsat"] <= t["monthly_total_usd"]["fifo"]
 
 
 def test_dominated_policies_are_named():
-    """A policy beaten on BOTH axes is dominated -- no weighting would choose it."""
+    """A policy beaten on BOTH axes is dominated -- no weighting would choose it.
+
+    REVISED 2026-08-24 with the ops-window fix: cpsat, previously itself dominated by
+    greedy, now dominates every myopic policy -- zero tardiness at a bill at-or-below
+    FIFO's leaves no axis on which fifo, greedy or otto_q_asis can win.
+    """
     from pathlib import Path as _Path
     from cost import cost_comparison
     sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
     t = cost_comparison(sc)["tradeoff"]
     assert set(t["pareto_optimal"]) | set(t["dominated"]) == set(t["total_tardy_min"])
-    # As measured 2026-08-24 the CP-SAT prototype is dominated by greedy: worse on
-    # tardiness is not the issue -- it is beaten on tardiness AND on cost. Recorded so
-    # an improvement to the prototype shows up as this test failing.
-    assert "cpsat" in t["dominated"]
+    assert t["pareto_optimal"] == ["cpsat"]
+    assert set(t["dominated"]) == {"fifo", "greedy", "otto_q_asis"}
 
 
 def test_every_cost_artifact_states_its_assumptions():

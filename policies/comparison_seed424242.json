@@ -1,14 +1,14 @@
 {
- "comparison_sha256": "913932afccc0b4f945fd260dea5339b88cb8e44e8308dfe1d7cd32b66fef5294",
+ "comparison_sha256": "5c1c5de7ca7d5240bbaa05585f3e3597ec0f3221479ce336e81b6f41dc5f15fa",
  "crn_pairing": "one scenario draw per seed, shared by all policies",
  "paired_delta_vs_fifo": {
   "cpsat": {
    "charge_point_turns": 0,
-   "makespan_min": -178,
-   "p95_wait_to_first_op_min": 84,
-   "peak_site_kw": 96,
+   "makespan_min": -401,
+   "p95_wait_to_first_op_min": 74,
+   "peak_site_kw": 100,
    "total_moves": 0,
-   "total_tardy_min": -503
+   "total_tardy_min": -621
   },
   "greedy": {
    "charge_point_turns": 0,
@@ -467,80 +467,80 @@
    "assets": {
     "AV-00": {
      "arrival": 129,
-     "charge_end": 163,
-     "charge_start": 129,
-     "finish": 179,
+     "charge_end": 176,
+     "charge_start": 142,
+     "finish": 192,
      "moves": 1,
      "ready_by": 360,
      "soc": 26,
      "tardy_min": 0,
-     "wait_min": 0
+     "wait_min": 13
     },
     "AV-01": {
      "arrival": 179,
-     "charge_end": 220,
-     "charge_start": 179,
-     "finish": 220,
+     "charge_end": 235,
+     "charge_start": 194,
+     "finish": 235,
      "moves": 0,
      "ready_by": 417,
      "soc": 36,
      "tardy_min": 0,
-     "wait_min": 0
+     "wait_min": 15
     },
     "AV-02": {
      "arrival": 78,
-     "charge_end": 206,
-     "charge_start": 162,
-     "finish": 206,
+     "charge_end": 123,
+     "charge_start": 79,
+     "finish": 123,
      "moves": 0,
      "ready_by": 229,
      "soc": 39,
      "tardy_min": 0,
-     "wait_min": 84
+     "wait_min": 1
     },
     "AV-03": {
      "arrival": 170,
-     "charge_end": 222,
-     "charge_start": 181,
-     "finish": 238,
+     "charge_end": 211,
+     "charge_start": 170,
+     "finish": 227,
      "moves": 1,
      "ready_by": 467,
      "soc": 39,
      "tardy_min": 0,
-     "wait_min": 11
+     "wait_min": 0
     },
     "AV-04": {
      "arrival": 60,
-     "charge_end": 203,
-     "charge_start": 162,
-     "finish": 203,
+     "charge_end": 147,
+     "charge_start": 106,
+     "finish": 147,
      "moves": 0,
      "ready_by": 379,
      "soc": 36,
      "tardy_min": 0,
-     "wait_min": 102
+     "wait_min": 46
     },
     "AV-05": {
      "arrival": 35,
-     "charge_end": 442,
+     "charge_end": 63,
      "charge_start": 35,
-     "finish": 458,
+     "finish": 79,
      "moves": 1,
      "ready_by": 340,
      "soc": 48,
-     "tardy_min": 118,
+     "tardy_min": 0,
      "wait_min": 0
     },
     "AV-06": {
      "arrival": 64,
-     "charge_end": 95,
-     "charge_start": 64,
-     "finish": 111,
+     "charge_end": 193,
+     "charge_start": 162,
+     "finish": 209,
      "moves": 1,
      "ready_by": 243,
      "soc": 33,
      "tardy_min": 0,
-     "wait_min": 0
+     "wait_min": 98
     },
     "AV-07": {
      "arrival": 91,
@@ -555,36 +555,36 @@
     },
     "AV-08": {
      "arrival": 85,
-     "charge_end": 145,
-     "charge_start": 105,
-     "finish": 172,
+     "charge_end": 134,
+     "charge_start": 94,
+     "finish": 150,
      "moves": 1,
      "ready_by": 282,
      "soc": 48,
      "tardy_min": 0,
-     "wait_min": 20
+     "wait_min": 9
     },
     "AV-09": {
      "arrival": 36,
-     "charge_end": 87,
-     "charge_start": 36,
-     "finish": 87,
+     "charge_end": 88,
+     "charge_start": 37,
+     "finish": 88,
      "moves": 0,
      "ready_by": 245,
      "soc": 13,
      "tardy_min": 0,
-     "wait_min": 0
+     "wait_min": 1
     },
     "AV-10": {
      "arrival": 91,
-     "charge_end": 144,
-     "charge_start": 91,
-     "finish": 160,
+     "charge_end": 218,
+     "charge_start": 165,
+     "finish": 234,
      "moves": 1,
      "ready_by": 361,
      "soc": 13,
      "tardy_min": 0,
-     "wait_min": 0
+     "wait_min": 74
     },
     "AV-11": {
      "arrival": 4,
@@ -600,11 +600,11 @@
    },
    "metrics": {
     "charge_point_turns": 12,
-    "makespan_min": 458,
-    "p95_wait_to_first_op_min": 84,
-    "peak_site_kw": 436,
+    "makespan_min": 235,
+    "p95_wait_to_first_op_min": 74,
+    "peak_site_kw": 440,
     "total_moves": 9,
-    "total_tardy_min": 118
+    "total_tardy_min": 0
    },
    "policy": "cpsat"
   }

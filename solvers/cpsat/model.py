@@ -144,13 +144,42 @@ def build_and_solve(
     previous_plan: dict | None = None,
     blocked_points: set[str] | None = None,
     time_limit_s: float = 20.0,
+    objective_mode: str = "weighted",
+    max_tardy_total: int | None = None,
 ) -> dict:
     """Solve the scenario; returns the plan dict (see _extract).
 
     previous_plan + t_now implement previous-feasible retention: any op in the
     previous plan that STARTED before t_now is pinned to its point and start;
     everything else is hinted. On failure the previous plan is returned.
+
+    objective_mode selects what is minimized. The DEFAULT is byte-for-byte the
+    original weighted objective -- T1-T8 and the committed C5 comparison depend on
+    that and must not move. The other two modes exist for the lexicographic solve
+    in policies/forward.py:
+
+      "weighted"  -- the original multi-term objective (default; unchanged).
+      "min_tardy" -- minimize total tardiness alone. Pass 1 of the lexicographic
+                     solve: find T*, the best achievable service level.
+      "min_peak"  -- minimize the site's instantaneous peak kW, subject to
+                     sum(tardy) <= max_tardy_total (required in this mode).
+                     Pass 2: hold service at T*, then spend every remaining
+                     degree of freedom on flattening the load.
+
+    Why instantaneous peak and not the billed interval-average: the billed peak
+    is the mean over the tariff's demand interval, and modelling per-bucket
+    averages would add O(assets x points x segments x buckets) overlap variables.
+    The instantaneous peak is an UPPER BOUND on every interval average, so
+    minimizing it can only over-serve the bill, never cheat it -- and the bill
+    reported downstream is always computed from the actual curve by the real
+    tariff (sites/tariff.py), not from this proxy.
     """
+    if objective_mode not in ("weighted", "min_tardy", "min_peak"):
+        raise ValueError(f"unknown objective_mode {objective_mode!r}")
+    if objective_mode == "min_peak" and max_tardy_total is None:
+        raise ValueError("min_peak requires max_tardy_total -- an unconstrained "
+                         "peak minimization would buy flatness with unbounded "
+                         "lateness, which is not a schedule anyone asked for")
     blocked = blocked_points or set()
     m = cp_model.CpModel()
     site = sc["site"]
@@ -180,6 +209,13 @@ def build_and_solve(
                     pinned[(a["aid"], op["op"])] = op
 
     for asset in sc["assets"]:
+        #: When the asset leaves its charge point. Charging AND its parallel ops
+        #: must both be done: an asset whose ops outlast the charge stays on the
+        #: point the extra minutes rather than being forced onto a slower charger
+        #: whose window happens to be long enough. Constrained below to
+        #: max(charge_end, every parallel-op end).
+        stay_end = m.NewIntVar(0, H, f"stay.{asset.aid}")
+
         # ---- charge: choose ONE point among capable charge points ------------
         cands = []
         for kind in ("dcfc", "l2"):
@@ -226,9 +262,12 @@ def build_and_solve(
             # min-gap ON THE POINT, exactly
             cool = site["dcfc_cooldown_min"] if kind == "dcfc" else 0
             occ_e = m.NewIntVar(0, H + cool, f"occend.{asset.aid}.{p['id']}")
-            m.Add(occ_e == prev_end + cool).OnlyEnforceIf(lit)
-            total = sum(seg["minutes"] for seg in segs) + cool
-            occ = m.NewOptionalIntervalVar(starts[0], total, occ_e, lit,
+            #: 0069-fix analogue in the model: occupancy runs to stay_end (charge
+            #: AND parallel ops), not merely to the end of the charge chain. The
+            #: interval size is therefore variable, not the fixed chain length.
+            m.Add(occ_e == stay_end + cool).OnlyEnforceIf(lit)
+            occ_size = m.NewIntVar(0, H + cool, f"occsz.{asset.aid}.{p['id']}")
+            occ = m.NewOptionalIntervalVar(starts[0], occ_size, occ_e, lit,
                                            f"occ.{asset.aid}.{p['id']}")
             per_point_intervals[p["id"]].append(occ)
             chains.append((lit, kind, p, segs, starts, ends))
@@ -265,13 +304,23 @@ def build_and_solve(
             e = m.NewIntVar(0, H, f"{asset.aid}.{op}.e")
             iv = m.NewIntervalVar(s, d, e, f"{asset.aid}.{op}")
             m.Add(s >= charge_start)
-            m.Add(e <= charge_end)  # concurrency within the point: free throughput
+            #: Ops run in parallel with the charge and MAY outlast it -- the asset
+            #: then simply stays on the point until they finish (stay_end). The
+            #: previous form here (e <= charge_end) silently required every op to
+            #: fit INSIDE the charge window, which forced assets with more ops
+            #: minutes than fast-charge minutes onto slow chargers: AV-05 (41 min
+            #: of ops, 28 min of DCFC) was pushed to a 407-minute L2 session and
+            #: ate 118 phantom tardy-minutes. CLAUDE.md 2.3 says ops run DURING
+            #: charging for throughput; it does not say a car may never sit an
+            #: extra 13 minutes to let its interior reset finish.
             par_ivs.append((op, iv, s, e))
         if len(par_ivs) > 1:
             m.AddNoOverlap([iv for _, iv, _, _ in par_ivs])  # one tech per car
+        m.AddMaxEquality(stay_end,
+                         [charge_end] + [e for _, _, _, e in par_ivs])
 
         # ---- wash (separate bay) + the move to it ---------------------------
-        finish_candidates = [charge_end]
+        finish_candidates = [stay_end]
         n_moves = 0
         wash_tuple = insp_tuple = None
         if asset.needs_wash:
@@ -290,7 +339,7 @@ def build_and_solve(
             me = m.NewIntVar(0, H, f"{asset.aid}.mv1.e")
             mv = m.NewIntervalVar(ms, site["move_duration_min"], me, f"{asset.aid}.mv1")
             path_intervals.append(mv)
-            m.Add(ms >= charge_end)
+            m.Add(ms >= stay_end)
             m.Add(ws >= me)
             n_moves += 1
             finish_candidates.append(we)
@@ -317,7 +366,7 @@ def build_and_solve(
             me = m.NewIntVar(0, H, f"{asset.aid}.mv2.e")
             mv = m.NewIntervalVar(ms, site["move_duration_min"], me, f"{asset.aid}.mv2")
             path_intervals.append(mv)
-            m.Add(ms >= (wash_tuple[1] if wash_tuple else charge_end))
+            m.Add(ms >= (wash_tuple[1] if wash_tuple else stay_end))
             m.Add(isv >= me)
             n_moves += 1
             finish_candidates.append(iev)
@@ -347,11 +396,22 @@ def build_and_solve(
     peak_excess = m.NewIntVar(0, site["power_cap_kw_hard"], "peak_excess_kw")
     m.AddCumulative(soft_intervals, soft_demands,
                     site["power_soft_target_kw"] + peak_excess)
-    obj_terms.append(W["peak_excess_per_kw"] * peak_excess)
-    obj_terms.extend([W["onpeak_kw_min"] * t for t in onpeak_terms])
-    obj_terms.append(W["per_move"] * sum(move_count_vars))
 
-    m.Minimize(sum(obj_terms))
+    all_tardy = [pv["tardy"] for pv in plan_vars.values()]
+    if objective_mode == "weighted":
+        obj_terms.append(W["peak_excess_per_kw"] * peak_excess)
+        obj_terms.extend([W["onpeak_kw_min"] * t for t in onpeak_terms])
+        obj_terms.append(W["per_move"] * sum(move_count_vars))
+        m.Minimize(sum(obj_terms))
+    elif objective_mode == "min_tardy":
+        m.Minimize(sum(all_tardy))
+    else:  # min_peak
+        m.Add(sum(all_tardy) <= max_tardy_total)
+        #: peak_var IS the instantaneous site peak: a cumulative capacity the
+        #: solver pays to raise. Same mechanism the soft target already uses.
+        peak_var = m.NewIntVar(0, site["power_cap_kw_hard"], "site_peak_kw")
+        m.AddCumulative(power_intervals, power_demands, peak_var)
+        m.Minimize(peak_var)
 
     solver = cp_model.CpSolver()
     solver.parameters.random_seed = sc["seed"] % (2**31)

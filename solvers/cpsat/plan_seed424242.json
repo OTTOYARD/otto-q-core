@@ -3,47 +3,47 @@
   {
    "aid": "AV-00",
    "class": "generic_robotaxi",
-   "finish": 179,
+   "finish": 192,
    "ops": [
     {
-     "end": 163,
+     "end": 176,
      "kind": "dcfc",
      "op": "charge",
      "point": "NASH-DCFC-01",
      "segments": [
       {
-       "end": 147,
+       "end": 160,
        "kw": 120,
        "minutes": 18,
-       "start": 129
+       "start": 142
       },
       {
-       "end": 157,
+       "end": 170,
        "kw": 72,
        "minutes": 10,
-       "start": 147
+       "start": 160
       },
       {
-       "end": 163,
+       "end": 176,
        "kw": 42,
        "minutes": 6,
-       "start": 157
+       "start": 170
       }
      ],
-     "start": 129
+     "start": 142
     },
     {
-     "end": 163,
+     "end": 152,
      "op": "interior_tidy",
      "parallel": true,
      "point": "NASH-DCFC-01",
-     "start": 153
+     "start": 142
     },
     {
-     "end": 179,
+     "end": 192,
      "op": "wash",
-     "point": "NASH-WASH-01",
-     "start": 167
+     "point": "NASH-WASH-02",
+     "start": 180
     }
    ],
    "ready_by": 360,
@@ -52,48 +52,48 @@
   {
    "aid": "AV-01",
    "class": "waymo_jaguar_ipace_2024",
-   "finish": 220,
+   "finish": 235,
    "ops": [
     {
-     "end": 220,
+     "end": 235,
      "kind": "dcfc",
      "op": "charge",
-     "point": "NASH-DCFC-04",
+     "point": "NASH-DCFC-01",
      "segments": [
       {
-       "end": 198,
+       "end": 213,
        "kw": 100,
        "minutes": 19,
-       "start": 179
+       "start": 194
       },
       {
-       "end": 212,
+       "end": 227,
        "kw": 60,
        "minutes": 14,
-       "start": 198
+       "start": 213
       },
       {
-       "end": 220,
+       "end": 235,
        "kw": 35,
        "minutes": 8,
-       "start": 212
+       "start": 227
       }
      ],
-     "start": 179
+     "start": 194
     },
     {
-     "end": 189,
+     "end": 204,
      "op": "interior_tidy",
      "parallel": true,
-     "point": "NASH-DCFC-04",
-     "start": 179
+     "point": "NASH-DCFC-01",
+     "start": 194
     },
     {
-     "end": 195,
+     "end": 210,
      "op": "sensor_clean",
      "parallel": true,
-     "point": "NASH-DCFC-04",
-     "start": 189
+     "point": "NASH-DCFC-01",
+     "start": 204
     }
    ],
    "ready_by": 417,
@@ -102,248 +102,42 @@
   {
    "aid": "AV-02",
    "class": "zoox_robotaxi_2024",
-   "finish": 206,
+   "finish": 123,
    "ops": [
     {
-     "end": 206,
+     "end": 123,
      "kind": "dcfc",
      "op": "charge",
-     "point": "NASH-DCFC-02",
+     "point": "NASH-DCFC-01",
      "segments": [
       {
        "cold_start": true,
-       "end": 188,
+       "end": 105,
        "kw": 150,
        "minutes": 26,
-       "start": 162
-      },
-      {
-       "end": 199,
-       "kw": 90,
-       "minutes": 11,
-       "start": 188
-      },
-      {
-       "end": 206,
-       "kw": 52,
-       "minutes": 7,
-       "start": 199
-      }
-     ],
-     "start": 162
-    },
-    {
-     "end": 172,
-     "op": "interior_tidy",
-     "parallel": true,
-     "point": "NASH-DCFC-02",
-     "start": 162
-    },
-    {
-     "end": 197,
-     "op": "software_update",
-     "parallel": true,
-     "point": "NASH-DCFC-02",
-     "start": 172
-    },
-    {
-     "end": 203,
-     "op": "sensor_clean",
-     "parallel": true,
-     "point": "NASH-DCFC-02",
-     "start": 197
-    }
-   ],
-   "ready_by": 229,
-   "tardy_min": 0
-  },
-  {
-   "aid": "AV-03",
-   "class": "generic_robotaxi",
-   "finish": 238,
-   "ops": [
-    {
-     "end": 222,
-     "kind": "dcfc",
-     "op": "charge",
-     "point": "NASH-DCFC-01",
-     "segments": [
-      {
-       "cold_start": true,
-       "end": 206,
-       "kw": 120,
-       "minutes": 25,
-       "start": 181
-      },
-      {
-       "end": 216,
-       "kw": 72,
-       "minutes": 10,
-       "start": 206
-      },
-      {
-       "end": 222,
-       "kw": 42,
-       "minutes": 6,
-       "start": 216
-      }
-     ],
-     "start": 181
-    },
-    {
-     "end": 191,
-     "op": "interior_tidy",
-     "parallel": true,
-     "point": "NASH-DCFC-01",
-     "start": 181
-    },
-    {
-     "end": 238,
-     "op": "wash",
-     "point": "NASH-WASH-01",
-     "start": 226
-    }
-   ],
-   "ready_by": 467,
-   "tardy_min": 0
-  },
-  {
-   "aid": "AV-04",
-   "class": "waymo_jaguar_ipace_2024",
-   "finish": 203,
-   "ops": [
-    {
-     "end": 203,
-     "kind": "dcfc",
-     "op": "charge",
-     "point": "NASH-DCFC-03",
-     "segments": [
-      {
-       "end": 181,
-       "kw": 100,
-       "minutes": 19,
-       "start": 162
-      },
-      {
-       "end": 195,
-       "kw": 60,
-       "minutes": 14,
-       "start": 181
-      },
-      {
-       "end": 203,
-       "kw": 35,
-       "minutes": 8,
-       "start": 195
-      }
-     ],
-     "start": 162
-    }
-   ],
-   "ready_by": 379,
-   "tardy_min": 0
-  },
-  {
-   "aid": "AV-05",
-   "class": "zoox_robotaxi_2024",
-   "finish": 458,
-   "ops": [
-    {
-     "end": 442,
-     "kind": "l2",
-     "op": "charge",
-     "point": "NASH-L2-01",
-     "segments": [
-      {
-       "end": 167,
-       "kw": 11,
-       "minutes": 132,
-       "start": 35
-      },
-      {
-       "end": 332,
-       "kw": 6,
-       "minutes": 165,
-       "start": 167
-      },
-      {
-       "end": 442,
-       "kw": 3,
-       "minutes": 110,
-       "start": 332
-      }
-     ],
-     "start": 35
-    },
-    {
-     "end": 60,
-     "op": "software_update",
-     "parallel": true,
-     "point": "NASH-L2-01",
-     "start": 35
-    },
-    {
-     "end": 66,
-     "op": "sensor_clean",
-     "parallel": true,
-     "point": "NASH-L2-01",
-     "start": 60
-    },
-    {
-     "end": 76,
-     "op": "interior_tidy",
-     "parallel": true,
-     "point": "NASH-L2-01",
-     "start": 66
-    },
-    {
-     "end": 458,
-     "op": "wash",
-     "point": "NASH-WASH-02",
-     "start": 446
-    }
-   ],
-   "ready_by": 340,
-   "tardy_min": 118
-  },
-  {
-   "aid": "AV-06",
-   "class": "generic_robotaxi",
-   "finish": 111,
-   "ops": [
-    {
-     "end": 95,
-     "kind": "dcfc",
-     "op": "charge",
-     "point": "NASH-DCFC-01",
-     "segments": [
-      {
-       "end": 79,
-       "kw": 120,
-       "minutes": 15,
-       "start": 64
-      },
-      {
-       "end": 89,
-       "kw": 72,
-       "minutes": 10,
        "start": 79
       },
       {
-       "end": 95,
-       "kw": 42,
-       "minutes": 6,
-       "start": 89
+       "end": 116,
+       "kw": 90,
+       "minutes": 11,
+       "start": 105
+      },
+      {
+       "end": 123,
+       "kw": 52,
+       "minutes": 7,
+       "start": 116
       }
      ],
-     "start": 64
+     "start": 79
     },
     {
      "end": 89,
-     "op": "software_update",
+     "op": "interior_tidy",
      "parallel": true,
      "point": "NASH-DCFC-01",
-     "start": 64
+     "start": 79
     },
     {
      "end": 95,
@@ -353,10 +147,216 @@
      "start": 89
     },
     {
-     "end": 111,
+     "end": 120,
+     "op": "software_update",
+     "parallel": true,
+     "point": "NASH-DCFC-01",
+     "start": 95
+    }
+   ],
+   "ready_by": 229,
+   "tardy_min": 0
+  },
+  {
+   "aid": "AV-03",
+   "class": "generic_robotaxi",
+   "finish": 227,
+   "ops": [
+    {
+     "end": 211,
+     "kind": "dcfc",
+     "op": "charge",
+     "point": "NASH-DCFC-04",
+     "segments": [
+      {
+       "cold_start": true,
+       "end": 195,
+       "kw": 120,
+       "minutes": 25,
+       "start": 170
+      },
+      {
+       "end": 205,
+       "kw": 72,
+       "minutes": 10,
+       "start": 195
+      },
+      {
+       "end": 211,
+       "kw": 42,
+       "minutes": 6,
+       "start": 205
+      }
+     ],
+     "start": 170
+    },
+    {
+     "end": 180,
+     "op": "interior_tidy",
+     "parallel": true,
+     "point": "NASH-DCFC-04",
+     "start": 170
+    },
+    {
+     "end": 227,
      "op": "wash",
      "point": "NASH-WASH-02",
-     "start": 99
+     "start": 215
+    }
+   ],
+   "ready_by": 467,
+   "tardy_min": 0
+  },
+  {
+   "aid": "AV-04",
+   "class": "waymo_jaguar_ipace_2024",
+   "finish": 147,
+   "ops": [
+    {
+     "end": 147,
+     "kind": "dcfc",
+     "op": "charge",
+     "point": "NASH-DCFC-02",
+     "segments": [
+      {
+       "end": 125,
+       "kw": 100,
+       "minutes": 19,
+       "start": 106
+      },
+      {
+       "end": 139,
+       "kw": 60,
+       "minutes": 14,
+       "start": 125
+      },
+      {
+       "end": 147,
+       "kw": 35,
+       "minutes": 8,
+       "start": 139
+      }
+     ],
+     "start": 106
+    }
+   ],
+   "ready_by": 379,
+   "tardy_min": 0
+  },
+  {
+   "aid": "AV-05",
+   "class": "zoox_robotaxi_2024",
+   "finish": 92,
+   "ops": [
+    {
+     "end": 63,
+     "kind": "dcfc",
+     "op": "charge",
+     "point": "NASH-DCFC-04",
+     "segments": [
+      {
+       "end": 45,
+       "kw": 150,
+       "minutes": 10,
+       "start": 35
+      },
+      {
+       "end": 56,
+       "kw": 90,
+       "minutes": 11,
+       "start": 45
+      },
+      {
+       "end": 63,
+       "kw": 52,
+       "minutes": 7,
+       "start": 56
+      }
+     ],
+     "start": 35
+    },
+    {
+     "end": 60,
+     "op": "software_update",
+     "parallel": true,
+     "point": "NASH-DCFC-04",
+     "start": 35
+    },
+    {
+     "end": 70,
+     "op": "interior_tidy",
+     "parallel": true,
+     "point": "NASH-DCFC-04",
+     "start": 60
+    },
+    {
+     "end": 76,
+     "op": "sensor_clean",
+     "parallel": true,
+     "point": "NASH-DCFC-04",
+     "start": 70
+    },
+    {
+     "end": 92,
+     "op": "wash",
+     "point": "NASH-WASH-01",
+     "start": 80
+    }
+   ],
+   "ready_by": 340,
+   "tardy_min": 0
+  },
+  {
+   "aid": "AV-06",
+   "class": "generic_robotaxi",
+   "finish": 209,
+   "ops": [
+    {
+     "end": 193,
+     "kind": "dcfc",
+     "op": "charge",
+     "point": "NASH-DCFC-03",
+     "segments": [
+      {
+       "end": 177,
+       "kw": 120,
+       "minutes": 15,
+       "start": 162
+      },
+      {
+       "end": 187,
+       "kw": 72,
+       "minutes": 10,
+       "start": 177
+      },
+      {
+       "end": 193,
+       "kw": 42,
+       "minutes": 6,
+       "start": 187
+      }
+     ],
+     "start": 162
+    },
+    {
+     "end": 187,
+     "op": "software_update",
+     "parallel": true,
+     "point": "NASH-DCFC-03",
+     "start": 162
+    },
+    {
+     "end": 193,
+     "op": "sensor_clean",
+     "parallel": true,
+     "point": "NASH-DCFC-03",
+     "start": 187
+    },
+    {
+     "end": 209,
+     "op": "wash",
+     "point": "NASH-WASH-02",
+     "start": 197
     }
    ],
    "ready_by": 243,
@@ -365,13 +365,13 @@
   {
    "aid": "AV-07",
    "class": "waymo_jaguar_ipace_2024",
-   "finish": 215,
+   "finish": 186,
    "ops": [
     {
      "end": 144,
      "kind": "dcfc",
      "op": "charge",
-     "point": "NASH-DCFC-02",
+     "point": "NASH-DCFC-03",
      "segments": [
       {
        "end": 122,
@@ -395,37 +395,37 @@
      "start": 91
     },
     {
-     "end": 97,
-     "op": "sensor_clean",
+     "end": 101,
+     "op": "interior_tidy",
      "parallel": true,
-     "point": "NASH-DCFC-02",
+     "point": "NASH-DCFC-03",
      "start": 91
     },
     {
-     "end": 122,
-     "op": "software_update",
+     "end": 107,
+     "op": "sensor_clean",
      "parallel": true,
-     "point": "NASH-DCFC-02",
-     "start": 97
+     "point": "NASH-DCFC-03",
+     "start": 101
     },
     {
      "end": 132,
-     "op": "interior_tidy",
+     "op": "software_update",
      "parallel": true,
-     "point": "NASH-DCFC-02",
-     "start": 122
+     "point": "NASH-DCFC-03",
+     "start": 107
     },
     {
-     "end": 191,
+     "end": 162,
      "op": "wash",
-     "point": "NASH-WASH-01",
-     "start": 179
+     "point": "NASH-WASH-02",
+     "start": 150
     },
     {
-     "end": 215,
+     "end": 186,
      "op": "inspect",
      "point": "NASH-SVC-01",
-     "start": 195
+     "start": 166
     }
    ],
    "ready_by": 337,
@@ -434,55 +434,55 @@
   {
    "aid": "AV-08",
    "class": "zoox_robotaxi_2024",
-   "finish": 161,
+   "finish": 150,
    "ops": [
     {
-     "end": 145,
+     "end": 134,
      "kind": "dcfc",
      "op": "charge",
      "point": "NASH-DCFC-04",
      "segments": [
       {
        "cold_start": true,
-       "end": 127,
+       "end": 116,
        "kw": 150,
        "minutes": 22,
-       "start": 105
+       "start": 94
       },
       {
-       "end": 138,
+       "end": 127,
        "kw": 90,
        "minutes": 11,
-       "start": 127
+       "start": 116
       },
       {
-       "end": 145,
+       "end": 134,
        "kw": 52,
        "minutes": 7,
-       "start": 138
+       "start": 127
       }
      ],
-     "start": 105
+     "start": 94
     },
     {
-     "end": 115,
-     "op": "interior_tidy",
-     "parallel": true,
-     "point": "NASH-DCFC-04",
-     "start": 105
-    },
-    {
-     "end": 140,
+     "end": 119,
      "op": "software_update",
      "parallel": true,
      "point": "NASH-DCFC-04",
-     "start": 115
+     "start": 94
     },
     {
-     "end": 161,
+     "end": 129,
+     "op": "interior_tidy",
+     "parallel": true,
+     "point": "NASH-DCFC-04",
+     "start": 119
+    },
+    {
+     "end": 150,
      "op": "wash",
      "point": "NASH-WASH-02",
-     "start": 149
+     "start": 138
     }
    ],
    "ready_by": 282,
@@ -491,42 +491,42 @@
   {
    "aid": "AV-09",
    "class": "generic_robotaxi",
-   "finish": 87,
+   "finish": 88,
    "ops": [
     {
-     "end": 87,
+     "end": 88,
      "kind": "dcfc",
      "op": "charge",
-     "point": "NASH-DCFC-04",
+     "point": "NASH-DCFC-02",
      "segments": [
       {
        "cold_start": true,
-       "end": 71,
+       "end": 72,
        "kw": 120,
        "minutes": 35,
-       "start": 36
+       "start": 37
       },
       {
-       "end": 81,
+       "end": 82,
        "kw": 72,
        "minutes": 10,
-       "start": 71
+       "start": 72
       },
       {
-       "end": 87,
+       "end": 88,
        "kw": 42,
        "minutes": 6,
-       "start": 81
+       "start": 82
       }
      ],
-     "start": 36
+     "start": 37
     },
     {
-     "end": 61,
+     "end": 63,
      "op": "software_update",
      "parallel": true,
-     "point": "NASH-DCFC-04",
-     "start": 36
+     "point": "NASH-DCFC-02",
+     "start": 38
     }
    ],
    "ready_by": 245,
@@ -535,54 +535,54 @@
   {
    "aid": "AV-10",
    "class": "waymo_jaguar_ipace_2024",
-   "finish": 160,
+   "finish": 234,
    "ops": [
     {
-     "end": 144,
+     "end": 218,
      "kind": "dcfc",
      "op": "charge",
-     "point": "NASH-DCFC-03",
+     "point": "NASH-DCFC-02",
      "segments": [
       {
-       "end": 122,
+       "end": 196,
        "kw": 100,
        "minutes": 31,
-       "start": 91
+       "start": 165
       },
       {
-       "end": 136,
+       "end": 210,
        "kw": 60,
        "minutes": 14,
-       "start": 122
+       "start": 196
       },
       {
-       "end": 144,
+       "end": 218,
        "kw": 35,
        "minutes": 8,
-       "start": 136
+       "start": 210
       }
      ],
-     "start": 91
+     "start": 165
     },
     {
-     "end": 102,
+     "end": 175,
      "op": "interior_tidy",
      "parallel": true,
-     "point": "NASH-DCFC-03",
-     "start": 92
+     "point": "NASH-DCFC-02",
+     "start": 165
     },
     {
-     "end": 108,
+     "end": 181,
      "op": "sensor_clean",
      "parallel": true,
-     "point": "NASH-DCFC-03",
-     "start": 102
+     "point": "NASH-DCFC-02",
+     "start": 175
     },
     {
-     "end": 160,
+     "end": 234,
      "op": "wash",
      "point": "NASH-WASH-01",
-     "start": 148
+     "start": 222
     }
    ],
    "ready_by": 361,
@@ -597,7 +597,7 @@
      "end": 41,
      "kind": "dcfc",
      "op": "charge",
-     "point": "NASH-DCFC-01",
+     "point": "NASH-DCFC-03",
      "segments": [
       {
        "end": 23,
@@ -624,7 +624,7 @@
      "end": 14,
      "op": "interior_tidy",
      "parallel": true,
-     "point": "NASH-DCFC-01",
+     "point": "NASH-DCFC-03",
      "start": 4
     },
     {
@@ -638,9 +638,9 @@
    "tardy_min": 0
   }
  ],
- "objective": 2131,
+ "objective": 135,
  "peak_excess_kw": 0,
- "plan_sha256": "e228ea73d00d518b5e77870ef26d60f51e71cd2c1e281604c4d161e0d8c86c40",
+ "plan_sha256": "330efe0721c119a6a9b13d2a670c680effac7239809883bfd1d7e2bd3f3f6ad2",
  "proposals": [
   {
    "action_context": "stall_assignment",
@@ -661,7 +661,7 @@
    "proposal": {
     "abstain": false,
     "requested_kw": 100,
-    "stall_id": "NASH-DCFC-04",
+    "stall_id": "NASH-DCFC-01",
     "stall_type": "dcfc"
    },
    "source": "cpsat"
@@ -673,7 +673,7 @@
    "proposal": {
     "abstain": false,
     "requested_kw": 150,
-    "stall_id": "NASH-DCFC-02",
+    "stall_id": "NASH-DCFC-01",
     "stall_type": "dcfc"
    },
    "source": "cpsat"
@@ -685,7 +685,7 @@
    "proposal": {
     "abstain": false,
     "requested_kw": 120,
-    "stall_id": "NASH-DCFC-01",
+    "stall_id": "NASH-DCFC-04",
     "stall_type": "dcfc"
    },
    "source": "cpsat"
@@ -697,7 +697,7 @@
    "proposal": {
     "abstain": false,
     "requested_kw": 100,
-    "stall_id": "NASH-DCFC-03",
+    "stall_id": "NASH-DCFC-02",
     "stall_type": "dcfc"
    },
    "source": "cpsat"
@@ -708,9 +708,9 @@
    "entity_type": "vehicle",
    "proposal": {
     "abstain": false,
-    "requested_kw": 11,
-    "stall_id": "NASH-L2-01",
-    "stall_type": "l2"
+    "requested_kw": 150,
+    "stall_id": "NASH-DCFC-04",
+    "stall_type": "dcfc"
    },
    "source": "cpsat"
   },
@@ -721,7 +721,7 @@
    "proposal": {
     "abstain": false,
     "requested_kw": 120,
-    "stall_id": "NASH-DCFC-01",
+    "stall_id": "NASH-DCFC-03",
     "stall_type": "dcfc"
    },
    "source": "cpsat"
@@ -733,7 +733,7 @@
    "proposal": {
     "abstain": false,
     "requested_kw": 100,
-    "stall_id": "NASH-DCFC-02",
+    "stall_id": "NASH-DCFC-03",
     "stall_type": "dcfc"
    },
    "source": "cpsat"
@@ -757,7 +757,7 @@
    "proposal": {
     "abstain": false,
     "requested_kw": 120,
-    "stall_id": "NASH-DCFC-04",
+    "stall_id": "NASH-DCFC-02",
     "stall_type": "dcfc"
    },
    "source": "cpsat"
@@ -769,7 +769,7 @@
    "proposal": {
     "abstain": false,
     "requested_kw": 100,
-    "stall_id": "NASH-DCFC-03",
+    "stall_id": "NASH-DCFC-02",
     "stall_type": "dcfc"
    },
    "source": "cpsat"
@@ -781,7 +781,7 @@
    "proposal": {
     "abstain": false,
     "requested_kw": 150,
-    "stall_id": "NASH-DCFC-01",
+    "stall_id": "NASH-DCFC-03",
     "stall_type": "dcfc"
    },
    "source": "cpsat"
