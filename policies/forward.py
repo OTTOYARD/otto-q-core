@@ -182,8 +182,13 @@ def dispatch_storage(curve: list[tuple[float, float]], storage: Storage,
 
 def forward_comparison(scenario_path, *, site_id: str = "site_alpha",
                        storage_site_id: str = "nashville_nes_gsa3_bess",
-                       month: int = 7) -> dict:
-    """All five policies billed, plus the forward policy with storage aimed by foresight."""
+                       month: int = 7, curve_end_min: int = 1440,
+                       scenario_label: str = "reduced_canonical_nash_v1") -> dict:
+    """All five policies billed, plus the forward policy with storage aimed by foresight.
+
+    `curve_end_min` must cover the scenario's horizon -- the 24h scenario runs 1,800
+    minutes and truncating its curve at a day would silently drop the tail's charges.
+    """
     site = get_site(site_id)
     storage_site = get_site(storage_site_id)
     rows: dict[str, dict] = {}
@@ -193,7 +198,7 @@ def forward_comparison(scenario_path, *, site_id: str = "site_alpha",
         sc = load_scenario(scenario_path)            # CRN: same draw for every policy
         policy = cls()
         result, state = run_policy_traced(sc, policy)
-        curve = site_load_curve(state)
+        curve = site_load_curve(state, end_min=curve_end_min)
         peak = float(result["metrics"]["peak_site_kw"])
         bill = site.tariff.bill(curve, month=month, days=30, historical_peak_kw=peak)
         rows[policy.name] = {
@@ -217,7 +222,7 @@ def forward_comparison(scenario_path, *, site_id: str = "site_alpha",
 
     lb = peak_lower_bound(scenario_path)
     payload = {
-        "scenario": "reduced_canonical_nash_v1",
+        "scenario": scenario_label,
         "seed": 424242,
         "month": month,
         "site_id": site_id,
@@ -254,10 +259,29 @@ def forward_comparison(scenario_path, *, site_id: str = "site_alpha",
     return payload
 
 
+def forward_comparison_24h() -> dict:
+    """The same formulation at scale: the 24h KPI-gate scenario, 16 assets, 30 hours.
+
+    The reduced canonical day is a 12-asset toy; this is the scenario the CI KPI gate
+    already guards. Same seed discipline, same tariff, same bound -- the question it
+    answers is whether forward's edge survives a longer horizon with overlapping
+    arrival waves, and the artifact makes the answer reproducible rather than told.
+    """
+    sc24 = HERE.parent / "solvers" / "cpsat" / "scenario_24h.json"
+    import json as _json
+    horizon = _json.loads(Path(sc24).read_text())["horizon_min"]
+    return forward_comparison(sc24, curve_end_min=horizon,
+                              scenario_label="canonical_24h_nash_v1")
+
+
 def main() -> dict:
-    sc = HERE.parent / "solvers" / "cpsat" / "scenario_canonical.json"
-    comp = forward_comparison(sc)
-    artifact = HERE / "forward_seed424242.json"
+    if "--24h" in sys.argv:
+        comp = forward_comparison_24h()
+        artifact = HERE / "forward_24h_seed424242.json"
+    else:
+        sc = HERE.parent / "solvers" / "cpsat" / "scenario_canonical.json"
+        comp = forward_comparison(sc)
+        artifact = HERE / "forward_seed424242.json"
     blob = json.dumps(comp, indent=1, sort_keys=True) + "\n"
     if "--write" in sys.argv:
         artifact.write_text(blob)
