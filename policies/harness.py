@@ -60,6 +60,27 @@ class HarnessState:
 
 
 def run_policy(sc, policy) -> dict:
+    """The committed comparison's per-policy result. Return shape is FROZEN.
+
+    `comparison_seed424242.json` is asserted byte-for-byte by test_policies.py, so
+    adding a key here changes a committed artifact's sha256. Anything that needs more
+    than these metrics should use `run_policy_traced`, which returns this dict
+    unchanged plus the harness state -- the load curve included.
+    """
+    result, _ = run_policy_traced(sc, policy)
+    return result
+
+
+def run_policy_traced(sc, policy):
+    """`run_policy` plus the state it built, so the site load curve is recoverable.
+
+    The harness already computes the kW event stream to take its maximum; discarding
+    it afterwards is what left `peak_site_kw` as the only power fact the comparison
+    could report, and therefore why the tariff never reached the objective
+    (docs/BENCHMARK_CREDIBILITY.md). Returning the state costs nothing and lets the
+    cost layer bill the same schedule the metrics describe -- the same run, not a
+    re-derivation that could drift from it.
+    """
     state = HarnessState(sc)
     assignments = policy.decide(state, list(sc["assets"]))
     assert len(assignments) == len(sc["assets"]), f"{policy.name}: unassigned assets"
@@ -118,7 +139,7 @@ def run_policy(sc, policy) -> dict:
             "total_moves": sum(a["moves"] for a in per_asset.values()),
             "makespan_min": max(a["finish"] for a in per_asset.values()),
         },
-    }
+    }, state
 
 
 def run_comparison(scenario_path) -> dict:

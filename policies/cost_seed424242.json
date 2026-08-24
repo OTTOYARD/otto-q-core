@@ -1,0 +1,203 @@
+{
+ "assumptions": [
+  "One reduced canonical day of 12 assets, billed as though that day repeats for a month. Standard for reasoning about a demand charge (one interval sets the month) but an assumption, not a forecast of a real bill.",
+  "The ratchet floor uses each policy's own peak as its billing history; the scenario has no 12-month history to draw on.",
+  "Wash and inspect routing is identical FCFS for every policy, so this isolates the charge-assignment decision -- the axis the policies differ on.",
+  "This scenario's peak never approaches any site's power cap, so the cap is not a binding constraint here and no policy is being rewarded for respecting it (docs/BENCHMARK_CREDIBILITY.md)."
+ ],
+ "cost_sha256": "eaf295a2101f1dc545785e5c7736951fba008a27517f78e4ced44e6a84335ae0",
+ "month": 7,
+ "scenario": "reduced_canonical_nash_v1",
+ "seed": 424242,
+ "sites": {
+  "atlanta_georgia_power": {
+   "policies": {
+    "cpsat": {
+     "annual_total": 68254.56,
+     "billed_peaks_kw": {
+      "billing demand": 414.2
+     },
+     "demand_cost": 5645.55,
+     "energy_cost": 42.34,
+     "fixed_cost": 0.0,
+     "measured_peak_kw": 436.0,
+     "monthly_delta_vs_fifo": 1244.29,
+     "monthly_total": 5687.88
+    },
+    "fifo": {
+     "annual_total": 53323.08,
+     "billed_peaks_kw": {
+      "billing demand": 323.0
+     },
+     "demand_cost": 4402.49,
+     "energy_cost": 41.1,
+     "fixed_cost": 0.0,
+     "measured_peak_kw": 340.0,
+     "monthly_delta_vs_fifo": 0.0,
+     "monthly_total": 4443.59
+    },
+    "greedy": {
+     "annual_total": 62964.12,
+     "billed_peaks_kw": {
+      "billing demand": 381.9
+     },
+     "demand_cost": 5205.3,
+     "energy_cost": 41.72,
+     "fixed_cost": 0.0,
+     "measured_peak_kw": 402.0,
+     "monthly_delta_vs_fifo": 803.42,
+     "monthly_total": 5247.01
+    },
+    "otto_q_asis": {
+     "annual_total": 61389.6,
+     "billed_peaks_kw": {
+      "billing demand": 372.4
+     },
+     "demand_cost": 5075.81,
+     "energy_cost": 39.98,
+     "fixed_cost": 0.0,
+     "measured_peak_kw": 392.0,
+     "monthly_delta_vs_fifo": 672.21,
+     "monthly_total": 5115.8
+    }
+   },
+   "tariff": "PLL-18",
+   "utility": "Georgia Power"
+  },
+  "phoenix_aps_e35": {
+   "policies": {
+    "cpsat": {
+     "annual_total": 13320.72,
+     "billed_peaks_kw": {
+      "off-peak demand": 361.0,
+      "on-peak demand": 0.0
+     },
+     "demand_cost": 1075.42,
+     "energy_cost": 34.64,
+     "fixed_cost": 0.0,
+     "measured_peak_kw": 436.0,
+     "monthly_delta_vs_fifo": 206.57,
+     "monthly_total": 1110.06
+    },
+    "fifo": {
+     "annual_total": 10841.88,
+     "billed_peaks_kw": {
+      "off-peak demand": 292.0,
+      "on-peak demand": 0.0
+     },
+     "demand_cost": 869.87,
+     "energy_cost": 33.63,
+     "fixed_cost": 0.0,
+     "measured_peak_kw": 340.0,
+     "monthly_delta_vs_fifo": 0.0,
+     "monthly_total": 903.49
+    },
+    "greedy": {
+     "annual_total": 14780.28,
+     "billed_peaks_kw": {
+      "off-peak demand": 402.0,
+      "on-peak demand": 0.0
+     },
+     "demand_cost": 1197.56,
+     "energy_cost": 34.13,
+     "fixed_cost": 0.0,
+     "measured_peak_kw": 402.0,
+     "monthly_delta_vs_fifo": 328.2,
+     "monthly_total": 1231.69
+    },
+    "otto_q_asis": {
+     "annual_total": 14405.76,
+     "billed_peaks_kw": {
+      "off-peak demand": 392.0,
+      "on-peak demand": 0.0
+     },
+     "demand_cost": 1167.77,
+     "energy_cost": 32.71,
+     "fixed_cost": 0.0,
+     "measured_peak_kw": 392.0,
+     "monthly_delta_vs_fifo": 296.99,
+     "monthly_total": 1200.48
+    }
+   },
+   "tariff": "E-35 Extra-Large General Service TOU",
+   "utility": "Arizona Public Service"
+  },
+  "site_alpha": {
+   "policies": {
+    "cpsat": {
+     "annual_total": 116321.28,
+     "billed_peaks_kw": {
+      "max demand (summer)": 353.5
+     },
+     "demand_cost": 7564.9,
+     "energy_cost": 36.83,
+     "fixed_cost": 2091.71,
+     "measured_peak_kw": 436.0,
+     "monthly_delta_vs_fifo": 1531.17,
+     "monthly_total": 9693.44
+    },
+    "fifo": {
+     "annual_total": 97947.24,
+     "billed_peaks_kw": {
+      "max demand (summer)": 282.0
+     },
+     "demand_cost": 6034.8,
+     "energy_cost": 35.76,
+     "fixed_cost": 2091.71,
+     "measured_peak_kw": 340.0,
+     "monthly_delta_vs_fifo": 0.0,
+     "monthly_total": 8162.27
+    },
+    "greedy": {
+     "annual_total": 114388.8,
+     "billed_peaks_kw": {
+      "max demand (summer)": 346.0
+     },
+     "demand_cost": 7404.4,
+     "energy_cost": 36.29,
+     "fixed_cost": 2091.71,
+     "measured_peak_kw": 402.0,
+     "monthly_delta_vs_fifo": 1370.13,
+     "monthly_total": 9532.4
+    },
+    "otto_q_asis": {
+     "annual_total": 113600.4,
+     "billed_peaks_kw": {
+      "max demand (summer)": 343.0
+     },
+     "demand_cost": 7340.2,
+     "energy_cost": 34.79,
+     "fixed_cost": 2091.71,
+     "measured_peak_kw": 392.0,
+     "monthly_delta_vs_fifo": 1304.43,
+     "monthly_total": 9466.7
+    }
+   },
+   "tariff": "GSA-3",
+   "utility": "Nashville Electric Service"
+  }
+ },
+ "tradeoff": {
+  "dominated": [
+   "cpsat"
+  ],
+  "monthly_total_usd": {
+   "cpsat": 9693.44,
+   "fifo": 8162.27,
+   "greedy": 9532.4,
+   "otto_q_asis": 9466.7
+  },
+  "pareto_optimal": [
+   "fifo",
+   "greedy",
+   "otto_q_asis"
+  ],
+  "reference_site": "site_alpha",
+  "total_tardy_min": {
+   "cpsat": 118,
+   "fifo": 621,
+   "greedy": 0,
+   "otto_q_asis": 395
+  }
+ }
+}
