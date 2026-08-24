@@ -91,14 +91,29 @@ for us, because it is only solvable with the forward view of arrivals the founde
 
 ## 5. A strategic finding that falls out of the tariff
 
-NES also offers **EVC** — an EV-specific schedule with **no demand charge at all**, 21.773 ¢/kWh
-flat. Against GSA-3's ~8.2 ¢/kWh all-in energy plus demand charges, the break-even is:
+> **CORRECTION 2026-08-24 (research answer R-5).** The EVC figure this section was built on is
+> wrong, and the number that follows from it is withdrawn. EVC is **not** a flat 21.773 ¢/kWh.
+> The current schedule is **$100/month customer charge + On-Peak 23.279 ¢/kWh + a lower Off-Peak
+> tier**; 21.773 ¢ was the off-peak tier (or a prior vintage), not an all-hours rate. Source:
+> NES EVC retail rate schedule, July 2024, via `docs/research/answers/R-5-demand-charge-structures-us.md`.
+> The corrected crossover depends on the **on-peak/off-peak split of the depot's own load**, which
+> is precisely what OTTO-Q schedules — so it is not a single number and must be computed per
+> load shape. It is strictly *more* favourable to us than the old framing: the rate choice now
+> depends on a quantity only a forward scheduler can produce. Recomputing it against a real
+> Site Profile load shape is tracked as work, not asserted here.
 
-> **160 equivalent full-load hours per month — a 22% load factor.**
+NES also offers **EVC** — an EV-specific schedule with **no demand charge**. Against GSA-3's
+~8.2 ¢/kWh all-in energy plus demand charges, the original break-even was computed as:
 
-- **Above 22%**, GSA-3 wins and demand charges dominate → peak shaving is worth the $261k/MW/yr.
-- **Below 22%**, EVC wins, demand charges are irrelevant, and the battery's economic case
-  collapses → but the depot is also badly underused.
+> ~~**160 equivalent full-load hours per month — a 22% load factor.**~~ **WITHDRAWN** — rests on
+> the incorrect flat-rate assumption corrected above.
+
+The *direction* of the argument survives and is unchanged:
+
+- At **high** load factor, GSA-3 wins and demand charges dominate → peak shaving is worth the
+  $261k/MW/yr.
+- At **low** load factor, EVC wins, demand charges matter less, and the battery's economic case
+  weakens → but the depot is also badly underused.
 
 The tariff-selection crossover is therefore **an OTTO-Q output, not an input** — the provenance
 note in our own tariff row says exactly this. A depot operator asking "which rate should I be on"
