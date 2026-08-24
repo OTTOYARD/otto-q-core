@@ -1,0 +1,124 @@
+{
+  "site_id": "nashville_nes_gsa3_bess",
+  "name": "Nashville depot, 3 MW service + Megapack storage",
+  "notes": "The founder's site-acquisition thesis made runnable: take a 3-5 MW site plus storage instead of holding out for a 10 MW site. Three Tesla Megapack 2 XL (3,000 kWh / 1,500 kW each, LFP, 96% RTE, SoC 10-95%) from ottoq_bess_units -- real specs, not invented. Firm capacity during a wave is 3,000 + 4,500 = 7,500 kW, but ONLY for as long as the energy lasts: 7,650 kWh usable / 4,500 kW = 1.70 h. That duration limit is the correction recorded in docs/BESS_SITE_ACQUISITION_THESIS.md -- storage is sized by ENERGY, not power, and a 4-hour wave needs ~4.7 packs, not 3. Recharge counts toward the same monthly peak, so the recharge is itself a scheduling problem. Field precedent for the pattern: Zenobe/National Express Yardley Wood, 667 kWh BESS serving 19 e-buses on a restricted grid connection (R-4).",
+  "timezone": "America/Chicago",
+  "installed_charger_kw": 7512,
+  "grid": {
+    "service_capacity_kw": 3000,
+    "voltage_class": "primary",
+    "safety_margin_pct": 0,
+    "upgrade_lead_time_months": [
+      6,
+      24
+    ],
+    "upgrade_cost_usd": [
+      250000,
+      2900000
+    ]
+  },
+  "layout": {
+    "move_duration_min": 4,
+    "path_capacity": 2,
+    "dcfc_cooldown_min": 18
+  },
+  "environment": {
+    "cold_start_below_c": 5,
+    "cold_start_penalty_min": 12
+  },
+  "robotics": {
+    "arms": 0,
+    "tether_release_supported": true
+  },
+  "tariff": {
+    "tariff_id": "nes_gsa3",
+    "utility": "Nashville Electric Service",
+    "schedule_code": "GSA-3",
+    "source_url": "https://www.nespower.com/",
+    "source_label": "primary",
+    "notes": "From the NES commercial-rate PDF, already held in ottoq_depot_tariffs. Demand basis is 30-minute NCP -- a Southeast regional trait (R-5), NOT a default. Energy rate 4.785 c/kWh is the base excluding the TVA fuel cost adjustment (~2.8-4 c/kWh), so total energy cost is understated here by design; the FCA is a pass-through that varies monthly.",
+    "fixed_charge_per_month": 2091.71,
+    "summer_months": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "winter_months": [
+      12,
+      1,
+      2,
+      3
+    ],
+    "energy": [
+      {
+        "season": "all",
+        "tou_window": null,
+        "rate_per_kwh": 0.04785
+      }
+    ],
+    "demand": [
+      {
+        "label": "max demand (summer)",
+        "basis": "NCP",
+        "interval_min": 30,
+        "season": "summer",
+        "tiers": [
+          {
+            "up_to_kw": 1000,
+            "rate": 21.4
+          },
+          {
+            "up_to_kw": null,
+            "rate": 21.78
+          }
+        ]
+      },
+      {
+        "label": "max demand (winter)",
+        "basis": "NCP",
+        "interval_min": 30,
+        "season": "winter",
+        "tiers": [
+          {
+            "up_to_kw": 1000,
+            "rate": 20.34
+          },
+          {
+            "up_to_kw": null,
+            "rate": 20.73
+          }
+        ]
+      },
+      {
+        "label": "max demand (transition)",
+        "basis": "NCP",
+        "interval_min": 30,
+        "season": "transition",
+        "tiers": [
+          {
+            "up_to_kw": 1000,
+            "rate": 20.34
+          },
+          {
+            "up_to_kw": null,
+            "rate": 20.73
+          }
+        ]
+      }
+    ],
+    "ratchet": {
+      "percent": 30,
+      "lookback_months": 12
+    }
+  },
+  "storage": {
+    "power_kw": 1500,
+    "energy_kwh": 3000,
+    "units": 3,
+    "round_trip_efficiency": 0.96,
+    "soc_min_pct": 10,
+    "soc_max_pct": 95,
+    "recharge_counts_toward_peak": true
+  }
+}

@@ -37,10 +37,22 @@ from conformance.spec import (
     load,
     validate,
 )
+from sites.site_profile import SiteProfile
+from sites.site_profile import get as get_site
 
 PACK_DIR = Path(__file__).parent / "packs"
-SITE_POWER_CAP_KW = 3000.0        # CLAUDE.md C8 Site Alpha
 TICK_MIN = 30.0                   # matches the twin's tick
+
+#: The site a run uses when the caller names none. A pack describes the ASSETS and
+#: the WORK; the SiteProfile describes THE PLACE. Until this was wired the place was
+#: a literal in this file -- `SITE_POWER_CAP_KW = 3000.0` -- which is a Nashville-
+#: shaped, C8-shaped assumption wearing the costume of a kernel constant.
+DEFAULT_SITE_ID = "site_alpha"
+
+#: Kept so existing callers and tests keep resolving, but it is now DERIVED from the
+#: default profile rather than declared here. Anything that wants a different site
+#: passes one; nothing needs to know this number.
+SITE_POWER_CAP_KW = get_site(DEFAULT_SITE_ID).power_cap_kw()
 
 
 @dataclass(frozen=True)
@@ -65,6 +77,13 @@ class ConformanceResult:
     violations: list[str] = field(default_factory=list)
     findings: list[dict[str, Any]] = field(default_factory=list)
     mechanisms_used: set[str] = field(default_factory=set)
+    #: Which SiteProfile this pack was run against. A conformance verdict without a
+    #: site is incomplete: the pack describes assets and work, the site describes the
+    #: place, and feasibility is a property of the pair.
+    site_id: str = ""
+    #: False when the site's own installed chargers cannot exceed its power cap. A
+    #: power-cap pass is then vacuous -- no schedule could have failed it.
+    power_cap_binds: bool = True
     #: Constraints naming a mechanism this run never actually exercised. NOT
     #: failures — but not evidence either. Without this, a pack author makes an
     #: awkward constraint disappear by naming a plausible mechanism, and the
@@ -246,8 +265,18 @@ def schedule(pack: Pack, scenario) -> tuple[list[ScheduledOp], list[str], set[st
 # The three invariants — verified, not asserted (CLAUDE.md C11.1)
 # ---------------------------------------------------------------------------
 
-def verify(pack: Pack, scheduled: list[ScheduledOp]) -> list[str]:
+def verify(pack: Pack, scheduled: list[ScheduledOp],
+           site: SiteProfile | None = None) -> list[str]:
+    """Check the three C11 invariants against a pack scheduled on a SITE.
+
+    The power cap comes from the site profile, never from a constant in this file.
+    Which site a pack runs on is a real variable: the same pack is feasible on a
+    generous connection and infeasible on a tight one, and that is a property of the
+    PLACE, not of the pack.
+    """
     violations: list[str] = []
+    site = site or get_site(DEFAULT_SITE_ID)
+    cap_kw = site.power_cap_kw()
 
     # 3. no operation on an incapable point
     cap = {(sp.point_type, c, o) for sp in pack.service_points for c, o in sp.capabilities}
@@ -301,9 +330,10 @@ def verify(pack: Pack, scheduled: list[ScheduledOp]) -> list[str]:
     edges = sorted({s.start_min for s in scheduled} | {s.end_min for s in scheduled})
     for t in edges:
         draw = sum(s.peak_kw for s in scheduled if s.start_min <= t < s.end_min)
-        if draw > SITE_POWER_CAP_KW + 1e-9:
+        if draw > cap_kw + 1e-9:
             violations.append(
-                f"POWER CAP: {draw:.0f} kW at t={t:.0f} exceeds {SITE_POWER_CAP_KW:.0f} kW"
+                f"POWER CAP: {draw:.0f} kW at t={t:.0f} exceeds {cap_kw:.0f} kW "
+                f"({site.site_id}, binding at the {site.grid.binding_level()})"
             )
     return violations
 
@@ -353,24 +383,31 @@ def _path_was_stressed(pack: Pack, scheduled: list[ScheduledOp]) -> bool:
     return False
 
 
-def run_pack(path: Path) -> ConformanceResult:
+def run_pack(path: Path, site: SiteProfile | None = None) -> ConformanceResult:
     doc = json.loads(path.read_text())
     pack = load(doc)
+    site = site or get_site(DEFAULT_SITE_ID)
     res = ConformanceResult(pack_id=pack.pack_id, status=pack.status)
+    res.site_id = site.site_id
+    #: A power-cap result on a site whose own chargers cannot reach the cap measures
+    #: arithmetic, not scheduling. Recording it here means the verdict carries its own
+    #: caveat instead of a reader having to know docs/BENCHMARK_CREDIBILITY.md.
+    res.power_cap_binds = site.is_binding()
     res.load_errors = validate(pack)
     if res.load_errors:
         return res
     scenario = build_scenario(pack)
     res.scheduled, res.unschedulable, res.mechanisms_used = schedule(pack, scenario)
-    res.violations = verify(pack, res.scheduled)
+    res.violations = verify(pack, res.scheduled, site)
     res.findings = constraint_findings(pack)
     res.unverified_claims = unverified_claims(pack, res.mechanisms_used)
     res.path_stressed = _path_was_stressed(pack, res.scheduled)
     return res
 
 
-def run_all() -> list[ConformanceResult]:
-    return [run_pack(p) for p in sorted(PACK_DIR.glob("*.json"))]
+def run_all(site: SiteProfile | None = None) -> list[ConformanceResult]:
+    site = site or get_site(DEFAULT_SITE_ID)
+    return [run_pack(p, site) for p in sorted(PACK_DIR.glob("*.json"))]
 
 
 if __name__ == "__main__":

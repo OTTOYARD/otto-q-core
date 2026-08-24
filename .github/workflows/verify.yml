@@ -14,10 +14,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install "ortools>=9.10"
+      - run: pip install "ortools>=9.10" pytest
       - name: CP-SAT prototype battery (T1-T8, incl. byte-identical determinism)
         run: python3 solvers/cpsat/test_cpsat_prototype.py
       - name: Policy battery (P1-P5, incl. byte-for-byte committed comparison)
         run: python3 policies/test_policies.py
       - name: KPI regression gate (24h seeded comparison vs committed baseline)
         run: python3 metrics/kpi_gate.py
+      # The conformance suite and the site-profile/tariff tests were never gated --
+      # verify.yml ran three scripts and no pytest, so C11's falsification instrument
+      # and everything under sites/ could break without CI noticing.
+      - name: Pytest suite (conformance, site profiles, tariffs, recall, adapters)
+        run: python3 -m pytest -q
