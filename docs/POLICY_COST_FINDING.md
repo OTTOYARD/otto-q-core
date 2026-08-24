@@ -1,5 +1,36 @@
 # The four-policy comparison, with money — and OTTO-Q does not win
 
+> **ADDENDUM 2026-08-24, same day — the conclusion below is superseded in the best way.**
+> Investigating why an exact solver couldn't reach greedy's zero tardiness exposed an
+> over-constraint in the model: parallel ops were forced to end *inside* the charge window,
+> exiling ops-heavy assets to slow chargers (AV-05: 41 min of ops, 28 min of DCFC, pushed onto a
+> 407-minute L2 session = **118 phantom tardy-minutes**). With that fixed, and a lexicographic
+> objective added (tardiness first, then peak — `policies/forward.py`), the picture inverts:
+>
+> | policy | tardy min | peak kW | monthly $ | vs FIFO |
+> |---|---:|---:|---:|---:|
+> | fifo | 621 | 340 | 8,162 | — |
+> | greedy | 0 | 402 | 9,532 | +1,370 |
+> | cpsat (fixed model) | 0 | 440 | 8,161 | −2 |
+> | **forward** | **0** | **160** | **5,282** | **−2,880** |
+> | *provable ideal* | — | *89.8* | *4,045* | — |
+>
+> **Zero missed deadlines at $2,880/month below FIFO** — while FIFO misses 621 deadline-minutes.
+> Forward sits at 1.31× the provable ideal; every myopic policy sits at 2.0–2.4×. The
+> tardiness-vs-cost tradeoff this document diagnosed was real for myopic policies but was
+> **never physics** for a forward scheduler: load can be spread flat *and* deadlines met, by a
+> scheduler that already knows tonight's total demand. With the site's committed Megapack fleet,
+> foresight-aimed dispatch holds the grid at **30.5 kW** ($2,779/mo) — with the honest caveat
+> that three Megapacks (7,650 kWh usable) are hugely oversized for this reduced 12-asset day
+> (651 kWh), so that last number shows the mechanism, not a sizing recommendation.
+>
+> The baseline regeneration this required (plan, comparison, cost, KPI-gate artifacts) was a
+> **deliberate act**, recorded in the commit; T5 and two cost tests were rewritten to assert the
+> corrected physics, each carrying its own history. The analysis below is preserved as written —
+> it is the measurement that found the defect.
+
+---
+
 **2026-08-24.** The committed comparison has always reported tardiness, wait, peak kW, turns,
 moves and makespan. **None of those is money.** `docs/BENCHMARK_CREDIBILITY.md` named that as the
 reason "OTTO-Q wins on peak kW" had to be withdrawn: peak kW is not a bill, and nobody is charged

@@ -81,23 +81,33 @@ def main():
     assert saw_cold, "T4 FAIL: no cold-start modifier exercised"
     print("T4 PASS piecewise segments taper above 70% SoC; cold-start modifier applied")
 
-    # T5 — CONCURRENCY WITHIN A POINT: parallel ops inside their charge window,
-    # serialized per asset; MOVES are scheduled ops with duration.
+    # T5 — CONCURRENCY WITHIN A POINT: parallel ops start during the asset's time
+    # on its charge point and MAY outlast the charge (the asset then stays on the
+    # point until they finish); serialized per asset; MOVES are scheduled ops with
+    # duration and depart only after charge AND ops are done. The earlier form of
+    # this test asserted ops END inside the charge window -- that was the
+    # over-constraint itself (it forced AV-05, with 41 min of ops and 28 min of
+    # DCFC, onto a 407-minute L2 session for 118 phantom tardy-minutes), so it
+    # was rewritten deliberately when the model was fixed, not relaxed casually.
     mv = sc["site"]["move_duration_min"]
     for a in p1["assets"]:
         charge = next(o for o in a["ops"] if o["op"] == "charge")
         pars = [o for o in a["ops"] if o.get("parallel")]
+        stay_end = max([charge["end"]] + [x["end"] for x in pars])
         for x in pars:
-            assert charge["start"] <= x["start"] and x["end"] <= charge["end"], \
-                f"T5 FAIL: parallel op outside charge window on {a['aid']}"
+            assert x["start"] >= charge["start"], \
+                f"T5 FAIL: parallel op starts before the asset is on-point on {a['aid']}"
+            assert x["point"] == charge["point"], \
+                f"T5 FAIL: parallel op on a different point on {a['aid']}"
         for x, y in zip(sorted(pars, key=lambda o: o["start"]),
                         sorted(pars, key=lambda o: o["start"])[1:]):
             assert not overlapping(x, y), f"T5 FAIL: parallel ops overlap on {a['aid']}"
         wash = [o for o in a["ops"] if o["op"] == "wash"]
         if wash:
-            assert wash[0]["start"] >= charge["end"] + mv, \
-                f"T5 FAIL: wash starts before the {mv}-min move completes on {a['aid']}"
-    print(f"T5 PASS concurrency-in-point + {mv}-min moves as scheduled operations")
+            assert wash[0]["start"] >= stay_end + mv, \
+                f"T5 FAIL: wash starts before charge+ops end plus the {mv}-min move on {a['aid']}"
+    print(f"T5 PASS concurrency-in-point (ops may outlast the charge; departure "
+          f"waits for both) + {mv}-min moves as scheduled operations")
 
     # T6 — ROLLING RE-SOLVE WITH PREVIOUS-FEASIBLE RETENTION: block a DCFC at
     # t=120; every op already started keeps its point and start, and the new
