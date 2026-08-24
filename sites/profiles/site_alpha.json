@@ -1,0 +1,53 @@
+{
+  "site_id": "site_alpha",
+  "name": "Site Alpha (C8 reference, as built)",
+  "notes": "The C8 site EXACTLY as its committed config declares it, preserved so the defect stays visible and regression-tested. Installed charger nameplate is 1,612 kW (10x150 DCFC + 8x11 L2 + 6x4 AMR pad) against a 3,000 kW cap: an oversubscription ratio of 0.54:1. Every charger on this site running flat out simultaneously draws barely half the cap, so NO SCHEDULE CAN VIOLATE IT and is_binding() returns false. This is docs/BENCHMARK_CREDIBILITY.md's finding expressed as data instead of prose. R-4's observed band is 1.4:1 to 7:1; this site is on the wrong side of 1.0. Use site_alpha_binding for a benchmark where the cap is a real constraint.",
+  "timezone": "America/Chicago",
+  "installed_charger_kw": 1612,
+  "grid": {
+    "service_capacity_kw": 3000,
+    "voltage_class": "primary",
+    "safety_margin_pct": 0,
+    "upgrade_lead_time_months": [6, 24],
+    "upgrade_cost_usd": [250000, 2900000]
+  },
+  "layout": { "move_duration_min": 4, "path_capacity": 2, "dcfc_cooldown_min": 18 },
+  "environment": { "cold_start_below_c": 5, "cold_start_penalty_min": 12 },
+  "robotics": { "arms": 0, "tether_release_supported": true },
+  "tariff": {
+    "tariff_id": "nes_gsa3",
+    "utility": "Nashville Electric Service",
+    "schedule_code": "GSA-3",
+    "source_url": "https://www.nespower.com/",
+    "source_label": "primary",
+    "notes": "From the NES commercial-rate PDF, already held in ottoq_depot_tariffs. Demand basis is 30-minute NCP -- a Southeast regional trait (R-5), NOT a default. Energy rate 4.785 c/kWh is the base excluding the TVA fuel cost adjustment (~2.8-4 c/kWh), so total energy cost is understated here by design; the FCA is a pass-through that varies monthly.",
+    "fixed_charge_per_month": 2091.71,
+    "summer_months": [6, 7, 8, 9],
+    "winter_months": [12, 1, 2, 3],
+    "energy": [ { "season": "all", "tou_window": null, "rate_per_kwh": 0.04785 } ],
+    "demand": [
+      {
+        "label": "max demand (summer)",
+        "basis": "NCP",
+        "interval_min": 30,
+        "season": "summer",
+        "tiers": [ { "up_to_kw": 1000, "rate": 21.40 }, { "up_to_kw": null, "rate": 21.78 } ]
+      },
+      {
+        "label": "max demand (winter)",
+        "basis": "NCP",
+        "interval_min": 30,
+        "season": "winter",
+        "tiers": [ { "up_to_kw": 1000, "rate": 20.34 }, { "up_to_kw": null, "rate": 20.73 } ]
+      },
+      {
+        "label": "max demand (transition)",
+        "basis": "NCP",
+        "interval_min": 30,
+        "season": "transition",
+        "tiers": [ { "up_to_kw": 1000, "rate": 20.34 }, { "up_to_kw": null, "rate": 20.73 } ]
+      }
+    ],
+    "ratchet": { "percent": 30, "lookback_months": 12 }
+  }
+}

@@ -84,9 +84,14 @@ arm time (§2 stands, and the count is still an unwanted variable across runs), 
 still be a residue-mediated path through some *other* table — visit needs, open decisions,
 `charge_sessions` itself — but the booking-conflict path specifically is closed.
 
-**Status: the cause of 14 vs 61 is unknown.** Finding 4's harness defect, which blocked the
-controlled test, is now fixed (migrations 0071 and 0072), so the test that was impossible when
-this document was written is available. It should be run before any further fix is designed.
+**Status: RESOLVED AS FAR AS THE EVIDENCE ALLOWS — see `docs/RESIDUE_EXPERIMENT.md`.** The
+controlled test has been run (2026-08-24, three arms, residue 0 / 708 / 1416 foreign bookings,
+everything else pinned). **The score did not move: 61, 61, 61**, with throughput, peak kW,
+enactment, backlog and safety all identical too. Residue is not the cause of anything that
+matters. The leading remaining explanation — labelled as inference, because the 14-runs have
+since been purged and cannot be examined — is that those runs advanced fewer ticks than
+believed, which is exactly the silent short-advance that 0071 now makes impossible. The session
+count is steeply tick-dependent and 14 is only reachable partway through tick 10 of 20.
 
 ## 4. A separate defect found while testing: the harness can silently do nothing — PROVEN
 

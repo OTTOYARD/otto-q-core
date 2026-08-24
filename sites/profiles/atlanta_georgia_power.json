@@ -1,0 +1,26 @@
+{
+  "site_id": "atlanta_georgia_power",
+  "name": "Atlanta depot, Georgia Power PLL-18",
+  "notes": "PORTABILITY TEST 2. Exists for the RATCHET. Georgia Power bills the greater of measured demand and 95% of the highest summer month -- against Nashville's 30%. R-5: typical commercial ratchets run 80-95% over 11-12 months and Nashville's 30%/12 is at the very bottom of the observed range, so calibrating only against NES understates ratchet severity by roughly 3x. One 30-minute excursion here sets a floor that survives a year, which is the single most expensive mistake a depot scheduler can make and the strongest argument for the forward view. Demand interval is 30-minute -- the Southeast regional trait, shared with NES and FPL.",
+  "timezone": "America/New_York",
+  "installed_charger_kw": 7512,
+  "grid": { "service_capacity_kw": 3000, "voltage_class": "primary", "safety_margin_pct": 0 },
+  "layout": { "move_duration_min": 4, "path_capacity": 2, "dcfc_cooldown_min": 18 },
+  "tariff": {
+    "tariff_id": "georgia_power_pll18",
+    "utility": "Georgia Power",
+    "schedule_code": "PLL-18",
+    "source_url": "https://www.georgiapower.com/",
+    "source_label": "primary",
+    "notes": "Demand $13.63/kW, 30-minute basis, and the 95% summer ratchet are from research answer R-5 (Georgia Power tariff PDFs). KNOWN LIMITATION, stated rather than approximated away: PLL-18 prices energy in DECLINING BLOCKS whose rate depends on hours-use of demand, so it has no clean $/kWh. The tariff object as built carries a flat energy list and CANNOT express that structure; the 0.055 $/kWh below is a placeholder, not a sourced rate. The demand side -- which is what a scheduler optimises against -- is faithful. Extending the object with hours-use blocks needs the block table, which R-5 does not carry; filed as a limitation, not silently rounded.",
+    "fixed_charge_per_month": 0,
+    "summer_months": [6, 7, 8, 9],
+    "winter_months": [12, 1, 2, 3],
+    "energy": [ { "season": "all", "tou_window": null, "rate_per_kwh": 0.055 } ],
+    "demand": [
+      { "label": "billing demand", "basis": "NCP", "interval_min": 30, "season": "all",
+        "tiers": [ { "up_to_kw": null, "rate": 13.63 } ] }
+    ],
+    "ratchet": { "percent": 95, "lookback_months": 12, "basis_season": "summer" }
+  }
+}

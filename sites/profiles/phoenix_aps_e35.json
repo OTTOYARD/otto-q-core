@@ -1,0 +1,38 @@
+{
+  "site_id": "phoenix_aps_e35",
+  "name": "Phoenix depot, APS E-35 Extra-Large TOU",
+  "notes": "PORTABILITY TEST 1. Exists to prove the tariff object is not Nashville-shaped. Two things here are structurally impossible to express in the old single-scalar model: the demand interval is 15-MINUTE (not Nashville's 30), and demand is SPLIT by time of use into separately priced on-peak and off-peak components rather than one max. R-5's warning is exact -- a scheduler hard-coding NCP_30min silently mis-models every California, Arizona, Texas and Nevada depot. The on-peak rate is 6.6x the off-peak rate, so on this site WHEN a vehicle charges matters far more than on GSA-3, where only the monthly max matters.",
+  "timezone": "America/Phoenix",
+  "installed_charger_kw": 7512,
+  "grid": { "service_capacity_kw": 3000, "voltage_class": "primary", "safety_margin_pct": 0 },
+  "layout": { "move_duration_min": 4, "path_capacity": 2, "dcfc_cooldown_min": 18 },
+  "environment": { "cold_start_below_c": null, "cold_start_penalty_min": 0 },
+  "tariff": {
+    "tariff_id": "aps_e35",
+    "utility": "Arizona Public Service",
+    "schedule_code": "E-35 Extra-Large General Service TOU",
+    "source_url": "https://www.aps.com/",
+    "source_label": "primary",
+    "notes": "$/kW and the 15-minute interval are from research answer R-5 (APS tariff sheet). ASSUMPTION -- pending R-6: the on-peak CLOCK WINDOW is modelled as 16:00-19:00 local weekdays. R-5 supplies the rates and the interval but not the window hours, and this is labelled rather than presented as sourced. Energy rate is a placeholder single rate; E-35's stretcher-block energy structure is not modelled here because R-5 does not carry the block table.",
+    "fixed_charge_per_month": 0,
+    "summer_months": [6, 7, 8, 9],
+    "winter_months": [12, 1, 2, 3],
+    "tou_windows": [
+      { "name": "on", "ranges": [[960, 1140]] },
+      { "name": "off", "ranges": [[1140, 960]] }
+    ],
+    "energy": [
+      { "season": "all", "tou_window": "on", "rate_per_kwh": 0.085 },
+      { "season": "all", "tou_window": "off", "rate_per_kwh": 0.045 }
+    ],
+    "demand": [
+      { "label": "on-peak demand", "basis": "TOU", "tou_window": "on",
+        "interval_min": 15, "season": "all",
+        "tiers": [ { "up_to_kw": null, "rate": 19.795 } ] },
+      { "label": "off-peak demand", "basis": "TOU", "tou_window": "off",
+        "interval_min": 15, "season": "all",
+        "tiers": [ { "up_to_kw": null, "rate": 2.979 } ] }
+    ],
+    "ratchet": null
+  }
+}
