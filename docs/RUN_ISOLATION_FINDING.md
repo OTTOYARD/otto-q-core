@@ -43,7 +43,7 @@ not sit on top of each other. 0070 pins every run to the same window — 2026-08
 2026-08-23 08:00 — so **every cert run now stacks its ~700 bookings into the identical slots.**
 The world is reproducible; the calendar is now cumulative.
 
-## 3. The leading explanation for 14 vs 61 — STRONG HYPOTHESIS, not yet proven
+## 3. The leading explanation for 14 vs 61 — DISPROVEN 2026-08-24
 
 The ordering fits exactly:
 
@@ -60,6 +60,33 @@ they are internally consistent. The run that scored 61 is the one that started c
 same seed, deliberately varied residue — because the attempt was blocked by finding 4. A
 plausible mechanism and a matching ordering is not proof, and this document does not claim it
 as one.
+
+### ADDENDUM 2026-08-24 — the mechanism above is wrong, and the cause is open again
+
+The hypothesis rested on prior runs' bookings blocking a new run's bookings. They cannot. All
+three exclusion constraints on `ottoq_stall_bookings` are scoped by `sim_run_id`:
+
+```
+ottoq_stall_bookings_no_overlap     EXCLUDE USING gist (sim_run_id WITH =, stall_id WITH =, during WITH &&)
+                                      WHERE state IN ('held','active')
+ottoq_stall_bookings_no_overlap_v2  EXCLUDE USING gist (sim_run_id WITH =, stall_id WITH =, during WITH &&)
+                                      WHERE state IN ('held','active','done')    AND booked_at >= 2026-08-02
+ottoq_stall_bookings_no_overlap_v3  EXCLUDE USING gist (sim_run_id WITH =, stall_id WITH =, during WITH &&)
+                                      WHERE state IN ('held','active','done','interrupted') AND booked_at >= 2026-08-02
+```
+
+`sim_run_id WITH =` means two bookings only conflict if they belong to **the same run**. A new
+run's booking is never refused because of a prior run's booking, no matter how much residue is
+in the table. Recommended fix 1 below, as written, would have changed nothing about 14 vs 61.
+
+The correlation in the table above is real but unexplained. Foreign rows are still present at
+arm time (§2 stands, and the count is still an unwanted variable across runs), and there may
+still be a residue-mediated path through some *other* table — visit needs, open decisions,
+`charge_sessions` itself — but the booking-conflict path specifically is closed.
+
+**Status: the cause of 14 vs 61 is unknown.** Finding 4's harness defect, which blocked the
+controlled test, is now fixed (migrations 0071 and 0072), so the test that was impossible when
+this document was written is available. It should be run before any further fix is designed.
 
 ## 4. A separate defect found while testing: the harness can silently do nothing — PROVEN
 
@@ -107,11 +134,15 @@ run-isolated either. Both need to hold before any policy comparison means anythi
 
 ## Recommended fixes, in order — none applied
 
-1. **Isolate runs at arm time.** `ottoq_benchmark_reset` should clear prior runs' bookings,
-   visit needs and open decisions for the benchmark depot, not just free the stalls. This is the
-   one that unblocks everything else.
-2. **Make the harness fail loudly.** `ottoq_cert_arm_step` should raise when it advances fewer
-   ticks than requested, rather than returning a number the caller may not compare.
+1. ~~**Isolate runs at arm time.**~~ **WITHDRAWN as specified — see the §3 addendum.** The
+   mechanism it was meant to fix (prior bookings blocking new ones) does not exist: the
+   exclusion constraints are `sim_run_id`-scoped. Clearing residue may still be worth doing to
+   remove an uncontrolled variable, but it is no longer the fix that "unblocks everything else",
+   and it must not be sold as the cause of 14 vs 61.
+2. **Make the harness fail loudly.** ✅ **APPLIED** — `db/migrations/0071` (raise on short
+   advance) and `db/migrations/0072` (NULL-safe loop guard, found by 0071's own verification
+   test: a nonexistent run reported a full clean advance). This is now the *first* fix in the
+   sequence rather than the second, because the controlled test of everything else depends on it.
 3. **Exempt `cert_harness` from `ottoq_purge_prior_runs`**, or snapshot the evidence into
    `ottoq_run_archives` before the purge can reach it, so a run ID keeps resolving to its
    evidence.
@@ -119,3 +150,8 @@ run-isolated either. Both need to hold before any policy comparison means anythi
    turned around — quantities that mean something if a row is missing.
 
 Then, and only then, re-run the four-policy comparison.
+
+**Revised next step (2026-08-24):** with fix 2 applied, run the controlled residue experiment —
+same seed, same policy, same A/B group, deliberately varied residue at arm time — and let it say
+whether residue moves the score at all. Design the isolation work from that result, not from the
+ordering table above.
