@@ -204,3 +204,105 @@ def main() -> dict:
 
 if __name__ == "__main__":
     main()
+
+
+# ---- how much of the cost gap is actually recoverable? ---------------------------
+
+def peak_lower_bound(scenario_path) -> dict:
+    """A PROVABLE lower bound on the peak any feasible schedule can achieve.
+
+    Answers the question that has to precede "should we optimise for cost": is there
+    anything to win? A gap between two policies says one is better than the other; it
+    says nothing about how much either is leaving on the table.
+
+    THE ARGUMENT, which is why this is a bound and not an estimate. Take any window
+    [s, e]. Every asset whose ENTIRE feasible interval [arrival, ready_by] lies inside
+    that window must receive all of its energy within it -- it cannot start earlier or
+    finish later. So the average draw over that window is at least (energy of those
+    assets) / (e - s), and the PEAK is at least the average. Maximising over all
+    windows gives a valid lower bound. A single asset with a tight window supplies a
+    second floor the same way.
+
+    This is a bound, not a target. Achieving it would need perfectly interleaved
+    fractional charging; real points deliver fixed kW, so the true optimum sits
+    somewhere above it. That makes the headroom it reports CONSERVATIVE -- the real
+    recoverable amount is smaller than the number below, never larger.
+    """
+    sc = load_scenario(scenario_path)
+    classes = sc["asset_classes"]
+    items = []
+    for a in sc["assets"]:
+        c = classes[a.cls]
+        items.append({
+            "aid": a.aid, "start": float(a.arrival_min), "end": float(a.ready_by_min),
+            "kwh": c["battery_kwh"] * (a.target_soc - a.soc) / 100.0,
+        })
+
+    times = sorted({i["start"] for i in items} | {i["end"] for i in items})
+    best_kw, best_window = 0.0, None
+    for idx, s in enumerate(times):
+        for e in times[idx + 1:]:
+            hours = (e - s) / 60.0
+            if hours <= 0:
+                continue
+            need = sum(i["kwh"] for i in items if i["start"] >= s and i["end"] <= e)
+            if need <= 0:
+                continue
+            kw = need / hours
+            if kw > best_kw:
+                best_kw, best_window = kw, (s, e, need, hours)
+
+    solo = max(i["kwh"] / ((i["end"] - i["start"]) / 60.0) for i in items)
+    bound = max(best_kw, solo)
+    return {
+        "peak_lower_bound_kw": round(bound, 1),
+        "binding_window": ({"start_min": best_window[0], "end_min": best_window[1],
+                            "kwh": round(best_window[2], 1),
+                            "hours": round(best_window[3], 2)} if best_window else None),
+        "single_asset_floor_kw": round(solo, 1),
+        "total_energy_kwh": round(sum(i["kwh"] for i in items), 1),
+    }
+
+
+def headroom(scenario_path, *, site_id: str = "site_alpha", month: int = 7) -> dict:
+    """What the ideal schedule would bill, and therefore what is left on the table.
+
+    The ideal is a flat curve at the lower bound, held long enough to deliver the
+    scenario's energy. Since the bound is conservative, the headroom reported here is
+    an UNDERSTATEMENT of the true opportunity, which is the right direction for a
+    number that will be used to decide whether work is worth doing.
+    """
+    lb = peak_lower_bound(scenario_path)
+    kw = lb["peak_lower_bound_kw"]
+    sc = load_scenario(scenario_path)
+    start = min(float(a.arrival_min) for a in sc["assets"])
+    minutes = lb["total_energy_kwh"] / kw * 60.0
+
+    curve = [(float(m), kw if start <= m < start + minutes else 0.0)
+             for m in range(0, DAY_MIN, STEP_MIN)]
+    curve.append((float(DAY_MIN), 0.0))
+
+    site = get_site(site_id)
+    ideal = site.tariff.bill(curve, month=month, days=30, historical_peak_kw=kw)
+
+    comp = cost_comparison(scenario_path, site_ids=(site_id,), month=month)
+    rows = comp["sites"][site_id]["policies"]
+    return {
+        "site_id": site_id,
+        "peak_lower_bound_kw": kw,
+        "ideal_monthly_usd": ideal["total"],
+        "policies": {
+            name: {
+                "monthly_usd": r["monthly_total"],
+                "left_on_table_usd": round(r["monthly_total"] - ideal["total"], 2),
+                "multiple_of_ideal": round(r["monthly_total"] / ideal["total"], 2)
+                if ideal["total"] else None,
+            }
+            for name, r in sorted(rows.items())
+        },
+        "caveat": (
+            "The bound assumes perfectly interleaved fractional charging; real points "
+            "deliver fixed kW, so the true optimum is above it and the headroom here "
+            "is an understatement, never an overstatement."
+        ),
+    }

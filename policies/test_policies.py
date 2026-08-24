@@ -150,3 +150,46 @@ def test_every_cost_artifact_states_its_assumptions():
     assert len(c["assumptions"]) >= 4
     assert any("repeats" in a for a in c["assumptions"])
     assert any("power cap" in a for a in c["assumptions"])
+
+
+def test_peak_lower_bound_is_a_valid_bound():
+    """No policy may measure a peak below the provable lower bound.
+
+    The bound comes from an interval argument: assets whose entire [arrival, ready_by]
+    lies inside a window must deliver their energy inside it, so the average -- and
+    therefore the peak -- is at least energy/duration over that window. A measured peak
+    below it would mean either the bound or the harness is wrong.
+    """
+    from pathlib import Path as _Path
+    from cost import cost_comparison, peak_lower_bound
+    sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
+    lb = peak_lower_bound(sc)["peak_lower_bound_kw"]
+    rows = cost_comparison(sc, site_ids=("site_alpha",))["sites"]["site_alpha"]["policies"]
+    for name, r in rows.items():
+        assert r["measured_peak_kw"] >= lb, f"{name} peak below the provable bound"
+
+
+def test_headroom_shows_every_policy_leaves_more_on_the_table_than_they_differ_by():
+    """The finding that reframes the comparison.
+
+    The spread BETWEEN policies is small next to what they all leave unclaimed. If this
+    ever inverts -- policies differing by more than they waste -- the objective has
+    started reaching the tariff and this test should be revisited deliberately.
+    """
+    from pathlib import Path as _Path
+    from cost import headroom
+    sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
+    h = headroom(sc)
+    left = {n: r["left_on_table_usd"] for n, r in h["policies"].items()}
+    costs = [r["monthly_usd"] for r in h["policies"].values()]
+    spread = max(costs) - min(costs)
+    assert min(left.values()) > spread
+    # every policy bills a multiple of the ideal, not a near-miss
+    assert all(r["multiple_of_ideal"] >= 2.0 for r in h["policies"].values())
+
+
+def test_headroom_states_its_caveat():
+    from pathlib import Path as _Path
+    from cost import headroom
+    sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
+    assert "understatement" in headroom(sc)["caveat"]
