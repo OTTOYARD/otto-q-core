@@ -67,6 +67,14 @@ class Asset:
 
 def load_scenario(path: str | Path) -> dict:
     sc = json.loads(Path(path).read_text())
+    return materialize(sc)
+
+
+def materialize(sc: dict) -> dict:
+    """Populate a scenario DICT's fleet -- the entry point for callers that
+    build scenarios in memory (the production proposer bridge) rather than
+    loading them from a committed file. Same function either way, so an
+    in-memory world and a file world are indistinguishable to the solver."""
     sc["assets"] = _generate_assets(sc)
     return sc
 
