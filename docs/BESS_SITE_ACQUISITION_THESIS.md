@@ -101,6 +101,17 @@ for us, because it is only solvable with the forward view of arrivals the founde
 > load shape. It is strictly *more* favourable to us than the old framing: the rate choice now
 > depends on a quantity only a forward scheduler can produce. Recomputing it against a real
 > Site Profile load shape is tracked as work, not asserted here.
+>
+> **SECOND CORRECTION 2026-08-25 (R-6, primary EVC PDF) — which corrects the correction.** R-5's
+> reading was itself wrong: EVC's on-peak/off-peak clock EXISTS in the tariff but **prices the
+> same 21.773 c/kWh in both windows** — a TOU clock with no TOU price differential (likely
+> reserved for future TVA adjustments). The real structure is $100.00/mo customer charge + flat
+> 21.773 c/kWh, demand ceiling 50-5,000 kW, no demand charge. The break-even is therefore
+> computable again, now with the fixed charges included: against GSA-3's ~$21.40/kW + $2,091.71/mo
+> + ~8.2 c/kWh all-in energy (FCA estimate included and labeled), the crossover is roughly
+> **158-172 equivalent full-load hours per month (~22-24% load factor)** depending on site size —
+> the original ~22% figure approximately restored for large depots, this time from the primary
+> tariff read, with its chain of corrections documented instead of erased.
 
 NES also offers **EVC** — an EV-specific schedule with **no demand charge**. Against GSA-3's
 ~8.2 ¢/kWh all-in energy plus demand charges, the original break-even was computed as:

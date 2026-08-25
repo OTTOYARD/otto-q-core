@@ -1,0 +1,121 @@
+{
+  "site_id": "las_vegas_nv_lgs2",
+  "name": "Las Vegas depot, NV Energy LGS-2 (secondary)",
+  "notes": "Seeded from PRIMARY figures via R-6 (NV Energy Statement of Rates, PUCN Sheet 10B), which corrected R-5's third-party $2.68/kW to the real $13.43/kW summer on-peak demand + $3.45/kW facilities. Distinctive shapes this profile exercises: the on-peak window is DAILY (all 7 days, 15:01-21:00, summer only) -- unlike APS/SCE/LADWP weekday windows -- and winter has no on-peak at all. Demand on a 15-minute interval.",
+  "timezone": "America/Los_Angeles",
+  "installed_charger_kw": 7512,
+  "grid": {
+    "service_capacity_kw": 3000,
+    "voltage_class": "secondary",
+    "safety_margin_pct": 0
+  },
+  "layout": {
+    "move_duration_min": 4,
+    "path_capacity": 2,
+    "dcfc_cooldown_min": 18
+  },
+  "tariff": {
+    "tariff_id": "nv_energy_lgs2_secondary",
+    "utility": "NV Energy (south)",
+    "schedule_code": "LGS-2",
+    "source_url": "https://www.nvenergy.com/publish/content/dam/nvenergy/brochures_arch/about-nvenergy/rates-regulatory/electric-schedules-south/StatementofRates.pdf",
+    "source_label": "primary",
+    "notes": "All figures primary via R-6. Summer (Jun-Sep): on-peak 15:01-21:00 DAILY. Winter (Oct-May): all hours off-peak, demand $1.65/kW. Facilities $3.45/kW year-round (modelled as an NCP component). Basic service $122.40/mo.",
+    "fixed_charge_per_month": 122.4,
+    "summer_months": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "winter_months": [
+      10,
+      11,
+      12,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "tou_windows": [
+      {
+        "name": "on",
+        "ranges": [
+          [
+            901,
+            1260
+          ]
+        ],
+        "days": "daily"
+      },
+      {
+        "name": "off",
+        "ranges": [
+          [
+            1260,
+            901
+          ]
+        ],
+        "days": "daily"
+      }
+    ],
+    "energy": [
+      {
+        "season": "summer",
+        "tou_window": "on",
+        "rate_per_kwh": 0.12932
+      },
+      {
+        "season": "summer",
+        "tou_window": "off",
+        "rate_per_kwh": 0.05754
+      },
+      {
+        "season": "winter",
+        "tou_window": null,
+        "rate_per_kwh": 0.06922
+      }
+    ],
+    "demand": [
+      {
+        "label": "summer on-peak demand",
+        "basis": "TOU",
+        "tou_window": "on",
+        "interval_min": 15,
+        "season": "summer",
+        "tiers": [
+          {
+            "up_to_kw": null,
+            "rate": 13.43
+          }
+        ]
+      },
+      {
+        "label": "winter demand",
+        "basis": "NCP",
+        "interval_min": 15,
+        "season": "winter",
+        "tiers": [
+          {
+            "up_to_kw": null,
+            "rate": 1.65
+          }
+        ]
+      },
+      {
+        "label": "facilities",
+        "basis": "NCP",
+        "interval_min": 15,
+        "season": "all",
+        "tiers": [
+          {
+            "up_to_kw": null,
+            "rate": 3.45
+          }
+        ]
+      }
+    ],
+    "ratchet": null
+  }
+}

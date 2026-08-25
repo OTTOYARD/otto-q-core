@@ -77,15 +77,25 @@ Same fleet, same physics, three metros:
 
 | metro | tariff | recommended service | annual operating cost |
 |---|---|---|---|
+| Las Vegas | NV Energy LGS-2 | 363 kW | **$36,218** |
+| Phoenix | APS E-35 | 363 kW | **$39,626** |
 | Nashville | NES GSA-3 | 363 kW | **$120,794** |
-| Atlanta | Georgia Power PLL-18 | 363 kW | **$62,273** |
-| Phoenix | APS E-35 | 363 kW | **$39,290** |
+| Atlanta | Georgia Power PLL-18 | 363 kW | **$148,837** |
 
-Phoenix is **3× cheaper for the identical fleet** — because an overnight window falls entirely
-inside APS's cheap off-peak demand band ($2.979/kW vs on-peak $19.795/kW), while Nashville bills
-one flat $21.40/kW against the monthly max no matter when it occurs. **An overnight-charging
-depot should strongly prefer a time-of-use tariff**, and that recommendation now comes out of the
-model rather than out of intuition.
+*(Corrected 2026-08-25 with R-6's primary tariff reads. Two corrections worth naming: the APS
+on-peak window is 11:00–21:00 weekdays — not the 16:00–19:00 this repo originally assumed — and
+Phoenix barely moved anyway ($39,290 → $39,626) because an overnight fleet is off-peak under
+either window. Atlanta, however, went from $62,273 to $148,837: Georgia Power's real PLL-18
+prices energy in declining blocks keyed to hours-use of demand, and a low-load-factor depot pays
+11–19 ¢/kWh — the earlier flat 5.5 ¢ placeholder understated it 2.4×. The placeholder was
+labeled as one; this is the label doing its job.)*
+
+The TOU metros are **3× cheaper for the identical fleet** — an overnight window falls entirely
+inside their cheap off-peak bands, while Nashville bills one flat $21.40/kW against the monthly
+max whenever it occurs, and Atlanta's declining blocks punish low hours-use outright. **An
+overnight-charging depot should strongly prefer a time-of-use tariff and should fear
+hours-use-block tariffs at low load factor** — both recommendations now come out of the model
+rather than out of intuition.
 
 ## The trap the model exists to catch
 
