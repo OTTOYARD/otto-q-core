@@ -1,0 +1,462 @@
+{
+ "columns": {
+  "otto_q_shaped": {
+   "load_curve": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     15.0,
+     0.0
+    ],
+    [
+     30.0,
+     8.0
+    ],
+    [
+     45.0,
+     12.0
+    ],
+    [
+     60.0,
+     12.0
+    ],
+    [
+     75.0,
+     12.0
+    ],
+    [
+     90.0,
+     16.0
+    ],
+    [
+     105.0,
+     16.0
+    ],
+    [
+     120.0,
+     158.0
+    ],
+    [
+     135.0,
+     158.0
+    ],
+    [
+     150.0,
+     255.0
+    ],
+    [
+     165.0,
+     222.0
+    ],
+    [
+     180.0,
+     162.0
+    ],
+    [
+     195.0,
+     259.0
+    ],
+    [
+     210.0,
+     226.0
+    ],
+    [
+     225.0,
+     259.0
+    ],
+    [
+     240.0,
+     222.0
+    ],
+    [
+     255.0,
+     154.0
+    ],
+    [
+     270.0,
+     112.0
+    ],
+    [
+     285.0,
+     175.0
+    ],
+    [
+     300.0,
+     229.0
+    ],
+    [
+     315.0,
+     204.0
+    ],
+    [
+     330.0,
+     173.0
+    ],
+    [
+     345.0,
+     220.0
+    ],
+    [
+     360.0,
+     176.0
+    ],
+    [
+     375.0,
+     158.0
+    ],
+    [
+     390.0,
+     227.0
+    ],
+    [
+     405.0,
+     139.0
+    ],
+    [
+     420.0,
+     223.0
+    ],
+    [
+     435.0,
+     214.0
+    ],
+    [
+     450.0,
+     234.0
+    ],
+    [
+     465.0,
+     224.0
+    ],
+    [
+     480.0,
+     164.0
+    ],
+    [
+     495.0,
+     215.0
+    ],
+    [
+     510.0,
+     242.0
+    ],
+    [
+     525.0,
+     117.0
+    ],
+    [
+     540.0,
+     61.0
+    ],
+    [
+     555.0,
+     226.0
+    ],
+    [
+     570.0,
+     183.0
+    ],
+    [
+     585.0,
+     183.0
+    ],
+    [
+     600.0,
+     179.0
+    ],
+    [
+     615.0,
+     246.0
+    ],
+    [
+     630.0,
+     246.0
+    ],
+    [
+     645.0,
+     171.0
+    ],
+    [
+     660.0,
+     243.0
+    ],
+    [
+     675.0,
+     168.0
+    ],
+    [
+     690.0,
+     168.0
+    ],
+    [
+     705.0,
+     64.0
+    ],
+    [
+     720.0,
+     0.0
+    ]
+   ],
+   "peak_site_kw": 259.0,
+   "total_tardy_min": 0
+  },
+  "unmanaged": {
+   "load_curve": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     15.0,
+     0.0
+    ],
+    [
+     30.0,
+     8.0
+    ],
+    [
+     45.0,
+     12.0
+    ],
+    [
+     60.0,
+     12.0
+    ],
+    [
+     75.0,
+     12.0
+    ],
+    [
+     90.0,
+     16.0
+    ],
+    [
+     105.0,
+     16.0
+    ],
+    [
+     120.0,
+     308.0
+    ],
+    [
+     135.0,
+     462.0
+    ],
+    [
+     150.0,
+     559.0
+    ],
+    [
+     165.0,
+     570.0
+    ],
+    [
+     180.0,
+     533.0
+    ],
+    [
+     195.0,
+     376.0
+    ],
+    [
+     210.0,
+     263.0
+    ],
+    [
+     225.0,
+     169.0
+    ],
+    [
+     240.0,
+     68.0
+    ],
+    [
+     255.0,
+     200.0
+    ],
+    [
+     270.0,
+     264.0
+    ],
+    [
+     285.0,
+     459.0
+    ],
+    [
+     300.0,
+     319.0
+    ],
+    [
+     315.0,
+     178.0
+    ],
+    [
+     330.0,
+     68.0
+    ],
+    [
+     345.0,
+     112.0
+    ],
+    [
+     360.0,
+     172.0
+    ],
+    [
+     375.0,
+     355.0
+    ],
+    [
+     390.0,
+     540.0
+    ],
+    [
+     405.0,
+     423.0
+    ],
+    [
+     420.0,
+     468.0
+    ],
+    [
+     435.0,
+     280.0
+    ],
+    [
+     450.0,
+     134.0
+    ],
+    [
+     465.0,
+     4.0
+    ],
+    [
+     480.0,
+     8.0
+    ],
+    [
+     495.0,
+     12.0
+    ],
+    [
+     510.0,
+     24.0
+    ],
+    [
+     525.0,
+     24.0
+    ],
+    [
+     540.0,
+     24.0
+    ],
+    [
+     555.0,
+     24.0
+    ],
+    [
+     570.0,
+     20.0
+    ],
+    [
+     585.0,
+     20.0
+    ],
+    [
+     600.0,
+     20.0
+    ],
+    [
+     615.0,
+     4.0
+    ],
+    [
+     630.0,
+     4.0
+    ],
+    [
+     645.0,
+     4.0
+    ],
+    [
+     660.0,
+     4.0
+    ],
+    [
+     675.0,
+     4.0
+    ],
+    [
+     690.0,
+     0.0
+    ],
+    [
+     705.0,
+     0.0
+    ],
+    [
+     720.0,
+     0.0
+    ]
+   ],
+   "peak_site_kw": 608.0,
+   "total_tardy_min": 0
+  }
+ },
+ "deck_sha256": "6e2a7f4b40dd45b50e93e7faaa0ad81e2a25d4760d1f2cd0fd514348cb205017",
+ "derived": {
+  "delta": {
+   "bess_kwh_avoided": 597.4,
+   "interconnect_kw_avoided": 350,
+   "kw_avoided": 349.0,
+   "monthly_demand_charge_avoided": 6890.8,
+   "monthly_total_avoided": 6888.66,
+   "peak_ratio": 2.35
+  },
+  "otto_q_shaped": {
+   "bess_to_match_shaped": {
+    "delivered_kwh": 0.0,
+    "discharge_power_kw": 0.0,
+    "note": "none required by construction -- the schedule is the battery",
+    "recharge_fits_in_window": true,
+    "stored_kwh_at_96pct_rte": 0.0
+   },
+   "monthly_demand_charge": 5189.5,
+   "monthly_total": 7373.74,
+   "peak_site_kw": 259.0,
+   "required_interconnect_kw": 300,
+   "total_tardy_min": 0
+  },
+  "unmanaged": {
+   "bess_to_match_shaped": {
+    "delivered_kwh": 573.5,
+    "discharge_power_kw": 311.0,
+    "recharge_fits_in_window": true,
+    "stored_kwh_at_96pct_rte": 597.4
+   },
+   "monthly_demand_charge": 12080.3,
+   "monthly_total": 14262.4,
+   "peak_site_kw": 608.0,
+   "required_interconnect_kw": 650,
+   "total_tardy_min": 0
+  }
+ },
+ "fleet": "18 robotaxi + 6 yard tractor + 6x4-AMR-pad-served 24 AMR, 48 assets, one overnight window (720 min)",
+ "interconnect_definition": "measured peak rounded up to the next 50 kW",
+ "methodology": [
+  "Baseline is charge-on-arrival, first come first served -- the industry's own documented unmanaged practice (third-party anchor: The Mobility House 97-bus depot, unmanaged 4.7 MW cut to 1.4 MW under managed charging; research answer R-4).",
+  "Common random numbers: both columns consume the identical declared 48-asset fleet and arrival list, frozen in scenario_deck.json.",
+  "One overnight window billed as a month (30 days) on NES GSA-3 -- standard for demand-charge reasoning (one interval sets the month); a fair ranking and indicative magnitude, not a bill forecast.",
+  "BESS equivalence is the battery making the unmanaged site present the shaped column's grid profile, losses included -- buy the battery, or buy the scheduler."
+ ],
+ "peak_lower_bound_kw": 182.2,
+ "scenario": "deck_site_alpha_overnight_v1",
+ "seed": 424242,
+ "solver_provenance": {
+  "pass1": "min_tardy, OPTIMAL, T*=0",
+  "pass2": "min_peak at T*=0, wall-limited FEASIBLE (180 s); curves committed, downstream arithmetic regenerable"
+ },
+ "tariff": "NES GSA-3 (primary; ottoq_depot_tariffs)"
+}

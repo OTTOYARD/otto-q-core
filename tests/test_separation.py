@@ -101,6 +101,7 @@ ALLOWED_READS = {
     ("sites/site_alpha/run_matrix.py", "verify"),  # regenerate == committed
     ("sites/site_alpha/make_charts.py", "verify"),  # charts OF committed runs
     ("metrics/kpi_gate.py", "verify"),             # candidate vs baseline gate
+    ("policies/deck_run.py", "verify"),            # committed-curve artifact display/derive
 }
 _ALLOWED_FILES = {f for f, _ in ALLOWED_READS}
 
