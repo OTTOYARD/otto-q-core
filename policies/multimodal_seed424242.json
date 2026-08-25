@@ -8,28 +8,28 @@
   "cpsat_weighted": "superseded by forward's lexicographic solve on the same model; one exact-solver entry is enough here",
   "otto_q_asis": "faithful reduction of the live robotaxi cursor; no multi-class capability concept -- would book aircraft onto car chargers and score noise"
  },
- "multimodal_sha256": "a45ca13fa9b46997f40bd04876d00a68f5d54c09bded6be8e014a433a7260c02",
- "nameplate_kw": 1690,
- "peak_lower_bound_kw": 138.2,
+ "multimodal_sha256": "5f61d5639052c8e8f5afbc57d1f190781ec6436d12aa2d283eb925c365abd370",
+ "nameplate_kw": 1231,
+ "peak_lower_bound_kw": 178.5,
  "policies": {
   "fifo": {
-   "exceeds_service_kw": 90.0,
-   "monthly_total": 16449.11,
-   "peak_site_kw": 890.0,
+   "exceeds_service_kw": 43.0,
+   "monthly_total": 16416.57,
+   "peak_site_kw": 843.0,
    "physically_runnable": false,
    "total_tardy_min": 154
   },
   "forward": {
    "exceeds_service_kw": 0.0,
-   "monthly_total": 8548.35,
+   "monthly_total": 7263.63,
    "peak_site_kw": 300.0,
    "physically_runnable": true,
    "total_tardy_min": 0
   },
   "greedy": {
-   "exceeds_service_kw": 90.0,
-   "monthly_total": 16363.05,
-   "peak_site_kw": 890.0,
+   "exceeds_service_kw": 43.0,
+   "monthly_total": 16416.2,
+   "peak_site_kw": 843.0,
    "physically_runnable": false,
    "total_tardy_min": 0
   }
