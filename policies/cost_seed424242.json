@@ -5,7 +5,7 @@
   "Wash and inspect routing is identical FCFS for every policy, so this isolates the charge-assignment decision -- the axis the policies differ on.",
   "This scenario's peak never approaches any site's power cap, so the cap is not a binding constraint here and no policy is being rewarded for respecting it (docs/BENCHMARK_CREDIBILITY.md)."
  ],
- "cost_sha256": "acccd9177f3cc3d9867c98118d9ceeae258b837fd981acd84716c6d78754ab6c",
+ "cost_sha256": "93de52dbd876f315c0501e99d4f811038ad633b82e41a100c03704ff1d246ccc",
  "month": 7,
  "scenario": "reduced_canonical_nash_v1",
  "seed": 424242,
@@ -13,52 +13,52 @@
   "atlanta_georgia_power": {
    "policies": {
     "cpsat": {
-     "annual_total": 68839.8,
+     "annual_total": 71440.08,
      "billed_peaks_kw": {
       "billing demand": 418.0
      },
-     "demand_cost": 5697.34,
-     "energy_cost": 39.31,
-     "fixed_cost": 0.0,
+     "demand_cost": 0.0,
+     "energy_cost": 3447.47,
+     "fixed_cost": 256.0,
      "measured_peak_kw": 440.0,
-     "monthly_delta_vs_fifo": 1293.06,
-     "monthly_total": 5736.65
+     "monthly_delta_vs_fifo": 1294.85,
+     "monthly_total": 5953.34
     },
     "fifo": {
-     "annual_total": 53323.08,
+     "annual_total": 55901.88,
      "billed_peaks_kw": {
       "billing demand": 323.0
      },
-     "demand_cost": 4402.49,
-     "energy_cost": 41.1,
-     "fixed_cost": 0.0,
+     "demand_cost": 0.0,
+     "energy_cost": 3590.33,
+     "fixed_cost": 256.0,
      "measured_peak_kw": 340.0,
      "monthly_delta_vs_fifo": 0.0,
-     "monthly_total": 4443.59
+     "monthly_total": 4658.49
     },
     "greedy": {
-     "annual_total": 62964.12,
+     "annual_total": 65535.6,
      "billed_peaks_kw": {
       "billing demand": 381.9
      },
-     "demand_cost": 5205.3,
-     "energy_cost": 41.72,
-     "fixed_cost": 0.0,
+     "demand_cost": 0.0,
+     "energy_cost": 3639.79,
+     "fixed_cost": 256.0,
      "measured_peak_kw": 402.0,
-     "monthly_delta_vs_fifo": 803.42,
-     "monthly_total": 5247.01
+     "monthly_delta_vs_fifo": 802.81,
+     "monthly_total": 5461.3
     },
     "otto_q_asis": {
-     "annual_total": 61389.6,
+     "annual_total": 63981.72,
      "billed_peaks_kw": {
       "billing demand": 372.4
      },
-     "demand_cost": 5075.81,
-     "energy_cost": 39.98,
-     "fixed_cost": 0.0,
+     "demand_cost": 0.0,
+     "energy_cost": 3501.32,
+     "fixed_cost": 256.0,
      "measured_peak_kw": 392.0,
-     "monthly_delta_vs_fifo": 672.21,
-     "monthly_total": 5115.8
+     "monthly_delta_vs_fifo": 673.32,
+     "monthly_total": 5331.81
     }
    },
    "tariff": "PLL-18",

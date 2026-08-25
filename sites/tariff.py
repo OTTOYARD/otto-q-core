@@ -62,10 +62,19 @@ class TouWindow:
     Ranges may wrap past midnight (start > end), which is how off-peak windows are
     normally written. Kept as minutes-of-day rather than hours because 15-minute
     demand intervals do not divide cleanly into an hours-only model.
+
+    `days` records which days the window applies (R-6: APS is weekdays-only, NV
+    Energy is daily -- the difference is real tariff structure, not noise). The
+    billing engine prices ONE REPRESENTATIVE DAY repeated for the month, and that
+    day is treated as a weekday; a weekday-only window therefore slightly
+    overstates on-peak energy for the ~8.7 weekend days it does not cover. Stated
+    rather than silently absorbed: the demand side -- which dominates -- is
+    unaffected when the month's peak falls on a weekday.
     """
 
     name: str
     ranges: tuple[tuple[int, int], ...]
+    days: str = "daily"                       # "daily" | "weekdays"
 
     def contains(self, minute_of_day: int) -> bool:
         m = minute_of_day % 1440
@@ -121,6 +130,56 @@ class EnergyRate:
 
 
 @dataclass(frozen=True)
+class HoursUseBlocks:
+    """Declining energy blocks keyed to HOURS-USE OF DEMAND (Georgia Power PLL-18).
+
+    The tariff folds the demand charge into declining kWh blocks whose boundaries
+    are expressed as "N hours times the billing demand": hours-use = kWh / billing
+    demand, and a customer that runs more hours at the same demand pushes energy
+    into the cheap tail. R-6 read the table verbatim from the primary PDF.
+
+    `first_blocks` price kWh WITHIN `base_hours` x demand, in absolute-kWh tiers
+    (Tier.up_to_kw reused as up-to-kWh); `tail_blocks` price kWh beyond, in
+    hours-use tiers. `min_bill_fixed` + `min_bill_per_kw` form the minimum-bill
+    FLOOR (R-6: a floor, not a demand charge on top) -- the customer pays the
+    greater of the block charge and the floor.
+    """
+
+    base_hours: float
+    first_blocks: tuple[Tier, ...]
+    tail_blocks: tuple[tuple[float, float], ...]
+    min_bill_fixed: float = 0.0
+    min_bill_per_kw: float = 0.0
+
+    def energy_cost(self, kwh: float, billing_demand_kw: float) -> float:
+        base_cap = self.base_hours * billing_demand_kw
+        within = min(kwh, base_cap)
+        cost, lower = 0.0, 0.0
+        for t in self.first_blocks:
+            upper = t.up_to_kw if t.up_to_kw is not None else float("inf")
+            span = max(0.0, min(within, upper) - lower)
+            cost += span * t.rate
+            lower = upper
+            if within <= upper:
+                break
+        excess = max(0.0, kwh - base_cap)
+        prev_hours = self.base_hours
+        for up_to_hours, rate in self.tail_blocks:
+            upper_kwh = ((up_to_hours - prev_hours) * billing_demand_kw
+                         if up_to_hours != float("inf") else float("inf"))
+            span = min(excess, upper_kwh)
+            cost += span * rate
+            excess -= span
+            prev_hours = up_to_hours
+            if excess <= 0:
+                break
+        return cost
+
+    def floor(self, billing_demand_kw: float) -> float:
+        return self.min_bill_fixed + self.min_bill_per_kw * billing_demand_kw
+
+
+@dataclass(frozen=True)
 class Ratchet:
     """A billing floor set by a historical peak.
 
@@ -149,6 +208,10 @@ class Tariff:
     demand: tuple[DemandComponent, ...] = ()
     energy: tuple[EnergyRate, ...] = ()
     ratchet: Ratchet | None = None
+    #: When set, ENERGY is priced by hours-use declining blocks (demand
+    #: folded in) instead of the energy[] list, and the min-bill floor
+    #: applies. demand[] should then be empty or true adders only.
+    hours_use_blocks: "HoursUseBlocks | None" = None
     tou_windows: tuple[TouWindow, ...] = ()
     summer_months: tuple[int, ...] = (6, 7, 8, 9)
     winter_months: tuple[int, ...] = (12, 1, 2, 3)
@@ -202,6 +265,11 @@ class Tariff:
         season = self.season_of(month)
         lines: list[dict[str, Any]] = []
 
+        if self.hours_use_blocks is not None:
+            return self._bill_hours_use(load_kw, month=month, days=days,
+                                        historical_peak_kw=historical_peak_kw,
+                                        season=season)
+
         energy_kwh = _energy_by_window(load_kw, self)
         energy_cost = 0.0
         for name, kwh in sorted(energy_kwh.items()):
@@ -249,6 +317,50 @@ class Tariff:
             "total": round(total, 2),
             "billed_peaks_kw": {k: round(v, 2) for k, v in billed_peaks.items()},
             "lines": lines,
+        }
+
+    def _bill_hours_use(self, load_kw, *, month: int, days: int,
+                        historical_peak_kw: float, season: str) -> dict[str, Any]:
+        """Georgia-Power-shaped billing: demand folded into declining blocks.
+
+        Billing demand takes the ratchet floor first (PLL-18 summer: greatest of
+        current and 95 percent of the prior summer peak; the 60-percent-of-winter
+        leg is NOT modelled because every committed run bills a summer month --
+        stated rather than silently absorbed). One day's curve repeats for the
+        month, so monthly kWh = day kWh x days.
+        """
+        hub = self.hours_use_blocks
+        interval = self.demand[0].interval_min if self.demand else 30
+        peaks = _interval_peaks(load_kw, interval)
+        measured = max((kw for _, kw in peaks), default=0.0)
+        billed = measured
+        floor_kw = 0.0
+        if self.ratchet:
+            floor_kw = self.ratchet.floor_kw(historical_peak_kw)
+            billed = max(billed, floor_kw)
+
+        day_kwh = sum(_energy_by_window(load_kw, self).values())
+        month_kwh = day_kwh * days
+        blocks = hub.energy_cost(month_kwh, billed)
+        floor_bill = hub.floor(billed)
+        total_core = max(blocks, floor_bill)
+        hours_use = month_kwh / billed if billed else 0.0
+
+        total = total_core + self.fixed_charge_per_month
+        return {
+            "tariff_id": self.tariff_id, "season": season, "month": month,
+            "energy_cost": round(blocks, 2),
+            "demand_cost": 0.0,
+            "min_bill_floor": round(floor_bill, 2),
+            "floor_binding": floor_bill > blocks,
+            "fixed_cost": round(self.fixed_charge_per_month, 2),
+            "total": round(total, 2),
+            "billed_peaks_kw": {"billing demand": round(billed, 2)},
+            "hours_use": round(hours_use, 1),
+            "lines": [{"kind": "hours_use_blocks", "kwh": round(month_kwh, 1),
+                       "billing_demand_kw": round(billed, 2),
+                       "ratchet_floor_kw": round(floor_kw, 2),
+                       "cost": round(total_core, 2)}],
         }
 
     def _energy_rate(self, season: str, window: str) -> float | None:
@@ -391,19 +503,35 @@ def load_tariff(doc: dict[str, Any]) -> Tariff:
         for e in doc.get("energy", [])
     )
     windows = tuple(
-        TouWindow(w["name"], tuple((int(a), int(b)) for a, b in w["ranges"]))
+        TouWindow(w["name"], tuple((int(a), int(b)) for a, b in w["ranges"]),
+                  w.get("days", "daily"))
         for w in doc.get("tou_windows", [])
     )
     r = doc.get("ratchet")
     ratchet = Ratchet(float(r["percent"]), int(r["lookback_months"]),
                       r.get("basis_season")) if r else None
 
+    hb = doc.get("hours_use_blocks")
+    hours_use = None
+    if hb:
+        hours_use = HoursUseBlocks(
+            base_hours=float(hb["base_hours"]),
+            first_blocks=tuple(Tier(t.get("up_to_kwh"), float(t["rate"]))
+                               for t in hb["first_blocks"]),
+            tail_blocks=tuple((float(t["up_to_hours"]) if t["up_to_hours"] is not None
+                               else float("inf"), float(t["rate"]))
+                              for t in hb["tail_blocks"]),
+            min_bill_fixed=float(hb.get("min_bill_fixed", 0.0)),
+            min_bill_per_kw=float(hb.get("min_bill_per_kw", 0.0)),
+        )
+
     t = Tariff(
         tariff_id=doc["tariff_id"], utility=doc["utility"],
         schedule_code=doc["schedule_code"], source_url=doc.get("source_url", ""),
         source_label=doc.get("source_label", "third-party"),
         fixed_charge_per_month=float(doc.get("fixed_charge_per_month", 0.0)),
-        demand=tuple(demand), energy=energy, ratchet=ratchet, tou_windows=windows,
+        demand=tuple(demand), energy=energy, ratchet=ratchet,
+        hours_use_blocks=hours_use, tou_windows=windows,
         summer_months=tuple(doc.get("summer_months", (6, 7, 8, 9))),
         winter_months=tuple(doc.get("winter_months", (12, 1, 2, 3))),
         demand_charge_free=bool(doc.get("demand_charge_free", False)),
@@ -417,6 +545,9 @@ def load_tariff(doc: dict[str, Any]) -> Tariff:
                 f"{t.tariff_id}/{comp.label}: names TOU window {comp.tou_window!r} "
                 f"which the tariff does not define"
             )
-    if not t.energy:
+    if not t.energy and t.hours_use_blocks is None:
         raise TariffError(f"{t.tariff_id}: a tariff with no energy rate cannot bill a curve")
+    if t.hours_use_blocks is not None and not t.energy:
+        # blocks price the energy; a zero-rate row keeps kWh accounting alive
+        t = Tariff(**{**t.__dict__, "energy": (EnergyRate("all", None, 0.0),)})
     return t

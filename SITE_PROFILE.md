@@ -153,14 +153,17 @@ unexpressible, the tariff object has regressed to a single-utility model.
 
 ## Known limitations, stated rather than approximated away
 
-- **Georgia Power's energy structure is not modelled.** PLL-18 prices energy in declining blocks
-  whose rate depends on hours-use of demand, so it has no clean $/kWh. The object carries a flat
-  energy list and cannot express it; the profile's energy rate is a **placeholder, not a sourced
-  rate**, and says so. The demand side — what a scheduler optimises against — is faithful.
-  Extending the object needs the block table, which R-5 does not carry.
-- **APS on-peak clock hours are an assumption.** R-5 supplies APS's $/kW and its 15-minute
-  interval but not the window hours; 16:00–19:00 is labelled `ASSUMPTION — pending R-6` in the
-  profile rather than presented as sourced.
+- ~~Georgia Power's energy structure is not modelled.~~ **RESOLVED by R-6:** the object now
+  carries `hours_use_blocks` — declining kWh tiers keyed to hours-use of demand, with the
+  minimum-bill floor — read verbatim from the primary PLL-18 PDF. One leg remains unmodelled and
+  says so: the 60%-of-winter-peak ratchet branch (every committed run bills a summer month), and
+  R-6 flags the 400/600-hour tail boundary for one re-verification before pricing a >400
+  hours-use customer.
+- ~~APS on-peak clock hours are an assumption.~~ **RESOLVED by R-6, and the assumption was
+  wrong:** the primary tariff says **11:00–21:00 weekdays year-round**, not 16:00–19:00 — a
+  ten-hour window versus a three-hour guess. Exactly the error the labeled assumption existed to
+  catch. `TouWindow` also gained a `days` field (APS is weekdays-only; NV Energy's window is
+  daily), with the representative-day billing limitation stated on the class.
 - **Coincident-peak demand refuses to guess.** A CP component raises unless the system-peak
   intervals are supplied, because CP cannot be inferred from site load. R-5 notes CP is rare
   below transmission level.

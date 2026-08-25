@@ -1,26 +1,95 @@
 {
   "site_id": "atlanta_georgia_power",
   "name": "Atlanta depot, Georgia Power PLL-18",
-  "notes": "PORTABILITY TEST 2. Exists for the RATCHET. Georgia Power bills the greater of measured demand and 95% of the highest summer month -- against Nashville's 30%. R-5: typical commercial ratchets run 80-95% over 11-12 months and Nashville's 30%/12 is at the very bottom of the observed range, so calibrating only against NES understates ratchet severity by roughly 3x. One 30-minute excursion here sets a floor that survives a year, which is the single most expensive mistake a depot scheduler can make and the strongest argument for the forward view. Demand interval is 30-minute -- the Southeast regional trait, shared with NES and FPL.",
+  "notes": "PORTABILITY TEST 2, now on the PRIMARY tariff via R-6. Georgia Power PLL-18 folds the demand charge INTO declining energy blocks keyed to hours-use of demand (kWh / billing demand): 18.943 c/kWh for the first 3,000 kWh down to 1.101 c beyond 600 hours-use. The minimum bill ($256.00 + $13.63/kW of billing demand) is a FLOOR, not a demand charge on top -- a low-load-factor customer pays the floor. Billing demand ratchet: summer = greatest of current and 95% of prior summer peak (the 60%-of-winter leg is unmodelled; every committed run bills a summer month -- stated, not absorbed). 30-minute basis. The earlier flat-energy placeholder is GONE; this profile now expresses the structure R-5 said the object could not.",
   "timezone": "America/New_York",
   "installed_charger_kw": 7512,
-  "grid": { "service_capacity_kw": 3000, "voltage_class": "primary", "safety_margin_pct": 0 },
-  "layout": { "move_duration_min": 4, "path_capacity": 2, "dcfc_cooldown_min": 18 },
+  "grid": {
+    "service_capacity_kw": 3000,
+    "voltage_class": "primary",
+    "safety_margin_pct": 0
+  },
+  "layout": {
+    "move_duration_min": 4,
+    "path_capacity": 2,
+    "dcfc_cooldown_min": 18
+  },
   "tariff": {
     "tariff_id": "georgia_power_pll18",
     "utility": "Georgia Power",
     "schedule_code": "PLL-18",
     "source_url": "https://www.georgiapower.com/",
     "source_label": "primary",
-    "notes": "Demand $13.63/kW, 30-minute basis, and the 95% summer ratchet are from research answer R-5 (Georgia Power tariff PDFs). KNOWN LIMITATION, stated rather than approximated away: PLL-18 prices energy in DECLINING BLOCKS whose rate depends on hours-use of demand, so it has no clean $/kWh. The tariff object as built carries a flat energy list and CANNOT express that structure; the 0.055 $/kWh below is a placeholder, not a sourced rate. The demand side -- which is what a scheduler optimises against -- is faithful. Extending the object with hours-use blocks needs the block table, which R-5 does not carry; filed as a limitation, not silently rounded.",
-    "fixed_charge_per_month": 0,
-    "summer_months": [6, 7, 8, 9],
-    "winter_months": [12, 1, 2, 3],
-    "energy": [ { "season": "all", "tou_window": null, "rate_per_kwh": 0.055 } ],
-    "demand": [
-      { "label": "billing demand", "basis": "NCP", "interval_min": 30, "season": "all",
-        "tiers": [ { "up_to_kw": null, "rate": 13.63 } ] }
+    "notes": "Blocks, floor, and ratchet legs read verbatim from Georgia Power Schedule PLL-18 (eff. April 2025 billing month) via research answer R-6. R-6 open item: the 400/600-hour tail-block boundary text deserves one re-verification before anything prices a >400 hours-use customer; block VALUES are unambiguous. ECCR/DSM/fuel/franchise riders not modelled.",
+    "fixed_charge_per_month": 256.0,
+    "summer_months": [
+      6,
+      7,
+      8,
+      9
     ],
-    "ratchet": { "percent": 95, "lookback_months": 12, "basis_season": "summer" }
+    "winter_months": [
+      12,
+      1,
+      2,
+      3
+    ],
+    "energy": [],
+    "demand": [
+      {
+        "label": "billing demand (interval only)",
+        "basis": "NCP",
+        "interval_min": 30,
+        "season": "all",
+        "tiers": [
+          {
+            "up_to_kw": null,
+            "rate": 0.0
+          }
+        ]
+      }
+    ],
+    "ratchet": {
+      "percent": 95,
+      "lookback_months": 12,
+      "basis_season": "summer"
+    },
+    "hours_use_blocks": {
+      "base_hours": 200,
+      "first_blocks": [
+        {
+          "up_to_kwh": 3000,
+          "rate": 0.18943
+        },
+        {
+          "up_to_kwh": 10000,
+          "rate": 0.171794
+        },
+        {
+          "up_to_kwh": 200000,
+          "rate": 0.146526
+        },
+        {
+          "up_to_kwh": null,
+          "rate": 0.112968
+        }
+      ],
+      "tail_blocks": [
+        {
+          "up_to_hours": 400,
+          "rate": 0.019458
+        },
+        {
+          "up_to_hours": 600,
+          "rate": 0.014671
+        },
+        {
+          "up_to_hours": null,
+          "rate": 0.01101
+        }
+      ],
+      "min_bill_fixed": 0.0,
+      "min_bill_per_kw": 13.63
+    }
   }
 }

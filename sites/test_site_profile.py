@@ -251,3 +251,73 @@ def _tariff_with(interval: int):
         "energy": [{"rate_per_kwh": 0.05}],
         "demand": [{"label": "d", "interval_min": interval, "rate_per_kw": 10.0}],
     })
+
+
+# ---- R-6 corrections: primary windows, hours-use blocks, the daily shape ---------
+
+def test_phoenix_window_is_the_primary_tariffs_not_the_old_assumption():
+    """R-6 read the APS E-35 PDF: on-peak 11:00-21:00 WEEKDAYS, year-round. The
+    repo's original 16:00-19:00 assumption was wrong by a factor of 3.3 in window
+    length -- exactly what the labeled assumption existed to catch."""
+    t = sp.get("phoenix_aps_e35").tariff
+    on = t.window("on")
+    assert on.ranges == ((660, 1260),)
+    assert on.days == "weekdays"
+
+
+def test_atlanta_hours_use_blocks_price_the_primary_table():
+    """PLL-18 verbatim: 18.943 c first 3,000 kWh ... 1.101 c beyond 600 hours-use."""
+    hub = sp.get("atlanta_georgia_power").tariff.hours_use_blocks
+    assert hub is not None
+    # 100 kW billing demand, 10,000 kWh -> hours-use 100, all within 200h x demand
+    cost = hub.energy_cost(10_000, 100.0)
+    assert cost == pytest.approx(3000 * 0.189430 + 7000 * 0.171794)
+    # high load factor pushes energy into the ~1-2c tail: 100 kW, 50,000 kWh = 500h
+    lo = hub.energy_cost(50_000, 100.0)
+    within = hub.energy_cost(20_000, 100.0)          # exactly 200h
+    tail = lo - within
+    # 20,000 kWh sits in the 200-400h block, 10,000 in the 400-600h block
+    assert tail == pytest.approx(20_000 * 0.019458 + 10_000 * 0.014671)
+
+
+def test_atlanta_min_bill_is_a_floor_not_a_charge_on_top():
+    """R-6: $13.63/kW is the minimum-bill floor. A low-load-factor customer pays
+    the floor; a high-load-factor customer pays the blocks."""
+    t = sp.get("atlanta_georgia_power").tariff
+    # tiny energy, big demand -> floor binds
+    spiky = [(0.0, 500.0), (30.0, 0.0), (1440.0, 0.0)]
+    b = t.bill(spiky, month=7, days=30, historical_peak_kw=0.0)
+    assert b["floor_binding"] is True
+    assert b["total"] == pytest.approx(b["min_bill_floor"] + b["fixed_cost"])
+    # sustained load -> blocks exceed the floor
+    flat = [(float(m), 400.0) for m in range(0, 1440, 60)] + [(1440.0, 400.0)]
+    b2 = t.bill(flat, month=7, days=30, historical_peak_kw=0.0)
+    assert b2["floor_binding"] is False
+    assert b2["energy_cost"] > b2["min_bill_floor"]
+
+
+def test_atlanta_high_load_factor_is_rewarded_per_kwh():
+    """The whole point of declining hours-use blocks: more hours at the same
+    demand -> cheaper average energy. If this inverts, the block order broke."""
+    t = sp.get("atlanta_georgia_power").tariff
+    lo_lf = [(float(m), 400.0 if m < 240 else 0.0) for m in range(0, 1440, 15)] + [(1440.0, 0.0)]
+    hi_lf = [(float(m), 400.0 if m < 960 else 0.0) for m in range(0, 1440, 15)] + [(1440.0, 0.0)]
+    b_lo = t.bill(lo_lf, month=7, days=30, historical_peak_kw=0.0)
+    b_hi = t.bill(hi_lf, month=7, days=30, historical_peak_kw=0.0)
+    per_kwh_lo = b_lo["energy_cost"] / (400 * 4 * 30)
+    per_kwh_hi = b_hi["energy_cost"] / (400 * 16 * 30)
+    assert per_kwh_hi < per_kwh_lo
+
+
+def test_las_vegas_daily_demand_and_seasonal_split():
+    """LGS-2 from primary figures (R-6 corrected R-5's third-party $2.68 to
+    $13.43): summer on-peak demand is billed only in summer, winter demand is
+    $1.65, facilities year-round -- the same curve bills very differently by month."""
+    t = sp.get("las_vegas_nv_lgs2").tariff
+    curve = [(float(m), 1000.0 if 901 <= m < 1260 else 200.0)
+             for m in range(0, 1440, 15)] + [(1440.0, 200.0)]
+    summer = t.bill(curve, month=7, days=30, historical_peak_kw=1000)
+    winter = t.bill(curve, month=1, days=30, historical_peak_kw=1000)
+    assert "summer on-peak demand" in summer["billed_peaks_kw"]
+    assert "summer on-peak demand" not in winter["billed_peaks_kw"]
+    assert summer["demand_cost"] > winter["demand_cost"]
