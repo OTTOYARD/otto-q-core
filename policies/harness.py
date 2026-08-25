@@ -33,8 +33,24 @@ class HarnessState:
         self.bookings = []          # (aid, point_id, start, end) charge only
         self.segments = {}          # aid -> [{kw, minutes, start, end}]
 
-    def charge_points(self):
-        return [p for p in self.sc["service_points"] if p["kind"] in ("dcfc", "l2")]
+    def charge_points(self, asset=None):
+        """Charge-capable points -- for THIS asset when one is given.
+
+        Capability is data: an asset class declares charge_kinds and only points
+        of those kinds are its candidates (a robotaxi cannot book an eVTOL pad,
+        an eVTOL cannot book a car DCFC). The default is the legacy robotaxi
+        pair, so single-modality scenarios and their committed artifacts are
+        untouched. With no asset: the union of every class's kinds -- the set of
+        points that are chargers to anyone, used by metrics.
+        """
+        if asset is not None:
+            kinds = tuple(self.sc["asset_classes"][asset.cls].get(
+                "charge_kinds", ("dcfc", "l2")))
+        else:
+            kinds = set()
+            for cls in self.sc["asset_classes"].values():
+                kinds.update(cls.get("charge_kinds", ("dcfc", "l2")))
+        return [p for p in self.sc["service_points"] if p["kind"] in kinds]
 
     def point(self, pid):
         return next(p for p in self.sc["service_points"] if p["id"] == pid)
@@ -50,7 +66,8 @@ class HarnessState:
         for seg in charge_segments(self.sc, asset, point["kw"]):
             segs.append({**seg, "start": t, "end": t + seg["minutes"]})
             t += seg["minutes"]
-        cool = self.sc["site"]["dcfc_cooldown_min"] if point["kind"] == "dcfc" else 0
+        cool = int(point.get("min_gap_min",
+                   self.sc["site"]["dcfc_cooldown_min"] if point["kind"] == "dcfc" else 0))
         assert start >= self._free[point["id"]], \
             f"double-booking {point['id']}: start {start} < free {self._free[point['id']]}"
         self._free[point["id"]] = t + cool
@@ -87,6 +104,8 @@ def run_policy_traced(sc, policy):
 
     # identical downstream routing for every policy: FCFS wash, then inspect
     mv = sc["site"]["move_duration_min"]
+    wash_min = int(sc["site"].get("wash_min", 12))
+    inspect_min = int(sc["site"].get("inspect_min", 20))
     wash_free = {p["id"]: 0 for p in sc["service_points"] if p["kind"] == "wash_bay"}
     svc_free = {p["id"]: 0 for p in sc["service_points"] if p["kind"] == "service_bay"}
     per_asset, events = {}, []
@@ -97,14 +116,14 @@ def run_policy_traced(sc, policy):
         if asset.needs_wash:
             pid = min(wash_free, key=lambda k: (wash_free[k], k))
             ws = max(finish + mv, wash_free[pid])
-            wash_free[pid] = ws + 12
-            finish = ws + 12
+            wash_free[pid] = ws + wash_min
+            finish = ws + wash_min
             moves += 1
         if asset.needs_inspect:
             pid = min(svc_free, key=lambda k: (svc_free[k], k))
             isv = max(finish + mv, svc_free[pid])
-            svc_free[pid] = isv + 20
-            finish = isv + 20
+            svc_free[pid] = isv + inspect_min
+            finish = isv + inspect_min
             moves += 1
         segs = state.segments[asset.aid]
         for s in segs:

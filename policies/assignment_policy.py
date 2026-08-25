@@ -63,7 +63,7 @@ class FifoPolicy(AssignmentPolicy):
     def decide(self, state, arrivals):
         out = []
         for asset in sorted(arrivals, key=lambda a: (a.arrival_min, a.aid)):
-            best = min(state.charge_points(),
+            best = min(state.charge_points(asset),
                        key=lambda p: (_earliest_start(state, asset, p),
                                       state.point_order(p["id"])))
             start = _earliest_start(state, asset, best)
@@ -79,7 +79,7 @@ class GreedyPolicy(AssignmentPolicy):
     def decide(self, state, arrivals):
         out = []
         for asset in sorted(arrivals, key=lambda a: (a.arrival_min, a.aid)):
-            best = min(state.charge_points(),
+            best = min(state.charge_points(asset),
                        key=lambda p: (_earliest_start(state, asset, p)
                                       + _chain_minutes(state.sc, asset, p),
                                       state.point_order(p["id"])))
@@ -100,6 +100,12 @@ class OttoQAsIsPolicy(AssignmentPolicy):
     books in the same step — the P0 invariant).
     """
     name = "otto_q_asis"
+    #: DELIBERATELY NOT capability-aware. This class is a faithful reduction
+    #: of the live robotaxi cursor, which has no multi-class capability
+    #: concept; teaching the reduction things the production function does
+    #: not know would make it stop being a reduction. Multimodal comparisons
+    #: therefore EXCLUDE it with a stated reason instead of letting it book
+    #: aircraft onto car chargers and score noise.
     PLUG_TARGET_SOC = 55
 
     def decide(self, state, arrivals):

@@ -191,3 +191,85 @@ def test_billed_curve_conserves_every_charged_kwh():
     day = site_load_curve(state, end_min=1440, step_min=1)
     day_kwh = sum(kw / 60.0 for _, kw in day[:-1])
     assert day_kwh <= curve_kwh + 1e-6
+
+
+# ---- the multimodal hero-shot backend: vertiport over depot ----------------------
+
+@pytest.fixture(scope="module")
+def mm():
+    from forward import multimodal_comparison
+    return multimodal_comparison()
+
+
+def test_multimodal_forward_runs_the_morning_rush(mm):
+    """The wedge itself: on an oversubscribed multimodal site, the joint solve is
+    the only policy that turns the commuter peak around on time WITHIN the
+    physical service capacity."""
+    f = mm["policies"]["forward"]
+    assert f["total_tardy_min"] == 0
+    assert f["physically_runnable"] is True
+    assert f["peak_site_kw"] <= mm["service_capacity_kw"]
+
+
+def test_multimodal_myopic_policies_cannot_physically_run(mm):
+    """fifo and greedy exceed the 800 kW service in the rush -- in the real world
+    a tripped main or a brownout mid-turnaround, not a worse score.
+
+    Scope of the claim, stated so it is never overquoted: MYOPIC PER-ASSET
+    policies with no site-level view exceed the service. It does not say no
+    other algorithm could stay under -- staying under while meeting deadlines
+    requires seeing every modality's demand at once, and a policy that does so
+    has become a site-level coordinator, which is the product. If a future
+    myopic policy passes this, that is worth understanding, not suppressing.
+    """
+    for name in ("fifo", "greedy"):
+        r = mm["policies"][name]
+        assert r["physically_runnable"] is False, name
+        assert r["exceeds_service_kw"] > 0, name
+
+
+def test_multimodal_no_asset_books_an_incapable_point():
+    """Capability is data and it binds every policy: aircraft never book car
+    chargers, cars never book pads, drones only their pads."""
+    import sys as _sys
+    _sys.path.insert(0, str(HERE.parent / "solvers" / "cpsat"))
+    from assignment_policy import FifoPolicy, GreedyPolicy
+    from forward import ForwardOrchestratorPolicy
+    from harness import run_policy_traced
+    from model import load_scenario
+
+    sc_path = HERE.parent / "solvers" / "cpsat" / "scenario_vertiport.json"
+    for cls in (FifoPolicy, GreedyPolicy, ForwardOrchestratorPolicy):
+        sc = load_scenario(sc_path)
+        _, state = run_policy_traced(sc, cls())
+        kinds = {p["id"]: p["kind"] for p in sc["service_points"]}
+        by_aid = {a.aid: a for a in sc["assets"]}
+        for aid, pid, _, _ in state.bookings:
+            allowed = tuple(sc["asset_classes"][by_aid[aid].cls].get(
+                "charge_kinds", ("dcfc", "l2")))
+            assert kinds[pid] in allowed, \
+                f"{cls.__name__}: {aid} booked {pid} ({kinds[pid]}), allowed {allowed}"
+
+
+def test_multimodal_artifact_is_deterministic_and_committed(mm):
+    import json
+    from forward import multimodal_comparison
+    assert mm["multimodal_sha256"] == multimodal_comparison()["multimodal_sha256"]
+    blob = json.dumps(mm, indent=1, sort_keys=True) + "\n"
+    assert blob == (HERE / "multimodal_seed424242.json").read_text()
+
+
+def test_multimodal_exclusions_carry_their_reasons(mm):
+    assert "otto_q_asis" in mm["excluded"]
+    assert "capability" in mm["excluded"]["otto_q_asis"]
+    assert any("R-7" in a for a in mm["assumptions"])
+
+
+def test_the_solver_knows_no_vertiport_vocabulary():
+    """Kernel purity, asserted at the source level: the words that make this a
+    vertiport (pad_charge, swap_dock, drone_pad, evtol, drone) appear in the
+    SCENARIO and nowhere in the solver. If one leaks into model.py, a sector
+    has entered the kernel and CLAUDE.md 2.2 calls that an escalation."""
+    src = (HERE.parent / "solvers" / "cpsat" / "model.py").read_text()
+    for word in ("pad_charge", "swap_dock", "drone_pad", "evtol", "vertiport"):
+        assert word not in src, f"sector word {word!r} leaked into the kernel"

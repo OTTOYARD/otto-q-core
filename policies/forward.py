@@ -259,6 +259,78 @@ def forward_comparison(scenario_path, *, site_id: str = "site_alpha",
     return payload
 
 
+def multimodal_comparison() -> dict:
+    """The hero-shot backend: three modalities, one cap, and who can actually fly.
+
+    scenario_vertiport.json declares eVTOL pads above, ground chargers below and
+    drone pads at the edge, on an 800 kW service deliberately oversubscribed
+    2.11:1. The comparison runs the capability-aware myopic policies against the
+    forward orchestrator and reports, per policy, the ONE number this scenario
+    exists to expose: the peak versus the service limit. A schedule whose peak
+    exceeds the site's physical service capacity is not a worse schedule -- it is
+    a schedule that CANNOT RUN; in the real world it is a tripped main or a
+    brownout mid-turnaround. Myopic policies cannot avoid this, because avoiding
+    it requires seeing every modality's demand at once, which is the wedge.
+
+    otto_q_asis is EXCLUDED, with the reason stated in its class: it is a
+    faithful reduction of the live robotaxi cursor, which has no multi-class
+    capability concept; including it would book aircraft onto car chargers and
+    score noise rather than the as-is engine.
+    """
+    from assignment_policy import FifoPolicy, GreedyPolicy
+
+    sc_path = HERE.parent / "solvers" / "cpsat" / "scenario_vertiport.json"
+    import json as _json
+    doc = _json.loads(Path(sc_path).read_text())
+    cap = float(doc["site"]["power_cap_kw_hard"])
+    site = get_site("site_alpha")                    # NES tariff; power cap is the scenario's
+
+    rows: dict[str, dict] = {}
+    for cls in (FifoPolicy, GreedyPolicy, ForwardOrchestratorPolicy):
+        sc = load_scenario(sc_path)                  # CRN: same declared fleet for all
+        policy = cls()
+        result, state = run_policy_traced(sc, policy)
+        curve = site_load_curve(state, end_min=doc["horizon_min"])
+        peak = float(result["metrics"]["peak_site_kw"])
+        bill = site.tariff.bill(curve, month=7, days=30, historical_peak_kw=peak)
+        rows[policy.name] = {
+            "total_tardy_min": result["metrics"]["total_tardy_min"],
+            "peak_site_kw": peak,
+            "exceeds_service_kw": round(max(0.0, peak - cap), 1),
+            "physically_runnable": peak <= cap + 1e-9,
+            "monthly_total": bill["total"],
+        }
+
+    lb = peak_lower_bound(sc_path)
+    payload = {
+        "scenario": "vertiport_over_depot_v1",
+        "seed": 424242,
+        "service_capacity_kw": cap,
+        "nameplate_kw": sum(p["kw"] for p in doc["service_points"]),
+        "policies": {k: rows[k] for k in sorted(rows)},
+        "peak_lower_bound_kw": lb["peak_lower_bound_kw"],
+        "excluded": {
+            "otto_q_asis": "faithful reduction of the live robotaxi cursor; no "
+                           "multi-class capability concept -- would book aircraft "
+                           "onto car chargers and score noise",
+            "cpsat_weighted": "superseded by forward's lexicographic solve on the "
+                              "same model; one exact-solver entry is enough here",
+        },
+        "assumptions": [
+            "Swap dock expressed as a 450 kW transfer, not a fixed-duration swap "
+            "-- pending the finishing-chain generalization; labeled in the scenario.",
+            "eVTOL and drone turnaround parameters are engineering placeholders "
+            "pending research request R-7; they are scenario DATA, so correcting "
+            "them edits the JSON, never the solver.",
+            "Billing uses the NES GSA-3 tariff; the power cap is the scenario's "
+            "own 800 kW service.",
+        ],
+    }
+    blob = json.dumps(payload, indent=1, sort_keys=True)
+    payload["multimodal_sha256"] = hashlib.sha256(blob.encode()).hexdigest()
+    return payload
+
+
 def forward_comparison_24h() -> dict:
     """The same formulation at scale: the 24h KPI-gate scenario, 16 assets, 30 hours.
 
@@ -275,29 +347,40 @@ def forward_comparison_24h() -> dict:
 
 
 def main() -> dict:
-    if "--24h" in sys.argv:
+    if "--vertiport" in sys.argv:
+        comp = multimodal_comparison()
+        artifact = HERE / "multimodal_seed424242.json"
+    elif "--24h" in sys.argv:
         comp = forward_comparison_24h()
         artifact = HERE / "forward_24h_seed424242.json"
     else:
         sc = HERE.parent / "solvers" / "cpsat" / "scenario_canonical.json"
         comp = forward_comparison(sc)
         artifact = HERE / "forward_seed424242.json"
+    sha = comp.get("forward_sha256") or comp.get("multimodal_sha256")
     blob = json.dumps(comp, indent=1, sort_keys=True) + "\n"
     if "--write" in sys.argv:
         artifact.write_text(blob)
-        print(f"wrote {artifact.name}  sha256={comp['forward_sha256']}")
+        print(f"wrote {artifact.name}  sha256={sha}")
     elif artifact.exists():
         same = artifact.read_text() == blob
-        print(f"regenerated sha256={comp['forward_sha256']} -> "
+        print(f"regenerated sha256={sha} -> "
               f"{'MATCHES' if same else 'DIFFERS FROM'} committed artifact")
 
     print(f"\nprovable ideal peak: {comp['peak_lower_bound_kw']} kW\n")
-    print(f"  {'policy':>12} {'tardy min':>10} {'peak kW':>8} {'month $':>9} {'vs fifo':>9}")
+    print(f"  {'policy':>12} {'tardy min':>10} {'peak kW':>8} {'month $':>9}")
     for name, r in comp["policies"].items():
         print(f"  {name:>12} {r['total_tardy_min']:>10,} {r['peak_site_kw']:>8,.0f} "
-              f"{r['monthly_total']:>9,.0f} {r['monthly_delta_vs_fifo']:>9,.0f}")
-    fs = comp["forward_with_storage"]
-    if fs["supported"]:
+              f"{r['monthly_total']:>9,.0f}")
+    if "service_capacity_kw" in comp:
+        cap = comp["service_capacity_kw"]
+        print(f"\n  service {cap:.0f} kW / nameplate {comp['nameplate_kw']} kW:")
+        for name, r in comp["policies"].items():
+            tag = "RUNS" if r["physically_runnable"] else \
+                  f"CANNOT RUN (+{r['exceeds_service_kw']} kW over service)"
+            print(f"    {name:>12}: {tag}")
+    fs = comp.get("forward_with_storage")
+    if fs and fs["supported"]:
         print(f"\n  forward + storage ({fs['storage_site_id']}): grid held at "
               f"{fs['grid_peak_kw']} kW -> ${fs['monthly_total']:,.0f}/mo "
               f"(battery moves {fs['deficit_kwh']} kWh, recharges {fs['recharge_kwh']})")

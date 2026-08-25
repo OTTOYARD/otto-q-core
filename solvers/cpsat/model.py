@@ -72,16 +72,40 @@ def load_scenario(path: str | Path) -> dict:
 
 
 def _generate_assets(sc: dict) -> list[Asset]:
+    """Build the fleet. Two paths, both pure functions of the scenario file:
+
+    - `assets_spec.explicit`: a DECLARED list of assets, verbatim. This is how a
+      multimodal scenario states exactly which eVTOLs, drones and ground vehicles
+      arrive when -- no generator opinions involved.
+    - the legacy seeded generator, byte-for-byte what it always was (every magic
+      number below is the historical default, kept so the committed artifacts
+      regenerate identically; a scenario overrides them as data, never here).
+    """
+    spec = sc["assets_spec"]
+    menu = sorted(sc["parallel_ops_menu"].keys())
+
+    if "explicit" in spec:
+        return [Asset(
+            aid=a["aid"], cls=a["cls"], arrival_min=int(a["arrival_min"]),
+            soc=int(a["soc"]), target_soc=int(a.get("target_soc", 90)),
+            ready_by_min=int(a["ready_by_min"]),
+            pack_temp_c=int(a.get("pack_temp_c", 18)),
+            needs_wash=bool(a.get("needs_wash", False)),
+            needs_inspect=bool(a.get("needs_inspect", False)),
+            parallel_ops=list(a.get("parallel_ops", [])),
+        ) for a in spec["explicit"]]
+
     rng = random.Random(sc["seed"])
     classes = sorted(sc["asset_classes"].keys())
-    menu = sorted(sc["parallel_ops_menu"].keys())
-    aw = sc["assets_spec"].get("arrival_window_min", [0, 180])
-    rd = sc["assets_spec"].get("ready_delta_min", [150, 330])
+    aw = spec.get("arrival_window_min", [0, 180])
+    rd = spec.get("ready_delta_min", [150, 330])
+    sr = spec.get("soc_range", [12, 55])
+    target = spec.get("target_soc", 90)
     out = []
-    for i in range(sc["assets_spec"]["count"]):
+    for i in range(spec["count"]):
         cls = classes[i % len(classes)]
         arrival = rng.randrange(aw[0], aw[1])
-        soc = rng.randrange(12, 55)
+        soc = rng.randrange(sr[0], sr[1])
         ready_by = arrival + rng.randrange(rd[0], rd[1])
         out.append(
             Asset(
@@ -89,7 +113,7 @@ def _generate_assets(sc: dict) -> list[Asset]:
                 cls=cls,
                 arrival_min=arrival,
                 soc=soc,
-                target_soc=90,
+                target_soc=target,
                 ready_by_min=ready_by,
                 pack_temp_c=(-2 if rng.random() < 0.25 else 18),
                 needs_wash=(rng.random() < 0.5),
@@ -187,10 +211,28 @@ def build_and_solve(
     W = sc["objective_weights"]
 
     points = [p for p in sc["service_points"]]
-    charge_points = {"dcfc": [p for p in points if p["kind"] == "dcfc"],
-                     "l2": [p for p in points if p["kind"] == "l2"]}
+    #: Charge-capable point kinds are DATA: an asset class declares charge_kinds
+    #: (an ordered list -- candidate enumeration order is part of determinism),
+    #: and points of those kinds are its candidates. The default is the legacy
+    #: robotaxi pair so committed scenarios regenerate byte-identically. This is
+    #: what lets an eVTOL pad, a swap dock or a mining refuel bay be a first-
+    #: class point without editing solver code -- the kernel-purity test.
+    def _charge_kinds(asset) -> tuple[str, ...]:
+        return tuple(sc["asset_classes"][asset.cls].get("charge_kinds",
+                                                        ("dcfc", "l2")))
+
+    points_by_kind: dict[str, list] = {}
+    for p in points:
+        points_by_kind.setdefault(p["kind"], []).append(p)
     wash_points = [p for p in points if p["kind"] == "wash_bay"]
     svc_points = [p for p in points if p["kind"] == "service_bay"]
+    #: Wash/inspect are the legacy finishing ops; their durations were literals
+    #: (12 / 20) baked into the kernel until the separation audit flagged them.
+    #: Now scenario data with the historical defaults. Their full generalization
+    #: -- an arbitrary declared finishing chain -- is a known remaining step; it
+    #: is vocabulary debt, not simulation bleed (SEPARATION.md).
+    wash_min = int(site.get("wash_min", 12))
+    inspect_min = int(site.get("inspect_min", 20))
 
     per_point_intervals: dict[str, list] = {p["id"]: [] for p in points}
     power_intervals, power_demands = [], []          # hard site cap
@@ -218,8 +260,8 @@ def build_and_solve(
 
         # ---- charge: choose ONE point among capable charge points ------------
         cands = []
-        for kind in ("dcfc", "l2"):
-            for p in charge_points[kind]:
+        for kind in _charge_kinds(asset):
+            for p in points_by_kind.get(kind, []):
                 if p["id"] in blocked and (asset.aid, "charge") not in pinned:
                     continue
                 cands.append((kind, p))
@@ -260,7 +302,11 @@ def build_and_solve(
                 onpeak_terms.append(seg["kw"] * gated)
             # point-side occupancy: chain + cooldown (DCFC only) — the 2.5
             # min-gap ON THE POINT, exactly
-            cool = site["dcfc_cooldown_min"] if kind == "dcfc" else 0
+            #: Minimum gap ON THE POINT (CLAUDE.md 2.5). Declared per point as
+            #: min_gap_min (a pad's turnaround separation, a swap dock's reload);
+            #: the legacy default keeps DCFC cooldown exactly as it was.
+            cool = int(p.get("min_gap_min",
+                             site["dcfc_cooldown_min"] if kind == "dcfc" else 0))
             occ_e = m.NewIntVar(0, H + cool, f"occend.{asset.aid}.{p['id']}")
             #: 0069-fix analogue in the model: occupancy runs to stay_end (charge
             #: AND parallel ops), not merely to the end of the charge chain. The
@@ -331,7 +377,7 @@ def build_and_solve(
                 if p["id"] in blocked and (asset.aid, "wash") not in pinned:
                     continue
                 lit = m.NewBoolVar(f"{asset.aid}.wash@{p['id']}")
-                iv = m.NewOptionalIntervalVar(ws, 12, we, lit, f"{asset.aid}.wash.{p['id']}")
+                iv = m.NewOptionalIntervalVar(ws, wash_min, we, lit, f"{asset.aid}.wash.{p['id']}")
                 per_point_intervals[p["id"]].append(iv)
                 wl.append((lit, p))
             m.AddExactlyOne([l for l, _ in wl])
@@ -358,7 +404,7 @@ def build_and_solve(
             il = []
             for p in svc_points:
                 lit = m.NewBoolVar(f"{asset.aid}.insp@{p['id']}")
-                iv = m.NewOptionalIntervalVar(isv, 20, iev, lit, f"{asset.aid}.insp.{p['id']}")
+                iv = m.NewOptionalIntervalVar(isv, inspect_min, iev, lit, f"{asset.aid}.insp.{p['id']}")
                 per_point_intervals[p["id"]].append(iv)
                 il.append((lit, p))
             m.AddExactlyOne([l for l, _ in il])
