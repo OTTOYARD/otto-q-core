@@ -1,0 +1,622 @@
+{
+  "name": "deck_site_alpha_overnight_v1",
+  "comment": "THE DECK-SCALE PROOF RUN's world: Site Alpha's committed C8 tenants and points, expressed for the generalized kernel model, one overnight service window (18:00 -> 06:00, 720 min). Fleet is the committed mix -- 18 overnight-heavy robotaxis, 6 evening-wave yard tractors, 24 opportunity-charging AMRs -- frozen as an explicit list drawn once at seed 424242 so the world is reviewable data. Points are Site Alpha's: 10x150 kW DCFC, 8x11 kW L2, 6x4 kW AMR pads, 2 wash, 1 service bay (calibration and swap dock omitted: no asset in this window uses them). Purpose: the slide-10 A/B -- unmanaged charge-on-arrival FCFS vs the forward orchestrator -- same fleet, same arrivals, billed on the real NES GSA-3 tariff, with the BESS-equivalence column computed by the foresight dispatcher.",
+  "seed": 424242,
+  "horizon_min": 720,
+  "site": {
+    "power_cap_kw_hard": 3000,
+    "power_soft_target_kw": 2200,
+    "dcfc_cooldown_min": 18,
+    "move_duration_min": 4,
+    "path_capacity": 2,
+    "cold_start_below_c": 5,
+    "cold_start_penalty_min": 12,
+    "onpeak_window_min": [
+      0,
+      180
+    ]
+  },
+  "objective_weights": {
+    "tardiness_per_min": 10,
+    "onpeak_kw_min": 1,
+    "peak_excess_per_kw": 20,
+    "per_move": 15
+  },
+  "asset_classes": {
+    "waymo_jaguar_ipace_2024": {
+      "battery_kwh": 90,
+      "max_charge_kw": 100,
+      "inlet": "CCS",
+      "charge_kinds": [
+        "dcfc",
+        "l2"
+      ],
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        },
+        {
+          "above_soc_pct": 70,
+          "accept_frac": 0.6
+        },
+        {
+          "above_soc_pct": 85,
+          "accept_frac": 0.35
+        }
+      ]
+    },
+    "yard_tractor_e_2025": {
+      "battery_kwh": 220,
+      "max_charge_kw": 150,
+      "inlet": "CCS",
+      "charge_kinds": [
+        "dcfc"
+      ],
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        },
+        {
+          "above_soc_pct": 70,
+          "accept_frac": 0.65
+        },
+        {
+          "above_soc_pct": 85,
+          "accept_frac": 0.4
+        }
+      ]
+    },
+    "amr_pallet_2025": {
+      "battery_kwh": 12,
+      "max_charge_kw": 4,
+      "inlet": "pad",
+      "charge_kinds": [
+        "amr_pad"
+      ],
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        }
+      ]
+    }
+  },
+  "service_points": [
+    {
+      "id": "SA-DCFC-01",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-DCFC-02",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-DCFC-03",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-DCFC-04",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-DCFC-05",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-DCFC-06",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-DCFC-07",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-DCFC-08",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-DCFC-09",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-DCFC-10",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "SA-L2-01",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "SA-L2-02",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "SA-L2-03",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "SA-L2-04",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "SA-L2-05",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "SA-L2-06",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "SA-L2-07",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "SA-L2-08",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "SA-AMR-01",
+      "kind": "amr_pad",
+      "kw": 4
+    },
+    {
+      "id": "SA-AMR-02",
+      "kind": "amr_pad",
+      "kw": 4
+    },
+    {
+      "id": "SA-AMR-03",
+      "kind": "amr_pad",
+      "kw": 4
+    },
+    {
+      "id": "SA-AMR-04",
+      "kind": "amr_pad",
+      "kw": 4
+    },
+    {
+      "id": "SA-AMR-05",
+      "kind": "amr_pad",
+      "kw": 4
+    },
+    {
+      "id": "SA-AMR-06",
+      "kind": "amr_pad",
+      "kw": 4
+    },
+    {
+      "id": "SA-WASH-01",
+      "kind": "wash_bay",
+      "kw": 0
+    },
+    {
+      "id": "SA-WASH-02",
+      "kind": "wash_bay",
+      "kw": 0
+    },
+    {
+      "id": "SA-SVC-01",
+      "kind": "service_bay",
+      "kw": 0
+    }
+  ],
+  "parallel_ops_menu": {
+    "sensor_clean": {
+      "dur_min": 6
+    },
+    "interior_tidy": {
+      "dur_min": 10
+    },
+    "software_update": {
+      "dur_min": 25
+    }
+  },
+  "assets_spec": {
+    "explicit": [
+      {
+        "aid": "RT-00",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 369,
+        "soc": 24,
+        "target_soc": 90,
+        "ready_by_min": 680
+      },
+      {
+        "aid": "RT-01",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 419,
+        "soc": 43,
+        "target_soc": 90,
+        "ready_by_min": 677
+      },
+      {
+        "aid": "RT-02",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 251,
+        "soc": 31,
+        "target_soc": 90,
+        "ready_by_min": 672
+      },
+      {
+        "aid": "RT-03",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 275,
+        "soc": 45,
+        "target_soc": 90,
+        "ready_by_min": 704
+      },
+      {
+        "aid": "RT-04",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 337,
+        "soc": 32,
+        "target_soc": 90,
+        "ready_by_min": 685
+      },
+      {
+        "aid": "RT-05",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 379,
+        "soc": 39,
+        "target_soc": 90,
+        "ready_by_min": 672
+      },
+      {
+        "aid": "RT-06",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 279,
+        "soc": 40,
+        "target_soc": 90,
+        "ready_by_min": 706
+      },
+      {
+        "aid": "RT-07",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 409,
+        "soc": 29,
+        "target_soc": 90,
+        "ready_by_min": 687
+      },
+      {
+        "aid": "RT-08",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 241,
+        "soc": 21,
+        "target_soc": 90,
+        "ready_by_min": 672
+      },
+      {
+        "aid": "RT-09",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 394,
+        "soc": 11,
+        "target_soc": 90,
+        "ready_by_min": 688
+      },
+      {
+        "aid": "RT-10",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 383,
+        "soc": 44,
+        "target_soc": 90,
+        "ready_by_min": 686
+      },
+      {
+        "aid": "RT-11",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 265,
+        "soc": 37,
+        "target_soc": 90,
+        "ready_by_min": 696
+      },
+      {
+        "aid": "RT-12",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 276,
+        "soc": 34,
+        "target_soc": 90,
+        "ready_by_min": 670
+      },
+      {
+        "aid": "RT-13",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 373,
+        "soc": 41,
+        "target_soc": 90,
+        "ready_by_min": 717
+      },
+      {
+        "aid": "RT-14",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 353,
+        "soc": 25,
+        "target_soc": 90,
+        "ready_by_min": 684
+      },
+      {
+        "aid": "RT-15",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 409,
+        "soc": 10,
+        "target_soc": 90,
+        "ready_by_min": 693
+      },
+      {
+        "aid": "RT-16",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 292,
+        "soc": 18,
+        "target_soc": 90,
+        "ready_by_min": 718
+      },
+      {
+        "aid": "RT-17",
+        "cls": "waymo_jaguar_ipace_2024",
+        "arrival_min": 384,
+        "soc": 24,
+        "target_soc": 90,
+        "ready_by_min": 688
+      },
+      {
+        "aid": "YT-00",
+        "cls": "yard_tractor_e_2025",
+        "arrival_min": 106,
+        "soc": 17,
+        "target_soc": 90,
+        "ready_by_min": 411
+      },
+      {
+        "aid": "YT-01",
+        "cls": "yard_tractor_e_2025",
+        "arrival_min": 107,
+        "soc": 31,
+        "target_soc": 90,
+        "ready_by_min": 416
+      },
+      {
+        "aid": "YT-02",
+        "cls": "yard_tractor_e_2025",
+        "arrival_min": 141,
+        "soc": 39,
+        "target_soc": 90,
+        "ready_by_min": 473
+      },
+      {
+        "aid": "YT-03",
+        "cls": "yard_tractor_e_2025",
+        "arrival_min": 163,
+        "soc": 25,
+        "target_soc": 90,
+        "ready_by_min": 477
+      },
+      {
+        "aid": "YT-04",
+        "cls": "yard_tractor_e_2025",
+        "arrival_min": 179,
+        "soc": 28,
+        "target_soc": 90,
+        "ready_by_min": 507
+      },
+      {
+        "aid": "YT-05",
+        "cls": "yard_tractor_e_2025",
+        "arrival_min": 125,
+        "soc": 41,
+        "target_soc": 90,
+        "ready_by_min": 527
+      },
+      {
+        "aid": "AM-00",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 503,
+        "soc": 23,
+        "target_soc": 80,
+        "ready_by_min": 640
+      },
+      {
+        "aid": "AM-01",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 22,
+        "soc": 31,
+        "target_soc": 80,
+        "ready_by_min": 239
+      },
+      {
+        "aid": "AM-02",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 30,
+        "soc": 32,
+        "target_soc": 80,
+        "ready_by_min": 268
+      },
+      {
+        "aid": "AM-03",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 262,
+        "soc": 48,
+        "target_soc": 80,
+        "ready_by_min": 408
+      },
+      {
+        "aid": "AM-04",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 116,
+        "soc": 20,
+        "target_soc": 80,
+        "ready_by_min": 324
+      },
+      {
+        "aid": "AM-05",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 78,
+        "soc": 48,
+        "target_soc": 80,
+        "ready_by_min": 240
+      },
+      {
+        "aid": "AM-06",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 590,
+        "soc": 25,
+        "target_soc": 80,
+        "ready_by_min": 719
+      },
+      {
+        "aid": "AM-07",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 304,
+        "soc": 31,
+        "target_soc": 80,
+        "ready_by_min": 444
+      },
+      {
+        "aid": "AM-08",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 468,
+        "soc": 45,
+        "target_soc": 80,
+        "ready_by_min": 679
+      },
+      {
+        "aid": "AM-09",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 145,
+        "soc": 20,
+        "target_soc": 80,
+        "ready_by_min": 294
+      },
+      {
+        "aid": "AM-10",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 127,
+        "soc": 23,
+        "target_soc": 80,
+        "ready_by_min": 351
+      },
+      {
+        "aid": "AM-11",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 326,
+        "soc": 42,
+        "target_soc": 80,
+        "ready_by_min": 482
+      },
+      {
+        "aid": "AM-12",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 40,
+        "soc": 36,
+        "target_soc": 80,
+        "ready_by_min": 222
+      },
+      {
+        "aid": "AM-13",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 367,
+        "soc": 49,
+        "target_soc": 80,
+        "ready_by_min": 489
+      },
+      {
+        "aid": "AM-14",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 483,
+        "soc": 48,
+        "target_soc": 80,
+        "ready_by_min": 636
+      },
+      {
+        "aid": "AM-15",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 364,
+        "soc": 46,
+        "target_soc": 80,
+        "ready_by_min": 529
+      },
+      {
+        "aid": "AM-16",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 155,
+        "soc": 26,
+        "target_soc": 80,
+        "ready_by_min": 283
+      },
+      {
+        "aid": "AM-17",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 505,
+        "soc": 20,
+        "target_soc": 80,
+        "ready_by_min": 659
+      },
+      {
+        "aid": "AM-18",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 437,
+        "soc": 33,
+        "target_soc": 80,
+        "ready_by_min": 558
+      },
+      {
+        "aid": "AM-19",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 540,
+        "soc": 39,
+        "target_soc": 80,
+        "ready_by_min": 719
+      },
+      {
+        "aid": "AM-20",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 344,
+        "soc": 47,
+        "target_soc": 80,
+        "ready_by_min": 489
+      },
+      {
+        "aid": "AM-21",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 512,
+        "soc": 36,
+        "target_soc": 80,
+        "ready_by_min": 698
+      },
+      {
+        "aid": "AM-22",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 501,
+        "soc": 46,
+        "target_soc": 80,
+        "ready_by_min": 719
+      },
+      {
+        "aid": "AM-23",
+        "cls": "amr_pallet_2025",
+        "arrival_min": 509,
+        "soc": 39,
+        "target_soc": 80,
+        "ready_by_min": 651
+      }
+    ]
+  }
+}
