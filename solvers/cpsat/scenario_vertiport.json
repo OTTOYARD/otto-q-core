@@ -1,0 +1,311 @@
+{
+  "name": "vertiport_over_depot_v1",
+  "comment": "THE HERO-SHOT BACKEND, as declared data. eVTOLs land and turn around on pads above; ground robotaxis stage and get serviced below; cargo drones opportunity-charge at the edge -- every modality drawing on ONE 800 kW service connection that is deliberately OVERSUBSCRIBED (1,690 kW nameplate, 2.11:1, inside R-4's observed band), so no modality can be scheduled without seeing the others. Nothing in the solver knows this is a vertiport: pads, swap docks and drone pads are just declared point kinds with declared kW and min-gap; eVTOLs are just assets whose class declares which kinds serve it and how its battery accepts energy. That is the kernel test passing at the scenario level. LABELED ASSUMPTIONS, pending research: (1) the swap dock is expressed as a very fast energy transfer (450 kW, accept_frac 1.0) rather than a true fixed-duration battery-swap operation -- fixed-duration ops are part of the finishing-chain generalization; (2) eVTOL turnaround parameters (charge kW, pad separation minutes, schedule slack) are engineering placeholders pending R-7; (3) drone specs likewise. All three are scenario DATA -- correcting them edits this file, never the solver. ARRIVAL SHAPE: the fleet arrives in a commuter-peak rush (eVTOLs within a 40-minute morning window, robotaxi shift-change overlapping) because that is the demand pattern vertiports exist for; a politely staggered fleet would test nothing.",
+  "seed": 424242,
+  "horizon_min": 720,
+  "site": {
+    "power_cap_kw_hard": 800,
+    "power_soft_target_kw": 600,
+    "dcfc_cooldown_min": 18,
+    "move_duration_min": 4,
+    "path_capacity": 2,
+    "cold_start_below_c": 5,
+    "cold_start_penalty_min": 12,
+    "onpeak_window_min": [
+      240,
+      420
+    ]
+  },
+  "objective_weights": {
+    "tardiness_per_min": 10,
+    "onpeak_kw_min": 1,
+    "peak_excess_per_kw": 20,
+    "per_move": 15
+  },
+  "asset_classes": {
+    "evtol_lift6": {
+      "battery_kwh": 120,
+      "max_charge_kw": 350,
+      "inlet": "CCS-HP",
+      "charge_kinds": [
+        "pad_charge",
+        "swap_dock"
+      ],
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        },
+        {
+          "above_soc_pct": 70,
+          "accept_frac": 0.6
+        },
+        {
+          "above_soc_pct": 85,
+          "accept_frac": 0.35
+        }
+      ]
+    },
+    "drone_cargo_m2": {
+      "battery_kwh": 8,
+      "max_charge_kw": 6,
+      "inlet": "XT90",
+      "charge_kinds": [
+        "drone_pad"
+      ],
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        }
+      ]
+    },
+    "generic_robotaxi": {
+      "battery_kwh": 80,
+      "max_charge_kw": 120,
+      "inlet": "CCS",
+      "charge_kinds": [
+        "dcfc",
+        "l2"
+      ],
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        },
+        {
+          "above_soc_pct": 70,
+          "accept_frac": 0.6
+        },
+        {
+          "above_soc_pct": 85,
+          "accept_frac": 0.35
+        }
+      ]
+    }
+  },
+  "service_points": [
+    {
+      "id": "VP-PAD-01",
+      "kind": "pad_charge",
+      "kw": 300,
+      "min_gap_min": 6
+    },
+    {
+      "id": "VP-PAD-02",
+      "kind": "pad_charge",
+      "kw": 300,
+      "min_gap_min": 6
+    },
+    {
+      "id": "VP-SWAP-01",
+      "kind": "swap_dock",
+      "kw": 450,
+      "min_gap_min": 8
+    },
+    {
+      "id": "VP-DPAD-01",
+      "kind": "drone_pad",
+      "kw": 6
+    },
+    {
+      "id": "VP-DPAD-02",
+      "kind": "drone_pad",
+      "kw": 6
+    },
+    {
+      "id": "VP-DPAD-03",
+      "kind": "drone_pad",
+      "kw": 6
+    },
+    {
+      "id": "VP-DCFC-01",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "VP-DCFC-02",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "VP-DCFC-03",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "VP-DCFC-04",
+      "kind": "dcfc",
+      "kw": 150
+    },
+    {
+      "id": "VP-L2-01",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "VP-L2-02",
+      "kind": "l2",
+      "kw": 11
+    },
+    {
+      "id": "VP-WASH-01",
+      "kind": "wash_bay",
+      "kw": 0
+    },
+    {
+      "id": "VP-SVC-01",
+      "kind": "service_bay",
+      "kw": 0
+    }
+  ],
+  "parallel_ops_menu": {
+    "sensor_clean": {
+      "dur_min": 6
+    },
+    "interior_tidy": {
+      "dur_min": 10
+    },
+    "software_update": {
+      "dur_min": 25
+    }
+  },
+  "assets_spec": {
+    "explicit": [
+      {
+        "aid": "EV-01",
+        "cls": "evtol_lift6",
+        "arrival_min": 60,
+        "soc": 32,
+        "target_soc": 90,
+        "ready_by_min": 135
+      },
+      {
+        "aid": "EV-02",
+        "cls": "evtol_lift6",
+        "arrival_min": 70,
+        "soc": 28,
+        "target_soc": 90,
+        "ready_by_min": 150
+      },
+      {
+        "aid": "EV-03",
+        "cls": "evtol_lift6",
+        "arrival_min": 85,
+        "soc": 35,
+        "target_soc": 90,
+        "ready_by_min": 165
+      },
+      {
+        "aid": "EV-04",
+        "cls": "evtol_lift6",
+        "arrival_min": 100,
+        "soc": 25,
+        "target_soc": 90,
+        "ready_by_min": 185
+      },
+      {
+        "aid": "DR-01",
+        "cls": "drone_cargo_m2",
+        "arrival_min": 65,
+        "soc": 20,
+        "target_soc": 95,
+        "ready_by_min": 400
+      },
+      {
+        "aid": "DR-02",
+        "cls": "drone_cargo_m2",
+        "arrival_min": 110,
+        "soc": 30,
+        "target_soc": 95,
+        "ready_by_min": 500
+      },
+      {
+        "aid": "RT-01",
+        "cls": "generic_robotaxi",
+        "arrival_min": 55,
+        "soc": 18,
+        "target_soc": 90,
+        "ready_by_min": 300,
+        "needs_wash": true,
+        "parallel_ops": [
+          "sensor_clean",
+          "interior_tidy"
+        ]
+      },
+      {
+        "aid": "RT-02",
+        "cls": "generic_robotaxi",
+        "arrival_min": 60,
+        "soc": 40,
+        "target_soc": 90,
+        "ready_by_min": 320,
+        "parallel_ops": [
+          "software_update"
+        ]
+      },
+      {
+        "aid": "RT-03",
+        "cls": "generic_robotaxi",
+        "arrival_min": 70,
+        "soc": 22,
+        "target_soc": 90,
+        "ready_by_min": 340,
+        "needs_wash": true,
+        "parallel_ops": [
+          "sensor_clean"
+        ]
+      },
+      {
+        "aid": "RT-04",
+        "cls": "generic_robotaxi",
+        "arrival_min": 80,
+        "soc": 35,
+        "target_soc": 90,
+        "ready_by_min": 360,
+        "pack_temp_c": -2
+      },
+      {
+        "aid": "RT-05",
+        "cls": "generic_robotaxi",
+        "arrival_min": 90,
+        "soc": 15,
+        "target_soc": 90,
+        "ready_by_min": 400,
+        "needs_inspect": true
+      },
+      {
+        "aid": "RT-06",
+        "cls": "generic_robotaxi",
+        "arrival_min": 95,
+        "soc": 44,
+        "target_soc": 90,
+        "ready_by_min": 420,
+        "parallel_ops": [
+          "interior_tidy"
+        ]
+      },
+      {
+        "aid": "RT-07",
+        "cls": "generic_robotaxi",
+        "arrival_min": 105,
+        "soc": 27,
+        "target_soc": 90,
+        "ready_by_min": 440,
+        "needs_wash": true
+      },
+      {
+        "aid": "RT-08",
+        "cls": "generic_robotaxi",
+        "arrival_min": 115,
+        "soc": 33,
+        "target_soc": 90,
+        "ready_by_min": 460,
+        "parallel_ops": [
+          "sensor_clean",
+          "software_update"
+        ]
+      }
+    ]
+  }
+}

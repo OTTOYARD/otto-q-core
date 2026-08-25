@@ -1,0 +1,40 @@
+{
+ "assumptions": [
+  "Swap dock expressed as a 450 kW transfer, not a fixed-duration swap -- pending the finishing-chain generalization; labeled in the scenario.",
+  "eVTOL and drone turnaround parameters are engineering placeholders pending research request R-7; they are scenario DATA, so correcting them edits the JSON, never the solver.",
+  "Billing uses the NES GSA-3 tariff; the power cap is the scenario's own 800 kW service."
+ ],
+ "excluded": {
+  "cpsat_weighted": "superseded by forward's lexicographic solve on the same model; one exact-solver entry is enough here",
+  "otto_q_asis": "faithful reduction of the live robotaxi cursor; no multi-class capability concept -- would book aircraft onto car chargers and score noise"
+ },
+ "multimodal_sha256": "a45ca13fa9b46997f40bd04876d00a68f5d54c09bded6be8e014a433a7260c02",
+ "nameplate_kw": 1690,
+ "peak_lower_bound_kw": 138.2,
+ "policies": {
+  "fifo": {
+   "exceeds_service_kw": 90.0,
+   "monthly_total": 16449.11,
+   "peak_site_kw": 890.0,
+   "physically_runnable": false,
+   "total_tardy_min": 154
+  },
+  "forward": {
+   "exceeds_service_kw": 0.0,
+   "monthly_total": 8548.35,
+   "peak_site_kw": 300.0,
+   "physically_runnable": true,
+   "total_tardy_min": 0
+  },
+  "greedy": {
+   "exceeds_service_kw": 90.0,
+   "monthly_total": 16363.05,
+   "peak_site_kw": 890.0,
+   "physically_runnable": false,
+   "total_tardy_min": 0
+  }
+ },
+ "scenario": "vertiport_over_depot_v1",
+ "seed": 424242,
+ "service_capacity_kw": 800.0
+}
