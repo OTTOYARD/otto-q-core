@@ -38,7 +38,8 @@ ROOT = Path(__file__).parent.parent
 #: way to dodge the guard, and reviews should treat an unlisted kernel package
 #: as a finding.
 KERNEL_PACKAGES = ("policies", "solvers", "sites", "wear",
-                   "onboarding", "conformance", "recall", "adapters", "metrics")
+                   "onboarding", "conformance", "recall", "adapters", "metrics",
+                   "proposer")
 
 #: Imports that would let kernel code reach state it must not know about.
 FORBIDDEN_IMPORTS = re.compile(
