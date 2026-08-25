@@ -1,6 +1,6 @@
 {
   "name": "vertiport_over_depot_v1",
-  "comment": "THE HERO-SHOT BACKEND, as declared data. eVTOLs land and turn around on pads above; ground robotaxis stage and get serviced below; cargo drones opportunity-charge at the edge -- every modality drawing on ONE 800 kW service connection that is deliberately OVERSUBSCRIBED (1,690 kW nameplate, 2.11:1, inside R-4's observed band), so no modality can be scheduled without seeing the others. Nothing in the solver knows this is a vertiport: pads, swap docks and drone pads are just declared point kinds with declared kW and min-gap; eVTOLs are just assets whose class declares which kinds serve it and how its battery accepts energy. That is the kernel test passing at the scenario level. LABELED ASSUMPTIONS, pending research: (1) the swap dock is expressed as a very fast energy transfer (450 kW, accept_frac 1.0) rather than a true fixed-duration battery-swap operation -- fixed-duration ops are part of the finishing-chain generalization; (2) eVTOL turnaround parameters (charge kW, pad separation minutes, schedule slack) are engineering placeholders pending R-7; (3) drone specs likewise. All three are scenario DATA -- correcting them edits this file, never the solver. ARRIVAL SHAPE: the fleet arrives in a commuter-peak rush (eVTOLs within a 40-minute morning window, robotaxi shift-change overlapping) because that is the demand pattern vertiports exist for; a politely staggered fleet would test nothing.",
+  "comment": "THE HERO-SHOT BACKEND, as declared data -- now on R-7's SOURCED figures. eVTOLs land and turn around on charge pads above; ground robotaxis stage and get serviced below; delivery drones opportunity-charge at the edge -- every modality drawing on ONE 800 kW service. Airframes are real: Joby S4 (~125 kWh, GEACS ~300 kW -- Aviation Week / Joby GEACS PDF; kWh flagged +/-20%, R-7 open item), Archer Midnight (~75 kWh, 800 V, ~10-12 min turnarounds -- AIN / Archer press), Beta ALIA (~220 kWh at 115 kW CONTINUOUS -- beta.team/battery; the slow charger, and the scheduling tension). Per R-7, swap is the EXCEPTION among eVTOLs (Volocopter only, and its pack kWh is NOT FOUND) -- so the swap dock is REMOVED until fixed-duration operations exist and a swap OEM has sourced numbers; assumption (1) of the previous revision is thereby resolved by deletion, not by promotion. ready_by slack uses R-7's demonstrated-capability band (~20-40 min: 7-12 min block times per Joby/Delta, Archer/United filings + 10-12 min charge), not the earlier 65-85 min airline-style placeholder -- R-7 measured that as ~3x too generous. REMAINING LABELED INFERENCE, per R-7: pad min_gap_min=6 (no regulator publishes a time -- downwash criteria are velocity-distance; R-7 Q2 NOT FOUND); drone battery/charge (~2 kWh / ~3 kW derived from the 10-min/10-mile energy budget; no vendor publishes kWh -- R-7 Q4); generic charge-taper curves (per-OEM curves unpublished). ARRIVAL SHAPE: commuter-peak rush, because that is the demand pattern vertiports exist for. All of it is scenario DATA -- correcting any figure edits this file, never the solver.",
   "seed": 424242,
   "horizon_min": 720,
   "site": {
@@ -23,13 +23,12 @@
     "per_move": 15
   },
   "asset_classes": {
-    "evtol_lift6": {
-      "battery_kwh": 120,
-      "max_charge_kw": 350,
-      "inlet": "CCS-HP",
+    "evtol_joby_s4": {
+      "battery_kwh": 125,
+      "max_charge_kw": 300,
+      "inlet": "GEACS",
       "charge_kinds": [
-        "pad_charge",
-        "swap_dock"
+        "pad_charge"
       ],
       "energy_curve": [
         {
@@ -46,10 +45,54 @@
         }
       ]
     },
-    "drone_cargo_m2": {
-      "battery_kwh": 8,
-      "max_charge_kw": 6,
-      "inlet": "XT90",
+    "evtol_archer_midnight": {
+      "battery_kwh": 75,
+      "max_charge_kw": 300,
+      "inlet": "CCS-800V",
+      "charge_kinds": [
+        "pad_charge"
+      ],
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        },
+        {
+          "above_soc_pct": 70,
+          "accept_frac": 0.6
+        },
+        {
+          "above_soc_pct": 85,
+          "accept_frac": 0.35
+        }
+      ]
+    },
+    "evtol_beta_alia": {
+      "battery_kwh": 220,
+      "max_charge_kw": 115,
+      "inlet": "CCS",
+      "charge_kinds": [
+        "pad_charge"
+      ],
+      "energy_curve": [
+        {
+          "above_soc_pct": 0,
+          "accept_frac": 1.0
+        },
+        {
+          "above_soc_pct": 70,
+          "accept_frac": 0.6
+        },
+        {
+          "above_soc_pct": 85,
+          "accept_frac": 0.35
+        }
+      ]
+    },
+    "drone_delivery_2kwh": {
+      "battery_kwh": 2,
+      "max_charge_kw": 3,
+      "inlet": "dock",
       "charge_kinds": [
         "drone_pad"
       ],
@@ -98,25 +141,19 @@
       "min_gap_min": 6
     },
     {
-      "id": "VP-SWAP-01",
-      "kind": "swap_dock",
-      "kw": 450,
-      "min_gap_min": 8
-    },
-    {
       "id": "VP-DPAD-01",
       "kind": "drone_pad",
-      "kw": 6
+      "kw": 3
     },
     {
       "id": "VP-DPAD-02",
       "kind": "drone_pad",
-      "kw": 6
+      "kw": 3
     },
     {
       "id": "VP-DPAD-03",
       "kind": "drone_pad",
-      "kw": 6
+      "kw": 3
     },
     {
       "id": "VP-DCFC-01",
@@ -174,39 +211,39 @@
     "explicit": [
       {
         "aid": "EV-01",
-        "cls": "evtol_lift6",
+        "cls": "evtol_joby_s4",
         "arrival_min": 60,
         "soc": 32,
         "target_soc": 90,
-        "ready_by_min": 135
+        "ready_by_min": 95
       },
       {
         "aid": "EV-02",
-        "cls": "evtol_lift6",
+        "cls": "evtol_archer_midnight",
         "arrival_min": 70,
         "soc": 28,
         "target_soc": 90,
-        "ready_by_min": 150
+        "ready_by_min": 100
       },
       {
         "aid": "EV-03",
-        "cls": "evtol_lift6",
+        "cls": "evtol_joby_s4",
         "arrival_min": 85,
         "soc": 35,
         "target_soc": 90,
-        "ready_by_min": 165
+        "ready_by_min": 125
       },
       {
         "aid": "EV-04",
-        "cls": "evtol_lift6",
+        "cls": "evtol_beta_alia",
         "arrival_min": 100,
-        "soc": 25,
+        "soc": 40,
         "target_soc": 90,
-        "ready_by_min": 185
+        "ready_by_min": 220
       },
       {
         "aid": "DR-01",
-        "cls": "drone_cargo_m2",
+        "cls": "drone_delivery_2kwh",
         "arrival_min": 65,
         "soc": 20,
         "target_soc": 95,
@@ -214,7 +251,7 @@
       },
       {
         "aid": "DR-02",
-        "cls": "drone_cargo_m2",
+        "cls": "drone_delivery_2kwh",
         "arrival_min": 110,
         "soc": 30,
         "target_soc": 95,
