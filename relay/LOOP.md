@@ -1,6 +1,6 @@
 # relay/LOOP.md — the relay loop's anti-bloat contract
 
-The relay loop is a 45-minute cron job that keeps Hermes (research) and Claude Code (build)
+The relay loop is a 2-minute cron job that keeps Hermes (research) and Claude Code (build)
 synchronized through files. This file is the contract that keeps it bounded. Every rule here exists
 to prevent ONE failure: **the loop inventing work forever after the real work is finished.**
 
@@ -51,7 +51,7 @@ No cycle may spawn more than one research item.
 
 ## Kill switch
 
-The entire loop is ONE cron job (`relay-loop`, every 45 min). Chase stops it with one message
+The entire loop is ONE cron job (`relay-loop`, every 2 min). Chase stops it with one message
 ("pause the relay loop") and it is paused/removed. There is no other long-running component.
 
 ## The auto-pilot clarification (read this literally)

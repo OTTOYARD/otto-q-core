@@ -59,10 +59,11 @@ dossier.
 
 ## Loop status
 
-- Recurring task (45-min pull → process REQ-*.md → advance queue → commit+push): **pending** a
-  governance decision — MASTER_SHEET says "push wakes the build agent" (direct-to-main), but
-  AGENTS.md says "never merge; branch + PR, Chase merges." Flagged to Chase; defaulting to
-  branch + PR until confirmed. Research itself is not blocked by this.
+- Recurring task (`relay-loop`, every 2 min): git pull → process REQ-*.md → advance queue →
+  commit+push DIRECT to `origin main` (scoped to `relay/**`). **Resolved by Chase 2026-08-26:**
+  relay/** pushes direct to main (the handoff that wakes the build agent); everything else in the
+  repo stays on branch+PR. Idle cycles are silent and cost nothing (monitor guard suppresses the
+  agent when there is no open work).
 
 ## Log
 
