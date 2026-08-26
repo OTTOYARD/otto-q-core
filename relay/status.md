@@ -66,5 +66,10 @@ dossier.
 
 ## Log
 
+- 2026-08-26 01:45 UTC — bootstrap research wave complete: RES-001…RES-006 written, verified,
+  committed direct to main. R1/R2/R3/R4/R5/R6/R7/R8/R9/R10 + S1/S2 all answered. Queue drained
+  to empty (only R11 recurring weekly sweep remains standing). Key corrections surfaced:
+  EO 14269 = Apr 2025 (not Feb 2026); no "Midsouth" NavalX Tech Bridge (nearest = Midwest/Crane);
+  Corsair unit cost not publicly derivable; AFWERX traditional Open Topic retired for 2026.
 - 2026-08-25 01:35 UTC — bootstrap: context packs committed (pending PR), relay/ + status.md
   written, 6-agent research wave dispatched (RES-001…RES-006).
