@@ -203,20 +203,77 @@ retention (started ops pinned; solver failure returns the previous plan — the 
 without a schedule). Output is a proposal batch in the exact `ottoq_external_proposals` shape,
 `source='cpsat'`.
 
-Test battery (`test_cpsat_prototype.py`, run 2026-08-19):
+Test battery (`test_cpsat_prototype.py`, re-run 2026-08-27; the 2026-08-19 transcript this
+block used to carry was stale — the scenario has moved since, so the T1 line quoted a plan
+the committed scenario no longer produces):
 
 ```
-T1 PASS determinism: sha256 e228ea73d00d518b… identical across 2 solves (OPTIMAL, objective=2131)
-T2 PASS point exclusivity + 18-min DCFC cooldown held on every point
-T3 PASS site power: true peak 436 kW <= hard cap 1000 kW; excess over soft target = 0 kW
-T4 PASS piecewise segments taper above 70% SoC; cold-start modifier applied
-T5 PASS concurrency-in-point + 4-min moves as scheduled operations
-T6 PASS re-solve at t=120 with NASH-DCFC-02 blocked: 9 started ops retained, no new work on the blocked point
-T7 PASS 12 proposals in ottoq_external_proposals shape (source='cpsat'); nothing writes state
-T8 PASS charge_segments derives from the class energy_curve
+T1  PASS determinism: sha256 330efe0721c119a6… identical across 2 solves (OPTIMAL, objective=135)
+T1b PASS truncated solve (FEASIBLE, det budget 0.06) byte-identical idle vs 5 contending processes
+T1c PASS default solve is deterministically budgeted with no wall-clock limit;
+         a wall-clocked plan is labelled reproducible=False
+T1d PASS fresh-process solve matches: sha256 330efe0721c119a6…
+T2  PASS point exclusivity + 18-min DCFC cooldown held on every point
+T3  PASS site power: true peak 440 kW <= hard cap 1000 kW; excess over soft target = 0 kW
+T4  PASS piecewise segments taper above 70% SoC; cold-start modifier applied
+T5  PASS concurrency-in-point + 4-min moves as scheduled operations
+T6  PASS re-solve at t=120 with NASH-DCFC-02 blocked: 9 started ops retained, none on the blocked point
+T7  PASS 12 proposals in ottoq_external_proposals shape (source='cpsat'); nothing writes state
+T8  PASS charge_segments derives from the class energy_curve
 ```
+
+### 6.1 The determinism claim was false, and how (2026-08-27)
+
+The prototype's header claimed determinism under fixed seed on the strength of a fixed
+`random_seed`, a single worker, and a stable build order. It also set
+`solver.parameters.max_time_in_seconds` — **a wall-clock limit** — and said nothing about it.
+A search truncated by the clock stops wherever the machine happened to be at that instant, so
+the plan is a function of how loaded the box was, not of the seed.
+
+T1 could not catch this. The canonical scenario proves OPTIMAL, so no limit ever binds and the
+two solves agree for reasons unrelated to the budget. **A determinism test on a case that
+finishes early is not a determinism test.**
+
+Measured on the canonical scenario, one worker, seed 424242, at a 1.2 s wall-clock limit:
+
+| budget | contending processes | status | objective | plan sha256 |
+|---|---|---|---|---|
+| wall 1.2 s | none | FEASIBLE | 7311 | `eeb58aed4f4bf15a…` |
+| wall 1.2 s | all cores | FEASIBLE | **10261** | **`22797ea092062a6f…`** |
+| det 0.06 | none | FEASIBLE | 13461 | `b809de73c3fef4af…` |
+| det 0.06 | all cores | FEASIBLE | 13461 | `b809de73c3fef4af…` |
+
+Same seed, same scenario, same config: a 40 % worse schedule because the machine was busy —
+and it would have shipped under the same run ID. The deterministic budget is unmoved by the
+same load.
+
+The exposure was not hypothetical. `scenario_deck.json` — the 48-asset deck scenario — solves
+in **19.34 s** against the old **20 s** default. Three percent of margin between the numbers in
+the deck and a different set of numbers.
+
+The fix: `max_deterministic_time` (CP-SAT work units, machine-independent) is the binding limit
+at a 5.0-unit budget, ~7× the worst committed scenario's 0.70; `max_time_in_seconds` is left
+unset. A caller may still pass `time_limit_s` — the live proposer has one tick of
+right-of-first-refusal before the local path pre-empts it — but the plan then carries
+`repro.reproducible = False` unless it proved OPTIMAL, because optimality is limit-independent
+and a truncated search is not. `forward_proposer.propose()` surfaces the same flag in its
+solver accounting, so "truncated by the clock" stays distinguishable in a fire record, the same
+discipline `cuopt_invocation_log` applies to abstention.
+
+No plan moved: all four committed scenarios and the C5 comparison hash byte-identically before
+and after.
+
+T1b is the standing guard — a deliberately truncating deterministic budget solved idle and under
+full CPU contention, asserting byte-identical plans **and** asserting the budget actually bound,
+so the test can never pass vacuously the way T1 did. T1c asserts the posture directly (finite
+deterministic budget, no finite wall-clock limit, single worker); T1d re-solves in a fresh
+process, since repeat solves in one process can agree through warmed state.
 
 The committed `plan_seed424242.json` is the reproducibility artifact: same seed → same sha256.
+It is now **compared** by the battery rather than overwritten by it. Previously the battery
+rewrote the artifact on every run and nothing in CI ever read it — a proof that regenerated
+itself out of any disagreement it might have found. Regenerating is now deliberate
+(`REGEN_PLAN=1`) and lands as a reviewable diff.
 
 ## 7. Nothing deleted (C4 step 5)
 

@@ -3,17 +3,66 @@
 Run:  python3 solvers/cpsat/test_cpsat_prototype.py
 """
 import json
+import math
+import multiprocessing as mp
+import os
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from model import build_and_solve, charge_segments, load_scenario  # noqa: E402
+from ortools.sat.python import cp_model  # noqa: E402
 
 SC_PATH = Path(__file__).parent / "scenario_canonical.json"
 
 
 def overlapping(a, b):
     return a["start"] < b["end"] and b["start"] < a["end"]
+
+
+def _burners() -> int:
+    """Enough busy processes to contend every core, oversubscribed so the load
+    is real even on a single-core runner."""
+    return max(2, (os.cpu_count() or 2) + 1)
+
+
+def _spin(stop):
+    x = 0
+    while not stop.is_set():
+        x = (x * 1103515245 + 12345) % (2**61 - 1)
+
+
+def _solve_under_load(det_budget_s: float) -> dict:
+    procs, stop = [], mp.Event()
+    for _ in range(_burners()):
+        pr = mp.Process(target=_spin, args=(stop,), daemon=True)
+        pr.start()
+        procs.append(pr)
+    time.sleep(0.3)                       # let the load actually land
+    try:
+        return build_and_solve(load_scenario(SC_PATH), det_budget_s=det_budget_s)
+    finally:
+        stop.set()
+        for pr in procs:
+            pr.join(timeout=5)
+
+
+def _capture_params(call):
+    """Run `call` and hand back the CpSolverParameters it actually used."""
+    seen, real = {}, cp_model.CpSolver.Solve
+
+    def spy(self, model, *a, **k):
+        seen["params"] = self.parameters
+        return real(self, model, *a, **k)
+
+    cp_model.CpSolver.Solve = spy
+    try:
+        call()
+    finally:
+        cp_model.CpSolver.Solve = real
+    return seen["params"]
 
 
 def main():
@@ -25,6 +74,74 @@ def main():
     assert p1["plan_sha256"] == p2["plan_sha256"], "T1 FAIL: plans differ across solves"
     print(f"T1 PASS determinism: sha256 {p1['plan_sha256'][:16]}… identical across 2 solves "
           f"(status={p1['solver_status']}, objective={p1['objective']})")
+    #: T1 ON ITS OWN PROVES ALMOST NOTHING, and it is worth being blunt about
+    #: why. This scenario reaches OPTIMAL, so no budget ever binds and the two
+    #: solves agree for a reason that has nothing to do with the budget being
+    #: sound. The determinism question only has teeth when the search is CUT
+    #: OFF -- that is T1b.
+    assert p1["solver_status"] == "OPTIMAL", "T1 assumption changed: see T1b"
+
+    # T1b — THE BUDGET IS DETERMINISTIC WORK, NOT WALL-CLOCK TIME.
+    # A truncating budget, solved twice: once idle, once with every core
+    # contended. CP-SAT's max_time_in_seconds is measured against the machine's
+    # clock, so a search it truncates depends on how loaded the box was --
+    # measured on this scenario at a 1.2s wall limit: objective 7311 idle vs
+    # 10261 loaded, same seed, same config, different plan. max_deterministic_time
+    # counts solver work units and cuts off at the same node on any machine.
+    # This is the test that decides whether "no number ships without a run ID"
+    # is true or decorative.
+    tiny = 0.06
+    idle = build_and_solve(load_scenario(SC_PATH), det_budget_s=tiny)
+    assert idle["solver_status"] != "OPTIMAL", (
+        f"T1b FAIL: det budget {tiny} did not truncate the search "
+        "(status OPTIMAL) -- the test proves nothing; lower the budget")
+    loaded = _solve_under_load(tiny)
+    assert idle["plan_sha256"] == loaded["plan_sha256"], (
+        "T1b FAIL: a truncated solve returned different plans idle vs under "
+        f"CPU contention -- {idle['plan_sha256'][:16]} (obj {idle['objective']}) "
+        f"vs {loaded['plan_sha256'][:16]} (obj {loaded['objective']}). "
+        "The binding limit is not machine-independent.")
+    print(f"T1b PASS truncated solve (status={idle['solver_status']}, det budget "
+          f"{tiny}) byte-identical idle vs {_burners()} contending processes: "
+          f"sha256 {idle['plan_sha256'][:16]}…")
+
+    # T1c — THE POSTURE THAT MAKES T1b HOLD, asserted directly so it cannot
+    # regress quietly: a default solve sets a deterministic budget and sets NO
+    # wall-clock limit. A plan whose search a wall clock may have decided is
+    # labelled non-reproducible, because it is not a function of
+    # (scenario, seed, config) alone.
+    params = _capture_params(lambda: build_and_solve(load_scenario(SC_PATH)))
+    #: CP-SAT's own default for both limits is +inf, so "finite" IS "set".
+    #: Read that way rather than via protobuf presence, which this build of
+    #: ortools does not expose on its parameters wrapper.
+    assert math.isfinite(params.max_deterministic_time), (
+        "T1c FAIL: no deterministic budget set")
+    assert math.isinf(params.max_time_in_seconds), (
+        "T1c FAIL: build_and_solve set a wall-clock limit by default "
+        f"({params.max_time_in_seconds}s) -- that is the T1b failure mode")
+    assert params.num_search_workers == 1, "T1c FAIL: not single-worker"
+    walled = build_and_solve(load_scenario(SC_PATH), time_limit_s=1.2,
+                             det_budget_s=1e9)
+    assert walled["repro"]["reproducible"] is False, (
+        "T1c FAIL: a wall-clock-truncated plan claimed to be reproducible")
+    assert idle["repro"]["reproducible"] is True, (
+        "T1c FAIL: a deterministically-budgeted plan was not labelled reproducible")
+    print("T1c PASS default solve is deterministically budgeted with no "
+          "wall-clock limit; a wall-clocked plan is labelled reproducible=False")
+
+    # T1d — ACROSS PROCESSES, not just twice in one. Repeat solves in a single
+    # process can agree through warmed state that a fresh process would not have.
+    fresh = subprocess.run(
+        [sys.executable, "-c",
+         "import sys,json;sys.path.insert(0,%r);"
+         "from model import build_and_solve, load_scenario;"
+         "print(build_and_solve(load_scenario(%r))['plan_sha256'])"
+         % (str(Path(__file__).parent), str(SC_PATH))],
+        capture_output=True, text=True, check=True).stdout.strip()
+    assert fresh == p1["plan_sha256"], (
+        f"T1d FAIL: fresh process solved to {fresh[:16]}, this one to "
+        f"{p1['plan_sha256'][:16]}")
+    print(f"T1d PASS fresh-process solve matches: sha256 {fresh[:16]}…")
 
     # T2 — POINT EXCLUSIVITY + DCFC COOLDOWN (18 min) ON THE POINT.
     cool = sc["site"]["dcfc_cooldown_min"]
@@ -155,5 +272,32 @@ def main():
 if __name__ == "__main__":
     plan = main()
     out = Path(__file__).parent / "plan_seed424242.json"
-    out.write_text(json.dumps(plan, indent=1, sort_keys=True))
-    print(f"wrote {out.name} (sha256 {plan['plan_sha256']})")
+    #: repro.deterministic_time is a MEASUREMENT and the one field that could
+    #: legitimately move between ortools builds; it stays out of the artifact
+    #: so this file gates the SCHEDULE. The posture (which budget bound,
+    #: whether the plan is reproducible at all) does belong in it.
+    artifact = {k: v for k, v in plan.items() if k != "repro"}
+    artifact["repro"] = {k: v for k, v in plan["repro"].items()
+                         if k != "deterministic_time"}
+    text = json.dumps(artifact, indent=1, sort_keys=True)
+    #: THE COMMITTED ARTIFACT IS THE REPRODUCIBILITY CLAIM, so it is compared,
+    #: not overwritten. Before this, the battery rewrote it on every run and
+    #: nothing in CI ever read it -- a proof that regenerated itself out of any
+    #: disagreement. Regenerate deliberately with REGEN_PLAN=1 and commit the
+    #: diff, which is then reviewable.
+    if out.exists() and out.read_text() != text and not os.environ.get("REGEN_PLAN"):
+        was = json.loads(out.read_text())
+        #: Name the keys that moved. Reporting only the two plan_sha256 values
+        #: is useless when the artifact itself was edited -- the stored hash
+        #: then still matches while the file it describes does not.
+        keys = sorted(set(was) | set(artifact))
+        moved = [k for k in keys if was.get(k) != artifact.get(k)]
+        raise SystemExit(
+            f"DRIFT: {out.name} does not match this run's plan.\n"
+            f"  keys that differ: {', '.join(moved) or '(formatting only)'}\n"
+            f"  committed plan_sha256: {was.get('plan_sha256')}\n"
+            f"  this run:              {plan['plan_sha256']}\n"
+            "If the change is intended, re-run with REGEN_PLAN=1 and commit "
+            "the diff so a reviewer sees exactly what moved.")
+    out.write_text(text)
+    print(f"{out.name} matches (sha256 {plan['plan_sha256']})")

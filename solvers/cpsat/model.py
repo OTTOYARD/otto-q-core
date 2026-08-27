@@ -27,7 +27,18 @@ requirement:
     previous plan; if the solver fails, the previous plan is returned unchanged
     (the site is never without a schedule)
   * determinism under fixed seed -> fixed random_seed, single worker, stable
-    build order; test_cpsat_prototype.py asserts byte-identical plans
+    build order, and -- the part that is easy to get wrong -- a DETERMINISTIC
+    work budget rather than a wall-clock one. CP-SAT's max_time_in_seconds is
+    measured against the machine's clock, so a search cut off by it depends on
+    how fast the box was that day: the same seed on a loaded runner returns a
+    different plan. max_deterministic_time counts solver work units instead and
+    cuts off at the same place on every machine. This file therefore sets a
+    deterministic budget by default and leaves max_time_in_seconds unset.
+    A caller may still pass time_limit_s to bound wall-clock, but the plan then
+    carries plan["repro"]["reproducible"] = False unless it proved OPTIMAL
+    (optimality is limit-independent; a truncated search is not).
+    test_cpsat_prototype.py asserts byte-identical plans, including across
+    processes and under CPU contention -- see T1 and T1b.
 
 The prototype DISPOSES nothing. Its output is a proposal batch in the exact
 shape of ottoq_external_proposals (source='cpsat'), entering the live engine
@@ -45,6 +56,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ortools.sat.python import cp_model
+
+#: Deterministic work budget, in CP-SAT's machine-independent work units.
+#: The four committed scenarios all prove OPTIMAL at <= 0.70 units (deck, the
+#: 48-asset one, at 0.52), so this is ~7x headroom over anything shipped and
+#: the limit is not expected to bind. It exists so an unexpectedly hard
+#: instance terminates in bounded WORK rather than bounded time.
+DET_BUDGET_S = 5.0
 
 # ----------------------------------------------------------------------------
 # Scenario loading and deterministic asset generation
@@ -175,7 +193,8 @@ def build_and_solve(
     t_now: int = 0,
     previous_plan: dict | None = None,
     blocked_points: set[str] | None = None,
-    time_limit_s: float = 20.0,
+    time_limit_s: float | None = None,
+    det_budget_s: float = DET_BUDGET_S,
     objective_mode: str = "weighted",
     max_tardy_total: int | None = None,
 ) -> dict:
@@ -470,20 +489,45 @@ def build_and_solve(
     solver = cp_model.CpSolver()
     solver.parameters.random_seed = sc["seed"] % (2**31)
     solver.parameters.num_search_workers = 1          # determinism
-    solver.parameters.max_time_in_seconds = time_limit_s
+    #: THE BINDING LIMIT IS DETERMINISTIC WORK, NOT WALL-CLOCK TIME.
+    #: max_deterministic_time counts solver work units, so a search truncated
+    #: by it truncates at the same node on every machine. max_time_in_seconds
+    #: does not: under CPU contention the same seed yields a different plan
+    #: (measured -- see test T1b). It is set ONLY if a caller explicitly asks
+    #: for a wall-clock bound, and doing so is recorded in the plan.
+    solver.parameters.max_deterministic_time = det_budget_s
+    if time_limit_s is not None:
+        solver.parameters.max_time_in_seconds = time_limit_s
     status = solver.Solve(m)
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         # THE SITE IS NEVER WITHOUT A SCHEDULE: hand back the previous plan.
         if previous_plan is not None:
+            #: The retained plan is only as reproducible as the plan it came
+            #: from -- AND, if a wall clock was set, the decision to retain at
+            #: all may itself have been the clock's, so say so.
+            prev_repro = dict(previous_plan.get("repro") or {})
+            if time_limit_s is not None:
+                prev_repro["reproducible"] = False
             return {**previous_plan, "retained_previous": True,
-                    "solver_status": solver.StatusName(status)}
+                    "solver_status": solver.StatusName(status),
+                    **({"repro": prev_repro} if prev_repro else {})}
         raise RuntimeError(f"no schedule and no previous plan: {solver.StatusName(status)}")
 
-    return _extract(sc, solver, status, plan_vars, peak_excess)
+    repro = {
+        "det_budget_s": det_budget_s,
+        "deterministic_time": round(solver.deterministic_time, 6),
+        "wall_limit_s": time_limit_s,
+        #: TRUE means this plan is a function of (scenario, seed, config) alone.
+        #: An OPTIMAL proof is limit-independent, so it holds whatever the
+        #: limits were. Otherwise the search was truncated, and only a purely
+        #: deterministic budget truncates it in the same place every time.
+        "reproducible": status == cp_model.OPTIMAL or time_limit_s is None,
+    }
+    return _extract(sc, solver, status, plan_vars, peak_excess, repro)
 
 
-def _extract(sc, solver, status, plan_vars, peak_excess) -> dict:
+def _extract(sc, solver, status, plan_vars, peak_excess, repro=None) -> dict:
     assets_out, proposals = [], []
     for asset in sc["assets"]:
         pv = plan_vars[asset.aid]
@@ -532,4 +576,9 @@ def _extract(sc, solver, status, plan_vars, peak_excess) -> dict:
     }
     plan["plan_sha256"] = hashlib.sha256(
         json.dumps(plan, sort_keys=True).encode()).hexdigest()
+    #: DELIBERATELY AFTER THE HASH. plan_sha256 is the identity of the SCHEDULE;
+    #: it must not move because the box was slower today. The repro record is
+    #: provenance about how that schedule was reached, so it rides alongside.
+    if repro is not None:
+        plan["repro"] = repro
     return plan

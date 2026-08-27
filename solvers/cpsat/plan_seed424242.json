@@ -787,6 +787,11 @@
    "source": "cpsat"
   }
  ],
+ "repro": {
+  "det_budget_s": 5.0,
+  "reproducible": true,
+  "wall_limit_s": null
+ },
  "scenario": "reduced_canonical_nash_v1",
  "seed": 424242,
  "solver_status": "OPTIMAL"
