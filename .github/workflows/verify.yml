@@ -14,7 +14,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install "ortools==9.15.6755" pytest   # PINNED: see SOLVER_STATE.md 6.1 -- 9.11 and 9.15 produce different (equally-optimal) plans
+      # Installs THE pin, from the one file that carries it. See requirements.txt for why the
+      # OR-Tools version is part of a run's identity rather than hygiene.
+      - run: pip install -r requirements.txt
       - name: CP-SAT prototype battery (T1-T8, incl. byte-identical determinism)
         run: python3 solvers/cpsat/test_cpsat_prototype.py
       - name: Policy battery (P1-P5, incl. byte-for-byte committed comparison)

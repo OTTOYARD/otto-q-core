@@ -4,6 +4,7 @@ Run:  python3 solvers/cpsat/test_cpsat_prototype.py
 """
 import json
 import math
+import re
 import multiprocessing as mp
 import os
 import subprocess
@@ -24,6 +25,18 @@ SC_PATH = Path(__file__).parent / "scenario_canonical.json"
 
 def overlapping(a, b):
     return a["start"] < b["end"] and b["start"] < a["end"]
+
+
+def pinned_ortools_version() -> str:
+    """The pinned OR-Tools version, read from requirements.txt — the one file that carries it.
+
+    Parsed rather than duplicated on purpose: a constant here would be a second copy of a number
+    whose whole job is to be singular, and the two would drift the first time one was bumped.
+    """
+    req = (Path(__file__).parents[2] / "requirements.txt").read_text()
+    m = re.search(r"^ortools==(\S+)\s*$", req, re.M)
+    assert m, "requirements.txt no longer pins ortools with =="
+    return m.group(1)
 
 
 def _variant(*, charge_points: int, horizon_min: int, churn: int = 0,
@@ -456,6 +469,21 @@ def main():
           f"horizon solves ({lp['solver_status']}, {served_ops} charges) instead of "
           "reporting the site infeasible")
 
+    # T12 — THE PIN IS SINGULAR, AND CI USES IT.
+    # It used to live only in verify.yml while solvers/cpsat/README.md told developers to
+    # `pip install ortools` unpinned. Given §6.2 — 9.11 and 9.15 give identical objectives and
+    # different plans — a developer on another build running REGEN_PLAN=1 would rewrite the
+    # committed artifact with a foreign plan. The drift gate would catch it in CI, after the fact;
+    # the guard below refuses to write it at all. This test stops the pin becoming two numbers.
+    pinned = pinned_ortools_version()
+    workflow = (Path(__file__).parents[2] / ".github" / "workflows" / "verify.yml").read_text()
+    assert "pip install -r requirements.txt" in workflow, (
+        "T12 FAIL: CI no longer installs from requirements.txt, so the pin has forked")
+    assert "ortools==" not in workflow, (
+        "T12 FAIL: verify.yml carries its own ortools pin again — that is the second copy this "
+        "test exists to prevent")
+    print(f"T12 PASS the OR-Tools pin lives in requirements.txt alone ({pinned}); CI installs from it")
+
     print("ALL TESTS PASS")
     return p1
 
@@ -476,6 +504,17 @@ if __name__ == "__main__":
     #: nothing in CI ever read it -- a proof that regenerated itself out of any
     #: disagreement. Regenerate deliberately with REGEN_PLAN=1 and commit the
     #: diff, which is then reviewable.
+    #: REGENERATING ON AN UNPINNED BUILD IS REFUSED, not merely detected later. REGEN_PLAN is the
+    #: one path that deliberately overwrites the reproducibility artifact, so it is the one path
+    #: where running the wrong OR-Tools silently commits a foreign schedule. CI would catch it on
+    #: the next run; by then it is in the history and someone has to work out why.
+    if os.environ.get("REGEN_PLAN") and ortools.__version__ != pinned_ortools_version():
+        raise SystemExit(
+            f"REFUSING TO REGENERATE {out.name} on ortools {ortools.__version__}.\n"
+            f"  requirements.txt pins {pinned_ortools_version()}, and the version is part of the\n"
+            "  plan's identity: releases break ties among equally-optimal schedules differently,\n"
+            "  so this would commit a different schedule under the same seed (SOLVER_STATE.md 6.2).\n"
+            "  Install the pin first:  pip install -r requirements.txt")
     if out.exists() and out.read_text() != text and not os.environ.get("REGEN_PLAN"):
         was = json.loads(out.read_text())
         #: Name the keys that moved. Reporting only the two plan_sha256 values

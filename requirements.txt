@@ -1,0 +1,14 @@
+# THE reproducibility pin. One source of truth, read by CI and asserted by the battery.
+#
+# OR-Tools version is part of the run's identity, not hygiene. Measured across four committed
+# scenarios (SOLVER_STATE.md 6.2): 9.11.4210 and 9.15.6755 give IDENTICAL objectives and DIFFERENT
+# plans, every time -- they break ties among equally-optimal schedules differently, so which asset
+# goes to which point at which minute moves. The schedule is what ships.
+#
+# This file exists because the pin used to live only in .github/workflows/verify.yml while
+# solvers/cpsat/README.md told developers to `pip install ortools` unpinned. A developer on a
+# different build who ran REGEN_PLAN=1 would rewrite the committed plan_seed424242.json with a
+# foreign plan. CI's drift gate would have caught it after the fact; test_cpsat_prototype.py now
+# refuses to write the artifact at all on an unpinned version.
+ortools==9.15.6755
+pytest
