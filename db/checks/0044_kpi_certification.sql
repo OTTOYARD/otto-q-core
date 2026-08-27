@@ -21,9 +21,27 @@ SELECT 'K2 determinism' AS check,
   FROM ottoq_run_archives;
 
 -- K3. The reproducibility key is complete on stamped archives.
+-- K3 COULD NOT FAIL. The verdict tested `count(*)` -- the TOTAL number of archives -- so an
+-- empty table gave 'PASS(empty)' and ANY rows gave 'PASS'. There was no FAIL branch at all, and
+-- the `unstamped` column it computes was never consulted by the verdict beside it. A run archive
+-- missing its config_hash is exactly what this check exists to catch, and it certified the
+-- opposite. K2 immediately above is written correctly, which is how this survived review.
+-- Empty is now its own verdict rather than a silent pass: a certification that goes green on a
+-- system where nothing has happened is the failure mode this whole file exists to prevent.
+--
+-- FIRST RUN AFTER THE FIX (production, 2026-08-27): archives 155, unstamped 153, verdict FAIL.
+-- Nothing regressed -- the check simply started reporting what was already true. The cause and
+-- the forward fix are 0074_the_archive_carries_its_key.sql: the stamping helper was defined and
+-- never called, and the config is purged with the run, so the hash must be taken at archive time.
+-- The 153 existing rows cannot be repaired (their configs are gone) and must NOT be backfilled
+-- with invented hashes. EXPECT THIS RED until those rows age out. A green K3 before then would
+-- mean someone fabricated a key, which is the failure this check is for.
 SELECT 'K3 repro_key' AS check,
+       count(*) AS archives,
        count(*) FILTER (WHERE config_hash IS NULL) AS unstamped,
-       CASE WHEN count(*) = 0 THEN 'PASS(empty)' ELSE 'PASS' END AS verdict
+       CASE WHEN count(*) = 0 THEN 'EMPTY(no archives to certify)'
+            WHEN count(*) FILTER (WHERE config_hash IS NULL) = 0 THEN 'PASS'
+            ELSE 'FAIL' END AS verdict
   FROM ottoq_run_archives;
 
 -- K4. KPI-3 recomputation vs the twin-maintained 15-min column (info row —
