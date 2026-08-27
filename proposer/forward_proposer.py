@@ -167,12 +167,31 @@ def _abstain(vehicle: dict, reason: str) -> dict:
 
 def plan_to_proposals(plan: dict, scenario: dict, *,
                       ready_by_used: dict[str, str]) -> list[dict]:
-    """One advisory row per planned charge, in the production proposal shape."""
+    """One advisory row per asset: a planned charge, or an explicit abstention.
+
+    NEVER SILENTLY DROPS ONE. The `continue` this replaced skipped any asset with
+    no charge op, which was harmless while every asset was guaranteed a point --
+    and became a silent-drop the moment the solver could reject one
+    (allow_rejection, SOLVER_STATE.md 6.1a). A vehicle the solver deliberately
+    could not serve would have left no row at all, making it indistinguishable
+    from a vehicle nobody asked about. That distinction is the entire reason
+    cuopt_invocation_log exists on the other proposer, and it survives here.
+    """
     kinds = {p["id"]: p["kind"] for p in scenario["service_points"]}
     out = []
     for a in plan["assets"]:
         charge = next((o for o in a["ops"] if o["op"] == "charge"), None)
         if charge is None:
+            #: served is False -> the solver looked and could not place it.
+            #: served absent -> rejection was off, so no charge op means something
+            #: unexpected; say that rather than inventing a reason.
+            reason = ("the site could not serve this vehicle within its capacity"
+                      if a.get("served") is False else
+                      "no charge operation in the returned plan")
+            #: _abstain reads only the id, and the plan carries it -- reaching
+            #: back into assets_spec for the original row would key on `aid`
+            #: there, not `id`, and buy nothing.
+            out.append(_abstain({"id": a["aid"]}, reason))
             continue
         out.append({
             "action_context": "stall_assignment",
@@ -203,13 +222,19 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             ready_by_min: dict[str, int] | None = None,
             default_ready_delta_min: int = 240,
             det_budget_s: float | None = None,
-            time_limit_s: float | None = None) -> dict:
+            time_limit_s: float | None = None,
+            allow_rejection: bool = False) -> dict:
     """Frame in, advisory rows out. Writes nothing, ever.
 
     The result carries the rows AND the solve's own accounting (T*, peak,
     statuses) so the caller can log an honest fire record next to the insert --
     the same discipline as cuopt_invocation_log: every invocation quantifiable,
     "never invoked" distinguishable from "invoked and abstained".
+
+    allow_rejection lets the solver return a plan for a site it cannot fully
+    serve, instead of INFEASIBLE and no plan at all. Every vehicle it declines
+    still gets a row, with abstain=True and a reason -- a decline that produced
+    no row would be indistinguishable from a vehicle nobody asked about.
 
     The budget is DETERMINISTIC work by default, not wall-clock time: a
     proposal truncated by the clock is a function of how loaded the box was,
@@ -230,11 +255,19 @@ def propose(frame: dict, class_table: dict, *, site: dict,
                 "planned": 0, "solver": None,
                 "note": "no plannable vehicles in frame"}
 
-    budget = {"time_limit_s": time_limit_s}
+    budget = {"time_limit_s": time_limit_s, "allow_rejection": allow_rejection}
     if det_budget_s is not None:
         budget["det_budget_s"] = det_budget_s
     pass1 = build_and_solve(scenario, objective_mode="min_tardy", **budget)
-    t_star = sum(a["tardy_min"] for a in pass1["assets"])
+    #: T* IS THE BEST SERVICE LEVEL OVER THE VEHICLES THAT CAN BE SERVED. A
+    #: rejected one carries tardy_min None -- it has no deadline to miss, because
+    #: nothing is being done for it -- and summing it raw is a TypeError, which is
+    #: how this was found. It matches the model: the lexicographic passes read
+    #: CHARGED tardiness, from which rejected assets are already excluded, so
+    #: pass 2's `sum(tardy) <= T*` budget and this figure count the same set.
+    #: Pass 2 cannot quietly reject MORE to buy a lower peak: the rejection price
+    #: (100,000) is two orders of magnitude above any peak this site can reach.
+    t_star = sum(a["tardy_min"] for a in pass1["assets"] if a["tardy_min"] is not None)
     pass2 = build_and_solve(scenario, objective_mode="min_peak",
                             max_tardy_total=t_star, previous_plan=pass1,
                             **budget)
@@ -257,6 +290,12 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             #: record carrying FALSE must not be cited as a reproducible number.
             "reproducible": bool(pass1.get("repro", {}).get("reproducible")
                                  and pass2.get("repro", {}).get("reproducible")),
+            #: WHO THE SOLVER COULD NOT SERVE, named. Without rejection enabled an
+            #: over-subscribed site returns INFEASIBLE and this whole call yields
+            #: nothing; with it, the fire record can say "invoked, planned N,
+            #: could not serve M, and here is M" -- the same quantifiability
+            #: cuopt_invocation_log gives the other proposer.
+            "rejected": list(pass2.get("rejected", [])),
             "deterministic_time": round(
                 pass1.get("repro", {}).get("deterministic_time", 0.0)
                 + pass2.get("repro", {}).get("deterministic_time", 0.0), 6),

@@ -308,6 +308,47 @@ that removing the `served` gate on wash/inspect (so a rejected asset still holds
 the tardiness excuse **both passed every structural assertion** while silently changing which assets
 were dropped. The number is what sees them.
 
+### 6.1b A tariff window outside the horizon made every site infeasible
+
+Found while testing rejection through the production bridge, and worth separating from it because
+at first it looked like *"rejection enabled and still no plan"* — precisely the failure rejection
+exists to prevent. It was not that. **One asset on one free point was infeasible too**, which is what
+proved it had nothing to do with capacity.
+
+The on-peak overlap held `max(charge_start, window_start)` in a variable bounded by the horizon. So
+whenever the tariff window began **after the horizon ended**, `max(s, 240)` was unrepresentable in
+`[0, 180]` and the model returned INFEASIBLE outright — with a message blaming the site.
+
+Measured on the bridge's own frame, one vehicle needing 48 minutes on one free stall:
+
+| horizon | on-peak window | result |
+|---|---|---|
+| 120 min | [240, 420] | **INFEASIBLE** |
+| 180 min | [240, 420] | **INFEASIBLE** |
+| 240 min | [240, 420] | OPTIMAL |
+
+This is ordinary production input, not a corner: plan the next two hours at 08:00 against a
+16:00–19:00 on-peak window and **nothing is ever schedulable**. The window is now clamped to the
+horizon, and when it does not intersect at all the term is not built — a window outside the horizon
+costs nothing, because every interval ends by `H` and no charge can run in it. All four committed
+plans hash byte-identically, since their windows lie inside their horizons.
+
+T11 pins it with **one asset against the full point set**, deliberately: a larger fleet at that
+horizon is genuinely capacity-bound, and a test that cannot tell a real limit from a modelling bug
+sends you looking in the wrong place — which is exactly what happened the first time.
+
+Two smaller fixes came with it, both in `proposer/forward_proposer.py`:
+
+- **`plan_to_proposals` silently dropped a rejected vehicle.** Its `continue` past any asset with no
+  charge op was harmless while every asset was guaranteed a point, and became a silent drop the
+  instant the solver could decline one — leaving *no row at all*, indistinguishable from a vehicle
+  nobody asked about. That distinction is the whole reason `cuopt_invocation_log` exists on the
+  other proposer. Every vehicle now gets a row; the guard is row count, and mutation-testing
+  confirms it is the only assertion in that file that sees the drop.
+- **T\* summed `tardy_min` over rejected assets**, which are `None`. A rejected vehicle has no
+  deadline to miss because nothing is being done for it, so it is excluded — matching the model,
+  whose lexicographic passes read *charged* tardiness for the same reason.
+
 ### 6.2 The same run needs the same OR-Tools, and CI was installing a range
 
 `verify.yml` installed `ortools>=9.10`. Measured on the four committed scenarios, 9.11.4210 vs

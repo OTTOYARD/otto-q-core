@@ -26,7 +26,8 @@ def overlapping(a, b):
     return a["start"] < b["end"] and b["start"] < a["end"]
 
 
-def _variant(*, charge_points: int, horizon_min: int, churn: int = 0) -> dict:
+def _variant(*, charge_points: int, horizon_min: int, churn: int = 0,
+             assets: int | None = None) -> dict:
     """The canonical scenario with its charge capacity and horizon squeezed.
 
     Built in memory via `materialize` rather than written to a file, so the
@@ -39,6 +40,8 @@ def _variant(*, charge_points: int, horizon_min: int, churn: int = 0) -> dict:
     sc["horizon_min"] = horizon_min
     if churn:
         sc["objective_weights"]["churn_per_change"] = churn
+    if assets is not None:
+        sc["assets_spec"]["count"] = assets
     return sc
 
 
@@ -417,6 +420,41 @@ def main():
         f"at weight {W}; expected {W} x {len(discretionary)} discretionary moves")
     print(f"T10 PASS churn: unpriced re-solve moves {len(free_moved)} assets, priced moves "
           f"{len(held_moved)}; the {len(forced)} forced by the blocked point cost nothing")
+
+    # T11 — A TARIFF WINDOW OUTSIDE THE HORIZON IS NOT AN INFEASIBLE SITE.
+    # The on-peak overlap held max(charge_start, window_start) in a variable
+    # bounded by the horizon, so a window starting AFTER the horizon ended was
+    # unrepresentable and the whole model returned INFEASIBLE — blaming the site
+    # for an input inconsistency. It is ordinary input for the production bridge:
+    # plan the next two hours at 08:00 against a 16:00–19:00 on-peak window.
+    #
+    # Found while testing rejection, and worth separating from it: at first this
+    # looked like "rejection enabled and still no plan", which is exactly the
+    # failure rejection exists to prevent. It was not. ONE asset on ONE free point
+    # was infeasible too — which is what proved it had nothing to do with capacity.
+    #: H=200 is deliberate: past the [0, 180] arrival window (an asset arriving
+    #: after the plan ends is a different, genuinely inconsistent input, and it
+    #: fails as MODEL_INVALID rather than INFEASIBLE) but short of the on-peak
+    #: window's 240. That gap is exactly where this bug lived.
+    #: ONE asset against the full point set, so ANY failure here is the window and
+    #: nothing else. A larger fleet at this horizon is genuinely capacity-bound,
+    #: and a test that cannot tell a real limit from a modelling bug is the kind
+    #: that sends you looking in the wrong place -- which is exactly what happened
+    #: the first time, when this looked like rejection failing.
+    late = _variant(charge_points=6, horizon_min=200, assets=1)
+    w0, w1 = late["site"]["onpeak_window_min"]
+    assert w0 > late["horizon_min"], (
+        f"T11 assumption changed: window starts at {w0}, inside the horizon")
+    lp = build_and_solve(materialize(json.loads(json.dumps(late))))
+    assert lp["solver_status"] in ("OPTIMAL", "FEASIBLE")
+    #: and a window wholly outside the horizon costs nothing, because no charge
+    #: can run in it — every interval ends by H.
+    assert lp["peak_excess_kw"] >= 0
+    served_ops = sum(1 for a in lp["assets"] for o in a["ops"] if o["op"] == "charge")
+    assert served_ops == len(lp["assets"]), "T11 FAIL: not every asset was scheduled"
+    print(f"T11 PASS an on-peak window at [{w0}, {w1}] outside a {late['horizon_min']}-min "
+          f"horizon solves ({lp['solver_status']}, {served_ops} charges) instead of "
+          "reporting the site infeasible")
 
     print("ALL TESTS PASS")
     return p1
