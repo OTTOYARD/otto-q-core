@@ -177,3 +177,71 @@ def test_an_empty_serviceable_set_is_a_quiet_no_op():
                    [_stall("s-1")])
     out = propose(frame, CLASSES, site=SITE)
     assert out["planned"] == 0 and out["solver"] is None
+
+
+# ---------------------------------------------------------------------------
+# Rejection through the bridge (SOLVER_STATE.md 6.1a)
+# ---------------------------------------------------------------------------
+
+def _oversubscribed(n_vehicles=8, n_stalls=1):
+    """More vehicles than the site can serve inside the horizon."""
+    return _frame([_vehicle(f"v{i}", soc=15) for i in range(n_vehicles)],
+                  [_stall(f"s{i}") for i in range(n_stalls)])
+
+
+def test_an_oversubscribed_site_returns_a_plan_instead_of_nothing():
+    frame = _oversubscribed()
+    # Without rejection the model is infeasible and the whole call yields nothing.
+    with pytest.raises(RuntimeError):
+        propose(frame, CLASSES, site=SITE, horizon_min=120,
+                default_ready_delta_min=60)
+
+    r = propose(frame, CLASSES, site=SITE, horizon_min=120,
+                default_ready_delta_min=60, allow_rejection=True)
+    assert r["solver"]["rejected"], "rejection enabled but nothing was rejected"
+    assert r["planned"] > 0, "a partial plan should still serve someone"
+
+
+def test_no_vehicle_ever_vanishes_from_the_batch():
+    """THE SILENT-DROP GUARD, and it is the reason this feature needed a test here
+    rather than only in the solver battery.
+
+    plan_to_proposals used to `continue` past any asset with no charge op. That
+    was harmless while every asset was guaranteed a point, and became a silent
+    drop the instant the solver could decline one: a vehicle the solver
+    deliberately could not serve would have left NO ROW AT ALL, making it
+    indistinguishable from a vehicle nobody asked about. Row count is what sees
+    it -- every other assertion in this file passes with the drop in place.
+    """
+    frame = _oversubscribed()
+    r = propose(frame, CLASSES, site=SITE, horizon_min=120,
+                default_ready_delta_min=60, allow_rejection=True)
+    assert len(r["proposals"]) == len(frame["vehicles"]), (
+        f"{len(frame['vehicles'])} vehicles in, {len(r['proposals'])} rows out")
+    assert {p["entity_id"] for p in r["proposals"]} == {v["id"] for v in frame["vehicles"]}
+
+
+def test_a_declined_vehicle_says_so_and_says_why():
+    frame = _oversubscribed()
+    r = propose(frame, CLASSES, site=SITE, horizon_min=120,
+                default_ready_delta_min=60, allow_rejection=True)
+    declined = {p["entity_id"] for p in r["proposals"] if p["proposal"]["abstain"]}
+    assert declined == set(r["solver"]["rejected"]), (
+        f"abstained {sorted(declined)} but reported {sorted(r['solver']['rejected'])}")
+    for p in r["proposals"]:
+        if p["proposal"]["abstain"]:
+            reason = p["proposal"]["rationale"]["reason"]
+            assert "could not serve" in reason, f"unhelpful reason: {reason!r}"
+        else:
+            # a served vehicle still carries a real assignment, not an empty one
+            assert p["proposal"]["stall_id"] and p["proposal"]["requested_kw"]
+
+
+def test_rejection_stays_off_unless_asked():
+    """Default OFF, asserted directly: the flag is what makes this feature safe to
+    land at all, since an accidental default would let the proposer quietly decline
+    vehicles the site could in fact have served."""
+    frame = _frame([_vehicle("v0"), _vehicle("v1")], [_stall("s0"), _stall("s1")])
+    r = propose(frame, CLASSES, site=SITE, horizon_min=480)
+    assert r["solver"]["rejected"] == []
+    assert all(not p["proposal"]["abstain"] for p in r["proposals"])

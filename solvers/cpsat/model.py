@@ -363,19 +363,33 @@ def build_and_solve(
                 power_intervals.append(iv); power_demands.append(seg["kw"])
                 soft_intervals.append(iv); soft_demands.append(seg["kw"])
                 # on-peak overlap in kW-minutes (exact for one window)
+                #: THE WINDOW IS CLAMPED TO THE HORIZON, and that is a bug fix, not
+                #: a nicety. ov_lo held max(start, w0) in a var bounded by H, so a
+                #: tariff window starting AFTER the horizon ends made the model
+                #: INFEASIBLE outright -- max(s, 240) is unrepresentable in [0, 180].
+                #: Measured: ONE vehicle on ONE free stall, needing 48 minutes,
+                #: returned "no schedule" at every horizon below the window's start,
+                #: and the message blamed the site. The production bridge hits this
+                #: on ordinary input: plan the next two hours at 08:00 against a
+                #: 16:00-19:00 on-peak window and nothing is ever schedulable.
+                #: A window outside the horizon simply costs nothing -- no charge
+                #: can run in it, since every interval ends by H -- so the term is
+                #: not built rather than being built unsatisfiably.
                 w0, w1 = site["onpeak_window_min"]
-                ov_lo = m.NewIntVar(0, H, f"ovlo.{asset.aid}.{p['id']}.{si}")
-                ov_hi = m.NewIntVar(0, H, f"ovhi.{asset.aid}.{p['id']}.{si}")
-                m.AddMaxEquality(ov_lo, [s, m.NewConstant(w0)])
-                m.AddMinEquality(ov_hi, [e, m.NewConstant(w1)])
-                raw = m.NewIntVar(-H, H, f"ovraw.{asset.aid}.{p['id']}.{si}")
-                m.Add(raw == ov_hi - ov_lo)
-                ov = m.NewIntVar(0, H, f"ov.{asset.aid}.{p['id']}.{si}")
-                m.AddMaxEquality(ov, [raw, m.NewConstant(0)])
-                gated = m.NewIntVar(0, H, f"ovg.{asset.aid}.{p['id']}.{si}")
-                m.Add(gated == ov).OnlyEnforceIf(lit)
-                m.Add(gated == 0).OnlyEnforceIf(lit.Not())
-                onpeak_terms.append(seg["kw"] * gated)
+                w0, w1 = max(0, min(w0, H)), max(0, min(w1, H))
+                if w1 > w0:
+                    ov_lo = m.NewIntVar(0, H, f"ovlo.{asset.aid}.{p['id']}.{si}")
+                    ov_hi = m.NewIntVar(0, H, f"ovhi.{asset.aid}.{p['id']}.{si}")
+                    m.AddMaxEquality(ov_lo, [s, m.NewConstant(w0)])
+                    m.AddMinEquality(ov_hi, [e, m.NewConstant(w1)])
+                    raw = m.NewIntVar(-H, H, f"ovraw.{asset.aid}.{p['id']}.{si}")
+                    m.Add(raw == ov_hi - ov_lo)
+                    ov = m.NewIntVar(0, H, f"ov.{asset.aid}.{p['id']}.{si}")
+                    m.AddMaxEquality(ov, [raw, m.NewConstant(0)])
+                    gated = m.NewIntVar(0, H, f"ovg.{asset.aid}.{p['id']}.{si}")
+                    m.Add(gated == ov).OnlyEnforceIf(lit)
+                    m.Add(gated == 0).OnlyEnforceIf(lit.Not())
+                    onpeak_terms.append(seg["kw"] * gated)
             # point-side occupancy: chain + cooldown (DCFC only) — the 2.5
             # min-gap ON THE POINT, exactly
             #: Minimum gap ON THE POINT (CLAUDE.md 2.5). Declared per point as
