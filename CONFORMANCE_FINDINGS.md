@@ -279,3 +279,69 @@ propose/dispose audit trail are shaped to fill.
 **That convergence is not evidence that the kernel is technically general — §1 is
 the honest accounting there. It is evidence that the generality is aimed at
 something real.** Those are different claims and this document keeps them apart.
+
+---
+
+## 6. What the PRODUCTION schema costs, measured 2026-08-27
+
+**This section exists because §0–§5 measure the wrong engine, and say so if you read
+them closely.** `conformance/` loads packs and solves them with its *own* simple
+scheduler. That is a real test of whether a pack is **expressible**, and it is not a
+test of whether the production engine can run one. "Zero kernel modification" was
+true of an instrument that never touched the production schema. So the verdict above
+was resting on a narrower base than its wording suggests.
+
+Rung 1 of PLAN-001 put a real ArduPilot drone through the ingest chain, which made the
+next question concrete and answerable: **what would it actually cost to book that
+drone a bay in the live engine?** Measured directly against project `gxdrc…`, read-only.
+
+### Two hard blocks. Both additive, neither structural.
+
+| # | Where | Today | Why it blocks |
+|---|---|---|---|
+| 1 | `vehicles.category` — enum `vehicle_category` | `{autonomous, retail, delivery_bot, humanoid, shuttle}` | No drone, UGV, eVTOL or USV. The column is NOT NULL with no default, so **a drone cannot be inserted at all** |
+| 2 | `stalls.stall_type` — enum `stall_type` | `{dcfc, l2, wash_bay, detail_bay, service_bay, staging, parking, safety}` | No landing pad, rearm point or swap dock. NOT NULL, no default, so **a pad cannot be inserted at all** |
+
+Both are `ALTER TYPE … ADD VALUE`. Additive, no rewrite, no data migration, nothing
+existing invalidated. That is the entire hard cost of admitting a new modality as a
+first-class asset.
+
+### Two semantic gaps. Insertable, but the row would be lying.
+
+3. **`vehicles.current_state`** — enum `vehicle_state`, 17 values, every one a ground
+   robotaxi state (`charging_dcfc`, `in_wash_bay`, `en_route_to_depot`). It has a
+   default, so a drone inserts fine — and then sits in a state that describes a car.
+   This is the `data_source` defect from migration 0073 in a different column: a field
+   that reads as evidence while carrying none.
+4. **`ottoq_vehicle_classes`** carries `curb_weight_kg`, `expected_lifetime_miles`,
+   `inlet_type`, `fast_charge_compatible`. All nullable, so omittable — but a drone's
+   endurance is not measured in miles, and a column that is always NULL for half the
+   fleet is a pack field living in the kernel.
+
+### The good news, and it is the larger half
+
+**The booking calendar — the actual heart of the engine — needs nothing.**
+
+`ottoq_stall_bookings` keys on `vehicle_id uuid`, `stall_id uuid`, `during tstzrange`,
+and `purpose **text**`. Not an enum. The EXCLUDE constraint that makes double-booking
+physically impossible does not know or care what kind of machine it is protecting.
+**A drone can be booked against a pad with no schema change whatsoever**, the moment
+the two enum values above exist.
+
+`ottoq_vehicle_classes.vehicle_class_code` is likewise `text`, with `pack_id`,
+`energy_curve jsonb` and `duty_cycle_profile jsonb` — exactly the declarative pack
+slots CLAUDE.md 2.3 claims as the foothold. That claim checks out.
+
+### What this does to the verdict
+
+It **strengthens** it, and narrows its basis honestly. The prediction in PLAN-001's
+rung 2 gate was "at least three kernel changes." The measured answer against the real
+schema is **two additive enum extensions and no change to the scheduling substrate** —
+better than predicted, and now a number rather than a hope.
+
+But the verdict in §0 should be read as: *provisionally a platform, on evidence from a
+harness that does not touch the production schema, plus this one measurement that does.*
+The remaining unmeasured claim is the one that matters most and is next: whether the
+production **decide path** — not the conformance scheduler — will actually schedule a
+heterogeneous fleet once those two values exist. Nothing here shows that yet, and this
+document should not be read as though it does.
