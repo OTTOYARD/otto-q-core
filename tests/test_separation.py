@@ -140,3 +140,104 @@ def test_no_decide_path_module_reads_any_file_at_all():
            re.search(r"(read_text|json\.load)\s*\(", src):
             offenders.append(rel)
     assert offenders == [], f"decide/price modules reading files: {offenders}"
+
+
+# ---------------------------------------------------------------------------
+# "Agents propose, solver disposes" — the other half of the rule
+# ---------------------------------------------------------------------------
+#
+# The tests above enforce that the propose path cannot REACH production state:
+# `proposer` is in KERNEL_PACKAGES and FORBIDDEN_IMPORTS bans every DB and HTTP
+# client. That is one half of CLAUDE.md 2.5.
+#
+# The other half — that what the propose path EMITS is advisory rather than a
+# command — was asserted in prose in four separate files
+# (policies/assignment_policy.py:16, proposer/forward_proposer.py:1,
+# adapters/base.py:16) and enforced nowhere. Prose is what this file exists to
+# replace. `adapters/base.py` already rejects decision-implying method names on
+# adapters at import time; these are the same idea applied to the proposal rows
+# themselves, which is where the architecture would actually erode: not by
+# someone writing to the database, which is blocked, but by a row quietly
+# acquiring the shape of an instruction.
+
+_ADVISORY_SOURCES = ("cpsat", "forward_lex")
+
+#: Keys that would turn an advisory row into an instruction. A proposal says
+#: "here is what I would do and why"; a command says "do it". If one of these
+#: ever appears in a proposal payload, the propose/dispose seam has collapsed
+#: and the deferral pattern that gives the local decide path right-of-first-
+#: refusal no longer has anything to refuse.
+_COMMAND_KEYS = ("command", "command_type", "enact", "enacted", "execute",
+                 "actuate", "setpoint", "issue_at", "dispatch")
+
+
+def _emitted_proposal_rows():
+    """Every row both emitters produce, on a scenario that forces a rejection.
+
+    The tight scenario is deliberate: a plan where everything is served exercises
+    only the happy path, and the abstention row — the one most likely to be built
+    by a different code path and forget the contract — never appears.
+    """
+    import json as _json
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "solvers" / "cpsat"))
+    from model import build_and_solve, materialize  # noqa: E402
+
+    sc = _json.loads((ROOT / "solvers" / "cpsat" / "scenario_canonical.json").read_text())
+    charge = [p for p in sc["service_points"] if p["kind"] in ("dcfc", "l2")][:2]
+    sc["service_points"] = charge + [p for p in sc["service_points"]
+                                     if p["kind"] not in ("dcfc", "l2")]
+    sc["horizon_min"] = 300
+    plan = build_and_solve(materialize(_json.loads(_json.dumps(sc))), allow_rejection=True)
+    assert plan["rejected"], "the tight scenario no longer rejects — this test proves nothing"
+    return plan["proposals"]
+
+
+def test_every_emitted_row_is_advisory_not_an_instruction():
+    """A proposal declares an intent and an abstention; it never carries a verb
+    that means 'make it so'."""
+    rows = _emitted_proposal_rows()
+    assert rows, "no proposal rows emitted"
+    offenders = []
+    for r in rows:
+        payload = r.get("proposal", {})
+        if "abstain" not in payload:
+            offenders.append(f"{r.get('entity_id')}: no abstain field — not an advisory row")
+        for k in _COMMAND_KEYS:
+            if k in payload or k in r:
+                offenders.append(f"{r.get('entity_id')}: carries command key {k!r}")
+        if r.get("source") not in _ADVISORY_SOURCES:
+            offenders.append(f"{r.get('entity_id')}: unknown source {r.get('source')!r}")
+    assert offenders == [], (
+        "propose/dispose violated — a row emitted by the solver reads as an "
+        f"instruction rather than a proposal: {offenders}. The local decide path "
+        "disposes (CLAUDE.md 2.5); a proposer that emits commands leaves it "
+        "nothing to refuse.")
+
+
+def test_a_declined_asset_still_gets_a_row():
+    """An asset the solver could not serve is REPORTED, never dropped.
+
+    This is the distinction `cuopt_invocation_log` exists to preserve on the
+    other proposer: 'invoked and abstained' must stay distinguishable from
+    'never asked'. A silent drop makes a declined asset look like one nobody
+    asked about, and the count is the only thing that sees it.
+    """
+    import json as _json
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "solvers" / "cpsat"))
+    from model import build_and_solve, materialize  # noqa: E402
+
+    sc = _json.loads((ROOT / "solvers" / "cpsat" / "scenario_canonical.json").read_text())
+    charge = [p for p in sc["service_points"] if p["kind"] in ("dcfc", "l2")][:2]
+    sc["service_points"] = charge + [p for p in sc["service_points"]
+                                     if p["kind"] not in ("dcfc", "l2")]
+    sc["horizon_min"] = 300
+    plan = build_and_solve(materialize(_json.loads(_json.dumps(sc))), allow_rejection=True)
+
+    assert len(plan["proposals"]) == len(plan["assets"]), (
+        f"{len(plan['assets'])} assets in, {len(plan['proposals'])} rows out — "
+        "a declined asset was dropped instead of abstained")
+    abstained = sorted(p["entity_id"] for p in plan["proposals"] if p["proposal"]["abstain"])
+    assert abstained == sorted(plan["rejected"]), (
+        f"rejected {sorted(plan['rejected'])} but abstained {abstained}")

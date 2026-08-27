@@ -349,6 +349,33 @@ Two smaller fixes came with it, both in `proposer/forward_proposer.py`:
   deadline to miss because nothing is being done for it, so it is excluded — matching the model,
   whose lexicographic passes read *charged* tardiness for the same reason.
 
+### 6.1c What the solver is actually worth, measured (2026-08-27)
+
+Written because `docs/BENCHMARK_CREDIBILITY.md` (2026-08-23) said the opposite and was quoted as
+current for four days after it stopped being true. Both of its legs are superseded; that file now
+carries the correction and the reasoning behind it.
+
+**On the canonical scenario, CP-SAT and greedy tie at the certified floor.** Under the scenario's
+own weights, re-derived from `policies/comparison_seed424242.json` at HEAD: greedy 135, cpsat 135 —
+both 0 tardy, both finishing before the on-peak window opens, both paying only the 9-move cost. The
+118 tardy minutes that used to separate them were a model bug fixed 2026-08-24.
+
+**Under the real tariff they separate.** `policies/cost_seed424242.json`: cpsat **$8,160.71/mo**,
+fifo $8,162.27, otto_q_asis $9,466.70, greedy $9,532.40 — `pareto_optimal: ["cpsat"]`,
+`dominated: ["fifo", "greedy", "otto_q_asis"]`. The synthetic objective prices only *excess above a
+soft target*, which is dead under abundance; a utility bill prices peak **absolutely**.
+
+**Where a cap actually binds, the naive baselines produce unrunnable schedules.**
+`scenario_vertiport.json` declares 1,231 kW installed against an 800 kW service.
+`policies/multimodal_seed424242.json`: fifo and greedy both peak at 843 kW, 43 kW over, stamped
+`physically_runnable: false`; the CP-SAT lexicographic forward policy holds **300 kW at zero
+tardiness**, and is the only runnable policy in the set.
+
+**The caveat, stated because it cuts against us:** fifo and greedy here have no power-cap check at
+all, so part of that gap is baseline naivety rather than solver skill. A cap-aware heuristic has
+never been built or measured. Until it is, the *existence* of the advantage is evidenced and its
+*size* is not.
+
 ### 6.2 The same run needs the same OR-Tools, and CI was installing a range
 
 `verify.yml` installed `ortools>=9.10`. Measured on the four committed scenarios, 9.11.4210 vs
