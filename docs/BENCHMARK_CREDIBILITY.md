@@ -1,4 +1,73 @@
-# Why greedy beats OTTO-Q on our own benchmark — and why that is a fact about the benchmark
+# Why greedy beat OTTO-Q on our own benchmark — and why that is a fact about the benchmark
+
+> # ⚠ SUPERSEDED ON BOTH LEGS — 2026-08-27
+>
+> **This document was correct when written on 2026-08-23. Both of its load-bearing facts were
+> overtaken within 48 hours, and it was still being quoted as current four days later — including
+> to the founder, by me. Corrected here rather than deleted, because the reason it went stale is
+> the more useful lesson: an unflattering finding gets quoted long after it stops being true,
+> precisely because nobody re-checks a document that makes them look bad.**
+>
+> ### Leg 1 — "greedy dominates, 135 to 2131" is dead. They TIE at 135.
+>
+> CP-SAT's 118 tardy minutes were a model bug, fixed **2026-08-24**: parallel ops were
+> over-constrained to end inside the charge window, exiling AV-05 to a 407-minute L2 session and
+> manufacturing "118 phantom tardy-minutes" (`policies/test_policies.py:110-133`). Re-derived from
+> the artifact committed at HEAD, `policies/comparison_seed424242.json`, under this scenario's own
+> weights:
+>
+> | policy | tardy | peak kW | excess | moves | makespan | weighted |
+> |---|---|---|---|---|---|---|
+> | **greedy** | 0 | 402 | 0 | 9 | 227 | **135** |
+> | **cpsat** | 0 | 440 | 0 | 9 | 235 | **135** |
+> | otto_q_asis | 395 | 392 | 0 | 9 | 551 | 4,085 + on-peak |
+> | fifo | 621 | 340 | 0 | 9 | 636 | 6,345 + on-peak |
+>
+> Both finish before the on-peak window opens at minute 240, so both pay zero there. **135 is the
+> move cost — 9 moves × 15 — and it is the certified floor for this scenario.** Two policies reach
+> it. §1 below is retained as the record of the pre-fix state.
+>
+> Under the repo's *real* tariff (`sites/tariff.py`, NES GSA-3) rather than the synthetic weights,
+> they separate: `policies/cost_seed424242.json` records **cpsat $8,160.71/mo** against fifo
+> $8,162.27, otto_q_asis $9,466.70 and **greedy $9,532.40**, with `pareto_optimal: ["cpsat"]` and
+> `dominated: ["fifo", "greedy", "otto_q_asis"]`. The analytical error in §1 is precise and worth
+> keeping: this objective prices only *excess above a soft target* — dead, as §2 correctly says —
+> while a utility bill prices peak **absolutely**, through demand charges and the ratchet.
+>
+> ### Leg 2 — "the cap can never bind" is false as of 2026-08-25.
+>
+> `solvers/cpsat/scenario_vertiport.json` declares **1,231 kW of installed point draw against an
+> 800 kW hard cap** (600 kW soft). The cap binds, and the naive baselines break it.
+> `policies/multimodal_seed424242.json`, committed and sha-stamped:
+>
+> | policy | peak kW | over service | physically runnable? | tardy |
+> |---|---|---|---|---|
+> | fifo | 843 | +43 | **NO** | 154 |
+> | greedy | 843 | +43 | **NO** | 0 |
+> | forward *(CP-SAT, lexicographic)* | **300** | 0 | **YES** | 0 |
+>
+> On the one committed scenario where the cap actually binds, both naive baselines emit schedules
+> that **cannot physically run**, and the CP-SAT policy is the only one that can.
+>
+> **The honest caveat, stated because it cuts against us:** our fifo and greedy baselines have no
+> power-cap check at all. Part of that gap is baseline naivety, not solver skill. A cap-aware
+> heuristic has never been built or measured, and until it is, the size of the advantage is
+> unproven — only its existence is.
+>
+> §2's claim remains true of the four **conformance packs**. It is false for the **scenarios**, and
+> this document stated it unqualified about both.
+>
+> ### What survives, and is still worth reading
+>
+> §2's term-by-term analysis — that two of four objective terms are dead under abundance — is sound
+> and is the reason the synthetic weights were the wrong instrument. The methodological point stands
+> and got sharper: **a benchmark whose binding constraint never binds measures nothing**, which is
+> exactly why the vertiport scenario was built.
+>
+> Everything below this block is the 2026-08-23 text, unedited.
+
+---
+
 
 **Question from the founder:** the last committed four-policy comparison shows a naive greedy
 scheduler beating OTTO-Q on throughput. Is that a real finding about our edge, or an artifact?
