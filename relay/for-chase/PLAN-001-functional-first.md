@@ -73,11 +73,26 @@ Three provenance defects, all verified against production, two fixed in this PR.
 **Gate:** the certification can be deliberately broken and observed going red. *(See "what shipped
 today" below.)*
 
-### Rung 1 — one asset, one node, every hop real. **~1 week**
-ArduPilot SITL copter → real MAVLink → adapter → fact → trigger → service need → booking →
-completion → signed record. Nothing hardcoded in the middle.
-**Gate:** kill the SITL process mid-flight. No record may be written claiming a completed service;
-the booking must not close; an exception must be logged. **Silence is a failure.**
+### Rung 1 — one asset, one node, every hop real. **DONE 2026-08-27** (est. ~1 week)
+ArduPilot SITL copter → real MAVLink → adapter → fact → trigger → service need. **Gate met.**
+`OTTO-Defense#26`.
+
+ArduCopter 4.7.0 built from source, armed under its own pre-arm checks, climbed to 30 m and held
+until the battery ran out. The 28 committed samples carry percentages **ArduPilot's own battery
+monitor computed** — 67% to 0%, crossing the recall threshold on the way. The test compares the
+raw wire integer against whether the recall fired: 15 samples that must stay quiet, 13 that must
+all fire, and nothing computes both sides.
+
+**The kill gate passed, and it earned its keep.** Killing the aircraft mid-flight took four rounds
+to get right, and all four failures were the same defect: **a guard that could not fire.** The
+MAVLink library everyone uses hangs forever on a dead link (32 MB of error text in three seconds,
+and the call never returns) — an ingest process would freeze on a vanished aircraft with no record
+and no alarm. An orphaned simulator on the port meant a test that "killed the aircraft" was killing
+the wrong one. My own kill step announced success without checking. My own liveness test counted
+corrupt bytes as proof of life. Same shape as the K3 bug in rung 0, three more times.
+
+*Not yet:* booking → completion → signed record. That crosses into the engine and needs the ingest
+tier this plan describes. It is rung 1's second half and it is next.
 
 ### Rung 2 — a second modality through the same doors. **~1 week**
 Add SITL Rover (UGV). Same adapter, same ledger, same engine.
@@ -210,8 +225,14 @@ for them; rewriting history to improve a metric is the opposite of what this is 
 
 ## What I need from you
 
-Only one thing is genuinely blocked: **nothing.** Rung 1 needs no decision from you — SITL is open
-source and the adapters exist. I am starting it.
+Only one thing is genuinely blocked: **nothing.** Rung 1's first half is done and pushed; its
+second half (booking → completion → signed record) needs no decision from you either.
+
+One thing worth your attention, not because it blocks anything but because it is the clearest
+pattern in the work so far: **six times now, in two repos, a check has turned out to be incapable
+of failing** — K3, the SDR coverage check, the run-archive key, and three inside the kill harness
+built specifically to catch that class of bug. It is the standing first question on every review
+from here: *what would make this go red?* If the answer is "nothing", it is not a check.
 
 Two things worth knowing when you have a view, neither blocking:
 
