@@ -263,6 +263,51 @@ discipline `cuopt_invocation_log` applies to abstention.
 No plan moved: all four committed scenarios and the C5 comparison hash byte-identically before
 and after.
 
+### 6.1a Rejection and churn — the two T2 features that were genuinely missing
+
+Reading the prototype against the defense spec's T2 definition (rolling-horizon CP-SAT *with
+rejection, churn term, hints, frozen window*), four of the five already existed and ran: rolling
+re-solve, `AddHint` warm-starting, the frozen commitment window (started work pinned at `t_now`),
+and the multi-term objective. **Rejection and the churn term were absent.** Both are now built, and
+both are **off by default** — the four committed scenarios, the C5 comparison and the 24h KPI gate
+hash byte-identically with them off, so no published number moves until a caller opts in.
+
+**Rejection** (`allow_rejection=True`). Without it `AddExactlyOne` forces every asset onto a point,
+so an over-subscribed site returns INFEASIBLE and the decide path is left with no schedule at all.
+That is the wrong failure for a site under pressure and the wrong one for a contested site. With it,
+on a deliberately tightened canonical scenario that is INFEASIBLE by default: **10 of 12 served, zero
+tardiness on the served set**, and the two it could not serve enter the proposal batch as
+`abstain: true` — a field `ottoq_external_proposals` already carries and the dispose path already
+reads, so no new vocabulary. The default penalty is 100,000, an order of magnitude above the worst
+single-asset tardiness the horizon can produce, so the solver rejects only when the alternative is
+infeasibility rather than as a cheap way to duck a hard asset.
+
+**Churn** (`objective_weights.churn_per_change`). The previous plan was only ever *hinted*; nothing
+priced leaving it, so a rolling re-solve would relocate an asset for a one-minute objective gain — in
+the yard, a real vehicle making a real trip for nothing. Measured on a re-solve an hour in with one
+DCFC point out of service: **unpriced, 4 of 12 assets change point; at weight 500, 2 do.** The two
+that still move are the ones the blocked point displaced, and they **cost nothing** — a forced move
+is free, because charging for it would price the site's own failure to the asset. The term is built
+only when a weight is set; "add it with weight 0" is not equivalent, since the extra variable can
+land the search on a different equally-optimal plan (§6.2).
+
+**A bug found by trying to falsify the guard rather than trusting it.** Rejection's first
+implementation excused a rejected asset from tardiness with
+`m.Add(tardy == 0).OnlyEnforceIf(served.Not())`. That reads as removing a price; it imposes a
+constraint. Combined with `tardy >= finish - ready_by` it forces `finish <= ready_by` for an asset
+nobody is serving, and that asset's own parallel-op durations can make it impossible: on the tight
+scenario with `ready_delta_min [5, 12]` the model went **INFEASIBLE with rejection enabled** —
+exactly the failure the feature exists to prevent. Every other assertion in the battery passed. The
+fix removes the term from the *objective* instead (a `charged` tardiness variable, which the
+lexicographic passes also read so a rejected asset cannot eat `max_tardy_total`), and **T9b pins the
+scenario that exposes it**. The canonical scenario is far too slack to show it, which is why the bug
+survived its first review.
+
+T9's pinned objective and rejected set are load-bearing for the same reason: mutation-testing showed
+that removing the `served` gate on wash/inspect (so a rejected asset still holds a bay) and removing
+the tardiness excuse **both passed every structural assertion** while silently changing which assets
+were dropped. The number is what sees them.
+
 ### 6.2 The same run needs the same OR-Tools, and CI was installing a range
 
 `verify.yml` installed `ortools>=9.10`. Measured on the four committed scenarios, 9.11.4210 vs

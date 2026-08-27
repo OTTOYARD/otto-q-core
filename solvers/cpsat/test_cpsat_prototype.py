@@ -12,7 +12,10 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from model import build_and_solve, charge_segments, load_scenario  # noqa: E402
+from model import (  # noqa: E402
+    DEFAULT_REJECTION_PENALTY, build_and_solve, charge_segments, load_scenario,
+    materialize,
+)
 import ortools  # noqa: E402
 from ortools.sat.python import cp_model  # noqa: E402
 
@@ -21,6 +24,43 @@ SC_PATH = Path(__file__).parent / "scenario_canonical.json"
 
 def overlapping(a, b):
     return a["start"] < b["end"] and b["start"] < a["end"]
+
+
+def _variant(*, charge_points: int, horizon_min: int, churn: int = 0) -> dict:
+    """The canonical scenario with its charge capacity and horizon squeezed.
+
+    Built in memory via `materialize` rather than written to a file, so the
+    committed scenarios stay the only committed scenarios.
+    """
+    sc = json.loads(SC_PATH.read_text())
+    charge = [p for p in sc["service_points"] if p["kind"] in ("dcfc", "l2")][:charge_points]
+    other = [p for p in sc["service_points"] if p["kind"] not in ("dcfc", "l2")]
+    sc["service_points"] = charge + other
+    sc["horizon_min"] = horizon_min
+    if churn:
+        sc["objective_weights"]["churn_per_change"] = churn
+    return sc
+
+
+def _charge_points(plan) -> dict:
+    return {a["aid"]: next((o["point"] for o in a["ops"] if o["op"] == "charge"), None)
+            for a in plan["assets"]}
+
+
+def _resolve_pair(churn: int, blocked: set[str]):
+    """Solve, then re-solve an hour in with a point out of service.
+
+    Returns (first, again, moved) where `moved` names the assets that changed
+    charge point between the two.
+    """
+    sc = json.loads(SC_PATH.read_text())
+    if churn:
+        sc["objective_weights"]["churn_per_change"] = churn
+    first = build_and_solve(materialize(json.loads(json.dumps(sc))))
+    again = build_and_solve(materialize(json.loads(json.dumps(sc))), t_now=60,
+                            previous_plan=first, blocked_points=set(blocked))
+    a, b = _charge_points(first), _charge_points(again)
+    return first, again, [k for k in sorted(a) if a[k] != b[k]]
 
 
 def _burners() -> int:
@@ -266,6 +306,117 @@ def main():
     segs = charge_segments(sc, sc["assets"][0], 150)
     assert segs[0]["kw"] > segs[-1]["kw"] or len(segs) == 1
     print("T8 PASS charge_segments derives from the class energy_curve")
+
+    # T9 — REJECTION: a site that cannot serve everyone plans for those it can.
+    # Without it every asset MUST take a point, so an over-subscribed site returns
+    # INFEASIBLE and the decide path is left with no schedule at all. That is the
+    # wrong failure mode for a site under pressure, and the wrong one for a
+    # contested one: "serve ten of twelve and name the two" beats "serve nobody".
+    tight = _variant(charge_points=2, horizon_min=300)
+    try:
+        build_and_solve(materialize(json.loads(json.dumps(tight))))
+        raise AssertionError("T9 FAIL: the tight scenario is no longer infeasible by "
+                             "default — the test proves nothing; tighten it further")
+    except RuntimeError as e:
+        assert "INFEASIBLE" in str(e), f"T9 FAIL: unexpected default failure: {e}"
+
+    rej = build_and_solve(materialize(json.loads(json.dumps(tight))), allow_rejection=True)
+    served = [a for a in rej["assets"] if a["served"]]
+    assert rej["rejected"], "T9 FAIL: rejection enabled but nothing was rejected"
+    assert len(served) == len(rej["assets"]) - len(rej["rejected"])
+    #: Every rejection is REPORTED, as an abstention in the shape the dispose path
+    #: already reads. A drop that vanished from the output would be
+    #: indistinguishable from an asset nobody asked about.
+    abstained = sorted(p["entity_id"] for p in rej["proposals"] if p["proposal"]["abstain"])
+    assert abstained == sorted(rej["rejected"]), (
+        f"T9 FAIL: rejected {rej['rejected']} but abstained {abstained}")
+    for a in rej["assets"]:
+        if not a["served"]:
+            #: ONE PRICE. A rejected asset must not also accrue tardiness for work
+            #: nobody performed — double-charging biases the solver back toward
+            #: infeasibility, which is the behaviour this feature exists to end.
+            assert a["ops"] == [] and a["tardy_min"] is None, f"T9 FAIL: {a['aid']}"
+    #: PINNED, because everything above this line turned out to be a weak guard.
+    #: Mutation-tested: gating the wash/inspect exactly-one on `served` (so a
+    #: rejected asset does not hold a bay) and zeroing its tardiness (so rejection
+    #: has one price) BOTH pass every assertion above — the first silently changed
+    #: which two assets were dropped, the second silently changed the objective,
+    #: and neither was visible. The number is what sees them. Same rule as the
+    #: committed plan artifact: a behaviour you cannot name is a behaviour you
+    #: cannot notice changing.
+    assert rej["rejected"] == ["AV-03", "AV-07"], (
+        f"T9 FAIL: rejected {rej['rejected']}, expected ['AV-03', 'AV-07']")
+    assert rej["objective"] == 206130, (
+        f"T9 FAIL: objective {rej['objective']}, expected 206130 "
+        f"(= 2 x {DEFAULT_REJECTION_PENALTY} + 6130 of served-side cost)")
+    #: and the penalty dominates by design: rejection is a last resort, never a
+    #: cheap way to duck a hard asset.
+    assert rej["objective"] - 2 * DEFAULT_REJECTION_PENALTY < DEFAULT_REJECTION_PENALTY
+    print(f"T9 PASS rejection: a site that returns INFEASIBLE by default serves "
+          f"{len(served)}/{len(rej['assets'])} and names {rej['rejected']} as abstentions "
+          f"(objective {rej['objective']}, pinned)")
+
+    # T9b — REJECTION MUST NOT CONSTRAIN AN ASSET IT IS NOT SERVING.
+    # The first implementation excused a rejected asset from tardiness with
+    # `m.Add(tardy == 0).OnlyEnforceIf(served.Not())`. That reads as a price being
+    # removed; it is a CONSTRAINT being imposed — combined with
+    # `tardy >= finish - ready_by` it forces finish <= ready_by for an asset nobody
+    # is serving, and its own parallel-op durations can make that impossible.
+    # Measured here: the model went INFEASIBLE with rejection ENABLED, which is
+    # precisely the failure the feature exists to prevent. The fix removes the term
+    # from the OBJECTIVE instead.
+    #
+    # This scenario is the one that exposes it — ready almost on arrival, so a
+    # rejected asset's ops alone push its finish past its deadline. The canonical
+    # scenario is far too slack to show it, which is why the first version passed
+    # every other assertion.
+    urgent = _variant(charge_points=2, horizon_min=300)
+    urgent["assets_spec"]["ready_delta_min"] = [5, 12]
+    u = build_and_solve(materialize(json.loads(json.dumps(urgent))),
+                        allow_rejection=True, objective_mode="min_tardy")
+    assert u["rejected"], "T9b FAIL: nothing rejected — the scenario is not tight enough"
+    #: min_tardy's objective IS sum(charged tardiness) + the rejection price, so
+    #: this arithmetic says directly that no rejected asset was billed.
+    billed = u["objective"] - len(u["rejected"]) * DEFAULT_REJECTION_PENALTY
+    assert billed == sum(a["tardy_min"] for a in u["assets"] if a["served"]), (
+        f"T9b FAIL: objective bills {billed} tardy-minutes but the served assets "
+        f"account for {sum(a['tardy_min'] for a in u['assets'] if a['served'])}")
+    print(f"T9b PASS a rejected asset is excused from the objective, not constrained: "
+          f"{len(u['rejected'])} rejected, {billed} tardy-min billed, all of it on served assets")
+
+    # T10 — CHURN: a re-solve does not move an asset across the site for nothing.
+    # The previous-plan HINT only suggests the old point; without a price, a
+    # rolling re-solve will relocate an asset for a one-minute objective gain — a
+    # real vehicle making a real trip, and the first thing that makes operators
+    # distrust a scheduler.
+    BLOCKED = {"NASH-DCFC-03"}
+    free_first, free_again, free_moved = _resolve_pair(0, BLOCKED)
+    _, held_again, held_moved = _resolve_pair(500, BLOCKED)
+    assert len(held_moved) < len(free_moved), (
+        f"T10 FAIL: churn weight changed nothing — {len(free_moved)} moved unpriced, "
+        f"{len(held_moved)} moved at weight 500")
+
+    # A FORCED MOVE MUST BE FREE. NASH-DCFC-03 is out of service, so whoever was on
+    # it has no choice; charging for that would price the site's own failure to the
+    # asset and push the solver toward worse plans elsewhere to avoid a cost it
+    # cannot escape. Asserted as arithmetic: at weight w the objective rises by
+    # exactly w per DISCRETIONARY move, and the forced ones cost nothing.
+    W = 50
+    _, mid_again, _ = _resolve_pair(W, BLOCKED)
+    #: FORCED is a STRUCTURAL property, not a behavioural one: an asset is forced
+    #: iff the point it held is the one taken out of service, so no "stay" literal
+    #: exists for it and no churn term is built. Defining it as "moved anyway at
+    #: weight W" would be circular — an asset can move at weight W simply because
+    #: moving is worth more than W, and it pays for that.
+    first_points = _charge_points(free_first)
+    forced = [aid for aid in free_moved if first_points[aid] in BLOCKED]
+    discretionary = [aid for aid in free_moved if first_points[aid] not in BLOCKED]
+    assert forced, "T10 FAIL: no asset was actually displaced by the blocked point"
+    assert mid_again["objective"] - free_again["objective"] == W * len(discretionary), (
+        f"T10 FAIL: objective rose {mid_again['objective'] - free_again['objective']} "
+        f"at weight {W}; expected {W} x {len(discretionary)} discretionary moves")
+    print(f"T10 PASS churn: unpriced re-solve moves {len(free_moved)} assets, priced moves "
+          f"{len(held_moved)}; the {len(forced)} forced by the blocked point cost nothing")
 
     print("ALL TESTS PASS")
     return p1

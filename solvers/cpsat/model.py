@@ -58,6 +58,34 @@ from pathlib import Path
 import ortools
 from ortools.sat.python import cp_model
 
+#: What a rejection costs when a scenario does not price one itself. Deliberately
+#: an order of magnitude above the worst single-asset tardiness this horizon can
+#: produce, so the solver rejects ONLY when the alternative is infeasibility --
+#: never as a cheap way to duck a hard asset. A scenario that wants a different
+#: trade sets objective_weights.rejection_penalty and owns the consequence.
+DEFAULT_REJECTION_PENALTY = 100_000
+
+#: What one asset moving to a different point between re-solves costs. ZERO by
+#: default, and the term is then not built at all -- see the churn block in
+#: build_and_solve for why "add it with weight 0" would not be equivalent.
+DEFAULT_CHURN_PENALTY = 0
+
+
+def _exactly_one_if_served(m, lits, served):
+    """Exactly one of `lits`, or none at all when the asset is not served.
+
+    With rejection off (`served is None`) this is literally AddExactlyOne, so the
+    model is unchanged. With it on, a rejected asset must not still be handed a
+    wash bay or an inspection slot -- points it would occupy for a service that
+    is not happening.
+    """
+    if served is None:
+        m.AddExactlyOne(lits)
+    else:
+        m.Add(sum(lits) == 1).OnlyEnforceIf(served)
+        m.Add(sum(lits) == 0).OnlyEnforceIf(served.Not())
+
+
 def _det_time(solver) -> float:
     """Deterministic work consumed by the solve.
 
@@ -213,6 +241,7 @@ def build_and_solve(
     det_budget_s: float = DET_BUDGET_S,
     objective_mode: str = "weighted",
     max_tardy_total: int | None = None,
+    allow_rejection: bool = False,
 ) -> dict:
     """Solve the scenario; returns the plan dict (see _extract).
 
@@ -285,6 +314,10 @@ def build_and_solve(
     plan_vars = {}
     onpeak_terms = []
     move_count_vars = []
+    served_vars = {}                                 # rejection: aid -> BoolVar
+    reject_terms = []                                # rejection: the price of each
+    churn_terms = []                                 # stability vs previous_plan
+    churn_w = W.get("churn_per_change", DEFAULT_CHURN_PENALTY)
 
     pinned = {}
     if previous_plan:
@@ -361,7 +394,25 @@ def build_and_solve(
             per_point_intervals[p["id"]].append(occ)
             chains.append((lit, kind, p, segs, starts, ends))
             lits.append(lit)
-        m.AddExactlyOne(lits)
+
+        #: REJECTION (allow_rejection=True). Without it every asset MUST take a
+        #: point, so a site that cannot serve everyone yields INFEASIBLE and the
+        #: whole plan is lost -- the decide path then falls back to the previous
+        #: schedule or raises. That is the wrong failure: a site under pressure
+        #: should return a plan that serves most, and SAY WHO IT COULD NOT SERVE.
+        #: A rejected asset surfaces as abstain=True in the proposal batch, which
+        #: is a field ottoq_external_proposals already carries and the dispose
+        #: path already understands -- no new vocabulary.
+        #: OFF by default: the exactly-one below is then byte-for-byte the
+        #: original constraint with no extra variables, so committed plans and
+        #: the C5 comparison cannot move.
+        if allow_rejection:
+            served = m.NewBoolVar(f"served.{asset.aid}")
+            m.Add(sum(lits) == 1).OnlyEnforceIf(served)
+            m.Add(sum(lits) == 0).OnlyEnforceIf(served.Not())
+        else:
+            served = None
+            m.AddExactlyOne(lits)
 
         # pin / hint from the previous plan (previous-feasible retention)
         key = (asset.aid, "charge")
@@ -377,6 +428,21 @@ def build_and_solve(
             if "charge" in prev_ops:
                 for lit, kind, p, segs, starts, ends in chains:
                     m.AddHint(lit, 1 if p["id"] == prev_ops["charge"]["point"] else 0)
+                #: CHURN. The hint above merely SUGGESTS the previous point; nothing
+                #: PRICES leaving it, so a rolling re-solve will move an asset across
+                #: the site for a one-minute objective gain. In the yard that is a
+                #: real vehicle making a real trip for nothing, and it is the thing
+                #: operators notice first about a scheduler they cannot trust.
+                #: Built only when a weight is actually set -- "add the term with
+                #: weight 0" is NOT equivalent, because the extra variable changes
+                #: the search and can land on a different equally-optimal plan
+                #: (measured across ortools versions: same objective, different
+                #: schedule -- SOLVER_STATE.md 6.2). Absent weight, absent term.
+                if churn_w > 0:
+                    stay = next((lit for lit, kind, p, segs, starts, ends in chains
+                                 if p["id"] == prev_ops["charge"]["point"]), None)
+                    if stay is not None:
+                        churn_terms.append(stay.Not())
 
         charge_start = m.NewIntVar(0, H, f"cs.{asset.aid}")
         charge_end = m.NewIntVar(0, H, f"ce.{asset.aid}")
@@ -423,7 +489,8 @@ def build_and_solve(
                 iv = m.NewOptionalIntervalVar(ws, wash_min, we, lit, f"{asset.aid}.wash.{p['id']}")
                 per_point_intervals[p["id"]].append(iv)
                 wl.append((lit, p))
-            m.AddExactlyOne([l for l, _ in wl])
+            #: A rejected asset does not get a wash bay either.
+            _exactly_one_if_served(m, [l for l, _ in wl], served)
             ms = m.NewIntVar(0, H, f"{asset.aid}.mv1.s")
             me = m.NewIntVar(0, H, f"{asset.aid}.mv1.e")
             mv = m.NewIntervalVar(ms, site["move_duration_min"], me, f"{asset.aid}.mv1")
@@ -450,7 +517,7 @@ def build_and_solve(
                 iv = m.NewOptionalIntervalVar(isv, inspect_min, iev, lit, f"{asset.aid}.insp.{p['id']}")
                 per_point_intervals[p["id"]].append(iv)
                 il.append((lit, p))
-            m.AddExactlyOne([l for l, _ in il])
+            _exactly_one_if_served(m, [l for l, _ in il], served)
             ms = m.NewIntVar(0, H, f"{asset.aid}.mv2.s")
             me = m.NewIntVar(0, H, f"{asset.aid}.mv2.e")
             mv = m.NewIntervalVar(ms, site["move_duration_min"], me, f"{asset.aid}.mv2")
@@ -466,10 +533,41 @@ def build_and_solve(
         m.AddMaxEquality(finish, finish_candidates)
         tardy = m.NewIntVar(0, H, f"tardy.{asset.aid}")
         m.Add(tardy >= finish - asset.ready_by_min)
-        obj_terms.append(W["tardiness_per_min"] * tardy)
-        move_count_vars.append(n_moves)
+        if served is None:
+            charged = tardy
+            move_count_vars.append(n_moves)
+        else:
+            #: REJECTION HAS EXACTLY ONE PRICE. An unserved asset's finish/tardy
+            #: vars still float (its parallel-op intervals are not optional and
+            #: start no earlier than arrival), so without this it would pay the
+            #: rejection penalty AND tardiness for work nobody did -- which makes
+            #: rejection look dearer than it is and biases the solver back toward
+            #: the infeasibility this feature exists to avoid.
+            #:
+            #: NOT DONE BY CONSTRAINING `tardy`. The first version of this line was
+            #: `m.Add(tardy == 0).OnlyEnforceIf(served.Not())`, and it is a bug:
+            #: combined with `tardy >= finish - ready_by` it forces
+            #: finish <= ready_by for a REJECTED asset, which its own parallel-op
+            #: durations can make impossible. Measured on the tight scenario with
+            #: ready_delta_min [5, 12]: the model went INFEASIBLE -- rejection
+            #: enabled, and still no plan. A price must be removed from the
+            #: OBJECTIVE, never imposed as a constraint on an asset nobody is
+            #: serving. Found by trying to falsify the guard rather than trusting
+            #: it; T9b now pins the case.
+            charged = m.NewIntVar(0, H, f"tardyc.{asset.aid}")
+            m.Add(charged == tardy).OnlyEnforceIf(served)
+            m.Add(charged == 0).OnlyEnforceIf(served.Not())
+            mv = m.NewIntVar(0, n_moves, f"mv.{asset.aid}")
+            m.Add(mv == n_moves).OnlyEnforceIf(served)
+            m.Add(mv == 0).OnlyEnforceIf(served.Not())
+            move_count_vars.append(mv)
+            reject_terms.append(W.get("rejection_penalty", DEFAULT_REJECTION_PENALTY)
+                                * served.Not())
+            served_vars[asset.aid] = served
+        obj_terms.append(W["tardiness_per_min"] * charged)
 
-        plan_vars[asset.aid] = dict(chains=chains, charge_start=charge_start,
+        plan_vars[asset.aid] = dict(served=served, charged_tardy=charged,
+                                    chains=chains, charge_start=charge_start,
                                     charge_end=charge_end, par=par_ivs,
                                     wash=wash_tuple, insp=insp_tuple,
                                     finish=finish, tardy=tardy)
@@ -486,21 +584,32 @@ def build_and_solve(
     m.AddCumulative(soft_intervals, soft_demands,
                     site["power_soft_target_kw"] + peak_excess)
 
-    all_tardy = [pv["tardy"] for pv in plan_vars.values()]
+    #: CHARGED tardiness, not raw: the lexicographic passes must not bill a
+    #: rejected asset either, and min_peak's `sum(all_tardy) <= max_tardy_total`
+    #: would otherwise spend T* on assets nobody is serving.
+    all_tardy = [pv["charged_tardy"] for pv in plan_vars.values()]
+    #: CHURN AND REJECTION RIDE IN EVERY OBJECTIVE MODE, and they are kept out of
+    #: obj_terms to make that possible. The lexicographic passes in
+    #: policies/forward.py minimize tardiness alone and then peak alone -- they
+    #: never read obj_terms -- so a rejection priced there would be free in pass 2,
+    #: which could drop an asset while holding its tardiness target and report the
+    #: same T*. `side` is zero-valued and zero-variable when neither feature is
+    #: on, which is what keeps the default path byte-identical.
+    side = sum(reject_terms) + (churn_w * sum(churn_terms) if churn_terms else 0)
     if objective_mode == "weighted":
         obj_terms.append(W["peak_excess_per_kw"] * peak_excess)
         obj_terms.extend([W["onpeak_kw_min"] * t for t in onpeak_terms])
         obj_terms.append(W["per_move"] * sum(move_count_vars))
-        m.Minimize(sum(obj_terms))
+        m.Minimize(sum(obj_terms) + side)
     elif objective_mode == "min_tardy":
-        m.Minimize(sum(all_tardy))
+        m.Minimize(sum(all_tardy) + side)
     else:  # min_peak
         m.Add(sum(all_tardy) <= max_tardy_total)
         #: peak_var IS the instantaneous site peak: a cumulative capacity the
         #: solver pays to raise. Same mechanism the soft target already uses.
         peak_var = m.NewIntVar(0, site["power_cap_kw_hard"], "site_peak_kw")
         m.AddCumulative(power_intervals, power_demands, peak_var)
-        m.Minimize(peak_var)
+        m.Minimize(peak_var + side)
 
     solver = cp_model.CpSolver()
     solver.parameters.random_seed = sc["seed"] % (2**31)
@@ -553,8 +662,28 @@ def build_and_solve(
 
 def _extract(sc, solver, status, plan_vars, peak_excess, repro=None) -> dict:
     assets_out, proposals = [], []
+    rejected = []
     for asset in sc["assets"]:
         pv = plan_vars[asset.aid]
+        #: A REJECTED ASSET IS REPORTED, NEVER DROPPED. It leaves the plan with an
+        #: empty op list and enters the proposal batch as abstain=True -- the field
+        #: ottoq_external_proposals already carries for exactly this. A rejection
+        #: that vanished from the output would be indistinguishable from an asset
+        #: nobody asked about, which is the whole distinction cuopt_invocation_log
+        #: exists to preserve on the other proposer.
+        if pv["served"] is not None and not solver.Value(pv["served"]):
+            rejected.append(asset.aid)
+            proposals.append({
+                "source": "cpsat", "action_context": "stall_assignment",
+                "entity_type": "vehicle", "entity_id": asset.aid,
+                "proposal": {"stall_id": None, "stall_type": None,
+                             "requested_kw": None, "abstain": True,
+                             "reason": "no feasible point within the site's capacity"},
+            })
+            assets_out.append({"aid": asset.aid, "class": asset.cls,
+                               "ready_by": asset.ready_by_min, "served": False,
+                               "finish": None, "tardy_min": None, "ops": []})
+            continue
         ops = []
         for lit, kind, p, segs, starts, ends in pv["chains"]:
             if solver.Value(lit):
@@ -587,6 +716,9 @@ def _extract(sc, solver, status, plan_vars, peak_excess, repro=None) -> dict:
                         "start": solver.Value(isv), "end": solver.Value(iev)})
         assets_out.append({"aid": asset.aid, "class": asset.cls,
                            "ready_by": asset.ready_by_min,
+                           #: Only when rejection is ENABLED, so the default plan
+                           #: dict -- and therefore plan_sha256 -- does not move.
+                           **({"served": True} if pv["served"] is not None else {}),
                            "finish": solver.Value(pv["finish"]),
                            "tardy_min": solver.Value(pv["tardy"]),
                            "ops": sorted(ops, key=lambda o: (o["start"], o["op"]))})
@@ -597,6 +729,8 @@ def _extract(sc, solver, status, plan_vars, peak_excess, repro=None) -> dict:
         "peak_excess_kw": solver.Value(peak_excess),
         "assets": sorted(assets_out, key=lambda a: a["aid"]),
         "proposals": sorted(proposals, key=lambda p: p["entity_id"]),
+        **({"rejected": sorted(rejected)} if any(
+            pv["served"] is not None for pv in plan_vars.values()) else {}),
     }
     plan["plan_sha256"] = hashlib.sha256(
         json.dumps(plan, sort_keys=True).encode()).hexdigest()
