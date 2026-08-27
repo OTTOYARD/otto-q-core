@@ -202,13 +202,23 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             horizon_min: int = 720,
             ready_by_min: dict[str, int] | None = None,
             default_ready_delta_min: int = 240,
-            time_limit_s: float = 10.0) -> dict:
+            det_budget_s: float | None = None,
+            time_limit_s: float | None = None) -> dict:
     """Frame in, advisory rows out. Writes nothing, ever.
 
     The result carries the rows AND the solve's own accounting (T*, peak,
     statuses) so the caller can log an honest fire record next to the insert --
     the same discipline as cuopt_invocation_log: every invocation quantifiable,
     "never invoked" distinguishable from "invoked and abstained".
+
+    The budget is DETERMINISTIC work by default, not wall-clock time: a
+    proposal truncated by the clock is a function of how loaded the box was,
+    and rows like that must never be logged under a run ID as if they were
+    reproducible. A caller that genuinely needs a wall-clock ceiling -- the
+    live decide path has one tick of right-of-first-refusal before the local
+    path pre-empts it -- may still pass time_limit_s; solver["reproducible"]
+    then reports whether the clock was what stopped the search, so
+    "truncated by the clock" stays distinguishable in the fire record.
     """
     scenario, abstentions = frame_to_scenario(
         frame, class_table, site=site, horizon_min=horizon_min,
@@ -220,12 +230,14 @@ def propose(frame: dict, class_table: dict, *, site: dict,
                 "planned": 0, "solver": None,
                 "note": "no plannable vehicles in frame"}
 
-    pass1 = build_and_solve(scenario, objective_mode="min_tardy",
-                            time_limit_s=time_limit_s)
+    budget = {"time_limit_s": time_limit_s}
+    if det_budget_s is not None:
+        budget["det_budget_s"] = det_budget_s
+    pass1 = build_and_solve(scenario, objective_mode="min_tardy", **budget)
     t_star = sum(a["tardy_min"] for a in pass1["assets"])
     pass2 = build_and_solve(scenario, objective_mode="min_peak",
                             max_tardy_total=t_star, previous_plan=pass1,
-                            time_limit_s=time_limit_s)
+                            **budget)
 
     ready_by_used = {a["aid"]: ("explicit" if a["aid"] in (ready_by_min or {})
                                 else "default")
@@ -240,5 +252,13 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             "pass1_status": pass1["solver_status"],
             "pass2_status": pass2["solver_status"],
             "total_tardy_min": t_star,
+            #: FALSE means a wall-clock limit may have decided this plan, so it
+            #: is not a function of (scenario, seed, config) alone. A fire
+            #: record carrying FALSE must not be cited as a reproducible number.
+            "reproducible": bool(pass1.get("repro", {}).get("reproducible")
+                                 and pass2.get("repro", {}).get("reproducible")),
+            "deterministic_time": round(
+                pass1.get("repro", {}).get("deterministic_time", 0.0)
+                + pass2.get("repro", {}).get("deterministic_time", 0.0), 6),
         },
     }

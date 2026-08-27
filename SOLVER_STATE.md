@@ -203,20 +203,151 @@ retention (started ops pinned; solver failure returns the previous plan — the 
 without a schedule). Output is a proposal batch in the exact `ottoq_external_proposals` shape,
 `source='cpsat'`.
 
-Test battery (`test_cpsat_prototype.py`, run 2026-08-19):
+Test battery (`test_cpsat_prototype.py`, re-run 2026-08-27; the 2026-08-19 transcript this
+block used to carry was stale — the scenario has moved since, so the T1 line quoted a plan
+the committed scenario no longer produces):
 
 ```
-T1 PASS determinism: sha256 e228ea73d00d518b… identical across 2 solves (OPTIMAL, objective=2131)
-T2 PASS point exclusivity + 18-min DCFC cooldown held on every point
-T3 PASS site power: true peak 436 kW <= hard cap 1000 kW; excess over soft target = 0 kW
-T4 PASS piecewise segments taper above 70% SoC; cold-start modifier applied
-T5 PASS concurrency-in-point + 4-min moves as scheduled operations
-T6 PASS re-solve at t=120 with NASH-DCFC-02 blocked: 9 started ops retained, no new work on the blocked point
-T7 PASS 12 proposals in ottoq_external_proposals shape (source='cpsat'); nothing writes state
-T8 PASS charge_segments derives from the class energy_curve
+T1  PASS determinism: sha256 330efe0721c119a6… identical across 2 solves (OPTIMAL, objective=135)
+T1b PASS truncated solve (FEASIBLE, det budget 0.06) byte-identical idle vs 5 contending processes
+T1c PASS default solve is deterministically budgeted with no wall-clock limit;
+         a wall-clocked plan is labelled reproducible=False
+T1d PASS fresh-process solve matches: sha256 330efe0721c119a6…
+T2  PASS point exclusivity + 18-min DCFC cooldown held on every point
+T3  PASS site power: true peak 440 kW <= hard cap 1000 kW; excess over soft target = 0 kW
+T4  PASS piecewise segments taper above 70% SoC; cold-start modifier applied
+T5  PASS concurrency-in-point + 4-min moves as scheduled operations
+T6  PASS re-solve at t=120 with NASH-DCFC-02 blocked: 9 started ops retained, none on the blocked point
+T7  PASS 12 proposals in ottoq_external_proposals shape (source='cpsat'); nothing writes state
+T8  PASS charge_segments derives from the class energy_curve
 ```
+
+### 6.1 The determinism claim was false, and how (2026-08-27)
+
+The prototype's header claimed determinism under fixed seed on the strength of a fixed
+`random_seed`, a single worker, and a stable build order. It also set
+`solver.parameters.max_time_in_seconds` — **a wall-clock limit** — and said nothing about it.
+A search truncated by the clock stops wherever the machine happened to be at that instant, so
+the plan is a function of how loaded the box was, not of the seed.
+
+T1 could not catch this. The canonical scenario proves OPTIMAL, so no limit ever binds and the
+two solves agree for reasons unrelated to the budget. **A determinism test on a case that
+finishes early is not a determinism test.**
+
+Measured on the canonical scenario, one worker, seed 424242, at a 1.2 s wall-clock limit:
+
+| budget | contending processes | status | objective | plan sha256 |
+|---|---|---|---|---|
+| wall 1.2 s | none | FEASIBLE | 7311 | `eeb58aed4f4bf15a…` |
+| wall 1.2 s | all cores | FEASIBLE | **10261** | **`22797ea092062a6f…`** |
+| det 0.06 | none | FEASIBLE | 13461 | `b809de73c3fef4af…` |
+| det 0.06 | all cores | FEASIBLE | 13461 | `b809de73c3fef4af…` |
+
+Same seed, same scenario, same config: a 40 % worse schedule because the machine was busy —
+and it would have shipped under the same run ID. The deterministic budget is unmoved by the
+same load.
+
+The exposure was not hypothetical. `scenario_deck.json` — the 48-asset deck scenario — solves
+in **19.34 s** against the old **20 s** default. Three percent of margin between the numbers in
+the deck and a different set of numbers.
+
+The fix: `max_deterministic_time` (CP-SAT work units, machine-independent) is the binding limit
+at a 5.0-unit budget, ~7× the worst committed scenario's 0.70; `max_time_in_seconds` is left
+unset. A caller may still pass `time_limit_s` — the live proposer has one tick of
+right-of-first-refusal before the local path pre-empts it — but the plan then carries
+`repro.reproducible = False` unless it proved OPTIMAL, because optimality is limit-independent
+and a truncated search is not. `forward_proposer.propose()` surfaces the same flag in its
+solver accounting, so "truncated by the clock" stays distinguishable in a fire record, the same
+discipline `cuopt_invocation_log` applies to abstention.
+
+No plan moved: all four committed scenarios and the C5 comparison hash byte-identically before
+and after.
+
+### 6.1a Rejection and churn — the two T2 features that were genuinely missing
+
+Reading the prototype against the defense spec's T2 definition (rolling-horizon CP-SAT *with
+rejection, churn term, hints, frozen window*), four of the five already existed and ran: rolling
+re-solve, `AddHint` warm-starting, the frozen commitment window (started work pinned at `t_now`),
+and the multi-term objective. **Rejection and the churn term were absent.** Both are now built, and
+both are **off by default** — the four committed scenarios, the C5 comparison and the 24h KPI gate
+hash byte-identically with them off, so no published number moves until a caller opts in.
+
+**Rejection** (`allow_rejection=True`). Without it `AddExactlyOne` forces every asset onto a point,
+so an over-subscribed site returns INFEASIBLE and the decide path is left with no schedule at all.
+That is the wrong failure for a site under pressure and the wrong one for a contested site. With it,
+on a deliberately tightened canonical scenario that is INFEASIBLE by default: **10 of 12 served, zero
+tardiness on the served set**, and the two it could not serve enter the proposal batch as
+`abstain: true` — a field `ottoq_external_proposals` already carries and the dispose path already
+reads, so no new vocabulary. The default penalty is 100,000, an order of magnitude above the worst
+single-asset tardiness the horizon can produce, so the solver rejects only when the alternative is
+infeasibility rather than as a cheap way to duck a hard asset.
+
+**Churn** (`objective_weights.churn_per_change`). The previous plan was only ever *hinted*; nothing
+priced leaving it, so a rolling re-solve would relocate an asset for a one-minute objective gain — in
+the yard, a real vehicle making a real trip for nothing. Measured on a re-solve an hour in with one
+DCFC point out of service: **unpriced, 4 of 12 assets change point; at weight 500, 2 do.** The two
+that still move are the ones the blocked point displaced, and they **cost nothing** — a forced move
+is free, because charging for it would price the site's own failure to the asset. The term is built
+only when a weight is set; "add it with weight 0" is not equivalent, since the extra variable can
+land the search on a different equally-optimal plan (§6.2).
+
+**A bug found by trying to falsify the guard rather than trusting it.** Rejection's first
+implementation excused a rejected asset from tardiness with
+`m.Add(tardy == 0).OnlyEnforceIf(served.Not())`. That reads as removing a price; it imposes a
+constraint. Combined with `tardy >= finish - ready_by` it forces `finish <= ready_by` for an asset
+nobody is serving, and that asset's own parallel-op durations can make it impossible: on the tight
+scenario with `ready_delta_min [5, 12]` the model went **INFEASIBLE with rejection enabled** —
+exactly the failure the feature exists to prevent. Every other assertion in the battery passed. The
+fix removes the term from the *objective* instead (a `charged` tardiness variable, which the
+lexicographic passes also read so a rejected asset cannot eat `max_tardy_total`), and **T9b pins the
+scenario that exposes it**. The canonical scenario is far too slack to show it, which is why the bug
+survived its first review.
+
+T9's pinned objective and rejected set are load-bearing for the same reason: mutation-testing showed
+that removing the `served` gate on wash/inspect (so a rejected asset still holds a bay) and removing
+the tardiness excuse **both passed every structural assertion** while silently changing which assets
+were dropped. The number is what sees them.
+
+### 6.2 The same run needs the same OR-Tools, and CI was installing a range
+
+`verify.yml` installed `ortools>=9.10`. Measured on the four committed scenarios, 9.11.4210 vs
+9.15.6755:
+
+| scenario | objective 9.11 | objective 9.15 | plan sha256 9.11 | plan sha256 9.15 |
+|---|---|---|---|---|
+| canonical | 135 | 135 | `0558a9e0dc83…` | `330efe0721c1…` |
+| 24h | 1490 | 1490 | `1c8f7ab7828b…` | `c720132fdeed…` |
+| deck | 296 | 296 | `ed8b131f7c9c…` | `008f3beb155e…` |
+| vertiport | 60 | 60 | `e1a41d82a3f3…` | `d1edb255a000…` |
+
+**Every objective is identical; every plan differs.** Neither version is worse — both prove
+optimal — but they break ties among equally-optimal schedules differently, so *which* asset goes
+to *which* point at *which* minute moves. The schedule is what ships; the objective is a number
+about it. This is precisely the failure the defense spec's T1 row names: integer-quantised costs
+tie constantly, and unspecified tie-breaks are the classic source of "why did it change?"
+
+So the version is part of the reproducibility key. `verify.yml` now pins `ortools==9.15.6755`,
+`plan["repro"]["ortools_version"]` records it, and the drift message diagnoses a mismatch by name
+instead of leaving a reviewer to guess. Had CI ever resolved 9.11, the old battery would have
+silently rewritten `plan_seed424242.json` to a different schedule and reported success.
+
+One related sharp edge: `CpSolver` only grew a `deterministic_time` accessor around 9.15; on 9.11
+the number lives on the response proto alone. `_det_time()` reads whichever exists, so an older
+ortools produces a clear result rather than an AttributeError mid-solve.
+
+### 6.3 The guards
+
+T1b is the standing guard — a deliberately truncating deterministic budget solved idle and under
+full CPU contention, asserting byte-identical plans **and** asserting the budget actually bound,
+so the test can never pass vacuously the way T1 did. T1c asserts the posture directly (finite
+deterministic budget, no finite wall-clock limit, single worker); T1d re-solves in a fresh
+process, since repeat solves in one process can agree through warmed state.
 
 The committed `plan_seed424242.json` is the reproducibility artifact: same seed → same sha256.
+It is now **compared** by the battery rather than overwritten by it. Previously the battery
+rewrote the artifact on every run and nothing in CI ever read it — a proof that regenerated
+itself out of any disagreement it might have found. Regenerating is now deliberate
+(`REGEN_PLAN=1`) and lands as a reviewable diff.
 
 ## 7. Nothing deleted (C4 step 5)
 

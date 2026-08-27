@@ -3,11 +3,21 @@
 Run:  python3 solvers/cpsat/test_cpsat_prototype.py
 """
 import json
+import math
+import multiprocessing as mp
+import os
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from model import build_and_solve, charge_segments, load_scenario  # noqa: E402
+from model import (  # noqa: E402
+    DEFAULT_REJECTION_PENALTY, build_and_solve, charge_segments, load_scenario,
+    materialize,
+)
+import ortools  # noqa: E402
+from ortools.sat.python import cp_model  # noqa: E402
 
 SC_PATH = Path(__file__).parent / "scenario_canonical.json"
 
@@ -16,7 +26,88 @@ def overlapping(a, b):
     return a["start"] < b["end"] and b["start"] < a["end"]
 
 
+def _variant(*, charge_points: int, horizon_min: int, churn: int = 0) -> dict:
+    """The canonical scenario with its charge capacity and horizon squeezed.
+
+    Built in memory via `materialize` rather than written to a file, so the
+    committed scenarios stay the only committed scenarios.
+    """
+    sc = json.loads(SC_PATH.read_text())
+    charge = [p for p in sc["service_points"] if p["kind"] in ("dcfc", "l2")][:charge_points]
+    other = [p for p in sc["service_points"] if p["kind"] not in ("dcfc", "l2")]
+    sc["service_points"] = charge + other
+    sc["horizon_min"] = horizon_min
+    if churn:
+        sc["objective_weights"]["churn_per_change"] = churn
+    return sc
+
+
+def _charge_points(plan) -> dict:
+    return {a["aid"]: next((o["point"] for o in a["ops"] if o["op"] == "charge"), None)
+            for a in plan["assets"]}
+
+
+def _resolve_pair(churn: int, blocked: set[str]):
+    """Solve, then re-solve an hour in with a point out of service.
+
+    Returns (first, again, moved) where `moved` names the assets that changed
+    charge point between the two.
+    """
+    sc = json.loads(SC_PATH.read_text())
+    if churn:
+        sc["objective_weights"]["churn_per_change"] = churn
+    first = build_and_solve(materialize(json.loads(json.dumps(sc))))
+    again = build_and_solve(materialize(json.loads(json.dumps(sc))), t_now=60,
+                            previous_plan=first, blocked_points=set(blocked))
+    a, b = _charge_points(first), _charge_points(again)
+    return first, again, [k for k in sorted(a) if a[k] != b[k]]
+
+
+def _burners() -> int:
+    """Enough busy processes to contend every core, oversubscribed so the load
+    is real even on a single-core runner."""
+    return max(2, (os.cpu_count() or 2) + 1)
+
+
+def _spin(stop):
+    x = 0
+    while not stop.is_set():
+        x = (x * 1103515245 + 12345) % (2**61 - 1)
+
+
+def _solve_under_load(det_budget_s: float) -> dict:
+    procs, stop = [], mp.Event()
+    for _ in range(_burners()):
+        pr = mp.Process(target=_spin, args=(stop,), daemon=True)
+        pr.start()
+        procs.append(pr)
+    time.sleep(0.3)                       # let the load actually land
+    try:
+        return build_and_solve(load_scenario(SC_PATH), det_budget_s=det_budget_s)
+    finally:
+        stop.set()
+        for pr in procs:
+            pr.join(timeout=5)
+
+
+def _capture_params(call):
+    """Run `call` and hand back the CpSolverParameters it actually used."""
+    seen, real = {}, cp_model.CpSolver.Solve
+
+    def spy(self, model, *a, **k):
+        seen["params"] = self.parameters
+        return real(self, model, *a, **k)
+
+    cp_model.CpSolver.Solve = spy
+    try:
+        call()
+    finally:
+        cp_model.CpSolver.Solve = real
+    return seen["params"]
+
+
 def main():
+    print(f"ortools {ortools.__version__}")
     sc = load_scenario(SC_PATH)
 
     # T1 — DETERMINISM UNDER FIXED SEED: two independent solves, byte-identical.
@@ -25,6 +116,74 @@ def main():
     assert p1["plan_sha256"] == p2["plan_sha256"], "T1 FAIL: plans differ across solves"
     print(f"T1 PASS determinism: sha256 {p1['plan_sha256'][:16]}… identical across 2 solves "
           f"(status={p1['solver_status']}, objective={p1['objective']})")
+    #: T1 ON ITS OWN PROVES ALMOST NOTHING, and it is worth being blunt about
+    #: why. This scenario reaches OPTIMAL, so no budget ever binds and the two
+    #: solves agree for a reason that has nothing to do with the budget being
+    #: sound. The determinism question only has teeth when the search is CUT
+    #: OFF -- that is T1b.
+    assert p1["solver_status"] == "OPTIMAL", "T1 assumption changed: see T1b"
+
+    # T1b — THE BUDGET IS DETERMINISTIC WORK, NOT WALL-CLOCK TIME.
+    # A truncating budget, solved twice: once idle, once with every core
+    # contended. CP-SAT's max_time_in_seconds is measured against the machine's
+    # clock, so a search it truncates depends on how loaded the box was --
+    # measured on this scenario at a 1.2s wall limit: objective 7311 idle vs
+    # 10261 loaded, same seed, same config, different plan. max_deterministic_time
+    # counts solver work units and cuts off at the same node on any machine.
+    # This is the test that decides whether "no number ships without a run ID"
+    # is true or decorative.
+    tiny = 0.06
+    idle = build_and_solve(load_scenario(SC_PATH), det_budget_s=tiny)
+    assert idle["solver_status"] != "OPTIMAL", (
+        f"T1b FAIL: det budget {tiny} did not truncate the search "
+        "(status OPTIMAL) -- the test proves nothing; lower the budget")
+    loaded = _solve_under_load(tiny)
+    assert idle["plan_sha256"] == loaded["plan_sha256"], (
+        "T1b FAIL: a truncated solve returned different plans idle vs under "
+        f"CPU contention -- {idle['plan_sha256'][:16]} (obj {idle['objective']}) "
+        f"vs {loaded['plan_sha256'][:16]} (obj {loaded['objective']}). "
+        "The binding limit is not machine-independent.")
+    print(f"T1b PASS truncated solve (status={idle['solver_status']}, det budget "
+          f"{tiny}) byte-identical idle vs {_burners()} contending processes: "
+          f"sha256 {idle['plan_sha256'][:16]}…")
+
+    # T1c — THE POSTURE THAT MAKES T1b HOLD, asserted directly so it cannot
+    # regress quietly: a default solve sets a deterministic budget and sets NO
+    # wall-clock limit. A plan whose search a wall clock may have decided is
+    # labelled non-reproducible, because it is not a function of
+    # (scenario, seed, config) alone.
+    params = _capture_params(lambda: build_and_solve(load_scenario(SC_PATH)))
+    #: CP-SAT's own default for both limits is +inf, so "finite" IS "set".
+    #: Read that way rather than via protobuf presence, which this build of
+    #: ortools does not expose on its parameters wrapper.
+    assert math.isfinite(params.max_deterministic_time), (
+        "T1c FAIL: no deterministic budget set")
+    assert math.isinf(params.max_time_in_seconds), (
+        "T1c FAIL: build_and_solve set a wall-clock limit by default "
+        f"({params.max_time_in_seconds}s) -- that is the T1b failure mode")
+    assert params.num_search_workers == 1, "T1c FAIL: not single-worker"
+    walled = build_and_solve(load_scenario(SC_PATH), time_limit_s=1.2,
+                             det_budget_s=1e9)
+    assert walled["repro"]["reproducible"] is False, (
+        "T1c FAIL: a wall-clock-truncated plan claimed to be reproducible")
+    assert idle["repro"]["reproducible"] is True, (
+        "T1c FAIL: a deterministically-budgeted plan was not labelled reproducible")
+    print("T1c PASS default solve is deterministically budgeted with no "
+          "wall-clock limit; a wall-clocked plan is labelled reproducible=False")
+
+    # T1d — ACROSS PROCESSES, not just twice in one. Repeat solves in a single
+    # process can agree through warmed state that a fresh process would not have.
+    fresh = subprocess.run(
+        [sys.executable, "-c",
+         "import sys,json;sys.path.insert(0,%r);"
+         "from model import build_and_solve, load_scenario;"
+         "print(build_and_solve(load_scenario(%r))['plan_sha256'])"
+         % (str(Path(__file__).parent), str(SC_PATH))],
+        capture_output=True, text=True, check=True).stdout.strip()
+    assert fresh == p1["plan_sha256"], (
+        f"T1d FAIL: fresh process solved to {fresh[:16]}, this one to "
+        f"{p1['plan_sha256'][:16]}")
+    print(f"T1d PASS fresh-process solve matches: sha256 {fresh[:16]}…")
 
     # T2 — POINT EXCLUSIVITY + DCFC COOLDOWN (18 min) ON THE POINT.
     cool = sc["site"]["dcfc_cooldown_min"]
@@ -148,6 +307,117 @@ def main():
     assert segs[0]["kw"] > segs[-1]["kw"] or len(segs) == 1
     print("T8 PASS charge_segments derives from the class energy_curve")
 
+    # T9 — REJECTION: a site that cannot serve everyone plans for those it can.
+    # Without it every asset MUST take a point, so an over-subscribed site returns
+    # INFEASIBLE and the decide path is left with no schedule at all. That is the
+    # wrong failure mode for a site under pressure, and the wrong one for a
+    # contested one: "serve ten of twelve and name the two" beats "serve nobody".
+    tight = _variant(charge_points=2, horizon_min=300)
+    try:
+        build_and_solve(materialize(json.loads(json.dumps(tight))))
+        raise AssertionError("T9 FAIL: the tight scenario is no longer infeasible by "
+                             "default — the test proves nothing; tighten it further")
+    except RuntimeError as e:
+        assert "INFEASIBLE" in str(e), f"T9 FAIL: unexpected default failure: {e}"
+
+    rej = build_and_solve(materialize(json.loads(json.dumps(tight))), allow_rejection=True)
+    served = [a for a in rej["assets"] if a["served"]]
+    assert rej["rejected"], "T9 FAIL: rejection enabled but nothing was rejected"
+    assert len(served) == len(rej["assets"]) - len(rej["rejected"])
+    #: Every rejection is REPORTED, as an abstention in the shape the dispose path
+    #: already reads. A drop that vanished from the output would be
+    #: indistinguishable from an asset nobody asked about.
+    abstained = sorted(p["entity_id"] for p in rej["proposals"] if p["proposal"]["abstain"])
+    assert abstained == sorted(rej["rejected"]), (
+        f"T9 FAIL: rejected {rej['rejected']} but abstained {abstained}")
+    for a in rej["assets"]:
+        if not a["served"]:
+            #: ONE PRICE. A rejected asset must not also accrue tardiness for work
+            #: nobody performed — double-charging biases the solver back toward
+            #: infeasibility, which is the behaviour this feature exists to end.
+            assert a["ops"] == [] and a["tardy_min"] is None, f"T9 FAIL: {a['aid']}"
+    #: PINNED, because everything above this line turned out to be a weak guard.
+    #: Mutation-tested: gating the wash/inspect exactly-one on `served` (so a
+    #: rejected asset does not hold a bay) and zeroing its tardiness (so rejection
+    #: has one price) BOTH pass every assertion above — the first silently changed
+    #: which two assets were dropped, the second silently changed the objective,
+    #: and neither was visible. The number is what sees them. Same rule as the
+    #: committed plan artifact: a behaviour you cannot name is a behaviour you
+    #: cannot notice changing.
+    assert rej["rejected"] == ["AV-03", "AV-07"], (
+        f"T9 FAIL: rejected {rej['rejected']}, expected ['AV-03', 'AV-07']")
+    assert rej["objective"] == 206130, (
+        f"T9 FAIL: objective {rej['objective']}, expected 206130 "
+        f"(= 2 x {DEFAULT_REJECTION_PENALTY} + 6130 of served-side cost)")
+    #: and the penalty dominates by design: rejection is a last resort, never a
+    #: cheap way to duck a hard asset.
+    assert rej["objective"] - 2 * DEFAULT_REJECTION_PENALTY < DEFAULT_REJECTION_PENALTY
+    print(f"T9 PASS rejection: a site that returns INFEASIBLE by default serves "
+          f"{len(served)}/{len(rej['assets'])} and names {rej['rejected']} as abstentions "
+          f"(objective {rej['objective']}, pinned)")
+
+    # T9b — REJECTION MUST NOT CONSTRAIN AN ASSET IT IS NOT SERVING.
+    # The first implementation excused a rejected asset from tardiness with
+    # `m.Add(tardy == 0).OnlyEnforceIf(served.Not())`. That reads as a price being
+    # removed; it is a CONSTRAINT being imposed — combined with
+    # `tardy >= finish - ready_by` it forces finish <= ready_by for an asset nobody
+    # is serving, and its own parallel-op durations can make that impossible.
+    # Measured here: the model went INFEASIBLE with rejection ENABLED, which is
+    # precisely the failure the feature exists to prevent. The fix removes the term
+    # from the OBJECTIVE instead.
+    #
+    # This scenario is the one that exposes it — ready almost on arrival, so a
+    # rejected asset's ops alone push its finish past its deadline. The canonical
+    # scenario is far too slack to show it, which is why the first version passed
+    # every other assertion.
+    urgent = _variant(charge_points=2, horizon_min=300)
+    urgent["assets_spec"]["ready_delta_min"] = [5, 12]
+    u = build_and_solve(materialize(json.loads(json.dumps(urgent))),
+                        allow_rejection=True, objective_mode="min_tardy")
+    assert u["rejected"], "T9b FAIL: nothing rejected — the scenario is not tight enough"
+    #: min_tardy's objective IS sum(charged tardiness) + the rejection price, so
+    #: this arithmetic says directly that no rejected asset was billed.
+    billed = u["objective"] - len(u["rejected"]) * DEFAULT_REJECTION_PENALTY
+    assert billed == sum(a["tardy_min"] for a in u["assets"] if a["served"]), (
+        f"T9b FAIL: objective bills {billed} tardy-minutes but the served assets "
+        f"account for {sum(a['tardy_min'] for a in u['assets'] if a['served'])}")
+    print(f"T9b PASS a rejected asset is excused from the objective, not constrained: "
+          f"{len(u['rejected'])} rejected, {billed} tardy-min billed, all of it on served assets")
+
+    # T10 — CHURN: a re-solve does not move an asset across the site for nothing.
+    # The previous-plan HINT only suggests the old point; without a price, a
+    # rolling re-solve will relocate an asset for a one-minute objective gain — a
+    # real vehicle making a real trip, and the first thing that makes operators
+    # distrust a scheduler.
+    BLOCKED = {"NASH-DCFC-03"}
+    free_first, free_again, free_moved = _resolve_pair(0, BLOCKED)
+    _, held_again, held_moved = _resolve_pair(500, BLOCKED)
+    assert len(held_moved) < len(free_moved), (
+        f"T10 FAIL: churn weight changed nothing — {len(free_moved)} moved unpriced, "
+        f"{len(held_moved)} moved at weight 500")
+
+    # A FORCED MOVE MUST BE FREE. NASH-DCFC-03 is out of service, so whoever was on
+    # it has no choice; charging for that would price the site's own failure to the
+    # asset and push the solver toward worse plans elsewhere to avoid a cost it
+    # cannot escape. Asserted as arithmetic: at weight w the objective rises by
+    # exactly w per DISCRETIONARY move, and the forced ones cost nothing.
+    W = 50
+    _, mid_again, _ = _resolve_pair(W, BLOCKED)
+    #: FORCED is a STRUCTURAL property, not a behavioural one: an asset is forced
+    #: iff the point it held is the one taken out of service, so no "stay" literal
+    #: exists for it and no churn term is built. Defining it as "moved anyway at
+    #: weight W" would be circular — an asset can move at weight W simply because
+    #: moving is worth more than W, and it pays for that.
+    first_points = _charge_points(free_first)
+    forced = [aid for aid in free_moved if first_points[aid] in BLOCKED]
+    discretionary = [aid for aid in free_moved if first_points[aid] not in BLOCKED]
+    assert forced, "T10 FAIL: no asset was actually displaced by the blocked point"
+    assert mid_again["objective"] - free_again["objective"] == W * len(discretionary), (
+        f"T10 FAIL: objective rose {mid_again['objective'] - free_again['objective']} "
+        f"at weight {W}; expected {W} x {len(discretionary)} discretionary moves")
+    print(f"T10 PASS churn: unpriced re-solve moves {len(free_moved)} assets, priced moves "
+          f"{len(held_moved)}; the {len(forced)} forced by the blocked point cost nothing")
+
     print("ALL TESTS PASS")
     return p1
 
@@ -155,5 +425,42 @@ def main():
 if __name__ == "__main__":
     plan = main()
     out = Path(__file__).parent / "plan_seed424242.json"
-    out.write_text(json.dumps(plan, indent=1, sort_keys=True))
-    print(f"wrote {out.name} (sha256 {plan['plan_sha256']})")
+    #: repro.deterministic_time is a MEASUREMENT and the one field that could
+    #: legitimately move between ortools builds; it stays out of the artifact
+    #: so this file gates the SCHEDULE. The posture (which budget bound,
+    #: whether the plan is reproducible at all) does belong in it.
+    artifact = {k: v for k, v in plan.items() if k != "repro"}
+    artifact["repro"] = {k: v for k, v in plan["repro"].items()
+                         if k != "deterministic_time"}
+    text = json.dumps(artifact, indent=1, sort_keys=True)
+    #: THE COMMITTED ARTIFACT IS THE REPRODUCIBILITY CLAIM, so it is compared,
+    #: not overwritten. Before this, the battery rewrote it on every run and
+    #: nothing in CI ever read it -- a proof that regenerated itself out of any
+    #: disagreement. Regenerate deliberately with REGEN_PLAN=1 and commit the
+    #: diff, which is then reviewable.
+    if out.exists() and out.read_text() != text and not os.environ.get("REGEN_PLAN"):
+        was = json.loads(out.read_text())
+        #: Name the keys that moved. Reporting only the two plan_sha256 values
+        #: is useless when the artifact itself was edited -- the stored hash
+        #: then still matches while the file it describes does not.
+        keys = sorted(set(was) | set(artifact))
+        moved = [k for k in keys if was.get(k) != artifact.get(k)]
+        was_ver = (was.get("repro") or {}).get("ortools_version")
+        #: The likeliest cause by far, so lead with it. Two ortools releases
+        #: break ties among equally-optimal schedules differently: measured on
+        #: 9.11 vs 9.15, every objective matched and every plan differed.
+        why = ("\n  LIKELY CAUSE: ortools version. This artifact was generated "
+               f"on {was_ver}; you are running {ortools.__version__}. Different "
+               "releases break ties among equally-optimal schedules differently "
+               "-- same objective, different schedule. CI pins the version; "
+               "match it before regenerating."
+               if was_ver and was_ver != ortools.__version__ else "")
+        raise SystemExit(
+            f"DRIFT: {out.name} does not match this run's plan.\n"
+            f"  keys that differ: {', '.join(moved) or '(formatting only)'}\n"
+            f"  committed plan_sha256: {was.get('plan_sha256')}\n"
+            f"  this run:              {plan['plan_sha256']}" + why + "\n"
+            "If the change is intended, re-run with REGEN_PLAN=1 and commit "
+            "the diff so a reviewer sees exactly what moved.")
+    out.write_text(text)
+    print(f"{out.name} matches (sha256 {plan['plan_sha256']})")
