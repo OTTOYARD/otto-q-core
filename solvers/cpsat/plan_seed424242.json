@@ -789,6 +789,7 @@
  ],
  "repro": {
   "det_budget_s": 5.0,
+  "ortools_version": "9.15.6755",
   "reproducible": true,
   "wall_limit_s": null
  },

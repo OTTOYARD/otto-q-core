@@ -55,7 +55,23 @@ import random
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import ortools
 from ortools.sat.python import cp_model
+
+def _det_time(solver) -> float:
+    """Deterministic work consumed by the solve.
+
+    CpSolver only grew a `deterministic_time` accessor around 9.15; on 9.11 and
+    earlier the number exists solely on the response proto. Reading just the
+    accessor turns an older ortools into an AttributeError mid-solve instead of
+    a clear version complaint -- and CI installs from a range, so "older" is a
+    thing that can actually happen. The response field is present in both.
+    """
+    v = getattr(solver, "deterministic_time", None)
+    if v is None:
+        v = solver.response_proto.deterministic_time
+    return float(v)
+
 
 #: Deterministic work budget, in CP-SAT's machine-independent work units.
 #: The four committed scenarios all prove OPTIMAL at <= 0.70 units (deck, the
@@ -515,8 +531,16 @@ def build_and_solve(
         raise RuntimeError(f"no schedule and no previous plan: {solver.StatusName(status)}")
 
     repro = {
+        #: WHICH ORTOOLS PRODUCED THIS PLAN. Measured across 9.11 vs 9.15: every
+        #: objective value is identical (the solver is not worse on either), but
+        #: all four committed plans differ -- the two versions break ties among
+        #: equally-optimal schedules differently, so WHICH asset goes to WHICH
+        #: point at WHICH minute moves. The schedule ships; the objective is
+        #: just a number about it. Reproducing a run therefore requires the
+        #: version, which is why CI pins it and why it is recorded here.
+        "ortools_version": ortools.__version__,
         "det_budget_s": det_budget_s,
-        "deterministic_time": round(solver.deterministic_time, 6),
+        "deterministic_time": round(_det_time(solver), 6),
         "wall_limit_s": time_limit_s,
         #: TRUE means this plan is a function of (scenario, seed, config) alone.
         #: An OPTIMAL proof is limit-independent, so it holds whatever the

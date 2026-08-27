@@ -263,6 +263,35 @@ discipline `cuopt_invocation_log` applies to abstention.
 No plan moved: all four committed scenarios and the C5 comparison hash byte-identically before
 and after.
 
+### 6.2 The same run needs the same OR-Tools, and CI was installing a range
+
+`verify.yml` installed `ortools>=9.10`. Measured on the four committed scenarios, 9.11.4210 vs
+9.15.6755:
+
+| scenario | objective 9.11 | objective 9.15 | plan sha256 9.11 | plan sha256 9.15 |
+|---|---|---|---|---|
+| canonical | 135 | 135 | `0558a9e0dc83…` | `330efe0721c1…` |
+| 24h | 1490 | 1490 | `1c8f7ab7828b…` | `c720132fdeed…` |
+| deck | 296 | 296 | `ed8b131f7c9c…` | `008f3beb155e…` |
+| vertiport | 60 | 60 | `e1a41d82a3f3…` | `d1edb255a000…` |
+
+**Every objective is identical; every plan differs.** Neither version is worse — both prove
+optimal — but they break ties among equally-optimal schedules differently, so *which* asset goes
+to *which* point at *which* minute moves. The schedule is what ships; the objective is a number
+about it. This is precisely the failure the defense spec's T1 row names: integer-quantised costs
+tie constantly, and unspecified tie-breaks are the classic source of "why did it change?"
+
+So the version is part of the reproducibility key. `verify.yml` now pins `ortools==9.15.6755`,
+`plan["repro"]["ortools_version"]` records it, and the drift message diagnoses a mismatch by name
+instead of leaving a reviewer to guess. Had CI ever resolved 9.11, the old battery would have
+silently rewritten `plan_seed424242.json` to a different schedule and reported success.
+
+One related sharp edge: `CpSolver` only grew a `deterministic_time` accessor around 9.15; on 9.11
+the number lives on the response proto alone. `_det_time()` reads whichever exists, so an older
+ortools produces a clear result rather than an AttributeError mid-solve.
+
+### 6.3 The guards
+
 T1b is the standing guard — a deliberately truncating deterministic budget solved idle and under
 full CPU contention, asserting byte-identical plans **and** asserting the budget actually bound,
 so the test can never pass vacuously the way T1 did. T1c asserts the posture directly (finite

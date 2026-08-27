@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from model import build_and_solve, charge_segments, load_scenario  # noqa: E402
+import ortools  # noqa: E402
 from ortools.sat.python import cp_model  # noqa: E402
 
 SC_PATH = Path(__file__).parent / "scenario_canonical.json"
@@ -66,6 +67,7 @@ def _capture_params(call):
 
 
 def main():
+    print(f"ortools {ortools.__version__}")
     sc = load_scenario(SC_PATH)
 
     # T1 — DETERMINISM UNDER FIXED SEED: two independent solves, byte-identical.
@@ -292,11 +294,21 @@ if __name__ == "__main__":
         #: then still matches while the file it describes does not.
         keys = sorted(set(was) | set(artifact))
         moved = [k for k in keys if was.get(k) != artifact.get(k)]
+        was_ver = (was.get("repro") or {}).get("ortools_version")
+        #: The likeliest cause by far, so lead with it. Two ortools releases
+        #: break ties among equally-optimal schedules differently: measured on
+        #: 9.11 vs 9.15, every objective matched and every plan differed.
+        why = ("\n  LIKELY CAUSE: ortools version. This artifact was generated "
+               f"on {was_ver}; you are running {ortools.__version__}. Different "
+               "releases break ties among equally-optimal schedules differently "
+               "-- same objective, different schedule. CI pins the version; "
+               "match it before regenerating."
+               if was_ver and was_ver != ortools.__version__ else "")
         raise SystemExit(
             f"DRIFT: {out.name} does not match this run's plan.\n"
             f"  keys that differ: {', '.join(moved) or '(formatting only)'}\n"
             f"  committed plan_sha256: {was.get('plan_sha256')}\n"
-            f"  this run:              {plan['plan_sha256']}\n"
+            f"  this run:              {plan['plan_sha256']}" + why + "\n"
             "If the change is intended, re-run with REGEN_PLAN=1 and commit "
             "the diff so a reviewer sees exactly what moved.")
     out.write_text(text)
