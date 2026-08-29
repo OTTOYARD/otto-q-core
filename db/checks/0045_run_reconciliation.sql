@@ -215,4 +215,28 @@ SELECT 'R11 completed run leaves no open legs',
             WHEN (SELECT count(*) FROM public.ottoq_itinerary_legs, target
                    WHERE sim_run_id=target.id AND status IN ('planned','active')) = 0
               THEN 'PASS'
+            ELSE 'FAIL' END
+UNION ALL
+
+-- R12. EVERY WITNESS EVENT OF THE TEARDOWN CARRIES ITS RUN. Before 0092, stop_and_reset
+--      flipped the run's status first and reset stalls/vehicles second, so the teardown's own
+--      state-change trigger events resolved "no active run" and were written sim_run_id NULL,
+--      data_source 'production' — sim rows masquerading as production rows (4,074 measured in
+--      one 16-min window on 2026-08-29). This watches the run's teardown window for orphans.
+--      Caveat: on a DB with real production traffic, a genuine production event in the same
+--      seconds would false-positive; on the engine DB (all test data) that is acceptable.
+SELECT 'R12 teardown events carry the run',
+       (SELECT count(*) FROM public.ottoq_events e, target t
+         WHERE e.sim_run_id IS NULL AND e.data_source='production'
+           AND e.event_type IN ('vehicle.state_changed','stall.state_changed')
+           AND e.recorded_at BETWEEN t.ended_at - interval '5 seconds'
+                                 AND t.ended_at + interval '30 seconds')::text
+       ||' untagged witness events in the teardown window',
+       CASE WHEN (SELECT ended_at FROM target) IS NULL THEN 'EMPTY(run has no ended_at)'
+            WHEN (SELECT count(*) FROM public.ottoq_events e, target t
+                   WHERE e.sim_run_id IS NULL AND e.data_source='production'
+                     AND e.event_type IN ('vehicle.state_changed','stall.state_changed')
+                     AND e.recorded_at BETWEEN t.ended_at - interval '5 seconds'
+                                           AND t.ended_at + interval '30 seconds') = 0
+              THEN 'PASS'
             ELSE 'FAIL' END;

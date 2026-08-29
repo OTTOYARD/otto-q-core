@@ -28,14 +28,23 @@
 --      re-phase wear the way ottoq_sim_run_scenario's boot does.
 --   2. EMISSION SUPPRESSION, cliff-shaped in arm C: vehicle.state_changed 1566→1422→30,
 --      stall.state_changed 844→798→0 — while activity continued (58 charge sessions started,
---      116 dispatches completed). The witness triggers were gated, not the work. Prime
---      suspect: a stateful event-flood/dedup guard (0015 family) keyed on something that
---      saturates across back-to-back runs rather than per run.
+--      116 dispatches completed).
+--      ROOT-CAUSED (same day, superseding the flood-guard suspicion this file first recorded):
+--      not suppression — MIS-TAGGING. ottoq_active_sim_run_id() cached 'none' in its
+--      transaction-scoped GUC when the arm's fleet reset fired triggers before the run row
+--      existed, and arm C ran reset+start+ticks in ONE transaction — so 12 ticks of witness
+--      events were written sim_run_id NULL / data_source 'production' (arms A/B ticked in a
+--      separate transaction and resolved correctly; that procedural difference was the cliff).
+--      The same mechanism mis-tagged EVERY run teardown ever: stop flips status before the
+--      depot reset, so teardown events found no 'running' run — 4,074 orphaned witness rows
+--      measured in one 16-minute window. Fixed by 0092 (no cached misses; GUC pinned at run
+--      start and at teardown); check 0045 R12 watches the teardown window permanently.
 --
--- Until (a) holds, (b) cannot even be assessed. Fix order: give run start a WORLD FINGERPRINT
--- (hash of vehicle/wear/gate state, stored in the run payload) so same-seed runs prove they
--- started equal; make the seeded reset (or a scenario-boot-equivalent) cover the full
--- vehicle world; key the flood guard per run. Then re-run this triplet expecting A=B=C.
+-- Until (a) holds, (b) cannot even be assessed. Remaining fix order: give run start a WORLD
+-- FINGERPRINT (hash of vehicle/wear/gate state, stored in the run payload) so same-seed runs
+-- prove they started equal; make the seeded reset (or a scenario-boot-equivalent) cover the
+-- full vehicle world. Then re-run this triplet — one transaction per arm step — expecting
+-- A=B=C on commands/decisions/bookings, and event parity now that tagging is honest.
 --
 -- ── THE INSTRUMENT (re-runnable verbatim) ──────────────────────────────────────────────────
 -- One arm (repeat per arm; cert_harness is exempt from the metronome and the governor):
