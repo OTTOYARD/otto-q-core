@@ -102,6 +102,22 @@
 -- 3→6 (divergence at tick 2 pos ~1 → tick 3 pos 21 → pos 29 → pos 28-with-fewer-diffs) says
 -- the method is working; what remains is finishing the enumeration, not new theory.
 --
+-- ── PAIR 7, after 0100 closed the service-flow admissions (arms 2ebf111d/4f203026) ────────
+-- Command and decision COUNTS are now equal (655/655, 1854/1854) — pure permutation remains.
+-- The front is PINNED: three pairs running, the first divergent row is position 28 of tick 3,
+-- vehicle 77ecd026's gate_intake_no_charge stall pick (e0f2bf3a / 06acce00 / 321e4142 across
+-- pairs) — and each time the winning stall was pre-claimed by a co-tick 5-minute temp_hold
+-- for a DIFFERENT vehicle whose own placement permuted. Everything upstream in the decision
+-- stream is identical, so the permuting writer is a NON-decision hold placement in the same
+-- tick. NEXT SESSION'S TARGET, in order: (1) find which path books the co-tick
+-- [clock, clock+5min) temp_holds (it is NOT place_unplaced_vehicles ORDER BY id, NOT the
+-- charge-session loop ORDER BY vehicle_id, NOT prearrival_contracts — all verified stable);
+-- candidates: twin.ottoq_sim_stop_charge_session's post-charge hold (its CALLER's iteration
+-- feeds it), ottoq_replan_stranded_undercharge, ottoq_enact_opportunistic_charge, and
+-- ottoq_book_stall/find_and_book internals; (2) the score-only ORDER BY tail from the sweep
+-- (ottoq_svc_to_stall_type etc.). The instrument stands: run the pair, align tick-3 decisions
+-- by decision_seq, diff at position 28.
+--
 -- ── THE INSTRUMENT (re-runnable verbatim) ──────────────────────────────────────────────────
 -- One arm (repeat per arm; cert_harness is exempt from the metronome and the governor):
 --
