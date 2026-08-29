@@ -10,6 +10,11 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v17: audit honesty (check 0045 R5). enacted_action gains a `verb` derived from what was
+//      ACTUALLY applied, and outcome_status is 'enacted' only when something was — a tick
+//      where everything the model asked for was rejected or queued now records
+//      'noop_no_candidate' instead of claiming action. 100 of 822 enacted decisions on run
+//      9291ec6d were verbless, all from this insert.
 // v16: 🔴 FIXED — THE MODEL'S NUMBERS WERE BEING REPLACED WITH AN EXTREME.
 //      v15 clamped with `if (cd.hi - cd.lo <= 1) { Math.round(value) }`. That test was
 //      meant to ask "is this a whole-number dial?" but it measures RANGE WIDTH, and 4 of
@@ -204,15 +209,31 @@ serve(async (req) => {
     }
 
     const totalMs = Date.now() - tStart;
+    // 0088-era audit fix (check 0045 R5). Two defects lived in this one insert:
+    //  * no `verb` anywhere -- 100 of 822 enacted decisions on run 9291ec6d could not say WHAT
+    //    the agent did; the AI layer was the only actor whose actions the trail lost.
+    //  * outcome_status hardcoded "enacted" even when NOTHING was applied -- everything the
+    //    model asked for was rejected or queued, and the audit still said the agent acted.
+    // The verb is derived from what actually happened, never from what was proposed: one
+    // applied ops_action names itself; one set_policy names the dial; several name the batch.
+    const a0 = applied[0] as any;
+    const verb =
+      applied.length === 0 ? "no_op"
+      : applied.length === 1
+        ? (a0.type === "ops_action" ? String(a0.action ?? "ops_action")
+           : a0.type === "set_policy" ? `set_policy:${a0.key}`
+           : String(a0.type))
+      : `agent_batch:${applied.length}`;
     await sb.from("ottoq_decisions").insert({
       sim_run_id: run.sim_run_id, tick_seq: run.tick_count, sim_clock: run.sim_clock_current,
       depot_id: depot, action_context: "task_start", resolved_action_context: "orchestrator_agent",
       entity_type: "depot", entity_id: depot,
       context_frame: { board_tick: board.tick, lens: "board+return_wave+energy", fr4: true },
       proposed_action: { actions: parsed.actions, model: modelUsed },
-      enacted_action: { applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
+      enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
-      outcome_status: "enacted", propose_latency_ms: proposeMs, total_latency_ms: totalMs,
+      outcome_status: applied.length > 0 ? "enacted" : "noop_no_candidate",
+      propose_latency_ms: proposeMs, total_latency_ms: totalMs,
     });
 
     return json({ ok: true, run: run.sim_run_id, model: modelUsed, applied, queued, rejected,
