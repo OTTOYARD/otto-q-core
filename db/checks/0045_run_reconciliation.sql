@@ -11,6 +11,11 @@
 -- existed. A reconciliation that passes on its first try has not been shown able to fail (the
 -- K3 lesson, db/checks/0044). Expected verdicts as of writing are noted per check.
 --
+-- R10 and R11 added 2026-08-29 with the R8 root cause (migration 0089): R2 conditions on legs
+-- already 'done', so a leg STUCK short of 'done' was invisible to it — completed work whose
+-- settlement never fired hid in exactly the blind spot. R10 and R11 watch the lifecycle itself.
+-- Both born red against 9291ec6d; historical rows stay as evidence and are not backfilled.
+--
 -- Targets the MOST RECENT COMPLETED run. Re-run after every engine change.
 -- ============================================================================================
 
@@ -165,4 +170,49 @@ SELECT 'R9 SDRs hashed and signed',
        CASE WHEN count(*) = 0 THEN 'EMPTY(no SDRs)'
             WHEN count(*) FILTER (WHERE payload_hash IS NULL OR signature IS NULL) = 0 THEN 'PASS'
             ELSE 'FAIL' END
-  FROM public.ottoq_service_detail_records, target WHERE sim_run_id = target.id;
+  FROM public.ottoq_service_detail_records, target WHERE sim_run_id = target.id
+UNION ALL
+
+-- R10. LIFECYCLE COHERENCE, settlement side: a booking closed 'done' is completed work, and
+--      completed work settles through its leg — so that leg must be 'done' too. This is the
+--      blind spot R2 could not see: R2 checks legs already 'done'; a leg STUCK short of 'done'
+--      never enters its view. (2026-08-29: FAIL — 5 charge bookings on 9291ec6d closed
+--      'window_elapsed_occupied' with legs stuck 'active'; their SDRs never fired. Fixed
+--      forward by 0089; historical rows stay.)
+SELECT 'R10 done bookings sit on done legs',
+       (SELECT count(*) FROM public.ottoq_stall_bookings b, target
+         WHERE b.sim_run_id=target.id AND b.state='done' AND b.leg_id IS NOT NULL)::text
+       ||' done legged bookings, '||
+       (SELECT count(*) FROM public.ottoq_stall_bookings b
+          JOIN public.ottoq_itinerary_legs l ON l.leg_id=b.leg_id, target
+         WHERE b.sim_run_id=target.id AND b.state='done' AND l.status <> 'done')::text
+       ||' on un-done legs',
+       CASE WHEN (SELECT count(*) FROM public.ottoq_stall_bookings b, target
+                   WHERE b.sim_run_id=target.id AND b.state='done' AND b.leg_id IS NOT NULL) = 0
+              THEN 'EMPTY(no done legged bookings)'
+            WHEN (SELECT count(*) FROM public.ottoq_stall_bookings b
+                    JOIN public.ottoq_itinerary_legs l ON l.leg_id=b.leg_id, target
+                   WHERE b.sim_run_id=target.id AND b.state='done' AND l.status <> 'done') = 0
+              THEN 'PASS'
+            ELSE 'FAIL' END
+UNION ALL
+
+-- R11. LIFECYCLE COHERENCE, finalize side: a completed run leaves no leg open. Every other
+--      ledger gets closed at teardown (bookings released, commands expired, dispatches
+--      completed); a leg still 'planned' or 'active' on a completed run is a plan whose
+--      outcome was never recorded. (2026-08-29: FAIL — 366 planned + 30 active left open on
+--      9291ec6d. Fixed forward by 0089: finalizer closes active->'amended', planned->'skipped'.)
+SELECT 'R11 completed run leaves no open legs',
+       (SELECT count(*) FROM public.ottoq_itinerary_legs, target
+         WHERE sim_run_id=target.id AND status='planned')::text||' planned + '||
+       (SELECT count(*) FROM public.ottoq_itinerary_legs, target
+         WHERE sim_run_id=target.id AND status='active')::text||' active still open of '||
+       (SELECT count(*) FROM public.ottoq_itinerary_legs, target
+         WHERE sim_run_id=target.id)::text||' total',
+       CASE WHEN (SELECT count(*) FROM public.ottoq_itinerary_legs, target
+                   WHERE sim_run_id=target.id) = 0
+              THEN 'EMPTY(no legs)'
+            WHEN (SELECT count(*) FROM public.ottoq_itinerary_legs, target
+                   WHERE sim_run_id=target.id AND status IN ('planned','active')) = 0
+              THEN 'PASS'
+            ELSE 'FAIL' END;
