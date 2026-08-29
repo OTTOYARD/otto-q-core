@@ -40,11 +40,26 @@
 --      measured in one 16-minute window. Fixed by 0092 (no cached misses; GUC pinned at run
 --      start and at teardown); check 0045 R12 watches the teardown window permanently.
 --
--- Until (a) holds, (b) cannot even be assessed. Remaining fix order: give run start a WORLD
--- FINGERPRINT (hash of vehicle/wear/gate state, stored in the run payload) so same-seed runs
--- prove they started equal; make the seeded reset (or a scenario-boot-equivalent) cover the
--- full vehicle world. Then re-run this triplet — one transaction per arm step — expecting
--- A=B=C on commands/decisions/bookings, and event parity now that tagging is honest.
+-- ── SECOND PAIR, after 0092–0096 (2026-08-29, arms 05553150 / e1fe726c) ────────────────────
+-- Property (a) is now PROVEN: both arms stamped the SAME world fingerprint
+-- (3c903a8f2e7dc924ca2a6661f62feb21) — the 0095 whitelist reset + 0093 residue strip close
+-- the world completely (rolled-back 8-tick probe: fp_equal=t, zero column diffs).
+--
+-- Property (b) FAILS, and the first divergence names its mechanisms. Tick 1 is BYTE-IDENTICAL
+-- (55 commands, same hash). Divergence begins at tick 2: five 'stage' (ready:true) commands
+-- present in arm A, absent in arm B — the task_start staging decision drew differently from
+-- an identical world. Two wall-clock/cross-run inputs reach that decision:
+--   1. PROPOSAL TTLs LIVE IN THE WALL DOMAIN: greedy proposals get expires_at = now()+120
+--      REAL seconds and ottoq_l2_external_proposal filters >= now() — ticks run at variable
+--      wall speed, so a proposal straddles the next tick in one arm and is expired in the
+--      other (20 proposals in arm A vs 32 in arm B). Same disease class as the 0067
+--      reservation-expiry fix; the cure is the same: sim-domain freshness for sim runs.
+--   2. ottoq_ops_approvals IS READ WITHOUT RUN SCOPE: the table HAS sim_run_id, but decide's
+--      checks filter only vehicle/type/status/created_at — so arm B inherits arm A's
+--      approvals (66 approvals written during the pair; 271 accumulated). One run's
+--      greenlights leak into the next run's gates.
+-- Fix both, then re-run this pair expecting equality tick by tick; the first-divergence
+-- bisection above is the debugging loop to repeat if a third mechanism hides behind them.
 --
 -- ── THE INSTRUMENT (re-runnable verbatim) ──────────────────────────────────────────────────
 -- One arm (repeat per arm; cert_harness is exempt from the metronome and the governor):
