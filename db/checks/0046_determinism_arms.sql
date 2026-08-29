@@ -61,6 +61,33 @@
 -- Fix both, then re-run this pair expecting equality tick by tick; the first-divergence
 -- bisection above is the debugging loop to repeat if a third mechanism hides behind them.
 --
+-- ── PAIRS 4 AND 5, after 0097/0098 (2026-08-29) — the horizon moves, the diagnosis lands ──
+-- Pair 4 (02ad9218/40cd6a63, after 0097 expired approvals at teardown): ticks 1 AND 2 now
+-- byte-identical — mechanism 2 (approvals) confirmed dead. Divergence moved to tick 3:
+-- one vehicle (bc55d859) admitted to the overnight drain in one arm only. Root: the
+-- admission cursor ORDER BY (deferred count DESC, last_state_change) LIMIT n — same-tick
+-- transitions share last_state_change (the sim clock), so the last slot went in heap order.
+-- Fixed by 0098 (append id).
+-- Pair 5 (908c16bc/de282fc7, after 0098): stall_assignment queue identical through
+-- position 28 (the drain fix held); the first divergence is now a forward temp-hold at
+-- tick 2 — the same window's hold on stall a06d087f went to fixture vehicle a1111111 in
+-- arm A and b2222222 in arm B, and the pairing permutation cascades from there.
+--
+-- ── THE GENERAL DIAGNOSIS (ending one-at-a-time whack-a-mole) ─────────────────────────────
+-- A live sweep of pg_proc for `ORDER BY ... LIMIT` cursors lacking a closing unique key
+-- found DOZENS of sites across the tick path, dominated by two families:
+--   * `ORDER BY vn.created_at DESC LIMIT 1` — "the latest need" picked by a WALL-clock
+--     column whose values tie for rows created in the same transaction (arrival_disposition,
+--     book_appointment, decide_wash_triage, plan_opportunistic_charges, readmit_*,
+--     record_enacted_booking, reoptimize_reservation_book, reserve_inbound_bays, ...);
+--   * score-only ORDER BY with no id tiebreak (the 0054/0067 disease, re-grown since the
+--     decide-path rewrite).
+-- The remaining work is a 0054-scale sweep: enumerate every site from the live catalog,
+-- close each order with the row's unique key, one self-verifying migration, then re-run
+-- this pair expecting tick-by-tick equality. The sweep query lives in the session notes;
+-- rebuild it as: regexp over pg_proc.prosrc for 'ORDER BY ... LIMIT' minus snippets already
+-- carrying id/stall_code/seq columns.
+--
 -- ── THE INSTRUMENT (re-runnable verbatim) ──────────────────────────────────────────────────
 -- One arm (repeat per arm; cert_harness is exempt from the metronome and the governor):
 --
