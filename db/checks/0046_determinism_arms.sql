@@ -118,6 +118,49 @@
 -- (ottoq_svc_to_stall_type etc.). The instrument stands: run the pair, align tick-3 decisions
 -- by decision_seq, diff at position 28.
 --
+-- ── PAIRS 8–10, after 0104/0105/0106 (2026-08-29) — CONVERGENCE ───────────────────────────
+-- The pair-7 hypothesis was INVERTED by the ledger trace. Phase order (world -> proposals ->
+-- decide_tick -> place_unplaced) proves the 5- and 15-minute temp_holds are written AFTER
+-- decide_tick by place_unplaced_vehicles: they were victims of the cascade, not its cause.
+-- The true first divergent write of tick 3 was a WORLD-PHASE 30-minute hold from
+-- twin.ottoq_opportunistic_scan -> ottoq_enact_opportunistic_charge, and behind it TWO
+-- defects in one function: the simulated tech verdict drew its coin from
+-- approval_id::text — a gen_random_uuid, different every run (ledger: 5f8af8a5 declined in
+-- one arm, approved in the other; 814c9bc7 the reverse) — and the verdict cursor had no
+-- ORDER BY at all. Fixed by 0104 (run-stable salt vehicle:type:requested_at + total order).
+--
+-- PAIR 8 (966dd746/7814f235): COMMAND stream byte-identical over all 12 ticks (671/671,
+-- h_cmd cd1269c4), decisions identical ticks 1–11. The tick-12 residue was not a cursor: the
+-- ottoq-orchestrator-agent edge function (Nemotron LLM, fired from decide_and_dispatch every
+-- 3rd tick) returned HTTP 503 in one arm, 429 then a DIFFERENT policy batch in the other.
+-- A sampling LLM cannot be replayed by seed. Fixed by 0105: cert_harness runs quiesce the
+-- LLM proposer (the 0056 cuOpt precedent, applied to the orchestrator).
+--
+-- PAIR 9 (466a8404/2b970077): commands, decisions AND bookings byte-identical
+-- (h_cmd cd1269c4, h_dec 2af3a71b at 1856/1856, h_bkg 0752973e). Event multiset differed by
+-- exactly six vehicle.state_changed rows stamped 23:08:00.602 — the ottoq-depot-tick cron
+-- (ottoq_cron_tick) treats ANY running run as "depot live" and ran the production brain
+-- (world_advance, orchestrate-tick submit=true, wave-admit commit=true) against the arm that
+-- was alive on the */2-minute boundary; wave-admit flipped six gate vehicles. Fixed by 0106:
+-- the cron's idle gate ignores cert_harness runs. Also catalogued: the event projection's
+-- entity_id is a per-run RANDOM uuid for entity_type ocpp_session / service_detail_record /
+-- sim_run (the bookings projection already excludes such ids); the projection below now
+-- masks those three to '-'. ottoq_decisions.enacted_action for bay_reconcile rows embeds a
+-- per-run leg_id — full-payload decision comparisons must exclude it (the projection already
+-- does).
+--
+-- PAIR 10 (47643e53/7596fab7), all three fixes live: ALL FOUR STREAMS BYTE-IDENTICAL —
+--   h_cmd cd1269c42ea0571b587890921da8e78b   (671 commands)
+--   h_dec 2af3a71bafbba80f3ff285730e2224d3   (1856 decisions)
+--   h_evt 6b191843f04c167b01d50720e8a7bce9   (2675 events, stable projection)
+--   h_bkg 0752973ea5337e86fa07893e4226a584
+-- and h_cmd/h_dec/h_bkg are identical ACROSS pairs 9 and 10 (four arms, one stream).
+-- Scope of the claim, stated honestly: scenario busy_day, seed 424242, 12 ticks, world
+-- fingerprint 3c903a8f, external proposers quiesced (cuOpt per 0056, LLM orchestrator per
+-- 0105), production cron standing off (0106), volatile per-run ids excluded from the event
+-- projection. Next rungs for a standing certification: more seeds, longer horizons, and the
+-- C7 property test wrapping this instrument.
+--
 -- ── THE INSTRUMENT (re-runnable verbatim) ──────────────────────────────────────────────────
 -- One arm (repeat per arm; cert_harness is exempt from the metronome and the governor):
 --
@@ -153,8 +196,13 @@ SELECT
       E'\n' ORDER BY sim_clock, tick_seq, action_context, entity_id, outcome_status,
                     COALESCE(enacted_action->>'verb', proposed_action->>'verb','-'), COALESCE(proposed_action->>'stall_id','-')), ''))
      FROM public.ottoq_decisions d, r WHERE d.sim_run_id=r.id) AS h_dec,
-  (SELECT md5(COALESCE(string_agg(event_type||'|'||COALESCE(entity_id::text,'-'),
-      E'\n' ORDER BY event_type, COALESCE(entity_id::text,'-')), ''))
+  (SELECT md5(COALESCE(string_agg(
+      event_type||'|'||CASE WHEN e.entity_type IN ('ocpp_session','service_detail_record','sim_run')
+                            THEN '-'   -- per-run random ids (pairs 9-10 finding); vehicle/stall/depot ids are stable
+                            ELSE COALESCE(entity_id::text,'-') END,
+      E'\n' ORDER BY event_type,
+                    CASE WHEN e.entity_type IN ('ocpp_session','service_detail_record','sim_run')
+                         THEN '-' ELSE COALESCE(entity_id::text,'-') END), ''))
      FROM public.ottoq_events e, r WHERE e.sim_run_id=r.id) AS h_evt,
   (SELECT md5(COALESCE(string_agg(
       lower(during)::text||'|'||upper(during)::text||'|'||vehicle_id::text||'|'||stall_id::text||'|'||purpose||'|'||state,
