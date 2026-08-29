@@ -88,6 +88,20 @@
 -- rebuild it as: regexp over pg_proc.prosrc for 'ORDER BY ... LIMIT' minus snippets already
 -- carrying id/stall_code/seq columns.
 --
+-- ── PAIR 6, after 0099 swept the created_at family (2026-08-29, arms b2148f8b/2dc7d9df) ────
+-- 0099 closed the 12 `ORDER BY created_at DESC LIMIT 1` latest-need cursors across 10
+-- functions with the run-stable `visit_key` tiebreak (visit_key = vehicle:sim-time — a per-run
+-- random uuid would NOT do; 0054's rule). Pair 6: tick 2's forward-hold divergence is GONE
+-- (ticks 1–2 identical for the third pair running); tick 3's first divergence moved one hold
+-- upstream again — vehicle 03726c33's same-tick 5-minute temp_hold landed on stall 06acce00
+-- in arm A and 9b1306c1 in arm B, and vehicle 77ecd026's gate intake cascaded from that.
+-- FRONT: the same-tick HOLD-BOOKING LOOPS (which vehicle's hold books first / which candidate
+-- survives). Next: enumerate the remaining score-only ORDER BY ... LIMIT sites from the sweep
+-- (svc_to_stall_type and the tail past the first 40) plus the loops that call
+-- book_hold_stall in the twin phase, close each, re-pair. The convergence trend across pairs
+-- 3→6 (divergence at tick 2 pos ~1 → tick 3 pos 21 → pos 29 → pos 28-with-fewer-diffs) says
+-- the method is working; what remains is finishing the enumeration, not new theory.
+--
 -- ── THE INSTRUMENT (re-runnable verbatim) ──────────────────────────────────────────────────
 -- One arm (repeat per arm; cert_harness is exempt from the metronome and the governor):
 --
