@@ -87,6 +87,15 @@
 -- the row image minus (drawn_at, updated_at, drawn_for_run, wear_km_applied_run); the
 -- watermark pair is 0109-normalized. No open members found.
 --
+-- ── THE SOC FIXPOINT (pairs 29-31; the sweep's capstone finding) ──────────────────────────
+-- vehicles.current_soc is fp-covered but normalized by NOTHING for non-deployed vehicles
+-- (reset leaves it; boot draw leaves it; prime seeds only the deployed ~70%). Run-final
+-- SoCs carry into the next boot, and repeated same-behavior runs CONVERGE them — the world
+-- sits at a per-(seed, behavior-era) fixpoint, which is why pairs pass at all. This is a
+-- FEATURE with a rule (0046: transition pairs), not a defect: the lineage soc is a real
+-- overnight state and dealing it would make cert boots fully synthetic. The permanent
+-- close (deal soc at reset) stays optional; take it only if transition pairs grate.
+--
 -- ── VERIFICATION (this chunk) ─────────────────────────────────────────────────────────────
 -- 0117/0118/0119 are behavior-touching; the pair campaign around them is db/checks/0046
 -- pairs 23-26. Harness note that cost an hour: the platform now cancels any statement at

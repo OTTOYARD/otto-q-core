@@ -316,12 +316,43 @@
 -- config.lifetime_miles + SUM(dispatch miles), and the ingest path writes it back — so
 -- lifetime_miles ACCRUES per arrival cycle in-run (correcting 0049's earlier "no in-run
 -- writer" read; the writer hides behind the payload round-trip, not a column-name
--- mention). One run of a seed converges it; the first arm after a foreign lineage always
--- boots off-fixpoint. Close options (next V7 leg): draw lifetime_miles at cert reset as
--- f(seed, vehicle) like the profile's odometer prior, or stop round-tripping the odometer
--- through config. Until then the fp caveat stands EXACTLY as documented above; stream
--- inequality remains the only real defect signal, and streams are canon-exact on both
--- seeds from every lineage tested (pairs 25-28).
+-- mention). Closed by 0121: the cert reset DEALS lifetime_miles from the seed.
+--
+-- ── PAIRS 29-33 — 0121, THE FIXPOINT MODEL COMPLETED, AND TWO HARNESS LESSONS ────────────
+-- HARNESS LESSON 1 (the zombie): job v7_pair28 was never unscheduled and fired 424242
+-- pairs every minute through pairs 29-30 — yet every contaminated verdict was later
+-- REPRODUCED byte-for-byte under quiet one-shot conditions: concurrent pair invocations
+-- serialize or roll back entirely; interference cannot alter committed arms. Pairs now run
+-- as TRUE ONE-SHOTS: cron.schedule at a specific 'MI HH24' minute (fires exactly once),
+-- unscheduled after the verdict is read. Never '* * * * *' for a multi-minute job.
+-- HARNESS LESSON 2 (the transition pair): pairs 29/30 (171717, post-0121) forked on fp
+-- with IDENTICAL per-arm values under interference and under quiet — deterministic, not
+-- noise: arm A 23092841, arm B 092b70a5. Root: the cert reset does not touch
+-- vehicles.current_soc; non-deployed vehicles carry run-final SoCs forward, so the world
+-- sits at a per-(seed, behavior-era) SOC FIXPOINT. A behavior-changing migration (0121's
+-- dealt odometers shifted PM/charge patterns) MOVES the fixpoint; the first pair after it
+-- straddles old->new and fails on fp with byte-equal streams; convergence is ONE STEP.
+-- Reset-idempotency was proven directly (two consecutive resets, identical fp sections);
+-- seeded_random is hash-pure (hashtextextended, IMMUTABLE).
+-- PAIR 31 (171717, clean one-shot): PASSED — both arms at the NEW fixpoint 092b70a5,
+-- streams the standing Z-canon. The predicted one-step convergence, verified.
+-- PAIR 32 (424242, transition): streams mint the post-0121 424242 canon — bkg ea089ec6 ·
+-- cmd dcc9144e · dec de709c77 · evt 76364859 (matching the zombie-era values exactly) —
+-- fps 350bf848 -> d9d94a7b (the new 424242 fixpoint candidate).
+-- PAIR 33 (424242, confirm): PASSED — both arms at the new fixpoint d9d94a7b, streams the
+-- post-0121 424242 canon. One-step convergence verified on the second seed.
+--
+-- ── THE OPERATING RULE (supersedes the fp caveat wording above) ───────────────────────────
+-- 1. STREAM inequality is ALWAYS a real defect. No exceptions, any lineage, any era.
+-- 2. FP-only inequality is the soc/residue fixpoint moving: expected on the FIRST pair
+--    after any behavior-changing migration and after any foreign-seed/non-cert session.
+--    Run one throwaway TRANSITION PAIR per seed, then read verdicts; the confirm pair
+--    must pass at the new fixpoint or something real is wrong.
+-- 3. Post-0121 canon: 171717/12t streams bkg aa324fad · cmd 118d3fda · dec cf6fb562 ·
+--    evt 92e81190 at fp fixpoint 092b70a5; 424242/12t streams bkg ea089ec6 · cmd dcc9144e
+--    · dec de709c77 · evt 76364859 at fp fixpoint d9d94a7b. 424242/24t re-baseline
+--    still pending. Permanent close option if transition pairs ever grate: deal
+--    current_soc at cert reset too (kills the fixpoint concept; one more transition).
 -- OPEN FRONT (named, next campaign chunk): sweep vehicles (and sibling world tables) for
 -- ALL columns mutable in-run but absent from fingerprint + boot reset + reset_fleet —
 -- owning_sim_run_id first; the first pair after ANY non-cert session on the depot is the
