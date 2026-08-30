@@ -404,17 +404,93 @@
 -- and the OR-NULL departure gate stay deliberately unscoped (cross-run by design).
 -- Prediction (falsifiable): pairs 41+ land both arms on ONE stream set per seed.
 --
+-- ── PAIRS 41-46 — 0124 VERIFIED ON 424242; THE 171717/24T GHOST FRONT OPENS ──────────────
+-- PAIR 41 (424242/24t, post-0124): **PASSED** — both arms fp 8de3415f (unchanged), streams
+-- ONE set: bkg 6340041e · cmd a1129be5 · dec 2d533252 · evt 045100f1 (runs dd201b8f/
+-- e4fb3952). The run-pure canon is a THIRD behavior — neither cross-contaminated variant
+-- was privileged. PAIR 42 (confirm): PASSED — canon reproduced exactly (c619fd87/cd94a989).
+-- 424242/24t GREEN, canon minted: 6340041e·a1129be5·2d533252·045100f1 @ fp 8de3415f.
+-- PAIR 43 (171717/24t, transition): fp-only fork (760e435c / dc203e36), STREAMS EQUAL at
+-- the new 171717/24t candidate cmd f6a5a00c — textbook transition (06b67c4b/b6ef091b).
+-- PAIR 44 (171717/24t, confirm): **FAILED ON STREAMS** — fps equal (dc203e36), h_dec
+-- EQUAL, bkg/cmd/evt forked (7998389f/its arm B). Archaeology: the entire cmd diff is ONE
+-- enter_wash (5cee8fb3, 13:00, WSH-02 vs WSH-03); the true first divergence is SIX SIM
+-- HOURS earlier — the 06:00 prearrival sweep (reserve_inbound_bays -> book_workflow_legs,
+-- 10-min shift walk) placed vehicle 0ea2ccfe's and aff36072's future detail bookings one
+-- 10-min slot apart (12:25:08.704248 vs 12:35:08.704248 — IDENTICAL seeded jitter, base
+-- shifted one slot; original plan 09:43-10:04 in the why-text of BOTH arms). One arm's
+-- find_and_book refused a probe the other accepted. Ruled OUT by direct read: visit-ledger
+-- reads (0124), carryover consumption (none — consumed_by null across the lineage),
+-- policy_get (keyed lookups, no cursors), prearrival cursor order (total, 0054-stamped),
+-- free_between's booking conflict (strict run filter), charger heartbeats (same-seed arms
+-- write identical values). NAMED SUSPECT (unverified): STALL-OCCUPANCY GHOSTS —
+-- stalls.current_vehicle_id left set by teardown for vehicles mid-wash at the 14:00
+-- horizon cut (171717/24t ends with a wash queue running to 14:26; 424242 does not —
+-- the seed-specificity). A ghost on a wash bay engages free_between's occupancy guard
+-- ([now_sim, +45..240min] with no legs to project) and blocks the 09:43-10:0x probes in
+-- one arm only. FALSIFIABLE TEST: inspect stalls.current_vehicle_id vs vehicles'
+-- current_stall_id on the quiet world right after a teardown; ghosts -> 0125 clears the
+-- stall side at release, then 171717/24t transition+confirm must go green.
+-- PAIR 45 (424242/12t, transition): fp-only fork (7d7bec4e / d9d94a7b), streams EQUAL at
+-- the new 12t canon (07fe9557/...). PAIR 46 (confirm): **PASSED** — both arms fp d9d94a7b,
+-- streams bkg 9ed052b8 · cmd 413837dc · dec 482309a0 · evt ffd06c20 (2ef89737/...).
+-- 424242/12t GREEN at the new canon (old post-0121 canon retired by run-purity).
+--
+-- ── PAIRS 47-52 — THE REST OF THE MATRIX GOES GREEN (fresh seed + second scenario) ───────
+-- Every leg the same textbook shape: one fp-only transition (streams equal, the soc
+-- fixpoint migrating under run-pure behavior), then a confirm PASS at the new fixpoint.
+-- PAIR 47 (171717/12t, transition): fps 23092841 -> 092b70a5, streams equal (447e95da).
+-- PAIR 48 (171717/12t, confirm): PASSED — fp 092b70a5 (unchanged from post-0121!),
+--   new canon bkg aa324fad · cmd 1433b93f · dec cf6fb562 · evt 92e81190 (2fe0095d) —
+--   only h_cmd moved under 0123/0124; bkg/dec/evt survive from the old canon.
+-- PAIR 49 (314159/12t, FRESH SEED, transition): fps fd10cb8c / 24b807f0, streams equal
+--   (1a8b88ce). A never-before-run seed needed exactly the predicted two pairs.
+-- PAIR 50 (314159/12t, confirm): PASSED — fp 24b807f0, canon minted: bkg 24a4a0b4 ·
+--   cmd 5beb3b43 · dec e9ed6ee8 · evt fda87aa6 (0aaacc56).
+-- PAIR 51 (normal_day 171717/12t, transition): fps 22ea60f0 / 3ece9fbe, streams equal
+--   (0e1a9970). PAIR 52 (confirm): PASSED — fp 3ece9fbe, canon: bkg a88de84f ·
+--   cmd a3680029 · dec 5b4826fc · evt fadf837a (050e97e1). Second scenario green.
+-- GHOST CHECK (quiet world, post-P52 teardown): ZERO stalls with current_vehicle_id set
+-- on the flagship depot — teardown clears the stall side cleanly here. The occupancy-ghost
+-- hypothesis for P44 is WEAKENED but not dead (P52's teardown was 12t/normal_day, not the
+-- 171717/24t mid-wash horizon cut the theory needs). Sharper evidence from the matrix:
+-- 171717/12t PASSED while 171717/24t forked, and both horizons run the SAME 06:00
+-- prearrival sweep over an identical-to-tick-12 trajectory — so the P44 carrier is
+-- LINEAGE-BORNE boot-world state, not intrinsic to the sweep. PAIR 53 re-runs 171717/24t
+-- from tonight's different lineage as the discriminating experiment: pass = the fork
+-- needs the specific post-171717/24t leftover state; fail = robust reproducer with
+-- fresh post-teardown evidence.
+-- PAIR 53 (171717/24t from the post-normal_day lineage): FAILED WIDER — fps 3ece9fbe /
+-- dc203e36 (transition-shaped) but ALL FOUR streams forked including h_dec, both arms on
+-- new hashes (bkg ca2499ed/0516f4e0 · cmd c9b55fef/819dcf5b · dec 3d635974/c2aa26b8 ·
+-- evt 42b8bd68/13ab966c; runs 0416646e/...). The column's arm-asymmetry is robust across
+-- lineages; only (171717 × 24t) exhibits it — every 12t column and 424242/24t are green.
+-- GHOST HYPOTHESIS FALSIFIED by direct observation under its exact required condition:
+-- immediately after P53's arm-B teardown (a true 171717/24t horizon cut), the flagship
+-- depot shows ZERO seated stalls, ZERO reservations, ZERO seated vehicles. Teardown is
+-- clean on the physical side. Vehicle-state census at that instant: 116 offline,
+-- 4 staged_for_departure (fp-covered; noted, not implicated).
+-- NEXT INSTRUMENT (before more spelunking): the pair grows a BOOT-STATE fingerprint —
+-- after each arm's reset+boot+prime, hash the suspect ledgers per table (row count +
+-- content hash over ottoq_stall_bookings, ottoq_itinerary_legs, ottoq_visit_needs,
+-- ottoq_vehicle_dispatches, plus the vehicles/stalls world projections) into the verdict
+-- notes. The next failing pair then NAMES the table whose boot image differs between
+-- arms, replacing six-sim-hour backward archaeology with a direct read.
+--
 -- ── THE OPERATING RULE (supersedes the fp caveat wording above) ───────────────────────────
 -- 1. STREAM inequality is ALWAYS a real defect. No exceptions, any lineage, any era.
 -- 2. FP-only inequality is the soc/residue fixpoint moving: expected on the FIRST pair
 --    after any behavior-changing migration and after any foreign-seed/non-cert session.
 --    Run one throwaway TRANSITION PAIR per seed, then read verdicts; the confirm pair
 --    must pass at the new fixpoint or something real is wrong.
--- 3. Post-0121 canon: 171717/12t streams bkg aa324fad · cmd 118d3fda · dec cf6fb562 ·
---    evt 92e81190 at fp fixpoint 092b70a5; 424242/12t streams bkg ea089ec6 · cmd dcc9144e
---    · dec de709c77 · evt 76364859 at fp fixpoint d9d94a7b. 424242/24t re-baseline
---    still pending. Permanent close option if transition pairs ever grate: deal
---    current_soc at cert reset too (kills the fixpoint concept; one more transition).
+-- 3. STANDING CANON (post-0124, run-pure; supersedes every earlier canon list):
+--      424242/24t: bkg 6340041e · cmd a1129be5 · dec 2d533252 · evt 045100f1 @ fp 8de3415f
+--      424242/12t: bkg 9ed052b8 · cmd 413837dc · dec 482309a0 · evt ffd06c20 @ fp d9d94a7b
+--      171717/12t: bkg aa324fad · cmd 1433b93f · dec cf6fb562 · evt 92e81190 @ fp 092b70a5
+--      314159/12t: bkg 24a4a0b4 · cmd 5beb3b43 · dec e9ed6ee8 · evt fda87aa6 @ fp 24b807f0
+--      normal_day 171717/12t: bkg a88de84f · cmd a3680029 · dec 5b4826fc · evt fadf837a @ fp 3ece9fbe
+--    171717/24t: NO CANON — the open column (pairs 44/53). Permanent close option if
+--    transition pairs ever grate: deal current_soc at cert reset (one more transition).
 -- OPEN FRONT (named, next campaign chunk): sweep vehicles (and sibling world tables) for
 -- ALL columns mutable in-run but absent from fingerprint + boot reset + reset_fleet —
 -- owning_sim_run_id first; the first pair after ANY non-cert session on the depot is the
