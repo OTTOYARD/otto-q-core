@@ -477,7 +477,23 @@
 -- notes. The next failing pair then NAMES the table whose boot image differs between
 -- arms, replacing six-sim-hour backward archaeology with a direct read.
 --
--- ── THE OPERATING RULE (supersedes the fp caveat wording above) ───────────────────────────
+-- ── PAIR 54 — THE INSTRUMENT NAMES THE CARRIER ON ITS FIRST OUTING (0125 → 0127) ─────────
+-- PAIR 54 (171717/24t, first instrumented pair): **PASSED** outright — and the boot
+-- fingerprint showed exactly ONE difference between the arms' starting worlds:
+-- bookings.fgn (foreign live-state stall bookings) — arm A n=203, arm B n=206. Arm A's
+-- teardown leaked three live rows into arm B's world. World census: 209 leftover
+-- live-state bookings across the campaign lineage, essentially all state='interrupted' —
+-- written by the vehicle exception-handler path (0119's), retired by NOTHING:
+-- release_depot's booking release listed only ('held','active'). The EXCLUDE constraints
+-- are run-scoped (sim_run_id WITH =), so leaks never block physically — but live-booking
+-- reads filter state IN ('held','active','interrupted',...), and any not also run-scoped
+-- see a set that differs between arms. Whether a leaked row intersects a probe window is
+-- lineage luck — the observed intermittency (P43 pass, P44 fail, P53 fail, P54 pass).
+-- CLOSED by 0127: teardown retires 'interrupted' with held/active (one word in the state
+-- list, both feed modes) + one-time repair of the 209 accumulated leaks
+-- (release_reason '0127_interrupted_leak_repair'; production NULL-run rows untouched).
+-- Prediction (falsifiable): 171717/24t transition+confirm pass, and every healthy pair's
+-- boot fingerprint shows bookings.fgn n=0 from now on. Round-2 matrix = pairs 55-66.
 -- 1. STREAM inequality is ALWAYS a real defect. No exceptions, any lineage, any era.
 -- 2. FP-only inequality is the soc/residue fixpoint moving: expected on the FIRST pair
 --    after any behavior-changing migration and after any foreign-seed/non-cert session.
