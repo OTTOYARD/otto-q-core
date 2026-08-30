@@ -342,6 +342,68 @@
 -- PAIR 33 (424242, confirm): PASSED — both arms at the new fixpoint d9d94a7b, streams the
 -- post-0121 424242 canon. One-step convergence verified on the second seed.
 --
+-- ── PAIRS 34-39 — THE CORE-CERT GATE: 0122 TRANSITION, 24T CANON, AND THE P39 CATCH ───────
+-- The founder's gate for everything above the core: the matrix must go green over and over
+-- before any AI/agent layer work starts. Sequence run 2026-08-30 (all quiet one-shots).
+-- PAIR 34 (171717/12t, post-0122 transition): fp-only fork exactly per the operating rule —
+-- arm A 23092841, arm B at the standing fixpoint 092b70a5, streams canon-exact both arms
+-- (runs 50bc1e69/64e28292). 0122's TTL-sweep fix is stream-invisible at 12t (cuOpt is
+-- structurally absent from cert runs; the sweep no longer insta-expires, but no pending
+-- proposals exist to keep). Throwaway by rule.
+-- PAIR 35 (171717/12t, confirm): PASSED — both arms fp 092b70a5, streams the standing
+-- 12t canon aa324fad · 118d3fda · cf6fb562 · 92e81190 (runs 9907e1a9/ee0383e6). The
+-- 171717/12t fixpoint did NOT move under 0122 — convergence pulled the world straight back.
+-- PAIR 36 (171717/24t, transition): fp-only fork — arm A booted at the 12t fixpoint
+-- 092b70a5 (the world had been living at 12-tick horizons), arm B at the emerging 24t
+-- fixpoint; STREAMS EQUAL both arms and they MINT the 171717/24t canon: bkg d9d817bd ·
+-- cmd e704dfb4 · dec 8914c57d · evt 9dba2c1f (runs 6c11745d/1abdab3c). A longer horizon
+-- moves the fixpoint too — more arrival cycles, different final SoCs. Same rule, new axis.
+-- PAIR 37 (171717/24t, confirm): PASSED — both arms fp b5d05799 (the 24t fixpoint),
+-- streams the 24t canon exactly (runs fff097aa/f239b5fa). 171717 column fully green.
+-- PAIR 38 (424242/24t, transition): fp-only fork as expected (arm A fcd44b57 straddling),
+-- arm A streams minting the 424242/24t canon candidate: bkg d2f8c144 · cmd 4c119966 ·
+-- dec 10c1f3a4 · evt d54195c1 (runs 7a1f5a66/f0d7da76). Throwaway by rule.
+-- PAIR 39 (424242/24t, confirm): **FAILED ON STREAMS — the gate's first real catch.**
+-- fps EQUAL at 8de3415f (the fixpoint converged) but every stream forked: arm A
+-- 6340041e · a1129be5 · 2d533252 · 045100f1 vs arm B reproducing the P38 candidate
+-- exactly (runs 5614402c/57b14885). By rule 1 this is a REAL DEFECT, and the row-level
+-- diff ran it to ground: one stage command shifted a tick, tick-22 bay_reconcile chose
+-- bind-vs-displace differently, first divergent write 12:45:24 — vehicle 9f5d69bb's wash
+-- and detail atoms booked in opposite order, steered by WHICH copy of the vehicle's
+-- reopened visit the latest-need cursor read. Inside a pair transaction created_at is
+-- frozen and visit_key embeds (vehicle, sim clock), so arm B's second-visit row ties arm
+-- A's leftover copy EXACTLY and LIMIT 1 picks by heap — a 0054-class coin that needs a
+-- vehicle on its SECOND visit, which is why 12t pairs never saw it and the 24t gate did.
+-- Census: 13 latest-need cursors in 11 functions, 4 already scoped, NINE not. Closed by
+-- 0123 (all nine run-scoped, 0020 zero-uuid convention; decide_tick's two cursor sites
+-- anchored per-site after the first apply correctly aborted on a third anchor match — the
+-- arrival-admission EXISTS gate, a different class, deliberately left for its own census).
+--
+-- ── PAIR 40 — 0123 NECESSARY BUT NOT SUFFICIENT; THE FULL VISIT-LEDGER CLASS (0124) ──────
+-- PAIR 40 (424242/24t, post-0123 transition; runs cc765a66/f2b72fae): fps EQUAL at the
+-- P39 fixpoint 8de3415f, STREAMS STILL FORKED — the same two variants as P39 with the
+-- arms SWAPPED (arm A now the P38 candidate d2f8c144·4c119966·10c1f3a4·d54195c1, arm B
+-- the 6340041e variant). Two harness lessons first: (1) cron.job_run_details lies for
+-- multi-statement jobs — it logged "succeeded/SET/1s" while the pair's SELECT was still
+-- running; pg_stat_activity is the truth for in-flight detached pairs. (2) A cancelled
+-- diagnostic (60s MCP client timeout) keeps running server-side — pg_cancel_backend it.
+-- The archaeology was one query this time: the ENTIRE h_cmd diff is one stage command
+-- (vehicle d0887837, 13:00 in B vs 13:30 in A), rooted at tick 22's bay_reconcile
+-- (arm A displace_and_bind, arm B bind_bay_occupant) — which itself follows from the
+-- 12:45:24 wash-vs-detail purpose swap for 9f5d69bb (A: detail 21min then wash; B: wash
+-- 10min then detail — so at 13:00 the bay is busy in A, free in B). The purpose comes
+-- from ottoq_visit_wants_detail() — an EXISTS gate over ottoq_visit_needs with NO run
+-- scope — and the crediting writer mark_visit_atoms_done() turned out to be a BARE
+-- latest-need cursor (ORDER BY created_at DESC LIMIT 1, no visit_key tiebreak, no run
+-- scope — older than 0099, invisible to the 0123 census which keyed on the tiebroken
+-- form). Full census of ottoq_visit_needs: 51 functions, ~95 sites, three unscoped
+-- shapes — bare cursors, membership gates, one depot-wide status-rewrite UPDATE.
+-- Closed by 0124: 32 sites in 20 functions run-scoped (strict zero-uuid where
+-- p_sim_run_id exists; an in-place resolve-the-running-run subquery for the paramless
+-- helpers — no signature changes). Janitors, the carryover resolver, reporting reads,
+-- and the OR-NULL departure gate stay deliberately unscoped (cross-run by design).
+-- Prediction (falsifiable): pairs 41+ land both arms on ONE stream set per seed.
+--
 -- ── THE OPERATING RULE (supersedes the fp caveat wording above) ───────────────────────────
 -- 1. STREAM inequality is ALWAYS a real defect. No exceptions, any lineage, any era.
 -- 2. FP-only inequality is the soc/residue fixpoint moving: expected on the FIRST pair

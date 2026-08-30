@@ -96,6 +96,18 @@
 -- overnight state and dealing it would make cert boots fully synthetic. The permanent
 -- close (deal soc at reset) stays optional; take it only if transition pairs grate.
 --
+-- ── THE VISIT-NEEDS READ CLASSES (0123 census, while fixing the anchor) ───────────────────
+-- The latest-need CURSOR class (ORDER BY created_at DESC, visit_key DESC LIMIT 1) is
+-- CLOSED by 0123: nine unscoped cursors run-scoped (0020 zero-uuid), four were already.
+-- OPEN, ADJACENT CLASS: visit_needs EXISTS MEMBERSHIP GATES — decide_tick alone holds six
+-- (departure-hold ×3, arrival-admission, wash-skip, plus one already run-aware via the
+-- `= p_sim_run_id OR IS NULL` idiom at the departure gate). No ORDER BY/LIMIT, so no heap
+-- coin — a gate can only fork if a leftover row's CONTENT differs from the current run's,
+-- which the pairs have never shown. Needs its own census (all functions, all aliases) and
+-- an idiom decision first: zero-uuid strict vs OR-NULL differ exactly in external-feed
+-- runs (strict blinds a sim run to production rows; OR-NULL admits them). Do NOT patch
+-- ride-along; evidence first.
+--
 -- ── VERIFICATION (this chunk) ─────────────────────────────────────────────────────────────
 -- 0117/0118/0119 are behavior-touching; the pair campaign around them is db/checks/0046
 -- pairs 23-26. Harness note that cost an hour: the platform now cancels any statement at
