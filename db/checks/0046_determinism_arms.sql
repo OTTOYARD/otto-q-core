@@ -306,6 +306,22 @@
 -- pairs run DETACHED via cron.schedule with SET statement_timeout TO '25min', polled from
 -- validation_status, then unscheduled (three invocations were silently killed mid-flight
 -- before cron.job_run_details exposed the cancel).
+--
+-- ── PAIRS 27-28 — 0120 (whitelist drops last_calibration_at): CORRECT BUT INSUFFICIENT ────
+-- PAIR 27 (171717, post-0120): PASSED — new same-seed fp fixpoint c525a339 both arms,
+-- streams the standing Z-canon exactly. PAIR 28 (424242, first pair after the 171717
+-- lineage): streams canon-exact as always now, fps ffe49a6a (arm A) / 38f347c7 (arm B) —
+-- the first-arm-after-foreign-lineage variance SURVIVES 0120, and its mechanism is now
+-- pinned at the emitter: ottoq_sim_build_arrival_payload computes the webhook odometer as
+-- config.lifetime_miles + SUM(dispatch miles), and the ingest path writes it back — so
+-- lifetime_miles ACCRUES per arrival cycle in-run (correcting 0049's earlier "no in-run
+-- writer" read; the writer hides behind the payload round-trip, not a column-name
+-- mention). One run of a seed converges it; the first arm after a foreign lineage always
+-- boots off-fixpoint. Close options (next V7 leg): draw lifetime_miles at cert reset as
+-- f(seed, vehicle) like the profile's odometer prior, or stop round-tripping the odometer
+-- through config. Until then the fp caveat stands EXACTLY as documented above; stream
+-- inequality remains the only real defect signal, and streams are canon-exact on both
+-- seeds from every lineage tested (pairs 25-28).
 -- OPEN FRONT (named, next campaign chunk): sweep vehicles (and sibling world tables) for
 -- ALL columns mutable in-run but absent from fingerprint + boot reset + reset_fleet —
 -- owning_sim_run_id first; the first pair after ANY non-cert session on the depot is the
