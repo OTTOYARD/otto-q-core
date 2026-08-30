@@ -214,6 +214,76 @@
 -- pending/passed/failed/inconclusive; fixed in 0110b). A later budget-cut pair where both
 -- arms happened to cut at tick 2 was byte-equal even truncated.
 --
+-- ── PAIRS 17-19 — THE FIRST PAIR AFTER PRODUCTION (2026-08-30, post-0111..0114) ───────────
+-- PAIR 17 (seed 171717, first pair after the production E2E e8a0ba01 ran on this depot):
+-- FAILED with a brand-new signature — both arms booted fp-EQUAL (e2902297) yet diverged
+-- from tick 1, in stall assignment. Root, traced to the row: vehicles.target_soc and
+-- current_soc_updated_at are in-run state that survives teardown OUTSIDE both the boot
+-- draw and the fingerprint. Arm A charged vehicle 091fa637 to target 90; arm B booted
+-- "fp-identical", and ottoq_l2_optimize_assignments' eligibility (current_soc <
+-- COALESCE(target_soc, default) - 0.5) read arm A's leftover target — one extra vehicle in
+-- one queue at tick 1, cascade from there. Pairs 8-16 never saw it because back-to-back
+-- IDENTICAL cert runs leave IDENTICAL leftovers (the 424242 fixpoint lesson, again):
+-- production on the cert depot broke the fixpoint and exposed the class. Also surfaced:
+-- 33 live approvals from completed pre-0097-era runs (among them an indepot_reassign
+-- approved AFTER its own expiry by an auto-gate) — constant inputs, not the fork, but
+-- 0097 violations. ALL FIXED BY 0115: boot draw resets target_soc/current_soc_source/
+-- current_soc_updated_at; fingerprint extended with target_soc + current_soc_updated_at
+-- (per its own rule this line is the justifying probe); stale approvals expired with
+-- provenance. NOTE: production sessions never call the boot draw (0111) — a real feed's
+-- SoC state is never reset by this.
+-- PAIR 18 (post-0115): decisions BYTE-EQUAL (h_dec cf6fb562 both arms — the target_soc
+-- channel is dead) and commands equal ticks 1-11; ONE residual command at the final tick
+-- (arm B sent one arrived-at-gate vehicle to long staging at the horizon; arm A did not).
+-- The driver is the same CLASS — cross-run state outside fingerprint + boot reset — not
+-- yet pinned to a column. Known member identified by inspection while hunting:
+-- vehicles.owning_sim_run_id (admit_stranded's claim column: set to the claiming run,
+-- COALESCE-kept forever, filters candidates across runs, in neither fp nor any reset).
+-- Cross-pair stream identity also varies with the pair transaction's wall now() — the
+-- wall-domain TTL front from pair 14, still the standing open front for the live path.
+-- PAIR 19 (immediately after 18): TOTAL EQUALITY — fp ea2b7c32 · h_cmd 118d3fda ·
+-- h_dec cf6fb562 · h_evt 92e81190 · h_bkg aa324fad. (Superseded as canon by 0116 below.)
+-- PAIR 20 (seed 424242, first cross-SEED lineage post-0115: arm A's predecessor ran
+-- 171717): the pair-14(a) signature under the new fingerprint — ALL FOUR STREAMS
+-- BYTE-EQUAL, fingerprints UNEQUAL (465f7301 vs 8476972c). Root: stalls.reserved_at.
+-- ottoq_reserve_stall stamps it, the fp has always covered it, and NO teardown cleared it —
+-- release_depot cleared reserved_by + reservation_expires_at and left the dead
+-- reservation's timestamp behind. Measured: 158 flagship stalls carrying an orphaned
+-- reserved_at across 12 distinct values — the predecessors' reservation pattern, varying
+-- with predecessor seed; behaviorally dead (readers gate on reserved_by/expires — and the
+-- equal streams prove it). FIXED BY 0116: both release clear-sites also null reserved_at
+-- (world-reset AND ledger-only), standing orphans repaired.
+-- PAIR 21 (424242, post-0116): PASSED — fp 8476972c both arms, streams identical to pair
+-- 20's (fp-only fork closed). PAIR 22 (171717, post-0116, arm A booting from the 424242
+-- lineage): streams ALL EQUAL again, fp forked again (arm A 3419d654, arm B ea2b7c32 — arm
+-- B landing exactly on the old same-lineage value). The residue family behind it is now
+-- ENUMERATED, not guessed: vehicles.config keys written in-run that the boot draw neither
+-- draws nor strips, so their presence pattern tracks which RUNS ran — measured on the
+-- flagship post-pair-22: deploy_gate (17 vehicles), flagged_issue/_type (4), exception (3),
+-- bay_eviction (3), nightly_soc_target (4), last_balance_charge_at (1), deploy_gate_override
+-- (1), plus accumulating last_calibration_at + lifetime_miles (all 100 seeded). One-by-one
+-- normalization is a losing game — the systematic close is the V7 sweep (see OPEN FRONT).
+--
+-- ── THE STANDING CANON (post-0116, ledger-backed) ─────────────────────────────────────────
+-- STREAMS are seed-pure and CROSS-PAIR STABLE — byte-identical across every post-0115 arm
+-- of the same seed regardless of lineage (six consecutive arms over pairs 18-22):
+--   171717/12t: h_cmd 118d3fda · h_dec cf6fb562 · h_evt 92e81190 · h_bkg aa324fad
+--   424242/12t: h_cmd 185a0a6b · h_dec c2e0b16c · h_evt 97a1e359 · h_bkg d536d9c3
+-- FINGERPRINTS have same-seed-lineage fixpoints (171717 -> ea2b7c32, 424242 -> 8476972c)
+-- but the FIRST boot after a foreign-seed lineage varies with the config-key residue above:
+-- until V7 lands, a determinism_pair fired after a different seed (or any non-cert session)
+-- may FAIL ON FP ALONE with byte-equal streams — read the notes, don't just read the
+-- verdict. Behavioral (stream) inequality is ALWAYS a real defect. 424242/24t re-baseline
+-- still pending. Era history: f3e03b9a/2797c30d/1fed4510 post-0109; ea2b7c32 post-0115
+-- same-lineage; the values above are post-0116.
+-- (One known BEHAVIORAL cross-lineage transient remains on the books: pair 18's single
+-- final-tick staging command, production-lineage first-arm only, never reproduced since —
+-- V7's reproduction instrument is the first pair after any non-cert session.)
+-- OPEN FRONT (named, next campaign chunk): sweep vehicles (and sibling world tables) for
+-- ALL columns mutable in-run but absent from fingerprint + boot reset + reset_fleet —
+-- owning_sim_run_id first; the first pair after ANY non-cert session on the depot is the
+-- reproduction instrument.
+--
 -- ── THE INSTRUMENT (re-runnable verbatim) ──────────────────────────────────────────────────
 -- One arm (repeat per arm; cert_harness is exempt from the metronome and the governor):
 --
