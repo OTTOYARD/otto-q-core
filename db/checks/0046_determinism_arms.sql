@@ -460,6 +460,22 @@
 -- from tonight's different lineage as the discriminating experiment: pass = the fork
 -- needs the specific post-171717/24t leftover state; fail = robust reproducer with
 -- fresh post-teardown evidence.
+-- PAIR 53 (171717/24t from the post-normal_day lineage): FAILED WIDER — fps 3ece9fbe /
+-- dc203e36 (transition-shaped) but ALL FOUR streams forked including h_dec, both arms on
+-- new hashes (bkg ca2499ed/0516f4e0 · cmd c9b55fef/819dcf5b · dec 3d635974/c2aa26b8 ·
+-- evt 42b8bd68/13ab966c; runs 0416646e/...). The column's arm-asymmetry is robust across
+-- lineages; only (171717 × 24t) exhibits it — every 12t column and 424242/24t are green.
+-- GHOST HYPOTHESIS FALSIFIED by direct observation under its exact required condition:
+-- immediately after P53's arm-B teardown (a true 171717/24t horizon cut), the flagship
+-- depot shows ZERO seated stalls, ZERO reservations, ZERO seated vehicles. Teardown is
+-- clean on the physical side. Vehicle-state census at that instant: 116 offline,
+-- 4 staged_for_departure (fp-covered; noted, not implicated).
+-- NEXT INSTRUMENT (before more spelunking): the pair grows a BOOT-STATE fingerprint —
+-- after each arm's reset+boot+prime, hash the suspect ledgers per table (row count +
+-- content hash over ottoq_stall_bookings, ottoq_itinerary_legs, ottoq_visit_needs,
+-- ottoq_vehicle_dispatches, plus the vehicles/stalls world projections) into the verdict
+-- notes. The next failing pair then NAMES the table whose boot image differs between
+-- arms, replacing six-sim-hour backward archaeology with a direct read.
 --
 -- ── THE OPERATING RULE (supersedes the fp caveat wording above) ───────────────────────────
 -- 1. STREAM inequality is ALWAYS a real defect. No exceptions, any lineage, any era.
@@ -467,11 +483,14 @@
 --    after any behavior-changing migration and after any foreign-seed/non-cert session.
 --    Run one throwaway TRANSITION PAIR per seed, then read verdicts; the confirm pair
 --    must pass at the new fixpoint or something real is wrong.
--- 3. Post-0121 canon: 171717/12t streams bkg aa324fad · cmd 118d3fda · dec cf6fb562 ·
---    evt 92e81190 at fp fixpoint 092b70a5; 424242/12t streams bkg ea089ec6 · cmd dcc9144e
---    · dec de709c77 · evt 76364859 at fp fixpoint d9d94a7b. 424242/24t re-baseline
---    still pending. Permanent close option if transition pairs ever grate: deal
---    current_soc at cert reset too (kills the fixpoint concept; one more transition).
+-- 3. STANDING CANON (post-0124, run-pure; supersedes every earlier canon list):
+--      424242/24t: bkg 6340041e · cmd a1129be5 · dec 2d533252 · evt 045100f1 @ fp 8de3415f
+--      424242/12t: bkg 9ed052b8 · cmd 413837dc · dec 482309a0 · evt ffd06c20 @ fp d9d94a7b
+--      171717/12t: bkg aa324fad · cmd 1433b93f · dec cf6fb562 · evt 92e81190 @ fp 092b70a5
+--      314159/12t: bkg 24a4a0b4 · cmd 5beb3b43 · dec e9ed6ee8 · evt fda87aa6 @ fp 24b807f0
+--      normal_day 171717/12t: bkg a88de84f · cmd a3680029 · dec 5b4826fc · evt fadf837a @ fp 3ece9fbe
+--    171717/24t: NO CANON — the open column (pairs 44/53). Permanent close option if
+--    transition pairs ever grate: deal current_soc at cert reset (one more transition).
 -- OPEN FRONT (named, next campaign chunk): sweep vehicles (and sibling world tables) for
 -- ALL columns mutable in-run but absent from fingerprint + boot reset + reset_fleet —
 -- owning_sim_run_id first; the first pair after ANY non-cert session on the depot is the

@@ -1,0 +1,80 @@
+-- 0050 — CORE-CERT RECORD, ROUND 1 (2026-08-30)
+-- ============================================================================================
+-- The founder's gate, verbatim intent: no AI/agent layer above the deterministic core until
+-- the core is "validated over and over and over again without fail." This file is the standing
+-- record of that validation: what was run, what passed, what is still red, and what a pair IS
+-- — written so a non-engineer (or a hostile diligence reader) can follow it. Every number
+-- below traces to run IDs stamped in ottoq_sim_runs.validation_notes; the narrative history
+-- lives in db/checks/0046 (pairs 1-53).
+--
+-- ── WHAT A DETERMINISM PAIR IS (plain language) ───────────────────────────────────────────
+-- One pair = the same simulated depot day run TWICE from the same starting conditions, then
+-- compared byte-for-byte. Concretely, inside a single database transaction, each "arm":
+--   1. resets the fleet to a seed-dealt starting state,
+--   2. boots a simulation run (same seed, same scenario, same clock),
+--   3. deploys ~70% of the fleet and runs N ticks of the full engine — arrivals, charging,
+--      washes, staging, every scheduler decision,
+--   4. hashes four event streams (commands issued, decisions made, bay bookings, telemetry
+--      events) and a world fingerprint (fleet/stall end-state),
+--   5. tears the world down.
+-- Arm B then repeats 1-5 on the world arm A left behind. Verdict: PASS iff all four stream
+-- hashes match exactly. A single differing byte anywhere in thousands of scheduled actions
+-- fails the pair and the diff pinpoints the first divergent write. Deliberate design point:
+-- arm B runs on arm A's leftovers, not on a factory-reset world — a real depot never gets a
+-- factory reset, so the engine must be deterministic ON TOP OF accumulated history. That is
+-- exactly the condition that exposed every defect this campaign caught.
+-- The TRANSITION RULE (0046): after a behavior-changing fix, the first pair per column may
+-- fail on the world FINGERPRINT only (the world migrating to its new equilibrium) with
+-- streams equal; the confirm pair must then pass outright. Stream inequality is ALWAYS a
+-- real defect, no exceptions.
+--
+-- ── THE MATRIX (post-0123/0124, all quiet one-shot pairs, 2026-08-30) ─────────────────────
+-- Column                 | Verdict | Pairs (run IDs, arm A of each)
+-- 424242 / 24t busy_day  | GREEN   | P41 dd201b8f (pass), P42 c619fd87 (confirm pass)
+-- 424242 / 12t busy_day  | GREEN   | P45 07fe9557 (transition), P46 2ef89737 (pass)
+-- 171717 / 12t busy_day  | GREEN   | P47 447e95da (transition), P48 2fe0095d (pass)
+-- 314159 / 12t busy_day  | GREEN   | P49 1a8b88ce (transition), P50 0aaacc56 (pass)
+--   (fresh, never-run seed: green in exactly the predicted two pairs)
+-- normal_day 171717/12t  | GREEN   | P51 0e1a9970 (transition), P52 050e97e1 (pass)
+-- 171717 / 24t busy_day  | RED     | P43 06b67c4b (transition), P44 7998389f (STREAM FORK),
+--                                  | P53 0416646e (reproduced wider from a second lineage)
+-- Canon hashes for the green columns: 0046 operating rule §3.
+--
+-- ── WHAT THIS ROUND FIXED (the gate working as designed) ──────────────────────────────────
+-- The 24t gate caught a real defect class no 12t pair ever saw: reads of the visit ledger
+-- (ottoq_visit_needs) that never said WHICH RUN'S rows they meant. Closed in two migrations,
+-- both applied + self-verified + merged (PRs #119):
+--   0123 the_latest_need_belongs_to_the_run  — nine tiebroken latest-need cursors run-scoped.
+--   0124 the_visit_ledger_belongs_to_the_run — the full class: 32 sites in 20 functions
+--        (bare cursors incl. the atom-credit writer, EXISTS/COUNT membership gates incl. the
+--        wash-vs-detail purpose gate, one depot-wide status rewrite).
+-- Effect measured by the matrix: the 424242/24t fork (P39/P40) is GONE — both arms land on
+-- one run-pure canon, twice consecutively — and every 12t column plus the fresh seed and the
+-- second scenario went green under the transition rule.
+--
+-- ── THE OPEN COLUMN (171717/24t) — HONEST STATE ───────────────────────────────────────────
+-- Signature (P44): fps equal, DECISIONS equal, one enter_wash stall choice differs; first
+-- divergent write is the 06:00 prearrival slot-walk placing two future detail bookings one
+-- 10-minute slot apart (identical seeded jitter, shifted base). P53 (from a different
+-- lineage) reproduced the asymmetry wider (all four streams, decisions included).
+-- Ruled out by direct evidence: visit-ledger reads (0124 markers verified in place),
+-- carryover consumption (none in the lineage), policy resolution (keyed lookups only),
+-- prearrival cursor order (total, 0054-stamped), free_between's booking conflict (strict
+-- run filter), charger heartbeats (same-seed arms write identical values), stall-occupancy
+-- ghosts (FALSIFIED: zero seated stalls / reservations / seated vehicles observed
+-- immediately after a true 171717/24t teardown — the exact condition the theory required).
+-- Established: the carrier is boot-world state OUTSIDE the world fingerprint, outside the
+-- visit ledger, outside physical stall state; only the (171717 × 24t) trajectory reads it.
+-- NEXT INSTRUMENT (queued): the pair harness grows a per-table BOOT-STATE fingerprint
+-- (row count + content hash over bookings / itinerary legs / visit needs / dispatches +
+-- world projections, captured after each arm's reset+boot+prime). The next failing pair
+-- then NAMES the table whose boot image differs between arms — no more backward archaeology.
+--
+-- ── STANDING DISCIPLINE ───────────────────────────────────────────────────────────────────
+-- * Stream inequality is always a defect; fp-only inequality on a first pair after a
+--   behavior change is the world migrating (0046 transition rule).
+-- * Every verdict quotes run IDs; every claim in this file regenerates from
+--   ottoq_sim_runs.validation_notes for those IDs.
+-- * The gate stays closed for the AI/agent layer until 171717/24t joins the green columns
+--   and the full matrix holds green across repeated rounds.
+SELECT 'documentation only — see comments' AS note;
