@@ -1,0 +1,52 @@
+-- 0048 — LEDGER-ONLY RELEASE ON AN EXTERNAL FEED, PROVEN LIVE (2026-08-30)
+-- ============================================================================================
+-- 0114 made ottoq_sim_release_depot take its shape from depots.feed_mode: a sim-feed world
+-- is a fixture and resets to empty (unchanged behavior); an external-feed world is REALITY —
+-- the run's ledgers close and nothing physical is touched. This closes the first known
+-- limitation named in db/checks/0047.
+--
+-- ── THE PROOF RIG ─────────────────────────────────────────────────────────────────────────
+-- The permission layer (correctly) refused staging writes against the live Hardware Lab
+-- mirror, so the proof ran on a THROWAWAY external-feed depot created for it and retired
+-- after it (kept, stood down, so the run's ledger rows stay FK-intact):
+--   depot d2000000-0000-4000-8000-0000000000d2  'P2 Ledger-Only Proof Rig'  feed_mode=external
+--   stall 52000000-…00d2 (l2, P2-01) · vehicle e2000000-…00d2 (autonomous for the proof)
+-- Staged before the session: vehicle charging_l2 IN the stall, robotic tether held, plan
+-- residue on config (svc_step, charge_plan); stall occupied + reserved; then, under the
+-- session: a held booking, an issued command, a pending approval (all run-scoped).
+--
+-- ── THE PROOF (run aced4889-b2a5-48fe-bd0a-e1bfc4c3e8e4) ─────────────────────────────────
+-- ottoq_production_start(rig) → ok, feed_mode external, both agent switches VERIFIED at 0
+-- (first live production_start on a non-flagship, external-feed depot).
+-- ottoq_production_stop('p2_ledger_only_proof') returned release_mode=ledger_only,
+-- depot_reset_to_empty=false, vehicles_unplaced=0, vehicles_residue_stripped=1,
+-- sessions_ended=0, archived=true — and the TABLES agree (tick_count 0: no beat landed
+-- mid-proof, the images are clean):
+--   WORLD UNTOUCHED  vehicle still charging_l2, still in its stall, tether intact;
+--                    stall occupancy intact. Every one of these fails under the old
+--                    function (offline, unstalled, tether cleared, stall emptied).
+--   CLAIMS CLOSED    stall reservation cleared; booking 'released'; command 'expired';
+--                    approval 'expired'; config plan residue stripped while the untracked
+--                    p2_fixture marker key SURVIVES (the strip is the named keys, not a
+--                    config wipe).
+--   FLIGHT RECORDER  run completed with reason; archive written; the release event carries
+--                    release_mode=ledger_only.
+--
+-- ── WHAT THE SIM-FEED REGRESSION CAUGHT INSTEAD (the green light, broken on purpose) ──────
+-- The fresh determinism pair that was meant to rubber-stamp "sim path unchanged" FAILED —
+-- pair 17 in db/checks/0046 — and the fork predates 0114 entirely: vehicles.target_soc and
+-- current_soc_updated_at survive teardown outside both the boot draw and the world
+-- fingerprint, exposed the first time the pre-pair world was shaped by a PRODUCTION session
+-- (e8a0ba01) instead of by identical prior cert runs. 0115 (SoC state reset at boot,
+-- fingerprint extended, pre-0097 approval residue expired) and 0116 (reserved_at dies with
+-- its reservation) close what the campaign pinned; pairs 19 and 21 re-prove byte-equality
+-- on both seeds and mint the post-0116 canon; the enumerated remaining residue family
+-- (in-run config keys) is the V7 sweep. Full story and hashes: db/checks/0046.
+--
+-- ── RE-RUNNABLE VERIFICATION (any external-feed stop) ─────────────────────────────────────
+--   SELECT (public.ottoq_production_stop('reason'))->'release'->>'release_mode';
+--   -- expect 'ledger_only' when the depot's feed_mode='external'; then verify directly:
+--   SELECT v.current_state, v.current_stall_id, v.robotic_tether_until
+--     FROM vehicles v WHERE v.current_depot_id = :depot;              -- unchanged by stop
+--   SELECT b.state FROM ottoq_stall_bookings b WHERE b.sim_run_id = :run;   -- 'released'
+SELECT 'documentation only — see comments' AS note;
