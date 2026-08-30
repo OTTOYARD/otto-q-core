@@ -276,9 +276,36 @@
 -- verdict. Behavioral (stream) inequality is ALWAYS a real defect. 424242/24t re-baseline
 -- still pending. Era history: f3e03b9a/2797c30d/1fed4510 post-0109; ea2b7c32 post-0115
 -- same-lineage; the values above are post-0116.
--- (One known BEHAVIORAL cross-lineage transient remains on the books: pair 18's single
--- final-tick staging command, production-lineage first-arm only, never reproduced since —
--- V7's reproduction instrument is the first pair after any non-cert session.)
+-- (Pair 18's "single final-tick staging command" transient is RESOLVED below — it was the
+-- 0119 eviction-cursor coin all along, not a lineage transient.)
+--
+-- ── PAIRS 23-26 — THE V7 CHUNK (0117-0119), AND THE COIN RUN TO GROUND ────────────────────
+-- PAIR 23 (171717, post-0117 claim release): fps EQUAL, decisions EQUAL, and the streams
+-- split into the two familiar attractors — arm A the Y-stream (pairs 17B/18B: bkg 6a931f19
+-- cmd 57ec67dd evt d02a9e20), arm B the Z-stream (pairs 18A/19/22: the standing canon).
+-- PAIR 24 (post-0118 state-clock stamp): identical verdict to 23 — 0118's tier fix was
+-- real but was NOT the discriminator. The row-level diff pinned it: the ONLY differing
+-- command was one final-tick staging placement (vehicle bfbaf0b2), and the only differing
+-- bookings were WHICH of vehicle 87098f16's TWO live perimeter_holds (same upper bound,
+-- lowers 37m06s apart, rows identical in both arms) got interrupted by the deferred
+-- eviction resume. twin.ottoq_sim_vehicle_exception_handler picked with
+-- ORDER BY upper(b.during) DESC LIMIT 1 — a heap-order coin on the tie, at TWO sites.
+-- Also measured in pair 24: +116 vehicle.state_changed CONVERGENCE PHANTOMS in the
+-- dirty-lineage arm (the diff-trigger logs only rows that change; idempotent seeded
+-- boot/prime writes no-op in a converged world) — h_evt measures convergence effort, not
+-- only behavior; see db/checks/0049.
+-- PAIR 25 (post-0119 stable tail): PASSED — fp ea2b7c32 both arms, streams settling on the
+-- standing Z-canon exactly (bkg aa324fad · cmd 118d3fda · dec cf6fb562 · evt 92e81190).
+-- The coin is dead; Y is unreachable with the tie closed.
+-- PAIR 26 (424242, post-0119, fired straight after the 171717 lineage): streams ALL EQUAL
+-- and CANON-EXACT (bkg d536d9c3 · cmd 185a0a6b · dec c2e0b16c · evt 97a1e359) — 0119 holds
+-- on the second seed from a foreign lineage. Verdict 'failed' on the FIRST ARM'S FP ONLY
+-- (cross-lineage 465f7301 vs the 8476972c fixpoint): the documented config-key residue
+-- caveat, not a behavior fork. Both seeds now produce their canon streams from ANY lineage.
+-- Harness note: the platform now cancels statements at 120s on this connection path —
+-- pairs run DETACHED via cron.schedule with SET statement_timeout TO '25min', polled from
+-- validation_status, then unscheduled (three invocations were silently killed mid-flight
+-- before cron.job_run_details exposed the cancel).
 -- OPEN FRONT (named, next campaign chunk): sweep vehicles (and sibling world tables) for
 -- ALL columns mutable in-run but absent from fingerprint + boot reset + reset_fleet —
 -- owning_sim_run_id first; the first pair after ANY non-cert session on the depot is the

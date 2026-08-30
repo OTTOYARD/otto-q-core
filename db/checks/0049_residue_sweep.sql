@@ -1,0 +1,93 @@
+-- 0049 — V7 RESIDUE SWEEP: WORLD STATE OUTSIDE FINGERPRINT + BOOT RESET (2026-08-30)
+-- ============================================================================================
+-- The campaign question, made systematic after pairs 17-22 (db/checks/0046) peeled three
+-- residue columns one at a time (target_soc 0115, reserved_at 0116, owning_sim_run_id 0117):
+-- for every table the world fingerprint covers, which columns are (a) fp-covered,
+-- (b) normalized at boot (run_boot_draw / need-profile seeder / reset_fleet / prime),
+-- (c) cleared at teardown (release_depot), (d) written in-run — and which fall in
+-- "written in-run, in NONE of the normalizers"? That last set is the residue class:
+-- fp-covered members fork FINGERPRINTS across lineages (behavior-dead noise, pairs 20/22);
+-- uncovered members can fork BEHAVIOR silently (pair 17's target_soc; the claims 0117
+-- released). Column inventories read live from information_schema on 2026-08-30.
+--
+-- ── vehicles (40 columns) ─────────────────────────────────────────────────────────────────
+-- FIXTURE (identity/spec; not run-written): id, fleet_operator_id, retail_member_id,
+--   home_depot_id, category, vin, make, model, year, license_plate, color, display_name,
+--   battery_capacity_kwh, max_charge_rate_kw, connector_type, min_soc_threshold, platform,
+--   av_api_vehicle_id, av_dispatch_capable, default_service_sequence, is_active,
+--   created_at, inlet_type, inlet_max_kw, vehicle_class_code, current_depot_id.
+-- RUN-MUTABLE, NORMALIZED, FP-COVERED (closed): current_soc (boot-drawn), current_state /
+--   current_stall_id (teardown + prime), current_soc_source / target_soc /
+--   current_soc_updated_at (0115), robotic tether quartet (teardown; tether_until/stall in
+--   the interlock path), config drawn keys + 0093 strip keys.
+-- RESIDUE, CLOSED THIS CHUNK: owning_sim_run_id — admit_stranded's cross-run claim,
+--   COALESCE-kept, released by NOTHING; 21 vehicles measured still claimed by the
+--   COMPLETED production session, silently starved from every later run's stranded-admit.
+--   0117 releases claims at teardown (both feed modes) + one-time repair. Deliberately NOT
+--   added to the fp yet (it is a per-run uuid — 0054 — and post-0117 it is NULL at every
+--   clean boot); the sweep-final fp revision adds a presence marker instead.
+-- RESIDUE, OPEN (ranked; each needs its own migration + pair verification):
+--   1. config keys written in-run outside draw+strip — measured presence post-pair-22:
+--      deploy_gate (17 vehicles), flagged_issue/_type (4), nightly_soc_target (4),
+--      exception (3), bay_eviction (3), deploy_gate_override (1), last_balance_charge_at
+--      (1); accumulating state on all seeded: last_calibration_at, lifetime_miles.
+--      config IS fp-covered, so these fork fingerprints across lineages (pair 22's
+--      3419d654 vs ea2b7c32 with byte-equal streams). Proper close: the boot draw DRAWS
+--      the state counterparts (lifetime_miles, last_calibration_at — seeded, like their
+--      interval keys pm_interval_km / calib_interval_h already are) and STRIPS the pure
+--      run flags (deploy_gate, exception, bay_eviction, flagged_issue*,
+--      deploy_gate_override, nightly-ops keys) — behavior-touching, pair-verified.
+--   2. last_state_change — CLOSED (0118): NOT fp-covered; ordering input to the fairness
+--      cursors. Teardown wall-stamps only stood-down vehicles, so a first arm boots with
+--      multiple wall tiers while a second boots with one. 0118 makes the boot draw stamp
+--      the whole fleet with sim_clock_start (run-pure; production sessions never call the
+--      draw). NOTE: pairs 23-24 proved this was NOT the Y/Z stream discriminator — that
+--      was the eviction cursor below — but the tier asymmetry was real and is now gone.
+--
+-- ── TWO MORE FINDINGS FROM PAIRS 23-24 (the instrument reading its own fine print) ────────
+--   * THE Y/Z DISCRIMINATOR (CLOSED, 0119): twin.ottoq_sim_vehicle_exception_handler
+--     selected "the vehicle's live booking" with ORDER BY upper(b.during) DESC LIMIT 1 —
+--     at two sites. A vehicle holding TWO live perimeter_holds with the same upper bound
+--     (87098f16: [03:30,12:00) and [04:07:06,12:00), identical in both arms) made the
+--     pick a heap-order coin; each arm interrupted a different hold and re-staged the
+--     horizon arrival on whichever stall the interrupt freed (the single differing
+--     command). 0054 disease, verbatim; both sites got the run-stable tail
+--     (upper DESC, lower DESC, stall_id).
+--   * CONVERGENCE PHANTOMS (open, harness-design): the vehicles diff-trigger only logs
+--     rows that actually change, and idempotent seeded fleet-writes at boot/prime touch a
+--     LINEAGE-DEPENDENT subset — pair 24 measured +116 vehicle.state_changed events in
+--     the dirty-lineage arm (soc/target/config writes that no-op'd in the converged arm)
+--     with fp equal and decisions equal. h_evt therefore measures convergence EFFORT, not
+--     just behavior. Candidate close: the h_evt projection masks pure-convergence diffs,
+--     or boot/prime writes route around the event trigger. Until then a cross-lineage
+--     pair can fail h_evt alone — same read-the-notes rule as the fp caveat.
+-- ── stalls ────────────────────────────────────────────────────────────────────────────────
+-- fp covers id/status/current_vehicle_id/reserved_by/reserved_at/reservation_expires_at.
+-- CLOSED: reserved_at (0116). OPEN: status — run-mutable in failure scenarios
+--   (blocked/maintenance), reset by nothing observed; busy_day never flips it, so no pair
+--   has exercised it. Close alongside the C7 failure-scenario library work.
+-- ── ottoq_ocpp_chargers ───────────────────────────────────────────────────────────────────
+-- fp covers station_state + last_fault_code only.
+-- OPEN, BEHAVIORAL: last_heartbeat_at — read by the l2 proposer's freshness gate
+--   (c.last_heartbeat_at >= p_sim_clock - 90s), sim-domain, written by twin heartbeats,
+--   NOT in fp, normalized by nothing. Same-scenario sim windows overlap across runs, so a
+--   previous run's heartbeats read as fresh — deterministic per lineage today, and a
+--   candidate for exactly a pair-17-class fork if heartbeat cadence ever varies. Rank 3.
+-- OPEN, NOISE-ONLY: station_state_changed_at, last_fault_at, last_fault_payload,
+--   connector_states — not fp-covered, not read by decide/l2 predicates (station_state is
+--   the gate). Sweep-final fp revision decides coverage.
+-- ── vehicle_need_profile ──────────────────────────────────────────────────────────────────
+-- CLOSED by design: the seeder full-DO-UPDATEs every row per run (0107) and the fp hashes
+-- the row image minus (drawn_at, updated_at, drawn_for_run, wear_km_applied_run); the
+-- watermark pair is 0109-normalized. No open members found.
+--
+-- ── VERIFICATION (this chunk) ─────────────────────────────────────────────────────────────
+-- 0117/0118/0119 are behavior-touching; the pair campaign around them is db/checks/0046
+-- pairs 23-26. Harness note that cost an hour: the platform now cancels any statement at
+-- 120s on this connection path — every pair invocation after the reconnect silently
+-- rolled back mid-flight (cron.job_run_details finally showed the cancels). Pairs now run
+-- DETACHED via cron.schedule with an in-session `SET statement_timeout TO '25min'`,
+-- polled from ottoq_sim_runs.validation_status, then unscheduled. Wall-domain proposal
+-- TTLs (0046 pair-14 front) and the 424242/24t re-baseline remain open alongside the
+-- ranked items above.
+SELECT 'documentation only — see comments' AS note;
