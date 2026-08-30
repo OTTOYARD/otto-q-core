@@ -200,6 +200,20 @@
 -- function of the seed, independent of run history. Note: 0107/0109 change the canonical
 -- fingerprints and stream hashes; the values above are the post-0109 canonicals.
 --
+-- ── PAIR 16 + THE ONE-COMMAND CHECK (2026-08-30) ──────────────────────────────────────────
+-- PAIR 16 (seed 424242, 24 ticks = sim 02:00->14:00, one transaction per arm): TOTAL
+-- EQUALITY — fp 1fed4510 · h_cmd bdc5de12 (1344) · h_dec aec53de0 (3626) · h_evt 8c667786
+-- (5928) · h_bkg af8a7bb9. The 12-hour horizon holds.
+-- 0110 folds this whole instrument into one callable:
+--     SELECT public.ottoq_determinism_pair(<seed>[, ticks[, scenario]]);
+-- Two arms, five values captured per arm with these exact projections, verdict returned AND
+-- stamped on both run rows (validation_status passed|failed, hashes in validation_notes) so
+-- a dropped client can still read it. Its FIRST exercise proved the red path: a
+-- deliberately budget-cut pair computed unequal arms and drove the failed branch (caught a
+-- vocabulary bug in the draft while doing it — validation_status allows only
+-- pending/passed/failed/inconclusive; fixed in 0110b). A later budget-cut pair where both
+-- arms happened to cut at tick 2 was byte-equal even truncated.
+--
 -- ── THE INSTRUMENT (re-runnable verbatim) ──────────────────────────────────────────────────
 -- One arm (repeat per arm; cert_harness is exempt from the metronome and the governor):
 --
