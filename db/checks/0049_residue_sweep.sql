@@ -30,13 +30,19 @@
 --   1. config keys written in-run outside draw+strip — measured presence post-pair-22:
 --      deploy_gate (17 vehicles), flagged_issue/_type (4), nightly_soc_target (4),
 --      exception (3), bay_eviction (3), deploy_gate_override (1), last_balance_charge_at
---      (1); accumulating state on all seeded: last_calibration_at, lifetime_miles.
---      config IS fp-covered, so these fork fingerprints across lineages (pair 22's
---      3419d654 vs ea2b7c32 with byte-equal streams). Proper close: the boot draw DRAWS
---      the state counterparts (lifetime_miles, last_calibration_at — seeded, like their
---      interval keys pm_interval_km / calib_interval_h already are) and STRIPS the pure
---      run flags (deploy_gate, exception, bay_eviction, flagged_issue*,
---      deploy_gate_override, nightly-ops keys) — behavior-touching, pair-verified.
+--      (1); accumulating state: last_calibration_at, lifetime_miles. config IS fp-covered,
+--      so these fork fingerprints across lineages with byte-equal streams.
+--      STATUS: the pure run flags were ALREADY dropped by reset_fleet's 0095 whitelist
+--      (cert context clean). last_calibration_at CLOSED by 0120 (whitelisted but
+--      run-mutated by wear_mark_serviced, read by NOTHING — write-only residue; dropped).
+--      lifetime_miles REMAINS OPEN and is the last known fp-noise driver (pairs 27-28):
+--      the earlier "no in-run writer" read here was WRONG — the writer hides behind the
+--      arrival-payload round-trip (build_arrival_payload emits odometer = lifetime_miles
+--      + dispatch miles; ingest writes it back), so it accrues per arrival cycle and
+--      converges only after one run of a seed. Close options: seeded draw at cert reset
+--      (mirroring the profile's odometer prior), or stop round-tripping the odometer
+--      through config. Rank 1 for the next leg; behavior-neutral expected (readers use
+--      the PROFILE's odometer_km, drawn per run).
 --   2. last_state_change — CLOSED (0118): NOT fp-covered; ordering input to the fairness
 --      cursors. Teardown wall-stamps only stood-down vehicles, so a first arm boots with
 --      multiple wall tiers while a second boots with one. 0118 makes the boot draw stamp

@@ -11,9 +11,12 @@
 -- residue: dropping it from the keep-list changes no behavior, only kills the noise.
 -- ('lifetime_miles' stays: no in-run writer exists, so it is genuinely durable.)
 --
--- Prediction this migration makes (the falsifiable kind): with the key dropped, alternating
--- seeds must reach TRUE fp fixpoints -- pair 29 (171717 fired after a 424242 lineage) must
--- boot at the same fp as pair 27 (171717 after 171717). Verified in 0046 pairs 27-29.
+-- Prediction this migration made (the falsifiable kind): with the key dropped, alternating
+-- seeds reach TRUE fp fixpoints. OUTCOME (0046 pairs 27-28): correct but INSUFFICIENT --
+-- pair 27 passes on a new same-seed fixpoint (c525a339), but the first-arm-after-foreign-
+-- lineage variance survives via ONE more key: lifetime_miles, whose writer hides behind
+-- the arrival-payload round-trip (emit odometer -> ingest writes it back). That close is
+-- the next leg; streams are canon-exact throughout.
 --
 -- Pre-image pin, read live 2026-08-30 (anchor verified at exactly 1 occurrence):
 --   public.ottoq_tick_invariance_reset_fleet   f90aeb338978446d343a9bb60637f52f
