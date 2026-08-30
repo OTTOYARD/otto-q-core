@@ -1,0 +1,69 @@
+-- 0047 — PRODUCTION ORCHESTRATION LOOP, END TO END (2026-08-30)
+-- ============================================================================================
+-- Founder directive: the orchestration layer analyzes and optimizes integrated vehicle/site
+-- state continuously in the background once initiated, in real time, with no simulator/twin
+-- involvement and no cuOpt/LLM agents (deterministic core only; intelligence layers later).
+--
+-- ── THE LOOP, AS SHIPPED (0111–0113) ─────────────────────────────────────────────────────
+--   initiate:  SELECT public.ottoq_production_start();          -- flagship depot default
+--   stop:      SELECT public.ottoq_production_stop('reason');
+--   THE TICK:  ottoq-depot-tick cron (*/2 min) -> ottoq_cron_tick -> twin.ottoq_world_advance
+--              (tick = WALL-ELAPSED minutes since last beat, clamped 0.25..10)
+--              -> orchestration mirror (visit atoms, opportunistic scan, flow contract,
+--                 OTTO-Q energy orchestration, comms, service flow, charger reconcile,
+--                 webhook collect, stranded admits, wash triage, gate disposition)
+--              -> clock := now()  -> ottoq_sim_decide_and_dispatch (the deterministic brain).
+--   Twin isolation: every synthetic phase inside world_advance is gated on
+--   depots.feed_mode='sim'. With a real feed nothing simulated runs; with the sim feed (the
+--   stand-in until real vehicles are integrated) the twin only PLAYS THE WORLD — the
+--   orchestration layer reads the same integrated tables either way.
+--   Deterministic-only: run policies orchestrator_agent_enabled=0 / cuopt_propose_enabled=0,
+--   verified at start (0113), honored at every fire site (0112 decide-path + N4; 0113
+--   orchestrate-tick edge post, which calls cuOpt directly). cuopt_refresh already excludes
+--   production_live structurally. Metronome / governor / purges all stand aside.
+--
+-- ── THE LIVE PROOF (session e8a0ba01, flagship depot, feed_mode='sim') ────────────────────
+-- Phase 1 — the loop is autonomous and real-time:
+--   Started 04:32:03. With NO further input, the cron beat it at 04:34 and 04:36
+--   (tick_minutes_actual 1.999 — the wall-elapsed tick working as designed), sim clock
+--   tracking now(), and real work flowing: 71 decisions, 30 commands, 61 bookings,
+--   180 events after two beats.
+-- Phase 2 — the E2E caught the gate leaking (the green light broken on purpose):
+--   Nemotron ENACTED on both beats and by 04:38 had WRITTEN deploy_peak_fraction=0.85 and
+--   energy_demand_factor_peak=0.65 onto the run's policies (updated_by='ottoq_prime').
+--   Root: production_start's ottoq_policy_set calls were silently REFUSED — neither switch
+--   existed in ottoq_policy_param_catalog and the return was never checked. Both 0112 gates
+--   read default 1. Fixed by 0113: switches catalogued, start aborts on a refused write,
+--   the direct-cuOpt edge post gained its gate, and the live session was repaired (switches
+--   written, the agent's two steering rows deleted).
+-- Phase 3 — the gated loop holds:
+--   Two further autonomous beats (ticks 6–7, last at 04:46): agent decisions after the
+--   repair = 0, agent policy rows = 0, both switches at 0 — while the deterministic loop
+--   kept working (139 decisions, 76 commands total).
+-- Phase 4 — clean stop:
+--   production_stop('e2e_proof_complete'): finalizer ran (bookings released, commands
+--   expired, legs closed, approvals expired), archive written (scenario 'production',
+--   config_hash 961b07b6), run completed. All numbers above trace to run e8a0ba01.
+--
+-- ── KNOWN LIMITATIONS (named, not hidden) ─────────────────────────────────────────────────
+--   * ottoq_sim_release_depot also UNPLACES vehicles (depot_reset_to_empty) — correct for
+--     sim-feed sessions, wrong for a real feed where vehicles are physical. Before a
+--     real-feed depot goes live, production_stop needs a ledger-only release variant.
+--   * ottoq-orchestrate-tick still runs for NON-production (demo) sessions with its direct
+--     cuOpt call — intended; the gate is per-session policy, not a global kill.
+--   * The wall-domain proposal TTL front from db/checks/0046 applies to this loop's cadence
+--     (each beat is its own transaction); sim-domain TTLs remain the eventual fix.
+--
+-- ── RE-RUNNABLE VERIFICATION (against any production session id) ─────────────────────────
+--   WITH r AS (SELECT * FROM ottoq_sim_runs WHERE sim_run_id = :run)
+--   SELECT r.status, r.tick_count, r.last_tick_at, now()-r.last_tick_at AS since_last_beat,
+--          (SELECT count(*) FROM ottoq_decisions d WHERE d.sim_run_id=r.sim_run_id) AS decisions,
+--          (SELECT count(*) FROM ottoq_vehicle_commands c WHERE c.sim_run_id=r.sim_run_id) AS commands,
+--          (SELECT count(*) FROM ottoq_decisions d WHERE d.sim_run_id=r.sim_run_id
+--            AND d.entity_type='depot' AND d.action_context='task_start') AS agent_decisions,
+--          (SELECT jsonb_object_agg(param_key,param_value) FROM ottoq_policy_params p
+--            WHERE p.scope_id=r.sim_run_id) AS run_policies
+--   FROM r;
+-- Healthy: status running, since_last_beat < ~2.5 min, decisions/commands growing,
+-- agent_decisions flat at its pre-gate count, run_policies showing both switches at 0.
+SELECT 'documentation only — see comments' AS note;
