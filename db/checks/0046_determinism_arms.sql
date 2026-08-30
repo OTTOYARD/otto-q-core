@@ -161,6 +161,45 @@
 -- projection. Next rungs for a standing certification: more seeds, longer horizons, and the
 -- C7 property test wrapping this instrument.
 --
+-- ── PAIRS 11–15, the SECOND SEED (2026-08-30) — the 424242 green was seed-lucky ──────────
+-- PAIR 11 (seed 171717, first non-424242 seed ever paired): DIVERGED FROM TICK 1 (742 vs
+-- 768 commands) with MATCHING world fingerprints. Root: vehicle_need_profile is persistent
+-- state every run mutates (last_wash_at et al.) and nothing on the harness path redraws it —
+-- each arm inherited the previous run's clocks, and generate_service_manifest's wash
+-- backstop read them (one arm drew an exterior_wash atom, the other didn't). The 424242
+-- pairs had passed only because CONSECUTIVE IDENTICAL RUNS form a fixpoint. Fixed by 0107:
+-- twin.ottoq_sim_start_run now calls ottoq_run_boot_draw (full seed-deterministic profile
+-- redraw, all clocks sim-anchored) before stamping the fingerprint, and the fingerprint
+-- gains the profile section.
+-- PAIR 12 (post-0107): commands/events/bookings equal; one triage_confirm decision moved
+-- tick 11<->12, and the fingerprints differed on provably equal starts. A double-boot-draw
+-- probe showed the profile redraw perfectly idempotent (differing_columns=[NONE]) — the
+-- decision drift was ANOTHER 0054-family cursor: advance_visit_atoms' concurrent-atoms
+-- admission (ORDER BY urgency, charging, last_state_change LIMIT 30 — no run-stable tail);
+-- the fp noise was config.condition_drawn_run (the run's own uuid, stamped by the boot
+-- draw). Both fixed by 0108, which also run-scoped the tech_greenlight dedup guard (its
+-- NOT EXISTS read approvals across runs — a live cross-run leak on the same sim-day replay).
+-- PAIR 13 (post-0108, seed 171717): TOTAL EQUALITY — fp f3e03b9a and all four streams:
+--   h_cmd e08fad64 (773) · h_dec 660ca0da (2015) · h_evt 20dd7395 (2955) · h_bkg 74e42e0e
+-- PAIR 14 (seed 424242): fp differed across arms AND streams forked — two separate causes,
+-- both instructive. (a) fp: profile.wear_km_applied carries the PREVIOUS run's mid-run
+-- watermark (boot's 1c anchor no-ops on a fresh run), so arms whose predecessors ran
+-- different seeds fingerprint differently; behaviorally dead (mark_serviced treats a
+-- foreign-run watermark as unknown) — normalized at boot by 0109. (b) streams: arm B hit
+-- the 45s budget and finished its last 2 ticks in a SECOND transaction — now() jumps
+-- between transactions and the REAL-domain proposal TTLs (expires_at >= now()) behave
+-- differently than in a one-transaction arm. HARNESS RULE, now standing: an arm must run
+-- its whole tick loop in ONE transaction (budget raised to 90s below). The wall-domain
+-- proposal TTL remains an OPEN FRONT for the live path, where every tick is its own
+-- transaction minutes apart — a sim-domain TTL is the eventual fix.
+-- PAIR 15 (one-transaction arms, seed 424242): TOTAL EQUALITY —
+--   fp 2797c30d · h_cmd 815e18a3 (898) · h_dec 054809ea (2199) · h_evt c0295473 (3064) ·
+--   h_bkg 77f9bf18
+-- POST-0109 PROBE (rolled back): two boots at 171717, one after a 424242 run and one after
+-- a 171717 run, produced IDENTICAL fingerprints (e2902297) — the start world is a pure
+-- function of the seed, independent of run history. Note: 0107/0109 change the canonical
+-- fingerprints and stream hashes; the values above are the post-0109 canonicals.
+--
 -- ── THE INSTRUMENT (re-runnable verbatim) ──────────────────────────────────────────────────
 -- One arm (repeat per arm; cert_harness is exempt from the metronome and the governor):
 --
@@ -174,7 +213,7 @@
 --     LOOP
 --       SELECT sim_clock_current, status INTO v_clock, v_status FROM public.ottoq_sim_runs WHERE sim_run_id=v_run;
 --       EXIT WHEN v_status <> 'running' OR v_clock >= '2026-09-01 08:00:00+00'::timestamptz;
---       EXIT WHEN EXTRACT(EPOCH FROM (clock_timestamp()-v_t0)) >= 45;
+--       EXIT WHEN EXTRACT(EPOCH FROM (clock_timestamp()-v_t0)) >= 90;  -- pair-14 rule: ONE transaction per arm; a resumed arm shifts now() and the real-domain TTLs with it
 --       PERFORM public.ottoq_sim_advance_tick(v_run);
 --     END LOOP;
 --   END $arm$;
