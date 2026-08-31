@@ -1,0 +1,138 @@
+-- 0055 -- ROUND 4 RECORD: two fixes, one of them to the instrument itself.
+--
+-- Round 4 opened with normal_day 171717/12t alone failing a six-column ladder that 0132+0133
+-- had otherwise turned green. It closes with two migrations, and the second one matters more
+-- than the first.
+--
+-- ============================================================================
+-- 1. WHAT 0134 FIXED, AND THE PROOF IT WORKED
+-- ============================================================================
+-- twin.ottoq_sim_advance_bess read its two world inputs from the whole table, not from its own
+-- run. Measured live at a single sim_clock_at:
+--       solar SUM     280 rows spanning 70 DISTINCT RUNS
+--       ambient pick  70 tied rows carrying 2 DISTINCT temperature values
+-- Both arms of a pair run inside one transaction, arm A then arm B, so arm B's reads saw arm A's
+-- fresh rows and arm A's did not. Order-dependent by construction; the ambient pick a straight
+-- coin between 34.21 and 34.22, which is verbatim the delta the reason payloads showed.
+--
+-- That the READ was the whole defect was provable before the fix was written:
+--       own-run ambient series  md5 a362d84371a154b8adeb621bc8056476   arm A == arm B
+--       own-run solar   series  md5 2d8b905bdcaba461ae47ef7e5072b672   arm A == arm B
+-- The twin generates identical world state per seed. Only the read was unscoped.
+--
+-- The fix landed and is confirmed by the ledger, not by assertion. Post-0134 pair
+-- (run_a 8b04b5c3, run_b bc82a908), BESS soc_pct in the energy-command reason payloads:
+--       tick 3   69.71 vs 69.71      (pre-0134 lineage: 91.34 vs 91.46)
+--       tick 4   69.59 vs 69.59      (pre-0134 lineage: 83.99 vs 84.04)
+-- The SoC carrier is dead. A census of all five live readers of ottoq_solar_output /
+-- ottoq_weather_snapshots found two more sites and closed them: twin.ottoq_sim_advance_grid held
+-- the identical unscoped ambient read feeding the LMP/tariff path, and
+-- twin.ottoq_sim_advance_weather_and_solar read its own previous precip_state from the cross-run
+-- pool -- a latent carrier that forks the entire weather stream rather than one setpoint.
+--
+-- ============================================================================
+-- 2. AND THE PAIR STILL FAILED -- TWICE
+-- ============================================================================
+-- history fPfPfPPffP -> f -> f. Two consecutive post-0134 failures on an identical canon, so the
+-- residue is reproducible and dissectable, not a flake. The new evidence was sharper than the old:
+--
+--   (a) Divergence occurs ONLY on ticks where the BESS moves.
+--         ticks 1,2,3,5,7,10,11,12   setpoint 0.0    caps byte-identical
+--         ticks 4,6,8,9              setpoint != 0   every one diverges
+--       and cap + |setpoint| is constant across arms, so exactly ONE quantity forks.
+--
+--   (b) public.bess_snapshots dates the fork to BEFORE the first tick. At matching SoC:
+--         SoC 69.84 -> 30.10 vs 22.10    69.71 -> 27.80 vs 21.30    69.59 -> 26.10 vs 20.80
+--       Identical charge, five to eight degrees apart, while SoC itself does not diverge until
+--       tick 4 (76.94 vs 76.95). The battery did not get hot during the run. It STARTED hot.
+--
+-- The mechanism, from twin.ottoq_sim_bess_step:
+--       v_new_temp := v.current_temperature_c
+--                   + (v_target_temp - v.current_temperature_c) * v_thermal_lag
+--                   + v_thermal_noise;
+-- Temperature is a first-order lag state -- each value a function of the previous one -- so a
+-- different start is carried through the whole run rather than damped, and
+-- compute_max_power_kw is handed v.current_temperature_c on every step.
+-- public.ottoq_tick_invariance_reset_fleet never mentioned the column.
+--
+-- A HYPOTHESIS THAT WAS WRONG, RECORDED BECAUSE IT WAS WRONG. current_soh_pct is also a direct
+-- multiplier in compute_max_power_kw (nameplate * soc_factor * soh_factor * temp_factor) and is
+-- also never reset, so it was the first suspect, and the setpoint ratio 459.5/459.1 = 1.00087
+-- looked like one run of degradation. The snapshots refute it: health_percent is a flat 97.54
+-- across all twenty-four samples of BOTH arms, and max_charge_kw a flat 1500. SoH did not move
+-- in this pair. It is fixed anyway in 0135 -- same class, one degradation event from becoming
+-- the next carrier -- but it was not this carrier, and the ledger says so.
+--
+-- Also ruled out by reading rather than guessing: v_thermal_noise is
+-- ottoq_sim_seeded_random(v_seed,'noise'), deterministic per seed. Not a carrier.
+--
+-- ============================================================================
+-- 3. THE FINDING THAT OUTLIVES THIS ROUND
+-- ============================================================================
+-- The world fingerprints of these two arms were EQUAL. They were equal while the two batteries
+-- differed by eight degrees, because the BESS section 0133 added hashes exactly
+--       bess_id | current_power_kw | current_soc_pct | current_soc_kwh | current_state
+-- and current_temperature_c is not in it. The boot image every pair in this lineage certified
+-- as canonical was never canonical; the instrument simply could not see the column that carried
+-- the defect.
+--
+-- This is the repo's own rule turned on its own instrument: A CHECK THAT CANNOT FAIL IS NOT A
+-- CHECK. It generalizes past the battery, and it is the standing caution from round 4:
+--
+--     A FINGERPRINT IS A WHITELIST. Every column of mutable world state that it does not name
+--     is a column it certifies as equal without looking. Adding a reset without adding the
+--     matching fingerprint column buys a fix that cannot be verified and a check that cannot
+--     fail -- so reset and fingerprint are extended in the SAME migration, never separately.
+--
+-- 0133 canonicalized SoC at reset and taught the fingerprint to see SoC. It did both, correctly,
+-- for one column. The failure was one of SCOPE, not of method: the other four mutable columns on
+-- the same table got neither half.
+--
+-- ============================================================================
+-- 4. WHAT 0135 DOES
+-- ============================================================================
+-- Part A -- reset canonicalizes the columns the run mutates and the reset left standing:
+--       current_temperature_c   -> 25.0    THE PROVEN CARRIER
+--       current_soh_pct         -> 100.0   direct power multiplier, written by degradation
+--       current_cycle_count     -> 0       \ monotonic accumulators feeding the degradation
+--       lifetime_kwh_charged    -> 0        > calculation that writes current_soh_pct
+--       lifetime_kwh_discharged -> 0       /
+-- Part B -- the fingerprint gains all five, so it can fail on them.
+--
+-- On the constants: 0133 seeded SoC "inside the unit's own configured band rather than at an
+-- invented constant", and SoC has a real operating band in soc_min_floor_pct..soc_max_ceiling_pct.
+-- Temperature has none -- its only configured pair is temperature_min_c..temperature_max_c =
+-- -10..50 on every unit, a SAFETY envelope whose endpoints sit inside derate territory (derate
+-- triggers above 45 and below 5). Seeding a start temperature across it would drop arms into
+-- thermal derate at random. 25.0 is not invented either: public.ottoq_cert_arm_start already
+-- canonicalizes this exact column to 25.0, and Part A adopts the value the repo already chose.
+--
+-- 100.0 for SoH is the certification baseline -- every arm starts from a nameplate-healthy pack,
+-- within-run degradation still models normally, and cross-run accumulation is the leak. It also
+-- ends a live pathology: current_soh_pct and current_cycle_count were carrying roughly a
+-- THOUSAND digits of accumulated numeric precision, compounded across hundreds of runs with
+-- nothing ever rounding or restoring them (current_soh_pct read
+-- 97.5365879551193510114557910774574679718122896656241715496602689084477648689362078513913918269...).
+-- If a real per-unit nameplate SoH is wanted later it belongs in a column of its own, not in residue.
+--
+-- ============================================================================
+-- 5. THE VERIFICATION -- RUN BEFORE THE LADDER, ALL ASSERTIONS PASSED
+-- ============================================================================
+-- Executed inside a transaction and rolled back, against the flagship depot:
+--   * perturb current_temperature_c by +5    -> fingerprint MOVES  (it could not before)
+--   * restore it                             -> fingerprint returns to the original value
+--   * perturb current_soh_pct by -1          -> fingerprint MOVES
+--   * perturb lifetime_kwh_discharged by +1  -> fingerprint MOVES
+--   * dirty all five (41.7 / 88.3 / 999 / 12345 / 54321), then reset_fleet
+--                                            -> 25.0 / 100.0 / 0 / 0, all four asserted
+-- The first four are the ones that matter: they prove the new check CAN fail, which is the only
+-- thing that distinguishes it from the one it replaces.
+--
+-- ============================================================================
+-- 6. STATUS AT WRITING -- NOT GREEN, AND NOT CLAIMED TO BE
+-- ============================================================================
+-- 0135 re-mints every canon (both parts change run-visible state), so the pre-0135 history in
+-- ottoq_cert_matrix() belongs to a different engine and does not count toward the new streak.
+-- The six-column ladder restarts from zero. normal_day 171717/12t is re-run first, twice, on the
+-- identical canon; the remaining five columns follow only if it passes. No column in this file
+-- is asserted green. The matrix is the verdict, and it is derived from the ledger, not typed here.
