@@ -494,6 +494,44 @@
 -- (release_reason '0127_interrupted_leak_repair'; production NULL-run rows untouched).
 -- Prediction (falsifiable): 171717/24t transition+confirm pass, and every healthy pair's
 -- boot fingerprint shows bookings.fgn n=0 from now on. Round-2 matrix = pairs 55-66.
+--
+-- ── PAIRS 55-56 — 0127 HALF-CONFIRMED; THE INSTRUMENT CONVICTS BY ELIMINATION (0128) ─────
+-- PAIR 55 (171717/24t, post-0127): PASSED — and bookings.fgn = 0 in BOTH arms: the 0127
+-- prediction confirmed, the leak class is dead (runs 91671696/...).
+-- PAIR 56 (confirm): FAILED on streams — same two variants as P53 (cmd c9b55fef /
+-- 819dcf5b), fps equal, AND the boot images IDENTICAL across all five fingerprinted
+-- tables, both classes. With content ruled out wholesale, the carrier had to be
+-- heap-order-fed randomness. Archaeology: the primal write is at sim 03:00 — vehicle
+-- 5cee8fb3's far-future detail reservation (window 16:38) adopted on WSH-03 in one arm,
+-- WSH-02 in the other; the 14:00 enter_wash follows the adopted stall. The site convicts
+-- itself in its own 0063 comment: record_enacted_booking's forward-reservation ADOPTION
+-- pick orders by booked_at DESC (frozen in a pair — ties), the window (equal — ties),
+-- then straight to booking_id DESC — a RANDOM uuid: total within an arm, random between
+-- arms. Its sibling in enact_space_assignment got content keys (s.id, b.purpose) back in
+-- 0063; this site never did, and the tied candidates differ exactly in stall_id.
+-- CLOSED by 0128: b.stall_id, b.purpose inserted before the uuid last-resort — the
+-- 0062/0063 discipline completed. Applied mid-ladder BEFORE pair 57 fired, so pairs
+-- 57-66 all run post-0128; pairs 67-68 re-run 171717/24t at the ladder's end.
+--
+-- ── PAIRS 57-68 — ROUND-2 LADDER POST-0128: EVERY 12T COLUMN GREEN; 24T HAS ONE MORE COIN ─
+-- All boot fingerprints show bookings.fgn = 0 (0127 holds). The 12t columns each did the
+-- textbook transition→confirm under the 0128 behavior shift and are GREEN with new canons:
+--   424242/12t: cmd c5432bc9 @ fp d9d94a7b (P59 817cafec t / P60 81ab398e PASS)
+--   171717/12t: cmd db2179d3 @ fp 092b70a5 (P61 07619ae0 t / P62 0b83ec77 PASS)
+--   314159/12t: cmd 6041f3bb @ fp 24b807f0 (P63 3e4d38f3 t / P64 082f0016 PASS)
+--   normal_day: cmd a3680029 @ fp 3ece9fbe — canon UNCHANGED by 0127/0128
+--               (P65 cc2805e9 t / P66 9d1f224d PASS)
+-- The 24t columns still fork on confirm: P57 (424242/24t transition, streams equal, new
+-- cmd 30ae09ef) then P58 (1a3579c8) FAILED — fps equal 8de3415f, streams forked, first
+-- divergent write a leg-matched detail REBOOK planned at sim 10:00 landing [12:59] vs
+-- [13:09] (the 10-minute slot-walk signature: one arm's find_and_book probe refused once
+-- more than the other's). P67 (9af670b5) and P68 (f5b7d07a) forked likewise on 171717/24t.
+-- Established: at least one more in-run under-total ordered pick that ties only under the
+-- daytime (ticks 12-24) wash/detail rebooking pressure; world-purity is proven (boot
+-- images equal, fgn=0), so the class is closed ONLY by the systematic ordering census:
+-- enumerate every ORDER BY ... LIMIT 1 / windowed pick across public/ottoq/twin, prove
+-- each total over run-stable keys or fix it (0129, next round's opening move — the
+-- preliminary extraction already ran; ~200 clauses to triage).
 -- 1. STREAM inequality is ALWAYS a real defect. No exceptions, any lineage, any era.
 -- 2. FP-only inequality is the soc/residue fixpoint moving: expected on the FIRST pair
 --    after any behavior-changing migration and after any foreign-seed/non-cert session.

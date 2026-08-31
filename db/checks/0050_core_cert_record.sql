@@ -70,6 +70,29 @@
 -- world projections, captured after each arm's reset+boot+prime). The next failing pair
 -- then NAMES the table whose boot image differs between arms — no more backward archaeology.
 --
+-- ── ROUND 2 (2026-08-30 late; pairs 54-68; 0125-0128) ─────────────────────────────────────
+-- The queued instrument (0125: per-arm boot-state fingerprints in the pair verdict) found
+-- TWO carriers on its first day, each fixed the same hour it was named:
+--   * 0127 — teardown never retired state='interrupted' bookings; 209 had accumulated and
+--     leaked into every next run's world (pair 54's boot images differed ONLY there).
+--     Confirmed dead: every later pair boots with bookings.fgn = 0.
+--   * 0128 — record_enacted_booking's forward-reservation adoption pick fell through its
+--     frozen-clock/window ties to a RANDOM uuid (self-flagged as non-total since 0063;
+--     its enact_space sibling was fixed then, this site never was). Content keys added.
+-- Round-2 ladder (pairs 55-68), all post-fix:
+--   424242/12t GREEN (P59/P60: cmd c5432bc9 @ d9d94a7b) · 171717/12t GREEN (P61/P62:
+--   db2179d3 @ 092b70a5) · 314159/12t GREEN (P63/P64: 6041f3bb @ 24b807f0) ·
+--   normal_day GREEN, canon unchanged (P65/P66: a3680029 @ 3ece9fbe).
+--   BOTH 24t columns still fork on confirm (P58, P67, P68): fps equal, boot images
+--   equal, fgn=0 — one further IN-RUN under-total ordered pick, tying only under
+--   daytime (ticks 12-24) wash/detail rebooking pressure; signature is the 10-minute
+--   slot-walk (a probe refused once more in one arm).
+-- VERDICT AFTER ROUND 2: world-purity is PROVEN (boot images equal between arms; the
+-- foreign-leftover hazard set is structurally empty). What remains is pick-order
+-- totality inside a run. Next round opens with the systematic ordering census (0129):
+-- every ORDER BY ... LIMIT 1 and windowed pick in public/ottoq/twin proven total over
+-- run-stable keys or fixed. The extraction query is written; ~200 clauses to triage.
+--
 -- ── STANDING DISCIPLINE ───────────────────────────────────────────────────────────────────
 -- * Stream inequality is always a defect; fp-only inequality on a first pair after a
 --   behavior change is the world migrating (0046 transition rule).
