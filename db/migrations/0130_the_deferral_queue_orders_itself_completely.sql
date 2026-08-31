@@ -63,7 +63,11 @@
 -- each with the comment from the campaign that installed it): twin.ottoq_opportunistic_scan
 -- (requested_at, vehicle_id, approval_type) and twin.ottoq_sim_confirm_commands (issued_at,
 -- vehicle_id, command_type, payload stall_id) -- both 0059-era fixes whose remaining tie needs
--- two byte-identical rows; adding their uuid last resort is tier C, pending PK confirmation.
+-- two byte-identical rows. Tier C is to append their uuid last resort; the PKs are confirmed
+-- so the patch needs no further archaeology -- public.ottoq_ops_approvals.approval_id (uuid,
+-- alias ap) and public.ottoq_vehicle_commands.command_id (uuid, alias c). Deliberately NOT
+-- done here: 0130's four sites are the ones with a demonstrated tie, and every additional
+-- behavior-changing site costs the whole six-column ladder another transition+confirm round.
 -- twin.ottoq_sim_prime_deployment's `ORDER BY q.rn` was chased to its generator and is clean:
 -- row_number() OVER (ORDER BY ottoq_sim_seeded_random(v_seed, 'prime:' || v.id)) -- hash-pure
 -- over vehicle identity. ottoq_purge_prior_runs / ottoq_run_blackbox order by table_name
