@@ -588,6 +588,26 @@
 -- sim_energy_controller (issued_at, created_at — created_at is frozen inside a pair, so it
 -- can never break a tie). Verification = pairs 75-86, the full six-column re-certification
 -- ladder (both 24t columns, then all four 12t columns, transition + confirm each).
+-- ── PAIRS 75-91 — THE POST-0130 LADDER: ALL SIX COLUMNS GREEN ─────────────────────────────
+-- 17 pairs, three per column (transition + two confirms), run as quiet one-shots 01:28-04:30
+-- and unscheduled as they fired. Verdicts read from public.ottoq_cert_matrix() (0131), not by
+-- hand. Result: EVERY column green at streak 2 — the full matrix, for the first time.
+--   424242/24t  PP   (P75/P76) — no transition needed: its predecessor pair was the same
+--                     column, so the fixpoint never moved. canon cmd d0fe863c @ fp 8de3415f.
+--   171717/24t  fPP  (P77 fork, then two) — canon cmd e609496e @ fp dc203e36.
+--   424242/12t  fPP  · 171717/12t fPP · 314159/12t fPP · normal_day 171717/12t fPP.
+-- THE PREDICTION POSTED BEFORE THE LADDER RAN — "each column's first pair forks on the lineage
+-- switch from the previous column's seed; its 2nd and 3rd pass on one canon" — held on all six.
+-- That matters beyond bookkeeping: it means every fork in this ladder is the KNOWN transition
+-- behaviour, and not one is an unexplained signature needing a dig.
+-- Two design notes learned here, both now permanent:
+--   * THREE pairs per column, not two. Under the raised bar (§3) a column whose first pair
+--     forks can only reach one passing pair in two runs. The original ladder was built to the
+--     old rule and would have certified nothing but 424242/24t.
+--   * TEN minutes between 12t pairs, not eight. A 12t arm budget is 240s, so two arms plus
+--     teardown can reach the eight-minute mark; overlapping pairs share one depot and would
+--     corrupt each other silently.
+--
 -- 1. STREAM inequality is ALWAYS a real defect. No exceptions, any lineage, any era.
 -- 2. FP-only inequality is the soc/residue fixpoint moving: expected on the FIRST pair
 --    after any behavior-changing migration and after any foreign-seed/non-cert session.
