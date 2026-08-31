@@ -532,12 +532,74 @@
 -- enumerate every ORDER BY ... LIMIT 1 / windowed pick across public/ottoq/twin, prove
 -- each total over run-stable keys or fix it (0129, next round's opening move — the
 -- preliminary extraction already ran; ~200 clauses to triage).
+--
+-- ── PAIRS 69-74 — ROUND 3: 0129 GREENS THE OPENING COLUMN; 424242/24t NARROWS TO ONE LEDGER ─
+-- P69 (171717/24t, first pair post-0129): failed. P70 (confirm, pair run 4e7d2494): **PASSED
+-- OUTRIGHT** — the column that opened this entire campaign (P43/P44/P53, the one with NO
+-- canon since pair 44) is green for the first time. Post-0129 canon, 171717/24t:
+--     bkg 4be004e4 · cmd 0ea5131a · dec 2eebc79f · evt 1fa861d0 @ fp dc203e36
+-- (Note for the transition rule: settling took ONE EXTRA pair here — P69 failed, P70 passed.
+-- The rule stands as written, but "the first pair may fork" is now "the first pair or two".)
+-- P71 (424242/24t, transition): fps 7d7bec4e → 8de3415f, all four streams moved — the 0129
+-- behavior shift, as expected. P72 (confirm, run_a 653e0e8e): FAILED — but in the mildest
+-- shape this campaign has ever produced: fp EQUAL, boot images EQUAL, h_cmd/h_dec/h_evt all
+-- EQUAL, and **h_bkg alone unequal**. P73 (run_a cba09628) then reproduced P72
+-- HASH-FOR-HASH (bkg_a 338994b0 / bkg_b 11c0c14f, cmd_a 30ae09ef in both pairs), and P74
+-- (run_a 741f7955) PASSED with both arms on bkg ac697818 @ fp 8de3415f.
+-- Read the lineage as a whole and the shape is a two-state oscillation, not noise: arm
+-- streams alternate between X (cmd d0fe863c / bkg ac697818) and Y (cmd 30ae09ef / bkg
+-- 338994b0) by POSITION IN THE LINEAGE, with P73's arm A and P74's arm A booting from
+-- byte-identical boot images and still landing on different states. A single passing pair
+-- (P74) therefore does NOT green this column — an intermittent fork is still a fork. What
+-- P73 bought instead is worth more: a fork that reproduces exactly is a fork that can be
+-- dissected.
+--
+-- ── THE DISSECTION (P72/P73) — CONVICTED FROM THE MOVER'S OWN LEDGER (→ 0130) ─────────────
+-- The h_bkg multiset difference is exactly EIGHT rows: two vehicle PAIRS trading slots, one
+-- detail pair and one wash pair, all beyond the 14:00 run horizon (which is why no command,
+-- decision or event could differ — the rows never enact):
+--     arm A: 9e05d00e → c9466ca6 @15:55 | 9f5d69bb → ec443362 @16:05
+--     arm B: 9f5d69bb → c9466ca6 @15:55 | 9e05d00e → ec443362 @16:05
+-- Each row's `why` names a window ten hours earlier than its own `during`. That dates them:
+-- ottoq_booking_why prints p_from/p_to and the stall's own code, so a row whose why
+-- disagrees with its window was WRITTEN early and MOVED later. The mover keeps an audit
+-- trail, and the trail closes the case — public.bay_reservation_reconcile_2026_08_02, both
+-- arms, sim 13:00, defer_seq 3, all four rows entering with old_from = 12:45:
+--     arm A  9e05d00e detail  12:45 → 15:55 (keeps c9466ca6)   9f5d69bb → 16:05
+--     arm B  9f5d69bb detail  12:45 → 15:55 (takes c9466ca6)   9e05d00e → 16:05
+-- Two bookings, IDENTICAL lower(during), and ottoq_reconcile_bay_reservations drives its
+-- deferral loop on `ORDER BY lower(b.during)` and nothing else. The body walks each booking
+-- forward and takes the first non-colliding window, so the row the heap hands over first
+-- wins the earlier bay. The 06:00 and 10:00 defers in the same lineage tied too, but only
+-- between one vehicle's OWN two bookings, whose outcomes coincide; 13:00 was the first
+-- CROSS-VEHICLE tie, and it is the entire fork.
+-- WHY 0129 MISSED IT — the lesson worth more than the fix: 0129's census extracted
+-- `ORDER BY ... LIMIT n`, DISTINCT ON heads and window frames, i.e. every shape that picks
+-- ONE row. This site picks none — it is a FOR ... IN SELECT ... ORDER BY ... LOOP with no
+-- LIMIT. A cursor loop LOOKS total because it visits every row, and it is total in its set;
+-- but when the body mutates a resource the rows compete for, VISIT ORDER decides outcomes
+-- exactly as a LIMIT 1 does. New standing rule (§4 below). The re-census over that shape
+-- found 49 cursor loops, the great majority already carrying 0050/0054/0059-era run-stable
+-- tails — including this site's own sibling ottoq_activate_due_bay_reservations, which
+-- orders `(lower(during) <= p_clock) DESC, lower(during), b.booking_id`. Four did not, and
+-- 0130 totalizes them: reconcile_bay_reservations (the carrier), book_workflow_legs
+-- (`ORDER BY l.seq` — the 0129 leg-seq family, missed site, and the depot's principal
+-- forward booker), plan_overnight_wave (due_at, current_soc — no id tail) and
+-- sim_energy_controller (issued_at, created_at — created_at is frozen inside a pair, so it
+-- can never break a tie). Verification = pairs 75-86, the full six-column re-certification
+-- ladder (both 24t columns, then all four 12t columns, transition + confirm each).
 -- 1. STREAM inequality is ALWAYS a real defect. No exceptions, any lineage, any era.
 -- 2. FP-only inequality is the soc/residue fixpoint moving: expected on the FIRST pair
 --    after any behavior-changing migration and after any foreign-seed/non-cert session.
 --    Run one throwaway TRANSITION PAIR per seed, then read verdicts; the confirm pair
 --    must pass at the new fixpoint or something real is wrong.
--- 3. STANDING CANON (post-0124, run-pure; supersedes every earlier canon list):
+-- 3. STANDING CANON — ***STALE AS OF 0128/0129/0130; DO NOT CITE THESE VALUES.*** The list
+--    below is the post-0124 mint. 0128, 0129 and 0130 each moved behavior, so several of
+--    these hashes are superseded (the post-0129 values that are known good are recorded in
+--    the pairs 57-68 and 69-74 sections above). The block is re-minted in ONE pass from the
+--    pairs 75-86 ladder, once every column has passed its post-0130 confirm — a canon list
+--    that is partly stale is worse than none, so it carries this banner until then.
+--    (post-0124, run-pure; superseded — kept for lineage reading only):
 --      424242/24t: bkg 6340041e · cmd a1129be5 · dec 2d533252 · evt 045100f1 @ fp 8de3415f
 --      424242/12t: bkg 9ed052b8 · cmd 413837dc · dec 482309a0 · evt ffd06c20 @ fp d9d94a7b
 --      171717/12t: bkg aa324fad · cmd 1433b93f · dec cf6fb562 · evt 92e81190 @ fp 092b70a5
@@ -545,6 +607,12 @@
 --      normal_day 171717/12t: bkg a88de84f · cmd a3680029 · dec 5b4826fc · evt fadf837a @ fp 3ece9fbe
 --    171717/24t: NO CANON — the open column (pairs 44/53). Permanent close option if
 --    transition pairs ever grate: deal current_soc at cert reset (one more transition).
+-- 4. A CURSOR LOOP IS A PICK (0130). Any `FOR ... IN SELECT ... ORDER BY ... LOOP` whose
+--    body mutates state the rows compete for is as order-decisive as an `ORDER BY ... LIMIT
+--    1`, and its ORDER BY must be total over run-stable keys by the same 0062/0063 rule:
+--    content keys first, a per-run uuid only as the last resort for byte-identical rows.
+--    Ordering censuses MUST cover the no-LIMIT cursor shape — 0129's did not, and the site
+--    it could not see (reconcile_bay_reservations) cost round 3 four extra pairs.
 -- OPEN FRONT (named, next campaign chunk): sweep vehicles (and sibling world tables) for
 -- ALL columns mutable in-run but absent from fingerprint + boot reset + reset_fleet —
 -- owning_sim_run_id first; the first pair after ANY non-cert session on the depot is the
