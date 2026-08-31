@@ -91,7 +91,64 @@
 -- any of it: ottoq_kpi_five emits five unconditioned measurements with no target, so
 -- "are we meeting the requirement" is not currently a question the system can answer.
 --
--- ── THE ANSWER TO THE QUESTION ASKED ──────────────────────────────────────────────────────
+-- ══════════════════════════════════════════════════════════════════════════════════════════
+-- *** CORRECTION, SAME DAY (2026-08-31). THIS AUDIT'S FRAMING WAS WRONG. ***
+-- The method line above says "live catalog only". That was the error: it audited the DATABASE
+-- and ignored the REPOSITORY, and the repository contains a solver that implements nearly
+-- everything the gaps below call absent.
+--   solvers/cpsat/model.py (40 KB, with a 30 KB test suite that .github/workflows/verify.yml
+--   runs on EVERY PR -- the green "verify" check on this campaign's own pull requests) models,
+--   per SOLVER_STATE.md and its passing tests:
+--     * piecewise charge segments above 70% SoC, chained intervals, per-segment kW   (T4 PASS)
+--     * THE 18-MIN DCFC COOLDOWN as a minimum gap ON THE POINT, occupancy = chain +
+--       cooldown                                                                    (T2 PASS)
+--     * cold-start as a first-segment duration modifier                             (T4 PASS)
+--     * A MULTI-TERM OBJECTIVE WITH EXPOSED WEIGHTS -- tardiness 10/min, on-peak kW-minute 1,
+--       peak-kW excursion above the soft site target 20/kW (exact, via IntVar cumulative
+--       capacity), move 15
+--     * the site power cap as a hard constraint (T3 PASS: true peak 440 kW <= 1000 kW cap)
+--     * concurrency within a service point
+--   The 18-minute figure is not invented either: it is declarative config carried by every site
+--   profile (sites/profiles/*.json, sites/site_alpha/site_alpha.json: "dcfc_cooldown_min": 18)
+--   and defaulted in sites/site_profile.py.
+-- So GAP 2 ("there is no objective function"), GAP 4 ("no DCFC cooldown") and GAP 6 ("cold start
+-- is not a duration modifier") are FALSE AS WRITTEN. They are true of the live decide path and
+-- false of the system. GAP 3 (tariff) is half-wrong the same way: the objective prices on-peak
+-- kW-minutes, so the MODEL is tariff-aware even though no DB function is.
+--
+-- WHAT THE REAL GAP IS -- one, not seven. The model that has the physics is not the code that
+-- makes the decisions. proposer/forward_proposer.py exists precisely to bridge them: it reads
+-- ottoq_build_decision_frame's output and returns rows shaped for ottoq_external_proposals
+-- (verb=assign_stall, stall_id, requested_kw, rationale), propose-only, never writing -- the
+-- exact seat cuOpt occupies. It is NOT CONNECTED. Measured on ottoq_external_proposals:
+--     greedy_constrained 6,930 · ottoq_service_priority 526 · cuopt 136 · cpsat 0
+-- Built, CI-tested, and never once consulted by a running depot.
+--
+-- WHAT SURVIVES THE CORRECTION:
+--   * GAP 1 stands and is closed by 0132/0053 regardless of who proposes: the DISPOSER must
+--     enforce a site power cap, or a bad proposal becomes a breach. That fix is orthogonal.
+--   * GAP 5 IS ALSO FALSE AS WRITTEN. Battery test T6 PASSES: "re-solve at t=120 with
+--     {'NASH-DCFC-02'} blocked: 9 started ops retained, no new work on the blocked point" --
+--     that IS rolling re-solve with previous-feasible retention. Only the live path lacks it.
+--     (Run locally 2026-08-31, ortools 9.15.6755: ALL 15 TESTS PASS, and the committed plan
+--     reproduces byte-identically -- sha256 330efe0721c119a6…. T7 additionally proves the
+--     solver already emits rows in ottoq_external_proposals shape with source='cpsat' and
+--     writes no state, and T9/T9b prove abstention semantics: a rejected asset is named and
+--     excused from the objective rather than forced into an infeasible plan.)
+--   * GAP 7 (SLA half-null and unscored) stands untouched; R-10 is filed against it.
+--   * The KPI conclusion stands, for a different reason: peak_site_kw was uncontrolled because
+--     the live path never enforced a cap, not because nothing in the repo could model one.
+-- THE RECOMMENDATION CHANGES ACCORDINGLY. Do not port physics into the greedy path one
+-- migration at a time -- that rebuilds, badly, what solvers/cpsat already does and what
+-- CLAUDE.md 2.5 explicitly warns against ("do not rip out a working propose/dispose pipeline to
+-- install a textbook"). The question is the one the brief already frames: CP-SAT as decide-path
+-- successor, or as another proposer under the deferral pattern. The wiring is written; what is
+-- missing is the decision and the connection.
+-- METHOD NOTE, kept as a standing caution: a capability audit scoped to one substrate reports
+-- the other substrate's capabilities as absent. Audit the repo and the catalog together.
+-- ══════════════════════════════════════════════════════════════════════════════════════════
+--
+-- ── THE ANSWER TO THE QUESTION ASKED (as originally written, read with the correction above) ─
 -- Of the five canonical KPIs, three sit on capabilities the core genuinely controls
 -- (asset_hours_available_per_day, service_point_turns_per_point_per_day — modulo GAP 4 —
 -- touch_events_per_turn, p95_time_to_service). TWO do not: peak_site_kw is uncontrolled
