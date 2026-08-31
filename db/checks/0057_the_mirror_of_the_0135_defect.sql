@@ -1,0 +1,102 @@
+-- 0057 -- ROUND 5 RECORD: the instrument failing on non-defects, and three probes of mine that
+-- accused the wrong table.
+--
+-- ============================================================================
+-- 1. THE SHAPE THAT STARTED IT
+-- ============================================================================
+-- Post-0136 every pair failed on both re-run columns, twice each, in the exact MIRROR of a real
+-- defect: all four decision streams byte-identical (h_cmd/h_dec/h_evt/h_bkg), booking counts
+-- identical (normal_day 1045/1045, busy_day 1113/1113), and only the boot fingerprint differing
+-- -- reproducibly, the same two values every run (arm A 1bad411e, arm B ffcc9892).
+-- db/checks/0046 s1 says fp-equal + streams-differing is ALWAYS a real defect. This is its
+-- mirror, and it needed its own verdict: the engine agreed with itself completely while the
+-- instrument disagreed anyway.
+--
+-- ============================================================================
+-- 2. THE BISECTION -- WHAT WAS RULED OUT, BY MEASUREMENT
+-- ============================================================================
+-- Each of these killed a hypothesis I had actually formed and was ready to act on:
+--   * reset_fleet is IDEMPOTENT (two resets -> same fp).
+--   * A boot -> stop_and_reset -> boot with NO TICKS gives an IDENTICAL fp (1bad411e twice), so
+--     the boot path is symmetric. The pair harness loop is symmetric too, read from source:
+--     every arm does reset -> start_run -> prime -> ticks -> stop_and_reset.
+--   * 40 SECONDS of elapsed wall time, with all four every-minute / every-two-minute infra cron
+--     jobs live against the same depot, ALSO gives an identical fp. CONCURRENCY AND TIMING ARE
+--     NOT THE CAUSE. I reached for that explanation twice; it is dead by measurement.
+--   * Adding TWO TICKS reproduces it: 1bad411e -> 01d6215e. That is the minimal repro, and it
+--     runs inside one rolled-back transaction.
+--
+-- ============================================================================
+-- 3. THREE PROBES OF MINE THAT ACCUSED THE WRONG TABLE -- THE METHOD LESSON
+-- ============================================================================
+-- ottoq_world_fingerprint reads five sources. My first sweep hashed ROW IMAGES (t::text) rather
+-- than the columns the fingerprint actually hashes, and produced two false accusations plus one
+-- false exoneration. Corrected, with the real hashed column sets:
+--   ottoq_ocpp_chargers   ACCUSED, INNOCENT. Its full row differs; the fingerprint hashes only
+--                         station_state and last_fault_code, and BOTH show 0 rows differing.
+--   vehicle_need_profile  ACCUSED, INNOCENT. reset_fleet alone does not restore it -- but
+--                         ottoq_seed_vehicle_need_profiles, inside sim_start_run which ALWAYS
+--                         follows reset, rewrites every hashed column via ON CONFLICT DO UPDATE.
+--                         My probe captured it after reset and before start_run, a point the
+--                         real harness never observes. Measured post-seed: 0 differing rows.
+--   stalls                EXONERATED TOO EARLY, then properly cleared. My first test compared
+--                         id||status and proved nothing about reserved_at /
+--                         reservation_expires_at, which the fingerprint does hash. Re-probed on
+--                         all six hashed columns: 0 rows differing.
+--
+--     THE RULE: PROBE THE COLUMNS THE CHECK HASHES, NOT THE ROW. A row-image diff over-reports
+--     (every mutable column fires) and a hand-picked subset under-reports (the columns you did
+--     not think of stay invisible). Both failure modes hit this investigation, in both
+--     directions, within the same hour.
+--
+-- ============================================================================
+-- 4. THE CARRIER
+-- ============================================================================
+-- vehicles: all 116 rows differ. Per-column diff -> exactly two keys move:
+--     config                  -- and the only differing key inside it is 'condition_drawn_run',
+--                                which the fingerprint ALREADY subtracts (0115). Clean.
+--     current_soc_updated_at  -- 2026-09-01T06:00:00Z vs 2026-09-01T03:00:00Z
+-- One residue column, and it is a WRITE TIMESTAMP: it records WHEN state of charge was last
+-- written, not the charge. current_soc itself is hashed, matches between arms, and stays hashed.
+--
+-- ============================================================================
+-- 5. WHY THE FIX REMOVES A COLUMN, AND WHY THAT IS NOT 0135 IN REVERSE
+-- ============================================================================
+-- 0135 ADDED battery temperature to this function because temperature was real start-relevant
+-- state the reset was leaking -- a check that cannot fail on real state is not a check.
+-- 0137 REMOVES a write timestamp because the mirror error is equally real: a check that fires on
+-- bookkeeping fails on things that are not the world, and a check that cries wolf gets
+-- discounted by its readers, which costs exactly as much as a blind one.
+-- These are the same principle applied in opposite directions, and the codebase had already
+-- drawn this line twice: 0107 hashes the need profile "minus wall-clock / per-run bookkeeping"
+-- (drawn_at, updated_at, drawn_for_run, wear_km_applied_run), and 0115 subtracts
+-- 'condition_drawn_run'. current_soc_updated_at is that same class and was simply missed.
+-- 0137 finishes a line the fingerprint had already drawn; it does not move it.
+--
+-- The alternative -- canonicalizing the timestamp inside reset_fleet -- was considered and
+-- rejected: it writes 116+ rows on every reset to equalize a value that carries no information
+-- either way, and leaves the fingerprint asserting something it has no reason to assert.
+--
+-- ============================================================================
+-- 6. THE PROOF
+-- ============================================================================
+-- The two-tick repro, re-run post-0137 in a rolled-back transaction:
+--     fp = 823cd34d on BOTH boots   (was 1bad411e vs 01d6215e)
+-- And the migration's own verify proves the narrowing did not blind the instrument: it asserts
+-- current_soc_updated_at is gone from the CODE (comments stripped -- see below) while
+-- current_soc, current_state, current_stall_id, current_soc_source, target_soc, the config
+-- section, 0133's BESS section, 0135's battery temperature and the stall reservation columns are
+-- all still hashed. A "column removed" check that did not assert the survivors would pass just
+-- as happily on a fingerprint that had lost current_soc.
+--
+-- ============================================================================
+-- 7. A MISTAKE MADE TWICE, RECORDED SO IT IS MADE ONCE MORE AT MOST
+-- ============================================================================
+-- Both 0136 and 0137 aborted on their FIRST apply for the identical reason: the verify grep'd
+-- the function source for a symbol, and the migration's own explanatory comment contained that
+-- symbol. 0136 documented what the cap "used to be"; 0137 named the column it had just removed.
+-- Both rolled back cleanly with no partial state -- the anchored-migration pattern did its job
+-- both times -- and both were fixed the same way:
+--     STRIP /* */ COMMENTS BEFORE ANY PRESENCE/ABSENCE ASSERTION ON FUNCTION SOURCE.
+-- A well-documented migration is precisely the one whose prose contains the strings its own
+-- checks look for. Assert against code, never against the file.
