@@ -186,8 +186,17 @@
 -- the twin -- these runs are twin-fed. (4) That no under-total pick remains anywhere: tier B of
 -- the 0129 census and tier C of the 0130 census are documented, unfixed, and simply have not
 -- been shown to tie under any tested trajectory.
--- The honest one-line verdict: the deterministic core now reproduces itself on demand, and
--- every number it emits carries a run ID that regenerates it.
+-- The honest one-line verdict: the deterministic core now reproduces itself on demand.
+-- *** CORRECTION (2026-08-31, same day, see db/checks/0051) *** This paragraph originally
+-- ended "...and every number it emits carries a run ID that regenerates it." THAT SENTENCE IS
+-- FALSE and was false when written. Asking the obvious follow-up question -- do the two arms of
+-- a certified pair produce identical KPIs? -- answers NO on all six columns: peak_site_kw
+-- differs (424242/24t: 524.9 vs 416.3), because ottoq_bess_units.current_power_kw is world
+-- residue that no reset, no boot draw, no teardown and no fingerprint touches, and the energy
+-- tables sit outside all four surfaces the pair hashes. Four of the five KPIs ARE identical.
+-- The matrix above stands and every hash in it still regenerates -- what was overstated is the
+-- SCOPE: this certifies THE SCHEDULER. peak_site_kw is not reproducible, and no number derived
+-- from it should ship until 0051's fix lands.
 --
 -- ── THE GATE ──────────────────────────────────────────────────────────────────────────────
 -- The founder's condition was "no AI/agent layer until the core is validated over and over
