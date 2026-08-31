@@ -100,4 +100,100 @@
 --   ottoq_sim_runs.validation_notes for those IDs.
 -- * The gate stays closed for the AI/agent layer until 171717/24t joins the green columns
 --   and the full matrix holds green across repeated rounds.
+-- ── ROUND 3 (2026-08-31; pairs 75-91; 0130 + 0131) — ALL SIX COLUMNS GREEN ────────────────
+-- THE LAST CARRIER, CONVICTED FROM ITS OWN LEDGER. Round 2 ended with both 24t columns
+-- forking under daytime rebooking pressure and the diagnosis "one more under-total ordered
+-- pick". 0129 (the ordering census, tier A) greened 171717/24t. 424242/24t then forked in the
+-- mildest shape this campaign produced: fingerprint EQUAL, boot images EQUAL, commands,
+-- decisions and events all byte-EQUAL -- h_bkg alone unequal. Pair 73 reproduced pair 72
+-- HASH-FOR-HASH, and a fork that reproduces is a fork that can be dissected:
+--   * The h_bkg difference is exactly 8 rows -- two vehicle PAIRS trading bays, beyond the
+--     14:00 horizon (hence no command/decision/event could differ; the rows never enact).
+--   * Every one of those rows carried a `why` naming a window ten hours before its own
+--     `during`. ottoq_booking_why prints p_from/p_to and the stall's own code, so a row whose
+--     why disagrees with its window was written early and MOVED later.
+--   * The mover keeps an audit trail. public.bay_reservation_reconcile_2026_08_02, both arms,
+--     sim 13:00, defer_seq 3, all four rows entering with an IDENTICAL old_from of 12:45:
+--         arm A  9e05d00e detail 12:45 -> 15:55 (keeps c9466ca6)   9f5d69bb -> 16:05
+--         arm B  9f5d69bb detail 12:45 -> 15:55 (takes c9466ca6)   9e05d00e -> 16:05
+--     ottoq_reconcile_bay_reservations drives its deferral loop on `ORDER BY lower(b.during)`
+--     and nothing else. The body walks each booking forward to the first non-colliding window,
+--     so THE ROW THE HEAP HANDS OVER FIRST WINS THE EARLIER BAY. Two rows tied on the only
+--     sort key; physical row order broke the tie; that was the coin.
+-- CLOSED by 0130 (4 cursor loops totalized; primary sort keys untouched -- totality, not
+-- re-prioritisation).
+--
+-- THE STRUCTURAL LESSON (0046 operating rule §4). 0129's census extracted `ORDER BY ... LIMIT
+-- n`, DISTINCT ON heads and window frames -- every shape that picks ONE row. This site picks
+-- none: it is a FOR ... IN SELECT ... ORDER BY ... LOOP with no LIMIT. A cursor loop LOOKS
+-- total because it visits every row, and is total in its set; but when the body mutates a
+-- resource the rows compete for, VISIT ORDER is as decisive as a LIMIT 1. Re-census over that
+-- shape: 49 loops, the great majority already carrying 0050/0054/0059-era run-stable tails --
+-- including this site's own sibling one function away. Four did not; 0130 fixed them.
+--
+-- THE BAR WAS RAISED MID-CAMPAIGN, AND THE RAISE IS RETROACTIVE (0131). The old rule was
+-- "after a behaviour change the first pair may fork, the confirm pair must pass" -- one pass =
+-- green. PAIR 74 FALSIFIED IT: on 424242/24t the lineage ran f, f, PASS while the carrier was
+-- still live; that pass was a two-state coin landing favourably. green now requires TWO
+-- consecutive most-recent pairs on an IDENTICAL canon. Consequence stated plainly: columns
+-- previously reported green on a single confirm were NOT green by this standard, and every one
+-- of them was re-run here. Those earlier readings were correct under the rule as written --
+-- the rule was too weak, not the reading.
+--
+-- THE MATRIX IS NO LONGER TYPED BY HAND (0131). db/checks/0046 §3 carried hand-copied hashes
+-- that 0128/0129/0130 silently invalidated. Every hash already lived in
+-- ottoq_sim_runs.validation_notes, so the matrix became a query:
+--        SELECT * FROM public.ottoq_cert_matrix();
+-- It cannot go stale, and it reproduced every hand-established verdict for pairs 67-76,
+-- failures included, before being trusted for anything.
+--
+-- ── THE ROUND-3 MATRIX (2026-08-31 04:45, generated, not typed) ────────────────────────────
+-- Column                  | hist | streak | green | canon fp / cmd / dec / evt / bkg
+-- 424242/24t busy_day     | PP   |   2    |  YES  | 8de3415f / d0fe863c / 7d041338 / cecf3ba8 / ac697818
+-- 171717/24t busy_day     | fPP  |   2    |  YES  | dc203e36 / e609496e / 7a57132b / 48fd2043 / 3c40a00c
+-- 424242/12t busy_day     | fPP  |   2    |  YES  | d9d94a7b / c5432bc9 / 482309a0 / 1501b86a / 9ed052b8
+-- 171717/12t busy_day     | fPP  |   2    |  YES  | 092b70a5 / db2179d3 / ee7bb9f4 / 2696da89 / 47abc370
+-- 314159/12t busy_day     | fPP  |   2    |  YES  | 24b807f0 / 6041f3bb / 4e973ba5 / 94800d67 / d781cfa6
+-- normal_day 171717/12t   | fPP  |   2    |  YES  | 3ece9fbe / a3680029 / 5b4826fc / fadf837a / a88de84f
+-- Last confirming pair, arm A / arm B run IDs:
+--   424242/24t  b8988981-6624-4b4e-9ba4-8d139093c5ee / f6c3bdbf-0b25-4e75-a07d-dfd536a858bf
+--   171717/24t  819891b0-5675-4bf5-955f-d3dc18e26411 / 67ddc2a5-af4a-4a4c-ab45-9aa51538a1ae
+--   424242/12t  78c988e8-89fe-4a74-9a2b-10edc845b5ec / 2b2120ae-a3a4-49d9-8422-192052bf81e6
+--   171717/12t  58322855-1739-4ddd-b830-a9809272f5d1 / 1e9e82ca-ead7-4a59-b592-994f01bd7868
+--   314159/12t  9a166bcf-d453-4f80-abd5-60c75e9fb033 / 59e8371e-6197-4735-8398-01400e06eed7
+--   normal_day  bf154fc7-4397-4f8f-ae62-991051474d23 / c7e4de35-10c7-4e2b-a200-2fdfc0c71242
+-- A FALSIFIABLE PREDICTION WAS POSTED BEFORE THE LADDER RAN and held on all six columns: each
+-- column's FIRST pair forks (the lineage switch from the previous column's seed moves the
+-- world's starting point) and its 2nd and 3rd pass on ONE canon. 424242/24t needed no
+-- transition at all -- its predecessor pair was the same column, so it opened PP. Every fork
+-- in this ladder is the known lineage-transition behaviour; not one is an unexplained
+-- signature.
+--
+-- ── WHAT THIS CERTIFIES, AND WHAT IT DOES NOT ─────────────────────────────────────────────
+-- PROVEN: for each of six (seed × horizon × scenario) columns, the full engine -- arrivals,
+-- charging, washes, staging, bay reservation, deferral, teardown -- run twice from the same
+-- seed produces byte-identical command, decision, event and booking streams and an identical
+-- world fingerprint, TWICE CONSECUTIVELY, with the second pair booting on the first pair's
+-- leftovers rather than a factory reset. Five carriers were found and killed to get here
+-- (0123/0124 visit-ledger run scoping ~41 sites, 0127 the interrupted-booking teardown leak,
+-- 0128 the adoption pick's random-uuid tiebreak, 0129 the ordering census tier A, 0130 the
+-- deferral queue), every one convicted on evidence rather than suspicion.
+-- NOT PROVEN, and nobody should read it in: (1) that the engine is CORRECT -- determinism is
+-- reproducibility, not good scheduling; a deterministically bad decision is still bad. (2) That
+-- untested columns are deterministic -- six columns is six, and the campaign's own history is
+-- that longer horizons find what shorter ones cannot (every carrier here was invisible at 12
+-- ticks; the 0130 tie first fires at sim 13:00 ~= tick 22). (3) That production behaves like
+-- the twin -- these runs are twin-fed. (4) That no under-total pick remains anywhere: tier B of
+-- the 0129 census and tier C of the 0130 census are documented, unfixed, and simply have not
+-- been shown to tie under any tested trajectory.
+-- The honest one-line verdict: the deterministic core now reproduces itself on demand, and
+-- every number it emits carries a run ID that regenerates it.
+--
+-- ── THE GATE ──────────────────────────────────────────────────────────────────────────────
+-- The founder's condition was "no AI/agent layer until the core is validated over and over
+-- again without fail." Six columns, two consecutive byte-identical pairs each, under a bar
+-- deliberately raised mid-campaign after a single pass proved insufficient. That condition is
+-- MET. The standing obligation it leaves behind: the matrix is a query, so re-run it after any
+-- behaviour-changing migration -- a column that goes quiet is a column that regressed.
+
 SELECT 'documentation only — see comments' AS note;
