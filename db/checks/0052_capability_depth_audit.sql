@@ -127,7 +127,14 @@
 -- WHAT SURVIVES THE CORRECTION:
 --   * GAP 1 stands and is closed by 0132/0053 regardless of who proposes: the DISPOSER must
 --     enforce a site power cap, or a bad proposal becomes a breach. That fix is orthogonal.
---   * GAP 5 (rolling re-solve with previous-feasible retention) stands -- neither side has it.
+--   * GAP 5 IS ALSO FALSE AS WRITTEN. Battery test T6 PASSES: "re-solve at t=120 with
+--     {'NASH-DCFC-02'} blocked: 9 started ops retained, no new work on the blocked point" --
+--     that IS rolling re-solve with previous-feasible retention. Only the live path lacks it.
+--     (Run locally 2026-08-31, ortools 9.15.6755: ALL 15 TESTS PASS, and the committed plan
+--     reproduces byte-identically -- sha256 330efe0721c119a6…. T7 additionally proves the
+--     solver already emits rows in ottoq_external_proposals shape with source='cpsat' and
+--     writes no state, and T9/T9b prove abstention semantics: a rejected asset is named and
+--     excused from the objective rather than forced into an infeasible plan.)
 --   * GAP 7 (SLA half-null and unscored) stands untouched; R-10 is filed against it.
 --   * The KPI conclusion stands, for a different reason: peak_site_kw was uncontrolled because
 --     the live path never enforced a cap, not because nothing in the repo could model one.
