@@ -1,0 +1,142 @@
+-- 0056 -- WHAT THE BOUNDARY RECON FOUND, AND WHAT 0136 DELIBERATELY LEFT ALONE.
+--
+-- 0136 demoted the simulated BESS below the power-publication boundary. The recon that preceded
+-- it swept four independent dimensions of the live database read-only. Most of what it found is
+-- outside 0136's scope, and every item below is recorded with the evidence that establishes it
+-- so the next round starts from facts rather than from a fresh sweep.
+--
+-- The framing question that produced all of this, and the standing check it becomes:
+--     WHOSE ASSET IS THIS, AND DO WE ACTUATE IT?
+-- It was answerable from CLAUDE.md 2.5 before a single determinism round was spent on the
+-- battery, and the evidence was already in hand -- every one of 8,588 energy commands carries
+-- source='otto_q'; no external system has ever written one. Ask it BEFORE the deep dive.
+--
+-- ============================================================================
+-- OPEN 1 -- TWO DEPOTS RUN WITH NO POWER CAP AT ALL  [needs a fact we do not have]
+-- ============================================================================
+-- depots.service_max_kw is populated on only 2 of 4 depots (both 2,500 kW). Postgres LEAST()
+-- IGNORES NULLS, and ottoq_decide_tick guards the whole 0132 block with
+-- `IF v_charge_cap_kw IS NOT NULL THEN`, so a depot with a NULL service limit is not
+-- conservatively capped -- it is UNCAPPED, silently, with no error and no log line.
+-- The two NULL depots are `d0000000-…c30c` (OTTOYARD Hardware Lab) and `d2000000-…00d2` (P2
+-- Ledger-Only Proof Rig), and they are precisely the two carrying feed_mode='external' -- the
+-- depots a real site controller would feed. Nothing has run on them (zero energy commands), so
+-- nothing is broken today.
+-- NOT FIXED HERE because the fix requires their real utility service limits, which we do not
+-- have. Inventing a service contract is the exact class of fabrication this build forbids.
+-- DECISION NEEDED: either supply the two real limits, or change NULL from "unlimited" to
+-- "refuse", which is the safer default but a behaviour change on every depot.
+-- Related dead data: depots.config for the flagship carries "demand_limit_kw": 1200, which
+-- disagrees with its own service_max_kw of 2500 and is read by nothing. View v_energy_status
+-- exposes demand_limit_kw as config->>'peak_demand_kw_limit' -- a key absent from every depot,
+-- so that field and demand_utilization_pct are NULL for all four.
+--
+-- ============================================================================
+-- OPEN 2 -- 19,993 REFUSALS THAT CANNOT BE RECONSTRUCTED
+-- ============================================================================
+-- ottoq_decisions has purpose-built columns committed_kw_before and committed_kw_after. On the
+-- sampled deferred_site_power_cap rows BOTH ARE NULL, so for none of the 19,993 refusals can we
+-- say which cap value caused it. enacted_action is also populated identically to proposed_action
+-- on rows where nothing was enacted. A refusal that cannot be explained from the ledger is not
+-- evidence; it is an assertion. Cheap to fix at the gate, and it should be fixed the next time
+-- that gate is touched.
+--
+-- ============================================================================
+-- OPEN 3 -- TWO POWER CEILINGS THAT DISAGREE ON THE SAME DECISION
+-- ============================================================================
+-- Layer-1 rule EN.001 (ottoq_eval_en_001_grid_capacity) evaluates against service_max_kw and
+-- logged, on a real decision: "grid capacity OK: 15.6 + 19.2 = 34.8 kW (headroom 1585.2 kW)",
+-- enforcement_taken: allowed. The 0132 gate then REFUSED that same 19.2 kW assignment. They use
+-- different committed-kW bases (the shield's actuals vs the gate's SoC-derated stall estimate)
+-- and, until 0136, different limits. 0136 aligns the limit; the BASES still differ.
+-- Two inviolable-layer constraints that can contradict each other on one decision is a
+-- correctness problem, not a tuning problem. Reconciling them is a decision, not a patch.
+--
+-- ============================================================================
+-- OPEN 4 -- THE GATE'S OWN ARITHMETIC IS ASYMMETRIC
+-- ============================================================================
+-- v_ev_committed_kw derates the existing fleet by SoC (1.0 / 0.85 / 0.55 / 0.30 above 75%) but
+-- adds the incoming candidate at its FULL un-derated requested_kw. Baseline and candidate are
+-- therefore measured on different scales. It biases the comparison in one direction and will
+-- shift the deferral rate independently of the cap value.
+--
+-- ============================================================================
+-- OPEN 5 -- BESS STATE CANNOT BE ATTRIBUTED TO A RUN
+-- ============================================================================
+-- ottoq_bess_units (2 rows) has NO sim_run_id and NO data_source: it is a mutable singleton per
+-- depot, so two concurrent runs on one depot share one battery. bess_snapshots (69,539 rows)
+-- likewise has no run key -- confirmed against its full column list. Neither table appears in
+-- ottoq_run_scope_registry, because neither has a run-scoped column to register, so purge safety
+-- has nothing to enforce and BESS rows outlive their runs indefinitely.
+-- Consequence, stated plainly: any KPI touching battery SoC or BESS-derived peak shave is NOT
+-- reproducible from a run ID today. That collides with the company's own credibility rule.
+-- 0136 reduces the urgency -- after the demotion the battery no longer constrains the scheduler
+-- -- but peak_site_kw is still computed from grid_import_kw, which is still load minus battery.
+-- Corroborating dead read: otto-q-api's getLatestBESSSnapshot orders by `recorded_at`, a column
+-- that does not exist on bess_snapshots (it has `timestamp` and `created_at`), so the PostgREST
+-- call fails 42703 and returns nothing. Called from 2 sites; broken, unnoticed.
+--
+-- ============================================================================
+-- OPEN 6 -- THE PUBLICATION OBJECT DOES NOT EXIST, BUT ITS MATH DOES
+-- ============================================================================
+-- public.service_profiles is a VIEW, not a table. 0 rows. Both UNION branches are dead: the
+-- site_power branch reads ottoq_energy_plan (0 rows, total) and the service_point branch filters
+-- ottoq_stall_bookings to state IN ('held','active') of which there are 0 among 316,911 bookings.
+-- Zero functions read it, zero views depend on it, it has no primary key, and it is PostgREST-
+-- exposed to anon -- a presentation surface defined and never wired. It can be redefined freely.
+-- The forward-schedule MATH already exists and is thrown away every tick:
+--     public.ottoq_forecast_net_load(run, depot, clock, horizon_ticks=16, tick_min=30, ...)
+--     RETURNS numeric[] -- a genuine per-interval forward kW vector over an 8-hour horizon,
+--     STABLE, with run-stable cursor orders (ORDER BY st.id, ORDER BY v.id -- 0054-era fixes).
+-- Its ONLY caller is ottoq_bess_reserve_target, which binary-searches 34 iterations to collapse
+-- that whole vector into one scalar. We compute the forward demand schedule every tick and
+-- discard it. Publishing it is mostly a matter of persisting what already exists.
+-- Against OCPP 2.0.1 ChargingSchedule the gaps are specific: no explicit ChargingSchedulePeriod
+-- .startPeriod offsets (arrays are positional), no chargingRateUnit (W vs A never declared),
+-- no stackLevel or chargingProfilePurpose, no chargingProfileKind/recurrencyKind, no profile
+-- identity or versioning, no EVSE targeting. Also: ottoq_ocpp_messages (48,444 rows) is 100%
+-- cs_to_csms -- zero SetChargingProfile, nothing is published downstream today at all.
+-- Note the irony worth not repeating: the dormant legacy table tariff_schedules is the one
+-- carrying a `periods jsonb` column, the OCPP-shaped field, and it is referenced by no routine.
+--
+-- ============================================================================
+-- OPEN 7 -- A SECOND ENERGY DECISION PATH OUTSIDE THE PROPOSE/DISPOSE LEDGER
+-- ============================================================================
+-- Edge function ottoq-energy-optimize reads ottoq_bess_units and site_energy_snapshots directly,
+-- unfiltered by run, and writes into ottoq_recommendations through the 52-rule shield. It never
+-- touches ottoq_energy_commands, so it is invisible to everything 0132/0134/0135/0136 examined.
+-- It violates the same boundary from a second direction and is out of scope for 0136, but it
+-- should not be forgotten: "agents propose, solver disposes" requires ONE dispose path.
+-- Separately, ottoq_energy_plan's MPC branch has never executed: across 4,342 bess_setpoint_kw
+-- commands the reason mode distribution is idle 3,483 / charge_offpeak_reserve 487 /
+-- hold_reserve 350 / charge_solar_capture 12 / discharge_reserve_shave 10 -- mpc_follow: 0.
+--
+-- ============================================================================
+-- OPEN 8 -- THE POLICY COMPARISON IS STRUCTURALLY CONFOUNDED (LATENT)
+-- ============================================================================
+-- Energy orchestration is gated on `v_run.policy IS NULL OR v_run.policy = 'otto_q'`, and
+-- ottoq_fifo_tick / ottoq_greedy_tick never call ottoq_decide_tick and never consult the cap.
+-- So the site power cap constrains OTTO-Q and nothing else. Latent today -- all 279 sim runs are
+-- policy='otto_q' -- but it becomes a live confound the moment C5's four-policy comparison runs,
+-- and a comparison where only one arm is constrained is not a comparison.
+--
+-- ============================================================================
+-- OPEN 9 -- ottoq_energy_commands IS WORLD-READABLE
+-- ============================================================================
+-- RLS is DISABLED on public.ottoq_energy_commands while `anon` holds SELECT, so it is readable
+-- via PostgREST with the publishable key. bess_snapshots, ottoq_bess_units and
+-- site_energy_snapshots all have RLS enabled -- this table is the outlier. It is simulation data
+-- today, which is why this is recorded rather than hot-fixed, but the asymmetry is unintended.
+--
+-- ============================================================================
+-- CLOSED BY 0136, recorded here so the ladder's behaviour change is not mistaken for a defect
+-- ============================================================================
+-- The effective cap on the flagship moved from 1,267.5 kW (twin-derived, measured immediately
+-- before the migration) to 2,500 kW (the declared service limit). Committed EV load in these
+-- scenarios is 15-45 kW, so the 0132 gate will now essentially never fire and
+-- deferred_site_power_cap should fall from ~22.5% of decisions in an affected run to ~0.
+-- THAT IS CORRECT. A 2,500 kW service contract does not bind at 45 kW of load. The gate only
+-- appeared to bind because the simulated battery subtracted its own recharge draw from the
+-- fleet's charging budget -- 90.1% of emitted caps sat below the real service limit. The
+-- machinery is intact and binds again under Site Alpha (C8: 3,000 kW, 58 assets) or the moment
+-- a real DR call or EMS-declared limit arrives.
