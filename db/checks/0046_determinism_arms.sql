@@ -593,13 +593,26 @@
 --    after any behavior-changing migration and after any foreign-seed/non-cert session.
 --    Run one throwaway TRANSITION PAIR per seed, then read verdicts; the confirm pair
 --    must pass at the new fixpoint or something real is wrong.
--- 3. STANDING CANON — ***STALE AS OF 0128/0129/0130; DO NOT CITE THESE VALUES.*** The list
---    below is the post-0124 mint. 0128, 0129 and 0130 each moved behavior, so several of
---    these hashes are superseded (the post-0129 values that are known good are recorded in
---    the pairs 57-68 and 69-74 sections above). The block is re-minted in ONE pass from the
---    pairs 75-86 ladder, once every column has passed its post-0130 confirm — a canon list
---    that is partly stale is worse than none, so it carries this banner until then.
---    (post-0124, run-pure; superseded — kept for lineage reading only):
+-- 3. STANDING CANON — ***NO LONGER MAINTAINED HERE. QUERY IT (0131).***
+--        SELECT * FROM public.ottoq_cert_matrix();
+--    This block was hand-typed, and by round 3 several of its hashes were simply wrong while
+--    still labelled "standing" — caught only because a human happened to re-read them. That is
+--    the precise failure the company rule exists to prevent: a number that cannot be
+--    regenerated from its evidence is a number nobody should trust, ours included. Every hash
+--    already lives in ottoq_sim_runs.validation_notes, so the matrix is a QUERY, not a comment,
+--    and it cannot go stale. It returns per column: pairs_seen, consecutive_passes, green,
+--    the canon (fp/cmd/dec/evt/bkg), the last pair's two run IDs, and a history string
+--    (oldest-first, P=pass f=fork).
+--    THE BAR IS ALSO RAISED THERE, and the raise is retroactive. green now requires TWO
+--    consecutive most-recent pairs passing on an IDENTICAL canon, not one confirm pair. Pair 74
+--    is why: on 424242/24t the lineage ran f,f,PASS and the column was not fixed at all — the
+--    pass was a two-state coin landing favourably, and the next dig found the live carrier
+--    (0130). Under the old single-confirm rule several columns below were called green on ONE
+--    passing pair; under the new rule they are not green until re-confirmed. Those earlier
+--    calls were correct under the rule as it was written — the RULE was too weak, not the
+--    reading — and the honest consequence is that the 12t columns need a third pair whenever
+--    their transition pair forks.
+--    (post-0124 hand-typed snapshot; HISTORICAL, for lineage reading only — do not cite):
 --      424242/24t: bkg 6340041e · cmd a1129be5 · dec 2d533252 · evt 045100f1 @ fp 8de3415f
 --      424242/12t: bkg 9ed052b8 · cmd 413837dc · dec 482309a0 · evt ffd06c20 @ fp d9d94a7b
 --      171717/12t: bkg aa324fad · cmd 1433b93f · dec cf6fb562 · evt 92e81190 @ fp 092b70a5
