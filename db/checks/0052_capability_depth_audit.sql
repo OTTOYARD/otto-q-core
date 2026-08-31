@@ -1,0 +1,113 @@
+-- 0052 — CAPABILITY DEPTH AUDIT (2026-08-31): what the core actually orchestrates
+-- ============================================================================================
+-- THE QUESTION (founder, before committing to KPI work): is the deterministic core deep enough,
+-- or are there KPIs we could never move because the engine does not orchestrate for them in the
+-- first place? Determinism was certified in round 3 — that proves the engine REPEATS itself, and
+-- says nothing about what it OPTIMIZES. This audit answers the second question against the
+-- checklist the brief itself sets (CLAUDE.md §2.3 "two properties the model always preserves"
+-- and §2.5 "modeling requirements that bite"). Method: live catalog only, no inference from
+-- docs — a capability counts as present only where a function actually acts on it.
+--
+-- ── PRESENT AND REAL ──────────────────────────────────────────────────────────────────────
+--   Concurrency within a service point   public.ottoq_start_concurrent_atoms + decide_tick +
+--                                        twin.ottoq_sim_advance_visit_atoms
+--   Inter-point moves as scheduled ops   itin_travel_leg / itin_close_travel_legs (+ 18 fns
+--                                        carrying deadlock / arm-refusal guards)
+--   Layer-1 rules                        52 versioned rules, every evaluation logged
+--   Per-operator SLA terms               ottoq_fleet_operator_slas (see GAP 7)
+--   Propose / dispose                    cuOpt deferral, right-of-first-refusal, enactment log
+--   Determinism                          certified, six columns (db/checks/0050)
+--
+-- ── GAP 1 — THE SITE POWER CAP IS ACCOUNTED, NEVER ENFORCED  [the big one] ─────────────────
+-- The machinery exists and is fully wired EXCEPT for the comparison that would make it a
+-- constraint. In public.ottoq_decide_tick:
+--     line  16   v_charge_cap_kw numeric;  v_ev_committed_kw numeric := 0;
+--     line 181   v_charge_cap_kw := ottoq_active_charge_cap_kw(run, depot, clock);
+--     line 182-5 IF v_charge_cap_kw IS NOT NULL THEN  <compute current committed draw>
+--     line 289   PERFORM ottoq_claim_tick_kw(run, tick, depot, requested_kw, vehicle);
+--     line 335   v_ev_committed_kw := v_ev_committed_kw + requested_kw;
+-- Those two variables are WRITTEN AND NEVER COMPARED — grep of the whole function returns
+-- exactly the five lines above and no relational test between them. The helpers confirm it:
+--     ottoq_active_charge_cap_kw  — pure SELECT, returns numeric, read-only.
+--     ottoq_claim_tick_kw         — pure INSERT into ottoq_tick_reservations, RETURNS uuid.
+--                                   No cap check, no boolean, no rejection path.
+-- The ledger is real and large: ottoq_tick_reservations holds 103,489 claims across 222 runs
+-- (max single claim 212.5 kW). Its only reader is public.ottoq_tick_claimed_kw — which has
+-- ZERO callers anywhere in public/ottoq/twin. Caps are genuinely issued (ottoq_energy_commands:
+-- 221 executed charge_cap_kw rows, one per run, 795–13,182 kW), so this is not dormant config;
+-- it is a live signal the scheduler records and then ignores.
+-- CONSEQUENCE: no charge is ever refused or deferred for site power. peak_site_kw — the
+-- demand-charge KPI, and the number the C8 anti-correlation economics rest on — is an OUTCOME
+-- THE CORE DOES NOT CONTROL. It can be measured; it cannot currently be improved by scheduling.
+--
+-- ── GAP 2 — THERE IS NO OBJECTIVE FUNCTION ────────────────────────────────────────────────
+-- §2.5 specifies "multi-term objective with exposed weights (tardiness, energy cost vs tariff,
+-- peak-kW excursion, inter-point moves)". Catalog search for objective_weight / w_tardiness /
+-- score_weight / weights across public+ottoq+twin: ZERO functions. What exists instead is a
+-- set of fixed greedy orders:
+--     ottoq_l2_optimize_assignments   ORDER BY v.current_soc ASC, v.id   ("most depleted first")
+--     ottoq_stall_free_between        ORDER BY distance_from_entrance, stall_code
+--     decide_tick's fairness cursor   ORDER BY last_state_change, v.id
+-- These are defensible heuristics and they are deterministic — but nothing trades tardiness
+-- against energy cost against peak kW. There is no weight to tune and no cost to compare two
+-- plans by. CONSEQUENCE: an agent layer has nothing to propose AGAINST and no scalar to improve;
+-- "better" is currently undefined inside the kernel.
+--
+-- ── GAP 3 — TARIFF NEVER REACHES A SCHEDULING DECISION ────────────────────────────────────
+-- Eight functions touch tariff: build_decision_frame, demand_charge_per_kw, emit_sdr,
+-- eval_tw_004_tariff_window, twin_snapshot, sim_advance_grid, sim_advance_site_energy,
+-- sim_current_tariff. Of those, the number that write a booking, call book_stall/
+-- find_and_book_stall, or issue a vehicle command is ZERO. Price is snapshotted, billed onto
+-- the SDR, and rule-evaluated — never used to place work. CONSEQUENCE: load is never shifted
+-- into a cheap window. Energy cost is reported, not optimized.
+--
+-- ── GAP 4 — NO DCFC COOLDOWN / MINIMUM-GAP CONSTRAINT ON A SERVICE POINT ──────────────────
+-- §2.5 specifies "DCFC cooldown as a minimum-gap constraint on the service point (18 min in the
+-- throughput model)". Catalog search for cooldown / cool_down / min_gap / recovery_min: ZERO.
+-- Search for last_session / session_end / prev_session / since_last anywhere in the assignment
+-- path (decide_tick, find_and_book_stall, book_stall, book_workflow_legs, l2_optimize,
+-- plan_overnight_wave, charge_plan_for_visit, build_decision_frame): ZERO. Back-to-back DCFC
+-- sessions on one charger are therefore schedulable with no gap. CONSEQUENCE: the throughput
+-- model overstates DCFC capacity, and service_point_turns_per_point_per_day is optimistic by
+-- an unmeasured margin on DCFC points specifically.
+--
+-- ── GAP 5 — NO ROLLING RE-SOLVE WITH PREVIOUS-FEASIBLE RETENTION ──────────────────────────
+-- §2.5: "rolling re-solve with previous-feasible retention — the site is never without a
+-- schedule". Search for previous_feasible / retain_previous / prev_plan / rolling_resolve:
+-- one incidental match (ottoq_release_vacated_spaces), no mechanism. The tick recomputes from
+-- current state each time; there is no retained prior plan to fall back to.
+--
+-- ── GAP 6 — COLD START IS NOT A DURATION MODIFIER ─────────────────────────────────────────
+-- §2.5 names cold-start as a duration modifier. 'cold_start' appears in exactly one live
+-- function (twin.ottoq_sim_start_run) as run configuration. No service-duration computation
+-- reads it.
+--
+-- ── GAP 7 — THE SLA TABLE IS HALF-NULL AND UNSCORED ───────────────────────────────────────
+-- ottoq_fleet_operator_slas encodes real operator terms (min_soc_at_deployment_pct 80,
+-- preferred 90, max_queue_wait_minutes 30, expected_visit_duration_minutes 45) but leaves
+-- max_visit_duration_minutes, max_queue_depth, max_overnight_stage_count,
+-- max_concurrent_vehicles_at_depot, return_reserve_soc_pct, maintenance_window_start/end,
+-- required_services_before_deploy and penalty_schedule NULL/empty. No KPI is scored against
+-- any of it: ottoq_kpi_five emits five unconditioned measurements with no target, so
+-- "are we meeting the requirement" is not currently a question the system can answer.
+--
+-- ── THE ANSWER TO THE QUESTION ASKED ──────────────────────────────────────────────────────
+-- Of the five canonical KPIs, three sit on capabilities the core genuinely controls
+-- (asset_hours_available_per_day, service_point_turns_per_point_per_day — modulo GAP 4 —
+-- touch_events_per_turn, p95_time_to_service). TWO do not: peak_site_kw is uncontrolled
+-- (GAP 1) and any energy-cost KPI is both unmeasured and unoptimized (GAP 3). Adding KPIs on
+-- top of the current kernel would produce numbers we can report and cannot move. GAPS 1-4 are
+-- the ones that change what the engine can do; 5-7 change what it can promise.
+--
+-- Evidence, re-runnable: the enforcement gap in one query. Expect writes=true/reads=false for
+-- the claim helper, and ZERO callers for the reader.
+SELECT n.nspname||'.'||p.proname AS fn,
+       (pg_get_functiondef(p.oid) ~* 'INSERT INTO[[:space:]]+(public\.)?ottoq_tick_reservations') AS writes_claims,
+       (pg_get_functiondef(p.oid) ~* 'FROM[[:space:]]+(public\.)?ottoq_tick_reservations')        AS reads_claims,
+       (SELECT count(*) FROM pg_proc c JOIN pg_namespace cn ON cn.oid=c.pronamespace
+         WHERE cn.nspname IN ('public','ottoq','twin') AND c.proname <> p.proname
+           AND pg_get_functiondef(c.oid) LIKE '%'||p.proname||'%')                                AS callers
+FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE n.nspname IN ('public','ottoq','twin') AND p.prokind='f'
+  AND pg_get_functiondef(p.oid) ~* 'ottoq_tick_reservations'
+ORDER BY 1;
