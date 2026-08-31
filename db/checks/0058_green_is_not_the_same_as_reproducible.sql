@@ -1,0 +1,74 @@
+-- 0058 -- THE 0051 DEFECT IS NOT CLOSED, AND A PREMATURE CLAIM THAT IT WAS.
+--
+-- This file exists because I reported the opposite. After 0136 I checked peak_site_kw on three
+-- pairs, found 530.7 == 530.7 and 579.2 == 579.2 twice, and told Chase the 0051 defect was
+-- "closed on the evidence." THREE SAMPLES THAT HAPPENED TO AGREE IS NOT EVIDENCE OF
+-- REPRODUCIBILITY. Widening to the four post-0137 pairs breaks it:
+--
+--   busy_day  424242/12t  23:33  arm c66ceb69 / 292903fb   579.2 == 579.2   all 5 KPIs equal
+--   busy_day  424242/12t  23:41  arm 55b69698 / e076641d   579.2 == 579.2   all 5 KPIs equal
+--   normal_day 171717/12t 23:17  arm 39baa6b0 / 9b2e5337   528.4 vs 532.2   NOT equal
+--   normal_day 171717/12t 23:25  arm ea6b604b / 24331d3a   528.7 vs 528.3   NOT equal
+--
+-- Every one of those four pairs PASSED (equal=true) and both columns are GREEN with streak 2.
+-- So the headline finding of this round is a property of the harness, not of any one defect:
+--
+--     GREEN IS NOT THE SAME AS REPRODUCIBLE. The pair verdict hashes four streams -- commands,
+--     decisions, events, bookings -- plus the boot fingerprint. It does NOT hash
+--     site_energy_snapshots. peak_site_kw is computed from that table. A column can therefore be
+--     certified green while the demand-charge number it produces differs between the two arms
+--     that were just certified identical.
+--
+-- MECHANISM, measured on the 23:25 normal_day pair (arms ea6b604b / 24331d3a):
+--   loads_identical = TRUE at every one of the 12 timestamps -- total_ev_charging_kw,
+--   building_load_kw, lighting_load_kw and solar_generation_kw all match exactly.
+--   ONLY bess_output_kw differs, and only on ticks where the battery moves:
+--       04:00  -459.10 vs -459.20      05:00  -456.40 vs -456.70
+--       06:00  -458.10 vs -457.70      06:30  -427.60 vs -434.10
+--   grid_import_kw = load - bess, so it inherits the battery delta exactly, and the 15-minute
+--   rolling max over it is peak_site_kw.
+-- The SCHEDULER is deterministic -- that is what the four green streams prove. The simulated
+-- BATTERY is not. Since 0136 the battery sits BELOW the publication boundary, so its wobble no
+-- longer changes a single decision (which is precisely why these pairs pass), but it still
+-- writes site_energy_snapshots.
+--
+-- WHY THIS IS NOT ANOTHER RESIDUE HUNT. Rounds 3-5 closed five residue/scoping defects
+-- (0133 BESS canonicalization, 0134 cross-run world reads, 0135 temperature + accumulators,
+-- 0136 the cap loop + three cross-run energy reads, 0137 the write-timestamp in the
+-- fingerprint). Chasing the remaining battery wobble would be a sixth, and it would be chasing
+-- fidelity in a component we have just established WE DO NOT CONTROL AND NEVER ACTUATE.
+--
+-- THE REAL QUESTION IS WHAT THE NUMBER MEANS, and 0136 already split it in two:
+--   * THE DEMAND WE CAUSE -- the site load our schedule creates. Ours. Deterministic today:
+--     every load component above is byte-identical across arms. Warrantable.
+--   * THE PEAK AFTER A BATTERY SHAVES IT -- grid import net of a storage asset owned and
+--     operated by the site. Genuinely what demand billing charges on, and genuinely NOT
+--     something we can warrant, because the battery is the site's and we only publish a
+--     forward schedule to it.
+-- peak_site_kw currently conflates them: CLAUDE.md 2.9 defines it as "15-min rolling, matches
+-- demand billing", which is the SECOND one -- correct as a business metric and unwarrantable as
+-- our claim.
+--
+-- PROPOSED, NOT BUILT -- this changes the meaning of a published KPI and is Chase's call:
+--   report BOTH, and label them.
+--     peak_site_kw_demand  -- 15-min rolling max of (ev + building + lighting - solar).
+--                             Ours, reproducible from a run ID today, the number we warrant.
+--     peak_site_kw_billed  -- 15-min rolling max of grid_import_kw, net of site storage.
+--                             The real billing basis; reported as informational and explicitly
+--                             dependent on a site asset outside our control.
+-- That is the KPI-layer expression of the boundary 0136 enforced in the engine, and it is the
+-- only version of this number that can carry a run ID honestly.
+--
+-- UNTIL THAT LANDS: db/checks/0050's CORRECTION banner STANDS. peak_site_kw is not reproducible
+-- and no number derived from it ships. It was not struck in this round, and the instruction to
+-- strike it -- written by me into my own check-in, conditional on both columns going green --
+-- was itself the trap: the columns DID go green and the number still does not reproduce.
+--
+-- WHAT ROUND 5 DID ESTABLISH, and it is not small:
+--   * The scheduler reproduces itself. normal_day 171717/12t canon 823cd34d and busy_day
+--     424242/12t canon 4fddba55, both streak 2, both on post-0137 canons, all four decision
+--     streams byte-identical.
+--   * 823cd34d is the exact fingerprint 0137's two-tick proof probe predicted before any pair
+--     ran -- the fix reproduces end to end.
+--   * The four other matrix columns still read green on STALE pre-0136 canons and are being
+--     re-run rather than claimed.
