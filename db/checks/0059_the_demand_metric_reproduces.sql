@@ -1,0 +1,50 @@
+-- 0059 -- PROOF THAT 0138 WORKS, AND WHAT THE OLD NUMBER WAS ACTUALLY MEASURING.
+--
+-- 0058 established that peak_site_kw does not regenerate from a run ID: on pairs that PASS, on
+-- columns that are GREEN, the two certified-identical arms report different values, because the
+-- metric is defined over grid import -- net of a battery OTTO-Q publishes a schedule to and never
+-- commands. 0138 added peak_site_kw_demand: the identical 15-minute rolling computation over the
+-- load the schedule actually causes (ev + building + lighting - solar), storage excluded.
+--
+-- ============================================================================
+-- THE PROOF -- seven consecutive certified pairs, three columns
+-- ============================================================================
+--   column                at      peak_site_kw (billed)      peak_site_kw_demand
+--   normal_day 171717   23:17    528.4 vs 532.2   DIFFER     81.4 == 81.4   MATCH
+--   normal_day 171717   23:25    528.7 vs 528.3   DIFFER     81.4 == 81.4   MATCH
+--   busy_day   424242   23:33    579.2 == 579.2   match      67.3 == 67.3   MATCH
+--   busy_day   424242   23:41    579.2 == 579.2   match      67.3 == 67.3   MATCH
+--   busy_day   171717   23:56    529.3 vs 529.7   DIFFER     72.1 == 72.1   MATCH
+--   busy_day   171717   00:04    530.0 vs 529.0   DIFFER     72.1 == 72.1   MATCH
+--   busy_day   171717   00:12    529.4 vs 528.5   DIFFER     72.1 == 72.1   MATCH
+--
+-- 7 of 7 on the demand metric, including all five pairs where the billed figure forks.
+--
+-- STRONGER THAN INTRA-PAIR AGREEMENT: the demand figure is identical ACROSS pairs of the same
+-- column, not merely between the two arms of one pair -- 81.4 on every normal_day 171717 run,
+-- 72.1 on every busy_day 171717 run, 67.3 on every busy_day 424242 run. That is the property the
+-- credibility rule actually requires: a run key reproduces its number every time, not most times.
+-- It is also the property that three green columns did NOT have on the billed figure.
+--
+-- ============================================================================
+-- WHAT THE OLD NUMBER WAS MEASURING -- worth knowing before it is ever quoted
+-- ============================================================================
+-- demand runs 67-81 kW while billed runs ~530 kW on the same runs. The gap is the simulated
+-- battery drawing roughly 460 kW to recharge. So the figure CLAUDE.md 2.9 nominates as the
+-- demand-charge KPI is, on these scenarios, about 85% battery recharge draw and 15% fleet.
+-- Neither number is wrong -- demand billing genuinely charges on grid import, so peak_site_kw
+-- remains the correct commercial basis and 0138 left it untouched. But anyone reading
+-- "peak_site_kw = 530" as a statement about OTTO-Q's scheduling is reading it wrong: the
+-- scheduler's own contribution to that peak is 81. Both figures now ship, labelled, and
+-- ottoq_kpi_five's provenance block states which one carries a run ID.
+--
+-- ============================================================================
+-- STANDING CAUTION
+-- ============================================================================
+-- peak_site_kw is still NOT reproducible and 0050's CORRECTION banner still stands. 0138 did not
+-- fix it -- it made the unreproducible part separable from the reproducible part, and made the
+-- distinction machine-readable instead of tribal knowledge. Making peak_site_kw itself reproduce
+-- requires the twin's battery to become deterministic, which is twin fidelity in a component the
+-- kernel neither controls nor actuates, and is therefore a fidelity backlog item rather than a
+-- correctness defect. When it is done, the migration that does it moves peak_site_kw into
+-- ottoq_kpi_five's reproducible_from_run_id list.
