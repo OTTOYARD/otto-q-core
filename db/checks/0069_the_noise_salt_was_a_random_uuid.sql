@@ -1,0 +1,131 @@
+-- =====================================================================
+-- 0069  The noise salt was a random uuid — 0146 was necessary and
+--       insufficient, and round 4 proved it in three pairs
+-- =====================================================================
+-- Round 4 was armed to be the behavioural proof of 0146. It became the
+-- disproof, and that is the point of running it.
+--
+-- §1  What round 4 showed in three pairs
+-- --------------------------------------
+--   12:45 PM CT  busy_day/171717/12t   PASSED   h_cmd 91dd27ca  h_dec 6f47615f
+--   12:57 PM CT  busy_day/171717/12t   PASSED   h_cmd 91dd27ca  h_dec f567a2ac
+--    1:09 PM CT  busy_day/314159/12t   FAILED (h_dec)
+--
+-- Two things were wrong with the optimistic reading:
+--   * The two 171717 pairs passed but disagree with EACH OTHER on h_dec.
+--   * 314159/12t had been CLEAN in round 3 and now failed.
+--   * Every hash was a value already seen in round 3. I had predicted
+--     every canon would move. They did not.
+--
+-- §2  The measurement that settled it
+-- -----------------------------------
+-- On the 12:45 PM pair, which the verdict PASSED, comparing
+-- ottoq_energy_commands between the arms:
+--
+--   paired rows                24
+--   desired_ev_kw differs      20
+--   net_load_kw differs        10
+--   setpoint_kw differs        14
+--   max desired_ev delta    16 kW
+--
+-- Essentially the round-3 rate. 0146 correctly scoped the sum to one run
+-- and one depot, and the arms still disagreed. Necessary, insufficient.
+--
+-- §3  The residual carrier
+-- ------------------------
+-- ocpp_sessions.id DEFAULT uuid_generate_v4().
+--
+-- Pairing the two arms of that pair on (vehicle_id, stall_id):
+--
+--   paired sessions        85
+--   same session id         0
+--   DIFFERENT session id   85
+--   same started_at        85
+--
+-- Same vehicle, same stall, same start time, different random id. And
+-- that id keys two seeded draws:
+--
+--   ottoq_energy_orchestrate
+--     line 28  'btemp:'||s.id::text          -> battery temp, x8 degC term
+--     line 32  s.id::text||':'||p_sim_clock  -> charge-rate noise salt
+--   ottoq_forecast_net_load
+--     line 18  s.id::text                    -> charge-rate noise salt
+--
+-- A seeded RNG salted with a random value is not seeded. The whole seed
+-- promise — same scenario, same replay — is broken at the source. The
+-- battery-temp draw is the worse of the two: an 8 degC swing feeding the
+-- charge-rate curve, not a rounding wobble.
+--
+-- §4  The sweep, so this is the last of its kind
+-- ----------------------------------------------
+-- Every salt site in public/ottoq/twin was enumerated. EXACTLY these two
+-- functions salt with a random id. Every twin function uses a
+-- deterministic salt, and the house pattern for this same draw is:
+--
+--   twin.ottoq_sim_advance_charge_sessions
+--     p_noise_salt := v_session.vehicle_id::text || ':' || clock_salt...
+--   twin.ottoq_sim_start_charge_session
+--     p_noise_salt := p_vehicle_id::text || ':' || clock_salt...
+--
+-- The two public energy functions were the deviation, not the rule.
+-- 0147 adopts the house key: vehicle_id — a fixed fleet row, identical
+-- across arms, and unique among concurrently active sessions because a
+-- vehicle occupies at most one stall at a time.
+--
+-- Deliberately not widened: the twin also wraps its clock in
+-- ottoq_sim_clock_salt(). Raw p_sim_clock is already deterministic, so
+-- changing it would be churn. Only the random component was replaced.
+--
+-- Note forecast_net_load never had the 0146 defect — its query already
+-- reads WHERE s.sim_run_id = p_sim_run_id. It had only this one, which
+-- is why the 0146 round could not have caught it.
+--
+-- §5  0147 applied 1:28 PM CT, verified independently
+-- ---------------------------------------------------
+--   ottoq_energy_orchestrate  pin a1f7cab5 -> 2f172ec7
+--     random-id salts left 0, vehicle-id salts 2
+--     0146 depot predicate intact  true
+--     0146 run predicate intact    true
+--   ottoq_forecast_net_load   pin 3ca05c53 -> 69060ce3
+--     random-id salts left 0, vehicle-id salts 1
+--
+-- The post-check explicitly asserts 0147 did not clobber 0146's
+-- predicates — two migrations editing the same function body is exactly
+-- where a replace() can silently undo its predecessor.
+--
+-- Floor moved to 1:28 PM CT; matrix 0 green / 6 stale.
+--
+-- §6  Round 4 was stopped early, deliberately
+-- -------------------------------------------
+-- Nine of its twelve pairs were unscheduled unfired. Once the 20-of-24
+-- measurement was in hand, the remaining pairs would have spent 2.5
+-- hours measuring an engine with a known live defect to re-confirm a
+-- conclusion already established by direct measurement. The three pairs
+-- it did produce are kept as evidence.
+--
+-- §7  What I got wrong, recorded
+-- ------------------------------
+-- 0067 quoted the btemp/salt line and characterised the session id in
+-- the salt only as AMPLIFYING the foreign-session problem — "a foreign
+-- session perturbs the rate draw as well as the sum". That was too
+-- narrow. Even with zero foreign sessions, two arms mint different ids
+-- for the same logical session, so the salt diverges on its own. The
+-- defect was in a line I had already read and quoted.
+--
+-- The lesson worth keeping: when a value feeds a random draw, ask
+-- whether the value is deterministic, not merely whether it is scoped.
+-- Scoping a contaminated input and seeding from a random one are
+-- different defects that present identically in the pair verdict.
+--
+-- §8  Unchanged
+-- -------------
+--   * db/checks/0050's CORRECTION banner STANDS.
+--   * 0051 is NOT closed — peak_site_kw is still not reproducible.
+--   * Task #47 is NOT closed.
+--   * 0066 findings unfixed: the arrival-payload odometer and
+--     ottoq_fleet_pending_commands.
+--
+-- Round 5 armed 1:45 PM - 4:43 PM CT, twelve pairs, same seeds,
+-- scenarios, depot and sim start. That is the behavioural proof of
+-- 0146 + 0147 together.
+-- =====================================================================
