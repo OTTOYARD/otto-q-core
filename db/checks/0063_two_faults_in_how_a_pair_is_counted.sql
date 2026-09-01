@@ -105,3 +105,101 @@ FROM public.ottoq_cert_matrix();
 --   * Task #47: normal_day 171717/12t intermittent deviation. rc_d1/rc_d2 are two pairs,
 --     which is the green bar but still not evidence against a 1-in-4 rate. Do not close it
 --     on this run.
+
+-- ============================================================================
+-- 6. RE-CERTIFICATION RESULT -- all six columns green under the strict verdict
+-- ============================================================================
+--
+-- Twelve pairs ran 01:30-04:26. Every column reached two consecutive passes at or after
+-- the 0139 floor (09-01 01:16), so every green here was earned under the end-state
+-- comparison, not inherited.
+--
+--   scenario   seed/ticks  passes  green  inconclusive  last pair
+--   busy_day   171717/24t     2     yes        0         03:34
+--   busy_day   424242/24t     2     yes        0         04:26
+--   busy_day   171717/12t     2     yes        0         01:40
+--   busy_day   314159/12t     2     yes        0         02:04
+--   busy_day   424242/12t     2     yes        0         02:28
+--   normal_day 171717/12t     2     yes        0         02:52
+--
+-- Zero inconclusive pairs: the re-sized budgets (300s/arm at 12 ticks, 600s at 24) held.
+-- The 24-tick budget was raised because r9 c1 truncated an arm at 22 of 24 on 300s.
+--
+-- ============================================================================
+-- 7. CANON STABILITY ACROSS THE 0139-0143 BOUNDARY
+-- ============================================================================
+--
+-- The honest comparison uses only pairs run AFTER 0137 (08-31 23:12:30), because 0134-0137
+-- each legitimately moved canons. Restricted to that window, by decision-stream hash:
+--
+--   busy_day   171717/12t   23:56 00:04 00:12 01:30 01:40   fe36c5fb x5   REPRODUCED
+--   busy_day   171717/24t   00:46 00:58 03:08 03:34         bab9cec4 x4   REPRODUCED
+--   busy_day   314159/12t   00:20 00:28 00:36 01:50 02:04   2019771f x5   REPRODUCED
+--   normal_day 171717/12t   23:17 23:25 02:40 02:52         f24724eb x4   REPRODUCED
+--   busy_day   424242/12t   23:33 23:41  -> e054d83d
+--                           02:16 02:28  -> 94710b72        STEPPED ONCE
+--   busy_day   424242/24t   04:00 04:26  -> aefb7480        no pre-0139 baseline on this
+--                                                           engine; its previous pair was
+--                                                           08-31 15:32, before four canon-
+--                                                           moving fixes. NOT evidence of
+--                                                           anything, and not counted as such.
+--
+-- Four columns reproduce across four to five pairs spanning three hours and the entire
+-- 0139-0143 migration boundary. That is the strongest evidence to date that those five
+-- migrations changed the instrument and not the engine.
+--
+-- ============================================================================
+-- 8. THE 424242/12t STEP -- open, and what has been ruled out
+-- ============================================================================
+--
+-- One column stepped once, cleanly: six pairs on the old canon (20:46-23:41), two on the
+-- new one (02:16, 02:28). Both arms agreed within every pair. Not noise -- a step.
+--
+-- The divergence is tiny and late: 2191 vs 2190 decisions, IDENTICAL for the first 2096.
+-- All of ticks 1-11 and most of tick 12 match byte for byte. At the end of tick 12 the
+-- same five vehicles take the same gate_intake decision but land one stall over, and one
+-- promote_ready disappears.
+--
+-- It is not a reordering. The two stalls that swapped sit in different tiers:
+--   b5660c4c  staging_south   role long   distance 42    (old)
+--   e0f2bf3a  staging_buffer  role temp   distance 112   (new)
+-- ottoq_book_hold_stall picks the tier on v_minutes >= p_long_threshold_min (90). So a
+-- hold window crossed the 90-minute threshold and the candidate POOL changed, not its order.
+--
+-- RULED OUT, each by measurement rather than argument:
+--   * Concurrent pairs corrupting each other -- rc_b2 ran 02:04:00-02:10:22, rc_c1 started
+--     02:16:00. Six minutes clear. (The hazard is real: two pairs both reset the same depot.
+--     Spacing was widened to 12 min at 12 ticks and 26 at 24 for exactly this reason.)
+--   * A different starting world -- fp identical at 4fddba55, and ottoq_world_fingerprint
+--     genuinely hashes current_vehicle_id, reserved_by, reserved_at and
+--     reservation_expires_at, so stall residue would have shown.
+--   * Leftover bookings blocking the stall -- no live bookings on any of those stalls from
+--     any run.
+--   * Non-total ORDER BY in stall selection -- ottoq_stall_free_between orders by
+--     (distance_from_entrance NULLS LAST, stall_code). Measured at the flagship: 113 staging
+--     stalls, 0 null distances, 0 null codes, 0 tied (distance, stall_code) pairs. Strictly
+--     total. This was the leading hypothesis and it is dead.
+--   * Wall-clock in the arrival disposition -- ottoq_arrival_disposition contains no now()
+--     and no clock_timestamp(), and carries 7 sim_run_id references.
+--   * Policy drift -- ottoq_policy_params holds 1,379 rows, none modified in the window;
+--     newest edit 08-31 13:47, hours before either era. No row exists for
+--     staging_hold_default_min, staging_hold_max_min or any long_threshold key, so those
+--     take their code defaults (30, 480, 90) and cannot have moved.
+--
+-- STILL OPEN: what changed the hold window length for one vehicle at the last tick.
+-- Severity is low -- a vehicle parked in a buffer stall instead of a south stall, both runs
+-- internally consistent, no double-booking, no cap breach. It matters because an unexplained
+-- canon change means the number is not reproducible, and that is the rule everything rests on.
+--
+-- Note the instrument did its job: under the pre-0143 counting this column would have
+-- chained its new pair onto six old-canon pairs and reported green without anyone seeing
+-- that the canon had moved.
+--
+-- ============================================================================
+-- 9. STILL OPEN, UNCHANGED BY THIS RUN
+-- ============================================================================
+--
+--   * db/checks/0050's CORRECTION banner STANDS. peak_site_kw does not reproduce; 0051 open.
+--   * Task #47, normal_day 171717/12t: now four consecutive passes on one canon spanning
+--     23:17 to 02:52. Better evidence than before and still NOT closed -- a 1-in-4 deviation
+--     rate survives four clean passes about a third of the time.
