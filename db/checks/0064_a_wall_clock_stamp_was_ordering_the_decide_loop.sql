@@ -197,3 +197,47 @@ FROM public.vehicles WHERE home_depot_id='11111111-1111-1111-1111-111111111111';
 -- window in both eras.
 --
 -- The seed that matters is still busy_day 424242/12t, whose pairs run at 08:48 and 09:00.
+
+-- ============================================================================
+-- 9. THE 424242/12t COLUMN POST-0144 -- and what this does NOT show
+-- ============================================================================
+--
+--   col                  armed   status  ticks   fp        h_dec     h_bkg
+--   busy_day 171717/12t  08:00   passed  12/12   92b02f8b  fe36c5fb  b94ca1f8
+--   busy_day 171717/12t  08:12   passed  12/12   92b02f8b  fe36c5fb  b94ca1f8
+--   busy_day 314159/12t  08:24   passed  12/12   803698f3  2019771f  7f1abbed
+--   busy_day 314159/12t  08:36   passed  12/12   803698f3  2019771f  7f1abbed
+--   busy_day 424242/12t  08:48   passed  12/12   e418e4f0  94710b72  dd7846a8
+--   busy_day 424242/12t  09:00   passed  12/12   e418e4f0  94710b72  dd7846a8
+--
+-- THE HEADLINE RESULT, and it is about 0144 rather than about 424242: NOT ONE DECISION
+-- STREAM MOVED. h_dec and h_bkg on all three columns are byte-identical to their pre-0144
+-- values -- fe36c5fb/b94ca1f8, 2019771f/7f1abbed, 94710b72/dd7846a8. Only fp moved, on every
+-- column, which is exactly and only what adding a column to a fingerprint does.
+--
+-- That is the strongest possible outcome for a change of this kind. 0144 altered a value the
+-- decide loop sorts on, and the engine's behaviour did not shift by a single decision. The
+-- fix is behaviourally neutral and the instrument is now honest about the column.
+--
+-- ON THE 424242 STEP, carefully. The column landed on 94710b72 -- the post-step canon, not
+-- the pre-step e054d83d. So that canon has now been produced by pairs armed at
+--
+--   02:16, 02:28, 08:48, 09:00   -- four pairs spanning 6.5 hours
+--
+-- against six pairs on e054d83d armed 20:46-23:41. The column has been stable for 6.5 hours
+-- across a range of arming times that would have exposed a time-of-day dependence.
+--
+-- WHAT THIS IS NOT. It is not evidence that 0144 fixed the step, and it must not be written
+-- up that way:
+--
+--   * The step happened at 23:41 -> 02:16, BEFORE 0144 existed. The canon was already stable
+--     at 94710b72 from 02:16 onward, unchanged by 0144. There is nothing here for 0144 to
+--     have fixed.
+--   * 0144 provably changed no decision stream at all, on any column. A change that moves no
+--     stream cannot be the thing that stopped a stream from moving.
+--
+-- So the honest statement is narrower and duller than "fixed": the column is stable across a
+-- 6.5-hour arming spread, the single step at 23:41 -> 02:16 remains UNEXPLAINED, and 0144 is
+-- neither its cause nor its cure. db/checks/0063 section 12 stays open -- a state transition
+-- fired in one run and not the other from identical recorded state one tick earlier, and
+-- nothing measured since has accounted for it.
