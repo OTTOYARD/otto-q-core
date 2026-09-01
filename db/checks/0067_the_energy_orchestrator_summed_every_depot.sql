@@ -1,0 +1,178 @@
+-- =====================================================================
+-- 0067  The energy orchestrator summed every run's and every depot's
+--       charging sessions
+-- =====================================================================
+-- Read-only diagnosis. NO FIX APPLIED — re-certification round 3 runs
+-- until 17:08 and must not be invalidated.
+--
+-- This is the carrier for the busy_day/171717/12t failures in round 3.
+-- It is the same defect class as 0145 and 0066: an unscoped read of a
+-- run-scoped table in a causal path.
+--
+-- §1  What the round showed
+-- -------------------------
+-- Six columns; the 12-tick half of the round had run by 15:10:
+--
+--   busy_day/171717/12t  14:10  FAILED  h_dec only
+--   busy_day/171717/12t  14:22  FAILED  h_cmd only
+--   busy_day/314159/12t  14:34  passed
+--   busy_day/314159/12t  14:46  passed
+--   busy_day/424242/12t  14:58  passed
+--
+-- On both failures fp, h_evt, h_bkg and endst matched, both arms were
+-- complete (12/12), and the failing component MOVED between pairs.
+-- A moving single-component failure is a low-rate carrier, not a
+-- systematic one. That column had nine consecutive passes before this
+-- round.
+--
+-- §2  Locating it: pair the decision rows, then read what differs
+-- ---------------------------------------------------------------
+-- Paired on (tick_seq, entity_id, action_context, occurrence) — content
+-- keys, unique id last, per 0062/0063 — across the 14:10 arms:
+--
+--   paired_rows 1424, only_in_a 0, only_in_b 0     <-- key is right
+--   d_enacted 136, d_proposed 7, d_outcome 1, everything else 0
+--
+-- Decomposing the 136 by key shows most of it is NOT divergence:
+--
+--   booking_id  121 rows    freshly minted uuids
+--   leg_id      116 rows    freshly minted uuids
+--   command_id   94 rows    freshly minted uuids
+--   requested_kw   7 rows   -236.8 vs -231.1, -348.1 vs -348.3   <-- REAL
+--   rationale      7 rows   mode charge_offpeak_reserve
+--   verb/action/abstain/bess_id  1 row  <absent> vs set_bess     <-- REAL
+--
+-- Two different runs necessarily mint different uuids; h_dec scrubs
+-- them. The real divergence is seven numeric BESS setpoints and one
+-- decision arm A never made at all.
+--
+-- §3  The defect
+-- --------------
+-- public.ottoq_energy_orchestrate, lines 25–38:
+--
+--   SELECT COALESCE(SUM(
+--     ottoq_sim_compute_charge_rate(...
+--       p_noise_salt := s.id::text||':'||p_sim_clock::text)
+--     / GREATEST(0.2, ottoq_profile_rate_mult(p_sim_run_id,'charge_time'))
+--   ),0) INTO v_desired_ev
+--   FROM ocpp_sessions s JOIN stalls st ON st.id = s.stall_id
+--   JOIN ottoq_ocpp_chargers ch ON ch.charger_id = st.ocpp_charger_id
+--   JOIN vehicles v ON v.id = s.vehicle_id
+--   WHERE s.status='active' AND s.id_token LIKE 'TWIN-%';
+--
+-- No sim_run_id predicate. No depot_id predicate. The reads on either
+-- side of it are both properly scoped:
+--
+--   line 21   FROM site_energy_snapshots
+--              WHERE depot_id = p_depot_id AND sim_run_id = p_sim_run_id
+--   line 45   FROM ottoq_grid_snapshots
+--              WHERE sim_run_id = p_sim_run_id
+--
+-- so this is the outlier, not the house style. The id_token LIKE
+-- 'TWIN-%' filter excludes PRODUCTION but not OTHER RUNS — the same
+-- false comfort recorded in 0066 §5, where sim_seed_fleet guards its
+-- ocpp reset by token but not the dispatch abort beside it.
+--
+-- The missing depot predicate is the worse half. twin.ottoq_sim_seed_fleet
+-- closes active TWIN- sessions only WHERE cs.depot_id = p_depot_id, so
+-- sessions at OTHER depots are never cleared by any run's reset and are
+-- summed into every depot's load indefinitely.
+--
+-- The session id also enters the noise salt
+-- (p_noise_salt := s.id::text||':'||p_sim_clock::text), so a foreign
+-- session perturbs the rate DRAW as well as the sum.
+--
+-- §4  The path from the bad read to the changed decision
+-- ------------------------------------------------------
+--   v_ev            := GREATEST(v_se.total_ev_charging_kw, v_desired_ev)
+--   v_net_load      := v_base_load + v_ev - v_solar
+--   v_bess_dispatch := -LEAST(v_maxchg,
+--                        GREATEST(0, v_recharge_ceiling - v_net_load))
+--
+-- GREATEST means the contaminated value wins whenever it is the larger.
+--
+-- §5  Measured, from ottoq_energy_commands.reason (pair 14:10)
+-- ------------------------------------------------------------
+-- desired_ev_kw differs at TEN of twelve ticks, and net_load_kw tracks
+-- it one-for-one on every row:
+--
+--   tick  desired_ev A/B   d_ev   d_netload   setpoint A/B      mode
+--    3      35 / 34         -1       -1        0.0 / 0.0        hold both
+--    4     496 / 502        +6       +7        0.0 / 0.0        hold both
+--    5     240 / 246        +6       +6     -236.8 / -231.1     reserve both
+--    6     137 / 136        -1        0     -348.1 / -348.3     reserve both
+--    7     255 / 246        -9       -8     -229.5 / -238.0     reserve both
+--    8     533 / 510       -23      -23        0.0 / 0.0        hold both
+--    9     314 / 306        -8       -9     -169.3 / -177.6     reserve both
+--   10     426 / 425        -1       -1      -57.9 /  -58.7     reserve both
+--   11     475 / 461       -14      -14        0.0 /  -12.6     hold -> RESERVE
+--   12     366 / 357        -9       -9     -106.2 / -115.1     reserve both
+--
+-- Tick 11 is the important row: the divergence crosses a branch
+-- boundary, so arm B enacted a set_bess charge that arm A never made.
+-- That is the single <absent> row in §2, and it is why a decision hash
+-- and not merely a payload moved.
+--
+-- Convicted four independent ways: the source carries no predicate; the
+-- value it produces differs; net load tracks that difference 1:1; and it
+-- changes a decision branch.
+--
+-- §6  Why it is intermittent
+-- --------------------------
+-- Both arms run inside ONE transaction but read at two different
+-- wall-clock moments, and under READ COMMITTED each statement takes a
+-- fresh snapshot. Any concurrent job that commits ocpp_sessions between
+-- arm A's read and arm B's read changes the sum. ottoq-demo-metronome
+-- and ottoq-cert-battery both run every minute.
+--
+-- That accounts for nine consecutive passes followed by two failures,
+-- and for the failing component moving between them (h_dec at 14:10,
+-- h_cmd at 14:22) — which tick the perturbation lands on decides which
+-- stream carries it.
+--
+-- §7  Two hypotheses killed on the way, both recorded
+-- ---------------------------------------------------
+-- (a) BESS unit residue. ottoq_bess_units carries no sim_run_id and no
+--     data_source, which looked exactly like the 0137/0144 shape. It is
+--     NOT the carrier: ottoq_tick_invariance_reset_fleet restores
+--     current_power_kw, current_state, current_temperature_c,
+--     current_soh_pct, current_cycle_count, lifetime_kwh_charged,
+--     lifetime_kwh_discharged and both soc columns from a seeded draw —
+--     exactly the ten columns ottoq.ottoq_world_fingerprint hashes. Reset
+--     and fingerprint agree, and fp matched on both failed pairs.
+--
+-- (b) The arrival forecast. charge_offpeak_reserve reserves against
+--     predicted arrivals, so ottoq_predict_arrivals was the obvious
+--     suspect, and it reads ottoq_vehicle_dispatches — the same table
+--     carrying the 0066 cross-arm contamination. It is properly scoped:
+--       WHERE d.sim_run_id = p_sim_run_id AND d.status IN ('active','returning')
+--     and it ROUNDs to whole kW, so it cannot produce a 5.7 kW delta.
+--
+-- Neither was the answer. Both are worth keeping: each was a plausible
+-- mechanism refuted by reading the code rather than by argument.
+--
+-- §8  Relationship to task #47
+-- ----------------------------
+-- The normal_day/171717/12t intermittent has never closed, and round 4
+-- already implicated the energy path once (0134). This mechanism is a
+-- strong CANDIDATE for that same carrier — it is scenario-independent
+-- and rate-limited by concurrent commits, which fits an intermittent
+-- that survives targeted fixes. It is NOT established. The re_d1/re_d2
+-- pairs of this round are the first evidence either way.
+--
+-- Task #47 is NOT closed by this file.
+--
+-- §9  The fix, for the next round
+-- -------------------------------
+--   AND COALESCE(s.sim_run_id,'00000000-0000-0000-0000-000000000000'::uuid)
+--     = COALESCE(p_sim_run_id,'00000000-0000-0000-0000-000000000000'::uuid)
+--   AND st.depot_id = p_depot_id
+--
+-- The zero-uuid COALESCE idiom (0020/0124) keeps production, which runs
+-- with a NULL sim_run_id, working unchanged.
+--
+-- Still open, unchanged by this file:
+--   * db/checks/0050's CORRECTION banner STANDS.
+--   * 0051 is NOT closed — peak_site_kw is still not reproducible.
+--   * The 0066 findings (odometer, fleet_pending_commands) are unfixed.
+-- =====================================================================
