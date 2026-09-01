@@ -254,3 +254,70 @@ FROM public.ottoq_cert_matrix();
 --         runs -- which looked like a refutation and was really the filter hiding the
 --         staging-purpose rows. Two wrong turns, both from choosing the wrong population
 --         before diffing it.
+
+-- ============================================================================
+-- 11. SECOND CORRECTION, and the divergence stated with full identifiers
+-- ============================================================================
+--
+-- Section 10 corrected section 8's vehicle and then got the vehicle wrong again, because it
+-- printed vehicle_id truncated to 8 characters. 'a1111111' is not a vehicle -- it is a
+-- PREFIX shared by a whole block of seeded assets:
+--   a1111111-0001-0001-0001-000000000002, ...-000000000004, ...-000000000006, and more.
+-- Truncating collapsed several distinct vehicles into one label, and section 10's headline
+-- claim -- one vehicle taking a 15-minute hold in one run and a 240-minute hold in the other
+-- on the same stall -- paired two DIFFERENT vehicles' bookings.
+--
+-- METHOD RULE, and it is absolute: NEVER TRUNCATE AN IDENTIFIER YOU ARE JOINING, GROUPING OR
+-- PAIRING ON. Truncate for display only, after the comparison is done on the full value.
+-- This repo seeds vehicles and depots with structured uuids that share long prefixes, so a
+-- left(id,8) is not merely lossy here, it is systematically collision-prone.
+--
+-- The booking diff with FULL ids (same key h_bkg hashes):
+--
+--   OLD only  08:00-08:15  73e86c55-...86af  stall ...921cbc990dc3  temp_hold   REMOVED
+--   NEW only  08:00-12:00  a1111111-...0006  stall ...991dfa3803da  perimeter   ADDED
+--   both      08:00-08:15  a1111111-...0004  ...991dfa3803da -> ...9aef6056cdfa  moved
+--   both      08:00-08:15  03726c33-...35b9  ...9aef6056cdfa -> ...3c56f5236495  moved
+--   both      08:00-08:15  1b9b6ea1-...9792  ...3c56f5236495 -> ...e34388dc8cae  moved
+--   both      08:00-08:15  5cee8fb3-...1578  ...e34388dc8cae -> ...921cbc990dc3  moved
+--
+-- One booking ADDED, one REMOVED, four MOVED one stall along the chain. a1111111-...0006
+-- taking ...991dfa3803da for four hours displaces ...0004, which cascades, and 73e86c55 is
+-- squeezed out of the last stall entirely. That is the whole h_bkg difference.
+--
+-- ============================================================================
+-- 12. THE ACTUAL DIVERGENCE: a state transition that fired in one run and not the other
+-- ============================================================================
+--
+-- Vehicle a1111111-0001-0001-0001-000000000006, current_soc 77, in both runs:
+--
+--   tick 11  OLD and NEW IDENTICAL: task_start/amend_plan enacted,
+--            stall_assignment noop_no_candidate, vehicle_state 'arrived_at_gate'
+--   tick 12  OLD: vehicle_state 'staged_awaiting_service' -> task_start/promote_ready
+--                 enacted (step need_charge)
+--            NEW: vehicle_state still 'arrived_at_gate' -> no promote; the vehicle instead
+--                 takes the 240-minute perimeter_hold above
+--
+-- So the vehicle transitioned arrived_at_gate -> staged_awaiting_service between ticks 11
+-- and 12 in the old run and did not in the new one, from IDENTICAL recorded state at tick 11
+-- and with an identical decision stream for the preceding 2096 decisions.
+--
+-- This is not a stall rotation. The rotation is downstream of it. A state-machine transition
+-- fired in one run and not the other, and the 240-minute hold, the displaced vehicle and the
+-- four moved bookings are all consequences.
+--
+-- OPEN QUESTION, now well posed: what, at tick 12, decided that this vehicle was staged in
+-- one run and still at the gate in the other, given identical inputs at tick 11?
+--
+-- LEADING CANDIDATE, untested: the ORDER in which vehicles are processed within a tick. The
+-- stall candidate query is totally ordered (verified: 113 staging stalls, 0 tied sort keys),
+-- but if the decide loop iterates REQUESTING VEHICLES in a non-total order, then which
+-- vehicle reaches a scarce staging stall first changes, and exactly this cascade follows --
+-- one vehicle staged instead of another, everything after it shifting one slot. That is a
+-- different query from the one already cleared, and it has not been examined yet. Next probe
+-- is the cursor that produces v_req in ottoq_decide_tick.
+--
+-- Severity unchanged and still low for the fleet -- no double-booking, no cap breach, both
+-- runs internally consistent and both arms of each pair agreeing. But this is a behavioural
+-- divergence in the state machine, not cosmetic placement, so it is worth more than the
+-- earlier framing implied.
