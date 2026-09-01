@@ -1,0 +1,110 @@
+-- 0061: six greens, two of them certifying a dead engine
+--
+-- Found while reading the r9 matrix, same session as 0060. Same defect class -- an
+-- instrument that cannot fail where it should -- but this one sits on the single command
+-- anyone runs to ask whether we are certified.
+--
+-- ============================================================================
+-- 1. WHAT ottoq_cert_matrix() DID
+-- ============================================================================
+--
+-- green := (consecutive passes on the current canon >= 2)
+--
+-- and nothing else. It SELECTs last_pair_at into its output and never uses it. So a column
+-- whose last pair ran before the engine changed reads exactly as green as one certified a
+-- minute ago. Before 0140, the live answer was six green columns. Two of them:
+--
+--   busy_day 171717/24t   last pair 2026-08-31 16:08
+--   busy_day 424242/24t   last pair 2026-08-31 15:32
+--
+-- Between those pairs and now, four migrations changed the engine: 0134 (run-scoped the
+-- twin energy path), 0135 (canonicalized BESS reset, widened the fingerprint), 0136 (took
+-- the charge cap off the simulated battery), 0137 (removed a write timestamp from the world
+-- fingerprint). Every one of them moves the canon. Those two columns were certifying an
+-- engine that no longer exists, and the matrix called them green.
+--
+-- This is not a hypothetical failure mode. It is the state the repository was in while the
+-- previous check-in was written, and it is what made "the matrix reads all six green" a
+-- sentence I had to walk back by hand rather than one the instrument caught.
+--
+-- ============================================================================
+-- 2. WHAT 0140 DID -- consolidate, do not rebuild
+-- ============================================================================
+--
+-- No new lineage store. Supabase already records every applied migration in
+-- supabase_migrations.schema_migrations with a sortable UTC version; all 793 are
+-- well-formed 14-digit. That is the ledger. 0140 adds only the classification that the
+-- ledger cannot carry: WHICH migrations force re-certification.
+--
+--   public.ottoq_cert_lineage(name, forces_recert, note)
+--     -- absence means forces_recert = true. Exemption must be claimed and justified.
+--        An unclassified migration costs one re-run; it never inherits a green.
+--
+--   public.ottoq_cert_recert_floor()
+--     -- max applied_at over migrations where COALESCE(forces_recert, true)
+--
+--   ottoq_cert_matrix() gains  stale, recert_floor  and green becomes
+--     (consecutive_passes >= 2 AND last_pair_at >= recert_floor)
+--
+-- Two distinct things force re-certification and one flag covers both:
+--   canon-invalidating     -- the five hashes would move                      (0134-0137)
+--   verdict-strengthening  -- the pass criterion got stricter, so earlier
+--                             passes were never judged by it                  (0139)
+--
+-- ============================================================================
+-- 3. THE GATE DISTINGUISHES -- measured, before and after, same minute
+-- ============================================================================
+--
+-- BEFORE 0140:
+--   seed    ticks scenario    passes green
+--   171717   24   busy_day      2    true      <- last pair 16:08
+--   424242   24   busy_day      2    true      <- last pair 15:32
+--   171717   12   busy_day      3    true
+--   314159   12   busy_day      3    true
+--   424242   12   busy_day      2    true
+--   171717   12   normal_day    2    true
+--
+-- AFTER 0140 (floor 2026-08-31 23:12, which is 0137):
+--   seed    ticks scenario    passes green  stale  last_pair
+--   171717   24   busy_day      2    FALSE  TRUE   08-31 16:08
+--   424242   24   busy_day      2    FALSE  TRUE   08-31 15:32
+--   171717   12   busy_day      3    true   false  09-01 00:12
+--   314159   12   busy_day      3    true   false  09-01 00:36
+--   424242   12   busy_day      2    true   false  08-31 23:41
+--   171717   12   normal_day    2    true   false  08-31 23:25
+--
+-- Four survive, two are correctly demoted. The migration asserts v_stale > 0 at apply time
+-- for exactly this reason: a gate that demotes nothing is a gate that bought nothing.
+
+SELECT seed, ticks, scenario, consecutive_passes, green, stale,
+       to_char(last_pair_at  AT TIME ZONE 'UTC','MM-DD HH24:MI') AS last_pair,
+       to_char(recert_floor  AT TIME ZONE 'UTC','MM-DD HH24:MI') AS floor
+FROM public.ottoq_cert_matrix();
+
+-- ============================================================================
+-- 4. ORDERING -- 0140 BEFORE 0139, deliberately
+-- ============================================================================
+--
+-- 0139 is classified forces_recert = true, so applying it raises the floor to its own
+-- timestamp and every column goes stale until re-run. That is the correct accounting: the
+-- end-of-run world image was not part of the verdict when those passes were recorded.
+--
+-- It also means the ordering matters for the apply-time assertion. Applied before 0139,
+-- 0140 sees four survivors and two demotions and proves the gate discriminates. Applied
+-- after, it would see six stale and have nothing to distinguish. So 0140 went first, and
+-- its v_green check is a NOTICE rather than an exception -- all-stale is a legitimate
+-- state, just not an informative one to certify a new gate against.
+--
+-- 0140 exempts itself (reader-only) and pre-registers 0139's classification before 0139
+-- exists in the ledger. An unmatched row is inert until its migration is applied.
+--
+-- ============================================================================
+-- 5. STILL OPEN -- unchanged by any of this
+-- ============================================================================
+--
+--   * db/checks/0050's CORRECTION banner STANDS. peak_site_kw does not reproduce.
+--     0051 stays open. 0138 shipped peak_site_kw_demand as the number that carries a run ID.
+--   * Task #47, the normal_day 171717/12t intermittent deviation: 2 passes is not evidence
+--     against a 1-in-4 rate.
+--   * After 0139 lands, all six columns must be re-earned. The matrix will say so itself
+--     now, which is the whole point.
