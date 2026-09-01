@@ -206,8 +206,12 @@ BEGIN
   IF position($a$ORDER BY lower(during), upper(during), vehicle_id$a$ in v_src) = 0 THEN
     RAISE EXCEPTION '0148 new h_bkg order-by missing';
   END IF;
+  -- 'h_nrg' appears three times after the edit: once as the jsonb key,
+  -- twice in v_equal. Count the KEY form exactly once, and the total as 3.
+  v_n := (length(v_src)-length(replace(v_src,$a$'h_nrg', (SELECT$a$,'')))/length($a$'h_nrg', (SELECT$a$);
+  IF v_n <> 1 THEN RAISE EXCEPTION '0148 expected the h_nrg jsonb key once, found %', v_n; END IF;
   v_n := (length(v_src)-length(replace(v_src,$a$'h_nrg'$a$,'')))/length($a$'h_nrg'$a$);
-  IF v_n <> 1 THEN RAISE EXCEPTION '0148 expected h_nrg key once in the arm object, found %', v_n; END IF;
+  IF v_n <> 3 THEN RAISE EXCEPTION '0148 expected ''h_nrg'' three times (key + two verdict sides), found %', v_n; END IF;
   IF position($a$(v_arms[1]->>'h_nrg') = (v_arms[2]->>'h_nrg')$a$ in v_src) = 0 THEN
     RAISE EXCEPTION '0148 h_nrg not in the verdict';
   END IF;
