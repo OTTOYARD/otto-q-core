@@ -241,3 +241,55 @@ FROM public.vehicles WHERE home_depot_id='11111111-1111-1111-1111-111111111111';
 -- neither its cause nor its cure. db/checks/0063 section 12 stays open -- a state transition
 -- fired in one run and not the other from identical recorded state one tick earlier, and
 -- nothing measured since has accounted for it.
+
+-- ============================================================================
+-- 10. FINAL: all six columns re-certified, and 0144 moved NOTHING
+-- ============================================================================
+--
+-- Twelve pairs, armed 08:00 to 10:58, floor 09-01 07:51. Every column two consecutive
+-- passes at or after the floor. Zero inconclusive pairs, so the budgets held again
+-- (300s/arm at 12 ticks, 600s at 24).
+--
+--   scenario   seed/ticks  green  last pair  fp        h_dec     h_bkg
+--   busy_day   171717/24t   yes    10:06     92b02f8b  bab9cec4  51c6086d
+--   busy_day   424242/24t   yes    10:58     e418e4f0  aefb7480  e6b8bf98
+--   busy_day   171717/12t   yes    08:12     92b02f8b  fe36c5fb  b94ca1f8
+--   busy_day   314159/12t   yes    08:36     803698f3  2019771f  7f1abbed
+--   busy_day   424242/12t   yes    09:00     e418e4f0  94710b72  dd7846a8
+--   normal_day 171717/12t   yes    09:24     92b02f8b  f24724eb  a88de84f
+--
+-- THE RESULT THAT MATTERS: SIX OF SIX DECISION STREAMS UNCHANGED. Every h_dec and every
+-- h_bkg above is byte-identical to the value that column carried before 0144. Only fp
+-- moved, on every column, which is exactly and only what adding a column to a fingerprint
+-- does.
+--
+-- 0144 changed a value that three of the five decide loops sort on, and the engine did not
+-- alter a single decision or a single booking, across four seeds, two scenarios and two
+-- horizons. That is as clean a behavioural-neutrality result as this harness can produce.
+--
+-- A STRUCTURAL FACT MADE VISIBLE. fp now groups strictly by seed:
+--   171717 -> 92b02f8b   (12t busy_day, 24t busy_day AND 12t normal_day)
+--   424242 -> e418e4f0   (12t and 24t)
+--   314159 -> 803698f3
+-- fp is the BOOT world image and is a function of (depot, seed) alone -- not of scenario,
+-- not of horizon. Worth stating plainly because mistaking fp for a per-column identifier is
+-- what made db/checks/0060 briefly label canon 823cd34d as "the normal_day canon" when
+-- busy_day at the same seed shares it.
+--
+-- ============================================================================
+-- 11. WHAT REMAINS OPEN AFTER THIS ROUND
+-- ============================================================================
+--
+--   * db/checks/0050's CORRECTION banner STANDS. peak_site_kw does not reproduce and 0051
+--     stays open. 0138 shipped peak_site_kw_demand as the number that carries a run ID.
+--
+--   * db/checks/0063 section 12: the busy_day 424242/12t step is UNEXPLAINED. A state
+--     transition fired in one run and not the other from identical recorded state one tick
+--     earlier. The column is now stable on 94710b72 across pairs armed 02:16, 02:28, 08:48
+--     and 09:00 -- 6.5 hours -- but the step predates 0144 and 0144 moved no stream
+--     anywhere, so it is neither cause nor cure. Still open.
+--
+--   * Task #47, normal_day 171717/12t: canon f24724eb has now held across pairs armed
+--     23:17, 23:25, 02:40, 02:52, 09:12 and 09:24 -- six pairs over ten hours. At a 1-in-4
+--     deviation rate six clean pairs occur about 18% of the time, so this is materially
+--     stronger evidence than the four-pair position and STILL NOT proof. Left open.
