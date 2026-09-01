@@ -41,6 +41,12 @@ These override any default behavior.
    - **Kernel purity.** Sector-specific code lives only inside adapters. If sector logic must leak into the kernel, that is a platform-thesis finding: stop, document prominently, escalate.
    - **Agents propose, solver disposes.** `ottoq_external_proposals` and the cuOpt deferral pattern already implement propose/dispose. No proposer ever writes a final assignment; the decide path disposes.
 
+
+**7. Report every time in Chase's local time.** Chase is in Nashville, TN — US Central (CDT = UTC-5 roughly Mar-Nov, CST = UTC-6 otherwise). Every schedule, deadline, ETA, run time and check-in you state to him is in **CT**, written as e.g. "12:08 PM CT". Add UTC in parentheses only where the distinction matters. This is a reporting rule, not a storage one — the machinery underneath stays UTC and must not be "converted":
+   - `pg_cron` evaluates cron expressions in **UTC**. Convert CT to UTC before writing a schedule, and if the conversion crosses midnight shift the day fields too.
+   - `now()`, `started_at`, and every timestamptz in the database are UTC. Read them as UTC; convert only when reporting.
+   - Never restate a stored UTC timestamp as though it were CT, and never rewrite a working cron schedule just to make it read nicely.
+
 ---
 
 # PART 2 — THE KERNEL BRIEF
