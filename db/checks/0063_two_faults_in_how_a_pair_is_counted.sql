@@ -203,3 +203,54 @@ FROM public.ottoq_cert_matrix();
 --   * Task #47, normal_day 171717/12t: now four consecutive passes on one canon spanning
 --     23:17 to 02:52. Better evidence than before and still NOT closed -- a 1-in-4 deviation
 --     rate survives four clean passes about a third of the time.
+
+-- ============================================================================
+-- 10. CORRECTION to section 8, and the mechanism measured rather than inferred
+-- ============================================================================
+--
+-- Section 8 named the wrong vehicle and the wrong stalls. It read the divergence off the
+-- DECISION stream (ottoq_decisions.proposed_action->>'stall_id') and inferred a tier flip
+-- from the attributes of the two stalls that swapped there. The stall attributes quoted were
+-- right -- b5660c4c is staging_south/long/42 and e0f2bf3a is staging_buffer/temp/112, both
+-- verified -- but they are not where the tier flip happened.
+--
+-- Diffing the BOOKING stream instead, on the exact key h_bkg hashes
+-- (lower(during), upper(during), vehicle_id, stall_id, purpose, state):
+--
+--   only in OLD (55b69698)                       only in NEW (d2923358)
+--   08:00-08:15 a1111111 f40b19b9 temp_hold      08:00-12:00 a1111111 f40b19b9 perimeter_hold
+--                                                08:00-08:15 a1111111 aa9576a8 temp_hold
+--   08:00-08:15 03726c33 aa9576a8 temp_hold      08:00-08:15 03726c33 3b74da73 temp_hold
+--   08:00-08:15 1b9b6ea1 3b74da73 temp_hold      08:00-08:15 1b9b6ea1 53c971c7 temp_hold
+--   08:00-08:15 5cee8fb3 53c971c7 temp_hold      08:00-08:15 5cee8fb3 15ee200d temp_hold
+--   08:00-08:15 73e86c55 15ee200d temp_hold      (no counterpart -- one fewer vehicle held)
+--
+-- THE MECHANISM, now measured: at the final tick vehicle a1111111 took a 15-minute
+-- temp_hold on f40b19b9 in the old run and a 240-MINUTE PERIMETER_HOLD on the same stall in
+-- the new one. 240 >= 90 selects the long tier, 15 < 90 selects temp -- so the
+-- v_minutes >= p_long_threshold_min branch in ottoq_book_hold_stall is genuinely the fork,
+-- just not on the vehicle section 8 named. The other four vehicles rotate one stall over
+-- because a1111111 now occupies f40b19b9 for four hours instead of fifteen minutes, and one
+-- vehicle loses its hold entirely.
+--
+-- The old run also emitted a task_start/promote_ready for a1111111 that the new run did not.
+-- A vehicle that was promoted to ready in the old run instead sits in a four-hour hold in
+-- the new one. That is the behavioural difference to explain, and it is upstream of the
+-- stall choice rather than caused by it.
+--
+-- Note 240 is not a configured value: staging_hold_default_min is 30 and
+-- staging_hold_max_min is 480, and no policy row overrides either. So the 12:00 end came
+-- from v_disp->>'stage_until' -- ottoq_arrival_disposition -- or from
+-- max(planned_end_sim) over the vehicle's planned legs, which is where the next probe goes.
+--
+-- METHOD NOTE, the fourth of this round and the same shape as the other three:
+--   0057  probe the columns the check hashes, not the row
+--   0060  pair the rows before you believe the diff
+--   0062  a probe that reports success needs the same scrutiny as one reporting a defect
+--   0063  DIFF THE STREAM THE HASH IS BUILT FROM. h_bkg moved, so the answer was always in
+--         the booking stream; section 8 went looking in the decision stream and built a
+--         story on a disjoint set of vehicles. The first booking probe then filtered
+--         purpose IN ('perimeter_hold','temp_hold') and returned rows identical across both
+--         runs -- which looked like a refutation and was really the filter hiding the
+--         staging-purpose rows. Two wrong turns, both from choosing the wrong population
+--         before diffing it.
