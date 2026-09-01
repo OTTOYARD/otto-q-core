@@ -160,3 +160,40 @@ FROM public.vehicles WHERE home_depot_id='11111111-1111-1111-1111-111111111111';
 -- Net effect on 0144: unchanged. It fixes a real defect -- a wall-clock value ordering the
 -- decide loop, invisible to the fingerprint -- and the 424242 step remains unexplained and
 -- open.
+
+-- ============================================================================
+-- 8. 0144 PROVEN IN FLIGHT -- and a note on which population to measure
+-- ============================================================================
+--
+-- FIRST ATTEMPT AT THE PROOF, and it read like a failure. After the 08:24 pair, the depot's
+-- vehicles carried last_state_change = 09-01 08:24 -- a wall-clock stamp -- with zero rows on
+-- the sim start. Taken at face value: the fix did nothing.
+--
+-- WRONG POPULATION. ottoq_determinism_pair runs both arms in ONE transaction and each arm
+-- ends with ottoq_sim_stop_and_reset, so what is visible on public.vehicles after a pair is
+-- the TEARDOWN state, not the state the decide loop ran against. Reading it says nothing
+-- about the fix. (Fourth time this round that picking the wrong population produced a
+-- confident wrong answer -- 0060, 0063 sections 10 and 11, and now here.)
+--
+-- THE RIGHT POPULATION IS THE FINGERPRINT, which 0144 made hash the column, and which is
+-- captured at boot rather than teardown:
+--
+--   col                  armed   status   ticks   fp        h_dec
+--   busy_day 171717/12t  08:00   passed   12/12   92b02f8b  fe36c5fb
+--   busy_day 171717/12t  08:12   passed   12/12   92b02f8b  fe36c5fb
+--   busy_day 314159/12t  08:24   passed   12/12   803698f3  2019771f
+--
+-- fp is IDENTICAL across two pairs armed twelve minutes apart. Since 0144 the fingerprint
+-- hashes last_state_change, so if the reset were still writing now() those two fp values
+-- would necessarily differ. They do not. The reset is writing a constant -- the sim start --
+-- and p_as_of is reaching it. That is the proof, and it is only available because the
+-- fingerprint change and the reset change shipped together.
+--
+-- SECOND RESULT, unremarked but worth recording: the decision streams did NOT move.
+-- h_dec is fe36c5fb for busy_day 171717/12t and 2019771f for 314159/12t -- the same values
+-- these columns have carried since before 0139. Only fp moved, which is exactly what adding
+-- a column to the fingerprint does. So for these two seeds the reset stamp was never
+-- affecting loop order, consistent with section 7: their arming times fell before the sim
+-- window in both eras.
+--
+-- The seed that matters is still busy_day 424242/12t, whose pairs run at 08:48 and 09:00.
