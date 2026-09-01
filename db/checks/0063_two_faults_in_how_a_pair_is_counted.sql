@@ -105,3 +105,219 @@ FROM public.ottoq_cert_matrix();
 --   * Task #47: normal_day 171717/12t intermittent deviation. rc_d1/rc_d2 are two pairs,
 --     which is the green bar but still not evidence against a 1-in-4 rate. Do not close it
 --     on this run.
+
+-- ============================================================================
+-- 6. RE-CERTIFICATION RESULT -- all six columns green under the strict verdict
+-- ============================================================================
+--
+-- Twelve pairs ran 01:30-04:26. Every column reached two consecutive passes at or after
+-- the 0139 floor (09-01 01:16), so every green here was earned under the end-state
+-- comparison, not inherited.
+--
+--   scenario   seed/ticks  passes  green  inconclusive  last pair
+--   busy_day   171717/24t     2     yes        0         03:34
+--   busy_day   424242/24t     2     yes        0         04:26
+--   busy_day   171717/12t     2     yes        0         01:40
+--   busy_day   314159/12t     2     yes        0         02:04
+--   busy_day   424242/12t     2     yes        0         02:28
+--   normal_day 171717/12t     2     yes        0         02:52
+--
+-- Zero inconclusive pairs: the re-sized budgets (300s/arm at 12 ticks, 600s at 24) held.
+-- The 24-tick budget was raised because r9 c1 truncated an arm at 22 of 24 on 300s.
+--
+-- ============================================================================
+-- 7. CANON STABILITY ACROSS THE 0139-0143 BOUNDARY
+-- ============================================================================
+--
+-- The honest comparison uses only pairs run AFTER 0137 (08-31 23:12:30), because 0134-0137
+-- each legitimately moved canons. Restricted to that window, by decision-stream hash:
+--
+--   busy_day   171717/12t   23:56 00:04 00:12 01:30 01:40   fe36c5fb x5   REPRODUCED
+--   busy_day   171717/24t   00:46 00:58 03:08 03:34         bab9cec4 x4   REPRODUCED
+--   busy_day   314159/12t   00:20 00:28 00:36 01:50 02:04   2019771f x5   REPRODUCED
+--   normal_day 171717/12t   23:17 23:25 02:40 02:52         f24724eb x4   REPRODUCED
+--   busy_day   424242/12t   23:33 23:41  -> e054d83d
+--                           02:16 02:28  -> 94710b72        STEPPED ONCE
+--   busy_day   424242/24t   04:00 04:26  -> aefb7480        no pre-0139 baseline on this
+--                                                           engine; its previous pair was
+--                                                           08-31 15:32, before four canon-
+--                                                           moving fixes. NOT evidence of
+--                                                           anything, and not counted as such.
+--
+-- Four columns reproduce across four to five pairs spanning three hours and the entire
+-- 0139-0143 migration boundary. That is the strongest evidence to date that those five
+-- migrations changed the instrument and not the engine.
+--
+-- ============================================================================
+-- 8. THE 424242/12t STEP -- open, and what has been ruled out
+-- ============================================================================
+--
+-- One column stepped once, cleanly: six pairs on the old canon (20:46-23:41), two on the
+-- new one (02:16, 02:28). Both arms agreed within every pair. Not noise -- a step.
+--
+-- The divergence is tiny and late: 2191 vs 2190 decisions, IDENTICAL for the first 2096.
+-- All of ticks 1-11 and most of tick 12 match byte for byte. At the end of tick 12 the
+-- same five vehicles take the same gate_intake decision but land one stall over, and one
+-- promote_ready disappears.
+--
+-- It is not a reordering. The two stalls that swapped sit in different tiers:
+--   b5660c4c  staging_south   role long   distance 42    (old)
+--   e0f2bf3a  staging_buffer  role temp   distance 112   (new)
+-- ottoq_book_hold_stall picks the tier on v_minutes >= p_long_threshold_min (90). So a
+-- hold window crossed the 90-minute threshold and the candidate POOL changed, not its order.
+--
+-- RULED OUT, each by measurement rather than argument:
+--   * Concurrent pairs corrupting each other -- rc_b2 ran 02:04:00-02:10:22, rc_c1 started
+--     02:16:00. Six minutes clear. (The hazard is real: two pairs both reset the same depot.
+--     Spacing was widened to 12 min at 12 ticks and 26 at 24 for exactly this reason.)
+--   * A different starting world -- fp identical at 4fddba55, and ottoq_world_fingerprint
+--     genuinely hashes current_vehicle_id, reserved_by, reserved_at and
+--     reservation_expires_at, so stall residue would have shown.
+--   * Leftover bookings blocking the stall -- no live bookings on any of those stalls from
+--     any run.
+--   * Non-total ORDER BY in stall selection -- ottoq_stall_free_between orders by
+--     (distance_from_entrance NULLS LAST, stall_code). Measured at the flagship: 113 staging
+--     stalls, 0 null distances, 0 null codes, 0 tied (distance, stall_code) pairs. Strictly
+--     total. This was the leading hypothesis and it is dead.
+--   * Wall-clock in the arrival disposition -- ottoq_arrival_disposition contains no now()
+--     and no clock_timestamp(), and carries 7 sim_run_id references.
+--   * Policy drift -- ottoq_policy_params holds 1,379 rows, none modified in the window;
+--     newest edit 08-31 13:47, hours before either era. No row exists for
+--     staging_hold_default_min, staging_hold_max_min or any long_threshold key, so those
+--     take their code defaults (30, 480, 90) and cannot have moved.
+--
+-- STILL OPEN: what changed the hold window length for one vehicle at the last tick.
+-- Severity is low -- a vehicle parked in a buffer stall instead of a south stall, both runs
+-- internally consistent, no double-booking, no cap breach. It matters because an unexplained
+-- canon change means the number is not reproducible, and that is the rule everything rests on.
+--
+-- Note the instrument did its job: under the pre-0143 counting this column would have
+-- chained its new pair onto six old-canon pairs and reported green without anyone seeing
+-- that the canon had moved.
+--
+-- ============================================================================
+-- 9. STILL OPEN, UNCHANGED BY THIS RUN
+-- ============================================================================
+--
+--   * db/checks/0050's CORRECTION banner STANDS. peak_site_kw does not reproduce; 0051 open.
+--   * Task #47, normal_day 171717/12t: now four consecutive passes on one canon spanning
+--     23:17 to 02:52. Better evidence than before and still NOT closed -- a 1-in-4 deviation
+--     rate survives four clean passes about a third of the time.
+
+-- ============================================================================
+-- 10. CORRECTION to section 8, and the mechanism measured rather than inferred
+-- ============================================================================
+--
+-- Section 8 named the wrong vehicle and the wrong stalls. It read the divergence off the
+-- DECISION stream (ottoq_decisions.proposed_action->>'stall_id') and inferred a tier flip
+-- from the attributes of the two stalls that swapped there. The stall attributes quoted were
+-- right -- b5660c4c is staging_south/long/42 and e0f2bf3a is staging_buffer/temp/112, both
+-- verified -- but they are not where the tier flip happened.
+--
+-- Diffing the BOOKING stream instead, on the exact key h_bkg hashes
+-- (lower(during), upper(during), vehicle_id, stall_id, purpose, state):
+--
+--   only in OLD (55b69698)                       only in NEW (d2923358)
+--   08:00-08:15 a1111111 f40b19b9 temp_hold      08:00-12:00 a1111111 f40b19b9 perimeter_hold
+--                                                08:00-08:15 a1111111 aa9576a8 temp_hold
+--   08:00-08:15 03726c33 aa9576a8 temp_hold      08:00-08:15 03726c33 3b74da73 temp_hold
+--   08:00-08:15 1b9b6ea1 3b74da73 temp_hold      08:00-08:15 1b9b6ea1 53c971c7 temp_hold
+--   08:00-08:15 5cee8fb3 53c971c7 temp_hold      08:00-08:15 5cee8fb3 15ee200d temp_hold
+--   08:00-08:15 73e86c55 15ee200d temp_hold      (no counterpart -- one fewer vehicle held)
+--
+-- THE MECHANISM, now measured: at the final tick vehicle a1111111 took a 15-minute
+-- temp_hold on f40b19b9 in the old run and a 240-MINUTE PERIMETER_HOLD on the same stall in
+-- the new one. 240 >= 90 selects the long tier, 15 < 90 selects temp -- so the
+-- v_minutes >= p_long_threshold_min branch in ottoq_book_hold_stall is genuinely the fork,
+-- just not on the vehicle section 8 named. The other four vehicles rotate one stall over
+-- because a1111111 now occupies f40b19b9 for four hours instead of fifteen minutes, and one
+-- vehicle loses its hold entirely.
+--
+-- The old run also emitted a task_start/promote_ready for a1111111 that the new run did not.
+-- A vehicle that was promoted to ready in the old run instead sits in a four-hour hold in
+-- the new one. That is the behavioural difference to explain, and it is upstream of the
+-- stall choice rather than caused by it.
+--
+-- Note 240 is not a configured value: staging_hold_default_min is 30 and
+-- staging_hold_max_min is 480, and no policy row overrides either. So the 12:00 end came
+-- from v_disp->>'stage_until' -- ottoq_arrival_disposition -- or from
+-- max(planned_end_sim) over the vehicle's planned legs, which is where the next probe goes.
+--
+-- METHOD NOTE, the fourth of this round and the same shape as the other three:
+--   0057  probe the columns the check hashes, not the row
+--   0060  pair the rows before you believe the diff
+--   0062  a probe that reports success needs the same scrutiny as one reporting a defect
+--   0063  DIFF THE STREAM THE HASH IS BUILT FROM. h_bkg moved, so the answer was always in
+--         the booking stream; section 8 went looking in the decision stream and built a
+--         story on a disjoint set of vehicles. The first booking probe then filtered
+--         purpose IN ('perimeter_hold','temp_hold') and returned rows identical across both
+--         runs -- which looked like a refutation and was really the filter hiding the
+--         staging-purpose rows. Two wrong turns, both from choosing the wrong population
+--         before diffing it.
+
+-- ============================================================================
+-- 11. SECOND CORRECTION, and the divergence stated with full identifiers
+-- ============================================================================
+--
+-- Section 10 corrected section 8's vehicle and then got the vehicle wrong again, because it
+-- printed vehicle_id truncated to 8 characters. 'a1111111' is not a vehicle -- it is a
+-- PREFIX shared by a whole block of seeded assets:
+--   a1111111-0001-0001-0001-000000000002, ...-000000000004, ...-000000000006, and more.
+-- Truncating collapsed several distinct vehicles into one label, and section 10's headline
+-- claim -- one vehicle taking a 15-minute hold in one run and a 240-minute hold in the other
+-- on the same stall -- paired two DIFFERENT vehicles' bookings.
+--
+-- METHOD RULE, and it is absolute: NEVER TRUNCATE AN IDENTIFIER YOU ARE JOINING, GROUPING OR
+-- PAIRING ON. Truncate for display only, after the comparison is done on the full value.
+-- This repo seeds vehicles and depots with structured uuids that share long prefixes, so a
+-- left(id,8) is not merely lossy here, it is systematically collision-prone.
+--
+-- The booking diff with FULL ids (same key h_bkg hashes):
+--
+--   OLD only  08:00-08:15  73e86c55-...86af  stall ...921cbc990dc3  temp_hold   REMOVED
+--   NEW only  08:00-12:00  a1111111-...0006  stall ...991dfa3803da  perimeter   ADDED
+--   both      08:00-08:15  a1111111-...0004  ...991dfa3803da -> ...9aef6056cdfa  moved
+--   both      08:00-08:15  03726c33-...35b9  ...9aef6056cdfa -> ...3c56f5236495  moved
+--   both      08:00-08:15  1b9b6ea1-...9792  ...3c56f5236495 -> ...e34388dc8cae  moved
+--   both      08:00-08:15  5cee8fb3-...1578  ...e34388dc8cae -> ...921cbc990dc3  moved
+--
+-- One booking ADDED, one REMOVED, four MOVED one stall along the chain. a1111111-...0006
+-- taking ...991dfa3803da for four hours displaces ...0004, which cascades, and 73e86c55 is
+-- squeezed out of the last stall entirely. That is the whole h_bkg difference.
+--
+-- ============================================================================
+-- 12. THE ACTUAL DIVERGENCE: a state transition that fired in one run and not the other
+-- ============================================================================
+--
+-- Vehicle a1111111-0001-0001-0001-000000000006, current_soc 77, in both runs:
+--
+--   tick 11  OLD and NEW IDENTICAL: task_start/amend_plan enacted,
+--            stall_assignment noop_no_candidate, vehicle_state 'arrived_at_gate'
+--   tick 12  OLD: vehicle_state 'staged_awaiting_service' -> task_start/promote_ready
+--                 enacted (step need_charge)
+--            NEW: vehicle_state still 'arrived_at_gate' -> no promote; the vehicle instead
+--                 takes the 240-minute perimeter_hold above
+--
+-- So the vehicle transitioned arrived_at_gate -> staged_awaiting_service between ticks 11
+-- and 12 in the old run and did not in the new one, from IDENTICAL recorded state at tick 11
+-- and with an identical decision stream for the preceding 2096 decisions.
+--
+-- This is not a stall rotation. The rotation is downstream of it. A state-machine transition
+-- fired in one run and not the other, and the 240-minute hold, the displaced vehicle and the
+-- four moved bookings are all consequences.
+--
+-- OPEN QUESTION, now well posed: what, at tick 12, decided that this vehicle was staged in
+-- one run and still at the gate in the other, given identical inputs at tick 11?
+--
+-- LEADING CANDIDATE, untested: the ORDER in which vehicles are processed within a tick. The
+-- stall candidate query is totally ordered (verified: 113 staging stalls, 0 tied sort keys),
+-- but if the decide loop iterates REQUESTING VEHICLES in a non-total order, then which
+-- vehicle reaches a scarce staging stall first changes, and exactly this cascade follows --
+-- one vehicle staged instead of another, everything after it shifting one slot. That is a
+-- different query from the one already cleared, and it has not been examined yet. Next probe
+-- is the cursor that produces v_req in ottoq_decide_tick.
+--
+-- Severity unchanged and still low for the fleet -- no double-booking, no cap breach, both
+-- runs internally consistent and both arms of each pair agreeing. But this is a behavioural
+-- divergence in the state machine, not cosmetic placement, so it is worth more than the
+-- earlier framing implied.
