@@ -1,0 +1,107 @@
+-- 0063: two faults in how a pair is counted
+--
+-- 0143. The first fault was found in the r9 matrix. The second was found by asking what
+-- would go wrong in the re-certification 0139 forces, and it would have handed out a false
+-- green on the very first pair.
+--
+-- ============================================================================
+-- 1. THE TRUNCATED ARM, NOW SETTLED BY EVIDENCE
+-- ============================================================================
+--
+--   c1  00:46  busy_day 171717/24t   arm_a 24  arm_b 22   failed, all four streams DIFF
+--   c2  00:58  busy_day 171717/24t   arm_a 24  arm_b 24   passed, all four streams equal
+--
+-- Same seed, same scenario, same horizon, twelve minutes apart, same instrument. c1's arm B
+-- spent its 300s budget two ticks short; the streams differ because one arm did less work.
+-- c2 settles it: when both arms finish, they agree byte for byte.
+--
+-- The verdict could not tell those two situations apart. Both wrote 'failed'; both broke the
+-- streak. The 'f' characters in the history strings have never meant only nondeterminism.
+--
+-- 0143: each arm now reports complete := (tick_count >= p_ticks), and
+--
+--   NOT complete            -> 'inconclusive'
+--   complete AND equal      -> 'passed'
+--   complete AND NOT equal  -> 'failed'
+--
+-- The escape hatch is deliberately narrow, and the migration asserts that it stayed narrow:
+-- two complete arms that disagree still fail, with no appeal. Both arms stopping short at
+-- the SAME tick count is still inconclusive -- it is evidence about a horizon nobody asked
+-- to certify. ottoq_sim_runs already permitted the value (the CHECK constraint has read
+-- ARRAY['pending','passed','failed','inconclusive'] all along), so nothing was altered.
+--
+-- Historical rows are not rewritten. c1 stays 'failed' as the evidence it is.
+--
+-- ============================================================================
+-- 2. THE STREAK WALKED STRAIGHT THROUGH THE FLOOR -- a false green, one pair away
+-- ============================================================================
+--
+-- 0140 gated green on last_pair_at >= recert_floor. The STREAK behind that gate counted
+-- pairs backwards through the floor without noticing.
+--
+-- That is nearly harmless when a fix moves the canon: pre-floor pairs then fail the canon
+-- match and the streak stops by itself. 0139 is exactly the case where it is not harmless.
+-- It strengthens the verdict WITHOUT touching any of the five canon hashes -- endst is not
+-- one of them -- so every pre-0139 pair still matches the current canon exactly.
+--
+-- Under the old code, one new passing pair would have chained onto three pre-0139 pairs,
+-- reported consecutive_passes = 4, and turned the column green having been judged by the
+-- new verdict exactly once. That is precisely the false green the staleness gate exists to
+-- prevent, and it was one pair away from firing.
+--
+-- 0143: a pair older than the floor is never 'unbroken', whatever its hashes say. The
+-- migration asserts the consequence rather than the code -- every pair on record predates
+-- the 0139 floor, so every column must read zero consecutive passes and none may be green.
+-- If any column still claimed a streak, the gate would be inert and the migration aborts.
+
+SELECT seed, ticks, scenario, pairs_seen, consecutive_passes, green, stale, inconclusive_pairs,
+       to_char(recert_floor AT TIME ZONE 'UTC','MM-DD HH24:MI') AS floor
+FROM public.ottoq_cert_matrix();
+--   all six columns: consecutive_passes 0, green false, stale true
+
+-- ============================================================================
+-- 3. WHAT 0139 ACTUALLY BOUGHT, MEASURED ON A REAL PAIR
+-- ============================================================================
+--
+-- The end-state image recomputed for c2's two arms under the id-blind fingerprint:
+--
+--   arm aceed070  6838d1153c347a8fe24cf0dd67bfe00e
+--   arm 63f10dac  6838d1153c347a8fe24cf0dd67bfe00e   <- equal
+--
+-- Before 0139 the image differed on all nine pairs measured, including every passing one.
+-- After it, a genuinely deterministic 24-tick pair agrees on the end state too, so the
+-- promoted check passes where it should. The scrub was proven on 24-tick data before 0139
+-- was applied: scrubbed rollups collapse to one per table, unscrubbed stay at two.
+--
+-- ============================================================================
+-- 4. THE RE-CERTIFICATION NOW RUNNING
+-- ============================================================================
+--
+-- Twelve pairs, budgets sized from the measured exhaustion rather than guessed -- 300s per
+-- arm at 12 ticks (240s was observed sufficient), 600s at 24 ticks (300s was observed
+-- marginal: one arm reached 22).
+--
+--   rc_a1 01:30  rc_a2 01:40   busy_day  171717/12t
+--   rc_b1 01:50  rc_b2 02:00   busy_day  314159/12t
+--   rc_c1 02:10  rc_c2 02:20   busy_day  424242/12t
+--   rc_d1 02:30  rc_d2 02:40   normal_day 171717/12t
+--   rc_e1 02:55  rc_e2 03:19   busy_day  171717/24t
+--   rc_f1 03:43  rc_f2 04:07   busy_day  424242/24t
+--
+-- Every rc_* job is daily-recurring and must be unscheduled once it has fired.
+--
+-- Expected canons, carried forward from the pre-0139 evidence -- these five hashes are not
+-- touched by 0139, so a change in any of them is a real finding, not an expected shift:
+--   busy_day  171717/12t  fp 823cd34d  cmd f87f71de  dec fe36c5fb  evt d08ececc  bkg b94ca1f8
+--   busy_day  314159/12t  fp b2701577  cmd f247a07e  dec 2019771f  evt 56b98454  bkg 7f1abbed
+--   busy_day  424242/12t  fp 4fddba55  cmd 0b8e4fbc  dec e054d83d  evt c70d4544  bkg ebbc795c
+--   normal_day 171717/12t fp 823cd34d  cmd e605d4c6  dec f24724eb  evt 2c80aa69  bkg a88de84f
+--
+-- ============================================================================
+-- 5. STILL OPEN
+-- ============================================================================
+--
+--   * db/checks/0050's CORRECTION banner STANDS. peak_site_kw does not reproduce; 0051 open.
+--   * Task #47: normal_day 171717/12t intermittent deviation. rc_d1/rc_d2 are two pairs,
+--     which is the green bar but still not evidence against a 1-in-4 rate. Do not close it
+--     on this run.

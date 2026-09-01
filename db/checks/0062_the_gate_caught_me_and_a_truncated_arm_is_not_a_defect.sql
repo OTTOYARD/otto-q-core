@@ -93,7 +93,7 @@ FROM public.ottoq_cert_matrix();
 -- (33 on one column alone), this has likely been miscounted before -- the 'f' characters in
 -- the history strings cannot currently be trusted to mean nondeterminism.
 --
--- THE FIX, not yet built: a pair where either arm's tick_count < p_ticks is INCONCLUSIVE,
+-- THE FIX, shipped as 0143 (see db/checks/0063): a pair where either arm's tick_count < p_ticks is INCONCLUSIVE,
 -- not failed. It must be a narrow escape hatch, not a loophole -- if BOTH arms reach p_ticks
 -- and disagree, that is a failure, permanently and with no appeal. Inconclusive pairs should
 -- not count toward a streak in either direction.
