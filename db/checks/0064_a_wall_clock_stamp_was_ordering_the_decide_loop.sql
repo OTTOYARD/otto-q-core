@@ -110,3 +110,186 @@ FROM public.vehicles WHERE home_depot_id='11111111-1111-1111-1111-111111111111';
 --     other from identical recorded state one tick earlier. Unexplained.
 --   * Task #47, normal_day 171717/12t: four consecutive passes on one canon, still not
 --     enough to close.
+
+-- ============================================================================
+-- 7. CORRECTION to section 4: the argument was wrong, the conclusion survives
+-- ============================================================================
+--
+-- Section 4 said the wall-clock hypothesis had a "clean prediction" that went unconfirmed:
+-- that arm B of the 02:28 pair, resetting about five minutes after arm A, would land on the
+-- other side of the sim-window boundary and diverge from it -- and that the pair passing
+-- therefore counted against the hypothesis.
+--
+-- THAT PREMISE IS FALSE. ottoq_determinism_pair runs BOTH arms inside a single transaction,
+-- so now() -- transaction start -- is identical for both. Measured on every recent pair:
+--
+--   started_at            arms sharing that exact timestamp
+--   09-01 04:26:00.207    2
+--   09-01 04:00:00.240    2
+--   09-01 03:34:00.158    2
+--   09-01 03:08:00.206    2
+--   09-01 02:52:00.165    2
+--   09-01 02:40:00.093    2
+--
+-- Both arms share started_at to the millisecond. Arm B does not reset five minutes later; it
+-- resets with the same now(). So the reset stamp is IDENTICAL WITHIN A PAIR by construction
+-- and can only differ BETWEEN pairs. A pair could never have failed on this mechanism, and
+-- its passing was never evidence about it.
+--
+-- That also explains the shape of the whole matrix cleanly: every pair agreeing internally
+-- while canons occasionally step between pairs is exactly what a per-pair-constant,
+-- across-pair-varying input produces.
+--
+-- BUT THE CONCLUSION IN SECTION 4 STILL STANDS, for a better reason. Check where the stamps
+-- actually fell for busy_day 424242/12t, whose sim window is 02:30-08:00 on 09-01:
+--
+--   old canon e054d83d   armed 08-31 20:46, 21:30, 21:46, 23:33, 23:41  -> stamps precede
+--   new canon 94710b72   armed 09-01 02:16, 02:28                       -> 02:16 and 02:28
+--                                                                          ALSO precede 02:30
+--
+-- Both eras stamp BEFORE the first sim tick. Untouched vehicles sort first in both, so this
+-- mechanism predicts NO reordering between those two eras -- and therefore does not explain
+-- the step. Section 4's verdict was right; only its reasoning needed replacing.
+--
+-- METHOD NOTE, the fifth of this round: I TESTED MY OWN HYPOTHESIS AGAINST A PREDICTION THAT
+-- COULD NOT HAVE COME TRUE, and read the null result as evidence against it. Before treating
+-- a passing test as disconfirmation, check that the test could have failed. Same family as
+-- 0062 -- a probe that reports success needs the same scrutiny as one that reports a defect --
+-- but one level up: not the probe's mechanics, the prediction's premise.
+--
+-- Net effect on 0144: unchanged. It fixes a real defect -- a wall-clock value ordering the
+-- decide loop, invisible to the fingerprint -- and the 424242 step remains unexplained and
+-- open.
+
+-- ============================================================================
+-- 8. 0144 PROVEN IN FLIGHT -- and a note on which population to measure
+-- ============================================================================
+--
+-- FIRST ATTEMPT AT THE PROOF, and it read like a failure. After the 08:24 pair, the depot's
+-- vehicles carried last_state_change = 09-01 08:24 -- a wall-clock stamp -- with zero rows on
+-- the sim start. Taken at face value: the fix did nothing.
+--
+-- WRONG POPULATION. ottoq_determinism_pair runs both arms in ONE transaction and each arm
+-- ends with ottoq_sim_stop_and_reset, so what is visible on public.vehicles after a pair is
+-- the TEARDOWN state, not the state the decide loop ran against. Reading it says nothing
+-- about the fix. (Fourth time this round that picking the wrong population produced a
+-- confident wrong answer -- 0060, 0063 sections 10 and 11, and now here.)
+--
+-- THE RIGHT POPULATION IS THE FINGERPRINT, which 0144 made hash the column, and which is
+-- captured at boot rather than teardown:
+--
+--   col                  armed   status   ticks   fp        h_dec
+--   busy_day 171717/12t  08:00   passed   12/12   92b02f8b  fe36c5fb
+--   busy_day 171717/12t  08:12   passed   12/12   92b02f8b  fe36c5fb
+--   busy_day 314159/12t  08:24   passed   12/12   803698f3  2019771f
+--
+-- fp is IDENTICAL across two pairs armed twelve minutes apart. Since 0144 the fingerprint
+-- hashes last_state_change, so if the reset were still writing now() those two fp values
+-- would necessarily differ. They do not. The reset is writing a constant -- the sim start --
+-- and p_as_of is reaching it. That is the proof, and it is only available because the
+-- fingerprint change and the reset change shipped together.
+--
+-- SECOND RESULT, unremarked but worth recording: the decision streams did NOT move.
+-- h_dec is fe36c5fb for busy_day 171717/12t and 2019771f for 314159/12t -- the same values
+-- these columns have carried since before 0139. Only fp moved, which is exactly what adding
+-- a column to the fingerprint does. So for these two seeds the reset stamp was never
+-- affecting loop order, consistent with section 7: their arming times fell before the sim
+-- window in both eras.
+--
+-- The seed that matters is still busy_day 424242/12t, whose pairs run at 08:48 and 09:00.
+
+-- ============================================================================
+-- 9. THE 424242/12t COLUMN POST-0144 -- and what this does NOT show
+-- ============================================================================
+--
+--   col                  armed   status  ticks   fp        h_dec     h_bkg
+--   busy_day 171717/12t  08:00   passed  12/12   92b02f8b  fe36c5fb  b94ca1f8
+--   busy_day 171717/12t  08:12   passed  12/12   92b02f8b  fe36c5fb  b94ca1f8
+--   busy_day 314159/12t  08:24   passed  12/12   803698f3  2019771f  7f1abbed
+--   busy_day 314159/12t  08:36   passed  12/12   803698f3  2019771f  7f1abbed
+--   busy_day 424242/12t  08:48   passed  12/12   e418e4f0  94710b72  dd7846a8
+--   busy_day 424242/12t  09:00   passed  12/12   e418e4f0  94710b72  dd7846a8
+--
+-- THE HEADLINE RESULT, and it is about 0144 rather than about 424242: NOT ONE DECISION
+-- STREAM MOVED. h_dec and h_bkg on all three columns are byte-identical to their pre-0144
+-- values -- fe36c5fb/b94ca1f8, 2019771f/7f1abbed, 94710b72/dd7846a8. Only fp moved, on every
+-- column, which is exactly and only what adding a column to a fingerprint does.
+--
+-- That is the strongest possible outcome for a change of this kind. 0144 altered a value the
+-- decide loop sorts on, and the engine's behaviour did not shift by a single decision. The
+-- fix is behaviourally neutral and the instrument is now honest about the column.
+--
+-- ON THE 424242 STEP, carefully. The column landed on 94710b72 -- the post-step canon, not
+-- the pre-step e054d83d. So that canon has now been produced by pairs armed at
+--
+--   02:16, 02:28, 08:48, 09:00   -- four pairs spanning 6.5 hours
+--
+-- against six pairs on e054d83d armed 20:46-23:41. The column has been stable for 6.5 hours
+-- across a range of arming times that would have exposed a time-of-day dependence.
+--
+-- WHAT THIS IS NOT. It is not evidence that 0144 fixed the step, and it must not be written
+-- up that way:
+--
+--   * The step happened at 23:41 -> 02:16, BEFORE 0144 existed. The canon was already stable
+--     at 94710b72 from 02:16 onward, unchanged by 0144. There is nothing here for 0144 to
+--     have fixed.
+--   * 0144 provably changed no decision stream at all, on any column. A change that moves no
+--     stream cannot be the thing that stopped a stream from moving.
+--
+-- So the honest statement is narrower and duller than "fixed": the column is stable across a
+-- 6.5-hour arming spread, the single step at 23:41 -> 02:16 remains UNEXPLAINED, and 0144 is
+-- neither its cause nor its cure. db/checks/0063 section 12 stays open -- a state transition
+-- fired in one run and not the other from identical recorded state one tick earlier, and
+-- nothing measured since has accounted for it.
+
+-- ============================================================================
+-- 10. FINAL: all six columns re-certified, and 0144 moved NOTHING
+-- ============================================================================
+--
+-- Twelve pairs, armed 08:00 to 10:58, floor 09-01 07:51. Every column two consecutive
+-- passes at or after the floor. Zero inconclusive pairs, so the budgets held again
+-- (300s/arm at 12 ticks, 600s at 24).
+--
+--   scenario   seed/ticks  green  last pair  fp        h_dec     h_bkg
+--   busy_day   171717/24t   yes    10:06     92b02f8b  bab9cec4  51c6086d
+--   busy_day   424242/24t   yes    10:58     e418e4f0  aefb7480  e6b8bf98
+--   busy_day   171717/12t   yes    08:12     92b02f8b  fe36c5fb  b94ca1f8
+--   busy_day   314159/12t   yes    08:36     803698f3  2019771f  7f1abbed
+--   busy_day   424242/12t   yes    09:00     e418e4f0  94710b72  dd7846a8
+--   normal_day 171717/12t   yes    09:24     92b02f8b  f24724eb  a88de84f
+--
+-- THE RESULT THAT MATTERS: SIX OF SIX DECISION STREAMS UNCHANGED. Every h_dec and every
+-- h_bkg above is byte-identical to the value that column carried before 0144. Only fp
+-- moved, on every column, which is exactly and only what adding a column to a fingerprint
+-- does.
+--
+-- 0144 changed a value that three of the five decide loops sort on, and the engine did not
+-- alter a single decision or a single booking, across four seeds, two scenarios and two
+-- horizons. That is as clean a behavioural-neutrality result as this harness can produce.
+--
+-- A STRUCTURAL FACT MADE VISIBLE. fp now groups strictly by seed:
+--   171717 -> 92b02f8b   (12t busy_day, 24t busy_day AND 12t normal_day)
+--   424242 -> e418e4f0   (12t and 24t)
+--   314159 -> 803698f3
+-- fp is the BOOT world image and is a function of (depot, seed) alone -- not of scenario,
+-- not of horizon. Worth stating plainly because mistaking fp for a per-column identifier is
+-- what made db/checks/0060 briefly label canon 823cd34d as "the normal_day canon" when
+-- busy_day at the same seed shares it.
+--
+-- ============================================================================
+-- 11. WHAT REMAINS OPEN AFTER THIS ROUND
+-- ============================================================================
+--
+--   * db/checks/0050's CORRECTION banner STANDS. peak_site_kw does not reproduce and 0051
+--     stays open. 0138 shipped peak_site_kw_demand as the number that carries a run ID.
+--
+--   * db/checks/0063 section 12: the busy_day 424242/12t step is UNEXPLAINED. A state
+--     transition fired in one run and not the other from identical recorded state one tick
+--     earlier. The column is now stable on 94710b72 across pairs armed 02:16, 02:28, 08:48
+--     and 09:00 -- 6.5 hours -- but the step predates 0144 and 0144 moved no stream
+--     anywhere, so it is neither cause nor cure. Still open.
+--
+--   * Task #47, normal_day 171717/12t: canon f24724eb has now held across pairs armed
+--     23:17, 23:25, 02:40, 02:52, 09:12 and 09:24 -- six pairs over ten hours. At a 1-in-4
+--     deviation rate six clean pairs occur about 18% of the time, so this is materially
+--     stronger evidence than the four-pair position and STILL NOT proof. Left open.
