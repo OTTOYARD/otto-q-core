@@ -1,0 +1,94 @@
+-- =====================================================================
+-- 0068  Round 3 result, and 0146 applied
+-- =====================================================================
+-- Round 3 certified the engine as 0145 left it. Twelve pairs,
+-- 9:10 AM - 12:08 PM CT. Zero inconclusive. Every job unscheduled after
+-- firing.
+--
+-- §1  Result: 2 of 6 columns clean
+-- --------------------------------
+--   column                 pairs  passed  inter-pair   verdict
+--   busy_day/314159/12t      2      2     agree        CLEAN
+--   normal_day/171717/12t    2      2     agree        CLEAN
+--   busy_day/424242/12t      2      2     h_cmd DIFFERS  not green
+--   busy_day/171717/12t      2      0     -            failed both
+--   busy_day/171717/24t      2      0     -            failed both
+--   busy_day/424242/24t      2      0     -            failed both
+--
+-- Which component diverged, per failed pair:
+--   busy_day/171717/12t   9:10 AM  h_dec
+--   busy_day/171717/12t   9:22 AM  h_cmd
+--   busy_day/171717/24t  10:50 AM  h_cmd
+--   busy_day/171717/24t  11:16 AM  h_cmd + h_dec
+--   busy_day/424242/24t  11:42 AM  h_cmd + h_dec
+--   busy_day/424242/24t  12:08 PM  h_cmd
+-- Every arm complete (12/12 or 24/24) — nothing truncated, so none of
+-- these are the 0143 inconclusive case.
+--
+-- §2  Two things the round established that pass/fail alone would hide
+-- --------------------------------------------------------------------
+-- (a) A column can pass BOTH pairs and still not be reproducible.
+--     busy_day/424242/12t passed twice, but the two pairs produced
+--     DIFFERENT h_cmd from each other (streak 1, green=false). Each pair
+--     is internally consistent; the column is not. The 0140/0143 streak
+--     machinery caught this correctly — eight P's in the history string
+--     and still not green. Always check distinct hash counts ACROSS a
+--     column's passing pairs, not just the pair verdicts.
+--
+-- (b) The carrier tracks the SCENARIO, not the seed.
+--     busy_day/171717 failed at BOTH horizons (12t and 24t), while
+--     normal_day/171717 — same seed, same depot, same sim start — passed
+--     both. That is what the 0067 mechanism predicts: busy_day runs far
+--     more concurrent charging sessions, so the unscoped sum is larger
+--     and more often wins GREATEST(snapshot, desired_ev), which is
+--     exactly when the contamination reaches net_load and moves a
+--     setpoint. On a quiet scenario the properly-scoped snapshot usually
+--     wins and the bad read is masked.
+--
+-- §3  0146 applied
+-- ----------------
+-- Applied 12:27 PM CT. All guards passed and were verified independently
+-- afterwards rather than trusting the migration's own success flag:
+--
+--   pin before   2a79619a6200bd259eee986159e44fa4
+--   pin after    a1f7cab5b343b7afdb24b080d9599f21   (moved)
+--   arities                                    1
+--   depot predicate present                 true
+--   run predicate present                   true
+--   ocpp_sessions reads in body                1
+--   classified forces_recert                true
+--   recert floor                    12:27 PM CT
+--
+-- The matrix immediately went to 0 green / 6 stale. That is the
+-- instrument working: the floor moved above every existing pair, so all
+-- prior evidence was invalidated by the engine change, exactly as 0140
+-- and 0143 intend.
+--
+-- §4  What 0146 does NOT establish
+-- --------------------------------
+-- Its proof block asserts the predicate LOGIC and the post-check asserts
+-- that logic is in the installed body. Neither is behavioural. The
+-- behavioural proof is round 4, scheduled 12:45 PM - 3:43 PM CT, twelve
+-- pairs on the same seeds, scenarios, depot and sim start as round 3.
+--
+-- Expect EVERY canon to move: 0146 changes BESS setpoints, which is
+-- engine behaviour. A moved canon is the intended outcome, not a defect.
+-- What matters is each column's two pairs agreeing AND agreeing with
+-- each other.
+--
+-- §5  Task #47 remains open
+-- -------------------------
+-- normal_day/171717/12t passed both pairs and they agree — the
+-- instrument's bar for green. That is NOT sufficient to close #47. At
+-- that column's historical ~1-in-4 failure rate, two consecutive passes
+-- occur ~56% of the time by chance (0.75^2). Six passes would be ~18%.
+-- Green here means "met the bar", not "the intermittent is gone".
+--
+-- §6  Unchanged
+-- -------------
+--   * db/checks/0050's CORRECTION banner STANDS.
+--   * 0051 is NOT closed — peak_site_kw is still not reproducible.
+--   * 0066 findings unfixed: the arrival-payload odometer
+--     (twin.ottoq_sim_build_arrival_payload, 43/43 vehicles diverging)
+--     and ottoq_fleet_pending_commands (170 sim vs 4 production).
+-- =====================================================================
