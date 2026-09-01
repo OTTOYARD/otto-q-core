@@ -1,0 +1,190 @@
+-- =====================================================================
+-- 0066  The odometer sums every run that ever touched the vehicle
+--       (and two more of the 0145 defect class)
+-- =====================================================================
+-- Read-only audit. NO FIX APPLIED — the re-certification round armed
+-- 14:10–17:08 on 2026-09-01 must run against the engine exactly as 0145
+-- left it. The fixes below belong to the next round.
+--
+-- 0145 fixed ONE function that read a run-scoped table with no
+-- sim_run_id predicate. This file asks the general question: how many
+-- others are there?
+--
+-- §1  The sweep
+-- -------------
+-- Enumerate every function in public/ottoq/twin whose body references a
+-- table carrying a sim_run_id column, but whose body never mentions
+-- sim_run_id at all. Comments are stripped BEFORE the negative test —
+-- a commented-out mention would otherwise make an unscoped function
+-- look scoped (the comment-grep trap, cf. 0062).
+--
+--   WITH scoped AS (
+--     SELECT c.table_schema sch, c.table_name tbl
+--       FROM information_schema.columns c
+--       JOIN information_schema.tables t
+--         ON t.table_schema=c.table_schema AND t.table_name=c.table_name
+--        AND t.table_type='BASE TABLE'
+--      WHERE c.column_name='sim_run_id'
+--        AND c.table_schema IN ('public','ottoq','twin')
+--   ), fns AS (
+--     SELECT n.nspname sch, p.proname fname,
+--            regexp_replace(
+--              regexp_replace(p.prosrc,'/\*.*?\*/','','g'),
+--              '--[^\n]*','','g') AS body
+--       FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+--      WHERE n.nspname IN ('public','ottoq','twin')
+--        AND p.prokind IN ('f','p')
+--        AND p.proname NOT LIKE '%_backup_%'
+--   )
+--   SELECT f.sch||'.'||f.fname, string_agg(DISTINCT s.sch||'.'||s.tbl,', ')
+--     FROM fns f JOIN scoped s ON f.body ~ ('\m'||s.tbl||'\M')
+--    WHERE f.body !~ 'sim_run_id'
+--    GROUP BY 1;
+--
+-- 29 candidates. The large majority are analytics, reporting and trigger
+-- functions where reading across runs is the intended behaviour —
+-- ottoq_ab_paired_summary compares runs by design, ottoq_entity_history
+-- and ottoq_causation_chain are id-keyed lookups, ottoq_arm_interlock_guard
+-- deliberately watches all runs. Being on this list is not a defect.
+--
+-- The defect class is narrower: an unscoped read that sits in a CAUSAL
+-- path, so accumulated run history changes what the engine does or
+-- reports. Two convicted, one latent, one asymmetry.
+--
+-- §2  CONVICTED — twin.ottoq_sim_build_arrival_payload
+-- ----------------------------------------------------
+-- The odometer reported in every OEM arrival webhook:
+--
+--   v_odo NUMERIC := COALESCE((p_vehicle.config->>'lifetime_miles')::numeric, 0)
+--        + COALESCE((SELECT SUM(miles_driven) FROM ottoq_vehicle_dispatches
+--                     WHERE vehicle_id = p_vehicle.id
+--                       AND status = 'completed'), 0);
+--
+-- No run predicate. Every completed dispatch from every run ever run
+-- contributes. Measured at the flagship depot:
+--
+--   vehicles                       116
+--   avg distinct runs summed    361.64
+--   max distinct runs summed       364
+--   avg foreign sim miles/veh    380.1
+--
+-- Progressive and monotonic — the 0145 shape exactly. The reported
+-- odometer is not a property of the vehicle; it is a property of how
+-- many simulations have been run since the database was created.
+--
+-- §2a  It diverges the two arms of a pair, in every pair
+-- ------------------------------------------------------
+-- Both arms of a pair share one transaction, but they run in sequence.
+-- Each arm completes ~117 dispatches (~104 mi), and arm A's completions
+-- are already 'completed' when arm B's seed runs. The seed aborts
+-- 'active'/'returning' dispatches — it does not touch 'completed' ones —
+-- so arm B's sum includes arm A's mileage and arm A's did not.
+--
+-- Paired on vehicle_id across the arms of the 10:58 pair
+-- (11deb100-…/566c56c4-…), which the harness scored PASSED:
+--
+--   vehicles paired      43
+--   both present         43
+--   DIFFERING            43      <-- every single one
+--   max delta          2.1 mi    (arm B always the higher)
+--
+--   00cc3d0a-…  A=2092.2   B=2093.2
+--   091fa637-…  A=747.5    B=748.0
+--   0cb0532c-…  A=16181.9  B=16184.0
+--   0cb1b8c6-…  A=19881.7  B=19882.2
+--
+-- The harness hashes no webhook table, so fp, h_cmd, h_dec, h_evt,
+-- h_bkg and endst are all blind to it. This is the third blind spot of
+-- the same family — endst (closed by 0139) and reason_detail (named in
+-- 0145) were the first two — and the first one that diverges in EVERY
+-- pair rather than intermittently. Six green columns are green over a
+-- value that differs 43/43.
+--
+-- §3  CONVICTED — public.ottoq_fleet_pending_commands
+-- ---------------------------------------------------
+-- Returns pending commands to a fleet operator, filtered by depot and
+-- fleet_operator_id, with no run predicate:
+--
+--   FROM ottoq_vehicle_commands c JOIN vehicles v ON v.id = c.vehicle_id
+--    WHERE c.status = 'issued'
+--      AND (p_depot_id IS NULL OR c.depot_id = p_depot_id)
+--      AND (p_fleet_operator_id IS NULL OR v.fleet_operator_id = p_fleet_operator_id)
+--
+-- Live counts of status='issued':
+--
+--   b54929ce-…  (sim)          83
+--   3eeb5dc5-…  (sim)          69
+--   9291ec6d-…  (sim)          18
+--   NULL (production)           4
+--
+-- 170 simulation commands against 4 real ones — 97.7% of what this
+-- endpoint returns is simulation, and nothing in the result distinguishes
+-- them. This is the "not confined to the twin" hazard from the 0145 PR
+-- body, on an OUTBOUND surface. Correctness fault, not reproducibility.
+--
+-- §4  LATENT (not convicted) — public.ottoq_reconcile_charger_states
+-- ------------------------------------------------------------------
+-- Reads and mutates ocpp_sessions unscoped. Two exposures: a sim
+-- 'active' session on a stall satisfies the
+--   NOT EXISTS (SELECT 1 FROM ocpp_sessions cs2
+--                WHERE cs2.stall_id = s.id AND cs2.status = 'active')
+-- guard and so masks a genuine production orphan; and the orphan sweep
+-- can cancel sim sessions.
+--
+-- Probed: active ocpp_sessions at the flagship depot = ZERO rows.
+-- The mechanism is real but is NOT currently firing. Recorded as latent.
+-- Do not report this as a live defect.
+--
+-- §5  ASYMMETRY — twin.ottoq_sim_seed_fleet
+-- -----------------------------------------
+-- Two adjacent resets, only one guarded:
+--
+--   UPDATE ottoq_vehicle_dispatches d ... FROM vehicles v
+--    WHERE d.vehicle_id = v.id AND v.home_depot_id = p_depot_id
+--      AND d.status IN ('active','returning');          -- no twin guard
+--
+--   UPDATE ocpp_sessions cs ...
+--    WHERE cs.depot_id = p_depot_id AND cs.status = 'active'
+--      AND cs.id_token LIKE 'TWIN-%';                   -- twin-only
+--
+-- The ocpp reset confines itself to twin rows by token convention; the
+-- dispatch abort beside it does not. A twin seed would abort a
+-- production dispatch at that depot.
+--
+-- §6  Two false negatives caught while probing
+-- --------------------------------------------
+-- Both are worth keeping, because both LOOKED like clean refutations.
+--
+-- (a) Wrong JSON path. The first paired odometer comparison read
+--     payload->'vehicle_state'->>'lifetime_miles'. That path does not
+--     exist; the real one is payload->'diff'->'config'->'to'. The query
+--     returned zero rows, which reads as "no divergence" and is in fact
+--     "no data". Corrected, it returns 116 vehicles / 0 differing —
+--     genuinely no divergence there, because that field is the stored
+--     config base which the reset restores. The right answer, reached
+--     the wrong way the first time.
+--
+-- (b) A vacuous comparison. The webhook probe tested three key names —
+--     odometer_miles, odometer, telemetry.odometer — and reported
+--     "0 differing" across 116 vehicles. None of those keys exists.
+--     Every value was NULL, and NULL IS NOT DISTINCT FROM NULL is false,
+--     so the count was zero by construction. The real key is
+--     odometer_mi, and it is present in only 43 of 117 arrivals.
+--     Rechecking on the real key gave 43/43 differing.
+--
+--     Rule, restated: before reporting that a comparison found no
+--     difference, prove the comparison had rows AND non-null values on
+--     both sides. A check that cannot fail is not a check — and a
+--     comparison over two NULLs cannot fail.
+--
+-- §7  Status
+-- ----------
+-- No migration. No engine change. The twelve re_* pairs armed
+-- 14:10–17:08 certify the engine as 0145 left it; changing anything now
+-- would invalidate the round.
+--
+-- Still open, unchanged by this file:
+--   * db/checks/0050's CORRECTION banner STANDS.
+--   * 0051 is NOT closed — peak_site_kw is still not reproducible.
+--   * Task #47 is NOT closed.
+-- =====================================================================
