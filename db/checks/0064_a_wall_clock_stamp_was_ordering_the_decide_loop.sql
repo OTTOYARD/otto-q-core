@@ -1,0 +1,112 @@
+-- 0064: a wall-clock stamp was ordering the decide loop
+--
+-- Found while hunting the busy_day 424242/12t canon step (db/checks/0063 sections 8-12).
+-- It does not explain that step, and is not claimed to. It is a separate defect, convicted
+-- on its own evidence and fixed on its own merits by 0144.
+--
+-- ============================================================================
+-- 1. THE DEFECT, in four measurements
+-- ============================================================================
+--
+--   (a) ottoq_decide_tick has five vehicle loops. All five are totally ordered, but three
+--       end in:  ORDER BY v.last_state_change ASC NULLS FIRST, v.id
+--       So last_state_change decides which vehicle reaches a scarce staging stall first.
+--
+--   (b) ottoq_tick_invariance_reset_fleet wrote  last_state_change = now()  -- WALL CLOCK.
+--       Of the 25 functions that write the column it was the ONLY one writing a wall-clock
+--       value; every other writer is in the sim domain.
+--
+--   (c) ottoq.ottoq_world_fingerprint did not hash the column at all. The certification was
+--       blind to it.
+--
+--   (d) Live at the flagship depot before the fix: 120 vehicles, TWO distinct
+--       last_state_change values, 116 of them carrying 09-01 04:26 -- the wall-clock arming
+--       time of the last pair (rc_f2) -- and that value falls INSIDE the 02:30-08:00 sim
+--       window of a 12-tick run.
+--
+-- Together: a wall-clock value was a sort key for the decide loop, and nothing in the cert
+-- could see it. Where the untouched vehicles sorted relative to the sim-stamped ones
+-- depended on the time of day the pair happened to be armed:
+--
+--   armed 08-31 23:33  ->  stamp precedes the whole sim window  ->  untouched sort FIRST
+--   armed 09-01 04:26  ->  stamp lands INSIDE the window        ->  they sort in the middle
+
+SELECT count(*) AS vehicles, count(DISTINCT last_state_change) AS distinct_stamps,
+       count(*) FILTER (WHERE last_state_change
+                        BETWEEN '2026-09-01 02:00:00+00' AND '2026-09-01 08:00:00+00') AS inside_sim_window
+FROM public.vehicles WHERE home_depot_id='11111111-1111-1111-1111-111111111111';
+--   before 0144: 120 vehicles, 2 distinct stamps, 116 inside the sim window
+
+-- ============================================================================
+-- 2. PRECEDENT -- the same disease, already convicted once
+-- ============================================================================
+--
+-- public.ottoq_cert_arm_start carries the 0065 note: it had hardcoded the run's SIM clock to
+-- the wall-clock arming minute, so a cert pair sampled whichever slice of normal_day began
+-- when it was armed. Measured there: re-cert #17 (armed 22:40Z) carried 1,075/1,098 vehicle
+-- commands per arm, #18 (armed 00:32Z) carried 1,562/1,598 -- about 45% more work from the
+-- arrival curve alone. Within-round A-vs-B stayed valid, but no round could be differenced
+-- against another.
+--
+-- 0065's rule is the one 0144 applies: everything in the SIM domain moves together, and only
+-- the real-time metronome stamps keep now(). last_state_change is sim-domain -- nine
+-- functions do age arithmetic against it using sim clocks -- so it belongs on sim time.
+--
+-- ============================================================================
+-- 3. THE FIX (0144) AND WHY NOT A SENTINEL
+-- ============================================================================
+--
+-- ottoq_tick_invariance_reset_fleet(p_depot_id, p_seed, p_as_of timestamptz DEFAULT NULL)
+-- stamps COALESCE(p_as_of, now()); both callers -- ottoq_determinism_pair and
+-- ottoq_tick_invariance_arm, the only two, both cert harnesses -- now pass their sim start.
+-- The 2-arg arity was DROPPED rather than left beside the new one, or PL/pgSQL would keep
+-- resolving 2-arg calls to the wall-clock body; the migration asserts exactly one arity
+-- survives.
+--
+-- A sentinel epoch was considered and rejected: NINE functions do age arithmetic on this
+-- column, so a year-2000 constant would make every vehicle look ancient and change
+-- behaviour. The sim start is the value that is both constant -- per the reset's own 0096
+-- convention, "canonical means a CONSTANT" -- and semantically true: the fleet was reset as
+-- the run began. Untouched vehicles now sort ahead of every sim-stamped one, always,
+-- whatever the hour.
+--
+-- ottoq_world_fingerprint now hashes last_state_change, so the blindness cannot return
+-- silently. The migration proves the column actually entered the hash by computing the
+-- fingerprint before and after and asserting it MOVED -- a column added to a hash that does
+-- not move the hash was not added to the hash.
+--
+-- ============================================================================
+-- 4. WHAT THIS DOES NOT CLAIM
+-- ============================================================================
+--
+-- It does not claim to explain the busy_day 424242/12t canon step. The clean prediction --
+-- that arm B of the 02:28 pair, arming at ~02:33 INSIDE the sim window, should diverge from
+-- arm A arming at 02:28 outside it -- is NOT confirmed, because that pair passed. 0063's
+-- step stays open until something actually explains it.
+--
+-- What 0144 does buy is a testable property that did not hold before: canons should now be
+-- stable ACROSS TIMES OF DAY. Every previous re-certification ran inside a few hours; the
+-- next ones will not.
+--
+-- ============================================================================
+-- 5. RE-CERTIFICATION
+-- ============================================================================
+--
+-- 0144 is classified forces_recert = true, so the floor moved to 09-01 07:51 and all six
+-- columns went stale immediately, 0 green. Twelve pairs are scheduled 08:00-10:58 using the
+-- spacing and budgets that produced zero inconclusive pairs last round (12 min apart at 12
+-- ticks with 300s/arm, 26 min apart at 24 ticks with 600s/arm).
+--
+-- Every canon WILL move: the fingerprint gained a column, so fp changes by construction, and
+-- the reset stamp change may reorder the loops. That is expected. What matters is that the
+-- new canons reproduce.
+--
+-- ============================================================================
+-- 6. STILL OPEN
+-- ============================================================================
+--
+--   * db/checks/0050's CORRECTION banner STANDS. peak_site_kw does not reproduce; 0051 open.
+--   * The 424242/12t step (0063 section 12): a state transition fired in one run and not the
+--     other from identical recorded state one tick earlier. Unexplained.
+--   * Task #47, normal_day 171717/12t: four consecutive passes on one canon, still not
+--     enough to close.
