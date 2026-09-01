@@ -110,3 +110,53 @@ FROM public.vehicles WHERE home_depot_id='11111111-1111-1111-1111-111111111111';
 --     other from identical recorded state one tick earlier. Unexplained.
 --   * Task #47, normal_day 171717/12t: four consecutive passes on one canon, still not
 --     enough to close.
+
+-- ============================================================================
+-- 7. CORRECTION to section 4: the argument was wrong, the conclusion survives
+-- ============================================================================
+--
+-- Section 4 said the wall-clock hypothesis had a "clean prediction" that went unconfirmed:
+-- that arm B of the 02:28 pair, resetting about five minutes after arm A, would land on the
+-- other side of the sim-window boundary and diverge from it -- and that the pair passing
+-- therefore counted against the hypothesis.
+--
+-- THAT PREMISE IS FALSE. ottoq_determinism_pair runs BOTH arms inside a single transaction,
+-- so now() -- transaction start -- is identical for both. Measured on every recent pair:
+--
+--   started_at            arms sharing that exact timestamp
+--   09-01 04:26:00.207    2
+--   09-01 04:00:00.240    2
+--   09-01 03:34:00.158    2
+--   09-01 03:08:00.206    2
+--   09-01 02:52:00.165    2
+--   09-01 02:40:00.093    2
+--
+-- Both arms share started_at to the millisecond. Arm B does not reset five minutes later; it
+-- resets with the same now(). So the reset stamp is IDENTICAL WITHIN A PAIR by construction
+-- and can only differ BETWEEN pairs. A pair could never have failed on this mechanism, and
+-- its passing was never evidence about it.
+--
+-- That also explains the shape of the whole matrix cleanly: every pair agreeing internally
+-- while canons occasionally step between pairs is exactly what a per-pair-constant,
+-- across-pair-varying input produces.
+--
+-- BUT THE CONCLUSION IN SECTION 4 STILL STANDS, for a better reason. Check where the stamps
+-- actually fell for busy_day 424242/12t, whose sim window is 02:30-08:00 on 09-01:
+--
+--   old canon e054d83d   armed 08-31 20:46, 21:30, 21:46, 23:33, 23:41  -> stamps precede
+--   new canon 94710b72   armed 09-01 02:16, 02:28                       -> 02:16 and 02:28
+--                                                                          ALSO precede 02:30
+--
+-- Both eras stamp BEFORE the first sim tick. Untouched vehicles sort first in both, so this
+-- mechanism predicts NO reordering between those two eras -- and therefore does not explain
+-- the step. Section 4's verdict was right; only its reasoning needed replacing.
+--
+-- METHOD NOTE, the fifth of this round: I TESTED MY OWN HYPOTHESIS AGAINST A PREDICTION THAT
+-- COULD NOT HAVE COME TRUE, and read the null result as evidence against it. Before treating
+-- a passing test as disconfirmation, check that the test could have failed. Same family as
+-- 0062 -- a probe that reports success needs the same scrutiny as one that reports a defect --
+-- but one level up: not the probe's mechanics, the prediction's premise.
+--
+-- Net effect on 0144: unchanged. It fixes a real defect -- a wall-clock value ordering the
+-- decide loop, invisible to the fingerprint -- and the 424242 step remains unexplained and
+-- open.
