@@ -1,0 +1,112 @@
+-- 0062: the gate caught me, and a truncated arm is not a defect
+--
+-- Three things happened in fifteen minutes after 0140 landed. Two were mine. The third is
+-- a harness fault that has probably been miscounted before and is still open.
+--
+-- ============================================================================
+-- 1. I BROKE ottoq_cert_matrix() FOR anon, IN THE CHANGE THAT FIXED IT
+-- ============================================================================
+--
+-- 0140 gave the matrix a new dependency: the recert floor, which reads
+-- supabase_migrations.schema_migrations. ottoq_cert_recert_floor() was SECURITY INVOKER and
+-- anon has no USAGE on that schema, while anon DOES hold EXECUTE on
+-- ottoq_cert_matrix(timestamptz). So:
+--
+--   ERROR: 42501: permission denied for schema supabase_migrations
+--   CONTEXT: SQL function "ottoq_cert_recert_floor" during startup
+--
+-- Found by auditing the grants on the object I had just created, not by anything failing
+-- loudly. Nothing in CI or the harness would have caught it.
+--
+-- HOW IT WAS NEARLY MISSED. The first probe wrapped SET LOCAL ROLE anon in a DO block with
+-- an EXCEPTION handler and reported success. False negative: the role change did not take
+-- effect the way the block assumed, so the query ran as postgres. The second probe issued
+-- SET LOCAL ROLE anon as a plain statement and produced the error above with full context.
+--
+--   Third time this round the DESIGN of a probe mattered more than its result:
+--     0057  probe the columns the check hashes, not the row
+--     0060  pair the rows before you believe the diff
+--     0062  a probe that reports success needs the same scrutiny as one that reports a
+--           defect -- ask what it would have printed if the thing were broken
+--
+-- 0141 fixed it: the floor is an aggregate over the ledger -- one timestamp, no row data --
+-- so it is safe as SECURITY DEFINER with a pinned search_path, and it must return the same
+-- answer to every caller because that is what a certification floor is. 0141 also enabled
+-- RLS on ottoq_cert_lineage (checked first: anon and authenticated held only SELECT,
+-- REFERENCES, TRIGGER -- the register was never forgeable). Verified as anon after:
+--
+--   as_role  floor_as_anon   matrix_rows  register_rows_anon_can_read
+--   anon     09-01 01:00     0            0
+--
+-- No error, no register access, and no matrix rows -- anon sees nothing, which is the
+-- pre-existing ottoq_sim_runs RLS policy, not something 0140 or 0141 changed.
+--
+-- ============================================================================
+-- 2. THEN THE GATE I HAD JUST BUILT CAUGHT ME
+-- ============================================================================
+--
+-- Look at the floor in that output: 09-01 01:00, not 08-31 23:12. 0141 did not classify
+-- itself, absence means forces_recert = true, and the floor jumped to 0141's own timestamp.
+-- All six columns went stale, four of them wrongly -- they had been green fifteen minutes
+-- earlier and 0141 changes no engine behaviour.
+--
+-- The default failed in the correct direction. It cost a re-run; it did not grant a green
+-- that was not earned. That is the whole design argument for "absence means forces", and it
+-- was demonstrated against its own author within the hour.
+--
+-- 0142 corrects the omission and states the convention the register now carries:
+--
+--   EVERY MIGRATION CLASSIFIES ITSELF. Engine, fingerprint, or verdict -> say nothing and
+--   inherit forces_recert = true. Readers, permissions, comments, or data -> claim the
+--   exemption in the same file that makes the change.
+--
+-- After 0142, floor back to 08-31 23:12 (0137) and the four 12-tick columns green again.
+
+SELECT seed, ticks, scenario, consecutive_passes, green, stale,
+       to_char(last_pair_at AT TIME ZONE 'UTC','MM-DD HH24:MI') AS last_pair,
+       to_char(recert_floor AT TIME ZONE 'UTC','MM-DD HH24:MI') AS floor
+FROM public.ottoq_cert_matrix();
+--   171717 24 busy_day   0  false false  09-01 00:46   <- failed, see section 3
+--   424242 24 busy_day   2  false TRUE   08-31 15:32   <- genuinely stale, never re-run
+--   171717 12 busy_day   3  TRUE  false  09-01 00:12
+--   314159 12 busy_day   3  TRUE  false  09-01 00:36
+--   424242 12 busy_day   2  TRUE  false  08-31 23:41
+--   171717 12 normal_day 2  TRUE  false  08-31 23:25
+
+-- ============================================================================
+-- 3. OPEN: A TRUNCATED ARM IS RECORDED AS A DETERMINISM FAILURE
+-- ============================================================================
+--
+-- The r9 c1 pair (busy_day 171717/24t, 00:46) came back equal=false with all four streams
+-- differing. That reads as a serious engine defect. It is not one. The ticks:
+--
+--   arm_a ticks 24     arm_b ticks 22
+--
+-- ottoq_determinism_pair gives each arm p_arm_budget_s (300s here) and EXITs the tick loop
+-- when the budget is spent, whether or not p_ticks was reached. Arm B ran out two ticks
+-- short. Of course the four streams differ -- arm B has two fewer ticks of activity in them.
+--
+-- The verdict compares ticks, so equal=false is correct as far as it goes. What is wrong is
+-- that nothing distinguishes "the two arms disagreed" from "one arm did not finish". Both
+-- land as validation_status='failed', both break the streak in ottoq_cert_matrix(), and both
+-- invite a hunt for a carrier that does not exist. Given how many pairs this matrix has run
+-- (33 on one column alone), this has likely been miscounted before -- the 'f' characters in
+-- the history strings cannot currently be trusted to mean nondeterminism.
+--
+-- THE FIX, shipped as 0143 (see db/checks/0063): a pair where either arm's tick_count < p_ticks is INCONCLUSIVE,
+-- not failed. It must be a narrow escape hatch, not a loophole -- if BOTH arms reach p_ticks
+-- and disagree, that is a failure, permanently and with no appeal. Inconclusive pairs should
+-- not count toward a streak in either direction.
+--
+-- Operationally: 24-tick pairs need a larger arm budget than 300s. The remaining r9 c/d jobs
+-- were unscheduled rather than run -- with the floor about to move again when 0139 lands,
+-- pairs run now would be invalidated before they could certify anything.
+--
+-- ============================================================================
+-- 4. STILL OPEN, UNCHANGED
+-- ============================================================================
+--
+--   * db/checks/0050's CORRECTION banner STANDS. peak_site_kw does not reproduce; 0051 open.
+--   * Task #47: normal_day 171717/12t intermittent deviation, 2 passes is not enough.
+--   * 0139 is committed and not yet applied. When it lands the floor moves again and every
+--     column must be re-earned under the stricter verdict. That is by design.
