@@ -50,3 +50,15 @@ today's engine work there.
 
 The other five rows above are a baseline with nothing behind them. From round 9
 onward every column is diffable, which is the entire point of this file.
+
+## Final state — round 8 closed 6:40 PM CT
+
+Pass 2 (`s8a`..`s8e`) completed. **Six of six columns green**, every column
+`pairs_seen = 2`, `consecutive_passes = 2`, and every pass-2 canon reproduced
+its pass-1 value **exactly** — all four hashes, all six columns. No canon above
+moved; the table is final for this round.
+
+Recorded as an addition rather than an edit: the 5:45 PM snapshot above is left
+exactly as it was written, per the rule in this directory's README. Nothing in
+it was wrong, only incomplete, and rewriting a point-in-time record to look
+better in hindsight is the habit that rule exists to prevent.
