@@ -60,6 +60,44 @@ first (measured: proposals produced, 0 enacted).
 
 Any claim stronger than that sentence, in either direction, is not ledger-backed today.
 
+
+### 1a. Re-measured 2026-09-01 (live ledger, 7:20 PM CT) — supersedes the numbers above for any new claim
+
+The §1 table was read on 2026-08-19 and says "255 invocations". That was a window count then and is
+stale now. Live `cuopt_invocation_log` on 2026-09-01, span 2026-08-02 → 2026-09-02:
+
+| Ledger fact | Count |
+|---|---|
+| Invocations logged, total | **9,570** |
+| Abstained without an HTTP call | **9,554** |
+| — pacing abstentions: `debounce` 5,790 · `first_refusal_arm` 2,689 | 8,479 |
+| — `sql_gate` stage: no reason recorded 513 · `sql_gate_no_candidates` 60 · `policy_disabled` 3 · `no_running_run` 1 | 577 |
+| — `edge` stage: `no_candidates_in_instance` 383 · `no_free_stalls_demand_present` 114 · `missing_sim_run_id` 1 | 498 |
+| NVIDIA HTTP calls with a logged `http_status` | **16**, all `200` |
+| `proposals_out` returned, total | **136** (across those 16 calls) |
+| `ottoq_decisions` with `l2_engine='cuopt'` | **27**, all `outcome_status='enacted'` |
+| Deferral ledger (`ottoq_cuopt_deferrals`) | 28,460 rows: `clear` 28,397 · `spent` 63 |
+| `ottoq_ab_runs` | **68 rows** (§4 said zero; not yet analysed for a cuOpt-vs-baseline delta) |
+| All decisions in the same window, by engine | deterministic_v1 856,107 · inspect_seam 77,381 · greedy_constrained 52,708 · reservation_honoured 16,988 · needs_card 7,731 · charge_disposition 1,518 · reservation_reassigned 908 · nemotron 262 · reservation_broken 189 · ottoq_service_priority 108 · service_sequencing 105 · deterministic_fallback 79 · **cuopt 27** |
+
+**The honest sentence, re-issued 2026-09-01 (both directions, per the standing rule):**
+
+> *cuOpt is wired into the live tick as a gated proposer with a one-tick right of first refusal,
+> and every invocation is ledgered. Over 2026-08-02 → 09-02 it was invoked 9,570 times and
+> abstained 9,554 — 8,479 of those by design (debounce and first-refusal pacing), 577 at the SQL
+> gate, 498 at the edge for lack of candidates or free stalls. It made 16 receipted NVIDIA calls,
+> all HTTP 200, returned 136 proposals, and 27 decisions carrying `l2_engine='cuopt'` were enacted
+> through the shield. Against 856,107 deterministic decisions in the same window, cuOpt disposed
+> 27. `ottoq_ab_runs` now holds 68 rows; no measured throughput delta has been extracted from it
+> yet, so none is claimed.*
+
+**In certification runs specifically (round 5, 2026-09-01, 24 arms):** cuOpt was invoked 560 times
+and returned **0** proposals (debounce 360 · first_refusal_arm 152 · edge no_candidates 24 · 24 gate
+passes that found nothing). `ottoq_external_proposals` carried 76 rows, all from deterministic
+internal proposers (`ottoq_service_priority` 28 pending / 28 superseded; `greedy_constrained` 4 / 16).
+Zero decisions with `l2_engine='cuopt'`. 1,368 deferral rows. **The certification matrix has never
+exercised an external proposer.** That is the fact §8 below is built on.
+
 ## 2. The local decide path, in plain language (the disposer)
 
 Reconstructed from the live functions (captured in `db/fn_current/`, md5-stamped) and the 16
@@ -422,3 +460,92 @@ itself out of any disagreement it might have found. Regenerating is now delibera
 No function, table, proposer, or policy was removed or modified in this phase. The local decide
 path remains the `otto_q` named policy; cuOpt's gate, deferral, and batch enactment remain live;
 the prototype is additive and unwired until C5 wraps it as a policy.
+
+
+---
+
+## 8. Proposals and the verdict — the gate before the agentic layer (added 2026-09-01)
+
+**Where the pair verdict stands after 0148.** `ottoq_determinism_pair` hashes six streams per arm
+— `fp` (boot world), `h_cmd` (vehicle commands), `h_dec` (decisions), `h_evt` (events), `h_bkg`
+(stall bookings), `h_nrg` (energy commands) — plus `endst` (end state) and `complete`. Every hash
+now sorts by every field it hashes (0148). **Proposals are not in it.** `ottoq_external_proposals`,
+`ottoq_cuopt_deferrals`, `cuopt_invocation_log` and `ottoq_cuopt_fire_log` sit outside every hashed
+surface, exactly where the energy tables sat before 0148 and where the end state sat before 0139.
+
+**Why that has not bitten yet.** §1a: in certification runs cuOpt returns zero proposals and the
+proposal table carries only deterministic internal proposers. Nothing nondeterministic has been
+allowed to propose during a certified run, so there has been nothing for the blind spot to hide.
+That will stop being true the day an agent — cuOpt with the gate open, Nemotron, the CP-SAT
+proposer in `solvers/cpsat/`, the forward orchestrator in `proposer/` — is wired into a cert run.
+
+**"Agents propose, solver disposes" is currently an architectural statement, not a certified
+one.** To certify it, two things must be separately observable per pair:
+1. what was proposed (so a nondeterministic proposer is caught as such, not misread as a
+   disposer fault), and
+2. that identical proposals produce identical disposals (which `h_dec`/`h_cmd` already prove,
+   *given* identical proposals — a premise the verdict cannot currently check).
+
+### 8.1 `h_prop` — proposals enter the verdict, before any agent does
+
+Add to the per-arm object, computed exactly like `h_cmd` (before `stop_and_reset`, stored in
+`validation_notes` arm_a/arm_b automatically, entering `v_equal`):
+
+```
+'h_prop', (SELECT md5(COALESCE(string_agg(
+    p.action_context||'|'||p.entity_type||'|'||COALESCE(p.entity_id::text,'-')
+    ||'|'||p.source||'|'||p.status
+    ||'|'||public.ottoq_scrub_ids(p.proposal::text),
+    E'\n' ORDER BY p.action_context, p.entity_type, COALESCE(p.entity_id::text,'-'),
+                   p.source, p.status, public.ottoq_scrub_ids(p.proposal::text)), ''))
+  FROM ottoq_external_proposals p WHERE p.sim_run_id = v_run)
+```
+
+Excluded: `proposal_id` (uuid), `sim_run_id`, `depot_id` (constant per run), `created_at`,
+`expires_at` (wall-clock TTLs — 0129/P3 made these sim-domain, but a timestamp is still not
+content). `proposal` jsonb is id-scrubbed because proposals reference stall/booking ids that
+are stable world ids when they are stalls and fresh uuids when they are bookings; scrubbing both
+is the conservative choice and matches `endst`. `entity_id` is a vehicle — a stable fleet id —
+so it is hashed raw, as `h_cmd` does. ORDER BY lists every hashed field (the 0148 rule).
+
+A companion `h_defr` over `ottoq_cuopt_deferrals` (`vehicle_id|state|armed_at_tick|
+spent_at_tick|cleared_at_tick|defer_count`, ordered by all of them) makes the right-of-first-
+refusal mechanism itself certifiable. Cheap, and it is the one place a pacing bug would show.
+
+**Expected effect today:** with only deterministic internal proposers, `h_prop` and `h_defr`
+match across arms and the matrix gains two canon columns that never move. That is the point:
+they are tripwires, armed before there is anything to trip them.
+
+**Proof the migration must carry (falsifiable):** `h_prop` recomputed over round 5's twelve pairs
+must be EQUAL on all twelve (the internal proposers are deterministic — if they are not, that is
+a finding, not a proof failure, and the migration must stop and say so). There is no historical
+pair on which `h_prop` should be UNEQUAL — none has run an external proposer — so unlike `h_nrg`
+the migration cannot demonstrate discrimination on real data. State that plainly in it.
+
+### 8.2 External proposers under certification — the decision Chase owns
+
+cuOpt is an external NVIDIA endpoint; Nemotron is an LLM. Neither is reproducible under a seed
+from this side of the wire. Three defensible postures, not mutually exclusive:
+
+| Posture | What it certifies | Cost | Honest limit |
+|---|---|---|---|
+| **A. Pin cert runs to deterministic proposers** (`policy_disabled` for external ones inside `run_by='cert_harness'`) | The disposer and the internal proposers, fully | One gate check | Says nothing about the engine *with* agents. The certified artefact and the shipped one differ by a switch. |
+| **B. Record-and-replay** — production runs ledger every external proposal (already true for cuOpt: 136 in the log); a cert mode replays a recorded proposal stream into both arms | "Given these exact proposals, the disposer is deterministic" — the actual propose/dispose contract | A replay source for `ottoq_external_proposals` keyed by (tick, entity); `h_prop` is then the check that both arms *received* the same proposals | Does not certify the proposer. It is not supposed to. |
+| **C. Live external calls in cert, proposals hashed** | Whether the external proposer happens to be reproducible | Nothing new | It is not reproducible, so this manufactures red pairs that are not engine faults. Reject. |
+
+**Recommendation:** A now, B as the agentic layer's first deliverable, C never. Under A+B the
+sentence becomes provable: *the disposer is certified deterministic against recorded agent
+proposals; agents are measured, not trusted.* That is the edge Chase wants to show — an
+orchestration kernel that lets AI propose without letting AI make the schedule irreproducible —
+and it is a claim the harness can back with run IDs.
+
+### 8.3 Sequence
+
+1. `h_prop` + `h_defr` into the verdict (one migration, 0148 pattern, forces recert). Apply
+   after round 6, alongside 0150/0151. One more round to re-establish canon with eight hashes.
+2. Posture A: cert runs refuse external proposers explicitly (a check that fires if one proposes).
+3. Posture B: replay source + the first recorded-proposal certification pair. That is the door to
+   the agentic layer, and it opens with the harness already watching.
+
+None of this starts until the deterministic core is green on the corrected instrument (round 6)
+and the remaining core items are closed (0050/0051 peak_site_kw; 0150/0151).
