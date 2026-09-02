@@ -205,3 +205,70 @@ SELECT vn.vehicle_id, vn.dispatch_due_at,
 --     anchored edits assert the occurrence COUNT, never mere presence.
 -- Neither would have surfaced for hours on the old schedule-and-wait
 -- cadence. Both surfaced in under a minute on the grid.
+
+-- =====================================================================
+-- §10  FAULT RESPONSE - the requirement, and what is actually proven
+-- =====================================================================
+-- Chase, 3:2x PM CT: "Faults can occur in real life. OTTO-Q should
+-- identify and queue around that fault. Once back online, it can be
+-- reserved again. But identification and orchestration should occur
+-- around the broken system. If it breaks mid-charge, OTTO-Q should
+-- re-optimize and send vehicle either to other charger/station, or park
+-- temporarily in staging area until ready."
+--
+-- That is three distinct behaviours, not one. Written down as a spec so
+-- the difference between what we have proven and what we have assumed
+-- stays visible:
+--
+--   F1  ROUTE AROUND      a point known broken at plan time is not
+--                         offered, and the fleet is served by what
+--                         remains.
+--   F2  RECOVER AND REUSE when the point comes back, it becomes
+--                         reservable again with no operator action.
+--   F3  BREAK MID-SERVICE a point fails while an asset is ON it. The
+--                         asset must be re-optimised - moved to another
+--                         capable point, or parked in staging until one
+--                         frees - never left plugged into a dead point
+--                         waiting for a charge that will not come.
+--
+-- STATUS, measured, not assumed:
+--   F1  PROVEN (0163, grid-f4). Charger faulted for the whole horizon:
+--       0 bookings and 0 sessions landed on it, 31 bookings elsewhere,
+--       pair verdict passed and equal, end SoC 100/81/90/100 against
+--       100/96/100/90 on the healthy run. It degrades, it does not
+--       collapse.
+--   F2  UNPROVEN. The mechanism exists - twin.ottoq_sim_recover_chargers
+--       flips a charger back to Available once repair_minutes elapse, and
+--       0163 makes that duration declarable - but no test has yet run a
+--       fault that heals mid-horizon and then checked the point is used
+--       afterwards. One 20-second run closes it.
+--   F3  UNPROVEN AND PROBABLY UNBUILT. This is the one that matters
+--       commercially and it is the hardest. Nothing in the decide path
+--       has been shown to react to a charger failing under a live
+--       session: the proposer only filters candidate points at
+--       ASSIGNMENT time (station_state = 'Available'), which says nothing
+--       about an asset already plugged in. The likely honest finding is
+--       that an asset on a failed charger simply sits there until the
+--       session's own timeout. Testing it needs a fault injected at a
+--       tick rather than at boot - the timeline mechanism that the
+--       certification path does not read (see GAP 2 and 0161's header).
+--
+-- WHERE EACH BELONGS. F1 and F2 are deterministic-core behaviour and
+-- should be assertions on every grid smoke. F3 is where the agentic
+-- layer earns its keep, exactly as Chase says: the re-optimisation
+-- decision - another charger now, a slower one, or staging until a fast
+-- one frees - is the same trade as 0159's wait-vs-fit, under worse
+-- information and time pressure. The deterministic floor must exist
+-- first (move the asset somewhere sane, always), or the agent has
+-- nothing to beat and nothing to fall back to.
+--
+-- Recorded as the ordered next bricks:
+--   1. F2 assertion: fault with a short repair_minutes, assert the point
+--      is unused before recovery and used after.
+--   2. F3 deterministic floor: on a session whose charger goes
+--      unavailable, end the session with a reason code and re-enter the
+--      asset into assignment the same tick.
+--   3. F3 assertion: no asset remains bound to an unavailable point for
+--      more than one tick.
+--   4. Only then, the agentic re-optimisation, measured against 0158's
+--      readiness KPI so "it re-optimised well" is a number.
