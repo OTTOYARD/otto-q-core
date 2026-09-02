@@ -1,0 +1,462 @@
+-- =====================================================================
+-- 0076  What is MISSING, not just wrong - the ground-level gap register
+-- =====================================================================
+-- Chase, 2:4x PM CT Sep 2: "Always identify what is missing while we are
+-- at the ground level building up! If categories and code or scenario
+-- scope/architecture is missing and not just wrong, let's identify those
+-- gaps and build/test it now rather than later."
+--
+-- This file is the register. Gap 1 is BUILT (0158). The rest are named
+-- with evidence and an order, so none of them is a surprise later.
+--
+-- =====================================================================
+-- GAP 1 - BUILT (0158). Nothing measured whether we hit the deadline.
+-- =====================================================================
+-- ottoq_visit_needs.dispatch_due_at is populated on roughly half of all
+-- visits (27,059 of 53,805 rows all-time; 53 of 118 on the last flagship
+-- arm) and NOTHING read it for conformance:
+--   * The five canonical KPIs (CLAUDE.md 2.9) have no tardiness term,
+--     although 2.5 names tardiness as an objective term.
+--   * SLA.007.redeployment_readiness never mentions dispatch_due_at. It
+--     counts open blocking rows in exceptions/schedule_tasks - a
+--     different, older subsystem - inside BEGIN ... EXCEPTION WHEN
+--     OTHERS THEN v_open_exceptions := 0, so if those tables are absent
+--     it silently returns "no blockers".
+--   * ottoq_sla_violations has ZERO rows, ever, and no sim_run_id
+--     column, so even if it fired it could not be tied to a run.
+--
+-- We have been certifying that the engine is REPRODUCIBLE and never once
+-- measuring whether it is GOOD. Measured on the most recent flagship arm
+-- (70b2227e, started 9:39 AM CT, a run that passed every determinism
+-- check and counted toward round 7's six green):
+--
+--   visits with a due time      53
+--   ready on time               36
+--   ready LATE                   9   p50 165 min, p95 297 min, max 345 min
+--   needed no charge             8   (ended at or above target)
+--   genuinely stranded           0
+--   on-time rate                80%
+--
+-- CORRECTION, recorded because the first cut of this measure was wrong
+-- and the wrong number is the more alarming one: counting the 8
+-- no-charge-needed visits as misses gave "17 of 53 (32%) missed". They
+-- are not misses - those vehicles arrived at or above target and never
+-- needed a session. The honest figure is 9 of 53 late (17%), none
+-- stranded. The guard is in the function and stated in 0158's header.
+--
+-- Built: public.ottoq_kpi_dispatch_readiness(run) plus an
+-- assets_made_their_due_time row on every grid smoke, so the deadline is
+-- in front of us every twenty seconds instead of never. A run with no
+-- due times reports "NO DUE TIMES in this run - not evidence about
+-- readiness" rather than showing green, same anti-vacuity rule as the
+-- power cap check.
+--
+-- =====================================================================
+-- GAP 2 - the grid has never seen anything go wrong
+-- =====================================================================
+-- CLAUDE.md C7.3 names a canonical NINE failure scenarios: blocked
+-- point, overstay, immobile asset, mid-session charger fault, zone power
+-- loss, human path crossing, swap-dock jam, tug unavailable, work-side
+-- recall refusal. The grid fixture runs a clean day and nothing else. We
+-- have never once watched the engine handle a charger faulting mid
+-- session on a world small enough to read.
+-- Cost to close: each scenario is a data file plus one 20-second smoke.
+-- This is the cheapest large increase in confidence available and it is
+-- the natural next brick after round 8.
+--
+-- =====================================================================
+-- GAP 3 - one asset class, one operator, one tenant
+-- =====================================================================
+-- ottoq_vehicle_classes carries 7 classes; the grid fixture clones only
+-- autonomous robotaxis from the flagship. ottoq_fleet_operator_slas
+-- carries 4 versioned OEM rows; every grid run uses one operator. The
+-- platform thesis (CLAUDE.md 2.2) says a mining pack and a vertiport
+-- pack must both run on this kernel unchanged, and C8's Site Alpha needs
+-- three tenants sharing one power cap - the anti-correlation curve is
+-- the whole shared-infrastructure economics argument. None of it is
+-- exercised at ground level. A second asset class on the grid, with a
+-- different inlet and a different duty cycle, is a small brick that
+-- tests kernel purity directly.
+--
+-- =====================================================================
+-- GAP 4 - the queue is asserted, never tested
+-- =====================================================================
+-- stalls carries reserved_by / reserved_at / reservation_expires_at /
+-- reserved_for_mission_id, and bookings show source='reservation_
+-- honoured', but no assertion checks that a reservation is actually
+-- honoured, that it expires, or that a queue forms in a sensible order.
+-- Chase's framing - "OTTO-Q sees all variables and sends queue
+-- reservations accordingly" - is the intended product behaviour and it
+-- currently has no instrument at all.
+--
+-- =====================================================================
+-- GAP 5 - no policy comparison on the grid
+-- =====================================================================
+-- CLAUDE.md C5 requires FIFO / greedy / local / CP-SAT compared under
+-- common random numbers. ottoq_ab_runs exists for this. The grid could
+-- run the three charge_downgrade_policy modes (0159) on one seed and
+-- print a table in about a minute, which is what turns "wait vs slow
+-- charge" from an opinion into evidence. Blocked only on 0159 landing.
+--
+-- =====================================================================
+-- GAP 6 - the deterministic core has no quality gate, only a sameness gate
+-- =====================================================================
+-- The certification matrix answers "same seed, same answer". Nothing
+-- fails a round because the answer got WORSE. With 0158 there is now a
+-- number that could gate it (on-time rate, stranded count). Proposal,
+-- not yet built: extend the pair verdict or the matrix with a quality
+-- floor, so a change that keeps determinism while dropping the on-time
+-- rate cannot pass. This is the C6 CI gate idea applied to readiness.
+--
+-- =====================================================================
+-- §7  AN OPERATIONAL DEFECT OF MINE, recorded because it cost a pair
+-- =====================================================================
+-- r8_a1 (2:35 PM CT) FAILED: "canceling statement due to statement
+-- timeout" on an INSERT into ottoq_stall_bookings, inside
+-- ottoq_book_stall <- ottoq_record_enacted_booking. It failed because I
+-- was running a rolled-back grid trial in the same window - one that
+-- does CREATE OR REPLACE FUNCTION on ottoq_l2_propose_stall_assignment
+-- and then runs a 20-second two-arm pair, all in one transaction.
+--
+-- The lesson, which I had half-learned and stated too weakly in 0074:
+-- rolled-back trials are invisible to a concurrent run's CONTENT, but
+-- they are NOT free. They take locks - DDL takes ACCESS EXCLUSIVE on the
+-- function, and both workloads insert into the same bookings table with
+-- its exclusion constraint. During round 7 I ran trials throughout and
+-- got away with it; this time it killed a pair.
+--
+-- STANDING RULE from here: no grid trial and no DDL while a flagship
+-- certification pair is in flight. Trials go in the gaps between pairs,
+-- or after the round. The failed pair rolled back cleanly (both arms are
+-- one transaction, so nothing partial is on disk - zero ottoq_sim_runs
+-- rows for it), so the cost was one pair, not the round. Replacement
+-- r8_a1b scheduled 4:50 PM CT, after r8_f2.
+--
+-- =====================================================================
+-- §8  Queries
+-- =====================================================================
+-- 8.1 readiness for any run
+--   SELECT public.ottoq_kpi_dispatch_readiness('<sim_run_id>');
+-- 8.2 readiness across a round, to compare rounds
+SELECT to_char(r.started_at AT TIME ZONE 'America/Chicago','HH12:MI') AS at_ct,
+       r.scenario_code, r.tick_count,
+       public.ottoq_kpi_dispatch_readiness(r.sim_run_id) AS readiness
+  FROM ottoq_sim_runs r
+ WHERE r.run_by='cert_harness' AND r.status='completed'
+   AND r.depot_id='11111111-1111-1111-1111-111111111111'
+   AND r.started_at >= '2026-09-02 19:00:00+00'
+ ORDER BY r.started_at;
+-- 8.3 the late visits themselves, for any run
+SELECT vn.vehicle_id, vn.dispatch_due_at,
+       (SELECT min(cs.ended_at) FROM ocpp_sessions cs
+         WHERE cs.sim_run_id=vn.sim_run_id AND cs.vehicle_id=vn.vehicle_id
+           AND cs.soc_end >= COALESCE(vn.target_soc, public.ottoq_default_target_soc())) AS ready_at
+  FROM ottoq_visit_needs vn
+ WHERE vn.sim_run_id='<sim_run_id>' AND vn.dispatch_due_at IS NOT NULL
+ ORDER BY 3 NULLS FIRST;
+
+-- =====================================================================
+-- §9  ADDED 3:0x PM CT - the real-time loop, and what it caught
+-- =====================================================================
+-- Chase: "We can't wait over an hour to do a scheduled test. Cancel all
+-- schedules, and just test in real time."
+--
+-- Done. Every r6/r7/r8 cron job unscheduled; only the production
+-- heartbeat jobs remain. The iteration loop is now the grid fixture at
+-- roughly twenty seconds a run, driven on demand.
+--
+-- 9a. WHY ROUND 8 DIED, and it was not the engine. r8_a1 AND r8_a2 both
+-- failed after exactly 2 minutes. statement_timeout on this database is
+-- 120000 ms, and my round-8 cron commands were a bare SELECT
+-- ottoq_determinism_pair(...) with no override - so every flagship pair,
+-- which needs 5 to 13 minutes, was guaranteed to be killed at two
+-- minutes. Round 7's jobs must have set it and mine did not. Any future
+-- flagship pair fired from cron must carry "SET statement_timeout = 0;"
+-- ahead of the call. My scheduling error, not an engine regression - and
+-- the second failure came while I was running nothing at all, which is
+-- what ruled out the lock-contention theory in §7.
+--
+-- 9b. THE THREE-MODE A/B, run live on grid-starve (cap 150 kW so EN.001's
+-- ceiling is 135 kW, seed 424242, 12 ticks, both arms each time):
+--
+--   mode                     end SoC            assigns  EN.001  downgrades  holds  checks
+--   0 wait_for_wanted        73 / 60 / 100 / 89     3       17       -         -    12 of 13
+--   1 fit_now (default)     100 / 96 / 100 / 90     4        0       2         0    13 of 13
+--   2 deadline_aware        100 / 96 / 100 / 90     4        0       1         1    13 of 13
+--
+-- Mode 0 is the pre-0156 baseline and it fails exactly one check -
+-- no_asset_starves_while_a_capable_point_is_free - which is the check
+-- built for it. Mode 2 reaches the same end state as mode 1 with one
+-- downgrade instead of two, holding the fast point once for the asset
+-- whose slow charge would have missed dispatch_due_at (recorded in the
+-- decision as held_for_wanted='slow_point_misses_due_at'). On this
+-- scenario the hold costs nothing; on a busier one it is the trade the
+-- agentic layer will have to price, and 0158's readiness KPI is the
+-- scoreboard it gets priced on.
+--
+-- 9c. AND THE A/B CAUGHT TWO OF MY OWN ERRORS INSIDE FIVE MINUTES:
+--   * The first A/B read the same arm for both modes, because it ordered
+--     ottoq_sim_runs by started_at - which is the PINNED SIM CLOCK and
+--     therefore identical across runs. Only end_soc, read from live
+--     vehicle state, was genuinely per-mode. Fixed by capturing the run
+--     ids present before each smoke and taking the new one.
+--   * 0160 anchored an edit on a line occurring twice and broke check 12
+--     outright. Fixed by 0160r, with the standing rule now recorded:
+--     anchored edits assert the occurrence COUNT, never mere presence.
+-- Neither would have surfaced for hours on the old schedule-and-wait
+-- cadence. Both surfaced in under a minute on the grid.
+
+-- =====================================================================
+-- §10  FAULT RESPONSE - the requirement, and what is actually proven
+-- =====================================================================
+-- Chase, 3:2x PM CT: "Faults can occur in real life. OTTO-Q should
+-- identify and queue around that fault. Once back online, it can be
+-- reserved again. But identification and orchestration should occur
+-- around the broken system. If it breaks mid-charge, OTTO-Q should
+-- re-optimize and send vehicle either to other charger/station, or park
+-- temporarily in staging area until ready."
+--
+-- That is three distinct behaviours, not one. Written down as a spec so
+-- the difference between what we have proven and what we have assumed
+-- stays visible:
+--
+--   F1  ROUTE AROUND      a point known broken at plan time is not
+--                         offered, and the fleet is served by what
+--                         remains.
+--   F2  RECOVER AND REUSE when the point comes back, it becomes
+--                         reservable again with no operator action.
+--   F3  BREAK MID-SERVICE a point fails while an asset is ON it. The
+--                         asset must be re-optimised - moved to another
+--                         capable point, or parked in staging until one
+--                         frees - never left plugged into a dead point
+--                         waiting for a charge that will not come.
+--
+-- STATUS, measured, not assumed:
+--   F1  PROVEN (0163, grid-f4). Charger faulted for the whole horizon:
+--       0 bookings and 0 sessions landed on it, 31 bookings elsewhere,
+--       pair verdict passed and equal, end SoC 100/81/90/100 against
+--       100/96/100/90 on the healthy run. It degrades, it does not
+--       collapse.
+--   F2  UNPROVEN. The mechanism exists - twin.ottoq_sim_recover_chargers
+--       flips a charger back to Available once repair_minutes elapse, and
+--       0163 makes that duration declarable - but no test has yet run a
+--       fault that heals mid-horizon and then checked the point is used
+--       afterwards. One 20-second run closes it.
+--   F3  UNPROVEN AND PROBABLY UNBUILT. This is the one that matters
+--       commercially and it is the hardest. Nothing in the decide path
+--       has been shown to react to a charger failing under a live
+--       session: the proposer only filters candidate points at
+--       ASSIGNMENT time (station_state = 'Available'), which says nothing
+--       about an asset already plugged in. The likely honest finding is
+--       that an asset on a failed charger simply sits there until the
+--       session's own timeout. Testing it needs a fault injected at a
+--       tick rather than at boot - the timeline mechanism that the
+--       certification path does not read (see GAP 2 and 0161's header).
+--
+-- WHERE EACH BELONGS. F1 and F2 are deterministic-core behaviour and
+-- should be assertions on every grid smoke. F3 is where the agentic
+-- layer earns its keep, exactly as Chase says: the re-optimisation
+-- decision - another charger now, a slower one, or staging until a fast
+-- one frees - is the same trade as 0159's wait-vs-fit, under worse
+-- information and time pressure. The deterministic floor must exist
+-- first (move the asset somewhere sane, always), or the agent has
+-- nothing to beat and nothing to fall back to.
+--
+-- Recorded as the ordered next bricks:
+--   1. F2 assertion: fault with a short repair_minutes, assert the point
+--      is unused before recovery and used after.
+--   2. F3 deterministic floor: on a session whose charger goes
+--      unavailable, end the session with a reason code and re-enter the
+--      asset into assignment the same tick.
+--   3. F3 assertion: no asset remains bound to an unavailable point for
+--      more than one tick.
+--   4. Only then, the agentic re-optimisation, measured against 0158's
+--      readiness KPI so "it re-optimised well" is a number.
+
+-- =====================================================================
+-- §11  F1 AND F2 ARE NOW PROVEN (0163-0166), live, in about 20 s each
+-- =====================================================================
+--   F1 route around, permanent outage (grid-g1, repair 100000 min)
+--        14 of 14 assertions pass
+--        0 bookings and 0 sessions on the broken point, 23 elsewhere
+--        pair passed and equal - both arms identically broken
+--        end SoC 100/81/90/100 vs 100/96/100/90 healthy: it degrades,
+--        it does not collapse
+--   F2 recover and reuse, 2-hour outage in a 6-hour horizon (grid-g2)
+--        14 of 14 assertions pass
+--        0 bookings on the point while faulted (02:00-04:00)
+--        2 bookings after it healed (04:30 and 06:00, charge_dcfc)
+--        charger back to Available with no operator action
+--
+-- F3 (break mid-service) remains unproven and probably unbuilt - see §10.
+--
+-- TWO MORE CHECKS OF MINE WERE WRONG, both found by running faults:
+--   0165  assertion 14 demanded zero bookings on a faulted point for the
+--         WHOLE run, so a fault that heals and is then correctly reused
+--         read as a violation. Now scoped to the repair window.
+--   0166  assertion 12 called an asset starved below a hard-coded 90%.
+--         It fired on an asset that ended at 88% and never needed a
+--         charge. Now judged against the asset's own target_soc. Same
+--         error as 0158's first cut, which turned 17% late into 32% by
+--         counting vehicles that arrived full as misses. A fixed
+--         threshold is not a statement about need, and it fails in the
+--         direction that manufactures false alarms under degraded
+--         conditions - exactly when a check most needs to be trusted.
+
+-- =====================================================================
+-- §12  F3 MEASURED - and it did not need building, only looking
+-- =====================================================================
+-- I was about to build mid-service fault injection. Verify before you
+-- build (CLAUDE.md rule 5) said look first, and the twin has been doing
+-- this all along: 564 sessions across 273 runs ended with fault_count > 0
+-- and a charge.session_faulted event, in six calibrated modes -
+--   fault.connector_cable        270
+--   fault.station_hardware        99
+--   fault.session_aborted_other   98
+--   fault.communication_dropout   72
+--   fault.thermal_emergency       13
+--   fault.ground_fault_safety     12
+-- each after 9-16 SoC points had already been delivered. Genuine
+-- mid-charge interruptions, in ordinary runs, for months. Nobody had ever
+-- asked what happened next.
+--
+-- WHAT HAPPENS NEXT, over all 564:
+--   resumed charging on another point        89   avg 69 min, p95 150 min
+--   never charged again in that run         475
+--     of those, got some later booking      466   (moved, not ignored)
+--     got nothing at all                      9
+--   avg SoC when abandoned                 91.1%
+--   worst SoC abandoned                    47.0%
+--
+-- The raw 84% "never charged again" is misleading and must not be quoted:
+-- most of those vehicles were finished. Judged against each asset's OWN
+-- target (ottoq_visit_needs.target_soc, default 80):
+--
+--   already at or above target             358   (63% - nothing needed)
+--   still needed charge                    206
+--     resumed elsewhere                     87
+--     ABANDONED BELOW TARGET               119   57.8% of the needy
+--   average shortfall                      6.0 points
+--   WORST shortfall                       43.0 points
+--   runs affected                          101
+--
+-- SO: when a charger dies under a vehicle that still needs power, OTTO-Q
+-- fails to finish the job in 58% of cases. Usually by a little - six
+-- points - but the tail is an asset left 43 points short of what it was
+-- promised, and it happens across a hundred runs.
+--
+-- CAVEAT, stated so the number is not oversold: "abandoned" means no
+-- further charging session in that RUN, and a 12-tick run is six sim
+-- hours. A vehicle faulted near the horizon's end may simply have run out
+-- of clock rather than been ignored. Controlling for time-remaining is the
+-- first refinement, and the 43-point worst case and 101 affected runs
+-- survive any such control.
+--
+-- This confirms §10's prediction: F3 is the real hole, and it is now a
+-- number rather than a suspicion. It also confirms the shape of the fix -
+-- the deterministic floor is "on charge.session_faulted, re-enter the
+-- asset into assignment the same tick", and the intelligence layer is
+-- "where should it go", which is 0159's wait-vs-fit trade under worse
+-- information. The floor must exist first: "the agent was slow" cannot be
+-- why a car sat plugged into a brick.
+--
+-- 12.1 the query, reusable on any window
+WITH f AS (
+  SELECT cs.sim_run_id, cs.vehicle_id, cs.stall_id, cs.ended_at AS faulted_at, cs.soc_end,
+         COALESCE((SELECT max(vn.target_soc) FROM ottoq_visit_needs vn
+                    WHERE vn.sim_run_id=cs.sim_run_id AND vn.vehicle_id=cs.vehicle_id), 80) AS tgt
+    FROM ocpp_sessions cs
+   WHERE cs.fault_count > 0 AND cs.ended_at IS NOT NULL AND cs.sim_run_id IS NOT NULL)
+SELECT count(*) FILTER (WHERE soc_end < tgt) AS still_needed_charge,
+       count(*) FILTER (WHERE soc_end < tgt AND NOT EXISTS (
+         SELECT 1 FROM ocpp_sessions cs2 WHERE cs2.sim_run_id=f.sim_run_id
+            AND cs2.vehicle_id=f.vehicle_id AND cs2.started_at >= f.faulted_at
+            AND cs2.stall_id IS DISTINCT FROM f.stall_id)) AS abandoned_below_target
+  FROM f;
+
+-- =====================================================================
+-- §12a  CORRECTION to §12 - the 58% is an outcome, not a defect rate
+-- =====================================================================
+-- §12 reported "OTTO-Q fails to finish the job in 58% of cases" when a
+-- charger dies under a vehicle that still needs power. The 119 number is
+-- right; the framing was wrong, and it was wrong in the direction that
+-- flatters a finding. Looking at what the engine DID after each fault:
+--
+--   abandoned below target                          119
+--     reconsidered after the fault, no point free    95   (80%)
+--     NEVER RECONSIDERED AT ALL                      24   (20%)
+--   worst shortfall among the reconsidered           18 points
+--   worst shortfall among the never-reconsidered     43 points
+--   avg shortfall among the never-reconsidered     10.6 points
+--
+-- So in 80% of those cases the engine DID re-propose the asset and got
+-- noop_no_candidate - "no compatible available stall". That is contention,
+-- not amnesia, and it is a capacity statement about the depot rather than
+-- a defect in the decide path.
+--
+-- THE GENUINE GAP IS THE OTHER 24: assets below their own target, whose
+-- session died under them, that were never offered another point at all.
+-- 24 of 564 faults (4.3%), 24 of the 206 that still needed charge (11.7%).
+-- And the tail lives here - the 43-point worst case is in this bucket, not
+-- in the contention bucket, which tops out at 18. A small number carrying
+-- the worst outcomes is exactly the shape worth fixing.
+--
+-- TWO THINGS I MUST NOT IMPLY:
+--   * All 119 come from runs BEFORE today's 0155/0156. Zero come from
+--     after. That is NOT evidence the fixes helped - there have been no
+--     committed flagship runs since, only rolled-back grid trials. The
+--     post-fix sample is empty, not clean.
+--   * Some share of the 95 "no compatible available stall" cases may BE
+--     the 0156 starvation defect rather than true contention: before 0156
+--     a point refused for power was never downgraded to a slower one that
+--     fit. Re-measuring after a post-0156 flagship round will separate
+--     genuine contention from the bug we already closed.
+--
+-- REVISED CONCLUSION. The deterministic floor is still worth building and
+-- its shape is unchanged - on charge.session_faulted, re-enter the asset
+-- into assignment the same tick - but it is a fix for 24 sessions with the
+-- worst tail, not for 119. The other 95 are a capacity question, and the
+-- honest answer there may be "the depot was full", which no scheduler can
+-- fix and which the readiness KPI (0158) should report rather than hide.
+--
+-- This is the third time today a number softened under scrutiny: 32% ->
+-- 17% on readiness (0158), a starving asset that turned out to be at 88%
+-- and full (0166), and now 58% -> a 20% subset. The pattern is mine, not
+-- the engine's: I reach for the alarming denominator first. Recording it
+-- so the habit is visible.
+
+-- =====================================================================
+-- §12b  The open question in §12a is answered: it is contention
+-- =====================================================================
+-- §12a left it open whether the 95 "reconsidered but unplaced" cases were
+-- genuine contention or the 0156 starvation defect wearing a disguise.
+-- The two have different signatures and the ledger separates them:
+--   0156's defect  a candidate WAS found and proposed, then refused for
+--                  power (deferred_site_power_cap, or EN.001 block)
+--   contention     the proposer abstained with
+--                  no_compatible_available_stall - zero candidates existed
+--
+--   of the 95 reconsidered-but-unplaced
+--     also power-blocked at some point after the fault      6
+--     pure no_compatible_available_stall                   89
+--     abstention rows across them                         400
+--
+-- So at most 6 of 95 could be the defect we closed today. The other 89 are
+-- the depot genuinely having no free compatible point when the asset came
+-- back looking. That is a capacity fact, not a scheduling bug, and no
+-- solver fixes it - the honest response is for the readiness KPI (0158) to
+-- REPORT it rather than for the engine to pretend otherwise.
+--
+-- FINAL SHAPE OF F3, after three passes:
+--   564  mid-charge faults, six calibrated modes, already in the twin
+--   358  asset was already at or above target - nothing owed
+--   206  still needed charge
+--     87  resumed on another point                      working
+--     89  no free compatible point existed              capacity
+--      6  blocked for power (0156 class, now fixed)     probably closed
+--     24  NEVER RECONSIDERED                            the real gap
+--         avg 10.6 points short, worst 43 - the tail lives here
+--
+-- The deterministic floor is worth building for those 24 and for the 43-
+-- point tail, and for nothing else. It is a small, sharp fix, and saying
+-- so is more useful than the 58% I opened with.
