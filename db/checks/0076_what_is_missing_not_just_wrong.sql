@@ -373,3 +373,54 @@ SELECT count(*) FILTER (WHERE soc_end < tgt) AS still_needed_charge,
             AND cs2.vehicle_id=f.vehicle_id AND cs2.started_at >= f.faulted_at
             AND cs2.stall_id IS DISTINCT FROM f.stall_id)) AS abandoned_below_target
   FROM f;
+
+-- =====================================================================
+-- §12a  CORRECTION to §12 - the 58% is an outcome, not a defect rate
+-- =====================================================================
+-- §12 reported "OTTO-Q fails to finish the job in 58% of cases" when a
+-- charger dies under a vehicle that still needs power. The 119 number is
+-- right; the framing was wrong, and it was wrong in the direction that
+-- flatters a finding. Looking at what the engine DID after each fault:
+--
+--   abandoned below target                          119
+--     reconsidered after the fault, no point free    95   (80%)
+--     NEVER RECONSIDERED AT ALL                      24   (20%)
+--   worst shortfall among the reconsidered           18 points
+--   worst shortfall among the never-reconsidered     43 points
+--   avg shortfall among the never-reconsidered     10.6 points
+--
+-- So in 80% of those cases the engine DID re-propose the asset and got
+-- noop_no_candidate - "no compatible available stall". That is contention,
+-- not amnesia, and it is a capacity statement about the depot rather than
+-- a defect in the decide path.
+--
+-- THE GENUINE GAP IS THE OTHER 24: assets below their own target, whose
+-- session died under them, that were never offered another point at all.
+-- 24 of 564 faults (4.3%), 24 of the 206 that still needed charge (11.7%).
+-- And the tail lives here - the 43-point worst case is in this bucket, not
+-- in the contention bucket, which tops out at 18. A small number carrying
+-- the worst outcomes is exactly the shape worth fixing.
+--
+-- TWO THINGS I MUST NOT IMPLY:
+--   * All 119 come from runs BEFORE today's 0155/0156. Zero come from
+--     after. That is NOT evidence the fixes helped - there have been no
+--     committed flagship runs since, only rolled-back grid trials. The
+--     post-fix sample is empty, not clean.
+--   * Some share of the 95 "no compatible available stall" cases may BE
+--     the 0156 starvation defect rather than true contention: before 0156
+--     a point refused for power was never downgraded to a slower one that
+--     fit. Re-measuring after a post-0156 flagship round will separate
+--     genuine contention from the bug we already closed.
+--
+-- REVISED CONCLUSION. The deterministic floor is still worth building and
+-- its shape is unchanged - on charge.session_faulted, re-enter the asset
+-- into assignment the same tick - but it is a fix for 24 sessions with the
+-- worst tail, not for 119. The other 95 are a capacity question, and the
+-- honest answer there may be "the depot was full", which no scheduler can
+-- fix and which the readiness KPI (0158) should report rather than hide.
+--
+-- This is the third time today a number softened under scrutiny: 32% ->
+-- 17% on readiness (0158), a starving asset that turned out to be at 88%
+-- and full (0166), and now 58% -> a 20% subset. The pattern is mine, not
+-- the engine's: I reach for the alarming denominator first. Recording it
+-- so the habit is visible.
