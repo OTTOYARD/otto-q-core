@@ -1,0 +1,156 @@
+-- =====================================================================
+-- 0076  What is MISSING, not just wrong - the ground-level gap register
+-- =====================================================================
+-- Chase, 2:4x PM CT Sep 2: "Always identify what is missing while we are
+-- at the ground level building up! If categories and code or scenario
+-- scope/architecture is missing and not just wrong, let's identify those
+-- gaps and build/test it now rather than later."
+--
+-- This file is the register. Gap 1 is BUILT (0158). The rest are named
+-- with evidence and an order, so none of them is a surprise later.
+--
+-- =====================================================================
+-- GAP 1 - BUILT (0158). Nothing measured whether we hit the deadline.
+-- =====================================================================
+-- ottoq_visit_needs.dispatch_due_at is populated on roughly half of all
+-- visits (27,059 of 53,805 rows all-time; 53 of 118 on the last flagship
+-- arm) and NOTHING read it for conformance:
+--   * The five canonical KPIs (CLAUDE.md 2.9) have no tardiness term,
+--     although 2.5 names tardiness as an objective term.
+--   * SLA.007.redeployment_readiness never mentions dispatch_due_at. It
+--     counts open blocking rows in exceptions/schedule_tasks - a
+--     different, older subsystem - inside BEGIN ... EXCEPTION WHEN
+--     OTHERS THEN v_open_exceptions := 0, so if those tables are absent
+--     it silently returns "no blockers".
+--   * ottoq_sla_violations has ZERO rows, ever, and no sim_run_id
+--     column, so even if it fired it could not be tied to a run.
+--
+-- We have been certifying that the engine is REPRODUCIBLE and never once
+-- measuring whether it is GOOD. Measured on the most recent flagship arm
+-- (70b2227e, started 9:39 AM CT, a run that passed every determinism
+-- check and counted toward round 7's six green):
+--
+--   visits with a due time      53
+--   ready on time               36
+--   ready LATE                   9   p50 165 min, p95 297 min, max 345 min
+--   needed no charge             8   (ended at or above target)
+--   genuinely stranded           0
+--   on-time rate                80%
+--
+-- CORRECTION, recorded because the first cut of this measure was wrong
+-- and the wrong number is the more alarming one: counting the 8
+-- no-charge-needed visits as misses gave "17 of 53 (32%) missed". They
+-- are not misses - those vehicles arrived at or above target and never
+-- needed a session. The honest figure is 9 of 53 late (17%), none
+-- stranded. The guard is in the function and stated in 0158's header.
+--
+-- Built: public.ottoq_kpi_dispatch_readiness(run) plus an
+-- assets_made_their_due_time row on every grid smoke, so the deadline is
+-- in front of us every twenty seconds instead of never. A run with no
+-- due times reports "NO DUE TIMES in this run - not evidence about
+-- readiness" rather than showing green, same anti-vacuity rule as the
+-- power cap check.
+--
+-- =====================================================================
+-- GAP 2 - the grid has never seen anything go wrong
+-- =====================================================================
+-- CLAUDE.md C7.3 names a canonical NINE failure scenarios: blocked
+-- point, overstay, immobile asset, mid-session charger fault, zone power
+-- loss, human path crossing, swap-dock jam, tug unavailable, work-side
+-- recall refusal. The grid fixture runs a clean day and nothing else. We
+-- have never once watched the engine handle a charger faulting mid
+-- session on a world small enough to read.
+-- Cost to close: each scenario is a data file plus one 20-second smoke.
+-- This is the cheapest large increase in confidence available and it is
+-- the natural next brick after round 8.
+--
+-- =====================================================================
+-- GAP 3 - one asset class, one operator, one tenant
+-- =====================================================================
+-- ottoq_vehicle_classes carries 7 classes; the grid fixture clones only
+-- autonomous robotaxis from the flagship. ottoq_fleet_operator_slas
+-- carries 4 versioned OEM rows; every grid run uses one operator. The
+-- platform thesis (CLAUDE.md 2.2) says a mining pack and a vertiport
+-- pack must both run on this kernel unchanged, and C8's Site Alpha needs
+-- three tenants sharing one power cap - the anti-correlation curve is
+-- the whole shared-infrastructure economics argument. None of it is
+-- exercised at ground level. A second asset class on the grid, with a
+-- different inlet and a different duty cycle, is a small brick that
+-- tests kernel purity directly.
+--
+-- =====================================================================
+-- GAP 4 - the queue is asserted, never tested
+-- =====================================================================
+-- stalls carries reserved_by / reserved_at / reservation_expires_at /
+-- reserved_for_mission_id, and bookings show source='reservation_
+-- honoured', but no assertion checks that a reservation is actually
+-- honoured, that it expires, or that a queue forms in a sensible order.
+-- Chase's framing - "OTTO-Q sees all variables and sends queue
+-- reservations accordingly" - is the intended product behaviour and it
+-- currently has no instrument at all.
+--
+-- =====================================================================
+-- GAP 5 - no policy comparison on the grid
+-- =====================================================================
+-- CLAUDE.md C5 requires FIFO / greedy / local / CP-SAT compared under
+-- common random numbers. ottoq_ab_runs exists for this. The grid could
+-- run the three charge_downgrade_policy modes (0159) on one seed and
+-- print a table in about a minute, which is what turns "wait vs slow
+-- charge" from an opinion into evidence. Blocked only on 0159 landing.
+--
+-- =====================================================================
+-- GAP 6 - the deterministic core has no quality gate, only a sameness gate
+-- =====================================================================
+-- The certification matrix answers "same seed, same answer". Nothing
+-- fails a round because the answer got WORSE. With 0158 there is now a
+-- number that could gate it (on-time rate, stranded count). Proposal,
+-- not yet built: extend the pair verdict or the matrix with a quality
+-- floor, so a change that keeps determinism while dropping the on-time
+-- rate cannot pass. This is the C6 CI gate idea applied to readiness.
+--
+-- =====================================================================
+-- §7  AN OPERATIONAL DEFECT OF MINE, recorded because it cost a pair
+-- =====================================================================
+-- r8_a1 (2:35 PM CT) FAILED: "canceling statement due to statement
+-- timeout" on an INSERT into ottoq_stall_bookings, inside
+-- ottoq_book_stall <- ottoq_record_enacted_booking. It failed because I
+-- was running a rolled-back grid trial in the same window - one that
+-- does CREATE OR REPLACE FUNCTION on ottoq_l2_propose_stall_assignment
+-- and then runs a 20-second two-arm pair, all in one transaction.
+--
+-- The lesson, which I had half-learned and stated too weakly in 0074:
+-- rolled-back trials are invisible to a concurrent run's CONTENT, but
+-- they are NOT free. They take locks - DDL takes ACCESS EXCLUSIVE on the
+-- function, and both workloads insert into the same bookings table with
+-- its exclusion constraint. During round 7 I ran trials throughout and
+-- got away with it; this time it killed a pair.
+--
+-- STANDING RULE from here: no grid trial and no DDL while a flagship
+-- certification pair is in flight. Trials go in the gaps between pairs,
+-- or after the round. The failed pair rolled back cleanly (both arms are
+-- one transaction, so nothing partial is on disk - zero ottoq_sim_runs
+-- rows for it), so the cost was one pair, not the round. Replacement
+-- r8_a1b scheduled 4:50 PM CT, after r8_f2.
+--
+-- =====================================================================
+-- §8  Queries
+-- =====================================================================
+-- 8.1 readiness for any run
+--   SELECT public.ottoq_kpi_dispatch_readiness('<sim_run_id>');
+-- 8.2 readiness across a round, to compare rounds
+SELECT to_char(r.started_at AT TIME ZONE 'America/Chicago','HH12:MI') AS at_ct,
+       r.scenario_code, r.tick_count,
+       public.ottoq_kpi_dispatch_readiness(r.sim_run_id) AS readiness
+  FROM ottoq_sim_runs r
+ WHERE r.run_by='cert_harness' AND r.status='completed'
+   AND r.depot_id='11111111-1111-1111-1111-111111111111'
+   AND r.started_at >= '2026-09-02 19:00:00+00'
+ ORDER BY r.started_at;
+-- 8.3 the late visits themselves, for any run
+SELECT vn.vehicle_id, vn.dispatch_due_at,
+       (SELECT min(cs.ended_at) FROM ocpp_sessions cs
+         WHERE cs.sim_run_id=vn.sim_run_id AND cs.vehicle_id=vn.vehicle_id
+           AND cs.soc_end >= COALESCE(vn.target_soc, public.ottoq_default_target_soc())) AS ready_at
+  FROM ottoq_visit_needs vn
+ WHERE vn.sim_run_id='<sim_run_id>' AND vn.dispatch_due_at IS NOT NULL
+ ORDER BY 3 NULLS FIRST;
