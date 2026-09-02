@@ -1,0 +1,149 @@
+-- =====================================================================
+-- 0070  The instrument was failing a deterministic engine
+--       Round 5 re-scored: 12 of 12. 0148 + 0149 applied. Round 6 armed.
+-- =====================================================================
+--
+-- §1  Round 5 as the instrument scored it, and as it actually was
+-- ---------------------------------------------------------------
+-- Twelve pairs, 1:45 PM - 4:43 PM CT, all arms complete.
+--
+--   at CT   column                 stored    stored div   corrected  energy  h_cmd(fixed) h_dec    h_bkg
+--   1:45    busy_day/171717/12t    passed    -            PASS       0/24    44421962  6f47615f 814c3662
+--   1:57    busy_day/171717/12t    FAILED    h_cmd        PASS       0/24    44421962  6f47615f 814c3662
+--   2:09    busy_day/314159/12t    passed    -            PASS       0/24    9fee2271  ab2d72c9 4d796f12
+--   2:21    busy_day/314159/12t    passed    -            PASS       0/24    9fee2271  ab2d72c9 4d796f12
+--   2:33    busy_day/424242/12t    passed    -            PASS       0/24    f5a9b177  d5a2769b 5304e5e9
+--   2:45    busy_day/424242/12t    FAILED    h_cmd        PASS       0/24    f5a9b177  d5a2769b 5304e5e9
+--   2:57    normal_day/171717/12t  passed    -            PASS       0/24    3f1929ef  77b5cc15 abd9f263
+--   3:09    normal_day/171717/12t  passed    -            PASS       0/24    3f1929ef  77b5cc15 abd9f263
+--   3:25    busy_day/171717/24t    FAILED    h_cmd        PASS       0/24    8b868b78  31ac9d4e d80c45e8
+--   3:51    busy_day/171717/24t    FAILED    h_cmd        PASS       0/24    8b868b78  31ac9d4e d80c45e8
+--   4:17    busy_day/424242/24t    passed    -            PASS       0/24    2ffdba2b  dd0c832e 166faa92
+--   4:43    busy_day/424242/24t    passed    -            PASS       0/24    2ffdba2b  dd0c832e 166faa92
+--
+-- Corrected: 12 of 12 pass. Every column's two pairs agree on fp,
+-- h_cmd(fixed), h_dec, h_bkg. Energy commands identical on every pair.
+-- The four stored failures were all h_cmd, and all four evaporate under
+-- the corrected sort. The engine was deterministic across this matrix;
+-- the instrument was miscounting it.
+--
+-- §2  The instrument defect (0148 a/b)
+-- ------------------------------------
+-- h_cmd hashed reason_code but did not ORDER BY it. Two same-tick
+-- refusals for one vehicle differing only in reason_code
+-- (07:00 proceed_to_stall refused {target_occupied,
+-- vehicle_state_incompatible}, present in BOTH arms) tie on the sort
+-- key, so string_agg emits them in physical-scan order and the hash
+-- follows the plan, not the data.
+--
+-- Convicted three ways on the 1:57 PM pair: stored verdict h_cmd
+-- UNEQUAL; recomputing the as-is formula later gives IDENTICAL hashes
+-- (44421962/44421962); the two arms' command multisets on scrubbed
+-- content are identical (538 rows each, 0 differing). Then generalised:
+-- 2 tied groups per arm with distinct reason_code; 0 sub-minute
+-- issued_at values (so timestamps were not the cause).
+--
+-- h_bkg had the same latent flaw (upper(during) hashed, not sorted);
+-- 0 live ties across 36 arms; fixed alongside. h_dec and h_evt already
+-- sorted by every field they hash.
+--
+-- RULE: a hash's ORDER BY includes every field it hashes.
+--
+-- I nearly reproduced the defect while hunting it: my first
+-- command-stream diff numbered occurrences ORDER BY command_id - a
+-- random uuid - and showed 16 status "mirror-swaps" that were entirely
+-- the artefact of my own random ordering. The multiset diff on content
+-- was the correct instrument and showed zero. Recorded because it is
+-- the same mistake in a different costume.
+--
+-- §3  Retroactive scoring is legitimate here
+-- ------------------------------------------
+-- The raw command rows are stored per run, so the corrected h_cmd can
+-- be recomputed for any historical pair. That is how §1 was produced.
+-- It is NOT a re-run; it is the same data scored by a sort that no
+-- longer depends on scan order.
+--
+-- §4  0148 applied 6:49 PM CT
+-- ---------------------------
+--   pin 0099c5739a41efb0c01122f9692fdf2a -> 3345bee36fa701d05adfd6112026091c
+--   arity 1, signature unchanged (twelve positional cron callers safe)
+--   h_cmd ORDER BY += COALESCE(reason_code,'-')          verified
+--   h_bkg ORDER BY += upper(during)                      verified
+--   h_nrg in arm object (x1) and v_equal (x2) = 3 mentions verified
+--   h_nrg reads ottoq_energy_commands for the run          verified
+--   classified forces_recert = true; floor -> 6:49 PM CT
+--
+-- Its proofs, all of which could have fired: the corrected h_cmd made
+-- the 1:57 PM arms equal; h_nrg was EQUAL on the 1:45 PM pair (energy
+-- matched) and UNEQUAL on round 4's 12:45 PM pair (energy differed
+-- 20/24). h_nrg distinguishes exactly the case it exists for.
+--
+-- h_nrg hashes what the orchestrator DECIDED - tick_seq, command_type,
+-- source, setpoint_kw, horizon_min, issued_at (sim clock, UTC), reason
+-- (jsonb::text is canonical) - and excludes status/executed_at/
+-- executed_note, execution lifecycle an external executor could stamp
+-- with wall-clock time.
+--
+-- Pre-flight caught a bug in this migration's own post-check: it
+-- asserted 'h_nrg' once, but after the edit it appears three times
+-- (jsonb key + both verdict sides). It would have aborted itself after
+-- a correct edit. Fixed before apply (commit 661a276).
+--
+-- §5  0149 applied 6:50 PM CT
+-- ---------------------------
+--   pin 39f1adbd7204952506c5a575cc6694a7 -> a1ecc39fedffeac24145ec17b5171fa2
+--   RETURNS TABLE gains leading depot uuid and canon_nrg text
+--   key (depot, seed, ticks, scenario); depot from ottoq_sim_runs.depot_id
+--     (validation_notes carries none - 0 of 354 rows)
+--   canon_nrg in the inter-pair comparison
+--   0 function callers, 0 view callers - DROP+CREATE safe
+--   regression: flagship rows identical to the old matrix on all 18
+--     pre-existing columns (asserted before commit)
+--   classified forces_recert = false (a reader), registered explicitly
+--   6 flagship rows, 0 other-depot rows, 0 green / 6 stale after floor
+--
+-- §6  The review that did not happen
+-- ----------------------------------
+-- A six-agent adversarial review was launched on both drafts. Every
+-- agent died on a session usage limit. Zero findings is a NON-RESULT,
+-- not a clean bill. Replaced by direct SQL pre-flight against the live
+-- functions: pins, anchor counts raw and comment-stripped (all 1/1),
+-- paren balance before/after (66/66 -> 81/81), INTO v_h intact, proof
+-- pairs present with rows (1076 commands; 48+48 energy rows; the 1:45
+-- lookup returns one pair), matrix callers 0, flagship started_at
+-- groups all exactly 2. That pre-flight found the §4 post-check bug.
+--
+-- §7  Cadence
+-- -----------
+-- Round 6: single lane, 9 min (12t) / 14 min (24t). Observed pair
+-- runtimes 296-400s and 548-726s; 9/14 leaves ~2 min before the next
+-- pair resets the same depot. 8 min was considered and rejected - 80s
+-- margin, and a collision voids the round. 3h -> ~2h10m.
+--
+-- Two lanes DEFERRED: the Benchmark depot is not a valid pair target
+-- (busy_day/normal_day bound to the flagship in ottoq_scenarios; a pair
+-- there would reset the benchmark fleet then run a flagship run; no
+-- canopy rows; 14 policy params fall through; different geometry).
+--
+-- §8  What is and is not claimed
+-- ------------------------------
+-- CLAIMED: on rounds 3-5's twelve-pair matrix, with the corrected
+-- command sort, the engine produced identical command, decision,
+-- booking and energy streams across both arms of every pair and across
+-- both pairs of every column. 0146 and 0147 closed the energy carrier
+-- (0/24 on all twelve). 0148 corrects the instrument.
+--
+-- NOT CLAIMED: green. The matrix says 0 green / 6 stale because the
+-- 0148 floor invalidated every pre-change pair. Round 6 (7:05-9:04 PM
+-- CT) is the first round scored by the corrected instrument WITH h_nrg
+-- in the verdict. Green is round 6's to earn.
+--
+-- Task #47: normal_day/171717/12t passed both round-5 pairs, agreeing.
+-- Two agreeing pairs in round 5 = ~56% by chance at 1-in-4. Still open.
+--
+-- Unchanged: db/checks/0050's CORRECTION banner STANDS; 0051 NOT
+-- closed - peak_site_kw is still not reproducible; 0066 findings
+-- (arrival-payload odometer, ottoq_fleet_pending_commands) unfixed.
+-- These three are the remaining deterministic-core items before the
+-- agentic layer.
+-- =====================================================================
