@@ -272,3 +272,33 @@ SELECT vn.vehicle_id, vn.dispatch_due_at,
 --      more than one tick.
 --   4. Only then, the agentic re-optimisation, measured against 0158's
 --      readiness KPI so "it re-optimised well" is a number.
+
+-- =====================================================================
+-- §11  F1 AND F2 ARE NOW PROVEN (0163-0166), live, in about 20 s each
+-- =====================================================================
+--   F1 route around, permanent outage (grid-g1, repair 100000 min)
+--        14 of 14 assertions pass
+--        0 bookings and 0 sessions on the broken point, 23 elsewhere
+--        pair passed and equal - both arms identically broken
+--        end SoC 100/81/90/100 vs 100/96/100/90 healthy: it degrades,
+--        it does not collapse
+--   F2 recover and reuse, 2-hour outage in a 6-hour horizon (grid-g2)
+--        14 of 14 assertions pass
+--        0 bookings on the point while faulted (02:00-04:00)
+--        2 bookings after it healed (04:30 and 06:00, charge_dcfc)
+--        charger back to Available with no operator action
+--
+-- F3 (break mid-service) remains unproven and probably unbuilt - see §10.
+--
+-- TWO MORE CHECKS OF MINE WERE WRONG, both found by running faults:
+--   0165  assertion 14 demanded zero bookings on a faulted point for the
+--         WHOLE run, so a fault that heals and is then correctly reused
+--         read as a violation. Now scoped to the repair window.
+--   0166  assertion 12 called an asset starved below a hard-coded 90%.
+--         It fired on an asset that ended at 88% and never needed a
+--         charge. Now judged against the asset's own target_soc. Same
+--         error as 0158's first cut, which turned 17% late into 32% by
+--         counting vehicles that arrived full as misses. A fixed
+--         threshold is not a statement about need, and it fails in the
+--         direction that manufactures false alarms under degraded
+--         conditions - exactly when a check most needs to be trusted.
