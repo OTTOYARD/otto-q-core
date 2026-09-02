@@ -82,7 +82,7 @@
 --    and run twin.ottoq_grid_smoke(424242, 12) for the first committed
 --    grid pair; its run id goes here.
 --  - A tight-cap variant (service_max_kw below two DCFC sessions) so the
---    0132 gate is exercised, not merely respected.
+--    0132 gate is exercised, not merely respected. -> §7 (8:32 and 8:51 AM CT).
 --  - Every future engine change: grid smoke first (seconds), flagship
 --    round after (nightly).
 --
@@ -108,3 +108,145 @@ SELECT count(*) AS enacted,
                                         AND b.stall_id=(d.enacted_action->>'stall_id')::uuid)) AS booked_on_that_point,
        string_agg(DISTINCT enacted_action->>'verb', ', ') AS verbs
   FROM d;
+
+-- =====================================================================
+-- §7  The tight-cap trials: the cap check could not fail, and two cars
+--     starved under a ceiling the flagship never reaches
+-- =====================================================================
+-- Written 9:05 AM CT Sep 2. Two more rolled-back trials on a variant
+-- fixture 'grid-tight' (same 4 assets, 2 DCFC at 350 kW connector /
+-- 250 kW inlet, 2 L2 at 19.2 kW, 1 wash, 1 service, 4 staging), with
+-- service_max_kw = dcfc_max_concurrent_kw = demand_limit_kw = the cap.
+-- Seed 424242 deals boot SoCs 79 / 66 / 56 / 56 to AV-01..04. The decide
+-- path's DCFC request is inlet 250 kW x an SoC factor (0.85 below 55%,
+-- 0.55 from 55 to 75, 0.30 above): 212.5 / 137.5 / 75 kW. L2 asks 19.2.
+-- Both trials ran in the gap between two flagship pairs of DIFFERENT
+-- columns (c2|d1, d2|e1) and left nothing behind.
+--
+-- 7.1 Trial 1, cap 250 kW (8:32 AM CT, 17.0 s, 11 of 11 assertions pass)
+--   tick 3  dcfc@75    soc 79         tick 7  l2@19.2  soc 56
+--   tick 5  dcfc@137.5 soc 66         tick 8  dcfc@137.5 soc 56 + l2@19.2 soc 56
+--   deferred_site_power_cap rows: 0.  Shield blocks: 0.
+-- The engine never asked for two fast charges at once; the largest
+-- commitment in any tick was 156.7 kW. The cap did not bind. Eleven
+-- green rows that say nothing about the cap.
+--
+-- 7.2 Trial 2, cap 150 kW (8:51 AM CT, 15.9 s, 10 of 11 - see below)
+--   tick 3     dcfc@75 soc 79   AV-01 -> DCFC-02, booking 03:30-03:45 done
+--   ticks 5-12 EN.001.grid_capacity_ceiling blocked a DCFC proposal every
+--              tick: 13 stall_assignment/overridden_to_default in all
+--   tick 7     l2@19.2 soc 56   AV-03 -> L2-02, booking 05:30 (superseded 07:02)
+--   tick 8     l2@19.2 soc 56   AV-03 -> L2-01, booking 06:00 (released 07:32)
+--   deferred_site_power_cap rows: 0.
+--   end of run (5.5 sim hours): AV-01 100%  AV-02 66%  AV-03 90%  AV-04 56%
+--
+-- Reading. Layer 1's EN.001 ("aggregate active charging power may not
+-- exceed dcfc_max_concurrent_kw x (1 - safety_margin_pct/100), nor
+-- service_max_kw"; the flagship's own reason text reads headroom
+-- 1600.8 = 1800 x 0.9 - 19.2) evaluates BEFORE the 0132 gate and, with
+-- both caps at 150, its ceiling is 135 kW. Every fast-charge request
+-- for a car below 75% is 137.5 kW. So AV-02 and AV-04 were proposed for
+-- DCFC, blocked, proposed again next tick, blocked again - eight ticks
+-- running - and were never re-proposed for the L2 points, which stood
+-- free for most of the run (AV-03 reached L2 by its own need path).
+-- Two of four cars sat unchargeable for five hours at a 150 kW site
+-- with two idle 19.2 kW points. The 0132 gate never labelled anything
+-- because the stricter layer in front of it refused first. On the
+-- flagship (1800 / 2500 kW) none of this can surface.
+--
+-- This is an engine finding, not an instrument finding: under a
+-- binding power ceiling the decide path re-proposes the blocked
+-- operation and does not downgrade to a free slower point in the same
+-- tick. Whether that is policy (wait for the fast point) or a defect
+-- is Chase's call; my reading is defect - ottoq_l2_optimize_assignments
+-- scores L2 as overflow only when the DCFC points are BOOKED, not when
+-- DCFC is refused for power. A fix is an engine change (forces_recert)
+-- and waits for round 7 to close; the grid smoke is its first gate.
+--
+-- The one failed assertion (dcfc_first_l2_only_as_overflow: "1 of 1
+-- local-path L2 assignments made while a DCFC point was unbooked") is
+-- the instrument again: the DCFC points were unbooked BECAUSE the
+-- ceiling refused them. The check must read the same tick's blocked or
+-- deferred DCFC proposal for that vehicle before calling L2 a
+-- violation. Same class as 0148 and 0154.
+--
+-- 7.3 The meter and the plan are two different models
+-- ----------------------------------------------------
+-- site_energy_snapshots.total_ev_charging_kw is
+-- twin.ottoq_sim_compute_charger_load_kw: SUM(ocpp_sessions
+-- .last_meter_value->>'power_kw') over ACTIVE sessions of the depot's
+-- running run. It reports what the emulated chargers say they are
+-- delivering, one tick or more after the plan commits. Trial 2's
+-- sessions: DCFC-02 04:00-04:30 completed, last meter value 43.74 kW
+-- (planned at 75); L2 06:30-open, 16.50 kW (planned at 19.2). The
+-- snapshots read 0.00 kW at every tick through tick 9 and 16.5-16.9 at
+-- ticks 10-12 - in both trials, under caps of 250 and 150, while the
+-- plan held 75 to 156.7 kW.
+--
+-- Assertion 7 (site_power_cap_held) reads the meter. It therefore
+-- passed both trials at "max 16.9 kW vs cap", and would pass a run in
+-- which the plan committed twice the cap. A check that cannot fail is
+-- not a check. The corrected check (0155) has three parts, each
+-- vacuous => fail:
+--   a. the PLAN never exceeds the cap: at every decision clock, the sum
+--      of requested_kw over the charge bookings the enactments created
+--      (join on the booking whose lower(during) is that enactment's
+--      clock, not on (vehicle, stall) - the trial's replay joined every
+--      booking of the pair and over-counted) is <= service_max_kw;
+--   b. the METER never exceeds the cap (keep);
+--   c. when the cap binds - any tick where a charge proposal plus the
+--      active plan would exceed it - at least one deferred_site_power_cap
+--      or EN.001 block exists in that tick. On the untight fixture this
+--      part must report "cap never bound" as a distinct non-pass, not
+--      as green.
+-- And the fixture takes the two caps separately (p_service_max_kw,
+-- p_dcfc_max_concurrent_kw) so either layer can be isolated. Trial 3
+-- (9:24 AM CT, between e2 and f1) does exactly that: service_max_kw
+-- 150 with dcfc_max_concurrent_kw back at 1800, so the 0132 gate is the
+-- binding cap and should label for the first time. Its rows go below.
+--
+-- 7.4 Two side findings in twin.ottoq_sim_advance_site_energy
+-- -----------------------------------------------------------
+--   - v_dcfc_cap_kw := 1800 and v_service_cap_kw := 2500 are LITERALS.
+--     The twin.dcfc_cap_exceeded / dcfc_cap_approached events can never
+--     fire on a depot whose caps differ from the flagship's - the grid
+--     fixture included. Advisory events only; the gate and EN.001 read
+--     the depot row. Record for the literal sweep.
+--   - its DCFC load sum over ocpp_sessions is depot-scoped, not
+--     run-scoped (0145 class). Harmless today: 0 active sessions on the
+--     flagship outside a running arm, and the sum feeds only those two
+--     events. Belongs in the 0145 sweep list.
+--
+-- 7.5 Queries
+-- -----------
+-- 7.5.1 the per-tick picture of any grid arm (what the trials printed)
+--   SELECT d.tick_seq,
+--          (SELECT string_agg(s.stall_type::text||'@'||(d2.enacted_action->>'requested_kw'), ' ')
+--             FROM ottoq_decisions d2 JOIN stalls s ON s.id=(d2.enacted_action->>'stall_id')::uuid
+--            WHERE d2.sim_run_id=d.sim_run_id AND d2.tick_seq=d.tick_seq AND d2.action_context='stall_assignment'
+--              AND d2.outcome_status='enacted' AND s.stall_type::text IN ('dcfc','l2')) AS enacted_charge,
+--          count(*) FILTER (WHERE d.outcome_status='deferred_site_power_cap') AS gate_refusals,
+--          count(*) FILTER (WHERE d.outcome_status='overridden_to_default') AS shield_blocks,
+--          (SELECT total_ev_charging_kw FROM site_energy_snapshots e WHERE e.sim_run_id=d.sim_run_id
+--            ORDER BY abs(EXTRACT(epoch FROM e.timestamp - min(d.sim_clock))) LIMIT 1) AS meter_kw
+--     FROM ottoq_decisions d WHERE d.sim_run_id='<arm>' GROUP BY d.sim_run_id, d.tick_seq ORDER BY d.tick_seq;
+-- 7.5.2 the literals
+--   SELECT (regexp_matches(pg_get_functiondef('twin.ottoq_sim_advance_site_energy'::regproc), 'v_(dcfc|service)_cap_kw\s+NUMERIC := \d+', 'g'))[1];
+
+-- =====================================================================
+-- §8  SUPERSEDING NOTE - 2:2x PM CT Sep 2 (nothing above is struck)
+-- =====================================================================
+-- §7 called the dcfc_first_l2_only_as_overflow failure "the instrument
+-- again", and attributed it to DCFC having been refused for power. That
+-- was half right and the smaller half. The A/B that settled it: the same
+-- check fails identically on an UNCONSTRAINED fixture (cap 600 kW, no
+-- refusals anywhere), against an assignment whose own rationale reads
+-- wanted_type = l2, soc 85. The check does not encode a power-refusal
+-- edge case - it encodes a policy OTTO-Q deliberately does not have.
+-- Routing is need-matched, not fast-point-first. Corrected in 0157;
+-- full record in db/checks/0075.
+--
+-- §7's engine finding stands and is now closed: 0156. §7's meter finding
+-- stands and is now closed: 0155, which also restored sight to Layer 1's
+-- EN.001 capacity rule - it reads the same meter and had been evaluating
+-- every proposal against 0.0 kW of existing load. See 0075 §1a.
