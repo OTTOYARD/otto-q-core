@@ -95,8 +95,16 @@ stale now. Live `cuopt_invocation_log` on 2026-09-01, span 2026-08-02 → 2026-0
 and returned **0** proposals (debounce 360 · first_refusal_arm 152 · edge no_candidates 24 · 24 gate
 passes that found nothing). `ottoq_external_proposals` carried 76 rows, all from deterministic
 internal proposers (`ottoq_service_priority` 28 pending / 28 superseded; `greedy_constrained` 4 / 16).
-Zero decisions with `l2_engine='cuopt'`. 1,368 deferral rows. **The certification matrix has never
-exercised an external proposer.** That is the fact §8 below is built on.
+Zero decisions with `l2_engine='cuopt'`. 1,368 deferral rows. **In rounds 3–6 the certification
+matrix has not exercised an external proposer.** (Strictly: one `cert_harness` run on 2026-08-30
+received a single proposal from the wired remote solver and did not enact it — the only such
+event in the ledger.) That is the fact §8 below is built on.
+
+**Provenance of the 16 receipted calls in the window:** 11 from `claude_v2_validation` (my own
+V2 runs, 08-29; 88 proposals, 6 enacted), 2 from `operator_demo` (08-29; 26 proposals, 0
+enacted), **2 from `production_live` (08-30; 21 proposals, 21 enacted)**, 1 from `cert_harness`
+(08-30; 1 proposal, 0 enacted). 21 of the 27 enacted `l2_engine='cuopt'` decisions in the window
+were made in the production loop.
 
 ## 2. The local decide path, in plain language (the disposer)
 
