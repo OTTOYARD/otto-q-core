@@ -197,6 +197,17 @@
 -- The matrix above stands and every hash in it still regenerates -- what was overstated is the
 -- SCOPE: this certifies THE SCHEDULER. peak_site_kw is not reproducible, and no number derived
 -- from it should ship until 0051's fix lands.
+-- *** RESOLUTION NOTE (2026-09-02, 7:20 AM CT, see db/checks/0072) *** The CORRECTION above stands
+-- as written; this note records what closed it. 0144 resets ottoq_bess_units at arm start; 0146 +
+-- 0147 made BESS dispatch deterministic (run- and depot-scoped load sum, seed-derived noise salt);
+-- 0148 hashes the energy-command stream into the verdict. Re-measured with the same instrument
+-- 0051 used (ottoq_kpi_five) on all 12 round-5 pairs, 24 runs, 1:45-4:43 PM CT Sep 1:
+-- peak_site_kw IDENTICAL between arms on 12 of 12 (by column: 516.0 / 494.4 / 579.2 / 489.8 /
+-- 516.0 / 579.2 kW) and all five KPIs identical on 12 of 12. Still differing between the arms of
+-- a certified pair: run_key.config_hash, which is md5(ottoq_sim_runs.payload) and so carries the
+-- boot draw's wall-clock drawn_at. The reproducibility KEY is not yet reproducible; open as its
+-- own item in 0072. The scope sentence above is therefore now: this certifies the scheduler AND
+-- the energy path; the run key's hash is the remaining unfinished surface.
 --
 -- ── THE GATE ──────────────────────────────────────────────────────────────────────────────
 -- The founder's condition was "no AI/agent layer until the core is validated over and over
