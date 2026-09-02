@@ -460,3 +460,86 @@ SELECT count(*) FILTER (WHERE soc_end < tgt) AS still_needed_charge,
 -- The deterministic floor is worth building for those 24 and for the 43-
 -- point tail, and for nothing else. It is a small, sharp fix, and saying
 -- so is more useful than the 58% I opened with.
+
+--
+-- §13  GAP - the per-tick work caps are magic numbers, and when they bind
+--       the engine goes silent (found 4:15 PM CT, 2026-09-02)
+-- ------------------------------------------------------------------------
+-- Looking for what strands an asset - the 3 unserved in 0077 §5, the 8
+-- stranded in the readiness KPI, the 24 never-reconsidered mid-charge faults
+-- in §12 - the first thing to establish was whether re-entry exists at all.
+-- It does. ottoq_decide_tick line 928 loops vehicles in
+-- 'staged_awaiting_service' every tick, and line 1008 says so explicitly:
+-- "'hold_in_queue': the vehicle stays in staged_awaiting_service and is
+-- retried." So an asset in the holding state is NOT forgotten.
+--
+-- What is capped is how many the engine looks at. Three per-tick work caps,
+-- all bare literals (every other LIMIT in the function is a next-leg lookup):
+--
+--   line 453   LIMIT 40   release loop, current_state='charge_complete_holding'
+--                         ORDER BY last_state_change ASC NULLS FIRST, id
+--   line 794   LIMIT 20   THE SEATING LOOP - the one that actually puts a
+--                         vehicle in a stall, charge and bay both
+--                         ORDER BY eff_rank DESC, is_resume DESC, fits_window
+--                         DESC, minutes_to_deploy ASC, open_must_do_min ASC, id
+--   line 937   LIMIT 40   service loop, staged_awaiting_service
+--                         ORDER BY last_state_change ASC NULLS FIRST, id
+--
+-- The orderings are sound - line 794 is an urgency-ranked priority queue, the
+-- other two are oldest-waiting-first - so this is not arbitrary starvation.
+-- With 116-119 vehicles on the flagship, 20 seatings per tick is a real
+-- ceiling: at most 240 seating considerations across a 12-tick run.
+--
+-- THE ACTUAL GAP IS NOT THE CAP. IT IS THAT THE CAP IS UNRECORDED.
+--
+-- Lines 781-786 show the author already reasoned about this and stopped one
+-- step short:
+--
+--   -- 0003: how many FRESH candidates are competing for this same lane this
+--   -- tick. Window functions are evaluated over the whole qualifying set
+--   -- BEFORE the LIMIT, so this is the true competing demand, not just what
+--   -- fits in 20 rows.
+--   count(*) FILTER (WHERE NOT rk.is_resume) OVER (PARTITION BY rk.stall_type)
+--     AS fresh_waiting_lane
+--
+-- So the engine COMPUTES the true competing demand and uses it internally for
+-- the resumption budget - but never writes down that it was oversubscribed. A
+-- vehicle ranked 21st this tick produces no abstention row and no reason code.
+-- It is indistinguishable, afterwards, from a vehicle that was considered and
+-- declined.
+--
+-- That is exactly the distinction CLAUDE.md 6 demands of cuOpt - the ledger
+-- exists "precisely to make 'never invoked' distinguishable from 'invoked N
+-- times, abstained M'" - and exactly what OTTO-Defense's CLAUDE.md means by
+-- "every directive carries a reason code." The seating loop currently fails
+-- both, and it is the loop that decides whether an asset gets served.
+--
+-- WHAT TO BUILD (not built here; ottoq_decide_tick is an engine function and
+-- round 8 is in flight, so this is forces_recert = TRUE work for after it):
+--
+--   1. The three caps become policy params via ottoq_policy_get with their
+--      current values as defaults - decide_seat_batch 20, decide_service_batch
+--      40, decide_release_batch 40. At the defaults this is a zero-behavior
+--      change, which is what makes it safe to certify against the same canons.
+--      Same move 0159 made for the wait-vs-slower-charger choice: a number
+--      the orchestration layer will want to tune must not be a literal.
+--
+--   2. When the qualifying set exceeds the batch, RECORD IT - loop, tick,
+--      lane, qualified count, seated count, deferred count. Then "the engine
+--      ran out of tick budget" becomes a measurable cause, and the 3 unserved
+--      and 8 stranded can be attributed rather than guessed at.
+--
+--   Design note before writing it: adding rows to whatever stream h_dec hashes
+--   will move the decision canon. That is legitimate (the canon SHOULD move
+--   when the engine records more) but it must be a deliberate forces_recert
+--   migration certified on its own round, never folded into another change.
+--
+-- WHAT IS NOT YET ESTABLISHED - do not skip this before building:
+--   Whether the cap actually binds on the flagship runs in question. 116
+--   vehicles do not all await seating on the same tick. The query to settle
+--   it, after round 8: per tick, count vehicles in staged_awaiting_service
+--   passing the line 770-778 predicate, and compare to 20. If it never
+--   exceeds 20, the cap is innocent and the stranding has another cause -
+--   and the recording in (2) is still worth building, because that is the
+--   instrument that would have answered this question without reading 81k
+--   characters of function source.
