@@ -154,3 +154,54 @@ SELECT vn.vehicle_id, vn.dispatch_due_at,
   FROM ottoq_visit_needs vn
  WHERE vn.sim_run_id='<sim_run_id>' AND vn.dispatch_due_at IS NOT NULL
  ORDER BY 3 NULLS FIRST;
+
+-- =====================================================================
+-- §9  ADDED 3:0x PM CT - the real-time loop, and what it caught
+-- =====================================================================
+-- Chase: "We can't wait over an hour to do a scheduled test. Cancel all
+-- schedules, and just test in real time."
+--
+-- Done. Every r6/r7/r8 cron job unscheduled; only the production
+-- heartbeat jobs remain. The iteration loop is now the grid fixture at
+-- roughly twenty seconds a run, driven on demand.
+--
+-- 9a. WHY ROUND 8 DIED, and it was not the engine. r8_a1 AND r8_a2 both
+-- failed after exactly 2 minutes. statement_timeout on this database is
+-- 120000 ms, and my round-8 cron commands were a bare SELECT
+-- ottoq_determinism_pair(...) with no override - so every flagship pair,
+-- which needs 5 to 13 minutes, was guaranteed to be killed at two
+-- minutes. Round 7's jobs must have set it and mine did not. Any future
+-- flagship pair fired from cron must carry "SET statement_timeout = 0;"
+-- ahead of the call. My scheduling error, not an engine regression - and
+-- the second failure came while I was running nothing at all, which is
+-- what ruled out the lock-contention theory in §7.
+--
+-- 9b. THE THREE-MODE A/B, run live on grid-starve (cap 150 kW so EN.001's
+-- ceiling is 135 kW, seed 424242, 12 ticks, both arms each time):
+--
+--   mode                     end SoC            assigns  EN.001  downgrades  holds  checks
+--   0 wait_for_wanted        73 / 60 / 100 / 89     3       17       -         -    12 of 13
+--   1 fit_now (default)     100 / 96 / 100 / 90     4        0       2         0    13 of 13
+--   2 deadline_aware        100 / 96 / 100 / 90     4        0       1         1    13 of 13
+--
+-- Mode 0 is the pre-0156 baseline and it fails exactly one check -
+-- no_asset_starves_while_a_capable_point_is_free - which is the check
+-- built for it. Mode 2 reaches the same end state as mode 1 with one
+-- downgrade instead of two, holding the fast point once for the asset
+-- whose slow charge would have missed dispatch_due_at (recorded in the
+-- decision as held_for_wanted='slow_point_misses_due_at'). On this
+-- scenario the hold costs nothing; on a busier one it is the trade the
+-- agentic layer will have to price, and 0158's readiness KPI is the
+-- scoreboard it gets priced on.
+--
+-- 9c. AND THE A/B CAUGHT TWO OF MY OWN ERRORS INSIDE FIVE MINUTES:
+--   * The first A/B read the same arm for both modes, because it ordered
+--     ottoq_sim_runs by started_at - which is the PINNED SIM CLOCK and
+--     therefore identical across runs. Only end_soc, read from live
+--     vehicle state, was genuinely per-mode. Fixed by capturing the run
+--     ids present before each smoke and taking the new one.
+--   * 0160 anchored an edit on a line occurring twice and broke check 12
+--     outright. Fixed by 0160r, with the standing rule now recorded:
+--     anchored edits assert the occurrence COUNT, never mere presence.
+-- Neither would have surfaced for hours on the old schedule-and-wait
+-- cadence. Both surfaced in under a minute on the grid.
