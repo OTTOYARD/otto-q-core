@@ -302,3 +302,74 @@ SELECT vn.vehicle_id, vn.dispatch_due_at,
 --         threshold is not a statement about need, and it fails in the
 --         direction that manufactures false alarms under degraded
 --         conditions - exactly when a check most needs to be trusted.
+
+-- =====================================================================
+-- §12  F3 MEASURED - and it did not need building, only looking
+-- =====================================================================
+-- I was about to build mid-service fault injection. Verify before you
+-- build (CLAUDE.md rule 5) said look first, and the twin has been doing
+-- this all along: 564 sessions across 273 runs ended with fault_count > 0
+-- and a charge.session_faulted event, in six calibrated modes -
+--   fault.connector_cable        270
+--   fault.station_hardware        99
+--   fault.session_aborted_other   98
+--   fault.communication_dropout   72
+--   fault.thermal_emergency       13
+--   fault.ground_fault_safety     12
+-- each after 9-16 SoC points had already been delivered. Genuine
+-- mid-charge interruptions, in ordinary runs, for months. Nobody had ever
+-- asked what happened next.
+--
+-- WHAT HAPPENS NEXT, over all 564:
+--   resumed charging on another point        89   avg 69 min, p95 150 min
+--   never charged again in that run         475
+--     of those, got some later booking      466   (moved, not ignored)
+--     got nothing at all                      9
+--   avg SoC when abandoned                 91.1%
+--   worst SoC abandoned                    47.0%
+--
+-- The raw 84% "never charged again" is misleading and must not be quoted:
+-- most of those vehicles were finished. Judged against each asset's OWN
+-- target (ottoq_visit_needs.target_soc, default 80):
+--
+--   already at or above target             358   (63% - nothing needed)
+--   still needed charge                    206
+--     resumed elsewhere                     87
+--     ABANDONED BELOW TARGET               119   57.8% of the needy
+--   average shortfall                      6.0 points
+--   WORST shortfall                       43.0 points
+--   runs affected                          101
+--
+-- SO: when a charger dies under a vehicle that still needs power, OTTO-Q
+-- fails to finish the job in 58% of cases. Usually by a little - six
+-- points - but the tail is an asset left 43 points short of what it was
+-- promised, and it happens across a hundred runs.
+--
+-- CAVEAT, stated so the number is not oversold: "abandoned" means no
+-- further charging session in that RUN, and a 12-tick run is six sim
+-- hours. A vehicle faulted near the horizon's end may simply have run out
+-- of clock rather than been ignored. Controlling for time-remaining is the
+-- first refinement, and the 43-point worst case and 101 affected runs
+-- survive any such control.
+--
+-- This confirms §10's prediction: F3 is the real hole, and it is now a
+-- number rather than a suspicion. It also confirms the shape of the fix -
+-- the deterministic floor is "on charge.session_faulted, re-enter the
+-- asset into assignment the same tick", and the intelligence layer is
+-- "where should it go", which is 0159's wait-vs-fit trade under worse
+-- information. The floor must exist first: "the agent was slow" cannot be
+-- why a car sat plugged into a brick.
+--
+-- 12.1 the query, reusable on any window
+WITH f AS (
+  SELECT cs.sim_run_id, cs.vehicle_id, cs.stall_id, cs.ended_at AS faulted_at, cs.soc_end,
+         COALESCE((SELECT max(vn.target_soc) FROM ottoq_visit_needs vn
+                    WHERE vn.sim_run_id=cs.sim_run_id AND vn.vehicle_id=cs.vehicle_id), 80) AS tgt
+    FROM ocpp_sessions cs
+   WHERE cs.fault_count > 0 AND cs.ended_at IS NOT NULL AND cs.sim_run_id IS NOT NULL)
+SELECT count(*) FILTER (WHERE soc_end < tgt) AS still_needed_charge,
+       count(*) FILTER (WHERE soc_end < tgt AND NOT EXISTS (
+         SELECT 1 FROM ocpp_sessions cs2 WHERE cs2.sim_run_id=f.sim_run_id
+            AND cs2.vehicle_id=f.vehicle_id AND cs2.started_at >= f.faulted_at
+            AND cs2.stall_id IS DISTINCT FROM f.stall_id)) AS abandoned_below_target
+  FROM f;
