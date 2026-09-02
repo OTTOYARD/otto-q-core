@@ -464,7 +464,16 @@ the prototype is additive and unwired until C5 wraps it as a policy.
 
 ---
 
-## 8. Proposals and the verdict — the gate before the agentic layer (added 2026-09-01)
+## 8. Proposals and the verdict — the gate before the agentic layer (added 2026-09-01; reframed 7:35 PM CT)
+
+> **Scope note (Chase, 7:30 PM CT):** the solver/proposer choice is **open**. cuOpt is not a
+> commitment; it is one candidate, and the right tool is to be determined once the deterministic
+> layer is fully functional. Nothing in this section presumes cuOpt. Every mechanism below is
+> proposer-agnostic — it applies identically to CP-SAT (`solvers/cpsat/`), the forward orchestrator
+> (`proposer/`), cuOpt, an LLM, or a proposer that does not exist yet. cuOpt appears in §1/§1a only
+> because it is the proposer that is *currently wired into the tick* and therefore the one the
+> ledger has numbers for. §1a's finding that it is invoked in every certification run (560 times in
+> round 5, always abstaining) is a fact about the present engine, not an endorsement.
 
 **Where the pair verdict stands after 0148.** `ottoq_determinism_pair` hashes six streams per arm
 — `fp` (boot world), `h_cmd` (vehicle commands), `h_dec` (decisions), `h_evt` (events), `h_bkg`
@@ -476,8 +485,8 @@ surface, exactly where the energy tables sat before 0148 and where the end state
 **Why that has not bitten yet.** §1a: in certification runs cuOpt returns zero proposals and the
 proposal table carries only deterministic internal proposers. Nothing nondeterministic has been
 allowed to propose during a certified run, so there has been nothing for the blind spot to hide.
-That will stop being true the day an agent — cuOpt with the gate open, Nemotron, the CP-SAT
-proposer in `solvers/cpsat/`, the forward orchestrator in `proposer/` — is wired into a cert run.
+That will stop being true the day *any* proposer — CP-SAT in `solvers/cpsat/`, the forward
+orchestrator in `proposer/`, a remote solver, an LLM, or one not yet chosen — is wired into a cert run.
 
 **"Agents propose, solver disposes" is currently an architectural statement, not a certified
 one.** To certify it, two things must be separately observable per pair:
@@ -524,13 +533,14 @@ the migration cannot demonstrate discrimination on real data. State that plainly
 
 ### 8.2 External proposers under certification — the decision Chase owns
 
-cuOpt is an external NVIDIA endpoint; Nemotron is an LLM. Neither is reproducible under a seed
-from this side of the wire. Three defensible postures, not mutually exclusive:
+Any proposer that runs outside the database — a remote solver, an LLM, a service behind an HTTP
+call — is not reproducible under a seed from this side of the wire. Today that describes the two
+that happen to be wired (a remote solver and an LLM); it will describe whatever is chosen later. Three defensible postures, not mutually exclusive:
 
 | Posture | What it certifies | Cost | Honest limit |
 |---|---|---|---|
 | **A. Pin cert runs to deterministic proposers** (`policy_disabled` for external ones inside `run_by='cert_harness'`) | The disposer and the internal proposers, fully | One gate check | Says nothing about the engine *with* agents. The certified artefact and the shipped one differ by a switch. |
-| **B. Record-and-replay** — production runs ledger every external proposal (already true for cuOpt: 136 in the log); a cert mode replays a recorded proposal stream into both arms | "Given these exact proposals, the disposer is deterministic" — the actual propose/dispose contract | A replay source for `ottoq_external_proposals` keyed by (tick, entity); `h_prop` is then the check that both arms *received* the same proposals | Does not certify the proposer. It is not supposed to. |
+| **B. Record-and-replay** — production runs ledger every external proposal (the ledger discipline already exists: 136 proposals logged for the currently-wired proposer); a cert mode replays a recorded proposal stream into both arms | "Given these exact proposals, the disposer is deterministic" — the actual propose/dispose contract | A replay source for `ottoq_external_proposals` keyed by (tick, entity); `h_prop` is then the check that both arms *received* the same proposals | Does not certify the proposer. It is not supposed to. |
 | **C. Live external calls in cert, proposals hashed** | Whether the external proposer happens to be reproducible | Nothing new | It is not reproducible, so this manufactures red pairs that are not engine faults. Reject. |
 
 **Recommendation:** A now, B as the agentic layer's first deliverable, C never. Under A+B the
