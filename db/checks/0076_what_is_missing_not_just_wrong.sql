@@ -424,3 +424,39 @@ SELECT count(*) FILTER (WHERE soc_end < tgt) AS still_needed_charge,
 -- and full (0166), and now 58% -> a 20% subset. The pattern is mine, not
 -- the engine's: I reach for the alarming denominator first. Recording it
 -- so the habit is visible.
+
+-- =====================================================================
+-- §12b  The open question in §12a is answered: it is contention
+-- =====================================================================
+-- §12a left it open whether the 95 "reconsidered but unplaced" cases were
+-- genuine contention or the 0156 starvation defect wearing a disguise.
+-- The two have different signatures and the ledger separates them:
+--   0156's defect  a candidate WAS found and proposed, then refused for
+--                  power (deferred_site_power_cap, or EN.001 block)
+--   contention     the proposer abstained with
+--                  no_compatible_available_stall - zero candidates existed
+--
+--   of the 95 reconsidered-but-unplaced
+--     also power-blocked at some point after the fault      6
+--     pure no_compatible_available_stall                   89
+--     abstention rows across them                         400
+--
+-- So at most 6 of 95 could be the defect we closed today. The other 89 are
+-- the depot genuinely having no free compatible point when the asset came
+-- back looking. That is a capacity fact, not a scheduling bug, and no
+-- solver fixes it - the honest response is for the readiness KPI (0158) to
+-- REPORT it rather than for the engine to pretend otherwise.
+--
+-- FINAL SHAPE OF F3, after three passes:
+--   564  mid-charge faults, six calibrated modes, already in the twin
+--   358  asset was already at or above target - nothing owed
+--   206  still needed charge
+--     87  resumed on another point                      working
+--     89  no free compatible point existed              capacity
+--      6  blocked for power (0156 class, now fixed)     probably closed
+--     24  NEVER RECONSIDERED                            the real gap
+--         avg 10.6 points short, worst 43 - the tail lives here
+--
+-- The deterministic floor is worth building for those 24 and for the 43-
+-- point tail, and for nothing else. It is a small, sharp fix, and saying
+-- so is more useful than the 58% I opened with.
