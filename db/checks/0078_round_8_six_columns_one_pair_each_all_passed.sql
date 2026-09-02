@@ -126,14 +126,60 @@ SELECT left(depot::text,8) AS depot, seed, ticks, scenario, pairs_seen, consecut
   FROM public.ottoq_cert_matrix(public.ottoq_cert_recert_floor())
  ORDER BY scenario, seed, ticks;
 
--- 5.3 does the LIMIT 20 seating cap bind? (0076 §13's open question, ten fresh arms)
---     If max_awaiting never exceeds 20, the cap is innocent and the stranding
---     in 0077 §5 has another cause.
-SELECT r.sim_run_seq, r.random_seed, r.tick_count,
-       max(t.awaiting) AS max_awaiting_one_tick
-  FROM ottoq_sim_runs r
-  CROSS JOIN LATERAL (
-    SELECT count(*) AS awaiting FROM vehicles v
-     WHERE v.home_depot_id = r.depot_id AND v.category='autonomous'
-       AND v.current_state = 'staged_awaiting_service') t
- WHERE r.sim_run_seq > 1752 GROUP BY 1,2,3 ORDER BY 1;
+-- 5.3 does the LIMIT 20 seating cap bind? See §6 - answered, cap is not the
+--     culprit. This is the query that answered it. (An earlier version of this
+--     query in the first commit of 0078 was WRONG: it read vehicles.current_state
+--     at query time, which is the END state of the last run to touch the fleet,
+--     not a per-tick count. It would have "answered" the question with a number
+--     that had nothing to do with any tick.)
+WITH runs AS (SELECT sim_run_id, sim_run_seq, tick_count
+                FROM ottoq_sim_runs WHERE sim_run_seq IN (1753,1757,1759,1761)),
+b AS (SELECT r.sim_run_seq, b.booked_at_sim, count(DISTINCT b.vehicle_id) AS veh
+        FROM ottoq_stall_bookings b JOIN runs r USING (sim_run_id)
+       WHERE b.booked_by='otto_q_enacted'
+         AND b.source IN ('deterministic','greedy_constrained','needs_card','charge_disposition')
+       GROUP BY 1,2)
+SELECT sim_run_seq, count(*) AS ticks_with_seatings,
+       max(veh) AS max_vehicles_seated_one_tick, round(avg(veh),1) AS avg_per_tick,
+       count(*) FILTER (WHERE veh >= 20) AS ticks_at_cap
+  FROM b GROUP BY 1 ORDER BY 1;
+
+
+-- §6  ANSWERED: the LIMIT 20 seating cap is not what strands assets
+-- ------------------------------------------------------------------
+-- 0076 §13 named the three per-tick work caps in ottoq_decide_tick and left
+-- one question open: does the LIMIT 20 on the seating loop actually bind on
+-- these runs? Measured against four fresh round-8 arms:
+--
+--   seq   ticks with seatings   max vehicles seated in one tick   avg/tick
+--   1753          12                        21                      9.7
+--   1757          12                        19                     10.3
+--   1759          17                        21                      8.4
+--   1761          15                        17                      8.1
+--
+-- The loop runs at roughly HALF its budget. The cap is slack on almost every
+-- tick, so it is not the primary cause of an asset never being served. The
+-- stranding in 0077 §5 (3 unserved, 8 stranded) has another cause, and looking
+-- for it in the caps would have been wasted work.
+--
+-- Note the 21 - a single LIMIT 20 loop cannot seat 21 distinct vehicles in one
+-- tick, so the source filter above is over-inclusive and admits bookings from
+-- at least one other writer. Which means the "2 ticks at cap" figure is NOT
+-- evidence the cap bound; it is evidence the attribution is imprecise. The
+-- conclusion that survives is the one the averages carry: ~8-10 of 20.
+--
+-- THREE QUERIES WERE NEEDED TO GET HERE, AND THE FIRST TWO WERE WRONG:
+--   1. bookings per tick - 117-132 per tick, far over 20. Invalid: one seated
+--      vehicle books several legs.
+--   2. DISTINCT vehicles per tick, all sources - 67-75. Invalid: several loops
+--      write bookings and the count mixes them.
+--   3. DISTINCT vehicles per tick filtered by booked_by/source - the numbers
+--      above, and still not clean enough to call the 21.
+--
+-- That is exactly the instrument gap 0076 §13 describes. A booking does not
+-- record which loop seated it and a tick does not record that it was
+-- oversubscribed, so answering a simple question about the engine's own
+-- throughput took three attempts and ended in a qualified answer. Recording
+-- oversubscription is worth building for that reason alone, independent of
+-- whether the cap ever binds - it is the difference between measuring the
+-- engine and inferring it.
