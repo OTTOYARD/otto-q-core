@@ -223,7 +223,7 @@ END $post$;
 
 -- 7. Lineage. Engine behaviour changes for every run: forces re-certification.
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note, classified_at)
-VALUES ('0152_the_certification_runs_the_deterministic_core_alone', true,
+VALUES ('the_certification_runs_the_deterministic_core_alone', true,
         'Global tier: cuopt_propose_enabled=0, cuopt_first_refusal_max_defers=0; ottoq_determinism_pair pins both per arm. Removes the proposer''s one-tick holds (57-58 per 12-tick arm in round 6) from the decide path. Canon moves; round 7 establishes the deterministic-only canon.',
         now())
 ON CONFLICT (name) DO UPDATE

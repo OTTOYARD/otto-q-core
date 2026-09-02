@@ -178,14 +178,44 @@ def main():
         "T1c FAIL: build_and_solve set a wall-clock limit by default "
         f"({params.max_time_in_seconds}s) -- that is the T1b failure mode")
     assert params.num_search_workers == 1, "T1c FAIL: not single-worker"
+    #: A WALL CLOCK IS MACHINE-DEPENDENT BY CONSTRUCTION -- that is T1b's whole
+    #: point -- so no fixed wall limit can be relied on to truncate THIS scenario
+    #: on every runner. Measured: 1.2 s truncated it (FEASIBLE) on a box that
+    #: solves it in 2.6 s, and reached OPTIMAL on a CI runner (PR #144,
+    #: 2026-09-02), where the old assertion then accused a correctly-labelled
+    #: OPTIMAL plan of lying. The label is asserted on whichever branch this
+    #: machine produced, and the clock-decided path is pinned deterministically
+    #: below through the retained-plan route with a limit no machine can beat.
     walled = build_and_solve(load_scenario(SC_PATH), time_limit_s=1.2,
                              det_budget_s=1e9)
-    assert walled["repro"]["reproducible"] is False, (
-        "T1c FAIL: a wall-clock-truncated plan claimed to be reproducible")
+    if walled["solver_status"] == "OPTIMAL":
+        assert walled["repro"]["reproducible"] is True, (
+            "T1c FAIL: an OPTIMAL plan was labelled non-reproducible -- "
+            "optimality is limit-independent")
+        print("T1c note: the 1.2 s wall clock did not bind on this machine "
+              "(OPTIMAL); the truncated branch is exercised via the retained-plan route")
+    else:
+        assert walled["repro"]["reproducible"] is False, (
+            "T1c FAIL: a wall-clock-truncated plan claimed to be reproducible")
+    #: 1 ms cannot finish presolve on this scenario: the solver returns UNKNOWN,
+    #: the previous plan is retained, and the retention itself was the clock's
+    #: decision -- so the retained plan must be labelled non-reproducible even
+    #: though the plan it came from (idle, T1b) is reproducible.
+    clocked = build_and_solve(load_scenario(SC_PATH), time_limit_s=0.001,
+                              det_budget_s=1e9, previous_plan=idle)
+    assert clocked["solver_status"] != "OPTIMAL", (
+        "T1c FAIL: a 1 ms wall clock reached OPTIMAL -- the test proves nothing "
+        "on this machine; lower the limit")
+    assert clocked["repro"]["reproducible"] is False, (
+        "T1c FAIL: a plan whose truncation or retention a wall clock decided "
+        f"claimed to be reproducible (status={clocked['solver_status']}, "
+        f"retained={clocked.get('retained_previous', False)})")
     assert idle["repro"]["reproducible"] is True, (
         "T1c FAIL: a deterministically-budgeted plan was not labelled reproducible")
     print("T1c PASS default solve is deterministically budgeted with no "
-          "wall-clock limit; a wall-clocked plan is labelled reproducible=False")
+          f"wall-clock limit; wall-clocked plans are labelled reproducible=False "
+          f"(1.2 s: {walled['solver_status']}; 1 ms: {clocked['solver_status']}, "
+          f"retained={clocked.get('retained_previous', False)})")
 
     # T1d — ACROSS PROCESSES, not just twice in one. Repeat solves in a single
     # process can agree through warmed state that a fresh process would not have.

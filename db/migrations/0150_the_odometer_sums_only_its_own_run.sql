@@ -101,7 +101,7 @@ BEGIN
 END $post$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note, classified_at)
-VALUES ('0150_the_odometer_sums_only_its_own_run', false,
+VALUES ('the_odometer_sums_only_its_own_run', false,
         'Scopes the OEM arrival odometer sum to the dispatch''s own run. Reaches only the webhook payload (unhashed); measured in 0066 to differ 43/43 on a pair whose every hash matched, so it cannot move canon.',
         now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;

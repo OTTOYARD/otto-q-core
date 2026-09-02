@@ -97,7 +97,7 @@ END $post$;
 DROP TABLE pg_temp_0151;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note, classified_at)
-VALUES ('0151_the_fleet_api_returns_only_production_commands', false,
+VALUES ('the_fleet_api_returns_only_production_commands', false,
         'ottoq_fleet_pending_commands returns only sim_run_id IS NULL. Read-only outbound API, zero engine callers; cannot move canon.',
         now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;

@@ -86,3 +86,20 @@ SELECT col,
        public.ottoq_kpi_five(a::uuid)->>'peak_site_kw' AS peak_kw_arm_a,
        public.ottoq_kpi_five(b::uuid)->>'peak_site_kw' AS peak_kw_arm_b
 FROM arms ORDER BY col;
+
+-- *** CLOSED (2026-09-02, 7:20 AM CT, see db/checks/0072) *** Items 1-4 of the fix list above
+-- landed as 0134/0137 (weather pick scoped + tiebreak), 0144 (BESS reset at arm start), 0146 +
+-- 0147 (BESS dispatch deterministic: run/depot-scoped load sum, seed-derived salt) and 0148
+-- (h_nrg in the verdict). Item 5 ran as rounds 5 and 6. Re-measured with the SAME instrument
+-- (ottoq_kpi_five, via the scratch table public.cert0051_recheck_kpi, computed 9:20 PM CT Sep 1
+-- by cron and dropped after recording) on all 12 round-5 pairs, 24 runs:
+--   peak_site_kw identical between arms on 12 of 12 -- 516.0 (171717/12t), 494.4 (314159/12t),
+--   579.2 (424242/12t), 489.8 (normal_day/171717/12t), 516.0 (171717/24t), 579.2 (424242/24t);
+--   peak_site_kw_demand, asset_hours_available_per_day, service_point_turns_per_point_per_day,
+--   touch_events_per_turn, p95_time_to_service_min identical on 12 of 12.
+-- The "Expected TODAY: false" query above is kept as the historical evidence of the defect; it
+-- now returns kpis_identical = false ONLY because run_key.config_hash still differs (it is
+-- md5(ottoq_sim_runs.payload), which carries the boot draw's wall-clock drawn_at). That is the
+-- one remaining item from this check and is tracked in 0072. The provenance text inside
+-- ottoq_kpi_five ("the twin battery it models is not yet deterministic") is now stale and is
+-- corrected alongside the config_hash fix.
