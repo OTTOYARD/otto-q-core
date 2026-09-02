@@ -86,11 +86,25 @@
 
 -- ------------------------------------------------------- 1. the cap as policy
 
-INSERT INTO public.ottoq_policy_param_catalog (param_key, description, default_value)
+-- Catalog shape VERIFIED against the live table before commit: columns are
+-- (param_key, description, default_value, min_value, max_value, affects) and
+-- param_key is the PRIMARY KEY, so the ON CONFLICT target is valid. Shape and
+-- convention both taken from 0159's row, the proven precedent:
+--   charge_downgrade_policy  default=1 min=0 max=2 affects=ottoq_l2_propose_stall_assignment
+--
+-- min_value is 1, not 0, deliberately: a batch of 0 would seat nothing at all
+-- and halt the depot. max_value is left NULL because no upper bound is
+-- meaningful - raising the batch past the qualifying set simply removes the cap,
+-- which is a legitimate configuration.
+INSERT INTO public.ottoq_policy_param_catalog
+       (param_key, description, default_value, min_value, max_value, affects)
 VALUES ('decide_seat_batch',
-        'Max vehicles the seating loop in ottoq_decide_tick will consider per tick. Candidates ranked past this are recorded as deferred_tick_budget, not silently dropped. Default 20 = the literal it replaces (0169).',
-        20)
-ON CONFLICT (param_key) DO UPDATE SET description = EXCLUDED.description;
+        'Max vehicles the seating loop in ottoq_decide_tick will consider per tick. Candidates ranked past this are recorded as ottoq_decisions rows with outcome_status deferred_tick_budget, not silently dropped. Default 20 = the literal it replaces (0169).',
+        20, 1, NULL, 'ottoq_decide_tick')
+ON CONFLICT (param_key) DO UPDATE
+  SET description = EXCLUDED.description, default_value = EXCLUDED.default_value,
+      min_value = EXCLUDED.min_value, max_value = EXCLUDED.max_value,
+      affects = EXCLUDED.affects;
 
 -- ------------------------------------------- 2. rank the whole qualifying set
 
@@ -171,10 +185,9 @@ ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCL
 --
 -- 1. Only when no certification round is in flight and the matrix is 6 of 6
 --    green, so there is a clean baseline to diff against.
--- 2. Verify ottoq_policy_param_catalog's real column names before applying -
---    the INSERT above was written from the table's role, not from a read of its
---    definition. If they differ, fix the INSERT; do not drop the catalog row,
---    because an unregistered param is exactly the magic number this replaces.
+-- 2. The catalog INSERT is verified (see the note above it) and needs no further
+--    checking. Do NOT drop the catalog row to simplify an apply: an unregistered
+--    param is exactly the magic number this migration exists to replace.
 -- 3. Apply, then run ONE pair on the grid fixture (twin.ottoq_grid_smoke, ~20 s)
 --    before spending a flagship pair. It will catch a syntax or NULL error for
 --    the price of nothing.
