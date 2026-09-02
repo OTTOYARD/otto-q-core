@@ -232,3 +232,21 @@ SELECT count(*) AS enacted,
 --     FROM ottoq_decisions d WHERE d.sim_run_id='<arm>' GROUP BY d.sim_run_id, d.tick_seq ORDER BY d.tick_seq;
 -- 7.5.2 the literals
 --   SELECT (regexp_matches(pg_get_functiondef('twin.ottoq_sim_advance_site_energy'::regproc), 'v_(dcfc|service)_cap_kw\s+NUMERIC := \d+', 'g'))[1];
+
+-- =====================================================================
+-- §8  SUPERSEDING NOTE - 2:2x PM CT Sep 2 (nothing above is struck)
+-- =====================================================================
+-- §7 called the dcfc_first_l2_only_as_overflow failure "the instrument
+-- again", and attributed it to DCFC having been refused for power. That
+-- was half right and the smaller half. The A/B that settled it: the same
+-- check fails identically on an UNCONSTRAINED fixture (cap 600 kW, no
+-- refusals anywhere), against an assignment whose own rationale reads
+-- wanted_type = l2, soc 85. The check does not encode a power-refusal
+-- edge case - it encodes a policy OTTO-Q deliberately does not have.
+-- Routing is need-matched, not fast-point-first. Corrected in 0157;
+-- full record in db/checks/0075.
+--
+-- §7's engine finding stands and is now closed: 0156. §7's meter finding
+-- stands and is now closed: 0155, which also restored sight to Layer 1's
+-- EN.001 capacity rule - it reads the same meter and had been evaluating
+-- every proposal against 0.0 kW of existing load. See 0075 §1a.

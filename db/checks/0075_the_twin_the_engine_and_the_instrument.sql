@@ -1,0 +1,222 @@
+-- =====================================================================
+-- 0075  The twin, the engine, and the instrument: three fixes, three
+--       different kinds of wrong
+-- =====================================================================
+-- Chase, 2:0x PM CT Sep 2: "If the energy source is incorrect in its
+-- wiring, that's just a 'sim' or 'twin' testing apparatus fix. Still
+-- needs adjustment, but isn't the same as 'otto-q incorrectly read the
+-- energy signal, or is missing something crucial to future
+-- functionality.' Either way make sure when you identify, you actually
+-- build and don't just 'document' what's missing or in error."
+--
+-- Three defects were found in one morning on the grid fixture. They are
+-- NOT the same kind of thing, and the difference is the point.
+--
+--   0155  TWIN APPARATUS   the emulated meter reported no power
+--   0156  ENGINE           assets starved beside points they could use
+--   0157  INSTRUMENT       two checks asserted a policy we do not have
+--
+-- All three are applied. This file is the record, not the work.
+--
+-- =====================================================================
+-- §1  0155 - the twin's meter (apparatus, with a product consequence)
+-- =====================================================================
+-- twin.ottoq_sim_start_charge_session opened every session with
+-- last_meter_value = {'power_kw': 0} - a placeholder - while the initial
+-- rate it had just computed sat in the same INSERT statement, in
+-- peak_power_kw. twin.ottoq_sim_compute_charger_load_kw then summed only
+-- sessions with status='active', and the twin closes a session on the
+-- same tick it first writes a real meter value. A session shorter than
+-- two ticks was therefore never counted once.
+--
+-- Measured, grid fixture, 12 ticks, four completed charging sessions:
+--   before   0.00 kW at every one of twelve ticks
+--   after    16.9, 12.0, 244.9, 212.7 kW - reconciling with the
+--            sessions' own peaks (132.51 + 118.24 = 250.75 at 06:00)
+--
+-- Why it is not merely cosmetic: total_ev_charging_kw feeds
+-- peak_demand_kw_15min, which IS peak_site_kw, one of the five canonical
+-- KPIs and the one CLAUDE.md 2.9 describes as matching demand billing.
+-- A KPI computed off an all-zero meter is not conservative, it is wrong.
+-- Two further defects in the same function were fixed with it: the
+-- flagship's caps (1800 / 2500 kW) were LITERALS, so the twin's own
+-- cap-exceeded events could not fire on any other depot; and the
+-- demand-response lookup was LIMIT 1 with no ORDER BY and no run scope
+-- (the 0062/0063 coin-flip class).
+--
+-- §1a  THE FINDING THAT MATTERED MORE THAN THE FIX
+-- Layer 1's EN.001.grid_capacity_ceiling - the safety-critical rule that
+-- refuses a charge that would exceed the site's engineering cap - takes
+-- its "current demand" from public.ottoq_depot_current_demand_kw, which
+-- is a thin wrapper over that same broken meter. So in every simulation
+-- ever run, the shield evaluated 0.0 + request against the ceiling. It
+-- was blind to existing load. Proof, from the block reasons on the same
+-- fixture before and after 0155:
+--   before   "would exceed engineering cap: 0.0 + 137.5 = 137.5 kW"   x N
+--   after    "would exceed engineering cap: 0.0 + 137.5 = 137.5 kW"
+--            "would exceed engineering cap: 16.9 + 137.5 = 154.4 kW"
+--            "would exceed engineering cap: 36.8 + 137.5 = 174.3 kW"
+--            "would exceed engineering cap: 51.8 + 137.5 = 189.3 kW"
+-- The safety rule now sees the site. Note the 0132 site-cap gate was
+-- never blind - it computes committed load plan-side from vehicle state,
+-- independently - so the two layers now agree by two different routes,
+-- which is the property we want and did not have.
+--
+-- =====================================================================
+-- §2  0156 - the engine (judgment, not wiring)
+-- =====================================================================
+-- public.ottoq_l2_propose_stall_assignment chose ONE point per vehicle,
+-- ordered by (your reserved point, then a point of your wanted type,
+-- then nearest) LIMIT 1, with no notion of how much power the site had
+-- left. On a constrained site it proposed the fast point, EN.001 blocked
+-- it, the vehicle was held, and the next tick produced the same proposal
+-- and the same refusal. There is no re-proposal path. An asset whose
+-- fast-charge draw can NEVER fit under the ceiling never charged - with
+-- a slower point standing empty that would have fit easily.
+--
+-- Measured, 'grid-starve' (4 assets, 2 DCFC, 2 L2, seed 424242, 12
+-- ticks, caps 150 kW so EN.001's ceiling is 135 kW), both arms of a
+-- pair, rolled back, 0155 applied in both:
+--
+--                        before      after
+--   AV-01 end SoC          73%        100%
+--   AV-02 end SoC          60%         96%
+--   AV-03 end SoC         100%        100%
+--   AV-04 end SoC          89%         90%
+--   EN.001 blocks           17           0
+--   charge assignments       3           4   (every asset served)
+--   peak site load     51.8 kW     66.2 kW   (ceiling 135 kW)
+--   pair verdict        passed      passed
+--
+-- Two assets sat unchargeable for a whole run while two 19.2 kW points
+-- stood free under a 135 kW ceiling with 51.8 kW drawn. The site was
+-- stranding capacity and the fleet was losing exactly the thing the
+-- kernel exists to protect (asset_hours_available_per_day).
+--
+-- The fix gives the proposer the site's remaining headroom, computed by
+-- EN.001's own arithmetic, and has it prefer a point whose draw fits.
+-- It stops proposing what the shield is bound to refuse. No rule is
+-- weakened: the 0132 gate and every Layer 1 rule still judge the
+-- proposal. Agents propose, the solver disposes - this makes the
+-- proposal worth disposing of.
+--
+-- STRICT REFINEMENT, PROVEN BY CONTENT HASH rather than asserted. On the
+-- unconstrained fixture (grid-mtr, cap 600) the run is byte-identical
+-- before and after 0156:
+--   h_dec  8123dd87f6d0ee4dae9d0a181408a381   both
+--   h_bkg  c229e837eec2bd596563a002100ca7c1   both
+--   h_nrg  86e595ad05bf77b7c008a0f5b7c1ae20   both
+--   meter  [0,0,0,0,16.90,12.00,0,244.90,212.70,0,0,0]  both
+-- Headroom absent, ample or already exceeded all reproduce the pre-0156
+-- ordering exactly. Only a mixed fits/does-not-fit candidate set
+-- reorders - which is the starvation case and nothing else.
+--
+-- Every downgrade is now in the record: rationale carries headroom_kw,
+-- fits_headroom and power_downgrade. Observed at tick 3 - AV-04 wanted
+-- dcfc, headroom 68.8 kW, dcfc would have drawn 137.5 kW, took L2-01 at
+-- 19.2 kW, power_downgrade = true.
+--
+-- OPEN ITEM, deliberately not closed here: headroom is measured at the
+-- sim clock, so it does not yet see assignments enacted earlier in the
+-- SAME tick. The 0132 gate does track that accumulation and still
+-- refuses, so this is a missed improvement, never an over-commit.
+-- Closing it means threading v_ev_committed_kw into the decision frame,
+-- which touches ottoq_decide_tick and earns its own migration and round.
+--
+-- =====================================================================
+-- §3  0157 - the instrument (my checks were wrong)
+-- =====================================================================
+-- Two of the eleven grid assertions encoded a policy OTTO-Q does not
+-- implement and should not. dcfc_first_l2_only_as_overflow asserted that
+-- an L2 assignment is a violation whenever a DCFC point is free. The
+-- engine's real rule is need-matched: wanted_type is 'dcfc' only below
+-- 45% SoC or on immediate_dispatch, otherwise 'l2', because fast
+-- charging above ~70% SoC is slower per kWh and harder on the cells
+-- (CLAUDE.md 2.5's piecewise curve). It failed on a run whose own
+-- rationale read wanted_type = l2, soc 85 - the engine being right and
+-- the check calling it wrong. most_depleted_gets_the_fast_point had the
+-- same flaw: it flagged a lower-SoC asset on L2 beside a higher-SoC
+-- asset on DCFC, when the lower one had ASKED for L2 and the higher
+-- one's L2 point was reserved for a third vehicle.
+--
+-- Replaced by:
+--   charge_point_matches_the_asset_need     - the point matches
+--     wanted_type, or the record says why not (a declared power
+--     downgrade, or no point of that type free at that instant)
+--   the_fast_point_goes_to_whoever_needs_it - an inversion is a
+--     same-tick pair where the L2 asset wanted dcfc AND the DCFC asset
+--     wanted l2; raw SoC ranking is not the rule
+--
+-- site_power_cap_held read only the meter, so it could not fail: it
+-- passed both tight-cap trials at "max 16.9 kW vs cap" while the plan
+-- held 75-157 kW, and would pass a run committing twice the cap. It now
+-- replays the plan from the booking calendar AND reads the meter.
+--
+-- Two checks added:
+--   no_asset_starves_while_a_capable_point_is_free - the 0156 check
+--   the_power_cap_was_exercised - reports "CAP NEVER BOUND on this run,
+--     this run is not evidence about the cap" instead of showing green
+--
+-- §3a  THE CHECKS WERE FALSIFIED BEFORE THEY WERE TRUSTED
+-- A check that cannot fail is not a check. The pre-0156 proposer was
+-- restored inside a rolled-back transaction and the suite re-run:
+--   no_asset_starves_while_a_capable_point_is_free = FALSE
+--     "2 of 4 assets ended under 90% having never been assigned a charge
+--      point while one stood free"
+--   charge_point_matches_the_asset_need = FALSE  "0 of 3"
+-- Then on the live engine, same fixture: 13 of 13 pass, starvation row
+-- "0 of 4", and the cap row honestly reads "CAP NEVER BOUND on this run
+-- (peak plan 94.2 kW vs cap 150) - this run is not evidence about the
+-- cap; 0 power refusals". The cap stopped binding because the engine
+-- spread load instead of jamming the fast points; the instrument says so
+-- rather than claiming compliance as an achievement.
+--
+-- =====================================================================
+-- §4  Round 7, and what it means now
+-- =====================================================================
+-- Round 7 (7:40-9:50 AM CT Sep 2) was the first full round on the
+-- deterministic-only engine and it closed SIX GREEN: 12 pairs, 12
+-- passed, 24 arms, all complete. Every arm carried both quiesce pins by
+-- 0152_cert_quiesce, zero cuOpt deferrals, and 384 proposer invocations
+-- all logged policy_disabled. Canons at that moment:
+--   busy_day/171717/12t  04177a2a 1c9ace35 0bf42b3c e6425186
+--   busy_day/314159/12t  773fd6dc 56ce477d 4274369c 7ec57f52
+--   busy_day/424242/12t  16aabc27 b5e3e52c 5a227276 12b2c15a
+--   normal_day/171717/12t 78ece09b d58c21fb 2838c66c 7ab7da41
+--   busy_day/171717/24t  ec5c38aa 68ec2cdf 096b099e 195d0114
+--   busy_day/424242/24t  ac1dc757 4eba1917 37ed2670 588f0fca
+--
+-- 0155 and 0156 are both forces_recert, applied 2:04 and 2:1x PM CT, so
+-- that green is now correctly stale. It was earned on an engine whose
+-- meter read zero and whose assets could starve. Round 8 (2:35-4:47 PM
+-- CT) re-earns it on the corrected engine, and its canons WILL differ -
+-- they should.
+--
+-- =====================================================================
+-- §5  Queries
+-- =====================================================================
+-- 5.1 the whole suite on any grid arm
+--   SELECT * FROM twin.ottoq_grid_assert('<sim_run_id>');
+-- 5.2 one command, fixture to verdict, about twenty seconds
+--   SELECT twin.ottoq_grid_fixture_create('grid-fixture');
+--   SELECT * FROM twin.ottoq_grid_smoke(424242, 12);
+-- 5.3 the meter against its own sessions, for any run
+SELECT to_char(e.timestamp AT TIME ZONE 'UTC','HH24:MI') AS tick,
+       e.total_ev_charging_kw AS meter_kw,
+       (SELECT COALESCE(sum((cs.last_meter_value->>'power_kw')::numeric),0)
+          FROM ocpp_sessions cs
+         WHERE cs.sim_run_id = e.sim_run_id
+           AND cs.status IN ('active','completed')
+           AND cs.started_at <= e.timestamp
+           AND (cs.ended_at IS NULL OR cs.ended_at >= e.timestamp)) AS sessions_kw
+  FROM site_energy_snapshots e WHERE e.sim_run_id = '<sim_run_id>' ORDER BY e.timestamp;
+-- 5.4 every power downgrade the engine declared
+SELECT d.tick_seq, d.entity_id,
+       d.enacted_action->'rationale'->>'wanted_type'  AS wanted,
+       d.enacted_action->>'stall_type'                AS got,
+       d.enacted_action->'rationale'->>'headroom_kw'  AS headroom_kw,
+       d.enacted_action->>'requested_kw'              AS took_kw
+  FROM ottoq_decisions d
+ WHERE d.sim_run_id = '<sim_run_id>'
+   AND d.enacted_action->'rationale'->>'power_downgrade' = 'true'
+ ORDER BY d.tick_seq;
