@@ -62,3 +62,20 @@ Recorded as an addition rather than an edit: the 5:45 PM snapshot above is left
 exactly as it was written, per the rule in this directory's README. Nothing in
 it was wrong, only incomplete, and rewriting a point-in-time record to look
 better in hindsight is the habit that rule exists to prevent.
+
+## Addendum — a 48-tick column, 2026-09-02 evening
+
+A single 48-tick pair (seq 1773/1774, seed 171717, busy_day, flagship) fired
+6:55 PM CT to answer db/checks/0081 §4. Passed, arms equal, end state equal.
+
+| scenario | seed | ticks | h_cmd | h_dec | h_bkg | h_nrg |
+|---|---|---|---|---|---|---|
+| busy_day | 171717 | 48 | `beab1640…` | `dc07844d…` | `72be4b59…` | `1f746041…` |
+
+One pair, so `pairs_seen 1 / green false` — correct, not a regression. Recorded
+here because determinism at a 24-hour horizon is four times the longest
+previously certified and the value is worth having on disk before round 9.
+
+These canons were also the instrument that refuted a wrong alarm: see
+db/checks/0082 §3, where committed 24-tick canons reproducing across pairs
+fired 81 minutes apart proved a wall-clock leak was *not* a determinism defect.
