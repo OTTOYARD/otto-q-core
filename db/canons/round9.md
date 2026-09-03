@@ -98,3 +98,64 @@ not being closed unilaterally.
 
 Results land in a successor file; this section is the plan, written before the
 evidence, so it can be wrong.
+
+---
+
+## CORRECTION — 2026-09-03, 3 AM CT. The claim above is FALSE.
+
+Recorded as an ADDITION, not an edit, per this directory's README: the text
+above is left exactly as it was written. Rewriting a point-in-time record to
+look better in hindsight is the habit that rule exists to prevent.
+
+This file states, twice and in capitals:
+
+> **So, said plainly: `decide_seat_batch` has never bound anywhere.**
+
+**That is false.** It was true of seeds 171717 and 314159, where
+`recorder_rows = 0` honestly. It generalised two seeds to "anywhere". **Seed
+424242 refuted it within hours.**
+
+The overnight five-column run failed four times, identically, all on 424242 —
+at 12 ticks and at 24:
+
+```
+ERROR: new row for relation "ottoq_decisions" violates check constraint
+       "ottoq_decisions_outcome_status_check"
+```
+
+0169 wrote `outcome_status = 'deferred_tick_budget'` and never added that value
+to the constraint. The recorder's INSERT **could never succeed** — not dormant
+instrumentation but a **latent crash**: any run in which the batch binds aborts.
+So the batch had been binding on 424242 all along, and every time it bound, the
+run died.
+
+`0179` adds the value. On the re-run the batch bound and was recorded properly:
+`seat_qualified 23, seat_batch 20, seat_rank 21/22/23`, all `wash_bay`, tick 12.
+
+### The certification did not catch this, and the reason is worth keeping
+
+Round 9 certified 0169 a no-op on `busy_day/171717/12t` with four canons
+unmoved, and `db/checks/0085` §2 recorded the caveat verbatim:
+
+> "0169's new branch has still NEVER EXECUTED, anywhere. It is instrumentation
+> for a condition that has not yet occurred. Not a defect — but not a tested
+> code path either, and it must not be described as one."
+
+The defect lived exactly in the gap that caveat named. Writing it down is what
+made this diagnosable in one query instead of a mystery — it is not a substitute
+for having tested the branch.
+
+**A green column is evidence about what it exercised, and nothing else.** Four
+green columns did not make the fifth safe, and the summary sentence should never
+have reached past the seeds that produced it.
+
+### The 424242 canons therefore move — legitimately
+
+| scenario | seed | ticks | h_cmd | h_dec | h_bkg | h_nrg |
+|---|---|---|---|---|---|---|
+| busy_day | 424242 | 12 | `16aabc27…` held | **`f1224a98cf0a9f16967a7db1af8c199a`** | `5a227276…` held | `0cac7e0b…` held |
+
+`h_dec` moved because three deferral rows now exist that round 8 never had.
+`h_cmd`, `h_bkg` and `h_nrg` held — which is the load-bearing result: the
+`CONTINUE` did **not** change which assets were seated. Same seating, richer
+record. Predicted in 0179 before the pair fired.
