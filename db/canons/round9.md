@@ -67,3 +67,34 @@ One column of six. `busy_day/171717/24t`, `busy_day/314159/12t`,
 **not** re-run against 0169. They carry round-8 canons and are not yet diffed
 against the current engine. Round 9 is green on one column, not six — stated so
 the table is not read as more than it is.
+
+## The other five columns — fired overnight, 2026-09-03
+
+Scheduled 10:57 PM CT to close the gap this file names above. Two passes per
+column, flagship, same pinned sim start, `arm_budget 1800`:
+
+| slot (UTC) | slot (CT) | column |
+|---|---|---|
+| 04:00 / 04:20 | 11:00 / 11:20 PM | busy_day 314159 12t |
+| 04:40 / 05:00 | 11:40 PM / 12:00 AM | busy_day 424242 12t |
+| 05:20 / 05:40 | 12:20 / 12:40 AM | normal_day 171717 12t |
+| 06:00 / 06:25 | 1:00 / 1:25 AM | busy_day 171717 24t |
+| 06:50 / 07:15 | 1:50 / 2:15 AM | busy_day 424242 24t |
+
+Spaced 20 min (12t) and 25 min (24t) and **never overlapping**, because
+`twin.ottoq_sim_start_run`'s "one world, one mover" guard explicitly EXCLUDES
+`run_by = 'cert_harness'`: two cert pairs fired together would both tick the
+same shared flagship fleet and contaminate each other. Tonight's 12-tick pairs
+ran ~680 s, so the slots carry roughly 2x headroom.
+
+Each job **unschedules itself** as the last statement of its own command, so a
+session that dies overnight cannot leave ten daily-recurring pairs firing. A job
+whose pair FAILS rolls back its own unschedule and stays — deliberate, so a
+failure is visible rather than swept up.
+
+`normal_day 171717 12t` is task #47's column: two corrected passes against a
+proposed bar of eight. These two passes do not close it on their own and it is
+not being closed unilaterally.
+
+Results land in a successor file; this section is the plan, written before the
+evidence, so it can be wrong.
