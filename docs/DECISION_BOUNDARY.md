@@ -190,3 +190,92 @@ What is not defensible is the current state being *invisible*. A rule registered
 `active` at `block` severity that cannot fire should say so in the registry, so
 the count of rules and the count of enforced constraints stop being the same
 number in every report that quotes them.
+
+---
+
+# Addendum: the agentic layer as a continuous orchestration loop
+
+Chase, 2026-09-03, recorded close to verbatim because the shape matters:
+
+> *"The agentic layer should know what can fit within the deterministic core.
+> More importantly, it needs to constantly read, react and scan each vehicle and
+> depot, variables and constraints, so that it is intuitively and consistently
+> optimizing and seeking the next optimal sequence or queue it can provide to a
+> vehicle when the vehicle needs to arrive again. So it can truly be an
+> orchestration layer and efficiency-seeking layer that also funnels or shapes
+> for the deterministic core. Meaning it knows the rules and feeds into the core,
+> the core validates and confirms and then packages that for the final dispatch
+> communication back to the vehicle, and placeholders or reservations for OTTO-Q
+> to be aware of the reservations and overall queuing. So the agentic is a very
+> intelligent proposal and organizing player that scans, feeds the deterministic
+> core, and continues scanning. Once it passes through dispatch the agent layer
+> will be aware of those validated decisions and will see them in production by
+> the confirmed reservation or routing. So there would be a nice confirmation
+> loop there as well."*
+
+This does not contradict the placement rule above. It sharpens what the
+deterministic core must EXPOSE, which is a different and largely unbuilt thing.
+
+## The loop, named
+
+```
+   scan  ──►  propose  ──►  validate  ──►  confirm  ──►  dispatch
+    ▲            (agentic)    (deterministic core)          │
+    │                                                       │
+    └───────────────── observe the confirmed ◄──────────────┘
+```
+
+Four obligations fall out of it, and three of them are on the CORE, not the
+agent:
+
+1. **The core must publish what will fit.** An agent that proposes blind wastes
+   both layers' time. This is the "knows the rules" half - the core has to expose
+   its constraints as something readable, not only enforce them at the moment of
+   refusal.
+2. **The core must refuse legibly.** A rejected proposal has to come back with a
+   reason code the agent can learn from. `ottoq_decisions` already carries
+   `outcome_status` and rationale for this; 0169 adds the missing
+   `deferred_tick_budget` case.
+3. **The core must confirm observably.** The agent has to see its accepted
+   proposal become a real reservation - not infer it. `ottoq_stall_bookings` is
+   that record.
+4. **Only then**: the agent scans continuously and proposes.
+
+Note the asymmetry. Three of the four are core capabilities. The intelligence is
+the easy half; the honest interface is the work.
+
+## What this changes about sequencing
+
+It does not change the placement rule - the agent still only proposes, and the
+core still disposes. What it changes is the ORDER of the remaining build. The
+scan/propose loop is not blocked on a smarter proposer; it is blocked on the
+core being able to answer three questions it currently cannot answer well:
+
+| the agent needs to ask | can the core answer today? |
+|---|---|
+| what will fit, before I propose? | **no** - no forward-capacity projection is exposed |
+| why was my proposal refused? | **partly** - `ottoq_decisions` has the vocabulary, but nine rules never evaluate and the tick-budget case only exists as of 0169 |
+| did my accepted proposal become real? | **yes** - `ottoq_stall_bookings` is the confirmed reservation |
+
+So the first agentic work is not an agent. It is a **forward-capacity view** the
+agent can read before proposing, and completing the refusal vocabulary so a
+refusal teaches something. `ottoq_plan_overnight_wave` (0173) is already
+one-third of the first item - it computes exactly this kind of forward fit - and
+its `ottoq_wave_plan` output is the natural place for a published projection to
+live once something consumes it.
+
+## The trap to avoid
+
+A continuously-scanning proposer is a nondeterminism engine pointed directly at
+a core we spent this entire day certifying. CLAUDE.md 6 already answers it - no
+proposer writes a final assignment - but the sharper version, learned from the
+0152 quiesce work:
+
+> **Every proposal must be hashed into the run verdict, or the agentic layer
+> becomes a place where nondeterminism can hide.**
+
+The certification pairs run with the proposer quiesced precisely so the
+deterministic core can be certified alone. When the agent is live, the pair must
+still reproduce - which means the agent's proposals, and the core's accept/refuse
+decisions on them, are part of the certified stream. An agent whose proposals are
+not in the fingerprint is an agent that can silently change what ships.
