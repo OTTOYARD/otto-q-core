@@ -77,8 +77,20 @@ SELECT r.scenario_code, r.random_seed AS seed, r.tick_count AS ticks,
 -- wider blast radius: WHILE A CERT PAIR RUNS, THE PRODUCTION TICK
 -- SCHEDULE STOPS.
 --
--- Recorded as an open investigation, not a fix. The confirming
--- observation is whether cron resumes once the pair commits.
+-- CAUSATION CONFIRMED, not inferred. The confirming observation was
+-- taken the moment the pair committed:
+--
+--   21:55:17  pair_running 1  last_cron_launch 21:48:00  launches_since 0
+--   21:56:50  pair_running 0  last_cron_launch 21:56:06  launches_since 5
+--             flagship_pairs_committed 1
+--
+-- pg_cron was silent for the entire 21:49-21:55 window and resumed in
+-- the SAME MINUTE the pair committed, then caught up. The scheduler
+-- stops for exactly the duration of a certification pair.
+--
+-- Recorded as an open investigation, not a fix: the mechanism is not yet
+-- named. What IS established is the effect, its exact extent, and that
+-- every cheap alternative explanation was measured and excluded.
 SELECT to_char(max(d.start_time) AT TIME ZONE 'UTC','HH24:MI:SS') AS last_cron_launch,
        count(*) FILTER (WHERE d.start_time >= '2026-09-03 21:49:00+00') AS launches_after_pair_started
   FROM cron.job_run_details d;

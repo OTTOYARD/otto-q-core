@@ -70,9 +70,18 @@ This is **not** 0180's doing and is **not** fixed by it — 0180 removed a row-l
 collision; this is the scheduler itself going quiet. It is the same shape as the
 `ottoq_start_demo_run` blockage found in `db/checks/0089` but broader and by a
 different mechanism: **while a certification pair runs, the production tick
-schedule stops.** Causation is strongly indicated by the timing and by every
-alternative above being excluded; the confirming observation is whether cron
-resumes when the pair commits, which is recorded separately.
+schedule stops.** **Causation is now confirmed, not inferred.** The confirming observation was
+taken as soon as the pair committed:
+
+```
+21:55:17   pair_running 1   last_cron_launch 21:48:00   launches_since 0
+21:56:50   pair_running 0   last_cron_launch 21:56:06   launches_since 5
+           flagship_pairs_committed 1
+```
+
+pg_cron was silent for the whole 21:49–21:55 window and resumed in the same
+minute the pair committed. The scheduler stops for exactly the duration of a
+certification pair, then catches up.
 
 Filed as its own investigation rather than folded into a fix. Nothing here is
 guessed: each excluded cause was measured.
