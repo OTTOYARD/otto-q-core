@@ -108,3 +108,65 @@ SELECT jobname, schedule, active FROM cron.job
 --
 -- The correct probe method, recorded so the next one does not
 -- rediscover it: FLAGSHIP VIA CRON, SECOND LANE INLINE FROM A SESSION.
+
+-- =====================================================================
+-- §5  REFUTATION, 22:07 UTC — §3's GENERAL CLAIM IS WRONG
+-- =====================================================================
+-- §3 frames the stall as a general hazard of long work in pg_cron. A
+-- controlled experiment, with its interpretation fixed in advance,
+-- refutes that.
+--
+-- probe_sleeper - a cron job whose entire body is SELECT pg_sleep(90),
+-- touching nothing - ran 22:01:00 -> 22:02:30, a full 90 seconds.
+-- During that window:
+--
+--   ottoq-demo-metronome  '* * * * *'    fired 22:02:00  ON TIME
+--   ottoq-depot-tick      '*/2 * * * *'  fired 22:02:00  ON TIME
+--   ottoq-run-governor    '*/2 * * * *'  fired 22:02:00  ON TIME
+--
+-- A LONG-RUNNING pg_cron JOB DOES NOT STALL THE LAUNCHER. Duration is
+-- not the cause. "Don't run long work in pg_cron" is not the lesson, and
+-- §3's proposed mitigation - that cert pairs must not run as cron jobs -
+-- is NOT established.
+--
+-- WHAT SURVIVES: the effect. No cron job of any kind launched between
+-- 21:49 and 21:55, and the metronome resumed at 21:55:54, the minute the
+-- pair committed. That was measured JOIN-FREE over cron.job_run_details,
+-- so it is not an artifact of the query bug below.
+--
+-- WHAT IS REFUTED: the generalisation. The cause is specific to what a
+-- certification pair DOES - it holds a long transaction AND writes
+-- shared tables; a sleeper does neither.
+--
+-- WHAT REMAINS UNNAMED: the mechanism. The shape of the evidence is the
+-- clue: during the stall there were NO RUN ROWS AT ALL, not rows sitting
+-- blocked. Jobs merely waiting on the pair's row locks would still have
+-- been dispatched and recorded. So the launcher was not dispatching, and
+-- the sleeper proves a busy job alone does not cause that. Not guessed
+-- here.
+SELECT d.jobid,
+       to_char(d.start_time AT TIME ZONE 'UTC','HH24:MI:SS') AS started,
+       to_char(d.end_time   AT TIME ZONE 'UTC','HH24:MI:SS') AS ended,
+       d.status,
+       (SELECT j.jobname FROM cron.job j WHERE j.jobid=d.jobid) AS name_if_still_scheduled,
+       left(COALESCE(d.command,''),50) AS cmd
+  FROM cron.job_run_details d
+ WHERE d.start_time BETWEEN '2026-09-03 22:00:00+00' AND '2026-09-03 22:04:00+00'
+ ORDER BY d.start_time;
+
+-- §6  A QUERY BUG WORTH KEEPING
+-- ---------------------------------------------------------------------
+-- The first read of this experiment used
+--   FROM cron.job_run_details d JOIN cron.job j USING (jobid)
+-- and showed NO probe_sleeper row - which read as "the sleeper never
+-- fired". It HAD fired, for the full 90 s.
+--
+-- A self-unscheduling job DELETES ITS OWN cron.job ROW, so an inner join
+-- silently drops every run it ever made. The same join also hid lane2a's
+-- and lane2c's history.
+--
+-- Same family as the traps already collected here (0062's comment-grep,
+-- 0066 §6's two false negatives, 0175's lookup that could only miss): a
+-- query that cannot see the thing it is looking for returns an answer
+-- that LOOKS like evidence of absence. Read cron.job_run_details
+-- join-free and resolve the name with a scalar subquery.

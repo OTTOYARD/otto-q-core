@@ -93,3 +93,57 @@ Moving it to a cron job this round was my error — and it is precisely what
 exposed the pg_cron stall. The correct probe method is: flagship via cron,
 second lane inline from a session. Recorded so the next probe does not
 rediscover it.
+
+---
+
+## REFUTATION — 22:07 UTC. The general claim above is WRONG.
+
+Appended, not edited, per this directory's README.
+
+The section above says a cert pair halts pg_cron and frames it as a general
+hazard of the scheduler. **The generalisation is refuted.** A controlled
+experiment was run with its interpretation fixed in advance:
+
+`probe_sleeper` — a cron job whose entire body is `SELECT pg_sleep(90)`, touching
+nothing — ran **22:01:00 → 22:02:30**, a full 90 seconds. During that window:
+
+| job | scheduled | fired |
+|---|---|---|
+| `ottoq-demo-metronome` | `* * * * *` | **22:02:00, on time** |
+| `ottoq-depot-tick` | `*/2 * * * *` | **22:02:00, on time** |
+| `ottoq-run-governor` | `*/2 * * * *` | **22:02:00, on time** |
+
+**A long-running pg_cron job does not stall the launcher.** Duration is not the
+cause, so "don't run long work in pg_cron" is not the lesson and the mitigation
+proposed above ("certification pairs must not run as cron jobs") is not
+established.
+
+### What survives, and what does not
+
+**Survives — the effect.** No cron job of any kind launched between 21:49 and
+21:55, and the metronome resumed at 21:55:54, the minute the pair committed.
+That was measured with a **join-free** count over `cron.job_run_details`, so it
+is not an artifact of the query bug below.
+
+**Refuted — the generalisation.** Whatever stops the scheduler is specific to
+what a certification pair *does*, not to how long it runs. The pair holds a long
+transaction **and** writes shared tables; a sleeper does neither.
+
+**Unnamed — the mechanism.** Note the shape of the evidence: during the stall
+there were **no run rows at all**, not rows sitting blocked. Jobs that merely
+waited on the pair's row locks would still have been dispatched and recorded.
+So the launcher was not dispatching — and the sleeper shows a busy job alone
+does not cause that. The cause is not yet identified and is not guessed here.
+
+### A query bug worth keeping
+
+The first attempt to read this experiment used
+`FROM cron.job_run_details d JOIN cron.job j USING (jobid)` and showed **no**
+`probe_sleeper` row — which read as "the sleeper never fired". It had fired. A
+self-unscheduling job deletes its own `cron.job` row, so an inner join silently
+drops every run it ever made.
+
+Same family as the traps this codebase keeps collecting: a query that cannot see
+the thing it is looking for returns an answer that looks like evidence of
+absence. Read `cron.job_run_details` **join-free** and resolve the name
+separately.
