@@ -82,3 +82,67 @@ SELECT r.scenario_code, r.random_seed AS seed, r.tick_count AS ticks,
 -- instead of swept up.
 SELECT COALESCE(string_agg(jobname, ','), '(none - all self-unscheduled)') AS survivors
   FROM cron.job WHERE jobname LIKE 'k_p_';
+
+-- =====================================================================
+-- RESULT — round 11 closed, 2026-09-03 11:20 AM CT
+-- =====================================================================
+-- THE PREDICTION HELD ON ALL 24 HASH COMPARISONS. Twelve pairs, six
+-- columns, two each, every hash single-valued within its column, every
+-- run passed, every cell identical to round 10. Table in
+-- db/canons/round11.md.
+--
+-- Four columns are now stable across TWO round boundaries (8 -> 10 ->
+-- 11) - the bar roadmap item A actually asks for, met for the first
+-- time. The two 0179 canons reproduced, discharging round10.md's "a
+-- first observation, not a stable one" by evidence.
+--
+-- TASK #47, COUNTED EXACTLY AND NOT CLOSED
+-- ---------------------------------------------------------------------
+--   6 consecutive pairs on canon c36a99c1, zero non-passing
+--   streak began 2026-09-02 4:28 PM CT
+--   40 pairs all-time on this column
+-- The bar is EIGHT. Six is not eight. Two further pairs fired 16:21 and
+-- 16:41 UTC to reach it honestly rather than round up to it.
+WITH pairs AS (
+  SELECT DISTINCT ON (r.validation_notes) r.started_at,
+         left(r.validation_notes::jsonb->'arm_b'->>'h_dec',8) AS h_dec,
+         r.validation_notes::jsonb->>'outcome' AS outcome
+    FROM ottoq_sim_runs r
+   WHERE r.run_by='cert_harness' AND r.scenario_code='normal_day'
+     AND r.random_seed=171717 AND r.tick_count=12 AND r.validation_notes IS NOT NULL
+   ORDER BY r.validation_notes, r.started_at),
+ord AS (SELECT *, row_number() OVER (ORDER BY started_at DESC) AS rn FROM pairs)
+SELECT count(*) FILTER (WHERE rn <= (SELECT COALESCE(min(rn),999)-1 FROM ord WHERE h_dec <> 'c36a99c1'))
+         AS consecutive_pairs_on_canon,
+       8 AS bar,
+       count(*) FILTER (WHERE rn <= (SELECT COALESCE(min(rn),999)-1 FROM ord WHERE h_dec <> 'c36a99c1')) >= 8
+         AS bar_met
+  FROM ord;
+
+-- PROCESS FINDING: NEVER COMPUTE A CRON SLOT FROM A REMEMBERED TIME
+-- ---------------------------------------------------------------------
+-- Five of this round's twelve pairs did not fire at all on the first
+-- attempt. Their slots were computed from an ASSUMED clock (~09:55 UTC)
+-- when the real time was ~11:40 UTC - PR #155 merged nearly two hours
+-- after the last clock read and the clock was never re-read. The slots
+-- were already in the past when created, so pg_cron queued them for the
+-- next day.
+--
+-- The failure mode is quiet in a specific way: cron.job_run_details has
+-- NO ROW AT ALL for such a job, and status = null is indistinguishable
+-- at a glance from "scheduled, not yet fired". Nothing errors, nothing
+-- is stranded; the round just comes up short, invisibly, unless the
+-- missing columns are counted.
+--
+-- The re-schedule derives every slot from now() INSIDE the statement and
+-- asserts fire_utc > now() per row, so the check is structural rather
+-- than remembered. CLAUDE.md rule 7 already says pg_cron evaluates in
+-- UTC; this is its companion - the UTC value must also be CURRENT.
+--
+-- Detector for the next time: a scheduled job with no run row whose slot
+-- has already passed today.
+SELECT j.jobname, j.schedule,
+       (SELECT count(*) FROM cron.job_run_details d WHERE d.jobid = j.jobid) AS run_rows
+  FROM cron.job j
+ WHERE j.jobname ~ '^(k|t47|c|f)' 
+ ORDER BY j.jobname;
