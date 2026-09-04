@@ -412,6 +412,23 @@ ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCL
 COMMIT;
 
 -- =====================================================================
+-- APPLIED 2026-09-04 20:55:20 UTC (3:55 PM CT), after round 14 closed
+-- (six pairs done, zero pair backends, no jobs left). All assertions
+-- passed:
+--   A1  reset_fleet: heartbeat and fault_at each mentioned twice (SET +
+--       predicate), two 0194 markers.
+--   A2  live reset on the grid fixture depot, rolled back: every linked
+--       charger left with last_fault_at NULL and heartbeat = p_as_of.
+--   A3  one reopen_visit_atoms overload, five arguments, p_at DEFAULT
+--       NULL, five clocked stamps, one bare now() (the created_at window).
+--   A4  exception handler 2 of 2 calls clocked, release_vacated_spaces
+--       1 of 1; no other caller.
+--   A5  release_depot: no released_at/ended_at = now(); run-clock idiom
+--       x3; no engine function reads released_at as a value.
+--   lineage forces_recert = true.
+-- Applied together with 0195 (the round-14 pair-2 fix) before round 15.
+--
+-- =====================================================================
 -- THE PREDICTION (published before the round)
 -- =====================================================================
 -- 1. Round 15 (six columns, after round 14 completes and this applies)

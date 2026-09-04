@@ -126,8 +126,8 @@ BEGIN
 
   v_src := replace(v_src, v_o1,
     'ORDER BY (lower(b.during) <= p_clock) DESC, lower(b.during), b.vehicle_id, b.stall_id /* 0195 */'
-    || E'\n     -- 0195: never booking_id. It is drawn fresh every run, and two arms of one'
-    || E'\n     -- pair broke every tie on lower(during) differently (db/checks/0110).');
+    || E'\n     -- 0195: never the row''s own uuid. It is drawn fresh every run, and two arms of'
+    || E'\n     -- one pair broke every tie on lower(during) differently (db/checks/0110).');
   v_src := replace(v_src, v_c1,
        E'-- 0195: the cursor is a snapshot. A car this same batch already seated is no\n'
     || E'    -- longer holding; seating it again puts one car in two stalls, the unique index\n'
@@ -157,7 +157,11 @@ BEGIN
    WHERE n.nspname = 'ottoq' AND p.proname = 'ottoq_activate_due_bay_reservations';
   v_n := (length(v_src) - length(replace(v_src, '/* 0195 */', ''))) / length('/* 0195 */');
   IF v_n <> 2 THEN RAISE EXCEPTION '0195 A1 FAILED: markers = %, expected 2', v_n; END IF;
-  IF v_src ~ 'ORDER BY[^;]*booking_id' THEN RAISE EXCEPTION '0195 A1 FAILED: an ORDER BY still names booking_id'; END IF;
+  -- comments stripped first: the first apply attempt (20:56 UTC) tripped this
+  -- check on its own explanatory comment, which named the column.
+  IF regexp_replace(v_src, '--[^\n]*', '', 'g') ~ 'ORDER BY[^;]*booking_id' THEN
+    RAISE EXCEPTION '0195 A1 FAILED: an ORDER BY still names booking_id';
+  END IF;
   IF v_src !~ 'service_complete_holding''::vehicle_state\)\); /\* 0195 \*/\s*CONTINUE WHEN NOT public\.ottoq_reserve_stall' THEN
     RAISE EXCEPTION '0195 A1 FAILED: the state re-read does not immediately precede the CAS';
   END IF;
@@ -208,26 +212,43 @@ BEGIN
   IF v_a = v_b THEN RAISE EXCEPTION '0195 A2 FAILED: the old key orders both arms the same -- the conviction above is not supported by the rows'; END IF;
   RAISE NOTICE '0195 A2: old key orders the two arms differently; the new key orders them identically';
 
-  -- A3. THE CLASS. No function on the tick path may ORDER BY a per-run
-  --     UUID unless a run-stable identity precedes it in the same clause
-  --     (vehicle_id, stall_id, charger_id, or the row's stall_code).
-  --     The only survivors are the 0129 tiebreaks, which sit behind
-  --     stall_id and can never decide.
-  SELECT array_agg(fn || ' :: ' || clause ORDER BY fn) INTO v_bad
+  -- A3. THE CLASS. Every tick-path ORDER BY that names a per-run UUID
+  --     must either put a run-stable identity (vehicle_id, stall_id,
+  --     charger_id, stall_code) ahead of it, or be one of the SEVEN 0129
+  --     per-car leg cursors in ottoq_decide_tick, where leg_id decides
+  --     only between two legs of one car with identical seq and window.
+  --     Those seven are recorded in db/checks/0110 as the next instance
+  --     (the first apply attempt at 20:57 UTC surfaced them); they are
+  --     not this migration's to change. Anything else -- a new site, or
+  --     an eighth 0129 cursor -- refuses the migration.
+  SELECT array_agg(fn || ' :: ' || clause ORDER BY fn, clause) INTO v_bad
     FROM (
       SELECT n.nspname||'.'||p.proname AS fn, regexp_replace(m[1], '\s+', ' ', 'g') AS clause
         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        CROSS JOIN LATERAL regexp_matches(pg_get_functiondef(p.oid), '(ORDER BY[^;]*?(?:booking_id|decision_id|leg_id|visit_id|command_id|dispatch_id|itinerary_id|proposal_id|event_id)\M[^;]*)', 'g') m
+        -- greedy on purpose: in Postgres ARE a non-greedy FIRST quantifier makes the
+        -- whole match shortest, which cut every clause at the column name and hid
+        -- the 0129 marker from the exemption below (second apply attempt, 21:00 UTC).
+        CROSS JOIN LATERAL regexp_matches(pg_get_functiondef(p.oid), '(ORDER BY[^;]*)', 'g') m
        WHERE n.nspname IN ('public','twin','ottoq') AND p.prokind IN ('f','p')
          AND p.proname IN ('ottoq_activate_due_bay_reservations','ottoq_release_vacated_spaces','ottoq_sim_advance_service_flow',
                            'ottoq_sim_advance_tick_world','ottoq_sim_decide_and_dispatch','ottoq_sim_advance_visit_atoms',
                            'ottoq_sim_prearrival_contracts','ottoq_book_appointment','ottoq_plan_opportunistic_charges',
                            'ottoq_reconcile_bay_reservations','ottoq_sim_advance_flow_contract','ottoq_auto_dispatch_tick','ottoq_decide_tick')
     ) q
-   WHERE clause !~ '(vehicle_id|stall_id|charger_id|stall_code)[^;]*(booking_id|decision_id|leg_id|visit_id|command_id|dispatch_id|itinerary_id|proposal_id|event_id)';
+   WHERE clause ~ '\m(booking_id|decision_id|leg_id|visit_id|command_id|dispatch_id|itinerary_id|proposal_id|event_id)\M'
+     AND clause !~ '(vehicle_id|stall_id|charger_id|stall_code)[^;]*(booking_id|decision_id|leg_id|visit_id|command_id|dispatch_id|itinerary_id|proposal_id|event_id)'
+     AND NOT (fn = 'public.ottoq_decide_tick' AND clause ~ 'l\.seq, l\.planned_start_sim, l\.planned_end_sim, l\.leg_id /\* 0129 \*/');
   IF v_bad IS NOT NULL THEN
     RAISE EXCEPTION '0195 A3 FAILED: tick-path ORDER BY keyed on a per-run UUID before any stable identity: %', v_bad;
   END IF;
+  SELECT count(*) INTO v_n
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    CROSS JOIN LATERAL regexp_matches(pg_get_functiondef(p.oid), 'l\.seq, l\.planned_start_sim, l\.planned_end_sim, l\.leg_id /\* 0129 \*/', 'g') m
+   WHERE n.nspname = 'public' AND p.proname = 'ottoq_decide_tick';
+  IF v_n <> 7 THEN
+    RAISE EXCEPTION '0195 A3 FAILED: ottoq_decide_tick carries % 0129 leg cursors keyed on leg_id, the recorded set is 7', v_n;
+  END IF;
+  RAISE NOTICE '0195 A3: the 7 known 0129 leg cursors in ottoq_decide_tick are recorded (db/checks/0110), not changed';
 
   RAISE NOTICE '0195: all assertions passed.';
 END
@@ -245,13 +266,35 @@ VALUES ('0195_the_bay_queue_was_ordered_by_a_number_drawn_fresh_each_run', TRUE,
   'pair of seats before a CAS miss skips it is what differed. Fix: order by (in_window, lower(during), vehicle_id, stall_id), and '
   're-read the car''s state at seat time so a car already seated this batch is skipped instead of seated twice. 0054 class: the '
   'one cursor whose comment claimed totality. Not touched: ottoq_enact_space_assignment logs the same 23505 identically in both arms '
-  '(deterministic, wrong, next); per-seat subtransactions are the right shape and a larger change, written up in db/checks/0110. '
+  '(deterministic, wrong, next); per-seat subtransactions are the right shape and a larger change; and the seven 0129 per-car leg '
+  'cursors in ottoq_decide_tick that end in leg_id, surfaced by this migration''s own census and pinned at exactly seven. '
   'forces_recert=TRUE: busy_day/314159/12t must go green; any column whose batches had order-sensitive ties may move its canon.',
   now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
 
 COMMIT;
 
+-- =====================================================================
+-- APPLIED 2026-09-04 21:00:23 UTC (4:00 PM CT), third attempt, after
+-- 0194 (20:55:20 UTC) and after round 14 closed. The first two attempts
+-- were refused by this file's own assertions and rolled back cleanly
+-- (markers 0, no lineage row, 0194 intact between attempts):
+--   20:56  A1 matched the explanatory comment that named booking_id;
+--          the comment now says "the row's own uuid" and A1 strips
+--          comments before matching.
+--   20:57  A3 surfaced seven ORDER BY ... l.leg_id /* 0129 */ per-car
+--          leg cursors in ottoq_decide_tick; they are recorded
+--          (db/checks/0110 section 5) and pinned at exactly seven.
+--   21:00  A3's exemption still missed them: the capture regex mixed a
+--          non-greedy and a greedy quantifier and Postgres ARE made the
+--          whole match shortest, cutting each clause before the 0129
+--          marker. Capture is now greedy on the whole clause.
+-- Then: A1 shape (2 markers, no ORDER BY names booking_id, re-read
+-- precedes the CAS); A2 the two round-14 arms order the 04:30 batch
+-- identically under the new key and differently under the old; A3 no
+-- other tick-path ORDER BY keyed on a per-run UUID; lineage
+-- forces_recert = true. Round 15 scheduled 21:01 UTC, c2 first.
+--
 -- =====================================================================
 -- THE PREDICTION (published before round 15)
 -- =====================================================================
