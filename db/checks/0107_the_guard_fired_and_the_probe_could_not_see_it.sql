@@ -38,6 +38,19 @@
 -- =====================================================================
 -- PREDICTION 1 — HELD. THE COLUMN MOVED.
 -- =====================================================================
+-- *** CORRECTION (2026-09-04, same day, see db/migrations/0193) *** The
+-- column did move, but "because of 0192" is CONFOUNDED. This pair ran at
+-- 15:20 UTC against 6 null-return dispatch rows left by round 13's
+-- 24-tick arms at 00:36, and ottoq_sim_prearrival_contracts read those
+-- rows across runs (the 0193 defect). Round 13's 12-tick canon at 23:16
+-- the previous night predates all such residue. So the shift from
+-- 04177a2a to 80183641 has two candidate causes -- 0192 and residue --
+-- and nothing measured here separates them. The comparison is not
+-- withdrawn, because the column genuinely moved; the attribution is.
+-- Prediction 2 (both arms agree) is unaffected in its letter and
+-- weakened in its meaning: both arms read the SAME residue, and 0193
+-- records why that makes a green pair weaker evidence than it looks.
+
 -- busy_day/171717/12t against its round-13 canon:
 --
 --   canon    round 13                          after 0192                        moved

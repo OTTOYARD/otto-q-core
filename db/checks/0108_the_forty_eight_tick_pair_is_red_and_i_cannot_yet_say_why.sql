@@ -24,6 +24,22 @@
 -- nothing here is a partial round. The boot fingerprint is identical, so
 -- the two arms started from the same world and diverged during the run.
 --
+-- *** RESOLUTION (2026-09-04, same day, see db/migrations/0193) *** The
+-- cause is named and fixed. It is none of the five migrations. It is an
+-- unscoped read in ottoq.ottoq_sim_prearrival_contracts -- the inbound
+-- ETA taken as MAX(scheduled_return_at) over ottoq_vehicle_dispatches
+-- with no sim_run_id -- so the second arm read the first arm's
+-- unreturned 23:00 dispatch for vehicle 0003 and planned its first legs
+-- 22 hours out, where they could never be "late". The arms are
+-- byte-identical for 59 decisions and fork on exactly that amend_plan.
+-- 0181 created the residue class (honest teardown leaves NULL returns);
+-- 0192 made the fleet cycle enough for a 48-tick first arm to leave
+-- 20-31 such rows; the read itself is older than both. The decision
+-- below not to revert 0192 was right for a reason better than the one
+-- given: 0192 was never the author. Also recorded in 0193: the repeat
+-- pair scheduled below PASSED, and that pass was contamination on both
+-- arms, not determinism.
+--
 -- =====================================================================
 -- WHAT I SAID I WOULD DO, AND WHY I AM NOT DOING IT
 -- =====================================================================
