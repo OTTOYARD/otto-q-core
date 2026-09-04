@@ -303,7 +303,7 @@ ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCL
 COMMIT;
 
 -- =====================================================================
--- APPLIED 2026-09-04 ~17:08 UTC. All assertions passed:
+-- APPLIED 2026-09-04 ~17:22 UTC (12:22 PM CT). All assertions passed:
 --   A1  prearrival: 2 dispatch reads, 2 markers; manifest: 1 marker;
 --       the 0192 guard verified present before editing.
 --   A2  scoped MAX() for vehicle 0003 against a nonexistent run = NULL;
