@@ -31,8 +31,26 @@
 --    changed nothing a 12-tick run does, because a 12-tick arm ends at
 --    08:00 sim, before any car is re-dispatched, before any unreturned
 --    dispatch could be read. The 12-tick canon therefore did NOT move
---    between 0192 and 0193; 0193 prediction 4 assumed it would. The
---    remaining five columns are appended below as they land.
+--    between 0192 and 0193; 0193 prediction 4 assumed it would.
+--
+--    The full round (fired 19:06-20:30 UTC, read 20:53 UTC):
+--
+--      c1 busy_day/171717/12t   19:06  equal=TRUE   h_cmd 80183641  h_dec 6e116d5b  h_evt 4f8b2970  h_bkg b1d72a62  h_nrg 625014b7
+--      c2 busy_day/314159/12t   19:26  equal=FALSE  cf74d080 vs f2bd5208 -- fork at decision 505, db/checks/0110, fixed by 0195
+--      c3 normal_day/171717/12t 19:40  equal=TRUE   h_cmd af8b5e6d  h_dec 3a8719f8  h_evt 7872892a  h_bkg 2c7e0a3a  h_nrg de3b353e
+--      c4 busy_day/424242/12t   19:54  equal=TRUE   h_cmd 63f1dbe1  h_dec a0f541c2  h_evt 0cd28481  h_bkg 5a227276  h_nrg 0cac7e0b
+--      c5 busy_day/171717/24t   20:08  equal=TRUE   h_cmd 38465601  h_dec 09769827  h_evt 5c9a64cd  h_bkg 3b52ea78  h_nrg 7606aaf2
+--      c6 busy_day/424242/24t   20:30  equal=TRUE   h_cmd ec2fd827  h_dec e8367a52  h_evt ce532fe2  h_bkg f283c927  h_nrg e30295d3
+--
+--    Five of six green within the pair. c3, c4 and both 24-tick columns
+--    moved their canons from round 13 (0192 unparked the fleet); c4 kept
+--    h_bkg and h_nrg (5a227276, 0cac7e0b) exactly. c2 is the one column
+--    where the booking_id coin in the bay-activation cursor landed on
+--    different faces in the two arms; 0110 is the conviction and 0195
+--    the fix. Every arm of the round logged the swallowed 23505 from
+--    ottoq_activate_due_bay_reservations, and the counts match in both
+--    arms of every green pair and differ (4 vs 6) in the red one (0110,
+--    section 5c).
 --
 --    Job 347 (17:15 UTC, busy_day/171717/24t) is VOID and excluded from
 --    every canon: 0193 was applied at 17:22 while it ran, so its two

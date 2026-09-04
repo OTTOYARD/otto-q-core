@@ -84,10 +84,23 @@
 --         c1 busy/171717/12t  9a82a2ff 7   bd9b611a 7   equal
 --         c2 busy/314159/12t  ae0d8488 4   9b506190 6   RED
 --         c3 normal/171717    df469ac7 9   4f3235cf 9   equal
---         c4 busy/424242/12t  ce6790bb 10  (second arm still running)
---       Same count in both arms of every green pair; different counts in
---       the red one. The failure is deterministic whenever the order
---       happens to coincide, and the order is a coin.
+--         c4 busy/424242/12t  ce6790bb 10  24d9a92f 10  equal
+--         c5 busy/171717/24t  cbe28b8e 11  68f9ebbe 11  equal
+--         c6 busy/424242/24t  322b6267 11  e27a16cb 11  equal
+--       (complete at 20:52 UTC.) Same count in both arms of every green
+--       pair; different counts in the red one. The failure is
+--       deterministic whenever the order happens to coincide, and the
+--       order is a coin.
+--    d. Surfaced by 0195's own class census on its second apply attempt:
+--       seven per-car leg cursors in public.ottoq_decide_tick end in
+--         ORDER BY l.seq, l.planned_start_sim, l.planned_end_sim, l.leg_id /* 0129 */ LIMIT 1
+--       (charge leg, stage leg, wash/detail leg x2, svc-to-leg-type,
+--       service leg x2). All are scoped to one run and one vehicle, so
+--       leg_id decides only when a car holds two legs with identical seq
+--       and window -- a replanned itinerary alongside its predecessor.
+--       No round has shown it biting; 0195 pins the count at seven so an
+--       eighth refuses, and the stable key (itinerary creation order) is
+--       the next migration's, not 0195's.
 -- =====================================================================
 
 -- Q1 -- the fork by decision order.
