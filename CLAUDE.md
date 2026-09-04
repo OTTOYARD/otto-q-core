@@ -177,6 +177,26 @@ One CLI command: run ID in, all five KPIs out, deterministically. **The credibil
 
 **otto-q-core highlights (row counts at the pull):** 792,101 rule evaluations · 20,799 HMAC-signed events with signing-key registry · 25,308 telemetry packets · 255 cuOpt invocations logged against the NVIDIA endpoint · 1,340 decisions in the propose/dispose audit trail · 145 archived reproducible runs · 90 OCPP 2.0.1 chargers · 4 versioned OEM SLAs · 7 vehicle classes · 52 deterministic rules · calibration registry spanning ACN-Data / NYC TLC / CA DMV / NOAA · run-scope registry (219 classified columns) driving purge safety.
 
+**REFRESH 2026-09-03 (the line above is the 2026-08-18 pull and is left as the point-in-time record it is).** Sixteen days of twin operation moved most of those counts by one to three orders of magnitude. Anything reasoned from the August figures is stale; anything quoted from them is wrong:
+
+| | 2026-08-18 | 2026-09-03 | factor |
+|---|---|---|---|
+| rule evaluations | 792,101 | **4,607,065** | 5.8x |
+| HMAC-signed events | 20,799 | **2,487,708** | **120x** |
+| telemetry packets | 25,308 | **203,194** | 8.0x |
+| cuOpt invocations | 255 | **12,478** | **49x** |
+| decisions (propose/dispose) | 1,340 | **1,334,905** | **996x** |
+| archived reproducible runs | 145 | **762** | 5.3x |
+| sim runs | — | 603 | — |
+| service detail records | — | 127,122 | — |
+| OCPP 2.0.1 chargers | 90 | 94 | +4 |
+| versioned OEM SLAs | 4 | 4 | — |
+| vehicle classes | 7 | 9 | +2 |
+
+**Two clarifications, not corrections.** "52 deterministic rules" is a ROW count: 29 active plus 23 archived, across **29 distinct rule codes** — the archived rows are superseded versions of the same codes, not 52 separate rules. And rule 6's cuOpt sentence must be re-derived before it is spoken: the ledger now holds 12,478 invocations, not 255, so any claim built on the August figure is off by 49x in the direction that flatters us.
+
+**Why this refresh exists.** `db/checks/0098` records a 22-second KPI view that survived because it scanned a table CLAUDE.md said held 20,799 rows and which actually held 2.49M. Reasoning from a stale ground-truth line is how that happened. Re-measure before quoting; the queries are one `SELECT count(*)` each.
+
 **Agent access map (topology facts C1 documents):** Hermes (cloud agent, Telegram-fronted) holds a GitHub token authenticating as the OTTOYARD user — push + PR proven, **no `issues` scope** (Issues API 403) — and a Supabase Management API token executing SQL as the postgres role across all three projects. By standing policy in HERMES.md, Hermes's database use is **read-only** (its pre-existing `intelligence_events` ingestion excepted); all Hermes deliverables arrive as PRs into `docs/research/**`. Claude Code is the only agent that changes schema or engine state.
 
 **Known hazards:** duplicate table names across projects (`ottoq_events` exists in both core and MVP with different meaning — a client pointed at the wrong ref fails silently); ~100 scratch tables in core's `public` schema (`proof*/cert*/smoke*/fwd*/mig*/build*`) awaiting classification; cross-region split (core us-east-1, MVP us-east-2); **AGENTS.md drift** — the repo's AGENTS.md labels `gxdrc…` "the one database that matters" and calls `ycsis…` "OrchestrAV's legacy database," which conflicts with live naming and contents. Treat AGENTS.md as unreliable until C1 reconciles it.
