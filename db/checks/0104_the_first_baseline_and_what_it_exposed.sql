@@ -5,6 +5,22 @@
 -- the first result. It is not the result anyone was hoping for, and it is
 -- more useful than the one they were.
 --
+-- *** CORRECTION (2026-09-04, same day, see db/checks/0105) *** The two
+-- p95 wait columns below are WITHDRAWN, not adjusted. Both arms were fed
+-- l.planned_start_sim as the readiness time; that column is a plan the
+-- engine authored and habitually beats (mean deviation -66 to -113 min),
+-- so the OTTO-Q column measured plan adherence rather than waiting, and
+-- the FIFO column was forced to 0.0 arithmetically -- with idle stalls,
+-- GREATEST(ready_at, free_at) returns ready_at and no other value was
+-- reachable. The two columns never measured the same quantity. Measured
+-- honestly (arrival -> first service start, KPI 5's own definition) the
+-- run's p95 is 240 min, not 60. The TURNS columns are unaffected and
+-- stand. Section 4's open question is closed by 0105: ~30 min of the
+-- delay is the decision clock and the rest is a cold-start burst
+-- draining -- it was never contention. Section 5's premise is
+-- strengthened, not weakened: 0105 shows busy_day is a 90-minute mass
+-- arrival followed by ~20 hours of an empty depot.
+--
 -- SECTION 1 — OTTO-Q vs FIFO, eight runs, same demand
 -- ---------------------------------------------------------------------
 --   demand   stalls   OTTO-Q turns   FIFO turns   OTTO-Q p95   FIFO p95
