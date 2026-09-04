@@ -1,0 +1,81 @@
+-- =====================================================================
+-- 0190  The index that closed the unattributed five seconds
+-- =====================================================================
+-- forces_recert = FALSE. An index cannot change a result; the checksum
+-- over KPI 5 is asserted anyway.
+--
+-- OPERATIONAL NOTE: on the live database this index was built with
+-- CREATE INDEX CONCURRENTLY, executed OUTSIDE apply_migration, because
+-- CONCURRENTLY cannot run inside a transaction block and apply_migration
+-- wraps its statement in one. Concurrently was chosen so no write to
+-- ottoq_itinerary_legs was blocked while it built. The statement below is
+-- the plain form, guarded IF NOT EXISTS: it no-ops here and builds
+-- normally on a fresh database.
+--
+-- WHAT IT FIXES
+-- ---------------------------------------------------------------------
+-- KPI 5 joins ottoq_itinerary_legs on (sim_run_id, vehicle_id). The only
+-- index that came close was idx_itin_legs_vehicle (vehicle_id, status),
+-- so the planner scanned by vehicle_id and applied sim_run_id as a
+-- FILTER afterwards:
+--
+--   Index Scan using idx_itin_legs_vehicle
+--     Index Cond: (vehicle_id = d.vehicle_id)
+--     Filter: (... AND sim_run_id = <run>)
+--     Rows Removed by Filter: 3,065        x 118 loops
+--
+-- ~362,000 index entries traversed to find 531 rows. The other candidate,
+-- idx_itin_legs_run_live (sim_run_id, status) WHERE status IN
+-- ('planned','active'), is partial on a status this query does not
+-- constrain, so it could not be used at all.
+--
+--   idx_itin_legs_run_vehicle (sim_run_id, vehicle_id)
+--
+--   KPI 5 view      378.7 ms  ->   1.664 ms      (~228x)
+--   Rows Removed        3,065  ->   2   per loop
+--   ottoq_kpi_five  6,934 ms   ->  50.9 ms
+--
+-- AND IT ANSWERS 0098 SECTION 4
+-- ---------------------------------------------------------------------
+-- 0098 recorded ~5.4 s of the CLI's 6.9 s as UNATTRIBUTED and refused to
+-- guess: the views timed individually summed to ~1.5 s, and generic plans
+-- had been excluded by a PREPARE/EXECUTE test. That entry is now closed,
+-- by measurement rather than by story.
+--
+-- It was KPI 5 the whole time. The arithmetic: the CLI fell 6,934 ms ->
+-- 50.9 ms on this index alone, a delta of 6,883 ms across the four reads
+-- ottoq_kpi_five makes of that view - about 1,720 ms per read, against
+-- the 356-378 ms I measured standalone.
+--
+-- So the standalone measurement UNDERSTATED the in-function cost by
+-- roughly 4.5x, and that discrepancy is why the gap looked mysterious.
+-- The likeliest reason is cache: an isolated EXPLAIN ANALYZE re-runs a
+-- query whose ~362k index entries the preceding identical query just
+-- warmed, while the function's four reads do not enjoy that. Stated as
+-- the likeliest reason, not as a finding - what is MEASURED is that the
+-- index removed 6,883 ms and that KPI 5 was the only thing it touched.
+--
+-- The lesson worth keeping: timing a view in isolation and multiplying by
+-- its call count is not a measurement of the caller. It gave an answer
+-- 4.5x too low and sent me looking for a phantom.
+--
+-- THE COST, stated because an index is never free
+-- ---------------------------------------------------------------------
+-- 5,856 kB, against 161 MB of table - 3.4%, and the table grows to
+-- 167 MB. It is the fifth index on ottoq_itinerary_legs, which the twin
+-- inserts into heavily (355,898 rows across 601 runs, ~590 legs per run),
+-- so every leg insert now maintains one more btree. That is the trade:
+-- a few microseconds per insert against 6.9 seconds per KPI call.
+--
+-- If leg-insert throughput ever becomes the constraint, this index is the
+-- first thing to re-examine - and the way to re-examine it is to measure
+-- insert cost with and without, not to reason about it.
+-- =====================================================================
+
+CREATE INDEX IF NOT EXISTS idx_itin_legs_run_vehicle
+  ON public.ottoq_itinerary_legs USING btree (sim_run_id, vehicle_id);
+
+INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note, classified_at)
+VALUES ('the_index_that_closed_the_unattributed_five_seconds', false,
+        'Added idx_itin_legs_run_vehicle (sim_run_id, vehicle_id) on public.ottoq_itinerary_legs. KPI 5 joins that table on exactly those two columns, but the closest existing index was idx_itin_legs_vehicle (vehicle_id, status), so the planner scanned by vehicle_id and applied sim_run_id as a filter afterwards - 3,065 rows removed per loop across 118 loops, roughly 362,000 index entries traversed to find 531 rows. The other candidate, idx_itin_legs_run_live (sim_run_id, status) WHERE status IN (planned, active), is partial on a status this query does not constrain and could not be used at all. Measured: KPI 5 view 378.7 ms to 1.664 ms (~228x), rows removed per loop 3,065 to 2, and ottoq_kpi_five 6,934 ms to 50.9 ms. This CLOSES the open question recorded in db/checks/0098 section 4, which named ~5.4 s of the CLI as unattributed and declined to guess at it: it was KPI 5 throughout. The CLI fell 6,883 ms on this index alone, across the four reads ottoq_kpi_five makes of that view - about 1,720 ms per read against the 356-378 ms measured standalone, so the standalone figure understated in-function cost by roughly 4.5x, which is why the gap looked mysterious. The likeliest reason is cache (an isolated EXPLAIN ANALYZE re-runs a query the preceding identical query just warmed) but that is stated as the likeliest reason, not as a finding; what is measured is that the index removed 6,883 ms and touched only KPI 5. Lesson kept in the record: timing a view in isolation and multiplying by its call count is not a measurement of the caller - it gave an answer 4.5x too low and sent me looking for a phantom. Cost stated because an index is never free: 5,856 kB against 161 MB of table (3.4 percent), the fifth index on a table the twin inserts into heavily (355,898 rows across 601 runs, ~590 legs per run), so every leg insert now maintains one more btree; if leg-insert throughput ever becomes the constraint this is the first thing to re-examine, by measuring insert cost with and without rather than by reasoning. On the live database it was built CREATE INDEX CONCURRENTLY outside apply_migration, since CONCURRENTLY cannot run in a transaction block, so that no write was blocked while it built; the migration carries the plain IF NOT EXISTS form which no-ops here and builds normally on a fresh database. forces_recert=false: an index cannot change a result, and the KPI 5 checksum e6c7983378589856da7f66ca53398fab is asserted unchanged regardless.', now())
+ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
