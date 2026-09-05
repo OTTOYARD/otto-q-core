@@ -290,3 +290,22 @@ COMMIT;
 -- 4. busy_day/171717/12t, run twice again, agrees with its twin on every
 --    endst section (round 15 met this bar; it must survive the change).
 -- =====================================================================
+--
+-- =====================================================================
+-- PREDICTION VERDICT (round 16, read 03:28 UTC 2026-09-05; db/checks/0112)
+-- =====================================================================
+-- 1. MET on green, completion and equal 23505 counts (4/4). FAILED on
+--    "neither cf74d080 nor f2bd5208": the canon is cf74d080, arm A's
+--    round-14/15 value. The grant list is empty when arm A starts and
+--    leaks forward only; arm A was never contaminated. The prediction
+--    should have named arm A's value as the expected canon.
+-- 2. FAILED. No engine canon moved (h_cmd, h_dec, h_bkg, h_nrg identical
+--    to round 15 in every column). The skip_wash_bump half is real and
+--    now observable, but only in h_evt: the wash trigger fires as its
+--    own UPDATE where a run inserts a dispatch (columns 4, 6, 7), adding
+--    one vehicle.state_changed per bump and changing no decision.
+--    "Washes reshape every schedule" was an unsupported inference.
+-- 3. MET. e06b403e on fourteen of fourteen arms.
+-- 4. MET. The 171717/12t twins agree on every verdict field.
+-- Seven of seven pairs green. Round 17 (0112 section 5) tests the
+-- newest canon's stability and the inter-pair bar on a second column.
