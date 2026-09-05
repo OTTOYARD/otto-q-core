@@ -256,6 +256,25 @@ ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCL
 COMMIT;
 
 -- =====================================================================
+-- APPLIED 2026-09-05 01:37:04 UTC (8:37 PM CT on 09-04), first attempt,
+-- after round 15 closed (seven pairs done, zero pair backends, no jobs).
+-- The session that armed the 22:50 UTC check-in was disconnected until
+-- 01:35 UTC; the round waited, nothing ran in between. All assertions
+-- passed:
+--   A1  the two clears are the first statements of advance_tick and
+--       precede the world call; reset_fleet carries the 0196 UPDATE.
+--   A2  rounds 14 and 15 reproduce the red pair's canons by arm
+--       position (A cf74d080, B f2bd5208) and the arms differ.
+--   A3  the transaction-local ottoq.* settings are exactly the five
+--       accounted for (dryrun, reassign_ok, retention, sim_run_id,
+--       skip_wash_bump).
+--   A4  live reset on a depot with an unlinked charger, rolled back:
+--       every charger, linked or not, left with fault_at NULL and
+--       heartbeat = p_as_of.
+--   lineage forces_recert = true.
+-- Round 16 scheduled 01:38 UTC, the red column first.
+--
+-- =====================================================================
 -- THE PREDICTION (published before round 16)
 -- =====================================================================
 -- 1. busy_day/314159/12t passes in round 16, both arms complete, with a
