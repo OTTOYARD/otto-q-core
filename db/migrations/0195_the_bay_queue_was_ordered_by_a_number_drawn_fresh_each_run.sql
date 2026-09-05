@@ -310,3 +310,17 @@ COMMIT;
 --    double-seat is one of the ways a car ends up claimed by two stalls,
 --    not the only one.
 -- =====================================================================
+--
+-- =====================================================================
+-- CORRECTION 2026-09-05 01:40 UTC (round 15 read; db/checks/0111)
+-- =====================================================================
+-- Prediction 1 FAILED: busy_day/314159/12t stayed red in round 15, and
+-- both arms reproduced round 14's canons exactly (cf74d080 / f2bd5208).
+-- Prediction 3 FAILED: the swallowed-23505 counts were 4 and 6 again.
+-- Prediction 2 HELD, and two columns (424242/12t, 424242/24t) moved
+-- their canons under the new order, so the order was live and total.
+-- The order was a real defect of the 0054 class and its fix stands; it
+-- was not this column's cause. The cause is a transaction-local grant
+-- list the second arm inherits from the first inside the pair's single
+-- transaction -- db/migrations/0196, db/checks/0111 section 5.
+-- =====================================================================
