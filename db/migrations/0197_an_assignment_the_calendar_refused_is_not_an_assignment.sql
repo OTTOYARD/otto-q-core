@@ -643,3 +643,42 @@ VALUES ('0197_an_assignment_the_calendar_refused_is_not_an_assignment', TRUE,
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
 
 COMMIT;
+
+-- =====================================================================
+-- APPLIED 2026-09-05 17:35 UTC (12:35 PM CT), first attempt, with zero
+-- pair backends, zero round jobs and zero running runs. All assertions
+-- passed:
+--   A1  both functions carry one OQ197 raise, one handler and one
+--       success return; neither still reports booked = (v_bkg IS NOT NULL).
+--   A2  the class is exactly two book-and-occupy functions (both fixed)
+--       plus one occupy-only (twin.ottoq_sim_start_charge_session, the
+--       charge path, which books in section (3)).
+--   A3  the live probe, rolled back.
+--   A4  64 occupied Benchmark stalls carry no booking of any state.
+--   lineage forces_recert = true.
+--
+-- THE PROBE, BEFORE AND AFTER, SAME FIXTURE, SAME STUB
+-- ---------------------------------------------------------------------
+--   before  assigned=true   reason=-                booked=false
+--           ptr NULL -> 4b535878   stalls_pointing=1  stalls_reserved=1
+--   after   assigned=false  reason=booking_refused   booked=-
+--           ptr NULL -> NULL       stalls_pointing=0  stalls_reserved=0
+--
+-- =====================================================================
+-- THE PREDICTION (published before round 18)
+-- =====================================================================
+-- 1. Seven of seven pairs green, both arms complete.
+-- 2. NO canon moves. Every h_cmd, h_dec, h_evt, h_bkg, h_nrg, endst and
+--    boot chargers.world must equal round 17's value in every column
+--    (c2 cf74d080, c1 80183641, c3 af8b5e6d, c4 adf745a2, c5 38465601,
+--    c6 997e2c37; boot e06b403e on all fourteen arms). The refusal
+--    branch fired zero times in rounds 16 and 17, so nothing this
+--    migration changes was ever reached there. A canon that MOVES means
+--    the branch was reachable in a way the log census did not show, and
+--    that will be said plainly rather than absorbed as a new baseline.
+-- 3. Zero 'ROLLED BACK, calendar refused' warnings in the round. If any
+--    appear, prediction 2 is void and the moved canon is explained by
+--    them.
+-- 4. normal_day/171717/12t, run twice, agrees with itself on every
+--    verdict field -- the inter-pair bar on a third column.
+-- =====================================================================
