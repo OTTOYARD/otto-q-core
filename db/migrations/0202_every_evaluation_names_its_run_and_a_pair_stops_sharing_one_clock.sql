@@ -431,3 +431,21 @@ BEGIN
 END $post$;
 
 COMMIT;
+
+-- =====================================================================
+-- APPLIED 2026-09-06 20:37:00 UTC (3:37 PM CT) -- one transaction as
+-- postgres through one-shot pg_cron job 404, first attempt, 32 s
+-- (COMMIT at 20:37:32). Verified after the fact at 20:38 UTC:
+--
+--   lineage row                 present, 20:37:00.08, forces_recert TRUE
+--   sim_run_id column           present (nullable uuid, no default)
+--   idx_ottoq_evals_sim_run     present, valid
+--   ottoq_evaluate_rule_core    md5 3456fb4c -> cedaa29f
+--   recert floor                15:51:00 -> 20:37:00 (this migration)
+--
+-- Round 21 is the recertification. It runs after 0203 (h_rule measured)
+-- and 0207 (the refusal-walk tie), so it certifies three migrations at
+-- once; the attribution rule stands: this migration adds a column to an
+-- INSERT and cannot move a decision; any canon move belongs to 0207
+-- (tied columns only, one move) or is a new finding.
+-- =====================================================================

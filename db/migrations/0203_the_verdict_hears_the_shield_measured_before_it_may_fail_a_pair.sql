@@ -320,3 +320,21 @@ VALUES ('0203_the_verdict_hears_the_shield_measured_before_it_may_fail_a_pair', 
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
 
 COMMIT;
+
+-- =====================================================================
+-- APPLIED 2026-09-06 20:39:14 UTC (3:39 PM CT) -- one transaction as
+-- postgres through the SQL endpoint, first attempt, under 60 s (the A3
+-- grid pair included). Verified after the fact at 20:40 UTC:
+--
+--   lineage row                      present, 20:39:14.69, forces_recert FALSE
+--   ottoq_hash_rule_evaluations      present, not SECURITY DEFINER
+--   ottoq_determinism_pair           md5 176a41d6 -> 7b8faece; carries h_rule
+--   ottoq_cert_matrix                returns canon_rule
+--   A3 grid pair                     equal; h_rule 3fde30ff on both arms;
+--                                    24 run-scoped evaluations written by
+--                                    the 0202 evaluator
+--   recert floor                     unchanged (20:37:00, 0202)
+--
+-- From round 21 on every flagship arm carries h_rule. The promotion into
+-- v_equal (0205) is gated on that round.
+-- =====================================================================
