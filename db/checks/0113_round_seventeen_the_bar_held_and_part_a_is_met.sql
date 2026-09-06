@@ -201,3 +201,28 @@ FROM regexp_matches(pg_get_functiondef('public.ottoq_fleet_pending_commands'::re
                     '([^\n]*(?:sim_run_id)[^\n]*)', 'g') m;
 -- expect: the odometer SUM carries a sim_run_id predicate (0150);
 --         the fleet API filters c.sim_run_id IS NULL (0151).
+
+-- =====================================================================
+-- CORRECTION appended 2026-09-06 03:40 UTC (10:40 PM CT Sep 5), by 0199.
+-- Nothing above is rewritten.
+-- ---------------------------------------------------------------------
+-- The floor this file read from was stale. ottoq_cert_recert_floor()
+-- looked only at supabase_migrations.schema_migrations, and 0192-0197
+-- (all six classified forces_recert = TRUE) were applied through the
+-- SQL endpoint and never received a row there. So the floor reported
+-- 2026-09-03 17:16:37 while the newest recert-forcing change at the
+-- time this file was written was 0196, applied 2026-09-05 01:37 UTC.
+--
+-- What that does and does not change:
+--   * The values above are unchanged and round 18 reproduced every one.
+--   * Rounds 16 (01:39-03:24) and 17 (03:36-05:19) both ran AFTER 0196,
+--     so "Part A is MET" stood on two consecutive passes above the floor
+--     that should have been in force. The conclusion was right; the
+--     instrument that reported the floor was wrong.
+--   * 0197 (2026-09-05 17:36 UTC, forces_recert) moved the floor again.
+--     At the corrected floor round 18 is ONE pass per column (two for
+--     normal_day, which ran twice). "green" needs round 19, scheduled at
+--     03:41 UTC Sep 6 (10:41 PM CT Sep 5) as 0199 applied.
+-- 0199 makes the floor read the lineage table as well, and 0199's A1
+-- asserts it now reports 0197's apply time.
+-- =====================================================================
