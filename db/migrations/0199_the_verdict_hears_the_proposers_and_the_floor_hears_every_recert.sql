@@ -678,3 +678,33 @@ COMMIT;
 -- deterministic while the disposer is -- a Part-B finding, and it would
 -- be said so.
 -- =====================================================================
+
+-- =====================================================================
+-- CORRECTION appended 2026-09-06 15:40 UTC (10:40 AM CT), after round 19
+-- was read (db/checks/0115). Nothing above is rewritten.
+-- ---------------------------------------------------------------------
+-- Prediction 1  MET. Seven of seven, both arms complete.
+-- Prediction 2  NOT MET for five of seven pairs, and not because of
+--               this migration: cron job 2 (weekly calibration ingest)
+--               ran at 04:05:25 UTC, between pair 2 and pair 3, and
+--               refit the NOAA temperature/precipitation grids and the
+--               EIA grid-demand grid. The two pairs that ran before it
+--               equal round 18 on every field; every pair after it
+--               moved. The A0 pin holds: no engine function changed.
+-- Prediction 3  NOT MET, and it could not have been met as written:
+--               0198 began recording declared_source on proposals that
+--               go through the submitter, and this migration hashes it.
+--               The retro values were computed over pre-0198 rows.
+--               Hashing round-19 pair 1 with declared_source blanked
+--               gives b32df53d, the retro value, exactly. The live
+--               values (2b86847e, 2574c54f, 940d3890, 029cad7d,
+--               2574c54f, bea94486) are the first proposal canons.
+-- Prediction 4  PARTLY. canon_prop / canon_defr populated on all six
+--               columns. Green on three (171717/12t, 314159/12t,
+--               normal_day); one pass at the new priors on the other
+--               three.
+-- Lesson for the instrument: the reproducibility key does not include
+-- the calibration priors the twin draws from. G14 / 0201 adds a
+-- calibration fingerprint to the boot image, the arm and the matrix,
+-- and blocks the ingest under a certification.
+-- =====================================================================

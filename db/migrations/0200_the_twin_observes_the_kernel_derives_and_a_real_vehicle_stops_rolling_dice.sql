@@ -96,393 +96,34 @@ SELECT n.nspname || '.' || p.proname || '(' || pg_get_function_identity_argument
  WHERE n.nspname IN ('public','ottoq','twin') AND p.prokind IN ('f','p');
 
 -- ---------------------------------------------------------------------
--- 1. The old body, verbatim, under a probe name. SECURITY INVOKER (the
---    only caller is this migration, as postgres) so no new SECURITY
---    DEFINER function exists even for a moment; dropped after A1.
+-- 1. The old body, copied from the live catalog under a probe name.
+--    SECURITY INVOKER (the only caller is this migration, as postgres) so
+--    no new SECURITY DEFINER function exists even for a moment; dropped
+--    after A1.
 -- ---------------------------------------------------------------------
-CREATE FUNCTION twin.ottoq_sim_generate_service_manifest_pre0200(p_vehicle_id uuid, p_sim_run_id uuid DEFAULT NULL::uuid, p_seed bigint DEFAULT NULL::bigint)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
-AS $function$
-DECLARE
-  v_soc numeric; v_target numeric; v_cycles int; v_seed bigint; v_m jsonb := '[]'::jsonb;
-  v_depot uuid; v_clock timestamptz; v_run uuid; v_plan jsonb; v_visit text;
-  v_precip_stress numeric := 0; v_boost numeric := 0;
-  v_probs jsonb; v_clamp_lo numeric := 0.005; v_clamp_hi numeric := 0.90;
-  v_p numeric; v_conf numeric;
-  v_hour int; v_urgency text; v_due timestamptz; v_visit_target numeric;
-  v_is_night boolean; v_tail_scale numeric; v_insp_p numeric; v_night_start int; v_night_end int;
-  v_fault boolean := false; v_ota boolean := false;
-  v_band_lo numeric; v_band_hi numeric;
-  v_sla_floor numeric; v_sim_day int;
-  v_carry jsonb; v_carry_visit uuid; v_atom jsonb;
-  v_archetype text;
-  v_wear RECORD; v_soil numeric := 0; v_cap numeric; v_inlet_kw numeric; v_soh numeric;
-  v_curve numeric; v_svcspd numeric; v_pm_int numeric; v_calib_int numeric; v_washcad int;
-  v_pm_prog numeric := 0; v_calib_prog numeric := 0;
-  v_wash_min int; v_deep_min int; v_pm_min int; v_calib_min int; v_charge_min int := 0;
-  v_last_wash timestamptz; v_wash_int numeric; v_wash_ratio numeric; v_wash_overdue boolean := false;
-  v_cabin_cond text; v_deep_clean_due boolean := false;
-  v_rf_id uuid; v_rf_kind text; v_rf_status text; v_rf_visit text;
-  v_rf_svc text; v_rf_min int;
-  v_visit_id uuid; v_rf_prev_visit_id uuid; v_this_visit_id uuid;
-  v_rf_place boolean := false; v_rf_retire boolean := false;
-  v_salt text;
+DO $copy$
+DECLARE v_def text;
 BEGIN
-  SELECT current_soc, COALESCE(target_soc, public.ottoq_default_target_soc()), COALESCE((config->>'cycles_since_wash')::int,0),
-         home_depot_id, COALESCE(last_state_change, now()),
-         battery_capacity_kwh, inlet_max_kw,
-         (config->>'battery_soh_pct')::numeric, (config->>'charge_curve_scalar')::numeric,
-         (config->>'service_speed_scalar')::numeric, (config->>'pm_interval_km')::numeric,
-         (config->>'calib_interval_h')::numeric, (config->>'wash_cadence_cycles')::int
-    INTO v_soc, v_target, v_cycles, v_depot, v_clock,
-         v_cap, v_inlet_kw, v_soh, v_curve, v_svcspd, v_pm_int, v_calib_int, v_washcad
-    FROM vehicles WHERE id = p_vehicle_id;
-  IF v_soc IS NULL THEN RETURN NULL; END IF;
-  SELECT w.soil_index,
-         w.drive_km_total    - COALESCE(w.km_at_last_pm,0)             AS km_since_pm,
-         w.drive_hours_total - COALESCE(w.hours_at_last_calibration,0) AS h_since_calib
-    INTO v_wear FROM ottoq_vehicle_wear w
-   WHERE w.vehicle_id = p_vehicle_id AND (p_sim_run_id IS NULL OR w.sim_run_id = p_sim_run_id)
-   ORDER BY w.updated_at DESC LIMIT 1;
-  v_soil := COALESCE(v_wear.soil_index, 0);
-
-  SELECT p.last_wash_at, p.wash_interval_h, p.cabin_condition
-    INTO v_last_wash, v_wash_int, v_cabin_cond
-    FROM public.vehicle_need_profile p
-   WHERE p.vehicle_id = p_vehicle_id;
-
-  v_run := COALESCE(p_sim_run_id,
-    (SELECT sim_run_id FROM ottoq_sim_runs r
-      WHERE r.status = 'running' AND r.depot_id = v_depot
-      ORDER BY started_at DESC LIMIT 1));
-
-  v_plan := ottoq_feed_plan('service_manifest');
-
-  IF p_seed IS NOT NULL THEN
-    v_seed := p_seed;
-  ELSIF v_run IS NOT NULL THEN
-    SELECT COALESCE(random_seed, 42) INTO v_seed FROM ottoq_sim_runs WHERE sim_run_id = v_run;
-  ELSE
-    v_seed := abs(hashtextextended(p_vehicle_id::text || 'manifest', 13));
+  -- The probe copy is taken from the LIVE catalog, not retyped: it is the
+  -- body the engine ran round 19 on, to the byte. Its md5 is pinned to the
+  -- value measured when this file was written (0cd6b895...), so a generator
+  -- that changed since is refused rather than silently compared against.
+  v_def := pg_get_functiondef('twin.ottoq_sim_generate_service_manifest(uuid,uuid,bigint)'::regprocedure);
+  IF md5(v_def) <> '0cd6b895241d4f7898daaa44ae72fed4' THEN
+    RAISE EXCEPTION '0200: the live generator body (md5 %) is not the one this migration was written against (0cd6b895...)', md5(v_def);
   END IF;
-  v_visit := p_vehicle_id::text || ':' || to_char(v_clock, 'YYYYMMDDHH24MISS');
-  v_salt := p_vehicle_id::text || ':' ||
-            COALESCE((SELECT GREATEST(0, floor(EXTRACT(EPOCH FROM (v_clock - r.sim_clock_start)) / 60.0))::text
-                        FROM public.ottoq_sim_runs r WHERE r.sim_run_id = v_run),
-                     to_char(v_clock, 'YYYYMMDDHH24MISS'));
-  v_sim_day := (v_clock::date - DATE '2020-01-01');
-
-  IF v_run IS NOT NULL AND v_plan IS NOT NULL THEN
-    v_precip_stress := COALESCE((ottoq_twin_climate_stress(v_run, v_sim_day)->>'precip_stress')::numeric, 0);
-    v_boost := v_precip_stress * COALESCE((v_plan->>'precip_soil_coupling')::numeric, 0.6);
+  IF v_def !~ 'SECURITY DEFINER' OR v_def !~ 'ottoq_sim_seeded_random' THEN
+    RAISE EXCEPTION '0200: the live generator is not the seeded SECURITY DEFINER body this migration expects';
   END IF;
-
-  v_probs := COALESCE(v_plan->'probabilities', jsonb_build_object(
-    'interior_tidy',0.35,'sensor_clean',0.20,'interior_deep_clean',0.10,
-    'exterior_wash',0.20,'sensor_calibration',0.04,'mechanical_pm',0.05,'cosmetic_repair',0.02));
-  v_tail_scale := GREATEST(0, COALESCE((v_plan->>'long_tail_scale')::numeric, 0.5));
-  v_probs := v_probs || jsonb_build_object(
-    'sensor_clean',        COALESCE((v_probs->>'sensor_clean')::numeric,0.20)        * v_tail_scale,
-    'interior_deep_clean', COALESCE((v_probs->>'interior_deep_clean')::numeric,0.10) * v_tail_scale,
-    'sensor_calibration',  COALESCE((v_probs->>'sensor_calibration')::numeric,0.04)  * v_tail_scale,
-    'mechanical_pm',       COALESCE((v_probs->>'mechanical_pm')::numeric,0.05)       * v_tail_scale,
-    'cosmetic_repair',     COALESCE((v_probs->>'cosmetic_repair')::numeric,0.02)     * v_tail_scale);
-  IF v_plan IS NOT NULL THEN
-    v_clamp_lo := COALESCE((v_plan->'probability_clamp'->>0)::numeric, 0.005);
-    v_clamp_hi := COALESCE((v_plan->'probability_clamp'->>1)::numeric, 0.90);
+  v_def := replace(v_def, 'FUNCTION twin.ottoq_sim_generate_service_manifest(', 'FUNCTION twin.ottoq_sim_generate_service_manifest_pre0200(');
+  v_def := replace(v_def, E'\n SECURITY DEFINER', '');
+  IF v_def ~ 'SECURITY DEFINER' THEN
+    RAISE EXCEPTION '0200: could not strip SECURITY DEFINER from the probe copy';
   END IF;
-  v_band_lo := COALESCE((v_plan->>'confirm_band_lo')::numeric, 0.40);
-  v_band_hi := COALESCE((v_plan->>'confirm_band_hi')::numeric, 0.75);
-
-  v_fault := ottoq_sim_seeded_random(v_seed, v_salt || ':fault') < COALESCE((v_plan->>'fault_repair_p')::numeric, 0.02);
-  v_hour := EXTRACT(HOUR FROM (v_clock AT TIME ZONE 'America/Chicago'))::int;
-  IF v_fault THEN
-    v_urgency := 'tech_hold';
-  ELSIF v_hour >= 22 OR v_hour < 4 THEN
-    v_urgency := CASE WHEN ottoq_sim_seeded_random(v_seed, v_salt || ':urg')
-                        < COALESCE((v_plan->>'overnight_hold_p_night')::numeric, 0.75)
-                 THEN 'overnight_hold' ELSE 'standard' END;
-  ELSE
-    v_urgency := CASE WHEN ottoq_sim_seeded_random(v_seed, v_salt || ':urg')
-                        < COALESCE((v_plan->>'immediate_dispatch_p_day')::numeric, 0.30)
-                 THEN 'immediate_dispatch' ELSE 'standard' END;
-  END IF;
-  v_due := CASE v_urgency
-    WHEN 'immediate_dispatch' THEN v_clock + interval '45 minutes'
-    WHEN 'overnight_hold' THEN
-      (((v_clock AT TIME ZONE 'America/Chicago')::date
-        + CASE WHEN v_hour >= 4 THEN 1 ELSE 0 END) + time '07:00') AT TIME ZONE 'America/Chicago'
-    ELSE NULL END;
-  BEGIN
-    SELECT min_soc_at_deployment_pct INTO v_sla_floor
-      FROM ottoq_get_active_sla((SELECT fleet_operator_id FROM vehicles WHERE id = p_vehicle_id));
-  EXCEPTION WHEN OTHERS THEN v_sla_floor := NULL; END;
-  v_sla_floor := COALESCE(v_sla_floor, 80);
-  v_visit_target := CASE WHEN v_urgency = 'immediate_dispatch'
-                         THEN GREATEST(v_sla_floor + 5, 70) ELSE v_target END;
-
-  v_pm_prog    := CASE WHEN COALESCE(v_pm_int,0)    > 0 THEN COALESCE(v_wear.km_since_pm,0)   / v_pm_int    ELSE 0 END;
-  v_calib_prog := CASE WHEN COALESCE(v_calib_int,0) > 0 THEN COALESCE(v_wear.h_since_calib,0) / v_calib_int ELSE 0 END;
-  v_wash_min  := GREATEST(8, LEAST(10, round(9 * COALESCE(CASE WHEN v_run IS NOT NULL THEN ottoq_twin_deal(v_run,'wash_time',        v_salt, v_clock, v_sim_day, 0, 'global') END, 1.0) * COALESCE(v_svcspd,1))))::int;
-  v_deep_min  := GREATEST(12, round(20 * COALESCE(CASE WHEN v_run IS NOT NULL THEN ottoq_twin_deal(v_run,'detail_time',      v_salt, v_clock, v_sim_day, 0, 'global') END, 1.0) * COALESCE(v_svcspd,1)))::int;
-  v_pm_min    := GREATEST(20, round(40 * COALESCE(CASE WHEN v_run IS NOT NULL THEN ottoq_twin_deal(v_run,'maintenance_time', v_salt, v_clock, v_sim_day, 0, 'global') END, 1.0) * COALESCE(v_svcspd,1)))::int;
-  v_calib_min := GREATEST(18, round(30 * COALESCE(v_svcspd,1)))::int;
-  IF v_soc < v_visit_target - 1 THEN
-    v_charge_min := GREATEST(8, round(COALESCE(
-      ottoq_estimate_charge_minutes(v_soc, v_visit_target, 150, COALESCE(v_inlet_kw,150),
-                                    COALESCE(v_cap,75), 25, COALESCE(v_soh,95),
-                                    GREATEST(0.2, (CASE WHEN v_run IS NULL THEN 1.0 ELSE ottoq_profile_rate_mult(v_run,'charge_time') END)
-                                                  / GREATEST(0.2, COALESCE(v_curve,1.0)))), 25)))::int;
-  END IF;
-
-  IF v_soc < v_visit_target - 1 THEN
-    v_m := v_m || jsonb_build_object('svc','charge','must_do',true,'deferrable',false,
-      'target_soc',v_visit_target,'est_min',v_charge_min,'concurrency','anchor');
-  END IF;
-  v_m := v_m || jsonb_build_object('svc','readiness_check','must_do',true,'deferrable',false,
-      'est_min',3,'concurrency','gate','predecessors',jsonb_build_array('*'));
-  v_night_start := COALESCE((v_plan->>'night_start_hour')::int, 20);
-  v_night_end   := COALESCE((v_plan->>'night_end_hour')::int, 6);
-  v_is_night    := (v_hour >= v_night_start OR v_hour < v_night_end);
-
-  v_insp_p := CASE WHEN v_is_night
-                   THEN COALESCE((v_plan->>'night_interior_inspection_p')::numeric, 0.95)
-                   ELSE COALESCE((v_plan->>'day_interior_inspection_p')::numeric, 0.93) END;
-  IF ottoq_sim_seeded_random(v_seed, v_salt || ':insp') < v_insp_p THEN
-    v_m := v_m || jsonb_build_object('svc','interior_inspection','must_do',true,'deferrable',false,
-      'est_min', (3 + round(2 * ottoq_sim_seeded_random(v_seed, v_salt || ':inspmin')))::int,
-      'concurrency','cabin','at_charge_stall',true);
-  END IF;
-
-  v_p := LEAST(v_clamp_hi, GREATEST(v_clamp_lo, (v_probs->>'interior_tidy')::numeric * (1 + v_boost) * (0.6 + 1.6 * v_soil)));
-  IF ottoq_sim_seeded_random(v_seed, v_salt || ':tidy') < v_p THEN
-    v_conf := round((0.30 + 0.70 * ottoq_sim_seeded_random(v_seed, v_salt || ':tidyconf'))::numeric, 2);
-    v_m := v_m || jsonb_build_object('svc','interior_tidy','must_do',true,'deferrable',false,
-      'est_min', (3 + round(2 * ottoq_sim_seeded_random(v_seed, v_salt || ':tidymin')))::int,
-      'concurrency','cabin','confidence',v_conf,
-      'confirm_required', v_conf BETWEEN v_band_lo AND v_band_hi);
-  END IF;
-  IF ottoq_sim_seeded_random(v_seed, v_salt || ':item') < COALESCE((v_plan->>'item_retrieval_p')::numeric, 0.06) THEN
-    v_m := v_m || jsonb_build_object('svc','item_retrieval','must_do',true,'deferrable',false,
-      'est_min',4,'concurrency','cabin','confidence',1.0,'confirm_required',false);
-  END IF;
-  v_p := LEAST(v_clamp_hi, GREATEST(v_clamp_lo, (v_probs->>'sensor_clean')::numeric * (1 + v_boost) * (0.6 + 1.6 * v_soil)));
-  IF ottoq_sim_seeded_random(v_seed, v_salt || ':sclean') < v_p THEN
-    v_conf := round((0.30 + 0.70 * ottoq_sim_seeded_random(v_seed, v_salt || ':scleanconf'))::numeric, 2);
-    v_m := v_m || jsonb_build_object('svc','sensor_clean','must_do',true,'deferrable',false,
-      'est_min',5,'concurrency','exterior','confidence',v_conf,
-      'confirm_required', v_conf BETWEEN v_band_lo AND v_band_hi);
-  END IF;
-  IF ottoq_sim_seeded_random(v_seed, v_salt || ':diag') < COALESCE((v_plan->>'remote_diagnostics_p')::numeric, 0.05) THEN
-    v_m := v_m || jsonb_build_object('svc','remote_diagnostics','must_do',false,'deferrable',true,
-      'est_min',5,'concurrency','digital');
-  END IF;
-  v_ota := ottoq_sim_seeded_random(v_seed, 'ota_wave:' || v_sim_day::text) < COALESCE((v_plan->>'ota_wave_daily_p')::numeric, 0.08);
-  IF v_ota THEN
-    v_m := v_m || jsonb_build_object('svc','software_update','must_do',false,'deferrable',true,
-      'est_min', 15 + floor(ottoq_sim_seeded_random(v_seed, v_salt || ':otamin') * 30)::int,
-      'concurrency','digital','blocks_dispatch_while_running',true);
-  END IF;
-  v_deep_clean_due := COALESCE(v_cabin_cond IN ('soiled','biohazard'), false);
-
-  v_p := LEAST(v_clamp_hi, GREATEST(v_clamp_lo, (v_probs->>'interior_deep_clean')::numeric * (1 + v_boost * 0.5)));
-  IF v_deep_clean_due OR ottoq_sim_seeded_random(v_seed, v_salt || ':deep') < v_p THEN
-    v_m := v_m || jsonb_build_object('svc','interior_deep_clean',
-      'must_do', v_deep_clean_due, 'deferrable', NOT v_deep_clean_due,
-      'est_min',v_deep_min,'concurrency','bay','requires_bay','detail','carryover_eligible',true);
-  END IF;
-
-  v_wash_ratio := CASE WHEN v_last_wash IS NULL OR COALESCE(v_wash_int,0) <= 0
-                       THEN NULL
-                       ELSE EXTRACT(EPOCH FROM (v_clock - v_last_wash)) / 3600.0 / v_wash_int END;
-  v_wash_overdue := COALESCE(v_wash_ratio, 0) >= COALESCE(
-                      (SELECT c.overdue_ratio FROM public.service_cadence_policy c
-                        WHERE c.svc = 'exterior_wash' AND c.is_active), 1.25);
-
-  v_p := LEAST(v_clamp_hi, GREATEST(v_clamp_lo, (v_probs->>'exterior_wash')::numeric * (1 + v_boost) * (0.6 + 1.6 * v_soil)));
-  IF (v_is_night
-       AND COALESCE((SELECT (config->>'wash_group')::int FROM vehicles WHERE id = p_vehicle_id),
-                    (abs(hashtextextended(p_vehicle_id::text, 77)) % 3)) = (v_sim_day % 3))
-     OR v_soil >= COALESCE((v_plan->>'wash_soil_override')::numeric, 0.75)
-     OR v_cycles >= COALESCE((v_plan->>'wash_backstop_cycles')::int, 9)
-     OR v_wash_overdue THEN
-    v_m := v_m || jsonb_build_object('svc','exterior_wash',
-      'must_do', v_wash_overdue, 'deferrable', NOT v_wash_overdue,
-      'est_min',v_wash_min,'concurrency','bay','requires_bay','wash_bay','carryover_eligible',true);
-  END IF;
-
-  IF v_run IS NOT NULL THEN
-    SELECT f.flag_id, f.flag_kind, f.status, f.recalled_visit_key, f.recalled_visit_id
-      INTO v_rf_id, v_rf_kind, v_rf_status, v_rf_visit, v_rf_prev_visit_id
-      FROM public.ottoq_rider_cleaning_flags f
-     WHERE f.sim_run_id = v_run AND f.vehicle_id = p_vehicle_id
-       AND f.status IN ('pending','recalled')
-       AND f.raised_at_sim_clock <= v_clock;
-
-    IF v_rf_id IS NOT NULL THEN
-      IF v_rf_kind = 'exterior' THEN
-        v_rf_svc := 'exterior_wash'; v_rf_min := v_wash_min;
-      ELSE
-        v_rf_svc := 'interior_deep_clean'; v_rf_min := v_deep_min;
-      END IF;
-
-      SELECT n.visit_id INTO v_this_visit_id
-        FROM ottoq_visit_needs n
-       WHERE n.vehicle_id = p_vehicle_id
-         AND n.visit_key  = v_visit
-         AND COALESCE(n.sim_run_id, '00000000-0000-0000-0000-000000000000'::uuid)
-           = COALESCE(v_run,        '00000000-0000-0000-0000-000000000000'::uuid);
-
-      IF v_rf_status = 'recalled'
-         AND v_rf_prev_visit_id IS NOT NULL
-         AND v_rf_prev_visit_id IS DISTINCT FROM v_this_visit_id THEN
-        v_rf_retire := true;
-        v_rf_status := 'served';
-      ELSE
-        v_rf_place  := true;
-        v_rf_status := 'recalled';
-      END IF;
-    END IF;
-
-    IF v_rf_place THEN
-      IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_m) e WHERE e->>'svc' = v_rf_svc) THEN
-        SELECT jsonb_agg(CASE WHEN a->>'svc' = v_rf_svc
-                              THEN a || jsonb_build_object('must_do', true, 'deferrable', false,
-                                     'carryover_eligible', false,
-                                     'rider_flagged', true,
-                                     'rider_flag_kind', COALESCE(v_rf_kind,'interior'),
-                                     'return_trigger', 'rider_flag_cleaning')
-                              ELSE a END)
-          INTO v_m FROM jsonb_array_elements(v_m) a;
-      ELSE
-        v_m := v_m || jsonb_build_object(
-          'svc', v_rf_svc, 'must_do', true, 'deferrable', false,
-          'est_min', v_rf_min, 'concurrency', 'bay',
-          'requires_bay', CASE WHEN v_rf_svc = 'exterior_wash' THEN 'wash_bay' ELSE 'detail' END,
-          'carryover_eligible', false,
-          'rider_flagged', true,
-          'rider_flag_kind', COALESCE(v_rf_kind,'interior'),
-          'return_trigger', 'rider_flag_cleaning',
-          'why', 'Rider-reported ' || COALESCE(v_rf_kind,'interior')
-                 || ' cleanliness issue; vehicle was recalled for this.');
-      END IF;
-    END IF;
-  END IF;
-
-  IF v_is_night
-     AND ottoq_sim_seeded_random(v_seed, v_salt || ':walkaround')
-         < COALESCE((v_plan->>'night_walkaround_p')::numeric, 0.90) THEN
-    v_m := v_m || jsonb_build_object('svc','perimeter_walkaround','must_do',true,'deferrable',false,
-      'est_min', (10 + round(5 * ottoq_sim_seeded_random(v_seed, v_salt || ':walkmin')))::int,
-      'concurrency','hold','at_perimeter',true);
-  END IF;
-  IF ottoq_sim_seeded_random(v_seed, v_salt || ':calib') < LEAST(0.95, (v_probs->>'sensor_calibration')::numeric
-        * CASE WHEN v_calib_prog >= 1.0 THEN 12 WHEN v_calib_prog >= 0.8 THEN 4 ELSE 0.5 END) THEN
-    v_m := v_m || jsonb_build_object('svc','sensor_calibration','must_do',false,'deferrable',true,
-      'est_min',v_calib_min,'slot','dedicated_service','concurrency','bay','requires_bay','service_bay',
-      'predecessors',jsonb_build_array('exterior_wash'),'carryover_eligible',true);
-  END IF;
-  IF ottoq_sim_seeded_random(v_seed, v_salt || ':pm') < LEAST(0.95, (v_probs->>'mechanical_pm')::numeric
-        * CASE WHEN v_pm_prog >= 1.0 THEN 12 WHEN v_pm_prog >= 0.8 THEN 4 ELSE 0.5 END) THEN
-    v_m := v_m || jsonb_build_object('svc','mechanical_pm','must_do',false,'deferrable',true,
-      'est_min',v_pm_min,'concurrency','bay','requires_bay','service_bay','carryover_eligible',true);
-  END IF;
-  IF ottoq_sim_seeded_random(v_seed, v_salt || ':cosmetic') < (v_probs->>'cosmetic_repair')::numeric THEN
-    v_conf := round((0.30 + 0.70 * ottoq_sim_seeded_random(v_seed, v_salt || ':cosconf'))::numeric, 2);
-    v_m := v_m || jsonb_build_object('svc','cosmetic_repair','must_do',false,'deferrable',true,
-      'est_min',60,'disposition','offline_candidate','concurrency','bay','requires_bay','service_bay',
-      'confidence',v_conf,'confirm_required', v_conf BETWEEN v_band_lo AND v_band_hi,
-      'carryover_eligible',true);
-  END IF;
-  IF v_fault THEN
-    v_m := v_m || jsonb_build_object('svc','fault_repair','must_do',true,'deferrable',false,
-      'est_min', 30 + floor(ottoq_sim_seeded_random(v_seed, v_salt || ':faultmin') * 90)::int,
-      'concurrency','bay','requires_bay','service_bay','requires_tech_greenlight',true);
-  END IF;
-
-  SELECT visit_id, atoms INTO v_carry_visit, v_carry
-    FROM ottoq_visit_needs
-   WHERE vehicle_id = p_vehicle_id AND status = 'carried_over' AND COALESCE(sim_run_id, '00000000-0000-0000-0000-000000000000'::uuid) = COALESCE(p_sim_run_id, '00000000-0000-0000-0000-000000000000'::uuid)
-   ORDER BY created_at DESC LIMIT 1;
-  IF v_carry IS NOT NULL THEN
-    FOR v_atom IN SELECT * FROM jsonb_array_elements(v_carry) LOOP
-      IF COALESCE((v_atom->>'carryover_eligible')::boolean, false)
-         AND NOT COALESCE((v_atom->>'done')::boolean, false)
-         AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_m) e WHERE e->>'svc' = v_atom->>'svc') THEN
-        v_m := v_m || (v_atom || jsonb_build_object('carried',true));
-      END IF;
-    END LOOP;
-    UPDATE ottoq_visit_needs SET status = 'complete',
-           meta = COALESCE(meta,'{}'::jsonb) || jsonb_build_object('carryover_consumed_by', v_visit)
-     WHERE visit_id = v_carry_visit;
-  END IF;
-
-  v_archetype := CASE
-    WHEN v_fault THEN 'E_tech_hold_fault'
-    WHEN v_rf_id IS NOT NULL AND v_rf_status = 'recalled' THEN 'R_rider_flag_cleaning'
-    WHEN v_ota THEN 'J_ota_wave'
-    WHEN v_urgency = 'overnight_hold' THEN 'C_overnight'
-    WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_m) e WHERE e->>'svc' = 'charge') THEN 'M_pass_through_or_P_triage'
-    WHEN v_urgency = 'immediate_dispatch'
-         AND EXISTS (SELECT 1 FROM jsonb_array_elements(v_m) e WHERE e->>'svc' = 'interior_tidy') THEN 'A_charge_clean_go'
-    WHEN v_urgency = 'immediate_dispatch' THEN 'D_charge_and_go'
-    WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(v_m) e WHERE e->>'svc' = 'mechanical_pm') THEN 'B_full_service'
-    ELSE 'std_mixed' END;
-
-  UPDATE ottoq_visit_needs SET status = 'superseded'
-   WHERE vehicle_id = p_vehicle_id AND status IN ('open','in_progress');
-  INSERT INTO ottoq_visit_needs (vehicle_id, sim_run_id, depot_id, arrived_at, visit_key,
-                                 archetype, urgency, dispatch_due_at, target_soc, atoms, meta)
-  VALUES (p_vehicle_id, v_run, v_depot, v_clock, v_visit,
-          v_archetype, v_urgency, v_due, v_visit_target, ottoq.ottoq_atoms_guard(v_m),
-          jsonb_build_object('plan', CASE WHEN v_plan IS NULL THEN 'legacy' ELSE 'service_manifest.v1' END,
-                             'crn', v_run IS NOT NULL, 'precip_stress', round(v_precip_stress,3),
-                             'wet_boost', round(v_boost,3), 'soc_at_arrival', v_soc,
-                             'sla_floor', v_sla_floor, 'generator', 'v4_condition',
-                             'rider_flagged', (v_rf_id IS NOT NULL AND v_rf_status = 'recalled'),
-                             'rider_flag_kind', v_rf_kind))
-  ON CONFLICT (vehicle_id, visit_key, (COALESCE(sim_run_id, '00000000-0000-0000-0000-000000000000'::uuid)))
-  DO UPDATE
-    SET atoms = EXCLUDED.atoms, urgency = EXCLUDED.urgency, archetype = EXCLUDED.archetype,
-        dispatch_due_at = EXCLUDED.dispatch_due_at, target_soc = EXCLUDED.target_soc,
-        meta = EXCLUDED.meta, status = 'open'
-  RETURNING visit_id INTO v_visit_id;
-
-  IF v_rf_id IS NOT NULL AND v_visit_id IS NOT NULL THEN
-    IF v_rf_retire THEN
-      UPDATE public.ottoq_rider_cleaning_flags
-         SET status = 'served', served_at_sim_clock = COALESCE(served_at_sim_clock, v_clock)
-       WHERE flag_id = v_rf_id;
-    ELSIF v_rf_place THEN
-      UPDATE public.ottoq_rider_cleaning_flags
-         SET status                = 'recalled',
-             recalled_at_sim_clock = COALESCE(recalled_at_sim_clock, v_clock),
-             recalled_visit_key    = v_visit,
-             recalled_visit_id     = v_visit_id
-       WHERE flag_id = v_rf_id;
-    END IF;
-  END IF;
-
-  UPDATE vehicles SET config = jsonb_set(
-      jsonb_set(COALESCE(config,'{}'::jsonb), '{service_manifest}', v_m),
-      '{service_manifest_meta}', jsonb_build_object(
-        'visit', v_visit,
-        'visit_id', v_visit_id,
-        'plan', CASE WHEN v_plan IS NULL THEN 'legacy' ELSE 'service_manifest.v1' END,
-        'crn', v_run IS NOT NULL,
-        'precip_stress', round(v_precip_stress, 3),
-        'wet_boost', round(v_boost, 3),
-        'urgency', v_urgency,
-        'rider_flagged', (v_rf_id IS NOT NULL AND v_rf_status = 'recalled'),
-        'generator', 'v4_condition'))
-   WHERE id = p_vehicle_id;
-  RETURN v_m;
-END;
-$function$;
+  EXECUTE v_def;
+END $copy$;
 COMMENT ON FUNCTION twin.ottoq_sim_generate_service_manifest_pre0200(uuid, uuid, bigint) IS
-  '0200 probe copy of the pre-0200 generator body (SECURITY INVOKER). Exists only for assertion A1 and is dropped at the end of 0200.';
+  '0200 probe copy of the pre-0200 generator body, taken from the live catalog (SECURITY INVOKER). Exists only for assertion A1 and is dropped at the end of 0200.';
 
 -- ---------------------------------------------------------------------
 -- 2. THE KERNEL: needs from observations + asset state + policy.
@@ -1372,3 +1013,106 @@ VALUES ('0200_the_twin_observes_the_kernel_derives_and_a_real_vehicle_stops_roll
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
 
 COMMIT;
+
+-- =====================================================================
+-- APPLIED 2026-09-06 15:51:00 UTC (10:51 AM CT) -- one transaction as
+-- postgres through a one-shot pg_cron job (jobid 394, scheduled 15:49:34
+-- UTC for 15:51, per the lesson in 0201's footer). The job ran 15:51:00.10
+-- to 15:51:06.23 and returned COMMIT: the 160 A1 probes, the A2 real-path
+-- probe, the A3 purity scan, the A4 call-site check and the A5 re-pin all
+-- passed inside those six seconds. Verified from the ledger at 15:52 UTC:
+--
+--   job_run_details 394               succeeded, return_message COMMIT
+--   lineage row                       present, 15:51:00.10, forces_recert TRUE
+--   ottoq_cert_recert_floor()         moved 15:40:59 -> 15:51:00 (the matrix
+--                                     is entirely stale until round 20)
+--   ottoq.ottoq_derive_visit_needs    present, not SECURITY DEFINER
+--   ottoq.ottoq_generate_visit_needs  present, not SECURITY DEFINER
+--   ottoq.ottoq_observe_asset         present, not SECURITY DEFINER
+--   twin.ottoq_sim_observe_asset      present, not SECURITY DEFINER
+--   twin.ottoq_sim_generate_service_manifest
+--                                     body changed (now the feed_mode wrapper),
+--                                     still SECURITY DEFINER as before
+--   ..._pre0200 probe copy            absent (A5)
+--   vehicle_need_profile '0200-probe' 0 rows (A2 left nothing)
+--   ottoq_calibration_fingerprint()   11a246262ff7a2c929483b1ee0a7cd2d, unchanged
+--   apply_0200 cron job               unscheduled by hand at 15:52 UTC (a
+--                                     one-shot written as a date schedule
+--                                     would otherwise fire again next year)
+--
+-- Pre-checks before scheduling the apply, 15:45 UTC: no r*_ or apply_ jobs,
+-- no pair backend in pg_stat_activity, no running sim run, live generator
+-- md5 0cd6b895241d4f7898daaa44ae72fed4 (matches the A1 pin).
+--
+-- ROUND 20, scheduled 15:53 UTC as nine self-unscheduling pairs, budget
+-- 1800, sim_start 2026-09-01 02:00 UTC, flagship depot (jobids 395-403):
+--
+--   15:56  r20_c2_busy_314159_12t        16:09  r20_c1_busy_171717_12t
+--   16:22  r20_c2dup_busy_314159_12t     16:35  r20_c1dup_busy_171717_12t
+--   16:48  r20_c3_normal_171717_12t      17:01  r20_c3dup_normal_171717_12t
+--   17:14  r20_c4_busy_424242_12t        17:27  r20_c5_busy_171717_24t
+--   17:52  r20_c6_busy_424242_24t
+--
+-- PREDICTIONS, written before the first pair fires:
+--   1. No canon moves attributable to 0200. Its A1 equivalence (160 rolled-
+--      back probes, old vs new byte-identical on manifest, visit row, cache,
+--      cards and flags) is the proof; the round is the check. Concretely:
+--      314159/12t = 2b86847e, 171717/12t = 2574c54f, normal_day = 940d3890,
+--      424242/12t = 029cad7d, 171717/24t = 2574c54f, 424242/24t = bea94486
+--      (round 19's post-refit values), and the doubled columns agree with
+--      themselves twice.
+--   2. h_cal = 11a246262ff7a2c929483b1ee0a7cd2d on every arm of every pair,
+--      and canon_cal reads that value on every column. The next ingest is
+--      Sunday 2026-09-13 04:00 UTC; nothing refits under this round.
+--   3. h_prop and h_defr unchanged from round 19 per column.
+--   4. Nine of nine equal=true, complete=true within budget; 12t pairs in
+--      9-13 min, 24t pairs in 16-20 min, no overlap between neighbours.
+-- If prediction 1 fails on any column, the first divergence is 0200's to
+-- explain before anything else is built; the A1 probes covered day and
+-- night clocks but not every tick of a 12-tick run.
+-- =====================================================================
+--
+-- CORRECTION 2026-09-06 16:45 UTC (11:45 AM CT), written after round 20's
+-- first pair and before its fifth. Prediction 1 above is wrong twice, and
+-- the ledger caught it before the round did:
+--   (a) the six hashes it lists (2b86847e, 2574c54f, 940d3890, 029cad7d,
+--       2574c54f, bea94486) are round 19's h_prop values, not its h_cmd
+--       canons. The canons (h_cmd, arm_a, from validation_notes) are:
+--         314159/12t  cf74d080   PRE-refit  (round-19 pair 1, 03:43 UTC)
+--         171717/12t  80183641   PRE-refit  (round-19 pair 2, 03:56 UTC)
+--         normal_day  634a8781   post-refit
+--         424242/12t  adf745a2   post-refit
+--         171717/24t  5dd1816d   post-refit
+--         424242/24t  997e2c37   post-refit
+--   (b) round 19's pairs 1 and 2 ran BEFORE the 04:05:25 UTC calibration
+--       refit (db/checks/0115), so 314159/12t and 171717/12t have never
+--       been run on the current priors. The honest prediction for them is
+--       "a first post-refit value, and the doubled column agrees with
+--       itself twice" -- which is what task #64 said and what this footer
+--       failed to write. Only the four post-refit columns must equal
+--       round 19.
+-- Round 20 pair 1 (314159/12t, 15:56 UTC) reads h_cmd 9fa71d19, h_dec
+-- 1fa3e10e, h_evt 36bb019a, h_nrg fec46a84, h_prop 4469caa1, h_cal
+-- 11a24626, fp 803698f3. fp equals round 19's and h_cal is the post-refit
+-- fingerprint, so the world booted identically on the current priors and
+-- the streams moved -- consistent with the refit, not yet proof of it.
+-- Prediction 1 stands, corrected: 314159/12t and 171717/12t move once and
+-- repeat; normal_day, 424242/12t, 171717/24t and 424242/24t must read
+-- 634a8781, adf745a2, 5dd1816d, 997e2c37. If any of those four moves,
+-- 0200 is the suspect and the first divergence is its to explain.
+--
+-- ROUND 20 READ 2026-09-06 18:16 UTC (1:16 PM CT). db/checks/0116.
+-- Prediction 1 (corrected)  MET. normal_day 634a8781, 424242/12t adf745a2,
+--                           171717/24t 5dd1816d (arm A), 424242/24t 997e2c37
+--                           reproduced round 19; 314159/12t and 171717/12t
+--                           moved once (9fa71d19, 93e895e6) and repeated.
+--                           Nothing that 0200 could be blamed for moved.
+-- Prediction 2              MET. h_cal 11a24626 on all eighteen arms;
+--                           canon_cal populated on all six columns.
+-- Prediction 3              MET with a note: 314159/12t's h_prop moved with
+--                           its h_cmd on its first post-refit pass (the
+--                           refit, not a proposer coin); the rest unchanged.
+-- Prediction 4              NOT MET. 8 of 9. Pair 8 (171717/24t) failed
+--                           intra-pair: a sort tie in ottoq_react_to_refusals
+--                           settled by physical row order. Convicted in 0116,
+--                           fixed by 0207. Not this migration's.
