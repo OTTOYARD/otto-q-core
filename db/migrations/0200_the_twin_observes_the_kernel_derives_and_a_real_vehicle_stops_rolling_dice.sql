@@ -1071,3 +1071,32 @@ COMMIT;
 -- explain before anything else is built; the A1 probes covered day and
 -- night clocks but not every tick of a 12-tick run.
 -- =====================================================================
+--
+-- CORRECTION 2026-09-06 16:45 UTC (11:45 AM CT), written after round 20's
+-- first pair and before its fifth. Prediction 1 above is wrong twice, and
+-- the ledger caught it before the round did:
+--   (a) the six hashes it lists (2b86847e, 2574c54f, 940d3890, 029cad7d,
+--       2574c54f, bea94486) are round 19's h_prop values, not its h_cmd
+--       canons. The canons (h_cmd, arm_a, from validation_notes) are:
+--         314159/12t  cf74d080   PRE-refit  (round-19 pair 1, 03:43 UTC)
+--         171717/12t  80183641   PRE-refit  (round-19 pair 2, 03:56 UTC)
+--         normal_day  634a8781   post-refit
+--         424242/12t  adf745a2   post-refit
+--         171717/24t  5dd1816d   post-refit
+--         424242/24t  997e2c37   post-refit
+--   (b) round 19's pairs 1 and 2 ran BEFORE the 04:05:25 UTC calibration
+--       refit (db/checks/0115), so 314159/12t and 171717/12t have never
+--       been run on the current priors. The honest prediction for them is
+--       "a first post-refit value, and the doubled column agrees with
+--       itself twice" -- which is what task #64 said and what this footer
+--       failed to write. Only the four post-refit columns must equal
+--       round 19.
+-- Round 20 pair 1 (314159/12t, 15:56 UTC) reads h_cmd 9fa71d19, h_dec
+-- 1fa3e10e, h_evt 36bb019a, h_nrg fec46a84, h_prop 4469caa1, h_cal
+-- 11a24626, fp 803698f3. fp equals round 19's and h_cal is the post-refit
+-- fingerprint, so the world booted identically on the current priors and
+-- the streams moved -- consistent with the refit, not yet proof of it.
+-- Prediction 1 stands, corrected: 314159/12t and 171717/12t move once and
+-- repeat; normal_day, 424242/12t, 171717/24t and 424242/24t must read
+-- 634a8781, adf745a2, 5dd1816d, 997e2c37. If any of those four moves,
+-- 0200 is the suspect and the first divergence is its to explain.
