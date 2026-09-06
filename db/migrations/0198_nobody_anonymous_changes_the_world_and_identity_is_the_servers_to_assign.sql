@@ -352,18 +352,18 @@ BEGIN
       -- preserve the callers that matter BEFORE touching PUBLIC (30 functions
       -- have default privileges; revoking PUBLIC on those would strand them)
       EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', v_sig);
-      v_actions := v_actions || 'grant:service_role';
+      v_actions := array_append(v_actions, 'grant:service_role');
       IF NOT r.is_internal THEN
         EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', v_sig);
-        v_actions := v_actions || 'grant:authenticated';
+        v_actions := array_append(v_actions, 'grant:authenticated');
       END IF;
       EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC', v_sig);
-      v_actions := v_actions || 'revoke:PUBLIC';
+      v_actions := array_append(v_actions, 'revoke:PUBLIC');
       EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM anon', v_sig);
-      v_actions := v_actions || 'revoke:anon';
+      v_actions := array_append(v_actions, 'revoke:anon');
       IF r.is_internal THEN
         EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM authenticated', v_sig);
-        v_actions := v_actions || 'revoke:authenticated';
+        v_actions := array_append(v_actions, 'revoke:authenticated');
       END IF;
       v_n := v_n + 1;
     EXCEPTION WHEN insufficient_privilege THEN
@@ -394,7 +394,7 @@ DECLARE
   v_n int; v_names text; v_msg text;
   v_changed text[]; v_new text[];
   v_rule text; v_uid_mgr uuid; v_uid_sup uuid; v_uid_none uuid := '0198dead-0000-4000-8000-000000000198';
-  v_res uuid; v_got text;
+  v_res uuid; v_got text; v_run uuid;
 BEGIN
   -- ── A0. THE PIN. Exactly two bodies changed and exactly two are new.
   SELECT array_agg(a.sig ORDER BY a.sig) INTO v_changed
@@ -559,9 +559,15 @@ BEGIN
   RAISE NOTICE '0198 A5: manager ranked from staff_users despite declaring depot_tech; supervisor refused despite declaring command_center_operator; non-staff refused';
 
   -- ── A6. LIVE, ROLLED BACK: an operator's proposal source is assigned; a system's is trusted and recorded.
+  -- The proposals table carries fk_ottoq_external_proposals_sim_run, so the probe rides a real, completed
+  -- flagship run (the rows never persist: each probe raises inside a handled block and rolls itself back).
+  SELECT sim_run_id INTO v_run FROM public.ottoq_sim_runs
+   WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND status = 'completed'
+   ORDER BY started_at DESC, sim_run_id DESC LIMIT 1;
+  IF v_run IS NULL THEN RAISE EXCEPTION '0198 A6 FIXTURE: no completed flagship run to ride'; END IF;
   BEGIN
     PERFORM set_config('request.jwt.claims', json_build_object('role','authenticated','sub',v_uid_mgr)::text, true);
-    v_res := public.ottoq_submit_external_proposal('01980000-0000-4000-8000-000000000198'::uuid,
+    v_res := public.ottoq_submit_external_proposal(v_run,
               '11111111-1111-1111-1111-111111111111'::uuid, 'probe', 'vehicle',
               '01980000-0000-4000-8000-000000000001'::uuid, '{}'::jsonb, 'cuopt', 5);
     SELECT source||'|'||declared_source||'|'||submitted_by_role||'|'||coalesce(submitted_by::text,'NULL') INTO v_got
@@ -575,7 +581,7 @@ BEGIN
   END IF;
   BEGIN
     -- no JWT: this very session (a migration) is a system caller
-    v_res := public.ottoq_submit_external_proposal('01980000-0000-4000-8000-000000000198'::uuid,
+    v_res := public.ottoq_submit_external_proposal(v_run,
               '11111111-1111-1111-1111-111111111111'::uuid, 'probe', 'vehicle',
               '01980000-0000-4000-8000-000000000002'::uuid, '{}'::jsonb, 'cuopt', 5);
     SELECT source||'|'||declared_source||'|'||submitted_by_role INTO v_got
@@ -618,3 +624,77 @@ VALUES ('0198_nobody_anonymous_changes_the_world_and_identity_is_the_servers_to_
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
 
 COMMIT;
+
+-- =====================================================================
+-- APPLIED 2026-09-06 03:21:56 UTC (10:21:56 PM CT, Sep 5) -- one
+-- transaction as postgres, third attempt. Attempts 1 and 2 rolled back
+-- whole: 22P02 (text[] || 'literal' is array concatenation in plpgsql;
+-- array_append now) and 23503 (A6 rode a synthetic sim_run_id into
+-- fk_ottoq_external_proposals_sim_run; it now selects the newest
+-- completed flagship run, 347773ec at apply time). Before each retry
+-- the rollback was measured clean: snapshot table absent, both helpers
+-- absent, all six new columns absent, anon still holding EXECUTE on the
+-- submitter. No determinism pair was scheduled or in flight.
+--
+-- The SQL endpoint returns no NOTICEs, so the post-state was measured
+-- by independent queries after COMMIT rather than read off A0-A7:
+--
+--   snapshot rows                        334  = 332 SECURITY DEFINER that
+--                                               existed + the 2 helpers
+--     by schema                          ottoq 50, public 233, twin 51
+--     postgres-owned, actioned           331
+--       keep authenticated               192  (public, not control plane)
+--       lose authenticated               139  (ottoq 50 + twin 51 + 38
+--                                               public control-plane)
+--     supabase_admin-owned, untouched      3  (see CORRECTION)
+--     had default privileges before       30
+--   anon EXECUTE remaining
+--     on postgres-owned SECURITY DEFINER   0
+--     in total                             3  st_estimatedextent x3, PostGIS
+--                                               C estimators, read-only
+--   authenticated EXECUTE in ottoq/twin    0
+--   probe rows persisted                   0 proposals, 0 overrides
+--   lineage                                forces_recert = false
+--   first cron tick after apply            03:22:00 UTC, ottoq-depot-tick
+--                                          and ottoq-demo-metronome both
+--                                          succeeded (cron is postgres;
+--                                          the grant sweep cannot see it)
+--   function bodies changed (A0)           2, the submitter and the
+--                                          authorizer; decide path pinned
+--                                          and unchanged
+--
+-- CORRECTION (appended 03:24 UTC, applied; nothing above is rewritten)
+-- ---------------------------------------------------------------------
+-- The header says postgres "cannot act for" supabase_admin and that A1
+-- lists the three st_estimatedextent overloads. The outcome was right
+-- and the mechanism was wrong: a GRANT or REVOKE by a non-owner without
+-- grant option is a WARNING in Postgres, not insufficient_privilege, so
+-- the loop's handler never fired, skipped = 0, A1 had nothing to list,
+-- and the snapshot recorded four actions on each of the three rows
+-- while their acl did not move (acl_before = proacl after, verified).
+-- A1 still passed honestly because it filters to postgres-owned
+-- functions. The right guard is r.owner_name <> current_user before
+-- issuing anything, not a handler after. The three rows now say what
+-- happened. Statement run:
+--
+--   UPDATE public.ottoq_grant_snapshot_0198 g
+--      SET actions = ARRAY['noop:not_owner:' || g.owner_name || ':acl_unchanged']
+--     FROM pg_namespace n, pg_proc p
+--    WHERE n.nspname = g.schema_name AND p.pronamespace = n.oid
+--      AND p.proname = g.function_name
+--      AND pg_get_function_identity_arguments(p.oid) = g.identity_args
+--      AND g.owner_name <> 'postgres'
+--      AND p.proacl::text = g.acl_before;
+--   -- 3 rows: st_estimatedextent(text,text) / (text,text,text) /
+--   --         (text,text,text,boolean), owner supabase_admin
+--
+-- Those three remain anon-executable. They read table statistics for a
+-- geometry column and write nothing; closing them needs supabase_admin,
+-- which no agent here holds. Recorded, not hidden.
+--
+-- What this closes: external audit F1 (anonymous mutation through
+-- SECURITY DEFINER RPC; caller-declared identity in proposals and
+-- overrides). What it does not touch: any decide-path function (A0),
+-- cron (postgres), edge functions (service_role). No recert is owed and
+-- none was scheduled.
+-- =====================================================================
