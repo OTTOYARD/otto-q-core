@@ -191,10 +191,10 @@ DO $tim$
 DECLARE
   v_def text;
   v_old text[] := ARRAY[
-    '''unsafe_blocks'',       (SELECT count(*) FROM ottoq_rule_evaluations e',
+    '(SELECT count(*) FROM ottoq_rule_evaluations e',
     'AND e.evaluated_at >= r.started_at),'];
   v_new text[] := ARRAY[
-    '''unsafe_blocks'',       CASE WHEN r.started_at < (SELECT l.classified_at FROM ottoq_cert_lineage l WHERE l.name ~ ''^0202_'' LIMIT 1) THEN NULL ELSE (SELECT count(*) FROM ottoq_rule_evaluations e',
+    'CASE WHEN r.started_at < (SELECT l.classified_at FROM ottoq_cert_lineage l WHERE l.name ~ ''^0202_'' LIMIT 1) THEN NULL ELSE (SELECT count(*) FROM ottoq_rule_evaluations e',
     'AND e.sim_run_id = p_sim_run_id) END,'];
   v_n int; i int;
 BEGIN
@@ -310,8 +310,8 @@ BEGIN
   END IF;
   v_def := pg_get_functiondef('public.ottoq_tick_invariance_metrics(uuid)'::regprocedure);
   v_def := replace(v_def,
-    '''unsafe_blocks'',       CASE WHEN r.started_at < (SELECT l.classified_at FROM ottoq_cert_lineage l WHERE l.name ~ ''^0202_'' LIMIT 1) THEN NULL ELSE (SELECT count(*) FROM ottoq_rule_evaluations e',
-    '''unsafe_blocks'',       (SELECT count(*) FROM ottoq_rule_evaluations e');
+    'CASE WHEN r.started_at < (SELECT l.classified_at FROM ottoq_cert_lineage l WHERE l.name ~ ''^0202_'' LIMIT 1) THEN NULL ELSE (SELECT count(*) FROM ottoq_rule_evaluations e',
+    '(SELECT count(*) FROM ottoq_rule_evaluations e');
   v_def := replace(v_def, 'AND e.sim_run_id = p_sim_run_id) END,', 'AND e.evaluated_at >= r.started_at),');
   IF md5(v_def) <> '501848c0186d4ae4eac82d3777a08f28' THEN
     RAISE EXCEPTION '0202 A2 FAILED: tick_invariance_metrics differs from its pin outside the two fragments';
