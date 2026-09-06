@@ -1013,3 +1013,61 @@ VALUES ('0200_the_twin_observes_the_kernel_derives_and_a_real_vehicle_stops_roll
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
 
 COMMIT;
+
+-- =====================================================================
+-- APPLIED 2026-09-06 15:51:00 UTC (10:51 AM CT) -- one transaction as
+-- postgres through a one-shot pg_cron job (jobid 394, scheduled 15:49:34
+-- UTC for 15:51, per the lesson in 0201's footer). The job ran 15:51:00.10
+-- to 15:51:06.23 and returned COMMIT: the 160 A1 probes, the A2 real-path
+-- probe, the A3 purity scan, the A4 call-site check and the A5 re-pin all
+-- passed inside those six seconds. Verified from the ledger at 15:52 UTC:
+--
+--   job_run_details 394               succeeded, return_message COMMIT
+--   lineage row                       present, 15:51:00.10, forces_recert TRUE
+--   ottoq_cert_recert_floor()         moved 15:40:59 -> 15:51:00 (the matrix
+--                                     is entirely stale until round 20)
+--   ottoq.ottoq_derive_visit_needs    present, not SECURITY DEFINER
+--   ottoq.ottoq_generate_visit_needs  present, not SECURITY DEFINER
+--   ottoq.ottoq_observe_asset         present, not SECURITY DEFINER
+--   twin.ottoq_sim_observe_asset      present, not SECURITY DEFINER
+--   twin.ottoq_sim_generate_service_manifest
+--                                     body changed (now the feed_mode wrapper),
+--                                     still SECURITY DEFINER as before
+--   ..._pre0200 probe copy            absent (A5)
+--   vehicle_need_profile '0200-probe' 0 rows (A2 left nothing)
+--   ottoq_calibration_fingerprint()   11a246262ff7a2c929483b1ee0a7cd2d, unchanged
+--   apply_0200 cron job               unscheduled by hand at 15:52 UTC (a
+--                                     one-shot written as a date schedule
+--                                     would otherwise fire again next year)
+--
+-- Pre-checks before scheduling the apply, 15:45 UTC: no r*_ or apply_ jobs,
+-- no pair backend in pg_stat_activity, no running sim run, live generator
+-- md5 0cd6b895241d4f7898daaa44ae72fed4 (matches the A1 pin).
+--
+-- ROUND 20, scheduled 15:53 UTC as nine self-unscheduling pairs, budget
+-- 1800, sim_start 2026-09-01 02:00 UTC, flagship depot (jobids 395-403):
+--
+--   15:56  r20_c2_busy_314159_12t        16:09  r20_c1_busy_171717_12t
+--   16:22  r20_c2dup_busy_314159_12t     16:35  r20_c1dup_busy_171717_12t
+--   16:48  r20_c3_normal_171717_12t      17:01  r20_c3dup_normal_171717_12t
+--   17:14  r20_c4_busy_424242_12t        17:27  r20_c5_busy_171717_24t
+--   17:52  r20_c6_busy_424242_24t
+--
+-- PREDICTIONS, written before the first pair fires:
+--   1. No canon moves attributable to 0200. Its A1 equivalence (160 rolled-
+--      back probes, old vs new byte-identical on manifest, visit row, cache,
+--      cards and flags) is the proof; the round is the check. Concretely:
+--      314159/12t = 2b86847e, 171717/12t = 2574c54f, normal_day = 940d3890,
+--      424242/12t = 029cad7d, 171717/24t = 2574c54f, 424242/24t = bea94486
+--      (round 19's post-refit values), and the doubled columns agree with
+--      themselves twice.
+--   2. h_cal = 11a246262ff7a2c929483b1ee0a7cd2d on every arm of every pair,
+--      and canon_cal reads that value on every column. The next ingest is
+--      Sunday 2026-09-13 04:00 UTC; nothing refits under this round.
+--   3. h_prop and h_defr unchanged from round 19 per column.
+--   4. Nine of nine equal=true, complete=true within budget; 12t pairs in
+--      9-13 min, 24t pairs in 16-20 min, no overlap between neighbours.
+-- If prediction 1 fails on any column, the first divergence is 0200's to
+-- explain before anything else is built; the A1 probes covered day and
+-- night clocks but not every tick of a 12-tick run.
+-- =====================================================================
