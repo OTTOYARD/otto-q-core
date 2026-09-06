@@ -289,3 +289,28 @@ VALUES ('0207_a_tie_in_the_command_walk_is_settled_by_the_issuance_sequence_not_
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
 
 COMMIT;
+
+-- =====================================================================
+-- APPLIED 2026-09-06 20:42:00 UTC (3:42 PM CT) -- one transaction as
+-- postgres through one-shot pg_cron job 405, first attempt, 17 s
+-- (COMMIT at 20:42:16; the 318 MB identity rewrite and the grid pair
+-- inside it). Verified after the fact at 20:44 UTC:
+--
+--   lineage row                      present, 20:42:00.17, forces_recert TRUE
+--   command_seq                      present (identity by default)
+--   ottoq_react_to_refusals          md5 ea24d2ab -> 4d46d5e5
+--   ottoq_sim_confirm_commands       md5 26290678 -> 68286608
+--   A4 grid pair                     equal
+--   probe rows                       none survived
+--   recert floor                     20:37:00 (0202) -> 20:42:00 (this)
+--
+-- ROUND 21 (scheduled 20:45 UTC as jobs 406-414: 171717/24t first at
+-- 20:48, then 314159/12t, 171717/12t, normal_day, 424242/12t, their
+-- repeats, and 424242/24t last at 22:51; read at ~23:16 UTC / 6:16 PM CT)
+-- tests the predictions in the header above, plus 0202's (no move of
+-- its own) and 0203's (every arm carries h_rule and the arms agree).
+-- The attribution rule for the round: a move on 314159/12t, 171717/24t
+-- or 424242/24t is this migration's (a tie now resolved by issuance
+-- order) and must repeat; a move on 171717/12t, normal_day or
+-- 424242/12t is nobody's prediction and is a new finding.
+-- =====================================================================
