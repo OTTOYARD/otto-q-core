@@ -1100,3 +1100,19 @@ COMMIT;
 -- repeat; normal_day, 424242/12t, 171717/24t and 424242/24t must read
 -- 634a8781, adf745a2, 5dd1816d, 997e2c37. If any of those four moves,
 -- 0200 is the suspect and the first divergence is its to explain.
+--
+-- ROUND 20 READ 2026-09-06 18:16 UTC (1:16 PM CT). db/checks/0116.
+-- Prediction 1 (corrected)  MET. normal_day 634a8781, 424242/12t adf745a2,
+--                           171717/24t 5dd1816d (arm A), 424242/24t 997e2c37
+--                           reproduced round 19; 314159/12t and 171717/12t
+--                           moved once (9fa71d19, 93e895e6) and repeated.
+--                           Nothing that 0200 could be blamed for moved.
+-- Prediction 2              MET. h_cal 11a24626 on all eighteen arms;
+--                           canon_cal populated on all six columns.
+-- Prediction 3              MET with a note: 314159/12t's h_prop moved with
+--                           its h_cmd on its first post-refit pass (the
+--                           refit, not a proposer coin); the rest unchanged.
+-- Prediction 4              NOT MET. 8 of 9. Pair 8 (171717/24t) failed
+--                           intra-pair: a sort tie in ottoq_react_to_refusals
+--                           settled by physical row order. Convicted in 0116,
+--                           fixed by 0207. Not this migration's.
