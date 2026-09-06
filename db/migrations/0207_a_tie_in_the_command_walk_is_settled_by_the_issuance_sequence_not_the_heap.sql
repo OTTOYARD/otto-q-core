@@ -230,12 +230,20 @@ BEGIN
    ORDER BY r.started_at DESC, r.sim_run_id DESC LIMIT 1;
   SELECT v.id INTO v_veh FROM public.vehicles v WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111' ORDER BY v.id LIMIT 1;
   BEGIN
-    v_c1 := ottoq.ottoq_emit_vehicle_command(v_run, '11111111-1111-1111-1111-111111111111', v_veh, 'proceed_to_stall',
-              jsonb_build_object('stall_id', 'bc469f6a-edfd-46b9-b71f-be3d9e249c74', 'probe', '0207', 'z', 'c'), '2026-09-01 23:59:00+00');
-    v_c2 := ottoq.ottoq_emit_vehicle_command(v_run, '11111111-1111-1111-1111-111111111111', v_veh, 'proceed_to_stall',
-              jsonb_build_object('stall_id', 'bc469f6a-edfd-46b9-b71f-be3d9e249c74', 'probe', '0207', 'z', 'b'), '2026-09-01 23:59:00+00');
-    v_c3 := ottoq.ottoq_emit_vehicle_command(v_run, '11111111-1111-1111-1111-111111111111', v_veh, 'proceed_to_stall',
-              jsonb_build_object('stall_id', 'bc469f6a-edfd-46b9-b71f-be3d9e249c74', 'probe', '0207', 'z', 'a'), '2026-09-01 23:59:00+00');
+    -- direct INSERTs, not the emitter: the emitter validates the assignment first and
+    -- would refuse a probe against a completed run; the walk under test reads rows.
+    INSERT INTO public.ottoq_vehicle_commands (sim_run_id, depot_id, vehicle_id, command_type, payload, issued_at)
+    VALUES (v_run, '11111111-1111-1111-1111-111111111111', v_veh, 'proceed_to_stall',
+            jsonb_build_object('stall_id', 'bc469f6a-edfd-46b9-b71f-be3d9e249c74', 'probe', '0207', 'z', 'c'), '2026-09-01 23:59:00+00')
+    RETURNING command_id INTO v_c1;
+    INSERT INTO public.ottoq_vehicle_commands (sim_run_id, depot_id, vehicle_id, command_type, payload, issued_at)
+    VALUES (v_run, '11111111-1111-1111-1111-111111111111', v_veh, 'proceed_to_stall',
+            jsonb_build_object('stall_id', 'bc469f6a-edfd-46b9-b71f-be3d9e249c74', 'probe', '0207', 'z', 'b'), '2026-09-01 23:59:00+00')
+    RETURNING command_id INTO v_c2;
+    INSERT INTO public.ottoq_vehicle_commands (sim_run_id, depot_id, vehicle_id, command_type, payload, issued_at)
+    VALUES (v_run, '11111111-1111-1111-1111-111111111111', v_veh, 'proceed_to_stall',
+            jsonb_build_object('stall_id', 'bc469f6a-edfd-46b9-b71f-be3d9e249c74', 'probe', '0207', 'z', 'a'), '2026-09-01 23:59:00+00')
+    RETURNING command_id INTO v_c3;
     SELECT array_agg(c.command_seq ORDER BY c.command_seq) INTO v_seq FROM public.ottoq_vehicle_commands c WHERE c.command_id IN (v_c1, v_c2, v_c3);
     SELECT array_agg(c.command_id ORDER BY c.issued_at, c.vehicle_id, c.command_type, c.payload->>'stall_id', c.command_seq) INTO v_by_seq
       FROM public.ottoq_vehicle_commands c WHERE c.command_id IN (v_c1, v_c2, v_c3);
