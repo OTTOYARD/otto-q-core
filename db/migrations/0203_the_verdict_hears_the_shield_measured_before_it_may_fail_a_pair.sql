@@ -168,13 +168,13 @@ DECLARE
   v_def text; v_n int; i int;
   v_old text[] := ARRAY[
     $f$canon_defr text, canon_cal text)$f$,
-    $f$AS c_cal,$f$,
+    $f$p.j->'arm_a'->>'h_cal'$f$,
     $f$rk.c_prop, rk.c_defr, rk.c_cal$f$,
     $f$l.c_prop, l.c_defr, l.c_cal$f$];
   v_new text[] := ARRAY[
     $f$canon_defr text, canon_cal text, canon_rule text)$f$,
-    $f$AS c_cal,
-         p.j->'arm_a'->>'h_rule'                   AS c_rule,   -- 0203; NULL before 0203; reported, not judged (G15)$f$,
+    $f$p.j->'arm_a'->>'h_rule'                   AS c_rule,   -- 0203; NULL before 0203; reported, not judged (G15)
+         p.j->'arm_a'->>'h_cal'$f$,
     $f$rk.c_prop, rk.c_defr, rk.c_cal, rk.c_rule$f$,
     $f$l.c_prop, l.c_defr, l.c_cal, l.c_rule$f$];
 BEGIN
@@ -237,8 +237,8 @@ BEGIN
   END IF;
   v_def := pg_get_functiondef('public.ottoq_cert_matrix(timestamptz)'::regprocedure);
   v_def := replace(v_def, $f$canon_defr text, canon_cal text, canon_rule text)$f$, $f$canon_defr text, canon_cal text)$f$);
-  v_def := replace(v_def, $f$AS c_cal,
-         p.j->'arm_a'->>'h_rule'                   AS c_rule,   -- 0203; NULL before 0203; reported, not judged (G15)$f$, $f$AS c_cal,$f$);
+  v_def := replace(v_def, $f$p.j->'arm_a'->>'h_rule'                   AS c_rule,   -- 0203; NULL before 0203; reported, not judged (G15)
+         p.j->'arm_a'->>'h_cal'$f$, $f$p.j->'arm_a'->>'h_cal'$f$);
   v_def := replace(v_def, $f$rk.c_prop, rk.c_defr, rk.c_cal, rk.c_rule$f$, $f$rk.c_prop, rk.c_defr, rk.c_cal$f$);
   v_def := replace(v_def, $f$l.c_prop, l.c_defr, l.c_cal, l.c_rule$f$, $f$l.c_prop, l.c_defr, l.c_cal$f$);
   IF md5(v_def) <> 'c607932b524b6a519c39c0416c9a7f1e' THEN
