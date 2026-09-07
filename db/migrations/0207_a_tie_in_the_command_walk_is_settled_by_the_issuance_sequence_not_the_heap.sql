@@ -314,3 +314,46 @@ COMMIT;
 -- order) and must repeat; a move on 171717/12t, normal_day or
 -- 424242/12t is nobody's prediction and is a new finding.
 -- =====================================================================
+
+-- =====================================================================
+-- CORRECTION appended 2026-09-07 1:05 PM CT, after round 21 was read.
+--
+-- The header's prediction was right about the fix and WRONG ABOUT ITS
+-- SCOPE. It said: "171717/24t passes; 314159/12t, 171717/24t and
+-- 424242/24t (tie groups in round 20) may move once; 171717/12t,
+-- normal_day and 424242/12t must not move." The APPLIED footer above
+-- restated that as the round's attribution rule.
+--
+-- 171717/24t passed. All six columns moved.
+--
+-- The error: this migration was written from round 20's failure, which
+-- was a tie among REFUSED commands in ottoq.ottoq_react_to_refusals --
+-- a rare walk (12 tied groups in round 20, 8 in round 21). But the same
+-- migration also replaced the sort keys of the three walks in
+-- twin.ottoq_sim_confirm_commands (the supersession window, the
+-- duplicate ranking, the confirm walk), swapping c.payload::text and the
+-- random c.command_id for c.command_seq. Those walks run over EVERY
+-- same-tick same-stall duplicate command, refused or not, and that
+-- population is two orders of magnitude larger:
+--
+--     round 20   244 duplicate groups, 18 arms, 32 vehicles
+--     round 21   230 duplicate groups, 18 arms, 33 vehicles
+--     of which the refusal tie this migration was written for: 12 and 8
+--
+-- Measured on round 21's own rows: of its 230 duplicate groups, the OLD
+-- keys and the NEW key select a different survivor in 214, across all 18
+-- arms. Every column was always going to move. The header should have
+-- predicted six moves, not three, and should have said the other three
+-- columns move for the confirm pass rather than must not move at all.
+--
+-- The change itself stands: the survivor is now the first command the
+-- decide path issued, chosen by a function of the run rather than by
+-- physical row order. Round 21 was nine-for-nine equal and complete, and
+-- each of the four columns that ran twice reproduced its new canon.
+--
+-- The bar this correction sets: ROUND 22 MUST REPRODUCE EVERY h_cmd IN
+-- db/canons/round21.md. A column that moves again has a second carrier
+-- and this migration did not close it.
+--
+-- Full read: db/checks/0117 and db/canons/round21.md.
+-- =====================================================================

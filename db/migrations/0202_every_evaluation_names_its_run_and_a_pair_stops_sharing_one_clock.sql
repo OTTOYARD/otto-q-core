@@ -449,3 +449,19 @@ COMMIT;
 -- INSERT and cannot move a decision; any canon move belongs to 0207
 -- (tied columns only, one move) or is a new finding.
 -- =====================================================================
+
+-- =====================================================================
+-- ROUND 21 READ (appended 2026-09-07 1:05 PM CT). Prediction MET.
+--
+-- Nine pairs, nine equal and complete. Every arm carries a populated
+-- sim_run_id on its rule evaluations, and no canon move is attributable
+-- to this migration: it adds a column to an INSERT and cannot change a
+-- decision. All six columns DID move, but the carrier is 0207's confirm-
+-- pass reordering, convicted in db/checks/0117 §3 by direct measurement
+-- (214 of 230 duplicate groups resolve differently under the old and new
+-- keys). See the CORRECTION appended to 0207.
+--
+-- The unsafe_blocks guard behaved: runs started before this migration's
+-- lineage timestamp read NULL rather than a count taken over another
+-- run's evaluations.
+-- =====================================================================
