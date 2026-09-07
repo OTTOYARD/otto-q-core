@@ -145,3 +145,55 @@ SELECT relname, n_live_tup, n_dead_tup,
  WHERE relname IN ('ottoq_rule_evaluations','ottoq_events','ottoq_decisions',
                    'ottoq_stall_bookings','ottoq_vehicle_commands')
  ORDER BY pg_total_relation_size(relid) DESC;
+
+-- ---------------------------------------------------------------------------
+-- CORRECTION, appended 2026-09-07 22:41 UTC (5:41 PM CT), after r23_c3 landed.
+--
+-- c3 (171717/12t) was already in flight when c4..c9 were unscheduled, so it
+-- ran to completion and is a third data point. Its result changes the
+-- diagnosis and the header above is wrong in one important way:
+--
+--     r23_c3   arm A reached 12 ticks of 12
+--              arm B reached  9 ticks of 12      -> inconclusive
+--
+-- TWO ARMS OF THE SAME PAIR, RUN BACK TO BACK ON THE SAME WORLD, LANDED THREE
+-- TICKS APART. One of them finished. That is not the signature of an engine
+-- that is uniformly ~2.6x slower; it is the signature of a system sitting ON
+-- the 240 s boundary, where ordinary variance decides whether an arm finishes.
+--
+-- So "a STEP, not a drift" -- the header's framing -- is too strong. What the
+-- three pairs actually support:
+--
+--   * The 12-tick columns are marginal. They have been completing, and now
+--     sometimes do not. Round 22's 12-tick pairs finished; round 23's reached
+--     9, 11, 9 and 12. A column that finishes on one arm and not the other is
+--     a column whose per-tick cost has crept up to roughly 240/12 = 20 s and
+--     is now straddling the cap.
+--   * The 24-tick column is NOT marginal, it is far over: 9 and 10 ticks of
+--     24 means ~26 s/tick against the <=10 s/tick it needed in round 22. That
+--     gap is too large for boundary noise and still wants an explanation.
+--
+-- These may be one cause or two. A per-tick cost that has roughly doubled
+-- would put 12-tick arms on the boundary AND put 24-tick arms far past it,
+-- which is the single-cause reading and the one to test first.
+--
+-- WHAT THIS DOES NOT CHANGE: 0208 is still exonerated (one caller, outside the
+-- tick loop, 251 ms), the standing cron jobs are still flat, and the three
+-- measurements listed above are still the ones that would settle it. It does
+-- reorder them -- measurement 1, timing ottoq_sim_advance_tick directly on a
+-- scratch run, is now clearly first, because the question is no longer "what
+-- changed at 21:36" but "what does a tick cost now, and where does it go".
+--
+-- STATE AT THIS WRITING: cron carries no r-prefixed jobs, no sim run is
+-- running, no pair backend is live. The database is quiet and clean.
+-- ---------------------------------------------------------------------------
+
+-- 6. The correction's evidence: arms of one pair, three ticks apart.
+SELECT r.started_at, r.random_seed AS seed, r.tick_count AS ticks_reached,
+       r.scenario_code AS scen,
+       r.validation_notes::jsonb->>'outcome' AS outcome
+  FROM public.ottoq_sim_runs r
+ WHERE r.started_at >= '2026-09-07 22:24:00+00'
+   AND r.validation_notes IS NOT NULL
+   AND r.validation_notes::jsonb ? 'equal'
+ ORDER BY r.tick_count DESC;
