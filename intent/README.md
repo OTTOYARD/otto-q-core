@@ -92,6 +92,42 @@ ceiling). A cheaper per-tick flow formulation is the open hot-path item; for
 offline planning and the demo the current solver is fine. See
 `policies/test_regime.py` for the pinned trade-off numbers.
 
+## The learn loop (intent/learn.py) — rejection and intractability reconciliation
+
+The fourth line of the doctrine: *model proposes → optimizer disposes → shield
+guarantees → loop learns.* This module is the LEARN step, in the only form that
+is honest to build against the current world.
+
+**The honest scope line.** FR-5 is documented as "offline RL / Bayesian tuning
+from run outcomes." That half is deliberately **not built here** because run
+outcomes are *contaminated*: the twin replays OTTO-Q's own decisions, so tuning
+parameters against `ottoq_decisions` / dispatch history would be tuning against
+our own bugs. It belongs in `ottoq-intelligence`, against real depot data or a
+clean-world simulator.
+
+**What IS clean is the deterministic boundary**, and that is what `learn.py`
+reconciles:
+
+- **Refusals** — the shield's "not allowable because of X" is *law* (allowability),
+  not a decision outcome. `reconcile_refusals` classifies every production
+  `reason_code` (migration 0086's ten-code vocabulary) into `transient` /
+  `live_world` / `solver_gap`, flags anomalies (a solver_gap on any occurrence;
+  a live_world on entity repetition), and emits **learned constraints** that plug
+  straight into the next solve: `block_points`, `refresh_occupancy`,
+  `reconcile_frame`, `fix_emitter`, `tighten_capacity`, `vehicle_override`.
+- **Intractability** — `diagnose_solver` maps a solver status (INFEASIBLE /
+  UNKNOWN / MODEL_INVALID / …) to its next action: enable rejection, raise the
+  deterministic budget, retain the previous plan, or fix the model.
+
+Both are pure functions of their arguments (never read the database), and the
+closed loop is tested end-to-end: a faulted point learned from refusals is passed
+as `blocked_points` and the solver routes around it (`intent/test_learn.py`).
+
+**The remaining wiring** (not in this module, by design): an offline job reads
+`ottoq_vehicle_commands.reason_code` (shield output, clean) and feeds
+`reconcile_refusals`; the resulting constraints become the next propose's
+`blocked_points` / capacity. That is a deployment concern, not a kernel change.
+
 ## The honest gap (what is NOT yet wired)
 
 This artifact is the *specification* of the full objective. The solver currently
