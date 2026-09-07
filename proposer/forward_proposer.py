@@ -9,8 +9,15 @@ disposes"):
      proposal its one-tick right-of-first-refusal before the local decide path
      pre-empts. The DISPOSER remains the production decide path -- exactly the
      seat cuOpt occupies today, and deliberately no more.
-  2. No proposal is ever a command. Every row is advisory, carries abstain
-     semantics, and expires.
+  2. No proposal is ever a command. Every row is advisory and carries abstain
+     semantics. EXPIRY IS THE CALLER'S, and saying otherwise here was wrong: no
+     row this module builds carries expires_at or a TTL -- grep the file, the
+     only match used to be the law itself. proposer/README.md has it right
+     ("inserts the rows with sim_run_id/depot_id/expires_at"), because the
+     expiry belongs to the insert, where the sim run and depot are known and
+     the deferral pattern's one-tick window is measured. A law a module states
+     about its own output must be enforceable by that module; this one is an
+     obligation on its caller, and it is now stated as one.
 
 THE CONTRACT SHAPES ARE THE PRODUCTION ONES, verbatim. The input is the decision
 frame as ottoq_build_decision_frame emits it (keys: vehicles, stalls, sessions,
@@ -88,6 +95,28 @@ from regime import resolve_active                  # noqa: E402
 #: states -- the vehicle is done and staged out. This proposer proposes charge
 #: assignments; a caller that wants to schedule non-charge service on a holding
 #: vehicle passes its own predicate.
+#: THE PROPOSER IS ALWAYS BOUNDED. propose() used to default det_budget_s and
+#: time_limit_s to None -- no budget of any kind -- and orchestrate() passed
+#: neither, so nothing in the shipped call graph ever bounded a solve. An
+#: unbounded proposal is two problems at once: it can miss the tick it was
+#: meant to occupy, and its cost is a property of the box rather than of the
+#: instance, so it is not reproducible under a run ID.
+#:
+#: The budget is DETERMINISTIC WORK, not wall-clock seconds, so the same frame
+#: costs the same budget on any machine. Measured on this codebase's own
+#: two-pass hot path (both passes get the budget, and pass 2 spends all of it):
+#:
+#:     10 vehicles / 4 stalls   det_budget 2.0  ->   4.4 s wall
+#:     20 vehicles / 8 stalls   det_budget 2.0  ->  12.6 s wall
+#:     44 vehicles / 16 stalls  det_budget 2.0  ->  94.8 s wall
+#:
+#: 2.0 is an engineering default, not a sourced number: it keeps a tick-sized
+#: frame inside a 30-second tick (the interval every run in the engine uses)
+#: with room for model construction. It is NOT enough to make a 44-vehicle
+#: frame fit that tick -- see max_assets on propose() and the note in
+#: proposer/README.md. Callers with a different tick pass their own.
+DEFAULT_DET_BUDGET_S = 2.0
+
 DEFAULT_SERVICEABLE_STATES = frozenset({
     "arrived_at_gate", "staged_awaiting_service", "charging_dcfc", "charging_l2",
 })
@@ -261,9 +290,10 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             horizon_min: int = 720,
             ready_by_min: dict[str, int] | None = None,
             default_ready_delta_min: int = 240,
-            det_budget_s: float | None = None,
+            det_budget_s: float | None = DEFAULT_DET_BUDGET_S,
             time_limit_s: float | None = None,
             allow_rejection: bool = False,
+            max_assets: int | None = None,
             hour_of_day: int | None = None,
             signals: frozenset = frozenset()) -> dict:
     """Frame in, advisory rows out. Writes nothing, ever.
@@ -305,6 +335,43 @@ def propose(frame: dict, class_table: dict, *, site: dict,
         return {"proposals": abstentions, "abstained": len(abstentions),
                 "planned": 0, "solver": None,
                 "note": "no plannable vehicles in frame"}
+
+    #: THE BATCH BOUND, and why it is the caller's number and not a default.
+    #:
+    #: A deterministic budget bounds the SEARCH; it does not bound the MODEL.
+    #: A 44-vehicle frame costs ~95 s of wall time at det_budget 2.0 mostly in
+    #: construction and propagation, so no budget setting makes it fit a
+    #: 30-second tick. A caller that must occupy the one-tick seat sizes the
+    #: frame instead: solve the most urgent max_assets, and ABSTAIN on the rest
+    #: with a reason that names the batch.
+    #:
+    #: Urgency is deadline first, then depth of need -- earliest ready_by_min,
+    #: then lowest SoC, then aid for a stable tie-break. That is a selection of
+    #: WHO TO ASK ABOUT, not a scheduling decision: the solver still decides
+    #: placement and time for the batch it is given, and the deferred vehicles
+    #: get rows, so "deferred to the next tick" stays distinguishable from
+    #: "nobody asked". Left unset there is no batching and the whole frame is
+    #: solved, which is right for offline planning.
+    deferred: list[dict] = []
+    if max_assets is not None:
+        if max_assets < 1:
+            raise ValueError(f"max_assets must be >= 1, got {max_assets}")
+        explicit = scenario["assets_spec"]["explicit"]
+        if len(explicit) > max_assets:
+            ranked = sorted(explicit,
+                            key=lambda a: (a["ready_by_min"], a["soc"], a["aid"]))
+            keep, drop = ranked[:max_assets], ranked[max_assets:]
+            for a in drop:
+                deferred.append(_abstain(
+                    {"id": a["aid"]},
+                    f"outside this tick's batch of {max_assets} most urgent "
+                    f"(ready_by {a['ready_by_min']} min, soc {a['soc']}%); "
+                    f"re-offered next tick"))
+            kept = {a["aid"] for a in keep}
+            scenario["assets_spec"]["explicit"] = [
+                a for a in explicit if a["aid"] in kept]
+            scenario["assets"] = [a for a in scenario["assets"]
+                                  if a.aid in kept]
 
     budget = {"time_limit_s": time_limit_s, "allow_rejection": allow_rejection}
     if det_budget_s is not None:
@@ -394,9 +461,13 @@ def propose(frame: dict, class_table: dict, *, site: dict,
         }
 
     rows = plan_to_proposals(final_plan, scenario, ready_by_used=ready_by_used)
+    #: EVERY VEHICLE THE FRAME OFFERED STILL HAS EXACTLY ONE ROW: planned,
+    #: abstained at translation (unknown platform, no capable point), or
+    #: deferred out of this tick's batch.
     return {
-        "proposals": rows + abstentions,
+        "proposals": rows + abstentions + deferred,
         "planned": len(rows),
-        "abstained": len(abstentions),
+        "abstained": len(abstentions) + len(deferred),
+        "deferred": len(deferred),
         "solver": solver_record,
     }

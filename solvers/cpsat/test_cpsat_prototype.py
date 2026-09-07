@@ -122,6 +122,17 @@ def _capture_params(call):
     return seen["params"]
 
 
+#: EVERY PASS LINE THE BATTERY EMITS, so it can count itself at the end instead
+#: of a human maintaining the count in three files (README, the CI step name,
+#: the handoff) and getting it wrong in all three.
+_emitted: list[str] = []
+
+
+def _say(msg: str) -> None:
+    _emitted.append(msg)
+    print(msg)
+
+
 def main():
     print(f"ortools {ortools.__version__}")
     sc = load_scenario(SC_PATH)
@@ -130,7 +141,7 @@ def main():
     p1 = build_and_solve(load_scenario(SC_PATH))
     p2 = build_and_solve(load_scenario(SC_PATH))
     assert p1["plan_sha256"] == p2["plan_sha256"], "T1 FAIL: plans differ across solves"
-    print(f"T1 PASS determinism: sha256 {p1['plan_sha256'][:16]}… identical across 2 solves "
+    _say(f"T1 PASS determinism: sha256 {p1['plan_sha256'][:16]}… identical across 2 solves "
           f"(status={p1['solver_status']}, objective={p1['objective']})")
     #: T1 ON ITS OWN PROVES ALMOST NOTHING, and it is worth being blunt about
     #: why. This scenario reaches OPTIMAL, so no budget ever binds and the two
@@ -165,7 +176,7 @@ def main():
         f"CPU contention -- {idle['plan_sha256'][:16]} (obj {idle['objective']}) "
         f"vs {loaded['plan_sha256'][:16]} (obj {loaded['objective']}). "
         "The binding limit is not machine-independent.")
-    print(f"T1b PASS truncated solve (status={idle['solver_status']}, det budget "
+    _say(f"T1b PASS truncated solve (status={idle['solver_status']}, det budget "
           f"{tiny}) byte-identical idle vs {_burners()} contending processes: "
           f"sha256 {idle['plan_sha256'][:16]}…")
 
@@ -198,7 +209,7 @@ def main():
         assert walled["repro"]["reproducible"] is True, (
             "T1c FAIL: an OPTIMAL plan was labelled non-reproducible -- "
             "optimality is limit-independent")
-        print("T1c note: the 1.2 s wall clock did not bind on this machine "
+        _say("T1c note: the 1.2 s wall clock did not bind on this machine "
               "(OPTIMAL); the truncated branch is exercised via the retained-plan route")
     else:
         assert walled["repro"]["reproducible"] is False, (
@@ -218,7 +229,7 @@ def main():
         f"retained={clocked.get('retained_previous', False)})")
     assert idle["repro"]["reproducible"] is True, (
         "T1c FAIL: a deterministically-budgeted plan was not labelled reproducible")
-    print("T1c PASS default solve is deterministically budgeted with no "
+    _say("T1c PASS default solve is deterministically budgeted with no "
           f"wall-clock limit; wall-clocked plans are labelled reproducible=False "
           f"(1.2 s: {walled['solver_status']}; 1 ms: {clocked['solver_status']}, "
           f"retained={clocked.get('retained_previous', False)})")
@@ -235,7 +246,7 @@ def main():
     assert fresh == p1["plan_sha256"], (
         f"T1d FAIL: fresh process solved to {fresh[:16]}, this one to "
         f"{p1['plan_sha256'][:16]}")
-    print(f"T1d PASS fresh-process solve matches: sha256 {fresh[:16]}…")
+    _say(f"T1d PASS fresh-process solve matches: sha256 {fresh[:16]}…")
 
     # T2 — POINT EXCLUSIVITY + DCFC COOLDOWN (18 min) ON THE POINT.
     cool = sc["site"]["dcfc_cooldown_min"]
@@ -253,7 +264,7 @@ def main():
             if kind == "dcfc":
                 gap = y["start"] - x["end"]
                 assert gap >= cool, f"T2 FAIL: {pid} gap {gap} < cooldown {cool}"
-    print(f"T2 PASS point exclusivity + {cool}-min DCFC cooldown held on every point")
+    _say(f"T2 PASS point exclusivity + {cool}-min DCFC cooldown held on every point")
 
     # T3 — SITE POWER CAP (hard) never exceeded; peak excess reported vs soft target.
     events = []
@@ -310,9 +321,9 @@ def main():
     assert peak3b > binding_cap * 0.5, (
         f"T3b FAIL: the capped plan peaks at {peak3b} kW against a {binding_cap} kW "
         "cap, so the cap is not the thing shaping this schedule; pick a tighter one")
-    print(f"T3 PASS site power: true peak {peak} kW <= hard cap "
+    _say(f"T3 PASS site power: true peak {peak} kW <= hard cap "
           f"{sc['site']['power_cap_kw_hard']} kW; excess over soft target = {p1['peak_excess_kw']} kW")
-    print(f"T3b PASS the cap BINDS: free peak {unconstrained_peak} kW -> "
+    _say(f"T3b PASS the cap BINDS: free peak {unconstrained_peak} kW -> "
           f"{peak3b} kW under a {binding_cap} kW cap (a check that can fail)")
 
     # T4 — PIECEWISE CHARGING: any asset crossing 70% has >=2 segments with
@@ -331,7 +342,7 @@ def main():
                 saw_cold = True
     assert saw_piecewise, "T4 FAIL: no piecewise charge in scenario (raise SoC spread)"
     assert saw_cold, "T4 FAIL: no cold-start modifier exercised"
-    print("T4 PASS piecewise segments taper above 70% SoC; cold-start modifier applied")
+    _say("T4 PASS piecewise segments taper above 70% SoC; cold-start modifier applied")
 
     # T5 — CONCURRENCY WITHIN A POINT: parallel ops start during the asset's time
     # on its charge point and MAY outlast the charge (the asset then stays on the
@@ -358,7 +369,7 @@ def main():
         if wash:
             assert wash[0]["start"] >= stay_end + mv, \
                 f"T5 FAIL: wash starts before charge+ops end plus the {mv}-min move on {a['aid']}"
-    print(f"T5 PASS concurrency-in-point (ops may outlast the charge; departure "
+    _say(f"T5 PASS concurrency-in-point (ops may outlast the charge; departure "
           f"waits for both) + {mv}-min moves as scheduled operations")
 
     # T6 — ROLLING RE-SOLVE WITH PREVIOUS-FEASIBLE RETENTION: block a DCFC at
@@ -384,7 +395,7 @@ def main():
                 assert (a["aid"], op["op"]) in prev_started, \
                     f"T6 FAIL: new work routed to blocked point {op['point']}"
     assert not p3.get("retained_previous"), "T6: expected a fresh feasible re-solve"
-    print(f"T6 PASS re-solve at t={t_now} with {blocked} blocked: "
+    _say(f"T6 PASS re-solve at t={t_now} with {blocked} blocked: "
           f"{len(prev_started)} started ops retained, no new work on the blocked point")
 
     # T7 — PROPOSE, NEVER DISPOSE: output is ottoq_external_proposals-shaped.
@@ -392,13 +403,13 @@ def main():
         assert pr["source"] == "cpsat" and pr["action_context"] == "stall_assignment"
         assert set(pr["proposal"]) >= {"stall_id", "stall_type", "requested_kw", "abstain"}
     assert len(p1["proposals"]) == len(sc["assets"])
-    print(f"T7 PASS {len(p1['proposals'])} proposals in ottoq_external_proposals shape "
+    _say(f"T7 PASS {len(p1['proposals'])} proposals in ottoq_external_proposals shape "
           "(source='cpsat'); nothing in the plan writes state")
 
     # T8 — segment math sanity against the class curve.
     segs = charge_segments(sc, sc["assets"][0], 150)
     assert segs[0]["kw"] > segs[-1]["kw"] or len(segs) == 1
-    print("T8 PASS charge_segments derives from the class energy_curve")
+    _say("T8 PASS charge_segments derives from the class energy_curve")
 
     # T9 — REJECTION: a site that cannot serve everyone plans for those it can.
     # Without it every asset MUST take a point, so an over-subscribed site returns
@@ -450,7 +461,7 @@ def main():
     #: cheap way to duck a hard asset.
     assert rej["objective"] - len(rej["rejected"]) * DEFAULT_REJECTION_PENALTY \
         < DEFAULT_REJECTION_PENALTY
-    print(f"T9 PASS rejection: a site that returns INFEASIBLE by default serves "
+    _say(f"T9 PASS rejection: a site that returns INFEASIBLE by default serves "
           f"{len(served)}/{len(rej['assets'])} and names {rej['rejected']} as abstentions "
           f"(objective {rej['objective']}, pinned)")
 
@@ -479,7 +490,7 @@ def main():
     assert billed == sum(a["tardy_min"] for a in u["assets"] if a["served"]), (
         f"T9b FAIL: objective bills {billed} tardy-minutes but the served assets "
         f"account for {sum(a['tardy_min'] for a in u['assets'] if a['served'])}")
-    print(f"T9b PASS a rejected asset is excused from the objective, not constrained: "
+    _say(f"T9b PASS a rejected asset is excused from the objective, not constrained: "
           f"{len(u['rejected'])} rejected, {billed} tardy-min billed, all of it on served assets")
 
     # T10 — CHURN: a re-solve does not move an asset across the site for nothing.
@@ -527,7 +538,7 @@ def main():
     assert mid_again["objective"] == free_again["objective"], (
         f"T10 FAIL: forced moves were priced -- objective rose "
         f"{mid_again['objective'] - free_again['objective']} at weight {W}")
-    print(f"T10 PASS churn: unpriced re-solve moves {len(free_moved)} assets ({len(forced)} "
+    _say(f"T10 PASS churn: unpriced re-solve moves {len(free_moved)} assets ({len(forced)} "
           f"forced + {len(discretionary)} tie-break); any positive price leaves only the "
           f"{len(forced)} forced, and they cost nothing")
 
@@ -562,7 +573,7 @@ def main():
     assert lp["peak_excess_kw"] >= 0
     served_ops = sum(1 for a in lp["assets"] for o in a["ops"] if o["op"] == "charge")
     assert served_ops == len(lp["assets"]), "T11 FAIL: not every asset was scheduled"
-    print(f"T11 PASS an on-peak window at [{w0}, {w1}] outside a {late['horizon_min']}-min "
+    _say(f"T11 PASS an on-peak window at [{w0}, {w1}] outside a {late['horizon_min']}-min "
           f"horizon solves ({lp['solver_status']}, {served_ops} charges) instead of "
           "reporting the site infeasible")
 
@@ -579,7 +590,7 @@ def main():
     assert "ortools==" not in workflow, (
         "T12 FAIL: verify.yml carries its own ortools pin again — that is the second copy this "
         "test exists to prevent")
-    print(f"T12 PASS the OR-Tools pin lives in requirements.txt alone ({pinned}); CI installs from it")
+    _say(f"T12 PASS the OR-Tools pin lives in requirements.txt alone ({pinned}); CI installs from it")
 
     # T13 — CHEMISTRY CAP (R-11): an NMC class caps daily target SoC at 80%; a class
     # without the field is unchanged. Wikner & Thiringer 2018 (doi:10.3390/app8101825)
@@ -595,7 +606,7 @@ def main():
         cap = sc["asset_classes"][a.cls].get("max_daily_soc_pct", 100)
         assert a.target_soc <= cap, \
             f"T13 FAIL: {a.aid} ({a.cls}) target {a.target_soc} > cap {cap}"
-    print("T13 PASS chemistry cap: NMC target SoC clamped to 80%; no-cap classes unchanged")
+    _say("T13 PASS chemistry cap: NMC target SoC clamped to 80%; no-cap classes unchanged")
 
     # T14 — AN ASSET THAT NEEDS NO CHARGE MUST NOT TAKE THE WHOLE SITE DOWN.
     # charge_segments returns [] once soc >= target_soc, so an asset that came
@@ -644,7 +655,7 @@ def main():
                            objective_mode="min_tardy", allow_rejection=True)
     assert p14c.get("rejected") == [], \
         f"T14 FAIL: an asset was rejected for needing no charge: {p14c.get('rejected')}"
-    print(f"T14 PASS no-charge asset: 1 full -> {p14['solver_status']}, "
+    _say(f"T14 PASS no-charge asset: 1 full -> {p14['solver_status']}, "
           f"12 full -> {p14b['solver_status']}, none rejected for needing nothing")
 
     # T15 — THE REJECTION PRICE IS CHECKED, NOT TRUSTED.
@@ -689,10 +700,20 @@ def main():
             "T15 FAIL: the guard blocked a non-rejectable solve"
     finally:
         hot_path.unlink(missing_ok=True)
-    print("T15 PASS rejection price: every mode's ceiling cleared by the default; "
+    _say("T15 PASS rejection price: every mode's ceiling cleared by the default; "
           "a scenario that breaches it is refused, not silently under-served")
 
-    print("ALL TESTS PASS")
+    #: THE BATTERY COUNTS ITSELF. The size was published three ways and none
+    #: was right: this file's own README said "14-test battery", the CI step
+    #: name said "T1-T8", and the handoff said "T1-T13", while the battery
+    #: actually emits 19 PASS lines across T1..T15 plus the T1b/T1c/T1d and T9b
+    #: sub-tests. A count hand-maintained in three files is a count that will be
+    #: wrong in three files -- and a test that silently stops running is exactly
+    #: what such a count is supposed to reveal.
+    _passes = sum(1 for line in _emitted if line.startswith("T") and " PASS" in line)
+    _names = sorted({line.split()[0] for line in _emitted if " PASS" in line},
+                    key=lambda t: (int(re.match(r"T(\d+)", t).group(1)), t))
+    print(f"ALL TESTS PASS — {_passes} checks, {_names[0]}..{_names[-1]}")
     return p1
 
 
@@ -764,4 +785,13 @@ if __name__ == "__main__":
             "If the change is intended, re-run with REGEN_PLAN=1 and commit "
             "the diff so a reviewer sees exactly what moved.")
     out.write_text(text)
-    print(f"{out.name} matches (sha256 {plan['plan_sha256']})")
+    #: LABEL IT AS WHAT IT IS. This value is `plan_sha256`, a digest over the
+    #: CANONICALIZED SCHEDULE computed in model.py -- not the sha256 of the
+    #: file. Printing it as "sha256" taught readers to verify the artifact with
+    #: `sha256sum`, which returns a different value and reads as drift when
+    #: nothing has drifted. The comparison above is stronger than either digest:
+    #: it is the full file text, byte for byte.
+    import hashlib as _hashlib
+    _file_sha = _hashlib.sha256(out.read_bytes()).hexdigest()
+    print(f"{out.name} matches byte-for-byte "
+          f"(plan_sha256 {plan['plan_sha256'][:16]}…, file sha256 {_file_sha[:16]}…)")

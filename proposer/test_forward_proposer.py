@@ -18,6 +18,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 
 from forward_proposer import (  # noqa: E402
+    DEFAULT_DET_BUDGET_S,
     DEFAULT_SERVICEABLE_STATES,
     FrameError,
     frame_to_scenario,
@@ -330,6 +331,84 @@ def test_the_on_site_waiting_state_is_not_filtered_out():
     r = propose(frame, CLASSES, site=SITE, horizon_min=480)
     assert {p["entity_id"] for p in r["proposals"]} == {"v-gate", "v-staged"}
     assert not any(p["proposal"]["abstain"] for p in r["proposals"])
+
+
+def test_every_proposal_is_bounded_without_the_caller_asking():
+    """propose() defaulted det_budget_s AND time_limit_s to None -- no budget of
+    any kind -- and orchestrate() forwarded only **propose_kwargs with no caller
+    supplying them, so nothing in the shipped call graph ever bounded a solve.
+
+    An unbounded proposal is two problems: it can overrun the tick it was meant
+    to occupy, and its cost becomes a property of how loaded the box was rather
+    than of the instance, which is not reproducible under a run ID.
+    """
+    import inspect
+    sig = inspect.signature(propose)
+    assert sig.parameters["det_budget_s"].default == DEFAULT_DET_BUDGET_S
+    assert DEFAULT_DET_BUDGET_S is not None and DEFAULT_DET_BUDGET_S > 0
+
+    # ...and the default actually reaches the solver, which reports it back.
+    r = propose(FRAME, CLASSES, site=SITE, horizon_min=480)
+    assert r["solver"]["reproducible"] is True, (
+        "a bounded solve on deterministic work must report reproducible; "
+        "False means a wall clock stopped the search")
+
+
+def test_the_batch_bound_defers_the_rest_and_every_vehicle_still_gets_a_row():
+    """A deterministic budget bounds the SEARCH, not the MODEL.
+
+    Measured on this codebase: a 44-vehicle / 16-stall frame costs ~95 s of wall
+    time at the default budget, mostly construction and propagation, so no
+    budget setting makes it fit the engine's 30-second tick. A caller that must
+    occupy the one-tick seat sizes the frame: max_assets=8 on that same frame
+    runs in ~7.6 s.
+
+    The rule that survives is the module's own: NEVER SILENTLY DROPS ONE. A
+    deferred vehicle gets an abstention row naming the batch, so "deferred to
+    the next tick" stays distinguishable from "nobody asked".
+    """
+    vehicles = [_vehicle(f"v-{i}", soc=20 + (i * 7) % 50) for i in range(10)]
+    frame = _frame(vehicles, [_stall(f"s-{i}") for i in range(4)])
+
+    r = propose(frame, CLASSES, site=SITE, horizon_min=480, max_assets=3)
+
+    assert r["planned"] == 3
+    assert r["deferred"] == 7
+    assert {p["entity_id"] for p in r["proposals"]} == {v["id"] for v in vehicles}
+    deferred = [p for p in r["proposals"]
+                if "outside this tick's batch"
+                in p["proposal"]["rationale"].get("reason", "")]
+    assert len(deferred) == 7
+    assert all(p["proposal"]["abstain"] for p in deferred)
+
+
+def test_the_batch_keeps_the_most_urgent_and_the_choice_is_not_frame_order():
+    """Urgency is deadline first, then depth of need: earliest ready_by, then
+    lowest SoC, then aid. Selecting by frame order would make the proposal a
+    function of how the frame was assembled."""
+    vehicles = [_vehicle("v-late", soc=80), _vehicle("v-urgent", soc=10),
+                _vehicle("v-mid", soc=45)]
+    ready = {"v-late": 600, "v-urgent": 30, "v-mid": 120}
+    frame = _frame(vehicles, [_stall("s-0"), _stall("s-1")])
+
+    def planned_of(rows):
+        return {p["entity_id"] for p in rows["proposals"]
+                if not p["proposal"]["abstain"]}
+
+    a = propose(frame, CLASSES, site=SITE, horizon_min=720,
+                ready_by_min=ready, max_assets=2)
+    assert planned_of(a) == {"v-urgent", "v-mid"}
+
+    # reversing the frame rows changes nothing
+    b = propose(_frame(list(reversed(vehicles)), [_stall("s-0"), _stall("s-1")]),
+                CLASSES, site=SITE, horizon_min=720,
+                ready_by_min=ready, max_assets=2)
+    assert planned_of(b) == planned_of(a)
+
+
+def test_a_batch_bound_below_one_is_refused():
+    with pytest.raises(ValueError, match="max_assets"):
+        propose(FRAME, CLASSES, site=SITE, horizon_min=480, max_assets=0)
 
 
 def test_rejection_stays_off_unless_asked():

@@ -77,7 +77,57 @@ def main():
     assert names == ["fifo", "greedy", "otto_q_asis", "cpsat"], names
     print("P5 PASS four-policy comparison present: " + ", ".join(names))
 
+    # P6 — the README's headline table is the ARTIFACT, cell by cell.
+    #
+    # It was not. The published table read fifo 621/0/340/9/636, greedy
+    # 0/22/402/9/227, otto_q_asis 395/74/392/9/551, cpsat 118/84/436/9/458 while
+    # the artifact this file already asserted byte-for-byte held
+    # 237/0/370/9/501, 0/13/440/9/218, 157/55/372/9/386 and 0/90/550/9/270. Not
+    # one cell agreed, and the prose beneath it described cpsat as "trading
+    # tardiness minutes" when its actual total_tardy_min is 0. The byte-equality
+    # test could not catch that: it guards the JSON, and nobody was guarding the
+    # number a reader actually meets.
+    _assert_readme_table_matches(c1)
+    print("P6 PASS README headline table matches the committed artifact cell-by-cell")
+
     print("ALL TESTS PASS")
+
+
+#: Columns of the README headline table, in publication order.
+_README_COLUMNS = ("total_tardy_min", "p95_wait_to_first_op_min", "peak_site_kw",
+                   "total_moves", "makespan_min")
+
+
+def _parse_readme_table(text: str) -> dict[str, tuple[int, ...]]:
+    """The headline table as {policy: (…cells…)}, read out of README.md."""
+    out, in_table = {}, False
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("| policy |"):
+            in_table = True
+            continue
+        if in_table:
+            if not line.startswith("|"):
+                break
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if all(set(c) <= set("-: ") for c in cells):
+                continue
+            out[cells[0]] = tuple(int(c) for c in cells[1:])
+    return out
+
+
+def _assert_readme_table_matches(comparison: dict) -> None:
+    readme = (Path(__file__).parent / "README.md").read_text()
+    published = _parse_readme_table(readme)
+    assert published, "P6 FAIL: no headline table found in policies/README.md"
+    actual = {r["policy"]: tuple(r["metrics"][c] for c in _README_COLUMNS)
+              for r in comparison["runs"]}
+    assert set(published) == set(actual), (
+        f"P6 FAIL: README lists {sorted(published)}, artifact has {sorted(actual)}")
+    for policy, cells in sorted(published.items()):
+        assert cells == actual[policy], (
+            f"P6 FAIL: README publishes {policy} {cells}, artifact has "
+            f"{actual[policy]} (columns {_README_COLUMNS})")
 
 
 if __name__ == "__main__":

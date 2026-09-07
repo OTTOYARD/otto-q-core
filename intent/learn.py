@@ -33,8 +33,15 @@ ground truth. This module turns them into:
 THE VOCABULARY IS THE PRODUCTION ONE, not invented. The ten refusal codes are
 the exact CHECK constraint in migration 0086 (`ottoq_vehicle_commands`
 reason_code), with semantics from 0086's header and db/baseline/functions_ottoq.sql.
-The solver statuses are cp_model's own. Every seam is TOTAL: an unknown code
-raises rather than silently passing (the AGENTS.md total-function rule).
+The solver statuses are cp_model's own. Every seam is TOTAL, but TOTAL HERE
+MEANS NAMED, NOT RAISED: an unknown reason_code is returned in
+ReconciliationReport.unknown_codes and makes the report dirty; an unknown
+solver status is returned with recognized=False. Nothing in this module raises
+on an unrecognized vocabulary item. That is deliberate -- a refusal batch is
+telemetry arriving from a live world, and one unrecognized code must not
+discard the ninety-nine recognized ones -- but it is a different contract from
+"raises", and a caller who read "raises" here would never check unknown_codes
+and would absorb exactly what this module exists to surface.
 """
 
 from __future__ import annotations
@@ -109,7 +116,8 @@ REFUSAL_TAXONOMY: dict[str, RefusalClass] = {
 }
 
 #: The complete production vocabulary, so a test can pin that the taxonomy is
-#: TOTAL over it and an unknown code raises.
+#: TOTAL over it. An unknown code is NAMED in unknown_codes, not raised --
+#: see the module header.
 REFUSAL_CODES = tuple(sorted(REFUSAL_TAXONOMY))
 
 
@@ -308,8 +316,10 @@ def diagnose_solver(status: str, *, allow_rejection: bool = False,
     TOTAL over the known statuses; an unknown status is reported with
     recognized=False and a generic next action rather than raising, because a
     solver-status string is advisory telemetry, not a vocabulary the shield
-    enforces. (Contrast with refusal reason_codes, which ARE a constrained
-    vocabulary and therefore raise.)
+    enforces. Refusal reason_codes ARE a constrained vocabulary, and they are
+    handled the same way for the same reason: reconcile_refusals returns an
+    unrecognized code in unknown_codes and marks the report dirty rather than
+    raising, so one unknown code cannot discard a batch of known ones.
     """
     entry = SOLVER_DIAGNOSES.get(status)
     if entry is None:
