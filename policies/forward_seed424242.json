@@ -5,53 +5,53 @@
   "The storage row bills the Nashville tariff with the site's committed Megapack fleet; the no-storage rows bill the same tariff without it, so the two are comparable like-for-like."
  ],
  "formulation": "Lexicographic: pass 1 minimizes total tardiness (T*); pass 2 holds tardiness at T* and minimizes the instantaneous site peak, an upper bound on every billed interval average. Storage dispatch then holds the grid at the lowest ceiling the battery can sustain, recharge included, using the day-ahead curve only a forward scheduler possesses.",
- "forward_sha256": "a2431aa6bf092cce57fa08680198f3daced8fefed5d650b571cb4fe4cab26205",
+ "forward_sha256": "6c3ee0b395e5d4cbecab4a4b35c918d652dd57175a7954ca9f7b3a5e6acde36d",
  "forward_with_storage": {
-  "deficit_kwh": 495.8,
-  "grid_peak_kw": 30.5,
-  "monthly_total": 2779.34,
-  "note": "grid held at 30.5 kW; battery supplies 496 kWh, recharges 516 kWh inside the same ceiling",
-  "recharge_kwh": 516.4,
+  "deficit_kwh": 446.1,
+  "grid_peak_kw": 25.9,
+  "monthly_total": 2675.64,
+  "note": "grid held at 25.9 kW; battery supplies 446 kWh, recharges 465 kWh inside the same ceiling",
+  "recharge_kwh": 464.7,
   "storage_site_id": "nashville_nes_gsa3_bess",
   "supported": true
  },
  "month": 7,
- "peak_lower_bound_kw": 89.8,
+ "peak_lower_bound_kw": 74.6,
  "policies": {
   "cpsat": {
-   "annual_total": 97928.52,
-   "monthly_delta_vs_fifo": -1.56,
-   "monthly_total": 8160.71,
-   "peak_site_kw": 440.0,
+   "annual_total": 126890.52,
+   "monthly_delta_vs_fifo": 2975.01,
+   "monthly_total": 10574.21,
+   "peak_site_kw": 550.0,
    "total_tardy_min": 0
   },
   "fifo": {
-   "annual_total": 97947.24,
+   "annual_total": 91190.4,
    "monthly_delta_vs_fifo": 0.0,
-   "monthly_total": 8162.27,
-   "peak_site_kw": 340.0,
-   "total_tardy_min": 621
+   "monthly_total": 7599.2,
+   "peak_site_kw": 370.0,
+   "total_tardy_min": 237
   },
   "forward": {
-   "annual_total": 63385.8,
-   "monthly_delta_vs_fifo": -2880.12,
-   "monthly_total": 5282.15,
-   "peak_site_kw": 160.0,
+   "annual_total": 56261.88,
+   "monthly_delta_vs_fifo": -2910.71,
+   "monthly_total": 4688.49,
+   "peak_site_kw": 150.0,
    "total_tardy_min": 0
   },
   "greedy": {
-   "annual_total": 114388.8,
-   "monthly_delta_vs_fifo": 1370.13,
-   "monthly_total": 9532.4,
-   "peak_site_kw": 402.0,
+   "annual_total": 98645.4,
+   "monthly_delta_vs_fifo": 621.25,
+   "monthly_total": 8220.45,
+   "peak_site_kw": 440.0,
    "total_tardy_min": 0
   },
   "otto_q_asis": {
-   "annual_total": 113600.4,
-   "monthly_delta_vs_fifo": 1304.43,
-   "monthly_total": 9466.7,
-   "peak_site_kw": 392.0,
-   "total_tardy_min": 395
+   "annual_total": 83751.36,
+   "monthly_delta_vs_fifo": -619.92,
+   "monthly_total": 6979.28,
+   "peak_site_kw": 372.0,
+   "total_tardy_min": 157
   }
  },
  "scenario": "reduced_canonical_nash_v1",

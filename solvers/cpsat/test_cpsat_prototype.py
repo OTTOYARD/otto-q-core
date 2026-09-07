@@ -148,7 +148,13 @@ def main():
     # counts solver work units and cuts off at the same node on any machine.
     # This is the test that decides whether "no number ships without a run ID"
     # is true or decorative.
-    tiny = 0.06
+    # tiny = 0.06
+    #: Recalibrated 2026-09-06 for the chemistry cap (R-11). Capping NMC target SoC at 80%
+    #: (was 90%) reduces the canonical scenario's energy demand, so it now proves OPTIMAL
+    #: at 0.06 work units where it previously truncated. 0.03 is comfortably inside the
+    #: truncated (FEASIBLE) band -- measured 0.03 -> FEASIBLE obj 2505, 0.06 -> OPTIMAL obj
+    #: 135, 0.01 -> UNKNOWN -- with margin on both sides.
+    tiny = 0.03
     idle = build_and_solve(load_scenario(SC_PATH), det_budget_s=tiny)
     assert idle["solver_status"] != "OPTIMAL", (
         f"T1b FAIL: det budget {tiny} did not truncate the search "
@@ -390,14 +396,19 @@ def main():
     #: and neither was visible. The number is what sees them. Same rule as the
     #: committed plan artifact: a behaviour you cannot name is a behaviour you
     #: cannot notice changing.
-    assert rej["rejected"] == ["AV-03", "AV-07"], (
-        f"T9 FAIL: rejected {rej['rejected']}, expected ['AV-03', 'AV-07']")
-    assert rej["objective"] == 206130, (
-        f"T9 FAIL: objective {rej['objective']}, expected 206130 "
-        f"(= 2 x {DEFAULT_REJECTION_PENALTY} + 6130 of served-side cost)")
+    #: Recalibrated 2026-09-06 for the chemistry cap (R-11): capping NMC target at 80%
+    #: (was 90%) shrank the tight scenario's energy demand, so it now serves 11/12 and
+    #: rejects only AV-07 (was AV-03 + AV-07). The mechanism under test -- rejection
+    #: names the unserved, prices it exactly once, and never constrains it -- is unchanged.
+    assert rej["rejected"] == ["AV-07"], (
+        f"T9 FAIL: rejected {rej['rejected']}, expected ['AV-07']")
+    assert rej["objective"] == 105129, (
+        f"T9 FAIL: objective {rej['objective']}, expected 105129 "
+        f"(= 1 x {DEFAULT_REJECTION_PENALTY} + 5129 of served-side cost)")
     #: and the penalty dominates by design: rejection is a last resort, never a
     #: cheap way to duck a hard asset.
-    assert rej["objective"] - 2 * DEFAULT_REJECTION_PENALTY < DEFAULT_REJECTION_PENALTY
+    assert rej["objective"] - len(rej["rejected"]) * DEFAULT_REJECTION_PENALTY \
+        < DEFAULT_REJECTION_PENALTY
     print(f"T9 PASS rejection: a site that returns INFEASIBLE by default serves "
           f"{len(served)}/{len(rej['assets'])} and names {rej['rejected']} as abstentions "
           f"(objective {rej['objective']}, pinned)")
@@ -445,10 +456,10 @@ def main():
     # A FORCED MOVE MUST BE FREE. NASH-DCFC-03 is out of service, so whoever was on
     # it has no choice; charging for that would price the site's own failure to the
     # asset and push the solver toward worse plans elsewhere to avoid a cost it
-    # cannot escape. Asserted as arithmetic: at weight w the objective rises by
-    # exactly w per DISCRETIONARY move, and the forced ones cost nothing.
+    # cannot escape. Asserted as arithmetic: the objective does not rise when only
+    # forced moves occur, so a forced move costs nothing.
     W = 50
-    _, mid_again, _ = _resolve_pair(W, BLOCKED)
+    _, mid_again, mid_moved = _resolve_pair(W, BLOCKED)
     #: FORCED is a STRUCTURAL property, not a behavioural one: an asset is forced
     #: iff the point it held is the one taken out of service, so no "stay" literal
     #: exists for it and no churn term is built. Defining it as "moved anyway at
@@ -458,11 +469,26 @@ def main():
     forced = [aid for aid in free_moved if first_points[aid] in BLOCKED]
     discretionary = [aid for aid in free_moved if first_points[aid] not in BLOCKED]
     assert forced, "T10 FAIL: no asset was actually displaced by the blocked point"
-    assert mid_again["objective"] - free_again["objective"] == W * len(discretionary), (
-        f"T10 FAIL: objective rose {mid_again['objective'] - free_again['objective']} "
-        f"at weight {W}; expected {W} x {len(discretionary)} discretionary moves")
-    print(f"T10 PASS churn: unpriced re-solve moves {len(free_moved)} assets, priced moves "
-          f"{len(held_moved)}; the {len(forced)} forced by the blocked point cost nothing")
+    #: Recalibrated 2026-09-06 for the chemistry cap (R-11). Capping NMC target SoC at
+    #: 80% (was 90%) flattened the canonical objective: the discretionary movers that
+    #: the old 90% target moved for a small POSITIVE gain became zero-gain TIE-BREAKS
+    #: under 80% (equally-optimal schedules the unpriced solver picks freely). The
+    #: consequence is the mechanism working HARDER: at any positive churn weight the
+    #: tie-break movers vanish entirely, leaving exactly the forced movers. Asserted
+    #: as arithmetic -- the objective does not rise, so the forced moves cost nothing,
+    #: and no discretionary move survives a price it is not worth paying.
+    assert discretionary, "T10 FAIL: no discretionary tie-break mover exists to price"
+    assert held_moved == forced, (
+        f"T10 FAIL: at churn 500 expected only forced moves {forced}, got {held_moved}")
+    assert mid_moved == forced, (
+        f"T10 FAIL: tie-break movers survived a price they are not worth -- "
+        f"moved {mid_moved} at weight {W}")
+    assert mid_again["objective"] == free_again["objective"], (
+        f"T10 FAIL: forced moves were priced -- objective rose "
+        f"{mid_again['objective'] - free_again['objective']} at weight {W}")
+    print(f"T10 PASS churn: unpriced re-solve moves {len(free_moved)} assets ({len(forced)} "
+          f"forced + {len(discretionary)} tie-break); any positive price leaves only the "
+          f"{len(forced)} forced, and they cost nothing")
 
     # T11 — A TARIFF WINDOW OUTSIDE THE HORIZON IS NOT AN INFEASIBLE SITE.
     # The on-peak overlap held max(charge_start, window_start) in a variable
@@ -513,6 +539,22 @@ def main():
         "T12 FAIL: verify.yml carries its own ortools pin again — that is the second copy this "
         "test exists to prevent")
     print(f"T12 PASS the OR-Tools pin lives in requirements.txt alone ({pinned}); CI installs from it")
+
+    # T13 — CHEMISTRY CAP (R-11): an NMC class caps daily target SoC at 80%; a class
+    # without the field is unchanged. Wikner & Thiringer 2018 (doi:10.3390/app8101825)
+    # and Keil et al. 2016 (doi:10.1149/2.0411609jes): NMC calendar fade climbs steeply
+    # above ~80%, so routine cycling must not park an NMC pack above it. Without the cap
+    # every class charged to 90% -- the exact "nominal value" a reviewer would flag as
+    # ungrounded (R-11).
+    from model import _clamp_target  # noqa: E402
+    assert _clamp_target({"max_daily_soc_pct": 80}, 90) == 80, "T13 FAIL: NMC cap not applied"
+    assert _clamp_target({"max_daily_soc_pct": 80}, 55) == 55, "T13 FAIL: cap applied below ceiling"
+    assert _clamp_target({}, 90) == 90, "T13 FAIL: no-cap default changed legacy behaviour"
+    for a in sc["assets"]:
+        cap = sc["asset_classes"][a.cls].get("max_daily_soc_pct", 100)
+        assert a.target_soc <= cap, \
+            f"T13 FAIL: {a.aid} ({a.cls}) target {a.target_soc} > cap {cap}"
+    print("T13 PASS chemistry cap: NMC target SoC clamped to 80%; no-cap classes unchanged")
 
     print("ALL TESTS PASS")
     return p1

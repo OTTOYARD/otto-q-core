@@ -17,6 +17,7 @@
     ]
   },
   "objective_weights": {
+    "_provenance": "LEGACY-REPRO ARTIFACT, not the production objective. See docs/research/answers/R-11-objective-weights.md.",
     "tardiness_per_min": 10,
     "onpeak_kw_min": 1,
     "peak_excess_per_kw": 20,
@@ -27,6 +28,8 @@
       "battery_kwh": 90,
       "max_charge_kw": 100,
       "inlet": "CCS",
+      "chemistry": "NMC",
+      "max_daily_soc_pct": 80,
       "energy_curve": [
         {
           "above_soc_pct": 0,
@@ -46,6 +49,8 @@
       "battery_kwh": 110,
       "max_charge_kw": 150,
       "inlet": "CCS",
+      "chemistry": "NMC",
+      "max_daily_soc_pct": 80,
       "energy_curve": [
         {
           "above_soc_pct": 0,
@@ -65,6 +70,8 @@
       "battery_kwh": 80,
       "max_charge_kw": 120,
       "inlet": "CCS",
+      "chemistry": "NMC",
+      "max_daily_soc_pct": 80,
       "energy_curve": [
         {
           "above_soc_pct": 0,
