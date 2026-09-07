@@ -4,12 +4,30 @@
 // x-bridge-token auth (verify_jwt disabled so the twin can call it simply).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const AWS_URL = Deno.env.get("OTTOQ_INTEL_URL") ?? "http://100.53.130.57:8080";
-const AWS_TOKEN = Deno.env.get("OTTOQ_INTEL_TOKEN") ?? "ottoq-frontier-a7f3c9d1e5b8";
-const BRIDGE_TOKEN = Deno.env.get("OTTOQ_BRIDGE_TOKEN") ?? "ottoq-frontier-a7f3c9d1e5b8";
+// NO FALLBACKS, AND THE FUNCTION FAILS CLOSED WITHOUT THEM.
+// Until 2026-09-07 these three lines carried literal defaults: a hardcoded
+// http:// address and, for BOTH tokens, one shared 27-character secret. That
+// value was the only thing in front of this function -- it is deployed with
+// verify_jwt disabled, so x-bridge-token IS the authentication -- and it was
+// simultaneously the bearer token presented to the intelligence service. It
+// sat in two tracked files across four commits, so it is in history and must
+// be treated as compromised regardless of what this file says now.
+// The house rule is "no secrets in code, ever". A default that is a working
+// credential is a secret in code that also removes the operator's ability to
+// notice the configuration is missing: with a fallback, an unset variable is
+// silent; without one, it is a 500 on the first call.
+const AWS_URL = Deno.env.get("OTTOQ_INTEL_URL");
+const AWS_TOKEN = Deno.env.get("OTTOQ_INTEL_TOKEN");
+const BRIDGE_TOKEN = Deno.env.get("OTTOQ_BRIDGE_TOKEN");
 const j = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json" } });
 
 Deno.serve(async (req) => {
+  // Misconfiguration is a 500, never an open door. If BRIDGE_TOKEN were unset
+  // and a caller sent no header, both sides would be null and the comparison
+  // below would PASS -- an unauthenticated bridge to the intelligence service.
+  if (!BRIDGE_TOKEN || !AWS_TOKEN || !AWS_URL) {
+    return j({ error: "bridge not configured: set OTTOQ_INTEL_URL, OTTOQ_INTEL_TOKEN and OTTOQ_BRIDGE_TOKEN" }, 500);
+  }
   if (req.headers.get("x-bridge-token") !== BRIDGE_TOKEN) return j({ error: "unauthorized" }, 401);
   const url = new URL(req.url);
   try {
