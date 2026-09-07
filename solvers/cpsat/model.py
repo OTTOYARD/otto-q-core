@@ -71,6 +71,54 @@ DEFAULT_REJECTION_PENALTY = 100_000
 DEFAULT_CHURN_PENALTY = 0
 
 
+def rejection_saving_ceiling(sc: dict, objective_mode: str) -> int:
+    """The most the objective can save by rejecting ONE asset, over-estimated.
+
+    THE COMMENT ON DEFAULT_REJECTION_PENALTY WAS A CLAIM NOBODY CHECKED. It says
+    the penalty is "an order of magnitude above the worst single-asset tardiness
+    this horizon can produce" -- and that is true, and it is not the question.
+    In `weighted` mode the objective also carries on-peak kW-minutes, peak
+    excess and per-move terms, and the on-peak term alone can dwarf tardiness:
+    one asset charging at 150 kW through a 180-minute on-peak window is 27,000
+    kW-min before any weight is applied.
+
+    Measured on the canonical scenario with the on-peak window widened to the
+    whole horizon: at objective_weights.onpeak_kw_min = 30 the solver dropped
+    2 of 12 vehicles it could have served, at 60 it dropped 6. The vehicles were
+    servable; rejecting them was simply cheaper than the 100,000 constant. A
+    scheduler that quietly declines to serve a quarter of the yard because a
+    tariff weight was raised is not a scheduler anyone can trust.
+
+    So the penalty is CHECKED rather than trusted. This returns a deliberately
+    loose upper bound on one asset's contribution to every other objective term;
+    build_and_solve refuses to build a rejectable model whose penalty does not
+    clear it. Loose is the right direction: a bound that is too generous only
+    ever demands a larger penalty, never permits a dropped vehicle.
+
+    The lexicographic modes the production path actually runs (min_tardy,
+    min_peak, min_flow) each minimise ONE term, so their ceilings are small and
+    the default constant clears them by orders of magnitude. `weighted` is the
+    legacy repro mode and the one that can fail.
+    """
+    H = int(sc["horizon_min"])
+    W = sc.get("objective_weights", {})
+    if objective_mode == "min_tardy":
+        return H                                   # one asset's whole tardiness
+    if objective_mode == "min_peak":
+        return int(sc["site"]["power_cap_kw_hard"])  # the whole site peak
+    if objective_mode == "min_flow":
+        return H                                   # one asset's whole finish time
+    #: weighted: sum the worst each term can bill for a single asset.
+    max_kw = max([int(p.get("kw") or 0) for p in sc["service_points"]] or [0])
+    w0, w1 = sc["site"].get("onpeak_window_min", [0, 0])
+    onpeak_min = max(0, min(int(w1), H) - max(0, int(w0)))
+    #: at most one wash move + one inspect move
+    return (int(W.get("tardiness_per_min", 0)) * H
+            + int(W.get("onpeak_kw_min", 0)) * max_kw * onpeak_min
+            + int(W.get("peak_excess_per_kw", 0)) * max_kw
+            + int(W.get("per_move", 0)) * 2)
+
+
 def _exactly_one_if_served(m, lits, served):
     """Exactly one of `lits`, or none at all when the asset is not served.
 
@@ -308,6 +356,21 @@ def build_and_solve(
     site = sc["site"]
     H = sc["horizon_min"]
     W = sc["objective_weights"]
+    #: THE REJECTION PRICE MUST DOMINATE, AND IT IS CHECKED, NOT ASSERTED.
+    #: See rejection_saving_ceiling: a penalty below the ceiling lets the solver
+    #: buy a lower objective by declining to serve a vehicle it could serve, and
+    #: the plan ships with that vehicle silently dropped. Refuse loudly instead;
+    #: a caller who genuinely wants that trade sets a penalty that says so.
+    rejection_penalty = int(W.get("rejection_penalty", DEFAULT_REJECTION_PENALTY))
+    if allow_rejection:
+        floor = rejection_saving_ceiling(sc, objective_mode)
+        if rejection_penalty <= floor:
+            raise ValueError(
+                f"rejection_penalty {rejection_penalty} does not dominate the "
+                f"{objective_mode} objective: rejecting one asset can save up to "
+                f"{floor}, so the solver would drop assets it could serve. Raise "
+                f"objective_weights.rejection_penalty above {floor}, or lower the "
+                f"weights that make serving expensive.")
 
     points = [p for p in sc["service_points"]]
     #: Charge-capable point kinds are DATA: an asset class declares charge_kinds
@@ -455,7 +518,28 @@ def build_and_solve(
         #: OFF by default: the exactly-one below is then byte-for-byte the
         #: original constraint with no extra variables, so committed plans and
         #: the C5 comparison cannot move.
-        if allow_rejection:
+        #: AN ASSET THAT NEEDS NO CHARGE IS NOT AN INFEASIBLE SITE.
+        #: charge_segments returns [] once soc >= target_soc, so `lits` is empty
+        #: for an asset that came back full -- and _clamp_target caps the target at
+        #: the class's max_daily_soc_pct (80 on EVERY class in the canonical
+        #: scenario), so this is an ordinary Tuesday, not a corner case.
+        #: AddExactlyOne([]) is unsatisfiable, and it took the WHOLE SITE with it:
+        #: one asset at its own target and build_and_solve raised
+        #: "no schedule and no previous plan: INFEASIBLE" -- eleven other vehicles
+        #: lost their plan because one came back charged. Measured on the canonical
+        #: scenario by setting AV-00's soc to its target (80).
+        #: Such an asset simply does not occupy a charge point. Its stay begins at
+        #: arrival (below) and its other work -- wash, inspect, parallel ops --
+        #: schedules exactly as before.
+        needs_charge = bool(lits)
+        if not needs_charge:
+            served = m.NewBoolVar(f"served.{asset.aid}") if allow_rejection else None
+            if served is not None:
+                #: Nothing on the charge axis can reject it: there is no charge to
+                #: refuse. A wash or inspection it cannot get still can, through
+                #: _exactly_one_if_served below.
+                m.Add(served == 1)
+        elif allow_rejection:
             served = m.NewBoolVar(f"served.{asset.aid}")
             m.Add(sum(lits) == 1).OnlyEnforceIf(served)
             m.Add(sum(lits) == 0).OnlyEnforceIf(served.Not())
@@ -499,6 +583,12 @@ def build_and_solve(
             m.Add(charge_start == starts[0]).OnlyEnforceIf(lit)
             m.Add(charge_end == ends[-1]).OnlyEnforceIf(lit)
         m.Add(charge_start >= asset.arrival_min)
+        if not needs_charge:
+            #: No chain to anchor them to. The stay opens and closes at arrival, so
+            #: stay_end below comes from the parallel ops alone (or is arrival
+            #: itself when there are none).
+            m.Add(charge_start == asset.arrival_min)
+            m.Add(charge_end == asset.arrival_min)
 
         # ---- parallel ops INSIDE the charge window, serialized per asset -----
         par_ivs = []
@@ -610,8 +700,7 @@ def build_and_solve(
             m.Add(mv == n_moves).OnlyEnforceIf(served)
             m.Add(mv == 0).OnlyEnforceIf(served.Not())
             move_count_vars.append(mv)
-            reject_terms.append(W.get("rejection_penalty", DEFAULT_REJECTION_PENALTY)
-                                * served.Not())
+            reject_terms.append(rejection_penalty * served.Not())
             served_vars[asset.aid] = served
         obj_terms.append(W["tardiness_per_min"] * charged)
 
@@ -779,8 +868,16 @@ def _extract(sc, solver, status, plan_vars, peak_excess, repro=None,
                     "proposal": {"stall_id": p["id"], "stall_type": kind,
                                  "requested_kw": segs[0]["kw"], "abstain": False},
                 })
+        #: A no-charge asset has no charge op, so there is no point to attribute
+        #: its parallel ops to -- ops[0] would IndexError. NAMED GAP, not a silent
+        #: one: such an asset's ops therefore consume no point capacity in the
+        #: model, where a charging asset's do (its occupancy interval runs to
+        #: stay_end). Seating a no-charge asset at a staging point is the follow-on
+        #: work; until then a plan containing one slightly over-states how much
+        #: parallel-op throughput the site really has.
+        at_point = ops[0]["point"] if ops else None
         for op, iv, s, e in pv["par"]:
-            ops.append({"op": op, "point": ops[0]["point"], "parallel": True,
+            ops.append({"op": op, "point": at_point, "parallel": True,
                         "start": solver.Value(s), "end": solver.Value(e)})
         if pv["wash"]:
             ws, we, wl = pv["wash"]

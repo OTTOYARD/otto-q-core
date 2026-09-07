@@ -556,6 +556,101 @@ def main():
             f"T13 FAIL: {a.aid} ({a.cls}) target {a.target_soc} > cap {cap}"
     print("T13 PASS chemistry cap: NMC target SoC clamped to 80%; no-cap classes unchanged")
 
+    # T14 — AN ASSET THAT NEEDS NO CHARGE MUST NOT TAKE THE WHOLE SITE DOWN.
+    # charge_segments returns [] once soc >= target_soc, so an asset that came
+    # back full offers the model no charge chain -- and the old code then wrote
+    # AddExactlyOne([]), which is unsatisfiable. ONE such asset and the entire
+    # site returned INFEASIBLE: build_and_solve raised "no schedule and no
+    # previous plan", losing the plan for the other eleven vehicles.
+    #
+    # This is not a corner case. T13 above caps every NMC class's target at 80%,
+    # which is where a robotaxi routinely comes home on a light day. Reproduced
+    # on this scenario by setting AV-00's soc to its own target.
+    #
+    # The mutation that must go red: delete the `needs_charge` branch in
+    # model.py and restore the bare AddExactlyOne(lits).
+    def _at_target(scen, n):
+        for i in range(n):
+            a = scen["assets"][i]
+            scen["assets"][i] = a.__class__(**{**a.__dict__, "soc": a.target_soc})
+        return scen
+
+    one_full = _at_target(load_scenario(SC_PATH), 1)
+    assert charge_segments(one_full, one_full["assets"][0], 150) == [], \
+        "T14 assumption changed: an asset at its target still wants charge"
+    p14 = build_and_solve(one_full, objective_mode="min_tardy")
+    assert p14["solver_status"] in ("OPTIMAL", "FEASIBLE"), \
+        f"T14 FAIL: one asset at its target made the site {p14['solver_status']}"
+    assert len(p14["assets"]) == len(one_full["assets"]), \
+        "T14 FAIL: the no-charge asset vanished from the plan"
+    a0 = next(a for a in p14["assets"] if a["aid"] == one_full["assets"][0].aid)
+    assert not any(o["op"] == "charge" for o in a0["ops"]), \
+        "T14 FAIL: an asset at its target was still scheduled to charge"
+    # every other asset still gets its charge
+    others = [a for a in p14["assets"] if a["aid"] != a0["aid"]]
+    assert all(any(o["op"] == "charge" for o in a["ops"]) for a in others), \
+        "T14 FAIL: the no-charge asset cost another asset its charge"
+
+    # …and the degenerate end: a whole yard that came home full still plans.
+    all_full = _at_target(load_scenario(SC_PATH), len(load_scenario(SC_PATH)["assets"]))
+    p14b = build_and_solve(all_full, objective_mode="min_tardy")
+    assert p14b["solver_status"] in ("OPTIMAL", "FEASIBLE"), \
+        f"T14 FAIL: a fully charged yard is {p14b['solver_status']}"
+    assert not any(o["op"] == "charge" for a in p14b["assets"] for o in a["ops"]), \
+        "T14 FAIL: a fully charged yard was still scheduled to charge"
+    # rejection on: nothing is rejected for needing nothing
+    p14c = build_and_solve(_at_target(load_scenario(SC_PATH), 1),
+                           objective_mode="min_tardy", allow_rejection=True)
+    assert p14c.get("rejected") == [], \
+        f"T14 FAIL: an asset was rejected for needing no charge: {p14c.get('rejected')}"
+    print(f"T14 PASS no-charge asset: 1 full -> {p14['solver_status']}, "
+          f"12 full -> {p14b['solver_status']}, none rejected for needing nothing")
+
+    # T15 — THE REJECTION PRICE IS CHECKED, NOT TRUSTED.
+    # DEFAULT_REJECTION_PENALTY's comment claims it sits "an order of magnitude
+    # above the worst single-asset tardiness this horizon can produce". True, and
+    # not the question: in `weighted` mode the objective also bills on-peak
+    # kW-minutes, peak excess and moves, and the on-peak term alone can exceed
+    # 100,000. Measured on this scenario with the on-peak window widened to the
+    # whole horizon: at onpeak_kw_min=30 the solver dropped 2 of 12 vehicles it
+    # could serve; at 60 it dropped 6. They were servable. Rejecting them was
+    # simply cheaper than the constant.
+    #
+    # build_and_solve now refuses to build a rejectable model whose penalty does
+    # not clear rejection_saving_ceiling(). The margin is real but not an order
+    # of magnitude -- scenario_24h clears its own ceiling by 1.5x -- so the check
+    # earns its place.
+    from model import rejection_saving_ceiling  # noqa: E402
+    for mode in ("min_tardy", "min_peak", "min_flow", "weighted"):
+        ceil_ = rejection_saving_ceiling(sc, mode)
+        assert DEFAULT_REJECTION_PENALTY > ceil_, \
+            f"T15 FAIL: default penalty {DEFAULT_REJECTION_PENALTY} <= {mode} ceiling {ceil_}"
+    #: THE CHECK MUST BE ABLE TO FAIL. Widen the on-peak window to the horizon and
+    #: raise its weight past the constant: the build is refused, where before it
+    #: returned a plan quietly missing vehicles.
+    hot = json.loads(SC_PATH.read_text())
+    hot["site"]["onpeak_window_min"] = [0, hot["horizon_min"]]
+    hot["objective_weights"]["onpeak_kw_min"] = 30
+    hot_path = SC_PATH.parent / "_t15_hot.json"
+    hot_path.write_text(json.dumps(hot))
+    try:
+        hot_sc = load_scenario(hot_path)
+        assert rejection_saving_ceiling(hot_sc, "weighted") > DEFAULT_REJECTION_PENALTY, \
+            "T15 FAIL: the hot scenario no longer breaches the constant; pick a bigger weight"
+        try:
+            build_and_solve(hot_sc, objective_mode="weighted", allow_rejection=True)
+            raise AssertionError("T15 FAIL: a model whose penalty cannot dominate was built")
+        except ValueError as e:
+            assert "does not dominate" in str(e), f"T15 FAIL: wrong refusal: {e}"
+        #: and the same scenario WITHOUT rejection still plans -- the guard gates
+        #: the rejectable model, not the site.
+        assert build_and_solve(hot_sc, objective_mode="min_tardy")["solver_status"] in ("OPTIMAL", "FEASIBLE"), \
+            "T15 FAIL: the guard blocked a non-rejectable solve"
+    finally:
+        hot_path.unlink(missing_ok=True)
+    print("T15 PASS rejection price: every mode's ceiling cleared by the default; "
+          "a scenario that breaches it is refused, not silently under-served")
+
     print("ALL TESTS PASS")
     return p1
 
