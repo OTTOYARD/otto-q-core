@@ -125,3 +125,28 @@ VALUES ('0205_h_rule_may_now_fail_a_pair', FALSE,
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
 
 COMMIT;
+
+-- =====================================================================
+-- APPLIED 2026-09-07 18:21:23 UTC (1:21 PM CT) -- one transaction as
+-- postgres, sent directly, first attempt. Verified after:
+--
+--   lineage row              present, 18:21:23.222, forces_recert FALSE
+--   ottoq_determinism_pair   4b344be9 (0204's) -> 47b5ac779db0b40445f6ec200ca13ceb
+--   v_equal hears h_rule     true
+--   recert floor             unchanged at 2026-09-07 18:18:01 (0204's) --
+--                            this migration is harness-only and does not
+--                            move the floor
+--
+-- THE GATE THAT LET IT APPLY. Round 21 (2026-09-06, nine flagship pairs
+-- after 0203) put h_rule on all eighteen arms, and the two arms of every
+-- pair agreed. The file's own precondition re-measured that from the
+-- ledger before it changed anything: 9 pairs over 6 columns since 0203,
+-- 0 missing h_rule, 0 disagreeing. See db/checks/0117 and
+-- db/canons/round21.md.
+--
+-- From round 22 on, a pair whose arms disagree on the shield's disposals
+-- FAILS, where before it passed while carrying the disagreement in the
+-- verdict as data. canon_rule is still reported and not judged; that
+-- promotion waits for two rounds after 0204, because 0204 changes what
+-- clock the shield reads and the canon must be allowed to move once.
+-- =====================================================================

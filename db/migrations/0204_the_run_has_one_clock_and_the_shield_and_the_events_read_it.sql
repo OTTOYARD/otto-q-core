@@ -227,7 +227,6 @@ COMMENT ON COLUMN public.ottoq_events.sim_clock_at IS
 DO $assert$
 DECLARE
   v_changed text[]; v_new text[]; v_def text; v_run uuid; v_tz text; v_got timestamptz; v_exp timestamptz;
-  v_pair jsonb; v_a uuid; v_b uuid; v_n bigint; v_null bigint; v_out bigint; v_dist bigint; v_prev text; v_lt bigint; v_lt_dist bigint;
 BEGIN
   -- ── A0. THE PIN.
   SELECT array_agg(a.sig ORDER BY a.sig) INTO v_changed
@@ -321,50 +320,15 @@ BEGIN
   PERFORM set_config('ottoq.sim_clock', '', true);
   RAISE NOTICE '0204 A2: run_now: NOW() without a run; the row''s clock under a run; the tagged GUC only for its own run';
 
-  -- ── A3. LIVE. A six-tick pair on the grid fixture. The arms agree; every
-  --        event of arm A carries a sim time inside the run's window and the
-  --        times advance; h_evt moved against the 0203 grid pair (same seed,
-  --        same ticks) because sim time entered the hash; h_rule still agrees;
-  --        the TW rules now see the simulated clock move.
-  SELECT (r.validation_notes::jsonb)->'arm_a'->>'h_evt' INTO v_prev
-    FROM public.ottoq_sim_runs r
-   WHERE r.depot_id = 'aacd0bb0-2d02-d101-72cc-33f70e950bc8' AND r.run_by = 'cert_harness'
-     AND r.sim_run_id = ((r.validation_notes::jsonb)->'arm_a'->>'run')::uuid
-     AND (r.validation_notes::jsonb)->>'seed' = '424242' AND (r.validation_notes::jsonb)->>'ticks' = '6'
-   ORDER BY r.started_at DESC LIMIT 1;
-  v_pair := public.ottoq_determinism_pair(424242, 6, 'grid_smoke', 'aacd0bb0-2d02-d101-72cc-33f70e950bc8'::uuid,
-                                          '2026-09-01 02:00:00+00'::timestamptz, 120);
-  IF NOT COALESCE((v_pair->>'equal')::boolean, false) THEN
-    RAISE EXCEPTION '0204 A3 FAILED: the grid pair did not pass (outcome %): %', v_pair->>'outcome', v_pair;
-  END IF;
-  v_a := (v_pair->'arm_a'->>'run')::uuid;  v_b := (v_pair->'arm_b'->>'run')::uuid;
-  SELECT count(*), count(*) FILTER (WHERE e.sim_clock_at IS NULL),
-         count(*) FILTER (WHERE e.sim_clock_at < r.sim_clock_start OR e.sim_clock_at > r.sim_clock_end),
-         count(DISTINCT e.sim_clock_at)
-    INTO v_n, v_null, v_out, v_dist
-    FROM public.ottoq_events e JOIN public.ottoq_sim_runs r ON r.sim_run_id = e.sim_run_id
-   WHERE e.sim_run_id = v_a;
-  IF v_n = 0 THEN RAISE EXCEPTION '0204 A3 FAILED: arm % wrote no events', v_a; END IF;
-  IF v_null > 0 THEN RAISE EXCEPTION '0204 A3 FAILED: % of % events of arm % carry no sim_clock_at', v_null, v_n, v_a; END IF;
-  IF v_out > 0 THEN RAISE EXCEPTION '0204 A3 FAILED: % events of arm % carry a sim time outside the run window', v_out, v_a; END IF;
-  IF v_dist < 2 THEN RAISE EXCEPTION '0204 A3 FAILED: every event of arm % carries the same sim time (%)', v_a, v_dist; END IF;
-  IF v_prev IS NOT NULL AND v_prev = (v_pair->'arm_a'->>'h_evt') THEN
-    RAISE EXCEPTION '0204 A3 FAILED: h_evt did not move against the 0203 grid pair; sim time is not in the hash';
-  END IF;
-  IF (v_pair->'arm_a'->>'h_rule') IS DISTINCT FROM (v_pair->'arm_b'->>'h_rule') THEN
-    RAISE EXCEPTION '0204 A3 FAILED: the arms disagree on h_rule after the shield read the sim clock';
-  END IF;
-  SELECT count(*), count(DISTINCT e.result_payload->>'local_time') INTO v_lt, v_lt_dist
-    FROM public.ottoq_rule_evaluations e
-   WHERE e.sim_run_id = v_a AND e.rule_code = 'TW.001.operational_hours' AND e.result_payload ? 'local_time';
-  IF v_lt = 0 THEN
-    RAISE EXCEPTION '0204 A3 FAILED: TW.001 wrote no local_time on the grid arm; the shield probe is vacuous';
-  END IF;
-  IF v_lt_dist < 2 THEN
-    RAISE EXCEPTION '0204 A3 FAILED: TW.001 reported one local_time (%) across % evaluations; the shield still reads one clock', v_lt_dist, v_lt;
-  END IF;
-  RAISE NOTICE '0204 A3: grid pair % / %: % events all with sim time (% distinct), h_evt %% -> %%, h_rule agrees, TW.001 saw % distinct local times over % evaluations',
-    v_a, v_b, v_n, v_dist, left(COALESCE(v_prev,'-'),8), left(v_pair->'arm_a'->>'h_evt',8), v_lt_dist, v_lt;
+  -- ── A3 IS NOT RUN INSIDE THIS TRANSACTION. See the APPLIED footer.
+  --    The live grid pair takes longer than the client's statement budget, and
+  --    its TW.001 clause was VACUOUS: the grid fixture never evaluates
+  --    TW.001.operational_hours, so `v_lt = 0` and the assertion would have
+  --    aborted the apply for the wrong reason. The probe now runs immediately
+  --    after COMMIT, against the fixture that actually exercises each half:
+  --    the grid pair for the event stream (G11) and the flagship census for
+  --    the shield (G15). Both results are recorded in the footer and in
+  --    db/checks/0118. A rerun of this file should do the same.
 
   -- ── A4. Privileges unchanged.
   IF (SELECT p_anon FROM pre_0204) IS DISTINCT FROM has_function_privilege('anon', 'public.ottoq_determinism_pair(bigint,int,text,uuid,timestamptz,int)', 'EXECUTE')
@@ -374,7 +338,7 @@ BEGIN
     RAISE EXCEPTION '0204 A4 FAILED: a privilege moved';
   END IF;
   RAISE NOTICE '0204 A4: privileges unchanged';
-  RAISE NOTICE '0204: all assertions passed';
+  RAISE NOTICE '0204: structural assertions passed; the live probe runs next, outside this transaction';
 END $assert$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note, classified_at)
@@ -384,9 +348,103 @@ VALUES ('0204_the_run_has_one_clock_and_the_shield_and_the_events_read_it', TRUE
   'ottoq_events.sim_clock_at is filled by ottoq_record_event for run-scoped events and enters h_evt, so the h_evt canon moves '
   'once on every column by design. ottoq_depot_local_time and SLA.003/SLA.006 read the run''s clock, so TW.001/003/004/005, '
   'SLA.003 and SLA.006 stop judging a simulated day by Nashville''s wall clock; none is enforcement block, so h_cmd is '
-  'predicted not to move. A3 ran a live six-tick grid pair: every event carried a sim time, TW.001 saw the clock advance, '
-  'h_evt moved against the 0203 grid pair, h_rule agreed across arms. No backfill of sim_clock_at.',
+  'predicted not to move. No backfill of sim_clock_at. The live probe runs immediately after COMMIT, not inside it: the '
+  'grid pair for the event stream and the flagship TW.001 census for the shield. See the APPLIED footer and db/checks/0118.',
   now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
 
 COMMIT;
+
+-- =====================================================================
+-- APPLIED 2026-09-07 18:18:01 UTC (1:18 PM CT) -- one transaction as
+-- postgres, sent directly (statement_timeout 55s), first attempt after
+-- the two failures recorded below. Verified immediately after:
+--
+--   lineage row                 present, 18:18:01.484, forces_recert TRUE
+--   ottoq.ottoq_run_now()       present, not SECURITY DEFINER
+--   ottoq_events.sim_clock_at   present (nullable timestamptz, no default)
+--   ottoq_sim_advance_tick_world  9b49f2e4 -> 7ef368f36476e38b0985af722e1f7062
+--   ottoq_record_event            f1d96f94 -> 1b324db698715430265acc2fcd67a950
+--   ottoq_depot_local_time        e0ac3c32 -> 23438748b1c5245ae025f1e4457f7803
+--   ottoq_determinism_pair        7b8faece -> 4b344be9e7287d376a97ff597b949f7c
+--   recert floor                20:42:00 (0207) -> 2026-09-07 18:18:01
+--
+-- TWO FAILURES FIRST, BOTH WORTH KEEPING
+-- ---------------------------------------------------------------------
+-- 1. A MALFORMED LOG LINE ABORTED THE COMPILE. The A3 RAISE NOTICE wrote
+--    "h_evt %% -> %%" -- in RAISE, %% is a literal percent and consumes no
+--    argument, so the format string carried six placeholders for eight
+--    arguments and PL/pgSQL refused the block at compile time: "too many
+--    parameters specified for RAISE". Nothing applied; the transaction
+--    rolled back clean (pins and floor unmoved, verified). Fixed to
+--    "h_evt % -> %". A scan of 0204, 0205 and 0206 for the same class
+--    found no other mismatch.
+--
+-- 2. pg_cron REPORTED SUCCESS FOR A JOB THAT APPLIED NOTHING. The retry
+--    ran as job 416 at 18:15:00, finished in 0.3 s, and cron.job_run_details
+--    recorded status "succeeded" with command tag COMMENT. Nothing had
+--    applied: no lineage row, no ottoq_run_now, no column, every md5 still
+--    at its pin, and no grid run rows. The stored command was complete
+--    (21,243 chars, COMMIT and the A4 text both present), so it was not
+--    truncated -- the job simply stopped after a COMMENT and pg_cron called
+--    that success. THE PROTOCOL LESSON, which supersedes the "long
+--    migrations go through a one-shot pg_cron job" rule as stated: a
+--    pg_cron run row is NOT evidence that a migration applied. Only the
+--    post-apply catalog read is. Every future apply verifies the lineage
+--    row and the body md5s before it is called done, whatever the job
+--    status says.
+--
+-- A3 WAS RESTRUCTURED, AND WHY (the file above reflects what ran)
+-- ---------------------------------------------------------------------
+-- A3 as originally written asserted, inside the transaction, that
+-- TW.001.operational_hours wrote more than one distinct local_time on the
+-- grid arm. THE GRID FIXTURE NEVER EVALUATES TW.001: measured on the
+-- post-apply grid pair, 0 evaluations carry a local_time. The assertion
+-- was vacuous in the strong sense -- it could only ever have aborted the
+-- apply, and for a reason that says nothing about the change. It is the
+-- mirror of the house rule: a check that can only fail is no better than
+-- one that cannot.
+--
+-- The probe therefore runs after COMMIT, against the fixture that actually
+-- exercises each half. Both halves measured 2026-09-07 18:19-18:21 UTC:
+--
+--   G11, the event stream (grid pair bc331b9c / b9c57f3b, 6 ticks,
+--   seed 424242, grid-0169-smoke, sim start 2026-09-01 02:00:00+00):
+--     equal / passed; arms agree on h_cmd (e4158c95), h_evt (79fa107a)
+--     and h_rule (3fde30ff)
+--     138 events on arm A, 0 with a NULL sim_clock_at, 0 outside the run
+--     window, 7 DISTINCT sim times spanning 02:00:00+00 .. 05:00:00+00
+--     1 DISTINCT occurred_at across all 138 -- the wall clock is still one
+--       instant for the whole pair, which is precisely the G11 defect, and
+--       is now harmless because sim_clock_at carries the run's time
+--     h_evt moved ce7e2218 -> 79fa107a against the last pre-0204 grid pair,
+--       so sim time is in the hash
+--
+--   G15, the shield (flagship, round 21's last pair, 24 ticks, fired
+--   2026-09-06 22:51 UTC): the BEFORE census, which is the number this
+--   migration exists to change --
+--     TW.001.operational_hours  1,162 evaluations, ALL carrying local_time,
+--                               1 DISTINCT value: 17:51:00
+--   22:51 UTC is 17:51 CDT. The simulated day advanced twelve hours; the
+--   shield read Nashville's wall clock at the instant the pair ran and
+--   judged all 1,162 evaluations by it. TW.003, TW.005 and SLA.006 carry no
+--   local_time in their payloads, so they are not directly observable this
+--   way, but they read the same ottoq_depot_local_time and A2 proved that
+--   function now returns the run's clock.
+--
+-- ROUND 22 IS THE RECERTIFICATION and the AFTER census. Predictions:
+--   1. h_evt moves on ALL SIX columns. By design: sim_clock_at is in the
+--      hash and no run had it before.
+--   2. h_cmd, h_dec, h_bkg, h_nrg, h_prop, h_defr and h_cal DO NOT MOVE on
+--      any column, and every one equals round 21's canon in
+--      db/canons/round21.md. None of the six evaluators this migration
+--      touches is enforcement=block, so a changed verdict cannot change a
+--      command. If h_cmd moves, that reasoning is wrong and the move is
+--      this migration's to explain.
+--   3. h_rule MAY move: the evaluations' passed/severity can legitimately
+--      change once the shield judges the simulated hour instead of the
+--      Nashville hour. A move here is expected and is the point.
+--   4. TW.001 reports MORE THAN ONE distinct local_time per 24-tick arm,
+--      and the values track the simulated clock rather than the fire time.
+--      One distinct value means the shield is still on the wall clock.
+-- =====================================================================
