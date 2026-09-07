@@ -141,6 +141,19 @@ def materialize(sc: dict) -> dict:
     return sc
 
 
+def _clamp_target(cls: dict, target) -> int:
+    """Cap a target SoC at the class's chemistry daily cap, if it declares one.
+
+    NMC degrades fast above ~80% SoC (R-11; Wikner & Thiringer 2018, doi:10.3390/app8101825;
+    Keil et al. 2016, doi:10.1149/2.0411609jes), so a class that declares
+    `max_daily_soc_pct` must never be scheduled to park above it for routine cycling.
+    Absent the field the cap defaults to 100, and behaviour is byte-for-byte the legacy
+    default -- scenarios that do not opt into the chemistry rule are unchanged.
+    """
+    cap = int(cls.get("max_daily_soc_pct", 100))
+    return min(int(target), cap)
+
+
 def _generate_assets(sc: dict) -> list[Asset]:
     """Build the fleet. Two paths, both pure functions of the scenario file:
 
@@ -157,7 +170,9 @@ def _generate_assets(sc: dict) -> list[Asset]:
     if "explicit" in spec:
         return [Asset(
             aid=a["aid"], cls=a["cls"], arrival_min=int(a["arrival_min"]),
-            soc=int(a["soc"]), target_soc=int(a.get("target_soc", 90)),
+            soc=int(a["soc"]),
+            target_soc=_clamp_target(sc["asset_classes"][a["cls"]],
+                                     a.get("target_soc", 90)),
             ready_by_min=int(a["ready_by_min"]),
             pack_temp_c=int(a.get("pack_temp_c", 18)),
             needs_wash=bool(a.get("needs_wash", False)),
@@ -183,7 +198,7 @@ def _generate_assets(sc: dict) -> list[Asset]:
                 cls=cls,
                 arrival_min=arrival,
                 soc=soc,
-                target_soc=target,
+                target_soc=_clamp_target(sc["asset_classes"][cls], target),
                 ready_by_min=ready_by,
                 pack_temp_c=(-2 if rng.random() < 0.25 else 18),
                 needs_wash=(rng.random() < 0.5),

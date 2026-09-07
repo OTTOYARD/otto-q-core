@@ -1,30 +1,30 @@
 {
- "comparison_sha256": "5c1c5de7ca7d5240bbaa05585f3e3597ec0f3221479ce336e81b6f41dc5f15fa",
+ "comparison_sha256": "9dc05dcbae11d0b854d94178d8286525e5014b6ff6ff32e06cfbe05c95106f8b",
  "crn_pairing": "one scenario draw per seed, shared by all policies",
  "paired_delta_vs_fifo": {
   "cpsat": {
    "charge_point_turns": 0,
-   "makespan_min": -401,
-   "p95_wait_to_first_op_min": 74,
-   "peak_site_kw": 100,
+   "makespan_min": -231,
+   "p95_wait_to_first_op_min": 90,
+   "peak_site_kw": 180,
    "total_moves": 0,
-   "total_tardy_min": -621
+   "total_tardy_min": -237
   },
   "greedy": {
    "charge_point_turns": 0,
-   "makespan_min": -409,
-   "p95_wait_to_first_op_min": 22,
-   "peak_site_kw": 62,
+   "makespan_min": -283,
+   "p95_wait_to_first_op_min": 13,
+   "peak_site_kw": 70,
    "total_moves": 0,
-   "total_tardy_min": -621
+   "total_tardy_min": -237
   },
   "otto_q_asis": {
    "charge_point_turns": 0,
-   "makespan_min": -85,
-   "p95_wait_to_first_op_min": 74,
-   "peak_site_kw": 52,
+   "makespan_min": -115,
+   "p95_wait_to_first_op_min": 55,
+   "peak_site_kw": 2,
    "total_moves": 0,
-   "total_tardy_min": -226
+   "total_tardy_min": -80
   }
  },
  "runs": [
@@ -32,9 +32,9 @@
    "assets": {
     "AV-00": {
      "arrival": 129,
-     "charge_end": 163,
+     "charge_end": 154,
      "charge_start": 129,
-     "finish": 179,
+     "finish": 170,
      "moves": 1,
      "ready_by": 360,
      "soc": 26,
@@ -43,9 +43,9 @@
     },
     "AV-01": {
      "arrival": 179,
-     "charge_end": 220,
+     "charge_end": 207,
      "charge_start": 179,
-     "finish": 220,
+     "finish": 207,
      "moves": 0,
      "ready_by": 417,
      "soc": 36,
@@ -54,20 +54,20 @@
     },
     "AV-02": {
      "arrival": 78,
-     "charge_end": 551,
+     "charge_end": 112,
      "charge_start": 78,
-     "finish": 551,
+     "finish": 112,
      "moves": 0,
      "ready_by": 229,
      "soc": 39,
-     "tardy_min": 322,
+     "tardy_min": 0,
      "wait_min": 0
     },
     "AV-03": {
      "arrival": 170,
-     "charge_end": 211,
+     "charge_end": 202,
      "charge_start": 170,
-     "finish": 227,
+     "finish": 218,
      "moves": 1,
      "ready_by": 467,
      "soc": 39,
@@ -76,9 +76,9 @@
     },
     "AV-04": {
      "arrival": 60,
-     "charge_end": 101,
+     "charge_end": 88,
      "charge_start": 60,
-     "finish": 101,
+     "finish": 88,
      "moves": 0,
      "ready_by": 379,
      "soc": 36,
@@ -87,9 +87,9 @@
     },
     "AV-05": {
      "arrival": 35,
-     "charge_end": 63,
+     "charge_end": 53,
      "charge_start": 35,
-     "finish": 79,
+     "finish": 69,
      "moves": 1,
      "ready_by": 340,
      "soc": 48,
@@ -98,9 +98,9 @@
     },
     "AV-06": {
      "arrival": 64,
-     "charge_end": 95,
+     "charge_end": 86,
      "charge_start": 64,
-     "finish": 111,
+     "finish": 102,
      "moves": 1,
      "ready_by": 243,
      "soc": 33,
@@ -109,31 +109,31 @@
     },
     "AV-07": {
      "arrival": 91,
-     "charge_end": 596,
+     "charge_end": 461,
      "charge_start": 91,
-     "finish": 636,
+     "finish": 501,
      "moves": 2,
      "ready_by": 337,
      "soc": 13,
-     "tardy_min": 299,
+     "tardy_min": 164,
      "wait_min": 0
     },
     "AV-08": {
      "arrival": 85,
-     "charge_end": 125,
+     "charge_end": 339,
      "charge_start": 85,
-     "finish": 141,
+     "finish": 355,
      "moves": 1,
      "ready_by": 282,
      "soc": 48,
-     "tardy_min": 0,
+     "tardy_min": 73,
      "wait_min": 0
     },
     "AV-09": {
      "arrival": 36,
-     "charge_end": 87,
+     "charge_end": 78,
      "charge_start": 36,
-     "finish": 87,
+     "finish": 78,
      "moves": 0,
      "ready_by": 245,
      "soc": 13,
@@ -142,20 +142,20 @@
     },
     "AV-10": {
      "arrival": 91,
-     "charge_end": 158,
-     "charge_start": 105,
-     "finish": 174,
+     "charge_end": 136,
+     "charge_start": 96,
+     "finish": 152,
      "moves": 1,
      "ready_by": 361,
      "soc": 13,
      "tardy_min": 0,
-     "wait_min": 14
+     "wait_min": 5
     },
     "AV-11": {
      "arrival": 4,
-     "charge_end": 41,
+     "charge_end": 31,
      "charge_start": 4,
-     "finish": 57,
+     "finish": 47,
      "moves": 1,
      "ready_by": 326,
      "soc": 29,
@@ -165,11 +165,11 @@
    },
    "metrics": {
     "charge_point_turns": 12,
-    "makespan_min": 636,
+    "makespan_min": 501,
     "p95_wait_to_first_op_min": 0,
-    "peak_site_kw": 340,
+    "peak_site_kw": 370,
     "total_moves": 9,
-    "total_tardy_min": 621
+    "total_tardy_min": 237
    },
    "policy": "fifo"
   },
@@ -177,42 +177,42 @@
    "assets": {
     "AV-00": {
      "arrival": 129,
-     "charge_end": 177,
-     "charge_start": 143,
-     "finish": 194,
+     "charge_end": 155,
+     "charge_start": 130,
+     "finish": 172,
      "moves": 1,
      "ready_by": 360,
      "soc": 26,
      "tardy_min": 0,
-     "wait_min": 14
+     "wait_min": 1
     },
     "AV-01": {
      "arrival": 179,
-     "charge_end": 225,
-     "charge_start": 184,
-     "finish": 225,
+     "charge_end": 207,
+     "charge_start": 179,
+     "finish": 207,
      "moves": 0,
      "ready_by": 417,
      "soc": 36,
      "tardy_min": 0,
-     "wait_min": 5
+     "wait_min": 0
     },
     "AV-02": {
      "arrival": 78,
-     "charge_end": 125,
-     "charge_start": 81,
-     "finish": 125,
+     "charge_end": 112,
+     "charge_start": 78,
+     "finish": 112,
      "moves": 0,
      "ready_by": 229,
      "soc": 39,
      "tardy_min": 0,
-     "wait_min": 3
+     "wait_min": 0
     },
     "AV-03": {
      "arrival": 170,
-     "charge_end": 211,
+     "charge_end": 202,
      "charge_start": 170,
-     "finish": 227,
+     "finish": 218,
      "moves": 1,
      "ready_by": 467,
      "soc": 39,
@@ -221,9 +221,9 @@
     },
     "AV-04": {
      "arrival": 60,
-     "charge_end": 101,
+     "charge_end": 88,
      "charge_start": 60,
-     "finish": 101,
+     "finish": 88,
      "moves": 0,
      "ready_by": 379,
      "soc": 36,
@@ -232,9 +232,9 @@
     },
     "AV-05": {
      "arrival": 35,
-     "charge_end": 63,
+     "charge_end": 53,
      "charge_start": 35,
-     "finish": 79,
+     "finish": 69,
      "moves": 1,
      "ready_by": 340,
      "soc": 48,
@@ -243,9 +243,9 @@
     },
     "AV-06": {
      "arrival": 64,
-     "charge_end": 95,
+     "charge_end": 86,
      "charge_start": 64,
-     "finish": 111,
+     "finish": 102,
      "moves": 1,
      "ready_by": 243,
      "soc": 33,
@@ -254,31 +254,31 @@
     },
     "AV-07": {
      "arrival": 91,
-     "charge_end": 166,
-     "charge_start": 113,
-     "finish": 206,
+     "charge_end": 144,
+     "charge_start": 104,
+     "finish": 184,
      "moves": 2,
      "ready_by": 337,
      "soc": 13,
      "tardy_min": 0,
-     "wait_min": 22
+     "wait_min": 13
     },
     "AV-08": {
      "arrival": 85,
-     "charge_end": 145,
-     "charge_start": 105,
-     "finish": 161,
+     "charge_end": 126,
+     "charge_start": 96,
+     "finish": 142,
      "moves": 1,
      "ready_by": 282,
      "soc": 48,
      "tardy_min": 0,
-     "wait_min": 20
+     "wait_min": 11
     },
     "AV-09": {
      "arrival": 36,
-     "charge_end": 87,
+     "charge_end": 78,
      "charge_start": 36,
-     "finish": 87,
+     "finish": 78,
      "moves": 0,
      "ready_by": 245,
      "soc": 13,
@@ -287,20 +287,20 @@
     },
     "AV-10": {
      "arrival": 91,
-     "charge_end": 172,
-     "charge_start": 119,
-     "finish": 188,
+     "charge_end": 146,
+     "charge_start": 106,
+     "finish": 162,
      "moves": 1,
      "ready_by": 361,
      "soc": 13,
      "tardy_min": 0,
-     "wait_min": 28
+     "wait_min": 15
     },
     "AV-11": {
      "arrival": 4,
-     "charge_end": 41,
+     "charge_end": 31,
      "charge_start": 4,
-     "finish": 57,
+     "finish": 47,
      "moves": 1,
      "ready_by": 326,
      "soc": 29,
@@ -310,9 +310,9 @@
    },
    "metrics": {
     "charge_point_turns": 12,
-    "makespan_min": 227,
-    "p95_wait_to_first_op_min": 22,
-    "peak_site_kw": 402,
+    "makespan_min": 218,
+    "p95_wait_to_first_op_min": 13,
+    "peak_site_kw": 440,
     "total_moves": 9,
     "total_tardy_min": 0
    },
@@ -322,9 +322,9 @@
    "assets": {
     "AV-00": {
      "arrival": 129,
-     "charge_end": 163,
+     "charge_end": 154,
      "charge_start": 129,
-     "finish": 179,
+     "finish": 170,
      "moves": 1,
      "ready_by": 360,
      "soc": 26,
@@ -333,9 +333,9 @@
     },
     "AV-01": {
      "arrival": 179,
-     "charge_end": 220,
+     "charge_end": 207,
      "charge_start": 179,
-     "finish": 220,
+     "finish": 207,
      "moves": 0,
      "ready_by": 417,
      "soc": 36,
@@ -344,20 +344,20 @@
     },
     "AV-02": {
      "arrival": 78,
-     "charge_end": 551,
+     "charge_end": 386,
      "charge_start": 78,
-     "finish": 551,
+     "finish": 386,
      "moves": 0,
      "ready_by": 229,
      "soc": 39,
-     "tardy_min": 322,
+     "tardy_min": 157,
      "wait_min": 0
     },
     "AV-03": {
      "arrival": 170,
-     "charge_end": 211,
+     "charge_end": 202,
      "charge_start": 170,
-     "finish": 227,
+     "finish": 218,
      "moves": 1,
      "ready_by": 467,
      "soc": 39,
@@ -366,31 +366,31 @@
     },
     "AV-04": {
      "arrival": 60,
-     "charge_end": 452,
+     "charge_end": 317,
      "charge_start": 60,
-     "finish": 452,
+     "finish": 317,
      "moves": 0,
      "ready_by": 379,
      "soc": 36,
-     "tardy_min": 73,
+     "tardy_min": 0,
      "wait_min": 0
     },
     "AV-05": {
      "arrival": 35,
-     "charge_end": 141,
-     "charge_start": 113,
-     "finish": 157,
+     "charge_end": 122,
+     "charge_start": 104,
+     "finish": 138,
      "moves": 1,
      "ready_by": 340,
      "soc": 48,
      "tardy_min": 0,
-     "wait_min": 78
+     "wait_min": 69
     },
     "AV-06": {
      "arrival": 64,
-     "charge_end": 95,
+     "charge_end": 86,
      "charge_start": 64,
-     "finish": 111,
+     "finish": 102,
      "moves": 1,
      "ready_by": 243,
      "soc": 33,
@@ -399,9 +399,9 @@
     },
     "AV-07": {
      "arrival": 91,
-     "charge_end": 144,
+     "charge_end": 131,
      "charge_start": 91,
-     "finish": 184,
+     "finish": 171,
      "moves": 2,
      "ready_by": 337,
      "soc": 13,
@@ -410,20 +410,20 @@
     },
     "AV-08": {
      "arrival": 85,
-     "charge_end": 199,
-     "charge_start": 159,
-     "finish": 215,
+     "charge_end": 170,
+     "charge_start": 140,
+     "finish": 186,
      "moves": 1,
      "ready_by": 282,
      "soc": 48,
      "tardy_min": 0,
-     "wait_min": 74
+     "wait_min": 55
     },
     "AV-09": {
      "arrival": 36,
-     "charge_end": 87,
+     "charge_end": 78,
      "charge_start": 36,
-     "finish": 87,
+     "finish": 78,
      "moves": 0,
      "ready_by": 245,
      "soc": 13,
@@ -432,9 +432,9 @@
     },
     "AV-10": {
      "arrival": 91,
-     "charge_end": 144,
+     "charge_end": 131,
      "charge_start": 91,
-     "finish": 169,
+     "finish": 150,
      "moves": 1,
      "ready_by": 361,
      "soc": 13,
@@ -443,9 +443,9 @@
     },
     "AV-11": {
      "arrival": 4,
-     "charge_end": 41,
+     "charge_end": 31,
      "charge_start": 4,
-     "finish": 57,
+     "finish": 47,
      "moves": 1,
      "ready_by": 326,
      "soc": 29,
@@ -455,11 +455,11 @@
    },
    "metrics": {
     "charge_point_turns": 12,
-    "makespan_min": 551,
-    "p95_wait_to_first_op_min": 74,
-    "peak_site_kw": 392,
+    "makespan_min": 386,
+    "p95_wait_to_first_op_min": 55,
+    "peak_site_kw": 372,
     "total_moves": 9,
-    "total_tardy_min": 395
+    "total_tardy_min": 157
    },
    "policy": "otto_q_asis"
   },
@@ -467,42 +467,42 @@
    "assets": {
     "AV-00": {
      "arrival": 129,
-     "charge_end": 176,
-     "charge_start": 142,
-     "finish": 192,
+     "charge_end": 172,
+     "charge_start": 147,
+     "finish": 188,
      "moves": 1,
      "ready_by": 360,
      "soc": 26,
      "tardy_min": 0,
-     "wait_min": 13
+     "wait_min": 18
     },
     "AV-01": {
      "arrival": 179,
-     "charge_end": 235,
-     "charge_start": 194,
-     "finish": 235,
+     "charge_end": 216,
+     "charge_start": 188,
+     "finish": 216,
      "moves": 0,
      "ready_by": 417,
      "soc": 36,
      "tardy_min": 0,
-     "wait_min": 15
+     "wait_min": 9
     },
     "AV-02": {
      "arrival": 78,
-     "charge_end": 123,
-     "charge_start": 79,
-     "finish": 123,
+     "charge_end": 112,
+     "charge_start": 78,
+     "finish": 112,
      "moves": 0,
      "ready_by": 229,
      "soc": 39,
      "tardy_min": 0,
-     "wait_min": 1
+     "wait_min": 0
     },
     "AV-03": {
      "arrival": 170,
-     "charge_end": 211,
+     "charge_end": 202,
      "charge_start": 170,
-     "finish": 227,
+     "finish": 218,
      "moves": 1,
      "ready_by": 467,
      "soc": 39,
@@ -511,20 +511,20 @@
     },
     "AV-04": {
      "arrival": 60,
-     "charge_end": 147,
-     "charge_start": 106,
-     "finish": 147,
+     "charge_end": 124,
+     "charge_start": 96,
+     "finish": 124,
      "moves": 0,
      "ready_by": 379,
      "soc": 36,
      "tardy_min": 0,
-     "wait_min": 46
+     "wait_min": 36
     },
     "AV-05": {
      "arrival": 35,
-     "charge_end": 63,
+     "charge_end": 53,
      "charge_start": 35,
-     "finish": 79,
+     "finish": 69,
      "moves": 1,
      "ready_by": 340,
      "soc": 48,
@@ -533,76 +533,76 @@
     },
     "AV-06": {
      "arrival": 64,
-     "charge_end": 193,
-     "charge_start": 162,
-     "finish": 209,
+     "charge_end": 161,
+     "charge_start": 139,
+     "finish": 177,
      "moves": 1,
      "ready_by": 243,
      "soc": 33,
      "tardy_min": 0,
-     "wait_min": 98
+     "wait_min": 75
     },
     "AV-07": {
      "arrival": 91,
-     "charge_end": 144,
-     "charge_start": 91,
-     "finish": 184,
+     "charge_end": 230,
+     "charge_start": 190,
+     "finish": 270,
      "moves": 2,
      "ready_by": 337,
      "soc": 13,
      "tardy_min": 0,
-     "wait_min": 0
+     "wait_min": 99
     },
     "AV-08": {
      "arrival": 85,
-     "charge_end": 134,
-     "charge_start": 94,
-     "finish": 150,
+     "charge_end": 115,
+     "charge_start": 85,
+     "finish": 131,
      "moves": 1,
      "ready_by": 282,
      "soc": 48,
      "tardy_min": 0,
-     "wait_min": 9
+     "wait_min": 0
     },
     "AV-09": {
      "arrival": 36,
-     "charge_end": 88,
-     "charge_start": 37,
-     "finish": 88,
+     "charge_end": 78,
+     "charge_start": 36,
+     "finish": 78,
      "moves": 0,
      "ready_by": 245,
      "soc": 13,
      "tardy_min": 0,
-     "wait_min": 1
+     "wait_min": 0
     },
     "AV-10": {
      "arrival": 91,
-     "charge_end": 218,
-     "charge_start": 165,
-     "finish": 234,
+     "charge_end": 177,
+     "charge_start": 137,
+     "finish": 193,
      "moves": 1,
      "ready_by": 361,
      "soc": 13,
      "tardy_min": 0,
-     "wait_min": 74
+     "wait_min": 46
     },
     "AV-11": {
      "arrival": 4,
-     "charge_end": 41,
-     "charge_start": 4,
-     "finish": 57,
+     "charge_end": 121,
+     "charge_start": 94,
+     "finish": 137,
      "moves": 1,
      "ready_by": 326,
      "soc": 29,
      "tardy_min": 0,
-     "wait_min": 0
+     "wait_min": 90
     }
    },
    "metrics": {
     "charge_point_turns": 12,
-    "makespan_min": 235,
-    "p95_wait_to_first_op_min": 74,
-    "peak_site_kw": 440,
+    "makespan_min": 270,
+    "p95_wait_to_first_op_min": 90,
+    "peak_site_kw": 550,
     "total_moves": 9,
     "total_tardy_min": 0
    },

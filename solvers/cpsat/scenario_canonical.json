@@ -14,6 +14,7 @@
     "onpeak_window_min": [240, 420]
   },
   "objective_weights": {
+    "_provenance": "LEGACY-REPRO ARTIFACT, not the production objective. The production path (policies/forward.py) is lexicographic -- min tardiness (readiness floor) then min peak (cost) -- and never reads these values. They parameterise the frozen 'weighted' mode that T1-T8 and the C5 comparison assert byte-for-byte. Grounding of the two axes lives in docs/research/answers/R-11-objective-weights.md.",
     "tardiness_per_min": 10,
     "onpeak_kw_min": 1,
     "peak_excess_per_kw": 20,
@@ -22,6 +23,7 @@
   "asset_classes": {
     "waymo_jaguar_ipace_2024": {
       "battery_kwh": 90, "max_charge_kw": 100, "inlet": "CCS",
+      "chemistry": "NMC", "max_daily_soc_pct": 80,
       "energy_curve": [
         {"above_soc_pct": 0,  "accept_frac": 1.00},
         {"above_soc_pct": 70, "accept_frac": 0.60},
@@ -30,6 +32,7 @@
     },
     "zoox_robotaxi_2024": {
       "battery_kwh": 110, "max_charge_kw": 150, "inlet": "CCS",
+      "chemistry": "NMC", "max_daily_soc_pct": 80,
       "energy_curve": [
         {"above_soc_pct": 0,  "accept_frac": 1.00},
         {"above_soc_pct": 70, "accept_frac": 0.60},
@@ -38,6 +41,7 @@
     },
     "generic_robotaxi": {
       "battery_kwh": 80, "max_charge_kw": 120, "inlet": "CCS",
+      "chemistry": "NMC", "max_daily_soc_pct": 80,
       "energy_curve": [
         {"above_soc_pct": 0,  "accept_frac": 1.00},
         {"above_soc_pct": 70, "accept_frac": 0.60},

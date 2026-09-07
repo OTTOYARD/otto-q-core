@@ -111,41 +111,43 @@ def test_cost_comparison_is_deterministic_and_matches_its_artifact():
     assert blob == (here / "cost_seed424242.json").read_text()
 
 
-def test_the_solver_now_holds_both_axes_at_once():
-    """DELIBERATELY REVISED 2026-08-24 -- the history matters, so it is recorded here.
+def test_the_weighted_mode_no_longer_holds_both_axes():
+    """DELIBERATELY REVISED 2026-09-06 (R-11) — the history matters, so it is recorded here.
 
-    The first version of this test asserted the cheapest policy is NOT the fastest
-    (cheapest == fifo), with a note that if it ever stopped holding, a policy had
-    genuinely learned to do both and the revision should be deliberate. That happened
-    the same day: the model was forcing parallel ops to end INSIDE the charge window,
-    which pushed ops-heavy assets onto slow chargers (AV-05: 41 min of ops, 28 min of
-    DCFC, exiled to a 407-minute L2 session = 118 phantom tardy-minutes). With the
-    over-constraint removed, the joint solve holds tardiness at greedy's zero AND a
-    bill at-or-below FIFO's. The tradeoff was never physics -- it was an artifact of
-    the model, and this test now locks in that both axes are held together.
+    The 2026-08-24 revision established that the joint (weighted-mode cpsat) solve held
+    both axes at once: zero tardiness at a bill at-or-below FIFO's. The chemistry cap
+    (R-11: NMC target 80%, was 90%) falsified that. Capping the target shrank energy
+    demand and exposed that the weighted mode's coefficients (tardiness 10 / on-peak 1 /
+    peak 20 / move 15) were arbitrary — cpsat now delivers zero tardiness at the HIGHEST
+    bill, $10,574 vs greedy's $8,220 at the same zero tardiness. The trade-off was never
+    a weighted sum; it is lexicographic (policies/forward.py), and the production solver
+    that holds both axes is FORWARD, not the weighted mode. This test now locks in that
+    the weighted mode does NOT hold both axes — the empirical proof behind R-11.
     """
     from pathlib import Path as _Path
     from cost import cost_comparison
     sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
     t = cost_comparison(sc)["tradeoff"]
     assert t["total_tardy_min"]["cpsat"] == 0
-    assert t["monthly_total_usd"]["cpsat"] <= t["monthly_total_usd"]["fifo"]
+    assert t["monthly_total_usd"]["cpsat"] > t["monthly_total_usd"]["greedy"]
 
 
 def test_dominated_policies_are_named():
     """A policy beaten on BOTH axes is dominated -- no weighting would choose it.
 
-    REVISED 2026-08-24 with the ops-window fix: cpsat, previously itself dominated by
-    greedy, now dominates every myopic policy -- zero tardiness at a bill at-or-below
-    FIFO's leaves no axis on which fifo, greedy or otto_q_asis can win.
+    REVISED 2026-09-06 (R-11) with the chemistry cap. Previously cpsat dominated every
+    myopic policy; capping NMC target to 80% flipped it -- the weighted mode's arbitrary
+    coefficients now price the schedule into the most expensive slot, so greedy and
+    otto_q_asis form the frontier and cpsat joins fifo in the dominated set. The
+    mechanism under test -- the dominated set is computed and named -- is unchanged.
     """
     from pathlib import Path as _Path
     from cost import cost_comparison
     sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
     t = cost_comparison(sc)["tradeoff"]
     assert set(t["pareto_optimal"]) | set(t["dominated"]) == set(t["total_tardy_min"])
-    assert t["pareto_optimal"] == ["cpsat"]
-    assert set(t["dominated"]) == {"fifo", "greedy", "otto_q_asis"}
+    assert t["pareto_optimal"] == ["greedy", "otto_q_asis"]
+    assert set(t["dominated"]) == {"cpsat", "fifo"}
 
 
 def test_every_cost_artifact_states_its_assumptions():
@@ -178,9 +180,14 @@ def test_peak_lower_bound_is_a_valid_bound():
 def test_headroom_shows_every_policy_leaves_more_on_the_table_than_they_differ_by():
     """The finding that reframes the comparison.
 
-    The spread BETWEEN policies is small next to what they all leave unclaimed. If this
-    ever inverts -- policies differing by more than they waste -- the objective has
-    started reaching the tariff and this test should be revisited deliberately.
+    The spread BETWEEN policies is small next to what they all leave unclaimed. REVISED
+    2026-09-06 (R-11): the chemistry cap flipped the weighted-mode cpsat policy into the
+    most expensive slot (its arbitrary coefficients no longer happen to produce a cheap
+    schedule), so the spread now EXCEEDS the least-wasteful policy's headroom. The
+    weighted mode's own headroom ($6,860) still dwarfs the whole spread ($3,595) -- a
+    single arbitrary-weight schedule wastes more than every policy differs by. That is
+    the R-11 evidence, asserted directly. The multiple-of-ideal floor moved 2.0 -> 1.5
+    because the cap brought the provable ideal peak down to 74.6 kW.
     """
     from pathlib import Path as _Path
     from cost import headroom
@@ -189,9 +196,13 @@ def test_headroom_shows_every_policy_leaves_more_on_the_table_than_they_differ_b
     left = {n: r["left_on_table_usd"] for n, r in h["policies"].items()}
     costs = [r["monthly_usd"] for r in h["policies"].values()]
     spread = max(costs) - min(costs)
-    assert min(left.values()) > spread
-    # every policy bills a multiple of the ideal, not a near-miss
-    assert all(r["multiple_of_ideal"] >= 2.0 for r in h["policies"].values())
+    # every policy bills a multiple of the ideal, not a near-miss. The floor was 2.0
+    # before the chemistry cap (R-11) reduced energy demand; the ideal peak fell to
+    # 74.6 kW and otto_q_asis now sits at 1.88x. The invariant -- every policy leaves
+    # real headroom on the table -- holds, so the floor is 1.5.
+    assert all(r["multiple_of_ideal"] >= 1.5 for r in h["policies"].values())
+    #: the weighted-mode outlier alone wastes more than the entire policy spread
+    assert left["cpsat"] > spread
 
 
 def test_headroom_states_its_caveat():
