@@ -18,6 +18,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 
 from forward_proposer import (  # noqa: E402
+    DEFAULT_SERVICEABLE_STATES,
     FrameError,
     frame_to_scenario,
     propose,
@@ -250,6 +251,87 @@ def test_a_declined_vehicle_says_so_and_says_why():
             assert p["proposal"]["stall_id"] and p["proposal"]["requested_kw"]
 
 
+def test_a_derated_inlet_is_a_per_vehicle_fact_not_a_per_platform_one():
+    """Two vehicles of one platform, different inlet limits: each gets its own.
+
+    `inlet_max_kw` is declared per vehicle in the frame contract because a
+    derated or damaged inlet is a fact about one truck. The synthesized asset
+    class was keyed on platform alone and filled with `setdefault`, so only the
+    FIRST vehicle of each platform was ever consulted:
+
+      full first    -> {'v-derated': 100, 'v-full': 100}   # derated over-asked
+      derated first -> {'v-derated': 25,  'v-full': 25}    # healthy throttled
+
+    Both are wrong, in opposite directions, and which one you get depends on
+    frame row order — so the same site state produced two different plans.
+    """
+    full = _vehicle("v-full", inlet_max_kw=100.0)
+    derated = _vehicle("v-derated", inlet_max_kw=25.0)
+    stalls = [_stall("s-0"), _stall("s-1")]
+
+    def kws(vehicles):
+        r = propose(_frame(vehicles, stalls), CLASSES, site=SITE, horizon_min=480)
+        return {p["entity_id"]: p["proposal"]["requested_kw"] for p in r["proposals"]}
+
+    assert kws([full, derated]) == {"v-full": 100, "v-derated": 25}
+    # ...and reordering the frame rows changes nothing.
+    assert kws([derated, full]) == kws([full, derated])
+
+
+def test_two_identical_units_still_share_one_synthesized_class():
+    """The fix must not shatter the class table: units whose per-unit facts agree
+    are one class, so the model keeps its symmetry and the scenario stays small."""
+    frame = _frame([_vehicle("v-a", inlet_max_kw=100.0),
+                    _vehicle("v-b", inlet_max_kw=100.0),
+                    _vehicle("v-c", inlet_max_kw=40.0)],
+                   [_stall("s-0"), _stall("s-1")])
+    sc, _ = frame_to_scenario(frame, CLASSES, site=SITE, horizon_min=480)
+    assert len(sc["asset_classes"]) == 2, sorted(sc["asset_classes"])
+    by_aid = {a.aid: a.cls for a in sc["assets"]}
+    assert by_aid["v-a"] == by_aid["v-b"] != by_aid["v-c"]
+
+
+def test_every_default_serviceable_state_is_a_real_production_label():
+    """The set named three states the `vehicle_state` type cannot hold.
+
+    `awaiting_stall`, `in_queue` and `charge_scheduled` are not labels of the
+    production enum — they were written from memory — so three sixths of the
+    default predicate was dead code that could never match a frame row. The
+    enum is committed at db/contracts/vehicle_state_enum.json (a snapshot, read
+    by this test only; nothing reads it at runtime), so the check needs no
+    database and the set cannot drift from the type unnoticed again.
+    """
+    import json
+    enum = json.loads(
+        (HERE.parent / "db" / "contracts" / "vehicle_state_enum.json").read_text())
+    labels = set(enum["labels"])
+    assert enum["type"] == "vehicle_state"
+    bogus = sorted(DEFAULT_SERVICEABLE_STATES - labels)
+    assert bogus == [], (
+        f"states that the production enum cannot hold: {bogus}; "
+        f"real labels are {sorted(labels)}")
+
+
+def test_the_on_site_waiting_state_is_not_filtered_out():
+    """`staged_awaiting_service` is the enum's on-site-waiting label and was
+    missing from the set, so those vehicles were dropped before
+    frame_to_scenario ever saw them — no proposal AND no abstention, which is
+    the silent drop plan_to_proposals exists to prevent.
+
+    On the flagship depot that state carried 3,386 transitions across 113 of 116
+    vehicles in 24 hours; at the busiest sampled minute 16 vehicles held it
+    against 19 the old set could see. Nearly half the serviceable population.
+    """
+    assert "staged_awaiting_service" in DEFAULT_SERVICEABLE_STATES
+    frame = _frame(
+        [_vehicle("v-gate", state="arrived_at_gate"),
+         _vehicle("v-staged", state="staged_awaiting_service")],
+        [_stall("s-0"), _stall("s-1")])
+    r = propose(frame, CLASSES, site=SITE, horizon_min=480)
+    assert {p["entity_id"] for p in r["proposals"]} == {"v-gate", "v-staged"}
+    assert not any(p["proposal"]["abstain"] for p in r["proposals"])
+
+
 def test_rejection_stays_off_unless_asked():
     """Default OFF, asserted directly: the flag is what makes this feature safe to
     land at all, since an accidental default would let the proposer quietly decline
@@ -288,6 +370,65 @@ def test_default_path_keeps_the_two_pass_contract_without_a_regime():
     assert r["solver"]["pass1_status"] in ("OPTIMAL", "FEASIBLE")
     assert r["solver"]["pass2_status"] in ("OPTIMAL", "FEASIBLE")
     assert r["solver"]["total_tardy_min"] == 0
+
+
+def _crowded(n_vehicles=14, n_stalls=5):
+    """A frame big enough that the later lexicographic passes cannot be proved
+    inside a small deterministic budget. Fourteen vehicles over five DCFC stalls
+    is oversubscribed but feasible — the first pass proves out, the second and
+    third run out of budget holding an incumbent."""
+    return _frame(
+        [_vehicle(f"v-{i}", soc=20 + (i * 7) % 50) for i in range(n_vehicles)],
+        [_stall(f"s-{i}") for i in range(n_stalls)],
+    )
+
+
+def test_a_budget_truncated_pass_is_not_reported_complete():
+    """FEASIBLE is an incumbent, not a proof, and `complete` must say so.
+
+    CP-SAT returns FEASIBLE when it exhausts the deterministic budget holding a
+    solution it never proved minimal. The chain records that incumbent in
+    `optima` — correctly, since it is achieved and therefore a sound ceiling for
+    the later passes — but the fire record used to read "there is a number here"
+    as "this pass held its optimum". A truncated plan was published as a whole
+    one, and its unproven T* could be cited as the site's readiness floor.
+
+    The budget is DETERMINISTIC, not a wall clock, so the truncation is a
+    property of the instance and reproduces on any machine.
+    """
+    r = propose(_crowded(), CLASSES, site=SITE, horizon_min=480,
+                hour_of_day=7, det_budget_s=0.3)
+    s = r["solver"]
+    statuses = [p["status"] for p in s["passes"]]
+    assert statuses[0] == "OPTIMAL" and "FEASIBLE" in statuses[1:], (
+        f"this frame no longer truncates a later pass: {statuses}")
+    assert not r["solver"].get("retained_previous"), (
+        "a retained pass would prove the old code too; this must be the "
+        "FEASIBLE case specifically")
+    assert s["complete"] is False, (
+        f"complete claimed on statuses {statuses} — a truncated plan reported "
+        f"as a whole one")
+    # ...and the trace names WHICH pass was unproven, so the record is usable.
+    assert [p["proven"] for p in s["passes"]] == [st == "OPTIMAL" for st in statuses]
+
+
+def test_the_truncation_is_reproducible_not_a_race():
+    """The guard above is only meaningful if the same budget truncates the same
+    passes every time — otherwise it is a flake waiting to land in CI."""
+    a = propose(_crowded(), CLASSES, site=SITE, horizon_min=480,
+                hour_of_day=7, det_budget_s=0.3)["solver"]
+    b = propose(_crowded(), CLASSES, site=SITE, horizon_min=480,
+                hour_of_day=7, det_budget_s=0.3)["solver"]
+    assert [p["status"] for p in a["passes"]] == [p["status"] for p in b["passes"]]
+    assert a["complete"] == b["complete"] is False
+
+
+def test_complete_is_still_true_when_every_pass_proves_its_optimum():
+    """The other half: the guard above must not simply nail `complete` to False."""
+    r = propose(FRAME, CLASSES, site=SITE, hour_of_day=7)
+    s = r["solver"]
+    assert [p["status"] for p in s["passes"]] == ["OPTIMAL"] * len(s["pass_modes"])
+    assert s["complete"] is True
 
 
 def test_regime_path_is_deterministic():

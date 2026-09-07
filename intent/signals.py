@@ -17,9 +17,12 @@ DOCTRINE (why this lives here and not in the forecast repo):
 
 THE THREE SIGNALS, and what derives each:
 
-  * demand_surge        <- arrivals forecast. Expected arrivals over the next
-                           window >= surge_multiplier x the fleet's mean hourly
-                           return rate. (A "hot window" — throughput-first.)
+  * demand_surge        <- arrivals forecast. Expected (nowcast) arrivals over
+                           the next window >= surge_multiplier x the SAME
+                           window's climatological baseline. Comparing against
+                           a flat daily mean instead made the signal
+                           structurally unreachable; see the derivation at the
+                           computation. (A "hot window" — throughput-first.)
   * grid_peak_imminent  <- load forecast + the site's soft power target. The
                            p90 load (conservative tail) over the next window
                            reaching peak_fraction of the soft target means the
@@ -80,8 +83,10 @@ SIGNAL_THRESHOLDS: dict[str, Threshold] = {
     "surge_multiplier": Threshold(
         2.0, "ratio", "inference",
         "must-measure-on-twin: no published AV-depot surge threshold",
-        "a demand surge is expected arrivals >= 2x the fleet's mean hourly "
-        "return rate — a defensible 'hot window' default"),
+        "a demand surge is expected arrivals >= 2x the SAME window's "
+        "climatological baseline — a defensible 'hot window' default. Against "
+        "a flat daily mean this threshold is unreachable: the diurnal shape's "
+        "own busiest window is 1.91x that mean"),
     "surge_window_hours": Threshold(
         3, "hours", "inference",
         "must-measure-on-twin: look-ahead is an operating choice",
@@ -200,29 +205,60 @@ def forecast_signals(forecast: dict, *, site_power_target_kw: float,
     lmap = _hour_map(load, "load")
 
     # ---- demand_surge ------------------------------------------------------
-    mean_daily = float(arrivals.get("mean_daily_arrivals") or 0.0)
-    if mean_daily <= 0:
-        raise ForecastContractError("arrivals.mean_daily_arrivals is missing "
-                                    "or non-positive — no baseline to compare a "
-                                    "surge against")
+    #: THE BASELINE IS THE WINDOW'S OWN CLIMATOLOGY, NOT A FLAT DAILY MEAN.
+    #:
+    #: The first version compared the window against `(mean_daily / 24) * W` — a
+    #: FLAT hourly rate — while the arrivals forecast it consumes is strongly
+    #: diurnal (`mean_hourly * hourly_shape[hod] * dow_mult`, a real NYC-TLC
+    #: shape normalized to mean 1.0). That asks "is this window above the daily
+    #: flat average?", a question the shape already answers for every hour, and
+    #: it is bounded by the shape itself: the busiest 3-hour run in the shipped
+    #: prior (hours 16,17,18) sums to 4.7868 against a flat 3.0, a ratio of
+    #: 1.5956, and the largest day-of-week multiplier is 1.1980. The product is
+    #: 1.9115 — below the 2.0 default. `demand_surge` could therefore NEVER
+    #: fire, at any site, any hour, any day of week. The ratio is scale-
+    #: invariant, so no fleet size or turns-per-day setting rescued it.
+    #:
+    #: A surge is arrivals ABOVE WHAT WAS EXPECTED FOR THIS WINDOW, which needs
+    #: two numbers: the nowcast (`expected_arrivals`) and the climatological
+    #: expectation (`baseline_arrivals`). The bridge requires both rather than
+    #: reconstructing the second from a daily mean, exactly as it refuses a
+    #: missing count instead of reading it as zero. A pure-climatology
+    #: forecaster sets them equal and correctly never surges; a forecast that
+    #: carries live observation or a perturbation raises one above the other,
+    #: and that is the signal.
     surge_w = int(eff["surge_window_hours"])
     surge_m = float(eff["surge_multiplier"])
-    _vals = []
+    _vals, _base = [], []
     for h in _window(amap, now_hour, surge_w):
         if "expected_arrivals" not in h:
             raise ForecastContractError(
                 "an arrivals hour is missing expected_arrivals — the bridge "
                 "refuses to treat a missing count as zero (that would hide a "
                 "surge)")
+        if "baseline_arrivals" not in h:
+            raise ForecastContractError(
+                "an arrivals hour is missing baseline_arrivals — a surge is a "
+                "deviation from what this hour was expected to bring, and the "
+                "bridge refuses to substitute a flat daily mean for the "
+                "climatology (doing so made demand_surge unreachable: the "
+                "diurnal shape's own peak is only 1.91x the flat mean, under "
+                "the 2.0 threshold)")
         _vals.append(float(h["expected_arrivals"]))
+        _base.append(float(h["baseline_arrivals"]))
     expected = sum(_vals)
-    baseline = (mean_daily / 24.0) * surge_w
+    baseline = sum(_base)
+    if baseline <= 0:
+        raise ForecastContractError("arrivals baseline over the window is "
+                                    "non-positive — no climatology to compare a "
+                                    "surge against")
     surge_hit = expected >= surge_m * baseline
     reasoning = {
         "demand_surge": {
             "triggered": surge_hit,
-            "metric": "expected_arrivals over window",
+            "metric": "expected_arrivals vs baseline_arrivals over window",
             "value": round(expected, 3),
+            "baseline": round(baseline, 3),
             "threshold": round(surge_m * baseline, 3),
             "units": "vehicles",
             "window_hours": surge_w,

@@ -64,13 +64,32 @@ from forward import lexicographic_solve_traced     # noqa: E402
 from intent.solve import pass_sequence             # noqa: E402
 from regime import resolve_active                  # noqa: E402
 
-#: Vehicle states that mean "on site and awaiting service". The default is the
-#: conservative reading of the twin vocabulary; a caller with better knowledge
-#: passes its own predicate. Being a DEFAULT and not a constant baked into the
-#: solve is the point: the kernel model never sees state names at all.
+#: Vehicle states that mean "on site and awaiting or receiving service". Being a
+#: DEFAULT and not a constant baked into the solve is the point: the kernel model
+#: never sees state names at all, and a caller with better knowledge passes its
+#: own predicate.
+#:
+#: EVERY MEMBER IS A LABEL OF THE PRODUCTION `vehicle_state` ENUM. It was not.
+#: The first version was written from memory and named three states the type
+#: cannot hold -- `awaiting_stall`, `in_queue`, `charge_scheduled` -- while
+#: omitting `staged_awaiting_service`, which is the enum's actual "on site,
+#: waiting" label and one of the busiest states the depot has (3,386 transitions
+#: across 113 of 116 flagship vehicles in 24h; 16 vehicles held it at the
+#: busiest sampled minute against 19 the old set could see). Those 16 were
+#: filtered out before frame_to_scenario, so they got neither a proposal nor an
+#: abstention -- exactly the silent drop plan_to_proposals forbids.
+#:
+#: The full vocabulary is committed at db/contracts/vehicle_state_enum.json and
+#: tests/-- test_forward_proposer asserts every member below is one of its labels,
+#: so this set cannot drift from the type again without CI saying so.
+#:
+#: Deliberately EXCLUDED, though they are real labels: `charge_complete_holding`,
+#: `service_complete_holding` and `staged_for_departure`. Those are post-service
+#: states -- the vehicle is done and staged out. This proposer proposes charge
+#: assignments; a caller that wants to schedule non-charge service on a holding
+#: vehicle passes its own predicate.
 DEFAULT_SERVICEABLE_STATES = frozenset({
-    "arrived_at_gate", "awaiting_stall", "in_queue", "charging_dcfc",
-    "charging_l2", "charge_scheduled",
+    "arrived_at_gate", "staged_awaiting_service", "charging_dcfc", "charging_l2",
 })
 
 #: Stall types that can never charge anything, regardless of connector fields.
@@ -128,12 +147,24 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
             abstentions.append(_abstain(v, f"no capable point on site for "
                                            f"charge_kinds {list(ck)}"))
             continue
-        cname = f"{platform}"
+        #: THE SYNTHESIZED CLASS IS KEYED ON THE PER-UNIT FACTS, NOT THE PLATFORM.
+        #: `inlet_max_kw` and `inlet_type` are declared per vehicle in the frame
+        #: contract precisely because they vary per unit: a derated or damaged
+        #: inlet is a fact about one truck, not about its make. Keying on
+        #: `platform` alone and populating with `setdefault` meant only the FIRST
+        #: vehicle of each platform was consulted and every later one inherited
+        #: its limit -- so a derated unit was proposed 100 kW it cannot take, a
+        #: healthy unit beside it was held to 25 kW it did not need, and swapping
+        #: the two frame rows swapped the answers. Same frame, different plan,
+        #: from row order alone. A derated unit now materializes its own class.
+        eff_kw = float(min(cls["max_charge_kw"],
+                           v.get("inlet_max_kw") or cls["max_charge_kw"]))
+        inlet = v.get("inlet_type", "CCS")
+        cname = f"{platform}|{int(eff_kw)}|{inlet}"
         classes.setdefault(cname, {
             "battery_kwh": float(cls["battery_kwh"]),
-            "max_charge_kw": float(min(cls["max_charge_kw"],
-                                       v.get("inlet_max_kw") or cls["max_charge_kw"])),
-            "inlet": v.get("inlet_type", "CCS"),
+            "max_charge_kw": eff_kw,
+            "inlet": inlet,
             "charge_kinds": list(ck),
             "energy_curve": cls.get("energy_curve",
                                     [{"above_soc_pct": 0, "accept_frac": 1.0}]),
@@ -340,10 +371,20 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             "total_tardy_min": optima.get("min_tardy"),
             "site_peak_kw": optima.get("min_peak"),
             "total_flow_min": optima.get("min_flow"),
-            #: complete == every pass in the regime held an optimum; a retained
-            #: pass (solver could not solve within budget) is reported as None
-            #: and complete False, never silently claimed.
-            "complete": all(optima.get(m) is not None for m in modes),
+            #: complete == every pass in the regime RAN and PROVED its optimum.
+            #: Three ways it can be False, and all three used to be invisible:
+            #: a retained pass (INFEASIBLE/UNKNOWN) sets optima[mode]=None and
+            #: returns early, so `passes` is short; and a budget-truncated pass
+            #: returns FEASIBLE — an incumbent, not a proof. That last case was
+            #: reported complete:true, which published a truncated plan as a
+            #: whole one and let a non-optimal T* be cited as the readiness
+            #: floor. Optimality is claimed from the status, never from the
+            #: presence of a number.
+            "complete": (
+                len(passes) == len(modes)
+                and all(p.get("proven") for p in passes)
+                and all(optima.get(m) is not None for m in modes)
+            ),
             "reproducible": bool(
                 not final_plan.get("retained_previous")
                 and all(p.get("reproducible") for p in passes)),

@@ -99,6 +99,59 @@ def test_resource_fault_learns_the_blocked_point():
     assert r.learned_constraints == {"block_points": ["s-3"]}
 
 
+def test_the_learned_constraint_names_only_the_entities_that_crossed_the_threshold():
+    """One stuck point must not take its healthy neighbours down with it.
+
+    `reconcile_refusals` decides WHETHER to emit a constraint from the repeat
+    threshold. It must populate it from the same predicate. Before this test the
+    inner loop had no threshold check at all, so a single genuinely stuck point
+    dragged every point that produced one one-off refusal of the same code into
+    `block_points` — and the next solve lost their capacity. Every earlier test
+    here used one entity, which is why nothing caught it.
+
+    The flag message and the learned constraint must name the same entities;
+    that agreement is the property under test.
+    """
+    recs = [Refusal("resource_faulted", entity_id="p-stuck") for _ in range(5)]
+    recs += [Refusal("resource_faulted", entity_id=f"p-{i}") for i in range(58)]
+
+    r = reconcile_refusals(recs, entity_repeat_threshold=2)
+
+    assert r.learned_constraints["block_points"] == ["p-stuck"], (
+        f"blocked {len(r.learned_constraints['block_points'])} points; only "
+        f"p-stuck crossed the threshold"
+    )
+    # ...and the flag agrees with the constraint, which is the whole point.
+    assert "['p-stuck']" in r.flags[0][2]
+
+
+def test_a_code_flagged_by_one_entity_does_not_block_the_others_it_touched():
+    """The narrower sibling of the above, on the occupancy code.
+
+    Two stalls refuse once each, a third refuses four times. Only the third is
+    a stuck pattern; the other two are the ordinary noise of a busy site.
+    """
+    r = reconcile_refusals(
+        [Refusal("target_occupied", entity_id="s-1"),
+         Refusal("target_occupied", entity_id="s-2")]
+        + [Refusal("target_occupied", entity_id="s-3") for _ in range(4)],
+        entity_repeat_threshold=2,
+    )
+    assert r.learned_constraints == {"refresh_occupancy": ["s-3"]}
+
+
+def test_a_solver_gap_still_names_every_entity_it_touched():
+    """The other half of the predicate: solver_gap codes flag on ANY occurrence,
+    so every entity that carried one is in scope. Narrowing them to the repeat
+    threshold would be the opposite defect — a frame that never gets reconciled.
+    """
+    r = reconcile_refusals([
+        Refusal("target_unknown", entity_id="s-9"),
+        Refusal("target_unknown", entity_id="s-8"),
+    ], entity_repeat_threshold=2)
+    assert r.learned_constraints == {"reconcile_frame": ["s-8", "s-9"]}
+
+
 def test_unknown_codes_are_named_never_absorbed():
     r = reconcile_refusals([
         Refusal("superseded"),

@@ -240,9 +240,22 @@ def reconcile_refusals(refusals, *, entity_repeat_threshold: int = 2,
         if not flagged:
             continue
         learned.setdefault(lc, set())
-        for (rc, eid) in pairs:
-            if rc == code:
+        # Populate from the SAME predicate that flagged the code. A live_world
+        # code is flagged because some entity repeated past the threshold; only
+        # those entities belong in the constraint. Naming every entity that ever
+        # carried the code would let one stuck point remove every healthy point
+        # that produced a single one-off refusal of the same kind from the next
+        # solve's capacity. A solver_gap code flags on any occurrence, so every
+        # entity that carried it is in scope.
+        for (rc, eid), k in pairs.items():
+            if rc != code:
+                continue
+            if cls.kind == "solver_gap" or k > entity_repeat_threshold:
                 learned[lc].add(eid)
+        # The key stays even when the set is empty: a solver_gap refusal that
+        # carried no entity_id still means "fix the emitter", and dropping the
+        # key would lose that. A flagged live_world code always contributes at
+        # least one entity, since that is what flagged it.
 
     learned_constraints = {k: sorted(v) for k, v in sorted(learned.items())}
 
