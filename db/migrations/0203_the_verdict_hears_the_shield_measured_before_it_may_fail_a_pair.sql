@@ -338,3 +338,23 @@ COMMIT;
 -- From round 21 on every flagship arm carries h_rule. The promotion into
 -- v_equal (0205) is gated on that round.
 -- =====================================================================
+
+-- =====================================================================
+-- ROUND 21 READ (appended 2026-09-07 1:05 PM CT). Prediction MET, and
+-- the 0205 promotion gate is SATISFIED.
+--
+-- Nine post-0203 flagship pairs. Every one of the eighteen arms carries
+-- h_rule, and the two arms agree on it in all nine pairs; none disagree.
+-- Round 21's canon_rule per column:
+--
+--   busy_day/314159/12t    333cf172      busy_day/171717/24t   62ed1a1e
+--   busy_day/171717/12t    5a6ee595      busy_day/424242/12t   c3cca844
+--   normal_day/171717/12t  43cfd0a4      busy_day/424242/24t   eb2fce86
+--
+-- h_rule moved with h_cmd on every column, which is what a shield that
+-- evaluates the decide path's own commands must do; it did not move
+-- independently of one, which is what would have indicated a carrier
+-- inside the evaluator itself.
+--
+-- 0205 may now promote h_rule into v_equal. Full read: db/checks/0117.
+-- =====================================================================
