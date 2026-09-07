@@ -42,7 +42,7 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "solvers" / "cpsat"))
 
 from model import build_and_solve, load_scenario  # noqa: E402
-from forward import lexicographic_solve            # noqa: E402
+from forward import lexicographic_solve, lexicographic_solve_traced  # noqa: E402
 from regime import intent_orchestrate, resolve_active  # noqa: E402
 
 SC = HERE.parent / "solvers" / "cpsat" / "scenario_canonical.json"
@@ -187,3 +187,22 @@ def test_regime_policy_books_a_valid_complete_schedule():
         wins.sort()
         for (s1, e1), (s2, e2) in zip(wins, wins[1:]):
             assert s2 >= e1, f"overlap on {pid}"
+
+# ---- rejection composes with the chain -------------------------------------------
+
+def test_chain_supports_rejection_and_reads_the_true_peak():
+    import json as _json
+    from model import materialize
+    sc = _json.loads(SC.read_text())
+    charge = [p for p in sc["service_points"] if p["kind"] in ("dcfc", "l2")][:2]
+    sc["service_points"] = charge + [p for p in sc["service_points"]
+                                     if p["kind"] not in ("dcfc", "l2")]
+    sc["horizon_min"] = 300
+    m = materialize(_json.loads(_json.dumps(sc)))
+    plan, opt, passes = lexicographic_solve_traced(
+        m, ("min_tardy", "min_peak"), budget={"allow_rejection": True})
+    assert plan.get("rejected"), "rejection enabled but nothing was rejected"
+    assert opt["min_peak"] is not None and opt["min_peak"] < 100_000, (
+        f"peak misread from the rejection-inflated objective: {opt['min_peak']}")
+    assert [p["mode"] for p in passes] == ["min_tardy", "min_peak"]
+    assert all("status" in p and "objective" in p for p in passes)

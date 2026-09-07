@@ -245,3 +245,55 @@ def test_rejection_stays_off_unless_asked():
     r = propose(frame, CLASSES, site=SITE, horizon_min=480)
     assert r["solver"]["rejected"] == []
     assert all(not p["proposal"]["abstain"] for p in r["proposals"])
+
+# ---------------------------------------------------------------------------
+# Regime-aware propose (hour_of_day set) — the intent drives the proposer
+# ---------------------------------------------------------------------------
+
+def test_regime_path_runs_the_regimes_pass_order():
+    rush = propose(FRAME, CLASSES, site=SITE, hour_of_day=7)
+    s = rush["solver"]
+    assert s["regime"] == "dispatch_rush"
+    assert s["pass_modes"] == ["min_tardy", "min_flow", "min_peak"]
+    assert s["complete"] is True
+    assert s["total_tardy_min"] == 0
+    assert s["site_peak_kw"] is not None and s["total_flow_min"] is not None
+
+
+def test_grid_peak_regime_orders_energy_first_and_skips_flow():
+    r = propose(FRAME, CLASSES, site=SITE, hour_of_day=14,
+                signals=frozenset({"grid_peak_imminent"}))
+    s = r["solver"]
+    assert s["regime"] == "grid_peak"
+    assert s["pass_modes"] == ["min_tardy", "min_peak"]
+    assert s["total_flow_min"] is None
+
+
+def test_default_path_keeps_the_two_pass_contract_without_a_regime():
+    r = propose(FRAME, CLASSES, site=SITE)
+    assert "regime" not in r["solver"]
+    assert r["solver"]["pass1_status"] in ("OPTIMAL", "FEASIBLE")
+    assert r["solver"]["pass2_status"] in ("OPTIMAL", "FEASIBLE")
+    assert r["solver"]["total_tardy_min"] == 0
+
+
+def test_regime_path_is_deterministic():
+    a = propose(FRAME, CLASSES, site=SITE, hour_of_day=7)
+    b = propose(FRAME, CLASSES, site=SITE, hour_of_day=7)
+    assert a["proposals"] == b["proposals"]
+    assert a["solver"]["passes"] == b["solver"]["passes"]
+
+
+def test_regime_path_composes_with_rejection():
+    frame = _oversubscribed()
+    r = propose(frame, CLASSES, site=SITE, horizon_min=120,
+                default_ready_delta_min=60, allow_rejection=True, hour_of_day=7)
+    s = r["solver"]
+    assert s["regime"] == "dispatch_rush"
+    assert s["rejected"], "rejection enabled but nothing was rejected"
+    assert s["complete"] is True
+    # the peak is read from site_peak_kw, never the rejection-inflated objective
+    assert s["site_peak_kw"] is not None and s["site_peak_kw"] < 100_000
+    # every declined vehicle still gets a row
+    assert {p["entity_id"] for p in r["proposals"]} == {
+        v["id"] for v in frame["vehicles"]}
