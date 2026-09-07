@@ -50,8 +50,34 @@ named operating condition (dispatch rush, overnight, grid peak, demand surge,
 weather event) plus a priority ordering of objectives. `resolve_intent` picks
 the regime from a declarative `match` and returns the active priority order.
 
-This is the mechanism that turns "tonight is tight, pull this wash forward now"
-(forecast-driven) into an objective the solver can act on.
+**Floors are structural, not regime-dependent.** `readiness` (never strand an
+asset) and `service_completion` (never miss a must-by) are prepended to every
+resolved priority, in canonical order — a regime that omits them cannot drop
+them. This is the DECISION_BOUNDARY rule made mechanical: anything that can
+strand an asset is always-on, never a regime choice.
+
+## The pass sequencer (intent/solve.py)
+
+Maps the resolved intent to an ordered solver pass list. This is the single
+place the truth lives about what the solver can *actually* do:
+
+| objective | solver pass |
+|---|---|
+| readiness | `min_tardy` |
+| service_completion | `shield` (hard must-by deadline, not a pass) |
+| energy_cost / bess_peak_shave | `min_peak` (deduped) |
+| everything else (throughput, dwell, deadhead, staging, staff, degradation, risk_hedge) | *none — not yet a variable term* |
+
+`pass_sequence(active)` returns the ordered, deduplicated pass modes;
+`unmodeled(active)` returns the objectives a regime prioritizes but the solver
+cannot yet optimize, so the gap is visible rather than silently ignored.
+
+**Honest consequence:** with only `min_tardy` and `min_peak` available and the
+floors always first, most regimes resolve to `(min_tardy, min_peak)` and
+demand_surge / weather_event resolve to `(min_tardy,)` alone (they deprioritize
+energy entirely). **The regime does not change the schedule until a third
+variable objective term is added to the model.** This module makes that step a
+one-line mapping change; it does not pretend the change has already happened.
 
 ## The honest gap (what is NOT yet wired)
 

@@ -137,25 +137,52 @@ def _matches(regime: Regime, hour_of_day: int, signals: frozenset[str]) -> bool:
     return True
 
 
+#: The floors that must hold under EVERY regime, in canonical order. Readiness
+#: (never strand an asset) then service completion (never miss a must-by) —
+#: both structural, from DECISION_BOUNDARY.md: "anything that can strand an
+#: asset" and "obligation … the must-by is deterministic and non-negotiable."
+#: A regime's priority list orders the SOFT objectives; the floors are prepended
+#: in resolve_intent so no regime can ever drop them.
+CANONICAL_FLOORS = ("readiness", "service_completion")
+
+
+def _dedupe(seq: tuple[str, ...]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for x in seq:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return tuple(out)
+
+
 def resolve_intent(intent: Intent, *, hour_of_day: int,
                    signals: frozenset[str] = frozenset()) -> ActiveIntent:
     """Pick the active regime and return its ordered objectives.
 
     Regimes are evaluated in declaration order; the first match wins. Every
     artifact carries a `steady_state` regime with an empty match last, so the
-    resolver is TOTAL — it never returns "no regime". A caller signals
-    conditions (grid_peak_imminent, demand_surge, weather_hold) explicitly;
-    they are never inferred from telemetry here.
+    resolver is TOTAL — it never returns "no regime".
+
+    FLOORS ARE STRUCTURAL, not regime-dependent: the canonical floors are
+    prepended to whatever the regime lists. A regime that omits a floor must not
+    be allowed to drop it — grid_peak and overnight list only their soft
+    objectives, and without this prepend they would silently sacrifice
+    readiness, the exact defect DECISION_BOUNDARY.md forbids.
     """
     for regime in intent.regimes:
         if _matches(regime, hour_of_day % 24, signals):
-            floors = tuple(k for k in regime.priority
+            canonical = tuple(k for k in CANONICAL_FLOORS if k in intent.objectives)
+            soft = tuple(k for k in regime.priority
+                         if k in intent.objectives and k not in CANONICAL_FLOORS)
+            priority = _dedupe(canonical + soft)
+            floors = tuple(k for k in priority
                            if intent.objectives[k].kind == "floor")
-            objs = tuple(k for k in regime.priority
+            objs = tuple(k for k in priority
                          if intent.objectives[k].kind == "objective")
             return ActiveIntent(
                 regime_key=regime.key, regime_label=regime.label,
-                priority=regime.priority, floors=floors, objectives=objs,
+                priority=priority, floors=floors, objectives=objs,
                 rationale=regime.rationale,
             )
     raise RuntimeError("intent has no matching regime — a steady_state default "
