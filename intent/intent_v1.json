@@ -1,0 +1,288 @@
+{
+  "manifest": {
+    "description": "The machine-readable commander's intent: what to optimize, in what priority, under what regime, with what dollar-grounded weights, and what is a hard floor. Robotaxi-first, sector-agnostic objective structure, multi-OEM expressed in Tier 3 constraints.",
+    "fingerprint_md5": "562223f6d54da53d4103df481d873f7e",
+    "generated_at": "2026-09-06",
+    "kind": "intent_v1",
+    "version": 1
+  },
+  "numeraire": {
+    "decision": "lexicographic \u2014 objectives are ordered by priority, never summed into a single dollar scale",
+    "reason": "R-10: no robotaxi operator has published a dollar value for a late minute or an unready vehicle. A weight would be a price on lateness nobody agreed to. Readiness is therefore a floor, not a coefficient.",
+    "source": "docs/research/answers/R-10-fleet-uptime-sla-terms.md"
+  },
+  "objectives": {
+    "bess_peak_shave": {
+      "direction": "minimize",
+      "dollar_value": "sourced",
+      "dollar_value_detail": "500 kWh BESS shaving 200 kW saves $48-60k/yr at $20-25/kW demand rates (mgrid.org / NREL ATB)",
+      "kind": "objective",
+      "label": "BESS peak shaving",
+      "metric": "site_peak_kw (the instantaneous peak the demand charge bills)",
+      "provenance": {
+        "evidence_label": "trade-press",
+        "source": "https://mgrid.org/2025/12/08/commercial-battery-storage-costs-drop-40-percent-demand-charge-savings",
+        "source_name": "Commercial battery storage demand-charge savings"
+      },
+      "solver_wiring": "implemented (build_and_solve objective_mode=min_peak; policies/forward.py dispatch_storage aims the battery at the billed peak)",
+      "tier": 2
+    },
+    "deadhead": {
+      "direction": "minimize",
+      "dollar_value": "NOT_FOUND",
+      "dollar_value_detail": "the empty-mile ratio is sourced (Waymo ~44% of CA miles empty, MIT/CPUC) but the $/deadhead-mile depends on unpublished operator $/mile (R-11 NOT FOUND ledger)",
+      "kind": "objective",
+      "label": "Deadhead / repositioning (empty moves)",
+      "metric": "empty_moves (inter-point moves an asset makes without a service need)",
+      "provenance": {
+        "evidence_label": "primary",
+        "source": "https://findingspress.org/article/161870-millions-of-trips-waymo-empty-miles-california-s-first-thousand-days-of-commercial-robotaxi-service",
+        "source_name": "Waymo empty miles, MIT Transport Findings (CPUC data)"
+      },
+      "solver_wiring": "partial (the churn term in build_and_solve prices inter-point moves; deadhead at the fleet level is not yet a solver term)",
+      "tier": 2
+    },
+    "degradation": {
+      "direction": "minimize",
+      "dollar_value": "sourced",
+      "dollar_value_detail": "capping charge at 50% vs 100% SoC extends EV battery lifetime 44-130% (Wikner & Thiringer 2018); coordinated scheduling+charging cuts degradation cost 7.45% (JRSE/IEEE 2024)",
+      "kind": "objective",
+      "label": "Battery degradation (thermal / SoC park / cold-charge)",
+      "metric": "capacity_fade (fraction of pack capacity lost)",
+      "provenance": {
+        "evidence_label": "primary",
+        "source": "docs/research/answers/R-3-battery-degradation-coefficients.md",
+        "source_name": "R-3 battery degradation coefficients"
+      },
+      "solver_wiring": "partial (chemistry cap max_daily_soc_pct is enforced as data; cold-start and SoC-park are model terms in wear/degradation.py, not yet solver objectives)",
+      "tier": 2
+    },
+    "dwell": {
+      "direction": "minimize",
+      "dollar_value": "NOT_FOUND",
+      "dollar_value_detail": "dwell has no tariff term; its cost is indirect (occupies a stall, blocks throughput). Reference range sourced (38-52 min full cycle), the $ cost is not",
+      "kind": "objective",
+      "label": "Dwell / turnaround time",
+      "metric": "dwell_minutes (time an asset occupies a resource without productive work)",
+      "provenance": {
+        "evidence_label": "trade-press",
+        "source": "https://winsparking.com/av-depot-24-7-cleaning-charging-dispatch-operations",
+        "source_name": "AV depot operations (winsparking)"
+      },
+      "solver_wiring": "indirect (dwell is minimized by the readiness floor via tardiness, but not a standalone term)",
+      "tier": 2
+    },
+    "energy_cost": {
+      "direction": "minimize",
+      "dollar_value": "sourced",
+      "dollar_value_detail": "demand charge $21.40/kW first 1,000 kW (NES GSA-3); NES EVC flat 21.773 c/kWh no TOU differential",
+      "kind": "objective",
+      "label": "Energy cost (demand charge + time-of-use energy)",
+      "metric": "monthly_total_usd (tariff bill: demand $/kW/mo + TOU $/kWh)",
+      "provenance": {
+        "evidence_label": "standards",
+        "source": "docs/research/answers/R-5-demand-charge-structures-us.md",
+        "source_name": "R-5 demand-charge structures / R-6 TOU windows"
+      },
+      "solver_wiring": "implemented (build_and_solve objective_mode=min_peak is the demand-charge lever; sites/tariff.py bills the real curve)",
+      "tier": 1
+    },
+    "readiness": {
+      "direction": "minimize",
+      "dollar_value": "NOT_FOUND",
+      "dollar_value_detail": "no published $/minute for robotaxi lateness; nearest regime (NYCT paratransit $10 per pickup >15min late) is transit, not robotaxi, and non-transferable (R-10)",
+      "kind": "floor",
+      "label": "Fleet readiness / availability",
+      "metric": "tardy_minutes (minutes a vehicle is late past its required-ready time)",
+      "provenance": {
+        "evidence_label": "standards",
+        "source": "docs/research/answers/R-10-fleet-uptime-sla-terms.md",
+        "source_name": "R-10 fleet-uptime SLA terms"
+      },
+      "solver_wiring": "implemented (build_and_solve objective_mode=min_tardy is the readiness floor)",
+      "tier": 1
+    },
+    "risk_hedge": {
+      "direction": "maximize",
+      "dollar_value": "sourced",
+      "dollar_value_detail": "protecting against 10% energy-demand deviation adds <0.1% to total electricity cost (ETH Zurich 2026) \u2014 cheap enough to buy by default",
+      "kind": "objective",
+      "label": "Risk / uncertainty hedge",
+      "metric": "robustness_band (capacity reserved against arrival/price deviation)",
+      "provenance": {
+        "evidence_label": "primary",
+        "source": "https://arxiv.org/abs/2607.29304",
+        "source_name": "Optimal EV depot charging: cost savings, grid limits, robustness (ETH Zurich)"
+      },
+      "solver_wiring": "not implemented (the forecast's uncertainty band is the input; the solver does not yet reserve capacity against it)",
+      "tier": 2
+    },
+    "service_completion": {
+      "direction": "maximize",
+      "dollar_value": "NOT_FOUND",
+      "dollar_value_detail": "must-by windows are obligations, not prices; SLA penalties are unpublished (R-10 Q4: no AV depot penalty schedule is public)",
+      "kind": "floor",
+      "label": "Service completion (manifests done by must-by)",
+      "metric": "service_completion_rate (wash/tire/brake/software/inspection/calibration completed before must-by window)",
+      "provenance": {
+        "evidence_label": "standards",
+        "source": "docs/research/answers/R-10-fleet-uptime-sla-terms.md",
+        "source_name": "R-10 fleet-uptime SLA terms"
+      },
+      "solver_wiring": "partial (the shield enforces must-by as a hard deadline; the agentic ordering of deferrable service within the window is not yet a solver term)",
+      "tier": 1
+    },
+    "staff": {
+      "direction": "minimize",
+      "dollar_value": "sourced",
+      "dollar_value_detail": "up to 75% productivity gain and ~$1.7M/yr savings per 50-bay depot from robotic charging (Rocsys 2026); manual depot ~1:12-1:14 humans:vehicles",
+      "kind": "objective",
+      "label": "Staff utilization",
+      "metric": "touch_events_per_turn (human interventions per asset-turn)",
+      "provenance": {
+        "evidence_label": "trade-press",
+        "source": "https://www.prnewswire.com/news-releases/rocsys-unveils-worlds-first-multi-bay-hands-free-charging-solution-to-help-robotaxi-fleets-scale-and-raises-13m-series-a-extension-302757628.html",
+        "source_name": "Rocsys multi-bay hands-free charging (2026)"
+      },
+      "solver_wiring": "not implemented (staff is not a solver resource yet; it is a KPI and a packing objective in the robotaxi catalog)",
+      "tier": 2
+    },
+    "staging": {
+      "direction": "minimize",
+      "dollar_value": "NOT_FOUND",
+      "dollar_value_detail": "staging cost is site-footprint and congestion; no published $ figure exists",
+      "kind": "objective",
+      "label": "Staging efficiency",
+      "metric": "staging_footprint (assets buffered between service-complete and dispatch)",
+      "provenance": {
+        "evidence_label": "standards",
+        "source": "docs/research/answers/R-10-fleet-uptime-sla-terms.md",
+        "source_name": "R-10 fleet-uptime SLA terms (staging is a zoning/land-use condition, not a priced term)"
+      },
+      "solver_wiring": "not implemented (staging is a consequence of schedule, not yet a term)",
+      "tier": 2
+    },
+    "throughput": {
+      "direction": "maximize",
+      "dollar_value": "NOT_FOUND",
+      "dollar_value_detail": "no published $/cycle; value is operational (a cycled vehicle is a revenue-ready vehicle), not a direct tariff term",
+      "kind": "objective",
+      "label": "Throughput / vehicle cycles",
+      "metric": "vehicles_cycled (returns per asset per day)",
+      "provenance": {
+        "evidence_label": "trade-press",
+        "source": "https://winsparking.com/av-depot-24-7-cleaning-charging-dispatch-operations",
+        "source_name": "AV depot operations (winsparking)"
+      },
+      "solver_wiring": "indirect (throughput is the dual of minimized dwell and deadhead; not a first-class objective term yet)",
+      "tier": 1
+    }
+  },
+  "regimes": [
+    {
+      "key": "dispatch_rush",
+      "label": "Dispatch rush (morning/evening peaks)",
+      "match": {
+        "hour_range": [
+          5,
+          10
+        ]
+      },
+      "priority": [
+        "readiness",
+        "throughput",
+        "deadhead",
+        "energy_cost"
+      ],
+      "rationale": "get vehicles out the gate on time; minimize empty repositioning; energy cost yields"
+    },
+    {
+      "key": "overnight",
+      "label": "Overnight soak",
+      "match": {
+        "hour_range": [
+          20,
+          5
+        ]
+      },
+      "priority": [
+        "service_completion",
+        "energy_cost",
+        "degradation",
+        "dwell"
+      ],
+      "rationale": "vehicles return for full charge, cleaning, inspection, service; non-urgent work queues here; cheap off-peak energy; park at SoC that minimizes calendar fade (wraps midnight: 20:00 through 04:59)"
+    },
+    {
+      "key": "grid_peak",
+      "label": "Grid peak (demand-charge window)",
+      "match": {
+        "signals": [
+          "grid_peak_imminent"
+        ]
+      },
+      "priority": [
+        "bess_peak_shave",
+        "energy_cost",
+        "risk_hedge",
+        "degradation"
+      ],
+      "rationale": "the demand charge is set by one 15-min interval; aim the battery at it; protect the peak with the robustness band"
+    },
+    {
+      "key": "demand_surge",
+      "label": "Demand surge",
+      "match": {
+        "signals": [
+          "demand_surge"
+        ]
+      },
+      "priority": [
+        "readiness",
+        "throughput",
+        "deadhead",
+        "staging"
+      ],
+      "rationale": "serve the surge; every revenue-ready vehicle counts; minimize empty miles and staging backlog"
+    },
+    {
+      "key": "weather_event",
+      "label": "Weather event (grounding risk)",
+      "match": {
+        "signals": [
+          "weather_hold"
+        ]
+      },
+      "priority": [
+        "readiness",
+        "service_completion",
+        "risk_hedge",
+        "degradation"
+      ],
+      "rationale": "protect the fleet; prioritize safe service completion; battery thermal care matters more in extreme conditions"
+    },
+    {
+      "key": "steady_state",
+      "label": "Steady state (default)",
+      "match": {},
+      "priority": [
+        "readiness",
+        "service_completion",
+        "energy_cost",
+        "degradation",
+        "throughput",
+        "deadhead",
+        "staff",
+        "dwell",
+        "staging",
+        "bess_peak_shave",
+        "risk_hedge"
+      ],
+      "rationale": "the default ordering: readiness floor, then obligations, then cost, then the rest"
+    }
+  ],
+  "tier3_constraints": {
+    "note": "Tier 3 is NOT weighted and does NOT live in this artifact. It is the 52-rule deterministic shield plus the legal parameters: power caps, double-booking exclusion, incompatible asset/point pairing, state-machine validity, chemistry caps (max_daily_soc_pct), per-OEM charge curves, sensor-suite calibration cadences. This artifact points at it and never duplicates it.",
+    "source": "DECISION_BOUNDARY.md + ottoq_rules (52 rows, 29 active codes) + db/migrations/0043_schema_v2_service_objects.sql"
+  }
+}
