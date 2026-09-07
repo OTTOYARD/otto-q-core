@@ -56,6 +56,40 @@ resolved priority, in canonical order — a regime that omits them cannot drop
 them. This is the DECISION_BOUNDARY rule made mechanical: anything that can
 strand an asset is always-on, never a regime choice.
 
+**Signals override the clock, structurally.** A regime that *requires* a signal
+(`grid_peak`, `demand_surge`, `weather_event`) is evaluated before any pure-clock
+regime, so a `grid_peak_imminent` signal at 07:00 resolves to `grid_peak`, never
+`dispatch_rush` — the resolver does two passes (signal regimes, then clock
+regimes), it does not rely on declaration-order luck. Among simultaneous
+signals, the artifact declares `weather_event` first, so a grounding risk (safety)
+outranks a cost signal (`grid_peak`) outranks a throughput signal (`demand_surge`).
+
+## The signal bridge (intent/signals.py) — forecast → regime signals
+
+The forecast predicts the demand-side world; the regimes respond to qualitative
+events. This module is the seam: it turns the forecast's numbers into the
+signals `resolve_intent` reads. Three signals, two derived:
+
+| signal | derived from | mechanism |
+|---|---|---|
+| `demand_surge` | arrivals forecast | expected arrivals over the next window ≥ `surge_multiplier` × the fleet's mean hourly return rate |
+| `grid_peak_imminent` | load forecast + site soft power target | the p90 load (conservative tail) over the next window reaches `peak_fraction` of the soft target — the demand charge is at risk |
+| `weather_hold` | *external input* | passed through, never derived — the statistical forecast has no live-weather event model |
+
+**The honest threshold discipline.** Each signal's *mechanism* is grounded (the
+soft target is the sourced demand-charge ceiling, R-5/R-6; the arrival baseline
+is the fleet's declared scale). The exact *numbers* (`surge_multiplier` 2.0,
+`peak_fraction` 0.9, window lengths) have no published AV-depot value, so every
+one carries `evidence_label: "inference"` and `source: "must-measure-on-twin"` —
+a defensible default, flagged for calibration, never dressed up as a sourced
+coefficient. The bridge is a pure function of its arguments, deterministic, and
+TOTAL: a malformed forecast raises `ForecastContractError` (a missing field is
+never silently treated as zero, which would hide a real surge or peak).
+
+The loop closes end-to-end: `forecast_signals(...) → resolve_intent(..., signals=...)`
+is tested, including a hot window at 07:00 resolving to `demand_surge` rather
+than `dispatch_rush` (`intent/test_signals.py`).
+
 ## The pass sequencer (intent/solve.py)
 
 Maps the resolved intent to an ordered solver pass list. This is the single

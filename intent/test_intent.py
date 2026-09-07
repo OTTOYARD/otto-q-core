@@ -154,6 +154,38 @@ def test_signals_override_the_clock():
     assert c.regime_key == "demand_surge"
 
 
+def test_signals_override_the_clock_during_rush():
+    # The bug this pins: dispatch_rush is declared before the signal regimes, so
+    # a naive first-match resolver would return dispatch_rush at 07:00 even with
+    # a grid_peak_imminent signal. Signals override the clock at EVERY hour.
+    it = load_intent()
+    assert resolve_intent(it, hour_of_day=7,
+                          signals=frozenset({"grid_peak_imminent"})).regime_key == "grid_peak"
+    assert resolve_intent(it, hour_of_day=7,
+                          signals=frozenset({"demand_surge"})).regime_key == "demand_surge"
+    assert resolve_intent(it, hour_of_day=7,
+                          signals=frozenset({"weather_hold"})).regime_key == "weather_event"
+
+
+def test_signals_override_the_clock_during_overnight():
+    it = load_intent()
+    assert resolve_intent(it, hour_of_day=22,
+                          signals=frozenset({"demand_surge"})).regime_key == "demand_surge"
+    assert resolve_intent(it, hour_of_day=3,
+                          signals=frozenset({"grid_peak_imminent"})).regime_key == "grid_peak"
+
+
+def test_weather_grounding_risk_outranks_cost_and_throughput_signals():
+    # Safety first: a grounding risk (weather_hold) outranks a cost signal
+    # (grid_peak_imminent) and a throughput signal (demand_surge) when several
+    # are raised at once.
+    it = load_intent()
+    all_sigs = frozenset({"weather_hold", "grid_peak_imminent", "demand_surge"})
+    assert resolve_intent(it, hour_of_day=14, signals=all_sigs).regime_key == "weather_event"
+    two = frozenset({"grid_peak_imminent", "demand_surge"})
+    assert resolve_intent(it, hour_of_day=14, signals=two).regime_key == "grid_peak"
+
+
 def test_floors_are_subset_of_priority_in_order():
     it = load_intent()
     for h in range(24):
