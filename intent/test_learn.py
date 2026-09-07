@@ -112,8 +112,28 @@ def test_unknown_codes_are_named_never_absorbed():
 
 
 def test_a_missing_reason_code_is_skipped_as_malformed_input():
-    r = reconcile_refusals([Refusal("superseded"), Refusal("superseded")])
-    assert r.counts == {"superseded": 2}
+    """The name promised a malformed record; the body passed two well-formed ones.
+
+    Both records were Refusal("superseded"). Nothing in this test had a missing
+    reason_code, so `_pairs`' `if isinstance(rc, str)` guard -- the line the test
+    is named for -- was never exercised, and deleting it left the test green.
+    """
+    #: a None code and a duck-typed record with no attribute at all: two shapes
+    #: a real ottoq_vehicle_commands row can arrive in
+    class _NoCode:
+        entity_id = "s-9"
+
+    r = reconcile_refusals([
+        Refusal("superseded"),
+        Refusal(None),            # type: ignore[arg-type]
+        Refusal("superseded"),
+        _NoCode(),
+    ])
+    assert r.counts == {"superseded": 2}, (
+        f"a malformed record leaked into the counts: {r.counts}")
+    assert r.unknown_codes == (), (
+        "a missing reason_code is malformed INPUT, not an unknown vocabulary "
+        f"word; it must not be reported as one: {r.unknown_codes}")
 
 
 def test_reconciliation_is_deterministic():

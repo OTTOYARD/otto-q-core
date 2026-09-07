@@ -199,7 +199,20 @@ def test_an_oversubscribed_site_returns_a_plan_instead_of_nothing():
     r = propose(frame, CLASSES, site=SITE, horizon_min=120,
                 default_ready_delta_min=60, allow_rejection=True)
     assert r["solver"]["rejected"], "rejection enabled but nothing was rejected"
-    assert r["planned"] > 0, "a partial plan should still serve someone"
+    #: `planned` COUNTS DECLINED ROWS TOO. It is len(rows) from plan_to_proposals,
+    #: and a declined asset gets a row there (deliberately -- that is how
+    #: "asked and declined" stays distinguishable from "never asked"). So
+    #: `assert r["planned"] > 0, "a partial plan should still serve someone"`
+    #: was true even when the site served NOBODY, which is precisely the case
+    #: the sentence was written to rule out. Count the served rows instead.
+    served = [row for row in r["proposals"] if not row["proposal"]["abstain"]]
+    declined = [row for row in r["proposals"] if row["proposal"]["abstain"]]
+    assert served, (
+        f"a partial plan should still serve someone: {len(r['proposals'])} rows "
+        f"out and every one of them declined")
+    assert declined, "the oversubscribed frame produced no declined row"
+    assert len(served) + len(declined) == r["planned"] + r["abstained"], (
+        "a vehicle went missing between the plan and the batch")
 
 
 def test_no_vehicle_ever_vanishes_from_the_batch():

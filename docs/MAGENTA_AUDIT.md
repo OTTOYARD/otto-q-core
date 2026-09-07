@@ -24,6 +24,13 @@ Counts: 14 critical, 50 major, 23 minor.
 | G `intent/` outside the separation guard | **FIXED**; `intent` added to KERNEL_PACKAGES, mutation-proved |
 | G advisory guard never sees the proposer's rows | **FIXED**; both emitters generated, mutation-proved |
 | D "the suite was 267, was 201 before" | **REFUTED on the count.** The suite is 267 on current main. An earlier measurement of 256 was taken before PR #176 merged; #176 added `proposer/test_orchestrate.py`. The "201 before" half is still unverified. |
+| G `test_intent_tamper_is_refused` never calls the loader | **FIXED**; now loads a tampered copy and asserts the refusal. Deleting the loader's check turns it red |
+| G the signal-regime precedence is unpinned | **FIXED, and it found something.** Safety-over-cost is DECLARATION ORDER, not structure: reversing the regime list makes a tariff signal outrank a grounding risk. The pack format is not redesigned here; the shipped order is now asserted against the doctrine, so a tidy-up turns CI red |
+| G learn's malformed-input test passed two well-formed records | **FIXED**; passes a None code and a duck-typed record. Deleting the `isinstance(rc, str)` guard turns it red |
+| G `assert r["planned"] > 0` cannot fail (`planned` counts declined rows) | **FIXED**; counts served rows. Marking every row declined turns it red |
+| G T3 stays green with the site power cap deleted | **FIXED** via T3b, a cap set BELOW the free peak with the soft target raised out of the way. First attempt still passed with the cap deleted because the soft cumulative held the peak; corrected. Deleting the hard cap now reports 550 kW against a 330 kW cap |
+| G the min_flow pass's peak ceiling has no test | **FIXED**; a property test measures tardiness, flow and peak FROM THE SHIPPED PLAN on both three-pass orders. Deleting the threading reports "min_peak said 150, plan measures 460" |
+| G the CP-SAT battery contributes zero pytest tests | **FIXED**; a `test_cpsat_battery()` wrapper. The artifact comparison stays under `__main__` |
 | L non-serviceable vehicle gets no row | **REFUTED.** Deliberate and pinned by `test_plannable_vehicles_get_assignments_and_the_rest_abstain`; the proposer emits nothing for states it does not service, by design. |
 
 

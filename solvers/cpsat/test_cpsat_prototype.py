@@ -271,8 +271,49 @@ def main():
     assert peak <= sc["site"]["power_cap_kw_hard"], f"T3 FAIL: peak {peak} kW over hard cap"
     assert peak <= sc["site"]["power_soft_target_kw"] + p1["peak_excess_kw"], \
         "T3 FAIL: reported peak_excess understates the true peak"
+    #: T3 AS WRITTEN ABOVE CANNOT FAIL, and that has to be said plainly. The
+    #: canonical site's hard cap is 1000 kW and the plan's natural peak is a few
+    #: hundred: the assertion holds whether or not the cumulative constraint
+    #: exists. Deleting the site power cap from the model leaves it green.
+    #: A cap is only tested where it BINDS, so T3b re-solves the same scenario
+    #: under a cap below the unconstrained peak.
+    unconstrained_peak = peak
+    tight = load_scenario(SC_PATH)
+    binding_cap = int(unconstrained_peak * 0.6)
+    assert binding_cap < unconstrained_peak, "T3b setup: the cap is not below the free peak"
+    #: THE SOFT TARGET MUST NOT DO THE HARD CAP'S WORK. The first version of
+    #: T3b set both to binding_cap, and deleting the hard cumulative from the
+    #: model still left it green: the soft cumulative
+    #: (soft_target + peak_excess) held the peak on its own. A test of the hard
+    #: cap has to be the ONLY thing that can hold it, so the soft target is
+    #: raised out of the way.
+    tight["site"] = {**tight["site"], "power_cap_kw_hard": binding_cap,
+                     "power_soft_target_kw": unconstrained_peak * 4}
+    p3b = build_and_solve(tight, det_budget_s=3.0)
+    ev = []
+    for a in p3b["assets"]:
+        for op in a["ops"]:
+            if op["op"] == "charge":
+                for seg in op["segments"]:
+                    ev.append((seg["start"], seg["kw"]))
+                    ev.append((seg["end"], -seg["kw"]))
+    ev.sort()
+    load3b, peak3b = 0, 0
+    for _, d in ev:
+        load3b += d
+        peak3b = max(peak3b, load3b)
+    assert peak3b <= binding_cap, (
+        f"T3b FAIL: under a {binding_cap} kW hard cap the plan peaks at {peak3b} kW. "
+        "The site power constraint is not binding the schedule.")
+    #: and the cap must actually have COST something -- otherwise it is still
+    #: only being respected by accident and T3b is as vacuous as T3 was.
+    assert peak3b > binding_cap * 0.5, (
+        f"T3b FAIL: the capped plan peaks at {peak3b} kW against a {binding_cap} kW "
+        "cap, so the cap is not the thing shaping this schedule; pick a tighter one")
     print(f"T3 PASS site power: true peak {peak} kW <= hard cap "
           f"{sc['site']['power_cap_kw_hard']} kW; excess over soft target = {p1['peak_excess_kw']} kW")
+    print(f"T3b PASS the cap BINDS: free peak {unconstrained_peak} kW -> "
+          f"{peak3b} kW under a {binding_cap} kW cap (a check that can fail)")
 
     # T4 — PIECEWISE CHARGING: any asset crossing 70% has >=2 segments with
     # strictly decreasing kW; cold packs carry the cold-start duration modifier.
@@ -653,6 +694,22 @@ def main():
 
     print("ALL TESTS PASS")
     return p1
+
+
+def test_cpsat_battery():
+    """Make the battery visible to pytest.
+
+    This file is named test_*.py and pytest collects it, but every check lives
+    inside main() and pytest looks for test_* FUNCTIONS -- so the whole T1-T15
+    battery contributed ZERO tests to the suite that reports "267 passed".
+    CI does run it, as a separate script step, so it was gated; but anyone
+    running `pytest` alone got no CP-SAT coverage at all and no sign of it.
+
+    This wrapper runs the same battery. The committed-artifact comparison stays
+    under __main__ (below), because rewriting or diffing plan_seed424242.json is
+    the script's job, not a unit test's.
+    """
+    main()
 
 
 if __name__ == "__main__":
