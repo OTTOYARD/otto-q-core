@@ -1,7 +1,7 @@
 {
   "manifest": {
     "description": "The machine-readable commander's intent: what to optimize, in what priority, under what regime, with what dollar-grounded weights, and what is a hard floor. Robotaxi-first, sector-agnostic objective structure, multi-OEM expressed in Tier 3 constraints.",
-    "fingerprint_md5": "562223f6d54da53d4103df481d873f7e",
+    "fingerprint_md5": "90d7355d6a0b2c3aa8e83874e9ac2da4",
     "generated_at": "2026-09-06",
     "kind": "intent_v1",
     "version": 1
@@ -69,7 +69,7 @@
         "source": "https://winsparking.com/av-depot-24-7-cleaning-charging-dispatch-operations",
         "source_name": "AV depot operations (winsparking)"
       },
-      "solver_wiring": "indirect (dwell is minimized by the readiness floor via tardiness, but not a standalone term)",
+      "solver_wiring": "implemented (build_and_solve objective_mode=min_flow; same lever as throughput, deduped in intent/solve.py)",
       "tier": 2
     },
     "energy_cost": {
@@ -174,7 +174,7 @@
         "source": "https://winsparking.com/av-depot-24-7-cleaning-charging-dispatch-operations",
         "source_name": "AV depot operations (winsparking)"
       },
-      "solver_wiring": "indirect (throughput is the dual of minimized dwell and deadhead; not a first-class objective term yet)",
+      "solver_wiring": "implemented (build_and_solve objective_mode=min_flow is the throughput/dwell lever \u2014 minimize the fleet's sum of finish times, the dual of vehicles cycled)",
       "tier": 1
     }
   },

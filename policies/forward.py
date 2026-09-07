@@ -62,10 +62,7 @@ class ForwardOrchestratorPolicy(AssignmentPolicy):
     name = "forward"
 
     def decide(self, state, arrivals):
-        pass1 = build_and_solve(state.sc, objective_mode="min_tardy")
-        t_star = sum(a["tardy_min"] for a in pass1["assets"])
-        pass2 = build_and_solve(state.sc, objective_mode="min_peak",
-                                max_tardy_total=t_star, previous_plan=pass1)
+        pass2, _optima = lexicographic_solve(state.sc, ("min_tardy", "min_peak"))
         starts = {}
         for a in pass2["assets"]:
             for op in a["ops"]:
@@ -77,6 +74,91 @@ class ForwardOrchestratorPolicy(AssignmentPolicy):
             state.book_charge(asset, state.point(point_id), start)
             out.append(Assignment(asset.aid, point_id, start))
         return out
+
+
+def lexicographic_solve(sc, pass_modes, *, budget=None) -> tuple[dict, dict]:
+    """The generalized lexicographic chain: ordered passes, each holding prior optima.
+
+    `pass_modes` is an ordered, deduplicated list of solver modes, e.g.
+    ("min_tardy", "min_peak", "min_flow") or ("min_tardy", "min_flow", "min_peak").
+    The first must be min_tardy -- the readiness floor is structural and precedes
+    every soft objective (intent.resolve_intent prepends it to every regime). Each
+    subsequent pass minimizes its objective subject to every earlier pass's optimum
+    as a hard constraint:
+
+        min_tardy -> T*  (unconstrained floor)
+        min_peak  -> P*  (s.t. tardy <= T*)
+        min_flow  -> F*  (s.t. tardy <= T* and, when peak ran first, peak <= P*)
+
+    Returns (final_plan, optima) where optima maps mode -> held value. How each
+    optimum is read back: T* = sum(tardy_min); P* = plan["objective"] (the chain
+    runs side-free -- no rejection, no churn -- so the objective IS the peak); and
+    F* = sum(finish) over served assets.
+
+    ForwardOrchestratorPolicy.decide is exactly this chain with the two-pass
+    ("min_tardy", "min_peak") list, which is why its frozen artifact stays
+    byte-identical; the third lever (min_flow) is what the intent regimes add.
+    """
+    budget = budget or {}
+    if budget.get("allow_rejection"):
+        raise ValueError("lexicographic_solve runs side-free (no rejection/churn); "
+                         "a rejection-aware chain is a separate concern")
+    if not pass_modes or pass_modes[0] != "min_tardy":
+        raise ValueError("lexicographic chain must begin with min_tardy -- the "
+                         "readiness floor is structural and precedes every soft "
+                         "objective")
+    optima: dict[str, int | None] = {}
+    plan = None
+    max_tardy = None
+    max_peak = None
+    max_flow = None
+    for mode in pass_modes:
+        if mode == "min_tardy":
+            plan = build_and_solve(sc, objective_mode="min_tardy", **budget)
+            max_tardy = sum(a["tardy_min"] for a in plan["assets"]
+                            if a["tardy_min"] is not None)
+            optima["min_tardy"] = max_tardy
+        elif mode == "min_peak":
+            #: Thread EVERY earlier ceiling. The first version forgot max_flow_total,
+            #: so a flow-first chain (dispatch_rush) re-optimized peak from scratch
+            #: and silently threw away the flow optimum it had just spent a pass
+            #: finding -- final flow 3133 vs the 1684 the flow pass had reached.
+            #: A lexicographic pass must hold ALL prior optima, not just tardiness.
+            kwargs: dict = {"max_tardy_total": max_tardy}
+            if max_flow is not None:
+                kwargs["max_flow_total"] = max_flow
+            plan = build_and_solve(sc, objective_mode="min_peak",
+                                   previous_plan=plan, **kwargs, **budget)
+            # side is zero here, so the objective IS the instantaneous site peak.
+            max_peak = int(plan["objective"])
+            optima["min_peak"] = max_peak
+        elif mode == "min_flow":
+            kwargs: dict = {"max_tardy_total": max_tardy}
+            if max_peak is not None:
+                kwargs["max_peak_total"] = max_peak
+            plan = build_and_solve(sc, objective_mode="min_flow",
+                                   previous_plan=plan, **kwargs, **budget)
+            max_flow = sum(a["finish"] for a in plan["assets"]
+                           if a["finish"] is not None)
+            optima["min_flow"] = max_flow
+        else:
+            raise ValueError(f"unknown pass mode {mode!r}")
+
+        #: A RETAINED PASS MUST NOT BE MISTAKEN FOR A SOLVED ONE. When the solver
+        #: cannot find a solution within the budget (INFEASIBLE or UNKNOWN),
+        #: build_and_solve returns the PREVIOUS plan with retained_previous=True,
+        #: and its "objective" is the previous pass's optimum — not this pass's.
+        #: The first version of this chain read that objective as the new optimum
+        #: and reported a "peak" of 1685 that was really the min_flow objective
+        #: (a retained plan's leftover). Recording optima[mode]=None and returning
+        #: early is the honest signal: the ceiling this pass was asked to hold is
+        #: NOT held by the returned plan, and the caller must not cite the chain
+        #: as complete.
+        if plan.get("retained_previous"):
+            optima[mode] = None
+            return plan, optima
+
+    return plan, optima
 
 
 # ---- forward storage dispatch ----------------------------------------------------

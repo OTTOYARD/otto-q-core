@@ -13,20 +13,25 @@ something". As of this writing:
   * service_completion   -> (shield)     (must-by is a hard deadline the
                                           52-rule shield enforces; it is not a
                                           solver pass)
+  * throughput           -> min_flow    (dwell/turnaround: finish vehicles
+                                          soonest — the throughput lever)
+  * dwell                -> min_flow    (same lever — deduped)
   * energy_cost          -> min_peak    (the demand-charge lever)
   * bess_peak_shave      -> min_peak    (same lever — deduped)
 
-Everything else (throughput, dwell, deadhead, staging, staff, degradation,
-risk_hedge) has NO variable solver term yet. The intent declares it and this
-map names it as unmodeled, so the gap is visible at runtime rather than
-silently ignored. Adding a pass is a one-line change here plus the model work,
-never a re-architecture.
+Everything else (deadhead, staging, staff, degradation, risk_hedge) has NO
+variable solver term yet. The intent declares it and this map names it as
+unmodeled, so the gap is visible at runtime rather than silently ignored.
+Adding a pass is a one-line change here plus the model work, never a
+re-architecture.
 
-Consequence, stated plainly: with only min_tardy and min_peak available and the
-floors always first, every regime resolves to the SAME pass sequence today.
-The regime does not change the schedule until a third variable objective term
-is added to the model. This module makes that next step a one-line mapping
-change; it does not pretend the change has already happened.
+Consequence, stated plainly: with three variable passes available (min_tardy,
+min_peak, min_flow) and the floors always first, the regime now genuinely
+reorders the soft passes. dispatch_rush and demand_surge put min_flow before
+min_peak (get vehicles out fast, spend energy); grid_peak and overnight put
+min_peak first (flatten the demand charge); steady_state runs
+(min_tardy, min_peak, min_flow). The schedule is now a function of the regime,
+which is the point of the intent layer.
 """
 
 from __future__ import annotations
@@ -39,11 +44,11 @@ from intent.intent import ActiveIntent
 SOLVER_PASS: dict[str, str | None] = {
     "readiness": "min_tardy",
     "service_completion": "shield",
-    "throughput": None,
+    "throughput": "min_flow",
     "energy_cost": "min_peak",
     "bess_peak_shave": "min_peak",
     "degradation": None,
-    "dwell": None,
+    "dwell": "min_flow",
     "deadhead": None,
     "staging": None,
     "staff": None,
