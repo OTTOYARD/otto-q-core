@@ -156,13 +156,35 @@ def _dedupe(seq: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _build_active(intent: Intent, regime: Regime) -> ActiveIntent:
+    """Build the ActiveIntent for a matched regime (floors prepended, deduped)."""
+    canonical = tuple(k for k in CANONICAL_FLOORS if k in intent.objectives)
+    soft = tuple(k for k in regime.priority
+                 if k in intent.objectives and k not in CANONICAL_FLOORS)
+    priority = _dedupe(canonical + soft)
+    floors = tuple(k for k in priority
+                   if intent.objectives[k].kind == "floor")
+    objs = tuple(k for k in priority
+                 if intent.objectives[k].kind == "objective")
+    return ActiveIntent(
+        regime_key=regime.key, regime_label=regime.label,
+        priority=priority, floors=floors, objectives=objs,
+        rationale=regime.rationale,
+    )
+
+
 def resolve_intent(intent: Intent, *, hour_of_day: int,
                    signals: frozenset[str] = frozenset()) -> ActiveIntent:
     """Pick the active regime and return its ordered objectives.
 
-    Regimes are evaluated in declaration order; the first match wins. Every
-    artifact carries a `steady_state` regime with an empty match last, so the
-    resolver is TOTAL — it never returns "no regime".
+    SIGNALS OVERRIDE THE CLOCK, structurally — not by declaration-order luck.
+    Regimes that REQUIRE a signal (grid_peak, demand_surge, weather_event) are
+    evaluated before any pure-clock regime, so a grid_peak_imminent signal at
+    07:00 resolves to grid_peak, never to dispatch_rush. Within the signal pass,
+    declaration order is the precedence (the artifact declares weather_event
+    first, so a grounding risk outranks a cost or throughput signal — safety
+    first); within the clock pass, dispatch_rush precedes overnight precedes the
+    steady_state default.
 
     FLOORS ARE STRUCTURAL, not regime-dependent: the canonical floors are
     prepended to whatever the regime lists. A regime that omits a floor must not
@@ -170,21 +192,15 @@ def resolve_intent(intent: Intent, *, hour_of_day: int,
     objectives, and without this prepend they would silently sacrifice
     readiness, the exact defect DECISION_BOUNDARY.md forbids.
     """
+    hod = hour_of_day % 24
+    # Pass 1: signal-bearing regimes, in declaration order.
     for regime in intent.regimes:
-        if _matches(regime, hour_of_day % 24, signals):
-            canonical = tuple(k for k in CANONICAL_FLOORS if k in intent.objectives)
-            soft = tuple(k for k in regime.priority
-                         if k in intent.objectives and k not in CANONICAL_FLOORS)
-            priority = _dedupe(canonical + soft)
-            floors = tuple(k for k in priority
-                           if intent.objectives[k].kind == "floor")
-            objs = tuple(k for k in priority
-                         if intent.objectives[k].kind == "objective")
-            return ActiveIntent(
-                regime_key=regime.key, regime_label=regime.label,
-                priority=priority, floors=floors, objectives=objs,
-                rationale=regime.rationale,
-            )
+        if regime.match.get("signals") and _matches(regime, hod, signals):
+            return _build_active(intent, regime)
+    # Pass 2: pure-clock regimes, in declaration order (steady_state last).
+    for regime in intent.regimes:
+        if not regime.match.get("signals") and _matches(regime, hod, signals):
+            return _build_active(intent, regime)
     raise RuntimeError("intent has no matching regime — a steady_state default "
                        "is required and was absent")
 
