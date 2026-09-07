@@ -256,6 +256,8 @@ def build_and_solve(
     det_budget_s: float = DET_BUDGET_S,
     objective_mode: str = "weighted",
     max_tardy_total: int | None = None,
+    max_peak_total: int | None = None,
+    max_flow_total: int | None = None,
     allow_rejection: bool = False,
 ) -> dict:
     """Solve the scenario; returns the plan dict (see _extract).
@@ -266,16 +268,25 @@ def build_and_solve(
 
     objective_mode selects what is minimized. The DEFAULT is byte-for-byte the
     original weighted objective -- T1-T8 and the committed C5 comparison depend on
-    that and must not move. The other two modes exist for the lexicographic solve
-    in policies/forward.py:
+    that and must not move. The other three modes exist for the lexicographic
+    solve in policies/forward.py:
 
       "weighted"  -- the original multi-term objective (default; unchanged).
       "min_tardy" -- minimize total tardiness alone. Pass 1 of the lexicographic
                      solve: find T*, the best achievable service level.
       "min_peak"  -- minimize the site's instantaneous peak kW, subject to
-                     sum(tardy) <= max_tardy_total (required in this mode).
-                     Pass 2: hold service at T*, then spend every remaining
-                     degree of freedom on flattening the load.
+                     sum(tardy) <= max_tardy_total (required) and, when a flow
+                     ceiling was set by an earlier pass, sum(finish) <=
+                     max_flow_total. Pass 2: hold service at T*, flatten the load.
+      "min_flow"  -- minimize total flow time (sum of finish times: dwell /
+                     turnaround, the throughput lever), subject to sum(tardy) <=
+                     max_tardy_total (required) and, when a peak ceiling was set
+                     by an earlier pass, peak <= max_peak_total. Pass 3: among
+                     schedules that hold service AND load, finish soonest.
+
+    min_tardy is the floor and is always first; min_peak and min_flow are the
+    two soft levers a regime may order either way, each carrying the earlier
+    passes' optima as constraints.
 
     Why instantaneous peak and not the billed interval-average: the billed peak
     is the mean over the tariff's demand interval, and modelling per-bucket
@@ -285,12 +296,13 @@ def build_and_solve(
     reported downstream is always computed from the actual curve by the real
     tariff (sites/tariff.py), not from this proxy.
     """
-    if objective_mode not in ("weighted", "min_tardy", "min_peak"):
+    if objective_mode not in ("weighted", "min_tardy", "min_peak", "min_flow"):
         raise ValueError(f"unknown objective_mode {objective_mode!r}")
-    if objective_mode == "min_peak" and max_tardy_total is None:
-        raise ValueError("min_peak requires max_tardy_total -- an unconstrained "
-                         "peak minimization would buy flatness with unbounded "
-                         "lateness, which is not a schedule anyone asked for")
+    if objective_mode in ("min_peak", "min_flow") and max_tardy_total is None:
+        raise ValueError(
+            f"{objective_mode} requires max_tardy_total -- an unconstrained "
+            "soft-pass minimization would buy flatness or speed with unbounded "
+            "lateness, which is not a schedule anyone asked for")
     blocked = blocked_points or set()
     m = cp_model.CpModel()
     site = sc["site"]
@@ -333,6 +345,14 @@ def build_and_solve(
     reject_terms = []                                # rejection: the price of each
     churn_terms = []                                 # stability vs previous_plan
     churn_w = W.get("churn_per_change", DEFAULT_CHURN_PENALTY)
+
+    #: FLOW (dwell/turnaround) -- the third lexicographic lever. Materialized only
+    #: when a pass needs it (min_flow, or min_peak held under a flow ceiling), so
+    #: the default weighted path and the frozen min_tardy/min_peak paths gain no
+    #: variables and stay byte-identical (absent term, absent variable).
+    need_flow = (objective_mode == "min_flow"
+                 or (objective_mode == "min_peak" and max_flow_total is not None))
+    all_finish: list = []
 
     pinned = {}
     if previous_plan:
@@ -595,6 +615,17 @@ def build_and_solve(
             served_vars[asset.aid] = served
         obj_terms.append(W["tardiness_per_min"] * charged)
 
+        #: FLOW (dwell/turnaround), charged like tardiness: a rejected asset pays
+        #: no flow for work nobody did. Built only when need_flow (see above).
+        if need_flow:
+            if served is None:
+                all_finish.append(finish)
+            else:
+                cf = m.NewIntVar(0, H, f"finishc.{asset.aid}")
+                m.Add(cf == finish).OnlyEnforceIf(served)
+                m.Add(cf == 0).OnlyEnforceIf(served.Not())
+                all_finish.append(cf)
+
         plan_vars[asset.aid] = dict(served=served, charged_tardy=charged,
                                     chains=chains, charge_start=charge_start,
                                     charge_end=charge_end, par=par_ivs,
@@ -632,13 +663,22 @@ def build_and_solve(
         m.Minimize(sum(obj_terms) + side)
     elif objective_mode == "min_tardy":
         m.Minimize(sum(all_tardy) + side)
-    else:  # min_peak
+    elif objective_mode == "min_peak":
         m.Add(sum(all_tardy) <= max_tardy_total)
+        if max_flow_total is not None:
+            m.Add(sum(all_finish) <= max_flow_total)
         #: peak_var IS the instantaneous site peak: a cumulative capacity the
         #: solver pays to raise. Same mechanism the soft target already uses.
         peak_var = m.NewIntVar(0, site["power_cap_kw_hard"], "site_peak_kw")
         m.AddCumulative(power_intervals, power_demands, peak_var)
         m.Minimize(peak_var + side)
+    else:  # min_flow
+        m.Add(sum(all_tardy) <= max_tardy_total)
+        if max_peak_total is not None:
+            peak_var = m.NewIntVar(0, site["power_cap_kw_hard"], "site_peak_kw")
+            m.AddCumulative(power_intervals, power_demands, peak_var)
+            m.Add(peak_var <= max_peak_total)
+        m.Minimize(sum(all_finish) + side)
 
     solver = cp_model.CpSolver()
     solver.parameters.random_seed = sc["seed"] % (2**31)
