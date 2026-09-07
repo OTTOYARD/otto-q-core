@@ -36,11 +36,16 @@ separation discipline applied to production data:
     rationale records which was used, so a schedule built on a default is
     labeled as one.
 
-The solver underneath is policies/forward.py's lexicographic pair of solves on
-the generalized kernel model: minimize tardiness, then hold it and minimize the
-site's instantaneous peak. The kernel stays sector-blind; this module is the
-adapter between one database's vocabulary and the kernel's declared-data world,
-which is exactly where CLAUDE.md says adapters live.
+The solver underneath is policies/forward.py's generalized lexicographic chain
+on the kernel model. By default it runs the cheap two-pass solve (minimize
+tardiness, then hold it and minimize the site's instantaneous peak) -- the hot-
+path default, because the third lever (min_flow / dwell) does not prove OPTIMAL
+and costs ~10-20x the two-pass solve. Pass hour_of_day to resolve the active
+regime from the commander's intent (intent/) and run that regime's ordered pass
+sequence instead, so the schedule follows doctrine. The kernel stays sector-
+blind; this module is the adapter between one database's vocabulary and the
+kernel's declared-data world, which is exactly where CLAUDE.md says adapters
+live.
 """
 
 from __future__ import annotations
@@ -52,8 +57,12 @@ from typing import Any, Callable
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "solvers" / "cpsat"))
+sys.path.insert(0, str(HERE.parent / "policies"))
 
 from model import build_and_solve, materialize  # noqa: E402
+from forward import lexicographic_solve_traced     # noqa: E402
+from intent.solve import pass_sequence             # noqa: E402
+from regime import resolve_active                  # noqa: E402
 
 #: Vehicle states that mean "on site and awaiting service". The default is the
 #: conservative reading of the twin vocabulary; a caller with better knowledge
@@ -223,7 +232,9 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             default_ready_delta_min: int = 240,
             det_budget_s: float | None = None,
             time_limit_s: float | None = None,
-            allow_rejection: bool = False) -> dict:
+            allow_rejection: bool = False,
+            hour_of_day: int | None = None,
+            signals: frozenset = frozenset()) -> dict:
     """Frame in, advisory rows out. Writes nothing, ever.
 
     The result carries the rows AND the solve's own accounting (T*, peak,
@@ -244,6 +255,15 @@ def propose(frame: dict, class_table: dict, *, site: dict,
     path pre-empts it -- may still pass time_limit_s; solver["reproducible"]
     then reports whether the clock was what stopped the search, so
     "truncated by the clock" stays distinguishable in the fire record.
+
+    Pass hour_of_day (0-23) to run the REGIME-AWARE path: the active regime
+    is resolved from the commander's intent and its ordered pass sequence is
+    run through the generalized lexicographic chain, with `signals` marking
+    conditions the regime matches on (e.g. grid_peak_imminent). The fire
+    record then names the regime, the pass order, and the per-pass trace,
+    and reports optima read from served assets only (so rejection composes).
+    Left unset, the solver record keeps the two-pass pass1_status/pass2_status
+    contract exactly as before.
     """
     scenario, abstentions = frame_to_scenario(
         frame, class_table, site=site, horizon_min=horizon_min,
@@ -258,29 +278,34 @@ def propose(frame: dict, class_table: dict, *, site: dict,
     budget = {"time_limit_s": time_limit_s, "allow_rejection": allow_rejection}
     if det_budget_s is not None:
         budget["det_budget_s"] = det_budget_s
-    pass1 = build_and_solve(scenario, objective_mode="min_tardy", **budget)
-    #: T* IS THE BEST SERVICE LEVEL OVER THE VEHICLES THAT CAN BE SERVED. A
-    #: rejected one carries tardy_min None -- it has no deadline to miss, because
-    #: nothing is being done for it -- and summing it raw is a TypeError, which is
-    #: how this was found. It matches the model: the lexicographic passes read
-    #: CHARGED tardiness, from which rejected assets are already excluded, so
-    #: pass 2's `sum(tardy) <= T*` budget and this figure count the same set.
-    #: Pass 2 cannot quietly reject MORE to buy a lower peak: the rejection price
-    #: (100,000) is two orders of magnitude above any peak this site can reach.
-    t_star = sum(a["tardy_min"] for a in pass1["assets"] if a["tardy_min"] is not None)
-    pass2 = build_and_solve(scenario, objective_mode="min_peak",
-                            max_tardy_total=t_star, previous_plan=pass1,
-                            **budget)
 
     ready_by_used = {a["aid"]: ("explicit" if a["aid"] in (ready_by_min or {})
                                 else "default")
                      for a in scenario["assets_spec"]["explicit"]}
-    rows = plan_to_proposals(pass2, scenario, ready_by_used=ready_by_used)
-    return {
-        "proposals": rows + abstentions,
-        "planned": len(rows),
-        "abstained": len(abstentions),
-        "solver": {
+
+    if hour_of_day is None:
+        #: THE CHEAP HOT-PATH DEFAULT, unchanged: the two-pass forward solve.
+        #: The regime-aware chain is opt-in (hour_of_day set) because the third
+        #: lever (min_flow) does not prove OPTIMAL and costs ~10-20x the two-pass
+        #: solve -- fine for offline planning, too slow for the live tick. This
+        #: branch is byte-for-byte what propose() did before the intent layer.
+        pass1 = build_and_solve(scenario, objective_mode="min_tardy", **budget)
+        #: T* IS THE BEST SERVICE LEVEL OVER THE VEHICLES THAT CAN BE SERVED. A
+        #: rejected one carries tardy_min None -- it has no deadline to miss,
+        #: because nothing is being done for it -- and summing it raw is a
+        #: TypeError, which is how this was found. It matches the model: the
+        #: lexicographic passes read CHARGED tardiness, from which rejected
+        #: assets are already excluded, so pass 2's `sum(tardy) <= T*` budget and
+        #: this figure count the same set. Pass 2 cannot quietly reject MORE to
+        #: buy a lower peak: the rejection price (100,000) is two orders of
+        #: magnitude above any peak this site can reach.
+        t_star = sum(a["tardy_min"] for a in pass1["assets"]
+                     if a["tardy_min"] is not None)
+        pass2 = build_and_solve(scenario, objective_mode="min_peak",
+                                max_tardy_total=t_star, previous_plan=pass1,
+                                **budget)
+        final_plan = pass2
+        solver_record = {
             "optimizer": "forward_lex",
             "pass1_status": pass1["solver_status"],
             "pass2_status": pass2["solver_status"],
@@ -290,14 +315,47 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             #: record carrying FALSE must not be cited as a reproducible number.
             "reproducible": bool(pass1.get("repro", {}).get("reproducible")
                                  and pass2.get("repro", {}).get("reproducible")),
-            #: WHO THE SOLVER COULD NOT SERVE, named. Without rejection enabled an
-            #: over-subscribed site returns INFEASIBLE and this whole call yields
-            #: nothing; with it, the fire record can say "invoked, planned N,
-            #: could not serve M, and here is M" -- the same quantifiability
-            #: cuopt_invocation_log gives the other proposer.
             "rejected": list(pass2.get("rejected", [])),
             "deterministic_time": round(
                 pass1.get("repro", {}).get("deterministic_time", 0.0)
                 + pass2.get("repro", {}).get("deterministic_time", 0.0), 6),
-        },
+        }
+    else:
+        #: THE REGIME-AWARE PATH: the commander's intent resolves the active
+        #: regime and its pass order, then the generalized lexicographic chain
+        #: runs it. Every earlier pass's optimum is held by the later passes, and
+        #: the fire record names the regime and the per-pass trace so an auditor
+        #: can see WHY this order was chosen. rejection composes: the optima are
+        #: read from served assets only (T*/F*) and site_peak_kw (P*).
+        active = resolve_active(hour_of_day, signals)
+        modes = pass_sequence(active)
+        final_plan, optima, passes = lexicographic_solve_traced(
+            scenario, modes, budget=budget)
+        solver_record = {
+            "optimizer": "forward_lex",
+            "regime": active.regime_key,
+            "regime_label": active.regime_label,
+            "pass_modes": list(modes),
+            "passes": passes,
+            "total_tardy_min": optima.get("min_tardy"),
+            "site_peak_kw": optima.get("min_peak"),
+            "total_flow_min": optima.get("min_flow"),
+            #: complete == every pass in the regime held an optimum; a retained
+            #: pass (solver could not solve within budget) is reported as None
+            #: and complete False, never silently claimed.
+            "complete": all(optima.get(m) is not None for m in modes),
+            "reproducible": bool(
+                not final_plan.get("retained_previous")
+                and all(p.get("reproducible") for p in passes)),
+            "rejected": list(final_plan.get("rejected", [])),
+            "deterministic_time": round(
+                sum(p.get("deterministic_time", 0.0) for p in passes), 6),
+        }
+
+    rows = plan_to_proposals(final_plan, scenario, ready_by_used=ready_by_used)
+    return {
+        "proposals": rows + abstentions,
+        "planned": len(rows),
+        "abstained": len(abstentions),
+        "solver": solver_record,
     }

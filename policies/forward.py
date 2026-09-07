@@ -76,7 +76,7 @@ class ForwardOrchestratorPolicy(AssignmentPolicy):
         return out
 
 
-def lexicographic_solve(sc, pass_modes, *, budget=None) -> tuple[dict, dict]:
+def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, dict, list]:
     """The generalized lexicographic chain: ordered passes, each holding prior optima.
 
     `pass_modes` is an ordered, deduplicated list of solver modes, e.g.
@@ -90,19 +90,23 @@ def lexicographic_solve(sc, pass_modes, *, budget=None) -> tuple[dict, dict]:
         min_peak  -> P*  (s.t. tardy <= T*)
         min_flow  -> F*  (s.t. tardy <= T* and, when peak ran first, peak <= P*)
 
-    Returns (final_plan, optima) where optima maps mode -> held value. How each
-    optimum is read back: T* = sum(tardy_min); P* = plan["objective"] (the chain
-    runs side-free -- no rejection, no churn -- so the objective IS the peak); and
-    F* = sum(finish) over served assets.
+    Returns (final_plan, optima, passes) where optima maps mode -> held value
+    and passes is the per-pass trace ([{mode, status, objective}]). How each
+    optimum is read back: T* = sum(tardy_min) over served assets; P* =
+    plan["site_peak_kw"] (reported by the model separately from the objective,
+    which also carries rejection/churn side terms); F* = sum(finish) over served
+    assets.
+
+    `budget` may carry allow_rejection and time_limit_s: the chain threads them
+    through every pass, and the optima are read from served assets only, so a
+    rejection-aware chain is as sound as the side-free one. The retained-pass
+    guard below turns a pass that could not solve into optima[mode]=None.
 
     ForwardOrchestratorPolicy.decide is exactly this chain with the two-pass
     ("min_tardy", "min_peak") list, which is why its frozen artifact stays
     byte-identical; the third lever (min_flow) is what the intent regimes add.
     """
     budget = budget or {}
-    if budget.get("allow_rejection"):
-        raise ValueError("lexicographic_solve runs side-free (no rejection/churn); "
-                         "a rejection-aware chain is a separate concern")
     if not pass_modes or pass_modes[0] != "min_tardy":
         raise ValueError("lexicographic chain must begin with min_tardy -- the "
                          "readiness floor is structural and precedes every soft "
@@ -112,6 +116,7 @@ def lexicographic_solve(sc, pass_modes, *, budget=None) -> tuple[dict, dict]:
     max_tardy = None
     max_peak = None
     max_flow = None
+    passes: list[dict] = []
     for mode in pass_modes:
         if mode == "min_tardy":
             plan = build_and_solve(sc, objective_mode="min_tardy", **budget)
@@ -129,8 +134,10 @@ def lexicographic_solve(sc, pass_modes, *, budget=None) -> tuple[dict, dict]:
                 kwargs["max_flow_total"] = max_flow
             plan = build_and_solve(sc, objective_mode="min_peak",
                                    previous_plan=plan, **kwargs, **budget)
-            # side is zero here, so the objective IS the instantaneous site peak.
-            max_peak = int(plan["objective"])
+            #: The peak comes from the model's site_peak_kw, NOT the objective --
+            #: with rejection or churn the objective also carries those side
+            #: penalties. site_peak_kw is the instantaneous peak alone.
+            max_peak = int(plan.get("site_peak_kw", plan["objective"]))
             optima["min_peak"] = max_peak
         elif mode == "min_flow":
             kwargs: dict = {"max_tardy_total": max_tardy}
@@ -144,6 +151,12 @@ def lexicographic_solve(sc, pass_modes, *, budget=None) -> tuple[dict, dict]:
         else:
             raise ValueError(f"unknown pass mode {mode!r}")
 
+        passes.append({"mode": mode, "status": plan["solver_status"],
+                       "objective": plan.get("objective"),
+                       "deterministic_time": round(
+                           plan.get("repro", {}).get("deterministic_time", 0.0), 6),
+                       "reproducible": plan.get("repro", {}).get("reproducible", False)})
+
         #: A RETAINED PASS MUST NOT BE MISTAKEN FOR A SOLVED ONE. When the solver
         #: cannot find a solution within the budget (INFEASIBLE or UNKNOWN),
         #: build_and_solve returns the PREVIOUS plan with retained_previous=True,
@@ -156,8 +169,19 @@ def lexicographic_solve(sc, pass_modes, *, budget=None) -> tuple[dict, dict]:
         #: as complete.
         if plan.get("retained_previous"):
             optima[mode] = None
-            return plan, optima
+            return plan, optima, passes
 
+    return plan, optima, passes
+
+
+def lexicographic_solve(sc, pass_modes, *, budget=None) -> tuple[dict, dict]:
+    """Two-tuple convenience over lexicographic_solve_traced.
+
+    The per-pass trace is useful for the proposer's fire record; callers that
+    only need the final plan and the held optima use this. The plan is
+    byte-identical either way.
+    """
+    plan, optima, _ = lexicographic_solve_traced(sc, pass_modes, budget=budget)
     return plan, optima
 
 

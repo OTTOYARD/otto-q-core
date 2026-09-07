@@ -655,6 +655,12 @@ def build_and_solve(
     #: which could drop an asset while holding its tardiness target and report the
     #: same T*. `side` is zero-valued and zero-variable when neither feature is
     #: on, which is what keeps the default path byte-identical.
+    #: The min_peak pass reports its peak SEPARATELY (site_peak_kw) rather than
+    #: expecting callers to read plan["objective"]: with rejection or churn the
+    #: objective includes those side penalties and is NOT the peak. Absent a peak
+    #: pass the field stays None and the plan dict does not grow, so the default
+    #: weighted path stays byte-identical.
+    site_peak_var = None
     side = sum(reject_terms) + (churn_w * sum(churn_terms) if churn_terms else 0)
     if objective_mode == "weighted":
         obj_terms.append(W["peak_excess_per_kw"] * peak_excess)
@@ -672,6 +678,7 @@ def build_and_solve(
         peak_var = m.NewIntVar(0, site["power_cap_kw_hard"], "site_peak_kw")
         m.AddCumulative(power_intervals, power_demands, peak_var)
         m.Minimize(peak_var + side)
+        site_peak_var = peak_var
     else:  # min_flow
         m.Add(sum(all_tardy) <= max_tardy_total)
         if max_peak_total is not None:
@@ -726,10 +733,12 @@ def build_and_solve(
         #: deterministic budget truncates it in the same place every time.
         "reproducible": status == cp_model.OPTIMAL or time_limit_s is None,
     }
-    return _extract(sc, solver, status, plan_vars, peak_excess, repro)
+    return _extract(sc, solver, status, plan_vars, peak_excess, repro,
+                    site_peak_var)
 
 
-def _extract(sc, solver, status, plan_vars, peak_excess, repro=None) -> dict:
+def _extract(sc, solver, status, plan_vars, peak_excess, repro=None,
+             site_peak_var=None) -> dict:
     assets_out, proposals = [], []
     rejected = []
     for asset in sc["assets"]:
@@ -796,6 +805,12 @@ def _extract(sc, solver, status, plan_vars, peak_excess, repro=None) -> dict:
         "solver_status": ("OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE"),
         "objective": int(solver.ObjectiveValue()),
         "peak_excess_kw": solver.Value(peak_excess),
+        #: The min_peak objective's actual peak, reported only when a peak pass
+        #: ran -- the objective otherwise includes rejection/churn penalties and
+        #: is not the peak. Conditional, so weighted/min_tardy/min_flow plans
+        #: (and therefore plan_sha256) are unchanged.
+        **({"site_peak_kw": solver.Value(site_peak_var)}
+           if site_peak_var is not None else {}),
         "assets": sorted(assets_out, key=lambda a: a["aid"]),
         "proposals": sorted(proposals, key=lambda p: p["entity_id"]),
         **({"rejected": sorted(rejected)} if any(
