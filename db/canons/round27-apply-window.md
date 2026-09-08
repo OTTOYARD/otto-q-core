@@ -12,7 +12,7 @@ belt and braces on purpose: `ottoq_sim_runs` cannot see an in-flight pair (both
 arms are one transaction) and `cron.job_run_details` reports a running
 two-statement job as `succeeded` at ~1 s (`db/canons/round25.md`).
 
-## BLOCKED — 0225 will refuse as drafted (found 15:30 UTC, db/checks/0140)
+## 0225 WAS going to refuse — found 15:30 UTC (db/checks/0140), P3 rewritten 15:32
 
 **Do not run the window as written.** 0225's P3 was dry-run against the floor
 0226 installs — the combination the window actually creates, and one nothing had
@@ -47,7 +47,22 @@ the 08:25 pair. That disagreement is correct history and it is the evidence that
 motivated 0218. A migration that becomes applicable by hiding evidence is worse
 than one that refuses.
 
-Revised order, once 0225 is fixed: **0226 → 0225 → 0227 → 0228**, unchanged.
+**0225 has since been revised (15:32–15:40 UTC).** P3 now asks the question that
+matters — *does any column green under nine atoms stop being green under
+fourteen?* — keyed exactly as the matrix keys, computed once into a temp table
+and read twice, with an **A5** that reports every column whose
+`consecutive_passes` moves *without* losing green (expected:
+`busy_day/314159/12t` 6 → 3, which is the correct consequence of comparing more
+atoms, not a regression). The stale lineage note was corrected too.
+
+**THE ONE REMAINING BLOCKER: the replacement P3 has not been dry-run.** It was
+written while column f was firing and the database was deliberately left alone.
+Before 0225 is applied, extract its P3 body as a standalone read-only SELECT,
+run it, and see it return **no rows**. The file's own footer carries this
+requirement. 0140 exists precisely because the previous P3 was never run in the
+configuration it would meet — and APPLYING.md now has a step 3b(ii) about it.
+
+Order, unchanged: **0226 → 0225 → 0227 → 0228**.
 
 ## Pre-flight, 2026-09-08 15:25 UTC — every pin still matches live
 
