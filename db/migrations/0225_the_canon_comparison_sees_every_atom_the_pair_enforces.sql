@@ -491,8 +491,10 @@ VALUES ('the_canon_comparison_sees_every_atom_the_pair_enforces', false,
         'carried-and-printed to compared. NULL-tolerant in the 0199/0201 form. '
         'ottoq_cert_matrix is a STABLE pure read called by nothing in the '
         'decide path, so no engine behaviour changes and no canon can move; P3 '
-        'refuses to apply if any column already disagrees with itself on a '
-        'newly compared atom at or above the floor.',
+        'refuses to apply if any column that is green under the nine-atom '
+        'comparison would stop being green under the fourteen-atom one, and '
+        'A5 reports every column whose consecutive_passes moves without '
+        'losing green (db/checks/0140).',
         now())
 ON CONFLICT (name) DO UPDATE
   SET forces_recert = EXCLUDED.forces_recert,
