@@ -200,7 +200,7 @@ them reset a streak.
 |---|---|---|---|---|---|---|---|
 | a | `busy_day` / 314159 / 12 | 16:35:00 | **356** | 358 | −2 | 3 → **4** | pass, no atom moved |
 | b | `busy_day` / 171717 / 12 | 16:49:00 | **361** | 376 | −15 | 3 → **4** | pass, no atom moved |
-| c | `normal_day` / 171717 / 12 | 17:03 | | 358 | | | |
+| c | `normal_day` / 171717 / 12 | 17:03:00 | **342** | 358 | −16 | 3 → **4** | pass, no atom moved |
 | d | `busy_day` / 424242 / 12 | 17:17 | | 364 | | | |
 | e | `busy_day` / 171717 / **24** | 17:31 | | 560 | | | |
 | f | `busy_day` / 424242 / **24** | 18:01 | | 551 | | | |
@@ -251,3 +251,59 @@ against a predicted −16 each: **one column moved about as predicted and the
 other barely moved at all.**
 
 Judgement waits for d at 17:17 UTC (12:17 PM CT).
+
+### Column c lands at 342 s, and d now has an arithmetic gate
+
+c came in **16 s under round 27's 358** — the exact point estimate prediction 2
+named, on the one column where it landed. The three deltas are **−2, −15, −16**
+against a predicted −16 each: one column matched, one nearly, one barely moved.
+
+Three-column running mean **353.0** against round 27's 364.0.
+
+**Stated before d runs, so it cannot be fitted afterwards.** The band is on the
+FOUR-column mean, so with 1,059 s banked over three columns:
+
+| for the four-column mean to be | d must land |
+|---|---|
+| ≤ 354 s (inside the band) | **≤ 357 s** |
+| ≥ 344 s (inside the band) | **≥ 317 s** |
+| = 351.75 s | d = 348 s, i.e. round 27's d minus the same 16 |
+
+So **d between 317 and 357 s puts the mean inside 344–354**, and round 27's d
+was 364.
+
+**AND THE BAND BEING HIT WOULD STILL NOT BE A HIT.** This file committed, before
+the round started, that *"if round 28's 12-tick mean lands anywhere in 350–370 s,
+the honest report is 'no measurable change', not a hit"* — and 350–354 is inside
+**both** the band and the not-resolvable zone. That overlap was written down in
+advance precisely so it could not be resolved in our favour after the fact. It
+resolves toward **not resolvable**. A mean of 351.75 would mean 0227's effect is
+real in direction and below this instrument's resolution in size, which is a
+weaker claim than prediction 2 made and is the one the evidence supports.
+
+The only outcome that resolves cleanly is d landing **below 317** (mean under
+344, effect larger than predicted and outside the noise zone) or **above 357**
+(mean over 354, prediction 2 falsified outright).
+
+## `r28_g`'s baseline re-verified 17:10 UTC — not one counter moved
+
+The 16:23:39 capture claimed validity until g fires on the grounds that
+`track_functions` is `'none'` globally and only g's own session sets it. Checked
+rather than assumed, 47 minutes and **three certification pairs** later:
+
+| | baseline 16:23:39 | live 17:10 | |
+|---|---|---|---|
+| `SHOW track_functions` | `none` | `none` | — |
+| rows in the view | 304 | 304 | identical |
+| `public.ottoq_policy_get` | 15,634,388 | 15,634,388 | identical |
+| `twin.ottoq_sim_compute_charger_load_kw` | 1,130 | 1,130 | identical |
+
+Three pairs ran between the two readings and moved **nothing**, which is the
+property the baseline rests on, now measured instead of argued. Same check
+r27_g's baseline passed across 91 minutes and a container restart.
+
+Note for the diff: the load meter lives in the **`twin`** schema, not `public`.
+Its 1,130 lifetime calls are `2` from the `r25_g` era — when `track_functions`
+was `'pl'`, which does not count SQL functions, and is exactly what blinded
+`db/checks/0129` — plus `r27_g`'s counted **1,128** at 24 ticks. So the 12-tick
+count g produces will be the first ever taken with the meter actually visible.
