@@ -112,18 +112,30 @@ BEGIN
 END $pre$;
 
 -- 1. THE PROMOTION (catalog-derived rewrite) --------------------------------
+-- The anchor is the WHOLE LINE, trailing comment included, and that is not
+-- fussiness. Line 117 of the live definition reads
+--
+--   ·········AND·(v_arms[1]->>'h_rcl')·=·(v_arms[2]->>'h_rcl')···--·0217:·the·gate·0206·set·is·met
+--
+-- (9 leading spaces, 3 before the comment; measured, not assumed). Anchoring on
+-- the expression alone and inserting a newline after it would push 0217's
+-- provenance comment onto the END of the new h_sdr line — valid SQL, and a
+-- false record: the line that says "0217: the gate 0206 set is met" would be
+-- the line 0219 added. In a repo whose whole discipline is that the committed
+-- record is the product, that is not cosmetic.
 DO $rw$
 DECLARE
   v_def text;
-  v_old text := $f$AND (v_arms[1]->>'h_rcl') = (v_arms[2]->>'h_rcl')$f$;
-  v_new text := $f$AND (v_arms[1]->>'h_rcl') = (v_arms[2]->>'h_rcl')
+  v_old text := $f$AND (v_arms[1]->>'h_rcl') = (v_arms[2]->>'h_rcl')   -- 0217: the gate 0206 set is met$f$;
+  v_new text := $f$AND (v_arms[1]->>'h_rcl') = (v_arms[2]->>'h_rcl')   -- 0217: the gate 0206 set is met
          AND (v_arms[1]->>'h_sdr') = (v_arms[2]->>'h_sdr')   -- 0219: the settlement record may now fail a pair$f$;
 BEGIN
   SELECT pg_get_functiondef(p.oid) INTO v_def
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='public' AND p.proname='ottoq_determinism_pair';
   IF (length(v_def)-length(replace(v_def, v_old, '')))/length(v_old) <> 1 THEN
-    RAISE EXCEPTION '0219: the h_rcl anchor is not exactly once in the catalog definition';
+    RAISE EXCEPTION '0219: the h_rcl line (expression AND its 0217 comment) is not exactly '
+                    'once in the catalog definition — re-measure the line before editing this anchor';
   END IF;
   EXECUTE replace(v_def, v_old, v_new);
   RAISE NOTICE '0219: ottoq_determinism_pair rewritten from its own catalog definition';
@@ -157,7 +169,21 @@ BEGIN
   IF v_n <> 12 THEN
     RAISE EXCEPTION '0219 A1: % of 12 atoms are enforced; the rewrite dropped one', v_n;
   END IF;
-  RAISE NOTICE '0219 A1: twelve atoms enforced, h_sdr among them';
+
+  --: the chain carries two more equalities that are NOT hash atoms and so are
+  --: not in the list above: 'ticks' (both arms ran the same horizon) and
+  --: 'endst', which is compared with -> rather than ->> because it is a jsonb
+  --: object, not a text hash. The rewrite edits this chain, so assert they
+  --: survived it rather than trusting a string replace. "Twelve atoms" means
+  --: twelve NAMED HASH atoms; the chain has fourteen equalities in total.
+  IF position($$(v_arms[1]->>'ticks')=(v_arms[2]->>'ticks')$$ in v_flat) = 0 THEN
+    RAISE EXCEPTION '0219 A1: the ticks equality is gone — the rewrite damaged the chain';
+  END IF;
+  IF position($$(v_arms[1]->'endst')=(v_arms[2]->'endst')$$ in v_flat) = 0 THEN
+    RAISE EXCEPTION '0219 A1: the endst equality is gone — the rewrite damaged the chain';
+  END IF;
+
+  RAISE NOTICE '0219 A1: twelve hash atoms enforced with h_sdr among them, plus ticks and endst';
 END $a1$;
 
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
