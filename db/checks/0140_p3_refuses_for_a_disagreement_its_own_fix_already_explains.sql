@@ -271,3 +271,19 @@ SELECT DISTINCT to_char(r.started_at,'MM-DD HH24:MI:SS') AS fired,
 --     to be a habit and not a caution.
 -- ---------------------------------------------------------------------------
 
+-- Q5 FOOTNOTE, measured 16:00 UTC. Q5's dry-run pinned the floor at the flat
+-- '2026-09-07 21:36:53+00'. The floor 0226 actually installs is
+-- '21:36:53.363037' — GREATEST takes branch 2, which wins by 363 ms. So the
+-- dry-run ran against a floor 363 ms LOWER than the real one, which could only
+-- matter if a certification pair started inside that window and was therefore
+-- counted by the dry-run but will not be counted by the migration.
+--
+--   SELECT count(*) FROM ottoq_sim_runs WHERE run_by='cert_harness'
+--     AND started_at >= '2026-09-07 21:36:53+00'
+--     AND started_at <  '2026-09-07 21:36:53.363037+00';   ->  0
+--
+-- Zero. Q5's result transfers exactly. Recorded because the sentence "no pair
+-- started in that gap" was written as an inference before it was a measurement,
+-- and a 363 ms window is precisely the kind of thing that is obviously empty
+-- right up until it is not.
+
