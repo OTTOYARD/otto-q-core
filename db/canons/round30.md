@@ -79,3 +79,72 @@ That `0229` explains round 28's 24t:12t cost ratio moving from 1.53 to 2.34–2.
 ratio is still above 2.0 after this, the superlinearity has a second source.
 
 Results below a `## Results` heading. Nothing above it is to be edited.
+
+---
+
+# Results
+
+## The four 12-tick columns
+
+| col | scenario / seed | r30 | r28 | Δ | streak | verdict |
+|---|---|---|---|---|---|---|
+| a | `busy_day` / 314159 | **124** | 356 | −232 | 6 → **7** | pass, no atom moved |
+| b | `busy_day` / 171717 | **124** | 361 | −237 | 5 → **6** | pass, no atom moved |
+| c | `normal_day` / 171717 | **116** | 342 | −226 | 4 → **5** | pass, no atom moved |
+| d | `busy_day` / 424242 | **124** | 218 | −94 | 4 → **5** | pass, no atom moved |
+| **mean** | | **122.00** | 319.25 | **−197.25 (−61.8%)** | | |
+
+## PREDICTION 1 — HELD, on all four columns
+
+Every one of the ten canon atoms the matrix returns is byte-identical to round
+28 on every column — `fp`, `dec`, `cmd`, `evt`, `bkg`, `nrg`, `rule`, `rcl`,
+`sdr`, `endst`. All four green, all histories unbroken, `inconclusive_pairs`
+unchanged.
+
+**0229 removed 62% of the pair and changed nothing the certification measures.**
+That is the whole claim of the migration, and it is now a measurement rather than
+an EXCEPT over 120 rows.
+
+## PREDICTION 3 — MET, and by a wide margin
+
+The band was *"the four-column 12-tick mean lands below 250 s"*, stated
+deliberately loosely because the instrument had not earned a tighter one.
+**122.00 s.** The arc, all measured on the same six columns:
+
+| round | 12-tick mean | |
+|---|---|---|
+| 26 | 519.00 | |
+| 27 | 364.00 | −29.9% |
+| 28 | 319.25 | −12.3% |
+| **30** | **122.00** | **−61.8%** |
+
+**519 → 122 s is 4.25x, and the last step is more than the previous two combined.**
+
+## The spread collapsed — and it does NOT mean what it looks like
+
+| round | spread (max − min) |
+|---|---|
+| 27 | 18 s |
+| 28 | **143 s** |
+| **30** | **8 s** |
+
+Round 30's 8-second spread across four columns is the tightest ever recorded, and
+the temptation is to say the unscoped view was the source of round 28's ±40%
+variance and 0229 has now removed it.
+
+**That reading is wrong and the numbers above refute it.** The view was present,
+unfixed, for round 27 as well — and round 27's spread was **18 s**. If the view
+caused round 28's variance it would have caused round 27's too. It did not.
+
+So **round 28 remains the outlier round, and why it was an outlier remains
+unexplained** — exactly as `db/checks/0144` recorded before this fix was applied.
+0229 made the pair much faster; it did not explain round 28, and column d's −146 s
+stays quarantined. A finding that arrives conveniently packaged with the fix is
+the one to check hardest.
+
+## Still open, and unchanged by this round
+
+The **24t:12t cost ratio**. Round 28 measured it at 2.34–2.59 against round 27's
+1.53, and round 30 scheduled **no 24-tick column**, so the ratio is not
+re-measured here. If the superlinearity is still present at the new speed it has a
+second source, and that is the next thing to measure — not to theorise about.
