@@ -68,8 +68,17 @@ class ForwardOrchestratorPolicy(AssignmentPolicy):
             for op in a["ops"]:
                 if op["op"] == "charge":
                     starts[a["aid"]] = (op["point"], op["start"])
+        #: A REJECTED ASSET HAS NO START, AND THAT IS NOT AN ERROR (L-21).
+        #: allow_rejection is an advertised budget key -- this chain's own
+        #: docstring says so -- and a rejected asset leaves the plan with
+        #: ops: [], so it never enters `starts`. Indexing it raised KeyError,
+        #: which destroys the very abstain-vs-crash distinction the rejection
+        #: feature exists to preserve. The plan's own `proposals` list already
+        #: carries the declined asset with abstain: true; this policy simply
+        #: returns no assignment for it.
+        placed = [a for a in arrivals if a.aid in starts]
         out = []
-        for asset in sorted(arrivals, key=lambda a: (starts[a.aid][1], a.aid)):
+        for asset in sorted(placed, key=lambda a: (starts[a.aid][1], a.aid)):
             point_id, start = starts[asset.aid]
             state.book_charge(asset, state.point(point_id), start)
             out.append(Assignment(asset.aid, point_id, start))
@@ -158,7 +167,26 @@ def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, di
         else:
             raise ValueError(f"unknown pass mode {mode!r}")
 
+        #: A RETAINED PASS REPORTS NOTHING, IN EVERY FIELD (finding L-18).
+        #:
+        #: The guard below has always set optima[mode] = None for a retained
+        #: pass, because the returned plan's "objective" is the PREVIOUS pass's
+        #: optimum. But this append ran FIRST and recorded that same leftover
+        #: number under this pass's mode, along with the previous pass's
+        #: deterministic_time and its `reproducible: true` -- for a pass that
+        #: produced no schedule at all. The leftover was suppressed in `optima`
+        #: and published in `passes`, which travels verbatim into the fire
+        #: record. A pass that produced nothing now says so everywhere.
+        if plan.get("retained_previous"):
+            passes.append({"mode": mode, "status": plan["solver_status"],
+                           "proven": False, "objective": None,
+                           "deterministic_time": None, "reproducible": False,
+                           "retained": True})
+            optima[mode] = None
+            return plan, optima, passes
+
         passes.append({"mode": mode, "status": plan["solver_status"],
+                       "retained": False,
                        #: PROVEN OPTIMALITY IS NOT "THE PASS RETURNED A NUMBER".
                        #: When CP-SAT exhausts the deterministic budget with an
                        #: incumbent but no proof, the status is FEASIBLE and the
@@ -173,7 +201,8 @@ def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, di
                            plan.get("repro", {}).get("deterministic_time", 0.0), 6),
                        "reproducible": plan.get("repro", {}).get("reproducible", False)})
 
-        #: A RETAINED PASS MUST NOT BE MISTAKEN FOR A SOLVED ONE. When the solver
+        #: (The retained-pass guard now runs ABOVE the append; see L-18.) When
+        #: the solver
         #: cannot find a solution within the budget (INFEASIBLE or UNKNOWN),
         #: build_and_solve returns the PREVIOUS plan with retained_previous=True,
         #: and its "objective" is the previous pass's optimum — not this pass's.
@@ -183,10 +212,6 @@ def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, di
         #: early is the honest signal: the ceiling this pass was asked to hold is
         #: NOT held by the returned plan, and the caller must not cite the chain
         #: as complete.
-        if plan.get("retained_previous"):
-            optima[mode] = None
-            return plan, optima, passes
-
     return plan, optima, passes
 
 

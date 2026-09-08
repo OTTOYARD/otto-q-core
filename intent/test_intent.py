@@ -13,7 +13,11 @@ because that is what a technical reviewer will interrogate.
 import json
 from pathlib import Path
 
+import dataclasses  # noqa: E402
+import pytest  # noqa: E402
+
 from intent.intent import (
+    ARTIFACT_PATH, CANONICAL_FLOOR_ORDER, UNHASHED_MANIFEST_KEYS, _canonical,
     all_objective_keys, fingerprint, load_intent, resolve_intent, stamp,
 )
 
@@ -318,3 +322,103 @@ if __name__ == "__main__":
         fn()
         print(f"{fn.__name__} PASS")
     print("ALL INTENT TESTS PASS")
+
+
+# ---------------------------------------------------------------------------
+# L-38: an unknown signal is an error, not a silent fall-through to the clock.
+# ---------------------------------------------------------------------------
+
+def test_a_misspelled_signal_raises_instead_of_resolving_by_the_clock():
+    """The hazard: `grid_peak_imminant` at 07:00 resolved to dispatch_rush.
+
+    `_matches` only tested `need.issubset(signals)`, so a name no regime knows
+    matched nothing, pass 1 found no signal regime, and the resolver fell
+    through to the clock — returning a regime as though no signal had been
+    raised. Throughput first, on a tick about to hit a demand-charge ceiling.
+    """
+    it = load_intent()
+    good = resolve_intent(it, hour_of_day=7,
+                          signals=frozenset({"grid_peak_imminent"}))
+    assert good.regime_key == "grid_peak"
+    with pytest.raises(ValueError, match="grid_peak_imminant"):
+        resolve_intent(it, hour_of_day=7,
+                       signals=frozenset({"grid_peak_imminant"}))
+
+
+def test_the_signal_vocabulary_comes_from_the_artifact():
+    it = load_intent()
+    assert it.known_signals == frozenset(
+        {"weather_hold", "grid_peak_imminent", "demand_surge"})
+    #: every declared signal resolves; the vocabulary is not decoration
+    for sig in it.known_signals:
+        assert resolve_intent(it, hour_of_day=12, signals=frozenset({sig}))
+
+
+def test_no_signals_at_all_is_still_fine():
+    assert resolve_intent(load_intent(), hour_of_day=7).regime_key == "dispatch_rush"
+
+
+# ---------------------------------------------------------------------------
+# L-55: the fingerprint covers everything except itself.
+# ---------------------------------------------------------------------------
+
+def test_the_manifest_is_inside_the_fingerprint():
+    """`version` and `kind` used to ride outside the hash, so the loader
+    returned a verified-looking object carrying a field the verification never
+    covered — a document could declare itself version 9 of a different kind
+    without disturbing its own hash."""
+    raw = json.loads(ARTIFACT_PATH.read_text())
+    before = fingerprint(_canonical(raw))
+    for field in ("version", "kind", "description"):
+        tampered = json.loads(json.dumps(raw))
+        tampered["manifest"][field] = "tampered"
+        assert fingerprint(_canonical(tampered)) != before, (
+            f"manifest.{field} is still outside the fingerprint")
+
+
+def test_the_two_self_referential_fields_stay_outside_it():
+    raw = json.loads(ARTIFACT_PATH.read_text())
+    before = fingerprint(_canonical(raw))
+    for field in UNHASHED_MANIFEST_KEYS:
+        tampered = json.loads(json.dumps(raw))
+        tampered["manifest"][field] = "changed"
+        assert fingerprint(_canonical(tampered)) == before, (
+            f"{field} cannot describe itself and must stay out of the hash")
+
+
+def test_a_key_added_later_is_covered_by_default():
+    """The old allowlist covered a new top-level key only if someone remembered
+    to extend it. Coverage is now the default and exclusion is the exception."""
+    raw = json.loads(ARTIFACT_PATH.read_text())
+    before = fingerprint(_canonical(raw))
+    raw["some_future_section"] = {"a": 1}
+    assert fingerprint(_canonical(raw)) != before
+
+
+# ---------------------------------------------------------------------------
+# L-56: "floor" is defined by the artifact, not by a Python tuple.
+# ---------------------------------------------------------------------------
+
+def test_an_artifact_declared_floor_cannot_be_dropped_by_a_regime():
+    """There were two definitions of "floor": a hardcoded tuple that decided
+    what got PREPENDED, and the artifact's `kind == "floor"` that decided what
+    was REPORTED. An objective declared a floor but not named in the tuple was
+    silently dropped by every regime that did not list it."""
+    it = load_intent()
+    #: give the artifact a third floor it has never heard of
+    extra = dataclasses.replace(it.objectives["readiness"], key="grid_safety",
+                                kind="floor")
+    widened = dataclasses.replace(
+        it, objectives={**it.objectives, "grid_safety": extra})
+
+    for regime in widened.regimes:
+        active = resolve_intent(widened, hour_of_day=12,
+                                signals=frozenset(regime.match.get("signals", [])))
+        assert "grid_safety" in active.priority, (
+            f"regime {active.regime_key} dropped an artifact-declared floor")
+        assert "grid_safety" in active.floors
+
+
+def test_the_two_named_floors_keep_their_canonical_order():
+    active = resolve_intent(load_intent(), hour_of_day=12)
+    assert active.priority[:2] == CANONICAL_FLOOR_ORDER

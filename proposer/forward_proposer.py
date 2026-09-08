@@ -153,9 +153,286 @@ DEFAULT_SERVICEABLE_STATES = frozenset({
 #: Stall types that can never charge anything, regardless of connector fields.
 NON_CHARGING_TYPES = frozenset({"staging"})
 
+#: THE PRODUCTION JOIN KEY (finding L-41). `ottoq_vehicle_classes` is keyed by
+#: vehicle_class_code; this bridge keyed its class table on the frame's
+#: `platform`, which that table does not have a column for, so the join the
+#: README described could not be made. Migration 0209 puts the key in the frame
+#: and proposer/class_table.py writes the column projection; this is the field
+#: the two now meet on. 220 of the flagship depot's 221 autonomous vehicles
+#: carry it; the one that does not gets an abstention naming the field, which
+#: is the honest answer and not a guessed battery.
+DEFAULT_CLASS_KEY = "vehicle_class_code"
+
+#: INLET COMPATIBILITY, EXPRESSED IN THE ONLY VOCABULARY THE KERNEL HAS
+#: (finding L-42).
+#:
+#: The kernel's capability model is one string: a service point declares a
+#: `kind`, an asset class declares the `charge_kinds` it can use, and the model
+#: chooses among points whose kind the class names (model.py:437). The kernel
+#: knows nothing about connectors and must not -- an inlet is a sector fact and
+#: the kernel never learns what sector it is in. So the BRIDGE folds the
+#: connector INTO the capability label: a point is `dcfc@CCS1`, or
+#: `dcfc@CCS1+NACS` for a multi-standard one, and a vehicle may use exactly
+#: those labels whose inlet set contains its own inlet.
+#:
+#: What this closes: `charge_kinds` alone decided which stall types a vehicle
+#: could be sent to, and frame_to_scenario read NEITHER the vehicle's
+#: `inlet_type` NOR the stall's `connector_type` -- both of which the frame
+#: already carries. A PAD-inlet AMR was proposable onto a CCS1 DCFC stall, and
+#: the consumer (ottoq_l2_external_proposal) validates occupancy, reservation,
+#: station_state and heartbeat but not the plug, so nothing downstream would
+#: have caught it either.
+#:
+#: THE RULE IS NOT INVENTED HERE. The engine already owns it, in the L1 rule
+#: that guards the live decide path (db/baseline/functions_public.sql:6632):
+#:
+#:     a `Multi` stall passes iff the vehicle's inlet is in the stall's
+#:     supported_inlet_types; otherwise the connector_type must equal the
+#:     inlet_type exactly.
+#:
+#: This is a faithful translation of that rule into the kernel's declared-data
+#: vocabulary, not a second opinion about plugs. Measured on the flagship depot
+#: 2026-09-08: all 84 charging stalls are `Multi` with supported {CCS1, NACS},
+#: and the 220 autonomous vehicles carry CCS1 (158) or NACS (62) -- so a bridge
+#: that compared connector_type to inlet_type literally would have abstained on
+#: every vehicle at the site, and one that ignored both proposed every vehicle
+#: onto every plug. Neither is the rule the engine actually runs.
+CAPABILITY_SEP = "@"
+INLET_SEP = "+"
+
+#: The connector_type value that means "this point declares its supported inlets
+#: separately", per the L1 rule above. Compared after normalization.
+MULTI_STANDARD_CONNECTOR = "MULTI"
+
+
+def _connector(value: Any) -> str | None:
+    """A connector/inlet label normalized for comparison, or None if unstated.
+
+    Case and surrounding space are formatting, not facts: a stall recorded as
+    'ccs1 ' and a vehicle recorded as 'CCS1' are the same plug, and treating
+    them as different would abstain on every vehicle at that site while the
+    reason said "no capable point", which is true and useless.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().upper()
+    return text or None
+
+
+def _accepted_inlets(stall: dict) -> frozenset[str]:
+    """Which inlets this stall accepts -- the L1 rule, read off the frame row.
+
+    Empty means the point can serve nobody: an unstated connector, a
+    NonCharging bay, or a multi-standard stall that declares no supported list.
+    Empty is not a wildcard. Guessing a plug is how an AMR ends up at a 350 kW
+    DC connector it cannot physically take.
+    """
+    conn = _connector(stall.get("connector_type"))
+    if conn is None:
+        return frozenset()
+    if conn == MULTI_STANDARD_CONNECTOR:
+        supported = stall.get("supported_inlet_types") or ()
+        return frozenset(filter(None, (_connector(i) for i in supported)))
+    return frozenset({conn})
+
+
+def _capability(kind: str, inlets) -> str:
+    """The kernel-side capability label for (stall type, accepted inlets)."""
+    return f"{kind}{CAPABILITY_SEP}{INLET_SEP.join(sorted(inlets))}"
+
+
+def _capability_kind(cap: str) -> str:
+    return cap.split(CAPABILITY_SEP, 1)[0]
+
+
+def _capability_inlets(cap: str) -> frozenset[str]:
+    return frozenset(cap.split(CAPABILITY_SEP, 1)[1].split(INLET_SEP))
+
 
 class FrameError(ValueError):
     """A frame or class table this bridge refuses to guess around."""
+
+
+class ChainError(RuntimeError):
+    """The shipped plan does not honour a ceiling the chain says it holds.
+
+    Distinct from FrameError on purpose: FrameError means the caller handed
+    this bridge something it will not guess around, ChainError means the
+    lexicographic chain itself is broken. A caller may sensibly catch the
+    first and log an abstention; catching the second and shipping the plan
+    anyway is exactly what finding L-22 says must stop being possible.
+    """
+
+
+#: The reproducibility keys the MODEL says a run needs and the fire record
+#: dropped (finding L-43). model.py records ortools_version in every plan's
+#: `repro` block and states in its own comment why: measured across 9.11 and
+#: 9.15, every objective value is identical but all four committed plans differ
+#: -- the two versions break ties among equally-optimal schedules differently,
+#: so WHICH asset goes to WHICH point at WHICH minute moves. The schedule ships;
+#: the objective is just a number about it. A fire record without the version
+#: therefore cannot reproduce the plan it describes, which is the whole job of a
+#: fire record. det_budget_s and wall_limit_s travel with it for the same
+#: reason: they are what truncated the search, when anything did.
+_REPRO_KEYS = ("ortools_version", "det_budget_s", "wall_limit_s")
+
+
+def _repro_identity(*plans: dict) -> dict:
+    """The reproducibility identity of the plan that ships.
+
+    Plans are consulted in order and the FIRST that carries a repro block wins:
+    the final plan normally, falling back to an earlier pass when the final one
+    is a retained plan whose repro block is the earlier pass's anyway.
+    """
+    for plan in plans:
+        repro = plan.get("repro") or {}
+        if repro:
+            return {k: repro.get(k) for k in _REPRO_KEYS}
+    return {k: None for k in _REPRO_KEYS}
+
+
+def _measure_plan(plan: dict) -> dict:
+    """The three published KPIs, MEASURED OFF THE PLAN THAT SHIPS (finding L-22).
+
+    The fire record used to publish `optima['min_tardy']`, `optima['min_peak']`
+    and `optima['min_flow']` -- the values the 1st, 2nd and 3rd passes REACHED
+    -- as though they described `final_plan`, which is produced by a later pass
+    than most of them. Nothing re-derived them from the artifact. So the entire
+    correctness of a published number rested on the ceiling threading in
+    policies/forward.py being right, and a threading bug would have shipped a
+    number the plan does not have, under a run ID, silently. Doctrine 5 says no
+    number ships without a run ID; it means no number ships without the artifact
+    it describes, either.
+
+    Each figure is computed with the SAME definition the model optimizes, so
+    measured and optimum are comparable and _check_optima can assert on them:
+
+      total_tardy_min  sum(tardy_min) over served assets  == the model's
+                       sum(all_tardy) (a rejected asset carries None here and
+                       contributes zero there).
+      total_flow_min   sum(finish) over served assets     == sum(all_finish).
+      site_peak_kw     the max of the charge-segment kW step function == the
+                       AddCumulative(power_intervals, power_demands) the
+                       min_peak pass minimizes: power_intervals ARE the charge
+                       segments and power_demands ARE their kW (model.py:461).
+                       Measured rather than read from plan['site_peak_kw']
+                       because that field exists only when a min_peak pass
+                       produced the final plan -- a flow-last regime ships a
+                       plan that does not carry it at all.
+    """
+    assets = plan.get("assets", [])
+    events: list[tuple[int, int, int]] = []
+    for a in assets:
+        for op in a.get("ops", []):
+            if op.get("op") != "charge":
+                continue
+            for seg in op.get("segments", []):
+                #: Half-open [start, end): a segment ending at minute t and one
+                #: starting at t do not overlap, so ends are applied first at a
+                #: shared coordinate (-1 sorts before +1).
+                events.append((seg["start"], 1, seg["kw"]))
+                events.append((seg["end"], -1, seg["kw"]))
+    peak = running = 0
+    for _t, sign, kw in sorted(events, key=lambda e: (e[0], e[1])):
+        running += sign * kw
+        peak = max(peak, running)
+    return {
+        "total_tardy_min": sum(a["tardy_min"] for a in assets
+                               if a.get("tardy_min") is not None),
+        "total_flow_min": sum(a["finish"] for a in assets
+                              if a.get("finish") is not None),
+        "site_peak_kw": peak,
+    }
+
+
+#: Which measured figure answers to which pass's optimum.
+_OPTIMUM_OF = {"min_tardy": "total_tardy_min", "min_peak": "site_peak_kw",
+               "min_flow": "total_flow_min"}
+
+
+def _check_optima(measured: dict, optima: dict) -> None:
+    """Every pass's ceiling must be honoured by the plan that ships.
+
+    A later pass holds each earlier optimum as a hard `<=`, and the last pass's
+    own optimum is achieved by its own plan, so `measured <= optimum` is true
+    of a correct chain for EVERY pass -- including a budget-truncated one,
+    whose recorded value is an incumbent a real solution achieved. A violation
+    is therefore not a tolerance question and not a caller's problem: it means
+    a ceiling was dropped between passes, and the number about to be published
+    is not a number this plan has. It raises.
+
+    optima[mode] is None for a RETAINED pass (policies/forward.py returns early
+    and says so); there is no claim to check, so there is nothing to violate.
+    """
+    for mode, value in optima.items():
+        if value is None:
+            continue
+        key = _OPTIMUM_OF.get(mode)
+        if key is None or measured.get(key) is None:
+            continue
+        if measured[key] > value:
+            raise ChainError(
+                f"the shipped plan does not honour the {mode} ceiling: measured "
+                f"{key}={measured[key]} against an optimum of {value}. A later "
+                f"pass dropped an earlier pass's constraint; the fire record "
+                f"would have published {value} for a plan that has "
+                f"{measured[key]}.")
+
+
+#: ONE DEFAULT FOR target_soc, IN ONE PLACE (finding L-24).
+#:
+#: There were two. The serviceable predicate read `float(v.get("target_soc") or
+#: 100)` and the scenario row two dozen lines later read `int(v.get("target_soc")
+#: or 90)`, so a vehicle whose frame row carried no target was admitted against
+#: a target of 100 and then planned against a target of 90. At soc 95 that meant
+#: admitted as needing charge, then handed to the kernel already past its target
+#: -- an asset with no charge segments, occupying the model and the plan and
+#: proposable to nothing. 90 is the number the kernel itself defaults to
+#: (model.py::materialize twice, harness_alpha, onboarding/sizer), so 90 is the
+#: one that survives; the 100 was the outlier and is gone.
+DEFAULT_TARGET_SOC_PCT = 90
+
+
+def _pct(value: Any) -> float | None:
+    """A percentage field off a frame row as a float, or None if absent.
+
+    NULL AND GARBAGE BOTH BECOME None, DELIBERATELY. `float(None)` raises
+    TypeError, and one such raise inside the vehicle loop took the whole batch
+    down -- every other vehicle in the frame lost its proposal because one row
+    had a null the frame contract permits. A value this function cannot read is
+    a value the caller must be TOLD about, which is what the abstention rows in
+    frame_to_scenario do; it is not grounds for killing the batch.
+    """
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolved_target_soc(vehicle: dict) -> float:
+    """The vehicle's target SoC, resolved through the single default."""
+    target = _pct(vehicle.get("target_soc"))
+    return DEFAULT_TARGET_SOC_PCT if target is None else target
+
+
+def _default_serviceable(vehicle: dict) -> bool:
+    """On site, in a serviceable state, and not already at its target.
+
+    NULL-TOLERANT ON PURPOSE, and both halves matter. Reading soc as a number
+    here is what raised on a null row; deciding a null-soc vehicle is
+    unserviceable here would drop it silently, which is the same bug wearing
+    the other mask. So an unreadable soc PASSES this predicate and reaches
+    frame_to_scenario's guard, which turns it into an ABSTAIN row -- the
+    disposer learns the proposer saw the vehicle and declined it.
+    """
+    if vehicle.get("state") not in DEFAULT_SERVICEABLE_STATES:
+        return False
+    soc = _pct(vehicle.get("soc"))
+    if soc is None:
+        return True
+    return soc < _resolved_target_soc(vehicle)
 
 
 def frame_to_scenario(frame: dict, class_table: dict, *,
@@ -163,30 +440,68 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
                       ready_by_min: dict[str, int] | None = None,
                       default_ready_delta_min: int = 240,
                       serviceable: Callable[[dict], bool] | None = None,
+                      class_key: str = DEFAULT_CLASS_KEY,
                       ) -> tuple[dict, list[dict]]:
     """Translate a production decision frame into a kernel scenario.
 
-    Returns (scenario, abstentions). Vehicles that cannot be planned -- unknown
-    platform, or no capable charge point on site -- become ABSTAIN proposals
-    rather than being silently dropped: the disposer should know the proposer
-    saw them and declined, which is cuOpt's abstention pattern.
+    Returns (scenario, abstentions). Vehicles that cannot be planned -- no class
+    entry, no readable soc, no plug that fits any point on site -- become
+    ABSTAIN proposals rather than being silently dropped: the disposer should
+    know the proposer saw them and declined, which is cuOpt's abstention
+    pattern.
+
+    `class_key` names the FRAME FIELD that keys `class_table`. It defaults to
+    the production join key (see DEFAULT_CLASS_KEY); a caller holding a table
+    keyed some other way -- a pack file keyed by platform, a fixture -- names
+    its own field rather than reshaping the table.
     """
     ready_by_min = ready_by_min or {}
     if serviceable is None:
-        serviceable = lambda v: (v.get("state") in DEFAULT_SERVICEABLE_STATES
-                                 and float(v.get("soc", 100)) <
-                                 float(v.get("target_soc") or 100))
+        serviceable = _default_serviceable
 
     points, kinds_on_site = [], set()
+    #: kind -> the inlets the site actually accepts for it, kept only so an
+    #: abstention can say what IS on site rather than only what is not.
+    connectors_by_kind: dict[str, set[str]] = {}
     for st in frame.get("stalls", []):
         kind = st.get("type")
         kw = float(st.get("connector_max_kw") or 0)
         if kind in NON_CHARGING_TYPES or kw <= 0:
             continue
-        points.append({"id": st["id"], "kind": kind, "kw": int(kw)})
-        kinds_on_site.add(kind)
+        inlets = _accepted_inlets(st)
+        if not inlets:
+            #: A stall that does not say which plugs it has cannot be matched to
+            #: an inlet, and GUESSING one is the defect this finding is about.
+            #: It drops out of the capability set; the consequence surfaces on
+            #: the vehicle side, where an abstention names the inlet that found
+            #: nothing and the plugs the site does offer.
+            continue
+        cap = _capability(kind, inlets)
+        #: THE COOLDOWN MUST BE DECLARED, NOT INFERRED FROM THE LABEL. The
+        #: kernel falls back to `site["dcfc_cooldown_min"] if kind == "dcfc"`
+        #: for a point that declares no min_gap_min (model.py:497) -- a string
+        #: literal that a composite capability label silently stops matching.
+        #: Measured on the crowded fixture: composing the label without this
+        #: line dropped the 18-minute DCFC min-gap from every point, which
+        #: CLAUDE.md 2.5 names a modelling requirement that bites, and the
+        #: whole suite stayed green but for two status assertions. Declaring
+        #: the gap here is the kernel's own declared-data path and is what the
+        #: label was always standing in for.
+        if kind == "dcfc" and "dcfc_cooldown_min" not in site:
+            raise FrameError("site declares no dcfc_cooldown_min; the DCFC "
+                             "minimum gap on a service point cannot be guessed")
+        gap = int(site["dcfc_cooldown_min"]) if kind == "dcfc" else 0
+        points.append({"id": st["id"], "kind": cap, "kw": int(kw),
+                       "min_gap_min": gap,
+                       #: The ORIGINAL stall type, carried for the proposal
+                       #: row's `stall_type`: the gate router's contract is the
+                       #: database's vocabulary, not the kernel's label.
+                       "stall_type": kind})
+        kinds_on_site.add(cap)
+        connectors_by_kind.setdefault(kind, set()).update(inlets)
     if not points:
-        raise FrameError("frame has no charge-capable stalls; nothing to propose on")
+        raise FrameError("frame has no charge-capable stalls that declare an "
+                         "accepted inlet; nothing to propose on")
 
     classes: dict[str, dict] = {}
     explicit: list[dict] = []
@@ -194,16 +509,65 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
     for v in frame.get("vehicles", []):
         if not serviceable(v):
             continue
-        platform = v.get("platform")
-        cls = class_table.get(platform)
-        if cls is None:
-            abstentions.append(_abstain(v, f"no class-table entry for platform "
-                                           f"{platform!r}; battery unknown"))
+        #: THE TWO GUARDS THAT KEEP ONE BAD ROW FROM COSTING THE BATCH, and that
+        #: keep an unplannable vehicle from being planned anyway. Both abstain
+        #: rather than raise and rather than drop: the frame contract permits a
+        #: null soc, so a null soc is an input this bridge must answer for, not
+        #: an exception it may throw across every other vehicle in the frame.
+        soc_pct = _pct(v.get("soc"))
+        if soc_pct is None:
+            abstentions.append(_abstain(v, "frame carries no readable soc for "
+                                           "this vehicle; nothing to plan "
+                                           "toward"))
             continue
-        ck = tuple(cls.get("charge_kinds", ("dcfc", "l2")))
-        if not any(k in kinds_on_site for k in ck):
-            abstentions.append(_abstain(v, f"no capable point on site for "
-                                           f"charge_kinds {list(ck)}"))
+        #: Compared as the INTEGERS THE KERNEL WILL ACTUALLY SEE, not as the
+        #: floats they came in as: soc 89.6 and target 90.0 both round to 90,
+        #: and it is the rounded pair that decides whether model.py builds any
+        #: charge segment at all. Guarding the raw floats would let exactly that
+        #: pair through as an asset with nothing to do.
+        soc_i = int(round(soc_pct))
+        target_i = int(round(_resolved_target_soc(v)))
+        if target_i <= soc_i:
+            abstentions.append(_abstain(v, f"target_soc {target_i} is at or "
+                                           f"below soc {soc_i}; no charge to "
+                                           f"schedule"))
+            continue
+        ckey = v.get(class_key)
+        cls = class_table.get(ckey)
+        if cls is None:
+            abstentions.append(_abstain(v, f"no class-table entry for "
+                                           f"{class_key} {ckey!r}; battery "
+                                           f"unknown"))
+            continue
+        #: REQUIRED, exactly like battery_kwh (finding L-42). charge_kinds alone
+        #: decides which stall types a vehicle may be sent to, and it used to
+        #: default to ("dcfc", "l2") -- so a class table that omitted it, which
+        #: every production-derived one does since ottoq_vehicle_classes has no
+        #: such column, silently granted every vehicle both charging types. The
+        #: module's own rule for battery_kwh applies unchanged: a made-up
+        #: capability is a silently wrong plan, and silence is not a default.
+        if "charge_kinds" not in cls:
+            raise FrameError(
+                f"class {ckey!r} declares no charge_kinds; the field decides "
+                f"which stall types this vehicle may be sent to and there is no "
+                f"safe default for it (see battery_kwh)")
+        ck = tuple(cls["charge_kinds"])
+        inlet = _connector(v.get("inlet_type"))
+        if inlet is None:
+            abstentions.append(_abstain(v, "frame declares no inlet_type; the "
+                                           "plug that fits cannot be guessed"))
+            continue
+        #: Sorted so the class's charge_kinds -- and therefore the scenario and
+        #: the plan -- do not depend on set iteration order.
+        caps = tuple(c for c in sorted(kinds_on_site)
+                     if _capability_kind(c) in ck and inlet in _capability_inlets(c))
+        if not caps:
+            offered = sorted({i for k in ck
+                              for i in connectors_by_kind.get(k, ())})
+            abstentions.append(_abstain(
+                v, f"no point on site accepts inlet {inlet} for charge_kinds "
+                   f"{list(ck)}; the site accepts "
+                   f"{offered or 'no inlet of those kinds'}"))
             continue
         #: THE SYNTHESIZED CLASS IS KEYED ON THE PER-UNIT FACTS, NOT THE PLATFORM.
         #: `inlet_max_kw` and `inlet_type` are declared per vehicle in the frame
@@ -217,8 +581,7 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
         #: from row order alone. A derated unit now materializes its own class.
         eff_kw = float(min(cls["max_charge_kw"],
                            v.get("inlet_max_kw") or cls["max_charge_kw"]))
-        inlet = v.get("inlet_type", "CCS")
-        cname = f"{platform}|{int(eff_kw)}|{inlet}"
+        cname = f"{ckey}|{int(eff_kw)}|{inlet}"
         #: The chemistry cap, resolved once per synthesized class. Explicit
         #: beats derived; derived beats nothing; nothing means no cap, exactly
         #: as before for any class that declares neither field.
@@ -229,7 +592,10 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
             "battery_kwh": float(cls["battery_kwh"]),
             "max_charge_kw": eff_kw,
             "inlet": inlet,
-            "charge_kinds": list(ck),
+            #: The COMPOSITE capabilities this vehicle's plug can actually
+            #: reach, not the bare kinds: this is what binds the plug to the
+            #: point inside the kernel's own model.
+            "charge_kinds": list(caps),
             "energy_curve": cls.get("energy_curve",
                                     [{"above_soc_pct": 0, "accept_frac": 1.0}]),
             **({"max_daily_soc_pct": int(cap)} if cap is not None else {}),
@@ -237,8 +603,8 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
         rb = int(ready_by_min.get(v["id"], default_ready_delta_min))
         explicit.append({
             "aid": v["id"], "cls": cname, "arrival_min": 0,
-            "soc": int(round(float(v["soc"]))),
-            "target_soc": int(v.get("target_soc") or 90),
+            "soc": soc_i,
+            "target_soc": target_i,
             "ready_by_min": rb,
         })
 
@@ -282,7 +648,10 @@ def plan_to_proposals(plan: dict, scenario: dict, *,
     from a vehicle nobody asked about. That distinction is the entire reason
     cuopt_invocation_log exists on the other proposer, and it survives here.
     """
-    kinds = {p["id"]: p["kind"] for p in scenario["service_points"]}
+    #: The DATABASE's stall type, not the kernel's composite capability label:
+    #: the gate router receives `dcfc`, never `dcfc@CCS1`.
+    kinds = {p["id"]: p.get("stall_type", p["kind"])
+             for p in scenario["service_points"]}
     out = []
     for a in plan["assets"]:
         charge = next((o for o in a["ops"] if o["op"] == "charge"), None)
@@ -298,6 +667,23 @@ def plan_to_proposals(plan: dict, scenario: dict, *,
             #: there, not `id`, and buy nothing.
             out.append(_abstain({"id": a["aid"]}, reason))
             continue
+        #: THE TAPER SURVIVES THE ROW (finding L-25). `requested_kw` was the
+        #: FIRST segment's kW while planned_start/planned_end spanned ALL of
+        #: them, so the row invited kW x duration -- and the model produces
+        #: multi-segment charge ops precisely because acceptance falls above
+        #: ~70% SoC (CLAUDE.md 2.5 names the piecewise curve a modelling
+        #: requirement that bites). On a 30->90 plan that arithmetic overstates
+        #: the energy by the whole tapered tail, and CLAUDE.md 2.6 sends this
+        #: substrate into the SDR, so the overstatement would have settled.
+        #:
+        #: requested_kw stays SINGLE-VALUED for the gate router's existing
+        #: contract, but it is now the PEAK segment rather than the first: the
+        #: number a connector must be able to deliver. Those coincide on a
+        #: monotone taper and differ the moment a curve is not monotone, and
+        #: the peak is the one that is safe to size against.
+        segments = charge["segments"]
+        planned_kwh = round(
+            sum(sg["kw"] * (sg["end"] - sg["start"]) for sg in segments) / 60.0, 3)
         out.append({
             "action_context": "stall_assignment",
             "entity_type": "vehicle",
@@ -308,11 +694,13 @@ def plan_to_proposals(plan: dict, scenario: dict, *,
                 "stall_id": charge["point"],
                 "stall_type": kinds[charge["point"]],
                 "vehicle_id": a["aid"],
-                "requested_kw": charge["segments"][0]["kw"],
+                "requested_kw": max(sg["kw"] for sg in segments),
                 "rationale": {
                     "optimizer": "forward_lex",
                     "planned_start_min": charge["start"],
                     "planned_end_min": charge["end"],
+                    "planned_kwh": planned_kwh,
+                    "segments": segments,
                     "tardy_min": a["tardy_min"],
                     "ready_by_source": ready_by_used.get(a["aid"], "default"),
                 },
@@ -331,7 +719,9 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             allow_rejection: bool = False,
             max_assets: int | None = None,
             hour_of_day: int | None = None,
-            signals: frozenset = frozenset()) -> dict:
+            signals: frozenset = frozenset(),
+            intent=None,
+            class_key: str = DEFAULT_CLASS_KEY) -> dict:
     """Frame in, advisory rows out. Writes nothing, ever.
 
     The result carries the rows AND the solve's own accounting (T*, peak,
@@ -361,11 +751,19 @@ def propose(frame: dict, class_table: dict, *, site: dict,
     and reports optima read from served assets only (so rejection composes).
     Left unset, the solver record keeps the two-pass pass1_status/pass2_status
     contract exactly as before.
+
+    `intent` supplies the doctrine to resolve that regime FROM. Left None it is
+    the kernel default artifact -- which is one process-global object, and was
+    the only reachable one from this entry point, so no pack or tenant could
+    bring its own priority orderings (finding L-52). policies/regime.py's
+    intent_for_pack(pack_id) resolves a pack's artifact, and any Intent loaded
+    by intent.load_intent is accepted here.
     """
     scenario, abstentions = frame_to_scenario(
         frame, class_table, site=site, horizon_min=horizon_min,
         ready_by_min=ready_by_min,
-        default_ready_delta_min=default_ready_delta_min)
+        default_ready_delta_min=default_ready_delta_min,
+        class_key=class_key)
 
     if not scenario["assets_spec"]["explicit"]:
         return {"proposals": abstentions, "abstained": len(abstentions),
@@ -439,20 +837,51 @@ def propose(frame: dict, class_table: dict, *, site: dict,
                                 max_tardy_total=t_star, previous_plan=pass1,
                                 **budget)
         final_plan = pass2
+        #: A RETAINED PASS 2 IS PASS 1'S SCHEDULE WEARING PASS 2'S NAME. When
+        #: pass 2 cannot solve within the budget, model.py returns pass 1's plan
+        #: with retained_previous=True and pass 1's repro dict attached -- so
+        #: `reproducible` read true, `pass2_status` read whatever pass 1 proved,
+        #: and nothing on the record said the peak pass never landed. The
+        #: regime branch has surfaced this since it was written; the hot path,
+        #: which is the branch production actually runs, did not (finding L-23).
+        retained = bool(pass2.get("retained_previous"))
+        optima = {"min_tardy": t_star,
+                  "min_peak": (None if retained
+                               else pass2.get("site_peak_kw"))}
+        measured = _measure_plan(final_plan)
+        _check_optima(measured, optima)
         solver_record = {
             "optimizer": "forward_lex",
             "pass1_status": pass1["solver_status"],
             "pass2_status": pass2["solver_status"],
-            "total_tardy_min": t_star,
+            #: MEASURED OFF final_plan, not re-reported from the passes -- see
+            #: _measure_plan. `optima_reached` keeps what each pass reached, so
+            #: nothing is lost and the two can be compared by an auditor.
+            "total_tardy_min": measured["total_tardy_min"],
+            "site_peak_kw": measured["site_peak_kw"],
+            "total_flow_min": measured["total_flow_min"],
+            "optima_reached": optima,
+            "retained_previous": retained,
+            #: complete has ONE meaning across both branches: every pass this
+            #: path was asked to run RAN and PROVED its optimum. FEASIBLE is an
+            #: incumbent, not a proof, and a retained pass did not run at all.
+            "complete": (not retained
+                         and pass1["solver_status"] == "OPTIMAL"
+                         and pass2["solver_status"] == "OPTIMAL"),
             #: FALSE means a wall-clock limit may have decided this plan, so it
             #: is not a function of (scenario, seed, config) alone. A fire
             #: record carrying FALSE must not be cited as a reproducible number.
-            "reproducible": bool(pass1.get("repro", {}).get("reproducible")
+            #: A retained plan is not this pass's plan, so it cannot be cited
+            #: as this pass's reproducible result either -- the same gate the
+            #: regime branch applies.
+            "reproducible": bool(not retained
+                                 and pass1.get("repro", {}).get("reproducible")
                                  and pass2.get("repro", {}).get("reproducible")),
             "rejected": list(pass2.get("rejected", [])),
             "deterministic_time": round(
                 pass1.get("repro", {}).get("deterministic_time", 0.0)
                 + pass2.get("repro", {}).get("deterministic_time", 0.0), 6),
+            **_repro_identity(pass2, pass1),
         }
     else:
         #: THE REGIME-AWARE PATH: the commander's intent resolves the active
@@ -461,19 +890,33 @@ def propose(frame: dict, class_table: dict, *, site: dict,
         #: the fire record names the regime and the per-pass trace so an auditor
         #: can see WHY this order was chosen. rejection composes: the optima are
         #: read from served assets only (T*/F*) and site_peak_kw (P*).
-        active = resolve_active(hour_of_day, signals)
+        #: `intent` is the PACK's doctrine when the caller has one (finding
+        #: L-52). None keeps the kernel default, which is what every existing
+        #: caller gets, unchanged.
+        active = resolve_active(hour_of_day, signals, intent=intent)
         modes = pass_sequence(active)
         final_plan, optima, passes = lexicographic_solve_traced(
             scenario, modes, budget=budget)
+        measured = _measure_plan(final_plan)
+        _check_optima(measured, optima)
         solver_record = {
             "optimizer": "forward_lex",
             "regime": active.regime_key,
             "regime_label": active.regime_label,
             "pass_modes": list(modes),
             "passes": passes,
-            "total_tardy_min": optima.get("min_tardy"),
-            "site_peak_kw": optima.get("min_peak"),
-            "total_flow_min": optima.get("min_flow"),
+            #: MEASURED OFF final_plan (finding L-22). These three were the
+            #: per-pass optima, which describe the plan each pass returned and
+            #: not the one that ships. A consequence worth stating: a figure is
+            #: now reported whether or not a pass optimized it -- a regime that
+            #: skips min_flow still has a flow time, and this is it. What the
+            #: chain actually held is `optima_reached`, where a skipped mode is
+            #: absent and a retained one is None.
+            "total_tardy_min": measured["total_tardy_min"],
+            "site_peak_kw": measured["site_peak_kw"],
+            "total_flow_min": measured["total_flow_min"],
+            "optima_reached": dict(optima),
+            "retained_previous": bool(final_plan.get("retained_previous")),
             #: complete == every pass in the regime RAN and PROVED its optimum.
             #: Three ways it can be False, and all three used to be invisible:
             #: a retained pass (INFEASIBLE/UNKNOWN) sets optima[mode]=None and
@@ -494,6 +937,7 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             "rejected": list(final_plan.get("rejected", [])),
             "deterministic_time": round(
                 sum(p.get("deterministic_time", 0.0) for p in passes), 6),
+            **_repro_identity(final_plan),
         }
 
     rows = plan_to_proposals(final_plan, scenario, ready_by_used=ready_by_used)

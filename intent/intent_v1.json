@@ -1,7 +1,7 @@
 {
   "manifest": {
     "description": "The machine-readable commander's intent: what to optimize, in what priority, under what regime, with what dollar-grounded weights, and what is a hard floor. Robotaxi-first, sector-agnostic objective structure, multi-OEM expressed in Tier 3 constraints.",
-    "fingerprint_md5": "708ed712a9b718ab6f5428f171e7c063",
+    "fingerprint_md5": "a2214eeaf222514dba85f55dd9323e08",
     "generated_at": "2026-09-06",
     "kind": "intent_v1",
     "version": 1

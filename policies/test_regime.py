@@ -33,7 +33,10 @@ PERFORMANCE FINDINGS, STATED NOT HIDDEN (2026-09-07):
   the live hot path; for offline planning and the demo the current solver is fine.
 """
 
+import dataclasses
+import json
 import sys
+import types
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -43,7 +46,10 @@ sys.path.insert(0, str(HERE.parent / "solvers" / "cpsat"))
 
 from model import build_and_solve, load_scenario  # noqa: E402
 from forward import lexicographic_solve, lexicographic_solve_traced  # noqa: E402
+import regime  # noqa: E402
 from regime import intent_orchestrate, resolve_active  # noqa: E402
+from intent.intent import ARTIFACT_PATH, load_intent, stamp  # noqa: E402
+from intent.solve import pass_sequence  # noqa: E402
 
 SC = HERE.parent / "solvers" / "cpsat" / "scenario_canonical.json"
 
@@ -278,3 +284,173 @@ def test_the_readiness_floor_cannot_be_demoted_out_of_first_place():
         lexicographic_solve(load_scenario(SC), ("min_peak", "min_tardy"))
     with _pytest.raises(ValueError, match="must begin with min_tardy"):
         lexicographic_solve(load_scenario(SC), ())
+
+
+# ---------------------------------------------------------------------------
+# L-52: the commander's intent is a parameter, not a process-global singleton.
+# ---------------------------------------------------------------------------
+
+def _reversed_priority_intent():
+    """The kernel intent with every regime's soft priority reversed.
+
+    A DIFFERENT DOCTRINE over the same objectives -- which is what a pack from
+    another sector is. min_tardy still leads every chain because the resolver
+    prepends the readiness floor structurally; what a pack reorders is the rest.
+    """
+    base = load_intent()
+    return dataclasses.replace(
+        base,
+        regimes=tuple(dataclasses.replace(r, priority=tuple(reversed(r.priority)))
+                      for r in base.regimes))
+
+
+def test_an_intent_override_changes_the_pass_order_it_resolves():
+    assert pass_sequence(resolve_active(7)) != pass_sequence(
+        resolve_active(7, intent=_reversed_priority_intent())), (
+        "the fixture no longer distinguishes the two doctrines")
+
+
+def test_the_regime_policy_carries_an_intent_down_to_the_chain(monkeypatch):
+    """The defect L-52 names: the override existed and this caller dropped it."""
+    seen = {}
+
+    def _spy(sc, modes, *, budget=None):
+        seen["modes"] = list(modes)
+        return {"assets": []}, {}
+
+    monkeypatch.setattr(regime, "lexicographic_solve", _spy)
+    pack = _reversed_priority_intent()
+    policy = regime.RegimeOrchestratorPolicy(hour_of_day=7, intent=pack)
+    policy.decide(types.SimpleNamespace(sc={}), [])
+    assert seen["modes"] == list(pass_sequence(resolve_active(7, intent=pack)))
+    assert seen["modes"] != list(pass_sequence(resolve_active(7)))
+
+
+def test_a_pack_without_its_own_artifact_gets_the_kernel_default():
+    assert regime.intent_for_pack("no_such_pack_anywhere") is regime.INTENT
+    assert regime.intent_for_pack(None) is regime.INTENT
+
+
+def test_a_pack_that_ships_an_intent_artifact_gets_its_own(tmp_path,
+                                                           monkeypatch):
+    raw = json.loads(ARTIFACT_PATH.read_text())
+    for r in raw["regimes"]:
+        r["priority"] = list(reversed(r["priority"]))
+    dest = tmp_path / "mining_intent_v1.json"
+    dest.write_text(json.dumps(raw))
+    stamp(dest)                    # a pack's artifact is fingerprinted too
+
+    monkeypatch.setattr(regime, "PACK_INTENT_DIR", tmp_path)
+    monkeypatch.setattr(regime, "_PACK_INTENTS", {})
+    loaded = regime.intent_for_pack("mining")
+    assert loaded is not regime.INTENT
+    assert pass_sequence(resolve_active(7, intent=loaded)) != \
+        pass_sequence(resolve_active(7))
+
+
+# ---------------------------------------------------------------------------
+# L-18: a pass that produced nothing reports nothing, in every field.
+# ---------------------------------------------------------------------------
+
+def test_a_retained_pass_publishes_no_leftover_number(monkeypatch):
+    """The guard suppressed the leftover in `optima` and published it in `passes`.
+
+    `passes` travels verbatim into the proposer's fire record, so the previous
+    pass's objective was reported under THIS pass's mode, with the previous
+    pass's deterministic_time and its `reproducible: true` — for a pass that
+    returned no schedule at all. That is precisely the number the guard's own
+    comment says it exists to suppress, moved one field over.
+    """
+    import forward as fwd
+    real = fwd.build_and_solve
+    calls = {"n": 0}
+
+    def _retain_the_second_pass(sc, **kw):
+        calls["n"] += 1
+        plan = real(sc, **kw)
+        if calls["n"] == 2:
+            #: exactly what model.py returns when a pass cannot solve: the
+            #: PREVIOUS plan, carrying the previous pass's objective and repro.
+            return {**plan, "retained_previous": True, "solver_status": "UNKNOWN"}
+        return plan
+
+    monkeypatch.setattr(fwd, "build_and_solve", _retain_the_second_pass)
+    sc = load_scenario(SC)
+    _plan, optima, passes = fwd.lexicographic_solve_traced(
+        sc, ("min_tardy", "min_peak"), budget=FLOW_BUDGET)
+
+    assert len(passes) == 2
+    second = passes[1]
+    assert second["retained"] is True
+    assert optima["min_peak"] is None, "the guard's original half still holds"
+    for field in ("objective", "deterministic_time"):
+        assert second[field] is None, (
+            f"the retained pass published the PREVIOUS pass's {field}: "
+            f"{second[field]!r}")
+    assert second["reproducible"] is False and second["proven"] is False
+    #: ...and a pass that DID solve still reports its own numbers.
+    assert passes[0]["retained"] is False
+    assert passes[0]["objective"] is not None
+
+
+# ---------------------------------------------------------------------------
+# L-21: a rejected asset is abstained on, not crashed on.
+# ---------------------------------------------------------------------------
+
+class _FakeArrival:
+    def __init__(self, aid):
+        self.aid = aid
+
+
+class _FakeState:
+    """The two calls decide() makes on its state, and nothing else."""
+    sc = {}
+
+    def __init__(self):
+        self.booked = []
+
+    def point(self, pid):
+        return pid
+
+    def book_charge(self, asset, point, start):
+        self.booked.append((asset.aid, point, start))
+
+
+def _plan_missing_one(aids, rejected):
+    return {"assets": [
+        {"aid": aid, "ops": ([] if aid in rejected else
+                             [{"op": "charge", "point": "p1", "start": 0}])}
+        for aid in aids]}
+
+
+def test_the_regime_policy_abstains_on_a_rejected_asset_instead_of_raising(
+        monkeypatch):
+    """allow_rejection is an advertised budget key, and it crashed the policy.
+
+    A rejected asset leaves the plan with `ops: []` (model.py), so it never
+    enters `starts`; indexing it raised KeyError for every arrival, destroying
+    the abstain-vs-crash distinction the rejection feature exists to preserve.
+    The plan's own `proposals` list already carries the declined asset with
+    abstain: true, so the policy simply returns no Assignment for it.
+    """
+    aids = ["v-a", "v-b", "v-c"]
+    monkeypatch.setattr(regime, "intent_orchestrate",
+                        lambda sc, h, sig, budget=None, intent=None:
+                        (_plan_missing_one(aids, {"v-b"}), None, {}))
+    state = _FakeState()
+    out = regime.RegimeOrchestratorPolicy(hour_of_day=7).decide(
+        state, [_FakeArrival(a) for a in aids])
+    assert [a.aid for a in out] == ["v-a", "v-c"]
+    assert [b[0] for b in state.booked] == ["v-a", "v-c"]
+
+
+def test_the_forward_policy_abstains_on_a_rejected_asset_too(monkeypatch):
+    import forward as fwd
+    aids = ["v-a", "v-b"]
+    monkeypatch.setattr(fwd, "lexicographic_solve",
+                        lambda sc, modes, budget=None:
+                        (_plan_missing_one(aids, {"v-a"}), {}))
+    state = _FakeState()
+    out = fwd.ForwardOrchestratorPolicy().decide(
+        state, [_FakeArrival(a) for a in aids])
+    assert [a.aid for a in out] == ["v-b"]

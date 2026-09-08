@@ -64,6 +64,29 @@ kernel (and say so) or to conclude the thesis is wrong for that sector.
   express this."* `null` is not a failure to fill in a field — it is the finding, and
   the harness reports it as such.
 
+### Optional: a pack's own intent artifact
+
+A pack MAY ship its own doctrine — the priority ordering of objectives per regime —
+as `conformance/packs/<pack_id>_intent_v1.json`, in the same shape as the kernel
+default `intent/intent_v1.json` and fingerprinted the same way (`intent.stamp`
+writes the manifest hash; `load_intent` refuses a mismatch).
+
+`policies/regime.py::intent_for_pack(pack_id)` resolves it, **falling back to the
+kernel artifact when the file is absent** — a pack content with the kernel's
+orderings ships nothing and gets them. The override threads all the way to the
+production entry point: `forward_proposer.propose(..., intent=...)` and
+`RegimeOrchestratorPolicy(..., intent=...)`.
+
+This exists because the kernel artifact is robotaxi-flavoured in places a pack
+would otherwise read unconditionally — its `service_completion` objective's metric
+names *wash / tire / brake / software / inspection / calibration*, and its `staff`
+wiring says *"a packing objective in the robotaxi pack"*. Doctrine is declared
+data, so a mining or vertiport pack states its own **as data**; a pack that needs a
+kernel patch to express its priorities has falsified the thesis for its sector (§4)
+and `CONFORMANCE_FINDINGS.md` must say so. What a pack may NOT reorder is the
+readiness floor: `min_tardy` is prepended structurally to every regime by the
+resolver, whichever artifact is in force.
+
 ---
 
 ## 3. The three invariants the harness verifies

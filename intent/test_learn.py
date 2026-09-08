@@ -10,6 +10,9 @@ never decision history.
 """
 
 from intent.learn import (
+    COMMANDS_CHANNEL,
+    EVENTS_CHANNEL,
+    LEARNED_CONSTRAINT_TTL_SOLVES,
     REFUSAL_CODES,
     REFUSAL_TAXONOMY,
     Refusal,
@@ -309,3 +312,122 @@ if __name__ == "__main__":
         fn()
         print(f"{fn.__name__} PASS")
     print("ALL LEARN TESTS PASS")
+
+
+# ---------------------------------------------------------------------------
+# L-12: a batch it could not read is not a clean batch.
+# ---------------------------------------------------------------------------
+
+class _Nulled:
+    """A refusal row as migration 0086 deliberately left 14 of them: no code."""
+    reason_code = None
+    entity_id = "stall-1"
+    rule_code = None
+
+
+def test_a_batch_of_unreadable_rows_is_not_reported_clean():
+    """It used to be BYTE-IDENTICAL to the report for an empty batch.
+
+    Not counted, not in unknown_codes, no trace anywhere — and is_clean() said
+    True. The loop's answer was "everything is clean" when the truth was "I
+    could not read these", on a shape the live ledger actually holds.
+    """
+    empty = reconcile_refusals([])
+    nulled = reconcile_refusals([_Nulled(), _Nulled(), _Nulled()])
+    assert nulled.unreadable == 3
+    assert nulled.is_clean() is False
+    assert empty.is_clean() is True
+    assert nulled != empty, "the two reports are still indistinguishable"
+
+
+def test_a_readable_batch_reports_no_unreadable_rows():
+    r = reconcile_refusals([Refusal("superseded"), Refusal("superseded")])
+    assert r.unreadable == 0 and r.is_clean() is True
+
+
+# ---------------------------------------------------------------------------
+# L-45: rule_code was accepted, carried and discarded.
+# ---------------------------------------------------------------------------
+
+def test_the_shield_rule_that_refused_reaches_the_report_and_the_flag():
+    r = reconcile_refusals([
+        Refusal("command_malformed", entity_id="v-1", rule_code="HW.002"),
+        Refusal("command_malformed", entity_id="v-2", rule_code="HW.003"),
+    ])
+    assert r.rule_codes["command_malformed"] == ("HW.002", "HW.003")
+    msg = next(m for c, _n, m in r.flags if c == "command_malformed")
+    assert "HW.002" in msg and "HW.003" in msg
+
+
+def test_a_batch_without_rule_codes_says_nothing_about_rules():
+    r = reconcile_refusals([Refusal("command_malformed", entity_id="v-1")])
+    assert r.rule_codes == {}
+    msg = next(m for c, _n, m in r.flags if c == "command_malformed")
+    assert "shield rules" not in msg
+
+
+# ---------------------------------------------------------------------------
+# L-10: a learned block carries its evidence and its lifetime, and cannot
+# black out the site.
+# ---------------------------------------------------------------------------
+
+def _faults(entity, n):
+    return [Refusal("resource_faulted", entity_id=entity) for _ in range(n)]
+
+
+def test_every_learned_entry_carries_its_evidence_and_its_expiry():
+    r = reconcile_refusals(_faults("stall-1", 3), run_id="run-7")
+    assert r.learned_constraints["block_points"] == ["stall-1"]
+    (entry,) = r.learned_detail["block_points"]
+    assert entry["entity"] == "stall-1"
+    assert entry["observed_count"] == 3
+    assert entry["run_id"] == "run-7"
+    assert entry["expires_after_n_solves"] == LEARNED_CONSTRAINT_TTL_SOLVES == 1
+
+
+def test_a_block_set_that_would_black_out_the_site_is_refused_and_flagged():
+    """model.py raises a hard RuntimeError when a blocked set makes the model
+    infeasible with no previous plan — so an over-large learned block takes the
+    site from a degraded schedule to no schedule at all. Refusing to learn is
+    the finding; a flag an operator can read beats a RuntimeError three layers
+    down that they cannot."""
+    batch = [r for i in range(3) for r in _faults(f"stall-{i}", 3)]
+    r = reconcile_refusals(batch, capable_entities={"block_points": 4})
+    assert r.learned_constraints["block_points"] == []
+    msg = next(m for c, _n, m in r.flags if c == "block_points")
+    assert "3 of 4" in msg and "NOT learned" in msg
+    assert r.is_clean() is False
+
+
+def test_a_block_set_inside_the_cap_is_learned_normally():
+    batch = [r for i in range(2) for r in _faults(f"stall-{i}", 3)]
+    r = reconcile_refusals(batch, capable_entities={"block_points": 10})
+    assert r.learned_constraints["block_points"] == ["stall-0", "stall-1"]
+
+
+def test_no_cap_binds_when_the_caller_declares_no_capacity():
+    """This module refuses to guess a site's denominator."""
+    batch = [r for i in range(9) for r in _faults(f"stall-{i}", 3)]
+    r = reconcile_refusals(batch)
+    assert len(r.learned_constraints["block_points"]) == 9
+
+
+# ---------------------------------------------------------------------------
+# L-11: the taxonomy says which channel each code actually arrives on.
+# ---------------------------------------------------------------------------
+
+def test_no_capacity_is_marked_as_arriving_on_a_different_channel():
+    """77,435 escalations live in ottoq_events; 0 in the reason_code column
+    this module's declared feed reads. tighten_capacity — the branch that tells
+    the loop its capacity model is looser than the world's — is structurally
+    dead against that feed, and the taxonomy now says so."""
+    assert REFUSAL_TAXONOMY["no_capacity"].channel == EVENTS_CHANNEL
+    reachable = [c for c, cls in REFUSAL_TAXONOMY.items()
+                 if cls.channel == COMMANDS_CHANNEL]
+    assert "no_capacity" not in reachable
+    assert set(reachable) == set(REFUSAL_TAXONOMY) - {"no_capacity"}
+
+
+def test_every_class_names_a_real_channel():
+    assert {cls.channel for cls in REFUSAL_TAXONOMY.values()} <= {
+        COMMANDS_CHANNEL, EVENTS_CHANNEL}

@@ -162,6 +162,26 @@ as `blocked_points` and the solver routes around it (`intent/test_learn.py`).
 `reconcile_refusals`; the resulting constraints become the next propose's
 `blocked_points` / capacity. That is a deployment concern, not a kernel change.
 
+**Two corrections to the paragraph above, from the audit** (findings L-10, L-11):
+
+- That feed is not the whole vocabulary. The engine never writes `no_capacity`
+  into `reason_code` — it emits it as an `ottoq_events` payload field on
+  `event_type = 'ottoq.refusal_escalated'`, where 77,435 escalations live
+  against 0 in the column. So `tighten_capacity`, the branch that tells the loop
+  its capacity model is looser than the world's, is **structurally dead against
+  the declared feed**. Each `RefusalClass` now names its `channel`, so the
+  taxonomy stops reading as though every branch were reachable; the offline job
+  must read the UNION of the two feeds for that branch to be live.
+- A learned constraint is **for the next solve, and must be re-observed to
+  persist** (`expires_after_n_solves = 1`), carries its `observed_count` and its
+  `run_id`, and is subject to a cap: pass `capable_entities={kind: n}` and a set
+  that would remove more than `max_block_fraction` of them is NOT learned, and
+  is flagged instead. Without that, nothing bounded how many points a block set
+  could name, nothing expired an entry, and no inverse operation existed
+  anywhere — while `model.py` raises a hard `RuntimeError` when a blocked set
+  makes the model infeasible with no previous plan. An over-large learned block
+  took the site from a degraded schedule to **no schedule at all**.
+
 ## The honest gap (what is NOT yet wired)
 
 This artifact is the *specification* of the full objective. The solver currently

@@ -22,10 +22,23 @@ from pathlib import Path
 
 ARTIFACT_PATH = Path(__file__).parent / "intent_v1.json"
 
-#: The canonical content — what the fingerprint covers. `manifest` is excluded
-#: on purpose: it carries the fingerprint itself and generated_at, so a re-stamp
-#: that lands the same content is not a change to the world (0201 discipline).
-CANONICAL_KEYS = ("numeraire", "objectives", "regimes", "tier3_constraints")
+#: THE FINGERPRINT COVERS EVERYTHING EXCEPT ITSELF (finding L-55).
+#:
+#: It used to project onto four hardcoded top-level keys, which put the WHOLE
+#: manifest outside the hash -- `version`, `kind` and `description` along with
+#: it -- and left any future top-level key unauthenticated by default. The
+#: loader then built `Intent.version` from `manifest["version"]`, so it
+#: returned a verified-looking object carrying a field the verification never
+#: covered, and a document could declare itself version 9 of a different kind
+#: without disturbing its own hash.
+#:
+#: Only the two SELF-REFERENTIAL manifest fields stay out, and for the reason
+#: the original comment gave: `fingerprint_md5` cannot hash itself, and
+#: `generated_at` is the stamp's timestamp, so a re-stamp that lands the same
+#: content is not a change to the world (0201 discipline). Everything else is
+#: covered, and a key added later is covered by default rather than covered
+#: only if someone remembers to extend a list.
+UNHASHED_MANIFEST_KEYS = ("fingerprint_md5", "generated_at")
 
 
 @dataclass(frozen=True)
@@ -60,6 +73,16 @@ class Intent:
     fingerprint: str
     version: int
 
+    @property
+    def known_signals(self) -> frozenset[str]:
+        """Every signal name any regime in THIS artifact matches on.
+
+        The vocabulary is the artifact's, not a constant, so a pack that
+        declares its own signals is checked against its own doctrine.
+        """
+        return frozenset(sig for r in self.regimes
+                         for sig in r.match.get("signals", []))
+
 
 @dataclass(frozen=True)
 class ActiveIntent:
@@ -80,7 +103,13 @@ def fingerprint(content: dict) -> str:
 
 
 def _canonical(raw: dict) -> dict:
-    return {k: raw[k] for k in CANONICAL_KEYS}
+    """The document, minus the two fields that cannot describe themselves."""
+    out = {k: v for k, v in raw.items() if k != "manifest"}
+    manifest = raw.get("manifest")
+    if isinstance(manifest, dict):
+        out["manifest"] = {k: v for k, v in manifest.items()
+                           if k not in UNHASHED_MANIFEST_KEYS}
+    return out
 
 
 def load_intent(path: str | Path = ARTIFACT_PATH) -> Intent:
@@ -137,13 +166,30 @@ def _matches(regime: Regime, hour_of_day: int, signals: frozenset[str]) -> bool:
     return True
 
 
-#: The floors that must hold under EVERY regime, in canonical order. Readiness
-#: (never strand an asset) then service completion (never miss a must-by) —
-#: both structural, from DECISION_BOUNDARY.md: "anything that can strand an
-#: asset" and "obligation … the must-by is deterministic and non-negotiable."
-#: A regime's priority list orders the SOFT objectives; the floors are prepended
-#: in resolve_intent so no regime can ever drop them.
-CANONICAL_FLOORS = ("readiness", "service_completion")
+#: The canonical ORDER of the two named floors. Readiness (never strand an
+#: asset) then service completion (never miss a must-by) — both structural,
+#: from DECISION_BOUNDARY.md: "anything that can strand an asset" and
+#: "obligation … the must-by is deterministic and non-negotiable."
+#:
+#: THIS IS AN ORDER, NOT THE DEFINITION (finding L-56). There were two
+#: independent definitions of "floor": this Python tuple, which decided what
+#: got PREPENDED, and the artifact's own declarative `kind == "floor"` field,
+#: which decided what `ActiveIntent.floors` REPORTED. An objective the artifact
+#: declares as a floor but that is not named here was silently dropped by every
+#: regime that did not list it — precisely the failure resolve_intent's
+#: docstring says the mechanism prevents. The artifact is now the definition
+#: and this tuple only fixes the order of the two it names.
+CANONICAL_FLOOR_ORDER = ("readiness", "service_completion")
+
+
+def _floors_of(intent: "Intent") -> tuple[str, ...]:
+    """Every objective the ARTIFACT declares a floor, canonical names first."""
+    named = tuple(k for k in CANONICAL_FLOOR_ORDER
+                  if k in intent.objectives
+                  and intent.objectives[k].kind == "floor")
+    rest = tuple(k for k, o in sorted(intent.objectives.items())
+                 if o.kind == "floor" and k not in CANONICAL_FLOOR_ORDER)
+    return named + rest
 
 
 def _dedupe(seq: tuple[str, ...]) -> tuple[str, ...]:
@@ -158,9 +204,9 @@ def _dedupe(seq: tuple[str, ...]) -> tuple[str, ...]:
 
 def _build_active(intent: Intent, regime: Regime) -> ActiveIntent:
     """Build the ActiveIntent for a matched regime (floors prepended, deduped)."""
-    canonical = tuple(k for k in CANONICAL_FLOORS if k in intent.objectives)
+    canonical = _floors_of(intent)
     soft = tuple(k for k in regime.priority
-                 if k in intent.objectives and k not in CANONICAL_FLOORS)
+                 if k in intent.objectives and k not in canonical)
     priority = _dedupe(canonical + soft)
     floors = tuple(k for k in priority
                    if intent.objectives[k].kind == "floor")
@@ -192,6 +238,23 @@ def resolve_intent(intent: Intent, *, hour_of_day: int,
     objectives, and without this prepend they would silently sacrifice
     readiness, the exact defect DECISION_BOUNDARY.md forbids.
     """
+    #: AN UNKNOWN SIGNAL IS AN ERROR, NOT A NO-OP (finding L-38). `_matches`
+    #: only ever tested `need.issubset(signals)`, so a misspelled name matched
+    #: nothing, pass 1 found no signal regime, and the resolver fell through to
+    #: the CLOCK pass and returned a regime as if no signal had been raised.
+    #: `grid_peak_imminant` at 07:00 silently resolved to dispatch_rush --
+    #: throughput first, on a tick that was about to hit a demand-charge
+    #: ceiling. This is the same hazard signals.py guards on the other side of
+    #: the seam, where a missing field is never quietly read as zero because it
+    #: "would hide a real surge"; the same discipline applies here.
+    unknown = frozenset(signals) - intent.known_signals
+    if unknown:
+        raise ValueError(
+            f"unknown signal(s) {sorted(unknown)} — this intent artifact "
+            f"declares {sorted(intent.known_signals)}. A signal name no regime "
+            f"matches on cannot raise a regime, and silently resolving by the "
+            f"clock instead would hide it")
+
     hod = hour_of_day % 24
     # Pass 1: signal-bearing regimes, in declaration order.
     for regime in intent.regimes:

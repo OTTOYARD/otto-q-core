@@ -17,10 +17,12 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 
+import forward_proposer  # noqa: E402
 from forward_proposer import (  # noqa: E402
     CHEMISTRY_DAILY_SOC_CAP_PCT,
     DEFAULT_DET_BUDGET_S,
     DEFAULT_SERVICEABLE_STATES,
+    DEFAULT_TARGET_SOC_PCT,
     FrameError,
     frame_to_scenario,
     propose,
@@ -42,8 +44,12 @@ CLASSES = {
 
 
 def _vehicle(vid, platform="waymo", soc=30, state="arrived_at_gate", **kw):
+    #: vehicle_class_code mirrors platform here so the class tables below stay
+    #: readable; production keys the two apart (L-41), and the bridge joins on
+    #: whichever field `class_key` names.
     base = {"id": vid, "soc": soc, "make": platform.title(), "state": state,
-            "platform": platform, "stall_id": None, "svc_step": "await",
+            "platform": platform, "vehicle_class_code": platform,
+            "stall_id": None, "svc_step": "await",
             "inlet_type": "CCS1", "target_soc": 90, "inlet_max_kw": 100.0,
             "fleet_operator_id": "op-1", "min_soc_threshold": 20}
     base.update(kw)
@@ -172,7 +178,10 @@ def test_no_capable_point_on_site_is_an_abstention():
                    [_stall("s-3", kind="l2", kw=11)])   # zoox is dcfc-only
     out = propose(frame, CLASSES, site=SITE)
     assert out["planned"] == 0 and out["abstained"] == 1
-    assert "no capable point" in out["proposals"][0]["proposal"]["rationale"]["reason"]
+    reason = out["proposals"][0]["proposal"]["rationale"]["reason"]
+    #: The reason now names the INLET as well as the kinds (L-42), and says what
+    #: the site does offer -- "no capable point" was true and undiagnosable.
+    assert "charge_kinds ['dcfc']" in reason and "inlet CCS1" in reason
 
 
 def test_an_empty_serviceable_set_is_a_quiet_no_op():
@@ -542,7 +551,13 @@ def test_grid_peak_regime_orders_energy_first_and_skips_flow():
     s = r["solver"]
     assert s["regime"] == "grid_peak"
     assert s["pass_modes"] == ["min_tardy", "min_peak"]
-    assert s["total_flow_min"] is None
+    #: The regime skipped min_flow, so the CHAIN HELD no flow optimum -- that
+    #: is what optima_reached says. total_flow_min is now measured off the
+    #: shipped plan (L-22), and a plan that was never flow-optimized still has
+    #: a flow time; reporting it as None said "no number" when the truth was
+    #: "a number nobody minimized".
+    assert "min_flow" not in s["optima_reached"]
+    assert s["total_flow_min"] > 0
 
 
 def test_default_path_keeps_the_two_pass_contract_without_a_regime():
@@ -632,3 +647,400 @@ def test_regime_path_composes_with_rejection():
     # every declined vehicle still gets a row
     assert {p["entity_id"] for p in r["proposals"]} == {
         v["id"] for v in frame["vehicles"]}
+
+
+# ---------------------------------------------------------------------------
+# L-24: one null in one row must not cost the batch, and one default for
+# target_soc must serve both the admission test and the plan.
+# ---------------------------------------------------------------------------
+
+def _mixed(bad):
+    """`bad` beside two ordinarily plannable vehicles and two stalls."""
+    return _frame([_vehicle("v-ok1", soc=20), bad, _vehicle("v-ok2", soc=35)],
+                  [_stall("s-1"), _stall("s-2")])
+
+
+def _reason(rows, vid):
+    row = next(r for r in rows if r["entity_id"] == vid)
+    return row["proposal"].get("rationale", {}).get("reason", "")
+
+
+def test_a_null_soc_abstains_instead_of_killing_the_batch():
+    r = propose(_mixed(_vehicle("v-null", soc=None)), CLASSES, site=SITE)
+    ids = {p["entity_id"] for p in r["proposals"]}
+    assert ids == {"v-ok1", "v-null", "v-ok2"}, "a row per vehicle, always"
+    assert "no readable soc" in _reason(r["proposals"], "v-null")
+    planned = {p["entity_id"] for p in r["proposals"]
+               if not p["proposal"].get("abstain")}
+    assert planned == {"v-ok1", "v-ok2"}, "the rest of the batch survives it"
+
+
+def test_a_missing_soc_key_is_the_same_abstention():
+    bad = _vehicle("v-nosoc")
+    del bad["soc"]
+    r = propose(_mixed(bad), CLASSES, site=SITE)
+    assert "no readable soc" in _reason(r["proposals"], "v-nosoc")
+    assert len(r["proposals"]) == 3
+
+
+def test_an_unreadable_soc_is_an_abstention_not_a_raise():
+    r = propose(_mixed(_vehicle("v-junk", soc="n/a")), CLASSES, site=SITE)
+    assert "no readable soc" in _reason(r["proposals"], "v-junk")
+
+
+def test_one_default_for_target_soc_serves_both_admission_and_plan():
+    #: The two defaults were 100 (admission) and 90 (the plan). At soc 95 that
+    #: pair admitted a vehicle and then planned it past its own target. Under
+    #: one default of 90 it is simply not a candidate -- and the vehicle that
+    #: IS a candidate is planned against the same 90 that admitted it.
+    sc, abst = frame_to_scenario(
+        _frame([_vehicle("v-high", soc=95, target_soc=None),
+                _vehicle("v-low", soc=30, target_soc=None)],
+               [_stall("s-1")]),
+        CLASSES, site=SITE)
+    explicit = sc["assets_spec"]["explicit"]
+    assert [a["aid"] for a in explicit] == ["v-low"], "95 is past a target of 90"
+    assert explicit[0]["target_soc"] == DEFAULT_TARGET_SOC_PCT == 90
+    assert abst == []
+
+
+def test_a_target_that_rounds_onto_the_soc_abstains_rather_than_planning_a_no_op():
+    #: 89.6 < 90.0 as floats, so the admission test lets it through; both round
+    #: to 90, so the kernel would build no charge segment for it at all. The
+    #: guard compares the integers the kernel actually receives.
+    r = propose(_mixed(_vehicle("v-edge", soc=89.6, target_soc=90)),
+                CLASSES, site=SITE)
+    assert "at or below soc 90" in _reason(r["proposals"], "v-edge")
+    assert len(r["proposals"]) == 3
+
+
+def test_a_custom_predicate_cannot_smuggle_an_impossible_asset_past_the_bridge():
+    sc, abst = frame_to_scenario(
+        _frame([_vehicle("v-full", soc=95, target_soc=90)], [_stall("s-1")]),
+        CLASSES, site=SITE, serviceable=lambda v: True)
+    assert sc["assets_spec"]["explicit"] == []
+    assert len(abst) == 1 and "at or below soc 95" in (
+        abst[0]["proposal"]["rationale"]["reason"])
+
+
+# ---------------------------------------------------------------------------
+# L-25: the advisory row must carry the taper it plans.
+# ---------------------------------------------------------------------------
+
+def _charging_rows(result):
+    return [p for p in result["proposals"] if not p["proposal"].get("abstain")]
+
+
+def test_the_advisory_row_carries_the_taper_it_plans():
+    #: waymo's curve breaks at 70%, so 30 -> 90 is two segments at two kW.
+    r = propose(_frame([_vehicle("v-1", soc=30, target_soc=90)], [_stall("s-1")]),
+                CLASSES, site=SITE)
+    row = _charging_rows(r)[0]["proposal"]
+    segs = row["rationale"]["segments"]
+    assert len(segs) >= 2, f"this frame no longer tapers: {segs}"
+    assert {s["kw"] for s in segs} != {segs[0]["kw"]}, "the taper is flat"
+    #: The energy is the integral of the step function, not the rectangle the
+    #: row used to invite. The rectangle is strictly larger here, which is the
+    #: settlement error L-25 describes, in kWh.
+    span_h = (row["rationale"]["planned_end_min"]
+              - row["rationale"]["planned_start_min"]) / 60.0
+    assert row["rationale"]["planned_kwh"] < row["requested_kw"] * span_h
+    assert row["rationale"]["planned_kwh"] == pytest.approx(
+        sum(s["kw"] * (s["end"] - s["start"]) for s in segs) / 60.0, abs=1e-3)
+
+
+def test_requested_kw_is_the_peak_segment_not_the_first():
+    #: A curve that ACCELERATES: the first segment is the weakest. First-segment
+    #: kW would under-report what the connector must deliver by 2x.
+    classes = {"rising": {"battery_kwh": 90, "max_charge_kw": 100,
+                          "charge_kinds": ["dcfc"],
+                          "energy_curve": [{"above_soc_pct": 0, "accept_frac": 0.5},
+                                           {"above_soc_pct": 50, "accept_frac": 1.0}]}}
+    r = propose(_frame([_vehicle("v-1", platform="rising", soc=30, target_soc=90)],
+                       [_stall("s-1")]),
+                classes, site=SITE)
+    row = _charging_rows(r)[0]["proposal"]
+    segs = row["rationale"]["segments"]
+    assert segs[0]["kw"] < max(s["kw"] for s in segs), "not a rising curve"
+    assert row["requested_kw"] == max(s["kw"] for s in segs)
+
+
+# ---------------------------------------------------------------------------
+# L-23: the hot path must report completeness the way the regime path does.
+# ---------------------------------------------------------------------------
+
+def test_the_default_path_reports_completeness_and_retention():
+    s = propose(FRAME, CLASSES, site=SITE)["solver"]
+    assert s["complete"] is True
+    assert s["retained_previous"] is False
+    assert s["reproducible"] is True
+
+
+def test_a_truncated_default_path_is_not_reported_complete():
+    #: The same instance the regime-path guard uses, on the branch production
+    #: actually runs. Before L-23 this record had no `complete` at all, so a
+    #: caller reading solver.get("complete") got None on EVERY hot-path
+    #: invocation and could not tell a truncated plan from a whole one.
+    s = propose(_crowded(), CLASSES, site=SITE, horizon_min=480,
+                det_budget_s=0.3)["solver"]
+    assert "FEASIBLE" in (s["pass1_status"], s["pass2_status"]), (
+        f"this frame no longer truncates: {s['pass1_status']}/{s['pass2_status']}")
+    assert s["complete"] is False
+
+
+# ---------------------------------------------------------------------------
+# L-22: the published numbers describe the plan that ships.
+# ---------------------------------------------------------------------------
+
+def _peak_from_rows(result):
+    """The site's instantaneous peak, rebuilt from the ADVISORY ROWS alone."""
+    events = []
+    for p in _charging_rows(result):
+        for seg in p["proposal"]["rationale"]["segments"]:
+            events += [(seg["start"], 1, seg["kw"]), (seg["end"], -1, seg["kw"])]
+    peak = running = 0
+    for _t, sign, kw in sorted(events, key=lambda e: (e[0], e[1])):
+        running += sign * kw
+        peak = max(peak, running)
+    return peak
+
+
+@pytest.mark.parametrize("kwargs", [{}, {"hour_of_day": 7}])
+def test_the_published_peak_is_a_property_of_the_shipped_plan(kwargs):
+    r = propose(FRAME, CLASSES, site=SITE, **kwargs)
+    assert r["solver"]["site_peak_kw"] == _peak_from_rows(r) > 0
+    assert r["solver"]["total_tardy_min"] == sum(
+        p["proposal"]["rationale"]["tardy_min"] for p in _charging_rows(r))
+
+
+def test_the_optima_each_pass_reached_are_kept_alongside_the_measurement():
+    s = propose(FRAME, CLASSES, site=SITE, hour_of_day=7)["solver"]
+    assert set(s["optima_reached"]) == set(s["pass_modes"])
+    #: A correct chain measures at or below every ceiling it held.
+    assert s["total_tardy_min"] <= s["optima_reached"]["min_tardy"]
+    assert s["site_peak_kw"] <= s["optima_reached"]["min_peak"]
+    assert s["total_flow_min"] <= s["optima_reached"]["min_flow"]
+
+
+def test_a_dropped_ceiling_raises_instead_of_publishing_a_number_the_plan_lacks(
+        monkeypatch):
+    """The failure L-22 says must not be able to ship silently.
+
+    A chain that reports an optimum its final plan does not honour is a chain
+    bug -- the number would be published under a run ID against an artifact
+    that does not have it. Simulated here by returning a real plan with a
+    fabricated optimum, which is exactly the shape a dropped ceiling takes.
+    """
+    real = forward_proposer.lexicographic_solve_traced
+
+    def _liar(sc, modes, *, budget=None):
+        plan, optima, passes = real(sc, modes, budget=budget)
+        return plan, {**optima, "min_peak": 1}, passes
+
+    monkeypatch.setattr(forward_proposer, "lexicographic_solve_traced", _liar)
+    with pytest.raises(forward_proposer.ChainError, match="min_peak ceiling"):
+        propose(FRAME, CLASSES, site=SITE, hour_of_day=7)
+
+
+# ---------------------------------------------------------------------------
+# L-42: charge_kinds is required, and a plug that does not fit is not a
+# scheduling preference.
+# ---------------------------------------------------------------------------
+
+def test_a_class_without_charge_kinds_is_refused_not_defaulted():
+    #: battery_kwh raises; charge_kinds used to default to BOTH charging types,
+    #: and it is the field that decides which stall types a vehicle may reach.
+    classes = {"waymo": {k: v for k, v in CLASSES["waymo"].items()
+                         if k != "charge_kinds"}}
+    with pytest.raises(FrameError, match="charge_kinds"):
+        frame_to_scenario(_frame([_vehicle("v-1")], [_stall("s-1")]),
+                          classes, site=SITE)
+
+
+def test_a_pad_inlet_asset_is_never_proposed_onto_a_ccs_charger():
+    """The physically impossible assignment, refused at the bridge.
+
+    An AMR with a PAD inlet and a site of CCS1 DCFC stalls: the kinds match
+    (`dcfc` is in the class's charge_kinds), so before L-42 the vehicle was
+    proposed a stall whose connector it cannot physically accept. Nothing
+    downstream checks -- ottoq_l2_external_proposal validates occupancy,
+    reservation, station_state and heartbeat, but not the plug.
+    """
+    classes = {"amr": {"battery_kwh": 20, "max_charge_kw": 15,
+                       "charge_kinds": ["dcfc", "l2"]}}
+    r = propose(_frame([_vehicle("v-amr", platform="amr", soc=30,
+                                 inlet_type="PAD", inlet_max_kw=15.0)],
+                       [_stall("s-1"), _stall("s-2", kind="l2", kw=11)]),
+                classes, site=SITE)
+    assert r["planned"] == 0 and r["abstained"] == 1
+    reason = r["proposals"][0]["proposal"]["rationale"]["reason"]
+    assert "inlet PAD" in reason and "CCS1" in reason
+
+
+def test_a_pad_asset_is_planned_onto_the_pad_and_not_onto_the_ccs_stall():
+    """The other half: matching is a MATCH, not a blanket refusal.
+
+    Two L2 points side by side, one PAD and one CCS1. The kinds are identical,
+    so only the connector distinguishes them -- and the PAD asset must land on
+    the PAD point. This is the assertion the composite capability label exists
+    to make possible; the kernel itself has no notion of a connector.
+    """
+    classes = {"amr": {"battery_kwh": 20, "max_charge_kw": 15,
+                       "charge_kinds": ["l2"]}}
+    pad = _stall("s-pad", kind="l2", kw=15)
+    pad["connector_type"] = "PAD"
+    r = propose(_frame([_vehicle("v-amr", platform="amr", soc=30,
+                                 inlet_type="pad", inlet_max_kw=15.0)],
+                       [pad, _stall("s-ccs", kind="l2", kw=11)]),
+                classes, site=SITE)
+    assert r["planned"] == 1 and r["abstained"] == 0
+    assert _charging_rows(r)[0]["proposal"]["stall_id"] == "s-pad"
+
+
+def test_inlet_matching_is_case_and_space_insensitive():
+    frame = _frame([_vehicle("v-1", inlet_type=" ccs1 ")],
+                   [_stall("s-1")])   # the stall says "CCS1"
+    r = propose(frame, CLASSES, site=SITE)
+    assert r["planned"] == 1 and r["abstained"] == 0
+
+
+def test_a_vehicle_with_no_inlet_type_abstains_rather_than_guessing():
+    bad = _vehicle("v-1")
+    bad["inlet_type"] = None
+    r = propose(_frame([bad, _vehicle("v-2")], [_stall("s-1")]),
+                CLASSES, site=SITE)
+    assert "no inlet_type" in _reason(r["proposals"], "v-1")
+    assert r["planned"] == 1
+
+
+def test_a_stall_with_no_connector_type_is_not_a_capability():
+    st = _stall("s-1")
+    st["connector_type"] = None
+    with pytest.raises(FrameError, match="declare an accepted inlet"):
+        frame_to_scenario(_frame([_vehicle("v-1")], [st]), CLASSES, site=SITE)
+
+
+def test_the_proposal_row_reports_the_databases_stall_type_not_the_label():
+    r = propose(_frame([_vehicle("v-1", soc=30)], [_stall("s-1")]),
+                CLASSES, site=SITE)
+    row = _charging_rows(r)[0]["proposal"]
+    assert row["stall_type"] == "dcfc", (
+        "the gate router receives the database's vocabulary, never dcfc@CCS1")
+
+
+def test_the_dcfc_cooldown_survives_the_capability_label():
+    """The kernel's `kind == "dcfc"` fallback cannot see a composite label.
+
+    So the bridge DECLARES the gap. Without this the 18-minute min-gap on a
+    DCFC point vanishes from every production frame, silently.
+    """
+    sc, _ = frame_to_scenario(_frame([_vehicle("v-1")], [_stall("s-1")]),
+                              CLASSES, site=SITE)
+    assert sc["service_points"][0]["min_gap_min"] == SITE["dcfc_cooldown_min"]
+    #: ...and an L2 point still has none.
+    sc2, _ = frame_to_scenario(
+        _frame([_vehicle("v-1")], [_stall("s-2", kind="l2", kw=11)]),
+        CLASSES, site=SITE)
+    assert sc2["service_points"][0]["min_gap_min"] == 0
+
+
+# ---------------------------------------------------------------------------
+# L-52: the production entry point takes the doctrine as a parameter.
+# ---------------------------------------------------------------------------
+
+def test_propose_resolves_the_regime_from_the_intent_it_is_given():
+    """The kernel default was the only doctrine reachable from here (L-52).
+
+    A pack whose priorities genuinely differ could not express that through the
+    production proposer at all -- and the default artifact is robotaxi-flavoured
+    in places a pack then reads unconditionally.
+    """
+    import dataclasses
+    from intent.intent import load_intent
+
+    base = load_intent()
+    pack = dataclasses.replace(
+        base,
+        regimes=tuple(dataclasses.replace(r, priority=tuple(reversed(r.priority)))
+                      for r in base.regimes))
+
+    default = propose(FRAME, CLASSES, site=SITE, hour_of_day=7)["solver"]
+    packed = propose(FRAME, CLASSES, site=SITE, hour_of_day=7,
+                     intent=pack)["solver"]
+    assert default["pass_modes"] != packed["pass_modes"], (
+        "the intent override did not reach the regime resolver")
+    #: The readiness floor is structural and survives any doctrine.
+    assert packed["pass_modes"][0] == "min_tardy"
+
+
+# ---------------------------------------------------------------------------
+# L-42, production half: the engine's own Multi rule, mirrored.
+# ---------------------------------------------------------------------------
+
+def _multi(sid, kind="dcfc", kw=350, supported=("CCS1", "NACS")):
+    """A stall in the shape the flagship depot actually holds: every charging
+    stall is connector_type 'Multi' with a supported_inlet_types list."""
+    st = _stall(sid, kind=kind, kw=kw)
+    st["connector_type"] = "Multi"
+    st["supported_inlet_types"] = list(supported)
+    return st
+
+
+def test_a_multi_stall_serves_every_inlet_it_declares():
+    frame = _frame([_vehicle("v-ccs", soc=30, inlet_type="CCS1"),
+                    _vehicle("v-nacs", platform="tesla", soc=30,
+                             inlet_type="NACS")],
+                   [_multi("s-1"), _multi("s-2")])
+    classes = {**CLASSES, "tesla": {"battery_kwh": 75, "max_charge_kw": 250,
+                                    "charge_kinds": ["dcfc"]}}
+    r = propose(frame, classes, site=SITE)
+    assert r["planned"] == 2 and r["abstained"] == 0
+
+
+def test_a_multi_stall_refuses_an_inlet_it_does_not_declare():
+    #: The exact discrimination the L1 rule makes: Multi is not a wildcard, it
+    #: is a declared list. A CHAdeMO vehicle at a CCS1+NACS stall is refused.
+    frame = _frame([_vehicle("v-cha", soc=30, inlet_type="CHAdeMO")],
+                   [_multi("s-1")])
+    r = propose(frame, CLASSES, site=SITE)
+    assert r["planned"] == 0 and r["abstained"] == 1
+    reason = r["proposals"][0]["proposal"]["rationale"]["reason"]
+    assert "inlet CHADEMO" in reason and "CCS1" in reason and "NACS" in reason
+
+
+def test_a_multi_stall_with_no_supported_list_serves_nobody():
+    #: Empty is not a wildcard. The L1 rule reads
+    #: COALESCE(supported_inlet_types, ARRAY[]::text[]) and an empty array
+    #: matches no inlet; a bridge that treated it as "anything" would put every
+    #: vehicle on a plug the engine itself would then refuse.
+    with pytest.raises(FrameError, match="declare an accepted inlet"):
+        frame_to_scenario(_frame([_vehicle("v-1")], [_multi("s-1", supported=())]),
+                          CLASSES, site=SITE)
+
+
+def test_a_mixed_site_routes_each_inlet_to_the_plug_that_fits():
+    """One NACS-only DCFC beside one CCS1-only DCFC, and two vehicles."""
+    ccs, nacs = _stall("s-ccs"), _stall("s-nacs")
+    nacs["connector_type"] = "NACS"
+    classes = {**CLASSES, "tesla": {"battery_kwh": 75, "max_charge_kw": 250,
+                                    "charge_kinds": ["dcfc"]}}
+    r = propose(_frame([_vehicle("v-ccs", soc=30, inlet_type="CCS1"),
+                        _vehicle("v-nacs", platform="tesla", soc=30,
+                                 inlet_type="NACS")],
+                       [ccs, nacs]), classes, site=SITE)
+    assert r["planned"] == 2
+    where = {p["entity_id"]: p["proposal"]["stall_id"]
+             for p in _charging_rows(r)}
+    assert where == {"v-ccs": "s-ccs", "v-nacs": "s-nacs"}
+
+
+def test_the_capability_label_is_order_independent():
+    """Same site, supported list written both ways: identical scenario."""
+    a, _ = frame_to_scenario(
+        _frame([_vehicle("v-1")], [_multi("s-1", supported=("CCS1", "NACS"))]),
+        CLASSES, site=SITE)
+    b, _ = frame_to_scenario(
+        _frame([_vehicle("v-1")], [_multi("s-1", supported=("NACS", "CCS1"))]),
+        CLASSES, site=SITE)
+    assert a["service_points"] == b["service_points"]
+    assert a["asset_classes"] == b["asset_classes"]

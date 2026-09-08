@@ -46,11 +46,43 @@ invocation quantifiable, "never invoked" distinguishable from "invoked and absta
   `rationale.ready_by_source` records which was used, so a schedule built on a default deadline
   is labeled as one.
 
+### The production join, which for a while was a sentence and not an integration
+
+The line above said the class table is "the `ottoq_vehicle_classes` join". It was not joinable
+(finding L-41): the table is keyed by `vehicle_class_code` and the frame did not emit that
+column at all; its columns are named `battery_capacity_kwh` / `max_charge_rate_kw`, so passing
+a row verbatim raised `KeyError`; and it had no `charge_kinds` column, which the bridge now
+requires and refuses to default. Three pieces close it:
+
+- **Migration 0209** adds `vehicles[].vehicle_class_code` and `stalls[].supported_inlet_types`
+  to `ottoq_build_decision_frame`, and a backfilled `charge_kinds` column to
+  `ottoq_vehicle_classes` (derivation recorded in that column's `COMMENT`).
+- **`proposer/class_table.py`** is the column projection — the renames written down once, with
+  the `SELECT` committed beside them so the two cannot drift.
+- **`class_key`** on `frame_to_scenario` / `propose` names the frame field the table is keyed
+  on. It defaults to `vehicle_class_code`, the production key; a caller with a pack file keyed
+  some other way names its own field.
+
+### The plug is checked here, using the engine's own rule
+
+`charge_kinds` decides which stall **types** a vehicle may reach; it says nothing about whether
+the connector fits. The bridge folds the plug into the kernel's capability label — a point is
+`dcfc@CCS1`, or `dcfc@CCS1+NACS` for a multi-standard one — so the kernel never learns what a
+connector is, and a vehicle may only use labels whose inlet set contains its own inlet.
+
+The rule is not invented here. The L1 shield already owns it: a `Multi` stall passes iff the
+vehicle's inlet is in that stall's `supported_inlet_types`; otherwise `connector_type` must
+equal `inlet_type`. On the flagship depot all 84 charging stalls are `Multi` with
+`{CCS1, NACS}`, so a bridge comparing the two fields literally would abstain on every vehicle,
+and one ignoring both would propose every vehicle onto every plug. Neither is what the engine
+does.
+
 ## Abstention is first-class
 
-Unknown platform, or no capable point on site → an **abstain row with its reason**, never a
-guess and never a silent drop. The disposer should know the proposer saw the vehicle and
-declined — cuOpt's abstention pattern, preserved.
+No class-table entry, no readable `soc`, a target at or below the current charge, or no point
+on site whose plug fits → an **abstain row with its reason**, never a guess and never a silent
+drop, and never an exception that takes the rest of the batch with it. The disposer should know
+the proposer saw the vehicle and declined — cuOpt's abstention pattern, preserved.
 
 ## What integration requires (founder-gated; nothing here does it)
 
