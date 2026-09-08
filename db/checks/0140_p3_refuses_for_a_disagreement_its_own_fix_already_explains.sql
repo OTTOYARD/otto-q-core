@@ -5,8 +5,9 @@
 -- is the record of it. What changed: P3 now asks whether any column green
 -- under nine atoms stops being green under fourteen, keyed exactly as
 -- ottoq_cert_matrix keys, computed once and read twice, with an A5 that
--- reports streak movement that does not cost green. The replacement has NOT
--- yet been dry-run; that is the remaining blocker on the apply window.
+-- reports streak movement that does not cost green. **The replacement was
+-- dry-run at 15:47 UTC against the floor 0226 installs and it is clean —
+-- 0225 will apply. See Q5.** The apply window is unblocked.
 -- ---------------------------------------------------------------------------
 -- 0140 — 0225 WILL REFUSE TO APPLY, and the refusal is half right.
 --
@@ -223,3 +224,50 @@ SELECT DISTINCT to_char(r.started_at,'MM-DD HH24:MI:SS') AS fired,
 --     dropped-key nor the stricter-than-purpose fault. 0225's P3 was the only
 --     one.
 -- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- Q5. THE REPLACEMENT P3, DRY-RUN AT THE FLOOR 0226 INSTALLS — 15:47 UTC.
+--
+--     Run read-only between round 27 columns f and g, no pair in flight, with
+--     `fl` pinned to '2026-09-07 21:36:53+00' — the floor 0226 puts in place.
+--
+--       scenario/seed/ticks    streak(9)  streak(14)  refuse?  A5 reports
+--       --------------------   ---------  ----------  -------  ----------
+--       busy_day/171717/48t          0           0      no        no
+--       busy_day/171717/24t          3           3      no        no
+--       busy_day/424242/24t          3           3      no        no
+--       busy_day/171717/12t          3           3      no        no
+--       **busy_day/314159/12t        6           3      no       YES**
+--       busy_day/424242/12t          3           3      no        no
+--       normal_day/171717/12t        3           3      no        no
+--       grid_smoke/424242/6t         1           1      no        no
+--
+--     **0225 WILL APPLY.** Not one column goes green -> not-green, so P3 does
+--     not raise. Three things worth reading off this table:
+--
+--     1. `busy_day/314159/12t` moves **6 -> 3** — exactly the number Q4 traced
+--        by hand through the matrix's streak window before the query existed.
+--        A5 reports that column and only that column. The prediction and the
+--        measurement agree to the integer.
+--     2. `grid_smoke` **excludes itself**. Streak 1, never green, so it cannot
+--        lose green. No special case was written for it; the property-based
+--        bar simply does not care about a column nobody certifies.
+--     3. **Six flagship columns show a streak of 3 or more at this floor**,
+--        against `green`'s bar of 2. Today they read zero. That is G28's
+--        diagnosis confirmed from the other side, and it is 0226's A4
+--        (which demands at least two non-stale flagship columns) passing with
+--        room to spare.
+--
+--     AND THE WAY THIS WAS ALMOST GOT WRONG, RECORDED BECAUSE IT IS THE POINT
+--     OF THE FILE. The first run of this query used the LIVE floor rather than
+--     0226's. Every column came back `n9 = 1` — one pair above the floor, no
+--     column green, nothing to lose — and `p3_would_refuse` was false
+--     everywhere. It looked like a clean pass. It was the same mistake this
+--     file was written about, made forty minutes after `scripts/APPLYING.md`
+--     step 3b(ii) was written to prevent it, by the person who wrote it. The
+--     tell was `n9 = 1` on every row: a streak of one on a column with six
+--     pairs is not a result, it is a floor. Dry-running in the wrong world
+--     produces a green light, not an error — which is exactly why the rule has
+--     to be a habit and not a caution.
+-- ---------------------------------------------------------------------------
+
