@@ -148,3 +148,28 @@ The **24t:12t cost ratio**. Round 28 measured it at 2.34–2.59 against round 27
 1.53, and round 30 scheduled **no 24-tick column**, so the ratio is not
 re-measured here. If the superlinearity is still present at the new speed it has a
 second source, and that is the next thing to measure — not to theorise about.
+
+## Column g — PREDICTION 2 MET, and the control proves it
+
+| | r28_g | r30_g | |
+|---|---|---|---|
+| pair duration | 330 s | **121 s** | −63.3% |
+| **`ottoq_policy_get` calls** | **4,894,867** | **35,498** | **−99.27%** |
+| `twin.ottoq_sim_compute_charger_load_kw` calls | 1,004 | **1,004** | **identical** |
+
+The band was *"under 100,000, against 4,894,867."* **35,498.**
+
+**The load meter is the control and it is what makes this airtight.** `0229` does
+not touch that function, and it was called **exactly 1,004 times in both pairs** —
+the same figure `db/checks/0144` used to close G27. Identical call counts on an
+untouched function prove the two pairs did the *same amount of work*, so the
+99.27% collapse in `ottoq_policy_get` is a real reduction and not an artifact of a
+shorter or lighter run. Without that control, 35,498 would only mean "this pair did
+less"; with it, it means "this pair did the same thing without the waste."
+
+35,498 also sits where the derivation said it would: the view now contributes
+~5,889 (1,963 evaluations × 3 calls) and every plpgsql caller at its theoretical
+maximum adds at most 42,461 (`0144` Q2). The measured value is inside that
+envelope, which is a second, independent consistency check.
+
+**G29 is closed.**
