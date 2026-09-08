@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908161403
 -- migration-name:    the_canon_comparison_sees_every_atom_the_pair_enforces
 -- ---------------------------------------------------------------------------
 -- 0225 — the across-round comparison sees all fourteen atoms the pair
@@ -598,7 +598,7 @@ ON CONFLICT (name) DO UPDATE
 -- ---------------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------------
--- APPLIED 2026-09-08 16:1x UTC. All preconditions and all five assertion
+-- APPLIED 2026-09-08 16:14:03 UTC. All preconditions and all five assertion
 -- blocks passed. Result, against the prediction committed in
 -- db/canons/round27-apply-window.md before the window opened:
 --

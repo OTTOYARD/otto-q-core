@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908162111
 -- migration-name:    provenance_asks_the_depot_not_the_run_id
 -- ---------------------------------------------------------------------------
 -- 0228 — G16. The state-change triggers decide whether an event is production

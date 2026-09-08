@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908161833
 -- migration-name:    the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred
 -- ---------------------------------------------------------------------------
 -- 0227 — G21 FIX 2. The site load meter reads every charge session this

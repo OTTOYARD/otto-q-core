@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908161129
 -- migration-name:    the_recert_floor_reads_a_name_the_ledger_never_writes
 -- ---------------------------------------------------------------------------
 -- 0226 — the recert floor can read the classifications that were written for

@@ -208,10 +208,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0222](db/migrations/0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql) | `20260908112038` | yes — ledger | G19. ottoq_boot_state_fingerprint serialized and hashed 1.36 MILLION |
 | [0223](db/migrations/0223_the_load_meter_asks_which_run_is_running_once_per_row.sql) | `20260908133954` | yes — ledger | G21. twin.ottoq_sim_compute_charger_load_kw evaluates |
 | [0224](db/migrations/0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id.sql) | `20260908134109` | yes — ledger | 71,944 signed events assert `data_source = 'production'` while |
-| [0225](db/migrations/0225_the_canon_comparison_sees_every_atom_the_pair_enforces.sql) | `PENDING` | no — pending | the across-round comparison sees all fourteen atoms the pair |
-| [0226](db/migrations/0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql) | `PENDING` | no — pending | the recert floor can read the classifications that were written for |
-| [0227](db/migrations/0227_the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred.sql) | `PENDING` | no — pending | G21 FIX 2. The site load meter reads every charge session this |
-| [0228](db/migrations/0228_provenance_asks_the_depot_not_the_run_id.sql) | `PENDING` | no — pending | G16. The state-change triggers decide whether an event is production |
+| [0225](db/migrations/0225_the_canon_comparison_sees_every_atom_the_pair_enforces.sql) | `20260908161403` | yes — ledger | the across-round comparison sees all fourteen atoms the pair |
+| [0226](db/migrations/0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql) | `20260908161129` | yes — ledger | the recert floor can read the classifications that were written for |
+| [0227](db/migrations/0227_the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred.sql) | `20260908161833` | yes — ledger | G21 FIX 2. The site load meter reads every charge session this |
+| [0228](db/migrations/0228_provenance_asks_the_depot_not_the_run_id.sql) | `20260908162111` | yes — ledger | G16. The state-change triggers decide whether an event is production |
 
 96 migrations indexed.
 
