@@ -12,6 +12,36 @@ belt and braces on purpose: `ottoq_sim_runs` cannot see an in-flight pair (both
 arms are one transaction) and `cron.job_run_details` reports a running
 two-statement job as `succeeded` at ~1 s (`db/canons/round25.md`).
 
+## Step 0 — unschedule the round, or nothing will apply
+
+Every one of the four files refuses while **any** `r<N>_*` job is `active`, and
+round 27's seven stay active after firing: their schedules are date-pinned
+(`55 13 08 09 *`), so they are genuine one-shots that cannot fire again this
+year, but `cron.job.active` does not know that and neither does the guard. The
+guard is right to be crude — a job that *looks* scheduled is a job that might
+fire mid-migration.
+
+Pre-flight, run 2026-09-08 15:18 UTC: **only round 27's seven jobs exist**. No
+`r25_*` or `r26_*` residue, so the unschedule is exactly these:
+
+```sql
+-- after r27_g has FINISHED (pg_stat_activity, not the cron log — a running
+-- two-statement job reports 'succeeded' at ~1 s, db/canons/round25.md)
+SELECT cron.unschedule(jobname)
+  FROM cron.job
+ WHERE jobname ~ '^r27_';
+
+-- then confirm the guard will pass
+SELECT count(*) AS still_active FROM cron.job WHERE jobname ~ '^r[0-9]+_' AND active;
+-- expected: 0
+SELECT count(*) AS pairs_running FROM pg_stat_activity
+ WHERE query ILIKE '%ottoq_determinism_pair%' AND state='active' AND pid <> pg_backend_pid();
+-- expected: 0
+```
+
+**Do not unschedule `r27_g` before it runs.** It is the only instrumented column
+and it is the measurement for G27 *and* G23(b); losing it costs a round.
+
 ## The order, and why it is this one
 
 | # | file | what it does | why here |
