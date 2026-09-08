@@ -97,7 +97,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0228 — GENERATED, not a log
+## Index, 0134–0229 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228 — which are indexed below as well as logged above; the log row is
@@ -212,7 +212,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0226](db/migrations/0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql) | `20260908161129` | yes — ledger | the recert floor can read the classifications that were written for |
 | [0227](db/migrations/0227_the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred.sql) | `20260908161833` | yes — ledger | G21 FIX 2. The site load meter reads every charge session this |
 | [0228](db/migrations/0228_provenance_asks_the_depot_not_the_run_id.sql) | `20260908162111` | yes — ledger | G16. The state-change triggers decide whether an event is production |
+| [0229](db/migrations/0229_the_approach_band_scans_every_run_to_answer_about_one.sql) | `PENDING` | no — pending | G29. `public.ottoq_approach_band` resolves three policy parameters for EVERY |
 
-96 migrations indexed.
+97 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

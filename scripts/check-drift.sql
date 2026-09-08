@@ -327,7 +327,8 @@ repo_manifest(version, name, file) AS (
     ('20260908161403'::text, 'the_canon_comparison_sees_every_atom_the_pair_enforces'::text, '0225_the_canon_comparison_sees_every_atom_the_pair_enforces.sql'::text),
     ('20260908161129'::text, 'the_recert_floor_reads_a_name_the_ledger_never_writes'::text, '0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql'::text),
     ('20260908161833'::text, 'the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred'::text, '0227_the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred.sql'::text),
-    ('20260908162111'::text, 'provenance_asks_the_depot_not_the_run_id'::text, '0228_provenance_asks_the_depot_not_the_run_id.sql'::text)
+    ('20260908162111'::text, 'provenance_asks_the_depot_not_the_run_id'::text, '0228_provenance_asks_the_depot_not_the_run_id.sql'::text),
+    ('PENDING'::text, 'the_approach_band_scans_every_run_to_answer_about_one'::text, '0229_the_approach_band_scans_every_run_to_answer_about_one.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
