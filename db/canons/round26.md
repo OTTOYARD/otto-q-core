@@ -339,3 +339,69 @@ instrumented a 12-tick one (`track_functions='pl'`,
 measurement rather than as a theory. The round's verdict does not depend on it —
 every atom held — but a number this project cannot explain is a number it does
 not yet own.
+
+### f — `busy_day` / 424242 / **24 ticks** — **PASS**
+
+Fired 13:22:00 UTC, **734 s**, `equal true`. Every atom byte-identical to round
+25's 10:12 pair:
+
+`fp e418e4f0` · `h_cmd 8f232001` · `h_dec 35148055` · `h_evt 8dc37f82` ·
+`h_bkg ea8a12e2` · `h_nrg c79957a5` · `h_prop aabef458` · `h_defr d41d8cd9` ·
+`h_cal 11a24626` · `h_rule 726f6769` · `h_rcl 928262d2` · `h_sdr f2587dbc` ·
+`endst b2c2dc8e` (both arms, both rounds)
+
+---
+
+# ROUND 26 COMPLETE — six of six, seventy-eight atom comparisons, no movement
+
+| column | ticks | round 25 | round 26 | Δ | |
+|---|---|---|---|---|---|
+| a — `busy_day`/314159 | 12 | 812 s | **537 s** | −275 | −34% |
+| b — `busy_day`/171717 | 12 | 686 s | **533 s** | −153 | −22% |
+| c — `normal_day`/171717 | 12 | 735 s | **477 s** | −258 | −35% |
+| d — `busy_day`/424242 | 12 | 754 s | **529 s** | −225 | −30% |
+| e — `busy_day`/171717 | **24** | 1,272 s | **761 s** | −511 | −40% |
+| f — `busy_day`/424242 | **24** | 1,336 s | **734 s** | −602 | −45% |
+| **round total** | | **5,595 s** | **3,571 s** | **−2,024** | **−36%** |
+
+**Prediction 1 held on every column.** Five migrations — 0219 (h_sdr enforced),
+0213, 0220, 0221 (a decide-path rewrite) and 0222 (a rewrite of the function
+computing an *enforced* atom) — and thirteen atoms per column across six columns
+did not move once. The round is 34 minutes shorter than the one it reproduces.
+
+**Prediction 2 was right in mechanism, wrong in number, and the error is now
+systematic rather than a single miss.** I predicted ~450 s for 12-tick columns;
+they landed 477–537 with a mean of 519 against a predicted-from-arithmetic 492.
+Close. But the 24-tick columns saved **511 and 602 seconds** where the same
+arithmetic predicts ~255.
+
+## G27, sharpened by the second 24-tick column and one elimination
+
+Column e's unexplained saving is not a fluke — f is worse. Both 24-tick columns
+saved roughly **2.2–2.6x** what the 12-tick columns saved, from a fix whose cost
+model says the saving should be identical.
+
+**One candidate eliminated, by catalog rather than by argument.** Exactly one
+function calls `ottoq_boot_state_fingerprint`, and it calls it at **two sites**:
+
+    public.ottoq_determinism_pair    2 call sites
+
+Two sites × two arms = four calls per pair, *regardless of tick count*. So the
+extra saving is not more fingerprint calls on longer pairs. That door is closed.
+
+**What remains, stated as a hypothesis with a mechanism and a prediction.**
+The fingerprint read 1,360,915 rows per call, 5.4 million per pair. That is
+enough to evict the buffer cache, and the tick loop then re-reads its working
+set from disk. A 24-tick pair spends twice as long in that loop and therefore
+pays the eviction penalty twice as often. Removing the fingerprint stops the
+eviction — which would produce exactly the **superlinear** benefit observed.
+
+That predicts something checkable: `ottoq_sim_advance_tick`'s time *per tick*
+should have fallen, and fallen further on 24-tick pairs than on 12-tick ones.
+`db/checks/0129` measured it at 439.0 s over 24 calls — 18.3 s per tick — on a
+pre-0222 12-tick pair. If the instrumented pair (G27) shows per-tick time
+materially below that, the cache story is right and 0129's "36% of the pair is
+the fingerprint" understated the fix rather than overstating it.
+
+Recorded as the next measurement. Not as a conclusion, and not folded into the
+round's claim — every atom held, and that is what round 26 was for.
