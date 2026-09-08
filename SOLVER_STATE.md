@@ -567,3 +567,96 @@ and it is a claim the harness can back with run IDs.
 
 None of this starts until the deterministic core is green on the corrected instrument (round 6)
 and the remaining core items are closed (0050/0051 peak_site_kw; 0150/0151).
+
+---
+
+## 9. cuOpt re-derived, 2026-09-08 — the honest sentence is much narrower
+
+CLAUDE.md Part 1 rule 6: *"Any cuOpt statement — docs, decks, comments — is quantified from that
+ledger. Unquantified claims are forbidden in both directions."* And Part 3, on its own
+2026-09-03 refresh: *"rule 6's cuOpt sentence must be re-derived before it is spoken."*
+
+Re-derived here against the live ledger on 2026-09-08. **Every earlier figure in this document
+and in CLAUDE.md is superseded, including the ones that were correct when written.** They are
+left in place as the point-in-time records they are.
+
+### 9.1 The number everyone has been quoting is a log-row count
+
+`cuopt_invocation_log` holds **15,250 rows**, spanning 2026-08-02 → 2026-09-08. CLAUDE.md's
+refresh calls this "12,478 cuOpt invocations." It is not a count of invocations of anything. It
+is a count of *decisions about whether to invoke*, and 15,234 of the 15,250 decided **no**.
+
+The table has two stages and they answer different questions:
+
+| stage | rows | abstained | reached NVIDIA (HTTP 200) | proposals |
+|---|---|---|---|---|
+| `sql_gate` — the in-database gate | 14,714 | 14,179 | 0 | 0 |
+| `edge` — `ottoq-cuopt-propose` itself | 536 | 520 | **16** | **136** |
+
+The gate posted 535 requests to the edge function. The edge function abstained on 520 of them
+and made **16 network calls**, all of which returned HTTP 200 and 136 proposals between them.
+
+### 9.2 Why the other 15,234 abstained — all of it, no rounding
+
+| reason | rows | span |
+|---|---|---|
+| `debounce` | 6,128 | 08-29 → 09-02 |
+| `policy_disabled` | 5,163 | 08-30 → **09-08** |
+| `first_refusal_arm` | 2,827 | 08-29 → 09-02 |
+| *(gate posted to the edge; no abstention, no call of its own)* | 535 | 08-29 → 09-02 |
+| `no_candidates_in_instance` | 405 | 08-30 → 09-02 |
+| `no_free_stalls_demand_present` | 114 | 08-29 → 08-30 |
+| `sql_gate_no_candidates` | 60 | 08-29 → 08-30 |
+| **`(called the endpoint)` HTTP 200** | **16** | **08-29 → 08-30** |
+| `missing_sim_run_id` | 1 | 08-02 |
+| `no_running_run` | 1 | 08-02 |
+
+Two facts fall straight out of that table and neither is in any deck:
+
+1. **The NVIDIA endpoint has not been called since 2026-08-30.** Nine days as of writing.
+2. **Every row since is `policy_disabled`** — 5,163 of them. That is 0152 doing exactly what it
+   was built to do: quiesce the proposer so the deterministic core is certified alone. It is
+   correct, it is deliberate, and it means *cuOpt has been switched off for the entire
+   certification era*. Anyone reading "12,478 invocations" as evidence of an agentic system
+   running in production has been misled by a row count.
+
+### 9.3 What it disposed, against a denominator that is fair
+
+Only **4 sim runs** ever reached the endpoint. Scoping to exactly those runs — rather than to
+all-time, which flatters nothing and clarifies nothing:
+
+| | |
+|---|---|
+| decisions in those 4 runs | 6,154 |
+| carrying `l2_engine='cuopt'` | **27** |
+| of those, `outcome_status='enacted'` | **27** (all) |
+| share of decisions in runs where cuOpt could act at all | **0.44 %** |
+| other engines in the same runs | deterministic_v1, greedy_constrained, inspect_seam, needs_card, nemotron, charge_disposition, reservation_honoured, reservation_reassigned, service_sequencing, ottoq_service_priority, deterministic_fallback |
+
+`ottoq_cuopt_deferrals` holds **29,712** rows — 29,645 `clear`, 67 `spent`. The deferral
+mechanism (one-tick right of first refusal, then the local path pre-empts) has run tens of
+thousands of times and released cleanly every time but 67. Nothing has starved.
+
+### 9.4 The sentence the deck may use
+
+> cuOpt is wired into the live tick as a gated proposer with a one-tick right of first refusal,
+> and the gate is instrumented end to end. Across 15,250 logged gate decisions between
+> 2026-08-02 and 2026-09-08, the NVIDIA endpoint was called 16 times — all on 29–30 August — and
+> returned 136 proposals; 27 of those were enacted through the 52-rule shield, all of them, in
+> the four runs where the proposer was live. Since 30 August the proposer has been switched off
+> by policy so the deterministic core can be certified alone, which is why the other 15,234 rows
+> are abstentions rather than calls. The propose/dispose pipeline is real and audited. The claim
+> it supports today is that OTTO-Q *can* take an external optimiser's proposals and dispose them
+> under an inviolable rule layer — not that it is doing so at scale.
+
+That is a smaller claim than "12,478 invocations" and it is the one the ledger will survive
+being asked about.
+
+### 9.5 What this does not yet answer
+
+No A/B delta. `ottoq_ab_runs` exists and §4 of this document noted 68 rows, but none of the four
+cuOpt-live runs is paired against a cuOpt-off arm under common random numbers, so there is no
+measured outcome difference to report and none is claimed. Producing one is a task, not a query:
+it needs a cert-shaped pair with the proposer on in one arm — which, per §8, is exactly the
+posture (C) this document already rejected for certification and would have to be run as an
+experiment outside the certification lane.
