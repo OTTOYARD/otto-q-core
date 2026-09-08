@@ -49,7 +49,33 @@ DECLARE
                                            -- enough to follow an engine change
                                            -- within one round, large enough
                                            -- that one lucky pair cannot tighten
-                                           -- the slots into a collision
+                                           -- the slots into a collision.
+                                           --
+                                           -- KNOWN ASYMMETRY, measured
+                                           -- 2026-09-08 and NOT fixed here.
+                                           -- K counts RUNS, not rounds, and a
+                                           -- round holds four 12-tick columns
+                                           -- but only two 24-tick ones. So K=6
+                                           -- spans 1.5 rounds at 12 ticks and
+                                           -- THREE at 24 -- which is why round
+                                           -- 28's 24-tick slot is sized from a
+                                           -- 1,293 s round-25 pair while the
+                                           -- real duration is now ~555 s: a
+                                           -- 30-minute slot for a 9-minute
+                                           -- pair. The header claims this
+                                           -- adapts "in ONE round"; at 24 ticks
+                                           -- it does not.
+                                           --
+                                           -- Left alone deliberately. The
+                                           -- asymmetry errs LONG, and the whole
+                                           -- argument of this file is that long
+                                           -- costs wall clock while short costs
+                                           -- two contaminated pairs. Tightening
+                                           -- it by hand is exactly what went
+                                           -- wrong in round 25. The fix is to
+                                           -- make K count rounds, and it needs
+                                           -- its own change, not a constant
+                                           -- edited under time pressure.
   v_lookback_d interval    := '10 days';   -- outer bound on how far back K runs
                                            -- may be drawn from; a K-th run from
                                            -- a different engine is not evidence
@@ -92,6 +118,12 @@ BEGIN
          AND d.start_time > now() - v_lookback_d
          AND d.end_time IS NOT NULL
          AND extract(epoch FROM (d.end_time - d.start_time)) >= 60
+         -- 2026-09-08: an INSTRUMENTED column is not a certification timing.
+         -- r27_g ran 851 s against column e's 560 s on the same scenario, seed
+         -- and horizon -- a +52% overhead whose dominant term is 13.2M
+         -- track_functions counter updates (db/checks/0141). Sizing a slot from
+         -- it would bake the profiler's cost into every future round.
+         AND d.command NOT ILIKE '%track_functions%'
        ORDER BY d.start_time DESC
        LIMIT v_lookback
     ) recent;
