@@ -281,3 +281,57 @@ FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
 WHERE p.prokind IN ('f','p') AND n.nspname IN ('public','twin','ottoq')
   AND p.prosrc ~ 'COALESCE\(\s*\w+\.?\w*sim_run_id\s*,'
 ORDER BY 3 DESC, 1;
+
+-- Q10. THE TWO BIGGEST REMAINING FUNCTIONS IN THE PROFILE ARE BOTH THIS METER.
+--
+--      `self_time` in pg_stat_user_functions excludes time spent in TRACKED
+--      callees. Every hop of the load-meter chain is a SQL function and SQL
+--      functions are not tracked by track_functions='pl' — so the meter's cost
+--      does not appear as a function of its own. It appears as the SELF TIME OF
+--      WHOEVER CALLED IT. Adding up everything that calls
+--      ottoq_depot_current_demand_kw:
+--
+--        function                              calls   self_s
+--        ottoq_l2_propose_stall_assignment       616    124.9
+--        ottoq_eval_en_001_grid_capacity       1,304     62.9
+--        twin.ottoq_sim_advance_site_energy       24      5.1
+--        twin.ottoq_sim_advance_grid              24      4.4
+--        ottoq_eval_en_004_demand_response       944      0.1   <- short-circuits
+--        ------------------------------------------------------
+--        total                                          197.3
+--
+--      against the meter's own statement, measured independently in Q3:
+--
+--        twin.ottoq_sim_compute_charger_load_kw 1,024    195.4
+--
+--      **197.3 against 195.4 — within one percent.** Two numbers taken from two
+--      different pgstat views, by two different accounting rules, on the same
+--      pair. Which says something sharper than either alone: after the boot
+--      fingerprint, the two largest self-times in this engine's profile are
+--      not the proposer and not the grid rule. They are the site load meter,
+--      seen from its two busiest callers, and those callers have almost no
+--      cost of their own.
+--
+--      Stated as CONSISTENT WITH rather than PROVEN, because it leans on
+--      self_time attribution across untracked SQL functions, which is exactly
+--      the mechanism that hid this cost for months. The per-caller split of the
+--      1,024 meter calls is NOT determined by these numbers and is not claimed:
+--      1,968 calls reach a call site and only 1,024 reach the meter, so roughly
+--      half of eval_en_001's invocations return before they get there, and
+--      which half is unmeasured.
+--
+--      What it means for the work: 0223 removes ~109 s of the 195 s. FIX 2 —
+--      the Seq Scan in Q8 — is most of the rest. Together they are ~36% of a
+--      537 s pair, which is the same size G19 was, in the same place nobody
+--      was looking.
+SELECT f.funcname,
+       f.calls - COALESCE(b.calls,0) AS calls,
+       round(((f.total_time - COALESCE(b.total_time,0))/1000)::numeric,1) AS total_s,
+       round(((f.self_time  - COALESCE(b.self_time ,0))/1000)::numeric,1) AS self_s
+FROM pg_stat_user_functions f
+LEFT JOIN public.g19_fn_before b ON b.funcid = f.funcid
+WHERE f.funcname IN ('ottoq_l2_propose_stall_assignment','ottoq_eval_en_001_grid_capacity',
+                     'ottoq_eval_en_004_demand_response','ottoq_sim_advance_grid',
+                     'ottoq_sim_advance_site_energy')
+  AND (f.calls - COALESCE(b.calls,0)) > 0
+ORDER BY 4 DESC;
