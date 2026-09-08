@@ -56,9 +56,21 @@ is in the template's comments; the checklist is:
 
 ```bash
 cd ~/Desktop/OTTOYARD/otto-q-core
-git add db/migrations/NNNN_short_name.sql
+bash scripts/regen-artefacts.sh          # <- before `git add`, every time
+git add -A
 git commit -m "migration NNNN: short_name — <what and why in one line>"
 ```
+
+`regen-artefacts.sh` rewrites the two files derived from `db/migrations/*.sql`:
+the generated manifest inside `scripts/check-drift.sql` and the generated index
+in `MIGRATION_LOG.md`. **Both go stale the moment the migration FILE exists** —
+a `PENDING` draft that has not been applied and may never be still counts — and
+`tests/test_migration_hygiene.py` fails the CI pytest gate when they are.
+
+That is not hypothetical: on 2026-09-08, 0219 was committed as a draft and CI
+went red on three consecutive pushes, because the only instruction to refresh
+the manifest lived at step 6, after applying. Step 6 still exists — the version
+header changes then, so it has to run twice — but the first run belongs here.
 
 If applying it goes badly, the file already exists and describes exactly what
 was attempted. That is the entire point of this ordering.
@@ -92,14 +104,17 @@ SELECT version, name FROM supabase_migrations.schema_migrations
 Put that `version` into the file's header, replacing `PENDING`. Confirm the
 `name` matches `migration-name` exactly.
 
-### 6. Refresh the drift manifest
+### 6. Refresh the generated artefacts again
 
 ```bash
-bash scripts/gen-drift-sql.sh
+bash scripts/regen-artefacts.sh
 ```
 
-This rewrites the generated block inside `scripts/check-drift.sql` from your
-migration files' headers. It fails loudly if any file is missing its header.
+Yes, again — step 3 ran it when the file was written and `PENDING`; this run
+picks up the real version you just pasted into the header. It rewrites the
+generated block inside `scripts/check-drift.sql` and the generated index in
+`MIGRATION_LOG.md` from your migration files' headers, and fails loudly if any
+file is missing one.
 
 ### 7. Log it
 
