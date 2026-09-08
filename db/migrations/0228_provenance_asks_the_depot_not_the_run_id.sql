@@ -84,6 +84,18 @@
 -- return early on pure-timestamp churn (the 0015 filter), which is 80.9% of
 -- vehicle updates.
 --
+-- That cost now has a counter rather than an argument. db/checks/0139 measured
+-- `depots_pkey` at **44,940,156 lifetime index scans at 1.0003 tuples per
+-- scan** — a table probed forty-five million times, always finding exactly the
+-- one row, and it does not appear until eighth place in the database's
+-- scan ranking. The three above it are 6.76 billion. So this migration adds
+-- traffic to an index whose entire lifetime volume is 0.6% of what one
+-- unhoisted call in the load meter already spends, and it adds it only on
+-- emitted events. Worth stating precisely because 0139 convicted exactly this
+-- shape of per-call re-derivation elsewhere: the difference is that a trigger
+-- is per-row by nature and has nothing to hoist to, and that is an argument
+-- about *this* lookup, not a general licence.
+--
 -- THE REWRITE WAS DIFFED AGAINST THE LIVE BODIES, STATEMENT BY STATEMENT.
 -- Unlike 0223/0224/0225, which patch by anchored substitution, this file
 -- retypes two whole function bodies — so a dropped line would be a live defect
