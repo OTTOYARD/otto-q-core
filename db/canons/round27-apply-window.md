@@ -130,7 +130,7 @@ and it is the measurement for G27 *and* G23(b); losing it costs a round.
 
 | # | file | what it does | why here |
 |---|---|---|---|
-| 1 | **0226** | the recert floor can read its own classifications | Must be first. It lowers the floor from 2026-09-08 13:41:09 to 2026-09-07 21:36:53, which brings rounds 26 and 27 back into scope. |
+| 1 | **0226** | the recert floor can read its own classifications | Must be first. It lowers the floor from 2026-09-08 13:41:09 to 2026-09-07 21:36:53.363037, which brings rounds 26 and 27 back into scope. |
 | 2 | **0225** | the canon comparison sees all fourteen atoms | Must be second, *because* of 0226. Its `P3` asks whether any column green under the nine-atom comparison would stop being green under the fourteen-atom one. Under the old floor that question covered **one pair per column** and could not fail; under the new one it covers rounds 26 and 27, three to six pairs a column. Same check, far more evidence. |
 | 3 | **0227** | the load meter stops reading 45,379 rows to sum 303 | Independent. Index only. Placed after the two that change what `green` means so that if round 28 moves, the cause is not ambiguous. |
 | 4 | **0228** | provenance asks the depot, not the run id | Last. It is the only one that touches triggers firing on **every** write to `vehicles` and `stalls`. If something goes wrong here, the other three are already in and the diagnosis is not tangled with them. |
@@ -145,7 +145,7 @@ and leave 0225 for the investigation.
 0226's floor): no column loses green, one column's streak shortens
 (`busy_day/314159/12t`, 6 → 3) and A5 reports it. That is a reading taken
 *before* 0226 is applied, from a hand-pinned floor value. If 0226 installs a
-floor other than `2026-09-07 21:36:53+00` — its own A2 asserts it does not — the
+floor other than `2026-09-07 21:36:53.363037+00` — its own A2 asserts it does not — the
 dry-run does not transfer and P3 must be re-run before 0225. **The first version
 of this same dry-run was run at the wrong floor and came back clean for the
 wrong reason**, so the floor 0226 actually installs should be read off its
@@ -161,8 +161,24 @@ in the same window, and the floor must not move for either of them.**
 -- run BEFORE 0227, and again AFTER 0228
 SELECT public.ottoq_cert_recert_floor()      AS floor,
        (SELECT count(*) FROM public.ottoq_cert_lineage_orphans()) AS orphans;
--- expected both times: 2026-09-07 21:36:53+00 | 0
+-- expected both times: 2026-09-07 21:36:53.363037+00 | 22
 ```
+
+**Both expected values were wrong in the first draft of this runbook, and one of
+them would have aborted the window.** Measured 15:57–15:59 UTC:
+
+* The floor is **`21:36:53.363037`**, not the flat `21:36:53`. The floor is
+  `GREATEST(branch1, branch2)`, and branch 2 — `max(classified_at)` read
+  straight off `ottoq_cert_lineage` — wins by 363 ms. The flat value is a
+  rounding of branch 1.
+* Orphans is **22, not 0**, and 0226's original A1 asserted 0 — so 0226 would
+  have aborted on its own assertion, as the first file in the window. The 22 are
+  `0192`–`0215`, applied through the SQL endpoint, which writes no
+  `schema_migrations` row for anything. Nothing to key against, so no
+  normalisation can match them; 0199 anticipated exactly this and that is what
+  branch 2 is for. A1 has been rewritten to assert the property that actually
+  matters — no `schema_migrations` row since the naming boundary falls through
+  to the conservative default, measured 0. See `db/checks/0135`'s addendum.
 
 If the floor moves, a lineage row did not join, and the fix is incomplete.
 Before G28 this could not have been checked at all, because there was nothing
