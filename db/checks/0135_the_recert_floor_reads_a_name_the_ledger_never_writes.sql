@@ -167,3 +167,54 @@ ORDER BY ticks DESC, scenario, seed;
 --     refuses, that is the check working, and it is better to learn it from the
 --     larger evidence set than from a floor that admits one pair.
 SELECT 'see Q1-Q7; this file changes nothing' AS status;
+
+-- ---------------------------------------------------------------------------
+-- ADDENDUM 2026-09-08 15:58 UTC — 0226's A1 was asserting the wrong thing, and
+-- would have aborted the whole apply window on its own first migration.
+--
+-- Dry-running 0226's preconditions in the state they would actually meet
+-- (scripts/APPLYING.md step 3b(ii)) turned up a defect this file's own framing
+-- helped create. 0135 counted "33 of 92 classifications join nothing" and
+-- 0226 turned that into an assertion: `ottoq_cert_lineage_orphans()` must
+-- return zero. **It returns 22 after the fix, and 32 before it.**
+--
+-- THE 22, and they are not defects:
+--
+--     0192 … 0215 — a contiguous block, every one classified between
+--     2026-09-04 15:00 and 2026-09-08 07:47.
+--
+-- Those are the migrations applied through the **SQL endpoint**, which writes
+-- no `supabase_migrations.schema_migrations` row at all. There is nothing for
+-- their classification to be keyed against, so no amount of key normalisation
+-- can match them. 0199 already knew this and gave the floor a **second branch**
+-- reading `max(classified_at)` straight off `ottoq_cert_lineage` with no join —
+-- and measured today, that branch is the one setting the floor:
+--
+--     branch 1 (schema_migrations join) : 2026-09-07 21:36:53
+--     branch 2 (lineage direct)         : 2026-09-07 21:36:53.363037   <- wins
+--
+-- So the 22 rows' classifications ARE consulted. The function's name and its
+-- first COMMENT both said otherwise ("classifications ottoq_cert_recert_floor
+-- cannot consult"), and that was wrong for exactly the rows that make up the
+-- entire result.
+--
+-- WHAT G28 ACTUALLY CLAIMS, and it is checkable without this ambiguity, from
+-- the migration side: **no `schema_migrations` row since the naming boundary
+-- falls through to the conservative default.** Measured 15:57 UTC: **0**. That
+-- is the whole of the finding, it holds, and it is what 0226's A1 now asserts.
+--
+-- Two second-order notes:
+--   * The floor lands at **21:36:53.363037**, not the flat 21:36:53 this file
+--     quoted. The 363 ms is branch 2 winning. `db/checks/0140` Q5's P3 dry-run
+--     pinned the flat value — 363 ms early — and no pair started inside that
+--     gap, so that dry-run stands. Recorded because "the floor is 21:36:53" is
+--     the kind of rounded quote that is right until it is load-bearing.
+--   * 0226's A2 compares the floor to `max(classified_at) WHERE forces_recert`,
+--     i.e. to branch 2 itself, so it matches to the microsecond and passes.
+--
+-- The lesson is the one APPLYING.md 3b(ii) already carries, earning its keep a
+-- second time in one hour: an assertion derived from a check's *summary
+-- sentence* rather than from the check's data will encode the summary's
+-- imprecision. "33 of 92 join nothing" was true and was never a defect count.
+-- ---------------------------------------------------------------------------
+

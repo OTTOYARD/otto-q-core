@@ -200,21 +200,68 @@ BEGIN
   $function$;
 
   COMMENT ON FUNCTION public.ottoq_cert_lineage_orphans() IS
-    '0226 (G28, db/checks/0135). Lineage rows whose migration cannot be found '
-    'under the normalised name key — i.e. classifications that ottoq_cert_'
-    'recert_floor cannot consult, and which therefore fall through to its '
-    'conservative default. Should be empty. A non-empty result means someone '
-    'classified a migration under a name the apply path never wrote.';
+    '0226 (G28, db/checks/0135). Lineage rows whose migration has no '
+    'supabase_migrations.schema_migrations entry under the normalised name key. '
+    'IT IS NOT EXPECTED TO BE EMPTY, and an earlier draft of 0226 wrongly '
+    'asserted that it was: migrations applied through the SQL endpoint have no '
+    'schema_migrations row at all, and 22 of them (0192-0215) legitimately '
+    'appear here. Their classifications are still consulted — by the SECOND '
+    'branch of ottoq_cert_recert_floor, which reads max(classified_at) straight '
+    'off this table with no join, and which is the branch currently setting the '
+    'floor. Use this as a diagnostic, not a gate: what it shows is which '
+    'classifications the schema_migrations join cannot reach, which is a '
+    'different and larger set than the ones nothing can reach.';
 
   ------------------------------------------------------------------ A1 ------
-  SELECT count(*) INTO v_orphans FROM public.ottoq_cert_lineage_orphans();
-  IF v_orphans > 0 THEN
-    RAISE EXCEPTION '0226 A1: % lineage row(s) still match no migration under '
-                    'the normalised key: %. The join fix does not cover them '
-                    'and the floor is still ignoring their classification.',
-                    v_orphans,
-      (SELECT string_agg(name, ', ') FROM public.ottoq_cert_lineage_orphans());
+  -- REVISED 2026-09-08 15:58 UTC, before this migration was ever applied.
+  --
+  -- The first draft asserted `ottoq_cert_lineage_orphans()` returns zero rows.
+  -- **Dry-run against the live catalog it returns 22, and this migration would
+  -- have aborted on its own A1** — the first file in the apply window, blocking
+  -- the other three.
+  --
+  -- The 22 are 0192 through 0215: a contiguous block applied through the SQL
+  -- endpoint, which writes no schema_migrations row at all. They are not
+  -- mis-keyed classifications; there is nothing for them to be keyed against.
+  -- 0199 already anticipated exactly this and gave the floor a second branch
+  -- that reads max(classified_at) straight off ottoq_cert_lineage — and that
+  -- branch is the one setting the floor today. So the premise behind demanding
+  -- zero was wrong, not the data.
+  --
+  -- What A1 asserts instead is the property the fix actually claims, checked
+  -- from the migration side where it is unambiguous: **no schema_migrations row
+  -- since the naming boundary falls through to the conservative default.**
+  -- That is the whole of G28. Measured before drafting this: 0.
+  SELECT count(*) INTO v_n
+    FROM supabase_migrations.schema_migrations m
+   WHERE m.version ~ '^[0-9]{14}$'
+     AND m.version > '20260904150000'
+     AND NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage l
+                      WHERE regexp_replace(l.name,'^[0-9]{4}[a-z]?_','')
+                          = regexp_replace(m.name,'^[0-9]{4}[a-z]?_',''));
+  IF v_n > 0 THEN
+    RAISE EXCEPTION '0226 A1: % migration(s) since the naming boundary still '
+                    'match no classification under the normalised key, so they '
+                    'force a recert they may not deserve. The normalisation did '
+                    'not reach them: %', v_n,
+      (SELECT string_agg(m.name, ', ') FROM supabase_migrations.schema_migrations m
+        WHERE m.version ~ '^[0-9]{14}$' AND m.version > '20260904150000'
+          AND NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage l
+                           WHERE regexp_replace(l.name,'^[0-9]{4}[a-z]?_','')
+                               = regexp_replace(m.name,'^[0-9]{4}[a-z]?_','')));
   END IF;
+
+  -- And the rewrite must have *reduced* the unreachable set, or it did not take.
+  SELECT count(*) INTO v_orphans FROM public.ottoq_cert_lineage_orphans();
+  IF v_orphans >= 32 THEN
+    RAISE EXCEPTION '0226 A1: % lineage rows are unreachable by the join, which '
+                    'is no better than the 32 the raw-name join left. The '
+                    'normalisation did not take.', v_orphans;
+  END IF;
+  RAISE NOTICE '0226 A1: 0 migrations since the boundary are unclassified; % '
+               'lineage rows have no schema_migrations entry at all (expected '
+               '~22: the SQL-endpoint applies 0192-0215, consulted by the '
+               'floor''s second branch)', v_orphans;
 
   ------------------------------------------------------------------ A2 ------
   -- The floor must actually move, and must land exactly on 0208 — the newest
