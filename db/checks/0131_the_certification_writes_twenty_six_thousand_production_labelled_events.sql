@@ -164,6 +164,21 @@ WHERE event_type='vehicle.state_changed' AND ingest_source='trigger' AND data_so
 --     It is also why 0139's blind-spot doctrine does not catch this: an atom
 --     can only see what is inside its own run scope, and this defect is
 --     precisely a row landing outside it.
+--
+--     THE ARGUMENT'S LOAD-BEARING ASSUMPTION, named rather than left implicit.
+--     "Invisible to the verdict" holds only while every reader on the decide
+--     path is RUN-SCOPED. Consider what would happen if one were not: arm A's
+--     reset events carry sim_run_id NULL, which is the PRODUCTION scope, and arm
+--     B's carry arm A's run. A decide-path function reading events at
+--     production scope would see 116 rows on arm A that arm B cannot see —
+--     an asymmetry that reaches the schedule, not just the label.
+--
+--     That is exactly the 0145 defect class, and it is why 0123 and 0124 scoped
+--     every read of a run-scoped table to its own run. So the invisibility here
+--     rests on that sweep having been complete. If a future change introduces an
+--     unscoped read of ottoq_events on the decide path, this stops being a
+--     labelling defect and becomes a determinism defect, silently. Worth a line
+--     in whichever migration eventually fixes it.
 
 -- Q7. WHAT TO DO, with the consequence of each stated rather than a preference.
 --
