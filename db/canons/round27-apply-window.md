@@ -55,12 +55,22 @@ and read twice, with an **A5** that reports every column whose
 `busy_day/314159/12t` 6 → 3, which is the correct consequence of comparing more
 atoms, not a regression). The stale lineage note was corrected too.
 
-**THE ONE REMAINING BLOCKER: the replacement P3 has not been dry-run.** It was
-written while column f was firing and the database was deliberately left alone.
-Before 0225 is applied, extract its P3 body as a standalone read-only SELECT,
-run it, and see it return **no rows**. The file's own footer carries this
-requirement. 0140 exists precisely because the previous P3 was never run in the
-configuration it would meet — and APPLYING.md now has a step 3b(ii) about it.
+**BLOCKER CLEARED 15:47 UTC — the replacement P3 dry-runs clean** (`db/checks/0140`
+Q5), executed against the floor 0226 installs rather than the one live at the
+time. No column goes green → not-green, so **0225 will apply**. Exactly one
+column moves — `busy_day/314159/12t`, **6 → 3** — which is the number 0140 Q4
+traced by hand before the query existed, and A5 reports it alone. `grid_smoke`
+excludes itself.
+
+The same run also settles what 0226 buys: **six flagship columns show a streak
+of 3 or more at the lower floor, against `green`'s bar of 2, where today they
+read zero.** That is G28 confirmed from the other side and 0226's A4 passing
+with room to spare.
+
+*(The first attempt used the live floor and came back clean for the wrong reason
+— one pair above the floor means a streak of 1 everywhere and nothing that can
+lose green. It looked like a pass. Step 3b(ii) was written forty minutes before
+that happened.)*
 
 Order, unchanged: **0226 → 0225 → 0227 → 0228**.
 

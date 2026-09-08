@@ -515,11 +515,19 @@ ON CONFLICT (name) DO UPDATE
 -- The rewrite tests the property directly: no column green under nine atoms
 -- stops being green under fourteen.
 --
--- **NOT YET DRY-RUN.** The replacement P3 is written but has not been executed
--- against the live catalog — round 27 column f was firing. It must be run
--- read-only, as a standalone SELECT, and seen to return no rows before this
--- migration is applied. Recorded here rather than assumed, because 0140 exists
--- precisely because the previous P3 was never run in the configuration it
--- would meet.
+-- **DRY-RUN CLEAN, 2026-09-08 15:47 UTC** (db/checks/0140 Q5). Executed
+-- read-only between round 27 columns f and g, no pair in flight, with the floor
+-- pinned to '2026-09-07 21:36:53+00' — the value 0226 installs, not the one
+-- live at the time. No column goes green -> not-green, so P3 does not raise;
+-- exactly one column moves (`busy_day/314159/12t`, 6 -> 3), which is the number
+-- Q4 traced by hand before the query existed, and A5 reports that column and no
+-- other. `grid_smoke` excludes itself without a special case: streak 1, never
+-- green, nothing to lose.
+--
+-- The first attempt at that dry-run used the LIVE floor and came back clean for
+-- the wrong reason — every column read a streak of 1, because one pair sits
+-- above the current floor. It looked like a pass. That is the failure mode
+-- `scripts/APPLYING.md` step 3b(ii) exists for, and it was walked into forty
+-- minutes after that step was written.
 -- ---------------------------------------------------------------------------
 
