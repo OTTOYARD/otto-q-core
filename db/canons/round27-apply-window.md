@@ -12,6 +12,43 @@ belt and braces on purpose: `ottoq_sim_runs` cannot see an in-flight pair (both
 arms are one transaction) and `cron.job_run_details` reports a running
 two-statement job as `succeeded` at ~1 s (`db/canons/round25.md`).
 
+## BLOCKED — 0225 will refuse as drafted (found 15:30 UTC, db/checks/0140)
+
+**Do not run the window as written.** 0225's P3 was dry-run against the floor
+0226 installs — the combination the window actually creates, and one nothing had
+evaluated, because 0226 is not applied yet. **Two of seven columns trip it, so
+0225 raises and stops.**
+
+This is the apply-order reasoning working. The note below says 0226 goes first
+"deliberately: a lower floor makes 0225's P3 a much harder test." It is harder,
+and it fails.
+
+| column | trips on | verdict |
+|---|---|---|
+| `grid_smoke/424242/6t` | `d_rule=2 d_rcl=2 d_endst=2`, `d_sdr=0` | P3 should never have looked. A 6-tick fixture (0153), not a certification column. `d_sdr=0` means every pair predates h_sdr. |
+| `busy_day/314159/12t` | `d_sdr=2` | Real, on a flagship column, and **fully explained**: the 08:25:00 pair's two arms hashed h_sdr differently and it PASSED — eighteen minutes before **0218** (applied 08:43:04 UTC) fixed h_sdr hashing a signature over a run-scoped id, and while 0219 still had h_sdr *measured, not enforced*. The measured phase catching a defect before enforcement is the doctrine succeeding, not a hole. |
+
+**Three defects in P3, and 0225 must be revised before the window runs:**
+
+1. **P3 does not key as the matrix keys.** It selects `r.depot_id` and then
+   drops it at `GROUP BY 1,2,3`; the matrix keys `(depot, seed, ticks,
+   scenario)`. Inert today only because 0138 proved the Benchmark depot has
+   zero runs — a second lane activates it.
+2. **P3 judges scenarios the matrix does not certify** (grid_smoke).
+3. **P3's bar is stricter than its own stated purpose.** Its message claims
+   applying "would break their streaks". Traced through the matrix's
+   `bool_and ... ORDER BY rn` from the newest pair backwards,
+   `busy_day/314159/12t` would go from 6 consecutive passes to **3** — and
+   `green` needs ≥2, so **the column stays green**. It refuses a change that
+   costs three streak rows for a disagreement that cannot recur.
+
+**What must NOT be done to make it pass:** raise the floor past 08:25, or touch
+the 08:25 pair. That disagreement is correct history and it is the evidence that
+motivated 0218. A migration that becomes applicable by hiding evidence is worse
+than one that refuses.
+
+Revised order, once 0225 is fixed: **0226 → 0225 → 0227 → 0228**, unchanged.
+
 ## Pre-flight, 2026-09-08 15:25 UTC — every pin still matches live
 
 Re-read from the live catalog between columns e and f, no pair in flight. All
