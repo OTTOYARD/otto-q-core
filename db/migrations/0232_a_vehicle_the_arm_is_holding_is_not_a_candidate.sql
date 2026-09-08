@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908224618
 -- migration-name:    a_vehicle_the_arm_is_holding_is_not_a_candidate
 --
 -- G35 / db/checks/0151. The first fifo run in this database's history died on
@@ -267,3 +267,54 @@ VALUES (
   '-- it delegates to twin world functions shared with otto_q. Not claimed: that '
   'this makes fifo complete a run.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 22:46:18 UTC (5:46 PM CT). Three preconditions, four
+-- assertions, first attempt.
+--
+--   P2: ottoq_decide_tick contains the anchor 0 times, as designed
+--   A1: 4 tether predicates in each of fifo_tick and manual_tick
+--   A2: decide_tick md5 ae98f71b879a0a11bdf366d21ff5b4eb UNCHANGED
+--       greedy_tick md5 5a9a19f78878834a6d6a86ad36bea77d UNCHANGED
+--   A3: both still return ottoq_decide_tick_result
+--   A4: the predicate plans and executes against public.vehicles
+--
+-- THE FLOOR DID NOT MOVE: 2026-09-07 21:36:53.363037 before and after.
+--
+-- IT WORKED, AND THAT IS THE POINT. Immediately after applying, the first fifo
+-- run in this database's history completed:
+--
+--   e5ebc6d3-cb7d-4339-b669-76ccac0ea500   fifo, 12 ticks, seed 909090
+--   19 charge sessions, 273 stall bookings
+--
+-- and then a true CRN pair, same seed 555001 and same ab_group, both arms:
+--
+--   049eb402-20e9-406c-aec5-f4cc59928c48   otto_q, 12 ticks
+--   612dabbf-ccdc-4050-9e76-6e33b6d62b67   fifo,   12 ticks
+--
+-- The header said "NOT CLAIMED: that this makes fifo complete a run." It did,
+-- three times. The prediction was deliberately conservative and was beaten.
+--
+-- 0231's FALSIFIER PASSED. Its outcome block on the fifo arm returned non-zero
+-- on every field -- 577.98 kWh, 18 sessions, 18 vehicles served, 462 SoC points
+-- -- so it is not reading otto_q's substrate. That was the test 0231 could not
+-- run when it shipped, and it is now run and passed.
+--
+-- ONE CORRECTION TO db/checks/0149 FALLS OUT OF IT. 0149 listed
+-- coverage.bookings_total and used_calendar as otto_q-only substrate. The fifo
+-- arm produced 273 bookings and used_calendar=true, because the dispatcher's
+-- COMMON path books -- ottoq_place_unplaced_vehicles and
+-- ottoq_release_expired_bookings run after the policy CASE for every policy.
+-- The otto_q-only fields are the rule-evaluation pair: fifo scored
+-- rule_evals_total 0 and consulted_shield false, exactly as 0146 said.
+--
+-- AND IT EXPOSED A LARGER DEFECT, which is what running things does:
+-- db/checks/0152 / G36. Scoring the pair showed the otto_q arm reporting 0.0 kW
+-- peak while having delivered 128.79 kWh. Its sessions had been force-closed by
+-- the NEXT arm's ottoq_benchmark_reset with a wall-clock ended_at, six sim
+-- hours before they started. 55 of the benchmark lane's 88 sessions are in that
+-- state. Fix drafted as 0233.
+--
+-- STILL OPEN, and required before either arm's numbers mean anything: G34
+-- (0150) -- every arm must be preceded by a manual tether release, because the
+-- interlock has no run id to scope by. Three of the four runs above needed one.

@@ -330,7 +330,8 @@ repo_manifest(version, name, file) AS (
     ('20260908162111'::text, 'provenance_asks_the_depot_not_the_run_id'::text, '0228_provenance_asks_the_depot_not_the_run_id.sql'::text),
     ('20260908204137'::text, 'the_approach_band_scans_every_run_to_answer_about_one'::text, '0229_the_approach_band_scans_every_run_to_answer_about_one.sql'::text),
     ('20260908220518'::text, 'a_score_that_cannot_be_gamed_by_not_checking'::text, '0230_a_score_that_cannot_be_gamed_by_not_checking.sql'::text),
-    ('20260908222953'::text, 'a_comparative_score_may_read_only_what_every_arm_writes'::text, '0231_a_comparative_score_may_read_only_what_every_arm_writes.sql'::text)
+    ('20260908222953'::text, 'a_comparative_score_may_read_only_what_every_arm_writes'::text, '0231_a_comparative_score_may_read_only_what_every_arm_writes.sql'::text),
+    ('20260908224618'::text, 'a_vehicle_the_arm_is_holding_is_not_a_candidate'::text, '0232_a_vehicle_the_arm_is_holding_is_not_a_candidate.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
