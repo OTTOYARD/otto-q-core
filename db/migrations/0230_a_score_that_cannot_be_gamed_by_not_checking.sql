@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908220518
 -- migration-name:    a_score_that_cannot_be_gamed_by_not_checking
 --
 -- Part B groundwork. `public.ottoq_ab_score_run(uuid) RETURNS jsonb` — a
@@ -182,3 +182,35 @@ VALUES (
   'carries its coverage denominator so a zero is readable. forces_recert FALSE: a '
   'read-only function no engine code calls cannot change engine behaviour.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 22:05:18 UTC (5:05 PM CT), byte-identical to this file.
+-- Both assertions passed. Recert floor unchanged at 2026-09-07 21:36:53.363037,
+-- six flagship columns still green -- expected, since a STABLE function no
+-- engine code calls cannot alter engine behaviour, and checked anyway.
+--
+-- FIRST ATTEMPT FAILED, ATOMICALLY, AND THAT IS THE RECORD WORTH KEEPING.
+-- `peak AS (SELECT max(sum(d) OVER (...)) ...)` is invalid: an aggregate may not
+-- contain a window call (42803). The read-only prototype had `running` and
+-- `peak` as two separate CTEs and worked; the error was introduced by collapsing
+-- them into one line while moving the query into this file. Verified afterwards
+-- that NOTHING partial landed -- no function, no lineage row, no ledger row,
+-- floor unmoved. A migration that fails whole is the design working.
+--
+-- FIRST REAL SCORE, on `3f4b9690` (busy_day / 171717 / 12t, otto_q):
+--
+--   safety    peak_concurrent_kw 463.8 of a 2,500 kW cap (18.6%), not breached
+--             incapable_charge_bookings 0, unverifiable 0
+--   coverage  bookings_total 879, charge_bookings 287, rule_evals_total 5,900,
+--             used_calendar true, consulted_shield true
+--   through   decisions 1,488, sdrs 275, events 4,647, vehicles_booked 116
+--
+-- **The coverage block is doing its job in that output.** `incapable_charge_
+-- bookings: 0` is only meaningful because `charge_bookings: 287` sits beside it,
+-- and `consulted_shield: true` says this arm participated in L1 at all. Score an
+-- unshielded baseline and those read `false` and `0` -- the difference becomes
+-- impossible to miss instead of impossible to see.
+--
+-- WHAT IS STILL NOT BUILT, and must not be implied by the existence of a scorer:
+-- nothing writes `ottoq_ab_runs`, no pair has been run with two policies, and no
+-- comparison exists. This is the measurement half only.
