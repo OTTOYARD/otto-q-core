@@ -54,7 +54,19 @@ fixed" is the question a reader asks second.
 
 ---
 
-## The one thing on this page that is not ours to close
+## Not ours to close — founder actions
+
+These are open, they are the highest-severity items on this page, and no
+migration can close them.
+
+| # | Finding | State |
+|---|---|---|
+| **S-01 / S-02** | A shared secret was committed to the repository. The **code half is fixed**: the literal is gone and the bridge fails closed rather than open, pinned by `ottoq-intelligence/tests/test_auth_fails_closed.py`. A committed secret stays compromised until it is **rotated**, which is an operator action on EC2 and in Supabase. | open — awaiting rotation |
+
+Everything else in [`docs/MAGENTA_AUDIT.md`](docs/MAGENTA_AUDIT.md) — 85 of 87
+findings — is closed, each `FIXED` naming the guard that fails without it.
+
+## The other thing on this page that is not ours to close
 
 `db/migrations/UNFILED.md` lists **67 migrations, 734,007 characters**, applied to the
 database with no committed file. They are recoverable from `ottoq_schema_snapshots`
