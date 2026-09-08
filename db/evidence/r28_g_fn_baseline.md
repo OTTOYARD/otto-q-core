@@ -355,3 +355,27 @@ public|ottoq_active_charge_cap_kw|1|0.6
 ottoq|ottoq_booking_authorship|1|0.1
 public|ottoq_orchestrator_trigger|1|0.4
 ```
+
+## ADDENDUM 2026-09-08 16:53 UTC — this file has two rows for one name
+
+Found while testing `scripts/fn-delta.py` against this file, before `r28_g`
+fires. `public|ottoq_build_decision_frame` appears **twice** — 48 calls / 571.0 ms
+at line 303 and 1 call / 7.1 ms at line 353.
+
+That is not a capture error. `pg_stat_user_functions` is keyed by **`funcid`**,
+and `ottoq_build_decision_frame` is **overloaded** — two functions, one name, two
+rows. The capture is faithful; what it omits is the argument types that would
+tell the two apart.
+
+**Consequence for the `r28_g` diff:** the delta is computed by summing rows that
+share a schema and name, so the total per name is right and per-overload
+attribution is unavailable. The tool prints that aggregation rather than
+silently collapsing it. This affects exactly one of 303 names, and it is not one
+of the names `r28_g` is being run to measure (`ottoq_sim_compute_charger_load_kw`,
+`ottoq_policy_get`, and `ottoq_policy_get`'s callers), so no conclusion of round
+28 rests on it.
+
+**For the next instrumented column:** select `funcid` alongside the four columns
+so overloads are separable. This baseline cannot be re-captured — `r28_g`'s
+validity depends on it having been taken before the pair — so the fix lands in
+the capture that follows, not in this one.
