@@ -319,3 +319,36 @@ public|ottoq_active_charge_cap_kw|1|0.6
 public|ottoq_build_decision_frame|1|7.1
 public|ottoq_orchestrator_trigger|1|0.4
 ```
+
+## Transcription verified 18:54 UTC — and the first check was wrong
+
+These 304 rows were transcribed by hand from the query result. Every G21b number
+in `db/checks/0144` rests on them, so they were checksummed against the live view
+(safe: `track_functions` is `'none'` globally, so the counters have not moved
+since the 18:37 capture).
+
+| | file | database | |
+|---|---|---|---|
+| rows | 304 | 304 | exact |
+| **total calls** | **23,254,422** | **23,254,422** | **exact** |
+| calls, `twin` | 537,560 | 537,560 | exact |
+| calls, `ottoq` | 271,932 | 271,932 | exact |
+| calls, `public` | 22,393,073 | 22,393,073 | exact |
+| total self ms | 1,937,195.9 | 1,937,195.8 | **differs by 0.1** |
+
+**The first run of this check printed `*** TRANSCRIPTION ERROR ***`, and the check
+was what was wrong.** It compared the float sums with a tolerance of ±0.05. The
+database computes `round(sum(self_time), 1)` — full-precision values summed, then
+rounded once. The file holds 304 values each already rounded to one decimal, then
+summed. Those two operations can legitimately differ by up to `0.05 × 304 = ±15.2 ms`;
+the observed difference is **0.1 ms**, three orders of magnitude inside the real
+tolerance. A ±0.05 bound on a sum of 304 one-decimal values is arithmetically
+impossible to satisfy and should never have been written.
+
+**The integers are what settle it.** Call counts cannot round: an exact match on
+23,254,422 across 304 rows, and on all three per-schema subtotals independently,
+is conclusive. The transcription is correct.
+
+Recorded because the failure mode — an assertion firing on correct data and being
+believed — is the same one that made `cron.job_run_details` claim a running pair
+had finished in one second, twice, earlier the same afternoon.
