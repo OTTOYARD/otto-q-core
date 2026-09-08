@@ -335,3 +335,52 @@ WHERE f.funcname IN ('ottoq_l2_propose_stall_assignment','ottoq_eval_en_001_grid
                      'ottoq_sim_advance_site_energy')
   AND (f.calls - COALESCE(b.calls,0)) > 0
 ORDER BY 4 DESC;
+
+-- Q11. WHAT FIX 2 WOULD RISK, surveyed before drafting it rather than after.
+--
+--      FIX 2 is an index. An index cannot change a result SET, but it can
+--      change a PLAN, and a plan change reorders rows — which changes the
+--      answer of any query that takes LIMIT without a total ORDER BY. That is
+--      not hypothetical here: 0216 was exactly that bug, on the SDR booking
+--      pick, and it moved a hash.
+--
+--      So: which functions touch ocpp_sessions AND take a LIMIT?
+--
+--        function                              LIMITs  ORDER BYs
+--        ottoq_twin_run_list                        8          4
+--        ottoq_twin_snapshot                        7          9
+--        ottoq_energy_orchestrate                   5          4
+--        ottoq_build_decision_frame                 2          4
+--        twin.ottoq_sim_auto_charge_assign_tick     2          3
+--        ottoq_score_run                            2          3
+--        twin.ottoq_sim_advance_site_energy         2          2
+--        ottoq_forecast_net_load                    1          3
+--        ottoq_run_blackbox                         1          1
+--        ottoq_inbound_forecast                     1          1
+--        ottoq_tick_invariance_metrics              1          0   <- no ORDER BY at all
+--        ottoq_nl_status_brief                      1          0   <- no ORDER BY at all
+--
+--      Two functions contain a LIMIT and no ORDER BY anywhere in the body.
+--      Neither is on the tick or decide path by name — one is a metrics view,
+--      one a natural-language brief — but "by name" is not evidence, and
+--      counting LIMITs against ORDER BYs across a whole function body does NOT
+--      establish which clause belongs to which query. Telling those apart needs
+--      a plpgsql parser, which is finding G12, which is still open. So this is
+--      a candidate list, not a verdict.
+--
+--      What it changes about FIX 2: nothing yet, and that is the point of
+--      running the survey first. The index is still worth ~87 s; it is now
+--      known to be a change whose blast radius includes twelve functions rather
+--      than one, and the migration that makes it will have to say so and let a
+--      round judge it. Along with an assertion FIX 2 can actually carry: run
+--      the meter's own probes twice in the migration, once with enable_indexscan
+--      and enable_bitmapscan off, and require the same answer — which proves the
+--      index changes nothing for THE QUERY IT IS FOR, and proves nothing about
+--      the other eleven.
+SELECT n.nspname||'.'||p.proname AS fn,
+       (SELECT count(*) FROM regexp_matches(p.prosrc,'limit\s+[0-9]','gi')) AS limit_clauses,
+       (SELECT count(*) FROM regexp_matches(p.prosrc,'order\s+by','gi')) AS order_bys
+FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE p.prokind IN ('f','p') AND n.nspname IN ('public','twin','ottoq')
+  AND p.prosrc LIKE '%ocpp_sessions%' AND p.prosrc ~* 'limit\s+[0-9]'
+ORDER BY 2 DESC;
