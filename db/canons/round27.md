@@ -391,3 +391,57 @@ Seq Scan) next"* — still applies, and more strongly than it would have at 410:
 the fixes are clearly buying real time. **FIX 2 is already drafted as `0227`**,
 measured at 17.5 ms and 2,751 buffers per call across ~1,024 calls a pair, with
 its before-plan asserted so it refuses to apply if the premise does not hold.
+
+### e — `busy_day` / 171717 / **24 ticks** — **PASS**, 560 s
+
+Fired 15:03:00 UTC (10:03 AM CT), **560 s**. All thirteen atoms equal between
+the arms and byte-identical to round 26 — which was itself byte-identical to
+round 25. **This column has now produced the same fourteen values in three
+consecutive rounds across six migrations.**
+
+`fp 92b02f8b` · `h_cmd 050c4606` · `h_dec 0360adc9` · `h_evt b2230619` ·
+`h_bkg 947a2316` · `h_nrg 4c5035fe` · `h_prop 0046879e` · `h_defr d41d8cd9` ·
+`h_cal 11a24626` · `h_rule 9564b998` · `h_rcl fa8ab72c` · `h_sdr 957abcfb` ·
+`endst 967124f1`
+
+### And the duration constrains G27 — in the opposite direction from round 26
+
+Round 26 left an anomaly (G27): 0222 fixed the boot fingerprint, which is
+called **four times per pair regardless of tick count**, so its saving should
+have been roughly the same absolute number of seconds at both horizons. It was
+not — it removed 228 s from the 12-tick mean and **511 s** from the 24-tick
+column, a ratio of **2.24**.
+
+0223 is the opposite shape. The load meter is called **per tick** (~1,024 calls
+a pair), so a 24-tick pair makes about twice as many calls as a 12-tick one and
+the saving *should* scale by about 2.0:
+
+| fix | 12-tick saving | 24-tick saving | ratio | ratio the call count predicts |
+|---|---|---|---|---|
+| 0222 — boot fingerprint (round 25→26) | −228 s | −511 s | **2.24** | **1.0** (4 calls either way) |
+| 0223 — load meter (round 26→27) | −155 s | −201 s | **1.30** | **2.0** (per tick) |
+
+**Both fixes miss their predicted scaling, and they miss it in opposite
+directions.** 0222 scaled with ticks when it should not have; 0223 scales with
+ticks less than half as much as it should. A single explanation that covers both
+is not obvious, and the hypothesis recorded earlier in this file — that hoisting
+removes more than the call because it also removes what the planner did around
+it per row — predicts *over*-scaling for 0223, which is not what happened.
+
+So G27 is not one anomaly with two data points. It is two anomalies, and the
+per-call arithmetic is wrong about *both* directions of tick-scaling.
+
+**What would sharpen this, in order:**
+
+1. **Column f at 15:34 UTC** — the other 24-tick column, different seed. If its
+   saving also lands near 1.3x rather than 2.0x, the under-scaling is a property
+   of the fix and not of one seed. One column is a reading; two is a pattern.
+2. **`r27_g` at 15:52 UTC**, the instrumented column. Its
+   `pg_stat_user_functions` diff gives per-function call counts and self-times
+   over one complete 24-tick pair. It settles directly whether the load meter is
+   actually called ~2x more often at 24 ticks than at 12 — which the whole
+   "should scale 2.0" argument assumes and **nothing has yet measured**.
+
+That last point is the honest one: the predicted 2.0 rests on an assumption
+about call counts that has never been checked, and the instrument to check it
+fires in forty minutes.
