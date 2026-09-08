@@ -567,6 +567,46 @@ than a thing I can read off this one.
 The staged query carries this warning in its own header so the numbers cannot be
 read the wrong way at the moment they arrive.
 
+#### And a second confound in the same table, worse than the first — 15:55 UTC
+
+The row headed *"`ottoq_determinism_pair`'s SELF time on a 24-tick pair — ~255 s
+or ~500 s"* has a problem the first correction does not cover.
+
+**The 255,737 ms baseline is from `r25_g`, which ran BEFORE 0222.** Between that
+capture and g, seven migrations landed, one of them being 0222 — the fix that
+removed the boot fingerprint's million-row serialisation. `db/checks/0129`
+established that the fingerprint's cost *appeared as `ottoq_determinism_pair`'s
+own self-time* (it is not a separately tracked plpgsql call), and put it at
+roughly 64,000 ms × 4 calls ≈ 256,000 ms — which is, to three figures, the whole
+of that 255,737.
+
+So the comparison I set up compares a **pre-0222 12-tick** pair with a
+**post-0222 24-tick** pair. It confounds the fix with the horizon, and the fix is
+the larger term by far. **"~255 s or ~500 s" is not a live question**: post-0222
+the answer should be neither, but near zero, and if it is near zero that tells
+me 0222 worked — which round 26 already told me — not whether the fingerprint
+scales with ticks.
+
+What survives, and it is not nothing:
+
+- **A direct, non-wall-clock confirmation of 0222's magnitude.** If
+  `determinism_pair`'s self-time on g comes back at single-digit seconds against
+  a pre-fix 255.7 s, that is 0222 measured by the profiler rather than inferred
+  from round durations. Worth having on its own.
+- **G27's *live* half is 0223, not 0222**, and it needs the load meter's
+  absolute call count — which g does give, per the correction above.
+- **The fingerprint's tick-scaling is now unanswerable from this instrument and
+  probably not worth answering.** Post-0222 it is cheap at both horizons; a
+  quantity that is small either way does not explain a 511 s and 602 s saving.
+  That saving is round 26's, and explaining it needs a pre-0222 instrumented
+  24-tick pair, which will never exist because the code is gone.
+
+**That last line is the honest state of G27's first half: the evidence needed to
+explain 0222's over-scaling was destroyed by 0222.** It should have been captured
+before the fix. Recording that as a lesson rather than pretending the question is
+still open: *instrument before you fix, not after, when the fix removes the thing
+you would measure.*
+
 ### f — `busy_day` / 424242 / **24 ticks** — **PASS**, 551 s
 
 Fired 15:34:00 UTC (10:34 AM CT), **551 s**, `arms_identical` true across all
