@@ -257,3 +257,36 @@ mechanism fits — a 1.36-million-row scan's cost depends on how much of those
 tables the buffer cache happens to hold, and nothing else in the pair scans at
 that scale — but it is a post-hoc explanation of four data points and is
 labelled as one.
+
+## The two atoms the canon machinery cannot see — checked by hand
+
+`db/checks/0134`, found while this round was running: `ottoq_cert_matrix`
+compares nine atoms, the pair enforces fourteen, and **`h_sdr` and `endst` are
+not carried by the matrix at all** while `h_rule` and `h_rcl` are carried,
+printed and never compared. Until that is fixed the round file is the only place
+those four are diffed, so they are diffed here.
+
+`h_rule`, `h_rcl` and `h_sdr` are in each column's table above and all three
+reproduce. That leaves `endst` and `h_defr`, recorded now:
+
+| column | round 25 `endst` | round 26 `endst` | | `h_defr` |
+|---|---|---|---|---|
+| a — `busy_day`/314159/12t | `7b63e109` (10:52) | `7b63e109` | = | `d41d8cd9` |
+| b — `busy_day`/171717/12t | `c6424383` (08:46) | `c6424383` | = | `d41d8cd9` |
+| c — `normal_day`/171717/12t | `81b46976` (09:02) | `81b46976` | = | `d41d8cd9` |
+| d — `busy_day`/424242/12t | `2d6ea57e` (09:18) | `2d6ea57e` | = | `d41d8cd9` |
+
+(`endst` is a JSON object, so what is tabulated is `md5(endst::text)` of arm A;
+arm B is identical on every row, which is what the pair already enforced.
+`d41d8cd9` is the md5 of the empty string — the 0152 proposer quiesce holding on
+every column.)
+
+**This is the strongest single result of the round, and the matrix could not
+have produced it.** 0222 rewrote `ottoq_boot_state_fingerprint` — the function
+that computes `endst`. The pair only proves the rewritten function agrees with
+*itself* across two arms. What this table proves is that it agrees with the
+*old* function's answer, on four different worlds, after a change that removed
+1,360,899 of the 1,360,915 rows it used to serialize.
+
+Round 25's a-column value is taken from the 10:52 `r25_g` re-run rather than the
+08:25 pair, for the same reason its `h_sdr` was: the 08:25 pair predates 0218.
