@@ -412,9 +412,10 @@ have been roughly the same absolute number of seconds at both horizons. It was
 not — it removed 228 s from the 12-tick mean and **511 s** from the 24-tick
 column, a ratio of **2.24**.
 
-0223 is the opposite shape. The load meter is called **per tick** (~1,024 calls
-a pair), so a 24-tick pair makes about twice as many calls as a 12-tick one and
-the saving *should* scale by about 2.0:
+0223 is the opposite shape. The load meter is called **per tick** — about 1,024
+calls in a 12-tick pair, *derived* as 8,966,506 evaluations ÷ 8,756 per call
+(`db/checks/0130`), not counted directly — so a 24-tick pair should make about
+twice as many and the saving *should* scale by about 2.0:
 
 | fix | 12-tick saving | 24-tick saving | ratio | ratio the call count predicts |
 |---|---|---|---|---|

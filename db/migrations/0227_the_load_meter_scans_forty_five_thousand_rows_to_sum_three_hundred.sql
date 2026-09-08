@@ -25,8 +25,24 @@
 --
 -- Forty-five thousand rows read to sum three hundred, then all three hundred
 -- discarded by a run-scope predicate applied AFTER the scan as a Join Filter.
--- The meter is called ~1,024 times per certification pair, so this is roughly
--- 16-18 s of a 358-376 s pair: about 4.5%.
+-- The meter is called about 1,024 times per certification pair, so this is
+-- roughly 16-18 s of a 358-376 s pair: about 4.5%.
+--
+-- THAT 1,024 IS DERIVED, NOT COUNTED, AND IT IS A 12-TICK FIGURE. It comes from
+-- db/checks/0130's two measurements: 8,966,506 evaluations of
+-- ottoq_depot_running_run at 8,756 per call, and 8,966,506 / 8,756 = 1,023.8.
+-- Both were read from pg_stat_statements on a 12-TICK pair, so the arithmetic
+-- is sound and its scope is one horizon.
+--
+-- `pg_stat_user_functions` cannot corroborate it: the profile it came from ran
+-- with track_functions='pl', which does not count SQL functions, and this
+-- function is SQL — it shows 2 calls where the statement view shows a thousand.
+-- That is the same blindness that hid this whole chain from 0129.
+--
+-- Whether a 24-tick pair makes ~2,048 calls has never been measured at all.
+-- `r27_g` (15:52 UTC, track_functions='all') is the first run that can count
+-- them, and db/canons/round27.md records why that matters: the G27 scaling
+-- argument assumes the doubling and nothing has checked it.
 --
 -- SAY THE SIZE OUT LOUD, the way 0221 did. This will not transform the pair.
 -- It is worth applying because it is an unbounded-in-history read on a hot
@@ -231,8 +247,9 @@ VALUES ('the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred', fa
         'expression index on COALESCE(sim_run_id, zero-uuid) leading, so the '
         'site load meter stops reading 45,379 irrelevant rows per call to sum '
         '303. Index only; no SQL changes, so no result can change and no canon '
-        'can move. Measured before: 17.5 ms and 2,751 buffers per call, ~1,024 '
-        'calls per pair, about 4.5% of a pair.',
+        'can move. Measured before: 17.5 ms and 2,751 buffers per call; ~1,024 '
+        'calls per pair is DERIVED (8,966,506 / 8,756, db/checks/0130) and is a '
+        '12-tick figure, so about 4.5% of a 12-tick pair.',
         now())
 ON CONFLICT (name) DO UPDATE
   SET forces_recert = EXCLUDED.forces_recert,
