@@ -247,9 +247,14 @@ VALUES ('the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred', fa
         'expression index on COALESCE(sim_run_id, zero-uuid) leading, so the '
         'site load meter stops reading 45,379 irrelevant rows per call to sum '
         '303. Index only; no SQL changes, so no result can change and no canon '
-        'can move. Measured before: 17.5 ms and 2,751 buffers per call; ~1,024 '
-        'calls per pair is DERIVED (8,966,506 / 8,756, db/checks/0130) and is a '
-        '12-tick figure, so about 4.5% of a 12-tick pair.',
+        'can move. Measured before: 17.5 ms and 2,751 buffers per call. The '
+        'call count is no longer derived: r27_g COUNTED 1,128 calls and 17,886 '
+        'ms of self time in one 24-tick pair (db/checks/0141), i.e. 15.9 ms a '
+        'call, consistent with 0130 measuring 17.5. Against a 560 s 24-tick '
+        'pair that is about 3.2%. And the counted figure kills the per-tick '
+        'assumption behind 0223 s predicted 2.0x scaling: 1,128 at 24 ticks '
+        'against ~1,024 at 12 is ~1.10, which is what the observed 1.30 and '
+        '1.18 savings ratios were bracketing all along.',
         now())
 ON CONFLICT (name) DO UPDATE
   SET forces_recert = EXCLUDED.forces_recert,
