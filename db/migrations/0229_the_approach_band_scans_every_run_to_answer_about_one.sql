@@ -75,7 +75,8 @@
 -- A recertification round runs anyway and the canons are checked, because
 -- "provably identical on one run" is not "provably identical on every scenario".
 
-BEGIN;
+-- (no explicit BEGIN/COMMIT: apply_migration supplies the transaction,
+--  matching 0226-0228. The whole file is therefore one atomic unit.)
 
 -- ---------------------------------------------------------------------------
 -- P-  NEVER APPLY WHILE A CERTIFICATION PAIR IS IN FLIGHT.
@@ -223,4 +224,3 @@ VALUES (
   'directions across 120 rows and 12 columns; a recertification round runs anyway.'
 );
 
-COMMIT;
