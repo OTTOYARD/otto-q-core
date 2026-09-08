@@ -129,6 +129,7 @@ $a$;
   v_len_before int;
   v_n          int;
   v_bad        text;
+  v_streaks    text;
 BEGIN
   ------------------------------------------------------------------ P- ------
   -- pg_stat_activity is the ONLY authority on whether a pair is running.
@@ -343,6 +344,90 @@ BEGIN
   END IF;
   RAISE NOTICE '0225 P3: no green column loses green under the fourteen-atom '
                'comparison';
+
+  ------------------------------------------------------------- P3 record ----
+  -- P3 proves nothing goes green -> not-green. It does NOT prove no streak
+  -- moves, and one will: db/checks/0140 traced busy_day/314159/12t from six
+  -- consecutive passes to three, because the 08:25 pair (pre-0218 h_sdr)
+  -- becomes off-canon under the wider comparison. That is a published number
+  -- changing, and this migration is the reason. Capture it now, while the old
+  -- comparison still exists, and print it in A5 — so the movement is reported
+  -- by the change that causes it rather than discovered later as a mystery.
+  WITH fl AS (SELECT public.ottoq_cert_recert_floor() AS rf),
+  pair AS (
+    SELECT DISTINCT ON (r.depot_id, r.started_at)
+           r.depot_id AS c_depot, r.started_at AS t0,
+           (r.validation_status = 'passed') AS ok, r.validation_status AS st,
+           (r.validation_notes::jsonb) AS j
+      FROM public.ottoq_sim_runs r
+     WHERE r.run_by = 'cert_harness'
+       AND r.started_at >= (now() - interval '30 days')
+       AND r.validation_status IS NOT NULL AND r.validation_notes IS NOT NULL
+       AND jsonb_typeof((r.validation_notes::jsonb) -> 'arm_a') = 'object'
+     ORDER BY r.depot_id, r.started_at, r.sim_run_id
+  ), keyed AS (
+    SELECT p.c_depot, p.t0, p.ok, p.st,
+           (p.j->>'seed')::bigint AS c_seed,
+           COALESCE((p.j->>'ticks')::int, -1) AS c_ticks,
+           COALESCE(p.j->>'scenario','?') AS c_scen,
+           p.j->'arm_a'->>'fp' AS c_fp, p.j->'arm_a'->>'h_cmd' AS c_cmd,
+           p.j->'arm_a'->>'h_dec' AS c_dec, p.j->'arm_a'->>'h_evt' AS c_evt,
+           p.j->'arm_a'->>'h_bkg' AS c_bkg, p.j->'arm_a'->>'h_nrg' AS c_nrg,
+           p.j->'arm_a'->>'h_prop' AS c_prop, p.j->'arm_a'->>'h_defr' AS c_defr,
+           p.j->'arm_a'->>'h_cal' AS c_cal, p.j->'arm_a'->>'h_rule' AS c_rule,
+           p.j->'arm_a'->>'h_rcl' AS c_rcl, p.j->'arm_a'->>'h_sdr' AS c_sdr,
+           md5((p.j->'arm_a'->'endst')::text) AS c_endst,
+           (p.j->'arm_a'->>'run')::uuid AS c_run_a
+      FROM pair p
+  ), ranked AS (
+    SELECT k.*, row_number() OVER (PARTITION BY k.c_depot,k.c_seed,k.c_ticks,k.c_scen
+                                   ORDER BY k.t0 DESC, k.c_run_a DESC) AS rn
+      FROM keyed k WHERE k.st <> 'inconclusive'
+  ), canon AS (SELECT * FROM ranked WHERE rn = 1),
+  marked AS (
+    SELECT r.c_depot, r.c_seed, r.c_ticks, r.c_scen, r.rn,
+           (r.ok AND r.t0 >= fl.rf
+            AND r.c_fp IS NOT DISTINCT FROM k.c_fp
+            AND r.c_cmd IS NOT DISTINCT FROM k.c_cmd
+            AND r.c_dec IS NOT DISTINCT FROM k.c_dec
+            AND r.c_evt IS NOT DISTINCT FROM k.c_evt
+            AND r.c_bkg IS NOT DISTINCT FROM k.c_bkg
+            AND r.c_nrg IS NOT DISTINCT FROM k.c_nrg
+            AND (r.c_prop IS NULL OR k.c_prop IS NULL OR r.c_prop = k.c_prop)
+            AND (r.c_defr IS NULL OR k.c_defr IS NULL OR r.c_defr = k.c_defr)
+            AND (r.c_cal  IS NULL OR k.c_cal  IS NULL OR r.c_cal  = k.c_cal)) AS on9,
+           (r.ok AND r.t0 >= fl.rf
+            AND r.c_fp IS NOT DISTINCT FROM k.c_fp
+            AND r.c_cmd IS NOT DISTINCT FROM k.c_cmd
+            AND r.c_dec IS NOT DISTINCT FROM k.c_dec
+            AND r.c_evt IS NOT DISTINCT FROM k.c_evt
+            AND r.c_bkg IS NOT DISTINCT FROM k.c_bkg
+            AND r.c_nrg IS NOT DISTINCT FROM k.c_nrg
+            AND (r.c_prop IS NULL OR k.c_prop IS NULL OR r.c_prop = k.c_prop)
+            AND (r.c_defr IS NULL OR k.c_defr IS NULL OR r.c_defr = k.c_defr)
+            AND (r.c_cal  IS NULL OR k.c_cal  IS NULL OR r.c_cal  = k.c_cal)
+            AND (r.c_rule IS NULL OR k.c_rule IS NULL OR r.c_rule = k.c_rule)
+            AND (r.c_rcl  IS NULL OR k.c_rcl  IS NULL OR r.c_rcl  = k.c_rcl)
+            AND (r.c_sdr  IS NULL OR k.c_sdr  IS NULL OR r.c_sdr  = k.c_sdr)
+            AND (r.c_endst IS NULL OR k.c_endst IS NULL OR r.c_endst = k.c_endst)) AS on14
+      FROM ranked r
+      JOIN canon k ON k.c_depot=r.c_depot AND k.c_seed=r.c_seed
+                  AND k.c_ticks=r.c_ticks AND k.c_scen=r.c_scen
+      CROSS JOIN fl
+  ), streaks AS (
+    SELECT c_depot, c_seed, c_ticks, c_scen,
+           count(*) FILTER (WHERE u9)::int AS n9,
+           count(*) FILTER (WHERE u14)::int AS n14
+      FROM (SELECT m.*, bool_and(m.on9) OVER w AS u9, bool_and(m.on14) OVER w AS u14
+              FROM marked m
+            WINDOW w AS (PARTITION BY m.c_depot,m.c_seed,m.c_ticks,m.c_scen
+                         ORDER BY m.rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)) x
+     GROUP BY 1,2,3,4
+  )
+  SELECT string_agg(format('%s/%s/%st: %s -> %s', c_scen, c_seed, c_ticks, n9, n14),
+                    '; ' ORDER BY c_scen, c_seed, c_ticks)
+    INTO v_streaks
+    FROM streaks WHERE n9 <> n14;
   ------------------------------------------------------- catalog rewrite ----
   -- Every anchor asserted at exactly one occurrence FIRST, then all five
   -- applied. Counting by length delta rather than by regex so an anchor
@@ -445,6 +530,20 @@ BEGIN
     RAISE EXCEPTION '0225 A4: canon_sdr or canon_endst came back NULL for a '
                     'current flagship column (%), which means the extraction '
                     'is wrong, not that the atom is missing', v_bad;
+  END IF;
+
+  ------------------------------------------------------------------ A5 ------
+  -- Report the streak movement captured in P3. Not an assertion: P3 already
+  -- proved no column loses green, and a shortened streak on a column that
+  -- stays green is the correct consequence of comparing more atoms, not a
+  -- regression. It is printed because it is a published number that this
+  -- migration moves, and a number that moves without a stated cause is how
+  -- 0134 happened in the first place.
+  IF v_streaks IS NULL THEN
+    RAISE NOTICE '0225 A5: no column''s consecutive_passes changed';
+  ELSE
+    RAISE NOTICE '0225 A5: consecutive_passes moved on these columns (expected; '
+                 'they compare four more atoms now): %', v_streaks;
   END IF;
 
   RAISE NOTICE '0225 applied: body % -> %, length % -> %',
