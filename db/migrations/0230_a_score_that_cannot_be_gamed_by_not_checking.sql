@@ -61,9 +61,15 @@ ev AS (
   UNION ALL
   SELECT ended_at   AS t, -kw AS d FROM sess
 ),
-peak AS (
-  SELECT max(sum(d) OVER (ORDER BY t, d DESC ROWS UNBOUNDED PRECEDING)) AS kw FROM ev
+-- Two CTEs, not one: max(sum(...) OVER (...)) is invalid -- an aggregate may not
+-- contain a window call. The read-only prototype had these separate and the
+-- error appeared only when they were collapsed while moving the query into this
+-- file. The migration failed atomically and nothing landed, which is the point
+-- of assertions inside one transaction.
+running AS (
+  SELECT sum(d) OVER (ORDER BY t, d DESC ROWS UNBOUNDED PRECEDING) AS ckw FROM ev
 ),
+peak AS (SELECT max(ckw) AS kw FROM running),
 cap AS (SELECT d.service_max_kw AS kw FROM public.depots d JOIN r ON d.id = r.depot_id),
 -- A charge booking onto a stall whose connector cannot serve the vehicle's
 -- inlet. Counted only where BOTH sides declare their types; a NULL on either
