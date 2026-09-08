@@ -404,25 +404,91 @@ BEGIN
   END IF;
 
   ------------------------------------------------------------------ A2 ------
-  -- The load-bearing one. Extending a comparison must not retroactively
-  -- change any column's verdict, and P3 is the argument that it will not; A2
-  -- is the measurement. Recomputed against the snapshot taken before the drop.
+  -- REWRITTEN 2026-09-08 16:12 UTC, before this migration was ever applied,
+  -- because the previous version CONTRADICTED A5 and would have aborted here.
+  --
+  -- The first A2 asserted that no column's `consecutive_passes` changes. That
+  -- was correct for the ORIGINAL P3, which refused unless the newly compared
+  -- atoms were single-valued — under that bar no streak could move. When P3 was
+  -- rewritten (15:35) to permit a streak to shorten so long as no column loses
+  -- green, and A5 was added to REPORT exactly that movement, A2 was left
+  -- asserting the opposite of what A5 exists to print. Two blocks of the same
+  -- migration, disagreeing about whether a known, predicted, harmless change is
+  -- allowed. `busy_day/314159/12t` goes 6 -> 3; A5 says so; A2 would have
+  -- raised on it.
+  --
+  -- Found by reading the file top to bottom before applying, not by any check.
+  -- Recorded rather than quietly patched, because the lesson is specific:
+  -- **adding an assertion is not a local edit.** A5 was added in isolation and
+  -- its premise silently invalidated an assertion two hundred lines away.
+  --
+  -- What A2 asserts now, in four parts, and it is strictly stronger than a
+  -- blanket "nothing changed":
+  --   1. `green` may not change for ANY column. That is the certification
+  --      claim; P3 is the argument and this is the measurement.
+  --   2. No column may appear or disappear.
+  --   3. `consecutive_passes` may only DECREASE. An increase would mean the
+  --      wider comparison found MORE agreement than the narrower one, which is
+  --      impossible; if it happens the rewrite is wrong.
+  --   4. The columns whose streak moved must be EXACTLY the ones P3 recorded in
+  --      `_0225_streaks`. Not a subset, not a superset. This is the part that
+  --      makes A5 a report rather than an excuse: the movement was predicted
+  --      before the drop, and A2 checks the prediction against the outcome.
   IF EXISTS (SELECT 1 FROM _0225_before b
               FULL JOIN public.ottoq_cert_matrix(now() - interval '30 days') a
                 ON a.depot = b.depot AND a.seed = b.seed
                AND a.ticks = b.ticks AND a.scenario = b.scenario
              WHERE a.green IS DISTINCT FROM b.green
-                OR a.consecutive_passes IS DISTINCT FROM b.consecutive_passes
                 OR a.depot IS NULL OR b.depot IS NULL) THEN
-    RAISE EXCEPTION '0225 A2: a column changed green or streak: %',
-      (SELECT string_agg(format('%s/%s/%s: %s/%s -> %s/%s', b.scenario, b.seed, b.ticks,
-                                b.green, b.consecutive_passes, a.green, a.consecutive_passes), '; ')
+    RAISE EXCEPTION '0225 A2(1,2): a column changed green, or appeared, or '
+                    'vanished: %',
+      (SELECT string_agg(format('%s/%s/%s: green %s -> %s', b.scenario, b.seed, b.ticks,
+                                b.green, a.green), '; ')
          FROM _0225_before b
          FULL JOIN public.ottoq_cert_matrix(now() - interval '30 days') a
            ON a.depot=b.depot AND a.seed=b.seed AND a.ticks=b.ticks AND a.scenario=b.scenario
-        WHERE a.green IS DISTINCT FROM b.green
-           OR a.consecutive_passes IS DISTINCT FROM b.consecutive_passes
-           OR a.depot IS NULL OR b.depot IS NULL);
+        WHERE a.green IS DISTINCT FROM b.green OR a.depot IS NULL OR b.depot IS NULL);
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM _0225_before b
+               JOIN public.ottoq_cert_matrix(now() - interval '30 days') a
+                 ON a.depot=b.depot AND a.seed=b.seed AND a.ticks=b.ticks AND a.scenario=b.scenario
+              WHERE a.consecutive_passes > b.consecutive_passes) THEN
+    RAISE EXCEPTION '0225 A2(3): a streak GREW under a stricter comparison, '
+                    'which is impossible: %',
+      (SELECT string_agg(format('%s/%s/%s: %s -> %s', b.scenario, b.seed, b.ticks,
+                                b.consecutive_passes, a.consecutive_passes), '; ')
+         FROM _0225_before b
+         JOIN public.ottoq_cert_matrix(now() - interval '30 days') a
+           ON a.depot=b.depot AND a.seed=b.seed AND a.ticks=b.ticks AND a.scenario=b.scenario
+        WHERE a.consecutive_passes > b.consecutive_passes);
+  END IF;
+
+  SELECT string_agg(x.line, '; ') INTO v_bad FROM (
+    SELECT format('%s/%s/%s moved %s->%s but P3 did not predict it',
+                  b.scenario, b.seed, b.ticks, b.consecutive_passes, a.consecutive_passes) AS line
+      FROM _0225_before b
+      JOIN public.ottoq_cert_matrix(now() - interval '30 days') a
+        ON a.depot=b.depot AND a.seed=b.seed AND a.ticks=b.ticks AND a.scenario=b.scenario
+     WHERE a.consecutive_passes IS DISTINCT FROM b.consecutive_passes
+       AND NOT EXISTS (SELECT 1 FROM _0225_streaks s
+                        WHERE s.c_depot=b.depot AND s.c_seed=b.seed
+                          AND s.c_ticks=b.ticks AND s.c_scen=b.scenario
+                          AND s.n9 <> s.n14)
+    UNION ALL
+    SELECT format('%s/%s/%s: P3 predicted %s->%s but the matrix did not move it',
+                  s.c_scen, s.c_seed, s.c_ticks, s.n9, s.n14)
+      FROM _0225_streaks s
+      JOIN _0225_before b ON b.depot=s.c_depot AND b.seed=s.c_seed
+                         AND b.ticks=s.c_ticks AND b.scenario=s.c_scen
+      JOIN public.ottoq_cert_matrix(now() - interval '30 days') a
+        ON a.depot=b.depot AND a.seed=b.seed AND a.ticks=b.ticks AND a.scenario=b.scenario
+     WHERE s.n9 <> s.n14
+       AND a.consecutive_passes IS NOT DISTINCT FROM b.consecutive_passes
+  ) x;
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION '0225 A2(4): the streaks that moved are not the ones P3 '
+                    'predicted: %', v_bad;
   END IF;
 
   ------------------------------------------------------------------ A3 ------
