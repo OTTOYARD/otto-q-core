@@ -447,10 +447,15 @@ That last point is the honest one: the predicted 2.0 rests on an assumption
 about call counts that has never been checked, and the instrument to check it
 fires in forty minutes.
 
-### f's prediction, committed 2026-09-08 15:36 UTC — while f is running, before it finishes
+### f's prediction, committed 2026-09-08 15:27 UTC — before f fires at 15:34
 
-f fired at 15:34:00 UTC and will not finish until ~15:43. This is written now,
-against a running pair, so it cannot be fitted to the answer.
+**Correction to this heading as first committed.** It said "committed 15:36
+UTC — while f is running" and that was wrong: the commit landed at **15:26:52
+UTC**, seven minutes *before* f fired, not two minutes after. I misread my own
+clock check. The error runs in the direction that understates the prediction —
+this was committed before the pair started, not during it — and it is corrected
+rather than quietly improved because a canon that misstates when its own
+prediction was fixed is worth less than one that admits it.
 
 The arithmetic, all of it already on this page:
 
