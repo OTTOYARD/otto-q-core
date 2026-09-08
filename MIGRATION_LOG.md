@@ -90,7 +90,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0218 — GENERATED, not a log
+## Index, 0134–0219 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative and stop at 0133 (2026-08-31).
 Everything from 0134 on went unlogged at the time. Rather than invent prose after the
@@ -193,7 +193,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0216](db/migrations/0216_the_settlement_record_binds_to_whichever_booking_the_heap_returned_first.sql) | `20260908081848` | yes — ledger | the settlement record binds to whichever booking the heap returned |
 | [0217](db/migrations/0217_the_verdict_sees_the_settlement_record_and_h_rcl_may_now_fail_a_pair.sql) | `20260908082227` | yes — ledger | the verdict sees the settlement record, and h_rcl may now fail a pair |
 | [0218](db/migrations/0218_h_sdr_hashed_a_signature_computed_over_a_run_scoped_id.sql) | `20260908084304` | yes — ledger | h_sdr hashed a signature computed over a run-scoped id. Corrects 0217 |
+| [0219](db/migrations/0219_h_sdr_may_now_fail_a_pair.sql) | `PENDING` | no — pending | h_sdr may now fail a pair |
 
-86 migrations indexed.
+87 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

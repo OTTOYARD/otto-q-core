@@ -78,9 +78,56 @@ cost that grows with total history rather than with the run — but it is **not*
 812 s, the number to attack is ~33 s per tick, and `pg_stat_statements.track` is `top`, so the
 tick's internals are invisible to it. Next instrument, not next guess.
 
-## Remaining five columns
+## Pairs 2, 3 and 4 — all **PASSED**, all with a clean `h_sdr`
 
 Scheduled 08:46, 09:02, 09:18, 09:34 and 10:00 UTC (3:46 – 5:00 AM CT), 16-minute spacing for
-12-tick and 26 for 24-tick, from the 812 s / ~1300 s measurements. The round is complete when
-all six columns have run; `h_sdr` is enforced by a later migration only if all six show the
-arms agreeing, which is the same gate 0206 set for `h_rcl` and 0217 closed.
+12-tick and 26 for 24-tick, from the 812 s / ~1300 s measurements.
+
+| column | fired | verdict | `h_sdr` a / b |
+|---|---|---|---|
+| `busy_day` / 171717 / 12t | 08:46 | passed | `a2a35e03` = `a2a35e03` |
+| `normal_day` / 171717 / 12t | 09:02 | passed | `e0dfbbe8` = `e0dfbbe8` |
+| `busy_day` / 424242 / 12t | 09:18 | passed | `6fd75365` = `6fd75365` |
+
+Three columns, three agreements, on the first round in which `h_sdr` exists in its corrected
+(0218) form. Every other atom on every column reproduces the column's own last canon, with
+**one move, and it is 0208's**:
+
+| column | atom | from | to | why |
+|---|---|---|---|---|
+| `busy_day` / 424242 / 12t | `h_rule` | `c3cca844` | `d56e09a3` | 0208, applied 09-07 21:36 — **after** this column's last pair at 09-07 20:07 |
+
+That is the same move `busy_day / 314159 / 12t` already took in round 24 (`333cf172` →
+`fc69953b`), landing on this column at its first post-0208 pair. `fp`, `h_cmd`, `h_dec`,
+`h_evt`, `h_bkg`, `h_nrg`, `h_prop`, `h_defr`, `h_cal` and `h_rcl` are byte-identical to the
+09-07 20:07 pair. `h_cal` is `11a24626` on all four columns run so far, as it has been all week.
+
+## The instrument the drift needed was already in the server
+
+`pg_stat_statements.track` is `top`, so nothing inside a plpgsql function is visible there —
+that was recorded above as the reason the tick's internals could not be attributed. The way
+round is **`track_functions`**, which is `none` globally but which the `postgres` role can set
+**per session**:
+
+```sql
+SET track_functions TO 'pl';   -- verified settable as postgres, 2026-09-08 09:30 UTC
+```
+
+Because the setting is session-local and every other session on this database leaves it at
+`none`, the `pg_stat_user_functions` delta across a session that sets it contains **only that
+session's** calls. The metronome, the depot tick and the run governor — all firing every one or
+two minutes throughout — contribute nothing to it. That is exact isolation with no migration,
+no engine change and nothing added to a hashed table.
+
+So the sixth pair of round 25 is also the G19 instrument. `busy_day / 314159 / 12t` has to be
+re-run anyway — its 08:25 pair predates 0218 and its stored `h_sdr` is the contaminated kind —
+so job `r25_g_busy_314159_12_profiled` at **10:40 UTC (5:40 AM CT)** snapshots
+`pg_stat_user_functions` into `g19_fn_before` and then runs that re-run with `pl` tracking on.
+The verdict is a normal verdict: timing instrumentation touches no atom.
+
+## Round completion
+
+The round is complete when all six columns have a post-0218 pair; `h_sdr` is enforced by 0219
+only if all six show the arms agreeing, which is the same gate 0206 set for `h_rcl` and 0217
+closed. 0219's P1 block reads that condition out of the ledger itself and aborts if it does not
+hold, so the gate is not mine to wave through.

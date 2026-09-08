@@ -317,7 +317,8 @@ repo_manifest(version, name, file) AS (
     ('APPLIED-NO-LEDGER-ROW'::text, 'a_standing_refusal_stands_whatever_the_rate_is_now'::text, '0215_a_standing_refusal_stands_whatever_the_rate_is_now.sql'::text),
     ('20260908081848'::text, 'the_settlement_record_binds_to_whichever_booking_the_heap_returned_first'::text, '0216_the_settlement_record_binds_to_whichever_booking_the_heap_returned_first.sql'::text),
     ('20260908082227'::text, 'the_verdict_sees_the_settlement_record_and_h_rcl_may_now_fail_a_pair'::text, '0217_the_verdict_sees_the_settlement_record_and_h_rcl_may_now_fail_a_pair.sql'::text),
-    ('20260908084304'::text, 'h_sdr_hashed_a_signature_computed_over_a_run_scoped_id'::text, '0218_h_sdr_hashed_a_signature_computed_over_a_run_scoped_id.sql'::text)
+    ('20260908084304'::text, 'h_sdr_hashed_a_signature_computed_over_a_run_scoped_id'::text, '0218_h_sdr_hashed_a_signature_computed_over_a_run_scoped_id.sql'::text),
+    ('PENDING'::text, 'h_sdr_may_now_fail_a_pair'::text, '0219_h_sdr_may_now_fail_a_pair.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
