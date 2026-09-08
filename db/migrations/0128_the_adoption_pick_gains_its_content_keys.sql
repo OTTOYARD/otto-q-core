@@ -1,4 +1,4 @@
--- migration-version: 20260830240000
+-- migration-version: 20260830221659
 -- migration-name:    the_adoption_pick_gains_its_content_keys
 -- 0128 -- the second 171717/24t carrier, isolated by the 0125 instrument by ELIMINATION
 -- (0046 pairs 55-56): with the interrupted-booking leak closed (0127), pair 55 passed

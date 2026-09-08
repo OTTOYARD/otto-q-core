@@ -1,4 +1,4 @@
--- migration-version: 20260829191500
+-- migration-version: 20260829164021
 -- migration-name:    a_leg_closes_with_its_work
 -- 0089 -- R8 of the run-reconciliation audit (db/checks/0045): the settlement contract has a
 -- hole between the booking ledger and the leg ledger.

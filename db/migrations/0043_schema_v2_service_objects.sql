@@ -1,4 +1,4 @@
--- migration-version: 20260819031500
+-- migration-version: 20260819161838
 -- migration-name:    schema_v2_service_objects
 -- 0043 — SCHEMA V2: kernel naming layer + the six service objects + the SDR rule
 --

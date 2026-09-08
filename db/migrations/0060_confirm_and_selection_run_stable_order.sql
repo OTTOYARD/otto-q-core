@@ -1,5 +1,7 @@
--- migration-version: 20260820180000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    confirm_and_selection_run_stable_order
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0060 — C7 FOLLOW-UP #14, found by re-certification #14 (post-0059 arms
 -- 1a505390 vs eea3a256: 13/20 identical, first divergence sim-min 420). 0059
 -- HOLDS and is visible in the evidence: at the divergent tick both arms walk

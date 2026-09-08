@@ -1,4 +1,4 @@
--- migration-version: 20260830110000
+-- migration-version: 20260830043106
 -- migration-name:    the_production_session_lifecycle
 -- 0111 -- the founder directive (2026-08-30): make the orchestration layer work top to
 -- bottom -- once initiated it analyzes and optimizes integrated vehicle/site state

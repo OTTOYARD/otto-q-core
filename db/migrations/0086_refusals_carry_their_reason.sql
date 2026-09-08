@@ -1,4 +1,4 @@
--- migration-version: 20260829170000
+-- migration-version: 20260829162450
 -- migration-name:    refusals_carry_their_reason
 -- 0086 -- R3 of the run-reconciliation audit (db/checks/0045): every refusal carries a reason
 -- code, structurally.

@@ -1,4 +1,4 @@
--- migration-version: 20260829200000
+-- migration-version: 20260829164858
 -- migration-name:    cuopt_enactments_carry_their_verb
 -- 0090 -- written against R5's second writer; SUPERSEDED IN PURPOSE BY 0091, kept because it
 -- was applied (and registered) before the truth surfaced. Read 0091 for the real story.

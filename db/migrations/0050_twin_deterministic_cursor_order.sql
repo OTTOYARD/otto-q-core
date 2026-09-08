@@ -1,5 +1,7 @@
--- migration-version: 20260819235000
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    twin_deterministic_cursor_order
+-- (the ledger holds this as several rows -- 0050a..0050e -- so no single
+--  supabase_migrations version corresponds to this file. See task G18.)
 -- 0050 — C7 FOLLOW-UP #4, found by re-certification #4 (arms a4ce46d4 / 523f770e):
 -- 11 of 20 ticks identical, every vehicle SoC paired at the first divergence
 -- (sim-min 360) — the remaining diff was a pure STALL-ASSIGNMENT PERMUTATION:

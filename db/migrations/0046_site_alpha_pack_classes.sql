@@ -1,4 +1,4 @@
--- migration-version: 20260819200000
+-- migration-version: 20260819190226
 -- migration-name:    site_alpha_pack_classes
 -- 0046 — C8 SITE ALPHA: the non-robotaxi asset classes, as PACK DATA.
 -- Data-only, additive, idempotent. Classes live in ottoq_vehicle_classes with

@@ -1,4 +1,4 @@
--- migration-version: 20260827200000
+-- migration-version: 20260829160154
 -- migration-name:    provenance_says_what_it_is
 -- 0073 -- Two provenance fields stop lying. The SDR's data_source is derived from the depot's
 -- feed mode instead of from whether a run id was passed; the twin stops labelling its own burn

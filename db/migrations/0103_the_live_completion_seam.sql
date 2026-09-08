@@ -1,4 +1,4 @@
--- migration-version: 20260830030000
+-- migration-version: 20260829223107
 -- migration-name:    the_live_completion_seam
 -- 0103 -- third and final round of the natural-completion teardown (0101 -> 0102 -> here),
 -- each round caught by the same forced-completion smoke before anything real depended on it.

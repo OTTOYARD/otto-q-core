@@ -1,5 +1,7 @@
--- migration-version: 20260824201500
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    cert_arm_step_null_safe_run_guard
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0072 -- HARNESS ONLY. public.ottoq_cert_arm_step's loop guard becomes NULL-safe, so a run
 -- that does not exist stops the loop instead of being advanced.
 --

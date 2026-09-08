@@ -1,5 +1,7 @@
--- migration-version: 20260828110000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    wash_must_do_flag_reconciliation
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0085 -- Close the residual churn 0081 could not: 0082 made the manifest EMIT a wash atom on the
 -- hours-clock backstop but left its must_do flag at false (deferrable). The 0081 section-5 guard
 -- skips vehicles whose visit atoms carry a MUST-DO wash, so with must_do=false the guard never

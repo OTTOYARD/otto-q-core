@@ -1,4 +1,4 @@
--- migration-version: 20260831001500
+-- migration-version: 20260831000801
 -- migration-name:    every_pick_orders_itself_completely
 -- 0129 -- tier A of the ordering census (db/checks/0050 round-2 verdict: world-purity is
 -- proven; what remains is pick-order totality inside a run). The census enumerated 197

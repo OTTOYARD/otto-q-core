@@ -1,5 +1,7 @@
--- migration-version: 20260823160000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    cert_arm_start_pins_the_world
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0070 -- HARNESS ONLY. public.ottoq_cert_arm_start now derives the world from the run seed
 -- alone, and from a fixed reference day, so the same seed reproduces the same world across
 -- sessions and across calendar days.

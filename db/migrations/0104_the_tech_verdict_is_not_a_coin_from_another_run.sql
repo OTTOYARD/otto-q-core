@@ -1,4 +1,4 @@
--- migration-version: 20260830050000
+-- migration-version: 20260829230116
 -- migration-name:    the_tech_verdict_is_not_a_coin_from_another_run
 -- 0104 -- kills the determinism pair-7 front at its actual root: twin.ottoq_opportunistic_scan.
 --

@@ -1,4 +1,4 @@
--- migration-version: 20260819230000
+-- migration-version: 20260819211753
 -- migration-name:    twin_arm_refuse_move_clock_domain
 -- 0049 — C7 FOLLOW-UP #3, found by re-certification #3 (post-0048 arm 5822181f):
 -- a cert tick died on the vehicle-side arm interlock DESPITE the admit path

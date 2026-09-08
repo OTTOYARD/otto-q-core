@@ -1,4 +1,4 @@
--- migration-version: 20260831140000
+-- migration-version: 20260831133729
 -- migration-name:    the_power_cap_is_a_constraint
 -- 0132 -- GAP 1 of db/checks/0052: the site power cap was accounted and never enforced.
 --

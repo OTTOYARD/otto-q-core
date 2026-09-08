@@ -1,4 +1,4 @@
--- migration-version: 20260829233000
+-- migration-version: 20260829172453
 -- migration-name:    target_soc_pins_to_the_seeded_constant
 -- 0096 -- corrects 0095, caught (again) by the probe on first exercise: vehicles.target_soc is
 -- NOT NULL (default 100), so pinning it NULL raised 23502. Same lesson as 0094: canonical

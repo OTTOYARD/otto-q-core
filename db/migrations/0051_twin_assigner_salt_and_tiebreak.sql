@@ -1,5 +1,7 @@
--- migration-version: 20260820010000
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    twin_assigner_salt_and_tiebreak
+-- (the ledger holds this as several rows -- 0051a/0051b -- so no single
+--  supabase_migrations version corresponds to this file. See task G18.)
 -- 0051 — C7 FOLLOW-UP #5, found by re-certification #5 (post-0050 arms
 -- 8e8da5c5 vs 0d920ed3: 9/20 identical, first divergence sim-min 300).
 -- The tick-10 frame diff showed a pure vehicle<->stall matching permutation

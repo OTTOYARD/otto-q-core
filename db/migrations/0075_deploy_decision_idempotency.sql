@@ -1,5 +1,7 @@
--- migration-version: 20260827230000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    deploy_decision_idempotency
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0075 -- The redeployment decision churns: 965 "enacted" redeploy decisions against 91 real
 -- dispatches, because decide_tick re-selects the same staged vehicles every tick and emits a
 -- dispatch command that nothing executes.

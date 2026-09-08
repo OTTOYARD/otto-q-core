@@ -1,5 +1,7 @@
--- migration-version: 20260819180000
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    twin_determinism_and_playback
+-- (the ledger holds this as several rows -- 0045a..0045e -- so no single
+--  supabase_migrations version corresponds to this file. See task G18.)
 -- 0045 — C7 TWIN HARDENING: the determinism fix, the standing cert, the
 --        canonical event vocabulary, the playback timeline, and the A/B
 --        retention decision.

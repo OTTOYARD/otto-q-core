@@ -1,4 +1,4 @@
--- migration-version: 20260831020000
+-- migration-version: 20260831020239
 -- migration-name:    the_matrix_reads_itself_from_the_ledger
 -- 0131 -- the certification matrix stops being a hand-typed comment block.
 --

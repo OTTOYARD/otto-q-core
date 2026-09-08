@@ -1,4 +1,4 @@
--- migration-version: 20260821040000
+-- migration-version: 20260822004802
 -- migration-name:    cert_arm_pinned_sim_start
 -- 0065 -- THE MEASUREMENT FIX. Not an engine change: public.ottoq_cert_arm_start is
 -- the determinism-certification harness and has no caller outside it.

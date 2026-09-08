@@ -1,4 +1,4 @@
--- migration-version: 20260830210000
+-- migration-version: 20260830165520
 -- migration-name:    the_sweep_reads_the_clock_the_stamp_was_written_in
 -- 0122 -- closes the wall-vs-sim proposal-TTL front (db/checks/0046 pair-14; named to the
 -- founder as the production loop's gap (b)) -- and closes it the OPPOSITE way from the

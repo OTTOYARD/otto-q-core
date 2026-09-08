@@ -1,4 +1,4 @@
--- migration-version: 20260830060000
+-- migration-version: 20260829231202
 -- migration-name:    the_production_brain_stands_off_a_cert_run
 -- 0106 -- the last contamination path pair 9 exposed. With 0104+0105 applied, two same-seed
 -- 12-tick arms (466a8404 / 2b970077) produced byte-identical COMMAND (671/671), DECISION

@@ -1,5 +1,7 @@
--- migration-version: 20260821050000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    one_begin_charge_per_enactment
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0066 -- THE DUPLICATE EMIT. public.ottoq_decide_tick issues TWO begin_charge commands
 -- for every single stall enactment.
 --

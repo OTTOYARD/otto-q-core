@@ -1,5 +1,7 @@
--- migration-version: 20260820160000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    refusal_reactor_run_stable_order
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0059 — C7 FOLLOW-UP #13, found by re-certification #13 (post-0058 arms
 -- bb74e241 vs 0b490fb0: 12/20 identical, first divergence sim-min 390). The
 -- 0058 card fix HOLDS: eta_delay card sets are behaviorally identical per

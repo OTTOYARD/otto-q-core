@@ -1,5 +1,7 @@
--- migration-version: 20260809220000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    run_governor_auto_stop
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 --
 -- 0025_run_governor_auto_stop.sql
 -- ============================================================================

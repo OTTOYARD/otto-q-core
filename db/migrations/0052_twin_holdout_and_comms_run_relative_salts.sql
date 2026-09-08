@@ -1,5 +1,7 @@
--- migration-version: 20260820020000
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    twin_holdout_and_comms_run_relative_salts
+-- (the ledger holds this as several rows -- 0052a/0052b -- so no single
+--  supabase_migrations version corresponds to this file. See task G18.)
 -- 0052 — C7 FOLLOW-UP #6, found by re-certification #6 (post-0051 arms
 -- eb5a5d37 vs 1a576926: 8/20 identical, first divergence sim-min 270 — the
 -- exact tick the sim clock crosses 22:00 America/Chicago and the overnight

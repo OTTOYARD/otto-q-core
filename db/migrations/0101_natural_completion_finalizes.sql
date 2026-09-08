@@ -1,4 +1,4 @@
--- migration-version: 20260830020000
+-- migration-version: 20260829222635
 -- migration-name:    natural_completion_finalizes
 -- 0101 -- closes the latent teardown gap found during V2: twin.ottoq_sim_advance_clock's
 -- natural-completion branch (sim clock reaches sim_clock_end) sets status='completed', emits

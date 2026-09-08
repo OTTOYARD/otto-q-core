@@ -1,5 +1,7 @@
--- migration-version: 20260820210000
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    booking_pick_total_order
+-- (applied through a path that writes no supabase_migrations row; the file's
+--  own text is the only record. See task G18.)
 -- 0063 — THE RESERVATION-CHURN SEAM, found by the re-certification #16 follow-up.
 --
 -- WHAT #16 SHOWED. At the first divergent tick exactly one vehicle differed:

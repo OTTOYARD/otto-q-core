@@ -1,5 +1,7 @@
--- migration-version: 20260827230100
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    command_reason_codes
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0076 -- The command bus never records WHY. reason_code was NULL on ~99% of executed commands,
 -- which blocks the V1 audit log's core promise: "vehicle X was told to do Y *because Z*."
 --

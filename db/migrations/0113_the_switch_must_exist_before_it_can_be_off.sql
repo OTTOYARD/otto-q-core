@@ -1,4 +1,4 @@
--- migration-version: 20260830120000
+-- migration-version: 20260830044116
 -- migration-name:    the_switch_must_exist_before_it_can_be_off
 -- 0113 -- the live E2E of the production session (e8a0ba01) caught 0111/0112's gate leaking,
 -- exactly the way "every green light gets broken on purpose" demands:

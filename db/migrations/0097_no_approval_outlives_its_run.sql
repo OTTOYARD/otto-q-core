@@ -1,4 +1,4 @@
--- migration-version: 20260829234500
+-- migration-version: 20260829173602
 -- migration-name:    no_approval_outlives_its_run
 -- 0097 -- the first of check 0046's two in-run nondeterminism mechanisms, fixed at the
 -- teardown seam like its siblings (0087 commands, 0089 legs, 0093 plan residue).

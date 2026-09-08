@@ -1,4 +1,4 @@
--- migration-version: 20260829171500
+-- migration-version: 20260829162640
 -- migration-name:    no_command_left_dangling
 -- 0087 -- R4 and R7 of the run-reconciliation audit (db/checks/0045), both living in the same
 -- function: public.ottoq_sim_release_depot, the run finalizer.

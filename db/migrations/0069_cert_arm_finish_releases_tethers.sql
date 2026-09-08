@@ -1,4 +1,4 @@
--- migration-version: 20260822031000
+-- migration-version: 20260822200504
 -- migration-name:    cert_arm_finish_releases_tethers
 -- 0069 -- HARNESS ONLY. public.ottoq_cert_arm_finish now releases any robotic-arm tether
 -- still held at the benchmark depot as part of teardown.

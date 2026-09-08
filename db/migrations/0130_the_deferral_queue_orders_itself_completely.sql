@@ -1,4 +1,4 @@
--- migration-version: 20260831013000
+-- migration-version: 20260831012206
 -- migration-name:    the_deferral_queue_orders_itself_completely
 -- 0130 -- the 424242/24t carrier, CONVICTED FROM ITS OWN LEDGER (db/checks/0046 pairs 71-74).
 --

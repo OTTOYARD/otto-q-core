@@ -1,4 +1,4 @@
--- migration-version: 20260829223000
+-- migration-version: 20260829171855
 -- migration-name:    canonical_means_constant_not_null
 -- 0094 -- corrects 0093 patch D, caught by the world-bleed probe ON ITS FIRST EXERCISE:
 -- ottoq_ocpp_chargers.station_state_changed_at is NOT NULL, so the 0093 charger

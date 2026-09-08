@@ -1,5 +1,7 @@
--- migration-version: 202608090455
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    stop_is_two_phase_so_a_run_can_always_be_stopped
+-- (applied through a path that writes no supabase_migrations row; the file's
+--  own text is the only record. See task G18.)
 -- 0017 — a run must ALWAYS be stoppable, even when its teardown cannot finish
 --
 -- STATUS: APPLIED 2026-08-09 by Hermes Agent (DeepSeek V4 Pro). Verified live:

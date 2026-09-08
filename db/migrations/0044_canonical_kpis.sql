@@ -1,4 +1,4 @@
--- migration-version: 20260819054500
+-- migration-version: 20260819161926
 -- migration-name:    canonical_kpis
 -- 0044 — THE FIVE CANONICAL KPIs (CLAUDE.md 2.9) + the reproducibility key
 --

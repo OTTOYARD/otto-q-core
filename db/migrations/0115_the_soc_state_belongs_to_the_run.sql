@@ -1,4 +1,4 @@
--- migration-version: 20260830140000
+-- migration-version: 20260830052403
 -- migration-name:    the_soc_state_belongs_to_the_run
 -- 0115 -- pair 17 (db/checks/0046, seed 171717/12t, the first pair after production ran on
 -- the flagship) FAILED with a signature no previous pair produced: both arms booted with

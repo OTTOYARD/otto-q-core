@@ -1,4 +1,4 @@
--- migration-version: 20260829173000
+-- migration-version: 20260829162810
 -- migration-name:    occupied_refusals_reach_the_conflict_ledger
 -- 0088 -- R6 of the run-reconciliation audit (db/checks/0045): a calendar-vs-reality
 -- disagreement leaves a first-class record, whichever path discovers it.

@@ -1,4 +1,4 @@
--- migration-version: 20260830090000
+-- migration-version: 20260830040601
 -- migration-name:    the_watermark_does_not_outlive_its_run
 -- 0109 -- the last start-state carry the pair-14/15 comparison exposed. run_boot_draw's
 -- step 1c anchors vehicle_need_profile.wear_km_applied from the NEW run's wear rows -- and a

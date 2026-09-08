@@ -1,5 +1,7 @@
--- migration-version: 20260810171310
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    revert_0005_condition_resets_part2
+-- (applied through a path that writes no supabase_migrations row; the file's
+--  own text is the only record. See task G18.)
 --
 -- P1-15: Narrowly revert §2's unconditional `exterior_soil_level := round(soil_index, 3)`
 -- from migration 0005, which copies a sensor-soil counter (capped ~0.30) into a body-soil

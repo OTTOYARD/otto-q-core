@@ -1,5 +1,7 @@
--- migration-version: 20260828030000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    revert_reason_code_on_commands
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0078 -- REVERTS 0076 and 0077. Both assumed ottoq_vehicle_commands.reason_code is a free-text
 -- "why was this issued" field. It is not: the column carries a CHECK constraint restricting it to
 -- exactly seven REFUSAL reasons (target_occupied, resource_faulted, target_unknown,

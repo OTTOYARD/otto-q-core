@@ -1,4 +1,4 @@
--- migration-version: 20260830053000
+-- migration-version: 20260829230554
 -- migration-name:    the_cert_run_quiesces_the_llm_proposer
 -- 0105 -- closes determinism pair 8's LAST front. After 0104, the pair-8 arms (966dd746 /
 -- 7814f235, seed 424242, 12 ticks) were byte-identical on the COMMAND stream (671/671, equal
