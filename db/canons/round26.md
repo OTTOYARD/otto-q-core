@@ -219,3 +219,41 @@ fleet reset and before the run, so it depends on (depot, seed, sim_start) and
 not on the scenario. The scenario shows up in every atom downstream of it — and
 `h_cmd`, `h_dec`, `h_evt` and the rest all differ between b and c, which is the
 check that says so.
+
+### d — `busy_day` / 424242 / 12 ticks — **PASS**
+
+Fired 12:32:00 UTC, **529 s**, `equal true`. All eleven atoms byte-identical to
+round 25's 09:18 pair:
+
+`fp e418e4f0` · `h_cmd 76134009` · `h_dec 47757095` · `h_evt 6453c09b` ·
+`h_bkg 8bc2877b` · `h_nrg 9917f7c3` · `h_prop 029cad7d` · `h_cal 11a24626` ·
+`h_rule d56e09a3` · `h_rcl f58ee562` · `h_sdr 6fd75365`
+
+## The four 12-tick columns, complete
+
+**Forty-four atom comparisons. Not one moved.** Five migrations — two of them
+rewriting functions the certification exercises on every tick, one of them the
+function that computes an *enforced* atom — and the canon is untouched. That is
+prediction 1, on every column it applies to.
+
+| column | round 25 | round 26 | Δ |
+|---|---|---|---|
+| a — `busy_day`/314159 | 812 s | **537 s** | −275 |
+| b — `busy_day`/171717 | 686 s | **533 s** | −153 |
+| c — `normal_day`/171717 | 735 s | **477 s** | −258 |
+| d — `busy_day`/424242 | 754 s | **529 s** | −225 |
+| **mean** | **747 s** | **519 s** | **−228** |
+
+**Prediction 2, judged.** The fingerprint arithmetic said 255 s. The measured
+mean improvement is **228 s — 89% of what the fix argued for**, on four columns
+rather than one. The published landing point of ~450 s was wrong; the mechanism
+was not.
+
+And the second-order effect, which was not predicted at all and is stated here
+because it was noticed rather than forecast: **the spread collapsed.** The same
+four columns spanned 686–812 s before (126 s) and span 477–537 s now (60 s).
+Across all sixteen pre-0222 12-tick pairs the spread was 643–832 (189 s). The
+mechanism fits — a 1.36-million-row scan's cost depends on how much of those
+tables the buffer cache happens to hold, and nothing else in the pair scans at
+that scale — but it is a post-hoc explanation of four data points and is
+labelled as one.
