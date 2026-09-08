@@ -129,6 +129,40 @@ WHERE n.nspname='public' AND p.proname='ottoq_cert_matrix';
 --         off-canon on rule/rcl today. Check that BEFORE applying, or the
 --         migration lands looking like a regression.
 --
+--     THAT CHECK IS DONE, and the answer makes the timing matter. Counting
+--     distinct values per column across every pair at or after the current
+--     recert floor, 2026-09-08 13:02 UTC:
+--
+--       scenario/seed/ticks        pairs  h_rule  h_rcl  h_sdr  endst
+--       busy_day/171717/12             1       1      1      1      1
+--       busy_day/314159/12             1       1      1      1      1
+--       busy_day/424242/12             1       1      1      1      1
+--       normal_day/171717/12           1       1      1      1      1
+--
+--     One pair per column, because this morning's five migrations raised the
+--     floor and round 26 is the first round above it. Nothing can be off-canon
+--     when the canon is a single row.
+--
+--     So the cheapest moment to extend the matrix is NOW or immediately after
+--     round 27 — while each column has one or two pairs at the floor and they
+--     agree. Wait several rounds and any pre-existing variation in the newly
+--     compared atoms turns up at the moment of the change, where it will look
+--     like the change caused it. Extending a comparison is always easiest when
+--     there is least history to disagree with.
+SELECT j->>'scenario' AS scen, j->>'seed' AS seed, j->>'ticks' AS ticks, count(*) AS pairs,
+       count(DISTINCT j->'arm_a'->>'h_rule') AS distinct_h_rule,
+       count(DISTINCT j->'arm_a'->>'h_rcl')  AS distinct_h_rcl,
+       count(DISTINCT j->'arm_a'->>'h_sdr')  AS distinct_h_sdr,
+       count(DISTINCT md5((j->'arm_a'->'endst')::text)) AS distinct_endst
+FROM (SELECT DISTINCT r.started_at, r.depot_id, (r.validation_notes::jsonb) AS j
+        FROM public.ottoq_sim_runs r
+       WHERE r.run_by='cert_harness'
+         AND r.started_at >= public.ottoq_cert_recert_floor()
+         AND r.validation_notes IS NOT NULL
+         AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object') p
+WHERE depot_id='11111111-1111-1111-1111-111111111111'
+GROUP BY 1,2,3 ORDER BY 1,2,3;
+--
 --     Deliberately not drafted here: round 27 already judges 0223 and 0224, and
 --     a third change would make none of the three attributable.
 SELECT 'see Q1-Q6; this file changes nothing' AS status;
