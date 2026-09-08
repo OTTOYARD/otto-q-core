@@ -203,7 +203,7 @@ them reset a streak.
 | c | `normal_day` / 171717 / 12 | 17:03:00 | **342** | 358 | −16 | 3 → **4** | pass, no atom moved |
 | d | `busy_day` / 424242 / 12 | 17:17:00 | **218** | 364 | **−146** | 3 → **4** | pass, no atom moved |
 | e | `busy_day` / 171717 / **24** | 17:31:00 | **783** | 560 | **+223** | 4 → **5** | pass, no atom moved |
-| f | `busy_day` / 424242 / **24** | 18:01 | | 551 | | | |
+| f | `busy_day` / 424242 / **24** | 18:01:00 | **868** | 551 | **+317** | 3 → **4** | pass, no atom moved |
 | g | `busy_day` / 171717 / 12, instrumented | 18:25 | | — | | | not comparable |
 
 ### How "no atom moved" is established, and why it is not a hand-diff
@@ -442,6 +442,69 @@ instrument gets checked before it gets used.
 `r28_g`'s value at 18:25 is **call counts**, not wall-clock, and counts do not
 vary with how long a pair takes. G21b's caller attribution and G27's 12-tick
 load-meter count are unaffected by anything on this page.
+
+### Column f: 868 s. BOTH pre-registered bands missed, so neither story is claimed
+
+f completed at 868 s against round 27's 551 — **+317 s, +57.5%**. Streak
+**3 → 4**, green, `PPPP`, `inconclusive_pairs` 0, and `canon_fp e418e4f0` /
+`canon_evt 8dc37f82` / `canon_sdr f2587dbc` / `canon_rule 726f6769` all
+unchanged. Zero pairs in flight at 18:18, so no collision with g.
+
+**PREDICTION 1 HOLDS ON ALL SIX COLUMNS. Not one atom moved anywhere in round 28.**
+
+The pre-registration above named 730–830 for "24-tick uniformly slower, points at
+0228" and 530–570 for "e was an outlier". **868 is outside both.** The rule that
+file committed was *"anywhere else | neither story; record and do not reach"*,
+and it is applied here as written: **the 0228 story is not claimed**, even though
+f being slow is superficially friendly to it and the temptation to widen the band
+by 38 seconds is obvious. The band was set before the number and the number
+missed it.
+
+### The statistic that does survive: the 24t:12t cost ratio nearly doubled
+
+Both 24-tick columns are far slower and all four 12-tick columns are same-or-
+faster. That separates cleanly by tick count, and the ratio states it without
+needing either story:
+
+| | 12t mean | 24t mean | **24t / 12t** |
+|---|---|---|---|
+| round 27 | 364.00 | 555.50 | **1.526** |
+| round 28 | 319.25 | 825.50 | **2.586** |
+| round 28, excluding d | 353.00 | 825.50 | **2.339** |
+
+**Doubling the horizon used to cost 1.53x. It now costs 2.34–2.59x.** The finding
+is robust to dropping column d entirely, so it does not rest on the one column
+already quarantined.
+
+A ratio above 2.0 means **something in the tick loop is superlinear in tick
+count** — the shape of a query whose cost grows with data the run itself is
+writing, so tick N scans what ticks 1..N-1 produced. That is O(n²) in ticks and
+quadruples when ticks double. It is exactly the shape `0227` was written to fix
+for `ocpp_sessions`, which raises the obvious question of whether there is a
+second one.
+
+**That is a candidate mechanism and it is NOT a finding.** G19 burned four wrong
+guesses reasoning from structure and `db/checks/0139` closed refusing to name a
+caller without a measurement. No migration is drafted, no table is named.
+
+**And the clean 0228 hypothesis stays contradicted**, as pre-stated: a per-event
+cost would slow 12-tick pairs by roughly half what it slows 24-tick ones, and the
+12-tick columns got *faster*.
+
+### This makes `r28_g` considerably more valuable than it was
+
+`r27_g` is instrumented at **24 ticks**; `r28_g` at **12**. Together they give
+per-function call counts at both horizons, so every function gets a measured
+scaling ratio. **A function scaling ~2x is linear in ticks and innocent; one
+scaling ~4x is the superlinear term and is the thing to fix.** That is a direct
+test of the paragraph above, from data captured for other reasons.
+
+Two confounds, recorded before the numbers so they cannot be forgotten
+afterwards: `r27_g` ran **before** 0225–0228 were applied, so a difference may be
+a migration rather than the horizon; and `r27_g`'s baseline held only fourteen
+hand-picked rows, so the comparison is available only for functions appearing in
+both captures. `r28_g`'s baseline is the full 304 rows, which is why the next
+round will not have the second problem.
 
 ## `r28_g`'s baseline re-verified 17:10 UTC — not one counter moved
 
