@@ -1044,3 +1044,55 @@ def test_the_capability_label_is_order_independent():
         CLASSES, site=SITE)
     assert a["service_points"] == b["service_points"]
     assert a["asset_classes"] == b["asset_classes"]
+
+
+# ---------------------------------------------------------------------------
+# L-39: a tampered doctrine must not take down the path that never reads it.
+# ---------------------------------------------------------------------------
+
+def test_the_cheap_path_survives_an_unreadable_intent_artifact(monkeypatch):
+    """Failing closed on a tampered artifact is right; the blast radius was not.
+
+    `INTENT = load_intent()` ran at module import, and this module imports
+    `resolve_active` from `regime` unconditionally — so importing the PROPOSER
+    at all read and fingerprint-verified intent_v1.json. The default two-pass
+    path is documented as "byte-for-byte what propose() did before the intent
+    layer" and never consults the doctrine, yet a corrupted doctrine file took
+    it down at import time along with everything that imports the proposer.
+    """
+    import regime as regime_mod
+
+    def _tampered(*_a, **_k):
+        raise ValueError("intent fingerprint mismatch: refusing to optimize "
+                         "on an unverified intent")
+
+    monkeypatch.setattr(regime_mod, "_INTENT", None)
+    monkeypatch.setattr(regime_mod, "load_intent", _tampered)
+
+    #: the cheap path plans, because it never asks what the doctrine says
+    r = propose(FRAME, CLASSES, site=SITE)
+    assert r["planned"] > 0 and "regime" not in r["solver"]
+
+    #: ...and the regime path still FAILS CLOSED, which is the correct policy
+    with pytest.raises(ValueError, match="fingerprint mismatch"):
+        propose(FRAME, CLASSES, site=SITE, hour_of_day=7)
+
+
+def test_importing_the_proposer_does_not_read_the_doctrine():
+    """The load is lazy: a fresh interpreter that imports the proposer and
+    plans on the cheap path never touches the artifact."""
+    import subprocess
+    import sys as _sys
+    src = (
+        "import sys; sys.path[:0] = [%r, %r, %r, %r]\n"
+        "import regime\n"
+        "assert regime._INTENT is None, 'import already loaded the doctrine'\n"
+        "import forward_proposer\n"
+        "assert regime._INTENT is None, 'importing the proposer loaded it'\n"
+        "print('clean')\n"
+    ) % (str(HERE), str(HERE.parent), str(HERE.parent / "policies"),
+         str(HERE.parent / "solvers" / "cpsat"))
+    out = subprocess.run([_sys.executable, "-c", src], capture_output=True,
+                         text=True, cwd=str(HERE.parent))
+    assert out.returncode == 0, out.stderr[-800:]
+    assert "clean" in out.stdout

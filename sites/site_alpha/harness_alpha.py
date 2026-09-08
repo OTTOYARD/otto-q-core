@@ -371,8 +371,21 @@ def policy_cpsat_alpha(world, visits):
     solver = cp_model.CpSolver()
     solver.parameters.random_seed = site["seed"] % (2 ** 31)
     solver.parameters.num_search_workers = 1
+    #: THE DETERMINISTIC BUDGET IS THE ONLY BOUND (finding L-53). A
+    #: `max_time_in_seconds = 600.0` sat here as a "hang backstop only", and a
+    #: wall clock that can decide a plan makes that plan a function of how
+    #: loaded the box was -- while every cell this harness writes is published
+    #: under a seed and a run id as byte-reproducible. Nothing recorded that a
+    #: clock had been bound, so a clock-truncated plan would have been cited as
+    #: seed-reproducible with nothing saying otherwise.
+    #:
+    #: REMOVED RATHER THAN LABELLED, which the finding names as the preferred
+    #: fix. max_deterministic_time is already a hard cutoff in CP-SAT, so the
+    #: clock was redundant against a slow SEARCH; and it never covered the one
+    #: thing a backstop would be for -- a hang in model CONSTRUCTION, which
+    #: happens before Solve() is called and which no solver parameter bounds.
+    #: A redundant hazard is not worth a flag; it is worth deleting.
     solver.parameters.max_deterministic_time = CPSAT_DTIME
-    solver.parameters.max_time_in_seconds = 600.0   # hang backstop only
     status = solver.Solve(m)
     name = solver.StatusName(status)
     if name not in ("OPTIMAL", "FEASIBLE"):

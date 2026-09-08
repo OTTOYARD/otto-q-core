@@ -46,7 +46,33 @@ from intent.solve import pass_sequence                              # noqa: E402
 #: calibration; its staff wiring says "a packing objective in the robotaxi
 #: pack"). A mining pack cannot conform to a kernel that only knows one sector's
 #: doctrine, so the override is threaded end to end.
-INTENT = load_intent()
+#: LOADED ON FIRST USE, NOT ON IMPORT (finding L-39). `INTENT = load_intent()`
+#: ran at module import, and forward_proposer.py imports `resolve_active` from
+#: this module unconditionally -- so importing the PROPOSER at all read and
+#: fingerprint-verified intent_v1.json. Failing closed on a tampered artifact
+#: is right for the regime path; the blast radius was not. The cheap two-pass
+#: default path is documented as "byte-for-byte what propose() did before the
+#: intent layer" and never consults the intent, yet a corrupted doctrine file
+#: took it down at import time along with everything that imports the proposer.
+#:
+#: `INTENT` still resolves as a module attribute (PEP 562), so every existing
+#: caller is unchanged; the read now happens when a regime is actually
+#: resolved, which is exactly when the doctrine matters.
+_INTENT = None
+
+
+def _kernel_intent():
+    global _INTENT
+    if _INTENT is None:
+        _INTENT = load_intent()
+    return _INTENT
+
+
+def __getattr__(name):
+    if name == "INTENT":
+        return _kernel_intent()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 #: Per-pack intent artifacts, keyed by RESOLVED PATH. Each is fingerprint-checked
 #: once at load, like the kernel default, and reused thereafter.
@@ -70,10 +96,10 @@ def intent_for_pack(pack_id: str | None):
     than as a kernel patch. PACK_SPEC.md 2 records the file name.
     """
     if not pack_id:
-        return INTENT
+        return _kernel_intent()
     path = pack_intent_path(pack_id)
     if not path.exists():
-        return INTENT
+        return _kernel_intent()
     key = str(path)
     if key not in _PACK_INTENTS:
         _PACK_INTENTS[key] = load_intent(path)
@@ -83,7 +109,7 @@ def intent_for_pack(pack_id: str | None):
 def resolve_active(hour_of_day: int, signals: frozenset = frozenset(),
                    intent=None) -> ActiveIntent:
     """Resolve the active regime for the given clock and signals."""
-    return resolve_intent(intent or INTENT, hour_of_day=hour_of_day,
+    return resolve_intent(intent or _kernel_intent(), hour_of_day=hour_of_day,
                           signals=signals)
 
 

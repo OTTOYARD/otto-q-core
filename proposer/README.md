@@ -88,5 +88,34 @@ the proposer saw the vehicle and declined — cuOpt's abstention pattern, preser
 
 An edge function that: reads the frame → calls `propose()` with the class-table join and
 visit-need ready-bys → inserts the rows with `sim_run_id`/`depot_id`/`expires_at` → logs the
-fire. The deferral table and gate router need nothing new — the rows match the shape they
-already receive from `greedy_constrained` and cuOpt.
+fire. The rows match the shape the gate router already receives from `greedy_constrained` and
+cuOpt.
+
+### The deferral pattern is cuOpt-only today (finding L-40)
+
+This file and `forward_proposer.py`'s module docstring both said whoever inserts these rows gets
+"the one-tick right-of-first-refusal" and that "the deferral table and gate router need nothing
+new." **The second half is false, and it was worth being told plainly rather than discovered at
+integration.** The live mechanism is source-specific in three places:
+
+1. `ottoq_cuopt_first_refusal_arm` arms a vehicle only when no pending proposal exists with
+   `p.source IN ('cuopt','cuopt_fallback')`, and writes to `ottoq_cuopt_deferrals`.
+2. The arming cap is the policy key `cuopt_first_refusal_max_defers`.
+3. `ottoq_l2_external_proposal` picks the winner with
+   `ORDER BY (p.source = 'cuopt') DESC, (p.source = 'cuopt_fallback') DESC, p.created_at DESC`.
+
+So a `forward_lex` row would get **no deferral window and last place in the tie-break**: it
+would race the local decide path with no protection, and lose to any pending cuOpt row.
+
+Nothing is affected today — measured 2026-09-08, `ottoq_external_proposals` holds
+`greedy_constrained` 12,367, `ottoq_service_priority` 1,713, `cuopt` 136, and **`forward_lex` 0**,
+because this module writes nothing and the integration is founder-gated. The claim was the
+defect, and the claim is now corrected.
+
+**The extension, when the integration lands** (deliberately NOT done here, because it rewrites
+the live decide path's proposal selection and that is a scheduling decision, not a docs fix):
+generalize the precedence into declared data rather than three literals. `ottoq_policy_params`
+cannot hold it — `param_value` is `numeric` — so it needs a small precedence table keyed by
+source, seeded with `('cuopt', 'cuopt_fallback')` so the default reproduces today's ordering
+exactly and no canon moves. `ottoq_cuopt_deferrals` and its arming function want the same
+treatment, parameterized by source rather than named for one.

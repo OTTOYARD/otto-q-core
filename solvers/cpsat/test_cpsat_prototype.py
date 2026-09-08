@@ -454,9 +454,17 @@ def main():
     #: names the unserved, prices it exactly once, and never constrains it -- is unchanged.
     assert rej["rejected"] == ["AV-07"], (
         f"T9 FAIL: rejected {rej['rejected']}, expected ['AV-07']")
-    assert rej["objective"] == 105129, (
-        f"T9 FAIL: objective {rej['objective']}, expected 105129 "
-        f"(= 1 x {DEFAULT_REJECTION_PENALTY} + 5129 of served-side cost)")
+    #: Recalibrated 2026-09-08 for L-29, and the DELTA IS THE FIX. Both moves
+    #: (mv1 to the wash bay, mv2 to the service bay) were unconditional
+    #: intervals appended straight to `path_intervals`, so a REJECTED asset
+    #: still booked yard-path capacity for a trip nobody makes -- the one
+    #: resource leak in a rejection that is otherwise gated everywhere else.
+    #: Gating them on `served` freed that capacity and the served side got 4
+    #: units cheaper: 5129 -> 5125, same asset rejected. A/B'd against this
+    #: exact scenario with only the move gating reverted, which returns 105129.
+    assert rej["objective"] == 105125, (
+        f"T9 FAIL: objective {rej['objective']}, expected 105125 "
+        f"(= 1 x {DEFAULT_REJECTION_PENALTY} + 5125 of served-side cost)")
     #: and the penalty dominates by design: rejection is a last resort, never a
     #: cheap way to duck a hard asset.
     assert rej["objective"] - len(rej["rejected"]) * DEFAULT_REJECTION_PENALTY \
@@ -731,6 +739,208 @@ def test_cpsat_battery():
     the script's job, not a unit test's.
     """
     main()
+
+
+# ---------------------------------------------------------------------------
+# The model.py audit cluster: L-27, L-28, L-29, L-30. Pytest-visible, because
+# each is a property of the model rather than a battery number.
+# ---------------------------------------------------------------------------
+
+def _tight_rejecting():
+    """The T9 shape: a site that returns INFEASIBLE by default."""
+    tight = _variant(charge_points=2, horizon_min=300)
+    return build_and_solve(materialize(json.loads(json.dumps(tight))),
+                           allow_rejection=True)
+
+
+def test_a_rejection_reason_is_derived_not_a_literal():
+    """L-27: one string shipped on every abstain row regardless of why.
+
+    It is a factual claim ABOUT THE SITE, and it goes into
+    ottoq_external_proposals for a human or the dispose path to read as
+    evidence the site was full. It is true only at proven optimality — and a
+    truncated search establishes nothing about the site at all.
+    """
+    plan = _tight_rejecting()
+    abstains = [p for p in plan["proposals"] if p["proposal"]["abstain"]]
+    assert abstains, "this fixture no longer rejects anything"
+    for a in abstains:
+        pr = a["proposal"]
+        assert pr["solver_status"] in ("OPTIMAL", "FEASIBLE", "UNKNOWN")
+        assert pr["capacity_finding"] is (pr["solver_status"] == "OPTIMAL")
+        if pr["capacity_finding"]:
+            assert "proven optimality" in pr["reason"]
+        else:
+            assert "NOT a capacity finding" in pr["reason"]
+
+
+def test_a_truncated_search_does_not_claim_the_site_was_full():
+    """The half that matters: at FEASIBLE the incumbent dropped assets as a
+    feasibility escape hatch and proved nothing."""
+    tight = _variant(charge_points=2, horizon_min=300)
+    plan = build_and_solve(materialize(json.loads(json.dumps(tight))),
+                           allow_rejection=True, det_budget_s=0.02)
+    abstains = [p for p in plan["proposals"] if p["proposal"]["abstain"]]
+    if plan["solver_status"] != "OPTIMAL" and abstains:
+        for a in abstains:
+            assert a["proposal"]["capacity_finding"] is False
+            assert "NOT a capacity finding" in a["proposal"]["reason"]
+
+
+def test_a_blocked_service_bay_takes_no_new_inspection():
+    """L-28: the blocked filter was applied to charge and wash candidates and
+    NOT to the inspect loop, so a bay taken out of service was still handed
+    inspections. T6 only ever blocked a DCFC, so nothing caught it."""
+    raw = json.loads(SC_PATH.read_text())
+    bay = next(p for p in raw["service_points"] if p["kind"] == "service_bay")
+
+    #: FIRST, the unblocked control: inspections DO happen, on that bay.
+    base = build_and_solve(materialize(json.loads(json.dumps(raw))),
+                           allow_rejection=True, det_budget_s=3.0)
+    inspected = [op["point"] for a in base["assets"] for op in a["ops"]
+                 if op["op"] == "inspect"]
+    assert inspected and set(inspected) == {bay["id"]}, (
+        f"the fixture no longer inspects on {bay['id']}: {set(inspected)}")
+
+    #: NOW block the only capable bay, with rejection ON so the honest answer
+    #: is available. With the guard, the bay contributes no candidate, so
+    #: _exactly_one_if_served forces served == 0 and the asset is REJECTED —
+    #: named, not silently seated. Without it, the bay is a candidate and the
+    #: asset is inspected on a point that is out of service. Two bays would not
+    #: prove this: the solver could pick the legal one by tie-break and the
+    #: unguarded model would pass.
+    plan = build_and_solve(materialize(json.loads(json.dumps(raw))),
+                           blocked_points={bay["id"]}, allow_rejection=True,
+                           det_budget_s=3.0)
+    on_blocked = [(a["aid"], op["point"]) for a in plan["assets"]
+                  for op in a["ops"] if op["op"] == "inspect"]
+    assert not on_blocked, (
+        f"inspections were scheduled on the blocked bay: {on_blocked}")
+    assert plan.get("rejected"), (
+        "the assets needing inspection were seated anyway rather than named")
+
+
+def test_a_min_gap_on_a_wash_bay_is_honoured():
+    """L-30: min_gap_min is a per-POINT field (PACK_SPEC.md, CLAUDE.md 2.5) and
+    was read in exactly one place — inside the charge-candidate loop. A pack
+    declaring it on a wash bay got a plan that silently violated its own
+    declared constraint."""
+    raw = json.loads(SC_PATH.read_text())
+    wash = [p for p in raw["service_points"] if p["kind"] == "wash_bay"]
+    assert wash, "the canonical scenario has no wash bay"
+    gap = 45
+    for p in raw["service_points"]:
+        if p["kind"] == "wash_bay":
+            p["min_gap_min"] = gap
+    #: one bay only, so two washes must be separated rather than parallelised
+    raw["service_points"] = [p for p in raw["service_points"]
+                             if p["kind"] != "wash_bay"] + [wash[0]]
+    plan = build_and_solve(materialize(raw), det_budget_s=3.0)
+    washes = sorted(((op["start"], op["end"]) for a in plan["assets"]
+                     for op in a["ops"] if op["op"] == "wash"))
+    assert len(washes) >= 2, f"only {len(washes)} washes; nothing to separate"
+    for (s1, e1), (s2, _e2) in zip(washes, washes[1:]):
+        assert s2 >= e1 + gap, (
+            f"two washes on one bay are {s2 - e1} min apart, under the "
+            f"declared min_gap_min of {gap}")
+
+
+def test_the_min_gap_variable_is_absent_when_no_gap_is_declared():
+    """"The same interval with size + 0" is not equivalent: the extra end
+    variable changes the search and can land on a different equally-optimal
+    plan. Absent gap, absent variable — which is what keeps every committed
+    artifact byte-identical."""
+    from model import _point_gap_interval
+    assert _point_gap_interval(None, {}, None, 5, None, 100, "t") is None
+    assert _point_gap_interval(None, {"min_gap_min": 0}, None, 5, None, 100, "t") is None
+
+
+def test_a_rejected_asset_books_no_yard_path_capacity():
+    """L-29: both moves were unconditional intervals appended straight to
+    path_intervals, so an asset the solver declined still booked capacity for a
+    trip nobody makes — the one resource leak in a rejection gated everywhere
+    else. Its price: the T9 objective, 105129 -> 105125, same asset rejected."""
+    from model import _move_interval
+    from ortools.sat.python import cp_model
+    m = cp_model.CpModel()
+    s0 = m.NewIntVar(0, 10, "s")
+    e0 = m.NewIntVar(0, 10, "e")
+    #: `.proto`, NEVER `.Proto()`. On ortools 9.15 the deprecated CamelCase
+    #: accessor is a pybind11 binding on IntVar/BoolVar/IntervalVar that hands
+    #: back a proto reference it does not own; the interpreter then SEGFAULTS on
+    #: the next garbage collection -- not here, but wherever gc next runs, which
+    #: was two hundred tests later inside tests/test_separation.py. The
+    #: snake_case property returns the same ConstraintProto and is safe.
+    #: test_no_source_uses_the_crashing_proto_accessor keeps it that way.
+    #:
+    #: rejection OFF -> the identical UNCONDITIONAL interval it always was, so
+    #: the default model (and every artifact hashed from it) cannot move.
+    plain = _move_interval(m, s0, 4, e0, None, "mv")
+    assert not list(plain.proto.enforcement_literal)
+    #: rejection ON -> optional on the same literal that gates the rest of the
+    #: asset's work, so a declined asset books no path capacity.
+    served = m.NewBoolVar("served")
+    gated = _move_interval(m, s0, 4, e0, served, "mv2")
+    assert list(gated.proto.enforcement_literal) == [served.index]
+
+
+def test_no_source_uses_the_crashing_proto_accessor():
+    """`.Proto()` on a CP-SAT variable segfaults the interpreter, later.
+
+    On the pinned ortools (9.15.6755) `IntVar.Proto()`, `BoolVar.Proto()` and
+    `IntervalVar.Proto()` are pybind11 bindings that return a proto reference
+    the Python object does not own. Reading the value works; the process then
+    dies in `Garbage-collecting` at whatever unrelated line the collector next
+    runs on. Measured here: two `.Proto()` calls in ONE test killed the full
+    suite two hundred tests later, inside an untouched file, with a traceback
+    pointing at `new_int_var` in tests/test_separation.py. Nothing about that
+    traceback names the real call site, which is exactly why this is a guard and
+    not a comment.
+
+    Twenty lines reproduce it standalone:
+
+        m = cp_model.CpModel(); v = m.NewIntVar(0, 10, "s"); v.Proto()
+        gc.collect()          # -> Fatal Python error: Segmentation fault
+
+    `.proto` -- the current snake_case property -- returns the same
+    ConstraintProto and survives collection. `CpModel.Proto()` is a different
+    thing and is safe (a Python-level @deprecated wrapper that delegates to
+    `.proto`), but the rule is kept blunt: `.proto` reads identically on the
+    model too, so no source in this repo needs the CamelCase spelling at all.
+    A blunt rule is checkable; "safe on CpModel, fatal on IntVar" is not.
+
+    COMMENTS AND STRINGS ARE STRIPPED FIRST, by tokenize rather than by hand.
+    This file's own prose says `.Proto()` a dozen times, and a scan that counts
+    a bare token matches its own explanation -- the defect db/checks/0208 A4
+    records, and one this suite has already shipped once.
+    """
+    import io as _io
+    import tokenize as _tokenize
+    root = Path(__file__).resolve().parents[2]
+    offenders = []
+    for path in sorted(root.rglob("*.py")):
+        if ".git" in path.parts:
+            continue
+        try:
+            src = path.read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
+        if ".Proto()" not in src:
+            continue
+        try:
+            toks = list(_tokenize.generate_tokens(_io.StringIO(src).readline))
+        except (SyntaxError, _tokenize.TokenError):
+            offenders.append(f"{path.relative_to(root)}: unparseable, cannot clear it")
+            continue
+        code = "".join(t.string for t in toks
+                       if t.type not in (_tokenize.COMMENT, _tokenize.STRING))
+        if ".Proto()" in code:
+            offenders.append(str(path.relative_to(root)))
+    assert not offenders, (
+        "these files call .Proto() on a CP-SAT object; on ortools "
+        f"{pinned_ortools_version()} that returns an unowned reference and the "
+        "interpreter segfaults at the next garbage collection, in some unrelated "
+        f"file. Use the `.proto` property instead: {offenders}")
 
 
 if __name__ == "__main__":

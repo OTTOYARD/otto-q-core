@@ -132,13 +132,37 @@ def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, di
     max_tardy = None
     max_peak = None
     max_flow = None
+    #: THE SERVED SET IS PART OF THE LEXICOGRAPHIC PREFIX (finding L-20).
+    #:
+    #: Every ceiling this chain threads is an AGGREGATE over whoever a pass
+    #: happens to serve -- sum(tardy) over served, sum(finish) over served --
+    #: and nothing constrained WHICH assets those were, or how many. So with
+    #: rejection on, the vehicle the site abandons could change at every pass
+    #: while every reported optimum stayed perfectly honest: pass 2 could
+    #: strand a different asset than pass 1 and still report a tardiness sum
+    #: inside T*. The count was held only incidentally, by the rejection price
+    #: being larger than any peak the site can reach -- an argument
+    #: forward_proposer states about the PEAK pass, and which has no equivalent
+    #: for min_flow, whose objective scales with the horizon.
+    #:
+    #: A FLOOR, NOT AN EQUALITY: a later pass that can serve MORE still may,
+    #: and `optima["served"]` records who was held so an auditor can see it.
+    served_floor: set[str] | None = None
     passes: list[dict] = []
     for mode in pass_modes:
+        #: Passes after the first get the previous PASS's plan for hints and
+        #: retention, never as a tick to price churn against (finding L-19).
+        chain_kw = {"price_churn": mode == pass_modes[0],
+                    "require_served": served_floor}
         if mode == "min_tardy":
             plan = build_and_solve(sc, objective_mode="min_tardy", **budget)
             max_tardy = sum(a["tardy_min"] for a in plan["assets"]
                             if a["tardy_min"] is not None)
             optima["min_tardy"] = max_tardy
+            if budget.get("allow_rejection"):
+                served_floor = {a["aid"] for a in plan["assets"]
+                                if a.get("served") is not False}
+                optima["served"] = sorted(served_floor)
         elif mode == "min_peak":
             #: Thread EVERY earlier ceiling. The first version forgot max_flow_total,
             #: so a flow-first chain (dispatch_rush) re-optimized peak from scratch
@@ -149,18 +173,37 @@ def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, di
             if max_flow is not None:
                 kwargs["max_flow_total"] = max_flow
             plan = build_and_solve(sc, objective_mode="min_peak",
-                                   previous_plan=plan, **kwargs, **budget)
+                                   previous_plan=plan, **kwargs, **chain_kw,
+                                   **budget)
             #: The peak comes from the model's site_peak_kw, NOT the objective --
             #: with rejection or churn the objective also carries those side
             #: penalties. site_peak_kw is the instantaneous peak alone.
-            max_peak = int(plan.get("site_peak_kw", plan["objective"]))
+            #:
+            #: AND THERE IS NO FALLBACK (finding L-50). This read
+            #: `plan.get("site_peak_kw", plan["objective"])`, and site_peak_kw
+            #: is emitted only when a peak pass actually SOLVED -- so the
+            #: fallback fired exactly when the pass FAILED and a retained plan
+            #: came back, whose "objective" is the previous pass's: total
+            #: tardy-minutes, or total flow-minutes, or with rejection on a
+            #: value inflated by 100,000 per rejected asset. A flow-minute
+            #: count would have become a kW ceiling for every later pass. The
+            #: value was discarded three lines later by the retained-pass
+            #: guard, so it was dead -- but dead AND ARMED: the only thing
+            #: between a flow-minute count and a kW ceiling was the ordering of
+            #: two statements. The retention case is now handled here, where it
+            #: arises, and a missing site_peak_kw on a pass that DID solve is a
+            #: model bug that raises KeyError loudly rather than silently
+            #: becoming a number of the wrong kind.
+            max_peak = (None if plan.get("retained_previous")
+                        else int(plan["site_peak_kw"]))
             optima["min_peak"] = max_peak
         elif mode == "min_flow":
             kwargs: dict = {"max_tardy_total": max_tardy}
             if max_peak is not None:
                 kwargs["max_peak_total"] = max_peak
             plan = build_and_solve(sc, objective_mode="min_flow",
-                                   previous_plan=plan, **kwargs, **budget)
+                                   previous_plan=plan, **kwargs, **chain_kw,
+                                   **budget)
             max_flow = sum(a["finish"] for a in plan["assets"]
                            if a["finish"] is not None)
             optima["min_flow"] = max_flow

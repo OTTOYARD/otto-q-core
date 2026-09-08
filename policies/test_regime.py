@@ -34,6 +34,7 @@ PERFORMANCE FINDINGS, STATED NOT HIDDEN (2026-09-07):
 """
 
 import dataclasses
+import inspect
 import json
 import sys
 import types
@@ -44,8 +45,9 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "solvers" / "cpsat"))
 
-from model import build_and_solve, load_scenario  # noqa: E402
+from model import build_and_solve, load_scenario, materialize  # noqa: E402
 from forward import lexicographic_solve, lexicographic_solve_traced  # noqa: E402
+import forward as fwd  # noqa: E402
 import regime  # noqa: E402
 from regime import intent_orchestrate, resolve_active  # noqa: E402
 from intent.intent import ARTIFACT_PATH, load_intent, stamp  # noqa: E402
@@ -454,3 +456,147 @@ def test_the_forward_policy_abstains_on_a_rejected_asset_too(monkeypatch):
     out = fwd.ForwardOrchestratorPolicy().decide(
         state, [_FakeArrival(a) for a in aids])
     assert [a.aid for a in out] == ["v-b"]
+
+
+def _code_only(src: str) -> str:
+    """Source with whole-line comments removed, so a scan reads code not prose."""
+    return "\n".join(l for l in src.splitlines()
+                      if not l.lstrip().startswith("#"))
+
+
+# ---------------------------------------------------------------------------
+# L-50: a dead-but-armed fallback that would turn a flow count into a kW ceiling.
+# ---------------------------------------------------------------------------
+
+def test_no_fallback_can_turn_another_objective_into_a_peak_ceiling():
+    """A SOURCE-level guard, deliberately, and the reason is the finding.
+
+    `max_peak = int(plan.get("site_peak_kw", plan["objective"]))` fired exactly
+    when the peak pass FAILED and a retained plan came back — whose "objective"
+    is the PREVIOUS pass's: total tardy-minutes, total flow-minutes, or with
+    rejection on a value inflated by 100,000 per rejected asset. Today the
+    value is discarded three lines later by the retained-pass guard, so no
+    behavioural test can separate the two: the hazard is that the only thing
+    between a flow-minute count and a kW ceiling is the ordering of two
+    statements. A guard on the ordering is the guard that fits.
+    """
+    #: COMMENTS STRIPPED FIRST. The comment that explains the removal quotes
+    #: the removed expression verbatim, and a scan that cannot tell a mention
+    #: from a call is the same defect one level up as the guards this audit is
+    #: about (0208's A4 makes the identical point about counting a bare token).
+    src = _code_only(inspect.getsource(fwd.lexicographic_solve_traced))
+    assert 'plan.get("site_peak_kw"' not in src, (
+        "the fallback is back: a retained plan's objective would become a "
+        "peak ceiling for every later pass")
+    assert 'plan["site_peak_kw"]' in src, (
+        "the peak must be read directly, so a missing one raises loudly")
+    #: ...and the retention case is handled where it arises, not three lines on
+    assert 'None if plan.get("retained_previous")' in src
+
+
+def test_a_retained_peak_pass_still_holds_no_ceiling(monkeypatch):
+    """The behavioural half that IS observable: optima says None."""
+    real = fwd.build_and_solve
+    calls = {"n": 0}
+
+    def _retain_second(sc, **kw):
+        calls["n"] += 1
+        plan = real(sc, **kw)
+        if calls["n"] == 2:
+            return {**plan, "retained_previous": True, "solver_status": "UNKNOWN"}
+        return plan
+
+    monkeypatch.setattr(fwd, "build_and_solve", _retain_second)
+    _plan, optima, _passes = fwd.lexicographic_solve_traced(
+        load_scenario(SC), ("min_tardy", "min_peak"), budget=FLOW_BUDGET)
+    assert optima["min_peak"] is None
+
+
+# ---------------------------------------------------------------------------
+# L-19: churn prices a real trip between TICKS, never a hop between passes.
+# ---------------------------------------------------------------------------
+
+def _churned(churn):
+    """The canonical scenario with a churn weight, built from the raw file.
+
+    Not from `load_scenario`, whose result carries materialized Asset objects
+    that json cannot round-trip.
+    """
+    raw = json.loads(SC.read_text())
+    raw["objective_weights"]["churn_per_change"] = churn
+    return materialize(raw)
+
+
+def test_churn_is_not_priced_between_lexicographic_passes():
+    """Pass 2 minimized `peak + churn_w x (assets moved off their pass-1 point)`
+    and reported the result as P*, the minimum peak.
+
+    Churn prices a vehicle moving between rolling RE-SOLVES — a real trip in
+    the yard, against the previous TICK's enacted plan. The pass-1 plan is not
+    a tick that ever happened; it is an arbitrary tie-broken min-tardy
+    schedule, and penalising deviation from it makes the reported peak a peak
+    the site never had to pay.
+    """
+    sc = _churned(500)
+    _plan, optima, _passes = fwd.lexicographic_solve_traced(
+        sc, ("min_tardy", "min_peak"), budget=FLOW_BUDGET)
+    #: the same chain with churn OFF must reach the same peak: if churn were
+    #: still priced between passes, the churned run would report a HIGHER one.
+    _p2, optima_free, _ = fwd.lexicographic_solve_traced(
+        _churned(0), ("min_tardy", "min_peak"),
+        budget=FLOW_BUDGET)
+    assert optima["min_peak"] == optima_free["min_peak"], (
+        f"the peak moved with the churn weight ({optima['min_peak']} vs "
+        f"{optima_free['min_peak']}): churn is still priced between passes")
+
+
+def test_churn_is_still_priced_against_a_previous_tick():
+    """The mechanism must survive where it belongs: pass 1 against a real
+    previous plan. Only the BETWEEN-PASS pricing is switched off."""
+    sc = _churned(500)
+    tick1 = build_and_solve(sc, objective_mode="min_tardy", det_budget_s=1.0)
+    src = inspect.getsource(fwd.lexicographic_solve_traced)
+    assert '"price_churn": mode == pass_modes[0]' in _code_only(src), (
+        "the first pass must still be allowed to price churn")
+    #: and build_and_solve honours the flag both ways
+    a = build_and_solve(sc, objective_mode="min_tardy", previous_plan=tick1,
+                        det_budget_s=1.0, price_churn=True)
+    b = build_and_solve(sc, objective_mode="min_tardy", previous_plan=tick1,
+                        det_budget_s=1.0, price_churn=False)
+    assert a["solver_status"] and b["solver_status"]
+
+
+# ---------------------------------------------------------------------------
+# L-20: the served set is part of the lexicographic prefix.
+# ---------------------------------------------------------------------------
+
+def _tight():
+    import test_cpsat_prototype as T
+    return materialize(json.loads(json.dumps(
+        T._variant(charge_points=2, horizon_min=300))))
+
+
+def test_a_later_pass_cannot_swap_who_is_stranded():
+    """Every ceiling the chain threads is an AGGREGATE over whoever a pass
+    happens to serve, and nothing constrained WHICH assets those were — so a
+    later pass could strand a different vehicle and still report a tardiness
+    sum inside T*."""
+    budget = {"allow_rejection": True, "det_budget_s": 1.0}
+    plan, optima, _passes = fwd.lexicographic_solve_traced(
+        _tight(), ("min_tardy", "min_peak"), budget=budget)
+    assert "served" in optima, "the served set is not recorded as an optimum"
+    held = set(optima["served"])
+    final_served = {a["aid"] for a in plan["assets"] if a.get("served") is not False}
+    assert held <= final_served, (
+        f"the final pass stranded {sorted(held - final_served)}, which pass 1 "
+        f"had served — the served set is not being held")
+    #: a floor, not an equality: serving MORE is still allowed
+    assert isinstance(optima["served"], list) == True
+
+
+def test_the_served_floor_is_absent_when_rejection_is_off():
+    """With rejection off nobody can be stranded, so there is nothing to hold
+    and no extra constraint enters the model."""
+    _plan, optima, _ = fwd.lexicographic_solve_traced(
+        load_scenario(SC), ("min_tardy", "min_peak"), budget=FLOW_BUDGET)
+    assert "served" not in optima

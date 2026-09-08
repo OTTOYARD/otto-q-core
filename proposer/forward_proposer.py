@@ -5,10 +5,20 @@ disposes"):
 
   1. This module NEVER writes anything. propose() returns rows; whoever calls it
      (an edge function, a founder-gated integration) inserts them into
-     ottoq_external_proposals, where the deferral pattern gives an in-flight
-     proposal its one-tick right-of-first-refusal before the local decide path
-     pre-empts. The DISPOSER remains the production decide path -- exactly the
-     seat cuOpt occupies today, and deliberately no more.
+     ottoq_external_proposals. The DISPOSER remains the production decide path
+     -- exactly the seat cuOpt occupies today, and deliberately no more.
+
+     THE DEFERRAL WINDOW IS NOT YET THIS MODULE'S (finding L-40). This law used
+     to say the deferral pattern gives "an in-flight proposal" its one-tick
+     right-of-first-refusal, which reads as though it applied to any proposer.
+     It does not: ottoq_cuopt_first_refusal_arm arms only against
+     source IN ('cuopt','cuopt_fallback'), the cap is the policy key
+     cuopt_first_refusal_max_defers, and ottoq_l2_external_proposal breaks ties
+     with ORDER BY (source = 'cuopt') DESC, (source = 'cuopt_fallback') DESC.
+     A forward_lex row would get NO window and LAST place. Nothing is affected
+     today -- this module writes nothing and the table holds zero forward_lex
+     rows -- but the claim was false, and proposer/README.md now carries both
+     the correction and what generalizing the mechanism would take.
   2. No proposal is ever a command. Every row is advisory and carries abstain
      semantics. EXPIRY IS THE CALLER'S, and saying otherwise here was wrong: no
      row this module builds carries expires_at or a TTL -- grep the file, the
