@@ -175,3 +175,79 @@ caller and this does not undo that.
 
 **Nothing in this file is to be edited once the first column fires.** Results go
 below a `## Results` heading, as in every previous round canon.
+
+---
+
+# Results
+
+**Recorded as each column lands, not reconstructed afterwards.** Nothing above
+this heading has been edited since the first column fired at 16:35 UTC.
+
+## Verified before reading any column
+
+| | expected | measured 16:56:53 UTC | |
+|---|---|---|---|
+| recert floor | `2026-09-07 21:36:53.363037` | `2026-09-07 21:36:53.363037` | held |
+| `ottoq_cert_lineage_orphans()` | 22 | 22 | held |
+
+The floor has not moved through four migrations, which is 0226's whole claim:
+0225, 0227 and 0228 all landed as `forces_recert FALSE` after it and none of
+them reset a streak.
+
+## Columns as they land
+
+| col | scenario / seed / ticks | fired | secs | r27 | Δ | streak | verdict |
+|---|---|---|---|---|---|---|---|
+| a | `busy_day` / 314159 / 12 | 16:35:00 | **356** | 358 | −2 | 3 → **4** | pass, no atom moved |
+| b | `busy_day` / 171717 / 12 | 16:49:00 | **361** | 376 | −15 | 3 → **4** | pass, no atom moved |
+| c | `normal_day` / 171717 / 12 | 17:03 | | 358 | | | |
+| d | `busy_day` / 424242 / 12 | 17:17 | | 364 | | | |
+| e | `busy_day` / 171717 / **24** | 17:31 | | 560 | | | |
+| f | `busy_day` / 424242 / **24** | 18:01 | | 551 | | | |
+| g | `busy_day` / 171717 / 12, instrumented | 18:25 | | — | | | not comparable |
+
+### How "no atom moved" is established, and why it is not a hand-diff
+
+`consecutive_passes` increments only when `on_canon` is true, and since 0225
+`on_canon` compares **all fourteen** atoms the pair enforces rather than nine.
+So a streak going 3 → 4 *is* the assertion that every one of the fourteen
+matched the canon. Round 27 was judged by hand-diffing hashes out of the matrix;
+that is no longer the stronger instrument, and 0225 is the reason.
+
+Column a's `canon_fp` reads `803698f332adc0d0…`, which is round 27 column a's
+committed `fp 803698f3`, so the two instruments agree where they overlap.
+
+### Prediction 3 — judged, and it holds
+
+Six flagship columns green at the floor, from zero before the window:
+
+| depot / scenario / seed / ticks | pairs | streak | green |
+|---|---|---|---|
+| `busy_day` / 171717 / 24 | 4 | 4 | **true** |
+| `busy_day` / 424242 / 24 | 3 | 3 | **true** |
+| `busy_day` / 171717 / 12 | 4 | 4 | **true** |
+| `busy_day` / 314159 / 12 | 7 | 4 | **true** |
+| `busy_day` / 424242 / 12 | 3 | 3 | **true** |
+| `normal_day` / 171717 / 12 | 3 | 3 | **true** |
+
+**Six, not seven and not five** — which is what prediction 3 required in both
+directions, since *more* than six would have meant the comparison came out
+looser than intended. The seventh row the matrix returns is `grid_smoke` on
+depot `aacd0bb0…`: streak 1, **green false**, `canon_sdr` NULL. That is the
+fixture, it is not flagship, and 0225's P3 was rewritten specifically to stop
+judging it.
+
+### Prediction 2 — NOT yet judged, and the two columns in hand do not settle it
+
+Two of the four 12-tick columns are in: 356 and 361, running mean **358.5**
+against round 27's four-column mean of 364.
+
+That is **inside the 350–370 s zone this file declared "not resolvable" before
+the round started**, and above the 344–354 band prediction 2 committed to. It is
+not a judgement yet — c and d are still to come and round 27's own 12-tick
+columns spread 358–376. But the shape so far is the one the prediction warned
+about rather than the one it hoped for, and the per-column deltas are −2 and −15
+against a predicted −16 each: **one column moved about as predicted and the
+other barely moved at all.**
+
+Judgement waits for d at 17:17 UTC (12:17 PM CT).
