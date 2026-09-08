@@ -446,3 +446,43 @@ per-call arithmetic is wrong about *both* directions of tick-scaling.
 That last point is the honest one: the predicted 2.0 rests on an assumption
 about call counts that has never been checked, and the instrument to check it
 fires in forty minutes.
+
+### f's prediction, committed 2026-09-08 15:36 UTC — while f is running, before it finishes
+
+f fired at 15:34:00 UTC and will not finish until ~15:43. This is written now,
+against a running pair, so it cannot be fitted to the answer.
+
+The arithmetic, all of it already on this page:
+
+* Round 27's 12-tick mean is **364 s** against round 26's **519 s** — a saving
+  of **155 s**.
+* Column e (24 ticks, seed 171717) went **761 s → 560 s**: a saving of
+  **201 s**, which is **1.30x** the 12-tick saving.
+* 0223's call count predicts **2.0x**, because the load meter is called per
+  tick. e missed that by a factor of 1.5, in the direction that flatters
+  nothing — it under-delivered.
+* **Round 26's column f was 734 s.**
+
+**PREDICTION: f lands at 533 s, and I will accept 520–550 s as confirming.**
+That is 734 − 201, i.e. the same absolute saving column e produced. Scaling by
+e's percentage instead (−26.4%) gives 540 s, inside the same band, so the two
+readings of "behaves like e" do not need to be distinguished.
+
+**What each outcome decides, stated before the number exists:**
+
+| f lands at | reading |
+|---|---|
+| **520–550 s** | The 1.30x under-scaling is a property of **0223**, not of seed 171717. Two columns, two seeds, same shortfall. G27's second half is then a real question about the fix and not a sampling artefact. |
+| **~424 s** (a 310 s saving, 2.0x) | Column **e was the outlier** and the call-count arithmetic is right after all. The seed matters more than the fix does, which would be its own finding and a worse one — it would mean a single 24-tick column cannot be used to reason about scaling at all. |
+| **below ~500 s but well above 424** | Partial scaling. Neither story survives cleanly and the honest report is a range, not a ratio. |
+| **above 600 s** | Something other than 0223 changed between the rounds, and the whole G27 line of reasoning needs re-grounding before it goes further. |
+
+Note what this prediction does **not** cover, because the round-26 falsification
+table made exactly this omission and it was recorded as a finding: **f coming in
+*better* than 520 s.** That would mean the saving exceeded even column e's, and
+it is not on the table above. Recording the gap here rather than pretending the
+table is exhaustive.
+
+Prediction 1 — no verdict atom moves — applies to f unchanged. Round 26's f
+canon is the comparison, and it must match to the byte.
+
