@@ -196,6 +196,28 @@ WHERE depot_id = '11111111-1111-1111-1111-111111111111';
 --     2,413,581 / 24 ticks = 100,566 per tick, and note that (ii) is the same
 --     shape as the finding this whole file is about: a helper evaluated once per
 --     row of something large, to answer a question that does not vary.
+--
+--     For (i), the ten plpgsql callers that ran AND contain a loop, so the next
+--     person starts from a list of ten rather than sixty-five:
+--
+--       function                              sites  calls  loops
+--       public.ottoq_decide_tick                  9     24      7
+--       twin.ottoq_sim_advance_service_flow       5     24      6
+--       twin.ottoq_sim_auto_dispatch_tick         6     24      2
+--       public.ottoq_decide_indepot_approvals     3     24      1
+--       ottoq.ottoq_readmit_reopened_needs        3     24      1
+--       twin.ottoq_arm_advance_cycles             2     24      2
+--       twin.ottoq_sim_bay_fault_handler          2     24      2
+--       public.ottoq_plan_visit_itinerary         1    618      3
+--       public.ottoq_l2_optimize_assignments      1     24      1
+--       ottoq.ottoq_release_expired_bookings      1     24      1
+--
+--     Only the first two have enough sites and enough loop nesting to reach
+--     100,566 per tick without help, and reaching it needs a NESTED loop —
+--     226 vehicles x 330 stalls is 74,580, which is the right order. That is a
+--     hypothesis with an order-of-magnitude behind it, not a finding, and this
+--     file still declines to name a carrier without a measurement. Three of the
+--     four wrong answers on G19 were exactly this confident.
 SELECT f.funcname, f.calls - COALESCE(b.calls,0) AS calls,
        round(((f.self_time - COALESCE(b.self_time,0))/1000)::numeric,1) AS self_s
 FROM pg_stat_user_functions f
