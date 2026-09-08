@@ -110,6 +110,17 @@
 --     syntax, for catalog-shape assertions, for anything an empty cluster can
 --     answer. It is NOT the control for precondition defects, and the finding
 --     should stop implying it is.
+--   * **AND ONE THING IS NOW SHIPPED, NOT PROPOSED.** `verify.yml`'s last step
+--     is `python3 -m pytest -q` from the repo root, so `tests/test_sqlstruct.py`
+--     is picked up with no workflow change at all. From this commit, **every
+--     pull request checks that all 300+ committed migrations and checks
+--     tokenize and that every dollar tag pairs** — a property of the SQL, in
+--     CI, with no database. G12's headline is "CI does not run the SQL"; it is
+--     now more precisely "CI does not EXECUTE the SQL", and the gap between
+--     those two verbs is exactly the work this file did.
+--     Full suite after the change: **826 passed, 5 skipped** (470 before, 356
+--     added). The 5 skips are the cluster tests, which `initdb` refuses to run
+--     as root in this container and which do run in CI.
 --   * The `LIMIT 1` lint itself is still NOT shipped, and deliberately. Three
 --     code hits on 0220 are all inside that migration's own rewrite and its
 --     assertions, so the rule needs the ORDER-BY half before it would say
