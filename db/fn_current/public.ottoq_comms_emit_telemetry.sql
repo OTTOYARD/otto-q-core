@@ -1,3 +1,13 @@
+-- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, date not recorded
+-- md5 at capture: 3dd58d878e62b69b31133ddfdbe63e3e
+--   (this pin was computed FROM THIS FILE on 2026-09-08 because the capture shipped without one.
+--    It therefore proves only that the file has not been edited SINCE; it is not evidence
+--    about the catalog. The live comparison on the next line is.)
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live 0039ae2c2360b4c6c0596b6c9cac40c9
+--   here 3dd58d878e62b69b31133ddfdbe63e3e
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION public.ottoq_comms_emit_telemetry(p_run uuid, p_vehicle uuid, p_clock timestamp with time zone, p_lat numeric DEFAULT NULL::numeric, p_lng numeric DEFAULT NULL::numeric, p_speed_mps numeric DEFAULT NULL::numeric, p_heading numeric DEFAULT NULL::numeric)
  RETURNS uuid
  LANGUAGE plpgsql

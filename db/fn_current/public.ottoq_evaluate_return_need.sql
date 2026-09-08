@@ -1,5 +1,26 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
 -- md5 at capture: 0c463ada1588296a31ec1761d16a83d4
+-- SUPERSEDED BY MIGRATION 0206, AND STILL BYTE-EXACT — READ BOTH HALVES.
+-- 0206 copied this body out under the name public.ottoq_recall_naive_threshold_v1
+-- and left a dispatcher behind at public.ottoq_evaluate_return_need. So the body
+-- BELOW is the live rung ladder (rename ottoq_recall_naive_threshold_v1 back and
+-- it md5s to 0c463ada exactly; the name occurs once, so the rename is the whole
+-- difference) sitting under a name that now belongs to something else:
+--
+--   public.ottoq_recall_naive_threshold_v1   md5 cd3ffc2a  <- this body, renamed
+--   public.ottoq_evaluate_return_need        md5 53018872  <- the wrapper, which
+--       reads recall_implementation_id from the run's policy, EXECUTEs whichever
+--       evaluator ottoq_recall_implementations names, and writes the decision row
+--
+-- Do not read this file as "what ottoq_evaluate_return_need does" today.
+-- The md5 above is over the body ONLY: every line starting `--` is stripped, the
+-- rest rstripped with one trailing newline, which is what pg_get_functiondef
+-- returns. recall/test_recall.py recomputes it and fails if the two have drifted.
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live 53018872b12d8032f8728851dff719e7
+--   here 0c463ada1588296a31ec1761d16a83d4
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION public.ottoq_evaluate_return_need(p_vehicle_id uuid, p_sim_run_id uuid, p_sim_clock_now timestamp with time zone, p_horizon_min numeric DEFAULT 30, p_soc_pct numeric DEFAULT NULL::numeric)
  RETURNS TABLE(should_return boolean, return_trigger text, urgency text, rung smallint, is_deferrable boolean, lead_ticks smallint, projected_eta_min numeric, evidence jsonb)
  LANGUAGE plpgsql

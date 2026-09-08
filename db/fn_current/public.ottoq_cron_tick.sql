@@ -1,5 +1,10 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
 -- md5 at capture: 0000aacc9027798730952daa214d5ece
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live 0562fbd6579524bf71f6c733b9295268
+--   here 0000aacc9027798730952daa214d5ece
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION public.ottoq_cron_tick()
  RETURNS void
  LANGUAGE plpgsql

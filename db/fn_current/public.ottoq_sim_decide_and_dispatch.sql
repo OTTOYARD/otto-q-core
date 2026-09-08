@@ -1,5 +1,10 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
 -- md5 at capture: 72e5e6adfa4c4774d37bbaadea4822d0
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live 171edecec29d44e524c501cf0643670d
+--   here 72e5e6adfa4c4774d37bbaadea4822d0
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION public.ottoq_sim_decide_and_dispatch(p_sim_run_id uuid)
  RETURNS TABLE(out_dispatched integer, out_charge_assigned integer)
  LANGUAGE plpgsql

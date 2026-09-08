@@ -24,8 +24,26 @@ mining pack and a vertiport pack consume the same three structs unchanged).
 
 | Name | What it is | Why it exists |
 |---|---|---|
-| `naive_threshold_v1` | **Deliberately naive.** The rung ladder of the live `public.ottoq_evaluate_return_need` (captured md5 `0c463ada…`) as fixed thresholds, top-down, first hit wins: critical_reserve → fault_safety_critical → fault_major → low_soc_reserve → comms_stale → (behind the contention gate) service_interval_due → sensor_soil → wash_cadence. No forecasting, no cost model, no learning. | So the interface is real on day one and every smarter successor has a baseline to beat on the same ledger. |
+| `naive_threshold_v1` | **Deliberately naive.** The rung ladder now live as `public.ottoq_recall_naive_threshold_v1` (md5 `cd3ffc2a…`; it WAS `public.ottoq_evaluate_return_need` until migration 0206, md5 `0c463ada…`, which is the body captured in `db/fn_current/`) as fixed thresholds, top-down, first hit wins: critical_reserve → fault_safety_critical → fault_major → low_soc_reserve → comms_stale → (behind the contention gate) service_interval_due → sensor_soil → wash_cadence. No forecasting, no cost model, no learning. | So the interface is real on day one and every smarter successor has a baseline to beat on the same ledger. |
 | `fixed_window_dummy` | Recalls everything inside a fixed window. Not a policy anyone should run. | The **swap proof**: demonstrates config-swappability with zero call-site changes. |
+
+### Where the ladder lives, and where the wrapper lives
+
+Migration 0206 split one function into two, and any note citing the old name is
+now pointing at the wrong one:
+
+| live function | md5 | what it is |
+|---|---|---|
+| `public.ottoq_recall_naive_threshold_v1` | `cd3ffc2a…` | the rung ladder itself |
+| `public.ottoq_evaluate_return_need` | `53018872…` | the wrapper: reads `recall_implementation_id` from the run's policy, `EXECUTE`s whichever evaluator `ottoq_recall_implementations` names for it, and writes the row to `ottoq_recall_decisions` with its content hash |
+
+`db/fn_current/public.ottoq_evaluate_return_need.sql` holds the **pre-0206**
+body, md5 `0c463ada…`. It is still byte-exact for the ladder — renaming the live
+`ottoq_recall_naive_threshold_v1` back to `ottoq_evaluate_return_need` md5s to
+`0c463ada…`, and the name occurs exactly once in the definition, so the rename is
+the whole difference — but it sits under a name that now belongs to the wrapper.
+The capture's header says so, and `recall/test_recall.py` refuses a capture whose
+header hash and body have drifted apart.
 
 **Swapping is a config change, never a code change:**
 `make_recall({"implementation": "naive_threshold_v1"})` vs

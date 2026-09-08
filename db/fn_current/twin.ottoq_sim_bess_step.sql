@@ -1,5 +1,10 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run3/C7)
 -- md5 at capture: e1e1ae535e573d21997f51b8f968f962
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live 22a341ca2826b2a62a2daa13fac9a757
+--   here e1e1ae535e573d21997f51b8f968f962
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_bess_step(p_bess_id uuid, p_sim_run_id uuid, p_sim_clock_now timestamp with time zone, p_tick_minutes numeric, p_target_power_kw numeric, p_ambient_temp_c numeric DEFAULT NULL::numeric, p_dispatch_reason text DEFAULT 'manual'::text)
  RETURNS TABLE(out_actual_power_kw numeric, out_soc_pct_new numeric, out_temp_c_new numeric, out_soh_pct_new numeric, out_thermal_derated boolean, out_soc_limited boolean)
  LANGUAGE plpgsql

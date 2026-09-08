@@ -1,5 +1,6 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
 -- md5 at capture: 31bfaa66111ebdda51189cef543f709c
+-- VERIFIED AGAINST THE LIVE CATALOG 2026-09-08: body md5 == live md5 (31bfaa66111ebdda51189cef543f709c).
 CREATE OR REPLACE FUNCTION public.ottoq_cuopt_first_refusal_arm(p_sim_run_id uuid, p_tick bigint)
  RETURNS integer
  LANGUAGE plpgsql

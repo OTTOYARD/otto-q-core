@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+#: the repo root, for the db/fn_current capture check below
+ROOT = Path(__file__).resolve().parents[1]
 from recall_decision import (AssetState, FixedWindowRecall, NaiveThresholdRecall,
                              RecallEventLog, SiteForecast, WorkSideSignals,
                              make_recall, run_recall_cycle)
@@ -115,9 +117,62 @@ def test_refusal_is_first_class():
     print("refusal path: OK (first-class event + re-solve hook, never an error)")
 
 
+def test_the_captured_evaluator_matches_the_hash_its_header_pins():
+    """A capture whose header hash no longer describes its body is a lie with a
+    checksum on it, which is worse than no capture at all.
+
+    `db/fn_current/*.sql` files are `pg_get_functiondef` output with a two-line
+    provenance header. The header pins the md5 the body had at capture; the md5
+    is over the BODY only — every `--` line stripped, the rest rstripped with one
+    trailing newline, which is exactly what the catalog returns. Edit the body
+    (or paste a newer definition under the old header) and the two diverge.
+
+    This guard exists because the prose around this capture had already drifted
+    once: migration 0206 copied the rung ladder out to
+    `ottoq_recall_naive_threshold_v1` and left a dispatcher at
+    `ottoq_evaluate_return_need`, and `recall_decision.py` went on calling the
+    capture "the live public.ottoq_evaluate_return_need" for two migrations. The
+    BODY never moved — renaming the live ladder back md5s to `0c463ada` exactly —
+    so nothing mechanical could have caught it. The header now says which
+    function the body is, and this test makes sure the header cannot drift from
+    the body it describes.
+
+    The kernel reads no database (doctrine 7), so this is a file-vs-file check.
+    The body-vs-catalog half is the migration protocol's job, and 0206 did it:
+    its md5 pin table records `0c463ada -> 53018872`.
+    """
+    import hashlib
+    fn_dir = ROOT / "db" / "fn_current"
+    captures = sorted(fn_dir.glob("*.sql"))
+    assert captures, f"no captures under {fn_dir} — this guard would pass vacuously"
+    bad = []
+    for path in captures:
+        text = path.read_text()
+        pinned = [l.split(":", 1)[1].strip() for l in text.split("\n")
+                  if l.startswith("-- md5 at capture:")]
+        if len(pinned) != 1:
+            bad.append(f"{path.name}: {len(pinned)} '-- md5 at capture:' lines, want exactly 1")
+            continue
+        #: strip ONLY the leading header block. An earlier version of this guard
+        #: dropped every `--` line in the file and reported two captures as
+        #: drifted; both were fine, and their function BODIES contain SQL
+        #: comments — which pg_get_functiondef returns and the md5 covers.
+        lines = text.split("\n")
+        i = 0
+        while i < len(lines) and lines[i].startswith("--"):
+            i += 1
+        body = "\n".join(lines[i:]).rstrip("\n") + "\n"
+        actual = hashlib.md5(body.encode()).hexdigest()
+        if actual != pinned[0]:
+            bad.append(f"{path.name}: header pins {pinned[0]}, body is {actual}")
+    assert not bad, bad
+    print(f"captures: OK ({len(captures)} pinned, each header hash matches its body)")
+
+
 if __name__ == "__main__":
     test_ladder()
     test_swap_zero_call_site_changes()
     test_event_contract()
     test_refusal_is_first_class()
+    test_the_captured_evaluator_matches_the_hash_its_header_pins()
     print("all recall tests passed")
