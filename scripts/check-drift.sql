@@ -322,8 +322,8 @@ repo_manifest(version, name, file) AS (
     ('20260908111846'::text, 'the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was'::text, '0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql'::text),
     ('20260908111950'::text, 'the_run_scope_predicate_no_index_can_read'::text, '0221_the_run_scope_predicate_no_index_can_read.sql'::text),
     ('20260908112038'::text, 'the_fingerprint_hashed_a_million_rows_to_report_thirteen'::text, '0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql'::text),
-    ('PENDING'::text, 'the_load_meter_asks_which_run_is_running_once_per_row'::text, '0223_the_load_meter_asks_which_run_is_running_once_per_row.sql'::text),
-    ('PENDING'::text, 'the_refusal_reactor_says_production_and_hands_you_a_sim_run_id'::text, '0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id.sql'::text)
+    ('20260908133954'::text, 'the_load_meter_asks_which_run_is_running_once_per_row'::text, '0223_the_load_meter_asks_which_run_is_running_once_per_row.sql'::text),
+    ('20260908134109'::text, 'the_refusal_reactor_says_production_and_hands_you_a_sim_run_id'::text, '0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

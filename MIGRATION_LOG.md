@@ -197,8 +197,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0220](db/migrations/0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql) | `20260908111846` | yes — ledger | the schedule_task SDR emitter asks the stall what kind of charge it |
 | [0221](db/migrations/0221_the_run_scope_predicate_no_index_can_read.sql) | `20260908111950` | yes — ledger | the run-scope predicate no index can read. A carrier found while |
 | [0222](db/migrations/0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql) | `20260908112038` | yes — ledger | G19. ottoq_boot_state_fingerprint serialized and hashed 1.36 MILLION |
-| [0223](db/migrations/0223_the_load_meter_asks_which_run_is_running_once_per_row.sql) | `PENDING` | no — pending | G21. twin.ottoq_sim_compute_charger_load_kw evaluates |
-| [0224](db/migrations/0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id.sql) | `PENDING` | no — pending | 71,944 signed events assert `data_source = 'production'` while |
+| [0223](db/migrations/0223_the_load_meter_asks_which_run_is_running_once_per_row.sql) | `20260908133954` | yes — ledger | G21. twin.ottoq_sim_compute_charger_load_kw evaluates |
+| [0224](db/migrations/0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id.sql) | `20260908134109` | yes — ledger | 71,944 signed events assert `data_source = 'production'` while |
 
 92 migrations indexed.
 

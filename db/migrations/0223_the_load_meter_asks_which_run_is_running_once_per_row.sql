@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908133954
 -- migration-name:    the_load_meter_asks_which_run_is_running_once_per_row
 --
 -- ---------------------------------------------------------------------------
@@ -440,3 +440,38 @@ VALUES ('0223_the_load_meter_asks_which_run_is_running_once_per_row', FALSE,
         now());
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 13:39:54 UTC (8:39 AM CT), version 20260908133954.
+--
+-- Applied BYTE-FOR-BYTE from this file, and that is measured rather than
+-- claimed: the ledger stores the submitted text in
+-- supabase_migrations.schema_migrations.statements[1], and its md5 with the
+-- `-- migration-version:` line removed is
+--
+--     d44c96bc0d9693a731c0fb946ffa108f
+--
+-- which is exactly this file's md5 under the same treatment. (The version line
+-- differs only because it was PENDING when submitted and stamped afterwards,
+-- which is step 5 of scripts/APPLYING.md.)
+--
+-- Every gate passed; a failure in any of them would have raised and rolled the
+-- whole transaction back:
+--   P-   no cert job scheduled, no pair active, no sim run in flight
+--   P0   body 1386d615, one call site, one comment mention
+--   P1   ottoq_depot_running_run is sql / STABLE
+--   P2   one overload
+--   A1   MATERIALIZED CTE present, filter reads it, 0155's status set intact
+--   A2a  44,312 per-row evaluations, all equal to the hoisted value
+--   A2b  five clocks, CTE form = flat form, non-zero on at least one
+--   A2c  six (depot, clock) probes, deployed = old inline form
+--   A3   CTE materialized, no scan-node predicate names the function
+--
+-- Deployed function md5 is now 2d4f70fd (was 1386d615).
+--
+-- VERIFIED: A3's plan is the verification for the mechanism — `CTE r -> Result
+-- (cost=0.00..0.26 rows=1)`, one evaluation, and the function appears in no
+-- Filter, Index Cond or Join Filter. The verification for the CLAIM is round
+-- 27: db/canons/round27.md predicts the 12-tick mean moves 519 s -> ~410 s
+-- (±30), written and committed before this was applied.
+-- ---------------------------------------------------------------------------

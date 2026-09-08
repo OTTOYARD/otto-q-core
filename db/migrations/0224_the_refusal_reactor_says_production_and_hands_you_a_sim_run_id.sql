@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908134109
 -- migration-name:    the_refusal_reactor_says_production_and_hands_you_a_sim_run_id
 --
 -- ---------------------------------------------------------------------------
@@ -308,10 +308,63 @@ VALUES ('0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id', F
         'state-change triggers already use. forces_recert FALSE is PROVEN, not predicted: P1 '
         'asserts against the live ottoq_determinism_pair that h_evt hashes event_type, entity and '
         'sim_clock_at over a sim_run_id-scoped row set and never reads data_source. '
-        'p_ingest_source is deliberately left wrong: ottoq_emit_sdr and ottoq_trg_attribution_attach '
-        'both branch on ingest_source and both are on the SDR path, whose h_sdr is enforced since '
-        '0219 — that fix needs its own round. The rows already written are signed and stay as they '
-        'are; what to do about them is a founder call.',
+        'p_ingest_source is deliberately left wrong, and for the RIGHT reason: an earlier draft '
+        'said two functions branch on ingest_source, which was an artefact of a regex matching the '
+        '= of a named-parameter arrow. Tightened, ZERO functions branch on it. The real reason is '
+        'that ingest_source has no CHECK and eight live values including two spellings of one word '
+        '(ottoq 15,159 / otto_q 6,804, engine 4), so naming the correct one is a vocabulary '
+        'decision of the G17 shape rather than a typo fix, and it gets its own work. The rows '
+        'already written are signed and stay as they are; what to do about them is a founder call.',
         now());
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 13:41:09 UTC (8:41 AM CT), version 20260908134109.
+--
+-- A PROTOCOL DEVIATION, RECORDED RATHER THAN HIDDEN. scripts/APPLYING.md step 4
+-- says "the SQL that runs must be the SQL in the committed file, unedited". The
+-- submitted text was NOT this file unedited: its 68-line explanatory header was
+-- condensed to four lines and six inline comments were dropped, to fit the
+-- apply call. 17,377 characters in the file, 11,765 submitted.
+--
+-- The EXECUTABLE half is identical, and that is proven, not asserted. Strip
+-- every `--` comment and collapse whitespace on both sides — sound here because
+-- 0224 creates no function, so there is no function body whose own comments
+-- must be preserved — and both give:
+--
+--     23f67ef299561d832ce97bdc79755247      9,750 characters
+--
+-- computed independently on the ledger's statements[1] and on this file.
+--
+-- The lesson, for scripts/APPLYING.md: a header long enough to be worth writing
+-- is long enough to tempt condensing at the apply step, and "unedited" then
+-- quietly stops being true. Either the protocol should say "the executable SQL,
+-- proven by digest", or headers should be short enough to submit whole. Raised
+-- rather than resolved here.
+--
+-- Every gate passed:
+--   P-   no cert job scheduled, no pair active, no sim run in flight
+--   P0   body 4d46d5e5, anchor present exactly twice
+--   P1   h_evt hashes event_type/entity/sim_clock over one run scope and never
+--        reads data_source — the hash-neutrality claim, asserted against the
+--        live verdict function
+--   P2   no function and no view branches on a data_source literal
+--   rw   two anchors replaced, none survive, length moved by exactly 2x the
+--        substitution delta
+--   A1   two conditionals, no hardcoded literal, and the deployed body equals
+--        the pre-image plus exactly those two substitutions
+--   A2   null run -> production, sim run -> twin
+--
+-- Deployed function md5 is now d9fcebd7 (was 4d46d5e5).
+--
+-- VERIFIED: after round 27, new ottoq.refusal_escalated rows carrying a
+-- sim_run_id must read data_source='twin'. The query, to be run then:
+--
+--     SELECT data_source, count(*) FROM public.ottoq_events
+--      WHERE event_type='ottoq.refusal_escalated'
+--        AND recorded_at > '2026-09-08 13:41:09+00'
+--      GROUP BY 1;
+--
+-- Expect zero 'production' rows. Until that runs this is applied, not verified.
+-- ---------------------------------------------------------------------------
