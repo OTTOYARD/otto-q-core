@@ -104,14 +104,44 @@ ORDER BY 1;
 --   throughput: decisions, sdrs, events, vehicles_booked
 --   safety:     incapable_charge_bookings, unverifiable  (from bookings)
 --
--- Every one of those reads a substrate only otto_q writes to. Scored
--- against a fifo run they would read: bookings_total 0, charge_bookings
--- 0, decisions 0, sdrs 0, vehicles_booked 0, used_calendar false,
--- consulted_shield false -- and peak_concurrent_kw computed over an
--- empty booking set, so 0 kW.
+-- CORRECTION, made within the hour, before 0231 was built on it. The
+-- sentence above originally continued "...and peak_concurrent_kw
+-- computed over an empty booking set, so 0 kW." That is false, and it
+-- is false about a function I wrote. Reading the applied body rather
+-- than my memory of it:
 --
--- The scorer would report that fifo did nothing at all, while fifo was
--- in fact charging vehicles through ocpp_sessions the whole time.
+--   sess AS (SELECT ... FROM public.ocpp_sessions o JOIN r ON ...)
+--   ev   AS (SELECT started_at, +kw FROM sess UNION ALL ...)
+--   peak AS (SELECT max(ckw) AS kw FROM running)
+--
+-- peak_concurrent_kw is computed from ocpp_sessions -- COMMON GROUND --
+-- and so is coverage.charge_sessions. Verified numerically: the
+-- session-only sweep on run 3f4b9690 returns 463.8 kW, the same figure
+-- 0230 reported, because it is the same source.
+--
+-- So the defect is real but NARROWER than first written. Field by field:
+--
+--   COMMON GROUND (valid for comparison today)
+--     coverage.charge_sessions
+--     safety.peak_concurrent_kw, site_cap_kw, pct_of_cap, cap_breached
+--
+--   OTTO-Q SUBSTRATE ONLY (would read 0 / false for a baseline arm)
+--     coverage.bookings_total, charge_bookings, used_calendar
+--     coverage.rule_evals_total, consulted_shield
+--     safety.incapable_charge_bookings, unverifiable_charge_bookings
+--     throughput.decisions, sdrs, vehicles_booked, bookings_by_purpose
+--
+--   MIXED, and therefore the most misleading of the three
+--     throughput.events -- greedy emits via auto_charge_assign_tick and
+--     the dispatcher's common tail emits twin.sim_tick_advanced for
+--     every policy, but the decide path emits far more. A ratio here is
+--     dominated by which arm it is.
+--
+-- The scorer would still report a fifo arm as having produced almost
+-- nothing, because eleven of its sixteen fields are otto_q-only. The
+-- headline finding stands. The specific accusation about peak kW does
+-- not, and the most safety-critical field in the function turns out to
+-- have been fair all along.
 --
 -- I built it to be ungameable by NOT CHECKING. It is. It is fully
 -- gameable by WRITING SOMEWHERE ELSE, which is precisely what both
