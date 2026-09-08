@@ -517,3 +517,31 @@ ON CONFLICT (name) DO UPDATE
   SET forces_recert = EXCLUDED.forces_recert,
       note          = EXCLUDED.note,
       classified_at = EXCLUDED.classified_at;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 16:21 UTC. P-, P0, P1, P2 and A1-A3 all passed, including
+-- P1's isolation of the h_evt expression out of the live verdict function and
+-- its assertion that the fragment names neither `data_source` nor `depot_id`
+-- — so forces_recert FALSE is proven here, not assumed.
+--
+--   ottoq_vehicles_state_change  9ccac364... -> 09a4c54684b8927aa8737bd14758325e
+--   ottoq_stalls_state_change    84d622c6... -> b29d457b37d89f2424821b7cb7c308b4
+--
+-- The recert floor did not move. **G16 is closed at the source**: from here the
+-- harness's fleet-reset events are labelled by the depot's feed mode rather
+-- than by whether a GUC happened to be set, and the vehicles trigger passes a
+-- depot for the first time.
+--
+-- What this does NOT do, and 0131 said so: it cannot repair the 27,460 events
+-- already mislabelled. They are HMAC-signed and the signature covers the
+-- mislabel, so relabelling invalidates the signature and deleting is a deletion
+-- from an audit ledger. They stay, and they stay wrong, and that is recorded
+-- rather than tidied.
+--
+-- DEVIATION, DISCLOSED: the 129-line header was replaced by a two-line pointer.
+-- Every executable statement — both trigger bodies in full, all preconditions
+-- and all assertions — was submitted verbatim. The exact-whitespace assertions
+-- in A1 and A3 (`p_data_source       := v_data_source`,
+-- `p_depot_id          := v_depot`) are themselves a transcription check, and
+-- they passed.
+-- ---------------------------------------------------------------------------

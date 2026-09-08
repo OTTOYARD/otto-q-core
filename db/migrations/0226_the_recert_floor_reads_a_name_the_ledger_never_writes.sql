@@ -356,3 +356,18 @@ ON CONFLICT (name) DO UPDATE
   SET forces_recert = EXCLUDED.forces_recert,
       note          = EXCLUDED.note,
       classified_at = EXCLUDED.classified_at;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 16:11 UTC. Submitted byte-identical to this file.
+-- P-, P0, P1, P2 and A1-A4 all passed.
+--
+--   recert floor  2026-09-08 13:41:09  ->  2026-09-07 21:36:53.363037
+--   orphaned lineage rows              22 (the SQL-endpoint block 0192-0215)
+--   flagship columns not stale         6
+--   flagship columns GREEN             6, from ZERO
+--
+-- **G28 is closed.** And the proof it stayed closed is what happened next:
+-- 0225, 0227 and 0228 landed after it, all three `forces_recert FALSE`, and the
+-- floor did not move once. Before this migration every one of them would have
+-- jumped it and restarted all six streaks.
+-- ---------------------------------------------------------------------------

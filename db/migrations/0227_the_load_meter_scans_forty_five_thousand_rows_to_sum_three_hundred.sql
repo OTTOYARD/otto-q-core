@@ -260,3 +260,17 @@ ON CONFLICT (name) DO UPDATE
   SET forces_recert = EXCLUDED.forces_recert,
       note          = EXCLUDED.note,
       classified_at = EXCLUDED.classified_at;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 16:18 UTC. P-, P0, P1, P2 and A1-A3 all passed: the
+-- before-plan was a Seq Scan, the after-plan reaches the rows through
+-- ocpp_sessions_runscope_load_idx with no Seq Scan surviving and no Join
+-- Filter on the run scope, and the meter still returns non-NULL.
+--
+-- The recert floor did not move (2026-09-07 21:36:53.363037 before and after),
+-- which is 0226's fix doing its job on a live `forces_recert FALSE` apply.
+--
+-- DEVIATION, DISCLOSED (scripts/APPLYING.md step 4): the 104-line rationale
+-- header was replaced by a three-line pointer to this path. Every executable
+-- statement was submitted verbatim.
+-- ---------------------------------------------------------------------------
