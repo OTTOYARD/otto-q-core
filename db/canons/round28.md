@@ -70,6 +70,28 @@ This one is not really a prediction about round 28; it is verified in the apply
 window itself. It is listed because if it does *not* happen, round 28 should not
 be scheduled at all until it is understood.
 
+## The stake is larger than four migrations (db/checks/0143)
+
+Task #56 Part A — "the deterministic core is done" — was declared met by
+`db/checks/0113` after round 17, item by item, and properly. But it was met
+against **six** enforced atoms. Since then 0205, 0217 and 0219 promoted `h_rule`,
+`h_rcl` and `h_sdr` to enforced, and 0225 extended the matrix from comparing nine
+to comparing **fourteen**. The sentence in task #56 never changed; what it
+asserts did.
+
+Every Part A clause holds at the new bar except one: *"every canon stable across
+at least two rounds"* has had **one** round at fourteen atoms. **Round 28 is the
+second.**
+
+So this round re-establishes Part A at the standard the certification now
+actually enforces. That is a consequence of predictions 1 and 3 both holding —
+**not a fourth prediction**, because stating it as one would double-count the
+same evidence.
+
+Not re-shown here and recorded as a gap: *"inter-pair reproducible"*, which 0113
+met on two twin-pair columns at six atoms. Round 28's schedule has no twin pairs,
+so it will not be re-shown at fourteen.
+
 ## What would falsify each, as an action
 
 | prediction | falsified by |
