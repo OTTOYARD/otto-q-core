@@ -11,6 +11,9 @@ provenance, (c) the TOTAL seam (a malformed forecast raises, never silently
 defaults), and (d) the end-to-end loop into resolve_intent.
 """
 
+import os
+from pathlib import Path
+
 import pytest
 
 from intent.intent import load_intent, resolve_intent
@@ -177,6 +180,75 @@ def test_bridge_is_deterministic():
     a = forecast_signals(fc, site_power_target_kw=700, now_hour=0)
     b = forecast_signals(fc, site_power_target_kw=700, now_hour=0)
     assert a == b and a.signals == b.signals and a.reasoning == b.reasoning
+
+
+def test_the_resolved_decision_is_identical_across_processes_and_hash_seeds():
+    """The single-process determinism test cannot see the hazard it is named for.
+
+    Two calls in ONE interpreter share a PYTHONHASHSEED, so frozenset and dict
+    iteration order are already fixed; they share a warm import graph; and they
+    run milliseconds apart, so an hour-boundary clock read cannot differ between
+    them. It passes under exactly the conditions the doctrine warns about.
+
+    What must be stable is the DECISION, not the internal ordering of a set: the
+    active regime and the ordered objective list the optimizer acts on. Asserting
+    on `sorted(signals)` would normalize away the very hash-order dependence
+    worth catching, and asserting on the set's raw iteration order would fail
+    spuriously, since that legitimately differs by seed. So this runs the whole
+    path -- forecast -> signals -> resolve_intent -> ordered objectives -- in two
+    subprocesses under two hash seeds and compares the bytes of the outcome.
+
+    A regime resolver that iterated a frozenset instead of the artifact's
+    declaration order would pass every other test in this file and fail here.
+    """
+    import json as _json
+    import subprocess
+    import sys as _sys
+    import tempfile
+
+    prog = (
+        "import json,sys;"
+        "sys.path.insert(0, %r);"
+        "from intent.signals import forecast_signals;"
+        "from intent.intent import load_intent, resolve_intent;"
+        "fc=json.load(open(%r));"
+        "a=forecast_signals(fc, site_power_target_kw=700, now_hour=7);"
+        "act=resolve_intent(load_intent(), hour_of_day=7, signals=a.signals);"
+        "print(json.dumps({'regime': act.regime_key,"
+        " 'objectives': list(act.objectives)}, sort_keys=True))"
+    )
+
+    #: both a surge AND a grid peak, so more than one signal-gated regime
+    #: matches and PRECEDENCE actually has to decide -- the case where an
+    #: order-dependent resolver would diverge.
+    fc = _forecast(per_hour_arrivals={7: 3.0, 8: 3.0, 9: 3.0},
+                   load_p90={7: 700.0})
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+        _json.dump(fc, fh)
+        fixture = fh.name
+
+    root = str(Path(__file__).resolve().parent.parent)
+    outs = []
+    for seed in ("0", "12345"):
+        env = dict(os.environ, PYTHONHASHSEED=seed)
+        r = subprocess.run([_sys.executable, "-c", prog % (root, fixture)],
+                           capture_output=True, text=True, env=env, timeout=120)
+        assert r.returncode == 0, (
+            f"subprocess failed under PYTHONHASHSEED={seed}: {r.stderr[-500:]}")
+        outs.append(r.stdout)
+
+    assert outs[0] == outs[1], (
+        f"the resolved decision differs by hash seed:\n  seed 0     {outs[0]!r}"
+        f"\n  seed 12345 {outs[1]!r}\nsomething on the signal->regime path "
+        f"depends on hash iteration order, so two machines can disagree about "
+        f"which regime is active and in what order the optimizer sees its "
+        f"objectives")
+
+    #: byte-equality of nothing is not evidence: the fixture must actually have
+    #: forced a contested resolution.
+    decided = _json.loads(outs[0])
+    assert decided["regime"], "no regime resolved; the fixture proves nothing"
+    assert len(decided["objectives"]) > 1
 
 
 def test_window_wraps_midnight():

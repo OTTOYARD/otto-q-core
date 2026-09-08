@@ -18,6 +18,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 
 from forward_proposer import (  # noqa: E402
+    CHEMISTRY_DAILY_SOC_CAP_PCT,
     DEFAULT_DET_BUDGET_S,
     DEFAULT_SERVICEABLE_STATES,
     FrameError,
@@ -446,6 +447,70 @@ def test_the_batch_keeps_the_most_urgent_and_the_choice_is_not_frame_order():
 def test_a_batch_bound_below_one_is_refused():
     with pytest.raises(ValueError, match="max_assets"):
         propose(FRAME, CLASSES, site=SITE, horizon_min=480, max_assets=0)
+
+
+def test_the_chemistry_cap_reaches_the_production_path(): 
+    """R-11 through the BRIDGE, which is where it was dead.
+
+    `_clamp_target` has always capped a target at the class's
+    `max_daily_soc_pct`. T13 proves that by calling it directly with a
+    hand-built dict — and the production class table has no such column, while
+    `frame_to_scenario` copied neither it nor `battery_chemistry`. So every live
+    frame reached `_clamp_target` with a class that could not carry a cap, fell
+    through to the default 100, and the rule did nothing. T13 stayed green the
+    whole time: a guard over a dead path (L-51).
+
+    This asserts the property end-to-end — a frame goes in, and the asset the
+    solver is handed carries the capped target.
+    """
+    classes = {"nmc_ride": {"battery_kwh": 90, "max_charge_kw": 100,
+                            "charge_kinds": ["dcfc"], "battery_chemistry": "NMC"}}
+    frame = _frame([_vehicle("v-nmc", platform="nmc_ride", soc=30, target_soc=95)],
+                   [_stall("s-0")])
+    sc, _ = frame_to_scenario(frame, classes, site=SITE, horizon_min=480)
+
+    cname = next(iter(sc["asset_classes"]))
+    assert sc["asset_classes"][cname]["max_daily_soc_pct"] == 80, (
+        "the bridge did not carry the chemistry cap into the scenario")
+    assert sc["assets"][0].target_soc == 80, (
+        f"asset asked for {sc['assets'][0].target_soc}% on an NMC pack; R-11 "
+        f"caps routine daily cycling at 80%")
+
+
+def test_an_explicit_cap_beats_the_chemistry_default():
+    """A pack that states its own cap is not overruled by the chemistry table."""
+    classes = {"odd": {"battery_kwh": 90, "max_charge_kw": 100,
+                       "charge_kinds": ["dcfc"], "battery_chemistry": "NMC",
+                       "max_daily_soc_pct": 70}}
+    sc, _ = frame_to_scenario(
+        _frame([_vehicle("v-1", platform="odd", soc=30, target_soc=95)],
+               [_stall("s-0")]), classes, site=SITE, horizon_min=480)
+    assert sc["assets"][0].target_soc == 70
+
+
+def test_an_unknown_chemistry_is_not_given_a_guessed_cap():
+    """LFP tolerates high SoC and is not in the table; a chemistry we have no
+    evidence for must get NO cap rather than an invented one. Silence is the
+    honest answer, and it keeps legacy behaviour byte-for-byte."""
+    assert "LFP" not in CHEMISTRY_DAILY_SOC_CAP_PCT
+    classes = {"lfp": {"battery_kwh": 90, "max_charge_kw": 100,
+                       "charge_kinds": ["dcfc"], "battery_chemistry": "LFP"}}
+    sc, _ = frame_to_scenario(
+        _frame([_vehicle("v-1", platform="lfp", soc=30, target_soc=95)],
+               [_stall("s-0")]), classes, site=SITE, horizon_min=480)
+    assert "max_daily_soc_pct" not in sc["asset_classes"][next(iter(sc["asset_classes"]))]
+    assert sc["assets"][0].target_soc == 95
+
+
+def test_a_class_with_no_chemistry_at_all_is_unchanged():
+    """Two of the nine live classes declare no chemistry. They must behave
+    exactly as they did before this fix existed."""
+    classes = {"plain": {"battery_kwh": 90, "max_charge_kw": 100,
+                         "charge_kinds": ["dcfc"]}}
+    sc, _ = frame_to_scenario(
+        _frame([_vehicle("v-1", platform="plain", soc=30, target_soc=95)],
+               [_stall("s-0")]), classes, site=SITE, horizon_min=480)
+    assert sc["assets"][0].target_soc == 95
 
 
 def test_rejection_stays_off_unless_asked():

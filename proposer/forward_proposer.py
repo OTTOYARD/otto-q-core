@@ -95,6 +95,35 @@ from regime import resolve_active                  # noqa: E402
 #: states -- the vehicle is done and staged out. This proposer proposes charge
 #: assignments; a caller that wants to schedule non-charge service on a holding
 #: vehicle passes its own predicate.
+#: R-11, THE CHEMISTRY DAILY-SoC CAP, AS A TRANSLATION AND NOT A DECISION.
+#:
+#: The kernel already enforces this rule: model.py::_clamp_target caps a target
+#: at the asset class's `max_daily_soc_pct` and defaults to 100 when the class
+#: declares none. What was missing is the bridge between the two vocabularies.
+#: The production class table (`ottoq_vehicle_classes`) has NO max_daily_soc_pct
+#: column -- it declares `battery_chemistry` (NMC, NCA, or null) -- and
+#: frame_to_scenario never copied either field. So _clamp_target read a class
+#: dict that could not contain a cap, fell through to 100, and the rule was a
+#: NO-OP ON EVERY LIVE FRAME while T13 passed by calling _clamp_target directly
+#: with a hand-built dict. A green guard over a dead path (finding L-51).
+#:
+#: The mapping is DATA WITH A CITATION, not a scheduling opinion, which is why
+#: it may live in the bridge: adapters translate, never decide. NMC degrades
+#: sharply above ~80% SoC (Wikner & Thiringer 2018, doi:10.3390/app8101825;
+#: Keil et al. 2016, doi:10.1149/2.0411609jes) -- the same sources R-11 and the
+#: kernel docstring already cite, and 80 is the value the canonical scenarios
+#: and T13 already use. NCA shares the high-SoC degradation mechanism and is
+#: capped with it. A chemistry not named here gets NO cap rather than a guessed
+#: one: an unknown chemistry is not evidence for a number.
+#:
+#: An explicit `max_daily_soc_pct` on the class always wins, so a pack can state
+#: a cap the chemistry table does not know about, and this stays advisory data.
+CHEMISTRY_DAILY_SOC_CAP_PCT = {
+    "NMC": 80,
+    "NCA": 80,
+}
+
+
 #: THE PROPOSER IS ALWAYS BOUNDED. propose() used to default det_budget_s and
 #: time_limit_s to None -- no budget of any kind -- and orchestrate() passed
 #: neither, so nothing in the shipped call graph ever bounded a solve. An
@@ -190,6 +219,12 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
                            v.get("inlet_max_kw") or cls["max_charge_kw"]))
         inlet = v.get("inlet_type", "CCS")
         cname = f"{platform}|{int(eff_kw)}|{inlet}"
+        #: The chemistry cap, resolved once per synthesized class. Explicit
+        #: beats derived; derived beats nothing; nothing means no cap, exactly
+        #: as before for any class that declares neither field.
+        cap = cls.get("max_daily_soc_pct")
+        if cap is None:
+            cap = CHEMISTRY_DAILY_SOC_CAP_PCT.get(cls.get("battery_chemistry"))
         classes.setdefault(cname, {
             "battery_kwh": float(cls["battery_kwh"]),
             "max_charge_kw": eff_kw,
@@ -197,6 +232,7 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
             "charge_kinds": list(ck),
             "energy_curve": cls.get("energy_curve",
                                     [{"above_soc_pct": 0, "accept_frac": 1.0}]),
+            **({"max_daily_soc_pct": int(cap)} if cap is not None else {}),
         })
         rb = int(ready_by_min.get(v["id"], default_ready_delta_min))
         explicit.append({

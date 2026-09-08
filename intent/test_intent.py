@@ -69,6 +69,38 @@ def test_intent_tamper_is_refused():
         load_intent(good)
 
 
+def test_the_objective_taxonomy_is_two_weighted_tiers_and_a_shield():
+    """"11 objectives across 3 tiers" is the natural thing to say about this
+    artifact and it is wrong. The 11 objectives occupy tiers 1 and 2 only —
+    4 and 7 — and tier 3 holds ZERO of them, by the artifact's own statement:
+    it is not weighted and does not live here, being the 52-rule deterministic
+    shield (power caps, double-booking exclusion, chemistry caps, state-machine
+    validity). That distinction is doctrinal, not cosmetic: a tier-3 constraint
+    is non-negotiable, and describing it as a weighted objective invites someone
+    to trade it away.
+
+    The honest sentence is "11 weighted objectives across tiers 1-2, with tier 3
+    held as non-negotiable constraints outside the artifact". This pins the
+    distribution so any doc, deck or handoff repeating the wrong one can be
+    checked against the file rather than against memory.
+    """
+    from collections import Counter
+    art = json.loads((HERE / "intent_v1.json").read_text())
+    objs = art["objectives"]
+    tiers = Counter(o["tier"] for o in objs.values())
+
+    assert len(objs) == 11
+    assert tiers[1] == 4 and tiers[2] == 7
+    assert tiers[3] == 0, (
+        "a weighted tier-3 objective appeared; tier 3 is the shield and is not "
+        "weighted -- either the artifact or the doctrine changed")
+    assert sum(tiers.values()) == len(objs)
+
+    #: and the artifact says so itself, which is why the claim is checkable
+    note = art["tier3_constraints"]["note"]
+    assert "NOT weighted" in note and "does NOT live in this artifact" in note
+
+
 def test_the_shipped_artifact_declares_the_signal_regimes_in_doctrinal_order():
     """Safety over cost over throughput IS declaration order — so guard the order.
 

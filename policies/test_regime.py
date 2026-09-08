@@ -264,3 +264,17 @@ def test_chain_supports_rejection_and_reads_the_true_peak():
         f"peak misread from the rejection-inflated objective: {opt['min_peak']}")
     assert [p["mode"] for p in passes] == ["min_tardy", "min_peak"]
     assert all("status" in p and "objective" in p for p in passes)
+
+
+def test_the_readiness_floor_cannot_be_demoted_out_of_first_place():
+    """min_tardy leads every lexicographic chain because readiness is a floor,
+    not a preference: it is the one objective the site cannot trade away. The
+    solver enforces that, and every call site in the repo happens to pass a
+    conforming list -- so deleting the guard left the whole suite green and the
+    structural claim rested on nobody making a mistake.
+    """
+    import pytest as _pytest
+    with _pytest.raises(ValueError, match="must begin with min_tardy"):
+        lexicographic_solve(load_scenario(SC), ("min_peak", "min_tardy"))
+    with _pytest.raises(ValueError, match="must begin with min_tardy"):
+        lexicographic_solve(load_scenario(SC), ())
