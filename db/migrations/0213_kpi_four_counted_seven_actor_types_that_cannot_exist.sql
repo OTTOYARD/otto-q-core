@@ -37,11 +37,20 @@
 -- that the database will reject on insert. A filter that reads as thorough at
 -- eight entries is seven-eighths unsatisfiable.
 --
--- WHAT THIS DOES NOT CHANGE: any number. The seven impossible terms contribute
--- zero either way, and no depot_tech / depot_supervisor / ottow_driver /
--- otto_response_agent / oem_admin_console / fleet_operator_admin event exists
--- yet. KPI-4 is BLIND, not wrong, and the committed 24h KPI baseline must not
--- move — metrics/kpi_gate.py is the test of that, not this comment.
+-- WHAT THIS CHANGES, CORRECTED 2026-09-08 10:10 BEFORE APPLYING. The draft said
+-- "this does not change any number" and listed the newly-counted types as
+-- having no events. It missed one. `ottow_dispatcher` has **6 events** —
+-- `recall_refused`, data_source production, 2026-09-08 07:03, three each in
+-- sim runs 1e696479 and aa6a27dd, which are the G7 work-side-refusal exercise
+-- from earlier the same day. Counting them is CORRECT: a recall refused by a
+-- human dispatcher is a human intervention, which is what KPI-4 measures. But
+-- it is a change, and A4 below now names it instead of the header denying it.
+--
+-- The seven impossible terms do contribute zero either way, and the other six
+-- newly-counted types have no events. The committed 24h KPI baseline cannot
+-- move at all: metrics/kpi_gate.py runs in CI over committed artefacts with no
+-- database, so nothing here can reach it. What moves is the LIVE view, for two
+-- test runs, by three touches each.
 --
 -- THE FIX IS THE PIN, NOT THE LIST. Rewriting the enumeration would leave the
 -- next author free to drift it again, which is how it got here. 0213 derives
@@ -122,17 +131,25 @@ RETURNS TABLE(classified int, human int, not_insertable text[], unclassified tex
 LANGUAGE plpgsql STABLE
 SET search_path TO 'public', 'extensions'
 AS $v$
-DECLARE v_allowed text[]; v_def text;
+DECLARE v_allowed text[]; v_def text; v_n int;
 BEGIN
+  --: an unordered LIMIT 1 over the catalog is the same defect this repo spent
+  --: 0216 and 0221 on. If more than one constraint mentions actor_type, the pin
+  --: would silently pin against whichever the heap returned; refuse instead.
+  SELECT count(*) INTO v_n FROM pg_constraint c
+   WHERE c.conrelid = 'public.ottoq_events'::regclass
+     AND pg_get_constraintdef(c.oid) ILIKE '%actor_type%';
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'ottoq_assert_kpi_touch_vocabulary: % constraints on ottoq_events mention '
+                    'actor_type, expected exactly 1 — the pin has no unambiguous thing to pin '
+                    'against and must not report success', v_n;
+  END IF;
   SELECT pg_get_constraintdef(c.oid) INTO v_def
     FROM pg_constraint c
    WHERE c.conrelid = 'public.ottoq_events'::regclass
      AND pg_get_constraintdef(c.oid) ILIKE '%actor_type%'
+   ORDER BY c.conname
    LIMIT 1;
-  IF v_def IS NULL THEN
-    RAISE EXCEPTION 'ottoq_assert_kpi_touch_vocabulary: no actor_type CHECK on ottoq_events; '
-                    'the pin has nothing to pin against and must not report success';
-  END IF;
 
   --: the permitted set, read out of the live constraint rather than restated
   SELECT array_agg(m[1]) INTO v_allowed
@@ -156,48 +173,66 @@ COMMENT ON FUNCTION public.ottoq_assert_kpi_touch_vocabulary() IS
   'when the constraint itself is missing, because a pin with nothing to pin against '
   'that reports success is the defect it exists to prevent.';
 
--- A3. THE VIEW READS THE TABLE ----------------------------------------------
-CREATE OR REPLACE VIEW public.ottoq_kpi_touch_events_per_turn
-  WITH (security_invoker = true) AS
-WITH touches AS (
-  SELECT e.sim_run_id, count(*) AS n
-    FROM public.ottoq_events e
-   WHERE e.actor_type IN (SELECT t.actor_type FROM public.ottoq_kpi_touch_actor_types t
-                           WHERE t.human_actor)
-   GROUP BY e.sim_run_id
-), overrides AS (
-  SELECT d.sim_run_id, count(*) AS n
-    FROM public.ottoq_decisions d
-   WHERE d.overridden OR d.override_id IS NOT NULL
-   GROUP BY d.sim_run_id
-), confirms AS (
-  SELECT NULL::uuid AS sim_run_id, count(*) AS n
-    FROM public.schedule_tasks t
-   WHERE t.confirmed_by_user_id IS NOT NULL OR t.tech_override_at IS NOT NULL
-), turns AS (
+-- A3. THE VIEW READS THE TABLE -- AND CHANGES NOTHING ELSE ------------------
+-- Deliberately a MINIMAL rewrite of the live definition. The first draft of
+-- this migration also (a) dropped three output columns, which CREATE OR REPLACE
+-- VIEW cannot do and would have aborted the migration, (b) widened `turns` from
+-- state='done' to done/released/interrupted, which contradicts
+-- ottoq_kpi_service_point_turns (KPI-2 counts state='done' and nothing else)
+-- and would have moved the denominator, (c) turned the zero-turn case from NULL
+-- into 0 via GREATEST(1, n), and (d) added security_invoker, which this view
+-- does not have. None of those is the vocabulary defect. A migration titled
+-- "the touch vocabulary is wrong" changes the touch vocabulary.
+--
+-- The ONLY difference from the live definition below: the hardcoded actor array
+-- becomes a read of ottoq_kpi_touch_actor_types.
+CREATE OR REPLACE VIEW public.ottoq_kpi_touch_events_per_turn AS
+WITH turns AS (
   SELECT b.sim_run_id,
-         count(*) FILTER (WHERE b.state IN ('done','released','interrupted')) AS n
+         count(*) FILTER (WHERE b.state = 'done'::text)  AS n,
+         count(*) FILTER (WHERE b.state <> 'done'::text) AS not_a_turn
     FROM public.ottoq_stall_bookings b
    GROUP BY b.sim_run_id
+), counted AS (
+  SELECT t.sim_run_id, t.n, t.not_a_turn,
+         CASE WHEN t.sim_run_id IS NOT NULL
+              THEN (SELECT count(*) FROM public.ottoq_events e
+                     WHERE e.sim_run_id = t.sim_run_id
+                       AND e.actor_type IN (SELECT k.actor_type
+                                              FROM public.ottoq_kpi_touch_actor_types k
+                                             WHERE k.human_actor))
+              ELSE (SELECT count(*) FROM public.ottoq_events e
+                     WHERE e.sim_run_id IS NULL
+                       AND e.actor_type IN (SELECT k.actor_type
+                                              FROM public.ottoq_kpi_touch_actor_types k
+                                             WHERE k.human_actor))
+         END AS n_op,
+         CASE WHEN t.sim_run_id IS NOT NULL
+              THEN (SELECT count(*) FROM public.ottoq_decisions d
+                     WHERE d.sim_run_id = t.sim_run_id
+                       AND (d.overridden OR d.override_id IS NOT NULL))
+              ELSE (SELECT count(*) FROM public.ottoq_decisions d
+                     WHERE d.sim_run_id IS NULL
+                       AND (d.overridden OR d.override_id IS NOT NULL))
+         END AS n_ov
+    FROM turns t
 )
-SELECT t.sim_run_id,
-       COALESCE(tc.n,0) + COALESCE(o.n,0)
-         + CASE WHEN t.sim_run_id IS NULL THEN COALESCE(c.n,0) ELSE 0 END AS touch_events,
-       t.n AS turns,
-       round((COALESCE(tc.n,0) + COALESCE(o.n,0))::numeric / GREATEST(1, t.n), 3)
-         AS touch_events_per_turn
-  FROM turns t
-  LEFT JOIN touches tc ON tc.sim_run_id IS NOT DISTINCT FROM t.sim_run_id
-  LEFT JOIN overrides o ON o.sim_run_id IS NOT DISTINCT FROM t.sim_run_id
-  LEFT JOIN confirms c ON true;
+SELECT sim_run_id,
+       n_op + n_ov AS touch_events,
+       n AS turns,
+       CASE WHEN n > 0 THEN round((n_op + n_ov)::numeric / n::numeric, 3) END AS touch_events_per_turn,
+       not_a_turn AS bookings_not_a_turn,
+       n_op AS touch_events_operator,
+       n_ov AS touch_events_override
+  FROM counted;
 
 COMMENT ON VIEW public.ottoq_kpi_touch_events_per_turn IS
-  'KPI 4 (CLAUDE.md 2.9): human interventions per asset-turn. Touch = signed events '
-  'from actor types classified human in ottoq_kpi_touch_actor_types + overridden '
-  'decisions (+ production task confirmations for the NULL-run production row). '
-  'Turns = KPI-2 completed bookings. 0213: the actor list is a table pinned against '
-  'the ottoq_events CHECK, because the hardcoded list it replaced named seven types '
-  'the table forbids and omitted every permitted human type but one.';
+  'KPI 4 (CLAUDE.md 2.9): human interventions per asset-turn. Touch = signed events from actor '
+  'types classified human in ottoq_kpi_touch_actor_types, plus overridden decisions. Turns = '
+  'bookings in state done, the same definition ottoq_kpi_service_point_turns uses for KPI-2. '
+  '0213 (G17): the actor list is a table pinned against the live ottoq_events CHECK, because the '
+  'hardcoded list it replaced named seven types the table forbids and omitted every permitted '
+  'human type but one. Nothing else about this view changed.';
 
 -- A4. THE PIN MUST BE CLEAN AT APPLY TIME ------------------------------------
 DO $chk$
@@ -215,15 +250,77 @@ BEGIN
                r.classified, r.human;
 END $chk$;
 
+-- A5. THE ONLY NUMBERS THAT MOVE ARE THE ONES WE CAN NAME --------------------
+-- The view is already replaced by the time this runs, so this recomputes the
+-- OLD operator-touch count and diffs it against the new view. Any run whose
+-- count changes must be explained by an event carrying an actor type the old
+-- hardcoded list did not name; a run that moves for any other reason means the
+-- rewrite was not minimal, and the migration aborts.
+--
+-- Done as ONE grouped pass over ottoq_events rather than a correlated count per
+-- run. A per-run correlated subquery keyed with IS NOT DISTINCT FROM is not
+-- indexable, which is precisely the defect db/checks/0127 convicted; an
+-- assertion is not exempt from the rule it is written alongside.
+DO $a5$
+DECLARE r record; v_rows int := 0; v_bad text := ''; v_named text := '';
+BEGIN
+  FOR r IN
+    WITH ev AS (
+      SELECT e.sim_run_id,
+             count(*) FILTER (WHERE e.actor_type = ANY (ARRAY[
+               'command_center_operator','depot_staff','technician','charging_tech',
+               'cleaning_tech','maintenance_tech','yard_supervisor','ops_manager'])) AS n_old,
+             string_agg(DISTINCT e.actor_type, ',') FILTER (
+               WHERE e.actor_type IN (SELECT k.actor_type
+                                        FROM public.ottoq_kpi_touch_actor_types k
+                                       WHERE k.human_actor)
+                 AND e.actor_type <> 'command_center_operator') AS newly_counted
+        FROM public.ottoq_events e
+       GROUP BY e.sim_run_id
+    )
+    SELECT v.sim_run_id, v.touch_events_operator AS n_new,
+           COALESCE(ev.n_old, 0) AS n_old, ev.newly_counted
+      FROM public.ottoq_kpi_touch_events_per_turn v
+      LEFT JOIN ev ON ev.sim_run_id IS NOT DISTINCT FROM v.sim_run_id
+     WHERE v.touch_events_operator IS DISTINCT FROM COALESCE(ev.n_old, 0)
+  LOOP
+    v_rows := v_rows + 1;
+    IF r.newly_counted IS NULL THEN
+      v_bad := v_bad || format(' %s(%s->%s, unexplained);',
+                               left(r.sim_run_id::text,8), r.n_old, r.n_new);
+    ELSE
+      v_named := v_named || format(' %s(%s->%s via %s);',
+                                   left(r.sim_run_id::text,8), r.n_old, r.n_new, r.newly_counted);
+    END IF;
+  END LOOP;
+  IF v_bad <> '' THEN
+    RAISE EXCEPTION '0213 A5: run(s) changed with no newly-counted actor type to explain it:%  '
+                    '-- the rewrite was not minimal', v_bad;
+  END IF;
+  IF v_rows = 0 THEN
+    RAISE NOTICE '0213 A5: no run changed at all';
+  ELSE
+    RAISE NOTICE '0213 A5: % run(s) moved, every one explained by a newly-counted human actor:%',
+                 v_rows, v_named;
+  END IF;
+END $a5$;
+
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
 VALUES ('0213_kpi_four_counted_seven_actor_types_that_cannot_exist', FALSE,
         'G17. KPI-4 counted eight human actor types, seven of which the ottoq_events actor_type '
         'CHECK forbids (charging_tech, cleaning_tech, depot_staff, maintenance_tech, ops_manager, '
         'technician, yard_supervisor), while omitting every permitted human type except '
-        'command_center_operator — depot_tech among them. No shipped number moves: the impossible '
-        'terms contributed zero and no event of the newly counted types exists yet. The list is now '
-        'a table pinned against the live constraint by ottoq_assert_kpi_touch_vocabulary(), which '
-        'raises rather than passing when the constraint is absent.',
+        'command_center_operator — depot_tech among them. The list is now a table pinned against the '
+        'live constraint by ottoq_assert_kpi_touch_vocabulary(), which raises rather than passing '
+        'when the constraint is absent or ambiguous. The committed KPI baseline cannot move '
+        '(metrics/kpi_gate.py runs over committed artefacts with no database), and in the live '
+        'view exactly one newly-counted type has any events: ottow_dispatcher, 6 recall_refused '
+        'rows across two 2026-09-08 test runs. A5 asserts that every run whose number moves is '
+        'explained by a newly-counted actor type and aborts on any that is not. The first draft '
+        'of this migration also dropped three view columns (which CREATE OR REPLACE VIEW cannot '
+        'do), widened the turn denominator away from KPI-2''s state=done, and changed the '
+        'zero-turn result from NULL to 0; none of that was the vocabulary defect and all of it '
+        'was removed.',
         now());
 
 COMMIT;
