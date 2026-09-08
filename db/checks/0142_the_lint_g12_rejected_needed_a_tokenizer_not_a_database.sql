@@ -122,3 +122,54 @@
 --   * Whether any *other* file-only rule is worth shipping now that code and
 --     literal can be told apart. None is proposed here.
 -- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- Q4. THE SWEEP THE SEPARATOR UNBLOCKS, RUN ONCE — AND WHY IT IS NOT SHIPPED.
+--
+--     `db/baseline/functions_{public,ottoq,twin}.sql` mirrors the whole engine,
+--     28,628 lines. Run the rejected rule over it, code-only:
+--
+--       raw `LIMIT 1` matches ................................ 218
+--       code-only matches .................................... 218
+--       code-only with no `ORDER BY` before the nearest SELECT .. **58**
+--       distinct functions ................................... **44**
+--
+--     Note the first two numbers are equal, which is worth saying: across the
+--     function mirror there are no `LIMIT 1` strings hiding in prose, because
+--     the mirror is generated bodies rather than hand-written migrations with
+--     rationale headers. The separator earns its keep on `db/migrations/**`
+--     (0220: 14 raw, 3 code), not here.
+--
+--     **THESE 58 ARE NOT 58 DEFECTS, AND THE LIST IS NOT PUBLISHED AS ONE.**
+--     Most unordered `LIMIT 1` is correct: `SELECT x FROM t WHERE pk = $1
+--     LIMIT 1` cannot return two rows, and `public.get_fleet_operator_id`,
+--     `get_staff_depot_id`, `ottoq_resolve_signing_secret` are that shape.
+--     The rule as written cannot distinguish "unordered over a unique key"
+--     from "unordered over a contended set", and only the second is the G20
+--     defect. Shipping it as a gate would produce ~58 warnings of which most
+--     are wrong — the exact noise G12 predicted, arriving from a different
+--     direction than G12 expected.
+--
+--     TWO FURTHER REASONS NOT TO ACT ON THIS LIST AS IT STANDS:
+--
+--       1. **The mirror is dated 2026-08-04** (`db/baseline/README.md`) — over
+--          a month stale, and 0123 through 0228 have landed since, including
+--          0216 and 0220 which fixed exactly this class. Any site here must be
+--          re-derived against the live catalog before anyone touches it.
+--       2. The "nearest preceding SELECT" scope is a reviewer's heuristic, not
+--          a parser's. It is right for the common shapes and will mis-scope a
+--          CTE or a lateral join. Good enough to triage; not good enough to
+--          assert.
+--
+--     So the deliverable of this file is the **capability**, plus the honest
+--     statement that the rule on top of it still needs its selectivity half:
+--     something like "unordered LIMIT 1 whose WHERE clause does not constrain
+--     a unique key". That is a real piece of work and it is not started.
+--
+--     The 44 functions are listed in this session's transcript rather than
+--     pasted here, deliberately: a list that will be stale within a week, that
+--     is mostly false positives, and that nobody should act on without
+--     re-deriving is not something to carve into the repo where a later reader
+--     will mistake it for a backlog.
+-- ---------------------------------------------------------------------------
+

@@ -138,7 +138,7 @@ exclusion that would have been baked into every round from here on.
 
 ### `r28_g`'s baseline is captured, and this time it is the whole table
 
-`db/baselines/r28_g_fn_baseline.md` — **all 304 rows**, captured 16:23:39 UTC.
+`db/evidence/r28_g_fn_baseline.md` — **all 304 rows**, captured 16:23:39 UTC.
 Valid from capture until g fires because `track_functions` is `'none'` globally
 and only g sets it, the same property verified row-by-row for r27_g across 91
 minutes and a container restart.
