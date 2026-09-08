@@ -26,5 +26,9 @@ jobs:
       # The conformance suite and the site-profile/tariff tests were never gated --
       # verify.yml ran three scripts and no pytest, so C11's falsification instrument
       # and everything under sites/ could break without CI noticing.
-      - name: Pytest suite (conformance, site profiles, tariffs, recall, adapters)
+      # tests/test_migration_hygiene.py rides in here. It needs NO database, which
+      # is the point: the drift check was blind for 193 migrations because 93 files
+      # had no version header and 98 more carried invented ones, and nothing in CI
+      # ever looked at db/migrations at all. Both are properties of committed files.
+      - name: Pytest suite (conformance, site profiles, tariffs, recall, adapters, migration hygiene)
         run: python3 -m pytest -q
