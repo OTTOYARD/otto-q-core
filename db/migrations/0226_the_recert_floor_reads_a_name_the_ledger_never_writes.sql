@@ -11,7 +11,11 @@
 -- short-arm/floor logic, never by the decide path. No canon can move. What it
 -- changes is which pairs COUNT, and that is stated up front rather than
 -- discovered: the floor drops from 2026-09-08 13:41:09 to 2026-09-07
--- 21:36:53, so rounds 26 and 27 come back into scope.
+-- 21:36:53.363037, so rounds 26 and 27 come back into scope. (The sub-second
+-- is not decoration: the floor is GREATEST of two branches and the second —
+-- max(classified_at) off the lineage table — wins by 363 ms. Quoting the flat
+-- 21:36:53 is a rounding of branch 1 and was wrong in the first draft of the
+-- runbook.)
 --
 -- THE DEFECT (db/checks/0135, task G28). The floor joins
 --
@@ -25,6 +29,8 @@
 -- carries the unprefixed name the apply call was given, so 33 of 92 lineage
 -- rows join nothing and fall through to the default. Twenty-one of those 33
 -- declare forces_recert FALSE. Every one of them forced a recertification.
+-- (33 is 0135's figure at 14:15; re-measured at 15:57 the raw-name join leaves
+-- 32, because a classification has been added since. A1 pins 32, not 33.)
 --
 -- The measured cost, from 0135 Q5: not one certification column is green, six
 -- of seven are stale, and `busy_day/424242/24t` carries twenty-six consecutive
@@ -47,15 +53,23 @@
 -- lineage row that joins nothing looks exactly like one that joins: present,
 -- correct, and never asked whether it was consulted. So the migration also
 -- installs `public.ottoq_cert_lineage_orphans()`, which lists lineage rows
--- matching no migration under the normalised key. A1 asserts it is empty at
--- apply time; from then on a mis-named row is a question anyone can ask in one
--- statement instead of a silence nobody hears.
+-- matching no migration under the normalised key. From then on a mis-named row
+-- is a question anyone can ask in one statement instead of a silence nobody
+-- hears.
+--
+-- **It is NOT expected to be empty, and A1 no longer asserts that it is.** The
+-- first draft did, and dry-running it found 22 rows — 0192 through 0215, the
+-- block applied through the SQL endpoint, which writes no schema_migrations row
+-- for anything. This migration would have aborted on its own assertion as the
+-- first file in the window. See the A1 block and db/checks/0135's addendum.
 --
 -- APPLY BEFORE 0225, DELIBERATELY. Lowering the floor puts many more pairs in
--- scope, which makes 0225's P3 precondition ("no column already disagrees with
--- itself on a newly compared atom") a far harder test. If P3 then refuses,
--- that is the check doing its job on the real evidence set rather than on a
--- floor that admitted a single pair.
+-- scope, which makes 0225's P3 precondition — "does any column green under the
+-- nine-atom comparison stop being green under the fourteen-atom one" — a far
+-- harder test. If P3 then refuses, that is the check doing its job on the real
+-- evidence set rather than on a floor that admitted a single pair per column.
+-- (Dry-run at this floor, 0140 Q5: it does not refuse, and exactly one column's
+-- streak shortens without losing green.)
 -- ---------------------------------------------------------------------------
 
 DO $mig$
