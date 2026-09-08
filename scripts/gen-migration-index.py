@@ -2,7 +2,7 @@
 """
 gen-migration-index.py — refresh the INDEX block at the end of MIGRATION_LOG.md.
 
-WHY THIS EXISTS. MIGRATION_LOG.md's narrative rows stop at 0133 (2026-08-31).
+WHY THIS EXISTS. MIGRATION_LOG.md's narrative rows stopped at 0133 (2026-08-31).
 Eighty-two migrations after it went unlogged, including the whole G2..G17
 series, so there was no single place that said what is in the engine. Writing
 eighty-two narrative rows after the fact would mean inventing prose about work
@@ -11,7 +11,10 @@ it GENERATES an index from the files themselves — version, title line, and
 whether the file records having been applied — and says plainly that it is an
 index, not a log.
 
-The narrative rows above the marker are hand-written and are never touched.
+The narrative rows above the marker are hand-written and are never touched. Which
+of them cover migrations >= INDEX_FROM is DERIVED from the file (see
+narrative_rows_above) and stated in the generated preamble, so the block can
+never claim the narrative stops somewhere it does not.
 
 Usage:  python3 scripts/gen-migration-index.py
 Safe:   rewrites only the block between the markers in MIGRATION_LOG.md.
@@ -53,6 +56,25 @@ def title_of(text: str) -> str:
             return s.lstrip("- ").rstrip(".")
     return "(no title line in the file)"
 
+def narrative_rows_above(log_text: str) -> list:
+    """Migration numbers >= INDEX_FROM that ALREADY have a hand-written row.
+
+    The preamble used to say, in a hardcoded string, that the narrative rows
+    "stop at 0133". They did when this script was written; they do not now —
+    0216, 0217 and 0218 were logged by hand on 2026-09-08, and every later
+    hand-written row makes the sentence more wrong. A generated block that
+    states a falsehood about the file it is generated into is exactly the
+    failure this repo keeps finding elsewhere, so the sentence is derived.
+    """
+    head = log_text.split(BEGIN)[0]
+    nums = set()
+    for m in re.finditer(r"db/migrations/(\d{4})(\w?)_", head):
+        n = m.group(1) + m.group(2)
+        if n >= INDEX_FROM:
+            nums.add(n)
+    return sorted(nums)
+
+
 def main() -> int:
     rows, missing = [], []
     for f in sorted(MIG.glob("*.sql")):
@@ -90,11 +112,19 @@ def main() -> int:
         print("Run scripts/gen-drift-sql.sh — it is the canonical complaint.", file=sys.stderr)
         return 1
 
+    logged = narrative_rows_above(LOG.read_text())
+    if logged:
+        stops = ("The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) "
+                 "and then\nresume for " + ", ".join(logged) + " — which are indexed below as well as "
+                 "logged above; the log row is\nthe one that says what was VERIFIED.")
+    else:
+        stops = "The rows above this marker are hand-written narrative and stop at 0133 (2026-08-31)."
+
     out = [BEGIN, "",
            f"## Index, {INDEX_FROM}–{rows[-1][0]} — GENERATED, not a log",
            "",
-           "The rows above this marker are hand-written narrative and stop at 0133 (2026-08-31).",
-           f"Everything from {INDEX_FROM} on went unlogged at the time. Rather than invent prose after the",
+           stops,
+           f"Everything else from {INDEX_FROM} on went unlogged at the time. Rather than invent prose after the",
            "fact about work whose reasoning already lives in the migration files, this block is",
            "generated from those files by `scripts/gen-migration-index.py`. It answers *what is in the",
            "engine and where to read about it*; it does not pretend to answer *what was verified*, which",
