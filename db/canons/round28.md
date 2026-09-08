@@ -202,7 +202,7 @@ them reset a streak.
 | b | `busy_day` / 171717 / 12 | 16:49:00 | **361** | 376 | −15 | 3 → **4** | pass, no atom moved |
 | c | `normal_day` / 171717 / 12 | 17:03:00 | **342** | 358 | −16 | 3 → **4** | pass, no atom moved |
 | d | `busy_day` / 424242 / 12 | 17:17:00 | **218** | 364 | **−146** | 3 → **4** | pass, no atom moved |
-| e | `busy_day` / 171717 / **24** | 17:31 | | 560 | | | |
+| e | `busy_day` / 171717 / **24** | 17:31:00 | **783** | 560 | **+223** | 4 → **5** | pass, no atom moved |
 | f | `busy_day` / 424242 / **24** | 18:01 | | 551 | | | |
 | g | `busy_day` / 171717 / 12, instrumented | 18:25 | | — | | | not comparable |
 
@@ -385,6 +385,63 @@ A column that ran 40% fast is followed by one running at least 30% slow. Whateve
 this is, "0227 made pairs faster" does not describe it, and the mean of the four
 12-tick columns describes it even less. This is why d was quarantined rather
 than averaged.
+
+### Column e finished at 783 s, and the variance is now the finding
+
+e completed at ~17:44 (cron row updated to **783 s**; `pg_stat_activity` clean at
+17:50 with zero pairs in flight). Streak **4 → 5**, green, `canon_fp 92b02f8b`
+unchanged — so prediction 1 holds on all five columns so far.
+
+| col | ticks | r28 | r27 | Δ |
+|---|---|---|---|---|
+| a | 12 | 356 | 358 | −2 |
+| b | 12 | 361 | 376 | −15 |
+| c | 12 | 342 | 358 | −16 |
+| d | 12 | **218** | 364 | **−146 (−40%)** |
+| e | 24 | **783** | 560 | **+223 (+40%)** |
+
+**Five pairs produced byte-identical hashes to their canons and their wall-clock
+times swung ±40%.** The logical work is provably identical — that is what
+fourteen matching atoms means — so every second of this spread is something
+outside the computation. Round 28's real result is not prediction 2; it is that
+**this instrument has a run-to-run spread far larger than the effect any of
+these migrations was predicted to have**, which retroactively weakens every
+duration claim in rounds 26 and 27 that rested on differences of 10–20 s.
+
+### PRE-REGISTERED, before f runs at 18:01
+
+f is `busy_day/424242/24t`, round 27's **551 s** — the other 24-tick column, and
+the discriminator between two very different stories:
+
+| f lands | reading |
+|---|---|
+| **≈ 730–830 s** | 24-tick pairs are **uniformly** slower in round 28. That points at **0228**, the only applied change in the engine's path, whose cost is one `depots` primary-key lookup **per emitted event** and therefore scales with event count — twice as many at 24 ticks. round28.md predicted "none, or a shade slower" for 0228; +40% would falsify that prediction, and it would be a real finding rather than noise. |
+| **≈ 530–570 s** | e is a one-off outlier exactly like d, in the opposite direction. Then the finding is **unexplained bimodal variance in the harness**, not any migration, and the 12-tick mean question becomes moot because the instrument cannot resolve 16 s. |
+| anywhere else | neither story; record and do not reach. |
+
+**The 0228 story has a problem that must be stated now rather than after the
+number:** if 0228's per-event lookup cost +223 s at 24 ticks, it should cost
+roughly **+110 s at 12 ticks** — and the 12-tick columns got *faster*, by 2, 15
+and 16 s. So the clean version of the 0228 hypothesis is already contradicted by
+a, b and c. It survives only in some form where the cost is superlinear in event
+count. That is written down **before** f so the hypothesis cannot be quietly
+reshaped to fit whatever arrives.
+
+### A measurement error I made, recorded
+
+The 17:50 check asked `pg_stat_activity` for `query LIKE '%ottoq_determinism_pair%'`
+and got **1 row with `elapsed_s` 0** — which was *the query itself*, matching its
+own text, because that check dropped the `pid <> pg_backend_pid()` filter the
+17:42 check had. Had I read it as written, e would have been recorded as still
+running. Re-run with the filter it returns **0**. The rule that saved it is the
+same one that caught the cron row: a number that disagrees with another
+instrument gets checked before it gets used.
+
+### What this does NOT threaten
+
+`r28_g`'s value at 18:25 is **call counts**, not wall-clock, and counts do not
+vary with how long a pair takes. G21b's caller attribution and G27's 12-tick
+load-meter count are unaffected by anything on this page.
 
 ## `r28_g`'s baseline re-verified 17:10 UTC — not one counter moved
 
