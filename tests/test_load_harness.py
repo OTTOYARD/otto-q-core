@@ -14,6 +14,17 @@ The database tests skip rather than fail when the cluster cannot be built
 (no initdb, no pgbench, or running as root, which initdb refuses). A skip is
 honest; a green tick from a test that silently did nothing is not, so the
 skip reasons below all name what was missing.
+
+AND READ THIS BEFORE TRUSTING A LOCAL GREEN. The agent container runs as
+root, so every cluster test here SKIPS locally and RUNS in CI. That is
+exactly how a broken assertion reached eleven consecutive red CI runs: the
+suite was green locally, on a run that had skipped the newly added tests.
+When you touch this file, run it as a non-root user, e.g.
+
+    su postgres -s /bin/bash -c "cd $(pwd) && HOME=/var/lib/postgresql \
+        TMPDIR=/var/lib/postgresql python3 -m pytest tests/test_load_harness.py -q"
+
+A local green with five skips is not the same evidence as CI's green.
 """
 from __future__ import annotations
 
@@ -227,24 +238,44 @@ def test_pgbench_reports_two_latencies_and_the_harness_keeps_both():
                    "tps": 362089.648307}
 
 
-def test_the_gap_between_the_two_latencies_is_flagged_only_when_it_matters(
-        local_cluster, tmp_path):
-    """At the floor the gap is the whole number and must be flagged. For a
-    20 ms workload pgbench's ~0.01 ms of overhead is noise and flagging it
-    would be alarm fatigue, so it must NOT be flagged."""
-    floor = H.run_pgbench(local_cluster, T.FLOOR, {}, clients=4, duration=3,
-                          rate=None, workdir=tmp_path / "gapf")
-    assert floor["two_latencies_note"], (
-        "the floor's two latencies differ by orders of magnitude and the "
-        "result said nothing about it")
+def test_the_gap_flag_is_relative_and_is_tested_on_numbers_not_on_a_machine():
+    """The version of this test that shipped first ran a REAL floor and
+    asserted the flag came on. It passed here and failed in CI, because
+    whether `SELECT 1` shows a 29x gap between pgbench's two latencies or a
+    1.4x one is a fact about the CPU. The assertion was about the runner, not
+    about the harness, and it took eleven red CI runs to say so.
 
-    known = T.Target(name="calibration_sleep", layer="db", safety="read_only",
-                     what_it_represents="known sleep",
-                     sql=f"SELECT pg_sleep({SLEEP_MS / 1000.0});\n")
-    slow = H.run_pgbench(local_cluster, known, {}, clients=4, duration=3,
-                         rate=None, workdir=tmp_path / "gaps")
-    assert slow["two_latencies_note"] is None, (
-        f"flagged a gap that does not matter: {slow['two_latencies_note']}")
+    The decision is a pure function of two numbers, so it is tested as one.
+    """
+    # The floor case measured on this container: logged mean 0.0004 ms against
+    # a throughput-derived 0.011 ms. The overhead IS the number; flag it.
+    assert H.two_latency_gap_note(0.0004, 0.011)
+
+    # The calibration case: a 20 ms workload where pgbench's ~0.04 ms of
+    # overhead is noise. Flagging it would be alarm fatigue.
+    assert H.two_latency_gap_note(20.36, 20.40) is None
+
+    # A slower runner where the floor's gap is small in relative terms — the
+    # exact case that broke CI. Correctly silent.
+    assert H.two_latency_gap_note(0.008, 0.011) is None
+
+    # Boundaries and missing inputs, all of which reach this function.
+    assert H.two_latency_gap_note(0.011, 0.011) is None      # no gap at all
+    assert H.two_latency_gap_note(None, 0.011) is None       # no samples
+    assert H.two_latency_gap_note(0.0004, None) is None      # no summary line
+    assert H.two_latency_gap_note(0.0, 0.0) is None          # nothing measured
+
+
+def test_the_gap_field_is_always_present_and_correctly_typed(local_cluster,
+                                                             tmp_path):
+    """What a live run can honestly assert: the field exists and is a string
+    or None. NOT which of the two it is — that is the machine's business, and
+    asserting it is what turned CI red."""
+    r = H.run_pgbench(local_cluster, T.FLOOR, {}, clients=2, duration=2,
+                      rate=None, workdir=tmp_path / "gapf")
+    assert "two_latencies_note" in r
+    assert r["two_latencies_note"] is None or isinstance(
+        r["two_latencies_note"], str)
 
 
 def test_a_second_run_into_the_same_directory_is_refused(local_cluster, tmp_path):

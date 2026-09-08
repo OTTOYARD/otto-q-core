@@ -130,6 +130,34 @@ def percentiles(xs: list[float]) -> dict:
     return {k: (round(v, 3) if isinstance(v, float) else v) for k, v in out.items()}
 
 
+def two_latency_gap_note(logged_mean_ms, derived_ms):
+    """Is pgbench's own overhead a large share of what is being reported?
+
+    Pure, and separated from `run_pgbench` on purpose. The first version of
+    this decision was only exercised by running a real floor and asserting the
+    flag came on. That passed on one machine and failed on another, because
+    whether a `SELECT 1` floor shows a 29x gap or a 1.4x gap is a fact about
+    the CPU, not about the harness. A test that needs a particular machine to
+    pass is testing the machine.
+
+    RELATIVE, not absolute: the question is what SHARE of the reported number
+    is pgbench's own per-transaction overhead. An absolute threshold of
+    0.05 ms was the first attempt and stayed silent on exactly the case the
+    flag exists for, where the whole number is 0.011 ms.
+    """
+    if logged_mean_ms is None or derived_ms is None or derived_ms <= 0:
+        return None
+    gap = derived_ms - logged_mean_ms
+    if gap <= max(0.5 * derived_ms, 0.001):
+        return None
+    return (
+        f"pgbench's throughput-derived latency ({derived_ms} ms) exceeds the "
+        f"mean of its own per-transaction log ({logged_mean_ms} ms) by "
+        f"{round(gap, 4)} ms. That difference is pgbench's own per-transaction "
+        f"overhead, not the server. It matters only when it is large relative "
+        f"to the measurement, which is the case here.")
+
+
 def parse_pgbench_summary(stdout: str) -> dict:
     """pgbench's own numbers, from its own mouth.
 
@@ -235,23 +263,8 @@ def run_pgbench(url: str, target: T.Target, bindings: dict, clients: int,
     # large relative to the measurement -- which is exactly the case at the
     # floor and never the case for a millisecond-scale engine call -- the
     # result says so.
-    gap_note = None
-    if measured.get("n") and summary.get("latency_avg_ms") is not None:
-        logged = measured["mean_ms"]
-        derived = summary["latency_avg_ms"]
-        # RELATIVE, not absolute: the question is whether pgbench's own
-        # overhead is a large SHARE of what is being reported, and at the
-        # floor that share is everything while the absolute gap is 0.01 ms.
-        # An absolute threshold of 0.05 ms was the first attempt and it
-        # stayed silent on exactly the case the flag exists for.
-        if derived > 0 and (derived - logged) > max(0.5 * derived, 0.001):
-            gap_note = (
-                f"pgbench's throughput-derived latency ({derived} ms) exceeds "
-                f"the mean of its own per-transaction log ({logged} ms) by "
-                f"{round(derived - logged, 4)} ms. That difference is "
-                f"pgbench's own per-transaction overhead, not the server. It "
-                f"matters only when it is large relative to the measurement, "
-                f"which is the case here.")
+    gap_note = two_latency_gap_note(
+        measured.get("mean_ms"), summary.get("latency_avg_ms"))
 
     return {
         "target": target.name,
