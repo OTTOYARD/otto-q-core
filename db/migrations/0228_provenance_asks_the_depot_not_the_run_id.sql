@@ -6,11 +6,21 @@
 --        ask the depot, which is what 0073 already decided for the SDR emitter
 --        and never propagated here.
 --
--- forces_recert: FALSE, provable rather than asserted. P1 asserts against the
--- live `ottoq_determinism_pair` that `h_evt` hashes event_type, entity and
--- sim clock within one run scope and never reads `data_source` or `depot_id` —
--- the same assertion 0224 made and round 27 column a then confirmed by not
--- moving. No other verdict atom reads the event table's provenance columns.
+-- forces_recert: FALSE, provable rather than asserted — and the proof is
+-- narrower than 0224's, deliberately. P1 isolates the `h_evt` EXPRESSION out of
+-- the live `ottoq_determinism_pair` and asserts that it names neither
+-- `data_source` nor `depot_id`. Read from the catalog while drafting, h_evt
+-- hashes exactly three things — event_type, entity_id (blanked for
+-- ocpp_session / service_detail_record / sim_run) and sim_clock_at — scoped by
+-- sim_run_id. Neither column this migration writes is among them.
+--
+-- Narrower than 0224's because a whole-function grep for `depot_id` returns
+-- TRUE on this function for reasons that have nothing to do with h_evt: it
+-- carries `p_depot` and the 0175 scenario guard. An assertion that fails for
+-- the wrong reason is no better than one that passes for the wrong reason, and
+-- the first draft of P1 did both — it looked for a function called
+-- `ottoq_hash_events`, which does not exist. Found by dry-running P1 read-only
+-- before applying; recorded here rather than quietly corrected.
 --
 -- THE DEFECT (db/checks/0131, G16). Both state-change triggers write
 --
@@ -87,6 +97,7 @@ DECLARE
   v_pin_veh  constant text := '9ccac3646177a01a141f9c9cc3f39ba7';
   v_pin_stl  constant text := '84d622c64695d639091df84f099c96cc';
   v_pair     text;
+  v_evt      text;
   v_n        int;
   v_old      constant text := $a$CASE WHEN v_run IS NULL THEN 'production' ELSE 'twin' END$a$;
   v_new      constant text := $a$v_data_source$a$;
@@ -128,23 +139,60 @@ BEGIN
   END IF;
 
   ------------------------------------------------------------------ P1 ------
-  -- forces_recert FALSE, proven against the live verdict rather than claimed:
-  -- the event atom must not read either column this migration writes.
+  -- forces_recert FALSE, proven on the h_evt EXPRESSION rather than on the
+  -- whole function.
+  --
+  -- The first draft of this block looked for a function called
+  -- `ottoq_hash_events`, fell back to grepping the whole body of
+  -- ottoq_determinism_pair for `data_source`, and this file's header then
+  -- claimed it asserted `depot_id` too. Three things wrong with that, all
+  -- found by dry-running it read-only before applying:
+  --
+  --   * there is no ottoq_hash_events -- h_evt is computed inline;
+  --   * the header's depot_id claim was simply untrue, P1 never checked it;
+  --   * and a whole-body grep for `depot_id` returns TRUE anyway, because
+  --     ottoq_determinism_pair carries `p_depot` and the 0175 scenario guard.
+  --     It would have failed for a reason that has nothing to do with h_evt.
+  --
+  -- So the assertion is narrowed to the fragment that actually computes the
+  -- atom. Read from the live catalog, 2026-09-08 14:42 UTC, h_evt hashes
+  -- exactly three things -- event_type, entity_id (blanked for ocpp_session /
+  -- service_detail_record / sim_run) and sim_clock_at -- scoped by sim_run_id.
+  -- Neither column this migration writes appears in it.
   SELECT pg_get_functiondef(p.oid) INTO v_pair FROM pg_proc p
-    JOIN pg_namespace n ON n.oid=p.pronamespace
-   WHERE n.nspname='public' AND p.proname='ottoq_hash_events';
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'ottoq_determinism_pair';
   IF v_pair IS NULL THEN
-    SELECT pg_get_functiondef(p.oid) INTO v_pair FROM pg_proc p
-      JOIN pg_namespace n ON n.oid=p.pronamespace
-     WHERE n.nspname='public' AND p.proname='ottoq_determinism_pair';
+    RAISE EXCEPTION '0228 P1: ottoq_determinism_pair not found; forces_recert '
+                    'FALSE must be proven against the live verdict, not assumed';
   END IF;
-  IF v_pair IS NULL THEN
-    RAISE EXCEPTION '0228 P1: cannot find the function that computes h_evt; '
-                    'forces_recert FALSE must be proven, not assumed';
+
+  v_evt := substring(v_pair from position($e$'h_evt',$e$ in v_pair)
+                     for  position($e$'h_bkg',$e$ in v_pair)
+                        - position($e$'h_evt',$e$ in v_pair));
+  IF v_evt IS NULL OR length(v_evt) < 100 THEN
+    RAISE EXCEPTION '0228 P1: could not isolate the h_evt expression (got % '
+                    'chars). Do not fall back to grepping the whole function: '
+                    'it carries p_depot and would answer about the wrong thing.',
+                    COALESCE(length(v_evt), 0);
   END IF;
-  IF v_pair ~* '\mdata_source\M' THEN
-    RAISE EXCEPTION '0228 P1: the event hash reads data_source, so this '
-                    'migration DOES move a canon and forces_recert is wrong';
+
+  IF v_evt ~* '\mdata_source\M' THEN
+    RAISE EXCEPTION '0228 P1: the h_evt expression reads data_source, so Part A '
+                    'DOES move a canon and forces_recert is wrong: %', v_evt;
+  END IF;
+  IF v_evt ~* '\mdepot_id\M' THEN
+    RAISE EXCEPTION '0228 P1: the h_evt expression reads depot_id, so Part B '
+                    'DOES move a canon and forces_recert is wrong: %', v_evt;
+  END IF;
+  -- And the positive half: the fragment isolated must be the real one. An
+  -- empty or mis-sliced substring would satisfy both checks above by saying
+  -- nothing, which is the failure mode of every negative assertion.
+  IF v_evt NOT LIKE '%event_type%' OR v_evt NOT LIKE '%sim_clock_at%'
+     OR v_evt NOT LIKE '%ottoq_events%' THEN
+    RAISE EXCEPTION '0228 P1: the isolated fragment does not look like h_evt '
+                    '(no event_type / sim_clock_at / ottoq_events). The two '
+                    'checks above would have passed on nothing.';
   END IF;
 
   ------------------------------------------------------------------ P2 ------
@@ -424,8 +472,8 @@ VALUES ('provenance_asks_the_depot_not_the_run_id', false,
         'whether a run id happened to be set, which stamped 116 events a pair '
         'production about work the twin did. The vehicles trigger also now '
         'passes p_depot_id, which it never has -- 27,440 vehicle events carry '
-        'no depot at all. Hash-neutral: P1 asserts the event hash reads '
-        'neither data_source nor depot_id.',
+        'no depot at all. Hash-neutral: P1 isolates the h_evt expression out '
+        'of the live verdict function and asserts it names neither column.',
         now())
 ON CONFLICT (name) DO UPDATE
   SET forces_recert = EXCLUDED.forces_recert,
