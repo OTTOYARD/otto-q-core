@@ -10,10 +10,10 @@
 -- behaviour changes: `ottoq_cert_matrix` is a STABLE pure read called by
 -- nothing in the decide path (0131 established that and it is re-asserted in
 -- P1 below). No canon can move because nothing that produces a canon is
--- touched. (2) The migration is applied only when every column's newly
--- compared atoms are single-valued at the recert floor, asserted in P3, so no
--- existing streak can break. If P3 fails the migration refuses rather than
--- landing and looking like a regression.
+-- touched. (2) P3 asserts that no column which is green under the nine-atom
+-- comparison stops being green under the fourteen-atom one — the property the
+-- certification claim actually rests on. If P3 fails the migration refuses
+-- rather than landing and looking like a regression.
 --
 -- THE DEFECT, from db/checks/0134. Two different jobs share the word
 -- "certification":
@@ -37,22 +37,23 @@
 -- the streak and the other cannot. An omitted column is a gap; a displayed
 -- column that is never judged is a false assurance.
 --
--- WHY NOW, AND NOT LATER. 0134 Q6 did the timing arithmetic and it is the
--- whole argument for not deferring this. Counting distinct values per column
--- across every pair at or above the recert floor (2026-09-08 13:02 UTC):
+-- WHY NOW, AND NOT LATER. 0134 Q6's argument was that extending a comparison
+-- is cheapest when there is least history to disagree with, and at the
+-- 2026-09-08 13:02 floor every column held exactly one pair, so nothing could
+-- be off-canon.
 --
---     scenario/seed/ticks        pairs  h_rule  h_rcl  h_sdr  endst
---     busy_day/171717/12             1       1      1      1      1
---     busy_day/314159/12             1       1      1      1      1
---     busy_day/424242/12             1       1      1      1      1
---     normal_day/171717/12           1       1      1      1      1
+-- **That argument no longer applies as stated, and the correction matters.**
+-- 0226 lowers the floor to 2026-09-07 21:36:53 — the floor the classifications
+-- already specify, which G28 showed was never being read. This migration is
+-- applied AFTER 0226, deliberately, so the window P3 examines is much larger:
+-- seven columns and up to six pairs each, not four columns of one pair. The
+-- dry-run of that combination is db/checks/0140, and it is the reason P3 was
+-- rewritten before this file was ever applied.
 --
--- One pair per column, because this morning's five migrations raised the floor.
--- Nothing can be off-canon when the canon is a single row. Wait several rounds
--- and any pre-existing variation in the newly compared atoms surfaces at the
--- moment of the change, where it will look like the change caused it.
--- Extending a comparison is always cheapest when there is least history to
--- disagree with, and this is the least there will ever be.
+-- The timing argument that survives is weaker and still sufficient: history
+-- only grows, so the newly compared atoms only accumulate more chances to
+-- disagree. What changed is that "no disagreement anywhere" stopped being an
+-- achievable bar, so P3 now tests the bar that matters instead.
 --
 -- WHAT CHANGES, precisely five edits to a body that is otherwise byte-identical:
 --   1. `keyed` extracts c_sdr and c_endst.
@@ -204,38 +205,138 @@ BEGIN
   END IF;
 
   ------------------------------------------------------------------ P3 ------
-  -- 0134's caution, enforced rather than remembered: if any column at or above
-  -- the recert floor already disagrees with itself on a newly compared atom,
-  -- this migration would break that streak and look like the cause.
-  SELECT string_agg(format('%s/%s/%st: rule=%s rcl=%s sdr=%s endst=%s',
-                           scen, seed, ticks, d_rule, d_rcl, d_sdr, d_endst), '; ')
+  -- REVISED 2026-09-08 15:35 UTC, before the migration was ever applied, on
+  -- db/checks/0140. The first draft of P3 refused, and it refused for the
+  -- wrong reason, on two columns. What it got right is that it refused rather
+  -- than landing quietly; what it got wrong is all three of these:
+  --
+  --   1. It grouped by (scenario, seed, ticks) and DROPPED depot_id, which it
+  --      selected and then discarded — while ottoq_cert_matrix keys by
+  --      (depot, seed, ticks, scenario). Two depots running one scenario would
+  --      have collapsed into one row. Inert today only because 0138 proved the
+  --      Benchmark depot has zero runs, so a second lane would activate it.
+  --   2. It judged `grid_smoke` — the 6-tick fixture from 0153 — as though a
+  --      certification claim rested on it. Its d_sdr was 0: not "one value",
+  --      but *no* values, every pair predating h_sdr.
+  --   3. Worst, its bar was stricter than the property it exists to protect.
+  --      It refused on ANY disagreement in the window while its message
+  --      claimed streaks "would break". On busy_day/314159/12t the disagreeing
+  --      pair is the 08:25:00 one, eighteen minutes before 0218 fixed the
+  --      run-scoped-id signature it hashed, and while 0219 still had h_sdr
+  --      measured rather than enforced. Traced through the matrix's own
+  --      `bool_and ... ORDER BY rn` from the newest pair backwards, that
+  --      column goes from 6 consecutive passes to 3 — and green needs 2. It
+  --      stays green. P3 refused a change that costs three streak rows for a
+  --      disagreement that cannot recur.
+  --
+  -- So P3 now tests the property, not a proxy for it: **does any column that
+  -- is green under the nine-atom comparison stop being green under the
+  -- fourteen-atom one?** Same key as the matrix, same NULL-tolerant form, same
+  -- streak window, same >= 2 threshold, evaluated at whatever floor is live
+  -- when this runs. A fixture that was never green cannot lose green, so
+  -- grid_smoke drops out on its own rather than by being special-cased. And a
+  -- historical disagreement that does not cost a column its green no longer
+  -- blocks a change whose entire purpose is to compare more atoms.
+  --
+  -- Note what is deliberately NOT done: the floor is not raised past 08:25 and
+  -- that pair is not touched. It is correct history — the measured phase
+  -- catching an arm-unstable hash before enforcement — and it is the evidence
+  -- that motivated 0218. A migration that becomes applicable by hiding
+  -- evidence is worse than one that refuses.
+  WITH fl AS (
+    SELECT public.ottoq_cert_recert_floor() AS rf
+  ), pair AS (
+    SELECT DISTINCT ON (r.depot_id, r.started_at)
+           r.depot_id AS c_depot, r.started_at AS t0,
+           (r.validation_status = 'passed') AS ok,
+           r.validation_status AS st,
+           (r.validation_notes::jsonb) AS j
+      FROM public.ottoq_sim_runs r
+     WHERE r.run_by = 'cert_harness'
+       AND r.started_at >= (now() - interval '30 days')
+       AND r.validation_status IS NOT NULL
+       AND r.validation_notes IS NOT NULL
+       AND jsonb_typeof((r.validation_notes::jsonb) -> 'arm_a') = 'object'
+     ORDER BY r.depot_id, r.started_at, r.sim_run_id
+  ), keyed AS (
+    SELECT p.c_depot, p.t0, p.ok, p.st,
+           (p.j->>'seed')::bigint             AS c_seed,
+           COALESCE((p.j->>'ticks')::int, -1) AS c_ticks,
+           COALESCE(p.j->>'scenario', '?')    AS c_scen,
+           p.j->'arm_a'->>'fp'    AS c_fp,   p.j->'arm_a'->>'h_cmd'  AS c_cmd,
+           p.j->'arm_a'->>'h_dec' AS c_dec,  p.j->'arm_a'->>'h_evt'  AS c_evt,
+           p.j->'arm_a'->>'h_bkg' AS c_bkg,  p.j->'arm_a'->>'h_nrg'  AS c_nrg,
+           p.j->'arm_a'->>'h_prop' AS c_prop, p.j->'arm_a'->>'h_defr' AS c_defr,
+           p.j->'arm_a'->>'h_cal' AS c_cal,  p.j->'arm_a'->>'h_rule' AS c_rule,
+           p.j->'arm_a'->>'h_rcl' AS c_rcl,  p.j->'arm_a'->>'h_sdr'  AS c_sdr,
+           md5((p.j->'arm_a'->'endst')::text) AS c_endst
+      FROM pair p
+  ), ranked AS (
+    SELECT k.*, row_number() OVER (PARTITION BY k.c_depot, k.c_seed, k.c_ticks, k.c_scen
+                                   ORDER BY k.t0 DESC) AS rn
+      FROM keyed k WHERE k.st <> 'inconclusive'
+  ), canon AS (
+    SELECT * FROM ranked WHERE rn = 1
+  ), marked AS (
+    SELECT r.c_depot, r.c_seed, r.c_ticks, r.c_scen, r.rn,
+           (r.ok AND r.t0 >= fl.rf
+            AND r.c_fp  IS NOT DISTINCT FROM k.c_fp
+            AND r.c_cmd IS NOT DISTINCT FROM k.c_cmd
+            AND r.c_dec IS NOT DISTINCT FROM k.c_dec
+            AND r.c_evt IS NOT DISTINCT FROM k.c_evt
+            AND r.c_bkg IS NOT DISTINCT FROM k.c_bkg
+            AND r.c_nrg IS NOT DISTINCT FROM k.c_nrg
+            AND (r.c_prop IS NULL OR k.c_prop IS NULL OR r.c_prop = k.c_prop)
+            AND (r.c_defr IS NULL OR k.c_defr IS NULL OR r.c_defr = k.c_defr)
+            AND (r.c_cal  IS NULL OR k.c_cal  IS NULL OR r.c_cal  = k.c_cal)
+           ) AS on9,
+           (r.ok AND r.t0 >= fl.rf
+            AND r.c_fp  IS NOT DISTINCT FROM k.c_fp
+            AND r.c_cmd IS NOT DISTINCT FROM k.c_cmd
+            AND r.c_dec IS NOT DISTINCT FROM k.c_dec
+            AND r.c_evt IS NOT DISTINCT FROM k.c_evt
+            AND r.c_bkg IS NOT DISTINCT FROM k.c_bkg
+            AND r.c_nrg IS NOT DISTINCT FROM k.c_nrg
+            AND (r.c_prop IS NULL OR k.c_prop IS NULL OR r.c_prop = k.c_prop)
+            AND (r.c_defr IS NULL OR k.c_defr IS NULL OR r.c_defr = k.c_defr)
+            AND (r.c_cal  IS NULL OR k.c_cal  IS NULL OR r.c_cal  = k.c_cal)
+            AND (r.c_rule IS NULL OR k.c_rule IS NULL OR r.c_rule = k.c_rule)
+            AND (r.c_rcl  IS NULL OR k.c_rcl  IS NULL OR r.c_rcl  = k.c_rcl)
+            AND (r.c_sdr  IS NULL OR k.c_sdr  IS NULL OR r.c_sdr  = k.c_sdr)
+            AND (r.c_endst IS NULL OR k.c_endst IS NULL OR r.c_endst = k.c_endst)
+           ) AS on14
+      FROM ranked r
+      JOIN canon k ON k.c_depot=r.c_depot AND k.c_seed=r.c_seed
+                  AND k.c_ticks=r.c_ticks AND k.c_scen=r.c_scen
+      CROSS JOIN fl
+  ), streaks AS (
+    SELECT c_depot, c_seed, c_ticks, c_scen,
+           count(*) FILTER (WHERE u9)::int  AS n9,
+           count(*) FILTER (WHERE u14)::int AS n14
+      FROM (
+        SELECT m.*,
+               bool_and(m.on9)  OVER w AS u9,
+               bool_and(m.on14) OVER w AS u14
+          FROM marked m
+        WINDOW w AS (PARTITION BY m.c_depot, m.c_seed, m.c_ticks, m.c_scen
+                     ORDER BY m.rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+      ) x
+     GROUP BY 1,2,3,4
+  )
+  SELECT string_agg(format('%s/%s/%st depot=%s: green now (streak %s) but '
+                           'streak %s after', c_scen, c_seed, c_ticks,
+                           left(c_depot::text,8), n9, n14), '; ')
     INTO v_bad
-    FROM (
-      SELECT j->>'scenario' AS scen, j->>'seed' AS seed, j->>'ticks' AS ticks,
-             count(DISTINCT j->'arm_a'->>'h_rule')            AS d_rule,
-             count(DISTINCT j->'arm_a'->>'h_rcl')             AS d_rcl,
-             count(DISTINCT j->'arm_a'->>'h_sdr')             AS d_sdr,
-             count(DISTINCT md5((j->'arm_a'->'endst')::text)) AS d_endst
-        FROM (SELECT DISTINCT r.started_at, r.depot_id, r.validation_notes::jsonb AS j
-                FROM public.ottoq_sim_runs r
-               WHERE r.run_by = 'cert_harness'
-                 AND r.started_at >= public.ottoq_cert_recert_floor()
-                 AND r.validation_status = 'passed'
-                 AND r.validation_notes IS NOT NULL
-                 AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a') = 'object') p
-       GROUP BY 1,2,3
-      HAVING count(DISTINCT j->'arm_a'->>'h_rule') > 1
-          OR count(DISTINCT j->'arm_a'->>'h_rcl')  > 1
-          OR count(DISTINCT j->'arm_a'->>'h_sdr')  > 1
-          OR count(DISTINCT md5((j->'arm_a'->'endst')::text)) > 1
-    ) bad;
+    FROM streaks
+   WHERE n9 >= 2 AND n14 < 2;
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0225 P3: these columns already disagree with themselves on '
-                    'a newly compared atom, at or above the recert floor: %. '
-                    'Applying now would break their streaks and the change '
-                    'would be blamed. Investigate the disagreement first.', v_bad;
+    RAISE EXCEPTION '0225 P3: extending the comparison would take these columns '
+                    'out of green: %. That is a real regression in the '
+                    'certification claim, not a bookkeeping change. Investigate '
+                    'the disagreeing atom before applying.', v_bad;
   END IF;
-
+  RAISE NOTICE '0225 P3: no green column loses green under the fourteen-atom '
+               'comparison';
   ------------------------------------------------------- catalog rewrite ----
   -- Every anchor asserted at exactly one occurrence FIRST, then all five
   -- applied. Counting by length delta rather than by regex so an anchor
@@ -370,3 +471,26 @@ ON CONFLICT (name) DO UPDATE
   SET forces_recert = EXCLUDED.forces_recert,
       note          = EXCLUDED.note,
       classified_at = EXCLUDED.classified_at;
+
+-- ---------------------------------------------------------------------------
+-- REVISION NOTE — 2026-09-08 15:32 UTC, before this file was ever applied.
+--
+-- P3 was rewritten. The first draft asserted that every column's newly compared
+-- atoms were single-valued at the recert floor. Dry-run against the floor 0226
+-- installs (db/checks/0140) that assertion FAILED on two of seven columns, and
+-- inspection showed all three of its problems were in P3 rather than in the
+-- data: it dropped depot from a key the matrix carries, it judged a fixture
+-- scenario, and its bar was stricter than the property it names. It would have
+-- refused this migration for a disagreement that costs no column its green.
+--
+-- The rewrite tests the property directly: no column green under nine atoms
+-- stops being green under fourteen.
+--
+-- **NOT YET DRY-RUN.** The replacement P3 is written but has not been executed
+-- against the live catalog — round 27 column f was firing. It must be run
+-- read-only, as a standalone SELECT, and seen to return no rows before this
+-- migration is applied. Recorded here rather than assumed, because 0140 exists
+-- precisely because the previous P3 was never run in the configuration it
+-- would meet.
+-- ---------------------------------------------------------------------------
+
