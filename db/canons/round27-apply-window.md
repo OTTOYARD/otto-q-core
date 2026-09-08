@@ -176,10 +176,38 @@ in 0225's own footer rather than quietly fixed.
     WHERE depot = '11111111-1111-1111-1111-111111111111'
     ORDER BY ticks DESC, scenario, seed;
    ```
-   **Some columns should go green.** `busy_day/424242/24t` carries twenty-six
-   consecutive passing pairs (`db/checks/0135` Q5) and has been reading
-   `consecutive_passes = 0`. If nothing goes green after the floor drops, G28's
-   diagnosis was incomplete and that is the next thing to chase.
+   **This is now a falsifiable prediction, not a hope.** The 15:47 dry-run
+   (`db/checks/0140` Q5) computed the fourteen-atom streak every column will
+   have at 0226's floor, and `r27_g` adds one more pair to `171717/24t`:
+
+   | column | expected `consecutive_passes` | expected `green` |
+   |---|---|---|
+   | `busy_day/171717/24t` | **4** (3 + g) | **true** |
+   | `busy_day/424242/24t` | **3** | **true** |
+   | `busy_day/171717/12t` | **3** | **true** |
+   | `busy_day/314159/12t` | **3** | **true** |
+   | `busy_day/424242/12t` | **3** | **true** |
+   | `normal_day/171717/12t` | **3** | **true** |
+   | `busy_day/171717/48t` | 0 | false — stale, no pair since the floor |
+   | `grid_smoke/424242/6t` | 1 | false — one pair, bar is 2 |
+
+   **Six flagship columns green, where today there are zero.** If fewer go
+   green, G28's diagnosis was incomplete and that is the next thing to chase.
+   If *more* than these go green, the comparison is looser than intended and
+   that is worse than fewer.
+
+   A correction to what this step used to say: it claimed `busy_day/424242/24t`
+   "carries twenty-six consecutive passing pairs (`db/checks/0135` Q5)". That
+   26 is a count of passing pairs in a ten-day window, not a streak against the
+   canon at 0226's floor — only **three** of that column's pairs sit above
+   2026-09-07 21:36:53. Expecting 26 would have made a correct outcome look
+   like a failure.
+
+   **And 0225's A5 must name exactly one column**, `busy_day/314159/12t`,
+   moving `6 -> 3`. That is the 08:25 pre-0218 `h_sdr` pair falling off the
+   streak under the wider comparison — correct, expected, and traced by hand in
+   `0140` Q4 before any query confirmed it. If A5 names a second column,
+   something moved that this window did not predict.
 3. 0224's outstanding verification, which round 27 now supplies:
    ```sql
    SELECT data_source, count(*) FROM public.ottoq_events
