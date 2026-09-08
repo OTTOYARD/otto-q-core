@@ -84,6 +84,32 @@
 -- return early on pure-timestamp churn (the 0015 filter), which is 80.9% of
 -- vehicle updates.
 --
+-- THE REWRITE WAS DIFFED AGAINST THE LIVE BODIES, STATEMENT BY STATEMENT.
+-- Unlike 0223/0224/0225, which patch by anchored substitution, this file
+-- retypes two whole function bodies — so a dropped line would be a live defect
+-- on every write to `vehicles` and `stalls`, and no assertion in this file
+-- would notice, because the assertions check what was ADDED.
+--
+-- So before applying: both bodies were read from `pg_proc.prosrc`, comments
+-- and indentation stripped from each side, and diffed. The complete set of
+-- differences, 2026-09-08 14:58 UTC:
+--
+--   stalls    + v_data_source TEXT;
+--             + the feed_mode SELECT and its COALESCE fallback
+--             ~ p_data_source, at both call sites
+--
+--   vehicles  + v_depot UUID; + v_data_source TEXT;
+--             + v_depot := COALESCE(NEW.current_depot_id, NEW.home_depot_id);
+--             + the feed_mode SELECT and its COALESCE fallback
+--             + p_depot_id := v_depot, at both call sites   (Part B)
+--             ~ p_data_source, at both call sites           (Part A)
+--
+-- Nothing else. And because that diff strips comments, the 0015 block in the
+-- vehicles trigger was checked separately and survives verbatim — its banner,
+-- the 56,544-of-69,917 measurement, the 80.9%, the `current_soc` caveat and
+-- the fold-forward note. That block explains why 80.9% of vehicle updates emit
+-- no event; losing it would cost the next reader a day.
+--
 -- WHAT THIS DOES NOT FIX, restated from 0131 because it stays true: the 27,460
 -- rows already written. They are signed and the signature covers the mislabel.
 -- Re-labelling invalidates the signature; deleting is a deletion from an audit
