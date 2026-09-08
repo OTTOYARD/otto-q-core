@@ -90,7 +90,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0221 — GENERATED, not a log
+## Index, 0134–0222 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative and stop at 0133 (2026-08-31).
 Everything from 0134 on went unlogged at the time. Rather than invent prose after the
@@ -196,7 +196,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0219](db/migrations/0219_h_sdr_may_now_fail_a_pair.sql) | `PENDING` | no — pending | h_sdr may now fail a pair |
 | [0220](db/migrations/0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql) | `PENDING` | no — pending | the schedule_task SDR emitter asks the stall what kind of charge it |
 | [0221](db/migrations/0221_the_run_scope_predicate_no_index_can_read.sql) | `PENDING` | no — pending | the run-scope predicate no index can read. A carrier found while |
+| [0222](db/migrations/0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql) | `PENDING` | no — pending | G19. ottoq_boot_state_fingerprint serialized and hashed 1.36 MILLION |
 
-89 migrations indexed.
+90 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

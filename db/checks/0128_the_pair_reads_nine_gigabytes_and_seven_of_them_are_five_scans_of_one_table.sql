@@ -3,6 +3,15 @@
 --        reads 9.6 GB from disk and 7.0 GB of it is FIVE sequential scans of
 --        ottoq_events.
 --
+-- *** ITS CONCLUSION IS SUPERSEDED BY db/checks/0129, ninety minutes later. ***
+-- *** The MEASUREMENTS below stand and are of this pair. The inference that
+-- *** ottoq_events is G19 does not: a statement-level profile of the next pair
+-- *** put 36% of the wall clock in four calls to ottoq_boot_state_fingerprint,
+-- *** and gave a completely different I/O ranking on the same instrument —
+-- *** because I/O share is a cache artefact and ranks differently every run,
+-- *** while total_exec_time per statement does not. Read 0129 Q5 for the
+-- *** comparison. The lesson is which instrument to reach for.
+--
 -- Measured, not inferred: pg_stat_user_tables and pg_statio_user_tables were
 -- snapshotted into public.g19_seq_before / public.g19_io_pref at
 -- 2026-09-08 10:00:53 UTC with nothing running, and differenced after round

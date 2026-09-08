@@ -320,7 +320,8 @@ repo_manifest(version, name, file) AS (
     ('20260908084304'::text, 'h_sdr_hashed_a_signature_computed_over_a_run_scoped_id'::text, '0218_h_sdr_hashed_a_signature_computed_over_a_run_scoped_id.sql'::text),
     ('PENDING'::text, 'h_sdr_may_now_fail_a_pair'::text, '0219_h_sdr_may_now_fail_a_pair.sql'::text),
     ('PENDING'::text, 'the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was'::text, '0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql'::text),
-    ('PENDING'::text, 'the_run_scope_predicate_no_index_can_read'::text, '0221_the_run_scope_predicate_no_index_can_read.sql'::text)
+    ('PENDING'::text, 'the_run_scope_predicate_no_index_can_read'::text, '0221_the_run_scope_predicate_no_index_can_read.sql'::text),
+    ('PENDING'::text, 'the_fingerprint_hashed_a_million_rows_to_report_thirteen'::text, '0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
