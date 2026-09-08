@@ -290,3 +290,52 @@ that computes `endst`. The pair only proves the rewritten function agrees with
 
 Round 25's a-column value is taken from the 10:52 `r25_g` re-run rather than the
 08:25 pair, for the same reason its `h_sdr` was: the 08:25 pair predates 0218.
+
+### e — `busy_day` / 171717 / **24 ticks** — **PASS**
+
+Fired 12:51:00 UTC, **761 s**, `equal true`. Every atom byte-identical to round
+25's 09:34 pair, including the four the matrix cannot compare:
+
+`fp 92b02f8b` · `h_cmd 050c4606` · `h_dec 0360adc9` · `h_evt b2230619` ·
+`h_bkg 947a2316` · `h_nrg 4c5035fe` · `h_prop 0046879e` · `h_defr d41d8cd9` ·
+`h_cal 11a24626` · `h_rule 9564b998` · `h_rcl fa8ab72c` · `h_sdr 957abcfb` ·
+`endst 967124f1` (both arms, both rounds)
+
+Five columns, fifty-seven atom comparisons, no movement.
+
+### And a duration I cannot yet explain
+
+| | round 25 | round 26 | Δ | |
+|---|---|---|---|---|
+| 12-tick, mean of four | 747 s | 519 s | **−228** | −31% |
+| 24-tick, column e | 1,272 s | **761 s** | **−511** | **−40%** |
+
+**The 24-tick saving is 2.2x the 12-tick saving, and the fingerprint argument
+does not predict that.** `ottoq_boot_state_fingerprint` is called **four times
+per pair regardless of tick count** — twice at boot, twice for `endst` — so
+0222 should have removed roughly the same absolute number of seconds from both.
+It removed 228 from one and 511 from the other.
+
+Three explanations considered and none of them fit:
+
+- *the tables grew during the longer run, so the later calls scanned more* — a
+  24-tick pair adds ~1,600 bookings to a table holding 786,000. That is 0.2%.
+- *0221 scales with commands, and a 24-tick pair emits twice as many* —
+  `db/checks/0127` costed that path at ~4.2 s per arm on 12 ticks. Double it and
+  it is still under twenty seconds.
+- *the 1,272 s baseline was inflated* — the two other 24-tick pairs on record
+  ran 1,296 s and 1,336 s. It was not.
+
+So this is an unexplained 250-odd seconds, in the direction that flatters the
+fix, which is exactly the direction not to accept quietly. `db/checks/0129`'s
+profile has a clue it did not chase: alongside the 255.3 s `vn` statement there
+is a **128.2 s statement over 2 calls** assembling the verdict — and the verdict
+assembly is where `endst` is computed, so the fingerprint's true cost may be
+spread across two statements rather than one, and may not divide evenly by four.
+
+**What would settle it: an instrumented 24-tick pair**, run the way `r25_g`
+instrumented a 12-tick one (`track_functions='pl'`,
+`pg_stat_statements.track='all'`, snapshots either side). Recorded as the next
+measurement rather than as a theory. The round's verdict does not depend on it —
+every atom held — but a number this project cannot explain is a number it does
+not yet own.
