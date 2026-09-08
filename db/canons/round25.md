@@ -147,6 +147,31 @@ current pace lands between 1,300 and 1,600 s — so the original 10:00 slot risk
 while e still held the flagship depot. Both new slots were asserted `fire_utc > now()` against
 the database clock before being written.
 
+### How to read the capture, written before it exists
+
+Two traps, both easy to walk into once numbers are on the screen.
+
+**Nesting double-counts.** With `pg_stat_statements.track='all'`, the top-level
+`SELECT ottoq_determinism_pair(…)` carries the whole pair's `total_exec_time`,
+AND every statement inside it is recorded separately, AND a plpgsql statement
+that calls a function includes that function's time. So the nested rows sum to
+far more than the pair. Rank by `total_exec_time` with the top-level row
+excluded, and read a row as "this statement and everything under it", never as
+a share of a total.
+
+**Other sessions leak in, but only their top level.** The metronome, the depot
+tick and the run governor fire every one or two minutes and their sessions leave
+`track` at `'top'`, so the diff will contain a handful of rows for
+`CALL public.ottoq_demo_metronome(50)`, `SELECT public.ottoq_cron_tick()` and
+`SELECT public.ottoq_run_governor_auto_stop()` — and nothing from inside them.
+Those three are identifiable by name and are the only contamination.
+
+The number that settles G19 is simpler than either: `g19_seq_before` and
+`g19_io_pref` differenced after the pair commits give **sequential scans and
+disk blocks read per pair**, per table, measured rather than inferred. Note that
+those counters do not move while the pair runs — both arms are one transaction
+and pgstat flushes at commit — so a zero mid-pair means nothing.
+
 ## Round completion
 
 The round is complete when all six columns have a post-0218 pair; `h_sdr` is enforced by 0219
