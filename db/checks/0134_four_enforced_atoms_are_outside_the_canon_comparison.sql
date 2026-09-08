@@ -36,6 +36,17 @@
 --     Nine. Six strict, three NULL-tolerant (0199/0201, correctly: a pair
 --     hashed before an instrument existed cannot be judged by it).
 --
+--     THE OTHER HALF OF on_canon IS COMPLETE, and this is worth stating because
+--     it is the natural next suspicion. `r.ok` is
+--
+--         (r.validation_status = 'passed')  AS ok
+--
+--     which the pair writes from `v_equal AND v_complete` — the full fourteen.
+--     So the WITHIN-PAIR half loses nothing. A pair that disagrees on h_sdr
+--     still fails, still writes 'failed', and still breaks the streak through
+--     `ok`. What is missing is only the ACROSS-ROUND half: an atom that agrees
+--     with itself on both arms while differing from last round.
+--
 --     And `bool_and(m.on_canon) OVER (PARTITION BY …)` is what feeds
 --     consecutive_passes, and consecutive_passes is what feeds `green`. So the
 --     nine atoms above are the ones that can break a streak. The others cannot.
