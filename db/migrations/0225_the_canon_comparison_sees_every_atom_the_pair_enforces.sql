@@ -343,3 +343,30 @@ BEGIN
   RAISE NOTICE '0225 applied: body % -> %, length % -> %',
                v_pin, md5(v_def), v_len_before, length(v_def);
 END $mig$;
+
+-- Register the classification. Written with the UNPREFIXED name, which is what
+-- apply_migration writes into supabase_migrations.schema_migrations and
+-- therefore what ottoq_cert_recert_floor can join to.
+--
+-- This row was MISSING from the first draft of this file, and its absence would
+-- have been invisible and expensive: with no lineage row, the floor function's
+-- COALESCE(l.forces_recert, true) treats the migration as unclassified and
+-- jumps the recert floor to this migration's own timestamp — restarting every
+-- column's streak in the same apply window in which 0226 fixed exactly that.
+-- G28 (db/checks/0135) is what made the omission findable at all; before it,
+-- every migration was doing this and nobody could see it.
+INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
+VALUES ('the_canon_comparison_sees_every_atom_the_pair_enforces', false,
+        'G25 / db/checks/0134. Extends ottoq_cert_matrix so the across-round '
+        'comparison judges all fourteen atoms the pair enforces, not nine: '
+        'carries c_sdr and c_endst, and moves c_rule and c_rcl from '
+        'carried-and-printed to compared. NULL-tolerant in the 0199/0201 form. '
+        'ottoq_cert_matrix is a STABLE pure read called by nothing in the '
+        'decide path, so no engine behaviour changes and no canon can move; P3 '
+        'refuses to apply if any column already disagrees with itself on a '
+        'newly compared atom at or above the floor.',
+        now())
+ON CONFLICT (name) DO UPDATE
+  SET forces_recert = EXCLUDED.forces_recert,
+      note          = EXCLUDED.note,
+      classified_at = EXCLUDED.classified_at;
