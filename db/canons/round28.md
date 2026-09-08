@@ -104,12 +104,52 @@ FULL table this time, not fourteen hand-picked rows** — r27_g's baseline recor
 only the rows I thought would matter, which is why no delta is computable for
 any function outside that list.
 
-## Schedule
+## Schedule — committed 2026-09-08 16:26 UTC, after the apply window
 
-To be filled in after the apply window, by `scripts/schedule-round.sql` with
-`v_round := 28`. It sizes slots from the max of the last six runs of each tick
-count, so it will use round 27's durations (12-tick max 376 s, 24-tick max
-560 s) rather than round 26's.
+| column | scenario / seed / ticks | fires (UTC) | fires (CT) |
+|---|---|---|---|
+| a | `busy_day` / 314159 / 12 | 16:35 | 11:35 AM |
+| b | `busy_day` / 171717 / 12 | 16:49 | 11:49 AM |
+| c | `normal_day` / 171717 / 12 | 17:03 | 12:03 PM |
+| d | `busy_day` / 424242 / 12 | 17:17 | 12:17 PM |
+| e | `busy_day` / 171717 / **24** | 17:31 | 12:31 PM |
+| f | `busy_day` / 424242 / **24** | 18:01 | 1:01 PM |
+| **g** | `busy_day` / 171717 / **12**, `track_functions='all'` | **18:25** | **1:25 PM** |
+
+**The 24-tick slot is 30 minutes for a pair that now runs ~555 s, and that is a
+known defect left in deliberately.** `schedule-round.sql`'s lookback takes the
+max of the last **K=6 runs** of each tick count — but a round holds four 12-tick
+columns and only **two** 24-tick ones, so K=6 spans 1.5 rounds at 12 ticks and
+**three** at 24. Round 28's 24-tick slot is therefore sized from a **1,293 s
+round-25 pair**. The file's header claims the lookback adapts "in ONE round"; at
+24 ticks it does not.
+
+It was not tightened by hand. The asymmetry errs **long**, and that file's whole
+argument is that long costs wall clock while short costs two contaminated pairs
+— which is exactly what hand-tightening did in round 25. The fix is to make K
+count rounds, and it needs its own change rather than a constant edited at the
+end of an apply window. Recorded in the script.
+
+One thing that *was* fixed: the lookback now excludes commands containing
+`track_functions`, so an instrumented column can never size a future slot.
+r27_g ran **851 s** against column e's 560 s on the same scenario, seed and
+horizon — a +52% overhead that is mostly 13.2M counter updates — and without the
+exclusion that would have been baked into every round from here on.
+
+### `r28_g`'s baseline is captured, and this time it is the whole table
+
+`db/baselines/r28_g_fn_baseline.md` — **all 304 rows**, captured 16:23:39 UTC.
+Valid from capture until g fires because `track_functions` is `'none'` globally
+and only g sets it, the same property verified row-by-row for r27_g across 91
+minutes and a container restart.
+
+And it already sharpens G21b before g runs: **`ottoq_policy_get` is 44x the next
+function** (15,634,388 lifetime against `ottoq_sim_seeded_random`'s 356,072) and
+roughly an order of magnitude more than every other tracked function combined.
+That is the shape of a function called from SQL the profiler cannot attribute,
+not from plpgsql bodies. Two ratios are written down in that file **as things to
+test, not as findings** — 0139 spent its closing paragraph refusing to guess the
+caller and this does not undo that.
 
 **Nothing in this file is to be edited once the first column fires.** Results go
 below a `## Results` heading, as in every previous round canon.
