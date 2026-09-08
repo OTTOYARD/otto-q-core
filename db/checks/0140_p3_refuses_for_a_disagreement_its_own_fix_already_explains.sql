@@ -189,6 +189,15 @@ SELECT DISTINCT to_char(r.started_at,'MM-DD HH24:MI:SS') AS fired,
 --     flagship round shows the arms agree") and 0218 had landed by then, so
 --     the round it relied on is presumably post-0218 — but which round is not
 --     recorded in the file, and it is not reconstructed here.
---   * Whether the same three P3 defects exist in any other drafted migration's
---     preconditions. Not swept.
+--   * ~~Whether the same three P3 defects exist in any other drafted
+--     migration's preconditions.~~ **SWEPT 15:36 UTC, and it is clean.** Every
+--     other precondition and assertion in 0226, 0227 and 0228 is a catalog-shape
+--     check — an md5 pin, a regex occurrence count, an EXPLAIN plan shape — not
+--     a judgement over a data window, so the mis-keying class cannot arise.
+--     The one exception is **0226 A4**, which does read `ottoq_cert_matrix`:
+--     it is correctly scoped to the flagship depot
+--     (`depot='11111111-...'`), asserts a positive outcome (at least two
+--     columns stop being stale) rather than an absence, and so has neither the
+--     dropped-key nor the stricter-than-purpose fault. 0225's P3 was the only
+--     one.
 -- ---------------------------------------------------------------------------
