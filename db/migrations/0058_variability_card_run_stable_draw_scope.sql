@@ -1,5 +1,7 @@
--- migration-version: 20260820080000
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    variability_card_run_stable_draw_scope
+-- (applied through a path that writes no supabase_migrations row; the file's
+--  own text is the only record. See task G18.)
 -- 0058 — C7 FOLLOW-UP #12, found by re-certification #12 (post-0057 arms
 -- 54ff816e vs 7015af46: 14/20 identical, first divergence sim-min 450). The
 -- best round yet, and the residue is the sharpest signature so far: at tick 15

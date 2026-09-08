@@ -1,3 +1,5 @@
+-- migration-version: 20260904013402
+-- migration-name:    the_correction_nobody_could_see_from_the_one_command
 -- =====================================================================
 -- 0185  The correction nobody could see from the one command
 -- =====================================================================

@@ -1,4 +1,4 @@
--- migration-version: 20260830150000
+-- migration-version: 20260830053720
 -- migration-name:    the_reservations_timestamp_dies_with_it
 -- 0116 -- the post-0115 cross-seed pair (424242 after a 171717 pair; db/checks/0046 pair 20)
 -- produced the pair-14(a) signature under the new fingerprint: ALL FOUR STREAMS BYTE-EQUAL,

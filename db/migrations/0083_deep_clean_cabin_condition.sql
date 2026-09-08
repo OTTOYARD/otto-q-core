@@ -1,5 +1,7 @@
--- migration-version: 20260828090000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    deep_clean_cabin_condition
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0083 -- Reconcile the deep-clean divergence, the third instance of "the needs card identifies
 -- work the manifest never materializes." The card grades cabin_condition soiled->overdue,
 -- biohazard->critical and flags interior_deep_clean as MUST-DO; the manifest generated

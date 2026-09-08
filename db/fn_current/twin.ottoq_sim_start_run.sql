@@ -1,5 +1,10 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
 -- md5 at capture: a8454174d97ad2466320c22ed341f8ae
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live 96c44f492b007a8e22efe8a41c2088ad
+--   here a8454174d97ad2466320c22ed341f8ae
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_start_run(p_scenario_code text, p_sim_clock_start timestamp with time zone DEFAULT NULL::timestamp with time zone, p_time_scale numeric DEFAULT NULL::numeric, p_random_seed bigint DEFAULT NULL::bigint, p_run_by text DEFAULT 'otto_twin'::text)
  RETURNS uuid
  LANGUAGE plpgsql

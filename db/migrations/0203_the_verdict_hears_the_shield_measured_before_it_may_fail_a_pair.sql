@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_verdict_hears_the_shield_measured_before_it_may_fail_a_pair
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0203  The verdict hears the shield: h_rule, measured before it may
 --       fail a pair

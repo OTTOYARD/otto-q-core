@@ -1,3 +1,5 @@
+-- migration-version: 20260902200433
+-- migration-name:    drop_the_two_arg_grid_fault_overload
 -- 0164  Drop the two-argument grid_fault overload. Harness; forces_recert = false.
 --
 -- 0163 added p_duration_minutes with a DEFAULT, which in Postgres creates a NEW

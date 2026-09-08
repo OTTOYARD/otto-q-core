@@ -374,3 +374,156 @@ if __name__ == "__main__":
         fn()
         print(f"{fn.__name__} PASS")
     print("ALL SIGNAL BRIDGE TESTS PASS")
+
+
+# ---------------------------------------------------------------------------
+# L-14 / L-46: the TOTAL seam validates the VALUE, not only its presence.
+# ---------------------------------------------------------------------------
+
+def _sig(fc, **kw):
+    kw.setdefault("site_power_target_kw", 700)
+    kw.setdefault("now_hour", 0)
+    return forecast_signals(fc, **kw)
+
+
+def _with(fc, section, field, hod, value):
+    """Write one value straight into a built forecast.
+
+    Deliberately not through `_forecast(...)`: that helper derives p50/p90 from
+    the value it is given and would raise on NaN or None inside the FIXTURE,
+    which proves nothing about the seam. The bad value has to reach the bridge.
+    """
+    fc[section]["hours"][hod][field] = value
+    return fc
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"),
+                                 -500.0, "900", None, True, [1]])
+def test_a_bad_arrivals_value_raises_the_contract_error(bad):
+    """NaN is the sharp one: every comparison against it is False, so the
+    signal is SILENTLY NOT RAISED — the exact failure two comments in the
+    module claim to prevent, and worse than the missing field they guard,
+    because it does not raise."""
+    fc = _with(_forecast(), "arrivals", "expected_arrivals", 0, bad)
+    with pytest.raises(ForecastContractError, match="expected_arrivals"):
+        _sig(fc)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -9e9, "700", None])
+def test_a_bad_load_value_raises_the_contract_error(bad):
+    fc = _with(_forecast(), "load", "total_kw_p90", 0, bad)
+    with pytest.raises(ForecastContractError, match="total_kw_p90"):
+        _sig(fc)
+
+
+def test_a_nan_arrival_would_otherwise_have_suppressed_a_real_surge():
+    """The consequence, not just the type check: a genuine surge hidden.
+
+    Hour 0 alone carries a 20x nowcast — enough to fire on its own. Replacing
+    it with NaN made `expected >= surge_m * baseline` False and the assessment
+    came back clean, with no error and no signal.
+    """
+    good = _forecast(per_hour_arrivals={0: 20.0})
+    assert "demand_surge" in _sig(good).signals
+    with pytest.raises(ForecastContractError):
+        _sig(_with(good, "arrivals", "expected_arrivals", 0, float("nan")))
+
+
+def test_the_error_names_which_section_was_malformed():
+    """_hour_map's `key` was passed by both call sites and then discarded; the
+    message trusted the malformed input to identify itself via section['kind'],
+    which is exactly the field a malformed section may lack (L-48)."""
+    fc = _forecast()
+    del fc["load"]["hours"]
+    fc["load"].pop("kind", None)
+    with pytest.raises(ForecastContractError, match="'load'"):
+        _sig(fc)
+
+
+# ---------------------------------------------------------------------------
+# L-15: the one caller-supplied physical quantity is validated.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("bad", [0, -100, None, "700", float("nan"),
+                                 float("inf"), True])
+def test_the_site_power_target_is_validated(bad):
+    with pytest.raises(ValueError, match="site_power_target_kw"):
+        forecast_signals(_forecast(), site_power_target_kw=bad, now_hour=0)
+
+
+def test_a_zero_target_would_have_latched_the_grid_peak_signal_on():
+    """The consequence: `peak >= 0.9 * 0` is `peak >= 0.0`, true for any load.
+
+    A flat 100 kW site against a 700 kW target does not raise the signal; the
+    same site against a target of 0 raised it permanently, and the reasoning
+    dict published "threshold": 0.0 as if that were a demand-charge ceiling.
+    """
+    assert "grid_peak_imminent" not in _sig(_forecast()).signals
+    with pytest.raises(ValueError):
+        forecast_signals(_forecast(), site_power_target_kw=0, now_hour=0)
+
+
+# ---------------------------------------------------------------------------
+# L-47: bool is an int, and it slipped through the module's strictest guard.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("bad", [-1, 24, "7", True, False, 7.0])
+def test_now_hour_rejects_bools_and_non_ints(bad):
+    with pytest.raises(ValueError, match="now_hour"):
+        forecast_signals(_forecast(), site_power_target_kw=700, now_hour=bad)
+
+
+# ---------------------------------------------------------------------------
+# L-16: an override must land inside the threshold's domain.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name,bad", [
+    ("surge_window_hours", 0), ("surge_window_hours", -2),
+    ("surge_window_hours", 25), ("surge_window_hours", 3.9),
+    ("peak_window_hours", 0), ("peak_window_hours", 3.5),
+    ("surge_multiplier", 0), ("surge_multiplier", -1.0),
+    ("peak_fraction", 0), ("peak_fraction", -0.5),
+    ("surge_multiplier", float("nan")), ("peak_fraction", "0.9"),
+])
+def test_an_out_of_domain_override_is_refused(name, bad):
+    with pytest.raises(ValueError, match=name):
+        _sig(_forecast(), thresholds={name: bad})
+
+
+def test_a_zero_length_window_would_have_reported_a_surge_on_a_quiet_site():
+    """The consequence: an empty window sums to 0.0 on both sides, and
+    `0.0 >= 2.0 * 0.0` is True. A zero-length lookahead reported a surge."""
+    assert "demand_surge" not in _sig(_forecast()).signals
+    with pytest.raises(ValueError, match="surge_window_hours"):
+        _sig(_forecast(), thresholds={"surge_window_hours": 0})
+
+
+def test_a_valid_override_still_works():
+    quiet = _forecast(per_hour_arrivals={h: 1.6 for h in range(24)})
+    assert "demand_surge" not in _sig(quiet).signals
+    a = _sig(quiet, thresholds={"surge_multiplier": 1.5})
+    assert "demand_surge" in a.signals
+    assert a.thresholds["surge_multiplier"] == 1.5
+
+
+# ---------------------------------------------------------------------------
+# L-17: a caller's number must not be published under the house's grounding.
+# ---------------------------------------------------------------------------
+
+def test_an_overridden_threshold_is_labelled_as_the_operators():
+    a = _sig(_forecast(), thresholds={"surge_multiplier": 1.5})
+    r = a.reasoning["demand_surge"]
+    assert r["evidence_label"] == "operator-override"
+    assert "caller-supplied" in r["source"] and "2.0" in r["source"]
+    assert SIGNAL_THRESHOLDS["surge_multiplier"].source not in r["source"]
+
+
+def test_a_threshold_nobody_overrode_keeps_the_houses_grounding():
+    a = _sig(_forecast(), thresholds={"surge_multiplier": 1.5})
+    peak = a.reasoning["grid_peak_imminent"]
+    assert peak["evidence_label"] == SIGNAL_THRESHOLDS["peak_fraction"].evidence_label
+    assert peak["source"] == SIGNAL_THRESHOLDS["peak_fraction"].source
+
+
+def test_the_override_label_is_in_the_house_vocabulary():
+    assert "operator-override" in EVIDENCE_LABELS

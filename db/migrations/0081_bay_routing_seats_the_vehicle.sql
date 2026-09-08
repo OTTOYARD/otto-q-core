@@ -1,5 +1,7 @@
--- migration-version: 20260828070000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    bay_routing_seats_the_vehicle
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0081 -- Fix the wash/service bay churn the 0079 activity feed exposed: needs-card routing (4b)
 -- emitted 'proceed_to_stall', which moves current_stall_id but never transitions current_state, so
 -- a wash/service never actually started; service sequencing (5) then promoted the still-staged

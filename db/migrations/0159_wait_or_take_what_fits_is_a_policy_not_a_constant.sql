@@ -1,3 +1,5 @@
+-- migration-version: 20260902194751
+-- migration-name:    wait_or_take_what_fits_is_a_policy_not_a_constant
 -- =====================================================================
 -- 0159  Wait, or take what fits, is a policy - not a constant
 --       ENGINE. forces_recert = TRUE.

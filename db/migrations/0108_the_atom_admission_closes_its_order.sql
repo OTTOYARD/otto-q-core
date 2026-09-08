@@ -1,4 +1,4 @@
--- migration-version: 20260830080000
+-- migration-version: 20260830035542
 -- migration-name:    the_atom_admission_closes_its_order
 -- 0108 -- closes what pair 12 (seed 171717, post-0107) left open. That pair was equal on
 -- commands, events and bookings; the residue was (a) one task_start/triage_confirm decision

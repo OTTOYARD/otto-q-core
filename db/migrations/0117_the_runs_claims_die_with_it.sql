@@ -1,4 +1,4 @@
--- migration-version: 20260830160000
+-- migration-version: 20260830055459
 -- migration-name:    the_runs_claims_die_with_it
 -- 0117 -- first fix out of the V7 residue sweep. vehicles.owning_sim_run_id is
 -- ottoq.ottoq_admit_stranded_vehicles' claim column: set to the claiming run

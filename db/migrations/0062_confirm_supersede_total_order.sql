@@ -1,5 +1,7 @@
--- migration-version: 20260820190000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    confirm_supersede_total_order
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0062 — SELF-INFLICTED REGRESSION REPAIR, found by re-certification #16
 -- (post-0061 arms 2010f408 / c507bce2: 11/20, first divergence sim-min 360).
 --

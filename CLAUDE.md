@@ -193,6 +193,44 @@ One CLI command: run ID in, all five KPIs out, deterministically. **The credibil
 | versioned OEM SLAs | 4 | 4 | — |
 | vehicle classes | 7 | 9 | +2 |
 
+**REFRESH 2026-09-08 (the 09-03 table above is left as the point-in-time record it is, exactly as the 08-18 line was).** Five more days of twin operation. The interesting number is the one that went **down**:
+
+| | 2026-09-03 | 2026-09-08 09:58 UTC | |
+|---|---|---|---|
+| rule evaluations | 4,607,065 | **5,464,682** | 1.19x |
+| HMAC-signed events | 2,487,708 | **2,231,792** | **0.90x — down** |
+| telemetry packets | 203,194 | **272,919** | 1.34x |
+| cuOpt invocations | 12,478 | **15,346** | 1.23x |
+| decisions (propose/dispose) | 1,334,905 | **1,650,636** | 1.24x |
+| archived reproducible runs | 762 | **946** | 1.24x |
+| sim runs | 603 | **787** | 1.31x |
+| service detail records | 127,122 | **179,423** | 1.41x |
+| OCPP 2.0.1 chargers | 94 | 94 | — |
+| versioned OEM SLAs | 4 | 4 | — |
+| vehicle classes | 9 | 9 | — |
+
+`ottoq_events` is **smaller** than it was on 09-03. The nightly retention purge is doing its
+job — `pg_stat_user_tables` records 9,419,289 inserts against 9,195,864 deletes on that table
+over its life — so 2,487,708 was a high-water mark, not a floor, and any claim of the form
+"N million signed events" is a claim about a moment. Cite the run, not the table.
+
+**Counts CLAUDE.md did not previously carry, and one it carried wrongly:**
+
+| | value | note |
+|---|---|---|
+| stall bookings | **783,276** | the calendar; 53% of every disk block this database has ever read (`db/checks/0127`) |
+| recall decisions | **13,406** | the C9 ledger, live since 0206 |
+| run-scope registry | **223** classified columns | 219 at the 08-18 pull |
+| deterministic rules | **52** rows / **29** codes | unchanged; the 09-03 clarification still holds |
+| **stalls** | **330** | **CLAUDE.md 2.3 says 427. It is 330 today** — 232 staging, 64 L2, 22 DCFC, 7 wash bay, 5 service bay. The figure went down between the pulls; what removed them is not established here, so 2.3's number is marked stale rather than explained. |
+| vehicles | **226** | not previously carried |
+
+**And the cuOpt sentence has moved again**: 15,346 invocations, up from the 15,250 that
+`SOLVER_STATE.md` §9 derived earlier the same day. §9 is dated and stands as the derivation;
+what it shows is that this ledger grows by roughly a hundred rows an hour, so a cuOpt number
+quoted without its timestamp is already wrong. §9's finding — that the NVIDIA endpoint itself
+has not been called since 2026-08-30 — is the part that matters and is unaffected.
+
 **Two clarifications, not corrections.** "52 deterministic rules" is a ROW count: 29 active plus 23 archived, across **29 distinct rule codes** — the archived rows are superseded versions of the same codes, not 52 separate rules. And rule 6's cuOpt sentence must be re-derived before it is spoken: the ledger now holds 12,478 invocations, not 255, so any claim built on the August figure is off by 49x in the direction that flatters us.
 
 **Why this refresh exists.** `db/checks/0098` records a 22-second KPI view that survived because it scanned a table CLAUDE.md said held 20,799 rows and which actually held 2.49M. Reasoning from a stale ground-truth line is how that happened. Re-measure before quoting; the queries are one `SELECT count(*)` each.

@@ -37,6 +37,12 @@ Copy `db/migrations/0001_EXAMPLE_template.sql` to
 Not optional, and not style preference. Each rule below is a scar. The reasoning
 is in the template's comments; the checklist is:
 
+- **Refuse to run while a certification is scheduled or in flight.** Copy the
+  `P-. NOTHING IN FLIGHT` block from `db/migrations/0221_*.sql`. Three checks,
+  and the middle one is load-bearing: `ottoq_sim_runs` **cannot see an in-flight
+  pair at all** (both arms run in one transaction, so the rows are uncommitted
+  and invisible), and `cron.job_run_details` reports an in-flight pair as
+  `succeeded` in about a second. `pg_stat_activity` is the only authority.
 - **Snapshot before you replace.** `INSERT INTO ottoq_schema_snapshots ... SELECT
   pg_get_functiondef(p.oid), md5(...)` for every function the file touches,
   before it touches them.
@@ -56,17 +62,90 @@ is in the template's comments; the checklist is:
 
 ```bash
 cd ~/Desktop/OTTOYARD/otto-q-core
-git add db/migrations/NNNN_short_name.sql
+bash scripts/regen-artefacts.sh          # <- before `git add`, every time
+git add -A
 git commit -m "migration NNNN: short_name — <what and why in one line>"
 ```
 
+`regen-artefacts.sh` rewrites the two files derived from `db/migrations/*.sql`:
+the generated manifest inside `scripts/check-drift.sql` and the generated index
+in `MIGRATION_LOG.md`. **Both go stale the moment the migration FILE exists** —
+a `PENDING` draft that has not been applied and may never be still counts — and
+`tests/test_migration_hygiene.py` fails the CI pytest gate when they are.
+
+That is not hypothetical: on 2026-09-08, 0219 was committed as a draft and CI
+went red on three consecutive pushes, because the only instruction to refresh
+the manifest lived at step 6, after applying. Step 6 still exists — the version
+header changes then, so it has to run twice — but the first run belongs here.
+
 If applying it goes badly, the file already exists and describes exactly what
 was attempted. That is the entire point of this ordering.
+
+### 3b. Dry-run every precondition, read-only, before you apply anything
+
+Not optional, and not the same as writing good preconditions. Take each `P`
+block's query, run it by hand against the live catalog, and read the answer.
+
+Two migrations in one morning were saved by this and neither would have been
+caught by review:
+
+- **0228's `P1`** looked for a function called `ottoq_hash_events` to prove the
+  event hash could not see the column being changed. There is no such function —
+  `h_evt` is computed inline — so the check fell through to a fallback that
+  grepped the whole of `ottoq_determinism_pair`, and the file's own header
+  claimed it asserted something it never checked. Worse, the assertion the
+  header promised would have **failed for an unrelated reason**: the function
+  carries `p_depot`. Dry-running it turned a plausible block into a real one
+  that isolates the `h_evt` expression itself.
+- **0225** had no `ottoq_cert_lineage` row at all. Applying it would have
+  restarted every certification streak — in the same window as the migration
+  fixing exactly that (G28, `db/checks/0135`).
+
+The rule: **a precondition you have not executed is a comment.** The whole point
+of a `P` block is that it fails when the world is not what you think; one that
+cannot fail, or fails for the wrong reason, gives you the feeling of a check
+without the check.
+
+#### 3b(ii). Dry-run it in the world it will MEET, not the world you have
+
+The rule above is not sufficient, and a third save proves it. **0225's `P3` was
+dry-run and it passed** — against the recert floor that existed at the time. But
+0225 is applied *after* 0226, and 0226 lowers that floor by sixteen hours. Run
+against the floor 0226 installs, the same `P3` **failed on two of seven
+columns** (`db/checks/0140`), and all three faults were in the precondition
+rather than the data: it dropped `depot` from a key the thing it protects
+carries, it judged a fixture scenario, and its bar was stricter than the
+property it names.
+
+So when a window applies several migrations in order, **each precondition must
+be dry-run against the state its predecessors will have created**, not against
+the state on your screen. Concretely: if migration N changes a value that
+migration N+1's preconditions read — a floor, a threshold, a function body, a
+count — substitute N's post-state by hand and re-run N+1's checks. The apply
+order is chosen for a reason; that reason changes what the later checks see.
+
+The tell that this applies to you: the runbook says something like *"apply A
+before B, deliberately, because A makes B's test harder."* If the test is
+genuinely harder, it may now fail, and finding that out inside the window is
+finding it out at the worst possible moment.
 
 ### 4. Apply it — from the file
 
 Pick one. Whichever you use, the SQL that runs must be the SQL in the committed
 file, unedited.
+
+**"Unedited" is load-bearing, and it has been broken once.** `0224` was applied
+with its 68-line header condensed to four, to fit the apply call — 17,377
+characters in the file, 11,765 submitted. The executable half was identical and
+that was *proven* rather than claimed (strip every `--` comment, collapse
+whitespace, both sides give `23f67ef299561d832ce97bdc79755247` at 9,750
+characters), and the deviation is recorded in that file's APPLIED footer instead
+of being quietly dropped. But the lesson stands and is unresolved: a header long
+enough to be worth writing is long enough to tempt condensing at the apply step,
+and "unedited" then quietly stops being true. Either this document should say
+*the executable SQL, proven by digest*, or headers should be short enough to
+submit whole. Until it is decided, if you condense, prove the digest and say so
+in the footer.
 
 **a) Supabase MCP (what Claude uses):** `apply_migration` with `name` set to the
 migration's `short_name` and `query` set to the file's contents. This writes a
@@ -92,14 +171,17 @@ SELECT version, name FROM supabase_migrations.schema_migrations
 Put that `version` into the file's header, replacing `PENDING`. Confirm the
 `name` matches `migration-name` exactly.
 
-### 6. Refresh the drift manifest
+### 6. Refresh the generated artefacts again
 
 ```bash
-bash scripts/gen-drift-sql.sh
+bash scripts/regen-artefacts.sh
 ```
 
-This rewrites the generated block inside `scripts/check-drift.sql` from your
-migration files' headers. It fails loudly if any file is missing its header.
+Yes, again — step 3 ran it when the file was written and `PENDING`; this run
+picks up the real version you just pasted into the header. It rewrites the
+generated block inside `scripts/check-drift.sql` and the generated index in
+`MIGRATION_LOG.md` from your migration files' headers, and fails loudly if any
+file is missing one.
 
 ### 7. Log it
 

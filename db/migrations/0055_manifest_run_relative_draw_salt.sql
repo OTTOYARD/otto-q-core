@@ -1,4 +1,4 @@
--- migration-version: 20260820050000
+-- migration-version: 20260820040308
 -- migration-name:    manifest_run_relative_draw_salt
 -- 0055 — C7 FOLLOW-UP #9, found by re-certification #9 (post-0054 arms
 -- b982b594 vs 1c552be5: 1/20 identical, first divergence sim-min 60 — the

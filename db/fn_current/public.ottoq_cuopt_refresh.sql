@@ -1,5 +1,10 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
 -- md5 at capture: 220ae5cf31f85929fd8dbf14e3be4537
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live a68332176c19dc19cebd0b130c555896
+--   here 220ae5cf31f85929fd8dbf14e3be4537
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION public.ottoq_cuopt_refresh(p_sim_run_id uuid DEFAULT NULL::uuid)
  RETURNS bigint
  LANGUAGE plpgsql

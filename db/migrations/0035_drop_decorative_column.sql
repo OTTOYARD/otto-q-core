@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    drop_decorative_column
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0035_drop_decorative_seed_phase_max.sql
 -- P1-16: column service_cadence_policy.seed_phase_max is decorative.
 -- It holds constants 1.45/1.18/1.45/1.50 — the EXACT values hardcoded inside

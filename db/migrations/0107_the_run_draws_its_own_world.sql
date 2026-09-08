@@ -1,4 +1,4 @@
--- migration-version: 20260830070000
+-- migration-version: 20260830034718
 -- migration-name:    the_run_draws_its_own_world
 -- 0107 -- pair 11 (seed 171717, first seed tried after the 424242 certification) diverged at
 -- TICK 1: one arm's manifest for vehicle 58f68551 carried an exterior_wash atom, the other's

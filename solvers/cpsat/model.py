@@ -307,6 +307,18 @@ def build_and_solve(
     max_peak_total: int | None = None,
     max_flow_total: int | None = None,
     allow_rejection: bool = False,
+    #: FALSE between lexicographic passes: the previous PASS's plan is a hint
+    #: and a retention fallback, not a tick that happened, so deviation from it
+    #: must not be priced (finding L-19). True keeps the rolling re-solve
+    #: behaviour, where `previous_plan` IS the previous tick's enacted plan.
+    price_churn: bool = True,
+    #: Assets a later lexicographic pass must keep serving (finding L-20). The
+    #: ceilings the chain threads are AGGREGATES over whoever a pass happens to
+    #: serve, and nothing constrained WHICH assets those were -- so with
+    #: rejection on, the vehicle the site abandons could change at every pass
+    #: while every reported optimum stayed honest. A floor, not an equality: a
+    #: later pass that can serve MORE still may.
+    require_served: set[str] | None = None,
 ) -> dict:
     """Solve the scenario; returns the plan dict (see _extract).
 
@@ -546,6 +558,12 @@ def build_and_solve(
         else:
             served = None
             m.AddExactlyOne(lits)
+        #: THE SERVED SET AS A HARD FLOOR FOR A LATER PASS (finding L-20).
+        #: Applied after the branch above has decided whether this asset has a
+        #: `served` literal at all -- it does only with rejection on, which is
+        #: the only mode in which anyone can be stranded.
+        if served is not None and require_served and asset.aid in require_served:
+            m.Add(served == 1)
 
         # pin / hint from the previous plan (previous-feasible retention)
         key = (asset.aid, "charge")
@@ -571,7 +589,16 @@ def build_and_solve(
                 #: the search and can land on a different equally-optimal plan
                 #: (measured across ortools versions: same objective, different
                 #: schedule -- SOLVER_STATE.md 6.2). Absent weight, absent term.
-                if churn_w > 0:
+                #: price_churn is FALSE between lexicographic passes (finding
+                #: L-19). Churn prices a vehicle moving between rolling
+                #: RE-SOLVES -- a real trip in the yard, against the previous
+                #: TICK's enacted plan. The chain passes the PREVIOUS PASS's
+                #: plan here for hints and retention, and that plan is not a
+                #: tick that ever happened: it is an arbitrary tie-broken
+                #: min-tardy schedule. Penalizing deviation from it made pass 2
+                #: minimize `peak + churn_w * (assets moved off their pass-1
+                #: point)` while reporting the result as P*, the minimum peak.
+                if price_churn and churn_w > 0:
                     stay = next((lit for lit, kind, p, segs, starts, ends in chains
                                  if p["id"] == prev_ops["charge"]["point"]), None)
                     if stay is not None:
@@ -626,13 +653,16 @@ def build_and_solve(
                     continue
                 lit = m.NewBoolVar(f"{asset.aid}.wash@{p['id']}")
                 iv = m.NewOptionalIntervalVar(ws, wash_min, we, lit, f"{asset.aid}.wash.{p['id']}")
-                per_point_intervals[p["id"]].append(iv)
+                per_point_intervals[p["id"]].append(
+                    _point_gap_interval(m, p, ws, wash_min, lit, H,
+                                        f"{asset.aid}.wash.{p['id']}") or iv)
                 wl.append((lit, p))
             #: A rejected asset does not get a wash bay either.
             _exactly_one_if_served(m, [l for l, _ in wl], served)
             ms = m.NewIntVar(0, H, f"{asset.aid}.mv1.s")
             me = m.NewIntVar(0, H, f"{asset.aid}.mv1.e")
-            mv = m.NewIntervalVar(ms, site["move_duration_min"], me, f"{asset.aid}.mv1")
+            mv = _move_interval(m, ms, site["move_duration_min"], me, served,
+                                f"{asset.aid}.mv1")
             path_intervals.append(mv)
             m.Add(ms >= stay_end)
             m.Add(ws >= me)
@@ -652,14 +682,26 @@ def build_and_solve(
             iev = m.NewIntVar(0, H, f"{asset.aid}.insp.e")
             il = []
             for p in svc_points:
+                #: THE BLOCKED-POINT CONTRACT APPLIES TO EVERY POINT KIND
+                #: (finding L-28). The rolling re-solve contract is that a
+                #: point in blocked_points takes no NEW work; the filter was
+                #: applied to charge candidates and to wash candidates and NOT
+                #: here, so a service bay taken out of service was still handed
+                #: inspections. T6 only ever blocked a DCFC, so nothing caught
+                #: it. Same guard, same shape, same pinned-work exception.
+                if p["id"] in blocked and (asset.aid, "inspect") not in pinned:
+                    continue
                 lit = m.NewBoolVar(f"{asset.aid}.insp@{p['id']}")
                 iv = m.NewOptionalIntervalVar(isv, inspect_min, iev, lit, f"{asset.aid}.insp.{p['id']}")
-                per_point_intervals[p["id"]].append(iv)
+                per_point_intervals[p["id"]].append(
+                    _point_gap_interval(m, p, isv, inspect_min, lit, H,
+                                        f"{asset.aid}.insp.{p['id']}") or iv)
                 il.append((lit, p))
             _exactly_one_if_served(m, [l for l, _ in il], served)
             ms = m.NewIntVar(0, H, f"{asset.aid}.mv2.s")
             me = m.NewIntVar(0, H, f"{asset.aid}.mv2.e")
-            mv = m.NewIntervalVar(ms, site["move_duration_min"], me, f"{asset.aid}.mv2")
+            mv = _move_interval(m, ms, site["move_duration_min"], me, served,
+                                f"{asset.aid}.mv2")
             path_intervals.append(mv)
             m.Add(ms >= (wash_tuple[1] if wash_tuple else stay_end))
             m.Add(isv >= me)
@@ -826,6 +868,53 @@ def build_and_solve(
                     site_peak_var)
 
 
+def _point_gap_interval(m, point, start, size, lit, H, tag):
+    """The point's OCCUPANCY interval when it declares a min-gap (finding L-30).
+
+    `min_gap_min` is a generic per-service-point field -- PACK_SPEC.md lists it
+    beside `exclusive`, and CLAUDE.md 2.5 calls it "a minimum-gap constraint on
+    the SERVICE POINT" -- and it was read in exactly one place, inside the
+    charge-candidate loop. A pack declaring it on a wash bay, a decontamination
+    bay or a calibration bay got a plan that silently violated its own declared
+    constraint.
+
+    Returns None when no gap is declared, and the caller keeps the op's own
+    interval. That is not tidiness: "the same interval with size + 0" is NOT
+    equivalent, because the extra end variable changes the search and can land
+    on a different equally-optimal plan -- the same reason the churn term is
+    absent at weight 0 (SOLVER_STATE.md 6.2). Absent gap, absent variable, and
+    every committed artifact stays byte-identical.
+
+    The op's own start/end vars are untouched, so the REPORTED schedule does not
+    move; only the point's occupancy grows, which is what a gap is.
+    """
+    gap = int(point.get("min_gap_min", 0) or 0)
+    if gap <= 0:
+        return None
+    occ_e = m.NewIntVar(0, H + gap, f"occend.{tag}")
+    return m.NewOptionalIntervalVar(start, size + gap, occ_e, lit, f"occ.{tag}")
+
+
+def _move_interval(m, start, size, end, served, tag):
+    """The inter-point move, optional exactly when the asset is (finding L-29).
+
+    Both moves were `NewIntervalVar` -- unconditional -- and appended straight
+    to `path_intervals`, which feeds the site's path-capacity cumulative. Every
+    other resource an unserved asset would touch is correctly gated: its charge
+    occupancy is optional on the point literal, and _exactly_one_if_served
+    zeroes its wash/inspect bay literals. The moves were the one leak, so an
+    asset the solver declines still booked yard-path capacity for a trip nobody
+    makes -- spurious INFEASIBLE on a site rejection was meant to rescue.
+
+    With rejection OFF (`served is None`) this returns the identical
+    unconditional interval it always did, so the default model -- and every
+    committed artifact hashed from it -- is untouched.
+    """
+    if served is None:
+        return m.NewIntervalVar(start, size, end, tag)
+    return m.NewOptionalIntervalVar(start, size, end, served, tag)
+
+
 def _extract(sc, solver, status, plan_vars, peak_excess, repro=None,
              site_peak_var=None) -> dict:
     assets_out, proposals = [], []
@@ -840,12 +929,43 @@ def _extract(sc, solver, status, plan_vars, peak_excess, repro=None,
         #: exists to preserve on the other proposer.
         if pv["served"] is not None and not solver.Value(pv["served"]):
             rejected.append(asset.aid)
+            #: THE REASON IS DERIVED, NOT A LITERAL (finding L-27). One string
+            #: shipped on every abstain row -- "no feasible point within the
+            #: site's capacity" -- regardless of why the solver declined, and
+            #: it is a factual claim ABOUT THE SITE that goes into
+            #: ottoq_external_proposals for a human or the dispose path to read
+            #: as evidence the site was full.
+            #:
+            #: It is true only at PROVEN OPTIMALITY, and then for a reason worth
+            #: stating: the rejection price (100,000) is two orders of magnitude
+            #: above any peak this site can reach and above every mode's ceiling
+            #: (T15), so an optimal solution that rejects an asset is one where
+            #: serving it was genuinely impossible within the declared capacity
+            #: and deadlines.
+            #:
+            #: A TRUNCATED SEARCH ESTABLISHES NO SUCH THING. At FEASIBLE or
+            #: UNKNOWN the incumbent dropped assets as a feasibility escape
+            #: hatch and the search stopped before proving anything about the
+            #: site. Publishing the capacity sentence there states as fact
+            #: something the solver never found. The status travels with the
+            #: row so the distinction is machine-readable, not just prose.
+            proven = status == cp_model.OPTIMAL
+            reason = (
+                "no feasible placement at proven optimality: serving this asset "
+                "would have cost more than the rejection price, so the site "
+                "could not seat it within its declared capacity and deadlines"
+                if proven else
+                f"declined by a search that stopped at {solver.StatusName(status)} "
+                f"without proving optimality — this is NOT a capacity finding; "
+                f"raise the deterministic budget before reading it as one")
             proposals.append({
                 "source": "cpsat", "action_context": "stall_assignment",
                 "entity_type": "vehicle", "entity_id": asset.aid,
                 "proposal": {"stall_id": None, "stall_type": None,
                              "requested_kw": None, "abstain": True,
-                             "reason": "no feasible point within the site's capacity"},
+                             "reason": reason,
+                             "solver_status": solver.StatusName(status),
+                             "capacity_finding": proven},
             })
             assets_out.append({"aid": asset.aid, "class": asset.cls,
                                "ready_by": asset.ready_by_min, "served": False,

@@ -1,5 +1,7 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
 -- md5 at capture: 30fb5ae4f76ed2f083be333624926bc6
+-- NOT IN THE CATALOG as of 2026-09-08: no function of this name exists in gxdrcyphqjzjsuhxuqtg.
+--   This file is a record of something that was dropped, not a mirror of anything live.
 CREATE OR REPLACE PROCEDURE public.ottoq_demo_metronome(IN p_budget_s integer DEFAULT 50)
  LANGUAGE plpgsql
 AS $procedure$

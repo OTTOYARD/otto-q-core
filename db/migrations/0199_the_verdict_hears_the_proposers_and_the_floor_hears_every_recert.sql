@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_verdict_hears_the_proposers_and_the_floor_hears_every_recert
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0199  The verdict hears the proposers, and the floor hears every
 --       recert

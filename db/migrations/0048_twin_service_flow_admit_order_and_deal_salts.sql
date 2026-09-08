@@ -1,4 +1,4 @@
--- migration-version: 20260819220000
+-- migration-version: 20260819210107
 -- migration-name:    twin_service_flow_admit_order_and_deal_salts
 -- 0048 — C7 FOLLOW-UP #2, found by re-certification #2 (post-0047 arm 44252690):
 -- a cert tick died with a unique violation on idx_stalls_one_vehicle_per_stall.

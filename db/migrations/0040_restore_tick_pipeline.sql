@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    restore_tick_pipeline
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0040_restore_tick_pipeline.sql
 -- Restore functions damaged by cascade DROP of twin.ottoq_sim_confirm_commands.
 -- Apply via psql: psql -f db/migrations/0040_restore_tick_pipeline.sql

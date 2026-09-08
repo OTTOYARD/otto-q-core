@@ -1,4 +1,4 @@
--- migration-version: 20260830130000
+-- migration-version: 20260830050414
 -- migration-name:    the_release_takes_its_shape_from_the_feed
 -- 0114 -- closes the first known limitation named in db/checks/0047: ottoq_sim_release_depot
 -- was written for sim-feed teardown and also RESETS THE PHYSICAL WORLD -- cancels the depot's

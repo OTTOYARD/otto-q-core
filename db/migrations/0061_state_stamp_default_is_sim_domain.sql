@@ -1,5 +1,7 @@
--- migration-version: 20260820190000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    state_stamp_default_is_sim_domain
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0061 — C7 FOLLOW-UP #15, found by re-certification #15 (post-0060 arms
 -- c5dbc377 vs 943936c5: 19/20 identical, sole divergence sim-min 600 — the
 -- last tick). 0060 HOLDS completely: the command streams are byte-paired in

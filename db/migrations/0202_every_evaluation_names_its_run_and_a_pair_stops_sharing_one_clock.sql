@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    every_evaluation_names_its_run_and_a_pair_stops_sharing_one_clock
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0202  Every evaluation names its run, and the two arms of a pair
 --       stop sharing one clock

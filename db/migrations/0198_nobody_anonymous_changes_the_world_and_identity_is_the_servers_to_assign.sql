@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    nobody_anonymous_changes_the_world_and_identity_is_the_servers_to_assign
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0198  Nobody anonymous changes the world, and identity is the
 --       server's to assign

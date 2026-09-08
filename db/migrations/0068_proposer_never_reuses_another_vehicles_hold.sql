@@ -1,5 +1,7 @@
--- migration-version: 20260822020000
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    proposer_never_reuses_another_vehicles_hold
+-- (applied through a path that writes no supabase_migrations row; the file's
+--  own text is the only record. See task G18.)
 -- 0068 -- THE ISOLATION EXPERIMENT, and (if it lands as predicted) the repair of the
 -- throughput regression 0067 introduced.
 --

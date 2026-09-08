@@ -1,4 +1,4 @@
--- migration-version: 20260830100000
+-- migration-version: 20260830042119
 -- migration-name:    the_one_command_determinism_check
 -- 0110 -- folds the db/checks/0046 determinism instrument into one callable:
 --

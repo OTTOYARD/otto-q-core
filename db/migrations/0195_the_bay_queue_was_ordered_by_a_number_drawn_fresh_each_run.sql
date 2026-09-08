@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_bay_queue_was_ordered_by_a_number_drawn_fresh_each_run
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0195  The bay queue was ordered by a number drawn fresh each run
 -- =====================================================================

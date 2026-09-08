@@ -1,4 +1,4 @@
--- migration-version: 20260819210000
+-- migration-version: 20260819192606
 -- migration-name:    twin_determinism_charge_session_salts
 -- 0047 — C7 FOLLOW-UP: the two salt sites the 0045 census missed, found by the
 -- 0045 standing cert itself.

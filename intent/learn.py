@@ -61,11 +61,34 @@ from dataclasses import dataclass, field
 REFUSAL_KINDS = ("transient", "live_world", "solver_gap")
 
 
+#: WHICH CHANNEL A CODE ACTUALLY ARRIVES ON (finding L-11).
+#:
+#: This module's Refusal docstring and intent/README.md both name
+#: `ottoq_vehicle_commands.reason_code` as THE production source. For one code
+#: that is false, and it is the most consequential one in the taxonomy: the
+#: engine never writes `no_capacity` into that column. It emits it as an
+#: `ottoq_events` payload field on event_type 'ottoq.refusal_escalated'
+#: (db/baseline/functions_ottoq.sql:2373-2380), where 77,435 escalations live
+#: against 0 in the reason_code column. So `tighten_capacity` -- the branch that
+#: tells the loop its capacity model is looser than the world's -- was
+#: STRUCTURALLY DEAD against its declared feed, and nothing said so.
+#:
+#: Annotating the channel does not make the branch live; the offline job that
+#: unions the two feeds is the work that would. What it does is stop the
+#: taxonomy from reading as though every branch were reachable, which is the
+#: same discipline as naming an unknown code instead of absorbing it.
+COMMANDS_CHANNEL = "ottoq_vehicle_commands.reason_code"
+EVENTS_CHANNEL = "ottoq_events payload (event_type='ottoq.refusal_escalated')"
+
+
 @dataclass(frozen=True)
 class RefusalClass:
     kind: str
     learned_constraint: str | None   # the constraint kind to emit when flagged
     rationale: str
+    #: The channel this code is actually written on. A class whose channel is
+    #: not COMMANDS_CHANNEL is NOT reachable from the declared batch source.
+    channel: str = COMMANDS_CHANNEL
 
 
 #: reason_code -> classification. Grounded in 0086 (the refusal-vocabulary
@@ -100,7 +123,9 @@ REFUSAL_TAXONOMY: dict[str, RefusalClass] = {
     "no_capacity": RefusalClass(
         "solver_gap", "tighten_capacity",
         "functions_ottoq: escalated, no capacity. The solver over-estimated the "
-        "site's ability; its capacity model is looser than the world's."),
+        "site's ability; its capacity model is looser than the world's. NOT "
+        "REACHABLE from the declared batch source -- see EVENTS_CHANNEL.",
+        channel=EVENTS_CHANNEL),
     "superseded": RefusalClass(
         "transient", None,
         "0086/0080: a newer command replaced this one. Re-solve already handles "
@@ -154,31 +179,91 @@ class ReconciliationReport:
     #: has not learned — a vocabulary drift that must be reconciled, never
     #: silently absorbed.
     unknown_codes: tuple[str, ...]
+    #: HOW MANY RECORDS COULD NOT BE READ AT ALL (finding L-12). A record whose
+    #: reason_code is None or non-string was skipped: not counted, not in
+    #: unknown_codes, no trace anywhere. The report for a batch of nothing but
+    #: unreadable rows was BYTE-IDENTICAL to the report for an empty batch, and
+    #: is_clean() said True. Migration 0086 deliberately left 14 historical
+    #: refusals with a NULL reason_code as evidence (refusal_has_code is NOT
+    #: VALID), so this is a real shape in the live ledger, not a hypothetical:
+    #: the loop's answer was "everything is clean" when the truth was "I could
+    #: not read these".
+    unreadable: int = 0
+    #: reason_code -> the SHIELD RULE CODES that produced it, when the records
+    #: carry them (finding L-45). Refusal.rule_code was accepted, carried and
+    #: then discarded — _normalize never read it — so the field advertised a
+    #: capability the module did not have. It now reaches the report and the
+    #: flag messages, which is where an operator asks "which rule refused this".
+    rule_codes: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    #: per learned-constraint kind, the entities WITH THEIR EVIDENCE AND
+    #: LIFETIME (finding L-10). See reconcile_refusals.
+    learned_detail: dict[str, list[dict]] = field(default_factory=dict)
 
     def is_clean(self) -> bool:
-        return not self.flags and not self.unknown_codes
+        #: An unreadable record is not clean. It is the one state the old
+        #: report could not express.
+        return not self.flags and not self.unknown_codes and not self.unreadable
 
 
-def _normalize(refusals) -> list[tuple[str, str | None]]:
-    """Normalize a batch of refusals to (reason_code, entity_id) pairs.
+def _normalize(refusals) -> tuple[list[tuple[str, str | None, str | None]], int]:
+    """Normalize a batch to (reason_code, entity_id, rule_code) triples.
 
-    Accepts Refusal instances or any object carrying `reason_code` (str) and an
-    optional `entity_id`. A record with a missing/None reason_code is skipped —
-    it is malformed input, not a vocabulary word.
+    Returns (triples, unreadable_count). Accepts Refusal instances or any object
+    carrying `reason_code` (str) and optional `entity_id` / `rule_code`.
+
+    A record with a missing/None/non-string reason_code is still not classified
+    -- it is malformed input, not a vocabulary word -- but it is now COUNTED
+    (finding L-12). Skipping it silently made a batch of unreadable rows
+    indistinguishable from an empty clean one, which is the difference between
+    "nothing is wrong" and "I could not read this".
     """
-    out: list[tuple[str, str | None]] = []
+    out: list[tuple[str, str | None, str | None]] = []
+    unreadable = 0
     for r in refusals:
         if isinstance(r, Refusal):
-            rc, eid = r.reason_code, r.entity_id
+            rc, eid, rule = r.reason_code, r.entity_id, r.rule_code
         else:
             rc = getattr(r, "reason_code", None)
             eid = getattr(r, "entity_id", None)
+            rule = getattr(r, "rule_code", None)
         if isinstance(rc, str):
-            out.append((rc, eid if isinstance(eid, str) else None))
-    return out
+            out.append((rc,
+                        eid if isinstance(eid, str) else None,
+                        rule if isinstance(rule, str) else None))
+        else:
+            unreadable += 1
+    return out, unreadable
+
+
+#: A LEARNED BLOCK IS FOR THE NEXT SOLVE, AND MUST BE RE-OBSERVED TO PERSIST
+#: (finding L-10). The first version emitted a bare kind -> entity-list map:
+#: no bound on how many points block_points could name, no expiry on any
+#: entry, no confidence, and no inverse operation anywhere in the repo that
+#: ever removes a block. Downstream, model.py raises a hard RuntimeError when a
+#: blocked set makes the model infeasible with no previous plan -- so an
+#: over-large learned block set takes the site from "degraded schedule" to "no
+#: schedule at all", which is the opposite of what learning is for.
+#:
+#: A lifetime of ONE SOLVE is a design statement, not a guessed magnitude:
+#: evidence that is still true will be observed again on the next batch and
+#: renew itself, and evidence that has gone stale expires on its own. Nothing
+#: has to invent how long a fault lasts.
+LEARNED_CONSTRAINT_TTL_SOLVES = 1
+
+#: The share of a kind's capable entities a learned constraint may remove.
+#: An INFERENCE and flagged as one, in the house discipline: there is no
+#: measured AV-depot figure for "how much of a site may be blocked on
+#: evidence". Half is the point at which a block set stops being a correction
+#: and starts being an outage, and a caller with a measured number passes its
+#: own. It binds only when the caller declares how many capable entities exist
+#: -- this module never guesses the denominator.
+DEFAULT_MAX_BLOCK_FRACTION = 0.5
 
 
 def reconcile_refusals(refusals, *, entity_repeat_threshold: int = 2,
+                       capable_entities: dict[str, int] | None = None,
+                       max_block_fraction: float = DEFAULT_MAX_BLOCK_FRACTION,
+                       run_id: str | None = None,
                        ) -> ReconciliationReport:
     """Classify a batch of refusals and emit the reconciliation report.
 
@@ -194,12 +279,26 @@ def reconcile_refusals(refusals, *, entity_repeat_threshold: int = 2,
                       beyond `entity_repeat_threshold` (default 2). A stuck fault
                       or stale occupancy is a pattern; diffuse races are noise.
       * transient   — never flags (superseded / run_ended are expected).
+
+    `capable_entities` maps a learned-constraint kind to HOW MANY entities of
+    that kind the site has, and is the denominator for the block cap: when a
+    kind's learned set would exceed `max_block_fraction` of it, the constraint
+    is NOT emitted and a flag says so instead. Learning that would black out
+    the site is a finding about the evidence, not a schedule. Left None, no cap
+    binds -- this module refuses to guess a site's capacity (finding L-10).
+
+    `run_id` is echoed into every learned entry so a constraint fed forward can
+    be traced to the batch that produced it.
     """
-    norm = _normalize(refusals)
+    norm, unreadable = _normalize(refusals)
 
     counts: dict[str, int] = {}
     unknown: set[str] = set()
-    for rc, _eid in norm:
+    rules: dict[str, set[str]] = {}
+    for rc, _eid, rule in norm:
+        if rule:
+            rules.setdefault(rc, set()).add(rule)
+    for rc, _eid, _rule in norm:
         if rc in REFUSAL_TAXONOMY:
             counts[rc] = counts.get(rc, 0) + 1
         else:
@@ -209,16 +308,18 @@ def reconcile_refusals(refusals, *, entity_repeat_threshold: int = 2,
 
     # entity-pair repetition, for the live_world flag
     pairs: dict[tuple[str, str], int] = {}
-    for rc, eid in norm:
+    for rc, eid, _rule in norm:
         if rc in REFUSAL_TAXONOMY and eid is not None:
             pairs[(rc, eid)] = pairs.get((rc, eid), 0) + 1
 
     flags: list[tuple[str, int, str]] = []
     for code, n in sorted(counts.items()):
         cls = REFUSAL_TAXONOMY[code]
+        by = (f" [shield rules: {', '.join(sorted(rules[code]))}]"
+              if rules.get(code) else "")
         if cls.kind == "solver_gap":
             flags.append((code, n,
-                          f"solver_gap '{code}' fired {n}x — a proposal the "
+                          f"solver_gap '{code}' fired {n}x{by} — a proposal the "
                           f"shield could not even validate; fix the emitter or "
                           f"reconcile the frame ({cls.rationale})"))
         elif cls.kind == "live_world":
@@ -226,7 +327,7 @@ def reconcile_refusals(refusals, *, entity_repeat_threshold: int = 2,
                        if rc == code and k > entity_repeat_threshold]
             if repeats:
                 flags.append((code, n,
-                              f"live_world '{code}' repeated on "
+                              f"live_world '{code}'{by} repeated on "
                               f"{sorted(set(repeats))} beyond threshold "
                               f"{entity_repeat_threshold} — stale telemetry or a "
                               f"stuck resource; refresh before the next solve"))
@@ -234,7 +335,8 @@ def reconcile_refusals(refusals, *, entity_repeat_threshold: int = 2,
 
     # learned constraints: union over flagged codes' learned_constraint kinds,
     # with the offending entities where the signal carries one.
-    learned: dict[str, set[str]] = {}
+    #: kind -> entity -> how many times that entity carried the code.
+    learned: dict[str, dict[str, int]] = {}
     for code in counts:
         cls = REFUSAL_TAXONOMY[code]
         lc = cls.learned_constraint
@@ -247,7 +349,7 @@ def reconcile_refusals(refusals, *, entity_repeat_threshold: int = 2,
                         for (rc, _e), k in pairs.items())))
         if not flagged:
             continue
-        learned.setdefault(lc, set())
+        learned.setdefault(lc, {})
         # Populate from the SAME predicate that flagged the code. A live_world
         # code is flagged because some entity repeated past the threshold; only
         # those entities belong in the constraint. Naming every entity that ever
@@ -259,19 +361,56 @@ def reconcile_refusals(refusals, *, entity_repeat_threshold: int = 2,
             if rc != code:
                 continue
             if cls.kind == "solver_gap" or k > entity_repeat_threshold:
-                learned[lc].add(eid)
+                learned[lc][eid] = learned[lc].get(eid, 0) + k
         # The key stays even when the set is empty: a solver_gap refusal that
         # carried no entity_id still means "fix the emitter", and dropping the
         # key would lose that. A flagged live_world code always contributes at
         # least one entity, since that is what flagged it.
 
-    learned_constraints = {k: sorted(v) for k, v in sorted(learned.items())}
+    #: THE CAP, AND WHAT HAPPENS WHEN IT BINDS. Refusing to learn is itself a
+    #: finding: the flag says the site would have been blacked out, which an
+    #: operator can act on, where a silent RuntimeError from the solver three
+    #: layers down is not actionable at all.
+    capped: set[str] = set()
+    if capable_entities:
+        for kind, entities in sorted(learned.items()):
+            total = capable_entities.get(kind)
+            if not total or not entities:
+                continue
+            allowed = max_block_fraction * total
+            if len(entities) > allowed:
+                capped.add(kind)
+                flags.append((
+                    kind, len(entities),
+                    f"learned '{kind}' would remove {len(entities)} of {total} "
+                    f"capable entities, past the {max_block_fraction:g} cap — "
+                    f"NOT learned. A block set this size stops being a "
+                    f"correction and becomes an outage; the site would go from "
+                    f"a degraded schedule to no schedule at all"))
+        flags.sort(key=lambda f: f[0])
+
+    learned_constraints = {k: ([] if k in capped else sorted(v))
+                           for k, v in sorted(learned.items())}
+    #: EVERY LEARNED ENTRY CARRIES ITS EVIDENCE AND ITS LIFETIME. A bare id
+    #: could not say how often it was observed, which batch produced it, or
+    #: when it stops applying -- so nothing could ever unlearn it.
+    learned_detail = {
+        k: [{"entity": e,
+             "observed_count": learned[k][e],
+             "run_id": run_id,
+             "expires_after_n_solves": LEARNED_CONSTRAINT_TTL_SOLVES}
+            for e in learned_constraints[k]]
+        for k in learned_constraints}
 
     return ReconciliationReport(
         counts=counts, kinds=kinds, flags=tuple(flags),
         learned_constraints=learned_constraints,
         unknown_codes=tuple(sorted(unknown)),
+        unreadable=unreadable,
+        rule_codes={k: tuple(sorted(v)) for k, v in sorted(rules.items())},
+        learned_detail=learned_detail,
     )
+
 
 
 # ---------------------------------------------------------------------------

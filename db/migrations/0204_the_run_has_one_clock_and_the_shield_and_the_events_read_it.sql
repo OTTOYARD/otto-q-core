@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_run_has_one_clock_and_the_shield_and_the_events_read_it
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0204  The run has one clock, and the shield and the events read it
 -- =====================================================================

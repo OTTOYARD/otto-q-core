@@ -1,3 +1,5 @@
+-- migration-version: 20260903225512
+-- migration-name:    kpi_one_reported_more_hours_than_the_window_could_hold
 -- =====================================================================
 -- 0182  KPI 1 reported more hours than the window could hold
 -- =====================================================================

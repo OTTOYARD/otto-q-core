@@ -1,4 +1,4 @@
--- migration-version: 20260820040000
+-- migration-version: 20260820031245
 -- migration-name:    run_stable_cursor_order_full_sweep
 -- 0054 — C7 FOLLOW-UP #8, found by re-certification #8 (post-0053 arms
 -- c1389c7b vs 5d986813: 1/20 identical, first divergence sim-min 60). The

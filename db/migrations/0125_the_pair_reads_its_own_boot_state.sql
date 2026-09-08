@@ -1,4 +1,4 @@
--- migration-version: 20260830233000
+-- migration-version: 20260830213611
 -- migration-name:    the_pair_reads_its_own_boot_state
 -- 0125 -- the Round-2 instrument (db/checks/0050: "next instrument"). The 171717/24t
 -- column forks with equal end-fingerprints, equal boot fp-covered state (the fixpoint),

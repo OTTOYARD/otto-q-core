@@ -1,4 +1,4 @@
--- migration-version: 20260831200000
+-- migration-version: 20260831202425
 -- migration-name:    the_site_limit_is_an_input
 -- 0136 -- the power-publication boundary, enforced in the direction it was always written.
 --

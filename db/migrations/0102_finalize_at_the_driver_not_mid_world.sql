@@ -1,4 +1,4 @@
--- migration-version: 20260830023000
+-- migration-version: 20260829222909
 -- migration-name:    finalize_at_the_driver_not_mid_world
 -- 0102 -- corrects 0101, caught by its own smoke test BEFORE any real run depended on it.
 --

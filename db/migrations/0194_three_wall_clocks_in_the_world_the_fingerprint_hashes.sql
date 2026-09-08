@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    three_wall_clocks_in_the_world_the_fingerprint_hashes
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0194  Three wall clocks in the world the fingerprint hashes
 -- =====================================================================

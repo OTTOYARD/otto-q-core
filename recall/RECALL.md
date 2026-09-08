@@ -24,8 +24,26 @@ mining pack and a vertiport pack consume the same three structs unchanged).
 
 | Name | What it is | Why it exists |
 |---|---|---|
-| `naive_threshold_v1` | **Deliberately naive.** The rung ladder of the live `public.ottoq_evaluate_return_need` (captured md5 `0c463ada…`) as fixed thresholds, top-down, first hit wins: critical_reserve → fault_safety_critical → fault_major → low_soc_reserve → comms_stale → (behind the contention gate) service_interval_due → sensor_soil → wash_cadence. No forecasting, no cost model, no learning. | So the interface is real on day one and every smarter successor has a baseline to beat on the same ledger. |
+| `naive_threshold_v1` | **Deliberately naive.** The rung ladder now live as `public.ottoq_recall_naive_threshold_v1` (md5 `cd3ffc2a…`; it WAS `public.ottoq_evaluate_return_need` until migration 0206, md5 `0c463ada…`, which is the body captured in `db/fn_current/`) as fixed thresholds, top-down, first hit wins: critical_reserve → fault_safety_critical → fault_major → low_soc_reserve → comms_stale → (behind the contention gate) service_interval_due → sensor_soil → wash_cadence. No forecasting, no cost model, no learning. | So the interface is real on day one and every smarter successor has a baseline to beat on the same ledger. |
 | `fixed_window_dummy` | Recalls everything inside a fixed window. Not a policy anyone should run. | The **swap proof**: demonstrates config-swappability with zero call-site changes. |
+
+### Where the ladder lives, and where the wrapper lives
+
+Migration 0206 split one function into two, and any note citing the old name is
+now pointing at the wrong one:
+
+| live function | md5 | what it is |
+|---|---|---|
+| `public.ottoq_recall_naive_threshold_v1` | `cd3ffc2a…` | the rung ladder itself |
+| `public.ottoq_evaluate_return_need` | `53018872…` | the wrapper: reads `recall_implementation_id` from the run's policy, `EXECUTE`s whichever evaluator `ottoq_recall_implementations` names for it, and writes the row to `ottoq_recall_decisions` with its content hash |
+
+`db/fn_current/public.ottoq_evaluate_return_need.sql` holds the **pre-0206**
+body, md5 `0c463ada…`. It is still byte-exact for the ladder — renaming the live
+`ottoq_recall_naive_threshold_v1` back to `ottoq_evaluate_return_need` md5s to
+`0c463ada…`, and the name occurs exactly once in the definition, so the rename is
+the whole difference — but it sits under a name that now belongs to the wrapper.
+The capture's header says so, and `recall/test_recall.py` refuses a capture whose
+header hash and body have drifted apart.
 
 **Swapping is a config change, never a code change:**
 `make_recall({"implementation": "naive_threshold_v1"})` vs
@@ -58,6 +76,39 @@ It never raises. The C8 scenario `work_side_recall_refusal`
 (`sites/site_alpha/`) exercises the downstream consequence: refused assets
 return 90 min late and re-enter the queue with immediate urgency
 (`policy_otto_q_asis` orders refused-recall returns first).
+
+### And now in the database too, which it was not until 0211/0212
+
+Everything above described the kernel. In the engine, the work side had no
+voice at all: `twin.ottoq_sim_advance_deployed_telemetry` is the only consumer
+of a recall decision in the tick, and it went straight from `should_return` into
+the return handshake — ETA, `ottoq_book_appointment`, `status = 'returning'`.
+Nothing asked. `recall_refused` had been in `ottoq_event_types_catalog` since
+migration 0045 on 2026-08-19, described as "first-class, triggers re-solve
+(C9)", and had been emitted **zero times**. So had `recall_issued`,
+`move_start`, `move_end` and `touch_event`.
+
+| | kernel (`recall/`) | engine (0211 + 0212) |
+|---|---|---|
+| the seam | `work_side_accepts` callback | `public.ottoq_work_side_accepts` |
+| the ledger | `RecallEventLog.records` | `public.ottoq_recall_refusals`, append-only |
+| the event | `recall_refused` in the log | `recall_refused` in `ottoq_events` |
+| re-solve | the `resolve` hook | `v_should_return := false`; the asset stays deployed and the next tick decides again |
+| refusability | critical recalls are not refusable | non-deferrable recalls are not refusable |
+
+The re-solve is the part worth reading twice. It needed no new machinery: the
+tick already had a branch for "a deferrable need with no free stall keeps the
+car deployed and earning, retrying next tick". A refusal joins that branch. The
+site is never without a schedule because it never lost one.
+
+**A refusal is drawn from the run's CRN stream** (`ottoq_crn_draw`), never from
+`random()`, at `work_side_recall_refusal_rate` — default 0, so the work side
+never refuses unless a run asks. Proved on grid_smoke/424242/6t: at rate 0 all
+eight canon hashes reproduced the pre-change baseline exactly; at rate 1.0 the
+pair still PASSED with both arms byte-identical while `h_evt`, `h_bkg`, `h_dec`
+and `h_rcl` all moved. Identical arms mean the refusal is reproducible; moved
+hashes mean it reached the schedule instead of being recorded and ignored.
+Either half alone would have proved nothing. `db/checks/0122` holds the queries.
 
 ## Lineage and forward path
 

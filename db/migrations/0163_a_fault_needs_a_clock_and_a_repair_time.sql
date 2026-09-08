@@ -1,3 +1,5 @@
+-- migration-version: 20260902200406
+-- migration-name:    a_fault_needs_a_clock_and_a_repair_time
 -- =====================================================================
 -- 0163  A fault needs a clock and a repair time
 --       forces_recert = TRUE; inert for any depot declaring no fault.

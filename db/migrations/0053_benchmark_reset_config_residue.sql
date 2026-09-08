@@ -1,4 +1,4 @@
--- migration-version: 20260820030000
+-- migration-version: 20260820014345
 -- migration-name:    benchmark_reset_config_residue
 -- 0053 — C7 FOLLOW-UP #7, found by re-certification #7 (post-0052 arms
 -- 483954ce vs 4b626bb7: 8/20 identical, first divergence sim-min 210 — again

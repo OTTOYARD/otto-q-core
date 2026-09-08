@@ -1,4 +1,4 @@
--- migration-version: 20260830180000
+-- migration-version: 20260830134026
 -- migration-name:    the_coin_had_two_holds
 -- 0119 -- the Y/Z bistability of pairs 18/23/24 (db/checks/0046), run to ground. Vehicle
 -- 87098f16's exception flow left it holding TWO live perimeter_hold bookings with the SAME

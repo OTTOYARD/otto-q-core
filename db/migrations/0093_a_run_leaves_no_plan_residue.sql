@@ -1,4 +1,4 @@
--- migration-version: 20260829220000
+-- migration-version: 20260829171749
 -- migration-name:    a_run_leaves_no_plan_residue
 -- 0093 -- check 0046 bleed #1, measured to the key. A rolled-back probe (seeded reset ->
 -- snapshot -> 2-tick run -> teardown -> same-seed reset -> snapshot -> column diff) showed

@@ -1,3 +1,5 @@
+-- migration-version: 20260903230222
+-- migration-name:    kpi_two_counted_a_booking_nobody_kept_as_a_turn
 -- =====================================================================
 -- 0183  KPI 2 counted a booking nobody kept as a turn
 -- =====================================================================

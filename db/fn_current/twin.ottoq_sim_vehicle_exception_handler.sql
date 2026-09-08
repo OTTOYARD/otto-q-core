@@ -1,5 +1,10 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run3/C7)
 -- md5 at capture: 9cc341164274174bad52476463b3ff09
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live f564ad9dd11b8c366a5438a9a2e26e7c
+--   here 9cc341164274174bad52476463b3ff09
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_vehicle_exception_handler(p_depot_id uuid, p_sim_clock timestamp with time zone, p_sim_run_id uuid DEFAULT NULL::uuid)
  RETURNS integer
  LANGUAGE plpgsql

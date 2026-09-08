@@ -12,12 +12,28 @@ sector it is in: AssetState/WorkSideSignals/SiteForecast are sector-free.
 Two implementations ship:
 
   * NaiveThresholdRecall — DELIBERATELY NAIVE, and documented as such. It is a
-    faithful reduction of the live rung ladder in
-    public.ottoq_evaluate_return_need (captured md5 0c463ada… in
-    db/fn_current/): fixed thresholds, evaluated top-down, first hit wins.
-    It contains no forecasting, no optimization, no learning. It exists so the
-    interface is real on day one and so every smarter successor has a baseline
-    to beat ON THE SAME LEDGER.
+    faithful reduction of the live rung ladder: fixed thresholds, evaluated
+    top-down, first hit wins. No forecasting, no optimization, no learning. It
+    exists so the interface is real on day one and so every smarter successor
+    has a baseline to beat ON THE SAME LEDGER.
+
+    WHERE THAT LADDER LIVES MOVED, AND THIS NOTE MOVED WITH IT. Until migration
+    0206 the ladder WAS public.ottoq_evaluate_return_need, md5 0c463ada, and
+    that is the body captured in db/fn_current/. 0206 copied it out under a new
+    name and left a dispatcher behind, so today:
+
+        public.ottoq_recall_naive_threshold_v1   md5 cd3ffc2a  — the ladder
+        public.ottoq_evaluate_return_need        md5 53018872  — the wrapper:
+            reads recall_implementation_id from the run's policy, EXECUTEs
+            whichever evaluator the registry names, and writes the decision to
+            ottoq_recall_decisions with its content hash
+
+    The capture is still byte-exact for the ladder — renaming
+    ottoq_recall_naive_threshold_v1 back to ottoq_evaluate_return_need in the
+    live definition md5s to 0c463ada, and the name occurs exactly once — but it
+    is the PRE-0206 body under a name that now belongs to the wrapper. Calling
+    it "the live ottoq_evaluate_return_need", as this docstring did, pointed a
+    reader at a dispatcher and called it a ladder.
   * FixedWindowRecall — a deliberately trivial second implementation whose only
     job is to PROVE config-swappability: the call site (`run_recall_cycle`)
     is byte-identical for both. It is not a policy anyone should run.

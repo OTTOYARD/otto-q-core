@@ -1,4 +1,4 @@
--- migration-version: 20260820070000
+-- migration-version: 20260820121029
 -- migration-name:    vehicle_state_trigger_preserve_caller_clock
 -- 0057 — C7 FOLLOW-UP #11, found by re-certification #11 (post-0056 arms
 -- 112fea03 vs 5a209c14: 3/20 identical, first divergence sim-min 120). The

@@ -1,5 +1,7 @@
--- migration-version: 20260824200500
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    cert_arm_step_raises_on_short_advance
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0071 -- HARNESS ONLY. public.ottoq_cert_arm_step now RAISES when it advances fewer ticks than
 -- it was asked for, instead of returning the smaller number and saying nothing.
 --

@@ -1,4 +1,4 @@
--- migration-version: 20260827210000
+-- migration-version: 20260829160215
 -- migration-name:    the_archive_carries_its_key
 -- 0074 -- The run archive writes its own reproducibility key. Found by fixing the K3
 -- certification in db/checks/0044_kpi_certification.sql: the moment K3 could fail, it did.

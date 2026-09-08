@@ -1,5 +1,10 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
 -- md5 at capture: 6c5969d0c3935015f4a5643e13806ff6
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live 32fca2146e141c259bf82fb3bf313983
+--   here 6c5969d0c3935015f4a5643e13806ff6
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION public.ottoq_enact_cuopt_batch(p_sim_run_id uuid, p_depot_id uuid, p_clock timestamp with time zone, p_tick bigint, p_snapshot_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql

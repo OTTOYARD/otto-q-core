@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    purge_orphans
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0037_purge_orphans.sql
 -- P2-10: The purge function only cleans children of runs that STILL EXIST
 -- in ottoq_sim_runs. When a run is deleted (not purged), its children are

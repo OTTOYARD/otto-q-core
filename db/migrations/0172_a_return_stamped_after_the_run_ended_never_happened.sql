@@ -1,3 +1,5 @@
+-- migration-version: 20260903003438
+-- migration-name:    a_return_stamped_after_the_run_ended_never_happened
 -- 0172  A return stamped after the run ended never happened. KPI only; forces_recert = false.
 --
 -- The 48-tick pair (sim_run_seq 1773/1774) reported returns_deferred_beyond_horizon = 7

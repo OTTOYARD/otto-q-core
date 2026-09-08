@@ -1,5 +1,10 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
 -- md5 at capture: c99394c4cbd7436574e7a17b02dbc348
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live 3d7fa12fec5fe860854d8416dd8e4840
+--   here c99394c4cbd7436574e7a17b02dbc348
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION public.ottoq_l2_optimize_assignments(p_sim_run_id uuid, p_depot_id uuid, p_sim_clock timestamp with time zone)
  RETURNS integer
  LANGUAGE plpgsql

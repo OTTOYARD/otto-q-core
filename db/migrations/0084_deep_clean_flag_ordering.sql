@@ -1,5 +1,7 @@
--- migration-version: 20260828100000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    deep_clean_flag_ordering
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0084 -- Fix the ordering defect in 0083: v_deep_clean_due was COMPUTED AFTER the deep-clean
 -- gate already read it, so the flag was always false when the IF evaluated it. A soiled/biohazard
 -- vehicle therefore still deployed without a deep-clean atom.

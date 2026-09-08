@@ -1,3 +1,13 @@
+-- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, date not recorded
+-- md5 at capture: 44a2662e58035152120de463645380ca
+--   (this pin was computed FROM THIS FILE on 2026-09-08 because the capture shipped without one.
+--    It therefore proves only that the file has not been edited SINCE; it is not evidence
+--    about the catalog. The live comparison on the next line is.)
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live f2014058b6e1c07530a7db0203efbfc1
+--   here 44a2662e58035152120de463645380ca
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION public.ottoq_benchmark_reset(p_depot uuid, p_arrival_soc numeric DEFAULT 30, p_target_soc numeric DEFAULT 80)
  RETURNS void
  LANGUAGE plpgsql

@@ -1,5 +1,7 @@
--- migration-version: 20260821010000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    hold_outlives_its_command
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0064 — THE RESERVATION-EXPIRY RACE. Founder-approved (Option 1) on 2026-08-21.
 -- This is the first migration in the determinism series that deliberately
 -- CHANGES ENGINE BEHAVIOUR, so it is called out rather than buried: it extends

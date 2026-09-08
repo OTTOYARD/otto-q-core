@@ -1,3 +1,5 @@
+-- migration-version: 20260904015708
+-- migration-name:    the_percentile_that_dropped_its_worst_cases
 -- =====================================================================
 -- 0188  The percentile that dropped its worst cases
 -- =====================================================================

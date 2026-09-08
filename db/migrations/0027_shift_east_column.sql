@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    shift_east_column
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0027: shift staging_east column east to clear lane overlap (P1-5)
 -- The E-column staging stalls at x=437.2121 (both depots) overlap the northbound
 -- driving lane by 0.9 plan units. Moved 2 plan units east (3.14 ft) to match

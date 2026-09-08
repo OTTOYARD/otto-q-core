@@ -1,4 +1,4 @@
--- migration-version: 20260831150000
+-- migration-version: 20260831150515
 -- migration-name:    the_energy_path_joins_the_certification
 -- 0133 -- the defect db/checks/0051 documented: two byte-identical arms produced different
 -- peak_site_kw, so the demand-charge number was not reproducible even though the scheduler was.

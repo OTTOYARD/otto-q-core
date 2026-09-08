@@ -1,3 +1,5 @@
+-- migration-version: 20260902194149
+-- migration-name:    the_sixth_kpi_did_the_asset_make_its_due_time
 -- =====================================================================
 -- 0158  The sixth KPI: did the asset make its due time?
 --       READ-ONLY measure + one grid row. forces_recert = false.

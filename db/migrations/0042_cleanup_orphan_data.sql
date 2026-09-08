@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    cleanup_orphan_data
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0042_cleanup_orphan_data.sql
 -- Clean up orphan data in the database that is not associated with existing simulation runs.
 -- This migration targets:

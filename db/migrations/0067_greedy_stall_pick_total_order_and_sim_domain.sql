@@ -1,5 +1,7 @@
--- migration-version: 20260822013000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    greedy_stall_pick_total_order_and_sim_domain
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0067 -- THE REMAINING DETERMINISM RESIDUE, ROOT-CAUSED FROM THE FIRST PINNED BASELINE
 -- (re-cert #19, arms 88ed727f / 81ee350d, verdict 10/20, first divergence sim-min 330).
 -- Two defects in public.ottoq_l2_optimize_assignments, the 'greedy_constrained' proposer.

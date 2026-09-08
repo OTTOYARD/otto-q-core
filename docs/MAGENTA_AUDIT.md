@@ -23,6 +23,70 @@ and both directions are recorded because the point of the pass is the number, no
 | **Coverage was UNDER-counted at 31.** That figure counted outcome ROWS; several rows close more than one numbered finding. The true figure is **33 fixed**, plus `L-31`, `L-49` as duplicates and `L-13` closed by construction (the L-02 fix put the day-of-week multiplier on both sides of the comparison, where it cancels) — **36 of 87** | — |
 | **L-51 is CONFIRMED LIVE, and it sits on a line this session edited twice.** `max_daily_soc_pct` appears nowhere in `forward_proposer.py`, so `_clamp_target` falls back to 100 and the R-11 chemistry cap is a no-op on every production frame. T13 passes because it calls the clamp directly with a hand-built dict and never goes through the bridge. A green guard over a dead production path — the exact class this audit exists to find. **NOT fixed: closing it changes live behaviour** (capped classes would be asked for 80% instead of 90%), which is a product decision, not a verification-pass cleanup | `grep max_daily_soc_pct proposer/forward_proposer.py` → no match; `model.py:201` |
 
+**SECOND PASS — 2026-09-08, the `forward_proposer.py` cluster.** Seven more closed, every one
+mutation-proved on the same bar (restore the pre-fix code, require the named guard RED, restore,
+require GREEN): **L-22, L-23, L-24, L-25, L-41, L-42, L-52**, then the `orchestrate.py` cluster **L-43, L-44, L-57**, then the `signals.py` cluster **L-14, L-15, L-16, L-17, L-46, L-47, L-48**, then **L-18** and **L-21** in the lexicographic chain, then the `learn.py` cluster **L-10, L-11, L-12, L-45**, then **L-38, L-55, L-56** in the intent artifact and resolver, **L-33, L-34, L-54** in ottoq-intelligence's priors, the `model.py` cluster **L-27, L-28, L-29, L-30**, **L-36, L-39, L-50, L-53**, **L-40**, and **L-19, L-20** in the lexicographic chain. Ninety mutations across the thirty-nine that could be mutated
+(L-40 is a corrected claim, not a code change), all caught. Two of them needed the database, not just the file — the frame did not carry the
+class join key or the stall's accepted-inlet list, so migration **0209** put both there (evidence
+in `db/checks/0120`) — which is why they had survived four earlier passes over the same file.
+**Coverage is 85 of 87, and that number is now DERIVED rather than asserted.**
+
+Until this pass it was neither. Every one of the 87 findings carried the same never-ticked
+checklist — `- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test` — all 87 unticked, including
+the three dozen that had been fixed, mutation-proved and shipped. The coverage figure lived only in
+this header, counted by hand from prose outcome rows, several of which name a finding by its
+sentence rather than its id (six rows begin "G " and no more), and two of which use a pre-list
+numbering where `L-01` means what the master list calls `L-05`. Three successive recounts of that
+prose gave 31, then 36, then 76 — a number nobody could check and everybody was guessing at,
+in a repository whose first rule is that no number ships without a run ID.
+
+Each finding now carries a **Disposition** line instead: one of `FIXED`, `CORRECTED`, `DUPLICATE`,
+`BY_CONSTRUCTION`, `REFUTED` or `OPEN`, and every `FIXED` names the guard that fails without the
+fix, as a real `path::test_name`. `tests/test_audit_ledger.py` parses this file and refuses a
+disposition whose vocabulary is wrong, a named guard whose file or function does not exist, a
+`DUPLICATE` pointing at an id that is itself open or missing, a finding count that is not 87, and —
+the point of the exercise — **a header count that disagrees with the dispositions below it.** The
+sentence you are reading cannot drift from the document any more; editing one without the other
+turns CI red.
+
+The honest recount is 85, higher than the 76 the prose gave, because prose undercounts duplicates
+and doc corrections. Seventy-one are FIXED with a named guard, seven are DUPLICATEs of another
+finding at the same line (the twelve-dimension fan-out's dedup stage was cancelled with its verify
+stage), six are CORRECTED claims with no code path to change, and one — L-13 — is closed by
+construction by the L-02 fix.
+
+**The two that are OPEN are S-01 and S-02, and they are open on purpose.** The code half is fixed
+and pinned: the literal is gone and the bridge fails closed. But a committed secret stays
+compromised until it is rotated, and rotation is an operator action on EC2 and Supabase that is
+Chase's, not mine. Marking them fixed because the code changed would be exactly the class of
+defect this audit exists to find.
+
+Three things this cluster found that were not in any finding. Composing the connector into the
+kernel's capability label silently disabled the DCFC cooldown, because the kernel infers an
+18-minute min-gap from the literal string `"dcfc"`; measured on the crowded fixture, T\* went
+from 0 to 178 and the whole suite stayed green but for two status assertions. The bridge now
+DECLARES `min_gap_min` rather than leaving the kernel to infer it. And `proposer/test_orchestrate.py`'s
+stall fixture omitted `connector_type` entirely — a field every real stall carries — so it could
+not have exercised the inlet rule at all. The fixture was wrong, not the code, and it now
+reproduces the flagship depot's actual shape.
+
+And the L-29 guard segfaulted the whole test suite from two hundred tests away. `.Proto()` on a
+CP-SAT variable — the deprecated CamelCase spelling — is a pybind11 binding on the pinned ortools
+(9.15.6755) that hands back a proto reference the Python object does not own; reading the value
+works, and the interpreter then dies in `Garbage-collecting` at whatever unrelated line the
+collector next runs on. Two such calls in one new test killed `pytest` at 82%, with a traceback
+naming `new_int_var` inside `tests/test_separation.py`, a file this session never touched. The
+crash was reproduced identically twice, refuted as a memory problem (142 MB against 15 GB), and
+refuted as an allocation threshold — HEAD survives the ENTIRE suite run twice in one interpreter,
+846 tests, clean — before a bisect narrowed it to one test and then to one accessor. It is a
+twenty-line standalone reproducer. The fix is `.proto`, which returns the same `ConstraintProto`
+and survives collection, and
+`test_no_source_uses_the_crashing_proto_accessor` now scans every `.py` in the repo for the
+CamelCase spelling with comments and strings stripped by `tokenize` — because this file's own
+prose says `.Proto()` a dozen times, and a scan that counts a bare token matches its own
+explanation. Worth stating plainly: a green suite is not the same as a suite that RAN, and
+nothing in that traceback pointed within two hundred tests of the real call site.
+
 **A methodological note worth keeping.** The verification harness asserts that a mutation changed
 the FILE. It cannot assert that the mutation changed the MEANING, and twice it did not:
 `"complete": True and (expr)` is identical to `(expr)`, and three anchor strings never matched at
@@ -56,6 +120,45 @@ Counts: 14 critical, 50 major, 23 minor.
 | G the min_flow pass's peak ceiling has no test | **FIXED**; a property test measures tardiness, flow and peak FROM THE SHIPPED PLAN on both three-pass orders. Deleting the threading reports "min_peak said 150, plan measures 460" |
 | G the CP-SAT battery contributes zero pytest tests | **FIXED**; a `test_cpsat_battery()` wrapper. The artifact comparison stays under `__main__` |
 | **L-51 the R-11 chemistry cap never reaches production** | **FIXED 09-08**, and it was wider than filed. The production class table (`ottoq_vehicle_classes`) has NO `max_daily_soc_pct` column at all — it declares `battery_chemistry` (6 NMC, 1 NCA, 2 null) — and `frame_to_scenario` copied neither, so `_clamp_target` fell through to 100 on every live frame while T13 passed by calling it directly with a hand-built dict. The bridge now resolves the cap explicit-first, then via a cited chemistry table (`CHEMISTRY_DAILY_SOC_CAP_PCT`, NMC/NCA → 80, the same sources R-11 already cites), and an unknown chemistry gets NO cap rather than a guessed one. Four guards incl. end-to-end through the bridge; removing the passthrough turns two red. Corroboration: the intent artifact's own `tier3_constraints` names `max_daily_soc_pct` as a tier-3 shield constraint |
+| **L-24 one NULL row destroys the whole batch** | **FIXED 09-08.** Two defaults for one field: the admission predicate read `target_soc or 100`, the scenario row `target_soc or 90`, so a null-target vehicle at 95% was admitted as needing charge and then handed to the kernel already past its target. And `float(v["soc"])` raised on a null the frame contract permits, taking every other vehicle's proposal down with it. One default now (90, the kernel's own), resolved once per vehicle; a null/unreadable soc and a target at or below the soc both ABSTAIN with a reason. The target guard compares the INTEGERS the kernel receives, not the floats they arrived as — 89.6 and 90.0 both round to 90 and the kernel would build no charge segment. Five mutations, all caught |
+| **L-25 the advisory row discards the taper** | **FIXED 09-08.** `requested_kw` was the FIRST segment's kW while `planned_start`/`planned_end` spanned all of them, so the row invited kW × duration — and CLAUDE.md 2.6 sends this substrate into the SDR, so the overstatement would have settled. The rationale now carries `segments` and `planned_kwh` (the integral, not the rectangle), and `requested_kw` is the PEAK segment: the number a connector must be able to deliver. Reverting either turns a guard red |
+| **L-23 the hot path had no `complete` field** | **FIXED 09-08.** The regime branch has surfaced `complete` since it was written; the DEFAULT two-pass branch — the one production actually runs — did not, so a caller reading `solver.get("complete")` got `None` on every hot-path invocation and could not tell a truncated plan from a whole one. Worse, a retained pass 2 IS pass 1's schedule wearing pass 2's name, and `reproducible` read true through it. Both branches now report `complete` and `retained_previous` with one meaning |
+| **L-22 the fire record published numbers the plan did not have** | **FIXED 09-08.** `total_tardy_min` / `site_peak_kw` / `total_flow_min` were the per-pass optima re-reported, never measured from `final_plan` — which a LATER pass produces. All three are now measured off the shipped plan with the same definitions the model optimizes (the peak from the charge-segment step function, since `plan["site_peak_kw"]` exists only when a peak pass ran last), the per-pass values are kept as `optima_reached`, and `_check_optima` RAISES `ChainError` if the plan violates a ceiling the chain claims to hold. A consequence stated rather than hidden: a flow figure is now reported even for a regime that never optimized flow — `optima_reached` is what the chain actually held. Seven mutations, all caught |
+| **L-42 a plug that does not fit was not a scheduling constraint** | **FIXED 09-08, in code and in the database.** `charge_kinds` — the field that alone decides which stall types a vehicle may reach — silently defaulted to both charging types, and `frame_to_scenario` read NEITHER the vehicle's `inlet_type` NOR the stall's `connector_type`, though the frame carries both. It is now required (refused like `battery_kwh`), and the plug is folded into the kernel's own capability label (`dcfc@CCS1`, `dcfc@CCS1+NACS`) so the kernel never learns what a connector is. **The rule is not invented: the L1 shield already owns it** — a `Multi` stall passes iff the inlet is in its `supported_inlet_types`, else exact match. The frame did not emit that list, so only half the rule was reachable; migration **0209** adds it. Measured: all 84 flagship charging stalls are `Multi` with `{CCS1,NACS}` against a CCS1/NACS fleet, so a literal comparison would abstain on all 220 vehicles and ignoring both proposed a PAD-inlet AMR onto a 350 kW DC connector. One trap found on the way: composing the label silently killed the kernel's `kind == "dcfc"` cooldown fallback, so the bridge now DECLARES `min_gap_min`. Ten mutations, all caught |
+| **L-41 the production class join did not exist** | **FIXED 09-08.** `proposer/README.md` said the class table is "the `ottoq_vehicle_classes` join". Three things made that a sentence and not an integration: the table is keyed by `vehicle_class_code` and the frame emitted only `platform`, which the table has no column for; its columns are `battery_capacity_kwh`/`max_charge_rate_kw`, so a row passed verbatim raised `KeyError`; and it had no `charge_kinds` column at all. Migration **0209** adds the key to the frame and the column to the table (backfilled from `fast_charge_compatible`, derivation recorded in the column `COMMENT`); `proposer/class_table.py` is the projection with its `SELECT` committed beside it; `class_key` names the join field and defaults to the production one. Evidence in `db/checks/0120`. Five mutations, all caught |
+| **L-52 the commander's intent was process-global** | **FIXED 09-08.** `resolve_active` and `intent_orchestrate` always took an `intent=` override; the two callers that matter — `propose()` and `RegimeOrchestratorPolicy` — dropped it, so a process could hold exactly one doctrine while the kernel default is robotaxi-flavoured in places a pack then reads unconditionally. Threaded end to end, plus `intent_for_pack(pack_id)` resolving `conformance/packs/<pack_id>_intent_v1.json` (fingerprint-verified like the kernel artifact) and falling back to the default. `PACK_SPEC.md` documents it, including what a pack may NOT reorder: `min_tardy` is prepended structurally. Three mutations, all caught |
+| **L-43 the trail drops the two identifiers reproduction needs** | **FIXED 09-08.** `model.py` records `ortools_version` in every plan and states in its own comment why: measured across 9.11 and 9.15 every objective value is identical but all four committed plans differ — the versions break ties among equally-optimal schedules differently, so which asset goes to which point at which minute moves. The fire record dropped it on both branches, along with `det_budget_s`/`wall_limit_s`, so it could not reproduce the plan it described. `_repro_identity()` now travels on both. The doctrine half is in the provenance block below |
+| **L-44 the trail cannot name the forecast it came from** | **FIXED 09-08.** The result carried the measured value and the threshold it crossed but not WHICH forecast produced the value nor WHICH doctrine ordered the passes — and both are identifiable on purpose (`/forecast` emits `forecast_generated_at` and `priors_fingerprint`; the intent artifact carries a verified fingerprint). `orchestrate()` now returns a `provenance` block with both, the resolved regime, and a `run_id` that is now a REQUIRED argument — the company rule made structural rather than aspirational. A forecast carrying neither field yields `None` rather than an omission: a missing identity has to be visible in the record |
+| **L-57 the conductor made an opt-in cost unavoidable** | **FIXED 09-08.** `propose()` defaults to the cheap two-pass solve and its docstring justifies the opt-in on cost (the third lever does not prove OPTIMAL and costs ~10-20x); `orchestrate()` hard-wired `hour_of_day=now_hour` with no escape, so every conductor call — the only entry point production would use — took the expensive path. `regime: bool = True` now chooses, and the cheap path STILL resolves and records which regime the doctrine would have chosen, because resolving it is pure and free. Also: the two propose kwargs the conductor binds now raise a named `OrchestrateError` instead of a bare TypeError three frames down (`site` is deliberately not guarded — it is an orchestrate parameter, so passing it twice never reaches the guard) |
+| **L-14 / L-46 the TOTAL seam checked presence, never value** | **FIXED 09-08.** `float(x)` is a wide gate: NaN passed, and every downstream comparison with NaN is False, so a NaN forecast SILENTLY SUPPRESSED the signal — the exact failure two comments in the module claim to prevent, and worse than the missing field they guard because it does not raise. Negative counts were summed as arrivals; a string that parses (`'900'`) was coerced, so a JSON drift from number to string was invisible; one that does not escaped as a bare `ValueError` and `None` as a bare `TypeError`, both past the documented "a malformed forecast raises ForecastContractError". One `_number()` helper now gates every consumed field: no bool, no non-number, finite, non-negative, and every rejection names the section, the field and the value. The consequence is pinned too, not just the type check — a 20x nowcast that fires on its own goes silent when hour 0 is replaced with NaN |
+| **L-15 the site power target had no validation at all** | **FIXED 09-08.** The one caller-supplied physical quantity, and the only unguarded one — `now_hour` was bounds-checked and threshold names were checked. `peak >= 0.9 * 0` is `peak >= 0.0`, true for any load, so a target of 0 latched `grid_peak_imminent` on permanently and the reasoning dict published `"threshold": 0.0` to the operator as though that were a demand-charge ceiling. Negative is worse; NaN gives permanent silence. Now finite and strictly positive or `ValueError` |
+| **L-16 threshold overrides bypassed every range check** | **FIXED 09-08.** The override path checked the threshold NAME and then applied `float(v)`. `surge_window_hours=0` makes the window empty, so `0.0 >= 2.0*0.0` reported a demand surge on a quiet site; a negative window behaves identically (`range(-2)` is empty); a multiplier or fraction of 0 puts the threshold at or below zero, which every value clears; `3.9` was silently truncated to 3 by `int()`. `Threshold` now carries a `kind` — windows are integral hours 1..24 and are REFUSED rather than truncated, ratios are finite and > 0 — and the comparisons carry the belt-and-braces guard the peak side already had, whose absence on the surge side is what showed the asymmetry was unintended |
+| **L-17 an operator's number was published under the house's grounding** | **FIXED 09-08.** The reasoning dict read `evidence_label` and `source` from the module constants regardless of what was used, so after an override it reported the overridden NUMBER with the DEFAULT's provenance — stamping an arbitrary caller coefficient "must-measure-on-twin: no published AV-depot surge threshold" as a house inference. That walk from signal → number → grounding is the module's entire stated purpose. Provenance is now tracked per threshold: an overridden one reports `operator-override` and names the default it replaced; one nobody touched keeps the house's. `operator-override` is in `EVIDENCE_LABELS` |
+| **L-47 bool slipped through the module's strictest guard** | **FIXED 09-08.** `isinstance(True, int)` is True in Python, so `now_hour=True` was hour 1 and `False` was hour 0. The existing test covered `-1`, `24` and `'7'` — everything except the case that got through |
+| **L-48 the contract error could not name the failing section** | **FIXED 09-08.** `_hour_map(section, key)` never read `key`; both call sites passed the correct literal and it was discarded, while the message asked `section.get('kind', '?')` — trusting the malformed input to identify itself, and a section malformed by losing its own `kind` produced an error naming no section at all |
+| **L-18 a failed pass published the previous pass's number** | **FIXED 09-08.** The retained-pass guard set `optima[mode] = None` — but `passes.append` ran FIRST and unconditionally recorded the retained plan's `objective`, `deterministic_time` and `reproducible: true`, i.e. the pass BEFORE. The leftover the guard's own comment says it exists to suppress was suppressed in one field and published in another, and `passes` travels verbatim into the fire record. The guard now runs above the append and a retained pass reports `objective: None`, `deterministic_time: None`, `reproducible: False`, `retained: True` — nothing, in every field |
+| **L-21 a supported budget key crashed the policy** | **FIXED 09-08.** `allow_rejection` is advertised in the chain's own docstring; a rejected asset leaves the plan with `ops: []` so it never enters `starts`, and both `decide()` methods indexed `starts[a.aid]` for every arrival — KeyError. A supported configuration crashed rather than abstaining, which destroys the abstain-vs-crash distinction the rejection feature exists to preserve. Both now assign only the placed arrivals; the plan's own `proposals` already carries the declined ones with `abstain: true` |
+| **L-10 a learned block had no cap, no expiry and no unlearn** | **FIXED 09-08.** `learned_constraints` was a bare kind → entity-list map: nothing bounded how many points `block_points` could name, no entry carried a lifetime or a confidence, and no inverse operation existed anywhere in the repo. Meanwhile `model.py` raises a hard `RuntimeError` when a blocked set makes the model infeasible with no previous plan — so an over-large learned block took the site from a degraded schedule to NO schedule. Every entry now carries `observed_count`, `run_id` and `expires_after_n_solves = 1` (a design statement, not a guessed magnitude: evidence still true is re-observed and renews itself), and `capable_entities` + `max_block_fraction` make an outage-sized block a REFUSAL WITH A FLAG rather than a constraint. The denominator is the caller's — this module does not guess a site's capacity |
+| **L-11 tighten_capacity was dead against its declared feed** | **FIXED 09-08 as an annotation, which is the honest half.** `no_capacity` is never written to `ottoq_vehicle_commands.reason_code`, the source this module's docstring and `intent/README.md` both name; the engine emits it as an `ottoq_events` payload on `event_type='ottoq.refusal_escalated'` — 77,435 escalations there against 0 in the column. So the single most consequential calibration branch in the taxonomy could never fire. Each `RefusalClass` now names its `channel` and `no_capacity` is marked as arriving on the events channel, so the taxonomy stops reading as though every branch were reachable. Making it LIVE is the offline job that unions the two feeds; that is named in the README, not quietly assumed |
+| **L-12 an unreadable batch was reported clean** | **FIXED 09-08.** `if isinstance(rc, str)` dropped any record with a None or non-string reason_code: not counted, not in `unknown_codes`, no trace anywhere — so the report for a batch of nothing but unreadable rows was BYTE-IDENTICAL to the report for an empty batch and `is_clean()` returned True. Migration 0086 deliberately left 14 historical refusals with NULL reason_code as evidence, so this is a live shape, not a hypothetical. `unreadable` is now counted and `is_clean()` is False while it is non-zero: "I could not read these" is a different answer from "nothing is wrong" |
+| **L-45 rule_code was accepted and discarded** | **FIXED 09-08.** `Refusal.rule_code` was declared, carried and never read — `_normalize` extracted only reason_code and entity_id — so the field advertised a capability the module did not have, while the shield's own refusals carry the rule that produced them. It now reaches the report as `rule_codes` and is named in the flag messages, which is where an operator asks "which rule refused this" |
+| **L-38 an unknown signal fell through to the clock** | **FIXED 09-08.** `_matches` only tested `need.issubset(signals)` and nothing validated a caller's signal names, so a misspelling matched no regime, pass 1 found nothing, and the resolver returned a CLOCK regime as though no signal had been raised: `grid_peak_imminant` at 07:00 silently resolved to `dispatch_rush` — throughput first, on a tick about to hit a demand-charge ceiling. This is the same hazard `signals.py` guards on the other side of the seam, where a missing field is never quietly read as zero because it "would hide a real surge". `Intent.known_signals` is derived from the artifact's own regimes and `resolve_intent` raises on anything outside it |
+| **L-55 the fingerprint covered four keys, not the document** | **FIXED 09-08.** `CANONICAL_KEYS` put the WHOLE manifest outside the hash — `version`, `kind` and `description` with it — and left any future top-level key unauthenticated by default; the loader then built `Intent.version` from `manifest["version"]`, returning a verified-looking object carrying a field the verification never covered. It now hashes everything except the two SELF-REFERENTIAL fields (`fingerprint_md5` cannot hash itself; `generated_at` is the stamp's timestamp, and the 0201 discipline says a re-stamp landing the same content is not a change). The artifact was re-stamped: `708ed712…` → `a2214eea…` |
+| **L-56 "floor" had two independent definitions** | **FIXED 09-08.** A hardcoded Python tuple decided what got PREPENDED; the artifact's declarative `kind == "floor"` decided what `ActiveIntent.floors` REPORTED. An objective the artifact declares a floor but that is not one of the two hardcoded names was silently dropped by every regime that did not list it — precisely the failure `resolve_intent`'s own docstring says the mechanism prevents. The artifact is now the definition; the tuple only fixes the canonical ORDER of the two it names. Pinned by widening the artifact with a third floor and asserting every regime keeps it |
+| **L-34 the priors fingerprint hashed a refit timestamp** | **FIXED 09-08** (ottoq-intelligence), and the module was contradicting its own docstring: `fingerprint()` says `fitted_at` is "excluded from the hash where they are metadata rather than content" and nothing excluded anything. The fingerprint is not inert — `statistical.py` stamps it into every /forecast response as `priors_fingerprint`, which is how a forecast is identified — so a re-snapshot of NUMERICALLY IDENTICAL priors gave every forecast a new identity because a refit job ran. `_canonical_priors()` now performs the stated exclusion; the engine's own `ottoq_calibration_fingerprint()` has always done it ("Content only; timestamps are deliberately left out"). The snapshot fingerprint moves once, deliberately: `e50ecc88…` → `f9556e5b…` |
+| **L-54 the declared bounds were decorative** | **FIXED 09-08** (ottoq-intelligence). `mean_value` / `stddev_value` / `hard_min` / `hard_max` are declared `float \| None` and all four are JSON STRINGS in the committed snapshot, assigned straight through into a frozen dataclass; `statistical.py` survived only because it wraps two of them in `float()` at the point of use, and `hard_min`/`hard_max` were read by no code path at all. All four are coerced now, and load-time validation makes the bounds an ENFORCED invariant — a quantile grid outside them, or one that is not monotone non-decreasing, is refused the way a fingerprint mismatch is. The non-monotone case is the sharper one: the lookup walks the grid in order, so p90 could come back below p50 and every band built on it would be inverted with nothing raising |
+| **L-33 the priors fingerprint was self-certifying** | **FIXED 09-08** (ottoq-intelligence). `load_priors` read the expected hash out of the same blob it was hashing, which detects truncation and nothing more: any edit that also recomputed `fingerprint()` — eleven lines, exported from the same module — was accepted silently while the `datasets` block still declared ACN / TLC / EIA / NREL and every response still stamped `provenance.source_name` as if the number came from the public dataset. Two moves put the authority outside the artifact: the expected md5 is pinned as a committed literal in the test, so a prior change is a reviewed diff; and the manifest now records WHICH ENGINE STATE the snapshot came from — `ottoq_calibration_fingerprint()` at pull time (`11a24626…`) plus per-dataset `record_count` and date range, read live from `gxdrcyphqjzjsuhxuqtg` |
+| **L-27 every rejection shipped the same hardcoded reason** | **FIXED 09-08, and narrower than the finding, deliberately.** One literal — "no feasible point within the site's capacity" — rode every abstain row regardless of why the solver declined, and it is a factual claim ABOUT THE SITE that lands in `ottoq_external_proposals` for a human or the dispose path to read as evidence the site was full. Two of the finding's four cases collapse under measurement: an asset that needs no charge is never rejected (`served` is forced to 1), and at PROVEN optimality the capacity sentence is true for a reason worth stating — the rejection price is two orders of magnitude above every mode's ceiling (T15), so an optimal rejection means serving it really was impossible. The case that stands is the truncated one: at FEASIBLE or UNKNOWN the incumbent dropped assets as a feasibility escape hatch and proved nothing about the site. The reason is derived from the status now, and `solver_status` + `capacity_finding` ride on the row so the distinction is machine-readable |
+| **L-28 blocked_points was ignored for service bays** | **FIXED 09-08.** The rolling re-solve contract is that a point in `blocked_points` takes no NEW work. The filter was applied to charge candidates and to wash candidates and not to the inspect loop, so a service bay taken out of service was still handed inspections — and T6 only ever blocked a DCFC, so nothing caught it. Pinning it took care: two bays would not prove the guard, because the solver can pick the legal one by tie-break and an unguarded model passes. The test blocks the ONLY capable bay with rejection on, where the guarded model names the asset it cannot serve and the unguarded one seats it on an out-of-service bay |
+| **L-29 a rejected asset booked yard-path capacity** | **FIXED 09-08, and it was costing real schedule.** Both inter-point moves were unconditional `NewIntervalVar`s appended straight to `path_intervals`, which feeds the site's path-capacity cumulative — the one resource leak in a rejection that is gated everywhere else (charge occupancy is optional on the point literal; `_exactly_one_if_served` zeroes the bay literals). An asset the solver declined still booked capacity for a trip nobody makes. **T9's pinned objective moved 105129 → 105125**, same asset rejected: the served side got 4 units cheaper once the phantom trip stopped competing. A/B'd on that exact scenario with only the move gating reverted. With rejection OFF the interval is byte-identically the unconditional one it always was, so `plan_seed424242.json` is untouched |
+| **L-30 min_gap_min was honoured only on charge points** | **FIXED 09-08.** It is a generic per-POINT field — `PACK_SPEC.md` lists it beside `exclusive`, CLAUDE.md 2.5 calls it "a minimum-gap constraint on the SERVICE POINT" — and it was read in exactly one place, inside the charge-candidate loop. A pack declaring it on a wash bay, a decontamination bay or a calibration bay got a plan that silently violated its own declared constraint. The point's occupancy interval is now the op's interval extended by the gap, wherever a gap is declared; the op's own start/end are untouched, so the reported schedule does not move. Built ONLY when a gap is declared — "the same interval with size + 0" is not equivalent, because the extra end variable changes the search and can land on a different equally-optimal plan, which is why the committed artifacts stay byte-identical |
+| **L-36 the fleet energy band was 11x too wide** | **FIXED 09-08** (ottoq-intelligence). `fleet_energy_need_kwh` was the per-vehicle quantile times fleet_size — "every vehicle simultaneously at its own 90th percentile", an event of probability ~0, not the 90th percentile of the fleet TOTAL. This is the number the module docstring calls "the 'how tight is tonight' number": the headline output of the whole forecast. Measured on the committed priors at n=118: the published band was **1829–8496 kWh** where the fleet aggregate is **4741–5329**. The old band was ~11x too wide, not the 3.7x the finding estimated — the factor is √118 = 10.9, because the missing √n IS the error. The p50 was wrong for a second reason: `_need` is `max(0, …)`, so the sum of medians is not the median of the sum (4814 vs 5035). The aggregate is now the CLT normal convolution with μ and σ² taken numerically over the 101-point grid, and a `fleet_energy_need_basis` block carries the method, the moments, the n≥30 validity threshold and the independence assumption. **The committed T4 test had pinned the bug** — it asserted the fleet band must equal the scaled per-vehicle band — and now asserts the √n property instead |
+| **L-39 a tampered doctrine took down the path that never reads it** | **FIXED 09-08.** `INTENT = load_intent()` ran at module import and `forward_proposer` imports `resolve_active` from that module unconditionally, so importing the PROPOSER at all read and fingerprint-verified `intent_v1.json`. Failing closed on a tampered artifact is right for the regime path; the blast radius was not — the cheap two-pass path is documented as "byte-for-byte what propose() did before the intent layer" and never consults the doctrine. The load is lazy now (PEP 562 module `__getattr__`, so `regime.INTENT` still resolves for every existing caller) and happens when a regime is actually resolved. Pinned two ways: a subprocess proves importing the proposer leaves `_INTENT` unset, and a tampered loader leaves the cheap path planning while the regime path still raises |
+| **L-50 a dead-but-armed fallback** | **FIXED 09-08.** `int(plan.get("site_peak_kw", plan["objective"]))` fired exactly when the peak pass FAILED and a retained plan came back — whose `objective` is the previous pass's: total tardy-minutes, total flow-minutes, or with rejection on a value inflated by 100,000 per rejected asset. The value was discarded three lines later, so it was dead — but dead AND ARMED: the only thing between a flow-minute count and a kW ceiling was the ordering of two statements. Handled where it arises now, and a missing `site_peak_kw` on a pass that DID solve raises loudly instead of silently becoming a number of the wrong kind. Pinned at the source level, deliberately: no behavioural test can separate the two today, and the hazard IS the ordering |
+| **L-53 the Site Alpha solve bound a wall clock** | **FIXED 09-08 by removing it, which the finding names as the preferred fix.** A `max_time_in_seconds = 600.0` sat in the C8 harness as a "hang backstop only", and a wall clock that can decide a plan makes it a function of how loaded the box was — while every cell that harness writes is published under a seed and a run id as byte-reproducible, with nothing recording that a clock had been bound. It was redundant against a slow SEARCH (`max_deterministic_time` is already a hard cutoff) and never covered the one thing a backstop is for — a hang in model CONSTRUCTION, before `Solve()` is called. **Proof it never bit: both committed artifacts still match byte-for-byte with it gone** |
+| **L-40 the deferral claim was false** | **CORRECTED 09-08, which is the finding's own option (b), and the reason for choosing it is stated rather than assumed.** `proposer/README.md` and the module docstring both said the deferral pattern gives "an in-flight proposal" its one-tick right-of-first-refusal and that "the deferral table and gate router need nothing new". The mechanism is source-specific in three places: `ottoq_cuopt_first_refusal_arm` arms only against `source IN ('cuopt','cuopt_fallback')`; the cap is the policy key `cuopt_first_refusal_max_defers`; and `ottoq_l2_external_proposal` breaks ties with `ORDER BY (source = 'cuopt') DESC, (source = 'cuopt_fallback') DESC`. A `forward_lex` row would get NO window and LAST place. Both texts now say so. **Option (a), generalizing the mechanism, is deliberately not done here**: it rewrites the live decide path's proposal selection, which is a scheduling decision and not a docs fix, and `ottoq_policy_params` cannot even hold the list (`param_value` is `numeric`). Nothing is affected today — measured 2026-09-08, the proposal table holds `greedy_constrained` 12,367, `ottoq_service_priority` 1,713, `cuopt` 136 and **`forward_lex` 0** — so the claim was the whole defect. The README carries what the extension would take, seeded so the default reproduces today's ordering and no canon moves |
+| **L-19 churn was priced BETWEEN lexicographic passes** | **FIXED 09-08.** Passes 2 and 3 are called with `previous_plan=plan`, where `plan` is the PREVIOUS PASS's schedule, and `model.py` builds the churn term whenever `previous_plan` is set and `churn_per_change > 0` — riding in `side`, which is added to every objective mode. So pass 2 minimized `peak + churn_w × (assets moved off their pass-1 point)` and reported the result as **P\*, the minimum peak**. Churn prices a vehicle moving between rolling RE-SOLVES — a real trip in the yard, against the previous TICK's enacted plan. The pass-1 plan is not a tick that ever happened; it is an arbitrary tie-broken min-tardy schedule. `build_and_solve` takes `price_churn` now, the chain sets it True only for the first pass, and the guard proves it: the same chain with a 500-weight churn and with none reach the identical peak |
+| **L-20 the served SET was not held across passes** | **FIXED 09-08.** Every ceiling the chain threads is an AGGREGATE over whoever a pass happens to serve — `sum(tardy)` over served, `sum(finish)` over served — and nothing constrained WHICH assets those were, or how many. With rejection on, a later pass could strand a DIFFERENT vehicle than pass 1 and still report a tardiness sum inside T\*, perfectly honestly. The count was held only incidentally, by the rejection price exceeding any peak the site can reach — an argument stated about the PEAK pass, with no equivalent for `min_flow`, whose objective scales with the horizon. Pass 1's served set is now a hard FLOOR on every later pass (a floor, not an equality: serving MORE is still allowed) and is recorded as `optima["served"]` so an auditor can see who was held |
 | **G-12 the p10/p50/p90 band is unpinned** | **FIXED 09-08** (ottoq-intelligence). `p10 <= p50 <= p90` is satisfied by three identical numbers, so a collapsed band passed. Now pinned by WIDTH (strict `>` on busy hours, arrivals and load) and by VALUE (golden `_poisson_quantile` results). Collapsing the quantiles turns the width guard red while the ordering test stays green; breaking the Poisson recurrence turns both red |
 | **G-15 "11 objectives across 3 tiers"** | **FIXED 09-08**, measured: 11 objectives, **tier 1 = 4, tier 2 = 7, tier 3 = 0**. Tier 3 is not weighted and does not live in the artifact — it is the 52-rule shield, by the file's own statement. The phrase never appeared in the repo (it was in the handoff), so the fix is a guard pinning the true distribution and the artifact's own disclaimer, making any future doc claim checkable against the file |
 | **G-16 the repeat-threshold boundary is untested** | **FIXED 09-08**. The existing tests covered one and three occurrences — exactly the pair that cannot distinguish `>` from `>=`. Two occurrences (at the threshold, not beyond it) must stay clean, and a lowered threshold must move the boundary with it. Flipping the operator turns it red |
@@ -107,7 +210,7 @@ j({error:'server_misconfigured'}, 500)`; (2) migrate `ottoq_energy_mpc_replan` s
 `p_bridge_token` has NO default and callers pass it from a Supabase secret / vault read; (3) add
 the literal to a secret-scanning CI check (the same
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: OPEN** — the code half is fixed — the literal is gone and the bridge fails closed (pinned by ottoq-intelligence/tests/test_auth_fails_closed.py::test_unconfigured_service_refuses_every_request) — but a committed secret stays compromised until it is rotated, which is an operator action on EC2 and Supabase and is Chase's
 
 ### S-02 · CRITICAL · `core/edge-functions/ottoq-energy-mpc/index.ts:8`
 **Shared secrets hardcoded in the one live bridge to the intelligence service, which is deployed with verify_jwt=false over plaintext HTTP to a hardcoded IP**
@@ -127,7 +230,7 @@ secrets, since it is in git history. Put the EC2 service behind HTTPS (or an ALB
 plaintext http:// default. Add a CI grep that fails the build on a string literal used as a
 token default in edge-funct
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: OPEN** — same secret as S-01, same rotation; the fail-open half is fixed and pinned by ottoq-intelligence/tests/test_auth_fails_closed.py::test_configured_service_rejects_a_wrong_token_and_accepts_the_right_one
 
 ### S-03 · MAJOR · `intel/app/main.py:36`
 **Intelligence-service bearer auth fails OPEN when OTTOQ_API_TOKEN is unset, on a service the deploy playbook exposes to 0.0.0.0/0**
@@ -147,7 +250,7 @@ explicit `OTTOQ_ALLOW_OPEN=1` dev flag is set. Also compare with `hmac.compare_d
 than `!=` to remove the timing side channel, and change the DEPLOY_EC2.md security-group note
 from 'Anywhere' to the twin'
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_auth_fails_closed.py::test_unconfigured_service_refuses_every_request
 
 
 ## G — GUARDS THAT CANNOT FAIL
@@ -169,7 +272,7 @@ the intent_v1.json load. `stamp()`'s `p.write_text(...)` should move to a `scrip
 tool or be explicitly allowlisted, since a kernel module that writes a file is exactly what the
 guard exists to surface.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/tests/test_separation.py::test_the_guard_covers_every_package_it_claims_to
 
 ### G-02 · CRITICAL · `intel/tests/test_forecast_statistical.py:62`
 **The AST contamination guard is non-recursive — a subpackage under app/forecasters/ imports psycopg2, hardcodes a DSN, queries ottoq_decisions, and scales the forecast, with all 10 tests green**
@@ -189,7 +292,7 @@ whose __file__ is under the repo (transitively reachable from the package) is ei
 app/forecasters or on an explicit allowlist (stdlib math/json/hashlib/pathlib/dataclasses). A
 reachability check over s
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_forecast_statistical.py::test_contamination_guard_the_whole_imported_graph_stays_in_the_package
 
 ### G-03 · CRITICAL · `pr176/proposer/test_orchestrate.py:132`
 **The propose/dispose advisory guard never sees the rows the proposer actually emits — a proposal can grow `enact`/`execute`/`command_type` with the whole suite green**
@@ -209,7 +312,7 @@ declined/abstained rows, on the oversubscribed frame that already exists as `_ov
 Replace `assert "dispatch" not in row["proposal"]` in test_orchestrate.py with `for k in
 _COMMAND_KEYS: assert k not in ro
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/tests/test_separation.py::test_every_emitted_row_is_advisory_not_an_instruction
 
 ### G-04 · MAJOR · `core/intent/test_intent.py:35`
 **`test_intent_tamper_is_refused` never calls `load_intent` on tampered content — deleting the intent fingerprint check leaves all 267 tests green**
@@ -227,7 +330,7 @@ raw["objectives"]["readiness"]["direction"] = "maximize"         p = tmp_path /
 "intent_v1.json"; p.write_text(json.dumps(raw))         with pytest.raises(ValueError,
 match="fingerprint mismatch"):             load_intent(p)
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_intent.py::test_intent_tamper_is_refused
 
 ### G-05 · MAJOR · `core/intent/test_intent.py:157`
 **The two-pass "signals override the clock" resolver is unpinned, and the comment that claims to pin it is factually wrong about the shipped artifact**
@@ -246,7 +349,7 @@ signals=frozenset({"grid_peak_imminent"})).regime_key == "grid_peak"`. `Intent` 
 dataclass, so `dataclasses.replace(it, regimes=tuple(reversed(it.regimes)))` is enough — no
 artifact edit and no re-stamp. Also
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_intent.py::test_the_shipped_artifact_declares_the_signal_regimes_in_doctrinal_order
 
 ### G-06 · MAJOR · `core/intent/test_learn.py:114`
 **test_a_missing_reason_code_is_skipped_as_malformed_input contains no malformed record — deleting the guard it names leaves all 18 tests green**
@@ -265,7 +368,7 @@ not fail a single test.
 counter from the companion finding. As written it must either be fixed or deleted; a test that
 cannot fail is w
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_learn.py::test_a_missing_reason_code_is_skipped_as_malformed_input
 
 ### G-07 · MAJOR · `core/policies/forward.py:143`
 **The min_flow pass's peak-ceiling threading has zero test coverage: deleting it passes all 109 tests while the shipped plan's peak triples**
@@ -286,7 +389,7 @@ rather than the reported optima: for each of ('min_tardy','min_peak','min_flow')
 the charge segments' kW step function) and assert each is <= the corresponding value in
 `optima`. That one test kills both mutan
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/policies/test_regime.py::test_every_pass_order_holds_every_earlier_optimum_in_the_shipped_plan
 
 ### G-08 · MAJOR · `core/proposer/test_forward_proposer.py:202`
 **`assert r["planned"] > 0, "a partial plan should still serve someone"` cannot fail — `planned` counts declined rows too**
@@ -305,7 +408,7 @@ record is honest — keep `"rows": len(rows)` and add `"served": sum(1 for p in 
 p["proposal"]["abstain"])` — and update the callers/tests that read `planned`
 (test_forward_proposer.py:117, test_orchestrate.py:1
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_an_oversubscribed_site_returns_a_plan_instead_of_nothing
 
 ### G-09 · MAJOR · `intel/tests/test_forecast_statistical.py:180`
 **T5 "SNAPSHOT INTEGRITY: fingerprint verifies" is a tautology — it passes with the loader's verification deleted AND the snapshot corrupted**
@@ -323,7 +426,7 @@ deliberate, reviewed test edit; (2) a negative test that writes a mutated copy o
 to tmp_path with the manifest hash untouched and asserts `pytest.raises(ValueError)` from
 load_priors, so the refusal path is exerc
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_forecast_statistical.py::test_snapshot_fingerprint_verifies
 
 ### G-10 · MAJOR · `intel/tests/test_forecast_statistical.py:183`
 **test_snapshot_fingerprint_verifies is a tautology: it compares the manifest field to itself and passes on a tampered snapshot**
@@ -343,7 +446,7 @@ fingerprint(canonical(raw)) == raw["manifest"]["fingerprint_md5"]` using the mod
 mutated and `pytest.raises(ValueError)` on `load_priors(copy)`. Mirror
 intent/test_intent.py:35-43, which already has exa
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: DUPLICATE** — G-09 — the same tautology at the same assertion, filed by a second finder
 
 ### G-11 · MAJOR · `intel/tests/test_forecast_statistical.py:180`
 **`test_snapshot_fingerprint_verifies` is tautological — deleting the priors verification leaves the forecast suite green**
@@ -360,7 +463,7 @@ tampered-snapshot test anywhere in the file.
 make the existing assertion non-tautological by recomputing: `assert fingerprint({k: raw[k] for
 k in ("datasets","profiles","distributions")}) == PRIORS.fingerprint`.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: DUPLICATE** — G-09 — the same tautology at the same assertion, filed by a third finder
 
 ### G-12 · MAJOR · `intel/tests/test_forecast_statistical.py:147`
 **The forecast's entire p10/p50/p90 uncertainty band is unpinned — the monotonicity test passes when all three quantiles collapse to the same number**
@@ -380,7 +483,7 @@ committed snapshot seed (`_poisson_quantile(2.5, 0.90) == 5`). For load: `assert
 h["total_kw_p90"] - h["total_kw_p50"] == pytest.approx(1.28 * ev_std)` for one hour. For
 soc_return: assert `return_soc["p10"] <
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_forecast_statistical.py::test_the_uncertainty_band_has_NON_ZERO_WIDTH_where_it_should
 
 ### G-13 · MAJOR · `otto-q-core/intent/test_intent.py:35`
 **test_intent_tamper_is_refused never calls the loader — the entire fingerprint verification can be deleted and all 17 intent tests still pass**
@@ -400,7 +503,7 @@ artifact to tmp_path and assert `pytest.raises(ValueError, match="fingerprint mi
 that mutates a field in each of the four CANONICAL_KEYS, so narrowing the covered key set also
 fails. Import `_canonical` r
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: DUPLICATE** — G-04 — the same tamper test at the same line, filed twice
 
 ### G-14 · MAJOR · `pr176/tests/test_separation.py:42`
 **The zero-network/zero-DB separation guard does not cover intent/, which orchestrate() calls on every request — proven by adding `import requests` and watching CI pass**
@@ -420,7 +523,7 @@ explicit `("intent/intent.py", "world")` entry with its reason (loading the decl
 fingerprint-verified doctrine artifact) — which is the review moment the allowlist exists to
 create.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/tests/test_separation.py::test_every_covered_package_actually_exists
 
 ### G-15 · MINOR · `core/intent/intent_v1.json:284`
 **"11 objectives across 3 tiers" — the 11 objectives span 2 tiers; tier 3 contains no objectives by the artifact's own statement**
@@ -437,7 +540,7 @@ no objective is tier 3, and tier 3 is deliberately out of the artifact.
 outside the artifact (the 52-rule shield)". That is both true and the doctrinally important
 statement.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_intent.py::test_the_objective_taxonomy_is_two_weighted_tiers_and_a_shield
 
 ### G-16 · MINOR · `core/intent/test_learn.py:89`
 **The live_world flag threshold boundary is unpinned — the documented "beyond threshold 2" rule is never tested at 2**
@@ -453,7 +556,7 @@ reconcile_refusals([Refusal("target_occupied", entity_id="s-1")] * 2); assert tw
 — and, since the parameter is public, one call with `entity_repeat_threshold=1` asserting that
 two occurrences then DO flag.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_learn.py::test_the_repeat_threshold_boundary_is_exactly_where_it_says_it_is
 
 ### G-17 · MINOR · `core/intent/test_signals.py:95`
 **The determinism test compares two calls in one process and would not catch cross-process nondeterminism; no golden output is committed**
@@ -473,7 +576,7 @@ different PYTHONHASHSEED values and assert identical bytes. Separately, add one 
 imports app.forecasters.statistical.forecast with the committed priors and asserts each of
 demand_surge and grid_peak_imminent is
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_signals.py::test_the_resolved_decision_is_identical_across_processes_and_hash_seeds
 
 ### G-18 · MINOR · `core/policies/forward.py:110`
 **The readiness-floor guard on the lexicographic chain is unpinned — removing it leaves the policy suite green**
@@ -489,7 +592,7 @@ min_tardy, so the raise is never exercised and no test asserts it fires.
 with min_tardy"):         lexicographic_solve(load_scenario(SC), ("min_peak", "min_tardy"))
 with pytest.raises(ValueError):         lexicographic_solve(load_scenario(SC), ())
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/policies/test_regime.py::test_the_readiness_floor_cannot_be_demoted_out_of_first_place
 
 ### G-19 · MINOR · `core/solvers/cpsat/test_cpsat_prototype.py:271`
 **T3 'SITE POWER CAP' stays green with the hard site power cap deleted from the model, and T2 skips parallel ops when checking point exclusivity**
@@ -509,7 +612,7 @@ is <= the cap AND that a cap one step lower changes the plan. Include parallel o
 point grouping (the point is occupied to stay_end, so the exclusivity check should use each
 asset's on-point span, not jus
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/solvers/cpsat/test_cpsat_prototype.py::test_cpsat_battery (check T3b)
 
 ### G-20 · MINOR · `core/solvers/cpsat/test_cpsat_prototype.py:125`
 **`solvers/cpsat/test_cpsat_prototype.py` contributes zero tests to `pytest` despite its name — the 19-check CP-SAT battery is invisible to the suite that reports "267 passed"**
@@ -528,7 +631,7 @@ test_t15_rejection_price():` functions (keeping a `main()` that calls them in or
 script step). Splitting is worth the churn: it also removes the first-failure-aborts-the-rest
 behaviour, so one regression no longer masks eight
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/solvers/cpsat/test_cpsat_prototype.py::test_cpsat_battery
 
 
 ## L — LOGIC DEFECTS
@@ -551,7 +654,7 @@ any occurrence) keep the current behaviour. Concretely, replace the unconditiona
 with:      for (rc, eid), k in pairs.items():         if rc == code and (cls.kind ==
 'solver_gap' or k > entity_repea
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_learn.py::test_the_learned_constraint_names_only_the_entities_that_crossed_the_threshold
 
 ### L-02 · CRITICAL · `core/intent/signals.py:219`
 **demand_surge is structurally unreachable on the real forecast: a flat daily-mean baseline vs. a diurnally-shaped arrivals forecast whose own peak is only 1.9x that mean**
@@ -571,7 +674,7 @@ every hour. Compare the window against its OWN climatological expectation instea
 baseline = sum over the window of (mean_hourly * hourly_shape[hod] * dow_mult), which is exactly
 the forecast's unpert
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_signals.py::test_a_flat_daily_mean_baseline_cannot_reach_the_surge_threshold
 
 ### L-03 · CRITICAL · `core/proposer/forward_proposer.py:346`
 **The regime fire record reports complete:true when a pass returned FEASIBLE (never proved its optimum) — a truncated plan published as a whole one**
@@ -591,7 +694,7 @@ all(optima.get(m) is not None for m in modes))`. Correspondingly, in policies/fo
 the per-pass optimum should be recorded as `None` (or carried with a `proven: False` flag) when
 `plan["solver_status"] != "
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_a_budget_truncated_pass_is_not_reported_complete
 
 ### L-04 · CRITICAL · `core/proposer/forward_proposer.py:132`
 **Per-vehicle inlet power limit is collapsed into one per-class value taken from whichever vehicle happens to be first in the frame — wrong requested_kw, and the plan changes when the frame rows are reordered**
@@ -611,7 +714,7 @@ min(cls['max_charge_kw'], v.get('inlet_max_kw') or cls['max_charge_kw'])` — so
 materializes its own asset class. Add a test with two vehicles of one platform at different
 inlet_max_kw asserting each proposal's reque
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_a_derated_inlet_is_a_per_vehicle_fact_not_a_per_platform_one
 
 ### L-05 · CRITICAL · `core/solvers/cpsat/model.py:464`
 **An asset arriving at or above its target SoC makes the ENTIRE site model INFEASIBLE (AddExactlyOne over an empty list); reachable in production by rounding**
@@ -631,7 +734,7 @@ a no-charge path: bind charge_start = charge_end = arrival_min, skip the exactly
 still schedule wash/inspect and emit a proposal with abstain=True and reason 'already at target
 SoC; no charge schedul
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/solvers/cpsat/test_cpsat_prototype.py::test_cpsat_battery (check T14)
 
 ### L-06 · CRITICAL · `core/solvers/cpsat/model.py:66`
 **The 100k rejection penalty does not dominate the weighted objective: the solver proves OPTIMAL by dropping a vehicle it could have served**
@@ -651,7 +754,7 @@ W['tardiness_per_min'] * H + max_onpeak_term + W['peak_excess_per_kw'] * power_c
 W['per_move'] * max_moves` -- and use `max(DEFAULT_REJECTION_PENALTY, that_bound + 1)` unless
 the scenario explicitly set
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/solvers/cpsat/test_cpsat_prototype.py::test_cpsat_battery (check T15)
 
 ### L-07 · CRITICAL · `intel/tests/test_forecast_statistical.py:38`
 **FORBIDDEN_IMPORTS is a 11-name blacklist: __import__, importlib, urllib.request, socket, http.client, subprocess, sqlite3 and os.environ all reach the network or a database unchallenged**
@@ -671,7 +774,7 @@ package (`math`, `json`, `hashlib`, `pathlib`, `dataclasses`, `typing`, `__futur
 ast.Call to `__import__`, `eval`, `exec`, `compile`, `open`, `importlib.import_module`, and no
 `os.environ` access — those are calls
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_forecast_statistical.py::test_contamination_guard_no_db_or_network_import
 
 ### L-08 · CRITICAL · `pr176/proposer/forward_proposer.py:73`
 **The proposer's default serviceable-state vocabulary does not match production: 3 of its 6 states cannot exist, and it omits staged_awaiting_service, silently dropping 13 real vehicles**
@@ -691,7 +794,7 @@ consider `charge_complete_holding` for non-charge service), and delete `awaiting
 DEFAULT_SERVICEABLE_STATES is a label of the committed `vehicle_state` enum (the enum labels are
 already in db/baseline, so the test needs no dat
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_every_default_serviceable_state_is_a_real_production_label
 
 ### L-09 · CRITICAL · `pr176/proposer/forward_proposer.py:227`
 **propose() has no default solve budget and is orders of magnitude too slow for the one-tick right-of-first-refusal it claims to occupy: 10 vehicles takes 88.7s on the conductor path against cuOpt's 90s TTL, and the real frame's 44 serviceable vehicles do not finish in 5 minutes**
@@ -710,7 +813,7 @@ pass one), so a proposal is always bounded and always reproducible. Then either 
 tick's batch") or warm-start from the previous tick's plan. Add a benchmark test that runs
 propose() on a committed
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_every_proposal_is_bounded_without_the_caller_asking
 
 ### L-10 · MAJOR · `core/intent/learn.py:229`
 **learned constraints have no cap, no TTL and no unlearn path, and a large blocked set makes the next solve raise RuntimeError with no fallback**
@@ -730,7 +833,7 @@ at a configurable fraction of the capable points of a kind (refusing to learn be
 flagging instead), and require re-observation to renew a block. Declare the entity TYPE per
 constraint kind (block_points = servic
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_learn.py::test_every_learned_entry_carries_its_evidence_and_its_expiry
 
 ### L-11 · MAJOR · `core/intent/learn.py:93`
 **tighten_capacity is unreachable from the declared input source: 77,435 no_capacity escalations live in ottoq_events, 0 in the reason_code column learn.py reads**
@@ -750,7 +853,7 @@ for event_type='ottoq.refusal_escalated' — or annotate each RefusalClass with 
 actually arrives on so a reader can see which branches are live. In both cases give no_capacity
 a rate/threshold rule
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_learn.py::test_no_capacity_is_marked_as_arriving_on_a_different_channel
 
 ### L-12 · MAJOR · `core/intent/learn.py:168`
 **A batch whose reason_codes are all missing is silently dropped and is byte-identical to an empty clean batch**
@@ -769,7 +872,7 @@ ReconciliationReport, increment it in _normalize for every record whose reason_c
 str, and include it in is_clean(). A batch that contained records but produced no readable codes
 must not report clean.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_learn.py::test_a_batch_of_unreadable_rows_is_not_reported_clean
 
 ### L-13 · MAJOR · `core/intent/signals.py:219`
 **The surge baseline ignores the day-of-week multiplier that scales every forecast hour, drifting the trigger point +-20% by weekday**
@@ -788,7 +891,7 @@ dow-consistent by construction, needs no new contract field, and requires no tru
 `mean_daily_arrivals` at all (which would also remove the `mean_daily_arrivals <= 0` contract
 dependency at signals.py:203-207
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: BY_CONSTRUCTION** — the L-02 fix. The surge baseline is now summed from the forecast's own `baseline_arrivals` hours rather than reconstructed from `mean_daily_arrivals`, so the day-of-week multiplier is in the numerator AND the denominator and cancels — there is no dow-blind side left to bias. Evidenced by otto-q-core/intent/test_signals.py::test_a_forecast_without_a_climatology_is_refused_not_guessed
 
 ### L-14 · MAJOR · `core/intent/signals.py:217`
 **NaN in any consumed forecast field silently suppresses the signal — the exact failure the module documents itself as preventing**
@@ -808,7 +911,7 @@ refuses to compare against a non-finite forecast value")`. Add three tests (NaN 
 p90, inf p90) asserting ForecastContractError, mirroring the existing
 test_a_missing_value_field_raises_instead_of_treating_it_
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_signals.py::test_a_nan_arrival_would_otherwise_have_suppressed_a_real_surge
 
 ### L-15 · MAJOR · `core/intent/signals.py:245`
 **site_power_target_kw is never validated: a target of 0 or a negative target makes grid_peak_imminent fire unconditionally**
@@ -828,7 +931,7 @@ site_power_target_kw <= 0: raise ValueError(...)`. Add a test parameterized over
 '700', nan) asserting ValueError — the same shape as the existing
 test_now_hour_is_bounds_checked.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_signals.py::test_a_zero_target_would_have_latched_the_grid_peak_signal_on
 
 ### L-16 · MAJOR · `core/intent/signals.py:194`
 **Threshold overrides bypass all range validation: a zero/negative window or a non-positive multiplier makes demand_surge fire unconditionally**
@@ -848,7 +951,7 @@ and > 0. Independently, guard the comparison itself so an empty window can never
 `surge_hit = bool(_vals) and baseline > 0 and expected >= surge_m * baseline`, matching the
 existing `if _p90 else` gu
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_signals.py::test_a_zero_length_window_would_have_reported_a_surge_on_a_quiet_site
 
 ### L-17 · MAJOR · `core/intent/signals.py:229`
 **A caller-supplied threshold is published with the house's own evidence label and source, presenting an operator's number as a house inference**
@@ -868,7 +971,7 @@ supplied; not the SIGNAL_THRESHOLDS default (was <default>)'. Emit that triple i
 instead of the constant. Add 'operator-override' to EVIDENCE_LABELS and a test asserting the
 label changes when and o
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_signals.py::test_an_overridden_threshold_is_labelled_as_the_operators
 
 ### L-18 · MAJOR · `core/policies/forward.py:155`
 **A failed pass publishes the PREVIOUS pass's objective under its own mode in the trace — the exact number the retained-pass guard was written to suppress**
@@ -887,7 +990,7 @@ the fire record (forward_proposer.py:339 `"passes": passes`). The retained pass 
 "reproducible": False, "retained": True}`. A pass that produced nothing should report nothing,
 in every field, not just in `optima`.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/policies/test_regime.py::test_a_retained_pass_publishes_no_leftover_number
 
 ### L-19 · MAJOR · `core/policies/forward.py:136`
 **The chain prices churn BETWEEN lexicographic passes, so at the documented production weight pass 2 reports OPTIMAL for a peak 11 kW above the true constrained optimum**
@@ -907,7 +1010,7 @@ Penalizing deviation from it makes the reported P* no
 pricing off. Churn should be priced exactly once per chain, against the previous TICK's enacted
 plan, in pass 1 — never between pass
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/policies/test_regime.py::test_churn_is_not_priced_between_lexicographic_passes
 
 ### L-20 · MAJOR · `core/policies/forward.py:148`
 **With allow_rejection on, the chain does not hold the served SET across passes: the vehicle the site abandons changes at every pass**
@@ -927,7 +1030,7 @@ each aid in served_set), or at minimum thread `min_served_count`. Report it in `
 `served` so a later pass that could serve MORE is still allowed to, but none can silently swap
 who is stranded.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/policies/test_regime.py::test_a_later_pass_cannot_swap_who_is_stranded
 
 ### L-21 · MAJOR · `core/policies/regime.py:89`
 **ForwardOrchestratorPolicy.decide and RegimeOrchestratorPolicy.decide crash with KeyError on any rejected asset, though allow_rejection is an explicitly supported budget key**
@@ -947,7 +1050,7 @@ for the rest (the plan's own `proposals` list already carries them as `abstain: 
 RegimeOrchestratorPolicy with allow_rejection on the narrowed scenario and asserts
 len(assignments) == served count.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/policies/test_regime.py::test_the_forward_policy_abstains_on_a_rejected_asset_too
 
 ### L-22 · MAJOR · `core/proposer/forward_proposer.py:341`
 **The chain re-reports each pass's optimum as the shipped plan's KPI instead of measuring the plan, so a broken ceiling publishes a number the plan does not have**
@@ -966,7 +1069,7 @@ max of the charge-segment kW step function) and report those, with the per-pass 
 alongside as `optima_reached`. Assert `measured <= optimum` for every earlier pass before
 returning; a violation is a chain bug and should raise, not ship.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_the_published_peak_is_a_property_of_the_shipped_plan
 
 ### L-23 · MAJOR · `core/proposer/forward_proposer.py:308`
 **The default (cheap) path's fire record has no `complete` field and never surfaces `retained_previous`, so a truncated two-pass plan is indistinguishable from a whole one to any uniform consumer**
@@ -986,7 +1089,7 @@ pass2["solver_status"] == "OPTIMAL"`. Also add `"retained_previous":
 bool(pass2.get("retained_previous"))` and gate `reproducible` on it the way the regime path does
 (line 348). For deterministic_time, read pass 2's own solver tim
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_the_default_path_reports_completeness_and_retention
 
 ### L-24 · MAJOR · `core/proposer/forward_proposer.py:101`
 **One vehicle row with a NULL target_soc (or NULL soc) destroys the entire batch with a raw RuntimeError instead of producing an ABSTAIN row**
@@ -1006,7 +1109,7 @@ missing/None, or if the resolved `target_soc <= soc`, append `_abstain(v, ...)` 
 rather than admitting the row. Add tests for a NULL-soc row and a target-below-soc row asserting
 `planned == 0, ab
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_one_default_for_target_soc_serves_both_admission_and_plan
 
 ### L-25 · MAJOR · `core/proposer/forward_proposer.py:215`
 **The advisory row discards the charging taper: requested_kw is only the first segment's kW while planned_start/planned_end span all segments**
@@ -1025,7 +1128,7 @@ propagates into settlement and into any p
 gate router's existing single-valued contract. That preserves the existing consumer while making
 the taper recoverable and the energy figure honest.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_the_advisory_row_carries_the_taper_it_plans
 
 ### L-26 · MAJOR · `core/proposer/forward_proposer.py:346`
 **The proposer's `complete` and `reproducible` honesty flags can be hard-coded True with all 267 tests green**
@@ -1045,7 +1148,7 @@ flow-first chain). Push the same case through `propose(..., hour_of_day=7, det_b
 and assert `s["complete"] is False`, `s["site_peak_kw"] is None`, and `s["reproducible"] is
 False`. Add the symmetric case with `time_limit_s`
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_a_wall_clock_solve_reports_itself_unreproducible
 
 ### L-27 · MAJOR · `core/solvers/cpsat/model.py:759`
 **Every rejection ships the same hardcoded reason -- 'no feasible point within the site's capacity' -- which is false for economic, budget-truncated, and zero-demand rejections**
@@ -1065,7 +1168,7 @@ chains built and status != OPTIMAL -> 'declined within the solver budget (status
 a capacity finding'; chains built and status == OPTIMAL -> 'declined on objective cost, not
 capacity'. Carry the solver s
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/solvers/cpsat/test_cpsat_prototype.py::test_a_rejection_reason_is_derived_not_a_literal
 
 ### L-28 · MAJOR · `core/solvers/cpsat/model.py:564`
 **blocked_points is ignored for service-bay (inspect) assignment: the plan schedules work on an out-of-service bay**
@@ -1082,7 +1185,7 @@ p['id'] in blocked and (asset.aid, 'inspect') not in pinned:         continue an
 block a service bay (and a wash bay) in addition to a DCFC, so the property is asserted for
 every point kind rather than one.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/solvers/cpsat/test_cpsat_prototype.py::test_a_blocked_service_bay_takes_no_new_inspection
 
 ### L-29 · MAJOR · `core/solvers/cpsat/model.py:546`
 **A rejected asset's inter-point move intervals are non-optional and still consume the shared path resource, causing spurious INFEASIBLE**
@@ -1102,7 +1205,7 @@ else m.NewConstant(1), ...)` -- or, cleaner, gate on the corresponding wash/insp
 literal so the move exists exactly when the operation it precedes exists. Add a test on the
 probe7 shape: same site, sam
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/solvers/cpsat/test_cpsat_prototype.py::test_a_rejected_asset_books_no_yard_path_capacity
 
 ### L-30 · MAJOR · `core/solvers/cpsat/model.py:433`
 **min_gap_min is honored only on charge points; a wash bay or service bay declaring it is silently ignored, and the conformance harness disagrees**
@@ -1122,7 +1225,7 @@ int(p.get('min_gap_min', 0))` for the copy that goes into per_point_intervals, w
 side interval keeps the true duration. Add a test that a non-charge point declaring min_gap_min
 actually produces that gap between co
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/solvers/cpsat/test_cpsat_prototype.py::test_a_min_gap_on_a_wash_bay_is_honoured
 
 ### L-31 · MAJOR · `core/tests/test_separation.py:40`
 **intent/ is imported by two declared-kernel packages but is excluded from every separation guard, so the network/DB/file-read bans do not apply to it**
@@ -1143,7 +1246,7 @@ so `policies/regime.py:39` — `I
 `load_intent()` call out of module scope into an explicit argument/lazy accessor so regime.py
 genuinely takes its world as
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: DUPLICATE** — G-01 — word-for-word the same finding at the same line
 
 ### L-32 · MAJOR · `core/tests/test_separation.py:174`
 **The advisory-boundary guard never inspects the forward_lex rows, though it declares it covers 'both emitters' — command keys pass CI undetected**
@@ -1164,7 +1267,7 @@ abstain rows) before the assertions; assert the union of observed sources equals
 `_ADVISORY_SOURCES` so a missing emitter fails the test instead of silently narrowing it.
 Mutation-check the new coverage by injecting a co
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: DUPLICATE** — G-03 — the advisory guard's blind spot, filed twice
 
 ### L-33 · MAJOR · `intel/app/forecasters/priors.py:140`
 **The priors fingerprint is self-certifying: it lives inside the file it protects and is pinned nowhere, so re-hashing after an edit ships contaminated priors under intact provenance labels**
@@ -1184,7 +1287,7 @@ in the manifest, per dataset, the engine-side `ottoq_calibration_fingerprint()` 
 source `date_range_start/end` and `record_count` at pull time, and assert the snapshot's per-
 dataset content hash agai
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_forecast_statistical.py::test_a_changed_number_still_changes_the_identity
 
 ### L-34 · MAJOR · `intel/app/forecasters/priors.py:147`
 **The priors fingerprint hashes DB fit timestamps, so a re-snapshot of numerically identical priors changes every forecast's identity**
@@ -1204,7 +1307,7 @@ other provenance-only field) before `fingerprint()`, use it in both `load_priors
 stamps the snapshot, and re-stamp `manifest.fingerprint_md5` once. Then add a test that mutates
 only `fitted_at` and asserts the
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_forecast_statistical.py::test_a_refit_that_lands_the_same_numbers_does_not_change_the_identity
 
 ### L-35 · MAJOR · `intel/app/forecasters/priors_snapshot.json:646`
 **acn_data.hourly_charge_arrival_rate is indexed in UTC while consumed as site-local, and is combined at the same hour index with an explicitly America/Chicago EIA profile — the EV load forecast peaks 8 hours late**
@@ -1224,7 +1327,7 @@ America/Los_Angeles the way the EIA ingest already does with centralHour, and ha
 forecast_arrivals/forecast_load convert each profile from its declared basis to the site's
 timezone before indexing. Add a test
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_forecast_statistical.py::test_the_load_forecast_reads_each_shape_on_the_site_clock
 
 ### L-36 · MAJOR · `intel/app/forecasters/statistical.py:308`
 **fleet_energy_need_kwh p10/p90 are per-vehicle quantiles multiplied by fleet_size, not fleet quantiles — the published band is 3.7x too wide and its p90 has probability ~0**
@@ -1244,7 +1347,7 @@ grid (both are one pass), then report fleet p10/p50/p90 as n*mu -/+ z*sigma*sqrt
 z=1.2816 — for n>=30 this matches the Monte-Carlo above to under 1%. Keep
 `energy_need_per_vehicle_kwh` as the per-vehic
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_forecast_statistical.py::test_the_fleet_band_narrows_as_sqrt_n_not_linearly
 
 ### L-37 · MAJOR · `intel/tests/test_forecast_statistical.py:75`
 **The forbidden-identifier scan only matches bare ast.Name and whole string Constants — attribute access, kwargs, def names, bytes literals and split-string SQL all pass**
@@ -1264,7 +1367,7 @@ ast.Constant bytes by decoding. For strings, also run a case-insensitive regex o
 with docstring spans excised, rather than per-Constant substring matching, so concatenation
 cannot split a token.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: DUPLICATE** — G-02 — the same non-recursive contamination guard
 
 ### L-38 · MAJOR · `otto-q-core/intent/intent.py:134`
 **An unknown or misspelled signal is silently discarded — resolve_intent drops the safety regime and returns a different solver pass order with no error**
@@ -1284,7 +1387,7 @@ intent.known_signals` (e.g. `ValueError("unknown signal(s) {...}; declared: {...
 signals.py's ForecastContractError discipline. Add a test asserting a one-character typo raises
 rather than reso
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_intent.py::test_a_misspelled_signal_raises_instead_of_resolving_by_the_clock
 
 ### L-39 · MAJOR · `pr176/policies/regime.py:39`
 **A failed intent-artifact fingerprint makes `import forward_proposer` fail, taking down the cheap default path that never consults the intent**
@@ -1304,7 +1407,7 @@ accessor. Then a bad artifact raises a named error only on the regime path — t
 actually depends on it — and the cheap default path keeps running, which is what 'the site is
 never without a schedule' means.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_importing_the_proposer_does_not_read_the_doctrine
 
 ### L-40 · MAJOR · `pr176/proposer/README.md:6`
 **The right-of-first-refusal deferral is hardcoded to cuOpt: a forward_lex proposal gets no deferral window and is outranked by cuOpt in the consumer's ORDER BY, contradicting the README**
@@ -1324,7 +1427,7 @@ precedence list — or (b) correct proposer/README.md and the forward_proposer d
 plainly that the deferral pattern is cuOpt-only today and that forward_lex rows currently race
 the decide path with no prote
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: CORRECTED** — the finding's own option (b). `proposer/README.md` and the module docstring said every proposer runs under the deferral pattern; the deferral table is cuOpt-only. Both now say so. Generalising the precedence into declared data is a live decide-path change and a new table — recorded as Chase's call, not silently taken
 
 ### L-41 · MAJOR · `pr176/proposer/forward_proposer.py:121`
 **class_table has no production producer: the decision frame does not emit the join key, and ottoq_vehicle_classes uses different column names — passing its rows verbatim raises KeyError**
@@ -1344,7 +1447,7 @@ explicit projection ottoq_vehicle_classes -> {battery_kwh: battery_capacity_kwh,
 max_charge_rate_kw, charge_kinds: derived, energy_curve: energy_curve} as a committed function
 with a test that ro
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_class_table.py::test_the_production_frame_joins_to_the_production_class_table
 
 ### L-42 · MAJOR · `pr176/proposer/forward_proposer.py:126`
 **charge_kinds silently defaults to (dcfc, l2) — the field that decides which stall type a vehicle may be sent to — and produced a physically impossible assignment for a PAD-inlet AMR**
@@ -1364,7 +1467,7 @@ does), and additionally filter candidate points by inlet compatibility using the
 neither of which frame_to_scenario currently reads. Add a test asserting that a PAD-inlet asset
 never receives a dcfc or l2 p
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_a_pad_inlet_asset_is_never_proposed_onto_a_ccs_charger
 
 ### L-43 · MAJOR · `pr176/proposer/orchestrate.py:86`
 **The audit trail drops the two identifiers reproduction actually requires: the OR-Tools version and the intent artifact's fingerprint/version**
@@ -1383,7 +1486,7 @@ to solver_record on both branches, and in orchestrate() add `result["intent"] = 
 regime.INTENT.version, "fingerprint": regime.INTENT.fingerprint}` so the pass order is
 attributable to a specific doctrine artifact.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_orchestrate.py::test_the_solver_record_carries_what_reproducing_the_plan_requires
 
 ### L-44 · MAJOR · `pr176/proposer/orchestrate.py:80`
 **orchestrate()'s audit trail drops the forecast's own identity, so a fire record built from its return value cannot satisfy "no number ships without a run ID"**
@@ -1403,7 +1506,7 @@ config_hash. Combined with the fact tha
 back. Then define the fire-record table (extending ottoq_run_archives per CLAUDE.md C6 rather
 than a parallel table) so the block has somewhere
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_orchestrate.py::test_the_trail_names_which_forecast_produced_the_number
 
 ### L-45 · MINOR · `core/intent/learn.py:125`
 **Refusal.rule_code is accepted and then never read — the 52-rule shield's own 2,967 failures cannot influence any classification**
@@ -1423,7 +1526,7 @@ or drop the field and say plainly in the header that this module reconciles the 
 preflight refusal vocabulary (ottoq_vehicle_commands.reason_code), not ottoq_rule_evaluations,
 with the rule-shield channel named
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_learn.py::test_a_batch_without_rule_codes_says_nothing_about_rules
 
 ### L-46 · MINOR · `core/intent/signals.py:217`
 **Negative forecast values and string-typed numbers pass the TOTAL seam silently**
@@ -1441,7 +1544,7 @@ and not isinstance(x, bool)` (reject strings outright rather than coercing), req
 require >= 0 for both arrivals counts and kW. Wrap the whole coercion so every rejection
 surfaces as ForecastContractError naming the field and the offending value.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_signals.py::test_a_bad_arrivals_value_raises_the_contract_error
 
 ### L-47 · MINOR · `core/intent/signals.py:186`
 **now_hour accepts True/False as hours 1/0 — bool slips through the isinstance(int) bounds check**
@@ -1455,7 +1558,7 @@ strictest input guard, and test_now_hour_is_bounds_checked (test_signals.py:174-
 raise ValueError(...)`. Add True and False to the `for bad in (...)` tuple at
 test_signals.py:175.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_signals.py::test_now_hour_rejects_bools_and_non_ints
 
 ### L-48 · MINOR · `core/intent/signals.py:131`
 **_hour_map's `key` argument is dead; the contract error it raises cannot name which forecast section failed**
@@ -1470,7 +1573,7 @@ names no section at all.
 nothing to derive a signal from"`. Same fix for the 'a forecast hour entry is malformed' message
 at signals.py:142-143, which also names no section.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_signals.py::test_the_error_names_which_section_was_malformed
 
 ### L-49 · MINOR · `core/intent/test_learn.py:114`
 **`test_a_missing_reason_code_is_skipped_as_malformed_input` passes two well-formed refusals and never exercises a missing reason_code**
@@ -1485,7 +1588,7 @@ counting test.
 None     r = reconcile_refusals([Refusal("superseded"), Row(), Refusal("superseded")])
 assert r.counts == {"superseded": 2}     assert r.unknown_codes == ()
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: DUPLICATE** — G-06 — learn's malformed-input test, filed twice
 
 ### L-50 · MINOR · `core/policies/forward.py:140`
 **Dead-but-armed fallback turns a tardiness or flow objective into a kW ceiling if the early return is ever removed**
@@ -1503,7 +1606,7 @@ of two statements, in the one functio
 failure, or check `retained_previous` BEFORE computing any optimum (which also fixes finding
 #3's trace leak in the same move).
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/policies/test_regime.py::test_a_retained_peak_pass_still_holds_no_ceiling
 
 ### L-51 · MINOR · `core/proposer/forward_proposer.py:132`
 **The R-11 chemistry cap is dropped on the production path: frame_to_scenario never copies max_daily_soc_pct, so _clamp_target is a no-op on every live proposal**
@@ -1522,7 +1625,7 @@ cls['max_daily_soc_pct']} if 'max_daily_soc_pct' in cls else {})`, and add a bri
 class table declaring the cap produces a clamped target_soc in the materialized scenario.
 Otherwise scope the claim honestly to the two scenario files that carry it.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_the_chemistry_cap_reaches_the_production_path
 
 ### L-52 · MINOR · `core/proposer/forward_proposer.py:330`
 **The commander's intent is a single process-global artifact on both production entry points — no per-pack or per-tenant intent can be supplied**
@@ -1542,7 +1645,7 @@ completed before must-by window'; staff's solver_wiring says 'a packing objectiv
 the kernel default). Add an `intent` (or `objectives`/`regimes`) section to PACK_SPEC.md so a
 pack can declare its own priority orderings decl
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_forward_proposer.py::test_propose_resolves_the_regime_from_the_intent_it_is_given
 
 ### L-53 · MINOR · `core/sites/site_alpha/harness_alpha.py:375`
 **site_alpha's CP-SAT solve binds a wall-clock limit and records no reproducibility flag when it fires**
@@ -1561,7 +1664,7 @@ bookkeeping: record `wall_limit_s` on the cell and set a `reproducible: False` f
 the status is not OPTIMAL and a wall limit was set, so run_matrix's artifacts can never cite a
 clock-truncated plan as seed-reproducible.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/sites/site_alpha/test_site_alpha.py::test_the_solve_binds_no_wall_clock
 
 ### L-54 · MINOR · `intel/app/forecasters/priors.py:128`
 **Distribution.mean_value / stddev_value / hard_min / hard_max are declared float|None but load as str, and hard_min/hard_max are never enforced anywhere**
@@ -1580,7 +1683,7 @@ every quantile_grid is monotone non-decreasing and lies within [hard_min, hard_m
 same way the fingerprint mismatch does — that turns the declared bounds into an enforced
 invariant instead of doc
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — ottoq-intelligence/tests/test_forecast_statistical.py::test_the_declared_bounds_are_enforced_not_decorative
 
 ### L-55 · MINOR · `otto-q-core/intent/intent.py:28`
 **The fingerprint covers only four hardcoded top-level keys — the manifest (including the declared version and kind) and any injected top-level key are unauthenticated and accepted**
@@ -1600,7 +1703,7 @@ keys: build the canonical dict as a deep copy of `raw` with `manifest.fingerprin
 level key covered by default instead of covered only if someone remembers to extend
 CANONICAL_KEYS. Add an assertion that
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_intent.py::test_the_manifest_is_inside_the_fingerprint
 
 ### L-56 · MINOR · `otto-q-core/intent/intent.py:146`
 **"Floors are structural" is enforced from a hardcoded Python tuple, not from the artifact's own kind field — a new objective declared kind:"floor" is dropped by every regime that does not list it**
@@ -1620,7 +1723,7 @@ sorted(intent.objectives.items()) if o.kind == "floor" and k not in CANONICAL_FL
 keeping the two named floors' canonical order while making any artifact-declared floor
 structurally un-droppable. Then c
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/intent/test_intent.py::test_an_artifact_declared_floor_cannot_be_dropped_by_a_regime
 
 ### L-57 · MINOR · `pr176/proposer/orchestrate.py:50`
 **orchestrate() has no cheap mode: now_hour is mandatory, hour_of_day is always forwarded, and a caller cannot override it — the 10-20x regime path stops being opt-in at the conductor**
@@ -1640,7 +1743,7 @@ solve together. Guard `**propose_kwargs` against the keys orchestrate already bi
 `hour_of_day`, `signals`) and raise OrchestrateError naming the conflict instead of a bare
 TypeError. State the co
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/proposer/test_orchestrate.py::test_the_expensive_path_is_still_the_default
 
 
 ## D — CLAIMS AND DOCS
@@ -1663,7 +1766,7 @@ bad record cannot take down the batch — callers MUST check report.unknown_code
 parenthetical should be removed outright, since it asserts the opposite of the code in the same
 file.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: CORRECTED** — `reconcile_refusals` contains no raise; the module header, the REFUSAL_CODES comment and the `_diagnose` contrast now all say what the function does
 
 ### D-02 · MAJOR · `core/metrics/baseline_24h_seed424242.json:2`
 **The committed 24h KPI baseline is stale — every guarded number in it is unreproducible from the committed seed, and the gate hides it**
@@ -1683,7 +1786,7 @@ silent: have kpi_gate.py fail, or at minimum exit non-zero in CI, when `comparis
 baseline.comparison_sha256` without an explicit `--allow-improvement` acknowledgement —
 otherwise an improving-directi
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/metrics/kpi_gate.py (the committed 24h baseline was six numbers stale, all in the improving direction, so the gate could never trip)
 
 ### D-03 · MAJOR · `core/policies/README.md:31`
 **policies/README.md publishes a headline comparison table that no longer matches the committed seed-424242 artifact — every number is wrong**
@@ -1703,7 +1806,7 @@ test that parses the README's markdown table and asserts each cell equals the co
 — the same discipline OTTO-Defense already runs as `tools/narrative-check.mjs`. A doc number
 that no test regene
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: FIXED** — otto-q-core/policies/test_policies.py (check P6, cell-by-cell against the artifact)
 
 ### D-04 · MINOR · `core/.github/workflows/verify.yml:20`
 **The CP-SAT battery size is claimed three different ways (T1-T13 / 14-test / T1-T8) and none of them is right**
@@ -1719,7 +1822,7 @@ and delete the hard-coded counts from README.md:11 and verify.yml:20, replacing 
 CP-SAT battery". A number that must be hand-maintained in three files is a number that will be
 wrong in three files.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: CORRECTED** — the battery counts itself (`ALL TESTS PASS — 20 checks, T1..T15`) and the three hand-maintained counts are deleted from solvers/cpsat/README.md
 
 ### D-05 · MINOR · `core/proposer/forward_proposer.py:13`
 **forward_proposer's stated second law says every proposal row 'expires'; no emitted row carries an expiry**
@@ -1737,7 +1840,7 @@ is in fact an unenforced obligation on an
 test_forward_proposer's exact key-set check — or reword law 2 to match the README: 'every row is
 advisory and carries abstain semantics; the caller stamps expires_at on insert.'
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: CORRECTED** — the module's second law now states what it is — an obligation on the caller, which proposer/README.md already had right — not a property of the row
 
 ### D-06 · MINOR · `core/solvers/cpsat/plan_seed424242.json:571`
 **Claimed "plan_seed424242.json sha256" is the schedule digest, not the file's sha256 — sha256sum does not match**
@@ -1753,7 +1856,7 @@ and change the battery's final print from `sha256 <plan_sha256>` to `plan_sha256
 tool stops teaching the mislabel. The underlying claim is CONFIRMED — the battery does compare
 the full file text byte-for-byte and it reproduces.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: CORRECTED** — the battery prints `plan_sha256 …, file sha256 …` so `sha256sum` no longer reads as drift
 
 ### D-07 · MINOR · `core/tests:1`
 **"Was 201 at start of the magenta build" is wrong — the pre-magenta suite was 178 tests**
@@ -1767,4 +1870,4 @@ actually 89.
 *Fix:* State the baseline as 178 at cf80b05 (the commit immediately preceding db60f42) and the delta as
 +89, or name the exact commit the 201 was measured at so the number carries its own run ID.
 
-- [ ] reproduced   - [ ] fixed   - [ ] pinned by a test that fails without the fix
+**Disposition: CORRECTED** — and the correction runs against the first answer. The pre-magenta tree is cf80b05, the parent of the first magenta commit db60f42, and it collects 178 tests — exactly as the finding said. 201 is a mid-build count at 5cc49cd. The magenta layer added 89 tests, not 66. No live artifact carries the 201; this document is where the number lives

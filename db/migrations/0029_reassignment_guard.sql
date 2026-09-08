@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    reassignment_guard
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0029_reassignment_guard_charging.sql
 -- Wire ottoq_indepot_reassignment_guard into the charging stall assignment path.
 -- Currently the guard only fires for bay/service decisions. This adds it to section (3)

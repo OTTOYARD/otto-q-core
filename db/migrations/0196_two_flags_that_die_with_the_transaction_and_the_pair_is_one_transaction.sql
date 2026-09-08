@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    two_flags_that_die_with_the_transaction_and_the_pair_is_one_transaction
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0196  Two flags that die with the transaction, and the pair is one
 --       transaction

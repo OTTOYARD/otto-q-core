@@ -1,3 +1,5 @@
+-- migration-version: 20260902235218
+-- migration-name:    the_plan_lookup_reached_back_past_its_own_return
 -- 0171  The plan lookup reached back past its own return. KPI only; forces_recert = false.
 --
 -- 0170 stated a prediction so it could be falsified, and it was. Predicted after

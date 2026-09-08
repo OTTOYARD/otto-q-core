@@ -1,4 +1,4 @@
--- migration-version: 20260830235000
+-- migration-version: 20260830214923
 -- migration-name:    the_teardown_retires_the_interrupted
 -- 0127 -- the 171717/24t carrier, NAMED BY THE INSTRUMENT on its first outing (0125;
 -- db/checks/0046 pair 54). The pair's boot-state fingerprint showed exactly ONE

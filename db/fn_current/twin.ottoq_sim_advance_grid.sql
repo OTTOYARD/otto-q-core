@@ -1,5 +1,10 @@
 -- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run3/C7)
 -- md5 at capture: 617a867d3686400f45b20485fca77445
+-- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
+--   live ca8df6bc2f2779c75b58f0d03f565a15
+--   here 617a867d3686400f45b20485fca77445
+--   Read it as a point-in-time record, never as 'what the engine does now'.
+--   db/fn_current/README.md carries the whole drift table and how to refresh.
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_advance_grid(p_depot_id uuid, p_sim_run_id uuid, p_sim_clock_now timestamp with time zone)
  RETURNS uuid
  LANGUAGE plpgsql

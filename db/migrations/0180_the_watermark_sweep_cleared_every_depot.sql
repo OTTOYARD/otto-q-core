@@ -1,3 +1,5 @@
+-- migration-version: 20260903171637
+-- migration-name:    the_watermark_sweep_cleared_every_depot
 -- =====================================================================
 -- 0180  The watermark sweep cleared every depot
 -- =====================================================================

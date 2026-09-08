@@ -1,4 +1,4 @@
--- migration-version: 20260820060000
+-- migration-version: 20260820042552
 -- migration-name:    cuopt_propose_enabled_cert_quiesce
 -- 0056 — C7 FOLLOW-UP #10, found by re-certification #10 (post-0055 arms
 -- 36adbeae vs 515526fe: 2/20 identical, first divergence sim-min 90). The

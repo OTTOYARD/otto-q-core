@@ -1,5 +1,7 @@
--- migration-version: 20260828040000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    activity_feed
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0079 -- The V1 audit/activity log: a read-side feed of orchestration decisions with their WHY.
 --
 -- CONTEXT. Chase's V1 bar is "a 2D representation with an audit/activity log showing in real time

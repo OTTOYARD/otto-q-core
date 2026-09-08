@@ -1,3 +1,5 @@
+-- migration-version: 20260901234940
+-- migration-name:    the_verdict_sorts_by_every_field_it_hashes_and_hears_the_energy_stream
 -- =====================================================================
 -- 0148  The verdict sorts by every field it hashes, and hears the
 --       energy stream

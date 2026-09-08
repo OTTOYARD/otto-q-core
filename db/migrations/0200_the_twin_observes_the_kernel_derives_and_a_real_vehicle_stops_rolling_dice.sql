@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_twin_observes_the_kernel_derives_and_a_real_vehicle_stops_rolling_dice
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0200  The twin observes, the kernel derives, and a real vehicle
 --       stops rolling dice

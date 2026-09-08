@@ -1,3 +1,5 @@
+-- migration-version: 20260901172745
+-- migration-name:    the_load_sum_reads_only_its_own_run_and_depot
 -- =====================================================================
 -- 0146  The site-load sum reads only its own run and its own depot
 -- =====================================================================

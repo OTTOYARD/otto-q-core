@@ -1,4 +1,4 @@
--- migration-version: 20260830113000
+-- migration-version: 20260830043153
 -- migration-name:    the_agent_gate_is_a_policy
 -- 0112 -- completes the founder's "deterministic core only" posture for production
 -- sessions. 0111's production_start sets run policy orchestrator_agent_enabled=0; this

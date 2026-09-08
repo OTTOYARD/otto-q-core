@@ -1,0 +1,94 @@
+-- ---------------------------------------------------------------------------
+-- 0143 — "Part A is met" is still true, and it is true of a WEAKER claim than
+--        the one the certification now makes. Round 28 is the round that
+--        re-establishes it at the raised bar, and nothing has said so.
+--
+-- Not a database check. This is an audit of a shipped claim against findings
+-- made after it shipped — the same move `db/checks/0098` forced on CLAUDE.md's
+-- row counts, applied to the roadmap's own definition of done.
+-- ---------------------------------------------------------------------------
+
+-- Q1. WHAT WAS CLAIMED, AND IT WAS CLAIMED PROPERLY.
+--
+--     `db/checks/0113` declares task #56 Part A met after round 17 (ran
+--     2026-09-05 03:36–05:19 UTC), and it does the work item by item rather
+--     than asserting: seven of seven pairs, both arms complete; the inter-pair
+--     bar shown on a second column; every canon stable across two to four
+--     rounds; h_nrg in the verdict since 0148; and the two 0066 findings —
+--     the arrival-payload odometer and `ottoq_fleet_pending_commands` — closed
+--     by 0150 and 0151 and RE-VERIFIED live rather than taken from the
+--     migration log.
+--
+--     **G28 does not invalidate it, and that is worth stating because it
+--     nearly would have.** G28 broke `ottoq_cert_matrix`'s green bookkeeping
+--     from 2026-09-04 15:00, and round 17 ran after that boundary. But 0113
+--     never read `green`: its section 1 is a hand-diff of h_cmd, h_dec, h_evt,
+--     h_bkg, h_nrg and endst per pair against round 16. It used the pair
+--     verdicts, which were never broken, not the matrix, which was. The
+--     hand-diff habit that caught G25 in round 26 is the same habit that makes
+--     this claim survive G28.
+
+-- Q2. THE BAR HAS RISEN THREE TIMES SINCE, AND THE CLAIM DID NOT MOVE WITH IT.
+--
+--     0113's section 1 compares SIX atoms plus the fingerprint. Since round 17:
+--
+--       0205   h_rule  measured -> ENFORCED
+--       0217   h_rcl   measured -> ENFORCED
+--       0219   h_sdr   measured -> ENFORCED   (after 0218 corrected the hash)
+--       0139   endst   already enforced
+--       0225   the MATRIX extended from comparing NINE atoms to FOURTEEN
+--
+--     So "all six certification columns green" meant one thing on 2026-09-05
+--     and means a materially stronger thing today. The sentence in task #56 did
+--     not change; what it asserts did.
+--
+--     This is not a criticism of 0113 — it was right about the bar in force
+--     when it was written, and it published that bar before the round ran, in
+--     0112 section 5. It is a statement about what happens to a completion
+--     claim when the standard behind it keeps moving: **it quietly becomes a
+--     claim about the past.**
+
+-- Q3. WHERE PART A ACTUALLY STANDS, 2026-09-08 16:45 UTC.
+--
+--     | Part A clause | status at the FOURTEEN-atom bar |
+--     |---|---|
+--     | all six columns green | **YES, as of today** — six green, verified in the apply window after 0226 and 0225 landed |
+--     | inter-pair reproducible | held at round 17 on two columns; not re-shown at fourteen atoms |
+--     | h_nrg in the verdict | unchanged since 0148 |
+--     | every canon stable across ≥2 rounds | **ONE round so far at fourteen atoms.** Round 27's seven columns were judged retrospectively by the extended matrix; round 28 is the second |
+--     | the 0066 findings closed | unchanged; 0150/0151, re-verified live in 0113 Q5 |
+--
+--     **The only clause that is short is the two-round one, and round 28 is
+--     precisely the round that satisfies it.** That makes round 28 more than a
+--     recertification of four migrations: it is the round that re-establishes
+--     Part A at the standard the certification now actually enforces.
+--
+--     Nothing said so before this file. `db/canons/round28.md` was written as a
+--     recert of 0225/0226/0227/0228 and its three predictions are about those
+--     four migrations. They still are — this adds a reason to care about the
+--     outcome that is larger than the four.
+
+-- ---------------------------------------------------------------------------
+-- WHAT THIS CHANGES
+--
+--   * Task #56 Part A stays marked met — it was met, and the work behind 0113
+--     was done properly. It is NOT re-opened on a technicality.
+--   * But "Part A is done" should not be quoted without its bar. The honest
+--     form is: **met at round 17 against six enforced atoms; re-established at
+--     round 28 against fourteen** — and until round 28 lands, the second half
+--     of that sentence is a prediction.
+--   * `db/canons/round28.md` gains this as the stake, not a fourth prediction.
+--     It is a consequence of predictions 1 and 3 both holding, not an
+--     independent claim, and stating it as a fourth prediction would be
+--     double-counting the same evidence.
+--
+-- NOT ESTABLISHED:
+--   * Whether "inter-pair reproducible" needs re-showing at fourteen atoms.
+--     0113 met it on two columns at six atoms. The twin-pair columns are not in
+--     round 28's schedule, so it will not be re-shown there either. Recorded as
+--     a gap rather than quietly folded into the two-round clause.
+--   * Whether any of the three newly enforced atoms would have moved between
+--     rounds 16 and 17 had they existed. Unknowable — those pairs' verdicts
+--     never carried h_rule, h_rcl or h_sdr, so there is nothing to re-read.
+--     The claim is re-established forward, not retroactively.
+-- ---------------------------------------------------------------------------

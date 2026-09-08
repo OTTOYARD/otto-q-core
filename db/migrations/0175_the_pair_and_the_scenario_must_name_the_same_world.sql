@@ -1,3 +1,5 @@
+-- migration-version: 20260903031500
+-- migration-name:    the_pair_and_the_scenario_must_name_the_same_world
 -- =====================================================================
 -- 0175  The pair and the scenario must name the same world
 -- =====================================================================

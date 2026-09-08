@@ -1,4 +1,4 @@
--- migration-version: 20260830234000
+-- migration-version: 20260830213715
 -- migration-name:    the_dead_enactor_is_archived
 -- 0126 -- disposal of ottoq_enact_cuopt_batch, per the founder's decision rule
 -- (2026-08-30): "if we will rebuild better/differently later, then just clear it."

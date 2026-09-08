@@ -1,4 +1,4 @@
--- migration-version: 20260829213000
+-- migration-version: 20260829171141
 -- migration-name:    events_carry_their_run
 -- 0092 -- the "emission suppression" of check 0046's arm C was neither suppression nor a flood
 -- guard. It was MIS-TAGGING, and it has been polluting the production/twin separation at every

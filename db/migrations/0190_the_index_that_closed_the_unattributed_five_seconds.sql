@@ -1,3 +1,5 @@
+-- migration-version: 20260904020600
+-- migration-name:    the_index_that_closed_the_unattributed_five_seconds
 -- =====================================================================
 -- 0190  The index that closed the unattributed five seconds
 -- =====================================================================

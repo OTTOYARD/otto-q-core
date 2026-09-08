@@ -1,4 +1,4 @@
--- migration-version: 20260830000000
+-- migration-version: 20260829214014
 -- migration-name:    the_drain_admission_is_not_a_coin_flip
 -- 0098 -- check 0046's in-run nondeterminism, third pair (A4/B4, arms 02ad9218/40cd6a63,
 -- identical world fingerprints, approvals expired per 0097), bisected to ONE ROW:

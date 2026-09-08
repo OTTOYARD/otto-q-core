@@ -1,3 +1,5 @@
+-- migration-version: 20260903024009
+-- migration-name:    a_rule_that_cannot_fire_should_not_look_like_one_that_enforces
 -- 0174  A rule that cannot fire should not look like one that enforces.
 --       Read-only instrument. forces_recert = FALSE - adds a view and a summary
 --       function; touches no engine function and no rule.

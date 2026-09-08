@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    fix_metronome_ceiling
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0041_fix_metronome_ceiling.sql
 -- Fix the metronome ceiling guard: read statement_timeout from pg_settings
 -- instead of current_setting(). current_setting returns '2min' which fails

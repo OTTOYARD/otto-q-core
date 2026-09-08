@@ -51,6 +51,27 @@ for f in "$MIG_DIR"/*.sql; do
     continue
   fi
   rows+=("    ('$(sql_escape "$ver")'::text, '$(sql_escape "$nam")'::text, '$(sql_escape "$base")'::text)")
+
+  # A file can legitimately correspond to MORE THAN ONE ledger row. 0045, 0050,
+  # 0051 and 0052 were each applied in parts (0045a..0045e and so on), so the
+  # ledger holds five rows where the repo holds one file. Without this, those
+  # extra versions have no manifest entry and Section A reports them as
+  # "applied with no file in this repo" -- which is false, and 14 false alarms
+  # are how a real one gets ignored.
+  #
+  #   -- migration-also-covers: 20260819185342, 20260819185611, ...
+  #
+  # Each listed version gets its own manifest row pointing at the same file.
+  also="$(grep -m1 -E '^--[[:space:]]*migration-also-covers:' "$f" \
+          | sed -E 's/^--[[:space:]]*migration-also-covers:[[:space:]]*//' \
+          | tr -d '[:space:]' || true)"
+  if [ -n "$also" ]; then
+    IFS=',' read -r -a extra <<< "$also"
+    for v in "${extra[@]}"; do
+      [ -z "$v" ] && continue
+      rows+=("    ('$(sql_escape "$v")'::text, '$(sql_escape "$nam")'::text, '$(sql_escape "$base")'::text)")
+    done
+  fi
 done
 shopt -u nullglob
 

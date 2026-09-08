@@ -1,4 +1,4 @@
--- migration-version: 20260830200000
+-- migration-version: 20260830141928
 -- migration-name:    the_odometer_is_dealt_not_inherited
 -- 0121 -- closes the last known fp-noise driver (0046 pairs 27-28; db/checks/0049 rank 1).
 -- config.lifetime_miles accrues through the arrival-payload round-trip

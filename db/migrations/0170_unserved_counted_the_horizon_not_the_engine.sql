@@ -1,3 +1,5 @@
+-- migration-version: 20260902235023
+-- migration-name:    unserved_counted_the_horizon_not_the_engine
 -- 0170  "Unserved" counted the horizon, not the engine. KPI only; forces_recert = false.
 --
 -- 0167 gave returns_unserved its first honest definition: an asset that returned

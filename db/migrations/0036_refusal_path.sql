@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    refusal_path
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0036_refusal_path.sql
 -- P1-11: The refusal path has never fired. ottoq_sim_confirm_commands
 -- stamps ALL issued commands as executed unconditionally. 31,157 executed, 0 refused.

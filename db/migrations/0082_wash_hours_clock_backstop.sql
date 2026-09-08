@@ -1,5 +1,7 @@
--- migration-version: 20260828080000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    wash_hours_clock_backstop
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0082 -- Reconcile the two divergent wash-cadence models that left wash-due vehicles deploying
 -- unwashed. needs_card grades exterior_wash OVERDUE on an HOURS clock
 -- ((sim_clock - last_wash_at) / wash_interval_h >= overdue_ratio); the service manifest only

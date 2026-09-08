@@ -1,3 +1,5 @@
+-- migration-version: 20260907213653
+-- migration-name:    the_verdict_sees_what_the_shield_read
 -- ---------------------------------------------------------------------------
 -- 0208 — h_rule must see WHAT THE RULES READ, not only what they decided.
 --

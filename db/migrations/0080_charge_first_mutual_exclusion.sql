@@ -1,5 +1,7 @@
--- migration-version: 20260828050000
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
 -- migration-name:    charge_first_mutual_exclusion
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- 0080 -- Fix the stall-assignment churn the 0079 activity feed exposed: a multi-need vehicle
 -- (deferrable charge + must-do bay work) was assigned to BOTH a charger and a bay in the same tick.
 --

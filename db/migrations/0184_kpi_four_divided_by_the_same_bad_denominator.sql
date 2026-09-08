@@ -1,3 +1,5 @@
+-- migration-version: 20260903230800
+-- migration-name:    kpi_four_divided_by_the_same_bad_denominator
 -- =====================================================================
 -- 0184  KPI 4 divided by the same bad denominator
 -- =====================================================================

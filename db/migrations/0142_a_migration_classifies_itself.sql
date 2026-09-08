@@ -1,3 +1,5 @@
+-- migration-version: 20260901010305
+-- migration-name:    a_migration_classifies_itself
 -- 0142: a migration classifies itself
 --
 -- 0141 changed a function's security context and a table's RLS. It moves no canon and
