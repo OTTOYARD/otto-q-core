@@ -89,10 +89,14 @@ FROM public.ottoq_events WHERE data_source='production' AND sim_run_id IS NOT NU
 --       ottoq_ack_vehicle_command       vehicle.command_ack                 v_cmd.sim_run_id
 --       twin.ottoq_report_charger_fault ops.charger_fault_confirmed         v_run
 --
---     AND EVERY ONE OF THEM HAS PRODUCED ZERO EVENTS. All five event types
---     return no rows at all from ottoq_events. They are latent, not bleeding —
---     the same shape as G20, where the second SDR emitter would have billed a
---     DCFC charge at the L2 tariff and had simply never fired.
+--     AND ALL FIVE EVENT TYPES RETURN ZERO ROWS TODAY. Stated with the
+--     qualification 0131 Q5 had to add about itself: ottoq_events is purged
+--     nightly, so "zero rows now" is a statement about the CURRENT RETENTION
+--     WINDOW, not about all time. These paths may have fired before the window
+--     and left nothing behind. What the zero does establish is that they are
+--     not firing NOW — latent rather than bleeding, the same shape as G20,
+--     where the second SDR emitter would have billed a DCFC charge at the L2
+--     tariff and had simply never fired since the trigger was installed.
 --
 --     That is why 0224 is scoped to the one function with 71,944 rows of
 --     evidence and not to all five. It is also why the other four should be
