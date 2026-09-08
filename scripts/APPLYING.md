@@ -81,10 +81,48 @@ header changes then, so it has to run twice — but the first run belongs here.
 If applying it goes badly, the file already exists and describes exactly what
 was attempted. That is the entire point of this ordering.
 
+### 3b. Dry-run every precondition, read-only, before you apply anything
+
+Not optional, and not the same as writing good preconditions. Take each `P`
+block's query, run it by hand against the live catalog, and read the answer.
+
+Two migrations in one morning were saved by this and neither would have been
+caught by review:
+
+- **0228's `P1`** looked for a function called `ottoq_hash_events` to prove the
+  event hash could not see the column being changed. There is no such function —
+  `h_evt` is computed inline — so the check fell through to a fallback that
+  grepped the whole of `ottoq_determinism_pair`, and the file's own header
+  claimed it asserted something it never checked. Worse, the assertion the
+  header promised would have **failed for an unrelated reason**: the function
+  carries `p_depot`. Dry-running it turned a plausible block into a real one
+  that isolates the `h_evt` expression itself.
+- **0225** had no `ottoq_cert_lineage` row at all. Applying it would have
+  restarted every certification streak — in the same window as the migration
+  fixing exactly that (G28, `db/checks/0135`).
+
+The rule: **a precondition you have not executed is a comment.** The whole point
+of a `P` block is that it fails when the world is not what you think; one that
+cannot fail, or fails for the wrong reason, gives you the feeling of a check
+without the check.
+
 ### 4. Apply it — from the file
 
 Pick one. Whichever you use, the SQL that runs must be the SQL in the committed
 file, unedited.
+
+**"Unedited" is load-bearing, and it has been broken once.** `0224` was applied
+with its 68-line header condensed to four, to fit the apply call — 17,377
+characters in the file, 11,765 submitted. The executable half was identical and
+that was *proven* rather than claimed (strip every `--` comment, collapse
+whitespace, both sides give `23f67ef299561d832ce97bdc79755247` at 9,750
+characters), and the deviation is recorded in that file's APPLIED footer instead
+of being quietly dropped. But the lesson stands and is unresolved: a header long
+enough to be worth writing is long enough to tempt condensing at the apply step,
+and "unedited" then quietly stops being true. Either this document should say
+*the executable SQL, proven by digest*, or headers should be short enough to
+submit whole. Until it is decided, if you condense, prove the digest and say so
+in the footer.
 
 **a) Supabase MCP (what Claude uses):** `apply_migration` with `name` set to the
 migration's `short_name` and `query` set to the file's contents. This writes a
