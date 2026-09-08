@@ -201,7 +201,7 @@ them reset a streak.
 | a | `busy_day` / 314159 / 12 | 16:35:00 | **356** | 358 | −2 | 3 → **4** | pass, no atom moved |
 | b | `busy_day` / 171717 / 12 | 16:49:00 | **361** | 376 | −15 | 3 → **4** | pass, no atom moved |
 | c | `normal_day` / 171717 / 12 | 17:03:00 | **342** | 358 | −16 | 3 → **4** | pass, no atom moved |
-| d | `busy_day` / 424242 / 12 | 17:17 | | 364 | | | |
+| d | `busy_day` / 424242 / 12 | 17:17:00 | **218** | 364 | **−146** | 3 → **4** | pass, no atom moved |
 | e | `busy_day` / 171717 / **24** | 17:31 | | 560 | | | |
 | f | `busy_day` / 424242 / **24** | 18:01 | | 551 | | | |
 | g | `busy_day` / 171717 / 12, instrumented | 18:25 | | — | | | not comparable |
@@ -284,6 +284,58 @@ weaker claim than prediction 2 made and is the one the evidence supports.
 The only outcome that resolves cleanly is d landing **below 317** (mean under
 344, effect larger than predicted and outside the noise zone) or **above 357**
 (mean over 354, prediction 2 falsified outright).
+
+### PREDICTION 2 — JUDGED, AND FALSIFIED. The mean is not the finding.
+
+| col | r28 | r27 | Δ |
+|---|---|---|---|
+| a | 356 | 358 | −2 |
+| b | 361 | 376 | −15 |
+| c | 342 | 358 | −16 |
+| **d** | **218** | 364 | **−146** |
+| **mean** | **319.25** | **364.00** | **−44.75 (−12.3%)** |
+
+**319.25 is outside 344–354, so prediction 2 is falsified** — by the rule this
+file committed before the round, applied without adjustment. It is falsified on
+the *low* side: the effect is larger than predicted, not smaller. It is also
+outside the 350–370 "not resolvable" zone, so unlike the three-column position
+recorded above, this one is resolvable.
+
+**And the mean is the wrong statistic here.** Sorted, the deltas are
+−146, −16, −15, −2. The **median is −15.5, which is prediction 2's point
+estimate of −16 almost exactly**, and three of the four columns sit within 1 s
+of it. One column moved **eight times** more than the other three.
+
+So the honest split, and it is two findings rather than one:
+
+1. **On a, b and c, prediction 2's per-column point estimate was right** — a
+   ~16 s saving, which is what 0227's arithmetic predicted (17.5 ms × ~1,024
+   calls = 17.9 s, minus what an index cannot remove).
+2. **Column d's −146 s is not 0227 and must not be attributed to it.** Nothing
+   in 0227's premise scales to 146 s on one seed and 16 s on three others. It is
+   an unexplained outlier and it is recorded as one.
+
+**The averaged claim "0227 removed 45 s from a 12-tick pair" is therefore not
+available**, even though the arithmetic supports it and it flatters the change.
+0227 is credited with what three columns agree on and d is quarantined until
+explained. G27's whole lesson is that this kind of wall-clock arithmetic is the
+weakest instrument in the building, and G19 burned four wrong guesses reasoning
+from structure — so no mechanism is proposed here.
+
+**What would explain it, as things to test rather than findings:** d ran fourth,
+so `ocpp_sessions` was at its largest and 0227's index replaces a Seq Scan whose
+cost grows with the table — which predicts a saving that *increases* across a, b,
+c, d, and −2/−15/−16/−146 does increase, though not smoothly enough for that
+alone. Round 27's d was measured at 364 s (`round27.md` line 345, −165 from 529)
+against a smaller table. Both are checkable; neither is checked here.
+
+Note that d's pair is fully conclusive — `inconclusive_pairs` 0, history `PPPP`,
+streak 3 → 4, and `canon_fp e418e4f0` / `canon_evt 6453c09b` / `canon_sdr
+6fd75365` all unchanged. **It did the same logical work and produced the same
+fourteen hashes in 40% of the time**, which is what makes the outlier a real
+measurement rather than a short arm. That check was run before the number was
+believed, because `db/checks/0143` exists about a short arm being mistaken for a
+fast one.
 
 ## `r28_g`'s baseline re-verified 17:10 UTC — not one counter moved
 
