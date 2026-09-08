@@ -12,6 +12,28 @@ belt and braces on purpose: `ottoq_sim_runs` cannot see an in-flight pair (both
 arms are one transaction) and `cron.job_run_details` reports a running
 two-statement job as `succeeded` at ~1 s (`db/canons/round25.md`).
 
+## Pre-flight, 2026-09-08 15:25 UTC — every pin still matches live
+
+Re-read from the live catalog between columns e and f, no pair in flight. All
+four `md5(pg_get_functiondef(...))` pins the drafts assert are byte-identical to
+what is deployed, so no P0 will refuse on drift:
+
+| migration | function | live md5 | drafted |
+|---|---|---|---|
+| 0225 | `public.ottoq_cert_matrix` | `34628fff…5ed2d1b` | matches |
+| 0226 | `public.ottoq_cert_recert_floor` | `060b11c8…c9ed1a0d` | matches |
+| 0228 | `public.ottoq_vehicles_state_change` | `9ccac364…cc3f39ba7` | matches |
+| 0228 | `public.ottoq_stalls_state_change` | `84d622c6…4f099c96cc` | matches |
+
+0227 carries no function pin — it is index-only. Its P1 asserts the index does
+not already exist, and `ocpp_sessions` currently holds eleven indexes, none of
+them `ocpp_sessions_runscope_load_idx`. P1 will pass.
+
+This is a point-in-time record, not a guarantee: the pins are re-checked by the
+migrations themselves at apply time, which is the check that actually counts.
+Its value is that a drift would have been found now rather than inside the
+window.
+
 ## Step 0 — unschedule the round, or nothing will apply
 
 Every one of the four files refuses while **any** `r<N>_*` job is `active`, and
