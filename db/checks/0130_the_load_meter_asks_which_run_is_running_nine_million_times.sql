@@ -169,10 +169,33 @@ WHERE depot_id = '11111111-1111-1111-1111-111111111111';
 --         we have. So the caller must be found by function-level accounting or
 --         by reading the loops, not by ranking statements.
 --
---     What that leaves: a plpgsql loop calling it per iteration. The arithmetic
---     to beat is 2,413,581 / 24 ticks = 100,566 per tick. Candidates are
---     ordered by self_time in Q2; the answer is one measurement away and this
---     file declines to name it without one.
+--     (c) THE PLPGSQL CALL SITES ARE 1% OF IT. Joining the 65 callers to their
+--         own per-pair call counts and multiplying by the number of
+--         ottoq_policy_get sites in each body:
+--
+--           38 plpgsql callers ran, 7,956 invocations in total
+--           naive expectation at one execution per site per call:  26,038
+--           actual:                                            2,413,581
+--
+--         The top contributors are ottoq_recall_naive_threshold_v1 (650 calls x
+--         16 sites = 10,400), ottoq.ottoq_book_stall (3,408 x 2 = 6,816) and
+--         ottoq_arm_timings (252 x 9 = 2,268). Everything tracked, added up,
+--         is **1.1%** of the traffic.
+--
+--     So 98.9% comes from one of exactly two places, and this file names both
+--     rather than picking one:
+--
+--       (i)  a LOOP inside one of those plpgsql bodies, which makes the site
+--            count a lower bound rather than the upper bound assumed above; or
+--       (ii) one of the seven remaining SQL-language helpers, INLINED into a
+--            query over a large row set — inlining leaves no statement trace and
+--            no function-stat row, so it would be invisible to both views while
+--            multiplying its sites by the row count.
+--
+--     Both are checkable. Neither is checked here. The arithmetic to beat is
+--     2,413,581 / 24 ticks = 100,566 per tick, and note that (ii) is the same
+--     shape as the finding this whole file is about: a helper evaluated once per
+--     row of something large, to answer a question that does not vary.
 SELECT f.funcname, f.calls - COALESCE(b.calls,0) AS calls,
        round(((f.self_time - COALESCE(b.self_time,0))/1000)::numeric,1) AS self_s
 FROM pg_stat_user_functions f
