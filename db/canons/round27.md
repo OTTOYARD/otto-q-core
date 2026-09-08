@@ -671,3 +671,31 @@ call counts and self-times over one complete 24-tick pair — including the two
 numbers this whole table assumes and nothing has ever counted: how many times
 the boot fingerprint is called at 24 ticks, and how many times the load meter
 is.
+
+### g is running long — noted at 16:05 UTC, while it is still in flight
+
+The band committed at 15:43 was **570–640 s**. At 16:05:04 g has been running
+**784 s** and `pg_stat_activity` still shows the pair active. **The duration
+prediction is already falsified on the high side**, and that is being written
+down now rather than after the number lands, so it cannot be reframed.
+
+What I predicted and why it was wrong-ended: I said *"above e, because
+per-function instrumentation is not free"*, and then bounded it at +14%. The
+direction is right; the magnitude is not. e was 560 s, so g is already **+40%**
+and climbing. `track_functions = 'all'` counts **every** function call in the
+pair — plpgsql and SQL alike — and `ottoq_policy_get` alone accounts for
+2,416,924 of them at *twelve* ticks (`scratchpad/g27_fn_before.txt`). At
+twenty-four the counter updates are a multi-million-element cost in their own
+right.
+
+**This is itself a G21b datum, arriving before the diff does.** A profiler whose
+per-call bookkeeping adds ~40% to a run is telling you the run is dominated by
+call *count*, not by work per call — which is exactly what 0139 argued from the
+index counters and what the 44 µs-per-`policy_get` figure implied. Wall-clock
+inflation under `track_functions='all'` is a crude instrument, but it points the
+same way as the two precise ones.
+
+Consequence for the numbers g produces: **g's duration is not comparable to e's
+and must never be entered in the round-27 duration table.** It is an instrumented
+run, not a certification timing. Its *atoms* are comparable and still must match
+e's exactly; its seconds are not. Round 28's `r28_g` inherits the same rule.
