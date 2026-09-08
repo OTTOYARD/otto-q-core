@@ -55,7 +55,10 @@ KERNEL_PACKAGES = ("policies", "solvers", "sites", "wear",
 #: Imports that would let kernel code reach state it must not know about.
 FORBIDDEN_IMPORTS = re.compile(
     r"^\s*(import|from)\s+(supabase|psycopg\w*|sqlalchemy|asyncpg|requests|"
-    r"httpx|urllib\.request|twin)\b", re.M)
+    #: `load` is on this list for the same reason psycopg is: it is a
+    #: database client by design (load/harness.py drives pgbench against a
+    #: live URL). A kernel module importing it would have a connection.
+    r"httpx|urllib\.request|twin|load)\b", re.M)
 
 #: Identifiers of the production world. A kernel file that names them has been
 #: told which world it lives in.
@@ -107,6 +110,53 @@ def test_the_guard_covers_every_package_it_claims_to():
         f"new kernel package(s) {sorted(added)} are covered by the guard but "
         f"not recorded in EXPECTED_KERNEL_PACKAGES; add them here so the "
         f"coverage claim stays explicit.")
+
+
+#: Top-level packages that hold Python and are deliberately NOT kernel, each
+#: with the reason it is exempt. This exists because of how `intent` was found:
+#: the comment above KERNEL_PACKAGES says "reviews should treat an unlisted
+#: kernel package as a finding", and for however long intent/ existed, no review
+#: treated it as one. A human step that has already been skipped once is not a
+#: control. So the classification is now a CENSUS: every top-level package that
+#: contains a .py file must appear in exactly one of the two lists, and a new
+#: package that appears in neither fails this file rather than silently
+#: defaulting to unguarded.
+NON_KERNEL_PACKAGES = {
+    "tests":   "the guard itself and its siblings; they must import what they check",
+    "scripts": "operator tooling (migration index, drift SQL) — runs against the "
+               "repo and the ledger by design, never inside a decide path",
+    "db":      "SQL, checks and canons; the one .py is tooling beside them",
+    "load":    "the load harness (task G24). It is a NETWORK and DATABASE client "
+               "on purpose — measuring the served system is its whole job — which "
+               "is exactly why it must never be importable from a kernel package. "
+               "FORBIDDEN_IMPORTS below bans `import load` from the kernel for "
+               "the same reason it bans psycopg.",
+}
+
+
+def test_every_python_package_is_classified_as_kernel_or_not():
+    """The failure this test exists for, stated plainly: `intent` sat in neither
+    list from its creation until 2026-09-07, so none of this file's rules applied
+    to code that ran inside the kernel on every regime-aware proposal. Nothing
+    failed, because nothing was looking. Now something looks."""
+    packages = sorted(
+        d.name for d in ROOT.iterdir()
+        if d.is_dir() and not d.name.startswith((".", "_"))
+        and any(d.rglob("*.py")))
+    classified = EXPECTED_KERNEL_PACKAGES | set(NON_KERNEL_PACKAGES)
+    unclassified = [p for p in packages if p not in classified]
+    assert not unclassified, (
+        f"top-level package(s) holding Python and classified as neither kernel "
+        f"nor non-kernel: {unclassified}. Add each to EXPECTED_KERNEL_PACKAGES "
+        f"(and KERNEL_PACKAGES) if it decides, prices, sizes or derives, or to "
+        f"NON_KERNEL_PACKAGES with the reason it is exempt. Defaulting to "
+        f"unguarded is what happened to `intent`.")
+    overlap = EXPECTED_KERNEL_PACKAGES & set(NON_KERNEL_PACKAGES)
+    assert not overlap, f"package(s) claimed as both kernel and exempt: {sorted(overlap)}"
+    stale = [p for p in NON_KERNEL_PACKAGES if not (ROOT / p).is_dir()]
+    assert not stale, (
+        f"NON_KERNEL_PACKAGES names {stale}, which do not exist — an exemption "
+        f"for a package that is gone is an exemption waiting to be reused")
 
 
 def test_every_covered_package_actually_exists():
