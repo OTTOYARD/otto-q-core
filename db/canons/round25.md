@@ -78,29 +78,43 @@ cost that grows with total history rather than with the run — but it is **not*
 812 s, the number to attack is ~33 s per tick, and `pg_stat_statements.track` is `top`, so the
 tick's internals are invisible to it. Next instrument, not next guess.
 
-## Pairs 2, 3 and 4 — all **PASSED**, all with a clean `h_sdr`
+## Pairs 2 to 5 — all **PASSED**, all with a clean `h_sdr`
 
 Scheduled 08:46, 09:02, 09:18, 09:34 and 10:00 UTC (3:46 – 5:00 AM CT), 16-minute spacing for
 12-tick and 26 for 24-tick, from the 812 s / ~1300 s measurements.
 
-| column | fired | verdict | `h_sdr` a / b |
-|---|---|---|---|
-| `busy_day` / 171717 / 12t | 08:46 | passed | `a2a35e03` = `a2a35e03` |
-| `normal_day` / 171717 / 12t | 09:02 | passed | `e0dfbbe8` = `e0dfbbe8` |
-| `busy_day` / 424242 / 12t | 09:18 | passed | `6fd75365` = `6fd75365` |
-
-Three columns, three agreements, on the first round in which `h_sdr` exists in its corrected
-(0218) form. Every other atom on every column reproduces the column's own last canon, with
-**one move, and it is 0208's**:
-
-| column | atom | from | to | why |
+| column | fired | wall clock | verdict | `h_sdr` a / b |
 |---|---|---|---|---|
-| `busy_day` / 424242 / 12t | `h_rule` | `c3cca844` | `d56e09a3` | 0208, applied 09-07 21:36 — **after** this column's last pair at 09-07 20:07 |
+| `busy_day` / 171717 / 12t | 08:46 | 686 s | passed | `a2a35e03` = `a2a35e03` |
+| `normal_day` / 171717 / 12t | 09:02 | 735 s | passed | `e0dfbbe8` = `e0dfbbe8` |
+| `busy_day` / 424242 / 12t | 09:18 | 754 s | passed | `6fd75365` = `6fd75365` |
+| `busy_day` / 171717 / **24t** | 09:34 | ~1,300 s | passed | `957abcfb` = `957abcfb` |
 
-That is the same move `busy_day / 314159 / 12t` already took in round 24 (`333cf172` →
-`fc69953b`), landing on this column at its first post-0208 pair. `fp`, `h_cmd`, `h_dec`,
-`h_evt`, `h_bkg`, `h_nrg`, `h_prop`, `h_defr`, `h_cal` and `h_rcl` are byte-identical to the
-09-07 20:07 pair. `h_cal` is `11a24626` on all four columns run so far, as it has been all week.
+Four columns, four agreements, on the first round in which `h_sdr` exists in its corrected
+(0218) form. Every other atom on every column reproduces the column's own last canon, with
+**one move, twice, and both times it is 0208's**:
+
+| column | atom | from | to | previous pair |
+|---|---|---|---|---|
+| `busy_day` / 424242 / 12t | `h_rule` | `c3cca844` | `d56e09a3` | 09-07 20:07 |
+| `busy_day` / 171717 / 24t | `h_rule` | `62ed1a1e` | `9564b998` | 09-07 18:35 |
+
+0208 was applied 09-07 21:36 — **after** both of those pairs — so each column is taking the
+move at its first post-0208 outing, exactly as `busy_day / 314159 / 12t` already did in round
+24 (`333cf172` → `fc69953b`). On both columns every other atom is byte-identical to that
+previous pair: `fp`, `h_cmd`, `h_dec`, `h_evt`, `h_bkg`, `h_nrg`, `h_prop`, `h_defr`, `h_cal`
+and `h_rcl`. `h_cal` is `11a24626` on all four columns, as it has been all week.
+
+### An observability trap worth knowing about
+
+`cron.job_run_details` cannot be trusted to say whether one of these pairs is finished. At
+09:53 it reported `r25_e_busy_171717_24` as **`status='succeeded'`, `return_message='SET'`,
+duration 1 second** — while `pg_stat_activity` showed that job's own backend still executing
+the pair, 1,169 seconds in. The job command is two statements (`SET statement_timeout …;
+SELECT ottoq_determinism_pair(…)`) and the run-details row reflects the first one until the
+job actually ends. The authority for "is a pair running" is `pg_stat_activity`, not the cron
+log — which matters because the standing rule is never to apply a migration while a pair is in
+flight, and the cron log will happily say the coast is clear.
 
 ## The instrument the drift needed was already in the server
 
@@ -124,6 +138,14 @@ re-run anyway — its 08:25 pair predates 0218 and its stored `h_sdr` is the con
 so job `r25_g_busy_314159_12_profiled` at **10:40 UTC (5:40 AM CT)** snapshots
 `pg_stat_user_functions` into `g19_fn_before` and then runs that re-run with `pl` tracking on.
 The verdict is a normal verdict: timing instrumentation touches no atom.
+
+## Schedule change during the round
+
+`r25_f` was moved from 10:00 to **10:12 UTC** and `r25_g` from 10:40 to **10:52** (5:12 and
+5:52 AM CT). Pair e was still running at 09:53 having started 09:34, and a 24-tick pair at the
+current pace lands between 1,300 and 1,600 s — so the original 10:00 slot risked starting f
+while e still held the flagship depot. Both new slots were asserted `fire_utc > now()` against
+the database clock before being written.
 
 ## Round completion
 
