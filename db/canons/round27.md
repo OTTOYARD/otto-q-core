@@ -533,6 +533,40 @@ post-g delta is exactly g's pair — confirmed, not assumed.
 **One measurement, three findings.** That is why g exists as a seventh column
 rather than as a re-run of e.
 
+#### Correction to the table above, made 15:53 UTC — before g finishes, not after
+
+The row headed *"`ottoq_sim_compute_charger_load_kw`'s call count at 24 ticks
+against the 12-tick figure"* **cannot be read that way, and I should have seen it
+when I wrote the baseline file rather than when I wrote the diff query.**
+
+`r25_g` — the run the baseline was captured from — used
+`track_functions = 'pl'`. **That setting does not count SQL-language
+functions.** It is the exact blindness that produced `db/checks/0129`, and the
+baseline file even flags those two rows as *"SQL, barely tracked"*: the load
+meter shows **2 calls** where 0130 derives ~1,024 per 12-tick pair, and
+`ottoq_depot_running_run` shows 76.
+
+So the diff splits in two, and only half of it is a comparison:
+
+- **plpgsql rows** (`ottoq_determinism_pair`, `ottoq_sim_advance_tick`,
+  `ottoq_policy_get`, `ottoq_decide_tick`, …) — the baseline is real, and
+  `post − baseline` is a genuine 24-tick-against-12-tick reading. G27's first
+  question (is the fingerprint's self-time ~255 s or ~500 s at 24 ticks) is
+  **unaffected**, because `ottoq_determinism_pair` is plpgsql.
+- **SQL rows** (`ottoq_sim_compute_charger_load_kw`, `ottoq_depot_running_run`)
+  — the baseline is a tracking artefact, not a 12-tick measurement. The delta is
+  g's **absolute 24-tick count**, and any ratio computed from it is meaningless.
+
+That absolute number is still worth having, and is arguably the more valuable
+half: **how many times the load meter is actually called in a pair has only ever
+been derived** (8,966,506 ÷ 8,756), never counted. g counts it. Comparing 24 to
+12 needs a second instrumented column at 12 ticks, which does not exist —
+**that is round 28's g**, and it is now a thing round 28 has to schedule rather
+than a thing I can read off this one.
+
+The staged query carries this warning in its own header so the numbers cannot be
+read the wrong way at the moment they arrive.
+
 ### f — `busy_day` / 424242 / **24 ticks** — **PASS**, 551 s
 
 Fired 15:34:00 UTC (10:34 AM CT), **551 s**, `arms_identical` true across all
