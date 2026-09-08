@@ -204,7 +204,7 @@ them reset a streak.
 | d | `busy_day` / 424242 / 12 | 17:17:00 | **218** | 364 | **−146** | 3 → **4** | pass, no atom moved |
 | e | `busy_day` / 171717 / **24** | 17:31:00 | **783** | 560 | **+223** | 4 → **5** | pass, no atom moved |
 | f | `busy_day` / 424242 / **24** | 18:01:00 | **868** | 551 | **+317** | 3 → **4** | pass, no atom moved |
-| g | `busy_day` / 171717 / 12, instrumented | 18:25 | | — | | | not comparable |
+| g | `busy_day` / 171717 / 12, instrumented | 18:25:00 | **330** | — | — | — | instrumented; not comparable |
 
 ### How "no atom moved" is established, and why it is not a hand-diff
 
@@ -528,3 +528,71 @@ Its 1,130 lifetime calls are `2` from the `r25_g` era — when `track_functions`
 was `'pl'`, which does not count SQL functions, and is exactly what blinded
 `db/checks/0129` — plus `r27_g`'s counted **1,128** at 24 ticks. So the 12-tick
 count g produces will be the first ever taken with the meter actually visible.
+
+
+---
+
+## Column g — the instrumented column, and what it found
+
+330 s at `track_functions='all'`. Not comparable to a, b, c, d as a duration
+(round 27's instrumented column carried +52% overhead), but its **call counts**
+are the point and they do not vary with wall clock.
+
+Full write-up in `db/checks/0144`. Two findings closed:
+
+### G27 — CLOSED
+
+| | calls |
+|---|---|
+| `twin.ottoq_sim_compute_charger_load_kw` at **12** ticks (r28_g) | **1,004** |
+| same at **24** ticks (r27_g) | 1,128 |
+| **ratio** | **1.12x** |
+
+**Not 2.0x.** 0223's predicted scaling assumed the meter is called once per
+tick; it is very nearly independent of tick count. The per-call arithmetic did
+not under-deliver — the assumption underneath it was wrong.
+
+And `db/checks/0130` **derived** ~1,024 calls at 12 ticks without counting them.
+Measured 1,004 — **right to within 2.0%**. That derived figure was treated with
+suspicion for two rounds and did not deserve it; recorded here because the
+correction runs in our disfavour.
+
+### G21b — SOLVED, and it is the same defect class as 0145
+
+`ottoq_policy_get`: **4,894,867 calls, 199,648 ms self time, in one 12-tick
+pair.** The pair took 330 s, so that is **60.5% of the entire pair in one
+function**, and 85.96% of all function calls made.
+
+The caller is **not** among the 64 in the static census. Every one of them, at
+its theoretical maximum (measured invocations × static mentions), sums to
+**42,461** — **115x short**. `db/checks/0139` refused to name a caller from that
+census and called the shape "a function called from SQL the profiler cannot
+attribute." Measured now, not suspected.
+
+It is one view, `public.ottoq_approach_band`, whose first CTE is:
+
+```sql
+WITH r AS MATERIALIZED (
+    SELECT rr.sim_run_id, rr.depot_id, rr.sim_clock_current,
+        GREATEST(ottoq_policy_get(rr.sim_run_id,'approach_freeze_minutes',10),0),
+        GREATEST(ottoq_policy_get(rr.sim_run_id,'approach_horizon_minutes',30),1),
+        GREATEST(ottoq_policy_get(rr.sim_run_id,'approach_stale_heartbeat_sec',90),1)
+      FROM ottoq_sim_runs rr
+     WHERE rr.depot_id IS NOT NULL          -- no run scope. EVERY run, ever.
+)
+```
+
+**831 runs scanned, 1 needed. 2,493 calls per evaluation where 3 suffice.
+99.88% waste.** The consumer already filters by run and vehicle and takes one
+row — but `MATERIALIZED` is an optimisation fence, so the predicate cannot reach
+the CTE, and 96,120 of 96,121 rows are built and discarded.
+
+**Not established, and not to be implied:** that this explains the 24t:12t ratio
+moving from 1.53 to 2.34–2.59. It is the right *shape* — cost proportional to a
+table the runs themselves grow — but `ottoq_sim_runs` grew only ~4% between the
+rounds, which is not obviously enough. The mechanism is confirmed; its
+sufficiency for the superlinearity is a separate question and is not answered.
+
+**No fix is drafted.** Three candidate shapes and their pre-flight requirements
+are in 0144. The view is read on the decide path, so any change must prove the
+four 12-tick canons unmoved before it goes near a round.
