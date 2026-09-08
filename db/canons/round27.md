@@ -524,3 +524,68 @@ post-g delta is exactly g's pair — confirmed, not assumed.
 
 **One measurement, three findings.** That is why g exists as a seventh column
 rather than as a re-run of e.
+
+### f — `busy_day` / 424242 / **24 ticks** — **PASS**, 551 s
+
+Fired 15:34:00 UTC (10:34 AM CT), **551 s**, `arms_identical` true across all
+fourteen atoms. Every value byte-identical to round 26's f, which was itself
+byte-identical to round 25's. **This column has now produced the same fourteen
+values in three consecutive rounds.**
+
+`fp e418e4f0` · `h_cmd 8f232001` · `h_dec 35148055` · `h_evt 8dc37f82` ·
+`h_bkg ea8a12e2` · `h_nrg c79957a5` · `h_prop aabef458` · `h_defr d41d8cd9` ·
+`h_cal 11a24626` · `h_rule 726f6769` · `h_rcl 928262d2` · `h_sdr f2587dbc` ·
+`endst b2c2dc8e`
+
+**Prediction 1 (no verdict atom moves): HELD.** Six columns, fourteen atoms
+each, zero movement across 0223 and 0224.
+
+### The duration prediction MISSED — by one second
+
+The band committed at 15:26:52 UTC, before f fired, was **520–550 s**, centred
+on 533. **f landed at 551.** That is outside the band, and it is recorded as a
+miss rather than rounded into a hit. One second is a trivial amount of time and
+it is not a trivial amount of discipline: a band that gets widened after the
+fact to admit the answer is not a band.
+
+What makes it worth writing down rather than shrugging at: **the miss is on the
+number, and the reading the band was built to select is the one that holds — and
+holds harder.**
+
+| f lands at | reading committed in advance | what happened |
+|---|---|---|
+| 520–550 s | under-scaling is a property of **0223**, not of seed 171717 | **this one, at 551** |
+| ~424 s (2.0x) | column e was the outlier; a single 24-tick column can't ground scaling | no |
+| 500–520 s | partial scaling; report a range not a ratio | no |
+| >600 s | something other than 0223 changed; re-ground G27 | no |
+
+### G27 after two columns per fix: both fixes miss, consistently, in opposite directions
+
+Round 26's f was **734 s**, so f saved **183 s**. Against the 12-tick saving of
+155 s that is a ratio of **1.18** — where 0223's per-tick call count predicts
+**2.0**.
+
+| fix | 12-tick saving | 24-tick: e | 24-tick: f | ratios | ratio the call count predicts |
+|---|---|---|---|---|---|
+| 0222 — boot fingerprint (r25→26) | −228 s | −511 s | −602 s | **2.24 / 2.64** | **1.0** (4 calls either way) |
+| 0223 — load meter (r26→27) | −155 s | −201 s | −183 s | **1.30 / 1.18** | **2.0** (per tick) |
+
+**The two columns of each fix agree with each other and disagree with the
+prediction the same way.** 0222 over-scaled on both (2.24, 2.64) where it should
+not have scaled at all; 0223 under-scaled on both (1.30, 1.18) where it should
+have scaled by two. So the anomaly is **a property of each fix, not of a seed or
+of one unlucky column** — which is exactly what column f was run to decide, and
+it decides it in the direction that keeps G27 open.
+
+And it kills the hypothesis this file floated earlier. "Hoisting removes more
+than the call, because it also removes what the planner did around it per row"
+predicts *over*-scaling for 0223. 0223 under-scales on both columns. Whatever
+explains 0222 does not explain 0223, and a single mechanism covering both is now
+harder to construct, not easier.
+
+**This is still arithmetic about wall-clock, and wall-clock is the weakest
+instrument in the building.** `r27_g` at 15:52 replaces it with per-function
+call counts and self-times over one complete 24-tick pair — including the two
+numbers this whole table assumes and nothing has ever counted: how many times
+the boot fingerprint is called at 24 ticks, and how many times the load meter
+is.
