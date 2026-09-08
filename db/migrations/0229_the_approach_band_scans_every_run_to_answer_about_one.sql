@@ -183,7 +183,7 @@ END $A2$;
 --     not the favourable one.
 -- ---------------------------------------------------------------------------
 DO $A3$
-DECLARE plan jsonb; v_run uuid; v_veh uuid; n_seq int;
+DECLARE plan json; v_run uuid; v_veh uuid; n_seq int;   -- json, not jsonb: EXPLAIN (FORMAT JSON) returns json and the cast to jsonb is not implicit in assignment
 BEGIN
   SELECT sim_run_id INTO v_run FROM public.ottoq_sim_runs
    WHERE depot_id IS NOT NULL ORDER BY started_at DESC LIMIT 1;
@@ -197,7 +197,7 @@ BEGIN
     INTO plan;
 
   SELECT count(*) INTO n_seq
-    FROM jsonb_path_query(plan, '$.**."Node Type"') nt
+    FROM jsonb_path_query(plan::jsonb, '$.**."Node Type"') nt
    WHERE nt #>> '{}' = 'Seq Scan';
 
   IF n_seq > 0 THEN
