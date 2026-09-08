@@ -596,3 +596,54 @@ sufficiency for the superlinearity is a separate question and is not answered.
 **No fix is drafted.** Three candidate shapes and their pre-flight requirements
 are in 0144. The view is read on the decide path, so any change must prove the
 four 12-tick canons unmoved before it goes near a round.
+
+---
+
+## Closing verification, 18:46 UTC — round 28 complete
+
+| | expected | measured | |
+|---|---|---|---|
+| recert floor | `2026-09-07 21:36:53.363037` | `2026-09-07 21:36:53.363037` | held through the whole round |
+| `ottoq_cert_lineage_orphans()` | 22 | 22 | held |
+| flagship columns green | 6 | **6 of 6** | held |
+| minimum streak across the six | ≥ 2 | **4** | double the bar |
+| pairs in flight | 0 | 0 | round closed |
+
+The floor was checked at 16:56 — before columns c, d, e, f and g ran — and again
+here. Checking it once at the start would have proved nothing about the round.
+
+### Judging the check-in's own prediction, which was mine
+
+The scheduled check-in that opened this work said: *"If the 12-tick count is also
+**~1,100** the meter is confirmed near-independent of tick count and G27 is fully
+closed."*
+
+Measured: **1,004**. The point estimate was **9% high**. The *conclusion* holds —
+1,004 against 1,128 at double the ticks is 1.12x, which is near-independence and
+nothing like 2.0x — but the number I guessed was not the number that arrived, and
+saying "confirmed as predicted" would be overstating it by 96 calls.
+
+### Where this leaves task #56 Part A
+
+Part A is *"all six certification columns green AND inter-pair reproducible, with
+h_nrg in the verdict, every canon stable across at least two rounds."* At the
+fourteen-atom bar 0225 installed:
+
+| clause | state |
+|---|---|
+| six columns green | **met** — 6 of 6 |
+| every canon stable across ≥ 2 rounds | **met** — minimum streak 4 |
+| `h_nrg` in the verdict | met (0134) |
+| the 0066 run-scoping findings closed | met |
+| **inter-pair reproducible** | **NOT re-shown at fourteen atoms** |
+
+That last row is the same gap `db/checks/0143` recorded before the round and it
+has not closed: 0113 met it on two twin-pair columns **at six atoms**, and round
+28's schedule contained no twin pairs. Five of six clauses hold at the new bar
+and one is carried over from the old one.
+
+**So Part A is not declared done here.** The honest statement is that it is met at
+six atoms and met on every clause but one at fourteen, and the missing clause is a
+single twin-pair column — one scheduled pair, not a project. Declaring it complete
+while one clause rests on a superseded bar is exactly the move `0143` was written
+to prevent.
