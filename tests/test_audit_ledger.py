@@ -34,6 +34,17 @@ VOCABULARY = {"FIXED", "CORRECTED", "DUPLICATE", "BY_CONSTRUCTION", "REFUTED", "
 #: counting an unfixed one would overstate it.
 OPEN_DISPOSITIONS = {"OPEN"}
 
+#: This audit spans two repositories, and CI checks out only this one. A guard
+#: named in the sibling repo therefore CANNOT be verified from a CI run, and
+#: pretending otherwise is the defect this whole file exists to prevent — so the
+#: rule is: verify it when the sibling is on disk (it is in the build agent's
+#: workspace, so renames are still caught there), report it as unverifiable when
+#: it is not, and PIN THE COUNT so the exemption cannot quietly grow into a
+#: place to hide a guard that does not exist.
+THIS_REPO = "otto-q-core/"
+SIBLING_REPOS = ("ottoq-intelligence/",)
+CROSS_REPO_REFERENCES = 12
+
 HEADING = re.compile(r'^### ([SGLD]-\d\d) · ', re.M)
 DISPOSITION = re.compile(r'^\*\*Disposition: ([A-Z_]+)\*\* — (.*)$', re.M)
 GUARD = re.compile(r'([A-Za-z0-9_./-]+\.py)::(test_[A-Za-z0-9_]+)')
@@ -68,28 +79,75 @@ def test_every_disposition_is_in_the_vocabulary():
     assert not bad, f"dispositions outside {sorted(VOCABULARY)}: {bad}"
 
 
+def _named_paths():
+    """(finding, path, test_name or None) for every guard the document names."""
+    for fid, _disp, detail in _findings():
+        seen = set()
+        for path, fn in GUARD.findall(detail):
+            seen.add(path)
+            yield fid, path, fn
+        #: gate scripts and artifacts are named without a ::test and must still exist
+        for path in BARE_FILE.findall(detail):
+            if path not in seen:
+                yield fid, path, None
+
+
+def test_every_named_path_is_in_a_repository_this_audit_covers():
+    """A path under neither repo is a typo, and a typo would be exempted below."""
+    stray = sorted({(fid, path) for fid, path, _ in _named_paths()
+                    if not path.startswith(THIS_REPO)
+                    and not path.startswith(SIBLING_REPOS)})
+    assert not stray, (
+        f"these guard paths name neither {THIS_REPO!r} nor {SIBLING_REPOS}: {stray}")
+
+
+def test_the_cross_repo_exemption_has_not_widened():
+    """The count of guards this repo cannot check is pinned, deliberately.
+
+    CI checks out otto-q-core alone, so a guard living in ottoq-intelligence
+    cannot be verified from a CI run — and an exemption nobody counts is exactly
+    where a guard that does not exist would come to rest. Twelve findings are in
+    that position today (S-01..S-03 and the priors/forecast cluster). Adding a
+    thirteenth turns this red and asks for the number to be moved on purpose.
+    """
+    cross = sorted({(fid, path) for fid, path, _ in _named_paths()
+                    if path.startswith(SIBLING_REPOS)})
+    assert len(cross) == CROSS_REPO_REFERENCES, (
+        f"{len(cross)} cross-repo guard references, pinned at "
+        f"{CROSS_REPO_REFERENCES}. If that is deliberate, move the pin in the "
+        f"same commit: {cross}")
+
+
 def test_every_named_guard_exists():
     """A guard that does not exist is worse than no guard: it reads as evidence.
 
     Both the file and the function are checked, because a renamed test leaves the
     path valid and the claim false — which is the same shape as the tautological
     assertions this audit was convened to find.
+
+    In-repo guards are checked unconditionally. A guard in the sibling repo is
+    checked WHEN THAT REPO IS ON DISK — it is in the build agent's workspace, so
+    a rename there is still caught — and skipped when it is not, because CI
+    checks out this repository alone and a check that fails for the absence of
+    something it was never given is noise, not evidence. What stops that skip
+    from becoming a hiding place is not this test but the pinned count in
+    test_the_cross_repo_exemption_has_not_widened.
     """
-    missing = []
-    for fid, disp, detail in _findings():
-        for path, fn in GUARD.findall(detail):
-            p = WORKSPACE / path
-            if not p.exists():
+    missing, unverifiable = [], []
+    for fid, path, fn in _named_paths():
+        p = WORKSPACE / path
+        if not p.exists():
+            if path.startswith(SIBLING_REPOS):
+                unverifiable.append(f"{fid}: {path} (sibling repo not checked out)")
+            else:
                 missing.append(f"{fid}: no such file {path}")
-            elif not re.search(rf'^def {re.escape(fn)}\(', p.read_text(), re.M):
-                missing.append(f"{fid}: {path} defines no {fn}")
-        #: gate scripts and artifacts are named without a ::test, and must still exist
-        for path in BARE_FILE.findall(detail):
-            if f"{path}::" in detail:
-                continue
-            if not (WORKSPACE / path).exists():
-                missing.append(f"{fid}: no such file {path}")
+            continue
+        if fn and not re.search(rf'^def {re.escape(fn)}\(', p.read_text(), re.M):
+            missing.append(f"{fid}: {path} defines no {fn}")
     assert not missing, missing
+    if unverifiable:
+        print(f"{len(unverifiable)} cross-repo guards not verified here "
+              f"(count pinned at {CROSS_REPO_REFERENCES}): {unverifiable}")
 
 
 def test_every_fixed_finding_names_a_guard():
