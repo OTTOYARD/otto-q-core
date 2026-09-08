@@ -74,10 +74,51 @@ predicting against yet.
 | mean lands ~519 | the hoist bought nothing on a pair | 0223 joins the two earlier fixes that measured beautifully and moved no clock; say so in this file and stop optimising the meter |
 | mean lands between | partial | attribute before continuing — do not average it into a win |
 
-## Schedule
+## Schedule — laid out 2026-09-08 13:44 UTC, after 0223 and 0224 were applied
 
-*(filled in when the round is laid out, from `scripts/schedule-round.sql` with
-the last-K-runs window added 2026-09-08)*
+| | column | fires (UTC) | fires (CT) | slot |
+|---|---|---|---|---|
+| a | `busy_day` / 314159 / 12t | 13:55 | 8:55 AM | 17 min |
+| b | `busy_day` / 171717 / 12t | 14:12 | 9:12 AM | 17 min |
+| c | `normal_day` / 171717 / 12t | 14:29 | 9:29 AM | 17 min |
+| d | `busy_day` / 424242 / 12t | 14:46 | 9:46 AM | 17 min |
+| e | `busy_day` / 171717 / **24t** | 15:03 | 10:03 AM | 31 min |
+| f | `busy_day` / 424242 / **24t** | 15:34 | 10:34 AM | 31 min |
+| **g** | `busy_day` / 171717 / **24t**, **instrumented** | 15:52 | 10:52 AM | — |
+
+**The slots are deliberately too generous, and the new lookback is why.** The
+last-K-runs window added this morning takes the **max** of the last six runs of
+each tick count, and six still reaches back past 0222: 754 s for 12-tick,
+1,336 s for 24-tick. So the slots are sized for an engine two fixes ago, giving
+17 and 31 minutes against pairs that should run ~7 and ~11.
+
+That is the rule working, not failing. `scripts/schedule-round.sql` argues
+max-of-K rather than mean-of-K precisely because a slot too SHORT puts two pairs
+on one depot and contaminates both — which had to be fixed by hand mid-round 25
+— while a slot too LONG costs only wall clock. I had four post-0222 12-tick
+measurements in hand and the temptation to tighten by hand was real. Following
+the committed rule instead is the point of having written it down.
+
+After this round the window will hold six post-0222 runs and tighten on its own.
+
+## g — the seventh column, and why it is not one of the six
+
+`r27_g` repeats column e's world **instrumented**, and sits after f so it cannot
+perturb the six that judge prediction 2. `r25_g` is the precedent.
+
+It carries `track_functions='all'` — **not** `'pl'`, which is the setting `r25_g`
+used and the reason `db/checks/0129` could not see what `0130` later found. `'pl'`
+counts only procedural-language functions, and every hop of the load-meter chain
+is a SQL function. The baseline snapshot of `pg_stat_user_functions` was taken at
+**13:45:25 UTC**; no other session sets `track_functions`, so the delta across
+`r27_g` is exactly that pair.
+
+It answers G27 directly: **is `ottoq_determinism_pair`'s self time on a 24-tick
+pair ~255 s, the same as the 12-tick pair `r25_g` measured, or ~500 s?** "Four
+fixed calls" predicts the former. If it holds, the fingerprint is not where
+round 26's extra 24-tick saving came from, and the buffer-cache hypothesis gets
+its first real test in `ottoq_sim_advance_tick`'s per-tick time — 18.3 s per tick
+pre-0222, per `0129`.
 
 ## What to record, per column
 
