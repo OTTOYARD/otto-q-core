@@ -190,3 +190,32 @@ call**, for a value that is constant across the call. The whole load meter is
 the live catalog read-only. It waits for column f. Its prediction is written
 the same way 0222's was, and this time against the measured baseline rather
 than a remembered one.
+
+### c — `normal_day` / 171717 / 12 ticks — **PASS**
+
+Fired 12:13:00 UTC, **477 s**, `equal true`. All eleven atoms byte-identical to
+round 25's 09:02 pair on the same column:
+
+`fp 92b02f8b` · `h_cmd 5921ef70` · `h_dec 37624cdd` · `h_evt ac672423` ·
+`h_bkg ed4a986c` · `h_nrg 17c9b12b` · `h_prop 779e5a74` · `h_cal 11a24626` ·
+`h_rule 5b1d1dfa` · `h_rcl e4e41e69` · `h_sdr e0dfbbe8`
+
+Three columns, thirty-three atom comparisons, no movement.
+
+| | round 25 | round 26 | |
+|---|---|---|---|
+| a — `busy_day`/314159/12t | 812 s | **537 s** | −275 |
+| b — `busy_day`/171717/12t | 686 s | **533 s** | −153 |
+| c — `normal_day`/171717/12t | 735 s | **477 s** | −258 |
+
+477 s is 166 s below the fastest of the sixteen pre-0222 pairs. The three
+post-0222 12-tick pairs sit at 477–537 s (60 s apart) against a pre-0222 spread
+of 643–832 (189 s apart), which keeps the variance claim from column b alive
+for one more column.
+
+A note on `fp`, since c and b share it (`92b02f8b`) across different scenarios:
+that is expected, not a collision. `fp` is the world fingerprint taken after the
+fleet reset and before the run, so it depends on (depot, seed, sim_start) and
+not on the scenario. The scenario shows up in every atom downstream of it — and
+`h_cmd`, `h_dec`, `h_evt` and the rest all differ between b and c, which is the
+check that says so.
