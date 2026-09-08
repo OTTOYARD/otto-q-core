@@ -23,7 +23,26 @@ These override any default behavior.
 
 **2. Resumability contract.** On starting a run, first check which phase deliverables already exist in the repo (each phase names its deliverable). Resume after the last completed phase — never redo completed work. **Commit at the end of every phase** with message `run<N>/<phase-id>: <deliverable>` so a dead session costs one phase, not a run.
 
-**3. THE RESEARCH FIREWALL.** You have no web access and never attempt web research, fetching, or browsing. Hermes (a separate cloud research agent) does all external research and delivers findings by opening PRs into `docs/research/**`; merged files there are your only external facts, alongside this brief. When information is missing:
+**3. THE RESEARCH FIREWALL — amended 2026-09-08.** Chase granted direct web access
+in session on 2026-09-08 ("Search the web! You have my full permission"). The
+firewall is therefore **a provenance rule, not an access rule**, and what it always
+protected still holds: *every external fact in this repo carries a source and a date.*
+
+   - **Hermes remains the primary channel and the default.** It produces better
+     provenance than ad-hoc searching — see `docs/research/answers/R-12`, which
+     answered five questions against NVIDIA's own docs with a version baseline and
+     a URL per claim. File a request when the question is broad, when it needs a
+     survey, or when it is not blocking.
+   - **Direct search is for verification and for narrow, blocking questions** — in
+     particular for checking an unsourced claim, whoever made it. `SOLVER_STATE.md`
+     §10.2 exists because R-12's one unsourced sentence turned out to be materially
+     incomplete, and only a direct check found that.
+   - **Anything found by direct search is recorded exactly as a Hermes deliverable
+     would be**: the claim, the version or date it applies to, and the source URL.
+     A fact without a URL is not a fact, no matter who fetched it.
+   - **Never guess silently.** Unchanged, and the whole point.
+
+When information is missing:
    - Write `docs/research/requests/R-<n>-<slug>.md` with precise, answerable questions (field names, units, versions — never "tell me about X") and commit it. Hermes polls that folder at the start of its sessions.
    - Then proceed with labeled assumptions (`ASSUMPTION — pending R-<n>`) or park the step and continue the run.
    - If a needed H-file exists only in an unmerged PR, say so and pause that phase.

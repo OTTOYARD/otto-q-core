@@ -660,3 +660,116 @@ measured outcome difference to report and none is claimed. Producing one is a ta
 it needs a cert-shaped pair with the proposer on in one arm — which, per §8, is exactly the
 posture (C) this document already rejected for certification and would have to be run as an
 experiment outside the certification lane.
+
+---
+
+## 10. The capability envelope, 2026-09-08 — the decomposition is forced, and CP-SAT is *determinizable*, not deterministic
+
+§9 established what cuOpt has *done* (16 endpoint calls, 136 proposals, 27
+enacted, no A/B). This section establishes what cuOpt *can express* — a different
+question, and the one that settles the architecture.
+
+Source: `docs/research/answers/R-12-cuopt-capability-envelope-beyond-routing.md`,
+answered by Hermes 2026-09-08 against NVIDIA's own documentation at cuOpt
+**26.08**, plus a direct check of the OR-Tools side recorded below.
+
+### 10.1 What cuOpt cannot express — vendor-sourced, four for four
+
+Our site is a resource-constrained flexible flow shop (`CLAUDE.md` 2.3). Its four
+load-bearing constructs, against cuOpt 26.08:
+
+| construct | ours | cuOpt |
+|---|---|---|
+| **cumulative resource** | site power cap, kW, consumed concurrently | **absent.** `add_capacity_dimension` is a per-vehicle knapsack along a route, not a shared time-varying pool |
+| **disjunctive machine** | one stall, non-overlapping visits | **absent** |
+| **sequence-dependent gap** | DCFC cooldown, 18 min on the service point | **absent.** `service_time` is a fixed per-stop constant |
+| **a scheduling solver family** | — | **absent.** Routing (GA) + convex LP/QP + **MIP in beta** |
+
+NVIDIA's own wording on the MIP beta: *"The solver currently excels at finding
+high-quality feasible solutions quickly with GPU-accelerated primal heuristics.
+**Proving feasible solutions optimal remains under active development.**"*
+
+**So the decomposition — CP-SAT scheduling inside a site, cuOpt routing recalls
+between sites — is FORCED by the API surface, not chosen by us.** The sentence
+for the A/B design note is not "we prefer CP-SAT"; it is **"the site layer is not
+expressible in cuOpt at all,"** and that is vendor-sourced rather than opinion.
+
+Nor is there a bridge: warm start exists only cuOpt-to-cuOpt (routing accepts its
+own prior solutions; the MIP beta documents no warm-start parameter at all), so
+the matheuristic option is closed too.
+
+### 10.2 CORRECTION to R-12's closing claim, found by direct check
+
+R-12 ends: *"The byte-identical, reproducible output the certification rests on
+is a CP-SAT property, not a cuOpt property."* **The cuOpt half is right and
+well-sourced. The CP-SAT half carries no source and is materially incomplete.**
+
+Checked directly on 2026-09-08:
+
+- **Single worker is deterministic.** Fine.
+- **Multiple workers are not, by default.** Determinism under parallelism requires
+  the search to be split into fixed-size batches — `interleave_batch_size`,
+  conventionally ~2× the worker count. Reported failures include *one worker
+  returning optimal while eight returned infeasible on the same model.*
+- **OR-Tools 9.4 and 9.5 shipped nondeterministic results even single-worker.**
+  A vendor regression, in two consecutive releases, in exactly the property our
+  certification depends on.
+- **A wall-clock limit destroys determinism regardless of seed or threads.**
+  `max_time_in_seconds` is hardware- and load-dependent; `max_deterministic_time`
+  counts abstract ticks and is the reproducible one.
+
+**CP-SAT is therefore determinizable, not deterministic**, and the difference is
+four configuration pins, each of which must be asserted rather than assumed:
+
+1. **Pin the OR-Tools version.** The 9.4/9.5 regression proves the property is not
+   stable across releases.
+2. **`max_deterministic_time`, never `max_time_in_seconds`.** A wall-clock budget
+   inside a certified path is a nondeterminism source by construction — the same
+   defect class as G15 (the L1 shield reading the wall clock inside the twin).
+3. **Pin `num_workers=1`, or a fixed `interleave_batch_size`.**
+4. **A determinism canary in CI** that would have caught 9.4/9.5 — the same
+   instrument the SQL engine already has in the certification pair.
+
+### 10.3 What this settles, and what it does not
+
+**Settled:** cuOpt can never be the site scheduler, and cuOpt can never be inside
+the certified deterministic path — its routing solver documents **no seed and no
+determinism parameter at all**, and its MIP determinism mode is explicitly labelled
+*"experimental … does not yet guarantee fully deterministic results in all
+scenarios."*
+
+That is not a mark against propose/dispose — **it is the argument for it.** A
+nondeterministic proposer behind an inviolable deterministic shield, with its
+proposals hashed into the verdict (`h_prop`, G4), is the only safe way to consume
+a solver that cannot promise reproducibility. The architecture `CLAUDE.md` already
+mandates turns out to be the one the vendor documentation requires.
+
+**Not settled, and not to be implied:** that CP-SAT beats the local decide path,
+or that either proposer improves any KPI. **No A/B pair has ever been run.** R-12
+was explicitly scoped to exclude that question because it is ours to measure, and
+nothing in this section measures it.
+
+### 10.4 Alternatives considered, and declined for now
+
+Given cuOpt cannot express the site layer, is a different scheduler worth
+evaluating before we go deeper? Considered and declined:
+
+- **HiGHS, Gurobi, or any MILP** — same gap as cuOpt's MIP beta: no native
+  cumulative or disjunctive primitive, so the four constructs above become
+  hand-rolled big-M encodings. That is us writing a MILP, not a solver feature.
+- **Timefold / OptaPlanner** — metaheuristic, not exact; determinism is again
+  configuration-dependent, and it adds a JVM to a Python/SQL stack.
+- **Keep hand-rolling** — the local decide path already exists and remains a named
+  policy regardless (`CLAUDE.md` C4 step 5).
+
+**CP-SAT stays the choice**, because `AddCumulative` and `AddNoOverlap` are
+native primitives for exactly the two constructs cuOpt lacks, and the prototype in
+`solvers/cpsat/` already exists and passes 8 tests. This is a confirmation of
+`CLAUDE.md` 2.5's existing decision on new evidence, not a re-opening of it.
+
+**Sources for §10.2**, checked 2026-09-08 with Chase's explicit permission to
+search (see `CLAUDE.md` Part 1 rule 3, amended the same day):
+- https://github.com/google/or-tools/issues/3590 — "CP-SAT produces nondeterministic results"
+- https://github.com/google/or-tools/issues/3842 — optimal at 1 worker, infeasible at 8
+- https://d-krupke.github.io/cpsat-primer/05_parameters.html — `interleave_batch_size` and batch determinism
+- https://github.com/google/or-tools/issues/2604 — `max_time_in_seconds` behaviour
