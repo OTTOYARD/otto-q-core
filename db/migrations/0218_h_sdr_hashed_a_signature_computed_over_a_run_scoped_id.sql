@@ -224,3 +224,17 @@ VALUES ('0218_h_sdr_hashed_a_signature_computed_over_a_run_scoped_id', FALSE,
         now());
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 03:43 AM CT (08:43:04 UTC), ledger version 20260908084304.
+--
+--   P0  body 820f3491, the payload_hash term exactly once
+--   A1  payload_hash gone; the booking-content and money terms still present
+--   A2  round 25's two committed arms now AGREE:  aad2d1be / aad2d1be
+--   A3  the two pre-0216 arms are STILL separated: 1cc8a3ef / e1fe3504
+--
+-- A2 and A3 together are the point. A2 alone could be achieved by blinding the
+-- instrument; A3 is what rules that out. And A2 is also the proof that 0216
+-- worked — with the one column that could never agree removed, the SDR stream
+-- of a replayed seed reproduces exactly, booking attribution included.
+-- ---------------------------------------------------------------------------

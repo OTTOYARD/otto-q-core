@@ -307,3 +307,33 @@ VALUES ('0216_the_settlement_record_binds_to_whichever_booking_the_heap_returned
         now());
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 03:18 AM CT (08:18:48 UTC) to gxdrcyphqjzjsuhxuqtg, ledger
+-- version 20260908081848. All four blocks passed:
+--
+--   P0  body 54226dc2, the unordered read exactly once, no leg_id index
+--   A1  the ordered pick is installed; the bare LIMIT 1 is gone
+--   A2  the planner uses ottoq_stall_bookings_leg_idx
+--   A3  over the two committed round-24 arms: OLD picks 9446e834 / 885785db
+--       DIFFER, NEW picks f242efbf on both. 19 SDRs rebind in arm a, 15 in
+--       arm b, to the same answer.
+--
+-- Verified after commit, on the live table:
+--   the trigger's own lookup   965.175 ms -> 0.295 ms, 50,769 blocks -> 25
+--
+-- AND THE SPEED CLAIM IS WITHDRAWN. The lookup number above is real and
+-- cold-cache. It does NOT make the pair faster: round 25's first pair on the
+-- column this was measured against took 812 s, against 797 s and 801 s before
+-- the index, inside the 688-822 s range of the two preceding days. In a real
+-- arm those pages are warm and ~2,236 scans do not add up to anything near the
+-- 800 s pair. The index is still correct — it removes a cost that grows with
+-- total history rather than with the run — but the drift it was found chasing
+-- is unexplained and is now task G19. See db/canons/round25.md.
+--
+-- The determinism half stands on its own and is the reason this migration
+-- matters: round 25 pair 1 passed all eleven enforced atoms with every canon
+-- reproducing round 24, and the SDR stream of a replayed seed now agrees
+-- exactly (h_sdr aad2d1be on both arms, once 0218 removed the one column that
+-- could never agree).
+-- ---------------------------------------------------------------------------

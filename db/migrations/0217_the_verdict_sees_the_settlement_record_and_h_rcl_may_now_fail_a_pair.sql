@@ -232,3 +232,24 @@ VALUES ('0217_the_verdict_sees_the_settlement_record_and_h_rcl_may_now_fail_a_pa
         now());
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 03:22 AM CT (08:22:27 UTC), ledger version 20260908082227.
+-- P0 (body 788ed4b7, both anchors once, one overload), A1, A2 and A3 passed;
+-- A3 read h_sdr 833f61c9 vs 49714ab9 on the two pre-0216 arms.
+--
+-- CORRECTED THE SAME NIGHT BY 0218, which is the honest footer this file needs.
+-- h_sdr as shipped here included payload_hash, and payload_hash is
+-- ottoq_compute_event_hash over a payload containing leg_id — a fresh uuid per
+-- run — so it could never be equal across two arms of one seed. Round 25's
+-- first pair measured it: 284 of 284 SDRs differ on that column and 0 differ on
+-- tariff_id, total_cost_usd, ended_at, duration_min or source_kind.
+--
+-- A3 above therefore passed for two reasons at once and I counted only the one
+-- I was looking for. The uncontaminated evidence that h_sdr sees the booking
+-- blind spot is 0216's A3, not this one.
+--
+-- The h_rcl half of this migration is unaffected and did its job: round 25's
+-- pair 1 was the first round in which h_rcl could fail a pair, and it passed at
+-- 0e67b89a, the same value rounds 22 and 24 recorded.
+-- ---------------------------------------------------------------------------
