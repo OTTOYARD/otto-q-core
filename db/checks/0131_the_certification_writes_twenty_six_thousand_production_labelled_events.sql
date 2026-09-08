@@ -201,6 +201,27 @@ WHERE event_type='vehicle.state_changed' AND ingest_source='trigger' AND data_so
 --     bleeding; FIX 2 only if someone wants the reset to be part of the record,
 --     which is a product decision about what the twin's event stream is FOR.
 --
+--     FIX 1'S HAZARD, WRITTEN DOWN BEFORE ANYONE IMPLEMENTS IT. The suppression
+--     flag would be read by ottoq_vehicles_state_change and
+--     ottoq_stalls_state_change — the triggers on EVERY update to `vehicles`
+--     and `stalls` in this database, production path included. A flag left set
+--     silences the entire state-change event stream for the rest of the
+--     transaction, silently, and nothing downstream would notice: the events
+--     simply would not exist, and an absent event has no signature to fail.
+--     That is a strictly worse failure than the one being fixed.
+--
+--     So FIX 1 is not a small change and must not be written as one. Minimum
+--     bar before it goes near a migration:
+--       - reset_fleet clears the flag on EVERY exit path, including the
+--         exception path (EXCEPTION WHEN OTHERS THEN clear; RAISE);
+--       - an assertion that the flag is unset after a reset returns, and after
+--         a reset that raises;
+--       - the trigger honours the flag only for the narrow case it is for, and
+--         a stuck flag is loud rather than quiet.
+--     This file deliberately does NOT draft that migration. It is a trigger-layer
+--     change touching every asset write in the system, and it deserves its own
+--     review rather than a slot between two certification columns.
+--
 --     WHAT NEITHER FIXES: the 26,740 rows already written. They are signed, and
 --     the signature covers the mislabel. Re-labelling them invalidates the
 --     signature; deleting them is a deletion from the audit ledger. That is
