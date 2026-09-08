@@ -131,3 +131,62 @@ back into `ottoq_boot_state_fingerprint`, and "I subtracted from the wrong
 number" means the fingerprint is done and the next 439 s —
 `ottoq_sim_decide_and_dispatch` at 388.7 s, per `db/checks/0129` — is where the
 remaining time lives.
+
+### b — `busy_day` / 171717 / 12 ticks — **PASS**
+
+Fired 11:54:00 UTC, ended 12:02:53, **533 s**, `equal true`. Compared against
+round 25's 08:46 pair on the same column, all eleven atoms:
+
+| atom | round 25 (08:46) | round 26 b | |
+|---|---|---|---|
+| `fp` | `92b02f8b` | `92b02f8b` | = |
+| `h_cmd` | `1ae7ba68` | `1ae7ba68` | = |
+| `h_dec` | `cf2f44e2` | `cf2f44e2` | = |
+| `h_evt` | `e16ad964` | `e16ad964` | = |
+| `h_bkg` | `7146a8e1` | `7146a8e1` | = |
+| `h_nrg` | `08f719af` | `08f719af` | = |
+| `h_prop` | `0046879e` | `0046879e` | = |
+| `h_cal` | `11a24626` | `11a24626` | = |
+| `h_rule` | `3e57f511` | `3e57f511` | = |
+| `h_rcl` | `0a4ca4d3` | `0a4ca4d3` | = |
+| `h_sdr` | `a2a35e03` | `a2a35e03` | = |
+
+Two columns, twenty-two atom comparisons, no movement.
+
+**And the durations are doing something the prediction did not anticipate.**
+
+| | round 25 | round 26 | |
+|---|---|---|---|
+| a — `busy_day`/314159/12t | 812 s | **537 s** | −275 |
+| b — `busy_day`/171717/12t | 686 s | **533 s** | −153 |
+
+The sixteen pre-0222 pairs spread **643–832 s**, a 189 s range. The two
+post-0222 pairs are **537 and 533** — four seconds apart. Removing the
+fingerprint did not only remove its mean, it removed most of the variance,
+which fits the mechanism: a 1.36-million-row scan's cost depends on how much
+of those tables the cache is holding, and that changes hour to hour. Nothing
+else in the pair scans at that scale.
+
+That is a claim about two data points and is written here so the remaining four
+columns can contradict it.
+
+### While the round runs — G21, from the capture that was already on disk
+
+`db/checks/0130`. Ranking r25_g's statements by **calls** instead of seconds —
+which `0129` never did — puts one statement first by a factor of four:
+
+```
+8,966,506 calls   108.8 s   SELECT sim_run_id FROM ottoq_sim_runs
+                              WHERE depot_id = p_depot_id AND status = $2 …
+```
+
+It is `public.ottoq_depot_running_run`, called from
+`twin.ottoq_sim_compute_charger_load_kw` on the right of its run-scope
+comparison — so once per candidate `ocpp_sessions` row, **8,756 times per
+call**, for a value that is constant across the call. The whole load meter is
+**195.4 s of the 700.7 s pair**, which is ~36% of the 537 s pair we now have.
+
+`0223` is drafted and every precondition and assertion has been dry-run against
+the live catalog read-only. It waits for column f. Its prediction is written
+the same way 0222's was, and this time against the measured baseline rather
+than a remembered one.
