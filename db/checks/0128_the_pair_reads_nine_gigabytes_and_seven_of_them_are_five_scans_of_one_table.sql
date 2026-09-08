@@ -155,3 +155,30 @@ WHERE p.prokind IN ('f','p') AND n.nspname IN ('public','twin','ottoq')
   AND p.prosrc ~* 'COALESCE\s*\(\s*[a-z_]+\.sim_run_id'
   AND p.prosrc ~* '(FROM|JOIN)\s+(public\.)?ottoq_events\b'
 ORDER BY 1;
+
+-- Q6. THE CONTROL, because a delta is only as good as what else was running.
+--     A second snapshot (public.g19_idle_before) was taken at 10:38:41 with the
+--     pair finished and nothing else in flight, and read back at 10:47:03 —
+--     **502 seconds** during which cron.job_run_details records **17 job runs**
+--     (metronome every 60 s, depot tick and run governor every 120 s).
+--
+--       sequential scans, all user tables      0
+--       heap blocks read, all user tables      0
+--       heap buffer hits, all user tables      0
+--       index scans, all user tables          27
+--
+--     Seventeen firings, twenty-seven index scans, no heap traffic at all: with
+--     no sim run active those jobs check whether there is work, find none, and
+--     stop. So nothing in the background is quietly scanning ottoq_events, and
+--     the 5 sequential scans in Q2 are not somebody else's.
+--
+--     STATED PRECISELY, because this control does not prove quite as much as it
+--     looks like it does: it measures the background WITH NO RUN ACTIVE. During
+--     the pair a run IS active, so those jobs may do more than 27 index scans,
+--     and their work is inside the Q1/Q2 window with no way to separate it.
+--     What the control bounds is the magnitude — a job that does no heap I/O
+--     when idle is not the source of 9.6 GB — not the exact attribution.
+SELECT round(extract(epoch from (now() - max(snap_at)))) AS idle_secs_at_read,
+       (SELECT count(*) FROM cron.job_run_details
+         WHERE start_time > (SELECT max(snap_at) FROM public.g19_idle_before)) AS cron_runs
+FROM public.g19_idle_before;
