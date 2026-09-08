@@ -158,3 +158,27 @@ ORDER BY 2;
 -- recert floor advances after 0231, the move was not neutral and 0231
 -- is wrong.
 -- =====================================================================
+
+-- =====================================================================
+-- RETRACTED IN PART, 2026-09-08 22:4x UTC, by db/checks/0149.
+--
+-- §1 through §5 stand: the gate census is measured and reproducible,
+-- and the hold-constant rule it states is right.
+--
+-- §6 IS WRONG AND ITS MIGRATION 0231 WAS NEVER APPLIED. The premise was
+-- that fifo/greedy book chargers against satisfied needs. They cannot:
+-- neither reads ottoq_visit_needs and neither reads the atom array
+-- (0149 §1, measured). Closing an atom they never look at changes
+-- nothing. The proposed move would have been a no-op dressed as a
+-- correctness fix, perturbing the certified decide path for no reason.
+--
+-- §4's "PENALIZED" column is therefore also withdrawn. 0146's
+-- "FLATTERED" finding stands unchanged -- the baselines really do
+-- evaluate no rules. The contamination is one-directional after all,
+-- which is what 0146 said before this check overcomplicated it.
+--
+-- What replaced it is in 0149 §3 (G32) and is worse, because it is in
+-- code I shipped today rather than code I inherited.
+--
+-- Nothing above this line is edited.
+-- =====================================================================

@@ -1,0 +1,181 @@
+-- =====================================================================
+-- 0149 — Two of my own claims died today. The one that lived is in code
+--        I shipped four hours ago.
+--
+-- Finding id: G31 (revised), G32 (new)
+-- Opened:     2026-09-08 22:4x UTC (5:4x PM CT)
+-- Retracts:   0148 §6 and the migration 0231 it proposed. Not applied.
+-- Status:     G31 CLOSED-REFUTED · G32 OPEN, fix is 0231 (repurposed)
+--
+-- ---------------------------------------------------------------------
+-- 1. WHAT 0148 CLAIMED, AND WHY IT IS WRONG
+-- ---------------------------------------------------------------------
+-- 0148 §6 said: ottoq.ottoq_close_satisfied_charge_needs sits inside the
+-- policy='otto_q' gate, therefore "any fifo, greedy or manual run today
+-- books chargers against satisfied needs," therefore move it into the
+-- common path (migration 0231).
+--
+-- Every step of that is sound except the premise. Measured:
+SELECT 'a_who_reads_needs' AS check, p.proname,
+       (p.prosrc ~* 'ottoq_visit_needs') AS reads_visit_needs,
+       (p.prosrc ~* 'atoms')             AS reads_atoms
+FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE p.proname IN ('ottoq_decide_tick','ottoq_fifo_tick','ottoq_greedy_tick','ottoq_baseline_fifo')
+ORDER BY 2;
+-- Observed:  decide_tick      true  / true
+--            fifo_tick        false / false
+--            greedy_tick      false / false
+--            baseline_fifo    false / false
+--
+-- The baselines never read the needs table and never read the atom
+-- array. Closing an atom they cannot see changes nothing for them.
+-- There is no bug. 0231-as-drafted would have been a no-op dressed as a
+-- correctness fix, and would have perturbed the certified decide path
+-- for nothing. G31 is CLOSED-REFUTED.
+
+-- ---------------------------------------------------------------------
+-- 2. THE SECOND CLAIM, WHICH WAS MORE DRAMATIC AND ALSO WRONG
+-- ---------------------------------------------------------------------
+-- While checking §1 I found that ottoq_fifo_tick's only writes are
+-- `UPDATE vehicles` and `UPDATE stalls` -- it sets current_state to
+-- charging_dcfc/charging_l2 and occupies the stall, but never opens a
+-- charge session. And the charging physics is session-driven:
+--
+--   twin.ottoq_sim_advance_charge_sessions:
+--     FOR v_session IN ... FROM ocpp_sessions s WHERE s.status='active'
+--
+-- No session, no SoC advance. From which I concluded: a fifo-placed
+-- vehicle never charges, never reaches fifo's own current_soc>=70
+-- deploy gate, and holds its stall forever -- fifo deadlocks its own
+-- depot, and any A/B against it is a fake blowout.
+--
+-- That was worth writing down and it was worth checking. Checked:
+SELECT 'b_session_creators' AS check, n.nspname||'.'||p.proname AS can_open_a_session
+FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE n.nspname IN ('public','twin','ottoq')
+  AND p.prosrc ~* 'ottoq_sim_start_charge_session|INSERT INTO\s+(public\.)?ocpp_sessions'
+  AND p.proname <> 'ottoq_sim_start_charge_session'
+ORDER BY 1;
+-- Observed: twin.ottoq_sim_auto_charge_assign_tick (greedy's delegate)
+--           twin.ottoq_sim_reconcile_charge_sessions   <-- the refutation
+--
+-- The reconciler selects exactly the state fifo produces:
+--
+--   FROM vehicles v
+--    WHERE v.home_depot_id = v_depot
+--      AND v.current_state IN ('charging_dcfc','charging_l2')
+--      AND NOT EXISTS (... s.status='active' AND s.id_token LIKE 'TWIN-%')
+--   PERFORM ottoq_sim_start_charge_session(rec.vid, rec.sid, ...)
+--
+-- and it is called from public.ottoq_sim_advance_tick_world and
+-- twin.ottoq_world_advance -- the world advance, which runs for EVERY
+-- policy. fifo does not deadlock. It charges, one tick late, on a
+-- session the world opens on its behalf.
+--
+-- Recorded rather than deleted because the reasoning was correct and
+-- the conclusion was false, which is the only combination worth
+-- keeping. The static call graph said deadlock; one query about who
+-- else can open a session said otherwise.
+
+-- ---------------------------------------------------------------------
+-- 3. G32 — THE CLAIM THAT SURVIVED, AND IT IS MINE
+-- ---------------------------------------------------------------------
+-- The baselines do not merely decide differently. They write through a
+-- DIFFERENT SUBSTRATE.
+--
+--   policy    admission rule            charge target                    writes through
+--   --------  ------------------------  -------------------------------  -----------------------------
+--   otto_q    visit_needs atoms         COALESCE(visit.target_soc,       stall bookings calendar,
+--                                        veh.target_soc, default)        decisions, events, SDRs,
+--                                                                        vehicle commands
+--   greedy    current_soc < 85          COALESCE(veh.target_soc,         ocpp charge sessions, events
+--             (hardcoded)                default), clamped 50-100,
+--                                        via ottoq_apply_profile
+--   fifo      current_soc < 85          none -- sets no target at all;   vehicles + stalls, directly
+--             (hardcoded);               the reconciler supplies one
+--             deploys at soc >= 70
+--
+-- Now read what public.ottoq_ab_score_run(uuid) measures. I applied it
+-- as migration 0230 at 22:05 UTC today, four hours ago, and called it
+-- "a score that cannot be gamed by not checking":
+--
+--   coverage:   bookings_total, charge_bookings, rule_evals_total,
+--               used_calendar, consulted_shield
+--   throughput: decisions, sdrs, events, vehicles_booked
+--   safety:     incapable_charge_bookings, unverifiable  (from bookings)
+--
+-- Every one of those reads a substrate only otto_q writes to. Scored
+-- against a fifo run they would read: bookings_total 0, charge_bookings
+-- 0, decisions 0, sdrs 0, vehicles_booked 0, used_calendar false,
+-- consulted_shield false -- and peak_concurrent_kw computed over an
+-- empty booking set, so 0 kW.
+--
+-- The scorer would report that fifo did nothing at all, while fifo was
+-- in fact charging vehicles through ocpp_sessions the whole time.
+--
+-- I built it to be ungameable by NOT CHECKING. It is. It is fully
+-- gameable by WRITING SOMEWHERE ELSE, which is precisely what both
+-- baselines do, and I did not notice because 0147 §2a is true: no
+-- baseline run has ever existed, so there was nothing to score it
+-- against. A scorer validated only on the arm it was written for is
+-- validated on nothing.
+
+-- 3a. The defect, made concrete: which of the scorer's sources does
+--     each policy actually write?
+SELECT 'c_substrate' AS check, src,
+       'otto_q'  AS otto_q, 'greedy' AS greedy, 'fifo' AS fifo
+FROM (VALUES ('ottoq_stall_bookings'),('ottoq_decisions'),
+             ('ottoq_service_detail_records'),('ottoq_rule_evaluations'),
+             ('ocpp_sessions'),('vehicles / stalls')) t(src);
+-- Filled from §3's table, not from a query -- the point is the shape:
+--   bookings / decisions / SDRs / rule_evals : otto_q only
+--   ocpp_sessions                            : greedy + (fifo, via the
+--                                              world reconciler)
+--   vehicles / stalls                        : all three
+-- Only the last two rows are common ground. A comparative score may
+-- read ONLY common ground.
+
+-- ---------------------------------------------------------------------
+-- 4. THE RULE, THIRD REVISION
+-- ---------------------------------------------------------------------
+-- 0146: the L1 shield belongs on the hold-constant side.
+-- 0148: everything true of the world regardless of who schedules
+--       belongs on the hold-constant side.
+-- 0149: and the MEASUREMENT may only read what every arm writes.
+--
+--   A COMPARATIVE METRIC READ FROM AN ARTIFACT ONLY ONE ARM PRODUCES
+--   IS NOT A MEASUREMENT OF THAT ARM'S PERFORMANCE. IT IS A
+--   MEASUREMENT OF WHICH ARM IT IS.
+--
+-- Corollary, and the reason this is worth a check file: such a metric
+-- is perfectly reproducible. Same seed, same run id, same number every
+-- time. CLAUDE.md 2.9a says reproducibility is a product property; it
+-- is not, and was never, a validity property.
+--
+-- ---------------------------------------------------------------------
+-- 5. WHAT 0231 BECOMES
+-- ---------------------------------------------------------------------
+-- Not the need-closure move (§1, refuted). Instead:
+--
+--   ottoq_ab_score_run gains an OUTCOME block computed only from
+--   substrate every policy writes -- the vehicle state machine and
+--   ocpp_sessions -- reporting energy delivered, stall-hours consumed,
+--   vehicles returned to deployable state, and time-to-first-service.
+--   The existing coverage/throughput blocks stay, renamed to say what
+--   they are: an OTTO-Q PATH INSTRUMENTATION block, valid for
+--   describing one run, never for comparing two.
+--
+-- The falsifier for 0231, written before it is built: score a fifo run
+-- and an otto_q run on the same seed. If the outcome block reads zero
+-- for fifo on any field, the block is still reading otto_q's substrate
+-- and 0231 has failed. That test cannot run until a fifo arm exists --
+-- which makes creating one the next piece of work, not the last.
+--
+-- ---------------------------------------------------------------------
+-- 6. STANDING
+-- ---------------------------------------------------------------------
+-- 0147 §7's freeze on comparative numbers is unchanged and is now
+-- three-deep: no comparative number ships until (a) the arms solve the
+-- same problem, (b) the world is held constant across them, and (c) the
+-- score reads only common ground. None of the three holds today.
+-- =====================================================================
