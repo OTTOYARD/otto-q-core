@@ -493,6 +493,14 @@ canon is the comparison, and it must match to the byte.
 
 ### g's prediction, committed 2026-09-08 15:43 UTC — before g fires at 15:52
 
+> **Order note.** This section sits between f's *prediction* and f's *result*,
+> which reads oddly. It is deliberate: this file is appended in the order
+> things were actually known, and g's prediction had to be committed before g
+> fired at 15:52, which was before f's 551 s was written up. Reordering would
+> read better and would quietly destroy the one property that makes a
+> prediction worth anything — that it was fixed before the answer existed.
+> **f's result is the section after this one.**
+
 g is `busy_day` / 171717 / **24 ticks** — the same scenario, seed and horizon as
 column **e**, which landed at **560 s**. The only difference is that g's cron
 command sets `track_functions = 'all'` in its own session.
