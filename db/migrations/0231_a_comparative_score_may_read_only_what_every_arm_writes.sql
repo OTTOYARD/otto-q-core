@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908222953
 -- migration-name:    a_comparative_score_may_read_only_what_every_arm_writes
 --
 -- G32 / db/checks/0149. public.ottoq_ab_score_run was applied earlier today
@@ -301,3 +301,65 @@ VALUES (
   'outcome field reads zero for fifo, the block is still reading otto_q substrate '
   'and this migration failed.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 22:29:53 UTC (5:29 PM CT). All three preconditions and
+-- all four assertions passed on the first attempt.
+--
+--   functiondef md5  a472af5fccb93334ac549d1e4da77bef
+--                 -> 21d02c4daa7f0cd5040387265652e4ea
+--   anchors A/B: 1 occurrence each, as asserted
+--   A2: six top-level blocks present; all 6 coverage, 8 safety, 5 throughput
+--       keys 0230 emitted still present; all 12 outcome keys present
+--   A3: peak_concurrent_kw 463.8 unchanged, bookings_total 879 unchanged,
+--       the two charge_sessions counts agree
+--   A4: a nonexistent run still scores NULL
+--
+-- THE FLOOR DID NOT MOVE: 2026-09-07 21:36:53.363037 before and after, so the
+-- forces_recert FALSE classification was actually read rather than assumed --
+-- the property G28 showed was broken for four days until 0226.
+--
+-- WHAT WAS APPLIED, stated precisely rather than as "byte-identical to this
+-- file". The applied text is this file's EXECUTABLE STATEMENTS -- the five DO
+-- blocks and the lineage INSERT -- verbatim. The 67-line comment header above
+-- and this footer are repo documentation and were not submitted, because
+-- retyping 57 lines of prose into the apply call is exactly the transcription
+-- risk the anchored-substitution technique exists to avoid, and prose has no
+-- effect on the database. 0229's footer claimed byte-identity; this one does
+-- not, and says why.
+--
+-- THE DRY RUN, done before submitting and worth more than any assertion in the
+-- file. The identical substitution was compiled under the scratch name
+-- zz_dryrun_0231_score and its output diffed against the live function on run
+-- 3f4b9690, block by block:
+--
+--   run          jsonb-equal
+--   coverage     jsonb-equal
+--   safety       jsonb-equal
+--   throughput   jsonb-equal
+--   outcome      present         comparability  present
+--   nonexistent run -> NULL      preserved
+--
+-- then dropped (0 rows remaining in pg_proc). "Strict superset" is therefore
+-- measured, not argued.
+--
+-- FIRST REAL OUTCOME BLOCK, run 3f4b9690 (busy_day / 171717 / 12t / otto_q):
+--
+--   energy_delivered_kwh   1277.99      service_point_hours   88.00
+--   charge_sessions        83           kwh_per_point_hour    14.5
+--   vehicles_served        83           soc_points_added      1149
+--   service_points_used    40           mean_soc_gain         20.16
+--   turns_per_point        2.08         soc_measured_sessions 57
+--   sessions_still_open    0            sim_hours             6.00
+--
+-- ONE DATA-QUALITY FINDING FALLS OUT OF IT, recorded because the field was
+-- designed to surface exactly this: soc_measured_sessions is 57 of 83. Twenty-
+-- six sessions (31%) carry no soc_start or no soc_end, so mean_soc_gain 20.16
+-- is an average over 57 sessions, not 83, and soc_points_added 1149 undercounts
+-- by whatever those 26 delivered. The number is honest because it ships its own
+-- denominator. Why a third of sessions lack SoC bookends is NOT established
+-- here and is not guessed at. Filed as G33.
+--
+-- WHAT IS STILL NOT PROVEN, and is the whole point of the next piece of work:
+-- that the outcome block reads non-zero for a baseline arm. It cannot be proven
+-- until one exists. **No comparative number until it does.**
