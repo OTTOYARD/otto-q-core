@@ -1,0 +1,124 @@
+-- ---------------------------------------------------------------------------
+-- 0142 — G12's premise, sharpened in both directions. The file-only lint it
+--        rejected was rejected for a fixable reason; and the database it asks
+--        for would not have caught a single one of the three defects found in
+--        the 2026-09-08 apply window.
+--
+-- Not a database check — there is no SQL to run here. The evidence is
+-- `scripts/sqlstruct.py`, `tests/test_sqlstruct.py` (356 tests) and the two
+-- measurements below, and this file is where the reasoning lives.
+-- ---------------------------------------------------------------------------
+
+-- Q1. WHAT G12 SAYS, AND THE HALF OF IT THAT IS TOO STRONG.
+--
+--     "A file-only lint was tried as a cheaper substitute — flag `LIMIT 1` with
+--      no `ORDER BY` in a migration's own SQL — and REJECTED: on 0220 all five
+--      hits were the string 'LIMIT 1' inside literals and error messages, and
+--      telling code from literal here needs a real plpgsql parser because the
+--      bodies are dollar-quoted. A noisy gate gets disabled, so the answer is
+--      the database, not a regex."
+--
+--     The diagnosis is right and the conclusion overshoots. Telling code from
+--     literal does not need a *parser* — it needs a **tokenizer**, which is a
+--     hundred lines and needs no grammar at all. `scripts/sqlstruct.py` is
+--     that tokenizer: line comments, nesting block comments, '' and E''
+--     strings, quoted identifiers, and $tag$ bodies that close only on their
+--     own tag.
+--
+--     MEASURED on the exact file that killed the lint:
+--
+--       db/migrations/0220 — `\bLIMIT\s+1\b`
+--         raw text (what the rejected lint saw) ....... **14 hits**
+--         code only (what the tokenizer sees) ......... **3 hits**
+--
+--     Eleven of fourteen were prose or error-message strings. The three that
+--     survive are real SQL at lines 235, 243 and 320.
+--
+--     **And G12's own count is wrong**: it says "all five hits". The raw file
+--     matches fourteen times. Corrected here rather than left, because a
+--     finding that under-counts its own noise makes the noise look survivable.
+
+-- Q2. THE HALF THAT IS TOO WEAK — AND IT IS THE MORE IMPORTANT HALF.
+--
+--     G12 asks for the SQL to run against a database in CI. Three defects were
+--     found in the queued migrations on 2026-09-08 by dry-running preconditions
+--     before the apply window. **A database in CI would have caught none of
+--     them**, and neither would any file-only check:
+--
+--       0225 P3   Dry-run and PASSED — against the live recert floor rather
+--                 than the one 0226 installs. Needs the live catalog AND the
+--                 live pair history, in the state a predecessor migration will
+--                 have created. An empty CI cluster has neither.
+--       0226 A1   Asserted `ottoq_cert_lineage_orphans()` is empty; it returns
+--                 22, legitimately. Needs the live lineage table — 92 rows of
+--                 human classifications that exist nowhere but production.
+--       0225 A2   Contradicted its own A5: A2 forbade any streak change while
+--                 A5 existed to report exactly that change. Needs reading
+--                 comprehension. No machine catches this.
+--
+--     What caught all three was `scripts/APPLYING.md` step 3b(ii) — dry-run
+--     each precondition against the state its predecessors will have created —
+--     which is a **process**, not a gate. G12 is written as though CI is the
+--     missing control. For this class of defect it is not, and saying so
+--     matters, because "we'll catch it in CI" is how a process step gets
+--     dropped.
+
+-- Q3. SO WHAT IS THE FILE-ONLY CHECK ACTUALLY FOR?
+--
+--     A different and real class: **transcription and splice damage.**
+--
+--     0225 was spliced by hand five times in one afternoon (P3 rewritten, a
+--     tiebreaker added, A5 added, the predicate deduplicated, A2 rewritten) and
+--     its dollar-quote balance was verified BY EYE. That is not a durable
+--     control. `tests/test_sqlstruct.py::test_every_sql_file_segments_and_balances`
+--     now asserts it over every committed migration and check — 300+ files,
+--     under a second, no infrastructure, and no false positives possible
+--     because the tokenizer either tokenizes or names the offset where it
+--     could not.
+--
+--     It found one thing immediately, and the thing it found was **my own
+--     tool being wrong**: `db/migrations/0221` writes
+--
+--         IF position($$COALESCE(b.sim_run_id,'00000000$$ in v_flat) <> 0
+--
+--     — a dollar-quoted STRING whose content carries an unbalanced apostrophe,
+--     which is valid PostgreSQL precisely because dollar quoting exists so
+--     apostrophes need no escaping. The first `code_only` recursed into every
+--     dollar body assuming it was SQL, and raised.
+--
+--     0221's own comment, three lines above that literal, is:
+--
+--         "a guard that fires on correct input is worse than no guard, because
+--          the reflex is to weaken it."
+--
+--     Mine did exactly that, on its first run, against the file that says so.
+--     The fix is fail-safe rather than clever: recurse into a dollar body only
+--     if it tokenizes; if it does not, it is not SQL and is treated as an
+--     opaque literal. A body wrongly treated as a literal is a MISS (a lint
+--     sees less); a literal wrongly treated as SQL is a FALSE ALARM on a
+--     correct file. Misses are the cheaper error, so the ambiguity resolves
+--     toward the miss.
+
+-- ---------------------------------------------------------------------------
+-- WHAT THIS CHANGES
+--
+--   * G12's rejection of file-only lints is **withdrawn as stated**. The
+--     obstacle was real and is now removed; `sqlstruct.code_only()` gives any
+--     future lint a code-only view with byte offsets and line numbers
+--     preserved, so a hit reports against the original file directly.
+--   * G12's ASK is re-scoped. A database in CI is still worth having — for
+--     syntax, for catalog-shape assertions, for anything an empty cluster can
+--     answer. It is NOT the control for precondition defects, and the finding
+--     should stop implying it is.
+--   * The `LIMIT 1` lint itself is still NOT shipped, and deliberately. Three
+--     code hits on 0220 are all inside that migration's own rewrite and its
+--     assertions, so the rule needs the ORDER-BY half before it would say
+--     anything true. Building the separator is the part that was blocked; the
+--     rule on top of it is a separate decision with its own noise budget.
+--
+-- NOT ESTABLISHED:
+--   * Whether a Postgres in CI is worth its cost for this repo. 0137 costs the
+--     related question (G26) and recommends measuring first.
+--   * Whether any *other* file-only rule is worth shipping now that code and
+--     literal can be told apart. None is proposed here.
+-- ---------------------------------------------------------------------------
