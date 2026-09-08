@@ -131,15 +131,25 @@ and it is the measurement for G27 *and* G23(b); losing it costs a round.
 | # | file | what it does | why here |
 |---|---|---|---|
 | 1 | **0226** | the recert floor can read its own classifications | Must be first. It lowers the floor from 2026-09-08 13:41:09 to 2026-09-07 21:36:53, which brings rounds 26 and 27 back into scope. |
-| 2 | **0225** | the canon comparison sees all fourteen atoms | Must be second, *because* of 0226. Its `P3` asks whether any column already disagrees with itself on a newly compared atom at or above the floor. Under the old floor that question covered **one pair**; under the new one it covers rounds 26 and 27. Same check, far more evidence. |
+| 2 | **0225** | the canon comparison sees all fourteen atoms | Must be second, *because* of 0226. Its `P3` asks whether any column green under the nine-atom comparison would stop being green under the fourteen-atom one. Under the old floor that question covered **one pair per column** and could not fail; under the new one it covers rounds 26 and 27, three to six pairs a column. Same check, far more evidence. |
 | 3 | **0227** | the load meter stops reading 45,379 rows to sum 303 | Independent. Index only. Placed after the two that change what `green` means so that if round 28 moves, the cause is not ambiguous. |
 | 4 | **0228** | provenance asks the depot, not the run id | Last. It is the only one that touches triggers firing on **every** write to `vehicles` and `stalls`. If something goes wrong here, the other three are already in and the diagnosis is not tangled with them. |
 
-**0225 may legitimately refuse, and that is not a failure of this plan.** If P3
-finds a column whose `h_rule`, `h_rcl`, `h_sdr` or `endst` moved between rounds
-26 and 27, the right response is to go and find out why — that is a canon moving
-unnoticed, which is the exact thing 0225 exists to make impossible — not to
-weaken P3. Apply 0227 and 0228 anyway and leave 0225 for the investigation.
+**0225 may legitimately refuse, and that would not be a failure of this plan.**
+If P3 finds a column that loses green under the wider comparison, the right
+response is to go and find out why — a canon moving unnoticed is the exact thing
+0225 exists to make impossible — not to weaken P3. Apply 0227 and 0228 anyway
+and leave 0225 for the investigation.
+
+**As measured at 15:47 it will not refuse** (`db/checks/0140` Q5, dry-run at
+0226's floor): no column loses green, one column's streak shortens
+(`busy_day/314159/12t`, 6 → 3) and A5 reports it. That is a reading taken
+*before* 0226 is applied, from a hand-pinned floor value. If 0226 installs a
+floor other than `2026-09-07 21:36:53+00` — its own A2 asserts it does not — the
+dry-run does not transfer and P3 must be re-run before 0225. **The first version
+of this same dry-run was run at the wrong floor and came back clean for the
+wrong reason**, so the floor 0226 actually installs should be read off its
+`RAISE NOTICE` and compared, not assumed.
 
 ## The assertion that proves 0226 worked, and it is not inside 0226
 
