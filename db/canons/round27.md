@@ -79,6 +79,21 @@ predicting against yet.
 *(filled in when the round is laid out, from `scripts/schedule-round.sql` with
 the last-K-runs window added 2026-09-08)*
 
+## What to record, per column
+
+`db/checks/0134` (found while round 26 was running): the matrix compares nine
+atoms and the pair enforces fourteen. So the round file is the only place four
+of them are diffed across rounds. Record **all** of these per column, not the
+eleven that were habit:
+
+    fp  h_cmd  h_dec  h_evt  h_bkg  h_nrg  h_prop  h_defr  h_cal
+    h_rule  h_rcl  h_sdr          <- carried/printed or absent in the matrix
+    endst  (as md5(endst::text), arm A; assert arm B equal)
+
+Round 26's `endst` table is the model: four columns, both rounds, identical —
+which is what proved 0222 agreed with the function it replaced rather than
+merely with itself.
+
 ## Results
 
 *(filled in as the columns land)*
