@@ -1,3 +1,5 @@
+-- migration-version: 20260904014708
+-- migration-name:    the_kpi_that_scanned_two_and_a_half_million_rows_per_call
 -- =====================================================================
 -- 0187  The KPI that scanned two and a half million rows per call
 -- =====================================================================

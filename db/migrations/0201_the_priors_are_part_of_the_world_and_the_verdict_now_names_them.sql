@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_priors_are_part_of_the_world_and_the_verdict_now_names_them
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0201  The priors are part of the world, and the verdict now names
 --       them

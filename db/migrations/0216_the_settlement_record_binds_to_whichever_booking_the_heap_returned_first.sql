@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908081848
 -- migration-name:    the_settlement_record_binds_to_whichever_booking_the_heap_returned_first
 --
 -- NOTE on this header: APPLYING.md step 1 requires it, and 95 of the 215 files

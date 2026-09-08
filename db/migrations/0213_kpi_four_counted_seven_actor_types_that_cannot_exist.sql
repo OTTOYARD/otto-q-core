@@ -1,3 +1,5 @@
+-- migration-version: PENDING
+-- migration-name:    kpi_four_counted_seven_actor_types_that_cannot_exist
 -- ---------------------------------------------------------------------------
 -- *** DRAFT — NOT APPLIED. No APPLIED footer, no lineage row in the database. ***
 -- Written 2026-09-08 while round 24 was mid-flight; the preconditions below

@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    reservation_gc
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0033_reservation_gc.sql
 -- Garbage-collect stale stall reservations so capacity counting is accurate.
 -- P1-9: 54 reservations from July 28 were still blocking stalls 13 days later.

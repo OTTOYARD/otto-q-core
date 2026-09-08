@@ -1,3 +1,5 @@
+-- migration-version: 20260902121334
+-- migration-name:    the_certification_runs_the_deterministic_core_alone
 -- =====================================================================
 -- 0152  The certification runs the deterministic core alone
 -- =====================================================================

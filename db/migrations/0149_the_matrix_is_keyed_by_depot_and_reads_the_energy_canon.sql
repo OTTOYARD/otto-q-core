@@ -1,3 +1,5 @@
+-- migration-version: 20260901235044
+-- migration-name:    the_matrix_is_keyed_by_depot_and_reads_the_energy_canon
 -- =====================================================================
 -- 0149  The matrix is keyed by depot, and reads the energy canon
 -- =====================================================================

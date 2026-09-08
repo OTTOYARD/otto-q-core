@@ -1,3 +1,5 @@
+-- migration-version: 20260902121232
+-- migration-name:    the_odometer_sums_only_its_own_run
 -- =====================================================================
 -- 0150  The odometer sums only its own run
 -- =====================================================================

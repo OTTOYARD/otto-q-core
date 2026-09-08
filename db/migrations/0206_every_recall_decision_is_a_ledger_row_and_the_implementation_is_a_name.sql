@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    every_recall_decision_is_a_ledger_row_and_the_implementation_is_a_name
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0206  Every recall decision is a ledger row, and the implementation
 --       is a name

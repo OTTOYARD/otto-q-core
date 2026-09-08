@@ -1,3 +1,5 @@
+-- migration-version: 20260902195819
+-- migration-name:    the_grid_can_be_broken_on_purpose_and_must_prove_it
 -- =====================================================================
 -- 0161  The grid can be broken on purpose, and must prove it
 --       INSTRUMENT. Harness only; forces_recert = false.

@@ -1,3 +1,5 @@
+-- migration-version: 20260903075250
+-- migration-name:    the_recorder_wrote_a_status_the_table_refused
 -- =====================================================================
 -- 0179  The recorder wrote a status the table refused
 -- =====================================================================

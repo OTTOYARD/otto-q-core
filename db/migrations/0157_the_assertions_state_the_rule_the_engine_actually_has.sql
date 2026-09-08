@@ -1,3 +1,5 @@
+-- migration-version: 20260902191331
+-- migration-name:    the_assertions_state_the_rule_the_engine_actually_has
 -- =====================================================================
 -- 0157  The assertions state the rule the engine actually has
 --       INSTRUMENT. Harness only; forces_recert = false.

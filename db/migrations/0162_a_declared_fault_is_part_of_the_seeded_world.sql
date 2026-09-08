@@ -1,3 +1,5 @@
+-- migration-version: 20260902200201
+-- migration-name:    a_declared_fault_is_part_of_the_seeded_world
 -- =====================================================================
 -- 0162  A declared fault is part of the seeded world
 --       forces_recert = TRUE; inert for any depot declaring no fault.

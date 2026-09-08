@@ -1,3 +1,5 @@
+-- migration-version: 20260903113902
+-- migration-name:    the_cold_start_guard_looked_at_every_depot
 -- =====================================================================
 -- 0177  The cold-start guard looked at every depot
 -- =====================================================================

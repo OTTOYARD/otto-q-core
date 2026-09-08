@@ -1,3 +1,5 @@
+-- migration-version: 20260902234153
+-- migration-name:    the_kpi_view_recomputed_every_run_to_answer_about_one
 -- 0168  The KPI view recomputed every run to answer about one.
 --       Performance only; identical output. forces_recert = false.
 --

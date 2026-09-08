@@ -1,3 +1,5 @@
+-- migration-version: 20260901075119
+-- migration-name:    the_reset_stamp_leaves_the_wall_clock
 -- 0144: the reset stamp leaves the wall clock
 --
 -- ottoq_decide_tick has five vehicle loops. Three of them order by

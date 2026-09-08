@@ -1,3 +1,5 @@
+-- migration-version: 20260901011004
+-- migration-name:    the_end_state_is_part_of_the_verdict
 -- 0139: the end state is part of the verdict
 --
 -- ottoq_determinism_pair captures an end-of-run world image (endst) on every arm and then

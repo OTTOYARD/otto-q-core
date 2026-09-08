@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    a_production_run_does_not_recall_on_a_parked_implementation
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- ---------------------------------------------------------------------------
 -- 0210 — the recall registry has a status column and the wrapper never read it.
 --

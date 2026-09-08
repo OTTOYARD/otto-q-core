@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    drop_ottoq_recommendations
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- migration md5: 88c37f0d7f24831b81447d614244232e
 --
 -- P2-12: Investigate ottoq_recommendations — 83K rows, 0 executed. 

@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_eta_was_read_from_every_run_that_ever_dispatched_the_car
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0193  The ETA was read from every run that ever dispatched the car
 -- =====================================================================

@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_frame_carries_the_join_key_and_the_plug
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- ---------------------------------------------------------------------------
 -- 0209 — the decision frame carries the class join key and the plug.
 --

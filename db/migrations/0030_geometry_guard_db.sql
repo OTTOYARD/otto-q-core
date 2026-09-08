@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    geometry_guard_db
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- +micrate Up
 -- DB-side geometry guard function for OTTOYARD depot layouts.
 -- Implements three critical checks that currently exist only in JS (checkLayoutGeometry.mjs):

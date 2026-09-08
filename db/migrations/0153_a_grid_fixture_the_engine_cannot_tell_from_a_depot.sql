@@ -1,3 +1,5 @@
+-- migration-version: 20260902124926
+-- migration-name:    a_grid_fixture_the_engine_cannot_tell_from_a_depot
 -- =====================================================================
 -- 0153  A grid fixture the engine cannot tell from a depot
 -- =====================================================================

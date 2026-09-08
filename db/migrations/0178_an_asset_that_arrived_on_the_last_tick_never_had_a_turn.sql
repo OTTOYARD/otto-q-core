@@ -1,3 +1,5 @@
+-- migration-version: 20260903035049
+-- migration-name:    an_asset_that_arrived_on_the_last_tick_never_had_a_turn
 -- =====================================================================
 -- 0178  An asset that arrived on the last tick never had a turn
 -- =====================================================================

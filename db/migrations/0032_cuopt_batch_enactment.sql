@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    cuopt_batch_enactment
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0032_cuopt_batch_enactment.sql
 -- Make cuOpt the primary decision engine via atomic batch enactment.
 --

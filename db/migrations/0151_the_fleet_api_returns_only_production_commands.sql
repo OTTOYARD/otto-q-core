@@ -1,3 +1,5 @@
+-- migration-version: 20260902121253
+-- migration-name:    the_fleet_api_returns_only_production_commands
 -- =====================================================================
 -- 0151  The fleet API returns only production commands
 -- =====================================================================

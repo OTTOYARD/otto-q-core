@@ -1,3 +1,5 @@
+-- migration-version: 20260903023713
+-- migration-name:    the_overnight_planner_had_nashville_baked_in
 -- 0173  The overnight planner had Nashville baked in. forces_recert = FALSE, provably.
 --
 -- WHY THIS IS SAFE TO APPLY WITHOUT A ROUND, and the proof rather than the

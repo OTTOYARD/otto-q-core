@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    geometry_guard_minimal
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0031_geometry_guard_minimal.sql
 -- Two DB-side geometry checks that run in <1s:
 --   1. ottoq_check_fence_containment  — every stall inside its depot perimeter

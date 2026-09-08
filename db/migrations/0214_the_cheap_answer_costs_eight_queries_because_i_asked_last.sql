@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_cheap_answer_costs_eight_queries_because_i_asked_last
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- ---------------------------------------------------------------------------
 -- 0214 — the work side's cheap answer cost eight queries, because 0211 asked
 --        the deciding question last.

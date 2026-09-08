@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    a_standing_refusal_stands_whatever_the_rate_is_now
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- ---------------------------------------------------------------------------
 -- 0215 — a standing refusal stands, whatever the rate is now. Corrects 0214.
 --

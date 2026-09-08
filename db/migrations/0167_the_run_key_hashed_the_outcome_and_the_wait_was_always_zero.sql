@@ -1,3 +1,5 @@
+-- migration-version: 20260902205647
+-- migration-name:    the_run_key_hashed_the_outcome_and_the_wait_was_always_zero
 -- 0167  The run key hashed the outcome, and the wait was always zero.
 --       Instrument + KPI only; no engine function is touched. forces_recert = false.
 --

@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_tick_asks_the_work_side_before_it_books_the_stall
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- ---------------------------------------------------------------------------
 -- 0212 — the tick asks the work side, and a refusal re-solves instead of raising.
 --

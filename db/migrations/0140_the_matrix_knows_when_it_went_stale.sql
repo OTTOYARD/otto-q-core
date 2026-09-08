@@ -1,3 +1,5 @@
+-- migration-version: 20260901005506
+-- migration-name:    the_matrix_knows_when_it_went_stale
 -- 0140: the matrix knows when it went stale
 --
 -- public.ottoq_cert_matrix() is the one command that answers "are we certified". Today it

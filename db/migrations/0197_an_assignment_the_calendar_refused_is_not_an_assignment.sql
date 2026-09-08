@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    an_assignment_the_calendar_refused_is_not_an_assignment
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0197  An assignment the calendar refused is not an assignment
 -- =====================================================================

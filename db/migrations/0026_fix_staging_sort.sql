@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    fix_staging_sort
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION 0026: Fix staging allocation to prefer perimeter stalls before temp stalls.
 -- 
 -- P1-3: The ORDER BY clause that picks staging stalls was sorting with DESC, which prioritized 'temp'

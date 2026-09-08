@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908082227
 -- migration-name:    the_verdict_sees_the_settlement_record_and_h_rcl_may_now_fail_a_pair
 --
 -- ---------------------------------------------------------------------------

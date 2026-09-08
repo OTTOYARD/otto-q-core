@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    wash_monte_carlo
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0028_wash_monte_carlo.sql
 -- Wire wash variables into seeded-random so each run draws fresh Monte Carlo values.
 

@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    a_tie_in_the_command_walk_is_settled_by_the_issuance_sequence_not_the_heap
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- =====================================================================
 -- 0207  A tie in the command walk is settled by the issuance sequence,
 --       not the heap

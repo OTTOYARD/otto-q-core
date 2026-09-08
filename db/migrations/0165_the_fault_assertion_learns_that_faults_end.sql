@@ -1,3 +1,5 @@
+-- migration-version: 20260902200851
+-- migration-name:    the_fault_assertion_learns_that_faults_end
 -- 0165  The fault assertion learns that faults end. Harness; forces_recert = false.
 --
 -- Assertion 14 (0161) required ZERO bookings on a faulted point for the whole

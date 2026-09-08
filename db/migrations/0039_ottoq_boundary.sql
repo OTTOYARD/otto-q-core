@@ -1,3 +1,7 @@
+-- migration-version: UNVERIFIED-NO-LEDGER-ROW
+-- migration-name:    ottoq_boundary
+-- (no ledger row and no APPLIED note in the file: whether this is live in the
+--  database is not recorded anywhere. Needs a body check. See task G18.)
 -- MIGRATION: 0039_ottoq_boundary.sql
 -- P1-10: Restore the OTTO-Q / OTTO-TWIN boundary.
 -- OTTO-Q decides WHERE and WHEN, never HOW. Twin executes.

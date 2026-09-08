@@ -1,3 +1,5 @@
+-- migration-version: 20260903025526
+-- migration-name:    the_engine_can_say_it_found_nothing_but_not_that_it_never_looked
 -- 0169  The engine can say it found nothing. It cannot say it never looked.
 --       ENGINE CHANGE. forces_recert = TRUE. Its own certification round.
 --

@@ -1,3 +1,7 @@
+-- migration-version: APPLIED-NO-LEDGER-ROW
+-- migration-name:    the_work_side_can_refuse_a_recall_and_the_refusal_is_a_ledger_row
+-- (applied through execute_sql, which writes no supabase_migrations row; the
+--  file's own APPLIED footer is the record. See task G18.)
 -- ---------------------------------------------------------------------------
 -- 0211 — the work side gets a voice, and its refusal is a row.
 --
