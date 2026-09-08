@@ -491,3 +491,36 @@ table is exhaustive.
 Prediction 1 — no verdict atom moves — applies to f unchanged. Round 26's f
 canon is the comparison, and it must match to the byte.
 
+### g's prediction, committed 2026-09-08 15:43 UTC — before g fires at 15:52
+
+g is `busy_day` / 171717 / **24 ticks** — the same scenario, seed and horizon as
+column **e**, which landed at **560 s**. The only difference is that g's cron
+command sets `track_functions = 'all'` in its own session.
+
+**PREDICTION ON DURATION: 570–640 s.** Above e, because per-function
+instrumentation is not free, and `ottoq_policy_get` alone is called ~2.4M times
+in a *12*-tick pair — every one of which now takes a counter update. If g lands
+*below* 560 s, the run-to-run noise is larger than the instrumentation cost and
+neither number should be quoted to three digits.
+
+**PREDICTION ON ATOMS: all fourteen identical to e.** `track_functions` is a
+statistics setting. If any atom moves between e and g, the certification has a
+problem far larger than G27, because it would mean an observability setting
+changes the engine's output.
+
+**What g's `pg_stat_user_functions` diff decides, and none of it is decided yet:**
+
+| question | what the diff shows | why it cannot be answered without it |
+|---|---|---|
+| **G27** | `ottoq_determinism_pair`'s SELF time on a 24-tick pair — ~255 s (as on the 12-tick r25_g baseline, which is what "four fixed calls" predicts) or ~500 s | the whole "0222 should not have scaled with ticks" argument rests on the fingerprint being called four times regardless, and **nothing has measured that at 24 ticks** |
+| **G27, other half** | `ottoq_sim_compute_charger_load_kw`'s call count at 24 ticks against the 12-tick figure | 0223's predicted 2.0× scaling assumes the load meter is called twice as often at 24 ticks. That assumption is **derived, never counted** (8,966,506 ÷ 8,756, `db/checks/0130`) |
+| **G23(b)** | which functions actually cross `ottoq_stall_bookings`, by self-time | `pg_stat_statements` cannot answer it: reset 2026-07-30, it evicts, and bookings statements are 0.08% of its recorded blocks (`0136` Q7/Q8) |
+| **G21b** | per-caller call counts, divided by the static mention counts in `db/checks/0139` Q6 | 64 functions mention `ottoq_policy_get` 179 times and **mentions are demonstrably not calls** — the mention leader has no loop at all |
+
+The baseline is `scratchpad/g27_fn_before.txt`, captured 13:45:25 UTC and
+re-verified row by row at 15:16 UTC after a container restart: not one counter
+had moved in 91 minutes, and `SHOW track_functions` is `'none'` globally. So the
+post-g delta is exactly g's pair — confirmed, not assumed.
+
+**One measurement, three findings.** That is why g exists as a seventh column
+rather than as a re-run of e.
