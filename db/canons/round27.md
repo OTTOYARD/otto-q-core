@@ -137,4 +137,58 @@ merely with itself.
 
 ## Results
 
-*(filled in as the columns land)*
+### a — `busy_day` / 314159 / 12 ticks — **PASS**, 358 s
+
+Fired 13:55:00 UTC (8:55 AM CT), ended 14:00:58, **358 s**.
+
+**Prediction 1 holds on this column: nothing moved.** All fourteen atoms equal
+between the arms, and every one of them equal to round 26's value — including
+the four the matrix cannot see, which is the reason round 26's endst table
+existed and why 0134 says to keep diffing them by hand.
+
+| atom | arm A | arm B | vs round 26 |
+|---|---|---|---|
+| `fp` | `803698f3` | `803698f3` | = |
+| `h_cmd` | `109e340b` | `109e340b` | = |
+| `h_dec` | `9abdb4af` | `9abdb4af` | = |
+| `h_evt` | `9c631343` | `9c631343` | = |
+| `h_bkg` | `174b8835` | `174b8835` | = |
+| `h_nrg` | `a9c6b693` | `a9c6b693` | = |
+| `h_prop` | `a79c1095` | `a79c1095` | = |
+| `h_defr` | `d41d8cd9` | `d41d8cd9` | = (empty-string md5 — no deferrals) |
+| `h_cal` | `11a24626` | `11a24626` | = |
+| `h_rule` | `fc69953b` | `fc69953b` | = |
+| `h_rcl` | `0e67b89a` | `0e67b89a` | = |
+| `h_sdr` | `a1f79c20` | `a1f79c20` | = |
+| `endst` (md5) | `7b63e109` | `7b63e109` | = |
+| `ticks` | 12 | 12 | = |
+
+`h_evt` deserves a sentence of its own, because 0224 changed what goes into
+`ottoq_events.data_source` and this atom hashes that table. It did not move, and
+that is not luck: 0224's P1 block asserted against the live
+`ottoq_determinism_pair` that `h_evt` hashes event_type, entity and sim_clock
+over one run scope and never reads `data_source`. The prediction was made from
+the verdict function's own body and the round agrees with it.
+
+### Prediction 2 on column a: right about the direction, still wrong about the size
+
+| | round 26 | predicted | round 27 | |
+|---|---|---|---|---|
+| a — `busy_day`/314159/12t | 537 s | ~428 s | **358 s** | **70 s faster than predicted** |
+
+The per-column prediction was 537 − 109 = 428 s. It came in at 358 s, a saving of
+**179 s** where 109 s was claimed — 1.64x the prediction, in the direction that
+flatters the fix.
+
+**One column is not a verdict on prediction 2** — the committed rule is that the
+mean judges it, and a single column outside the band means nothing. But it is
+worth naming now which way this is likely to go, before the other five land and
+the temptation to explain them appears: the same shape as G27. Round 26's
+24-tick columns also saved about 2.2x what the fingerprint arithmetic predicted,
+and that anomaly is what `r27_g` was scheduled to measure. If b, c and d also
+overshoot, then 0223 and 0222 are both cheaper than their own arithmetic says,
+and the arithmetic — not the fixes — is what needs explaining. `r27_g`'s
+`pg_stat_user_functions` diff is the instrument for that, and it is already
+scheduled with `track_functions='all'` precisely so it can see SQL functions,
+which is what blinded `0129`.
+
