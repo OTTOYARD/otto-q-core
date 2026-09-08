@@ -77,6 +77,39 @@ It never raises. The C8 scenario `work_side_recall_refusal`
 return 90 min late and re-enter the queue with immediate urgency
 (`policy_otto_q_asis` orders refused-recall returns first).
 
+### And now in the database too, which it was not until 0211/0212
+
+Everything above described the kernel. In the engine, the work side had no
+voice at all: `twin.ottoq_sim_advance_deployed_telemetry` is the only consumer
+of a recall decision in the tick, and it went straight from `should_return` into
+the return handshake — ETA, `ottoq_book_appointment`, `status = 'returning'`.
+Nothing asked. `recall_refused` had been in `ottoq_event_types_catalog` since
+migration 0045 on 2026-08-19, described as "first-class, triggers re-solve
+(C9)", and had been emitted **zero times**. So had `recall_issued`,
+`move_start`, `move_end` and `touch_event`.
+
+| | kernel (`recall/`) | engine (0211 + 0212) |
+|---|---|---|
+| the seam | `work_side_accepts` callback | `public.ottoq_work_side_accepts` |
+| the ledger | `RecallEventLog.records` | `public.ottoq_recall_refusals`, append-only |
+| the event | `recall_refused` in the log | `recall_refused` in `ottoq_events` |
+| re-solve | the `resolve` hook | `v_should_return := false`; the asset stays deployed and the next tick decides again |
+| refusability | critical recalls are not refusable | non-deferrable recalls are not refusable |
+
+The re-solve is the part worth reading twice. It needed no new machinery: the
+tick already had a branch for "a deferrable need with no free stall keeps the
+car deployed and earning, retrying next tick". A refusal joins that branch. The
+site is never without a schedule because it never lost one.
+
+**A refusal is drawn from the run's CRN stream** (`ottoq_crn_draw`), never from
+`random()`, at `work_side_recall_refusal_rate` — default 0, so the work side
+never refuses unless a run asks. Proved on grid_smoke/424242/6t: at rate 0 all
+eight canon hashes reproduced the pre-change baseline exactly; at rate 1.0 the
+pair still PASSED with both arms byte-identical while `h_evt`, `h_bkg`, `h_dec`
+and `h_rcl` all moved. Identical arms mean the refusal is reproducible; moved
+hashes mean it reached the schedule instead of being recorded and ignored.
+Either half alone would have proved nothing. `db/checks/0122` holds the queries.
+
 ## Lineage and forward path
 
 The concept predates this phase (`early_recall_log`); this formalizes it. The
