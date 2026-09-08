@@ -106,3 +106,22 @@ SELECT n.nspname||'.'||p.proname AS fn,
 -- both of which write. Counting statements in one body is not a measure of what
 -- a function does. Reading the 615 characters is what corrected it, and reading
 -- the two delegates is what found the real defect.
+
+-- =====================================================================
+-- AMENDED 2026-09-08 by db/checks/0148 (G31).
+--
+-- This check named ONE gated step and called it "the shield." It read
+-- ottoq_decide_tick and did not read its caller. The guard is in
+-- public.ottoq_sim_decide_and_dispatch and wraps SEVEN calls, of which
+-- six are correctly gated intelligence and one --
+-- ottoq.ottoq_close_satisfied_charge_needs -- is a correctness step
+-- that belongs to the world, not to any policy.
+--
+-- The consequence reverses partly. This check said the baselines are
+-- FLATTERED (they skip the shield). They are also PENALIZED (they skip
+-- need closure, so they book chargers for needs that no longer exist).
+-- Two contaminations, opposite signs, different magnitudes, no
+-- cancellation. See 0148 §4. Fix drafted as migration 0231.
+--
+-- Nothing above this line is edited; it was right about what it read.
+-- =====================================================================
