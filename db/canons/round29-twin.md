@@ -59,3 +59,83 @@ in flight — `cron.job_run_details` reported round 28's column e as `succeeded,
 second` while it was 725 s into a 783-second run.
 
 Results go below a `## Results` heading. Nothing above it is to be edited.
+
+---
+
+# Results
+
+## Both pairs complete, and the twin PASSES
+
+| | fired | secs | status |
+|---|---|---|---|
+| `r29_t1_busy_314159_12` | 18:58:00 | **360** | succeeded, `validation_status = passed` |
+| `r29_t2_busy_314159_12` | 19:12:00 | **346** | succeeded, `validation_status = passed` |
+
+Zero pairs in flight at read time, confirmed by `pg_stat_activity` rather than by
+the cron row.
+
+## Every verdict key compared, not just the fourteen atoms
+
+The two verdicts were flattened to leaf paths with a recursive `jsonb_each` and
+full-outer-joined. **Not the fourteen atoms — every leaf in the document.**
+
+| | |
+|---|---|
+| leaf paths compared | **114** |
+| leaf paths that differ | **2** |
+| which ones | `.arm_a.run`, `.arm_b.run` |
+
+```
+.arm_a.run   pair 1: 9278ea31-…   pair 2: f87c8756-…
+.arm_b.run   pair 1: 5cf7acdf-…   pair 2: 1c336c81-…
+```
+
+Those are the `sim_run_id`s, which are necessarily distinct between two distinct
+pairs. **112 of 114 leaf values are byte-identical across two pairs run fourteen
+minutes apart.** That is `0113`'s bar (b) verbatim — *"every verdict key equal but
+'run'"* — now shown at the fourteen-atom bar and, in fact, across a document far
+wider than fourteen atoms.
+
+The column's streak went **5 → 6**, green.
+
+## PREDICTION — judged
+
+**Row 1 of the committed table: MET.** The two pairs agree on every verdict key
+but `run`, and both passed on the existing canon `fp 803698f3`.
+
+**Row 2 — the outcome this round was really run for — did NOT occur.** No verdict
+key outside the fourteen atoms differed.
+
+**And here is the limit of what that establishes, which matters more than the
+pass.** The twin can only reveal a gap between the verdict and the matrix *if the
+two pairs differ somewhere*. They differed nowhere. So the correct reading is:
+
+> The twin found **no evidence** that the fourteen-atom comparison is narrower
+> than the verdict. It did **not prove** the comparison is complete, because a
+> fully reproducible pair gives the test nothing to discriminate on.
+
+`0225` found the nine-versus-fourteen gap because a real change had moved an atom
+the matrix could not see. Nothing moved here, so the same instrument cannot speak.
+**The question "is the matrix still narrower than the verdict?" remains open and
+is only answerable on a round where something actually moves.** Recording it as
+answered would be the exact error `0225` exists to prevent, one level up.
+
+## Task #56 Part A — MET, at the fourteen-atom bar
+
+| clause | evidence |
+|---|---|
+| all six certification columns green | round 28, 6 of 6, minimum streak 4 |
+| **inter-pair reproducible** | **this twin: 112 of 114 leaf paths identical, the 2 exceptions being run ids** |
+| `h_nrg` in the verdict | `0134`, equal on every pair since |
+| every canon stable across ≥ 2 rounds | round 28, minimum streak 4 — double the bar |
+| the `0066` run-scoping findings closed | `0150`/`0151`, verified live in `0113` Q5 |
+| `peak_site_kw` reproducible | closed round 6; re-measured in `0113` Q4 |
+
+**Part A of task #56 is met in full at the bar the certification now actually
+enforces.** It was declared met once before, after round 17, on a six-atom
+hand-diff — correctly, at the bar of the time. `0225` raised that bar to fourteen
+and `0143` recorded which clauses had to be re-shown. All of them now have been.
+
+**What this does not say:** it does not say the engine is fast, or that `G29` is
+fixed, or that the 24t:12t ratio anomaly is understood. Part A is a claim about
+**reproducibility**, and nothing else.
