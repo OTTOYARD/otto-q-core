@@ -699,3 +699,78 @@ Consequence for the numbers g produces: **g's duration is not comparable to e's
 and must never be entered in the round-27 duration table.** It is an instrumented
 run, not a certification timing. Its *atoms* are comparable and still must match
 e's exactly; its seconds are not. Round 28's `r28_g` inherits the same rule.
+
+### g — `busy_day` / 171717 / **24 ticks**, instrumented — **PASS**, 851 s
+
+Fired 15:52:00 UTC, ran **851 s**, `arms_identical` true across all fourteen
+atoms, and **every value byte-identical to column e** — same scenario, same
+seed, same horizon, `track_functions='all'` the only difference.
+
+`fp 92b02f8b` · `h_cmd 050c4606` · `h_dec 0360adc9` · `h_evt b2230619` ·
+`h_bkg 947a2316` · `h_nrg 4c5035fe` · `h_prop 0046879e` · `h_defr d41d8cd9` ·
+`h_cal 11a24626` · `h_rule 9564b998` · `h_rcl fa8ab72c` · `h_sdr 957abcfb` ·
+`endst 967124f1`
+
+**Prediction on atoms: HELD.** An observability setting changes no engine
+output, demonstrated rather than assumed.
+
+**Prediction on duration: WRONG**, as recorded at 16:05 while g was still
+running. Band was 570–640 s; g landed at **851 s**, +52% over e's 560 s where
++14% was allowed. g's seconds do not enter the round-27 duration table.
+
+### ROUND 27 COMPLETE — seven columns, ninety-eight atom comparisons, no movement
+
+| column | ticks | round 26 | round 27 | Δ | |
+|---|---|---|---|---|---|
+| a — `busy_day`/314159 | 12 | 537 s | **358 s** | −179 | −33% |
+| b — `busy_day`/171717 | 12 | 533 s | **376 s** | −157 | −29% |
+| c — `normal_day`/171717 | 12 | 477 s | **358 s** | −119 | −25% |
+| d — `busy_day`/424242 | 12 | 529 s | **364 s** | −165 | −31% |
+| e — `busy_day`/171717 | **24** | 761 s | **560 s** | −201 | −26% |
+| f — `busy_day`/424242 | **24** | 734 s | **551 s** | −183 | −25% |
+| g — instrumented | **24** | — | *851 s, not comparable* | — | — |
+| **six-column total** | | **3,571 s** | **2,567 s** | **−1,004** | **−28%** |
+
+**Prediction 1 held on every column of every round since 25.** 0223 (a
+decide-path hoist) and 0224 (a provenance label) moved nothing.
+
+### G27's live half is SOLVED, and the premise was the error
+
+`db/checks/0141`. The whole 2.0× prediction for 0223 rested on the load meter
+being called **per tick**. That was never measured — 0130 *derived* ~1,024 calls
+per 12-tick pair from 8,966,506 ÷ 8,756, and two rounds of argument rested on the
+derivation.
+
+**Counted at last: `ottoq_sim_compute_charger_load_kw` is called 1,128 times in a
+24-tick pair.** Against ~1,024 at twelve ticks that is **~1.10**, not 2.0 — the
+meter is very nearly independent of tick count.
+
+| | ratio |
+|---|---|
+| predicted by the per-tick assumption | 2.00 |
+| observed, column e | 1.30 |
+| observed, column f | 1.18 |
+| **predicted by the counted call figure** | **~1.10** |
+
+The observations **bracket** the counted prediction instead of missing a wrong
+one. **0223 did not under-deliver. The arithmetic was built on an unmeasured
+assumption and the assumption was the error** — which is what "the number is only
+ever wrong in our favour" should have suggested two rounds ago.
+
+### And two fixes confirmed by profiler rather than by wall-clock
+
+- **0223's hoist, exactly**: `ottoq_depot_running_run` shows **1,128** calls and
+  the meter shows **1,128**. Identical to the unit — one run-scope lookup per
+  invocation where 0130 measured **8,756**.
+- **0222's magnitude**: `ottoq_determinism_pair`'s self time is **128 ms** against
+  a pre-fix **255,737 ms**. A ~2,000× reduction, as a counter.
+
+### G21b's number is larger than G21b claimed
+
+**`ottoq_policy_get`: 13,217,464 calls in one 24-tick pair.** That is 275,364 per
+tick per arm, roughly twelve hundred per vehicle per tick, all against a
+2,131-row table. And **no caller in the capture is within five orders of
+magnitude of it** — the largest are 16,692 rule evaluations and 1,656 shield
+probes. The dominant consumer is something the fourteen-row baseline never
+recorded, which is exactly why `round28.md` already instructs `r28_g` to capture
+the full table.
