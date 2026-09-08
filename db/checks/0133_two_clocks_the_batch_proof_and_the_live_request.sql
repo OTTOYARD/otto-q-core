@@ -35,8 +35,27 @@ ORDER BY start_time DESC LIMIT 8;
 --       191,845      23.58   14,131.1
 --       172,905      46.64    7,945.8
 --
---     637,473 calls at a 24-47 ms mean. That is real-time territory. The
---     internal lookups underneath are 0.00-0.01 ms each.
+--     637,473 calls at a 24-47 ms mean. The internal lookups underneath are
+--     0.00-0.01 ms each.
+--
+--     READ THAT WITH ITS WINDOW, which the first draft of this file left out and
+--     which materially weakens the claim. pg_stat_statements was last reset
+--     2026-07-30 and these rows' stats_since is 2026-07-30 / 2026-08-05, so
+--     these are **lifetime means over 34-40 days**, not a live reading:
+--
+--       272,723 calls / 34 days  =  ~334 per hour  =  ~5.6 per minute
+--
+--     And at 12:48:20 vs 12:49:35 UTC — 75 seconds apart, with no pair running —
+--     the counters were **identical to the decimal**. Zero calls arrived. The
+--     API is not merely quiet, it is idle at this moment.
+--
+--     So the honest form of the claim is: over a month of real but LIGHT traffic
+--     (~5.6 calls/min at the busiest endpoint), the typical request costs 24-47
+--     ms. That is evidence the code path is fast. **It is not evidence the
+--     system is fast under load, because it has never been under load.** No
+--     load test exists in this repo. Saying "real-time territory" without that
+--     sentence would be the same class of overstatement as quoting a row count
+--     without its retention window (0131 Q5, 0132 Q4).
 SELECT left(regexp_replace(query,'\s+',' ','g'), 60) AS q, calls,
        round(mean_exec_time::numeric,2) AS mean_ms,
        round(max_exec_time::numeric,1) AS max_ms
@@ -57,9 +76,17 @@ ORDER BY calls DESC LIMIT 6;
 --           a request that happens to hit a path scanning ottoq_stall_bookings
 --           (786k rows) or ottoq_events (2.28M) pays for the archive.
 --
---     (a) is testable by differencing the API's latency distribution inside and
---     outside a pair window, and it has NOT been tested. Until it is, the honest
---     statement is "24-47 ms typical, seconds at the tail, cause unproven".
+--     (a) is testable in principle by differencing the API's latency inside and
+--     outside a pair window. IT WAS ATTEMPTED, 2026-09-08 12:48-12:50 UTC, and
+--     the attempt is recorded here because it failed for an instructive reason:
+--     at ~5.6 calls per minute the windows are too sparse. A 19-minute pair
+--     window contains about a hundred calls against a distribution with a
+--     19-second tail, which is not enough to separate an effect from noise. The
+--     experiment needs generated load, and generated load is what this system
+--     has never had.
+--
+--     Until then the honest statement is "24-47 ms typical over a month of light
+--     traffic, seconds at the tail, cause unproven, never load-tested".
 --
 --     The architectural point stands regardless: **production must not share a
 --     database with the proof harness.** Whatever fraction of that tail is (a),
