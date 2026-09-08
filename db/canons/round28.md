@@ -337,6 +337,55 @@ measurement rather than a short arm. That check was run before the number was
 believed, because `db/checks/0143` exists about a short arm being mistaken for a
 fast one.
 
+### Column e ran long, and `cron.job_run_details` said it was finished
+
+At 17:42 UTC `cron.job_run_details` showed `r28_e_busy_171717_24` as
+**`succeeded`, `1` second**. That is a lie of the instrument, not a result, and
+it is the exact artefact the protocol names: the cron command is two statements
+(`SET statement_timeout …; SELECT ottoq_determinism_pair(…)`) and the row
+reports the first one. Columns a–d show real durations because their rows were
+updated on completion; e's had not been, because **e had not completed.**
+
+`pg_stat_activity` — the only authority on whether a pair is in flight —
+showed at 17:42:
+
+```
+pid 3546817 | active | started 17:31:00 | elapsed 725 s | wait_event_type NULL
+SET statement_timeout TO '25min'; SELECT public.ottoq_determinism_pair(171717, 24, 'busy_d…
+```
+
+**725 s against round 27's 560 s, still running, and not waiting on anything.**
+`wait_event_type` NULL means it is computing, not blocked on a lock or on I/O.
+
+Recorded now, in flight, because a number taken from the cron row would have
+been 1 second and would have been wrong by three orders of magnitude.
+
+**One sample against the contention hypothesis.** The `-146 s` on column d was
+quarantined above as unexplained, and shared-database contention (`G26`) was
+offered as a candidate — `ottoq-demo-metronome` runs every minute on this
+database, with `ottoq-depot-tick` and `ottoq-run-governor` every two. But at
+17:42 the certification pair was **the only non-idle backend in the database.**
+Those jobs complete in under a second each, so they seldom overlap a pair at
+all. That is one instant, not a distribution, and it does not refute G26 as an
+architectural finding — but it is evidence against contention explaining d, and
+it is recorded here rather than left out because it weakens a hypothesis I had
+already put in writing.
+
+**The shape across the round is now the thing to explain, not d alone:**
+
+| col | ticks | r28 | r27 | Δ |
+|---|---|---|---|---|
+| a | 12 | 356 | 358 | −2 |
+| b | 12 | 361 | 376 | −15 |
+| c | 12 | 342 | 358 | −16 |
+| d | 12 | **218** | 364 | **−146** |
+| e | 24 | **≥725, in flight** | 560 | **≥ +165** |
+
+A column that ran 40% fast is followed by one running at least 30% slow. Whatever
+this is, "0227 made pairs faster" does not describe it, and the mean of the four
+12-tick columns describes it even less. This is why d was quarantined rather
+than averaged.
+
 ## `r28_g`'s baseline re-verified 17:10 UTC — not one counter moved
 
 The 16:23:39 capture claimed validity until g fires on the grounds that
