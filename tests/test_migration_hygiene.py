@@ -174,3 +174,101 @@ def test_the_unfiled_list_agrees_with_itself():
     versions = [v for v, _, _ in table]
     assert len(set(versions)) == len(versions), "a version is listed twice"
     assert versions == sorted(versions), "the table is not in version order"
+
+
+# ---------------------------------------------------------------------------
+# DOLLAR-QUOTE BALANCE
+#
+# G12 says CI does not run the SQL, and it cannot: these files are catalog-
+# derived rewrites against a live 250-table database, and there is no
+# from-scratch schema to build one from. But one whole class of defect in them
+# is STRUCTURAL and needs no database at all — an unterminated dollar-quoted
+# block. Every migration in this repo is DO blocks nested inside dollar quotes
+# nested inside more dollar quotes, and an unterminated one does not fail
+# loudly: psql swallows the rest of the file as string content and the
+# migration silently does less than it says.
+#
+# This is not a SQL parser and does not pretend to be. It is the one check that
+# can be made honestly without a server.
+# ---------------------------------------------------------------------------
+
+_DOLLAR_TAG = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)?\$")
+
+
+def _unterminated_dollar_tag(sql):
+    """Return (tag, line) for the first dollar-quote opened and never closed, else None.
+
+    Dollar quoting does not nest: inside $outer$ ... $outer$ every other tag is
+    literal text. So the scanner has exactly two states, and while OUTSIDE a
+    quote it must skip line comments, block comments and single-quoted strings
+    -- otherwise prose mentioning $f$ reads as an opener. Positional parameters
+    ($1, $2) are excluded by the tag pattern requiring a letter or underscore.
+    """
+    i, n, open_tag, open_line = 0, len(sql), None, None
+    while i < n:
+        if open_tag is None:
+            if sql.startswith("--", i):
+                j = sql.find("\n", i)
+                i = n if j < 0 else j + 1
+                continue
+            if sql.startswith("/*", i):
+                j = sql.find("*/", i + 2)
+                i = n if j < 0 else j + 2
+                continue
+            if sql[i] == "'":
+                j = i + 1
+                while j < n:
+                    if sql[j] == "'":
+                        if j + 1 < n and sql[j + 1] == "'":
+                            j += 2
+                            continue
+                        break
+                    j += 1
+                i = j + 1
+                continue
+            m = _DOLLAR_TAG.match(sql, i)
+            if m:
+                open_tag, open_line = m.group(0), sql.count("\n", 0, i) + 1
+                i = m.end()
+                continue
+            i += 1
+        else:
+            j = sql.find(open_tag, i)
+            if j < 0:
+                return (open_tag, open_line)
+            i = j + len(open_tag)
+            open_tag = None
+    return None
+
+
+def test_the_dollar_quote_scanner_fires():
+    """A guard that never fires is not a guard. Three of these cases are the
+    false positives a naive version would produce."""
+    cases = [
+        ("balanced",          "DO $a$ BEGIN NULL; END $a$;",            False),
+        ("unterminated",      "DO $a$ BEGIN NULL; END;",                True),
+        ("literal inside",    "DO $p$ v := $f$hi$f$; $p$;",             False),
+        ("outer unterminated","DO $p$ v := $f$hi$f$;",                  True),
+        ("anonymous",         "DO $$ BEGIN NULL; END $$;",              False),
+        ("anonymous unterm",  "DO $$ BEGIN NULL; END;",                 True),
+        ("tag in a comment",  "-- prose mentioning $f$ here\nSELECT 1;", False),
+        ("tag in a string",   "'a $f$ b' ; SELECT 1;",                  False),
+        ("positional params", "-- WHERE x = $2 AND y = $3\nSELECT 1;",  False),
+    ]
+    for name, sql, should_fire in cases:
+        fired = _unterminated_dollar_tag(sql) is not None
+        assert fired == should_fire, f"dollar-quote scanner: {name} -> fired={fired}"
+
+
+def test_every_sql_file_closes_every_dollar_quote_it_opens():
+    bad = []
+    for d in ("db/migrations", "db/checks"):
+        for f in sorted((ROOT / d).glob("*.sql")):
+            r = _unterminated_dollar_tag(f.read_text())
+            if r:
+                bad.append(f"{d}/{f.name}: {r[0]} opened at line {r[1]} and never closed")
+    assert not bad, (
+        "unterminated dollar quote -- psql would swallow the rest of the file as "
+        "string content and the migration would silently do less than it says:\n"
+        + "\n".join(bad)
+    )
