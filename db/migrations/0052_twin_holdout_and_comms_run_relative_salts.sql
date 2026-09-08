@@ -1,5 +1,6 @@
 -- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    twin_holdout_and_comms_run_relative_salts
+-- migration-also-covers: 20260819233610, 20260819233630
 -- (the ledger holds this as several rows -- 0052a/0052b -- so no single
 --  supabase_migrations version corresponds to this file. See task G18.)
 -- 0052 — C7 FOLLOW-UP #6, found by re-certification #6 (post-0051 arms

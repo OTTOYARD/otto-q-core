@@ -1,5 +1,6 @@
 -- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    twin_determinism_and_playback
+-- migration-also-covers: 20260819185342, 20260819185611, 20260819185759, 20260819190050, 20260819190142
 -- (the ledger holds this as several rows -- 0045a..0045e -- so no single
 --  supabase_migrations version corresponds to this file. See task G18.)
 -- 0045 — C7 TWIN HARDENING: the determinism fix, the standing cert, the

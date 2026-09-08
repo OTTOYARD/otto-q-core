@@ -140,3 +140,37 @@ def test_the_drift_manifest_matches_the_migration_files():
 
 def test_the_migration_log_index_matches_the_migration_files():
     _generator_is_idempotent(["python3", "scripts/gen-migration-index.py"], "MIGRATION_LOG.md")
+
+
+def test_the_unfiled_list_agrees_with_itself():
+    """`db/migrations/UNFILED.md` enumerates the applied migrations that have no
+    file. Its prose count, its table and its total must agree, because the
+    number is load-bearing: after the manifest work of 2026-09-08, Section A of
+    the drift check reports exactly these and nothing else, so any drift between
+    the file and reality turns a precise alarm back into a vague one.
+
+    This cannot check the list against the ledger -- that needs a database, and
+    the drift check is where it is asked. It checks the file is internally
+    consistent, which is what a file-only test can do.
+    """
+    md = (MIG / "UNFILED.md").read_text()
+
+    table = re.findall(r"^\| `(\d{12,14})` \| ([\d,]+) \| (\S+) \|$", md, re.M)
+    assert table, "UNFILED.md has no version table"
+
+    claimed_n = int(re.search(r"\*\*(\d+) migrations, ([\d,]+) characters\.\*\*", md).group(1))
+    claimed_chars = int(re.search(r"\*\*(\d+) migrations, ([\d,]+) characters\.\*\*", md)
+                        .group(2).replace(",", ""))
+    prose_n = int(re.search(r"\*\*(\d+)\*\*\s*\|\s*\*\*open\*\*", md).group(1))
+    prose_chars = int(re.search(r"total \*\*([\d,]+) characters\*\*", md).group(1).replace(",", ""))
+
+    assert len(table) == claimed_n, f"table has {len(table)} rows, footer claims {claimed_n}"
+    assert len(table) == prose_n, f"table has {len(table)} rows, the disposition table says {prose_n}"
+    assert sum(int(b.replace(",", "")) for _, b, _ in table) == claimed_chars, \
+        "the byte counts in the table do not add up to the footer total"
+    assert claimed_chars == prose_chars, \
+        f"footer says {claimed_chars} characters, the prose says {prose_chars}"
+
+    versions = [v for v, _, _ in table]
+    assert len(set(versions)) == len(versions), "a version is listed twice"
+    assert versions == sorted(versions), "the table is not in version order"

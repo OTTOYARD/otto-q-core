@@ -1,5 +1,6 @@
 -- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    twin_assigner_salt_and_tiebreak
+-- migration-also-covers: 20260819231755, 20260819231841
 -- (the ledger holds this as several rows -- 0051a/0051b -- so no single
 --  supabase_migrations version corresponds to this file. See task G18.)
 -- 0051 — C7 FOLLOW-UP #5, found by re-certification #5 (post-0050 arms

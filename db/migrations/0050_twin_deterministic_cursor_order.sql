@@ -1,5 +1,6 @@
 -- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    twin_deterministic_cursor_order
+-- migration-also-covers: 20260819221057, 20260819221205, 20260819221507, 20260819221603, 20260819221809
 -- (the ledger holds this as several rows -- 0050a..0050e -- so no single
 --  supabase_migrations version corresponds to this file. See task G18.)
 -- 0050 — C7 FOLLOW-UP #4, found by re-certification #4 (arms a4ce46d4 / 523f770e):

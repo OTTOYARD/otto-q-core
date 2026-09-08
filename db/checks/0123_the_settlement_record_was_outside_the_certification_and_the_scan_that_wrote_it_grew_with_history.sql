@@ -38,7 +38,21 @@ ORDER BY indexname;
 --     BEFORE 0216:  Parallel Seq Scan, 387,241 rows removed by filter,
 --                   50,769 blocks read, Execution Time 965.175 ms.
 --     AFTER  0216:  Index Scan using ottoq_stall_bookings_leg_idx,
---                   25 buffers, Execution Time 0.295 ms.   3,270x.
+--                   25 buffers, Execution Time 0.295 ms.
+--
+--     AND THE 3,270x DOES NOT REACH THE PAIR. Recorded here because this file
+--     was written before the measurement existed and the number above would
+--     otherwise read as a fix for Q0's drift. It is not. Round 25's first pair
+--     on the same column took 812 s, against 797 s and 801 s before the index,
+--     inside the 688-822 s band of the two preceding days. The reading above is
+--     COLD-CACHE — read=50769 blocks — and in a real arm those pages are warm,
+--     so ~2,236 scans do not add up to anything near an 800 s pair.
+--
+--     The index is still correct: it removes a cost whose size is set by total
+--     history rather than by the run, which is unbounded by construction. It is
+--     simply not the carrier of Q0. That is open as task G19, where the
+--     hypotheses already refuted by measurement are listed so nobody re-runs
+--     them.
 EXPLAIN (ANALYZE, BUFFERS, COSTS OFF)
 SELECT b.booking_id, b.visit_id FROM public.ottoq_stall_bookings b
  WHERE b.leg_id = '00000000-0000-0000-0000-000000000001'::uuid
