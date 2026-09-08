@@ -79,13 +79,39 @@ FROM public.ottoq_events WHERE data_source='production' AND sim_run_id IS NOT NU
 --       twin.ottoq_report_charger_fault        1
 --
 --     Some hardcodes are honest: ottoq_production_start / _stop only ever run
---     on the production path. Two are not, on their names alone —
---     `twin.ottoq_report_charger_fault` is IN THE TWIN SCHEMA, and
---     ottoq_trg_attribution_attach writes `p_data_source => 'production',
---     p_sim_run_id => NULL` from a trigger on ottoq_visit_cost_attribution,
---     which is the table the SDR evolves from. Only the refusal reactor is
---     convicted here, because only it has 71,944 rows of evidence; the rest are
---     a list to work, not a verdict.
+--     on the production path. FOUR ARE THE SAME DEFECT AS THE REFUSAL REACTOR —
+--     'production' hardcoded on one line, a sim run id passed on another:
+--
+--       function                        event_type                          run argument
+--       ottoq_trg_attribution_attach    sdr_costs_attached                  NULL (hardcoded too)
+--       ottoq_ingest_service_complete   ops.services_completed_reported     v_run.sim_run_id
+--       ottoq_ingest_service_complete   ops.service_marked_complete         v_run.sim_run_id
+--       ottoq_ack_vehicle_command       vehicle.command_ack                 v_cmd.sim_run_id
+--       twin.ottoq_report_charger_fault ops.charger_fault_confirmed         v_run
+--
+--     AND EVERY ONE OF THEM HAS PRODUCED ZERO EVENTS. All five event types
+--     return no rows at all from ottoq_events. They are latent, not bleeding —
+--     the same shape as G20, where the second SDR emitter would have billed a
+--     DCFC charge at the L2 tariff and had simply never fired.
+--
+--     That is why 0224 is scoped to the one function with 71,944 rows of
+--     evidence and not to all five. It is also why the other four should be
+--     fixed BEFORE those paths are woken rather than after: the cost of fixing a
+--     latent defect is one line, and the cost of fixing it later includes
+--     whatever it wrote in between, which cannot be re-labelled because it is
+--     signed.
+--
+--     twin.ottoq_report_charger_fault deserves a second look on its own terms:
+--     a function in the TWIN schema, whose whole job is to inject a simulated
+--     fault, labelling its event 'production'.
+SELECT event_type, data_source, count(*) AS n,
+       count(*) FILTER (WHERE sim_run_id IS NOT NULL) AS with_run
+FROM public.ottoq_events
+WHERE event_type IN ('sdr_costs_attached','ops.services_completed_reported',
+                     'ops.service_marked_complete','vehicle.command_ack',
+                     'ops.charger_fault_confirmed')
+GROUP BY 1,2 ORDER BY 3 DESC;
+--     -> zero rows, 2026-09-08 12:35 UTC
 SELECT n.nspname||'.'||p.proname AS fn,
        (SELECT count(*) FROM regexp_matches(p.prosrc, 'data_source[^,;\n]{0,12}''production''', 'g')) AS hardcoded,
        (SELECT count(*) FROM regexp_matches(p.prosrc, 'data_source[^,;\n]{0,20}CASE', 'gi')) AS conditional
