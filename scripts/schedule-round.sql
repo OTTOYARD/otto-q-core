@@ -14,6 +14,20 @@
 -- count in the recent past, plus a margin. Edit the three constants, run it,
 -- read the plan it prints, then run it again with v_commit := true.
 --
+-- 2026-09-08: THE LOOKBACK IS THE LAST K RUNS, NOT THE LAST FIVE DAYS. Round 26
+-- was laid out from a five-day window, so its slots were computed from pre-0222
+-- durations — and 0222 then took a 12-tick pair from ~755 s to ~535 s. The
+-- round is correct but spends about an hour of wall clock waiting in slots
+-- sized for an engine that no longer exists, and would keep doing so for five
+-- days. Taking the max of the last K runs of that tick count adapts in ONE
+-- round instead of five days.
+--
+-- max-of-K, deliberately, not mean-of-K: a slot too SHORT puts two pairs on one
+-- depot and contaminates both (that is what had to be fixed by hand mid-round
+-- 25), while a slot too LONG costs only wall clock. The asymmetry is the whole
+-- argument for the margin and for the floor, and one fast outlier must not be
+-- able to tighten the schedule on its own.
+--
 -- Durations come from cron.job_run_details. Note the trap recorded in
 -- db/canons/round25.md: an IN-FLIGHT job of this shape reports
 -- status='succeeded', return_message='SET', duration ~1 s, because the command
@@ -30,6 +44,15 @@ DECLARE
   v_lead       interval    := '10 min';    -- gap before the first pair fires
   v_margin     numeric     := 1.35;        -- slot = slowest recent run x this
   v_floor_min  int         := 14;          -- never space closer than this
+  v_lookback   int         := 6;           -- how many recent runs of that tick
+                                           -- count to take the max over; small
+                                           -- enough to follow an engine change
+                                           -- within one round, large enough
+                                           -- that one lucky pair cannot tighten
+                                           -- the slots into a collision
+  v_lookback_d interval    := '10 days';   -- outer bound on how far back K runs
+                                           -- may be drawn from; a K-th run from
+                                           -- a different engine is not evidence
   v_commit     boolean     := false;       -- false = print the plan only
   v_depot      uuid        := '11111111-1111-1111-1111-111111111111';
   v_sim_start  timestamptz := '2026-09-01 02:00:00+00';
@@ -57,18 +80,25 @@ BEGIN
   v_fire := COALESCE(v_first_fire, now() + v_lead);
 
   FOR i IN 1 .. array_length(v_cols, 1) LOOP
-    -- slowest COMPLETED run of this tick count in the last five days; rows
-    -- under 60 s are in-flight artefacts (see the header), not fast pairs.
-    SELECT max(extract(epoch FROM (d.end_time - d.start_time))) INTO v_secs
-      FROM cron.job_run_details d
-     WHERE d.command ILIKE '%ottoq_determinism_pair%'
-       AND d.command ILIKE '%, '||v_cols[i][4]||', %'
-       AND d.start_time > now() - interval '5 days'
-       AND extract(epoch FROM (d.end_time - d.start_time)) >= 60;
+    -- Slowest of the LAST v_lookback completed runs of this tick count. Rows
+    -- under 60 s are in-flight artefacts (see the header) and are discarded
+    -- BEFORE the K most recent are taken — otherwise the artefact rows crowd
+    -- the real ones out of the window and K shrinks silently.
+    SELECT max(secs) INTO v_secs FROM (
+      SELECT extract(epoch FROM (d.end_time - d.start_time)) AS secs
+        FROM cron.job_run_details d
+       WHERE d.command ILIKE '%ottoq_determinism_pair%'
+         AND d.command ILIKE '%, '||v_cols[i][4]||', %'
+         AND d.start_time > now() - v_lookback_d
+         AND d.end_time IS NOT NULL
+         AND extract(epoch FROM (d.end_time - d.start_time)) >= 60
+       ORDER BY d.start_time DESC
+       LIMIT v_lookback
+    ) recent;
 
     IF v_secs IS NULL THEN
-      RAISE WARNING 'schedule-round: no measured duration for %-tick pairs in the last five '
-                    'days; falling back to 30 min', v_cols[i][4];
+      RAISE WARNING 'schedule-round: no measured duration for %-tick pairs within %; falling '
+                    'back to 30 min', v_cols[i][4], v_lookback_d;
       v_secs := 1800;
     END IF;
 
@@ -90,9 +120,9 @@ BEGIN
 
     -- one % per argument: RAISE has no %s, and a stray one silently eats an
     -- argument and prints a literal 's'.
-    RAISE NOTICE '% | fires % UTC | slot % min (slowest recent %-tick run % s x %)',
+    RAISE NOTICE '% | fires % UTC | slot % min (slowest of the last % %-tick runs: % s x %)',
                  rpad(v_name, 32), to_char(v_fire,'YYYY-MM-DD HH24:MI'), v_slot,
-                 v_cols[i][4], round(v_secs), v_margin;
+                 v_lookback, v_cols[i][4], round(v_secs), v_margin;
 
     IF v_commit THEN
       PERFORM cron.schedule(v_name, v_sched, v_cmd);

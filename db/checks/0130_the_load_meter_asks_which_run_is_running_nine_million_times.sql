@@ -229,11 +229,50 @@ ORDER BY 2 DESC;
 --     expression index is only usable if the query's expression matches the
 --     index's expression TEXTUALLY after normalisation — a different sentinel
 --     literal, a different cast, or a COALESCE with the arguments the other way
---     round all miss. Thirty-three sites written by different hands over two
---     months are unlikely to be textually uniform, and how many of them ARE is
---     the first thing to measure, before any index is built.
+--     round all miss.
 --
---     Sites to survey (0221's header counts 33 including the one it fixed):
+--     Whether they ARE uniform was measured first, 2026-09-08 12:23 UTC — and
+--     it is the part of this proposal that came out better than expected.
+--
+--     THE CENSUS: **40 functions, 99 sites** carry a COALESCE over something
+--     named sim_run_id. 0221's header says 33 functions; the difference is that
+--     this count also catches the parameter side, and the split is the finding:
+--
+--       COALESCE(p_sim_run_id, '000…000'::uuid)          42   PARAMETER side
+--       COALESCE(vn.sim_run_id,  '000…000'::uuid)        25   ottoq_visit_needs
+--       COALESCE(n.sim_run_id,   '000…000'::uuid)         8   ottoq_visit_needs
+--       COALESCE(vn2.sim_run_id, '000…000'::uuid)         4   ottoq_visit_needs
+--       COALESCE(d.sim_run_id,   '000…000'::uuid)         2
+--       COALESCE(ottoq_visit_needs.sim_run_id, …)         2   ottoq_visit_needs
+--       COALESCE(cs.sim_run_id,  '000…000'::uuid)         2   ocpp_sessions (this file)
+--       COALESCE(v_e.sim_run_id, c_nil)                   2   plpgsql constant
+--       COALESCE(e.sim_run_id,   c_nil)                   1   plpgsql constant
+--       COALESCE(vn3.sim_run_id, '000…000'::uuid)         1   ottoq_visit_needs
+--       COALESCE(vn.sim_run_id,'000…000'::uuid)           1   no space after the comma
+--
+--     Three things fall out of that table:
+--
+--     1. **Forty-two of the ninety-nine are free.** COALESCE over a PARAMETER
+--        is a constant per call — it is not a function of a column and defeats
+--        no index. Only the ~57 column-side sites are the defect. An estimate
+--        of this sweep that counts all 99 is wrong by nearly a factor of two,
+--        in the direction that makes the work look bigger than it is.
+--     2. **The literal IS uniform** — `'00000000-0000-0000-0000-000000000000'::uuid`
+--        everywhere except one missing space (which normalises away) and three
+--        sites using a plpgsql constant `c_nil`, which an expression index
+--        cannot match at all and which would need their own treatment.
+--     3. **One table dominates**: 41 of the ~57 column-side sites are
+--        ottoq_visit_needs, under six different aliases. So the sweep is not
+--        thirty-two function rewrites. It is plausibly two or three expression
+--        indexes — ottoq_visit_needs first — and the aliases are irrelevant,
+--        because an index matches the EXPRESSION, not the alias.
+--
+--     Still a proposal. The census says the shape is favourable; it does not
+--     say the planner will use the index, and this project has twice had a fix
+--     that measured beautifully and bought zero seconds on a pair. One index,
+--     one EXPLAIN, one pair — in that order, and after 0223 is judged.
+--
+--     The census query, so the count can be re-run rather than believed:
 SELECT n.nspname||'.'||p.proname AS fn,
        (length(p.prosrc) - length(replace(p.prosrc, 'COALESCE(', '')))/10 AS coalesce_total,
        (SELECT count(*) FROM regexp_matches(p.prosrc,
