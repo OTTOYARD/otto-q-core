@@ -157,4 +157,68 @@ SELECT datname, stats_reset,
 --
 --     (c) THE COUNTERS, which are now documented above so that the next person
 --         to quote a purge percentage knows which ones reconcile.
-SELECT 'see Q1-Q6; this file changes nothing' AS status;
+-- Q7. I TRIED TO DO (b) FROM pg_stat_statements AND IT CANNOT BE DONE THERE.
+--     Recorded as a failed method, because the next person will reach for the
+--     same view.
+--
+--     Ranking every statement that names ottoq_stall_bookings, 2026-09-08
+--     14:40 UTC:
+--
+--       statement                                     calls   mean_ms  blocks    blk/call
+--       ottoq.ottoq_enact_inspection_seam                24  3,845.6  19,159,434  797,000
+--       decide_tick's guard (WITH g AS MATERIALIZED)  4,658      2.8   2,111,089      453
+--       the occupancy check (b.during @> …)             612      7.9   2,548,061    4,163
+--       the booking INSERT                            1,532      1.8     246,274      160
+--
+--     And then the number that kills the method:
+--
+--       blocks across ALL statements                        43,747,553,601
+--       blocks in statements naming ottoq_stall_bookings        35,865,364   (0.08%)
+--
+--     Eight hundredths of one percent — against `pg_stat_user_tables` saying
+--     the table has been sequentially scanned 1,957,342 times for 49.3 billion
+--     tuples, and against db/checks/0127 putting it at 53% of every disk block
+--     this database has ever read.
+--
+--     Both are true, and the reason is what makes the method fail:
+--     **pg_stat_statements is a forty-day evicting SAMPLE and the table's own
+--     counters are complete.** `pg_stat_statements_info.stats_reset` is
+--     2026-07-30 02:59:23, and the view holds a bounded number of entries and
+--     discards the least used — so the statement responsible for two million
+--     scans need not be in it at all, and demonstrably is not: the busiest
+--     bookings statement it knows about has 4,658 calls.
+--
+--     So a census built on this view would have confidently named the wrong
+--     function. It is the same failure as `track_functions='pl'` in 0129 —
+--     an instrument that answers, in a voice that sounds complete, about the
+--     part of the world it can see.
+SELECT (SELECT stats_reset FROM pg_stat_statements_info)      AS pgss_reset,
+       (SELECT sum(shared_blks_read+shared_blks_hit) FROM pg_stat_statements)
+                                                              AS all_stmt_blocks,
+       (SELECT sum(shared_blks_read+shared_blks_hit) FROM pg_stat_statements
+         WHERE query ILIKE '%ottoq_stall_bookings%')           AS bookings_stmt_blocks,
+       (SELECT seq_scan FROM pg_stat_user_tables WHERE relname='ottoq_stall_bookings')
+                                                              AS table_seq_scans,
+       (SELECT seq_tup_read FROM pg_stat_user_tables WHERE relname='ottoq_stall_bookings')
+                                                              AS table_seq_tup_read;
+
+-- Q8. THE INSTRUMENT THAT CAN ANSWER IT IS ALREADY SCHEDULED.
+--
+--     `r27_g` fires at 15:52 UTC with `track_functions='all'` — set to 'all'
+--     rather than 'pl' precisely because 'pl' does not count SQL functions,
+--     which is what blinded 0129 to the load-meter chain. Its
+--     `pg_stat_user_functions` diff was scheduled to answer G27 (why two
+--     hoisting fixes each beat their own per-call arithmetic). It answers this
+--     too: a per-function call count and self-time over one complete pair,
+--     with nothing evicted and no sampling.
+--
+--     So G23(b) does not need its own measurement run. It needs the diff that
+--     is already coming, read a second way.
+--
+--     ONE CANDIDATE TO CHECK FIRST, from the sample above even though the
+--     sample is unreliable for ranking: `ottoq.ottoq_enact_inspection_seam` at
+--     **797,000 blocks per call** is the largest per-call reader of this table
+--     that pg_stat_statements knows about, by two orders of magnitude. Twenty-
+--     four calls, 3.8 s each. Whether it runs inside a pair at all is the first
+--     question, and r27_g answers that too.
+SELECT 'see Q1-Q8; this file changes nothing' AS status;
