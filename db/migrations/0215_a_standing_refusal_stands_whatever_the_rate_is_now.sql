@@ -160,3 +160,45 @@ COMMIT;
 -- returns is recorded in db/canons/round24.md as a reading, not here as a
 -- hope.
 -- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- CORRECTION 2026-09-08, appended after the re-measurement landed. The premise
+-- of 0214 — and therefore the reason 0215 exists at all — was FALSE.
+--
+-- The re-run of busy_day / 314159 / 12t on the flagship took 801 s against the
+-- 797 s it was compared with. 0215 saved nothing measurable, because there was
+-- nothing to save.
+--
+-- The "historical 438-454 s" in 0214's header is a real number from a real
+-- reading, but it is not this column's recent history. The full run-details
+-- series for this exact column (db/canons/round24.md carries it in full) is:
+--
+--   09-01  389            09-05  545 681 697 744
+--   09-02  308 ... 500    09-06  688 724 741 804 804
+--   09-03  431 ... 614    09-07  643 758 822
+--   09-04  512 652        09-08  797 801
+--
+-- Monotone drift over seven days on a fixed seed, tick count, scenario and
+-- depot. 09-06 reached 804 s with none of 0209-0212 applied. There was no step
+-- change when they landed and there is no regression to attribute to 0211.
+--
+-- So the honest ledger for this pair of migrations: 0214 chased a phantom and
+-- broke a standing refusal doing it; 0215 restored the behaviour and is
+-- correct on its own terms (its ordering IS the better one, and its A1 block
+-- keeps it that way); together they are a behavioural no-op, which round 24's
+-- two pairs prove atom by atom — seven canon values reproduced round 22 and
+-- only h_rule moved, exactly as 0208 requires.
+--
+-- The rule I should have followed and did not: BEFORE attributing a slowdown to
+-- a change, plot the metric's own history across the change. One query against
+-- cron.job_run_details would have refuted the whole excursion in thirty
+-- seconds. It is the same failure db/checks/0098 records — reasoning from a
+-- remembered number instead of re-measuring — and this time the stale number
+-- was one I wrote down myself four hours earlier.
+--
+-- What the excursion bought, which is why it is not a total loss: the duration
+-- series above is the signature of accumulating table size, and following it
+-- convicted the missing index on ottoq_stall_bookings.leg_id AND the
+-- unordered LIMIT 1 in the SDR terminus that hides behind it. Both are in
+-- 0216. See db/checks/0123.
+-- ---------------------------------------------------------------------------
