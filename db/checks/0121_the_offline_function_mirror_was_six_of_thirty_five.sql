@@ -99,10 +99,20 @@ SELECT (SELECT count(*) FROM public.ottoq_recall_decisions)         AS decisions
 --     open observation, not a fix: it is a live decide-path change and belongs
 --     in its own migration with its own A/B.
 --
---     RESULT 2026-09-08:
+--     RESULT 2026-09-08, BEFORE migration 0210:
 --       naive_threshold_v1 | active | ottoq_recall_naive_threshold_v1
 --       fixed_window_dummy | parked | ottoq_recall_fixed_window_dummy
 --       wrapper_reads_status = false
+--
+--     CLOSED THE SAME DAY by migration 0210, so re-running Q5 now reads
+--     wrapper_reads_status = true. The observation above is left as the
+--     point-in-time reading it was. 0210 refuses a non-active implementation
+--     only on a run whose run_by is 'production_live' — the parked dummy still
+--     runs on the twin, because deleting the swap proof to protect production
+--     would remove the evidence that the Recall Decision is an interface at all.
+--     Measured, not argued: an A/B over four replayed decisions that reach the
+--     rung ladder was byte-identical under the active implementation, so
+--     forces_recert is FALSE and the recert floor did not move.
 SELECT i.implementation, i.status, i.evaluator_function,
        pg_get_functiondef('public.ottoq_evaluate_return_need'::regproc)
          LIKE '%status%' AS wrapper_reads_status
