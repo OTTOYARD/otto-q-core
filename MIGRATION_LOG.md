@@ -90,7 +90,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0223 — GENERATED, not a log
+## Index, 0134–0224 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative and stop at 0133 (2026-08-31).
 Everything from 0134 on went unlogged at the time. Rather than invent prose after the
@@ -198,7 +198,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0221](db/migrations/0221_the_run_scope_predicate_no_index_can_read.sql) | `20260908111950` | yes — ledger | the run-scope predicate no index can read. A carrier found while |
 | [0222](db/migrations/0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql) | `20260908112038` | yes — ledger | G19. ottoq_boot_state_fingerprint serialized and hashed 1.36 MILLION |
 | [0223](db/migrations/0223_the_load_meter_asks_which_run_is_running_once_per_row.sql) | `PENDING` | no — pending | G21. twin.ottoq_sim_compute_charger_load_kw evaluates |
+| [0224](db/migrations/0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id.sql) | `PENDING` | no — pending | 71,944 signed events assert `data_source = 'production'` while |
 
-91 migrations indexed.
+92 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
