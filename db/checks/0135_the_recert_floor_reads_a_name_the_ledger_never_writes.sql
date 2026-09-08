@@ -218,3 +218,23 @@ SELECT 'see Q1-Q7; this file changes nothing' AS status;
 -- imprecision. "33 of 92 join nothing" was true and was never a defect count.
 -- ---------------------------------------------------------------------------
 
+-- THE REST OF 0226 DRY-RUNS CLEAN — checked 15:59 UTC, because finding one
+-- broken assertion is a reason to check the others, not a reason to stop.
+--
+--   P2  migrations since the boundary with no classification ......... 0   PASS
+--   A1  (rewritten) same check, asserted ............................. 0   PASS
+--   A1  lineage rows unreachable by the join, must be < 32 ........... 22  PASS
+--   A2  floor lands on max(classified_at) WHERE forces_recert ....... exact match
+--       (both are 2026-09-07 21:36:53.363037 — A2 compares against branch 2
+--        itself, so the sub-second cannot trip it)
+--   A3  an unclassified migration must still exist ................... 788 PASS
+--   A3  migrations counting as forcing, must be >= 700 ............... 810 PASS
+--   A4  non-stale flagship columns, must be >= 2 ..................... 6   PASS
+--
+-- A4 is worth a caveat rather than a tick: it reads 6 *today*, at the current
+-- high floor, only because round 27 finished after that floor was set. It would
+-- have read 1 at 14:15 when 0135 was written. So A4 passes for a reason that has
+-- nothing to do with 0226 working, and it is a weak assertion — kept because a
+-- weak assertion that cannot fail spuriously is still better than none, but not
+-- to be cited as evidence the fix worked. The evidence for that is A1 and A2.
+
