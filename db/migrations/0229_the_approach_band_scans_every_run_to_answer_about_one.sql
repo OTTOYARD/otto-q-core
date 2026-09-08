@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908204137
 -- migration-name:    the_approach_band_scans_every_run_to_answer_about_one
 --
 -- G29. `public.ottoq_approach_band` resolves three policy parameters for EVERY
@@ -224,3 +224,29 @@ VALUES (
   'directions across 120 rows and 12 columns; a recertification round runs anyway.'
 );
 
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 20:41:37 UTC (3:41 PM CT), byte-identical to this file.
+-- All three preconditions and all three assertions passed on the first attempt.
+--
+--   viewdef md5   b310756eb984fa60a2b5daaf8b42537a -> 17c4afecb27b2b51b98edec724519e79
+--   AS NOT MATERIALIZED occurrences: 1     bare AS MATERIALIZED: 0
+--   columns: 20, unchanged
+--   A3: zero Seq Scan nodes remain in the consumer plan
+--
+-- THE FLOOR DID NOT MOVE: 2026-09-07 21:36:53.363037 before and after, six
+-- flagship columns still green, minimum streak still 4. That is the proof the
+-- forces_recert FALSE classification was actually read -- which is exactly what
+-- G28 showed was broken for four days until 0226, and it is checked here rather
+-- than assumed.
+--
+-- ONE DEFECT CAUGHT IN PRE-FLIGHT, disclosed rather than silently fixed: A3
+-- originally declared `plan jsonb`, but EXPLAIN (FORMAT JSON) returns `json` and
+-- that cast is not implicit in a PL/pgSQL assignment. It would have aborted the
+-- migration. Found by reading the file before submitting it, corrected in a
+-- separate commit, and applied from the corrected file.
+--
+-- WHAT IS NOT YET PROVEN, and is the entire point of the round that follows:
+-- that a certification pair is faster and that no canon moved. The 137x figure
+-- is one query measured twice; a pair is 1,963 evaluations plus everything else
+-- the tick does. **No saving may be quoted until a pair has run.**
