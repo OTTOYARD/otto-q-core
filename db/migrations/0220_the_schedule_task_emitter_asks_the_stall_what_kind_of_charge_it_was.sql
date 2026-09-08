@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908111846
 -- migration-name:    the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was
 --
 -- ---------------------------------------------------------------------------

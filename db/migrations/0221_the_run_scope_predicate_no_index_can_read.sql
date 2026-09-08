@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908111950
 -- migration-name:    the_run_scope_predicate_no_index_can_read
 --
 -- ---------------------------------------------------------------------------

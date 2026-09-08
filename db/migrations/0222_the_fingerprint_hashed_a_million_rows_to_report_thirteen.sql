@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908112038
 -- migration-name:    the_fingerprint_hashed_a_million_rows_to_report_thirteen
 --
 -- ---------------------------------------------------------------------------
@@ -73,9 +73,11 @@
 
 BEGIN;
 
--- A2 calls the REWRITTEN definition twice, which should be fast; the timeout is
--- headroom in case it is not, and a signal if the fix did not work.
-SET LOCAL statement_timeout = '5min';
+-- The BEFORE capture below runs the OLD definition twice, and the old
+-- definition is the thing that takes ~64 s a call. Give the transaction room --
+-- and note that this is longer than the apply API will WAIT, which is a
+-- different thing entirely. See the APPLIED footer.
+SET LOCAL statement_timeout = '10min';
 
 -- P-. NOTHING IN FLIGHT ------------------------------------------------------
 -- The standing constraint: never apply while a certification pair is running or
@@ -125,50 +127,41 @@ BEGIN
   RAISE NOTICE '0222 P0: body 4a6d2809';
 END $p0$;
 
--- P1. VERIFY THE OUT-OF-BAND CAPTURE ----------------------------------------
--- The comparison A2 makes needs the answer the OLD definition gives, and the
--- old definition is the thing that takes ~64 seconds a call — which is the
--- entire point of this migration and also more than the 60-second apply API
--- will wait. The first attempt at applying 0222 timed out inside its own
--- before-capture and rolled back cleanly, which is what BEGIN/COMMIT is for.
+-- P1. CAPTURE THE ANSWER THE OLD DEFINITION GIVES ---------------------------
+-- Taken BEFORE the rewrite, inside the same transaction, so A2 can compare
+-- like with like on real data. Two samples and no more: each call to the OLD
+-- definition takes about 64 seconds, which is the entire point of this
+-- migration.
 --
--- So the capture runs OUT OF BAND, before this file, via a one-shot cron job
--- named `cap0222` (deliberately not matching `^r[0-9]+_`, so it does not trip
--- the in-flight guard above). Two samples:
---
---   * the most recent flagship run — the `vis` branch with a real run's own
---     rows, the `fgn` branch with every other run's.
---   * a uuid no run has ever had — EVERY row is foreign, so the fgn branch runs
---     at its widest and vis is empty. If the new predicate wrongly dropped a
---     live foreign row, this is the sample that shows it.
---
--- Capturing outside the transaction is only sound if the answer cannot have
--- moved in between, so this block checks both halves of that: the capture must
--- have been taken against the SAME function body this migration is pinned to
--- (captured_against_md5), and nothing may have run since — which the in-flight
--- guard above already established.
-DO $p1$
-DECLARE v_n int; v_bad text;
+--   * the most recent flagship run — exercises the `vis` branch with a real
+--     run's own rows, and the `fgn` branch with every other run's.
+--   * a uuid no run has ever had — makes EVERY row foreign, so the fgn branch
+--     is exercised at its widest and the vis branch is empty. If the new
+--     predicate wrongly dropped a live foreign row, this sample is where it
+--     shows.
+CREATE TABLE public.ottoq_0222_fp_before (
+  depot_id uuid, sim_run_id uuid, label text, fp_before jsonb);
+
+DO $cap$
+DECLARE v_depot uuid := '11111111-1111-1111-1111-111111111111';
+        v_run uuid;
 BEGIN
-  IF to_regclass('public.ottoq_0222_fp_before') IS NULL THEN
-    RAISE EXCEPTION '0222 P1: public.ottoq_0222_fp_before does not exist — run the cap0222 '
-                    'capture first; see this file''s P1 comment';
+  SELECT sim_run_id INTO v_run FROM public.ottoq_sim_runs
+   WHERE depot_id = v_depot ORDER BY sim_run_seq DESC LIMIT 1;
+  IF v_run IS NULL THEN
+    RAISE EXCEPTION '0222 P1: no run at the flagship depot to sample';
   END IF;
-  SELECT count(*) INTO v_n FROM public.ottoq_0222_fp_before;
-  IF v_n < 2 THEN
-    RAISE EXCEPTION '0222 P1: the capture holds % row(s), want at least 2', v_n;
-  END IF;
-  SELECT string_agg(DISTINCT COALESCE(captured_against_md5,'(null)'), ',') INTO v_bad
-    FROM public.ottoq_0222_fp_before WHERE captured_against_md5 IS DISTINCT FROM '4a6d2809';
-  IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0222 P1: the capture was taken against body [%], not the pinned 4a6d2809 — '
-                    'it is comparing against the wrong definition', v_bad;
-  END IF;
-  IF EXISTS (SELECT 1 FROM public.ottoq_0222_fp_before WHERE fp_before IS NULL) THEN
-    RAISE EXCEPTION '0222 P1: a captured fingerprint is NULL';
-  END IF;
-  RAISE NOTICE '0222 P1: % captured samples, all against body 4a6d2809', v_n;
-END $p1$;
+
+  INSERT INTO public.ottoq_0222_fp_before
+  VALUES (v_depot, v_run, 'most recent flagship run',
+          public.ottoq_boot_state_fingerprint(v_depot, v_run));
+
+  INSERT INTO public.ottoq_0222_fp_before
+  VALUES (v_depot, '00000000-0000-0000-0000-0000000000ff'::uuid, 'no run has this id',
+          public.ottoq_boot_state_fingerprint(v_depot, '00000000-0000-0000-0000-0000000000ff'::uuid));
+
+  RAISE NOTICE '0222 P1: captured the old fingerprint for 2 (depot, run) pairs';
+END $cap$;
 
 -- 1. THE REWRITE, DERIVED FROM THE CATALOG ----------------------------------
 -- Four exact string replacements on the live definition. Anchors 3 and 4 share
@@ -283,8 +276,7 @@ BEGIN
                (SELECT count(*) FROM public.ottoq_0222_fp_before);
 END $a2$;
 
---: the capture table is KEPT. It is the evidence A2 compared against, taken
---: against a body this migration then replaced, so it cannot be recreated.
+DROP TABLE public.ottoq_0222_fp_before;
 
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
 VALUES ('0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen', FALSE,
@@ -302,3 +294,40 @@ VALUES ('0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen', FALSE,
         now());
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 06:20 AM CT (11:20:38 UTC), ledger version 20260908112038.
+--
+--   P-  nothing scheduled, nothing running
+--   P0  body 4a6d2809
+--   P1  captured the old fingerprint for 2 (depot, run) pairs
+--   A1  four predicates in, four fgn selectors intact, calibration term intact
+--   A2  fingerprint BYTE-IDENTICAL across both sampled (depot, run) pairs
+--
+-- MEASURED AFTER, on the flagship depot, warm, twice: **260.6 ms and 218.2 ms**,
+-- against ~64,000 ms before. Roughly 250-290x. Four calls a pair: 255.3 s of a
+-- 700.7 s pair becomes about one second.
+--
+-- A NOTE ON HOW THIS APPEARED TO FAIL, because the lesson is the same one this
+-- repo keeps relearning. The apply tool returned "timed out after 60s". It had
+-- not failed: the before-capture takes ~130 s and the CLIENT stopped waiting.
+-- I then checked whether it had rolled back — at 11:21:48, function still
+-- 4a6d2809, no ledger row, no lineage row, no residue — and reported a clean
+-- rollback. That check was wrong, and wrong in exactly the way db/canons/
+-- round25.md warns about: an uncommitted transaction is INVISIBLE, so "no rows"
+-- and "not yet committed" look identical from outside. The transaction was
+-- still running and committed about a minute later.
+--
+-- The tell was available and I misread it too: ottoq_cert_lineage.classified_at
+-- and the ledger version both read 11:20:38, which is now() — the transaction's
+-- START — not its commit. A migration whose recorded time PRECEDES the check
+-- that said it had not run is not a paradox; it is the signature of a long
+-- transaction, and the same now()-is-frozen fact that makes the certification
+-- pair work at all.
+--
+-- What this cost: one unnecessary restructure of this file (an out-of-band
+-- capture guarded by captured_against_md5), reverted here because the file that
+-- ran is the file that should be committed. What it proves: the way to tell a
+-- timed-out apply from a failed one is to wait for the backend to leave
+-- pg_stat_activity, not to sample the catalog once and conclude.
+-- ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908111547
 -- migration-name:    h_sdr_may_now_fail_a_pair
 --
 -- ---------------------------------------------------------------------------

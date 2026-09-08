@@ -187,16 +187,16 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0210](db/migrations/0210_a_production_run_does_not_recall_on_a_parked_implementation.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | the recall registry has a status column and the wrapper never read it |
 | [0211](db/migrations/0211_the_work_side_can_refuse_a_recall_and_the_refusal_is_a_ledger_row.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | the work side gets a voice, and its refusal is a row |
 | [0212](db/migrations/0212_the_tick_asks_the_work_side_before_it_books_the_stall.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | the tick asks the work side, and a refusal re-solves instead of raising |
-| [0213](db/migrations/0213_kpi_four_counted_seven_actor_types_that_cannot_exist.sql) | `PENDING` | no — pending | KPI-4 counted seven human actor types the events table forbids |
+| [0213](db/migrations/0213_kpi_four_counted_seven_actor_types_that_cannot_exist.sql) | `20260908111702` | yes — ledger | KPI-4 counted seven human actor types the events table forbids |
 | [0214](db/migrations/0214_the_cheap_answer_costs_eight_queries_because_i_asked_last.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | the work side's cheap answer cost eight queries, because 0211 asked |
 | [0215](db/migrations/0215_a_standing_refusal_stands_whatever_the_rate_is_now.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | a standing refusal stands, whatever the rate is now. Corrects 0214 |
 | [0216](db/migrations/0216_the_settlement_record_binds_to_whichever_booking_the_heap_returned_first.sql) | `20260908081848` | yes — ledger | the settlement record binds to whichever booking the heap returned |
 | [0217](db/migrations/0217_the_verdict_sees_the_settlement_record_and_h_rcl_may_now_fail_a_pair.sql) | `20260908082227` | yes — ledger | the verdict sees the settlement record, and h_rcl may now fail a pair |
 | [0218](db/migrations/0218_h_sdr_hashed_a_signature_computed_over_a_run_scoped_id.sql) | `20260908084304` | yes — ledger | h_sdr hashed a signature computed over a run-scoped id. Corrects 0217 |
-| [0219](db/migrations/0219_h_sdr_may_now_fail_a_pair.sql) | `PENDING` | no — pending | h_sdr may now fail a pair |
-| [0220](db/migrations/0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql) | `PENDING` | no — pending | the schedule_task SDR emitter asks the stall what kind of charge it |
-| [0221](db/migrations/0221_the_run_scope_predicate_no_index_can_read.sql) | `PENDING` | no — pending | the run-scope predicate no index can read. A carrier found while |
-| [0222](db/migrations/0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql) | `PENDING` | no — pending | G19. ottoq_boot_state_fingerprint serialized and hashed 1.36 MILLION |
+| [0219](db/migrations/0219_h_sdr_may_now_fail_a_pair.sql) | `20260908111547` | yes — ledger | h_sdr may now fail a pair |
+| [0220](db/migrations/0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql) | `20260908111846` | yes — ledger | the schedule_task SDR emitter asks the stall what kind of charge it |
+| [0221](db/migrations/0221_the_run_scope_predicate_no_index_can_read.sql) | `20260908111950` | yes — ledger | the run-scope predicate no index can read. A carrier found while |
+| [0222](db/migrations/0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql) | `20260908112038` | yes — ledger | G19. ottoq_boot_state_fingerprint serialized and hashed 1.36 MILLION |
 
 90 migrations indexed.
 

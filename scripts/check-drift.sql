@@ -312,16 +312,16 @@ repo_manifest(version, name, file) AS (
     ('APPLIED-NO-LEDGER-ROW'::text, 'a_production_run_does_not_recall_on_a_parked_implementation'::text, '0210_a_production_run_does_not_recall_on_a_parked_implementation.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'the_work_side_can_refuse_a_recall_and_the_refusal_is_a_ledger_row'::text, '0211_the_work_side_can_refuse_a_recall_and_the_refusal_is_a_ledger_row.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'the_tick_asks_the_work_side_before_it_books_the_stall'::text, '0212_the_tick_asks_the_work_side_before_it_books_the_stall.sql'::text),
-    ('PENDING'::text, 'kpi_four_counted_seven_actor_types_that_cannot_exist'::text, '0213_kpi_four_counted_seven_actor_types_that_cannot_exist.sql'::text),
+    ('20260908111702'::text, 'kpi_four_counted_seven_actor_types_that_cannot_exist'::text, '0213_kpi_four_counted_seven_actor_types_that_cannot_exist.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'the_cheap_answer_costs_eight_queries_because_i_asked_last'::text, '0214_the_cheap_answer_costs_eight_queries_because_i_asked_last.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'a_standing_refusal_stands_whatever_the_rate_is_now'::text, '0215_a_standing_refusal_stands_whatever_the_rate_is_now.sql'::text),
     ('20260908081848'::text, 'the_settlement_record_binds_to_whichever_booking_the_heap_returned_first'::text, '0216_the_settlement_record_binds_to_whichever_booking_the_heap_returned_first.sql'::text),
     ('20260908082227'::text, 'the_verdict_sees_the_settlement_record_and_h_rcl_may_now_fail_a_pair'::text, '0217_the_verdict_sees_the_settlement_record_and_h_rcl_may_now_fail_a_pair.sql'::text),
     ('20260908084304'::text, 'h_sdr_hashed_a_signature_computed_over_a_run_scoped_id'::text, '0218_h_sdr_hashed_a_signature_computed_over_a_run_scoped_id.sql'::text),
-    ('PENDING'::text, 'h_sdr_may_now_fail_a_pair'::text, '0219_h_sdr_may_now_fail_a_pair.sql'::text),
-    ('PENDING'::text, 'the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was'::text, '0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql'::text),
-    ('PENDING'::text, 'the_run_scope_predicate_no_index_can_read'::text, '0221_the_run_scope_predicate_no_index_can_read.sql'::text),
-    ('PENDING'::text, 'the_fingerprint_hashed_a_million_rows_to_report_thirteen'::text, '0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql'::text)
+    ('20260908111547'::text, 'h_sdr_may_now_fail_a_pair'::text, '0219_h_sdr_may_now_fail_a_pair.sql'::text),
+    ('20260908111846'::text, 'the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was'::text, '0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql'::text),
+    ('20260908111950'::text, 'the_run_scope_predicate_no_index_can_read'::text, '0221_the_run_scope_predicate_no_index_can_read.sql'::text),
+    ('20260908112038'::text, 'the_fingerprint_hashed_a_million_rows_to_report_thirteen'::text, '0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
