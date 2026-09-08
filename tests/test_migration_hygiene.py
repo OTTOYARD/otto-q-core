@@ -40,6 +40,11 @@ NO_VERSION = {
 }
 TIMESTAMP = re.compile(r"^\d{12,14}$")
 
+#: An APPLIED footer, as APPLYING.md's final step writes it. Anchored at line
+#: start and requiring a date so prose like "NOT TO BE APPLIED WHILE A ROUND IS
+#: IN FLIGHT" (0225 line 76) is not mistaken for one.
+APPLIED_FOOTER = re.compile(r"^--\s+APPLIED\s+\d{4}-\d{2}-\d{2}")
+
 
 def _migration_files():
     return sorted(p for p in MIG.glob("*.sql") if "EXAMPLE" not in p.name)
@@ -84,6 +89,40 @@ def test_every_version_is_a_real_timestamp_or_a_declared_non_version():
                        "not a ledger version. Resolve it from "
                        "supabase_migrations.schema_migrations by name.")
     assert not bad, "\n  ".join([""] + bad)
+
+
+def test_no_file_calls_itself_pending_while_its_own_body_says_applied():
+    """A file cannot be both. 0225-0228 were all four, for 33 minutes.
+
+    They went in through `apply_migration`, which assigns a ledger version, and
+    the version was written into MIGRATION_LOG.md's hand-written row and never
+    back into the file header. So the header said PENDING, the footer said
+    APPLIED, the generated index believed the header, and
+    `scripts/check-drift.sql` carried the string 'PENDING' as its lookup key for
+    four live database objects -- which would have made the drift check blind to
+    exactly the objects most recently changed.
+
+    This needs no database. The contradiction is entirely inside one file, which
+    is the class of failure that went unnoticed for 193 migrations before G18.
+    APPLIED-NO-LEDGER-ROW and UNVERIFIED-NO-LEDGER-ROW are fine here: they say
+    applied-but-unversioned, which is a fact, not a contradiction.
+    """
+    bad = []
+    for f in _migration_files():
+        text = f.read_text(errors="replace")
+        first = text.split("\n", 1)[0]
+        if first.split(":", 1)[1].strip() != "PENDING":
+            continue
+        for line in text.splitlines():
+            if APPLIED_FOOTER.match(line):
+                bad.append(f"{f.name}: header says PENDING but body says {line.strip()[:72]!r}")
+                break
+    assert not bad, (
+        "\n  ".join([""] + bad)
+        + "\n\nResolve the version from supabase_migrations.schema_migrations by name, "
+          "write it into line 1, then regenerate scripts/check-drift.sql and the "
+          "MIGRATION_LOG.md index."
+    )
 
 
 def test_every_declared_name_is_well_formed_and_unique():
