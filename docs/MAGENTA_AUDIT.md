@@ -3,9 +3,33 @@
 87 findings from a twelve-dimension sweep of the agentic layer (`intent/`, `policies/`,
 `proposer/`, `solvers/cpsat/`, and `ottoq-intelligence/app/forecasters/`), run 2026-09-07.
 
-**These findings are UNVERIFIED.** The adversarial verification stage was cancelled on cost
-grounds after the finders returned, so each item is one agent's claim with its own evidence
-attached and nothing independent standing behind it. Every item is re-reproduced here before
+**The FINDINGS are unverified; the FIXES now are.** The adversarial verification stage was
+cancelled on cost grounds after the finders returned, so each item below is one agent's claim
+with its own evidence attached and nothing independent standing behind it.
+
+**VERIFICATION PASS — 2026-09-08.** Every fix claimed in the outcomes table was re-checked by
+mutation: restore the pre-fix code, require the named guard to go RED, restore again and require
+GREEN. A textual edit that leaves the file semantically unchanged is not a mutation, and two of
+those were caught and redone. Results: **21 of 22 verified.** The exception and the four
+accounting corrections are below — three of the five run against me and two run in my favour,
+and both directions are recorded because the point of the pass is the number, not the flattery.
+
+| what verification found | evidence |
+|---|---|
+| **G-01/G-14 was NOT mutation-proved, contrary to its outcome row.** The fix WORKS — planting `import psycopg2` in `intent/intent.py` turns the guard red, so the package really is covered. But nothing asserted that `intent` is IN `KERNEL_PACKAGES`: deleting it again turned NOTHING red, which is the original finding verbatim. Fixed on 09-08 by pinning the guard's own coverage list; the identical mutation now fails loudly | `tests/test_separation.py::test_the_guard_covers_every_package_it_claims_to` |
+| **L-26's second half was open.** L-03 closed the `complete` flag (nailing it True fails 2 tests). The finding named `reproducible` too, and THAT could be hard-coded True with 167 tests green. Fixed 09-08; the first attempt at the guard was FLAKY (a 0.25 s wall clock sometimes found no solution at all — 1 failure in 3) and was rewritten to let a deterministic budget do the truncating with the clock merely present. Stable 5/5 | `proposer/test_forward_proposer.py::test_a_wall_clock_solve_reports_itself_unreproducible` |
+| **D-07 was CONFIRMED, not refuted.** The row below says "REFUTED on the count" and leaves the baseline half unverified. Checked out `cf80b05` and collected: **178 tests, exactly as the finding stated.** The magenta layer added 89 tests, not the 66 the refutation implied. I refuted the wrong half | `git worktree` at `cf80b05`, `pytest --collect-only` |
+| **The 87 is inflated: at least 9 are duplicates** reported at the IDENTICAL file:line by different finder agents — a direct consequence of a twelve-dimension fan-out whose dedup stage was cancelled with the verify stage. `G-01≡L-31` and `G-06≡L-49` are the same defect word-for-word, so existing fixes already closed both | grouping all 87 by `location` |
+| **Coverage was UNDER-counted at 31.** That figure counted outcome ROWS; several rows close more than one numbered finding. The true figure is **33 fixed**, plus `L-31`, `L-49` as duplicates and `L-13` closed by construction (the L-02 fix put the day-of-week multiplier on both sides of the comparison, where it cancels) — **36 of 87** | — |
+| **L-51 is CONFIRMED LIVE, and it sits on a line this session edited twice.** `max_daily_soc_pct` appears nowhere in `forward_proposer.py`, so `_clamp_target` falls back to 100 and the R-11 chemistry cap is a no-op on every production frame. T13 passes because it calls the clamp directly with a hand-built dict and never goes through the bridge. A green guard over a dead production path — the exact class this audit exists to find. **NOT fixed: closing it changes live behaviour** (capped classes would be asked for 80% instead of 90%), which is a product decision, not a verification-pass cleanup | `grep max_daily_soc_pct proposer/forward_proposer.py` → no match; `model.py:201` |
+
+**A methodological note worth keeping.** The verification harness asserts that a mutation changed
+the FILE. It cannot assert that the mutation changed the MEANING, and twice it did not:
+`"complete": True and (expr)` is identical to `(expr)`, and three anchor strings never matched at
+all, which the first run reported as `MUTATION-NOT-APPLIED` rather than as a pass. Both classes
+were caught only because the harness distinguishes "not applied" from "applied and survived". A
+harness that silently treated a no-op as a pass would have certified two fixes that were never
+tested — which is the same defect, one level up, as the guards this audit is about. Every item is re-reproduced here before
 it is fixed, and an item that does not reproduce is marked REFUTED with what was actually
 found. Two were reproduced and fixed before this list existed (L-01, L-02).
 

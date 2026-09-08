@@ -74,6 +74,48 @@ def _kernel_sources():
             yield p, p.read_text()
 
 
+#: THE GUARD'S OWN COVERAGE IS NOW GUARDED.
+#:
+#: Every rule in this file is enforced by walking KERNEL_PACKAGES. A package
+#: that is not on that list is not checked -- and nothing failed if you removed
+#: one. That is how `intent` sat outside the guard while its code ran inside
+#: the kernel on every regime-aware proposal (the 2026-09-07 finding).
+#:
+#: Adding `intent` back closed the hole and left the door unlocked: verified on
+#: 2026-09-08 by deleting it again, which turned NOTHING red. A refactor, a
+#: merge resolution or a tidy-up could drop any entry and the suite would stay
+#: green while a whole package fell out of scope. The list is a coverage claim,
+#: so it is asserted like one.
+EXPECTED_KERNEL_PACKAGES = frozenset({
+    "policies", "solvers", "sites", "wear", "onboarding", "conformance",
+    "recall", "adapters", "metrics", "proposer", "intent",
+})
+
+
+def test_the_guard_covers_every_package_it_claims_to():
+    """Removing a package from KERNEL_PACKAGES silently narrows every rule in
+    this file. Adding one is fine and this test tells you to record it here;
+    losing one is the failure mode, and it now fails loudly."""
+    live = frozenset(KERNEL_PACKAGES)
+    missing = EXPECTED_KERNEL_PACKAGES - live
+    assert not missing, (
+        f"package(s) dropped out of the separation guard: {sorted(missing)}. "
+        f"Every rule in this file -- no database, no network, no production "
+        f"identifiers, no undeclared file reads -- stopped applying to them.")
+    added = live - EXPECTED_KERNEL_PACKAGES
+    assert not added, (
+        f"new kernel package(s) {sorted(added)} are covered by the guard but "
+        f"not recorded in EXPECTED_KERNEL_PACKAGES; add them here so the "
+        f"coverage claim stays explicit.")
+
+
+def test_every_covered_package_actually_exists():
+    """A typo in the list is the same defect wearing a different hat: the guard
+    walks a directory that is not there, finds no sources, and passes."""
+    for pkg in sorted(EXPECTED_KERNEL_PACKAGES):
+        assert (ROOT / pkg).is_dir(), f"KERNEL_PACKAGES names {pkg!r}, which does not exist"
+
+
 def test_kernel_imports_no_database_and_no_twin():
     hits = [(str(p), m.group(0).strip())
             for p, src in _kernel_sources()
