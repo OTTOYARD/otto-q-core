@@ -597,3 +597,36 @@ ON CONFLICT (name) DO UPDATE
 -- minutes after that step was written.
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 16:1x UTC. All preconditions and all five assertion
+-- blocks passed. Result, against the prediction committed in
+-- db/canons/round27-apply-window.md before the window opened:
+--
+--   busy_day/171717/24t   streak 4   green   (g added the fourth pair)
+--   busy_day/424242/24t   streak 3   green
+--   busy_day/171717/12t   streak 3   green
+--   busy_day/314159/12t   streak 3   green   <- moved 6 -> 3, A5 named it alone
+--   busy_day/424242/12t   streak 3   green
+--   normal_day/171717/12t streak 3   green
+--   busy_day/171717/48t   streak 0   not green, stale (no pair since the floor)
+--
+-- **Six flagship columns green, from zero.** canon_sdr and canon_endst are
+-- populated on every current column. The prediction table matched exactly.
+--
+-- DEVIATION, DISCLOSED (scripts/APPLYING.md step 4). The SQL submitted to
+-- apply_migration was NOT byte-identical to this file: the 81-line rationale
+-- header and the per-block explanatory comments were replaced by a three-line
+-- pointer back to this path, to fit the call. **Every executable statement was
+-- submitted verbatim** — the five dollar-quoted anchors, all preconditions, the
+-- catalog rewrite, and all five assertion blocks including the rewritten A2.
+--
+-- This is the same deviation 0224 recorded, and it is the second time, which
+-- makes it a pattern rather than an incident. APPLYING.md already calls it
+-- unresolved: a header long enough to need condensing is a header that will be
+-- condensed. It is recorded here rather than dropped, and the executable half
+-- is verifiable — the deployed body's md5 is printed by the final RAISE NOTICE
+-- and the anchors are self-checking (each asserted at exactly one occurrence
+-- before any substitution, so a transcription slip refuses rather than
+-- silently patching).
+-- ---------------------------------------------------------------------------
+
