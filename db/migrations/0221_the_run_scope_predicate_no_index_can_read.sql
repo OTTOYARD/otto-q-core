@@ -215,8 +215,8 @@ BEGIN
   -- Direction of change is STRICTLY tighter: it can only ever turn a true into a
   -- false, so it cannot create a double-booking.
   --
-  --: 0221. The run scope is an explicit BRANCH, not COALESCE(b.sim_run_id, nil)
-  --: = COALESCE(p_sim_run_id, nil). Same rows -- the two forms can only differ
+  --: 0221. The run scope is an explicit BRANCH, not a COALESCE over the column
+  --: folded onto a sentinel uuid. Same rows -- the two forms can only differ
   --: on a booking carrying the all-zero sentinel as its run id, and there are
   --: none (P1) -- but COALESCE over the column is a function of the column, so
   --: the planner could not use the LEADING column of
@@ -255,7 +255,14 @@ BEGIN
   SELECT pg_get_functiondef(p.oid) INTO v_def FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='ottoq' AND p.proname='ottoq_validate_assignment';
   v_flat := regexp_replace(v_def, '\s+', ' ', 'g');
-  IF position('COALESCE(b.sim_run_id' in v_flat) <> 0 THEN
+  --: match the PREDICATE (column folded onto the sentinel), not the bare
+  --: substring 'COALESCE(b.sim_run_id' -- an explanatory comment in this very
+  --: function contained that substring, and the first draft of this assertion
+  --: would have aborted the migration on its own prose. Same failure shape as
+  --: 0219's whitespace bug: a guard that fires on correct input is worse than
+  --: no guard, because the reflex is to weaken it.
+  IF position($$COALESCE(b.sim_run_id,'00000000$$ in v_flat) <> 0
+     OR position($$COALESCE(b.sim_run_id, '00000000$$ in v_flat) <> 0 THEN
     RAISE EXCEPTION '0221 A1: the COALESCE run-scope predicate is still in the body';
   END IF;
   IF position('b.sim_run_id IS NULL AND b.stall_id = p_stall_id' in v_flat) = 0 THEN
