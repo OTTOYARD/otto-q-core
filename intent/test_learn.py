@@ -90,6 +90,26 @@ def test_live_world_flags_only_on_entity_repetition():
     assert thrice.learned_constraints == {"refresh_occupancy": ["s-1"]}
 
 
+def test_the_repeat_threshold_boundary_is_exactly_where_it_says_it_is():
+    """`k > entity_repeat_threshold` with a default of 2 means TWO occurrences
+    are still noise and THREE are a pattern. The existing tests cover one and
+    three, which is precisely the pair that cannot tell `>` from `>=` — flip the
+    operator and both still pass. The boundary is the test.
+    """
+    twice = reconcile_refusals([Refusal("target_occupied", entity_id="s-1"),
+                                Refusal("target_occupied", entity_id="s-1")])
+    assert twice.is_clean(), (
+        "two occurrences are at the threshold, not beyond it; flagging here "
+        "would make the documented 'beyond threshold 2' rule a lie")
+
+    # ...and the parameter is public, so lowering it moves the boundary with it.
+    lowered = reconcile_refusals([Refusal("target_occupied", entity_id="s-1"),
+                                  Refusal("target_occupied", entity_id="s-1")],
+                                 entity_repeat_threshold=1)
+    assert not lowered.is_clean()
+    assert lowered.learned_constraints == {"refresh_occupancy": ["s-1"]}
+
+
 def test_resource_fault_learns_the_blocked_point():
     r = reconcile_refusals([
         Refusal("resource_faulted", entity_id="s-3"),
