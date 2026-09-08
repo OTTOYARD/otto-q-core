@@ -269,11 +269,17 @@ BEGIN
            p.j->'arm_a'->>'h_prop' AS c_prop, p.j->'arm_a'->>'h_defr' AS c_defr,
            p.j->'arm_a'->>'h_cal' AS c_cal,  p.j->'arm_a'->>'h_rule' AS c_rule,
            p.j->'arm_a'->>'h_rcl' AS c_rcl,  p.j->'arm_a'->>'h_sdr'  AS c_sdr,
-           md5((p.j->'arm_a'->'endst')::text) AS c_endst
+           md5((p.j->'arm_a'->'endst')::text) AS c_endst,
+           (p.j->'arm_a'->>'run')::uuid       AS c_run_a
       FROM pair p
   ), ranked AS (
+    -- Same tiebreaker as the matrix (t0 DESC, c_run_a DESC), so rn means the
+    -- same thing here as it does there. t0 is already unique per depot via the
+    -- DISTINCT ON above, so the tiebreaker cannot fire — it is carried for
+    -- fidelity, because a P3 that mirrors the matrix approximately is the kind
+    -- of thing 0140 was written about.
     SELECT k.*, row_number() OVER (PARTITION BY k.c_depot, k.c_seed, k.c_ticks, k.c_scen
-                                   ORDER BY k.t0 DESC) AS rn
+                                   ORDER BY k.t0 DESC, k.c_run_a DESC) AS rn
       FROM keyed k WHERE k.st <> 'inconclusive'
   ), canon AS (
     SELECT * FROM ranked WHERE rn = 1
