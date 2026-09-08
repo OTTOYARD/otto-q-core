@@ -171,11 +171,22 @@ BEGIN
   -- `data_source = 'production'` — but against ottoq_telemetry_packets, a
   -- different table this migration does not touch. A guard that cries wolf on
   -- the only run where anyone reads it is a guard that gets ignored.
-  SELECT string_agg(n.nspname||'.'||p.proname, ', ' ORDER BY n.nspname, p.proname) INTO v_bad
-    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-   WHERE p.prokind IN ('f','p') AND n.nspname IN ('public','twin','ottoq')
-     AND p.prosrc LIKE '%ottoq_events%'
-     AND p.prosrc ~* '(WHERE|AND|OR)[^;]{0,80}\mdata_source\M\s*(=|IN|<>|!=)\s*''';
+  SELECT string_agg(obj, ', ' ORDER BY obj) INTO v_bad FROM (
+    SELECT n.nspname||'.'||p.proname AS obj
+      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+     WHERE p.prokind IN ('f','p') AND n.nspname IN ('public','twin','ottoq')
+       AND p.prosrc LIKE '%ottoq_events%'
+       AND p.prosrc ~* '(WHERE|AND|OR)[^;]{0,80}\mdata_source\M\s*(=|IN|<>|!=)\s*'''
+    UNION ALL
+    -- views too: a KPI view filtering on data_source would move a SHIPPED
+    -- NUMBER without moving an atom, which is the quietest way for this change
+    -- to be wrong. (Measured 2026-09-08: none do.)
+    SELECT n.nspname||'.'||c.relname
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+     WHERE c.relkind IN ('v','m')
+       AND pg_get_viewdef(c.oid) LIKE '%ottoq_events%'
+       AND pg_get_viewdef(c.oid) ~* '\mdata_source\M\s*(=|IN|<>|!=)\s*'''
+  ) s;
   IF v_bad IS NOT NULL THEN
     RAISE WARNING '0224 P2: these functions compare data_source against a literal — check each '
                   'before trusting the neutrality claim: %', v_bad;
