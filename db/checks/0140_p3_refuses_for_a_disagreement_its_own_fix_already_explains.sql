@@ -184,11 +184,24 @@ SELECT DISTINCT to_char(r.started_at,'MM-DD HH24:MI:SS') AS fired,
 --     0134's caution was right to be enforced rather than remembered.
 --
 -- NOT ESTABLISHED:
---   * Whether 0219's enforcement decision explicitly considered the 08:25
---     pair. 0219's header states the rule ("an atom is enforced only after a
---     flagship round shows the arms agree") and 0218 had landed by then, so
---     the round it relied on is presumably post-0218 — but which round is not
---     recorded in the file, and it is not reconstructed here.
+--   * ~~Whether 0219's enforcement decision explicitly considered the 08:25
+--     pair.~~ **ESTABLISHED 15:40 UTC, and the answer is emphatic.** 0219's
+--     header names that pair, by both hashes, under its own heading:
+--
+--         "WHY THE 314159/12t COLUMN NEEDS A SECOND PAIR. Round 25's first
+--          pair ran at 08:25, BEFORE 0218, so the h_sdr stored in its verdict
+--          is the contaminated one (0df9a909 / 65ec044e). Recomputing
+--          ottoq_hash_sdrs over those two arms today gives aad2d1be on both,
+--          but the stored verdict is a point-in-time record and P1 reads what
+--          was stored, not what recomputes. That column must be re-run after
+--          0218 before this file can apply."
+--
+--     So 0219 did not merely avoid the pair — it identified it, proved the
+--     disagreement was in the stored record rather than in the SDRs (both arms
+--     recompute to `aad2d1be`), and made re-running that column a precondition
+--     of its own application. **The 08:25 pair was fully diagnosed and closed
+--     four hours before P3 refused on it.** P3 was refusing on a settled
+--     matter, which sharpens rather than softens the case for the rewrite.
 --   * ~~Whether the same three P3 defects exist in any other drafted
 --     migration's preconditions.~~ **SWEPT 15:36 UTC, and it is clean.** Every
 --     other precondition and assertion in 0226, 0227 and 0228 is a catalog-shape
