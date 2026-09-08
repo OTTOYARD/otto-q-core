@@ -354,6 +354,43 @@ def test_every_proposal_is_bounded_without_the_caller_asking():
         "False means a wall clock stopped the search")
 
 
+def test_a_wall_clock_solve_reports_itself_unreproducible():
+    """The OTHER honesty flag. `complete` is pinned above; `reproducible` was not,
+    and it could be hard-coded True with the entire suite green — verified
+    2026-09-08 by nailing it and watching 167 tests pass.
+
+    The flag is `status == OPTIMAL or time_limit_s is None`: a proof is
+    limit-independent, so it holds whatever the limits were; otherwise the
+    search was truncated and only a DETERMINISTIC budget truncates it in the
+    same place on every machine. Reporting True for a clock-bounded, unproven
+    plan would launder an irreproducible schedule into a run ID, which is the
+    one thing the flag exists to prevent.
+
+    THE TEST ITSELF MUST BE DETERMINISTIC, which the first draft was not: it
+    used a 0.25 s wall clock to force the flag, and on a loaded box the first
+    pass sometimes found no solution at all and raised INFEASIBLE — flaky, one
+    failure in three. Here the DETERMINISTIC budget does the truncating (this
+    frame reliably leaves a later pass at FEASIBLE) and the wall clock is only
+    PRESENT, generous enough never to bite. Present-and-unproven is exactly the
+    condition the flag is about.
+    """
+    frame = _crowded()
+
+    det = propose(frame, CLASSES, site=SITE, horizon_min=480,
+                  hour_of_day=7, det_budget_s=0.3)
+    assert det["solver"]["reproducible"] is True, (
+        "a deterministic-budget solve is reproducible by construction")
+
+    wall = propose(frame, CLASSES, site=SITE, horizon_min=480,
+                   hour_of_day=7, det_budget_s=0.3, time_limit_s=120)
+    assert not all(p["status"] == "OPTIMAL" for p in wall["solver"]["passes"]), (
+        "this frame no longer leaves a pass unproven; the flag would be True "
+        "for the legitimate reason and the test would prove nothing")
+    assert wall["solver"]["reproducible"] is False, (
+        "a wall clock was in play on an unproven plan, so the result is not a "
+        "function of (scenario, seed, config) alone and must not claim to be")
+
+
 def test_the_batch_bound_defers_the_rest_and_every_vehicle_still_gets_a_row():
     """A deterministic budget bounds the SEARCH, not the MODEL.
 
