@@ -106,6 +106,29 @@ of a `P` block is that it fails when the world is not what you think; one that
 cannot fail, or fails for the wrong reason, gives you the feeling of a check
 without the check.
 
+#### 3b(ii). Dry-run it in the world it will MEET, not the world you have
+
+The rule above is not sufficient, and a third save proves it. **0225's `P3` was
+dry-run and it passed** — against the recert floor that existed at the time. But
+0225 is applied *after* 0226, and 0226 lowers that floor by sixteen hours. Run
+against the floor 0226 installs, the same `P3` **failed on two of seven
+columns** (`db/checks/0140`), and all three faults were in the precondition
+rather than the data: it dropped `depot` from a key the thing it protects
+carries, it judged a fixture scenario, and its bar was stricter than the
+property it names.
+
+So when a window applies several migrations in order, **each precondition must
+be dry-run against the state its predecessors will have created**, not against
+the state on your screen. Concretely: if migration N changes a value that
+migration N+1's preconditions read — a floor, a threshold, a function body, a
+count — substitute N's post-state by hand and re-run N+1's checks. The apply
+order is chosen for a reason; that reason changes what the later checks see.
+
+The tell that this applies to you: the runbook says something like *"apply A
+before B, deliberately, because A makes B's test harder."* If the test is
+genuinely harder, it may now fail, and finding that out inside the window is
+finding it out at the worst possible moment.
+
 ### 4. Apply it — from the file
 
 Pick one. Whichever you use, the SQL that runs must be the SQL in the committed
