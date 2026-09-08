@@ -78,6 +78,32 @@ be scheduled at all until it is understood.
 | 2 — 0227 saves 10–20 s | a 12-tick mean outside 344–354 s. **And note that 350–370 s is the "not resolvable" zone, which overlaps the band** — that overlap is stated here rather than discovered afterwards |
 | 3 — six columns green | fewer than six green after the window (G28 incomplete), or **more** than six (the comparison is looser than intended, which is the worse outcome) |
 
+## Round 28 needs an instrumented **12-tick** column, and this is why
+
+`r27_g` is instrumented at **24 ticks**. Its baseline came from `r25_g`, which
+ran with `track_functions = 'pl'` — a setting that **does not count SQL-language
+functions**, which is precisely what blinded `db/checks/0129`.
+
+Consequence, recorded in `round27.md` before g finished: for plpgsql functions
+the r27_g diff is a genuine 24-against-12 comparison, but for the two SQL
+functions that matter — `ottoq_sim_compute_charger_load_kw` and
+`ottoq_depot_running_run` — the baseline is a tracking artefact (2 calls where
+`0130` derives ~1,024), so g yields their **absolute 24-tick counts** and no
+ratio at all.
+
+**So `r28_g` must be a 12-tick column with `track_functions='all'`**, giving the
+first honest 12-tick count of the load meter. Only then does "the load meter is
+called twice as often at 24 ticks as at 12" — the assumption underneath 0223's
+entire predicted 2.0× scaling, and still unmeasured after two rounds of arguing
+about it — become a measurement instead of an inference.
+
+Concretely: schedule round 28's g as `busy_day / 171717 / 12` with the same
+`SET track_functions TO 'all'` prefix r27_g uses, and capture a
+`pg_stat_user_functions` snapshot immediately before it fires. **Capture the
+FULL table this time, not fourteen hand-picked rows** — r27_g's baseline records
+only the rows I thought would matter, which is why no delta is computable for
+any function outside that list.
+
 ## Schedule
 
 To be filled in after the apply window, by `scripts/schedule-round.sql` with
