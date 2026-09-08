@@ -238,3 +238,61 @@ sentence round 26 forced about the fingerprint, and it is the second time the
 per-call arithmetic has under-predicted a hoisting fix by roughly the same
 factor. `r27_g` at 15:52 UTC, instrumented with `track_functions='all'`, is the
 instrument for it.
+
+### c — `normal_day` / 171717 / 12 ticks — **PASS**, 358 s
+
+Fired 14:29:00 UTC (9:29 AM CT), ended 14:34:58, **358 s** — the same second as
+column a, from a different scenario and a different seed.
+
+All thirteen atoms equal between the arms; `endst` md5 `81b46976`, which is
+round 25's and round 26's value for this column.
+
+| atom | arm A = arm B | vs round 26 |
+|---|---|---|
+| `fp` | `92b02f8b` | = |
+| `h_cmd` | `5921ef70` | = |
+| `h_dec` | `37624cdd` | = |
+| `h_evt` | `ac672423` | = |
+| `h_bkg` | `ed4a986c` | = |
+| `h_nrg` | `17c9b12b` | = |
+| `h_prop` | `779e5a74` | = |
+| `h_defr` | `d41d8cd9` | = (empty-string md5) |
+| `h_cal` | `11a24626` | = |
+| `h_rule` | `5b1d1dfa` | = |
+| `h_rcl` | `e4e41e69` | = |
+| `h_sdr` | `e0dfbbe8` | = |
+| `endst` (md5) | `81b46976` | = |
+
+Worth one line on its own: `fp` here is `92b02f8b`, the **same fingerprint as
+column b**, which is a different scenario on the same seed. That is not a
+defect and it is not new — the fingerprint is a world-state hash and the two
+columns start from the same seeded world; they diverge in what they then do,
+which is what `h_cmd` (`1ae7ba68` vs `5921ef70`) and every other atom show.
+Noting it because a reader scanning the two tables will see it and wonder.
+
+### The mean after three columns
+
+| column | round 26 | round 27 | Δ |
+|---|---|---|---|
+| a — `busy_day`/314159/12t | 537 s | **358 s** | −179 |
+| b — `busy_day`/171717/12t | 533 s | **376 s** | −157 |
+| c — `normal_day`/171717/12t | 477 s | **358 s** | −119 |
+| **mean so far** | **516 s** | **364 s** | **−152** |
+
+Predicted band for the four-column mean: **380–440 s**. Three columns in, the
+mean is **364 s**, still below it. Column d at 14:46 UTC decides it: d would
+have to run **398 s or more** to pull the mean back to 380, and no 12-tick
+column in this round has come within 20 s of that.
+
+So the falsification stated before the round is about to fire. Writing the
+conclusion now, before d lands, so it is not written to fit:
+
+> **Prediction 2 is going to be wrong about the size, in the direction that
+> flatters the fix.** The mechanism was right — the pair got faster, on every
+> column, by a lot. The arithmetic that turned the mechanism into 109 s was
+> wrong, and it is the second time: G27 recorded round 26's 24-tick columns
+> saving 2.2x what the fingerprint arithmetic predicted, and this is 1.4x.
+> Two independent hoisting fixes have both beaten their own per-call
+> arithmetic. That is a pattern in how the arithmetic is done, not luck in
+> which functions were fixed, and `r27_g` at 15:52 UTC — instrumented with
+> `track_functions='all'` — is the measurement that should explain it.
