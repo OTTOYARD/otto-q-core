@@ -172,6 +172,40 @@ disk blocks read per pair**, per table, measured rather than inferred. Note that
 those counters do not move while the pair runs — both arms are one transaction
 and pgstat flushes at commit — so a zero mid-pair means nothing.
 
+## Pair 6 — `busy_day` / 424242 / 24t — **PASSED**
+
+Fired 10:12 UTC (5:12 AM CT), 1,336 s. `h_sdr` `f2587dbc` on both arms. `h_rule`
+`726f6769`, moved from its column's previous value for the same reason the other two
+columns moved: 0208's first landing there. Every other atom reproduces.
+
+**Five of six columns now carry a post-0218 pair with the arms agreeing on `h_sdr`** —
+`a2a35e03`, `e0dfbbe8`, `6fd75365`, `957abcfb`, `f2587dbc`. The sixth is
+`busy_day / 314159 / 12t`, whose 08:25 pair predates 0218; `r25_g` re-runs it at 10:52,
+and 0219's own gate will refuse to promote `h_sdr` until it lands.
+
+## What the round measured, which was not on the schedule
+
+`db/checks/0128` — the first per-pair I/O profile this project has taken. Differencing
+`public.g19_seq_before` / `g19_io_pref` (snapshotted 10:00:53 with nothing running)
+across pair f:
+
+| | one 24-tick pair |
+|---|---|
+| disk blocks read | 1,227,704 = **9,591 MB** |
+| buffer hits | 228,017,784 |
+| index scans | **66,411,075** |
+| sequential scans | 11,197 |
+
+and 73% of that 9.6 GB — **7,040 MB** — is **five sequential scans of `ottoq_events`**,
+a 2,956 MB table the pair index-scans only 62 times. That is G19: a fixed workload
+whose cost grows because the table those five scans cross grows. `ottoq_rule_evaluations`,
+the biggest table in the database at 4,238 MB, cost the pair 168 MB and zero sequential
+scans — size was never the predictor, being scanned is.
+
+Which five statements is still open, and 0128 refuses to guess it: three guesses have
+already been spent on this task. `r25_g` carries `pg_stat_statements.track='all'`, so the
+statement holding ~877k blocks read will name itself.
+
 ## Round completion
 
 The round is complete when all six columns have a post-0218 pair; `h_sdr` is enforced by 0219
