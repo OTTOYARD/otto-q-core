@@ -192,3 +192,49 @@ and the arithmetic — not the fixes — is what needs explaining. `r27_g`'s
 scheduled with `track_functions='all'` precisely so it can see SQL functions,
 which is what blinded `0129`.
 
+
+### b — `busy_day` / 171717 / 12 ticks — **PASS**, 376 s
+
+Fired 14:12:00 UTC (9:12 AM CT), ended 14:18:16, **376 s**.
+
+All thirteen atoms equal between the arms and equal to round 26 — and for the
+eleven round 26 tabulated, equal to round 25 as well, so this column now has the
+same values across three rounds and four migrations.
+
+| atom | arm A | arm B | vs round 26 | vs round 25 |
+|---|---|---|---|---|
+| `fp` | `92b02f8b` | `92b02f8b` | = | = |
+| `h_cmd` | `1ae7ba68` | `1ae7ba68` | = | = |
+| `h_dec` | `cf2f44e2` | `cf2f44e2` | = | = |
+| `h_evt` | `e16ad964` | `e16ad964` | = | = |
+| `h_bkg` | `7146a8e1` | `7146a8e1` | = | = |
+| `h_nrg` | `08f719af` | `08f719af` | = | = |
+| `h_prop` | `0046879e` | `0046879e` | = | = |
+| `h_defr` | `d41d8cd9` | `d41d8cd9` | = | = (empty-string md5) |
+| `h_cal` | `11a24626` | `11a24626` | = | = |
+| `h_rule` | `3e57f511` | `3e57f511` | = | = |
+| `h_rcl` | `0a4ca4d3` | `0a4ca4d3` | = | = |
+| `h_sdr` | `a2a35e03` | `a2a35e03` | = | = |
+| `endst` (md5) | `c6424383` | `c6424383` | = | = |
+
+### The mean after two columns
+
+| column | round 26 | predicted | round 27 | actual saving | predicted saving |
+|---|---|---|---|---|---|
+| a — `busy_day`/314159/12t | 537 s | ~428 s | **358 s** | −179 | −109 |
+| b — `busy_day`/171717/12t | 533 s | ~424 s | **376 s** | −157 | −109 |
+| **mean so far** | **535 s** | **~426 s** | **367 s** | **−168** | **−109** |
+
+**367 s against a predicted band of 380–440.** Two of six columns is not the
+verdict — the committed rule is the mean over the four 12-tick columns — but the
+mean is now below the band rather than one column being below it, and both
+columns overshoot in the same direction by a similar factor (1.64x and 1.44x).
+
+Recording the reading now, before c and d land, so that whatever they do the
+prediction is judged against a number written down first: **if the four-column
+mean finishes below 380 s, prediction 2 was wrong about the size and the
+arithmetic behind it is what needs explaining, not the fix.** That is the same
+sentence round 26 forced about the fingerprint, and it is the second time the
+per-call arithmetic has under-predicted a hoisting fix by roughly the same
+factor. `r27_g` at 15:52 UTC, instrumented with `track_functions='all'`, is the
+instrument for it.
