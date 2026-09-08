@@ -325,7 +325,8 @@ repo_manifest(version, name, file) AS (
     ('20260908133954'::text, 'the_load_meter_asks_which_run_is_running_once_per_row'::text, '0223_the_load_meter_asks_which_run_is_running_once_per_row.sql'::text),
     ('20260908134109'::text, 'the_refusal_reactor_says_production_and_hands_you_a_sim_run_id'::text, '0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id.sql'::text),
     ('PENDING'::text, 'the_canon_comparison_sees_every_atom_the_pair_enforces'::text, '0225_the_canon_comparison_sees_every_atom_the_pair_enforces.sql'::text),
-    ('PENDING'::text, 'the_recert_floor_reads_a_name_the_ledger_never_writes'::text, '0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql'::text)
+    ('PENDING'::text, 'the_recert_floor_reads_a_name_the_ledger_never_writes'::text, '0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql'::text),
+    ('PENDING'::text, 'the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred'::text, '0227_the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
