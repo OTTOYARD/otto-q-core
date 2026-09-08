@@ -130,21 +130,30 @@ BEGIN
 END $rw$;
 
 -- A1. IT IS ENFORCED, AND NOTHING ELSE MOVED --------------------------------
+-- Whitespace-insensitive on purpose. The v_equal chain is aligned by hand --
+-- `(v_arms[1]->>'fp')    =` has four spaces, `h_cal')  =` has two, the rest one
+-- -- so a literal match on a single space silently fails on two atoms and this
+-- assertion would abort a correct migration. Strip the whitespace and compare.
 DO $a1$
-DECLARE v_def text; v_n int;
+DECLARE v_def text; v_flat text; v_n int := 0; a text;
 BEGIN
   SELECT pg_get_functiondef(p.oid) INTO v_def FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='public' AND p.proname='ottoq_determinism_pair';
-  IF position($$(v_arms[1]->>'h_sdr') = (v_arms[2]->>'h_sdr')$$ in v_def) = 0 THEN
+  v_flat := regexp_replace(v_def, '\s+', '', 'g');
+
+  IF position($$(v_arms[1]->>'h_sdr')=(v_arms[2]->>'h_sdr')$$ in v_flat) = 0 THEN
     RAISE EXCEPTION '0219 A1: h_sdr is not enforced in the installed body';
   END IF;
-  -- every atom that was enforced before must still be
-  FOREACH v_def IN ARRAY ARRAY[v_def] LOOP NULL; END LOOP;
-  SELECT count(*) INTO v_n FROM (
-    SELECT unnest(ARRAY['fp','h_cmd','h_dec','h_evt','h_bkg','h_nrg','h_prop','h_defr','h_cal','h_rule','h_rcl','h_sdr']) AS a
-  ) z WHERE position(format($$(v_arms[1]->>'%s') = (v_arms[2]->>'%s')$$, z.a, z.a) in
-                     (SELECT pg_get_functiondef(p.oid) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-                       WHERE n.nspname='public' AND p.proname='ottoq_determinism_pair')) > 0;
+
+  FOREACH a IN ARRAY ARRAY['fp','h_cmd','h_dec','h_evt','h_bkg','h_nrg',
+                           'h_prop','h_defr','h_cal','h_rule','h_rcl','h_sdr'] LOOP
+    IF position(format($$(v_arms[1]->>'%s')=(v_arms[2]->>'%s')$$, a, a) in v_flat) > 0 THEN
+      v_n := v_n + 1;
+    ELSE
+      RAISE WARNING '0219 A1: atom % is NOT enforced', a;
+    END IF;
+  END LOOP;
+
   IF v_n <> 12 THEN
     RAISE EXCEPTION '0219 A1: % of 12 atoms are enforced; the rewrite dropped one', v_n;
   END IF;
