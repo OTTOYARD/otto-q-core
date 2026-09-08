@@ -356,10 +356,14 @@ ottoq|ottoq_booking_authorship|1|0.1
 public|ottoq_orchestrator_trigger|1|0.4
 ```
 
-## ADDENDUM 2026-09-08 16:53 UTC — this file has two rows for one name
+## ADDENDUM 2026-09-08 16:48 UTC — this file has two rows for one name
 
 Found while testing `scripts/fn-delta.py` against this file, before `r28_g`
-fires. `public|ottoq_build_decision_frame` appears **twice** — 48 calls / 571.0 ms
+fires. The heading first read 16:53; the wall clock was 16:49:32 when the
+commit was pushed, so 16:53 was a guess written forward, and the discovery
+actually falls between the 16:46:45 and 16:49:32 clock reads either side of it.
+16:48 is the honest stamp and the guess is recorded rather than quietly
+overwritten. `public|ottoq_build_decision_frame` appears **twice** — 48 calls / 571.0 ms
 at line 303 and 1 call / 7.1 ms at line 353.
 
 That is not a capture error. `pg_stat_user_functions` is keyed by **`funcid`**,
