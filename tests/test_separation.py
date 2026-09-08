@@ -39,7 +39,18 @@ ROOT = Path(__file__).parent.parent
 #: as a finding.
 KERNEL_PACKAGES = ("policies", "solvers", "sites", "wear",
                    "onboarding", "conformance", "recall", "adapters", "metrics",
-                   "proposer")
+                   "proposer",
+                   #: `intent` was MISSING here until 2026-09-07, and it is imported
+                   #: by two packages that are on the list (policies/regime.py and
+                   #: proposer/forward_proposer.py both `from intent.solve import
+                   #: pass_sequence`). So every rule this file enforces -- no database,
+                   #: no network, no production identifiers, no undeclared file reads --
+                   #: simply did not apply to intent/intent.py, intent/signals.py,
+                   #: intent/solve.py or intent/learn.py, while their code ran inside
+                   #: the kernel on every regime-aware proposal. A network client or the
+                   #: production project ref could have landed there with the whole
+                   #: suite green.
+                   "intent")
 
 #: Imports that would let kernel code reach state it must not know about.
 FORBIDDEN_IMPORTS = re.compile(
@@ -102,6 +113,7 @@ ALLOWED_READS = {
     ("sites/site_alpha/make_charts.py", "verify"),  # charts OF committed runs
     ("metrics/kpi_gate.py", "verify"),             # candidate vs baseline gate
     ("policies/deck_run.py", "verify"),            # committed-curve artifact display/derive
+    ("intent/intent.py", "world"),                # load_intent: the commander's intent artifact
 }
 _ALLOWED_FILES = {f for f, _ in ALLOWED_READS}
 
@@ -171,8 +183,8 @@ _COMMAND_KEYS = ("command", "command_type", "enact", "enacted", "execute",
                  "actuate", "setpoint", "issue_at", "dispatch")
 
 
-def _emitted_proposal_rows():
-    """Every row both emitters produce, on a scenario that forces a rejection.
+def _cpsat_rows():
+    """The rows build_and_solve emits directly, on a scenario that forces a rejection.
 
     The tight scenario is deliberate: a plan where everything is served exercises
     only the happy path, and the abstention row — the one most likely to be built
@@ -191,6 +203,73 @@ def _emitted_proposal_rows():
     plan = build_and_solve(materialize(_json.loads(_json.dumps(sc))), allow_rejection=True)
     assert plan["rejected"], "the tight scenario no longer rejects — this test proves nothing"
     return plan["proposals"]
+
+
+def _forward_lex_rows():
+    """The rows the PROPOSER emits — which this guard never used to look at.
+
+    _ADVISORY_SOURCES has named ("cpsat", "forward_lex") since the proposer
+    landed, but the row generator only ever called build_and_solve(), whose rows
+    are all source="cpsat". Every row proposer.propose() actually emits — the
+    ones with the abstention reasons, the ready_by provenance and the class
+    synthesis, built by a different function on a different path — went
+    uninspected. A proposal could have grown an `enact` or a `command_type` and
+    the whole suite would have stayed green, which is the one thing this file
+    exists to prevent.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "solvers" / "cpsat"))
+    _sys.path.insert(0, str(ROOT / "proposer"))
+    from forward_proposer import propose  # noqa: E402
+
+    #: oversubscribed on purpose: more vehicles than one stall can serve, so the
+    #: batch carries served rows AND declined rows AND the not-serviceable
+    #: abstention, which are three different builders in the same function.
+    def _v(vid, soc, state="arrived_at_gate", platform="waymo"):
+        return {"id": vid, "soc": soc, "make": platform.title(), "state": state,
+                "platform": platform, "stall_id": None, "svc_step": "await",
+                "inlet_type": "CCS1", "target_soc": 90, "inlet_max_kw": 100.0,
+                "fleet_operator_id": "op-1", "min_soc_threshold": 20}
+    #: the unknown-platform vehicle is the one that produces a FRAME-LEVEL
+    #: abstention (a different builder from the solver's declined rows). A
+    #: non-serviceable vehicle would not: proposer emits nothing for those by
+    #: design, pinned by test_plannable_vehicles_get_assignments_and_the_rest_abstain.
+    frame = {"vehicles": [_v(f"v{i}", 15) for i in range(6)]
+                         + [_v("v-unknown", 20, platform="cybertruck")],
+             "stalls": [{"id": "s-1", "type": "dcfc", "status": "available",
+                         "vehicle_id": None, "connector_type": "CCS1",
+                         "connector_max_kw": 150}],
+             "sessions": [], "energy": {}, "bess": []}
+    classes = {"waymo": {"battery_kwh": 90, "max_charge_kw": 100,
+                         "charge_kinds": ["dcfc", "l2"], "chemistry": "NMC",
+                         "max_daily_soc_pct": 80,
+                         "energy_curve": [{"above_soc_pct": 0, "accept_frac": 1.0}]}}
+    site = {"power_cap_kw_hard": 1000, "power_soft_target_kw": 700,
+            "dcfc_cooldown_min": 18, "move_duration_min": 4, "path_capacity": 2,
+            "cold_start_below_c": 5, "cold_start_penalty_min": 12,
+            "onpeak_window_min": [240, 420]}
+    r = propose(frame, classes, site=site, horizon_min=120,
+                default_ready_delta_min=60, allow_rejection=True, det_budget_s=1.0)
+    assert r["proposals"], "the proposer emitted no rows — this test proves nothing"
+    assert r["abstained"] > 0, (
+        "the frame no longer produces an abstention — the row builder most "
+        "likely to forget the contract is not being exercised")
+    return r["proposals"]
+
+
+def _emitted_proposal_rows():
+    """Every row EVERY declared emitter produces."""
+    rows = _cpsat_rows() + _forward_lex_rows()
+    #: THE GUARD MUST COVER EVERY SOURCE IT CLAIMS TO COVER. Without this, a
+    #: future emitter can be added to _ADVISORY_SOURCES and never generated here,
+    #: which is exactly how forward_lex went uninspected.
+    seen = {r.get("source") for r in rows}
+    missing = set(_ADVISORY_SOURCES) - seen
+    assert not missing, (
+        f"_ADVISORY_SOURCES declares {_ADVISORY_SOURCES} but this run produced "
+        f"rows only from {sorted(seen)}; {sorted(missing)} is declared and never "
+        "inspected")
+    return rows
 
 
 def test_every_emitted_row_is_advisory_not_an_instruction():

@@ -448,3 +448,42 @@ COMMIT;
 --      and the values track the simulated clock rather than the fire time.
 --      One distinct value means the shield is still on the wall clock.
 -- =====================================================================
+
+-- =====================================================================
+-- ROUND 22 READ — 2026-09-07, nine pairs, 18:35-21:03 UTC (1:35-4:03 PM CT).
+-- Full record: db/checks/0118, db/canons/round22.md.
+--
+-- Nine of nine passed. Judging the four predictions above:
+--
+--   1. h_evt MOVES on all six columns.                          CONFIRMED.
+--      314159/12t a41175ba -> 9c631343   171717/12t e15a20ab -> e16ad964
+--      normal_day 454e34a6 -> ac672423   424242/12t 638655b3 -> 6453c09b
+--      171717/24t be8ee6cb -> b2230619   424242/24t 67cb213b -> 8dc37f82
+--      It moved ONCE: each of the three columns that ran twice reproduced
+--      its new value exactly.
+--
+--   2. Nothing else moves. CONFIRMED, and this is the stronger result:
+--      every h_cmd reproduced round 21's canon exactly, which answers the
+--      question round 21 left open -- 0207 closed the carrier and left no
+--      second one. h_dec, h_bkg, h_nrg, h_prop, h_defr and h_cal also held.
+--
+--   3. h_rule "may legitimately move now that the shield judges the
+--      simulated hour."  IT DID NOT MOVE, and that is the finding.
+--      171717/24t: 62ed1a1e before, 62ed1a1e after.
+--
+--   4. TW.001 reports MORE THAN ONE distinct local_time per 24-tick arm.
+--      CONFIRMED, and decisively: ONE distinct value in round 21, TWENTY-
+--      FOUR in round 22, spanning 00:00 to 23:30. The fix works.
+--
+-- PREDICTIONS 3 AND 4 TOGETHER ARE THE FINDING. The shield's read changed
+-- from one frozen local time to twenty-four tracking the run's clock, and
+-- the verdict's rule instrument did not notice, because
+-- ottoq_hash_rule_evaluations hashed parameters_used (the rule's configured
+-- thresholds, constant per rule) and not result_payload, where the read
+-- lives. 0208 folds result_payload in and moves the recertification floor.
+--
+-- CORRECTION to prediction 4's own before-number: it says round 21 had
+-- "1,162 evaluations at a single value, 17:51:00". The evaluation COUNT is
+-- 1,036 per pair (518 per arm) and it did not change between rounds. Only
+-- the local_time did. The prediction was right; its baseline figure was not.
+-- =====================================================================

@@ -150,3 +150,30 @@ COMMIT;
 -- promotion waits for two rounds after 0204, because 0204 changes what
 -- clock the shield reads and the canon must be allowed to move once.
 -- =====================================================================
+
+-- =====================================================================
+-- ROUND 22 READ — 2026-09-07. Full record: db/checks/0118.
+--
+-- The gate held: nine of nine pairs passed with h_rule judged, so promoting
+-- it into v_equal cost nothing and the arms agree on the shield's disposals
+-- on every column.
+--
+-- But the caution written above -- "canon_rule is still reported and not
+-- judged; that promotion waits for two rounds after 0204, because 0204
+-- changes what clock the shield reads and the canon must be allowed to move
+-- once" -- expected a movement that did not happen. canon_rule is identical
+-- on all six columns across rounds 21 and 22, while TW.001's local_time went
+-- from ONE distinct value to TWENTY-FOUR.
+--
+-- The instrument this migration promoted answers "did the same rules fire on
+-- the same entities, under the same thresholds, and reach the same verdicts".
+-- It does not answer "did they read the same world": result_payload, where
+-- every evaluator records what it looked at, was not hashed at all, and
+-- parameters_used -- which is hashed -- is the rule's configured thresholds
+-- and constant per rule.
+--
+-- That does not weaken this promotion. Both arms of a pair are equally blind
+-- and they agreed, so a pair-level disagreement is still caught. It is a
+-- round-to-round gap, and 0208 closes it by folding result_payload in.
+-- canon_rule will move on every column in round 23, by design.
+-- =====================================================================

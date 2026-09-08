@@ -630,3 +630,31 @@ COMMIT;
 --   3. canon_rcl appears on all six flagship columns; before round 22 it
 --      is NULL there and populated only on the grid column.
 -- =====================================================================
+
+-- =====================================================================
+-- ROUND 22 READ — 2026-09-07, nine pairs. Full record: db/checks/0118,
+-- db/canons/round22.md.
+--
+-- All three predictions CONFIRMED.
+--
+--   1. No canon moves that is attributable to 0206. Held: every h_cmd
+--      reproduced round 21's canon exactly, and h_dec/h_bkg/h_nrg/h_prop/
+--      h_defr/h_cal held too. The only movement in round 22 is h_evt, which
+--      is 0204's by design.
+--
+--   2. Every arm carries h_rcl and the arms AGREE on it, on all six columns.
+--      Held on all nine pairs. h_rcl is now eligible for promotion into
+--      v_equal on the same evidence standard 0205 used for h_rule.
+--
+--   3. canon_rcl appears on all six flagship columns. Held:
+--      314159/12t 0e67b89a   171717/12t 0a4ca4d3   normal_day e4e41e69
+--      424242/12t f58ee562   171717/24t fa8ab72c   424242/24t 928262d2
+--
+-- A caution earned elsewhere in this round applies to that promotion when it
+-- is written: 0205 promoted h_rule on exactly this evidence, and round 22
+-- then showed the instrument was narrower than the claim it had been
+-- promoted to carry (see 0208). Before h_rcl is judged, check what
+-- ottoq_hash_recall_decisions actually hashes against what a recall decision
+-- actually READS -- agreement across arms proves the arms match, not that
+-- the instrument can see the thing it is named for.
+-- =====================================================================

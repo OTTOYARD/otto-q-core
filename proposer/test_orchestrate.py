@@ -39,17 +39,27 @@ CLASSES = {
 }
 
 
-def _forecast(mean_daily_arrivals=24.0, per_hour_arrivals=None, load_p90=None):
+def _forecast(mean_daily_arrivals=24.0, per_hour_arrivals=None, load_p90=None,
+              per_hour_baseline=None):
     """A synthetic 24h forecast in the /forecast contract shape (flat 1.0/hr
-    arrivals, flat 100 kW p90 load — both below any trigger)."""
+    arrivals, flat 100 kW p90 load — both below any trigger).
+
+    `expected_arrivals` is the nowcast and `baseline_arrivals` the
+    climatological expectation for that hour; they default to the same flat
+    rate, which is what a pure-climatology forecaster emits. A surge is the
+    nowcast standing above the baseline, so a test that wants one raises only
+    `per_hour_arrivals`."""
     per_hour_arrivals = per_hour_arrivals or {}
+    per_hour_baseline = per_hour_baseline or {}
     load_p90 = load_p90 or {}
     hours_arr, hours_load = [], []
     for hod in range(24):
         arr = per_hour_arrivals.get(hod, 1.0)
+        base = per_hour_baseline.get(hod, 1.0)
         kw = load_p90.get(hod, 100.0)
         hours_arr.append({"hour_index": hod, "hour_of_day": hod,
-                          "expected_arrivals": arr, "p10": 0, "p50": int(arr),
+                          "expected_arrivals": arr,
+                          "baseline_arrivals": base, "p10": 0, "p50": int(arr),
                           "p90": int(arr) + 1})
         hours_load.append({"hour_index": hod, "hour_of_day": hod,
                            "base_kw": 50.0, "ev_kw_expected": 50.0,

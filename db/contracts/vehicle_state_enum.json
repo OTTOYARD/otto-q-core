@@ -1,0 +1,41 @@
+{
+  "_comment": [
+    "The production `vehicle_state` Postgres ENUM, verbatim and in enumsortorder.",
+    "This file exists so kernel-side code that names a production state can be",
+    "checked against the real vocabulary WITHOUT a test reaching a database.",
+    "It is a snapshot, not a runtime source: nothing reads it at runtime, and",
+    "changing it changes nothing about the running system.",
+    "",
+    "Provenance:",
+    "  project  otto-q-core (gxdrcyphqjzjsuhxuqtg)",
+    "  captured 2026-09-07",
+    "  query    SELECT e.enumlabel FROM pg_type t JOIN pg_enum e",
+    "             ON e.enumtypid = t.oid WHERE t.typname = 'vehicle_state'",
+    "            ORDER BY e.enumsortorder;",
+    "",
+    "When the enum changes, re-run that query and update this file in the same",
+    "migration that changed it."
+  ],
+  "type": "vehicle_state",
+  "captured_utc": "2026-09-07",
+  "project_ref": "gxdrcyphqjzjsuhxuqtg",
+  "labels": [
+    "offline",
+    "deployed",
+    "en_route_to_depot",
+    "arrived_at_gate",
+    "staged_awaiting_service",
+    "charging_dcfc",
+    "charging_l2",
+    "charge_complete_holding",
+    "in_wash_bay",
+    "in_detail_bay",
+    "in_service_bay",
+    "service_complete_holding",
+    "staged_for_departure",
+    "en_route_to_deployment",
+    "emergency_staged",
+    "tow_requested",
+    "out_of_service"
+  ]
+}

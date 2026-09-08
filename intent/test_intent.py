@@ -33,14 +33,88 @@ def test_intent_fingerprint_verifies():
 
 
 def test_intent_tamper_is_refused():
+    """load_intent must REFUSE a tampered artifact, not merely hash differently.
+
+    This test used to stop one step short: it recomputed the fingerprint of
+    mutated content and asserted the number changed. True, and not the claim.
+    The claim is that the LOADER refuses — and the loader was never called, so
+    deleting its verification block left this test green while every caller went
+    on optimizing against an edited commander's intent.
+    """
+    import tempfile
     raw = json.loads(ARTIFACT.read_text())
-    # a mutated objective must change the fingerprint, which load_intent then
-    # refuses to accept
     raw["objectives"]["readiness"]["direction"] = "maximize"
     canon = {k: raw[k] for k in ("numeraire", "objectives", "regimes",
                                  "tier3_constraints")}
     assert fingerprint(canon) != raw["manifest"]["fingerprint_md5"], \
         "I1 FAIL: a mutated objective did not change the fingerprint"
+
+    with tempfile.TemporaryDirectory() as d:
+        bad = Path(d) / "intent_tampered.json"
+        bad.write_text(json.dumps(raw))
+        try:
+            load_intent(bad)
+        except ValueError as e:
+            assert "fingerprint mismatch" in str(e), f"I1 FAIL: wrong refusal: {e}"
+        else:
+            raise AssertionError(
+                "I1 FAIL: load_intent accepted an artifact whose objectives do "
+                "not match its own fingerprint")
+
+        #: a REORDERED regime list is not tampering and must still load -- the
+        #: fingerprint is over content, and a false refusal is its own defect
+        ok = json.loads(ARTIFACT.read_text())
+        good = Path(d) / "intent_ok.json"
+        good.write_text(json.dumps(ok))
+        load_intent(good)
+
+
+def test_the_shipped_artifact_declares_the_signal_regimes_in_doctrinal_order():
+    """Safety over cost over throughput IS declaration order — so guard the order.
+
+    resolve_intent's two-pass design makes signals beat the clock structurally,
+    and that half is pinned by the tests above. The OTHER half is not structural
+    at all: within the signal pass the resolver returns the first match in
+    declaration order, so "safety outranks cost outranks throughput" holds only
+    because intent_v1.json happens to list weather_event, then grid_peak, then
+    demand_surge.
+
+    Measured, by reversing the regime list in a copy and re-stamping it: with
+    both weather_hold and grid_peak_imminent raised at 07:00, the resolver
+    returns grid_peak instead of weather_event. A grounding risk loses to a
+    tariff signal, and nothing in the artifact says why.
+
+    Redesigning the pack format to carry an explicit precedence rank is a
+    deliberate change to a declarative contract and is NOT made here. What is
+    made here is the check that was missing: the shipped artifact's order is
+    asserted against the doctrine, so an editor who tidies the JSON turns CI red
+    instead of quietly inverting safety and cost.
+    """
+    raw = json.loads(ARTIFACT.read_text())
+    signal_regimes = [r["key"] for r in raw["regimes"] if r.get("match", {}).get("signals")]
+    assert signal_regimes == ["weather_event", "grid_peak", "demand_surge"], (
+        f"the signal regimes are declared {signal_regimes}. Within the signal "
+        "pass the resolver takes the FIRST match, so this list IS the precedence: "
+        "safety (weather_event) must precede cost (grid_peak), which must precede "
+        "throughput (demand_surge). Reordering this list silently reorders the "
+        "doctrine.")
+
+    #: and the resolver must actually honour it when signals collide
+    it = load_intent()
+    both = resolve_intent(it, hour_of_day=7,
+                          signals=frozenset({"weather_hold", "grid_peak_imminent"}))
+    assert both.regime_key == "weather_event", (
+        f"both signals up and the resolver chose {both.regime_key!r}; a grounding "
+        "risk must outrank a tariff signal")
+    all_three = resolve_intent(it, hour_of_day=7,
+                               signals=frozenset({"weather_hold", "grid_peak_imminent",
+                                                  "demand_surge"}))
+    assert all_three.regime_key == "weather_event"
+    cost_vs_throughput = resolve_intent(
+        it, hour_of_day=7, signals=frozenset({"grid_peak_imminent", "demand_surge"}))
+    assert cost_vs_throughput.regime_key == "grid_peak", (
+        f"cost vs throughput resolved to {cost_vs_throughput.regime_key!r}; "
+        "grid_peak must outrank demand_surge")
 
 
 # ---------------------------------------------------------------------------

@@ -57,6 +57,64 @@ FLOW_BUDGET = {"det_budget_s": 0.5}
 RUSH_BUDGET = {"det_budget_s": 1.5}
 
 
+def _peak_from_plan(plan):
+    """The plan's OWN peak, rebuilt from its charge segments.
+
+    Never plan["site_peak_kw"]: that field is present only when a min_peak pass
+    ran last, and reading a reported optimum to check a plan is the mistake this
+    test exists to catch.
+    """
+    ev = []
+    for a in plan["assets"]:
+        for op in a["ops"]:
+            if op["op"] == "charge":
+                for seg in op["segments"]:
+                    ev.append((seg["start"], seg["kw"]))
+                    ev.append((seg["end"], -seg["kw"]))
+    ev.sort()
+    load = peak = 0
+    for _, d in ev:
+        load += d
+        peak = max(peak, load)
+    return peak
+
+
+def test_every_pass_order_holds_every_earlier_optimum_in_the_shipped_plan():
+    """The chain's central claim, measured on the plan rather than re-reported.
+
+    lexicographic_solve threads each pass's optimum into the passes after it.
+    The min_peak branch's threading of max_flow_total IS covered -- mutating it
+    away turns test_rush_and_grid_peak_produce_different_schedules red. The
+    min_flow branch's threading of max_peak_total was covered by NOTHING:
+    deleting it left all 109 tests green while the overnight/steady_state chain
+    (the pass order two of the six regimes resolve to) shipped a plan peaking at
+    460 kW after its own min_peak pass had proved 150.
+
+    So this checks the property directly, on both three-pass orders, by
+    recomputing tardiness, flow and peak FROM THE FINAL PLAN and comparing them
+    against what each earlier pass reported. A ceiling that is not threaded shows
+    up here as a shipped plan worse than an optimum the chain claims it held.
+    """
+    for modes in (("min_tardy", "min_peak", "min_flow"),
+                  ("min_tardy", "min_flow", "min_peak")):
+        budget = RUSH_BUDGET if modes[1] == "min_flow" else FLOW_BUDGET
+        plan, optima, passes = lexicographic_solve_traced(
+            load_scenario(SC), list(modes), budget=budget)
+        got = {"min_tardy": _tardy(plan), "min_flow": _flow(plan),
+               "min_peak": _peak_from_plan(plan)}
+        for i, mode in enumerate(modes[:-1]):          # every pass but the last
+            held = optima.get(mode)
+            if held is None:
+                continue                                # retained pass: nothing held
+            assert got[mode] <= held, (
+                f"pass order {modes}: the {mode} pass reported {held}, but the "
+                f"SHIPPED plan measures {got[mode]} -- a later pass discarded an "
+                f"optimum the chain claims it held. This is the max_flow_total "
+                f"class of bug, in whichever branch dropped the ceiling.")
+        print(f"chain {modes} -> tardy {got['min_tardy']} flow {got['min_flow']} "
+              f"peak {got['min_peak']}; optima {optima}")
+
+
 def _flow(plan):
     return sum(a["finish"] for a in plan["assets"] if a["finish"] is not None)
 

@@ -5,6 +5,25 @@ the propose/dispose pattern. `propose()` takes a production decision frame and r
 rows in the `ottoq_external_proposals` shape; the deferral pattern gives an in-flight proposal
 its one-tick right-of-first-refusal; **the disposer remains the production decide path.**
 
+**Occupying that seat requires sizing the frame, and the numbers are these.** Every solve is
+bounded by default now (`DEFAULT_DET_BUDGET_S = 2.0`, deterministic work rather than wall
+clock, so the cost is a property of the instance and not of the box). A deterministic budget
+bounds the *search*, not the *model*, and on this codebase the model is what costs:
+
+| frame | `max_assets` | wall time |
+|---|---|---|
+| 44 vehicles / 16 stalls | unset | **97.9 s** |
+| 44 vehicles / 16 stalls | 12 | 14.0 s |
+| 44 vehicles / 16 stalls | 8 | **7.6 s** |
+
+The engine ticks every 30 seconds. So the whole-frame solve does **not** fit the one-tick seat
+at production scale, at any budget — an earlier version of this README asserted the seat
+without that qualification and it was not true. A caller that must occupy the tick passes
+`max_assets`: the most urgent N are solved (earliest `ready_by`, then lowest SoC, then id) and
+every deferred vehicle still gets an abstention row naming the batch, so *deferred to the next
+tick* stays distinguishable from *nobody asked*. Left unset there is no batching, which is
+right for offline planning.
+
 ```
 decision frame ──▶ frame_to_scenario ──▶ lexicographic solve ──▶ plan_to_proposals ──▶ rows
  (ottoq_build_      (adapter: DB           (policies/forward:      (production

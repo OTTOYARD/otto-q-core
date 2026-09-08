@@ -102,6 +102,13 @@ def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, di
     rejection-aware chain is as sound as the side-free one. The retained-pass
     guard below turns a pass that could not solve into optima[mode]=None.
 
+    A recorded optimum is not automatically a PROVEN one. A budget-truncated
+    pass returns status FEASIBLE with an incumbent; that incumbent is achieved
+    by a real solution, so threading it as a ceiling keeps every later pass
+    feasible, but the chain has not proved it minimal. Each pass therefore
+    carries `proven` (status == OPTIMAL) alongside its value, and no caller may
+    read "optima[mode] is not None" as "this pass held its optimum".
+
     ForwardOrchestratorPolicy.decide is exactly this chain with the two-pass
     ("min_tardy", "min_peak") list, which is why its frozen artifact stays
     byte-identical; the third lever (min_flow) is what the intent regimes add.
@@ -152,6 +159,15 @@ def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, di
             raise ValueError(f"unknown pass mode {mode!r}")
 
         passes.append({"mode": mode, "status": plan["solver_status"],
+                       #: PROVEN OPTIMALITY IS NOT "THE PASS RETURNED A NUMBER".
+                       #: When CP-SAT exhausts the deterministic budget with an
+                       #: incumbent but no proof, the status is FEASIBLE and the
+                       #: value recorded in `optima` is that incumbent — a real,
+                       #: achieved bound, so it is still a sound ceiling for the
+                       #: later passes, but it is NOT this pass's optimum. Only
+                       #: OPTIMAL means the pass held one. The chain reports it;
+                       #: the caller decides what to claim.
+                       "proven": plan["solver_status"] == "OPTIMAL",
                        "objective": plan.get("objective"),
                        "deterministic_time": round(
                            plan.get("repro", {}).get("deterministic_time", 0.0), 6),

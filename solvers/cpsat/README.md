@@ -5,7 +5,8 @@ engine as a PROPOSER (`source='cpsat'`) under the existing right-of-first-refusa
 pattern. See SOLVER_STATE.md §6 for the recommendation and the requirement map.
 
     pip install -r requirements.txt   # PINNED -- the version is part of a run's identity
-    python3 solvers/cpsat/test_cpsat_prototype.py   # 14-test battery, all must PASS
+    python3 solvers/cpsat/test_cpsat_prototype.py   # the CP-SAT battery, all must PASS
+                                                    # (it prints its own count)
 
 `plan_seed424242.json` is the committed reproducibility artifact: re-running the
 battery with the committed scenario must reproduce its sha256 exactly. The battery

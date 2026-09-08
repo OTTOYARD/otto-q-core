@@ -11,6 +11,8 @@ provenance, (c) the TOTAL seam (a malformed forecast raises, never silently
 defaults), and (d) the end-to-end loop into resolve_intent.
 """
 
+import pytest
+
 from intent.intent import load_intent, resolve_intent
 from intent.signals import (
     EVIDENCE_LABELS,
@@ -21,21 +23,29 @@ from intent.signals import (
 
 
 def _forecast(mean_daily_arrivals=24.0, per_hour_arrivals=None,
-              load_p90=None, horizon_hours=24):
+              load_p90=None, horizon_hours=24, per_hour_baseline=None):
     """A synthetic 24h forecast in the /forecast contract shape.
 
     Default: flat 1.0 arrival/hour (mean 24/day) and flat 100 kW p90 load —
     both below any default trigger, so each test opts IN to the signal it
     exercises.
+
+    `expected_arrivals` is the NOWCAST and `baseline_arrivals` the
+    CLIMATOLOGICAL expectation for that hour. They default to the same flat
+    rate, which is what a pure-climatology forecaster emits: no deviation, no
+    surge. A test that wants a surge raises the nowcast above the baseline.
     """
     per_hour_arrivals = per_hour_arrivals or {}
+    per_hour_baseline = per_hour_baseline or {}
     load_p90 = load_p90 or {}
     hours_arr, hours_load = [], []
     for hod in range(horizon_hours):
         arr = per_hour_arrivals.get(hod, 1.0)
+        base = per_hour_baseline.get(hod, 1.0)
         kw = load_p90.get(hod, 100.0)
         hours_arr.append({"hour_index": hod, "hour_of_day": hod,
-                          "expected_arrivals": arr, "p10": 0,
+                          "expected_arrivals": arr,
+                          "baseline_arrivals": base, "p10": 0,
                           "p50": int(arr), "p90": int(arr) + 1})
         hours_load.append({"hour_index": hod, "hour_of_day": hod,
                            "base_kw": 50.0, "ev_kw_expected": 50.0,
@@ -55,20 +65,90 @@ def _forecast(mean_daily_arrivals=24.0, per_hour_arrivals=None,
 
 # ---- the signal math -------------------------------------------------------------
 
-def test_demand_surge_triggers_when_arrivals_double_the_mean():
-    # mean 24/day -> 1.0/hr; 3 arrivals/hr in the next 3 hours -> 9 vs threshold 6
-    fc = _forecast(mean_daily_arrivals=24.0,
-                   per_hour_arrivals={0: 3.0, 1: 3.0, 2: 3.0})
+def test_demand_surge_triggers_when_arrivals_double_their_own_baseline():
+    # baseline 1.0/hr; nowcast 3.0/hr over the next 3 hours -> 9 vs threshold 6
+    fc = _forecast(per_hour_arrivals={0: 3.0, 1: 3.0, 2: 3.0})
     a = forecast_signals(fc, site_power_target_kw=700, now_hour=0)
     assert "demand_surge" in a.signals
     assert a.reasoning["demand_surge"]["value"] == 9.0
+    assert a.reasoning["demand_surge"]["baseline"] == 3.0
     assert a.reasoning["demand_surge"]["threshold"] == 6.0
 
 
-def test_demand_surge_stays_quiet_at_the_mean():
-    a = forecast_signals(_forecast(mean_daily_arrivals=24.0),
-                         site_power_target_kw=700, now_hour=0)
+def test_demand_surge_stays_quiet_when_the_nowcast_matches_its_climatology():
+    a = forecast_signals(_forecast(), site_power_target_kw=700, now_hour=0)
     assert "demand_surge" not in a.signals
+
+
+#: The shipped NYC-TLC hourly shape (priors_snapshot.json, profiles.nyc_tlc.
+#: hourly_arrival_rate), normalized to mean 1.0. Hard-coded here rather than
+#: imported: intent/ is kernel and must not reach into the intelligence service.
+_TLC_SHAPE = {0: 0.7734, 1: 0.5013, 2: 0.3297, 3: 0.2111, 4: 0.1493, 5: 0.1505,
+              6: 0.3198, 7: 0.6058, 8: 0.8701, 9: 0.9770, 10: 1.0681,
+              11: 1.1766, 12: 1.2811, 13: 1.3458, 14: 1.4413, 15: 1.4666,
+              16: 1.4836, 17: 1.6070, 18: 1.6962, 19: 1.4545, 20: 1.2887,
+              21: 1.3761, 22: 1.3381, 23: 1.0884}
+_TLC_MAX_DOW = 1.1980   # profiles.nyc_tlc.dow_demand_multiplier, day 5
+
+
+def test_a_flat_daily_mean_baseline_cannot_reach_the_surge_threshold():
+    """The arithmetic that made demand_surge structurally unreachable, pinned.
+
+    The old baseline was `(mean_daily / 24) * window` — a FLAT hourly rate —
+    while the forecast it consumes is strongly diurnal. The shape's own busiest
+    3-hour run therefore bounds the achievable ratio, and that bound is below
+    the 2.0 threshold: no site, no hour, no day of week could ever surge. The
+    ratio is scale-invariant, so no fleet_size or turns_per_day setting saved
+    it either.
+
+    If someone reverts the baseline to the flat mean, this test says why it
+    cannot work rather than leaving a dead regime in the pack.
+    """
+    W = int(SIGNAL_THRESHOLDS["surge_window_hours"].default)
+    best = max(sum(_TLC_SHAPE[(start + i) % 24] for i in range(W))
+               for start in range(24))
+    ceiling = (best / W) * _TLC_MAX_DOW
+    assert round(ceiling, 4) == 1.9115
+    assert ceiling < SIGNAL_THRESHOLDS["surge_multiplier"].default, (
+        f"the diurnal shape's own peak is {ceiling:.4f}x the flat daily mean, "
+        f"below the {SIGNAL_THRESHOLDS['surge_multiplier'].default} threshold")
+
+
+def test_the_diurnal_peak_is_not_a_surge_and_the_quiet_hours_can_still_be_one():
+    """The signal now means DEVIATION, not TIME OF DAY.
+
+    Rush hour matching its own climatology is not a surge — dispatch_rush is the
+    regime for that. And 4am at three times its (tiny) expectation IS a surge,
+    which the flat-mean version could never see because 4am is far below the
+    daily average no matter what actually shows up.
+    """
+    mean_hourly = 5.0
+    tlc = {h: mean_hourly * _TLC_SHAPE[h] for h in range(24)}
+
+    # 18:00, the shape's peak, exactly as forecast -> not a surge
+    at_peak = forecast_signals(
+        _forecast(per_hour_arrivals=tlc, per_hour_baseline=tlc),
+        site_power_target_kw=700, now_hour=18)
+    assert "demand_surge" not in at_peak.signals
+
+    # 04:00, the shape's trough, at 3x its expectation -> a surge
+    hot_dawn = dict(tlc)
+    for h in (4, 5, 6):
+        hot_dawn[h] = tlc[h] * 3.0
+    at_dawn = forecast_signals(
+        _forecast(per_hour_arrivals=hot_dawn, per_hour_baseline=tlc),
+        site_power_target_kw=700, now_hour=4)
+    assert "demand_surge" in at_dawn.signals
+
+
+def test_a_forecast_without_a_climatology_is_refused_not_guessed():
+    """The bridge will not substitute a flat daily mean for the baseline — that
+    substitution is the defect. Same posture as the missing-count refusal."""
+    fc = _forecast()
+    for h in fc["arrivals"]["hours"]:
+        h.pop("baseline_arrivals")
+    with pytest.raises(ForecastContractError, match="baseline_arrivals"):
+        forecast_signals(fc, site_power_target_kw=700, now_hour=0)
 
 
 def test_grid_peak_triggers_when_p90_approaches_the_soft_target():
