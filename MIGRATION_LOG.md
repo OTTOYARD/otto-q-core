@@ -101,7 +101,7 @@
 ## Index, 0134–0229 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
-resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228 — which are indexed below as well as logged above; the log row is
+resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229 — which are indexed below as well as logged above; the log row is
 the one that says what was VERIFIED.
 Everything else from 0134 on went unlogged at the time. Rather than invent prose after the
 fact about work whose reasoning already lives in the migration files, this block is
