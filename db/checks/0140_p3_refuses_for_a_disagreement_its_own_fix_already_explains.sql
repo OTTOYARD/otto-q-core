@@ -1,4 +1,13 @@
 -- ---------------------------------------------------------------------------
+-- RESOLVED 2026-09-08 15:40 UTC — 0225's P3 was rewritten on this file's
+-- findings, before 0225 was ever applied. The title below is kept in the past
+-- tense it was written in, because the measurement is what it is and the file
+-- is the record of it. What changed: P3 now asks whether any column green
+-- under nine atoms stops being green under fourteen, keyed exactly as
+-- ottoq_cert_matrix keys, computed once and read twice, with an A5 that
+-- reports streak movement that does not cost green. The replacement has NOT
+-- yet been dry-run; that is the remaining blocker on the apply window.
+-- ---------------------------------------------------------------------------
 -- 0140 — 0225 WILL REFUSE TO APPLY, and the refusal is half right.
 --
 --        Dry-run of 0225's P3 against the recert floor that 0226 installs
