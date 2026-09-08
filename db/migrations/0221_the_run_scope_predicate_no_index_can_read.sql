@@ -2,8 +2,23 @@
 -- migration-name:    the_run_scope_predicate_no_index_can_read
 --
 -- ---------------------------------------------------------------------------
--- 0221 — the run-scope predicate no index can read. G19's carrier, one
---        function, measured before it is generalised.
+-- 0221 — the run-scope predicate no index can read. A carrier found while
+--        chasing G19; worth fixing on its own terms, and NOT the drift.
+--
+-- HOW BIG IS IT, measured before claiming anything (db/checks/0127 Q6): both
+-- forms run through plpgsql variables across all 158 flagship stalls, warmed,
+-- then timed twice — 7.83 and 7.38 ms per call for the COALESCE form against
+-- 0.035 and 0.025 ms for the sargable one, ~300x. An arm emits 569 vehicle
+-- commands, so this is ~4.2 s per arm and ~8.4 s of an 812 s pair: ONE PERCENT.
+-- To account for the pair's ~566 s of tick time the query would have to be
+-- called 67 times per emitted command, and it is not.
+--
+-- So apply it because it is a genuine unbounded-in-history read on the hot path
+-- that gets monotonically worse and costs nothing to fix — not because it will
+-- move the clock. It will not, and 0127 says so before the fact rather than
+-- after. G19 remains open: 1,957,327 sequential scans of ottoq_stall_bookings
+-- reading 49.3 billion tuples belong to some OTHER query, and two measurements
+-- are already scheduled to name it.
 --
 -- Convicted in db/checks/0127. ottoq.ottoq_validate_assignment is called by
 -- ottoq_emit_vehicle_command on every assignment — 569 vehicle commands per
@@ -24,12 +39,15 @@
 --   COALESCE form   Index Cond: (stall_id = …)                        cost 5311.29
 --   sargable form   Index Cond: ((sim_run_id = …) AND (stall_id = …))  cost    2.65
 --
--- 2,004x, and the important half is not the ratio: the expensive plan's cost is
--- a function of total history and the cheap one's is not. 1,247 entries walked
--- per call today on a typical flagship stall; about 40 a week ago; more
--- tomorrow. That is G19's shape — a fixed workload getting monotonically
--- slower in calendar time — and ottoq_stall_bookings is 53% of every disk read
--- this database has ever performed.
+-- 2,004x by planner cost, ~300x on a stopwatch, and the important half is
+-- neither ratio: the expensive plan's cost is a function of total history and
+-- the cheap one's is not. 1,247 entries walked per call today on a typical
+-- flagship stall; about 40 a week ago; more tomorrow. That is G19's SHAPE — a
+-- fixed workload getting monotonically slower in calendar time — which is
+-- exactly what made it tempting to call it G19's cause. It is not; see the
+-- arithmetic at the top. ottoq_stall_bookings really is 53% of every disk read
+-- this database has ever performed, and this query is not how most of that
+-- happens.
 --
 -- WHY THE PREDICATE IS SHAPED THAT WAY, because it was not careless: 0123 and
 -- 0124 closed the 0145 defect class by scoping reads of run-scoped tables to

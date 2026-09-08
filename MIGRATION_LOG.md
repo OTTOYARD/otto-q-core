@@ -195,7 +195,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0218](db/migrations/0218_h_sdr_hashed_a_signature_computed_over_a_run_scoped_id.sql) | `20260908084304` | yes — ledger | h_sdr hashed a signature computed over a run-scoped id. Corrects 0217 |
 | [0219](db/migrations/0219_h_sdr_may_now_fail_a_pair.sql) | `PENDING` | no — pending | h_sdr may now fail a pair |
 | [0220](db/migrations/0220_the_schedule_task_emitter_asks_the_stall_what_kind_of_charge_it_was.sql) | `PENDING` | no — pending | the schedule_task SDR emitter asks the stall what kind of charge it |
-| [0221](db/migrations/0221_the_run_scope_predicate_no_index_can_read.sql) | `PENDING` | no — pending | the run-scope predicate no index can read. G19's carrier, one |
+| [0221](db/migrations/0221_the_run_scope_predicate_no_index_can_read.sql) | `PENDING` | no — pending | the run-scope predicate no index can read. A carrier found while |
 
 89 migrations indexed.
 

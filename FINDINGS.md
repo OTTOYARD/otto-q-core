@@ -34,7 +34,7 @@ fixed" is the question a reader asks second.
 
 | # | Finding | Evidence | Fix | State |
 |---|---|---|---|---|
-| **G19** | The certification pair got ~2x slower in seven days on a fixed workload. **Cause found:** `ottoq.ottoq_validate_assignment` scopes its calendar lookup with `COALESCE(b.sim_run_id, nil) = COALESCE(p_sim_run_id, nil)` — a function of the column, so the planner cannot use the leading column of `ottoq_stall_bookings_live_stall_idx (sim_run_id, stall_id)` and walks every booking that stall ever had in every run that ever ran. cost 5311.29 → 2.65. 33 functions carry the same predicate, from 0123/0124. | [0126](db/checks/0126_where_the_tick_actually_spends_its_time.sql), [0127](db/checks/0127_the_run_scope_predicate_that_no_index_can_read.sql) | **0221 drafted** (one function; the other 32 wait for a measurement) | fix written, not applied |
+| **G19** | The certification pair got ~2x slower in seven days on a fixed workload. **Table named, cause still open.** `ottoq_stall_bookings` is 53% of every disk block this database has ever read — 1,957,327 sequential scans, 49.3 billion tuples, 1.4 TB. One carrier convicted and costed: `ottoq.ottoq_validate_assignment` scopes its calendar lookup with `COALESCE(b.sim_run_id, nil) = …`, which no index can read, at 7.4 ms/call against 0.03 ms sargable. But at 569 calls per arm that is **~1% of the pair**, so it is a real defect and not the drift. The two million seq scans belong to a query not yet named. | [0126](db/checks/0126_where_the_tick_actually_spends_its_time.sql), [0127](db/checks/0127_the_run_scope_predicate_that_no_index_can_read.sql) | **0221 drafted** for the carrier; the cause needs the 10:52 `pg_stat_statements` capture | open |
 
 ---
 

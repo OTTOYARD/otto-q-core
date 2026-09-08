@@ -1,14 +1,25 @@
 -- ---------------------------------------------------------------------------
--- 0127 — G19 SOLVED: the run-scope predicate 0123/0124 added is a function of
---        the column, so no index can read it, and its cost is set by every run
---        that ever happened.
+-- 0127 — G19, NOT solved: the table is named, one carrier is convicted and
+--        costed, and the cost turns out to be about one percent of the pair.
+--
+-- *** CORRECTED 2026-09-08 10:05 UTC, BEFORE APPLYING ANYTHING. This check was
+-- *** first written with the title "G19 SOLVED" and that was wrong. Everything
+-- *** below Q1-Q4 is measurement and stands. The inference from it did not, and
+-- *** Q6 -- a warm stopwatch on the actual query, run twice -- is what refutes
+-- *** it. Recorded rather than rewritten away, because the failure mode here is
+-- *** the one this file was written to warn about: a plan cost is not a
+-- *** stopwatch, and two earlier fixes measured beautifully and bought nothing.
+--
+-- What IS established: the run-scope predicate 0123/0124 added is a function of
+-- the column, so no index can read it, and its cost is set by every run that
+-- ever happened.
 --
 -- Traced 2026-09-08 09:40-09:50 UTC, read-only, while round 25's pair e ran.
 -- Continues db/checks/0126, which decomposed the tick into two halves that had
 -- both grown ~3.4x in lockstep and concluded "what they SHARE degraded",
--- nominating buffer cache. Cache is the symptom. This is the cause, and it is
--- the same defect class as 0098 and 0123: a query whose cost is set by history
--- rather than by the run.
+-- nominating buffer cache. What follows is the same defect class as 0098 and
+-- 0123 — a query whose cost is set by history rather than by the run — but see
+-- Q6: it is a carrier, not THE cause.
 --
 -- A NOTE ON THE THEORY THIS REPLACES, because the wrong one was nearly written
 -- up: the first draft of this check argued that ~28,000 inserted rows per pair
@@ -164,3 +175,51 @@ SELECT (SELECT count(*) FROM public.ottoq_stall_bookings
          WHERE sim_run_id = '00000000-0000-0000-0000-000000000000') AS zero_uuid_runs,
        (SELECT count(*) FROM public.ottoq_stall_bookings
          WHERE sim_run_id IS NULL) AS production_bookings;
+
+-- Q6. THE STOPWATCH, WHICH IS WHY THIS FILE'S TITLE CHANGED.
+--     Q3's 2,004x is a PLANNER COST RATIO. Q5 said in as many words that a cost
+--     ratio is not a stopwatch. So: both forms, run through plpgsql variables
+--     exactly as the function runs them, across all 158 flagship stalls, warmed
+--     and then measured twice.
+--
+--       pass   COALESCE form   sargable form   ratio   per call
+--         1       1237.0 ms         5.6 ms      221x   7.83 ms -> 0.035 ms
+--         2       1166.3 ms         3.9 ms      299x   7.38 ms -> 0.025 ms
+--
+--     The defect is real, the fix is real, and it is roughly 300x on the call.
+--     Now the arithmetic nobody did before writing "SOLVED":
+--
+--       one arm emits 569 vehicle commands
+--       569 x 7.4 ms                       =   4.2 s per arm
+--                                          =   8.4 s per pair
+--       the pair is                            812 s
+--
+--     ONE PERCENT. To account for the ~566 s of tick time in a 12-tick pair
+--     (0126: 12 ticks x 23.6 s x 2 arms) this query would have to be called
+--     ~38,000 times per arm — 67 times per emitted command. It is not.
+--
+--     So 0221 is worth applying: it is a genuine unbounded-in-history read on
+--     the hot path, it gets monotonically worse, and it costs nothing to fix.
+--     It is not G19.
+--
+-- Q7. WHAT G19 STILL IS, STATED AS THE OPEN QUESTION IT IS.
+--     Q2's 1,957,327 SEQUENTIAL scans of ottoq_stall_bookings reading 49.3
+--     BILLION tuples are NOT this query — Q6 shows it plans onto an index scan
+--     even through plpgsql variables, which is why it costs 7.4 ms rather than
+--     the ~100 ms a warm scan of a 410 MB table would cost. Some other query
+--     seq-scans that table, roughly two million times, and that is where 1.4 TB
+--     of heap reads and 8.88 billion buffer touches actually go.
+--
+--     Two measurements are already scheduled to name it rather than guess a
+--     third time:
+--       * public.g19_seq_before — pg_stat_user_tables and pg_statio_user_tables
+--         snapshotted 2026-09-08 10:00:53 UTC with ottoq_stall_bookings at
+--         seq_scan = 1,957,331. Differencing after the next pair gives SEQUENTIAL
+--         SCANS PER PAIR exactly, with no inference at all.
+--       * r25_g at 10:52 UTC runs with pg_stat_statements.track='all' in its own
+--         session, so every nested statement inside the tick is recorded with its
+--         calls, total_exec_time and shared_blks_read. That names the query.
+SELECT relname, seq_scan, seq_tup_read, snap_at
+FROM public.g19_seq_before
+WHERE relname IN ('ottoq_stall_bookings','ottoq_itinerary_legs')
+ORDER BY seq_tup_read DESC;
