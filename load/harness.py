@@ -160,10 +160,32 @@ def run_pgbench(url: str, target: T.Target, bindings: dict, clients: int,
             f"{missing}. pgbench substitutes an empty string for an unset "
             f"variable, so this would have measured a syntax error.")
 
-    # Create it rather than assume it: main() hands in a TemporaryDirectory
-    # that already exists, but a caller (the calibration test does exactly
-    # this) may hand in a per-run subdirectory that does not.
+    # Create it rather than assume it: a caller may hand in a per-run
+    # subdirectory that does not exist yet.
     workdir.mkdir(parents=True, exist_ok=True)
+
+    # ONE RUN PER DIRECTORY, enforced rather than documented. The per-
+    # transaction logs are read back with a glob, and pgbench names them
+    # log_<prefix>.<pid>[.<thread>] -- so a second run of the same target into
+    # the same directory leaves the first run's files sitting there and the
+    # glob silently returns BOTH.
+    #
+    # This is not hypothetical. It was found by running the CLI end to end
+    # against a local cluster with `--target floor`: main() ran the floor, then
+    # ran the target (also the floor) into the same TemporaryDirectory, and the
+    # result reported 685,632 tps where pgbench's own summary said 349,191 --
+    # exactly double, over exactly twice as many samples. Every percentile in
+    # that result was computed over two runs' worth of transactions while
+    # claiming to describe one. A doubled sample count is invisible in a
+    # percentile; only the rate disagreeing with pgbench's own gave it away.
+    existing = sorted(workdir.glob(f"log_{target.name}*"))
+    if existing:
+        raise SystemExit(
+            f"{workdir} already holds {len(existing)} pgbench log file(s) for "
+            f"target {target.name!r}. Each run needs its own directory: the "
+            f"logs are read back by glob, so a second run here would be "
+            f"measured together with the first and report both as one.")
+
     script = workdir / f"{target.name}.sql"
     script.write_text(target.sql)
     log_prefix = workdir / f"log_{target.name}"
@@ -291,11 +313,14 @@ def main(argv=None) -> int:
 
     with tempfile.TemporaryDirectory(prefix="ottoq-load-") as td:
         work = Path(td)
+        # Separate directories, not one shared work dir: see the guard in
+        # run_pgbench. With `--target floor` the two runs have the same log
+        # prefix, and sharing a directory made the second read both.
         floor = run_pgbench(url, T.FLOOR, {}, a.clients, min(a.duration, 15),
-                            a.rate, work)
+                            a.rate, work / "floor")
         pair_mid = probe_pair(url)
         main_run = run_pgbench(url, target, bindings, a.clients, a.duration,
-                               a.rate, work)
+                               a.rate, work / "target")
 
     pair_after = probe_pair(url)
     finished = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

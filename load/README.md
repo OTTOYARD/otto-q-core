@@ -94,6 +94,32 @@ or running as root, which `initdb` refuses), and each skip names what was
 missing — a green tick from a test that silently did nothing is worse than a
 skip.
 
+## One bug the component tests could not have found
+
+The statistics and the pgbench wrapper were tested and green. Then the CLI was
+run end to end against the local cluster with `--target floor`, and reported:
+
+```
+achieved_rate_tps: 685632.5      pgbench_tps: 349191.2
+n: 3454410                       pgbench_transactions: 1745988
+```
+
+Exactly double, over exactly twice the samples. `main()` ran the floor and then
+ran the target — also the floor — into one temporary directory, and the
+per-transaction logs are read back with a glob, so the second run measured
+both.
+
+**Every percentile in that result was computed over two runs while describing
+one, and none of them looked wrong.** A doubled sample count is invisible in a
+percentile. The only thing that gave it away was the harness's own rate
+disagreeing with pgbench's, which are derived independently — and that
+disagreement is now a test
+(`test_the_reported_rate_agrees_with_pgbenchs_own`), alongside a guard that
+refuses a second run into a directory that already holds logs.
+
+The lesson is the reason this section exists: the parts were tested, the
+program was not. Run the program.
+
 ## What it cannot measure, so nobody has to infer it
 
 **The HTTP edge-function path is not measured.** `edge-functions/otto-q-api`

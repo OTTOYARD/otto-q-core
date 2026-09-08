@@ -245,3 +245,42 @@ def test_the_gap_between_the_two_latencies_is_flagged_only_when_it_matters(
                          rate=None, workdir=tmp_path / "gaps")
     assert slow["two_latencies_note"] is None, (
         f"flagged a gap that does not matter: {slow['two_latencies_note']}")
+
+
+def test_a_second_run_into_the_same_directory_is_refused(local_cluster, tmp_path):
+    """Found by running the CLI end to end rather than by testing its parts.
+
+    `python3 load/harness.py --target floor` ran the floor and then ran the
+    target -- also the floor -- into one TemporaryDirectory. The per-
+    transaction logs are read back with a glob, so the second run measured both
+    and reported 685,632 tps where pgbench's own summary said 349,191: exactly
+    double, over exactly twice the samples. The percentiles were computed over
+    two runs while describing one, and nothing about them looked wrong. Only
+    the rate disagreeing with pgbench's own number gave it away.
+
+    So the invariant is enforced at the door, and it is loud."""
+    d = tmp_path / "shared"
+    first = H.run_pgbench(local_cluster, T.FLOOR, {}, clients=2, duration=2,
+                          rate=None, workdir=d)
+    assert first["latency"]["n"] > 0
+
+    with pytest.raises(SystemExit) as e:
+        H.run_pgbench(local_cluster, T.FLOOR, {}, clients=2, duration=2,
+                      rate=None, workdir=d)
+    assert "own directory" in str(e.value)
+
+
+def test_the_reported_rate_agrees_with_pgbenchs_own(local_cluster, tmp_path):
+    """The cross-check that caught the shared-directory bug, kept as a test.
+
+    achieved_rate_tps is computed from the number of log lines over wall time;
+    pgbench_tps is pgbench's own. They are derived independently and must agree
+    within the slack of the harness's extra wall-clock (process spawn, log
+    read). If they diverge by more than that, the harness is counting
+    transactions that are not this run's."""
+    r = H.run_pgbench(local_cluster, T.FLOOR, {}, clients=2, duration=3,
+                      rate=None, workdir=tmp_path / "agree")
+    mine, theirs = r["achieved_rate_tps"], r["pgbench_tps"]
+    assert 0.5 < mine / theirs < 1.05, (
+        f"harness says {mine} tps, pgbench says {theirs} — a ratio near 2 "
+        f"means a foreign log file was globbed into this run")
