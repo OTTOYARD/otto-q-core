@@ -296,3 +296,98 @@ conclusion now, before d lands, so it is not written to fit:
 > arithmetic. That is a pattern in how the arithmetic is done, not luck in
 > which functions were fixed, and `r27_g` at 15:52 UTC — instrumented with
 > `track_functions='all'` — is the measurement that should explain it.
+
+### d — `busy_day` / 424242 / 12 ticks — **PASS**, 364 s
+
+Fired 14:46:00 UTC (9:46 AM CT), ended 14:52:04, **364 s**. Thirteen atoms equal
+between the arms; `endst` md5 `2d6ea57e`, which is round 26's value.
+
+| atom | arm A = arm B | vs round 26 |
+|---|---|---|
+| `fp` | `e418e4f0` | = |
+| `h_cmd` | `76134009` | = |
+| `h_dec` | `47757095` | = |
+| `h_evt` | `6453c09b` | = |
+| `h_bkg` | `8bc2877b` | = |
+| `h_nrg` | `9917f7c3` | = |
+| `h_prop` | `029cad7d` | = |
+| `h_defr` | `d41d8cd9` | = (empty-string md5) |
+| `h_cal` | `11a24626` | = |
+| `h_rule` | `d56e09a3` | = |
+| `h_rcl` | `f58ee562` | = |
+| `h_sdr` | `6fd75365` | = |
+| `endst` (md5) | `2d6ea57e` | = |
+
+---
+
+## THE VERDICT ON BOTH PREDICTIONS
+
+### Prediction 1 — no verdict atom moves: **HELD, on all four columns**
+
+Four columns x fourteen atoms = **fifty-six comparisons, zero movement**, and
+every value equal to round 26's. That includes `h_rule`, `h_rcl`, `h_sdr` and
+`endst` — the four `db/checks/0134` showed the matrix cannot see, and which
+`db/checks/0135` (G28) has since shown were the *only* comparison actually
+running for the last four days.
+
+`h_evt` deserves the specific note: 0224 changed what `ottoq_events.data_source`
+holds, and 0224's P1 asserted before the apply — against the live verdict
+function — that `h_evt` never reads that column. Four columns later it has not
+moved. The proof and the round agree.
+
+### Prediction 2 — the pair loses about 109 seconds: **WRONG, and wrong in the direction that flatters the fix**
+
+| column | round 26 | predicted | round 27 | actual saving |
+|---|---|---|---|---|
+| a — `busy_day`/314159/12t | 537 s | ~428 s | **358 s** | −179 |
+| b — `busy_day`/171717/12t | 533 s | ~424 s | **376 s** | −157 |
+| c — `normal_day`/171717/12t | 477 s | ~368 s | **358 s** | −119 |
+| d — `busy_day`/424242/12t | 529 s | ~420 s | **364 s** | −165 |
+| **mean** | **519 s** | **410 ± 30** | **364 s** | **−155** |
+
+Predicted 109 s. Delivered **155 s — 1.42x the claim**, and the mean landed
+**16 s below the bottom of the committed band**.
+
+### The falsification table had no row for this, and that is the finding
+
+The table written before the round listed three outcomes: the mean lands ~410
+(both fixes did what they claimed), ~519 (the hoist bought nothing), or between
+them (partial). **It did not have a row for "better than predicted."**
+
+Reading it back: I enumerated the ways the fix could disappoint and none of the
+ways it could over-deliver. That is not a falsification table, it is a risk
+register wearing one. The outcome that actually happened arrived with no
+pre-written action, which is exactly the state the table existed to prevent.
+
+Recorded rather than patched — the table stays as it was written, above.
+
+### What it means, and what it does not
+
+It does **not** mean 0223 is better than advertised in some vague way. It means
+**the arithmetic that converts a per-call measurement into a per-pair saving
+under-predicts, and this is the second time**:
+
+| fix | predicted saving | actual | factor |
+|---|---|---|---|
+| 0222, the boot fingerprint (round 26, 24-tick) | — | — | **2.2x** (G27) |
+| 0223, the load-meter hoist (round 27, 12-tick) | 109 s | 155 s | **1.42x** |
+
+Two unrelated fixes, both hoisting a call out of a per-row context, both beating
+their own per-call maths. The most likely explanation is that hoisting removes
+more than the call itself — it also removes whatever the planner had to do
+around it per row — but **that is a hypothesis, not a finding**, and the number
+is only ever wrong in our favour, which is precisely why it needs chasing rather
+than enjoying.
+
+`r27_g` at 15:52 UTC is the instrument: a seventh column with
+`track_functions='all'`, against a `pg_stat_user_functions` baseline captured at
+13:45:25. `db/checks/0136` Q8 establishes the same diff also answers G23(b), so
+one measurement settles two open findings.
+
+### The committed action
+
+The table's nearest row — *"mean lands ~410 → sweep FIX 2 (the `ocpp_sessions`
+Seq Scan) next"* — still applies, and more strongly than it would have at 410:
+the fixes are clearly buying real time. **FIX 2 is already drafted as `0227`**,
+measured at 17.5 ms and 2,751 buffers per call across ~1,024 calls a pair, with
+its before-plan asserted so it refuses to apply if the premise does not hold.
