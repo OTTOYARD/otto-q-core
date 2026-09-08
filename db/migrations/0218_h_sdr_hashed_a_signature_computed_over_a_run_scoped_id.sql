@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260908084304
 -- migration-name:    h_sdr_hashed_a_signature_computed_over_a_run_scoped_id
 --
 -- ---------------------------------------------------------------------------
