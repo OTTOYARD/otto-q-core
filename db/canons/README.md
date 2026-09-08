@@ -57,13 +57,31 @@ four are compared. Copy `h_rule`, `h_rcl`, `h_sdr` and the `endst` verdict into
 every round file and diff them against the previous round yourself. That is not
 belt-and-braces; for those four it is the only belt.
 
+### And the same is true of the whole across-round comparison, right now
+
+**`db/checks/0135` (G28): since 2026-09-04 15:00, no `forces_recert: FALSE`
+classification has reached the floor function at all.** It joins
+`ottoq_cert_lineage` to `supabase_migrations` on the raw name, and every lineage
+row since that date carries the `NNNN_` file prefix the apply path does not
+write — so 33 of 92 fall through the conservative default and the floor jumps to
+the newest migration after every apply. Measured 2026-09-08: **not one column
+green, six of seven stale, and one column carrying twenty-six consecutive
+passing pairs against a `consecutive_passes` of zero.**
+
+So while 0134's four atoms are the part the matrix *cannot* see, G28 means the
+matrix has not been seeing anything. Between them: **for four days the round
+file you write by hand has not been the last belt, it has been the only one.**
+Fix drafted as `0226`; until it is applied and a round runs above the corrected
+floor, treat every `green` in the matrix as unavailable rather than false.
+
 `ottoq_cert_recert_floor()` is the cutoff below which pairs no longer count,
 raised by every `forces_recert` migration — whether registered in
 `supabase_migrations` or only classified in `ottoq_cert_lineage` (0199; before it,
-six recerts applied through the SQL endpoint did not move the floor). A column with `green = false` has not
-yet shown two consecutive passes at the current floor, so its canon is provisional
-— record it anyway and mark it, because a provisional canon that later moves is
-still evidence.
+six recerts applied through the SQL endpoint did not move the floor), and, per
+G28 above, currently raised by every migration whether or not it forces one. A
+column with `green = false` has not yet shown two consecutive passes at the
+current floor, so its canon is provisional — record it anyway and mark it,
+because a provisional canon that later moves is still evidence.
 
 ## Reading a diff between rounds
 
