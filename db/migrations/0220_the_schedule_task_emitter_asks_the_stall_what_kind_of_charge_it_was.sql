@@ -84,6 +84,44 @@
 
 BEGIN;
 
+-- P-. NOTHING IN FLIGHT ------------------------------------------------------
+-- The standing constraint: never apply while a certification pair is running or
+-- scheduled. Until 2026-09-08 that was enforced by the operator remembering it,
+-- for three of the four migrations queued behind round 25. It is a file now.
+--
+-- All three checks are needed and the middle one is the load-bearing one.
+-- ottoq_sim_runs cannot see an in-flight pair AT ALL: both arms run inside one
+-- transaction, so their rows are uncommitted and invisible until it ends. And
+-- cron.job_run_details reports an in-flight pair of this shape as
+-- status='succeeded', return_message='SET', duration ~1 s, because the job
+-- command is two statements and the row reflects the first (db/canons/round25.md).
+-- pg_stat_activity is the only authority.
+DO $inflight$
+DECLARE v_jobs text; v_pairs int; v_runs int;
+BEGIN
+  SELECT string_agg(jobname, ', ' ORDER BY jobname) INTO v_jobs
+    FROM cron.job WHERE jobname ~ '^r[0-9]+_';
+  IF v_jobs IS NOT NULL THEN
+    RAISE EXCEPTION '0220 P-: certification jobs are still scheduled (%) — migrations wait for '
+                    'the round, and unscheduling them is the deliberate act that says it is over',
+                    v_jobs;
+  END IF;
+
+  SELECT count(*) INTO v_pairs FROM pg_stat_activity
+   WHERE query ILIKE '%ottoq_determinism_pair%' AND state = 'active'
+     AND pid <> pg_backend_pid();
+  IF v_pairs > 0 THEN
+    RAISE EXCEPTION '0220 P-: a determinism pair is running right now';
+  END IF;
+
+  SELECT count(*) INTO v_runs FROM public.ottoq_sim_runs WHERE status = 'running';
+  IF v_runs > 0 THEN
+    RAISE EXCEPTION '0220 P-: % sim run(s) are in flight', v_runs;
+  END IF;
+
+  RAISE NOTICE '0220 P-: no certification scheduled, no pair running, no sim run in flight';
+END $inflight$;
+
 INSERT INTO public.ottoq_schema_snapshots
        (label, object_kind, schema_name, object_name, definition, def_md5)
 SELECT '0220_pre', 'function', n.nspname, p.proname,

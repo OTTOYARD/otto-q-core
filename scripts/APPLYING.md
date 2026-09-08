@@ -37,6 +37,12 @@ Copy `db/migrations/0001_EXAMPLE_template.sql` to
 Not optional, and not style preference. Each rule below is a scar. The reasoning
 is in the template's comments; the checklist is:
 
+- **Refuse to run while a certification is scheduled or in flight.** Copy the
+  `P-. NOTHING IN FLIGHT` block from `db/migrations/0221_*.sql`. Three checks,
+  and the middle one is load-bearing: `ottoq_sim_runs` **cannot see an in-flight
+  pair at all** (both arms run in one transaction, so the rows are uncommitted
+  and invisible), and `cron.job_run_details` reports an in-flight pair as
+  `succeeded` in about a second. `pg_stat_activity` is the only authority.
 - **Snapshot before you replace.** `INSERT INTO ottoq_schema_snapshots ... SELECT
   pg_get_functiondef(p.oid), md5(...)` for every function the file touches,
   before it touches them.
