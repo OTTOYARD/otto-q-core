@@ -227,7 +227,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0238](db/migrations/0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql) | `20260909031408` | yes — ledger | G41 / db/checks/0156 |
 | [0239](db/migrations/0239_a_certification_that_replays_a_recorded_agent_stream.sql) | `20260909032226` | yes — ledger | AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door |
 | [0240](db/migrations/0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql) | `20260909051529` | yes — ledger | G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge |
-| [0241](db/migrations/0241_a_certification_hears_only_the_proposers_it_certified.sql) | `PENDING` | no — pending | POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that |
+| [0241](db/migrations/0241_a_certification_hears_only_the_proposers_it_certified.sql) | `20260909051812` | yes — ledger | POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that |
 | [0242](db/migrations/0242_a_capture_records_only_what_the_run_cannot_regenerate.sql) | `PENDING` | no — pending | G42 / db/checks/0159. APPLY AFTER 0241 -- it consults the registry 0241 |
 
 110 migrations indexed.

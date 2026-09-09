@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909051812
 -- migration-name:    a_certification_hears_only_the_proposers_it_certified
 --
 -- POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that
