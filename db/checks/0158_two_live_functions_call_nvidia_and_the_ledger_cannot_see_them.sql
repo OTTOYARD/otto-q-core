@@ -144,3 +144,36 @@
 --       can never fail the function.
 --
 -- With both, the next derivation needs one leg again, and it is the ledger.
+
+-- ===========================================================================
+-- HALF (b) SHIPPED AND VERIFIED, 2026-09-08 22:42 CT (2026-09-09 03:42 UTC)
+-- ===========================================================================
+-- ottoq-orchestrate-tick  v8 -> v9   deployed, verify_jwt preserved
+-- ottoq-assign-optimize   v4 -> v5   deployed, verify_jwt preserved
+--
+-- Then both were invoked for real, through the same net.http_post + vault anon
+-- key path ottoq_cron_tick uses, and the ledger was read back:
+--
+--   called_at                    source_note            cand  free  abstained      nvidia_called
+--   ---------------------------  ---------------------  ----  ----  -------------  -------------
+--   2026-09-09 03:42:56.173944   orchestrate-tick:v9       0   158  no_candidates  false
+--   2026-09-09 03:42:56.166076   assign-optimize:v5        0    40  no_candidates  false
+--
+-- Both took the EARLY-RETURN path -- which is exactly the path that was silent
+-- before, and the reason the early returns were ledgered rather than only the
+-- fetch. "Invoked and abstained because the depot had no candidates" is now a
+-- row; yesterday it was indistinguishable from "never invoked".
+--
+-- CORRECTION TO MY OWN WORKING ASSUMPTION, recorded because it was load-bearing
+-- while I held it: I suspected pg_net might not be delivering at all, on the
+-- evidence that net._http_response holds only 2 rows, both from 2026-09-06.
+-- It delivers fine -- these two requests were queued and served in seconds. The
+-- table is simply pruned. That does not change Finding 2: the absence of
+-- function_edge_logs in the 22:30-03:40 window still means no edge function was
+-- invoked then, and it now means so more strongly, since pg_net is demonstrably
+-- capable of invoking one.
+--
+-- STILL OPEN: half (a), the database-side dispatch row (migration 0240), which
+-- cannot be applied while round 31 is in flight. Without it, an
+-- ottoq_cron_tick that POSTs and gets no response still leaves no trace on the
+-- database side -- the edge row only exists if the function actually ran.
