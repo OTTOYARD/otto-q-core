@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909022308
 -- migration-name:    record_and_replay_an_agent_proposal_stream
 --
 -- AGENT LAYER, step 2 -- Posture B from SOLVER_STATE.md §8.2, which §8.3 calls
@@ -382,3 +382,42 @@ VALUES (
   'existing modified, nothing in the decide path calls them; A7 pins decide_tick md5 '
   'and asserts the verdict does not read the new table.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 21:23 CT (2026-09-09 02:23 UTC), version 20260909022308.
+-- First attempt. All seven assertions passed, INCLUDING A5.
+--
+--   table live                       true
+--   functions                        capture, inject, content_hash
+--   replay table rows                0        (self-test cleaned up)
+--   proposals with declared_source
+--     LIKE 'replay:%'                0        (ditto)
+--   rows carrying _0237_perturbation 0        (the A5 perturbation is gone)
+--   ottoq_external_proposals total   14,502   (unchanged by the self-test)
+--   decide_tick md5                  UNCHANGED
+--   recert floor                     2026-09-07 21:36:53.363037, unmoved
+--
+-- A5 IS THE ONE THAT MATTERS AND IT FIRED CORRECTLY. It injected a real
+-- recorded stream, hashed it, altered ONE proposal's jsonb, re-hashed, and
+-- required the two to differ. They did. Without that step A1-A4 would have been
+-- equally consistent with a content hash that returns a constant -- which is
+-- precisely the failure mode a green test suite hides.
+--
+-- WHAT IS NOW TRUE, AND WHAT IS NOT.
+--
+--   TRUE: an agent proposal stream can be recorded from any run, is recorded
+--   deterministically (content-ordered, so re-capture is byte-identical), can be
+--   replayed into any run tick-for-tick, arrives field-for-field identical, is
+--   auditable as a replay, and any single-field divergence is detectable.
+--
+--   NOT YET TRUE: that a certification PAIR has been run with a replayed stream
+--   in both arms. That needs a driver that interleaves
+--   ottoq_proposal_replay_inject with the tick loop, which is step 3. Until then
+--   this is a proven substrate, not a proven certification. Stated plainly here
+--   so nobody reads "Posture B" as done.
+--
+-- STEP 3, and the honest shape of it: ottoq_cert_arm drives its own tick loop
+-- internally (FOR i IN 1..p_ticks LOOP PERFORM ottoq_sim_advance_and_snapshot),
+-- so injection has to happen between ticks from a caller that owns the loop.
+-- That is a new arm procedure, not a change to the certified tick -- which is
+-- the same reason 0236 and 0237 could both stay forces_recert FALSE.
