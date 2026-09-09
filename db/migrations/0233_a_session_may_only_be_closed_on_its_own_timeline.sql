@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909003956
 -- migration-name:    a_session_may_only_be_closed_on_its_own_timeline
 --
 -- G36 / db/checks/0152. Fixes ONE of four sites in a single defect family, and
@@ -306,3 +306,57 @@ VALUES (
   'unexamined). Both of the first two are in the tick path and are forces_recert '
   'TRUE.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 19:39:56 CT (2026-09-09 00:39:56 UTC). Three preconditions,
+-- four assertions, first attempt.
+--
+--   benchmark_reset md5  f2014058b6e1c07530a7db0203efbfc1
+--                     -> ae412097c7b1b7cca8d110b9b91733a8
+--   P2: caller set is exactly the six cert-arm procedures
+--   A1: old wall-clock close gone; floor, run scope and stopped_reason present
+--   A2: no 'completed' anywhere in the function
+--   A3: the floor returns the sim start for both the missing-run case and the
+--       exact -05:59:28 case
+--   ottoq_decide_tick md5 ae98f71b879a0a11bdf366d21ff5b4eb UNCHANGED
+--   THE FLOOR DID NOT MOVE: 2026-09-07 21:36:53.363037 before and after.
+--
+-- ***  NOT YET VERIFIED IN BEHAVIOUR, AND THIS MATTERS  ***
+--
+-- The verification attempt did NOT verify anything, and it would have been easy
+-- to report that it did. The plan was: run arm A, snapshot its sessions, run arm
+-- B, and prove arm A's records survived arm B's reset.
+--
+--   arm A  bc760291-eef0-481c-989b-6f2dc8cce9b1  otto_q, 12 ticks
+--          BEFORE arm B: 56 sessions, 26 still open, 0 negative, 1280.67 kWh
+--          AFTER  arm B: 56 sessions,               0 negative, 1280.67 kWh
+--                        0 rows with stopped_reason='benchmark_reset'
+--
+-- That looks like a pass and is not one. Arm B CRASHED, and a CALL is one
+-- transaction, so arm B's ottoq_benchmark_reset rolled back with it and never
+-- touched arm A at all. Zero rows reaped is the tell: had the fix run, arm A's
+-- 26 open sessions would have been closed WITH stopped_reason='benchmark_reset'
+-- and 0 negative. Instead nothing ran. The evidence is consistent with the fix
+-- working and equally consistent with the fix doing nothing.
+--
+-- 0233 IS THEREFORE APPLIED AND UNPROVEN. What would prove it, exactly: a
+-- SUCCESSFUL arm B, after which arm A shows
+--     stopped_reason='benchmark_reset' on its previously-open sessions
+--     AND ended_at >= started_at on every one of them.
+-- Both conditions, or it is not proven.
+--
+-- WHY ARM B CRASHED -- a new finding, not this migration's business, written up
+-- as db/checks/0153 / G37:
+--
+--   ERROR: duplicate key value violates unique constraint
+--          "idx_stalls_one_vehicle_per_stall"
+--   CONTEXT: sync_stall_occupancy() -> ottoq_fifo_tick line 24
+--
+-- Two triggers on public.vehicles disagree about what "tethered" means.
+-- ottoq_arm_interlock_guard compares robotic_tether_until against a clock, so it
+-- PERMITS moving a vehicle whose tether has expired. sync_stall_occupancy tests
+-- only "robotic_tether_until IS NOT NULL", so for that same vehicle it REFUSES
+-- to vacate the old stall. The vehicle then occupies two stalls and the unique
+-- index on stalls.current_vehicle_id fires. Every successful move of an
+-- expired-but-non-NULL tether leaks a stall. Confirmed by reading both trigger
+-- bodies (expiry-aware: true / false).
