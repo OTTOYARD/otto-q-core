@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909032226
 -- migration-name:    a_certification_that_replays_a_recorded_agent_stream
 --
 -- AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door.
@@ -299,7 +299,7 @@ DECLARE v_pre text; v_new text; n_pre int; n_new int; n int;
 BEGIN
   SELECT definition INTO v_pre FROM public.ottoq_schema_snapshots
    WHERE label='0239_pre' AND object_name='ottoq_determinism_pair'
-   ORDER BY captured_at DESC LIMIT 1;
+   ORDER BY taken_at DESC LIMIT 1;
   IF v_pre IS NULL THEN RAISE EXCEPTION 'A2 FAILED: the pre-image snapshot is missing'; END IF;
   v_new := pg_get_functiondef('public.ottoq_determinism_pair_replay(bigint,integer,text,uuid,timestamptz,integer,uuid)'::regprocedure);
 

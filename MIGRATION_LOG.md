@@ -225,7 +225,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0236](db/migrations/0236_a_proposal_must_know_which_tick_it_was_made_in.sql) | `20260909021833` | yes — ledger | AGENT LAYER, step 1 of the Posture-B sequence in SOLVER_STATE.md §8.3 |
 | [0237](db/migrations/0237_record_and_replay_an_agent_proposal_stream.sql) | `20260909022308` | yes — ledger | AGENT LAYER, step 2 -- Posture B from SOLVER_STATE.md §8.2, which §8.3 calls |
 | [0238](db/migrations/0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql) | `20260909031408` | yes — ledger | G41 / db/checks/0156 |
-| [0239](db/migrations/0239_a_certification_that_replays_a_recorded_agent_stream.sql) | `PENDING` | no — pending | AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door |
+| [0239](db/migrations/0239_a_certification_that_replays_a_recorded_agent_stream.sql) | `20260909032226` | yes — ledger | AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door |
 
 107 migrations indexed.
 
