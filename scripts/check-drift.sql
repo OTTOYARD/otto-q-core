@@ -342,7 +342,7 @@ repo_manifest(version, name, file) AS (
     ('20260909051529'::text, 'the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row'::text, '0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql'::text),
     ('20260909051812'::text, 'a_certification_hears_only_the_proposers_it_certified'::text, '0241_a_certification_hears_only_the_proposers_it_certified.sql'::text),
     ('20260909051927'::text, 'a_capture_records_only_what_the_run_cannot_regenerate'::text, '0242_a_capture_records_only_what_the_run_cannot_regenerate.sql'::text),
-    ('PENDING'::text, '0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether'::text, '0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql'::text)
+    ('20260909060909'::text, '0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether'::text, '0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

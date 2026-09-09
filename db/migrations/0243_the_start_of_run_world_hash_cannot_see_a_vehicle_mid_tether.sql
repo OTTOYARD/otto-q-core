@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909060909
 -- migration-name: 0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether
 -- ===========================================================================
 -- 0243  THE START-OF-RUN WORLD HASH CANNOT SEE A VEHICLE MID-TETHER
@@ -251,3 +251,32 @@ VALUES ('0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether',
         'robotic_tether columns and ottoq_tick_invariance_reset_fleet now clears them. '
         'fp moves for every column: every canon recorded against the narrow hash is '
         'invalidated, which is the point.');
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-09 06:09:09 UTC (1:09 AM CT) as version 20260909060909
+-- ---------------------------------------------------------------------------
+-- Applied alone: 0 busy client backends, 0 tether residue at the flagship depot,
+-- round 31 long finished and the three G43 control jobs unscheduled first.
+--
+-- Post-state, measured:
+--
+--   ottoq_tick_invariance_reset_fleet  md5  b6371136cd4ba924cb7953c5fd15216e
+--                                       ->  8784bb1245160b035385270b2ec88187
+--   ottoq.ottoq_world_fingerprint      md5  ae1cb9d9659029584c373bc10ce5c6fc
+--                                       ->  f2ab1fb907ee1f63a5d25cfcf193fea9
+--   reset clears all four tether columns          true
+--   fingerprint hashes all four tether columns    true
+--   ottoq_cert_lineage row, forces_recert TRUE    1
+--   probe residue on public.vehicles              0
+--   recert floor  2026-09-09 03:15:07.410339 -> 2026-09-09 06:09:09.360796
+--
+-- Every canon recorded before 06:09:09 is now below the floor and must be
+-- re-earned. That is the intended cost, not a side effect.
+--
+-- WHAT JUSTIFIED APPLYING IT: db/checks/0160 section 9. C3 planted the residue
+-- and ran the ORIGINAL ottoq_determinism_pair with no replay of any kind, and
+-- the pair failed with TEN of fourteen atoms moved -- h_bkg, h_cmd, h_dec,
+-- h_evt, h_nrg, h_prop, h_rcl, h_rule, h_sdr and endst -- while fp, the atom
+-- whose entire job is "both arms began from the same world", read
+-- 803698f332adc0d06cbefca79dad1ce0 on BOTH arms. Causation established by
+-- controlled experiment, not inferred from a symptom.

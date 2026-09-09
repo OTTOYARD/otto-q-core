@@ -229,7 +229,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0240](db/migrations/0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql) | `20260909051529` | yes — ledger | G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge |
 | [0241](db/migrations/0241_a_certification_hears_only_the_proposers_it_certified.sql) | `20260909051812` | yes — ledger | POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that |
 | [0242](db/migrations/0242_a_capture_records_only_what_the_run_cannot_regenerate.sql) | `20260909051927` | yes — ledger | G42 / db/checks/0159. APPLY AFTER 0241 -- it consults the registry 0241 |
-| [0243](db/migrations/0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql) | `PENDING` | no — pending | THE START-OF-RUN WORLD HASH CANNOT SEE A VEHICLE MID-TETHER |
+| [0243](db/migrations/0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql) | `20260909060909` | yes — ledger | THE START-OF-RUN WORLD HASH CANNOT SEE A VEHICLE MID-TETHER |
 
 111 migrations indexed.
 
