@@ -19,6 +19,20 @@ function compatible(vehicleInlet: string, stall: any) {
   return true;
 }
 
+// G40 / db/checks/0158. Same blind spot as ottoq-orchestrate-tick: this function
+// POSTs to NVIDIA and wrote nothing to cuopt_invocation_log, so any claim
+// quantified from that ledger (CLAUDE.md rule 6) could not see it. Wrapped so a
+// ledger failure can never fail an assignment.
+async function logCuopt(sb: any, row: Record<string, unknown>) {
+  try {
+    // supabase-js RETURNS {error} rather than throwing, so a bare try/catch would
+    // swallow a rejected insert as success and the ledger would go quietly blind
+    // again -- which is the whole defect this closes. Check both.
+    const { error } = await sb.from("cuopt_invocation_log").insert(row);
+    if (error) console.error("cuopt ledger write REJECTED (non-fatal):", error.message);
+  } catch (e) { console.error("cuopt ledger write THREW (non-fatal):", e instanceof Error ? e.message : e); }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
@@ -36,7 +50,16 @@ serve(async (req) => {
     const e = energyRows?.[0] ?? {};
     const cands = vehicles ?? [];
     let free = stalls ?? [];
-    if (cands.length === 0 || free.length === 0) return json({ assignments: [], candidates: cands.length, stalls: free.length, source: "none" });
+    if (cands.length === 0 || free.length === 0) {
+      // G40 / 0158: an abstention is a ledger fact too. Rule 6 asks for "invoked N,
+      // abstained M"; a silent early return makes M unknowable.
+      await logCuopt(sb, { sim_run_id: null, stage: "edge", candidates_in: cands.length,
+        free_stalls_in: free.length, proposals_out: 0,
+        abstained_reason: cands.length === 0 ? "no_candidates" : "no_free_stalls",
+        source_note: "assign-optimize:v5",
+        detail: { depot_id, nvidia_called: false, ledgered_by: "G40/0158" } });
+      return json({ assignments: [], candidates: cands.length, stalls: free.length, source: "none" });
+    }
     const serviceMax = num(depot.service_max_kw, 2500);
     const margin = num(depot.dcfc_safety_margin_pct, 10) / 100;
     const billingPeak = num(e.billing_period_peak_kw, serviceMax * 0.6);
@@ -47,13 +70,31 @@ serve(async (req) => {
     const dcfcStalls = free.filter((s: any) => s.stall_type === "dcfc").slice(0, maxConcurrentDcfc);
     const l2Stalls = free.filter((s: any) => s.stall_type === "l2");
     free = [...dcfcStalls, ...l2Stalls];
-    if (free.length === 0) return json({ assignments: [], candidates: cands.length, stalls: 0, source: "none", note: "no energy-permitted stalls" });
+    if (free.length === 0) {
+      await logCuopt(sb, { sim_run_id: null, stage: "edge", candidates_in: cands.length,
+        free_stalls_in: 0, proposals_out: 0, abstained_reason: "no_energy_permitted_stalls",
+        source_note: "assign-optimize:v5",
+        detail: { depot_id, nvidia_called: false, max_concurrent_dcfc: maxConcurrentDcfc,
+                  ledgered_by: "G40/0158" } });
+      return json({ assignments: [], candidates: cands.length, stalls: 0, source: "none", note: "no energy-permitted stalls" });
+    }
     const apiKey = Deno.env.get("NVIDIA_API_KEY_CUOPT") ?? Deno.env.get("NVIDIA_API_KEY");
     let assignments: any[] = []; let source = "cuopt_fallback"; let cuoptError: string | null = null;
+    // G40 / 0158: nv is the ledger's eyes on the NVIDIA call.
+    const nv: any = { nvidia_called: false, nvidia_statuses: [] as number[], http_status: null, latency_ms: null };
+    let abstained: string | null = null;
     if (apiKey) {
-      try { assignments = await cuoptAssign(apiKey, cands, free); source = "cuopt"; }
-      catch (err) { cuoptError = err instanceof Error ? err.message : String(err); assignments = heuristic(cands, free); }
-    } else { assignments = heuristic(cands, free); cuoptError = "no NVIDIA_API_KEY_CUOPT"; }
+      try { assignments = await cuoptAssign(apiKey, cands, free, nv); source = "cuopt"; }
+      catch (err) { cuoptError = err instanceof Error ? err.message : String(err); abstained = "cuopt_call_failed"; assignments = heuristic(cands, free); }
+    } else { assignments = heuristic(cands, free); cuoptError = "no NVIDIA_API_KEY_CUOPT"; abstained = "no_nvidia_api_key"; }
+    await logCuopt(sb, {
+      sim_run_id: null, stage: "edge",
+      candidates_in: cands.length, free_stalls_in: free.length, proposals_out: assignments.length,
+      abstained_reason: abstained, latency_ms: nv.latency_ms, http_status: nv.http_status,
+      source_note: "assign-optimize:v5",
+      detail: { depot_id, source, nvidia_called: nv.nvidia_called, nvidia_statuses: nv.nvidia_statuses,
+                cuopt_error: cuoptError, max_concurrent_dcfc: maxConcurrentDcfc, ledgered_by: "G40/0158" },
+    });
     return json({
       depot_id, source, cuopt_error: cuoptError,
       candidates: cands.length, offered_stalls: free.length,
@@ -77,7 +118,7 @@ function heuristic(vehicles: any[], stalls: any[]) {
   return out;
 }
 
-async function cuoptAssign(apiKey: string, vehicles: any[], stalls: any[]) {
+async function cuoptAssign(apiKey: string, vehicles: any[], stalls: any[], meta: any) {
   const n = vehicles.length, m = stalls.length, dim = n + m, BIG = 1000000;
   const cost = Array.from({ length: dim }, (_, i) =>
     Array.from({ length: dim }, (_, j) => {
@@ -103,7 +144,11 @@ async function cuoptAssign(apiKey: string, vehicles: any[], stalls: any[]) {
       solver_config: { time_limit: 5 },
     },
   };
+  // G40 / db/checks/0158: a real NVIDIA call that left no ledger row until now.
+  const t0 = Date.now();
   const res = await fetch(CUOPT, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey, Accept: "application/json" }, body: JSON.stringify(payload) });
+  meta.nvidia_called = true; meta.nvidia_statuses.push(res.status);
+  meta.http_status = res.status; meta.latency_ms = Date.now() - t0;
   const rawText = await res.text();
   if (!res.ok) throw new Error("HTTP " + res.status + ": " + rawText.slice(0, 220));
   let result: any; try { result = JSON.parse(rawText); } catch { throw new Error("non-JSON: " + rawText.slice(0, 160)); }
