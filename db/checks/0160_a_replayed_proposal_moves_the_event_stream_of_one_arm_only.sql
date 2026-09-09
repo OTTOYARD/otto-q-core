@@ -1,0 +1,74 @@
+-- ===========================================================================
+-- 0160  G43 -- A REPLAYED PROPOSAL MOVES THE EVENT STREAM OF ONE ARM ONLY
+-- ===========================================================================
+-- Opened 2026-09-09 ~00:35 AM CT (05:35 UTC) out of 0159 section 7.
+--
+-- WHAT HAPPENED
+--
+-- The Posture B replay pair on the flagship column busy_day / 314159 / 12t
+-- FAILED, and failed in a shape nothing in the harness has produced before:
+-- exactly one atom moved, h_evt, and it moved on ONE ARM.
+--
+--   arm A (d06abdc4-3455-47a7-acd5-680d8c8bd98c)  h_evt 6cd5031317939de6d83bc1a3888b4ea1
+--   arm B (3a224796-177e-48e3-bd1c-d9165f23aa21)  h_evt 9c631343c32cca7a861b17bc5bc8f4b7
+--
+-- Arm B's value IS the canon. Both arms of the no-replay pair at 03:42 today
+-- (54b1c04a / ff826272) and both arms at 20:50 yesterday (bd2de131 / 8291f536)
+-- produced 9c631343... So arm B ran a canonical run; arm A did not.
+--
+-- Every other atom agreed, including the two that would carry a changed
+-- decision: h_dec was identical on both arms AND identical to the no-replay
+-- canon, and h_bkg, h_nrg, h_rule, h_sdr, h_rcl, endst all matched. So arm A
+-- emitted a different EVENT STREAM while taking the same decisions, booking the
+-- same stalls, issuing the same energy commands and ending in the same state.
+--
+-- WHY THE POST-HOC TABLE READ CANNOT JUDGE THIS
+--
+-- Reading ottoq_events afterwards shows arm A holding 4,656 rows against arm B's
+-- 4,531, +116 of them at the final sim clock -- one per vehicle. That difference
+-- is REAL but it is not the finding, and it would be a false lead to treat it as
+-- one. The pair's own structure explains it:
+--
+--   FOR v_arm IN 1..2 LOOP
+--     ottoq_tick_invariance_reset_fleet(...)   <-- line 56, top of each arm
+--     ... run the tick loop ...
+--     build the arm object, h_evt included     <-- line 98-155, HASH TAKEN HERE
+--     ottoq_sim_stop_and_reset(v_run, ...)     <-- line 160, AFTER the hash
+--   END LOOP;
+--
+-- Arm A's teardown and arm B's fleet reset both write events after arm A's hash
+-- was taken, and the payloads confirm it -- they carry last_state_change moving
+-- to the transaction wall clock and then back to the sim start, with
+-- condition_drawn_run set to arm A. All four runs (both replay arms AND both
+-- control arms) recompute to values other than their own verdict for this
+-- reason. Only the hash the pair took inside its own transaction is evidence.
+--
+-- THE TWO CONTROLS, AND THE PREDICTIONS, WRITTEN BEFORE EITHER RAN
+--
+-- C1 -- ottoq_determinism_pair_replay on the same column with p_replay_id NULL.
+--       Asks: is this the replay, or is it 0239's derivation of the pair?
+--
+--       PREDICTION: C1 PASSES, both arms 9c631343... I expect this because
+--       every behavioural addition 0239 made is inside IF p_replay_id IS NOT
+--       NULL, and check 0157's P0 control (this same function, replay NULL)
+--       already passed. Confidence moderate, not high: 0157 ran on the 4-vehicle
+--       grid fixture, which is small enough to miss a whole class of thing.
+--       If C1 FAILS, the finding is not about replay at all -- it is that 0239
+--       shipped a defective certification function, and 0157's Posture B proof
+--       has to be re-read in that light.
+--
+-- C2 -- the identical replay pair, run again.
+--       Asks: is the divergence deterministic, or is it a coin?
+--
+--       PREDICTION: C2 FAILS AGAIN with arm A at exactly 6cd50313... and arm B
+--       at 9c631343... A coin would be worse news and a different investigation;
+--       a repeatable arm-A-only divergence is a mechanism, and mechanisms can be
+--       found. Confidence moderate. If arm A lands on a THIRD value, the replay
+--       path is nondeterministic in itself and Posture B is not safe to promote.
+--
+-- Both controls are scheduled through pg_cron rather than run from a client
+-- session, for the reason the rounds are: the 25-minute statement timeout and
+-- an execution that does not depend on a connection staying up.
+--
+-- Round 31 finished at 04:58 (r31_f) and no cert job is scheduled after it, so
+-- both controls run alone on the flagship depot.
