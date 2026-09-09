@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909031408
 -- migration-name:    the_proposal_selector_orders_by_a_clock_that_does_not_tick
 --
 -- G41 / db/checks/0156.
@@ -352,7 +352,12 @@ BEGIN
       pg_get_functiondef('public.ottoq_l2_external_proposal(uuid,text,text,uuid)'::regprocedure),
       pg_get_functiondef('ottoq.ottoq_reoptimize_reservation_book(uuid,timestamptz)'::regprocedure)]
   LOOP
-    IF split_part(d, 'ORDER BY', 2) ~ 'proposal_id' THEN
+    -- every ORDER BY ... LIMIT region in the body, non-greedy so the regions do
+    -- not run into each other. split_part(d,'ORDER BY',2) was the first draft and
+    -- was wrong: ottoq_reoptimize_reservation_book has four ORDER BYs, so part 2
+    -- is the text between the FIRST and SECOND of them and never reaches line 39.
+    IF EXISTS (SELECT 1 FROM regexp_matches(d, 'ORDER BY(.*?)LIMIT', 'gs') m
+                WHERE m[1] ~ 'proposal_id') THEN
       RAISE EXCEPTION 'A6 FAILED: an ORDER BY reaches for proposal_id (gen_random_uuid), which differs between arms';
     END IF;
   END LOOP;

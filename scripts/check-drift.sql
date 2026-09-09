@@ -337,7 +337,7 @@ repo_manifest(version, name, file) AS (
     ('20260909015606'::text, 'the_ab_rig_takes_a_clock_anchor_and_ignores_it'::text, '0235_the_ab_rig_takes_a_clock_anchor_and_ignores_it.sql'::text),
     ('20260909021833'::text, 'a_proposal_must_know_which_tick_it_was_made_in'::text, '0236_a_proposal_must_know_which_tick_it_was_made_in.sql'::text),
     ('20260909022308'::text, 'record_and_replay_an_agent_proposal_stream'::text, '0237_record_and_replay_an_agent_proposal_stream.sql'::text),
-    ('PENDING'::text, 'the_proposal_selector_orders_by_a_clock_that_does_not_tick'::text, '0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql'::text)
+    ('20260909031408'::text, 'the_proposal_selector_orders_by_a_clock_that_does_not_tick'::text, '0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
