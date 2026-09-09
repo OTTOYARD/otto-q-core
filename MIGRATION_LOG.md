@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0244 — GENERATED, not a log
+## Index, 0134–0245 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -231,7 +231,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0242](db/migrations/0242_a_capture_records_only_what_the_run_cannot_regenerate.sql) | `20260909051927` | yes — ledger | G42 / db/checks/0159. APPLY AFTER 0241 -- it consults the registry 0241 |
 | [0243](db/migrations/0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql) | `20260909060909` | yes — ledger | THE START-OF-RUN WORLD HASH CANNOT SEE A VEHICLE MID-TETHER |
 | [0244](db/migrations/0244_the_end_state_fingerprint_cannot_see_the_assets_either.sql) | `PENDING` | no — pending | THE END-STATE FINGERPRINT CANNOT SEE THE ASSETS EITHER |
+| [0245](db/migrations/0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing.sql) | `PENDING` | no — pending | current_depot_id IS WRITTEN IN THE TICK AND CLEARED BY NOTHING |
 
-112 migrations indexed.
+113 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
