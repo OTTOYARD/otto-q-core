@@ -107,3 +107,91 @@ Full recipe and results: `SCHEMA_V2.md` §6 (0043: A1–A7 + live-fire B1–B6 a
 - KPI-4's human-actor enumeration is temporary until C7's canonical `touch_event` type lands.
 - The scratch cluster survives on this container at `/var/lib/postgresql/scratch` (port 5433)
   with the full 0043+0044 state loaded — reusable for C7 twin work until the container dies.
+
+---
+
+## 7. The agent layer: record a stream, replay it, certify against it
+
+*Added 2026-09-08. This is Posture B (SOLVER_STATE.md §8.2) and it is the thing the
+certification harness could not do before tonight. Proof: `db/checks/0157`.*
+
+### What the three pieces are
+
+| | |
+|---|---|
+| `ottoq_proposal_replay_capture(run, replay_id [, sources])` | records a run's external proposal stream, keyed `(replay_id, tick_seq)` |
+| `ottoq_proposal_replay_inject(run, replay_id, tick)` | puts one tick's worth back |
+| `ottoq_determinism_pair_replay(seed, ticks, scenario, depot, sim_start, budget, replay_id)` | `ottoq_determinism_pair` plus injection, tick for tick, into **both** arms |
+
+### The recipe
+
+```sql
+-- 1. record. From 0242 onward the DEFAULT skips the proposers that regenerate
+--    (ottoq_certified_proposers) -- replaying those would double them, because
+--    they also regenerate themselves during the replayed arm. See db/checks/0159.
+SELECT public.ottoq_proposal_replay_capture(
+         '<source run>'::uuid, '<replay id>'::uuid);
+
+-- 2. certify against it. Same key as any pair, plus the stream.
+SELECT public.ottoq_determinism_pair_replay(
+         p_seed       => 239001,
+         p_ticks      => 6,
+         p_scenario   => 'grid_smoke',
+         p_depot      => 'aacd0bb0-2d02-d101-72cc-33f70e950bc8'::uuid,
+         p_sim_start  => '2026-09-01 02:00:00+00'::timestamptz,
+         p_arm_budget_s => 120,
+         p_replay_id  => '<replay id>'::uuid);
+```
+
+The verdict gains three things: `replay` (which stream it ran against — a verdict that
+does not name its stream is not reproducible), and per arm `replay_injected` and
+`foreign_proposals`. **Both of those are MEASURED, not ENFORCED** (CLAUDE.md §2.9a) —
+they are not in the fourteen-atom equality list, and their promotion gates are written
+in 0239 and 0241 respectively.
+
+### How to read the result
+
+* **`h_prop` equal across arms** is the claim. It hashes proposal *status*, and
+  `ottoq_decide_tick` closes each proposal to enacted / superseded / expired at end of
+  tick — so equality means *the disposer did the same thing with the stream*, not merely
+  that the same rows went in.
+* **`h_prop` sensitive, `h_dec` not** means the perturbed proposal was never read.
+  That is not a bug in either atom: `h_prop` is what the agent *said*, `h_dec` is what
+  the agent *changed*. 0157 P3 and P4 are exactly this contrast.
+* **`h_prop = d41d8cd98f00b204e9800998ecf8427e`** is md5 of the empty string: the run saw
+  no proposals at all. Expected for a plain certification, because 0152 and 0105 quiesce
+  the producers. If you get it from a *replay* pair, the injection did not happen.
+
+### Three ways to get a wrong answer that looks right
+
+1. **Replaying a stream captured on another depot.** The entity ids match no vehicle, the
+   selector finds nothing, and the pair passes over an empty experiment. `0239` refuses
+   this before either arm is created — but only for the depot; a stream from a different
+   *scenario* on the same depot is still your problem.
+2. **A legacy stream.** Capture stores `COALESCE(tick_seq, -1)`, so anything recorded
+   before migration 0236 lands entirely in the −1 bucket. The arm injects that bucket once
+   at run start so it is presented rather than silently dropped, but it is not the original
+   timing and should not be described as one.
+3. **Capturing the internal proposers.** Fixed by 0242 and it is worth knowing why: they
+   regenerate identically from the seed during the replayed arm, so replaying them too puts
+   the same proposal in twice — the ghost at tick −1, visible from before tick 1 and
+   selectable in preference to the real one. `db/checks/0159`.
+
+### What a certification will refuse
+
+From migration 0241, a live proposer that is not in `ottoq_certified_proposers` is refused
+at the door with `OTTOQ_PROPOSAL_REFUSED_CERT` when the target run is `run_by='cert_harness'`.
+A **replay is not affected** — `ottoq_proposal_replay_inject` writes the table directly and
+never passes through that door. That asymmetry is the design: a recorded stream is the only
+stream a certification is allowed to hear.
+
+To let a genuinely new proposer into a certification, register it — deliberately, with a
+note saying why:
+
+```sql
+INSERT INTO public.ottoq_certified_proposers (source, note)
+VALUES ('<source>', '<why this proposer belongs in a certification>');
+```
+
+Be aware this has a second effect, by design: `ottoq_proposal_replay_capture` will then skip
+it by default, on the grounds that a certified proposer is one that regenerates.
