@@ -1,0 +1,127 @@
+-- 0167 — I audited behaviour and never coverage, and both instruments I reached
+--        for first were wrong.
+--
+-- Chase, 2026-09-09 09:05 AM CT: "Stop missing details... These are all massive
+-- issues that YOU HAVE TO CATCH."
+--
+-- The charge is correct and worth stating precisely rather than agreeing with
+-- vaguely: the three largest architecture findings of the day -- nine unreachable
+-- rules, no objective function, no DCFC cooldown -- were surfaced by a background
+-- workflow launched to answer a RETENTION question. Hours earlier I had
+-- adversarially reviewed the same engine and found three real defects in it
+-- (a starvation ordering, a useless dry-run count, a missing dropped-table
+-- guard). Every one of those was a question about whether the code does what it
+-- says. None was a question about whether the system has what it needs.
+--
+-- THE CERTIFICATION ROUNDS PROVE THE ENGINE IS DETERMINISTIC. NOTHING WAS ASKING
+-- WHETHER IT IS COMPLETE. Those are different properties and only one of them
+-- had an instrument. Thirty-six rounds of increasingly careful determinism work
+-- cannot detect a rule that never fires, because a rule that never fires is
+-- perfectly reproducible.
+--
+-- ---------------------------------------------------------------------------
+-- INSTRUMENT ONE, AND WHY ITS NUMBER WAS NOT A FINDING
+-- ---------------------------------------------------------------------------
+--
+-- First attempt at coverage: pg_stat_user_functions. It said 250 of 543
+-- OTTOQ-authored functions had never been called -- 46%. That is a striking
+-- number and I was one step from reporting it.
+--
+--   SELECT current_setting('track_functions');  -->  none
+--
+-- Function call tracking is OFF. The view is not recording anything; the 292
+-- rows that DO carry counts are residue from some earlier period. The 46% was an
+-- artefact of a disabled instrument.
+--
+-- This is the same defect class as db/checks/0098 -- a 22-second KPI view that
+-- survived because it scanned a table CLAUDE.md said held 20,799 rows and which
+-- actually held 2.49M -- and the same class as the stale row counts CLAUDE.md
+-- Part 3 now carries three refreshes of. VALIDATE THE INSTRUMENT BEFORE QUOTING
+-- IT. The rule is cheap: one query, every time, before any number leaves.
+--
+-- ---------------------------------------------------------------------------
+-- INSTRUMENT TWO, AND WHY ITS FIRST NUMBER WAS ALSO WRONG
+-- ---------------------------------------------------------------------------
+--
+-- Runtime stats being unavailable, the correct instrument is STATIC
+-- REACHABILITY: for every OTTOQ routine, does anything reference it -- another
+-- function body, a view, a trigger, a cron command? That needs no stats and
+-- cannot be turned off.
+--
+-- First run: 165 of 550 routines referenced by nothing. Among them, ALL 27 RULE
+-- EVALUATORS -- including ottoq_eval_en_001_grid_capacity and
+-- ottoq_eval_hw_004_stall_concurrency, which I have watched fire in production
+-- ticks today.
+--
+-- The evaluators are dispatched DYNAMICALLY:
+--
+--     format('SELECT * FROM %I($1,$2,$3,$4)', r.evaluator_function)
+--
+-- where the name comes from ottoq_rules.evaluator_function -- a TABLE COLUMN.
+-- A name stored in data is a call site the catalog cannot see. Reporting "27
+-- rule evaluators are dead" would have been badly, confidently wrong.
+--
+-- Corrected instrument = references in function bodies, views, triggers and cron
+-- commands, UNION names appearing in the known dispatch columns
+-- (ottoq_rules.evaluator_function, ottoq_recall_implementations.evaluator_function).
+--
+--     550 OTTOQ routines
+--     413 reachable
+--     137 with no caller found        <-- the honest number
+--
+-- AND 137 IS STILL AN UPPER BOUND, deliberately stated as one. It counts every
+-- external entry point as unreachable: the PostgREST/API surface (~27 by name
+-- pattern -- ottoq_api_*, ottoq_hw_*, ottoq_comms_*, ottoq_twin_*), the ML and
+-- feature-store scaffold (~15), and the things I invoke by hand every day --
+-- ottoq_kpi_five, ottoq_cert_matrix, ottoq_determinism_pair_replay,
+-- ottoq_production_start. Closing that gap needs the edge-function and UI call
+-- lists, which live outside this database. Until then the number is a triage
+-- queue, not a verdict.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE TRIAGE ALREADY SHOWS, and it is not nothing
+-- ---------------------------------------------------------------------------
+--
+--   6  ASSERTION/CHECK functions that nothing ever runs:
+--        ottoq_check_sdr_coverage, ottoq_check_stall_overlap,
+--        ottoq_check_fence_containment, ottoq_assert_context_sufficient,
+--        ottoq_assert_snapshot_integrity, ottoq_verify_audit_bundle
+--      A written check that nothing calls is worse than an absent one: it makes
+--      the property look guarded. This is the guard-that-cannot-fail class the
+--      magenta audit spent 87 findings on, in SQL rather than Python.
+--
+--   3  JANITORS never scheduled: ottoq_gc_stale_reservations,
+--        ottoq_purge_orphan_rows, ottoq_sweep_orphaned_visit_artifacts.
+--        G13 (40% of the Benchmark depot held by nothing, no janitor) is
+--        plausibly just this -- a janitor that exists and is not scheduled,
+--        which is exactly what G23 turned out to be.
+--
+--   4  A/B instrument functions with no caller, matching db/checks/0145's
+--        finding that nothing writes ottoq_ab_runs.
+--
+--   1  ottoq_plan_overnight_wave -- 0 callers, and ottoq_wave_plan has 0 rows.
+--
+-- ---------------------------------------------------------------------------
+-- THE STANDING CHANGE
+-- ---------------------------------------------------------------------------
+--
+-- BUILD_QUEUE.md now carries five coverage questions as a permanent table, with
+-- which are instrumented and which are not:
+--
+--   which registered rules can never fire      built, ad-hoc -> needs a check
+--   which routines has nothing called          built, ad-hoc -> this file
+--   which cert columns are stale               computed by ottoq_cert_matrix,
+--                                              and NOTHING ACTS ON IT -- which is
+--                                              exactly how the 48-tick flagship
+--                                              column sat unrun for five days
+--                                              while I called the matrix green
+--   which KPIs have no data behind them        MISSING (0251 is the first piece)
+--   which declared capability has no test      MISSING
+--
+-- The third line is the sharpest one. The staleness flag was not missing. It was
+-- computed, correct, returned in every matrix query I ran today, and read by
+-- nothing -- including me, until I wrote "six of seven" in a canon file and only
+-- then noticed I had been saying "the matrix is green" for hours.
+--
+-- Measured 2026-09-09 14:20-14:35 UTC. Catalog and small-table reads only;
+-- round 36 was in flight throughout and nothing here touches a run-scoped table.
