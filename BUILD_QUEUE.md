@@ -52,7 +52,7 @@ CLAUDE.md row counts. **Validate the instrument before quoting it.**
 |---|---|---|---|
 | 1 | **The 48-tick flagship column is stale** | We say "the flagship matrix is green". It is six of seven. `busy_day/171717/48t` has not run since 2026-09-04, sits below the recert floor, and its history predates four fingerprint migrations. | **scheduled** — two consecutive pairs after round 36 |
 | 2 | **`0251`: a purged run must say "gone", not "zero"** | `ottoq_kpi_five` returns `{}`/`null` for a purged run — identical to a real run with no bookings. A hollow number that carries a run ID defeats the one rule the whole project rests on. | **drafted**, applies after round 36 |
-| 3 | **Nothing acts on `stale`** | The matrix computes staleness and no process reads it. That is how #1 survived five days. A round should schedule its own stale columns. | **not started** |
+| 3 | **Nothing acts on `stale`** | The matrix computes staleness and no process reads it. That is how #1 survived five days. A round should schedule its own stale columns. | **half done** — `0252` drafted: `ottoq_cert_columns` declares what should be covered and `ottoq_cert_coverage()` returns MISSING/OVERDUE/UNREGISTERED. It makes the gap visible; it does **not** close the loop. The auto-scheduler is still open. |
 
 ## P1 — the model cannot orchestrate optimally without these
 
@@ -70,7 +70,7 @@ CLAUDE.md row counts. **Validate the instrument before quoting it.**
 | # | item | measured evidence | status |
 |---|---|---|---|
 | 10 | **9 of 29 rules can never fire (G44)** | Six are `block` severity. The engine announces four action contexts; every unreached rule listens outside that set. `SM.001` has had 1.19M vehicle state-change events go past it. | not started |
-| 11 | **`SM.006` fail-closed defect** | 5-argument evaluator, 4-argument dispatch. The moment #10 is fixed, every BESS state change is *refused* rather than validated. **Must ship with #10, never after.** | not started |
+| 11 | **`SM.006` fail-closed defect** | Verified by me from the catalog, not taken on report: `pronargs=5, pronargdefaults=0` against a dispatcher hard-coded to `%I($1,$2,$3,$4)`. Every other active evaluator is 4-arg. `SM.001`/`002`/`003` each have a dedicated 4-arg wrapper; SM.006 alone was wired straight to the generic. | **`0253` drafted** — ships *before* #10 rather than with it, so the mine is defused before the work that arms it. Two behavioural assertions, both directions. |
 | 12 | **137 routines have no in-database caller** | Static reachability, corrected for dispatch tables. ~27 are API surface and ~15 ML scaffold; the rest need triage. Named subsets: 6 assertion/check functions never run, 3 janitors never scheduled, 4 A/B functions. | `0167` measures; triage not started |
 | 13 | **Multi-tenancy is empty** | `ottoq_rule_parameters`: 0 rows. `ottoq_rule_overrides`: 0 rows. All four OEM SLA rows carry identical values on every enforceable field. **No active rule produces a different verdict for a different operator.** | not started |
 | 14 | **`ottoq_ab_runs` is an empty instrument** | 68–77 rows, one policy, one seed, no writer. And the baselines evaluate **no rules at all**, so greedy would "win" on throughput by checking nothing. Blocked behind #4: the quantity has not been defined. | blocked on #4 |
