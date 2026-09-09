@@ -774,3 +774,33 @@
 -- on evidence (is_active, reserved_for_mission_id, staging_role), and one stays
 -- deliberately excluded (owning_sim_run_id). The residue class is now named
 -- rather than estimated.
+
+-- ===========================================================================
+-- 12. ROUND 32, FIRST COLUMN -- 0243 CHANGED WHAT IS WATCHED, NOT WHAT RUNS
+-- ===========================================================================
+--
+-- The risk worth naming about 0243 was not that it would fail. It was that
+-- widening a fingerprint and adding four columns to a fleet reset might change
+-- what the ENGINE DOES, and that the recert would then quietly bless a new
+-- behaviour as if it were the old one. That risk was written into the round-32
+-- check-in prompt at 06:16 UTC -- before any round-32 pair had completed -- as:
+-- "If h_dec or h_evt moved on a clean world, 0243 did more than intended:
+-- investigate before writing anything down."
+--
+-- r32_a (busy_day / 314159 / 12t), fired 06:20, completed ~06:23:
+--
+--   verdict  PASSED
+--   fp       14fa5b5dd6d40b8142a5b58fd95bef0a   MOVED, and to exactly the value
+--                                               C4 measured after 0243 applied
+--   h_evt    9c631343c32cca7a861b17bc5bc8f4b7   UNCHANGED from the pre-0243 canon
+--   h_dec    9abdb4afb2d172f50821158698fd26be   UNCHANGED from the pre-0243 canon
+--
+-- That is the whole intended shape of the migration, measured on a clean world:
+-- the atom that WATCHES the starting world moved because it now watches more of
+-- it, and the atoms that record what the engine DECIDED and what it EMITTED did
+-- not move at all. 0243 widened the instrument and left the engine alone.
+--
+-- Five columns remain (06:34 through 07:36). This one is recorded here rather
+-- than held back because it is the answer to a specific stated risk, not a
+-- summary of the round -- db/canons/round32.md is where the round is judged, on
+-- all six, against a prediction made before the evidence.
