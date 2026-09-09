@@ -345,7 +345,8 @@ repo_manifest(version, name, file) AS (
     ('20260909060909'::text, '0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether'::text, '0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql'::text),
     ('20260909075534'::text, '0244_the_end_state_fingerprint_cannot_see_the_assets_either'::text, '0244_the_end_state_fingerprint_cannot_see_the_assets_either.sql'::text),
     ('20260909075605'::text, '0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing'::text, '0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing.sql'::text),
-    ('20260909094627'::text, '0246_the_world_hash_is_id_blind_everywhere_except_inside_config'::text, '0246_the_world_hash_is_id_blind_everywhere_except_inside_config.sql'::text)
+    ('20260909094627'::text, '0246_the_world_hash_is_id_blind_everywhere_except_inside_config'::text, '0246_the_world_hash_is_id_blind_everywhere_except_inside_config.sql'::text),
+    ('PENDING'::text, '0247_a_dead_runs_working_rows_outlive_it_because_nothing_deletes_them'::text, '0247_a_dead_runs_working_rows_outlive_it_because_nothing_deletes_them.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

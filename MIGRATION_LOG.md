@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0246 — GENERATED, not a log
+## Index, 0134–0247 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -233,7 +233,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0244](db/migrations/0244_the_end_state_fingerprint_cannot_see_the_assets_either.sql) | `20260909075534` | yes — ledger | THE END-STATE FINGERPRINT CANNOT SEE THE ASSETS EITHER |
 | [0245](db/migrations/0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing.sql) | `20260909075605` | yes — ledger | current_depot_id IS WRITTEN IN THE TICK AND CLEARED BY NOTHING |
 | [0246](db/migrations/0246_the_world_hash_is_id_blind_everywhere_except_inside_config.sql) | `20260909094627` | yes — ledger | THE WORLD HASH IS ID-BLIND EVERYWHERE EXCEPT INSIDE config |
+| [0247](db/migrations/0247_a_dead_runs_working_rows_outlive_it_because_nothing_deletes_them.sql) | `PENDING` | no — pending | A DEAD RUN'S WORKING ROWS OUTLIVE IT BECAUSE NOTHING DELETES THEM |
 
-114 migrations indexed.
+115 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
