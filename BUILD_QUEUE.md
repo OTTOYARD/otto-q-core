@@ -51,6 +51,25 @@ finding. It would have been an artifact of a disabled instrument, exactly the
 class of error that produced the 22-second KPI view (`0098`) and the stale
 CLAUDE.md row counts. **Validate the instrument before quoting it.**
 
+**A second lesson, about my own reasoning rather than the code, earned twice in
+one day.** Both times I wrote some version of *"erring in this direction is
+safe"*, and both times it was false:
+
+* `0247` — the delete list. The reasoning was that a purge covering *too much*
+  of an over-broad class was tolerable. It was not: that class held the cuOpt
+  ledger, the SDR rail and the conflict ledger.
+* `0251` — the backfill cutoff. The file said *"an over-stamp here is safe (it
+  says 'not whole' of a run that is whole)."* It was not: a two-day arithmetic
+  slip would have stamped 182 intact runs, rounds 31–35 among them, and
+  suppressed the KPIs of the very runs the certification rests on.
+
+**The phrase itself is the tell.** "Erring this way is safe" means I have worked
+out the failure mode in one direction and *not* in the other, and then licensed
+myself to stop. The correction is not to be more careful — it is to notice the
+sentence and treat it as an unfinished analysis. Where a value either reproduces
+a known set or does not, there is no safe side: pin it and assert the count
+(`0251` A7 pins the backfill to exactly 729).
+
 ---
 
 ## P0 — blocking a claim we already make
