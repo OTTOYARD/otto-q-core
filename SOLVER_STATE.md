@@ -568,6 +568,61 @@ and it is a claim the harness can back with run IDs.
 None of this starts until the deterministic core is green on the corrected instrument (round 6)
 and the remaining core items are closed (0050/0051 peak_site_kw; 0150/0151).
 
+#### 8.3a Status, 2026-09-08 22:30 CT (2026-09-09 03:30 UTC) — step 3 is DONE
+
+Step 1 shipped as 0199. Step 3 shipped tonight, ahead of step 2, and it took four migrations
+rather than the one this section imagined:
+
+| | | |
+|---|---|---|
+| 0236 | a proposal knows which tick it was made in | APPLIED |
+| 0237 | record and replay an agent proposal stream | APPLIED |
+| **0238** | **the selector that consumes it is total on content** | **APPLIED — forces recert** |
+| 0239 | `ottoq_determinism_pair_replay`, the replay-driven arm | APPLIED |
+
+**0238 was not in the plan and is the reason the rest is trustworthy.** The proposal selector
+ordered by `created_at DESC`, and `created_at` defaults to `now()` — the *transaction*
+timestamp — while a certification pair runs both arms and every tick in one transaction. Measured:
+821 of 827 runs carrying proposals have every proposal sharing one `created_at`. So the order was
+decided by index-scan order, proven by a flip that was run and rolled back (`db/checks/0156`):
+the same two proposals submitted A,B chose A and submitted B,A chose B. 0237's capture is
+content-ordered by design and the runs it records from consumed in submission order, so a
+faithful-looking replay could have enacted a *different* proposal than the run it came from —
+with all fourteen atoms matching. Step 3 would have been a green verdict over a silently
+different experiment.
+
+**The proof is `db/checks/0157`.** Five pairs, one key, `p_replay_id` the only variable:
+
+| run | replay | outcome | `h_prop` | `h_dec` |
+|---|---|---|---|---|
+| P0 | none | passed | `d41d8cd9…` (md5 of empty) | `c16074c6…` |
+| P1 | R | **passed** | `c270c2c5…` | `4fe7b305…` |
+| P2 | R | passed | `c270c2c5…` | `4fe7b305…` |
+| P3 | R′ — perturbed a proposal nothing read | passed | `8db15dc6…` **moved** | `4fe7b305…` unmoved |
+| P4 | R″ — perturbed a proposal it *enacted* | passed | `bfd3767c…` **moved** | `2f4cbbb9…` **moved** |
+
+P1 is the sentence 8.2 asked for. P0 is the control that says the stream was not a no-op — a
+certification today sees *no* proposals at all, because 0152/0105 quiesce the producers, so
+P0's `h_prop` is literally md5 of the empty string. P2 is between-pair reproducibility, which is
+the harder claim. P3 and P4 disagree deliberately: **`h_prop` is sensitive to the whole stream,
+`h_dec` only to the part the disposer consumed** — what the agent *said* versus what the agent
+*changed*.
+
+Of the 24 replayed proposals in P1's arm A, the disposer **enacted 4, superseded 5, and left 15
+pending**, at run `ac0f7263-5208-47d4-ade0-1630ed2d73d3`. That is propose/dispose as a ledger
+row rather than a slogan, and the split is reproducible because `h_prop` hashes exactly those
+statuses.
+
+Two honest limits, stated so they are not quoted past: the stream is **synthetic** (no run in
+this database has ever carried a tick-stamped proposal — 0236 shipped hours earlier and every
+run since has been a certification, which quiesces the producers), and it ran on the **grid
+fixture**, not the flagship depot. What is proven is the disposer's half. The capture half is
+proven by 0237's assertions and awaits its first production stream.
+
+Step 2 (Posture A — a cert that *refuses* a live external proposer) is now the only open item in
+this sequence, and it is smaller than it was: 0152 already quiesces the producers run-scoped,
+so what remains is a detector that fires rather than a gate that blocks.
+
 ---
 
 ## 9. cuOpt re-derived, 2026-09-08 — the honest sentence is much narrower

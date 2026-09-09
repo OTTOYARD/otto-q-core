@@ -425,3 +425,56 @@ VALUES (
   'forces_recert FALSE: nothing existing is edited (A1 pins both the certified '
   'pair and decide_tick), and no scheduled round calls the new function.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 22:22 CT (2026-09-09 03:22 UTC), version 20260909032226,
+-- first attempt, all five assertions green -- including the two that CALL the
+-- new function and require a refusal:
+--
+--   A3  an empty replay          refused, 0 runs created before the guard fired
+--   A4  a wrong-depot replay     refused, and refused for the right reason
+--   A5  no residue               0 probe replay rows, 0 injected proposals
+--   ottoq_determinism_pair md5   e323bf87d0fbd9d3778bbda7c8f94ba7   UNCHANGED
+--   ottoq_decide_tick md5        ae98f71b879a0a11bdf366d21ff5b4eb   UNCHANGED
+--   recert floor                 2026-09-09 03:15:07  (0238's, unmoved)
+--
+-- ---------------------------------------------------------------------------
+-- AND THEN IT WAS USED. THE PROOF IS db/checks/0157
+-- ---------------------------------------------------------------------------
+-- Five pairs on the grid fixture (seed 239001, 6 ticks, grid_smoke, depot
+-- aacd0bb0-..., sim_start 2026-09-01 02:00:00+00), differing ONLY in
+-- p_replay_id:
+--
+--   P0  no replay              passed   h_prop d41d8cd9 (md5 of '')  h_dec c16074c6
+--   P1  replay R               passed   h_prop c270c2c5             h_dec 4fe7b305
+--   P2  replay R again         passed   identical to P1, separate pair
+--   P3  replay R'              passed   h_prop MOVED, h_dec did not
+--   P4  replay R''             passed   h_prop MOVED, h_dec MOVED
+--
+-- P1 is the Posture-B sentence. P0 is the control that it was not a no-op: a
+-- certification today sees NO proposals at all, so its h_prop is literally the
+-- md5 of the empty string, and P1's h_dec differs from P0's with every other
+-- input held. P2 is between-pair reproducibility. P3 perturbed a proposal the
+-- disposer never read and moved h_prop only; P4 perturbed one it ENACTED and
+-- moved both. h_prop is what the agent said; h_dec is what the agent changed.
+--
+-- The disposer's own ledger for P1 arm A (run ac0f7263-5208-47d4-ade0-1630ed2d73d3):
+-- of 24 replayed proposals, 4 ENACTED, 5 SUPERSEDED (honest pre-emption), 15
+-- still PENDING at run end. Not one dropped silently.
+--
+-- ---------------------------------------------------------------------------
+-- STILL OWED
+-- ---------------------------------------------------------------------------
+--   * a REAL captured stream. The proof used a synthetic one, because no run in
+--     this database has ever carried a tick-stamped proposal -- 0236 shipped
+--     hours before and every run since has been a certification, which quiesces
+--     the producers. The capture half is proven by 0237's assertions; the first
+--     production run with a live proposer closes it for real.
+--   * replay_injected promoted from MEASURED to ENFORCED, on the gate stated
+--     above: one flagship-scale replay pair reporting the same count on both
+--     arms. Every pair so far reports 24 and 24.
+--   * the same proof at flagship scale. The grid is a real depot to the engine
+--     (0153) but it is four vehicles.
+--   * 0238's recert round. Until it completes no column is green, this one
+--     included -- what is proven here is that the rig behaves, not that the
+--     standing canon holds.
