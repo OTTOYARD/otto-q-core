@@ -623,6 +623,51 @@ Step 2 (Posture A — a cert that *refuses* a live external proposer) is now the
 this sequence, and it is smaller than it was: 0152 already quiesces the producers run-scoped,
 so what remains is a detector that fires rather than a gate that blocks.
 
+#### 8.3b Step 2 is CLOSED too — 2026-09-09 00:19 CT (05:19 UTC)
+
+**The whole 8.3 sequence is now shipped.** Posture A landed as **0241**, and the version that
+shipped is not the version anyone would write first.
+
+The obvious Posture A is *a certification refuses the agent door*. That was written, and then the
+door was measured: **372 proposals reach 148 CERTIFICATION runs through it**, from
+`ottoq_service_priority_propose` — which `ottoq_sim_decide_and_dispatch` calls **inside the
+certified tick**. Banning the door would have deleted a certified proposer, narrowed what the
+harness tests without saying so, and shipped under a `forces_recert FALSE` header that was simply
+false. It would have passed a textual review.
+
+Two column-based discriminators were tried next and both were also wrong: `declared_source` is
+NULL for the internal proposers (only the door stamps it), and `submitted_by_role` is *not* null
+for `ottoq_service_priority`. **Internal versus external is not visible in any column.** Which
+proposer it is, is.
+
+So Posture A is a registry — `ottoq_certified_proposers`, seeded from measurement rather than
+intent (`greedy_constrained` 12,403 proposals / 542 cert runs, `ottoq_service_priority` 1,904 /
+821, `cuopt` 1 / 1) — and its A5 asserts that seed **complete against every proposal ever written
+to a certification run**. That is what makes `forces_recert FALSE` a measurement rather than an
+argument. A replay is admitted by *being* a replay, never by registration, so Postures A and B
+stay independent.
+
+The same registry then closed a defect the Posture-B proof could not have caught (**G42**,
+`db/checks/0159`, migration **0242**): `ottoq_proposal_replay_capture` defaulted `p_sources` to
+NULL, meaning *every* source, so recording a run picked up the internal deterministic proposers —
+and replaying that injects them at tick −1 while the proposer **also regenerates them** at their
+real ticks. One list, two uses, one meaning: a certification *hears* these because they are the
+certified core, and a capture *skips* these because a replay would double them.
+
+Shipped state of the sequence:
+
+| step | | |
+|---|---|---|
+| 1 | `h_prop` + `h_defr` in the verdict | 0199 |
+| 2 | **Posture A — a cert hears only its certified proposers** | **0241** |
+| 3 | Posture B — replay-driven certification | 0236 / 0237 / 0238 / 0239, proof `db/checks/0157` |
+| — | the capture stops double-counting what regenerates | 0242 |
+| — | the NVIDIA door leaves a ledger row either way | 0240 |
+
+`ottoq_decide_tick` and `ottoq_determinism_pair` both keep their md5 through all of it; the recert
+floor stays where 0238 put it (`2026-09-09 03:15:07`), which **round 31 then certified against on
+all six columns with zero of fourteen atoms moved** (`db/canons/round31.md`).
+
 ---
 
 ## 9. cuOpt re-derived, 2026-09-08 — the honest sentence is much narrower
