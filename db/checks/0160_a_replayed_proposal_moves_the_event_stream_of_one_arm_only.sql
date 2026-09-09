@@ -570,3 +570,94 @@
 --
 -- The order is still right: make it visible now, because an invisible failure
 -- cannot be measured, and G26 is a database, not an afternoon.
+
+-- ===========================================================================
+-- 9. C3 JUDGED -- CONFIRMED IN MECHANISM, AND I UNDERSTATED THE BLAST RADIUS
+-- ===========================================================================
+--
+-- C3, fired 06:04:00 UTC as one cron job so the plant and the pair are ATOMIC
+-- (nothing can run between them, and the residue is invisible outside the
+-- transaction -- measured: tether_now = 0 from another session while it ran):
+--
+--   UPDATE public.vehicles SET robotic_tether_phase='unstow',
+--          robotic_tether_direction='mate',
+--          robotic_tether_until='2026-09-01 06:00:18.5+00',
+--          robotic_tether_stall_id=<a flagship stall>
+--    WHERE id IN (<7 flagship autonomous vehicles>);
+--   SELECT public.ottoq_determinism_pair(314159, 12, 'busy_day', <flagship>,
+--                                        '2026-09-01 02:00:00+00', 900);
+--
+-- ottoq_determinism_pair. THE ORIGINAL FUNCTION. No replay, no p_replay_id, no
+-- 0239, no injected proposal anywhere in it.
+--
+--   arm A  36b19eb1-b7cf-4ade-b38c-681c5adc7e41
+--   arm B  aaef64fc-6313-4ec8-9241-83b5be887141
+--   status FAILED
+--
+-- THE PREDICTION IS CONFIRMED. It said: "C3 FAILS on h_evt, arm A only, with arm
+-- B landing on the canon 9c631343..." It did:
+--
+--   h_evt  arm A  dfbac06930cb861534e884436fd61ea7
+--          arm B  9c631343c32cca7a861b17bc5bc8f4b7   <- the canon, exactly
+--
+-- **AND I UNDERSTATED IT BADLY.** I predicted one atom would move. TEN did:
+--
+--   atom     arm A          arm B          verdict
+--   ------   ------------   ------------   ---------------
+--   fp       803698f332ad   803698f332ad   same  <<<<<<<<<<
+--   h_cal    11a246262ff7   11a246262ff7   same
+--   h_defr   d41d8cd98f00   d41d8cd98f00   same
+--   ticks    12             12             same
+--   h_bkg    6b38422746a5   174b88355d03   MOVED
+--   h_cmd    bf7e8ef3e9cd   109e340b04a1   MOVED
+--   h_dec    da8afac6304e   9abdb4afb2d1   MOVED
+--   h_evt    dfbac06930cb   9c631343c32c   MOVED
+--   h_nrg    19fe1d80db26   a9c6b6937912   MOVED
+--   h_prop   a39e90ba6b1b   a79c109534ae   MOVED
+--   h_rcl    bfa86faad267   0e67b89a32cf   MOVED
+--   h_rule   1c6fb6b13783   fc69953b7ea2   MOVED
+--   h_sdr    49130b8231b7   a1f79c20a2ec   MOVED
+--   endst    (id-blind)     (id-blind)     MOVED
+--
+-- Every one of arm B's values is the no-replay canon for this column. Arm B ran
+-- the canonical run; arm A ran a different one, and the difference reached the
+-- decisions, the calendar, the energy commands, the rule evaluations, the recall
+-- ledger, the settlement records and the end state.
+--
+-- WHY BIGGER THAN THE ORIGINAL FAILURE: the natural residue on 09-09 was seven
+-- vehicles each mid-tether at its own stall, and it perturbed only the event log.
+-- The planted residue put all seven on ONE stall, which is a heavier and less
+-- realistic disturbance. That the planted case is worse is not a flaw in the
+-- experiment -- the experiment's job was to establish CAUSATION, and it does --
+-- but the "one atom" figure belongs to the natural case, and quoting ten atoms
+-- as the typical blast radius would be overstating it in the other direction.
+--
+-- ---------------------------------------------------------------------------
+-- THE LINE THAT MATTERS
+-- ---------------------------------------------------------------------------
+--
+--   fp is IDENTICAL on both arms -- 803698f332adc0d06cbefca79dad1ce0 -- while
+--   TEN other atoms disagree.
+--
+-- fp is one of the fourteen ENFORCED atoms and it is the start-of-run world
+-- hash. Its entire purpose is the sentence "both arms began from the same
+-- world." Arm A began with seven vehicles mid-tether and arm B began with none,
+-- and fp could not tell. This is no longer an inference from a failure or a
+-- reading of a function body: it is a controlled experiment with the disturbance
+-- applied by hand and the instrument watched while it failed to notice.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE THREE CONTROLS SETTLE, TOGETHER
+-- ---------------------------------------------------------------------------
+--
+--   C1  replay fn, no stream, clean world      passed   (0239 is not broken)
+--   C2  replay fn, same stream, clean world    passed   (replay is deterministic:
+--                                                        h_prop byte-identical to
+--                                                        the failed pair's)
+--   C3  ORIGINAL fn, no replay, planted residue FAILED  (residue alone does it)
+--
+-- THE REPLAY IS EXONERATED AND THE RESIDUE IS CONVICTED. G43 is a defect in the
+-- certification harness, not in the agent layer. db/checks/0157's Posture B
+-- proof stands and 0239 is not implicated in anything.
+--
+-- Migration 0243 is now cleared to apply.
