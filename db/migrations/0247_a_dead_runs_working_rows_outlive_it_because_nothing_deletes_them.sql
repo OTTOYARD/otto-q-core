@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909133254
 -- migration-name: 0247_a_dead_runs_working_rows_outlive_it_because_nothing_deletes_them
 -- ===========================================================================
 -- 0247  A DEAD RUN'S WORKING ROWS OUTLIVE IT BECAUSE NOTHING DELETES THEM
@@ -360,3 +360,13 @@ END $$;
 -- a GiST index, so the read cost 0163 measured does not come back without one
 -- (0164 Q4).
 -- ===========================================================================
+
+-- APPLIED 2026-09-09 as version 20260909133254.
+--
+-- AND SUPERSEDED THE SAME HOUR, TWICE. 0249 repaired a name collision that made
+-- the body unrunnable; 0250 replaced the delete list entirely after measuring
+-- that class='engine' contains the cuOpt ledger (84% doomed), the SDR settlement
+-- rail (76%) and the space-conflict ledger (94%). Read this file for the problem
+-- statement; read 0250 for what the purge actually does. Its own header names
+-- the gap that let this through: every assertion here is structural, and a
+-- structural assertion cannot see what a delete list contains.
