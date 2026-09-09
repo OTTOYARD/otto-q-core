@@ -661,3 +661,52 @@
 -- proof stands and 0239 is not implicated in anything.
 --
 -- Migration 0243 is now cleared to apply.
+
+-- ===========================================================================
+-- 10. C4 -- THE SAME EXPERIMENT, AFTER 0243. IT PASSES.
+-- ===========================================================================
+--
+-- 0243 applied 06:09:09 UTC. C4 fired at 06:12:00 with the SAME planted residue
+-- and the SAME original ottoq_determinism_pair as C3 -- byte-identical cron
+-- command except for the job name:
+--
+--   arm A  72dc88e8-8738-4939-9a3f-5e01096d6378
+--   arm B  d43e873c-b021-4ff4-8b96-1926eb1a2563
+--   status PASSED
+--
+--   atom     both arms                            was, in C3
+--   ------   ----------------------------------   ---------------------------
+--   h_evt    9c631343c32cca7a861b17bc5bc8f4b7     A dfbac069 / B 9c631343
+--   h_dec    9abdb4afb2d172f50821158698fd26be     A da8afac6 / B 9abdb4af
+--   fp       14fa5b5dd6d40b8142a5b58fd95bef0a     A = B = 803698f332ad
+--
+-- Read those three rows together, because each says something different:
+--
+--   h_evt and h_dec are back on the CANON on BOTH arms. Arm A no longer runs a
+--   different run: the reset clears the tether family before it boots, so the
+--   residue that produced ten divergent atoms twenty minutes ago produces none.
+--
+--   fp MOVED, to 14fa5b5dd6d40b8142a5b58fd95bef0a, and is EQUAL across arms.
+--   Moved because the hash now covers four more columns per vehicle -- which is
+--   why 0243 is forces_recert TRUE and why every canon below the 06:09:09 floor
+--   has to be re-earned. Equal because the world really is equal now.
+--
+-- THE BEFORE-AND-AFTER, ON ONE LINE EACH, SAME DISTURBANCE, SAME FUNCTION:
+--
+--   C3, before 0243:  planted residue -> FAILED, 10 of 14 atoms moved, fp blind
+--   C4, after  0243:  planted residue -> PASSED, 0 atoms moved,        fp equal
+--
+-- G43 is closed on the evidence that convicted it, which is the bar this file
+-- set for itself in section 2 and the only bar worth passing: the fix is
+-- verified against the experiment that produced the defect, not against a
+-- re-run of the case that happened to be clean.
+--
+-- WHAT IS NOT CLOSED is unchanged and still section 8: endst remains blind to
+-- the fleet, five mutable columns remain unconvicted and unhashed, and the root
+-- is still G26 -- the proof harness shares a database with everything that can
+-- write to the depot it certifies. 0243 makes that condition visible and
+-- survivable. It does not make it impossible.
+--
+-- Round 32 (six columns, 06:20-07:36 UTC) establishes the canons above the new
+-- floor. Until it completes, NO COLUMN HAS A CANON, and that is the correct
+-- state to be in, not a regression.
