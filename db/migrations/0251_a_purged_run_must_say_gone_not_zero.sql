@@ -216,19 +216,38 @@ $procedure$;
 --
 --    Those passes ran before this column existed, so their runs are unmarked
 --    and would report hollow KPIs as complete. The doomed predicate is
---    reconstructed with the SAME keep window and conditions the passes used;
---    an over-stamp here is safe (it says "not whole" of a run that is whole)
---    and an under-stamp is not, which is why the reconstruction is deliberately
---    the same predicate rather than an attempt to name only what was touched.
+--    reconstructed with the SAME keep window and conditions the passes used.
 --    0165 records what was actually reached: ottoq_rule_evaluations (drained)
 --    and ottoq_events (partial).
+--
+--    THE CUTOFF IS 2026-09-07 13:38, AND THE FIRST DRAFT OF THIS FILE HAD IT
+--    WRONG. It said 2026-09-09 11:38 -- I wrote "48 hours before the purge" and
+--    then subtracted two hours instead of two days. Verified read-only before
+--    applying:
+--
+--      cutoff 2026-09-07 13:38  ->  729 runs   (matches the purge's own doomed
+--                                               set exactly, which is the check)
+--      cutoff 2026-09-09 11:38  ->  911 runs
+--      difference               ->  182 runs WRONGLY STAMPED
+--
+--    Those 182 span rounds 31-35. Every one of them is intact, and stamping
+--    them would have made today's certification runs report their KPIs as GONE.
+--
+--    AND THE COMMENT THAT LET IT THROUGH IS CORRECTED TOO. The first draft said
+--    "an over-stamp here is safe (it says 'not whole' of a run that is whole)."
+--    THAT IS FALSE. Over-stamping suppresses a real number; under-stamping ships
+--    a hollow one. Both are wrong, in opposite directions, and calling one of
+--    them safe is what made a two-day arithmetic slip look tolerable instead of
+--    fatal. The cutoff is not a judgement call with a safe side -- it either
+--    reproduces the doomed set or it does not, and the test is that it returns
+--    exactly 729.
 -- ---------------------------------------------------------------------------
 UPDATE public.ottoq_sim_runs sr
    SET purged_at = '2026-09-09 13:38:00+00'::timestamptz
  WHERE sr.purged_at IS NULL
    AND sr.status <> 'running'
    AND COALESCE(sr.run_by,'') <> 'production_live'
-   AND sr.started_at < '2026-09-09 11:38:00+00'::timestamptz
+   AND sr.started_at < '2026-09-07 13:38:00+00'::timestamptz   -- 48h before the pass
    AND EXISTS (SELECT 1 FROM public.ottoq_run_archives a WHERE a.sim_run_id = sr.sim_run_id);
 
 -- ---------------------------------------------------------------------------
@@ -381,6 +400,16 @@ BEGIN
     END IF;
   END IF;
 
+  -- A7. THE BACKFILL REPRODUCED THE PURGE'S DOOMED SET, NOT SOMETHING NEAR IT.
+  --     Pinned to 729 because that is what the pass actually doomed; a cutoff
+  --     that is off by so much as a batch of runs fails here instead of quietly
+  --     suppressing good KPIs. This assertion exists because the first draft's
+  --     cutoff was two DAYS off and would have stamped 182 intact runs, rounds
+  --     31-35 among them.
   SELECT count(*) INTO v_n FROM public.ottoq_sim_runs WHERE purged_at IS NOT NULL;
-  RAISE NOTICE 'A1-A6 PASSED; % run(s) marked purged', v_n;
+  IF v_n <> 729 THEN
+    RAISE EXCEPTION 'A7 FAILED: backfill stamped % run(s); the purge doomed exactly 729. '
+                    'A mismatch means the cutoff does not reproduce the doomed set.', v_n;
+  END IF;
+  RAISE NOTICE 'A1-A7 PASSED; % run(s) marked purged, matching the doomed set exactly', v_n;
 END $$;
