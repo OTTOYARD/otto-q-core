@@ -177,3 +177,41 @@
 -- cannot be applied while round 31 is in flight. Without it, an
 -- ottoq_cron_tick that POSTs and gets no response still leaves no trace on the
 -- database side -- the edge row only exists if the function actually ran.
+
+-- ---------------------------------------------------------------------------
+-- POST-DEPLOY: THE TRANSCRIPTION WAS VERIFIED, NOT ASSUMED
+-- ---------------------------------------------------------------------------
+-- Both functions were deployed by sending their full source through the
+-- Management API, which means ~25 KB of hand-carried text into two LIVE
+-- functions. The behavioural check above proves the ledger write works; it
+-- proves nothing about the other 95% of each file, and a slip in a NUMBER would
+-- typecheck, deploy, run, and be wrong.
+--
+-- So both deployed bodies were fetched back and checked against the repository
+-- copies on every load-bearing constant and comparison:
+--
+--   orchestrate-tick v9   12 expressions + 7 structural counts   all match
+--     DCFC_KW=150 · BIG=1000000 · time_limit:5 · max_vehicles(12,30) ·
+--     margin/100 · billingPeak default serviceMax*0.6 ·
+--     effectiveCap = min(serviceMax*(1-margin), max(billingPeak, serviceMax*0.5)) ·
+--     floor(dcfcBudgetKw/DCFC_KW) · soc>60 -> c+=60 · (100-soc)+(dcfc?0:35) ·
+--     target_soc default 90 · dur*60000 and +60000 cursor step
+--     counts: logCuopt x2, cuoptCharge x2, fetch(CUOPT) x1,
+--             ottoq_shield_and_log x3, return json( x5, CATALOG[ x2,
+--             maxConcurrentDcfc x4
+--
+--   assign-optimize v5    same treatment                          all match
+--     max_vehicles(20,40) · stalls limit 80 · rawText.slice(0,220) AND
+--     slice(0,160) · order('timestamp') · the heuristic's dcfc preference
+--
+-- The check was deliberately weighted toward the places the two functions
+-- DIFFER from each other, because that is where a copy-paste error between two
+-- near-identical files would land and where nothing else would catch it:
+--
+--   * orchestrate-tick floors effectiveCap at serviceMax*0.5; assign-optimize
+--     does NOT. Preserved in both.
+--   * orchestrate-tick reads site_energy_snapshots ordered by created_at;
+--     assign-optimize by timestamp. Preserved in both.
+--   * 12/30 vs 20/40 vehicle caps. Preserved in both.
+--
+-- Neither function's behaviour changed except for the ledger write.
