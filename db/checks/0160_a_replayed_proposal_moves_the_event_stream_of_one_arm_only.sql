@@ -321,3 +321,97 @@
 -- to ENFORCED only after a flagship round shows the arms agree on it -- which is
 -- precisely the doctrine CLAUDE.md 2.9a lays down and precisely what 0139, 0206,
 -- 0217 and 0225 each did. It is drafted only after C3 reports.
+
+-- ===========================================================================
+-- 5. THE SHARP FORM: fp IS THE BOOT WORLD FINGERPRINT, IT IS ENFORCED, AND IT
+--    WAS EQUAL
+-- ===========================================================================
+--
+-- Section 4 proposed adding a NEW boot-time fleet fingerprint as a measured
+-- atom. That was the wrong fix and it is withdrawn: the certification already
+-- has exactly that atom, it is already enforced, and the defect is that it is
+-- too narrow. Extending what exists is the job; adding a parallel instrument
+-- beside it would have been the "rebuild what exists" failure CLAUDE.md rule 5
+-- names.
+--
+--   'fp' in the arm object is r.payload->>'world_fingerprint'
+--   written by twin.ottoq_sim_start_run(...) and public.ottoq_run_boot_draw(uuid)
+--   -- both at RUN START.
+--
+-- So fp is the start-of-run world hash. Its whole purpose is the sentence "both
+-- arms began from the same world." It is one of the fourteen ENFORCED atoms.
+--
+--   On the pair that failed:  fp arm A = fp arm B = 803698f332adc0d06cbefca79dad1ce0
+--
+-- The worlds were not the same. Seven vehicles carried live robotic-tether state
+-- in arm A and none in arm B, and the atom that exists to detect precisely that
+-- reported them identical.
+--
+-- WHY, from ottoq.ottoq_world_fingerprint(uuid) -- it is an ENUMERATED column
+-- list, not a row image:
+--
+--   vehicles (WHERE home_depot_id = p_depot AND category='autonomous'; 116 rows):
+--       id, current_soc, current_state, current_stall_id, current_soc_source,
+--       target_soc, config - 'condition_drawn_run', last_state_change
+--   stalls:  id, status, current_vehicle_id, reserved_by, reserved_at,
+--            reservation_expires_at
+--   plus ocpp chargers, vehicle_need_profile, and the BESS units.
+--
+--   robotic_tether_phase, robotic_tether_until, robotic_tether_stall_id and
+--   robotic_tether_direction are NOT in that list.
+--
+-- A vehicle mid-tether is, by any reading, start-relevant world state: it has a
+-- deadline (robotic_tether_until) that will come due during the run and change
+-- what the engine does. It belongs in this hash.
+--
+-- AND THE FUNCTION ITSELF SAYS SO. Its own header comment reads:
+--
+--   "The start-relevant world, hashed. ... Extend the column set only alongside
+--    the 0046 probe that justifies it."
+--
+-- Every prior extension followed that rule and left its probe number in the
+-- body: 0115 added the pair-17 columns, 0137 REMOVED current_soc_updated_at as
+-- a write timestamp, 0107 added the needs profile, 0133 added the BESS after
+-- 0051 showed peak_site_kw differing between two byte-identical arms because
+-- the battery carried across runs, 0135 added its temperature.
+--
+-- 0160 is the next such probe, and the tether columns are the next such
+-- extension. The mechanism is identical to 0133's, one table over: state that
+-- carries across runs, that the fingerprint cannot see, that changes the run.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE FIX COSTS, STATED BEFORE IT IS BUILT
+-- ---------------------------------------------------------------------------
+--
+-- Extending ottoq_world_fingerprint moves fp for EVERY column. fp is enforced,
+-- so every canon in the matrix is invalidated and the migration is
+-- forces_recert TRUE. That is not a reason to avoid it -- it is exactly what
+-- forces_recert exists for (0192): an atom that was wrong must move, and a
+-- canon derived from a wrong atom must not survive the correction. 0133 paid
+-- the same price for the same reason.
+--
+-- THE ORDER MATTERS AND IS NOT NEGOTIABLE. Widening fp while the reset still
+-- leaves tether residue would make pairs fail whenever residue happens to be
+-- present -- correctly, but intermittently, which is the worst of both worlds
+-- for diagnosis. So ONE migration does BOTH halves:
+--
+--   (a) ottoq_tick_invariance_reset_fleet clears the tether family for the
+--       depot's fleet, so the two arms genuinely start equal; and
+--   (b) ottoq_world_fingerprint hashes the tether family, so that when they do
+--       not start equal the pair says so at fp, on tick zero, instead of at
+--       h_evt nine ticks later with no indication why.
+--
+-- (a) without (b) closes this instance and leaves the class invisible. (b)
+-- without (a) is an intermittent alarm. Both together is the fix.
+--
+-- THE OTHER MUTABLE COLUMNS ARE ASSESSED, NOT SWEPT IN. From section 3's nine:
+--   current_depot_id, is_active, stalls.reserved_for_mission_id,
+--   stalls.staging_role  -- candidates on the same argument, but no probe has
+--                            convicted them; adding them on suspicion is how a
+--                            fingerprint accretes noise it cannot justify, and
+--                            the function's own comment forbids it.
+--   owning_sim_run_id     -- MUST NOT be hashed: it holds each arm's own run id
+--                            and differs between arms BY DESIGN.
+--   current_soc_updated_at -- already correctly excluded by 0137.
+--
+-- Nothing is applied until C3 reports.
