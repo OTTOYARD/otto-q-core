@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909021833
 -- migration-name:    a_proposal_must_know_which_tick_it_was_made_in
 --
 -- AGENT LAYER, step 1 of the Posture-B sequence in SOLVER_STATE.md §8.3.
@@ -249,3 +249,27 @@ VALUES (
   'the run tick_count, and deletes the probe -- because a textual check for tick_seq '
   'would pass on a function that stamps NULL.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 21:18 CT (2026-09-09 02:18 UTC), version 20260909021833,
+-- on the SECOND attempt. The first failed on A3 and rolled back atomically --
+-- column absent, registry row absent, both verified afterwards. A3's original
+-- form and why it was wrong are recorded above it rather than quietly rewritten.
+--
+--   column live            true
+--   registered             true   (class 'stamp')
+--   probe residue          none   (A1 cleans up after itself; verified by
+--                                  searching for source='0236_selftest' and
+--                                  action_context='0236_probe' -- zero rows)
+--   decide_tick md5        UNCHANGED
+--   recert floor           2026-09-07 21:36:53.363037, unmoved
+--
+-- A1 PASSED BEHAVIOURALLY, which is the part worth noting. It did not grep the
+-- function for the string 'tick_seq'; it called the agent door for real against
+-- a live run, read the stored row back, and compared tick_seq to that run's
+-- tick_count. A textual assertion would have passed on a function that stamped
+-- NULL. This is the assertion standard the rest of the agent-layer work uses.
+--
+-- NEXT, and this column is the reason it is now possible: 0237 records an
+-- external proposal stream keyed by (replay_id, tick_seq) and injects it back
+-- tick-for-tick, which is Posture B and the door to the agentic layer.

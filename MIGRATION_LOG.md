@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0235 — GENERATED, not a log
+## Index, 0134–0236 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -222,7 +222,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0233](db/migrations/0233_a_session_may_only_be_closed_on_its_own_timeline.sql) | `20260909003956` | yes — ledger | G36 / db/checks/0152. Fixes ONE of four sites in a single defect family, and |
 | [0234](db/migrations/0234_the_tether_is_run_written_residue_too.sql) | `20260909004734` | yes — ledger | G37 / db/checks/0153. The second attempt at a paired A/B died on |
 | [0235](db/migrations/0235_the_ab_rig_takes_a_clock_anchor_and_ignores_it.sql) | `20260909015606` | yes — ledger | G39 / db/checks/0155. public.ottoq_cert_arm's signature is |
+| [0236](db/migrations/0236_a_proposal_must_know_which_tick_it_was_made_in.sql) | `20260909021833` | yes — ledger | AGENT LAYER, step 1 of the Posture-B sequence in SOLVER_STATE.md §8.3 |
 
-103 migrations indexed.
+104 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

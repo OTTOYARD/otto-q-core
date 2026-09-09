@@ -334,7 +334,8 @@ repo_manifest(version, name, file) AS (
     ('20260908224618'::text, 'a_vehicle_the_arm_is_holding_is_not_a_candidate'::text, '0232_a_vehicle_the_arm_is_holding_is_not_a_candidate.sql'::text),
     ('20260909003956'::text, 'a_session_may_only_be_closed_on_its_own_timeline'::text, '0233_a_session_may_only_be_closed_on_its_own_timeline.sql'::text),
     ('20260909004734'::text, 'the_tether_is_run_written_residue_too'::text, '0234_the_tether_is_run_written_residue_too.sql'::text),
-    ('20260909015606'::text, 'the_ab_rig_takes_a_clock_anchor_and_ignores_it'::text, '0235_the_ab_rig_takes_a_clock_anchor_and_ignores_it.sql'::text)
+    ('20260909015606'::text, 'the_ab_rig_takes_a_clock_anchor_and_ignores_it'::text, '0235_the_ab_rig_takes_a_clock_anchor_and_ignores_it.sql'::text),
+    ('20260909021833'::text, 'a_proposal_must_know_which_tick_it_was_made_in'::text, '0236_a_proposal_must_know_which_tick_it_was_made_in.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
