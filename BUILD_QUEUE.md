@@ -19,6 +19,13 @@ the repo rather than in a task tool nobody else can see.
 **Rule for this file:** an item leaves only when it is measured closed, with the
 check or migration that closed it named. "Probably fine" is not a status.
 
+**The most predictive heuristic this codebase has, earned four times in one day:**
+when looking for what is broken, do not look for what is missing — look for what
+**exists and is never called**. G23 (`ottoq_purge_prior_runs`, correct, no
+scheduler), P0 #3 (`ottoq_cert_matrix.stale`, correct, no consumer), `0167` (six
+assert/check functions, correct, no caller), `0168` (the entire cost chain,
+correct, no caller at link 1).
+
 ---
 
 ## THE DISCIPLINE FIX — why the misses happened, and what changes
@@ -63,6 +70,7 @@ CLAUDE.md row counts. **Validate the instrument before quoting it.**
 | 6 | **Tariff never reaches a scheduling decision** | No function that writes a booking, reserves a stall or emits a command references tariff. Price is snapshotted, billed onto the SDR, rule-evaluated by `TW.004` (never fires) — never used to place work. | not started |
 | 7 | **The overnight wave is a slot, not a mechanism** | `ottoq_plan_overnight_wave`: 0 callers. `ottoq_wave_plan`: 0 rows. `TW.002`: never evaluated. The twin reaches a charged fleet by charging everything. | not started |
 | 8 | **No re-solve** | A shield refusal produces a hold and a logged decision; the vehicle is reconsidered next tick and nothing triggers a re-solve. `0156` exists because a proposal that could never fit was re-made and re-refused every tick for a whole run while a slower point stood empty. | not started |
+| 8b | **The settlement rail is financially empty (`0168`)** | 220,946 SDRs, 100% with a `tariff_id`, **0% with energy, cost or cost components**. `ottoq_visit_cost_attribution` has 0 rows and **no function anywhere inserts into it**; `ottoq_compute_visit_cost` has 0 callers; the attach trigger is enabled, correct, and has never fired; `sdr_issued` 125,648 vs `sdr_costs_attached` 0. CLAUDE.md 2.6 calls the SDR the strategic instruction of the entire build — telemetry and protocol are real, **settlement is a pipe with nothing flowing**. Blocks the `energy_cost` objective, which is one of only five with a *sourced* dollar value. | **not started — needs a judgement call from Chase first: may twin-simulated energy produce a dollar figure that looks like production revenue?** |
 | 9 | **Cold-start, and segmented charging** | Both reach planning only as durations/derates. Scheduled segments with a per-segment power profile are CP-SAT-only. | not started |
 
 ## P2 — registered but unreachable capability
