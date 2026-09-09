@@ -1,0 +1,137 @@
+-- =====================================================================
+-- 0155 — The sweep found the comparator, and I had already called it
+--        paired. Plus the calling convention that makes it true.
+--
+-- Finding id: G39 (fixed, 0235) · G39b (open) · G40 (open, cuOpt ledger)
+-- Opened:     2026-09-08 20:5x PM CT
+-- Source:     the cross-repo defect sweep (22 agents, 11 repos, 54
+--             adversarially-confirmed findings). Its #1 recommendation.
+--
+-- ---------------------------------------------------------------------
+-- 1. THE CORRECTION I OWE
+-- ---------------------------------------------------------------------
+-- Earlier today this repo recorded, in db/checks/0152 §1 and in the
+-- session report, that ab_group 02310000-0000-4000-8000-000000000003 was
+-- the "first true CRN policy pair in this database's history" because
+-- ottoq_cert_arm seeds both arms' worlds from
+-- hash(p_seed || p_ab_group || 'wave').
+--
+-- That is true of the FLEET and false of the SITE. Measured:
+SELECT 'a_the_unpaired_pair' AS check, r.policy, r.sim_clock_start,
+       count(*) AS ticks, min(e.building_load_kw) AS min_kw,
+       max(e.building_load_kw) AS max_kw, round(avg(e.building_load_kw),3) AS avg_kw
+FROM public.ottoq_sim_runs r
+JOIN public.site_energy_snapshots e ON e.sim_run_id = r.sim_run_id
+WHERE r.ab_group_id = '02310000-0000-4000-8000-000000000003'::uuid
+GROUP BY r.policy, r.sim_clock_start ORDER BY r.sim_clock_start;
+-- Observed:
+--   otto_q  2026-09-08 22:47:38.902697+00  12  65.50  130.50  84.033
+--   fifo    2026-09-08 22:48:10.290243+00  12  60.30  147.20  80.875
+--
+-- 31.4 seconds apart, and a different building. The arms did not share a
+-- world. Any energy figure differenced across that pair mixes policy with
+-- weather.
+--
+-- ---------------------------------------------------------------------
+-- 2. THE MECHANISM, WHICH THE SWEEP GOT HALF RIGHT
+-- ---------------------------------------------------------------------
+-- The sweep reported the building-load draw as seeded on
+-- `p_sim_clock_now::text`. It is not. Read from the catalog:
+--
+--   twin.ottoq_sim_advance_site_energy
+--     v_seed := abs(hashtextextended(p_depot_id::text
+--                 || twin.ottoq_sim_clock_salt(p_sim_run_id, p_sim_clock_now)
+--                 || 'site', 11));                    <- RUN-RELATIVE. Correct.
+--     v_salt := to_char(p_sim_clock_now, 'YYYYMMDD-HH24MISS');  <- ABSOLUTE.
+--
+--   ottoq_sim_compute_building_load_kw(depot, clock, ambient, p_seed, p_salt)
+--     ottoq_sim_seeded_random(p_seed, p_salt || '_svc')
+--     ottoq_sim_seeded_random(p_seed, p_salt || '_wash')
+--     ottoq_sim_seeded_random(p_seed, p_salt || '_bld_n')
+--
+-- ottoq_sim_seeded_random is a pure hash of (seed, salt). THE SEED WAS
+-- HARDENED TO BE RUN-RELATIVE BY 0051/0052 AND THE SALT SITTING BESIDE IT
+-- WAS NOT. That is a half-finished fix, not an oversight of the whole
+-- idea, and it is why the conclusion is right while the sweep's stated
+-- cause is wrong. Conclusion confirmed by measurement; mechanism
+-- corrected by reading.
+--
+-- ---------------------------------------------------------------------
+-- 3. WHY THE CERTIFICATION IS UNAFFECTED
+-- ---------------------------------------------------------------------
+SELECT 'b_pair_shares_anchor' AS check, trim(l) AS line
+FROM (SELECT prosrc s FROM pg_proc WHERE proname='ottoq_determinism_pair') x,
+     unnest(string_to_array(s, E'\n')) WITH ORDINALITY t(l, ord)
+WHERE l ~* 'p_sim_start' AND ord < 60;
+-- Observed: ottoq_tick_invariance_reset_fleet(p_depot, p_seed, p_sim_start)
+--           twin.ottoq_sim_start_run(p_scenario, p_sim_start, 60, ...)
+--
+-- The determinism pair takes an anchor and gives the SAME one to both
+-- arms. One anchor, identical absolute salts, byte-identical output.
+-- Thirty rounds of certification are sound and unaffected.
+--
+-- ottoq_cert_arm accepted p_start and never referenced it -- the fourth
+-- instance today of a defect that lives only on the path nothing had ever
+-- exercised. Fixed in 0235: v_now := COALESCE(p_start, now()).
+--
+-- ---------------------------------------------------------------------
+-- 4. THE CALLING CONVENTION, WHICH IS NOW LOAD-BEARING
+-- ---------------------------------------------------------------------
+-- 0235 makes a correct pairing POSSIBLE. It does not make one happen.
+-- From here, every comparative pair MUST be called as:
+--
+--   CALL ottoq_cert_arm(<seed>, '<policy A>', <group>, <ticks>, <ANCHOR>, 0);
+--   CALL ottoq_cert_arm(<seed>, '<policy B>', <group>, <ticks>, <ANCHOR>, 0);
+--                                                       ^^^^^^^^
+--   the SAME literal timestamptz in both calls. Never now(). Never two
+--   evaluations of the same expression -- now() called twice is two
+--   different anchors, which is the defect this replaced.
+--
+-- Passing NULL is still legal and still means "anchor at call time"; that
+-- is correct for a single standalone run and WRONG for either arm of a
+-- pair. There is no guard enforcing this yet, and that is the honest
+-- state: the rig can now express a paired comparison and still permits an
+-- unpaired one. A pair-runner that takes one anchor and calls both arms
+-- is the obvious next hardening.
+--
+-- 4a. Verification of 0235, kept here as the reference result:
+--     two arms, same seed 919191, same explicit anchor, BOTH otto_q so the
+--     policy is held constant and only the clock is under test --
+--     12 ticks each, matching_ticks 12, differing_ticks 0.
+--
+-- ---------------------------------------------------------------------
+-- 5. G39b, OPEN: the salt asymmetry itself
+-- ---------------------------------------------------------------------
+-- v_salt stays on the absolute clock inside
+-- twin.ottoq_sim_advance_site_energy. With a shared anchor the arms agree,
+-- so pairing is sound as it stands. Making the salt run-relative like its
+-- seed would additionally make a pair reproducible across different
+-- wall-clock DAYS, which is worth having for archived runs. That function
+-- is in the tick path: forces_recert TRUE, needs a round behind it.
+--
+-- ---------------------------------------------------------------------
+-- 6. G40, OPEN AND MORE URGENT THAN IT LOOKS: a published sentence the
+--    ledger cannot support
+-- ---------------------------------------------------------------------
+-- The sweep's finding #4, not yet independently verified here and
+-- therefore stated as its claim rather than as fact:
+--
+--   edge-functions/ottoq-orchestrate-tick/index.ts and
+--   edge-functions/ottoq-assign-optimize/index.ts both POST to the NVIDIA
+--   cuOpt endpoint and write NO cuopt_invocation_log row. Only
+--   ottoq-cuopt-propose logs. Both are reachable from ottoq-ottocommand
+--   ("reoptimize_depot"), ottoq-amend and ottoq-jobs-request without
+--   passing the cuOpt policy gate that 0152 set to 0.
+--
+-- If that holds, then SOLVER_STATE.md §9.2's published sentence "the
+-- NVIDIA endpoint has not been called since 2026-08-30" is UNPROVABLE as
+-- stated, because it is derived solely from a ledger that two of three
+-- call paths never write to. CLAUDE.md rule 6 makes that ledger the sole
+-- authority for cuOpt claims IN BOTH DIRECTIONS, and this is the negative
+-- direction.
+--
+-- That is a claim we have published. It is verified first thing next
+-- session, and either re-derived or withdrawn. Filed as G40 rather than
+-- acted on tonight because withdrawing a published sentence on an
+-- unverified agent report would be the same error in the other direction.
+-- =====================================================================

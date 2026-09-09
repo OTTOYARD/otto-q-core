@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909015606
 -- migration-name:    the_ab_rig_takes_a_clock_anchor_and_ignores_it
 --
 -- G39 / db/checks/0155. public.ottoq_cert_arm's signature is
@@ -217,3 +217,36 @@ VALUES (
   'not fix the v_salt asymmetry inside advance_site_energy, which is tick-path and '
   'forces_recert TRUE, filed as G39b.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 20:56 CT (2026-09-09 01:56 UTC). Four preconditions, three
+-- assertions, first attempt. decide_tick md5 UNCHANGED. Floor unmoved at
+-- 2026-09-07 21:36:53.363037.
+--
+-- *** PROVEN, and the test is worth reading because it isolates the variable. ***
+--
+-- Two arms, SAME seed (919191), SAME explicit anchor
+-- ('2026-09-09 02:00:00+00'), BOTH otto_q -- so the policy is held constant and
+-- the only thing under test is the clock:
+--
+--   64a1b741-0db4-4205-8015-5b8172f74404   sim_clock_start 2026-09-09 02:00:00+00
+--   (second arm, ab_group ...0002)         sim_clock_start 2026-09-09 02:00:00+00
+--
+--   distinct_anchors   1
+--   arm1_rows         12      arm2_rows        12
+--   matching_ticks    12      differing_ticks   0
+--
+-- Building load is now identical TICK FOR TICK across two separate runs. The
+-- comparison before the fix, on arms 31.4 s apart, differed at every tick
+-- (avg 84.033 vs 80.875 kW). Same seed, same world, on demand.
+--
+-- Note what the anchor being honoured also proves incidentally: sim_clock_start
+-- came back as exactly 02:00:00, a time that is neither now() nor anywhere near
+-- it, so p_start is genuinely reaching the INSERT rather than being shadowed.
+--
+-- WHY BOTH ARMS ARE otto_q. A fifo arm still cannot complete -- it dies on G38
+-- (db/checks/0154) -- and running one otto_q against one fifo would have
+-- confounded the clock fix with the policy difference. Holding the policy
+-- constant makes the 12/12 result attributable to this migration and nothing
+-- else. The policy comparison itself still waits on G38.
+-- ---------------------------------------------------------------------------
