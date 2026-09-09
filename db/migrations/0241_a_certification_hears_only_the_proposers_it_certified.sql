@@ -373,11 +373,13 @@ BEGIN
   END IF;
 END $a6$;
 
-INSERT INTO public.ottoq_run_scope_registry (table_schema, table_name, column_name, class, note)
-VALUES ('public', 'ottoq_certified_proposers', 'source', 'config',
-        '0241: Posture A registry. Not run-scoped -- it is configuration that outlives '
-        'every run, and the purge must leave it alone.')
-ON CONFLICT DO NOTHING;
+-- NO ottoq_run_scope_registry ROW, DELIBERATELY. The first draft registered the
+-- new table with class 'config', which the registry's CHECK does not allow
+-- (engine | stamp | evidence | run_ledger) -- and the fix is not to pick the
+-- least-wrong class. ottoq_check_run_scope_registry flags UNREGISTERED
+-- RUN-SCOPED COLUMNS; ottoq_certified_proposers has no run-scoped column at all,
+-- so it is not in that check's universe and a row would only teach a future
+-- reader that configuration tables belong in a run-scope registry. They do not.
 
 INSERT INTO public.ottoq_cert_lineage (name, classified_at, forces_recert, note)
 VALUES (
