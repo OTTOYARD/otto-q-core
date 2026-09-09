@@ -64,6 +64,19 @@
 --   than a key inside a function that also runs at boot. Measure, do not assume
 --   -- that is the whole lesson of 0129 and 0144.
 --
+--   MEASURED 2026-09-09 06:20 UTC, five consecutive calls on the flagship depot:
+--
+--     mean            13.98 ms
+--     four calls      55.93 ms
+--     as a share of a ~130 s pair   0.043%
+--
+--   The gate is satisfied and the shape stands. Fifty-six milliseconds against
+--   a two-minute pair is not a cost worth a second function to avoid, and the
+--   0129 arithmetic does not repeat here because 0222 already bounded what the
+--   expensive scans touch -- the world fingerprint reads 116 vehicles, the
+--   depot's stalls and chargers, the need profiles and the BESS units, not the
+--   786,457-row booking table that made the boot fingerprint 36% of a pair.
+--
 -- At boot the new key is redundant with fp by construction (same function, same
 -- depot, same moment). That redundancy is harmless and is not worth a second
 -- function to avoid; the value is at the END, where nothing else looks.
