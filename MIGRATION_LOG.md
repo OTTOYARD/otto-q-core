@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0250 — GENERATED, not a log
+## Index, 0134–0251 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -237,7 +237,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0248](db/migrations/0248_the_refusal_ledger_was_registered_engine_without_the_key_that_makes_it_true.sql) | `20260909133442` | yes — ledger | THE REFUSAL LEDGER WAS REGISTERED engine WITHOUT THE KEY THAT MAKES |
 | [0249](db/migrations/0249_the_purge_loop_variable_shadowed_the_table_it_was_selecting_from.sql) | `20260909133615` | yes — ledger | THE PURGE LOOP VARIABLE SHADOWED THE TABLE IT WAS SELECTING FROM |
 | [0250](db/migrations/0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat.sql) | `20260909134546` | yes — ledger | THE engine CLASS IS NOT A DELETE LIST, AND IT HOLDS THE MOAT |
+| [0251](db/migrations/0251_a_purged_run_must_say_gone_not_zero.sql) | `PENDING` | no — pending | A PURGED RUN MUST SAY "GONE", NOT "ZERO" |
 
-118 migrations indexed.
+119 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

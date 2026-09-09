@@ -349,7 +349,8 @@ repo_manifest(version, name, file) AS (
     ('20260909133254'::text, '0247_a_dead_runs_working_rows_outlive_it_because_nothing_deletes_them'::text, '0247_a_dead_runs_working_rows_outlive_it_because_nothing_deletes_them.sql'::text),
     ('20260909133442'::text, '0248_the_refusal_ledger_was_registered_engine_without_the_key_that_makes_it_true'::text, '0248_the_refusal_ledger_was_registered_engine_without_the_key_that_makes_it_true.sql'::text),
     ('20260909133615'::text, '0249_the_purge_loop_variable_shadowed_the_table_it_was_selecting_from'::text, '0249_the_purge_loop_variable_shadowed_the_table_it_was_selecting_from.sql'::text),
-    ('20260909134546'::text, '0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat'::text, '0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat.sql'::text)
+    ('20260909134546'::text, '0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat'::text, '0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat.sql'::text),
+    ('PENDING'::text, '0251_a_purged_run_must_say_gone_not_zero'::text, '0251_a_purged_run_must_say_gone_not_zero.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
