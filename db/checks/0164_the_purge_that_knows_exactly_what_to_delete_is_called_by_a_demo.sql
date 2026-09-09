@@ -1,3 +1,65 @@
+-- ###########################################################################
+-- CORRECTION, 13:20 UTC, ~8 MINUTES AFTER THIS FILE WAS COMMITTED.
+--
+-- THE CONCLUSION AT THE BOTTOM OF THIS FILE IS WRONG AND MUST NOT BE ACTED ON.
+-- "Schedule ottoq_purge_prior_runs" would destroy the entire certification
+-- history. I read steps (1)-(4) of that function, found the registry loop I
+-- expected, and stopped reading. Step (5) is:
+--
+--     DELETE FROM public.ottoq_sim_runs WHERE sim_run_id = ANY(v_doomed);
+--
+-- and v_doomed is EVERY run except the single p_keep_run, excluding only
+-- 'production_live' and status='running'. Cert-harness runs are not excluded.
+--
+-- WHY THAT IS FATAL. ottoq_cert_matrix reads its canon from exactly one place:
+--
+--     FROM public.ottoq_sim_runs r
+--      WHERE r.run_by = 'cert_harness' AND r.started_at >= p_since
+--        AND r.validation_status IS NOT NULL AND r.validation_notes IS NOT NULL
+--
+-- and nothing else. No engine table. The fourteen atoms, every column's streak,
+-- every canon and the recert floor all live in ottoq_sim_runs.validation_notes.
+-- Deleting the run row deletes the verdict. Scheduling this function nightly
+-- would have wiped 919 cert-harness runs and every canon this project has
+-- built, and it would not be recoverable -- a verdict is a hash of a world that
+-- no longer exists.
+--
+-- SO ottoq_purge_prior_runs IS NOT A RETENTION PURGE. It is a DEMO RESET:
+-- "wipe everything except this new run." That is precisely why its only caller
+-- is ottoq_start_demo_run, and I should have read the single caller as the
+-- statement of intent it was, instead of as an oversight.
+--
+-- WHAT IS STILL TRUE, AND IT IS MOST OF THE FILE:
+--   * Q1's registry answer stands. class='engine' on the calendar is real, and
+--     the registry is still the right authority for WHICH tables to purge.
+--   * Q2 (h_bkg is run-scoped) stands.
+--   * Q3 (the archive stores counts, not rows) stands.
+--   * Q4 (v2 is redundant given v3; 170 MB) stands.
+--   * The gap is real: nothing on a schedule deletes a dead run's engine rows.
+--
+-- WHAT THE FIX ACTUALLY IS, CORRECTED:
+--   Build a NEW purge that reuses the good half of this one -- the
+--   class='engine' loop over the registry, the retention arming, and the
+--   ottoq_check_run_scope_registry refusal gate -- and DELETES ONLY THE ENGINE
+--   ROWS. The ottoq_sim_runs row is never touched. It is class 'run_ledger' in
+--   the registry, which the engine loop already skips; the mistake was that
+--   step (5) sits OUTSIDE the loop and ignores the class entirely.
+--
+--   The whole of ottoq_sim_runs is 5,088 kB for 938 runs. The certification
+--   history costs five megabytes. It is kept forever, and the keep window
+--   applies to engine rows only.
+--
+--   Extra guards the new purge needs and the old one lacks:
+--     - exclude runs with no ottoq_run_archives row (Q3's ordering caveat --
+--       the archive's counts are taken at archive time);
+--     - exclude anything younger than the keep window;
+--     - never run while pg_stat_activity shows a pair in flight.
+--
+-- Q(c) FROM THE BOTTOM OF THIS FILE IS THEREFORE ANSWERED, AND ANSWERED THE
+-- HARD WAY: the canon cites the run ROW, not the run's rows. Engine rows are
+-- free to delete; the run row never is.
+-- ###########################################################################
+--
 -- 0164 — G23, questions 1–4 answered. The calendar is not unprotected; the
 --        machinery that would protect it is never invoked.
 --
