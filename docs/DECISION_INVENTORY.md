@@ -58,6 +58,41 @@ hold-constant side of every A/B (CLAUDE.md C5 correction, `db/checks/0146`).
 `enforcement` is one of `block` (the action cannot happen), `warn`, or
 `log_only`.
 
+> ### CORRECTION, 2026-09-09 13:58 UTC — NINE OF THESE 29 HAVE NEVER FIRED
+>
+> The first version of this section listed all 29 rules as though each one runs.
+> A background workflow reading the same database found otherwise, and I verified
+> it: **9 of the 29 have no evaluation in the ledger, ever. Six are `block`
+> severity.**
+>
+> | rule | severity | listens for |
+> |---|---|---|
+> | `HW.006.physical_presence_verification` | critical / **block** | `task_completion` |
+> | `SM.001.vehicle_transition_validity` | critical / **block** | `vehicle_state_change` |
+> | `SM.003.stall_transition_validity` | critical / **block** | `stall_state_change` |
+> | `SM.004.role_gated_actions` | critical / **block** | `tech_override`, `emergency_stop`, … |
+> | `SM.005.audit_note_required_on_overrides` | critical / **block** | `progression_decision_insert` |
+> | `SM.006.bess_transition_validity` | critical / **block** | `bess_state_change` |
+> | `SLA.002.max_queue_depth` | warn | `arrival`, `queue_admission` |
+> | `TW.002.overnight_staging` | log_only | `post_redeployment_staging` |
+> | `TW.004.tariff_window` | log_only | `cost_advisory`, `schedule_optimization` |
+>
+> **The pattern is one sentence: the shield is wired to decisions to START
+> something, not to outcomes.** The engine announces four action contexts —
+> `task_start`, `stall_assignment`, `redeployment`, `bess_dispatch`. Every rule
+> above listens only for contexts outside that set, so it is registered, active,
+> versioned, blocking — and unreachable. `SM.001` in particular has had over a
+> million vehicle state-change events go past it.
+>
+> So the honest count is **20 rules enforcing and 9 waiting to be connected**, and
+> "the L1 shield evaluates every action" is not yet true. Below, a rule that has
+> never fired is marked ⚠ NEVER FIRED.
+>
+> Measured: `SELECT rule_code, EXISTS(SELECT 1 FROM ottoq_rule_evaluations e WHERE
+> e.rule_code = r.rule_code) FROM ottoq_rules r WHERE status='active'`. The
+> corroborating read was taken before this session's retention purge touched
+> `ottoq_rule_evaluations`, so the answer is not an artefact of deletion.
+
 ### energy_safety — 5 rules
 - `EN.001.grid_capacity_ceiling` — **safety_critical, block, depot scope.** The site power cap. Evaluated on `task_start`, `stall_assignment`, `charge_session_start`, `power_increase`
 - `EN.002.stall_power_ceiling` — critical, block. Per-stall kW ceiling
@@ -68,7 +103,7 @@ hold-constant side of every A/B (CLAUDE.md C5 correction, `db/checks/0146`).
 ### hardware_safety — 3 rules
 - `HW.001.connector_compatibility` — **safety_critical, block**, `strict=true`. Connector/inlet pairing
 - `HW.002.charger_state_precondition` — critical, block. OCPP charger must be `Available` and seen within `max_offline_seconds=90`
-- `HW.006.physical_presence_verification` — critical, block, on `task_completion`. **You cannot complete a task on a vehicle that is not physically there**
+- `HW.006.physical_presence_verification` — critical, block, on `task_completion`. **You cannot complete a task on a vehicle that is not physically there** — ⚠ NEVER FIRED
 
 ### concurrency — 2 rules
 - `HW.004.stall_single_vehicle` — critical, block. One vehicle per stall (the software half; the EXCLUDE constraint on `ottoq_stall_bookings` is the physical half)
@@ -78,26 +113,33 @@ hold-constant side of every A/B (CLAUDE.md C5 correction, `db/checks/0146`).
 - `HW.003.sensor_liveness` — **safety_critical, block**, fleet-operator scope. SoC reading older than `max_stale_seconds=300` gates `task_start`, `task_completion` and `redeployment`. A stale sensor is not a usable sensor
 
 ### state_machine — 4 rules
-- `SM.001` vehicle transition validity · `SM.002` task transition validity · `SM.003` stall transition validity · `SM.006` BESS transition validity. All critical, all block
+- `SM.001` vehicle transition validity ⚠ · `SM.002` task transition validity · `SM.003` stall transition validity ⚠ · `SM.006` BESS transition validity ⚠. All critical, all block — **and three of the four have NEVER FIRED**
 
 ### sla_contract — 7 rules (the per-OEM layer, `fleet_operator` scope, versioned per tenant)
 - `SLA.001.min_soc_at_deployment` — critical, block. **No asset leaves below its operator's floor**
 - `SLA.004.required_services_complete` — critical, block. Contracted services must be done before release
 - `SLA.007.redeployment_readiness` — critical, block. The composite readiness gate
-- `SLA.002.max_queue_depth` — warn. Per-operator queue depth
+- `SLA.002.max_queue_depth` — warn. Per-operator queue depth — ⚠ NEVER FIRED
 - `SLA.003.max_visit_duration` — warn. Visit overrun
 - `SLA.006.maintenance_window` — warn. Maintenance-window restriction
 - `SLA.005.oem_acceptance_timing` — log_only. OEM acceptance gate configuration
 
 ### time_window — 5 rules (depot scope)
-- `TW.001.operational_hours` — warn · `TW.003.quiet_hours` — warn (noise) · `TW.005.shift_change_buffer` — warn, `buffer_minutes=15` · `TW.002.overnight_staging` — log_only, `threshold_minutes=120` · `TW.004.tariff_window` — log_only, `peak_start=14:00 / peak_end=20:00`
+- `TW.001.operational_hours` — warn · `TW.003.quiet_hours` — warn (noise) · `TW.005.shift_change_buffer` — warn, `buffer_minutes=15` · `TW.002.overnight_staging` — log_only, `threshold_minutes=120` ⚠ NEVER FIRED · `TW.004.tariff_window` — log_only, `peak_start=14:00 / peak_end=20:00` ⚠ NEVER FIRED
 
 ### role_authorization + audit_integrity — 2 rules
-- `SM.004.role_gated_actions` — critical, block. Gates `tech_override`, `flag_abnormality`, `resolve_abnormality`, `oem_accept`, `oem_flag_midflow`, `emergency_stop`, `brain_pause`
-- `SM.005.audit_note_required_on_overrides` — **critical, block**, `min_chars=3`. **You cannot override without saying why**
+- `SM.004.role_gated_actions` — critical, block ⚠ NEVER FIRED. Gates `tech_override`, `flag_abnormality`, `resolve_abnormality`, `oem_accept`, `oem_flag_midflow`, `emergency_stop`, `brain_pause`
+- `SM.005.audit_note_required_on_overrides` — **critical, block**, `min_chars=3`. **You cannot override without saying why** — ⚠ NEVER FIRED
 
 > **52 rows, 29 codes.** The other 23 rows are superseded versions of the same
 > codes, kept because the rules layer is versioned and tenant-parameterizable.
+>
+> **"Tenant-parameterizable" is true of the mechanism and false of the data.**
+> `ottoq_rule_parameters` has **zero rows**, so no per-operator or per-depot
+> override has ever contributed to a verdict, and all four OEM SLA rows carry
+> identical values on every enforceable field. **No active rule currently
+> produces a different verdict for a different operator.** `ottoq_rule_overrides`
+> is also empty: the override path has never been used.
 
 ---
 
@@ -326,6 +368,70 @@ does not currently have, with what it would take.
    the hold-constant side of the A/B before a single comparison number ships.
 10. **Production and the proof harness share one database.** Tracked as **G26** —
     the root cause behind G43, and still open.
+
+### Added 2026-09-09 14:00 UTC, from the background workflow, each verified
+
+11. **Nine of 29 rules are unreachable** (§2's correction). Six are `block`
+    severity. The shield is wired to decisions to *start* something, never to
+    outcomes. This is the largest single gap between what the rules layer claims
+    and what it does.
+12. **`SM.006` carries a latent fail-closed defect behind that gap.** It points
+    at a 5-argument evaluator while `ottoq_evaluate_rule_core` dispatches every
+    evaluator with 4. If `bess_state_change` were ever announced, every BESS
+    state change would be *refused* as `evaluator_error_failclosed` rather than
+    validated. Safe-direction, but it surfaces the moment gap 11 is closed —
+    so 11 and 12 must be fixed together. *(Read from `pg_proc.pronargs` and the
+    dispatch `format()`; not executed.)*
+13. **DCFC cooldown is absent from the engine.** CLAUDE.md 2.5 names it as a
+    modelling requirement that bites — a minimum gap on the *service point*,
+    18 minutes in the throughput model. A catalog-wide search of every function
+    in `public`, `ottoq` and `twin` for `cooldown|cool_down|min_gap|recovery_min`
+    returns **zero rows**. Back-to-back DCFC sessions on one charger are
+    schedulable with no gap. It exists only in the CP-SAT prototype.
+14. **There is no objective function in the engine, and this is the deep one.**
+    2.5 requires a multi-term objective with exposed weights (tardiness, energy
+    cost, peak excursion, moves). What exists instead is a set of fixed greedy
+    orders. There is no scalar by which two plans can be compared — which means
+    **the agent layer has nothing to propose *against*, and "better" is
+    undefined inside the kernel.** Weights exist only in the CP-SAT prototype.
+    This is why gap 8 (the empty A/B instrument) is not merely a missing test:
+    the thing it would measure has not been defined.
+15. **Tariff never reaches a scheduling decision.** No function that writes a
+    booking, reserves a stall or emits a vehicle command references tariff.
+    Price is snapshotted, billed onto the SDR, and rule-evaluated by `TW.004`
+    (which has never fired) — but never used to place work. Vehicle load is not
+    shifted into cheap windows; only the battery reacts to price.
+16. **The overnight turnaround is a slot, not a mechanism.** The night predicate
+    is live and the twin drains overnight, but `ottoq_plan_overnight_wave` has
+    **zero callers**, `ottoq_wave_plan` has **zero rows**, and `TW.002` — the
+    rule that would encode the staging policy — has never been evaluated. This
+    is the workflow Chase described in September; the engine currently reaches
+    the same end state by charging everything, not by planning a wave.
+17. **Cold-start is not in the planner**, and **piecewise charging above ~70%
+    SoC reaches planning as a duration and a derate, not as scheduled segments**
+    with a per-segment power profile. Both are CP-SAT-only today.
+18. **Rolling re-solve is weak.** A shield refusal produces a hold and a logged
+    decision; the vehicle is simply reconsidered next tick. Nothing triggers a
+    re-solve. That is exactly why `0156` was needed — a proposal that could
+    never fit under the ceiling was re-made and re-refused every tick for a
+    whole run while a slower point stood empty.
+19. **Five warn/log rules read the wall clock.** `ottoq_depot_local_time`
+    returns `NOW() AT TIME ZONE tz`, so `TW.001`/`TW.003`/`TW.005` read it, and
+    `SLA.003`/`SLA.006` compute against `NOW()`. All are warn or log tier, so
+    they cannot change an enacted action — but they can change a *logged
+    verdict* between two otherwise identical runs. G15's defect class, in the
+    tier where it is survivable rather than fatal.
+
+**The verdict those add up to, and it is worth stating plainly: the engine
+reasons like a kernel on feasibility and assigns like a greedy scheduler on
+objectives.** The constraint side is genuinely kernel-grade — versioned
+individually-logged rules every proposer must clear, physical exclusivity
+enforced by the database rather than by convention, a site power budget that
+actually refuses, every decision replayable against a snapshot of the world that
+produced it. The flow-shop half is not there yet: no cooldown, no objective, no
+price-aware placement, no re-solve. **OTTO-Q can prove a schedule is *legal* far
+better than it can argue any schedule is *good*** — and closing that is exactly
+what C4's CP-SAT prototype is for.
 
 ---
 
