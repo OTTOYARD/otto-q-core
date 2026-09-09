@@ -471,3 +471,51 @@
 --
 -- Both are the blind-spot promotion doctrine working as designed and leaving its
 -- fingerprints in the ledger. Neither is a false green.
+
+-- ===========================================================================
+-- 7. C2 JUDGED -- THE PREDICTION AS WRITTEN IS FALSIFIED
+-- ===========================================================================
+--
+-- C2 (the IDENTICAL replay pair, run again), fired 05:50:00 UTC, alone:
+--
+--   status  passed
+--   arm A   h_evt  9c631343c32cca7a861b17bc5bc8f4b7
+--   arm B   h_evt  9c631343c32cca7a861b17bc5bc8f4b7    <- both on the canon
+--   both    h_prop 0299e5e6b7112f6978a1177ba12230fe
+--   both    fp     803698f332adc0d06cbefca79dad1ce0
+--   both    replay_injected 5
+--
+-- SECTION 1 PREDICTED: "C2 FAILS AGAIN with arm A at exactly 6cd50313... and
+-- arm B at 9c631343..." IT DID NOT. C2 passed. That prediction is FALSIFIED and
+-- it is the second of the two I got wrong tonight.
+--
+-- Section 2, written and committed at 05:36 -- fourteen minutes BEFORE C2 fired
+-- and before I had any C2 result -- said the opposite: "C1 and C2 therefore both
+-- run on a clean world and are both expected to PASS." That is CONFIRMED. The
+-- record of which statement was made when is in git, not in this paragraph:
+-- commit 4ef0ab1 precedes the 05:50 firing.
+--
+-- So the honest scoring is: the prediction I wrote from the FAILURE was wrong,
+-- and the prediction I wrote from the MECHANISM was right. That is the whole
+-- argument for finding mechanisms instead of pattern-matching on symptoms, and
+-- it is worth more than either prediction.
+--
+-- ---------------------------------------------------------------------------
+-- AND C2 PROVES SOMETHING C1 COULD NOT: THE REPLAY PATH IS DETERMINISTIC
+-- ---------------------------------------------------------------------------
+--
+-- C2 replayed the same recorded stream into the same column and produced
+-- h_prop = 0299e5e6b7112f6978a1177ba12230fe -- BYTE-IDENTICAL to the h_prop of
+-- the pair that failed at 05:24, and identical across both of its own arms, with
+-- the same replay_injected count of 5.
+--
+-- The injection is reproducible. Same stream in, same proposal ledger out, twice,
+-- across four arms in two transactions half an hour apart. Whatever moved h_evt
+-- at 05:24, it was not the replay being nondeterministic -- because it is not.
+--
+-- That is the exoneration C1 could not give. C1 only showed the pair function
+-- works with replay switched off; C2 shows it works with replay switched ON and
+-- repeated. Posture B's proof in db/checks/0157 survives this investigation
+-- intact, and 0239 is not implicated.
+--
+-- What remains is C3.
