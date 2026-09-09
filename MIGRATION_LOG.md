@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0237 — GENERATED, not a log
+## Index, 0134–0238 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -224,7 +224,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0235](db/migrations/0235_the_ab_rig_takes_a_clock_anchor_and_ignores_it.sql) | `20260909015606` | yes — ledger | G39 / db/checks/0155. public.ottoq_cert_arm's signature is |
 | [0236](db/migrations/0236_a_proposal_must_know_which_tick_it_was_made_in.sql) | `20260909021833` | yes — ledger | AGENT LAYER, step 1 of the Posture-B sequence in SOLVER_STATE.md §8.3 |
 | [0237](db/migrations/0237_record_and_replay_an_agent_proposal_stream.sql) | `20260909022308` | yes — ledger | AGENT LAYER, step 2 -- Posture B from SOLVER_STATE.md §8.2, which §8.3 calls |
+| [0238](db/migrations/0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql) | `PENDING` | no — pending | G41 / db/checks/0156 |
 
-105 migrations indexed.
+106 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
