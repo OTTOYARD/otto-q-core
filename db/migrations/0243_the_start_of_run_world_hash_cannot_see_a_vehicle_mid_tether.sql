@@ -164,9 +164,14 @@ BEGIN
   --     back by the RAISE, while the PL/pgSQL variable assignment survives it.
   --     This is the property the old definition did not have, asserted rather
   --     than assumed.
+  -- The probe vehicle must currently have NO tether state, or setting it would
+  -- be a no-op and A4 would fail for a reason that has nothing to do with the fix.
   SELECT id INTO v_probe FROM public.vehicles
-   WHERE home_depot_id = v_flagship AND category = 'autonomous' ORDER BY id LIMIT 1;
-  IF v_probe IS NULL THEN RAISE EXCEPTION '0243 A4: no autonomous vehicle at the flagship depot to probe'; END IF;
+   WHERE home_depot_id = v_flagship AND category = 'autonomous'
+     AND robotic_tether_phase IS NULL ORDER BY id LIMIT 1;
+  IF v_probe IS NULL THEN
+    RAISE EXCEPTION '0243 A4: no autonomous flagship vehicle without tether state to probe';
+  END IF;
 
   BEGIN
     UPDATE public.vehicles SET robotic_tether_phase = 'unstow' WHERE id = v_probe;
@@ -181,13 +186,25 @@ BEGIN
       v_fp_clean, v_fp_probed;
   END IF;
 
-  -- A4b: the probe left nothing behind.
+  -- A4b: the probe left nothing behind. Asserted on the PROBE ROW ONLY -- an
+  -- earlier draft counted tether state across the whole depot, which would have
+  -- failed on any residue this migration did not create, i.e. on exactly the
+  -- condition the migration exists to survive.
   SELECT count(*) INTO n FROM public.vehicles
-   WHERE home_depot_id = v_flagship AND robotic_tether_phase IS NOT NULL;
-  IF n <> 0 THEN RAISE EXCEPTION '0243 A4b: probe residue -- % vehicles still mid-tether', n; END IF;
+   WHERE id = v_probe AND robotic_tether_phase IS NOT NULL;
+  IF n <> 0 THEN
+    RAISE EXCEPTION '0243 A4b: the probe subtransaction did not roll back -- vehicle % is still mid-tether', v_probe;
+  END IF;
 
   -- A5: fp moved for the clean world too. This is what makes forces_recert TRUE
   --     honest: every canon really is invalidated, not just the ones with residue.
+  --     CAVEAT, stated rather than hidden: the depot metronome runs every minute
+  --     and this is READ COMMITTED, so in principle a concurrent write could move
+  --     the hash between the two calls and A5 would pass for the wrong reason.
+  --     The assertion is still worth making -- the new body appends four fields
+  --     per vehicle for all 116 autonomous vehicles, so a MOVE is certain and
+  --     only its cause is theoretically ambiguous. A5 failing would be the real
+  --     signal, and it cannot fail spuriously.
   IF v_fp_clean = v_fp_before THEN
     RAISE EXCEPTION '0243 A5: fp did not move on a clean world -- forces_recert TRUE would be a lie';
   END IF;
