@@ -399,3 +399,42 @@ VALUES (
   'captures content-ordered while runs consumed in submission order, so a faithful '
   'replay could enact a different proposal with every atom matching.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 22:15 CT (2026-09-09 03:15 UTC), version 20260909031408,
+-- first attempt, all seven assertions green.
+--
+--   ottoq_l2_external_proposal          b35e1890... -> 2c60ce8dd7bfbdd2f4923f1eb59ad922
+--   ottoq_reoptimize_reservation_book   db254f69... -> 66d1bcdcd6a50d054b17535ff8e44ef5
+--   ottoq_decide_tick                   ae98f71b879a0a11bdf366d21ff5b4eb   UNCHANGED
+--   pre-images snapshotted              2  (label 0238_pre)
+--   probe residue                       0
+--   lineage row, forces_recert TRUE     present
+--   RECERT FLOOR MOVED                  2026-09-07 21:36:53.363037
+--                                    -> 2026-09-09 03:15:07.410339
+--
+-- THEN, INDEPENDENTLY OF THE MIGRATION'S OWN ASSERTIONS, db/checks/0156's
+-- experiment was re-run verbatim and rolled back:
+--
+--   before 0238:  submitted A,B -> chose A   |   submitted B,A -> chose B
+--   after  0238:  submitted A,B -> chose A   |   submitted B,A -> chose A
+--
+-- The flip is closed. This matters more than A1 passing: A1 is a test the
+-- migration brought with it, and this is the finding's own instrument, run
+-- again afterwards without being told what to expect.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT IS NOW OWED
+-- ---------------------------------------------------------------------------
+-- forces_recert TRUE reset every canon streak. A recert round follows; until
+-- it completes, no column is green and no number from before 03:15 UTC today
+-- should be quoted as certified.
+--
+-- NEXT: 0239, the replay-driven certification arm. It was the task in hand when
+-- this defect surfaced, and it could not have been honest before this migration:
+-- 0237 captures a proposal stream in CONTENT order (its A2 asserts that) while
+-- the run being recorded consumed in SUBMISSION order, and h_prop hashes the SET
+-- of proposals rather than the CHOICE among them. A replay could therefore have
+-- enacted a different proposal from the run it was recorded from, with all
+-- fourteen atoms matching. Now that the selector is total on content, the
+-- recorded order and the replayed order agree by construction.
