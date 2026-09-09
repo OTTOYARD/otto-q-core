@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0241 — GENERATED, not a log
+## Index, 0134–0242 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -228,7 +228,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0239](db/migrations/0239_a_certification_that_replays_a_recorded_agent_stream.sql) | `20260909032226` | yes — ledger | AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door |
 | [0240](db/migrations/0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql) | `PENDING` | no — pending | G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge |
 | [0241](db/migrations/0241_a_certification_hears_only_the_proposers_it_certified.sql) | `PENDING` | no — pending | POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that |
+| [0242](db/migrations/0242_a_capture_records_only_what_the_run_cannot_regenerate.sql) | `PENDING` | no — pending | G42 / db/checks/0159. APPLY AFTER 0241 -- it consults the registry 0241 |
 
-109 migrations indexed.
+110 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
