@@ -415,3 +415,59 @@
 --   current_soc_updated_at -- already correctly excluded by 0137.
 --
 -- Nothing is applied until C3 reports.
+
+-- ===========================================================================
+-- 6. HOW OFTEN HAS THIS ACTUALLY FIRED -- AND A CORRECTION TO SECTION 2
+-- ===========================================================================
+--
+-- Section 2 ended with: "the six green certification columns have been green
+-- partly by luck." That sentence is WITHDRAWN. It was an inference from the
+-- mechanism, I did not measure it before writing it, and the measurement does
+-- not support it.
+--
+-- Every distinct cert pair of the last ten days, classified by which of the
+-- fourteen atoms actually differed between its arms:
+--
+--   atoms moved                                       status         pairs
+--   -----------------------------------------------   ------------   -----
+--   (none)                                            passed           278
+--   endst                                             passed            48
+--   fp, endst                                         failed            20
+--   fp                                                failed            17
+--   h_bkg,h_cmd,h_dec,h_evt,endst                     failed             8
+--   h_cmd                                             failed             7
+--   fp,h_bkg,h_cmd,h_dec,h_evt,endst                  failed             4
+--   h_bkg,h_cmd,h_evt                                 failed             4
+--   h_bkg,h_cmd,h_dec,h_evt,h_nrg,endst               failed             4
+--   ... (single-digit tails) ...
+--   h_sdr                                             passed             1
+--   h_evt                                             failed             1   <-- 2026-09-09 05:24, this one
+--
+-- h_evt ALONE HAS HAPPENED EXACTLY ONCE IN TEN DAYS AND ~400 PAIRS, and it is
+-- the pair that opened this file. The G43 condition is RARE, not chronic, and
+-- the honest reading is:
+--
+--   - The instrument is blind: fp cannot see an unequal boot on these columns.
+--     That is established from the catalog and is true regardless of frequency.
+--   - The condition materialized once, in a pair that started 102 seconds after
+--     a client transaction touched the flagship depot -- almost certainly my own
+--     capture work for section 6's P1 experiment. Nothing in the normal cadence
+--     leaves a vehicle mid-tether between pairs.
+--
+-- So this is a LATENT defect with a real and demonstrated failure mode, not a
+-- history of false greens. The fix is still correct and still worth its recert:
+-- a certification that cannot detect an unequal boot is one manual touch away
+-- from a wrong verdict, in either direction. But "green by luck" overstated it
+-- and is not what the data says.
+--
+-- TWO OTHER THINGS THE SWEEP SURFACED, both benign and both consistent with the
+-- promotion timeline rather than defects:
+--
+--   endst moved / PASSED, 48 pairs, all between 08-30 21:39 and 09-01 00:58 --
+--     that window predates 0139, which promoted endst from MEASURED to ENFORCED.
+--     An atom moving while the pair passes is exactly what MEASURED means.
+--   h_sdr moved / PASSED, 1 pair, 2026-09-08 08:25 -- same pattern, before 0219
+--     put h_sdr in the equality list.
+--
+-- Both are the blind-spot promotion doctrine working as designed and leaving its
+-- fingerprints in the ledger. Neither is a false green.
