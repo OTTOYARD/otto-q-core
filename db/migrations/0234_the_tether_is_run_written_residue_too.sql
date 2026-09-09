@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909004734
 -- migration-name:    the_tether_is_run_written_residue_too
 --
 -- G37 / db/checks/0153. The second attempt at a paired A/B died on
@@ -270,3 +270,33 @@ VALUES (
   'forces_recert FALSE here: benchmark-lane only, asserted in P2, and the '
   'function refuses any non-benchmark depot by its own guard.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-08 19:5x PM CT. Four preconditions, four assertions, first
+-- attempt. decide_tick md5 ae98f71b879a0a11bdf366d21ff5b4eb UNCHANGED. Floor
+-- unmoved at 2026-09-07 21:36:53.363037.
+--
+-- PROVEN, in the same directly-committed reset that proved 0233:
+--
+--   vehicles with robotic_tether_until IS NOT NULL:  7  ->  0
+--
+-- Arm A (5e7a6a91) left seven vehicles tethered. The reset cleared all seven,
+-- with no interlock exception raised -- which is the guard honouring its own
+-- documented contract ("including the case where this very statement is what
+-- lets go") now that something finally takes it up.
+--
+-- ALSO PROVEN, indirectly and more usefully: the stall-collision this migration
+-- was written for is gone. The arm B that had died on
+--   duplicate key ... "idx_stalls_one_vehicle_per_stall"
+--   <- sync_stall_occupancy <- ottoq_fifo_tick line 24
+-- now gets PAST that point and runs on into the tick loop, where it hits an
+-- entirely different and later failure (uniq_ocpp_active_session_per_stall, from
+-- twin.ottoq_sim_reconcile_charge_sessions). A new failure further along is the
+-- correct outcome for this migration; the new one is db/checks/0154 / G38 and is
+-- not this migration's business.
+--
+-- THE MANUAL STEP IS RETIRED. Every arm run earlier today had to be preceded by
+-- a hand-issued twin.ottoq_arm_emergency_release over the whole depot. That is
+-- no longer needed on the benchmark lane: the reset does it, in the right place,
+-- with the right semantics.
+-- ---------------------------------------------------------------------------

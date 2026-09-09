@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0233 — GENERATED, not a log
+## Index, 0134–0234 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -220,7 +220,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0231](db/migrations/0231_a_comparative_score_may_read_only_what_every_arm_writes.sql) | `20260908222953` | yes — ledger | G32 / db/checks/0149. public.ottoq_ab_score_run was applied earlier today |
 | [0232](db/migrations/0232_a_vehicle_the_arm_is_holding_is_not_a_candidate.sql) | `20260908224618` | yes — ledger | G35 / db/checks/0151. The first fifo run in this database's history died on |
 | [0233](db/migrations/0233_a_session_may_only_be_closed_on_its_own_timeline.sql) | `20260909003956` | yes — ledger | G36 / db/checks/0152. Fixes ONE of four sites in a single defect family, and |
+| [0234](db/migrations/0234_the_tether_is_run_written_residue_too.sql) | `20260909004734` | yes — ledger | G37 / db/checks/0153. The second attempt at a paired A/B died on |
 
-101 migrations indexed.
+102 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

@@ -360,3 +360,37 @@ VALUES (
 -- index on stalls.current_vehicle_id fires. Every successful move of an
 -- expired-but-non-NULL tether leaks a stall. Confirmed by reading both trigger
 -- bodies (expiry-aware: true / false).
+
+-- ---------------------------------------------------------------------------
+-- *** PROVEN 2026-09-08 20:0x PM CT ***, replacing the "APPLIED AND UNPROVEN"
+-- note above. That note stands as written; this is the evidence it asked for.
+--
+-- WHY THE FIRST TWO ATTEMPTS PROVED NOTHING, and it is structural rather than
+-- bad luck: a cert arm is ONE transaction, so when arm B failed at any tick its
+-- ottoq_benchmark_reset rolled back with it. The fix could never be observed
+-- through a failing arm B. Both attempts showed "0 rows reaped", which reads as
+-- a pass and means the code never ran.
+--
+-- The route that works is to call the reset DIRECTLY, in its own transaction,
+-- against a finished arm -- which is the function's own purpose:
+--
+--   SELECT public.ottoq_benchmark_reset('22222222-...'::uuid, 30, 80);
+--
+-- Judged on arm A, run 5e7a6a91-b936-45f1-af7d-1734e5804928 (otto_q, 12 ticks,
+-- 51 sessions, 26 of them still open at the time of the reset):
+--
+--                      BEFORE          AFTER
+--   still_active         26              0
+--   stopped_reason=      --             26      <- 0233's first condition
+--     'benchmark_reset'
+--   ended_at < started_at 0              0      <- 0233's second condition
+--   status='cancelled'   --             26      <- no longer claims 'completed'
+--   shortest duration    --        00:00:00
+--
+-- Both conditions the footer demanded, met. And shortest_duration = 00:00:00 is
+-- the most informative number here: it is the GREATEST floor ENGAGING. At least
+-- one session's own run's sim_clock_current had not advanced past that session's
+-- own started_at, so the floor pinned it to exactly zero. Without GREATEST those
+-- rows would have been negative -- which is to say the run-scoped clock alone
+-- was not sufficient, and the floor was not belt-and-braces.
+-- ---------------------------------------------------------------------------

@@ -1,0 +1,124 @@
+-- =====================================================================
+-- 0154 — The world opens a charge session on a policy's behalf and never
+--        closes one. Only the decide path closes its own.
+--
+-- Finding id: G38
+-- Opened:     2026-09-08 20:0x PM CT
+-- Found by:   the third attempt at a paired A/B, which got further than
+--             the second because 0234 cleared the defect that stopped it.
+-- Status:     OPEN — fix is world-side and forces_recert TRUE; §5
+--
+-- ---------------------------------------------------------------------
+-- 1. THE FAILURE, AND WHY IT IS PROGRESS
+-- ---------------------------------------------------------------------
+--   ERROR: duplicate key value violates unique constraint
+--          "uniq_ocpp_active_session_per_stall"
+--   DETAIL: Key (stall_id)=(bbd31a19-...) already exists.
+--   CONTEXT: ottoq_sim_start_charge_session line 48
+--            <- twin.ottoq_sim_reconcile_charge_sessions line 15
+--            <- ottoq_sim_advance_tick_world line 60
+--            <- ottoq_sim_advance_tick <- ottoq_cert_arm
+--
+-- The index is exactly right and is doing its job:
+SELECT 'a_the_constraint' AS check, pg_get_indexdef(indexrelid) AS def
+FROM pg_index WHERE indexrelid::regclass::text = 'uniq_ocpp_active_session_per_stall';
+-- Observed: UNIQUE (stall_id) WHERE status = 'active'.
+--           One live charge session per stall. Physical truth.
+--
+-- This is the FOURTH distinct defect surfaced by trying to run a second
+-- policy, and the third one that is in the kernel rather than in the
+-- baseline. It appeared only because 0234 removed the one in front of it.
+-- Each fix buys the next tick's worth of visibility.
+--
+-- ---------------------------------------------------------------------
+-- 2. THE ASYMMETRY
+-- ---------------------------------------------------------------------
+SELECT 'b_open_vs_close' AS check, n.nspname||'.'||p.proname AS fn,
+       (p.prosrc ~* 'ottoq_sim_start_charge_session')          AS opens_sessions,
+       (p.prosrc ~* 'status\s*=\s*''(completed|cancelled)''')  AS closes_sessions
+FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE (n.nspname,p.proname) IN (('twin','ottoq_sim_reconcile_charge_sessions'));
+-- Observed: opens TRUE, closes FALSE.
+--
+-- twin.ottoq_sim_reconcile_charge_sessions is the world's safety net for
+-- session bookkeeping. It selects vehicles that are in a charging state
+-- with no active TWIN- session and OPENS one for them. That is what makes
+-- a policy which merely sets current_state='charging_dcfc' -- fifo, for
+-- instance -- actually charge anything at all (db/checks/0149 §2).
+--
+-- There is no symmetric half. Nothing in the world CLOSES a session when
+-- the vehicle leaves the stall. And:
+SELECT 'c_fifo_touches_sessions' AS check,
+       (prosrc ~* 'ocpp_sessions') AS touches
+FROM pg_proc WHERE proname='ottoq_fifo_tick';
+-- Observed: false. fifo never touches ocpp_sessions, so it cannot close
+-- what the world opened for it.
+--
+-- ---------------------------------------------------------------------
+-- 3. THE SEQUENCE THAT BREAKS
+-- ---------------------------------------------------------------------
+--   1. fifo places vehicle X in stall S. Sets vehicles.current_stall_id=S
+--      and stalls.current_vehicle_id=X.
+--   2. The world's reconciler notices X is charging with no session and
+--      opens one on S. Correct, and the only reason fifo charges at all.
+--   3. Later fifo deploys X: current_state='en_route_to_deployment',
+--      current_stall_id=NULL. The sync_stall_occupancy trigger vacates S,
+--      so S is free again.
+--      *** X's charge session on S IS STILL ACTIVE. Nobody ended it. ***
+--   4. fifo places vehicle Y in the now-free S.
+--   5. The reconciler notices Y is charging with no session and tries to
+--      open one on S -> uniq_ocpp_active_session_per_stall fires -> the
+--      whole arm dies, because a cert arm is one transaction.
+--
+-- ---------------------------------------------------------------------
+-- 4. WHY otto_q DOES NOT HIT IT
+-- ---------------------------------------------------------------------
+-- Same shape as G35 and G37, for the third time: ottoq_decide_tick manages
+-- session lifecycle itself -- it opens, it ends, it emits the SDR. The
+-- reconciler's rescue is dead code for otto_q and load-bearing for
+-- everything else. So the only policy that exercises the world's session
+-- bookkeeping is the one that does not need it, and the half that is
+-- missing has never been missed.
+--
+-- ---------------------------------------------------------------------
+-- 5. THE FIX, AND WHERE IT BELONGS
+-- ---------------------------------------------------------------------
+-- Not in fifo. db/checks/0148's rule decides this: a charge session
+-- ending when the vehicle leaves the stall is TRUE OF THE WORLD REGARDLESS
+-- OF WHO IS SCHEDULING. It is physics -- the cable comes out -- not
+-- strategy. It belongs on the hold-constant side, which means it belongs
+-- in the same world function that opens the session.
+--
+-- Shape: twin.ottoq_sim_reconcile_charge_sessions gains the symmetric
+-- half -- close any active TWIN- session for this run whose vehicle is no
+-- longer at that stall or no longer in a charging state, stamped with the
+-- run's own sim clock and floored at started_at, exactly as 0233 does.
+--
+-- Two reasons it is NOT being written tonight:
+--   i.  It is in the tick path -- ottoq_sim_advance_tick_world calls it
+--       every tick -- so it is forces_recert TRUE and needs a
+--       recertification round scheduled behind it.
+--   ii. The same function is site 3 of the G36 family (db/checks/0152 §4):
+--       its orphan-reaper stamps a FOREIGN run's session with the CALLING
+--       run's clock. Both changes are in the same body and should be made
+--       and recertified together, once, rather than twice.
+--
+-- ---------------------------------------------------------------------
+-- 6. THE PATTERN, NOW UNAVOIDABLE
+-- ---------------------------------------------------------------------
+-- G35: the baselines cannot survive the robotic arm.
+-- G37: two triggers disagree about when a tether ends.
+-- G38: the world opens sessions and never closes them.
+--
+-- Every one is a LIFECYCLE WITH NO TERMINAL STATE, and every one was
+-- invisible because exactly one policy has ever run and that policy
+-- happens to clean up after itself. The engine has been correct the way a
+-- single-threaded program is correct: not because the invariants hold, but
+-- because nothing has ever tested them.
+--
+-- That is the real value of the A/B work, ahead of any comparison it might
+-- eventually produce. Four attempts, four kernel defects, none of which a
+-- passing determinism certification could ever have caught -- because a
+-- determinism pair runs the SAME policy twice, and every one of these
+-- defects needs a SECOND, DIFFERENT policy to appear.
+-- =====================================================================
