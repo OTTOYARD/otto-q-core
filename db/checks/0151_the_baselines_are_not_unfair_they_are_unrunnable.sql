@@ -1,0 +1,165 @@
+-- =====================================================================
+-- 0151 — The baselines are not unfair. They are unrunnable.
+--
+-- Finding id: G35
+-- Opened:     2026-09-08 22:5x UTC (5:5x PM CT)
+-- Found by:   running the first fifo arm in this database's history.
+--             It crashed on tick 1.
+-- Status:     OPEN — fix drafted as migration 0232
+-- Supersedes: the framing in 0146, 0148 and 0149. All three argued about
+--             whether the A/B comparison would be FAIR. The prior
+--             question is whether it can RUN. It cannot.
+--
+-- ---------------------------------------------------------------------
+-- 1. WHAT HAPPENED
+-- ---------------------------------------------------------------------
+-- Arm A, otto_q, seed 909090, 12 ticks, on the isolated benchmark-crn
+-- depot: completed. sim_run_id 7cb0f46e-9306-4df2-af98-e566792167ff,
+-- 36 charge sessions, 407 stall bookings.
+--
+-- Arm B, fifo, SAME seed, SAME ab_group, same 12 ticks: aborted inside
+-- the first tick.
+--
+--   ERROR: arm interlock: vehicle 02f1a60b is held by the arm at stall
+--          4dae9406 until 2026-09-09 04:40:23 (sim 2026-09-09 04:40:11,
+--          demate/unlatch) -- refusing to move it to nowhere.
+--   CONTEXT: ottoq_arm_interlock_guard()
+--            SQL statement "UPDATE vehicles SET
+--              current_state='en_route_to_deployment',
+--              current_stall_id=NULL, last_state_change=v_clock
+--              WHERE id=v_req.vehicle_id"
+--            PL/pgSQL function ottoq_fifo_tick(uuid) line 36
+--            -> ottoq_sim_decide_and_dispatch line 82
+--            -> ottoq_sim_advance_tick -> ottoq_sim_advance_and_snapshot
+--            -> ottoq_cert_arm
+--
+-- Line 36 of ottoq_fifo_tick is its DEPLOY branch: staged_for_departure
+-- with current_soc >= 70 becomes en_route_to_deployment. It tries to
+-- drive away a vehicle the OTTO-CHARGE ARM is still unlatching from.
+--
+-- The whole CALL is one transaction, so the fifo run rolled back
+-- entirely -- no stranded row, nothing to clean up. Confirmed: the
+-- ab_group holds exactly one run, the otto_q one.
+--
+-- ---------------------------------------------------------------------
+-- 2. WHY otto_q SURVIVES AND THE OTHERS DO NOT
+-- ---------------------------------------------------------------------
+SELECT 'a_arm_awareness' AS check, n.nspname||'.'||p.proname AS fn,
+       (p.prosrc ~* 'robotic_tether')                  AS reads_tether,
+       (p.prosrc ~* 'arm_ready|arm_gate|demate|mated') AS coordinates_with_arm,
+       (length(p.prosrc)-length(replace(p.prosrc,'EXCEPTION','')))/9 AS exception_handlers
+FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE (n.nspname,p.proname) IN (
+        ('public','ottoq_decide_tick'), ('public','ottoq_fifo_tick'),
+        ('public','ottoq_greedy_tick'), ('public','ottoq_manual_tick'),
+        ('twin','ottoq_sim_auto_dispatch_tick'),
+        ('twin','ottoq_sim_auto_charge_assign_tick'))
+ORDER BY 3 DESC, 2;
+-- Observed 2026-09-08:
+--
+--   fn                             tether  coordinates  handlers
+--   ottoq_decide_tick              false   TRUE         1
+--   ottoq_fifo_tick                false   false        0
+--   ottoq_greedy_tick              false   false        0
+--   ottoq_manual_tick              false   false        0
+--   twin.auto_dispatch_tick        false   false        1
+--   twin.auto_charge_assign_tick   false   false        1
+--
+-- No tick function reads robotic_tether_until directly. otto_q does not
+-- need to: it coordinates with the arm through the arm's own gate
+-- vocabulary and therefore never asks to move a mated vehicle. The three
+-- baselines have no idea the arm exists.
+--
+-- And they carry ZERO exception handlers. The dispatcher's policy switch
+--
+--   v_decide := CASE v_run.policy
+--     WHEN 'greedy' THEN ottoq_greedy_tick(p_sim_run_id)
+--     WHEN 'fifo'   THEN ottoq_fifo_tick(p_sim_run_id)
+--     WHEN 'manual' THEN ottoq_manual_tick(p_sim_run_id)
+--     ELSE               ottoq_decide_tick(p_sim_run_id) END
+--
+-- is not wrapped either, so an interlock refusal propagates from the
+-- vehicles trigger all the way to the top and destroys the run. Not
+-- degrades -- destroys.
+
+-- ---------------------------------------------------------------------
+-- 3. THE FINDING, STATED PLAINLY
+-- ---------------------------------------------------------------------
+-- ottoq_fifo_tick, ottoq_greedy_tick and ottoq_manual_tick were written
+-- against a world that had no robotic charging arm. The arm was added
+-- later. Only the path that was being exercised -- otto_q -- was taught
+-- about it, because only that path ever ran.
+--
+--   27,130 arm cycles on nashville-flagship across 765 runs
+--      842 arm cycles on benchmark-crn across 46 runs
+--        0 of them under any policy but otto_q (0147: 845 of 845)
+--
+-- A policy that has never been executed is not a baseline. It is dead
+-- code that compiles. Three of the four "policies" in this engine are in
+-- that state, and the fourth is the product.
+--
+-- THIS IS WHY THERE HAS NEVER BEEN AN A/B. Not oversight, not
+-- prioritisation. The comparison was never possible, and nothing said so
+-- because nothing tried. 0145 measured the symptom -- ab_runs has one
+-- policy and one seed. 0147 measured it again from the run ledger. This
+-- is the cause.
+--
+-- ---------------------------------------------------------------------
+-- 4. WHAT THIS DOES TO THE PREVIOUS THREE CHECKS
+-- ---------------------------------------------------------------------
+-- 0146: baselines skip the L1 shield, so a comparison flatters them.
+-- 0148: the policy gate is seven steps (census stands; its §6 retracted).
+-- 0149: the scorer reads substrate only one arm writes.
+--
+-- All three are about FAIRNESS, and all three assumed the arms would
+-- both produce a run. They will not. The ordering is now:
+--
+--   1. make the baselines RUNNABLE          <- 0232, this is new work
+--   2. make the comparison FAIR             <- 0146 + 0148's rule
+--   3. make the measurement VALID           <- 0149 + 0231, done
+--
+-- Step 3 shipped first, which is the wrong order but harmless: 0231's
+-- outcome block is correct and its falsifier simply cannot be run yet.
+-- 0231's own footer says exactly that, so nothing published is wrong.
+--
+-- ---------------------------------------------------------------------
+-- 5. THE FIX, AND THE LINE IT MUST NOT CROSS
+-- ---------------------------------------------------------------------
+-- A vehicle cannot drive away while the cable is still latched. That is
+-- physics, not strategy -- it is true no matter who is scheduling. By
+-- 0148's rule it belongs on the HOLD-CONSTANT side of the A/B, which
+-- means the baselines get it and are still baselines.
+--
+-- Minimal shape, migration 0232: every baseline's vehicle-selection
+-- cursor gains
+--
+--   AND (v.robotic_tether_until IS NULL OR v.robotic_tether_until <= v_clock)
+--
+-- so a mated vehicle is simply not a candidate this tick. No retry, no
+-- queue, no cleverness -- it is skipped and reconsidered next tick,
+-- which is what a dumb policy should do.
+--
+-- WHAT 0232 MUST NOT DO, written down first so it cannot creep:
+--   - not give the baselines the shield, the calendar, or any proposer
+--   - not add an exception handler that swallows unrelated errors; the
+--     predicate prevents the specific refusal, it does not hide failures
+--   - not touch ottoq_decide_tick, which already coordinates correctly
+--     and is certified. Any diff there forces a recert for no reason.
+--
+-- Note the predicate uses v_clock -- the RUN'S OWN sim clock, which each
+-- baseline already reads from ottoq_sim_runs at the top of its body.
+-- That sidesteps G34 (db/checks/0150) entirely inside the policies:
+-- the guard has to guess which run is running, but a policy already
+-- knows.
+--
+-- ---------------------------------------------------------------------
+-- 6. WHAT IS STILL UNKNOWN
+-- ---------------------------------------------------------------------
+-- Whether the tether predicate is SUFFICIENT, or merely the first of
+-- several collisions between the baselines and eight weeks of world
+-- machinery they have never met. It is the first refusal on tick 1 of
+-- the first run; there is no reason to assume it is the last. The
+-- honest expectation is that 0232 gets fifo further and something else
+-- stops it, and that is fine -- each one is a real defect found by the
+-- only method that finds them, which is running the thing.
+-- =====================================================================

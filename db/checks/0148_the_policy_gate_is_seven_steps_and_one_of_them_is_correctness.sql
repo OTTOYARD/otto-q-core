@@ -1,0 +1,184 @@
+-- =====================================================================
+-- 0148 — The policy gate is seven steps, and one of them is correctness.
+--
+-- Finding id: G31
+-- Opened:     2026-09-08 22:2x UTC (5:2x PM CT)
+-- Amends:     0146 (which named ONE gated step and called it "the shield")
+-- Status:     OPEN — fix drafted as migration 0231
+--
+-- ---------------------------------------------------------------------
+-- 1. WHAT 0146 GOT RIGHT, AND WHAT IT UNDERSTATED
+-- ---------------------------------------------------------------------
+-- 0146 found that only ottoq_decide_tick evaluates the L1 rules, so a
+-- naive A/B would flatter fifo and greedy: they win on throughput
+-- because they check nothing. That is true and it stands.
+--
+-- What 0146 did not do is read the CALLER. The asymmetry is not one
+-- step inside decide_tick. It is a guard in
+-- public.ottoq_sim_decide_and_dispatch (live md5 of pg_get_functiondef:
+-- 171edecec29d44e524c501cf0643670d, 2026-09-08) reading
+--
+--     IF v_run.policy IS NULL OR v_run.policy = 'otto_q' THEN
+--
+-- and it wraps SEVEN calls before any policy runs. Everything in that
+-- block is invisible to fifo, greedy and manual.
+--
+-- ---------------------------------------------------------------------
+-- 2. THE CENSUS — what is inside the gate
+-- ---------------------------------------------------------------------
+--   #  call                                  class
+--   -  ------------------------------------  -----------------------
+--   1  ottoq_inbound_forecast (attach)       PREDICTION
+--   2  ottoq.ottoq_close_satisfied_charge_   CORRECTNESS  <-- the one
+--        needs                                             that matters
+--   3  ottoq_reoptimize_reservation_book     OPTIMIZATION
+--   4  ottoq_cuopt_refresh                   PROPOSER
+--   5  ottoq_cuopt_first_refusal_arm         PROPOSER / deferral
+--   6  ottoq_l2_optimize_assignments         OPTIMIZATION
+--   7  ottoq_service_priority_propose        PROPOSER
+--
+-- Then, outside the gate, the policy CASE:
+--     WHEN 'greedy' -> ottoq_greedy_tick   WHEN 'fifo' -> ottoq_fifo_tick
+--     WHEN 'manual' -> ottoq_manual_tick   ELSE ottoq_decide_tick
+-- Then one more asymmetry, this one greedy-only:
+--     IF v_run.policy IS DISTINCT FROM 'greedy' THEN
+--         ottoq_sim_auto_dispatch_tick(...)
+-- Then, common to every policy: itin_close_travel_legs,
+-- sweep_stranded_deployments, release_expired_bookings,
+-- place_unplaced_vehicles, react_to_refusals.
+
+-- 2a. Reproduce the census from the live catalog.
+SELECT 'a_gate_census' AS check, ord, trim(l) AS line
+FROM (SELECT prosrc s FROM pg_proc WHERE proname='ottoq_sim_decide_and_dispatch') src,
+     unnest(string_to_array(s, E'\n')) WITH ORDINALITY AS t(l, ord)
+WHERE trim(l) ~* '^IF .*policy' OR trim(l) ~* '^END IF;' OR trim(l) ~* 'ottoq_(close_satisfied|reoptimize_reservation|cuopt_refresh|cuopt_first_refusal|l2_optimize|service_priority|inbound_forecast|sim_auto_dispatch)'
+ORDER BY ord;
+
+-- 2b. Classify each gated call by what it writes. NOTE: absence of a
+--     literal INSERT/UPDATE in prosrc does NOT mean the function writes
+--     nothing -- it may delegate. (Recorded because this repo has made
+--     exactly that error once already, about ottoq_greedy_tick, which
+--     "writes nothing in 615 characters" and in fact delegates to two
+--     twin functions that both write.)
+SELECT 'b_writes' AS check, p.proname, length(p.prosrc) AS len,
+       (p.prosrc ~* 'INSERT INTO') AS has_insert,
+       (p.prosrc ~* 'UPDATE ')     AS has_update,
+       (p.prosrc ~* 'DELETE FROM') AS has_delete
+FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE p.proname IN ('ottoq_close_satisfied_charge_needs','ottoq_reoptimize_reservation_book',
+                    'ottoq_l2_optimize_assignments','ottoq_service_priority_propose',
+                    'ottoq_cuopt_first_refusal_arm','ottoq_inbound_forecast','ottoq_cuopt_refresh')
+ORDER BY 2;
+-- Observed 2026-09-08: close_satisfied_charge_needs is UPDATE-only,
+-- 2,044 chars. It closes charge atoms on visits whose charge target is
+-- already met. It does not choose anything.
+
+-- ---------------------------------------------------------------------
+-- 3. WHY STEP 2 IS DIFFERENT FROM THE OTHER SIX
+-- ---------------------------------------------------------------------
+-- Six of the seven are OTTO-Q's intelligence: forecasting, proposing,
+-- optimizing. A baseline is supposed to lack those. Gating them is
+-- correct and is the point of having baselines at all.
+--
+-- Step 2 is not intelligence. The dispatcher's own comment says so, and
+-- names the run it was written for:
+--
+--     "A SATISFIED NEED IS A DONE NEED, AND IT IS RESOLVED FIRST.
+--      Runs ahead of every planner below so nothing books a charger
+--      against a need the car no longer has. A charge atom left open on
+--      a car already at its target is what sent nine vehicles to
+--      chargers in run c99e4435 with 0.00 kWh to deliver."
+--
+-- That is a property of the WORLD -- a car at its target does not need
+-- charge -- not a property of a scheduling policy. Leaving it inside
+-- the gate means fifo and greedy are running against a world where
+-- satisfied needs stay open, which is a different world, not a worse
+-- policy.
+--
+-- ---------------------------------------------------------------------
+-- 4. THE COMPOUND EFFECT ON THE A/B, STATED HONESTLY
+-- ---------------------------------------------------------------------
+-- Two contaminations, pushing in OPPOSITE directions:
+--
+--   0146  fifo/greedy are FLATTERED  — they skip the L1 shield, so they
+--                                      never pay for a refusal.
+--   0148  fifo/greedy are PENALIZED  — they skip step 2, so they book
+--                                      chargers for needs that no longer
+--                                      exist and burn stall-time on
+--                                      0.00 kWh sessions.
+--
+-- They do not cancel. They are different magnitudes on different KPIs,
+-- and their net sign is unknown and unknowable without separating them.
+-- A comparison run today would produce a number that is precise,
+-- reproducible, run-ID-stamped, and meaningless -- which is the exact
+-- failure mode CLAUDE.md 2.9a was written to prevent. Reproducibility
+-- is not validity.
+--
+-- ---------------------------------------------------------------------
+-- 5. THE RULE THIS ESTABLISHES
+-- ---------------------------------------------------------------------
+-- Extends 0146's conclusion, which was "the L1 shield is not part of
+-- the policy, it is part of the problem definition." Generalized:
+--
+--     EVERYTHING THAT IS TRUE OF THE WORLD REGARDLESS OF WHO IS
+--     SCHEDULING BELONGS ON THE HOLD-CONSTANT SIDE OF THE A/B.
+--     A policy arm may differ ONLY in which asset it sends to which
+--     point at which time.
+--
+-- Held constant across all arms:  the seeded world (CRN), the L1 shield,
+--   need derivation and need CLOSURE, booking expiry, placement
+--   reconciliation, refusal reaction, travel-leg closure.
+-- Varied across arms:  the assignment decision, and nothing else.
+--
+-- By that rule the current split is wrong in exactly one place: step 2.
+-- Steps 1, 3, 4, 5, 6, 7 are correctly gated. The greedy-only skip of
+-- ottoq_sim_auto_dispatch_tick is a SECOND candidate -- redeployment
+-- after service is arguably world behaviour too -- but it is not
+-- resolved here: greedy's own delegates may already redeploy, and
+-- asserting otherwise without measuring would repeat the 615-character
+-- error. Left open as G31b.
+--
+-- ---------------------------------------------------------------------
+-- 6. THE FIX
+-- ---------------------------------------------------------------------
+-- Migration 0231 moves ottoq_close_satisfied_charge_needs out of the
+-- policy gate into the common path, ahead of the policy CASE, so every
+-- arm sees the same closed needs.
+--
+-- This is a live bug fix independent of the A/B: any fifo, greedy or
+-- manual run today books chargers against satisfied needs. That no such
+-- run exists yet (0147: policy='otto_q' for all 845) is why it has
+-- never been observed -- the bug has had no opportunity to fire. It
+-- would have fired on the first baseline run of the A/B, and been read
+-- as "the baseline is bad."
+--
+-- 0231 must not change otto_q behaviour at all. Same call, same
+-- arguments, same position relative to the other six (it is already
+-- first among them). The determinism canon must be unmoved: if the
+-- recert floor advances after 0231, the move was not neutral and 0231
+-- is wrong.
+-- =====================================================================
+
+-- =====================================================================
+-- RETRACTED IN PART, 2026-09-08 22:4x UTC, by db/checks/0149.
+--
+-- §1 through §5 stand: the gate census is measured and reproducible,
+-- and the hold-constant rule it states is right.
+--
+-- §6 IS WRONG AND ITS MIGRATION 0231 WAS NEVER APPLIED. The premise was
+-- that fifo/greedy book chargers against satisfied needs. They cannot:
+-- neither reads ottoq_visit_needs and neither reads the atom array
+-- (0149 §1, measured). Closing an atom they never look at changes
+-- nothing. The proposed move would have been a no-op dressed as a
+-- correctness fix, perturbing the certified decide path for no reason.
+--
+-- §4's "PENALIZED" column is therefore also withdrawn. 0146's
+-- "FLATTERED" finding stands unchanged -- the baselines really do
+-- evaluate no rules. The contamination is one-directional after all,
+-- which is what 0146 said before this check overcomplicated it.
+--
+-- What replaced it is in 0149 §3 (G32) and is worse, because it is in
+-- code I shipped today rather than code I inherited.
+--
+-- Nothing above this line is edited.
+-- =====================================================================

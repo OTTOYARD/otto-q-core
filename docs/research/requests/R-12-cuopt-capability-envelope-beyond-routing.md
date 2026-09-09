@@ -1,6 +1,6 @@
-# R-10 — cuOpt's capability envelope beyond routing
+# R-12 — cuOpt's capability envelope beyond routing
 
-**Filed 2026-09-08 by Claude Code.** Not blocking: the A/B harness that would
+**Filed 2026-09-08 by Claude Code as R-10; renumbered to R-12 the same day.** R-10 and R-11 were already taken in `docs/research/answers/` and I checked only `requests/` before choosing the number. Hermes caught it and answered as R-12. Not blocking: the A/B harness that would
 measure any proposer is being built regardless, and this answer changes which
 architecture that harness eventually tests, not whether it gets built.
 

@@ -1,0 +1,180 @@
+-- db/checks/0157 — THE POSTURE-B PROOF
+-- A CERTIFICATION PAIR DRIVEN BY A RECORDED AGENT STREAM
+--
+-- Ran:    2026-09-08 22:2x CT (2026-09-09 03:2x UTC), immediately after 0239
+-- Status: PROVEN. Five pairs, four hypotheses, two of them controls that had
+--         to fail and did.
+--
+-- This is the thing SOLVER_STATE.md 8.2 called "the agentic layer's first
+-- deliverable" and 0237 said it did not yet have:
+--
+--     "what is NOT yet true is that a certification PAIR has been run with a
+--      replayed stream in both arms... Until then this is a proven substrate,
+--      not a proven certification."
+--
+-- It is now a proven certification.
+--
+-- ---------------------------------------------------------------------------
+-- THE REPRODUCIBILITY KEY
+-- ---------------------------------------------------------------------------
+-- Every run below is public.ottoq_determinism_pair_replay with:
+--
+--   seed        239001
+--   ticks       6
+--   scenario    grid_smoke
+--   depot       aacd0bb0-2d02-d101-72cc-33f70e950bc8   (the 0153 grid fixture:
+--                                                       4 vehicles, 10 stalls)
+--   sim_start   2026-09-01 02:00:00+00
+--   budget      120 s
+--
+-- and they differ ONLY in p_replay_id. The three streams live in
+-- public.ottoq_proposal_replay and are not deleted, because they are the key:
+--
+--   R    0239aaaa-0000-0000-0000-000000000001   24 rows, stream hash 5e70e2f5...
+--   R'   0239aaaa-0000-0000-0000-000000000002   R with seq 1's verb changed
+--   R''  0239aaaa-0000-0000-0000-000000000003   R with seq 12's verb changed
+--
+-- ---------------------------------------------------------------------------
+-- THE STREAM IS SYNTHETIC, AND SAYING SO IS PART OF THE CLAIM
+-- ---------------------------------------------------------------------------
+-- R was written directly into ottoq_proposal_replay rather than captured off a
+-- production run, because no run in this database has ever carried a
+-- tick-stamped external proposal: 0236 shipped the tick_seq column hours ago and
+-- the only runs since are certifications, which quiesce the producers. Every one
+-- of the 14,502 recorded proposals predates the column.
+--
+-- That is honest and it does not weaken anything, because of what is being
+-- certified. The claim is about the DISPOSER's determinism GIVEN a stream, not
+-- about the realism of the stream. R uses real kernel vocabulary -- verb
+-- 'triage' on action_context 'service_sequencing', one of the seven verbs the
+-- ottoq_decisions ledger already carries in that context -- and it goes in
+-- through the same ottoq_proposal_replay_inject the real capture path uses. The
+-- day a production run records a real stream, the same rig replays it with no
+-- change; capture is the only step this proof stands in for.
+--
+-- ---------------------------------------------------------------------------
+-- THE FIVE PAIRS
+-- ---------------------------------------------------------------------------
+--
+--   run  replay  outcome  h_prop                            h_dec                             fp
+--   ---  ------  -------  --------------------------------  --------------------------------  --------
+--   P0   none    passed   d41d8cd98f00b204e9800998ecf8427e  c16074c6a8f136965666c009a3176eb9  6d2ceacb
+--   P1   R       passed   c270c2c590ec6d2d64b299bf5523685c  4fe7b3057fa5c1a559d21e60505008f6  6d2ceacb
+--   P2   R       passed   c270c2c590ec6d2d64b299bf5523685c  4fe7b3057fa5c1a559d21e60505008f6  6d2ceacb
+--   P3   R'      passed   8db15dc66720a0bc2d4487e208d364d2  4fe7b3057fa5c1a559d21e60505008f6  6d2ceacb
+--   P4   R''     passed   bfd3767c07d284d9cb59225c02fbdae5  2f4cbbb953d676bac2ed9da1b739efbc  6d2ceacb
+--
+--   P0 arm A run  00a9d5c1-3c68-4389-a304-1904b4c09536
+--   P1 arm A run  ac0f7263-5208-47d4-ade0-1630ed2d73d3
+--
+-- Read it row by row.
+--
+-- H1  THE PAIR PASSES WITH AN AGENT STREAM IN BOTH ARMS.            P1: passed.
+--     All fourteen atoms byte-identical across the arms, replay_injected 24 and
+--     24. This is the sentence:
+--
+--         the disposer is certified deterministic against recorded agent
+--         proposals; agents are measured, not trusted.
+--
+-- H2  THE STREAM REACHED THE DISPOSER -- IT WAS NOT A NO-OP.
+--     P0's h_prop is d41d8cd98f00b204e9800998ecf8427e, which is md5(''): a
+--     certification today sees NO proposals at all, because 0152 and 0105
+--     quiesce the producers. P1's is c270c2c5..., and P1's h_dec differs from
+--     P0's. Same seed, same scenario, same depot, same sim start, same clock
+--     anchor -- the ONLY difference is the replayed stream, and the decisions
+--     moved. A pair that passed while proving nothing would have shown
+--     h_dec = c16074c6... here. It does not.
+--
+-- H3  IT IS REPRODUCIBLE BETWEEN PAIRS, NOT MERELY WITHIN ONE.      P2 = P1 on
+--     h_prop, h_dec and fp, byte for byte, in a separate pair minutes later.
+--     Within-pair equality is a weaker claim (both arms share a transaction);
+--     this is the between-pair one.
+--
+-- H4  THE INSTRUMENT DISCRIMINATES -- TWO CONTROLS, AND THEY SAY DIFFERENT
+--     THINGS, WHICH IS THE MOST USEFUL RESULT HERE.
+--
+--     P3 changed the verb of ONE proposal that the disposer never read
+--     (seq 1: tick 1, a vehicle with no service candidate that tick).
+--       -> h_prop MOVED   (8db15dc6...)
+--       -> h_dec  did NOT (4fe7b305..., same as P1)
+--
+--     P4 changed the verb of ONE proposal the disposer ACTUALLY ENACTED
+--     (seq 12: tick 3, vehicle a3e6852f-d302-542f-c766-cb306cd9f10b).
+--       -> h_prop MOVED   (bfd3767c...)
+--       -> h_dec  MOVED   (2f4cbbb9...)
+--
+--     So h_prop is sensitive to the WHOLE stream and h_dec only to the part the
+--     disposer consumed. That is not a defect in either atom, it is the
+--     distinction the verdict is supposed to draw: h_prop says what the agent
+--     SAID, h_dec says what the agent CHANGED. Neither alone would be enough.
+--     Both pairs still PASSED, correctly -- each arm saw the same stream as its
+--     twin; the perturbation is between pairs, not within one.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE DISPOSER ACTUALLY DID WITH THE 24 PROPOSALS (P1, arm A)
+-- ---------------------------------------------------------------------------
+-- This is "agents propose, solver disposes" as a ledger row rather than a
+-- slogan, and it is queryable at run ac0f7263-5208-47d4-ade0-1630ed2d73d3:
+--
+--   tick  enacted  superseded  pending
+--   ----  -------  ----------  -------
+--    1       1          1         2
+--    2       1          1         2
+--    3       1          1         2
+--    4       1          1         2
+--    5       0          1         3
+--    6       0          0         4      <- injected at the top of the last tick
+--   ----  -------  ----------  -------
+--   tot      4          5        15
+--
+--   4  ENACTED     the disposer took the agent's proposal: the decision's
+--                  enacted_action carries source='agent_probe'.
+--   5  SUPERSEDED  honest pre-emption -- the entity WAS decided that tick, but
+--                  not by that proposal. This is the deferral doctrine working:
+--                  a proposer gets right of first refusal, not a guarantee.
+--  15  PENDING     no decision touched that entity, and the 35-minute wall-domain
+--                  expiry floor (0122) had not passed inside a 6-tick sim.
+--
+-- Not one row was silently dropped, and the split is reproducible: P2 produced
+-- the identical h_prop, which hashes exactly these statuses.
+--
+-- ---------------------------------------------------------------------------
+-- WHY THIS COULD NOT HAVE BEEN RUN THIS MORNING
+-- ---------------------------------------------------------------------------
+-- Four things had to be true first, and three of them were fixed today:
+--
+--   0236  a proposal has to know its tick, or a replay guesses one by dividing
+--         created_at by a tick interval.
+--   0237  the stream has to be recordable and re-injectable at all.
+--   0238  the SELECTOR that consumes it had to become total on content. Before
+--         it, the choice among competing proposals fell out of index-scan order,
+--         0237's capture is content-ordered by design, and the original run
+--         consumed in submission order -- so a faithful-looking replay could
+--         have enacted a different proposal than the run it came from, with
+--         every atom matching. P1 would have been a green verdict over a
+--         silently different experiment.
+--   0239  the replay had to go into ottoq_determinism_pair's loop. 0237's own
+--         footer named ottoq_cert_arm; measured, the pair does not call
+--         cert_arm at all. Wrapping cert_arm would have produced a
+--         replay-driven BENCHMARK and called it a certification.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT IS STILL OWED
+-- ---------------------------------------------------------------------------
+-- 1. A REAL captured stream. Everything above is the disposer's half. The
+--    capture half is proven by 0237's assertions but has never run against a
+--    production proposal carrying a real tick_seq, because none exists yet.
+--    First production run with a live proposer closes this.
+--
+-- 2. replay_injected is MEASURED, not ENFORCED (0239, CLAUDE.md 2.9a). Both
+--    arms reported 24 in P1 and in every pair since. One flagship-scale
+--    replay-driven pair agreeing on it promotes it to the equality list.
+--
+-- 3. This ran on the grid fixture, not the flagship depot. The grid is a real
+--    depot to the engine (0153) but it is 4 vehicles. A flagship replay pair is
+--    the next widening, and it belongs in the round after 0238's recert.
+--
+-- 4. 0238 moved the recert floor to 2026-09-09 03:15:07. Until that round
+--    completes, NO certification column is green -- including this one. What is
+--    proven here is that the replay rig behaves; the standing canon is owed
+--    separately and must not be quoted from before that timestamp.

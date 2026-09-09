@@ -328,7 +328,20 @@ repo_manifest(version, name, file) AS (
     ('20260908161129'::text, 'the_recert_floor_reads_a_name_the_ledger_never_writes'::text, '0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql'::text),
     ('20260908161833'::text, 'the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred'::text, '0227_the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred.sql'::text),
     ('20260908162111'::text, 'provenance_asks_the_depot_not_the_run_id'::text, '0228_provenance_asks_the_depot_not_the_run_id.sql'::text),
-    ('20260908204137'::text, 'the_approach_band_scans_every_run_to_answer_about_one'::text, '0229_the_approach_band_scans_every_run_to_answer_about_one.sql'::text)
+    ('20260908204137'::text, 'the_approach_band_scans_every_run_to_answer_about_one'::text, '0229_the_approach_band_scans_every_run_to_answer_about_one.sql'::text),
+    ('20260908220518'::text, 'a_score_that_cannot_be_gamed_by_not_checking'::text, '0230_a_score_that_cannot_be_gamed_by_not_checking.sql'::text),
+    ('20260908222953'::text, 'a_comparative_score_may_read_only_what_every_arm_writes'::text, '0231_a_comparative_score_may_read_only_what_every_arm_writes.sql'::text),
+    ('20260908224618'::text, 'a_vehicle_the_arm_is_holding_is_not_a_candidate'::text, '0232_a_vehicle_the_arm_is_holding_is_not_a_candidate.sql'::text),
+    ('20260909003956'::text, 'a_session_may_only_be_closed_on_its_own_timeline'::text, '0233_a_session_may_only_be_closed_on_its_own_timeline.sql'::text),
+    ('20260909004734'::text, 'the_tether_is_run_written_residue_too'::text, '0234_the_tether_is_run_written_residue_too.sql'::text),
+    ('20260909015606'::text, 'the_ab_rig_takes_a_clock_anchor_and_ignores_it'::text, '0235_the_ab_rig_takes_a_clock_anchor_and_ignores_it.sql'::text),
+    ('20260909021833'::text, 'a_proposal_must_know_which_tick_it_was_made_in'::text, '0236_a_proposal_must_know_which_tick_it_was_made_in.sql'::text),
+    ('20260909022308'::text, 'record_and_replay_an_agent_proposal_stream'::text, '0237_record_and_replay_an_agent_proposal_stream.sql'::text),
+    ('20260909031408'::text, 'the_proposal_selector_orders_by_a_clock_that_does_not_tick'::text, '0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql'::text),
+    ('20260909032226'::text, 'a_certification_that_replays_a_recorded_agent_stream'::text, '0239_a_certification_that_replays_a_recorded_agent_stream.sql'::text),
+    ('PENDING'::text, 'the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row'::text, '0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql'::text),
+    ('PENDING'::text, 'a_certification_hears_only_the_proposers_it_certified'::text, '0241_a_certification_hears_only_the_proposers_it_certified.sql'::text),
+    ('PENDING'::text, 'a_capture_records_only_what_the_run_cannot_regenerate'::text, '0242_a_capture_records_only_what_the_run_cannot_regenerate.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

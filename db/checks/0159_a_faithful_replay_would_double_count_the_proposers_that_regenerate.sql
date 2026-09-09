@@ -1,0 +1,118 @@
+-- db/checks/0159 — G42
+-- A FAITHFUL REPLAY WOULD DOUBLE-COUNT THE PROPOSERS THAT REGENERATE
+--
+-- Found 2026-09-08 23:0x CT (2026-09-09 04:0x UTC) while building Posture A,
+-- by asking a question the Posture-B proof never had to answer: what happens
+-- when you capture a REAL run instead of a hand-written one.
+--
+-- db/checks/0157 proved Posture B with a SYNTHETIC stream and said so. This is
+-- the thing that synthesis was hiding.
+--
+-- ===========================================================================
+-- 1. THREE WRITERS, AND ONLY ONE OF THEM STAMPS A TICK
+-- ===========================================================================
+-- Measured: exactly three functions INSERT into ottoq_external_proposals.
+--
+--   public.ottoq_l2_optimize_assignments  direct insert, INSIDE the certified
+--                                         tick. No tick_seq -- 0236 stamped the
+--                                         door and deliberately left this alone.
+--   public.ottoq_submit_external_proposal  the agent door. Stamps tick_seq (0236).
+--   public.ottoq_proposal_replay_inject    replay. Carries the recorded tick_seq.
+--
+-- And the traffic splits along that seam, hard:
+--
+--   source                   total   via door   direct   post-0236 w/ tick   w/o
+--   ----------------------  ------   --------   ------   -----------------  ----
+--   greedy_constrained      12,458          0   12,458                   0     2
+--   ottoq_service_priority   1,918        385    1,533                   8     0
+--
+-- So the LARGEST proposer in the system -- greedy_constrained, 12,458 proposals
+-- -- can never carry a tick_seq, because it is written by
+-- ottoq_l2_optimize_assignments and 0236 only reached the door. That is not new
+-- and it is not an accident; 0236's header states it and gives a good reason:
+--
+--     "Posture B replays the EXTERNAL stream. Internal deterministic proposers
+--      do not need replaying -- they regenerate themselves identically from the
+--      same seed, which is what 'deterministic internal proposer' means."
+--
+-- Correct. But it has a consequence 0236 did not have to think about, because
+-- 0237 and 0239 did not exist yet.
+--
+-- ===========================================================================
+-- 2. THE CONSEQUENCE: CAPTURE TAKES EVERYTHING, INCLUDING WHAT REGENERATES
+-- ===========================================================================
+-- public.ottoq_proposal_replay_capture(p_sim_run_id, p_replay_id, p_sources):
+--
+--     WHERE p.sim_run_id = p_sim_run_id
+--       AND (p_sources IS NULL OR p.source = ANY (p_sources))
+--
+-- p_sources DEFAULTS TO NULL, and NULL means EVERY SOURCE. So the default
+-- behaviour of "record this run's agent stream" is to record the internal
+-- deterministic proposers too.
+--
+-- Replay that into ottoq_determinism_pair_replay and both things happen:
+--
+--   (a) the recorded greedy_constrained / ottoq_service_priority rows are
+--       INJECTED -- at tick -1, because capture stores COALESCE(tick_seq,-1)
+--       and those rows have no tick; and
+--   (b) ottoq_l2_optimize_assignments and ottoq_service_priority_propose run
+--       during the replayed arm and REGENERATE the same proposals at their real
+--       ticks, exactly as 0236 says they will.
+--
+-- The same logical proposal is then present TWICE, from two mechanisms, at two
+-- different ticks. h_prop hashes both. The replay is not the recording; it is
+-- the recording plus a ghost of itself.
+--
+-- Worse than a wrong number: the ghosts land at tick -1, i.e. before tick 1, so
+-- they are visible to the decide path for the WHOLE run and can be selected in
+-- preference to the real ones. A replay could change the decisions it was
+-- supposed to reproduce.
+--
+-- ===========================================================================
+-- 3. WHY 0157 DID NOT CATCH IT, STATED PLAINLY
+-- ===========================================================================
+-- Because the stream in 0157 was hand-written: 24 rows, all source
+-- 'agent_probe', a source nothing regenerates. Every hash matched, the negative
+-- controls fired correctly, and the proof is sound FOR WHAT IT CLAIMED. It
+-- claimed the disposer is deterministic given a stream. It did not claim, and
+-- could not have caught, that capture picks up more than it should.
+--
+-- 0157's own "what is still owed" list opens with "a REAL captured stream".
+-- This is why that item was first.
+--
+-- ===========================================================================
+-- 4. THE FIX, AND WHY 0241's REGISTRY IS EXACTLY THE RIGHT MECHANISM
+-- ===========================================================================
+-- What must be excluded from a capture is precisely "the proposers that
+-- regenerate deterministically from the seed" -- and 0241 built a table naming
+-- exactly those, for exactly that reason, from measurement:
+-- ottoq_certified_proposers holds greedy_constrained, ottoq_service_priority
+-- and cuopt.
+--
+-- So (migration 0242, after 0241):
+--
+--   * ottoq_proposal_replay_capture EXCLUDES registered proposers by default.
+--     A caller who genuinely wants them names them in p_sources explicitly --
+--     the dangerous thing stops being the default and becomes a deliberate act.
+--   * The replay row count is recorded so a capture that took nothing is
+--     visibly different from a capture that was never run.
+--
+-- ===========================================================================
+-- 5. THE PREDICTION, WRITTEN BEFORE THE EXPERIMENT
+-- ===========================================================================
+-- Recorded now, in advance, so it can be wrong. The next step already scheduled
+-- is: run a real non-cert benchmark run with the internal proposers live, then
+-- capture and replay it.
+--
+--   P1. Captured with today's default (p_sources NULL), the replay will contain
+--       greedy_constrained and/or ottoq_service_priority rows, all at tick -1.
+--   P2. Replayed into a pair, arm A's ottoq_external_proposals will hold MORE
+--       rows for those sources than the source run did -- the injected copies
+--       plus the regenerated ones.
+--   P3. Both arms will still AGREE (the pair will pass), because both arms are
+--       ghosted identically. That is the dangerous part: the defect does not
+--       announce itself as a failure. It announces itself as a number that is
+--       quietly too big.
+--
+-- If P3 is wrong and the pair FAILS, the defect is worse than described, not
+-- better -- it would mean the doubled stream is also nondeterministic.

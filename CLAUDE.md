@@ -23,7 +23,26 @@ These override any default behavior.
 
 **2. Resumability contract.** On starting a run, first check which phase deliverables already exist in the repo (each phase names its deliverable). Resume after the last completed phase — never redo completed work. **Commit at the end of every phase** with message `run<N>/<phase-id>: <deliverable>` so a dead session costs one phase, not a run.
 
-**3. THE RESEARCH FIREWALL.** You have no web access and never attempt web research, fetching, or browsing. Hermes (a separate cloud research agent) does all external research and delivers findings by opening PRs into `docs/research/**`; merged files there are your only external facts, alongside this brief. When information is missing:
+**3. THE RESEARCH FIREWALL — amended 2026-09-08.** Chase granted direct web access
+in session on 2026-09-08 ("Search the web! You have my full permission"). The
+firewall is therefore **a provenance rule, not an access rule**, and what it always
+protected still holds: *every external fact in this repo carries a source and a date.*
+
+   - **Hermes remains the primary channel and the default.** It produces better
+     provenance than ad-hoc searching — see `docs/research/answers/R-12`, which
+     answered five questions against NVIDIA's own docs with a version baseline and
+     a URL per claim. File a request when the question is broad, when it needs a
+     survey, or when it is not blocking.
+   - **Direct search is for verification and for narrow, blocking questions** — in
+     particular for checking an unsourced claim, whoever made it. `SOLVER_STATE.md`
+     §10.2 exists because R-12's one unsourced sentence turned out to be materially
+     incomplete, and only a direct check found that.
+   - **Anything found by direct search is recorded exactly as a Hermes deliverable
+     would be**: the claim, the version or date it applies to, and the source URL.
+     A fact without a URL is not a fact, no matter who fetched it.
+   - **Never guess silently.** Unchanged, and the whole point.
+
+When information is missing:
    - Write `docs/research/requests/R-<n>-<slug>.md` with precise, answerable questions (field names, units, versions — never "tell me about X") and commit it. Hermes polls that folder at the start of its sessions.
    - Then proceed with labeled assumptions (`ASSUMPTION — pending R-<n>`) or park the step and continue the run.
    - If a needed H-file exists only in an unmerged PR, say so and pause that phase.
@@ -99,7 +118,14 @@ Three cooperating layers exist today:
 
 Modeling requirements that bite: piecewise charging demand above ~70% SoC; DCFC cooldown as a minimum-gap constraint on the **service point** (18 min in the throughput model); cold-start as a duration modifier in one tested function; multi-term objective with exposed weights (tardiness, energy cost vs. tariff, peak-kW excursion, inter-point moves); rolling re-solve with previous-feasible retention — the site is never without a schedule; determinism under fixed seed.
 
-**CP-SAT's role is a decision, not a mandate.** OR-Tools CP-SAT remains the strongest candidate for the deterministic scheduling core (disjunctive machines + cumulative resources is its home turf; cuOpt's strength is routing/LP-scale). But it enters as either (a) successor to the local decide path or (b) another proposer under the deferral pattern — gated on C4's findings. Do not rip out a working propose/dispose pipeline to install a textbook.
+**CP-SAT's role — GATE CLOSED 2026-09-08 by C4's findings (`SOLVER_STATE.md` §10).** This paragraph previously read that "cuOpt's strength is routing/LP-scale" and left the choice open. The vendor documentation settles it more sharply, and the softer wording should not be quoted any more:
+
+   - **The site layer is not expressible in cuOpt at all.** Against cuOpt 26.08, all four load-bearing constructs of 2.3 are absent — cumulative resource (the site power cap), disjunctive machine (one stall, no overlap), sequence-dependent gap (DCFC cooldown), and any scheduling solver family. cuOpt is routing + convex LP/QP + a **beta** MILP that NVIDIA states cannot yet prove optimality. Warm start is cuOpt-to-cuOpt only, so the matheuristic bridge is closed too. Sourced in `docs/research/answers/R-12`.
+   - **So the decomposition is FORCED, not chosen:** CP-SAT schedules *inside* a site; cuOpt, if used, routes recalls *between* sites (the `target_site` of 2.7, at 18-depot scale). Each gets the problem shape it is actually built for.
+   - **cuOpt can never sit inside the certified deterministic path.** Its routing solver documents no seed and no determinism parameter at all; its MIP determinism mode is labelled experimental and "does not yet guarantee fully deterministic results in all scenarios." That is not an argument against propose/dispose — **it is the argument for it.** A nondeterministic proposer behind an inviolable deterministic shield, its proposals hashed into the verdict (`h_prop`), is the only safe way to consume a solver that cannot promise reproducibility.
+   - **CP-SAT is *determinizable*, not deterministic**, and the difference is four pins that must be asserted, not assumed: pin the OR-Tools version (9.4 and 9.5 both shipped nondeterministic results even single-worker); use `max_deterministic_time`, never `max_time_in_seconds` (a wall clock inside a certified path is G15's defect class); pin `num_workers` or `interleave_batch_size`; and keep a determinism canary in CI that would have caught 9.4/9.5.
+
+Still true, and still the governing instruction: **do not rip out a working propose/dispose pipeline to install a textbook.** The local path remains a named policy regardless (C4 step 5).
 
 **Power publication boundary:** production interfaces publish forward demand schedules (smart-charging-profile shaped) to site controllers and vendor EMS. Real-time setpoint commands to physical inverters are never issued by OTTO-Q directly; the existing MPC bridge is a planning input inside the twin, and the boundary is encoded in adapter types when C10 lands.
 
@@ -162,6 +188,15 @@ Tested views over the existing substrate, identical across every policy and pack
 ```
 
 One CLI command: run ID in, all five KPIs out, deterministically. **The credibility rule of the company: no number ships without a run ID.**
+
+**2.9a — What the build grew that this brief did not name (added 2026-09-08).** "No number ships without a run ID" is now the *floor*, not the ceiling. What actually got built is a standing reproducibility apparatus, and it is a moat layer in its own right:
+
+   - a **fourteen-atom byte-identical verdict** over every pair (fingerprint, commands, decisions, events, bookings, energy, proposals, deferrals, calibration, rules, recalls, SDRs, tick count, end state);
+   - a **canon matrix** with per-column streaks, a recert floor derived from migration lineage, and `forces_recert` classification, so a change that *should* invalidate a canon does, and one that should not, does not;
+   - the **blind-spot promotion doctrine** — an atom is added MEASURED first and ENFORCED only after a flagship round shows the arms agree (0139 / 0206 / 0217 / 0225);
+   - a refusal to call a column green when the comparison is narrower than the enforcement (G25/G28).
+
+Why this belongs in the brief rather than in a check file: **R-12 established that the leading GPU solver in this space cannot promise byte-identical output at all.** "Same inputs, byte-identical outputs, verified continuously, across fourteen independent atoms" is therefore not hygiene — it is a claim most of the field cannot make, and it is what makes every KPI above worth quoting. Treat reproducibility as a product property, not a test practice.
 
 ---
 
@@ -293,7 +328,15 @@ Migration path over what exists — not a rewrite, not a parallel schema.
 **Deliverable:** `SOLVER_STATE.md` + running CP-SAT prototype + the ledger-backed cuOpt statement. Commit.
 
 ### Phase C5 — Policy Consolidation & Baselines
-`ottoq_ab_runs` already pairs OTTO-Q vs FIFO vs greedy under common random numbers, keyed by seed — wrap, don't rebuild.
+**CORRECTION 2026-09-08 (`db/checks/0145`), because this phase was about to be planned on a false premise.** This section used to say `ottoq_ab_runs` "already pairs OTTO-Q vs FIFO vs greedy under common random numbers, keyed by seed — wrap, don't rebuild." **It does not, and never has.** Measured: 68 rows, **one** policy (`otto_q`), **one** seed, 31 "groups" that each contain a single row, nothing written since 2026-08-24, and **no function anywhere in the database writes the table.** The schema is good — `ab_group_id`, seed, policy, scenario, ticks and twenty outcome columns — but it is a well-shaped *empty instrument*, not a working one. Wrap nothing; there is nothing there to wrap.
+
+**What does exist, under another name, is the hard half.** `ottoq_determinism_pair` already runs two arms in one transaction on an identical seed, scenario, depot and sim-clock start, and proves them byte-identical across fourteen atoms. **That is a common-random-numbers engine**, built while proving determinism. And the twin's RNG is *stateless and content-addressed* — `twin.ottoq_sim_seeded_random(seed, salt)` is a pure hash with no sequence to fall out of step, keyed on **(seed, entity, sim-seconds-since-this-run's-own-start)** rather than run id or wall clock (hardened by 0052). **So CRN survives policy variation by construction, and Part B needs no new RNG.**
+
+**AND A SECOND CORRECTION, `db/checks/0146` — the baselines do not pay the shield.** Measured: `ottoq_decide_tick` (otto_q) evaluates the 52-rule L1 shield and books through the stall calendar. **`ottoq_fifo_tick`, `ottoq_greedy_tick`, `ottoq_baseline_fifo` and greedy's two twin delegates evaluate no rules at all**, and three of them never touch the calendar. Run the comparison as it stands and greedy plausibly wins on `throughput_per_hr` — because it checks nothing. That number would be arithmetically correct, would carry a run ID, and would be worthless. **A run ID makes a number reproducible; it does not make it meaningful.**
+
+The architectural point is larger than this phase: **the L1 shield is not part of the policy, it is part of the problem definition.** A policy chooses among feasible actions; the shield defines which actions are feasible. Swapping the policy must not swap the constraint set, exactly as it must not swap the seed. So the shield sits on the *hold-constant* side of the A/B, and C5 must either route every arm through the same L1 evaluation, or publish safety and throughput only ever together, and relabel the baselines as what they are — dispatch with no safety layer, not "OTTO-Q without the clever part."
+
+The real gap is therefore narrow: give the pair rig a `p_policy`, score both arms into `ottoq_ab_runs`, and invert the verdict — the determinism pair passes when the arms are *identical*; the A/B pair passes when the arms are identical **on the world** and differ **only on what the policy decided**. That last assertion has no precedent in the existing rig and is the one genuinely new thing to build.
 1. `AssignmentPolicy { name; decide(state, arrivals): Assignment[] }` wrapping: FIFO, greedy, the local decide path ("as-is"), and the C4 CP-SAT prototype. Preserve CRN pairing and seed discipline exactly — the statistical spine of every future claim.
 2. `WaymoStagingPolicy`: stub only, PARKED, TODO referencing US 12,545,288 B2. Compiles, refuses to run.
 3. One committed four-policy comparison with seed and results table, regenerable byte-for-byte.

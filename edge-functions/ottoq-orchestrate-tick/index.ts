@@ -30,7 +30,7 @@ function chargeCompatible(inlet: string, st: any) {
   return true;
 }
 
-async function cuoptCharge(apiKey: string, vehicles: any[], stalls: any[]) {
+async function cuoptCharge(apiKey: string, vehicles: any[], stalls: any[], meta: any) {
   const n = vehicles.length, m = stalls.length, dim = n + m, BIG = 1000000;
   const cost = Array.from({ length: dim }, (_, i) => Array.from({ length: dim }, (_, j) => {
     if (i === j) return 0;
@@ -42,12 +42,34 @@ async function cuoptCharge(apiKey: string, vehicles: any[], stalls: any[]) {
     task_data: { task_locations: vehicles.map((_, i) => i), demand: [vehicles.map(() => 1)], task_time_windows: vehicles.map(() => [0, 86400]), service_times: vehicles.map(() => 1) },
     fleet_data: { vehicle_locations: stalls.map((_, i) => [n + i, n + i]), capacities: [stalls.map(() => 1)], vehicle_types: stalls.map(() => 0), vehicle_time_windows: stalls.map(() => [0, 86400]) },
     cost_matrix_data: { data: { "0": cost } }, solver_config: { time_limit: 5 } } };
+  // G40 / db/checks/0158: this is a REAL call to NVIDIA, and until 2026-09-08 it
+  // left no trace in cuopt_invocation_log. meta carries what the ledger needs.
+  const t0 = Date.now();
   const res = await fetch(CUOPT, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey, Accept: "application/json" }, body: JSON.stringify(payload) });
+  meta.nvidia_called = true; meta.nvidia_statuses.push(res.status);
+  meta.http_status = res.status; meta.latency_ms = Date.now() - t0;
   const txt = await res.text(); if (!res.ok) throw new Error("HTTP " + res.status + ": " + txt.slice(0, 160));
   const result = JSON.parse(txt); const out: Record<string, string> = {};
   const vd = result?.response?.solver_response?.vehicle_data ?? result?.response?.solver_infeasible_response?.vehicle_data;
   if (vd) for (const sIdx of Object.keys(vd)) { const r = vd[sIdx]; if (r.task_id) for (const tid of r.task_id) { const tnum = typeof tid === "number" ? tid : parseInt(String(tid).replace(/[^0-9]/g, "")); const v = vehicles[tnum], s = stalls[parseInt(sIdx)]; if (v && s) out[v.id] = s.id; } }
   return out;
+}
+
+// G40 / db/checks/0158. CLAUDE.md rule 6: cuopt_invocation_log exists to make
+// "never invoked" distinguishable from "invoked N times, abstained M". This
+// function calls NVIDIA directly and wrote no row, so SOLVER_STATE.md 9.2's
+// published sentence was derived from a ledger blind to it. A row is written on
+// EVERY pass, including the abstaining ones -- an absent row must mean the code
+// did not run, never that it ran and said nothing. Wrapped so a ledger failure
+// can never fail an orchestration tick.
+async function logCuopt(sb: any, row: Record<string, unknown>) {
+  try {
+    // supabase-js RETURNS {error} rather than throwing, so a bare try/catch would
+    // swallow a rejected insert as success and the ledger would go quietly blind
+    // again -- which is the whole defect this closes. Check both.
+    const { error } = await sb.from("cuopt_invocation_log").insert(row);
+    if (error) console.error("cuopt ledger write REJECTED (non-fatal):", error.message);
+  } catch (e) { console.error("cuopt ledger write THREW (non-fatal):", e instanceof Error ? e.message : e); }
 }
 
 serve(async (req) => {
@@ -71,7 +93,16 @@ serve(async (req) => {
     const cands = vehicles ?? [];
     const lockedStalls = new Set<string>(); for (const l of (locked ?? [])) { if (l.assigned_stall_id) lockedStalls.add(l.assigned_stall_id); if (l.actual_stall_id) lockedStalls.add(l.actual_stall_id); }
     const freeStalls = (stalls ?? []).filter((s: any) => !lockedStalls.has(s.id));
-    if (cands.length === 0) return json({ depot: depot.name, vehicles: 0, note: "no vehicles need action" });
+    if (cands.length === 0) {
+      // G40 / 0158: abstentions are ledger facts. A silent early return would make
+      // "never invoked" and "invoked and said nothing" indistinguishable, which is
+      // the exact distinction cuopt_invocation_log exists to draw.
+      await logCuopt(sb, { sim_run_id: null, stage: "edge", candidates_in: 0,
+        free_stalls_in: freeStalls.length, proposals_out: 0, abstained_reason: "no_candidates",
+        source_note: "orchestrate-tick:v9",
+        detail: { depot_id, nvidia_called: false, ledgered_by: "G40/0158" } });
+      return json({ depot: depot.name, vehicles: 0, note: "no vehicles need action" });
+    }
 
     const serviceMax = num(depot.service_max_kw, 2500); const margin = num(depot.dcfc_safety_margin_pct, 10) / 100;
     const billingPeak = num(e.billing_period_peak_kw, serviceMax * 0.6); const building = num(e.building_load_kw, 0);
@@ -89,10 +120,25 @@ serve(async (req) => {
     const offeredCharge = [...chargeStalls.filter((s: any) => s.stall_type === "dcfc").slice(0, maxConcurrentDcfc), ...chargeStalls.filter((s: any) => s.stall_type === "l2")];
     let chargeAssign: Record<string, string> = {}; let chargeSource = "none";
     const apiKey = Deno.env.get("NVIDIA_API_KEY_CUOPT") ?? Deno.env.get("NVIDIA_API_KEY");
+    // G40 / 0158: meta is the ledger's eyes on the NVIDIA call.
+    const nv: any = { nvidia_called: false, nvidia_statuses: [] as number[], http_status: null, latency_ms: null, cuopt_error: null };
+    let abstained: string | null = null;
     if (chargeVehicles.length && offeredCharge.length && apiKey) {
-      try { chargeAssign = await cuoptCharge(apiKey, chargeVehicles, offeredCharge); chargeSource = "cuopt"; }
-      catch { for (const v of chargeVehicles) { const s = offeredCharge.find((x: any) => !Object.values(chargeAssign).includes(x.id) && chargeCompatible(v.inlet_type, x)); if (s) chargeAssign[v.id] = s.id; } chargeSource = "fallback"; }
-    } else if (chargeVehicles.length && offeredCharge.length) { for (const v of chargeVehicles) { const s = offeredCharge.find((x: any) => !Object.values(chargeAssign).includes(x.id) && chargeCompatible(v.inlet_type, x)); if (s) chargeAssign[v.id] = s.id; } chargeSource = "fallback"; }
+      try { chargeAssign = await cuoptCharge(apiKey, chargeVehicles, offeredCharge, nv); chargeSource = "cuopt"; }
+      catch (err) { nv.cuopt_error = err instanceof Error ? err.message : String(err); for (const v of chargeVehicles) { const s = offeredCharge.find((x: any) => !Object.values(chargeAssign).includes(x.id) && chargeCompatible(v.inlet_type, x)); if (s) chargeAssign[v.id] = s.id; } chargeSource = "fallback"; }
+    } else if (chargeVehicles.length && offeredCharge.length) { abstained = "no_nvidia_api_key"; for (const v of chargeVehicles) { const s = offeredCharge.find((x: any) => !Object.values(chargeAssign).includes(x.id) && chargeCompatible(v.inlet_type, x)); if (s) chargeAssign[v.id] = s.id; } chargeSource = "fallback"; }
+    else { abstained = chargeVehicles.length === 0 ? "no_candidates" : "no_free_charge_stalls"; }
+    if (nv.cuopt_error) abstained = "cuopt_call_failed";
+    await logCuopt(sb, {
+      sim_run_id: null, stage: "edge",
+      candidates_in: chargeVehicles.length, free_stalls_in: offeredCharge.length,
+      proposals_out: Object.keys(chargeAssign).length,
+      abstained_reason: abstained, latency_ms: nv.latency_ms, http_status: nv.http_status,
+      source_note: "orchestrate-tick:v9",
+      detail: { depot_id, charge_source: chargeSource, nvidia_called: nv.nvidia_called,
+                nvidia_statuses: nv.nvidia_statuses, cuopt_error: nv.cuopt_error,
+                max_concurrent_dcfc: maxConcurrentDcfc, ledgered_by: "G40/0158" },
+    });
 
     const stallById: Record<string, any> = {}; for (const s of freeStalls) stallById[s.id] = s;
     const used = new Set<string>(Object.values(chargeAssign));

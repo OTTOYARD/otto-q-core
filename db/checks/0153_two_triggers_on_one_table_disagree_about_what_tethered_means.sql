@@ -1,0 +1,177 @@
+-- =====================================================================
+-- 0153 — Two triggers on one table disagree about what "tethered" means,
+--        and every move they disagree about leaks a stall.
+--
+-- Finding id: G37
+-- Opened:     2026-09-08 19:4x PM CT (2026-09-09 00:4x UTC)
+-- Found by:   the second attempt to run a paired A/B. Arm B crashed on a
+--             unique-index violation nobody had seen before.
+-- Status:     OPEN — the honest fix is NOT a one-liner; see §5
+-- Related:    G34 (db/checks/0150). Same root cause; §6.
+--
+-- ---------------------------------------------------------------------
+-- 1. THE CRASH
+-- ---------------------------------------------------------------------
+--   ERROR: duplicate key value violates unique constraint
+--          "idx_stalls_one_vehicle_per_stall"
+--   DETAIL: Key (current_vehicle_id)=(02734f04-...) already exists.
+--   CONTEXT: UPDATE stalls SET status='occupied', current_vehicle_id=NEW.id
+--            WHERE id = NEW.current_stall_id
+--            PL/pgSQL function sync_stall_occupancy() line 18
+--            <- ottoq_fifo_tick line 24  <- ottoq_sim_decide_and_dispatch
+--            <- ottoq_sim_advance_tick   <- ottoq_cert_arm
+--
+-- A vehicle ended up recorded in two stalls at once. The unique index --
+-- correctly -- refused it. This is the calendar's "assignment plus
+-- verification" principle (CLAUDE.md rule 6) doing its job: physical
+-- reality overruled a claim.
+--
+-- ---------------------------------------------------------------------
+-- 2. THE TWO DEFINITIONS
+-- ---------------------------------------------------------------------
+-- public.vehicles carries two triggers that both care about the robotic
+-- charge arm's tether, and they do not mean the same thing by it.
+SELECT 'a_definitions' AS check, p.proname,
+       (p.prosrc ~* 'robotic_tether_until\s*(<=|<|>)')  AS expiry_aware,
+       (p.prosrc ~* 'robotic_tether_until IS NOT NULL') AS null_test_only
+FROM pg_proc p
+WHERE p.proname IN ('ottoq_arm_interlock_guard','sync_stall_occupancy')
+ORDER BY 2;
+-- Observed 2026-09-08:
+--   ottoq_arm_interlock_guard   expiry_aware TRUE   null_test_only FALSE
+--   sync_stall_occupancy        expiry_aware FALSE  null_test_only TRUE
+--
+--   (null_test_only FALSE for the guard is correct and worth reading: it
+--   opens with "IF NEW.robotic_tether_until IS NULL THEN RETURN NEW" -- an
+--   IS NULL early-out -- and then compares the deadline to a clock. It
+--   never asks "IS NOT NULL" as a proxy for "live". The other trigger
+--   asks nothing else.)
+--
+-- ottoq_arm_interlock_guard, deciding whether to BLOCK a move:
+--     IF NEW.robotic_tether_until <= v_clock THEN RETURN NEW;  -- expired, allow
+--
+-- sync_stall_occupancy, deciding whether to VACATE the old stall:
+--     AND NOT (NEW.robotic_tether_until IS NOT NULL
+--              AND NEW.robotic_tether_stall_id IS NOT DISTINCT FROM OLD.current_stall_id)
+--
+-- One asks "is the tether still live?". The other asks "is the column
+-- populated?". For an EXPIRED but non-NULL tether those answers differ,
+-- and that gap is the entire defect.
+--
+-- ---------------------------------------------------------------------
+-- 3. WHY THAT LEAKS A STALL, STEP BY STEP
+-- ---------------------------------------------------------------------
+--   1. Vehicle V sits in stall S1 with robotic_tether_until set and
+--      robotic_tether_stall_id = S1.
+--   2. The tether's deadline passes. NOTHING NULLS THE COLUMN -- there is
+--      no reaper. It stays populated forever.
+--   3. A policy moves V from S1 to S2.
+--      - ottoq_arm_interlock_guard: expired, so it ALLOWS the move.
+--      - sync_stall_occupancy: column non-NULL and points at S1, so it
+--        does NOT vacate S1. S1.current_vehicle_id stays V.
+--      - the same trigger then occupies S2: S2.current_vehicle_id := V.
+--   4. Two stalls now claim V. idx_stalls_one_vehicle_per_stall fires,
+--      the statement aborts, and because a cert arm is one transaction,
+--      THE WHOLE RUN DIES.
+--
+-- Note the logical trap that makes this airtight rather than probable:
+-- while the tether is UNEXPIRED the interlock blocks the move entirely,
+-- so no leak is possible. The only way a move of a non-NULL-tethered
+-- vehicle can ever succeed is if it has EXPIRED -- which is exactly the
+-- case sync_stall_occupancy mishandles. Every such move leaks.
+
+-- 3a. Live state. Both readings are currently clean, which is expected --
+--     the crashing transaction rolled back -- so this is a monitor, not
+--     the evidence. The evidence is §2 plus the crash in §1.
+SELECT 'b_live_state' AS check,
+       (SELECT count(*) FROM public.vehicles WHERE robotic_tether_until IS NOT NULL) AS tethered_now,
+       (SELECT count(*) FROM public.stalls s JOIN public.vehicles v ON v.id = s.current_vehicle_id
+         WHERE v.current_stall_id IS DISTINCT FROM s.id)                             AS stall_points_at_absent_vehicle;
+-- Observed: 9 tethered, 0 mismatched.
+
+-- ---------------------------------------------------------------------
+-- 4. WHY otto_q HAS NEVER HIT IT
+-- ---------------------------------------------------------------------
+-- Same reason as G35. ottoq_decide_tick coordinates with the arm through
+-- the arm's own gate vocabulary, so it does not move a vehicle whose
+-- demate has not completed, and a completed demate clears the tether.
+-- The baselines have no idea the arm exists, so they are the first code
+-- to move a vehicle whose tether merely expired.
+--
+-- This is NOT a baseline defect. It is a kernel defect that only a
+-- baseline was careless enough to reach. Any future policy -- CP-SAT
+-- included -- walks into it on day one.
+--
+-- ---------------------------------------------------------------------
+-- 5. WHY THE FIX IS NOT A ONE-LINER
+-- ---------------------------------------------------------------------
+-- The obvious fix is "make sync_stall_occupancy expiry-aware too". It is
+-- the wrong fix, and the trigger's own comment says why:
+--
+--     "Deliberately tested against NEW's own columns only -- no function
+--      call and no extra read, because this trigger fires on every
+--      vehicles UPDATE and must stay cheap and unable to raise."
+--
+-- To compare robotic_tether_until against a clock, the trigger needs a
+-- clock. The only clock reachable from NEW's columns is the wall clock,
+-- and the tether deadline is in sim time -- which is precisely the G34
+-- mistake. The alternative is a lookup into ottoq_sim_runs on every
+-- vehicles UPDATE, which is the cost the comment refuses, and which
+-- would ALSO have to guess which run (G34 again).
+--
+-- So the fix is not in either trigger. It is upstream:
+--
+--     A TETHER MUST BE NULLED WHEN IT ENDS, NOT LEFT TO EXPIRE.
+--
+-- If the columns are cleared on demate-complete and by a reaper for the
+-- abandoned case, then "IS NOT NULL" and "not yet expired" become the
+-- same predicate and the two triggers agree by construction. No clock is
+-- needed in either. That is the correct shape and it is a real piece of
+-- work: find every writer of robotic_tether_*, give the completion path
+-- a clear, and give the abandoned case an owner.
+--
+-- ---------------------------------------------------------------------
+-- 6. THE SYNTHESIS WITH G34, WHICH IS THE POINT
+-- ---------------------------------------------------------------------
+-- G34 said: the interlock has to GUESS which run a tether belongs to,
+-- because the tether carries no run id.
+-- G37 says:  two triggers disagree about whether a tether is live,
+-- because nothing CLEARS a tether when it ends.
+--
+-- These are the same defect seen from two sides. `robotic_tether_until`,
+-- `_stall_id`, `_direction` and `_phase` are a run-scoped, lifecycle-
+-- bearing fact stored as four loose columns on a shared table, with:
+--
+--     no run id            -> nobody can tell whose it is      (G34)
+--     no terminal write    -> nobody can tell when it ended    (G37)
+--     no owner             -> nobody clears it                 (both)
+--
+-- A lifecycle without a terminal state is not a lifecycle, it is a flag
+-- that only ever turns on. Every consumer then invents its own rule for
+-- when to stop believing it, and the consumers disagree -- which is
+-- exactly what §2 measures.
+--
+-- The single fix that closes G34 and G37 together is to give the tether a
+-- proper record: a run id, an explicit end, and one writer responsible
+-- for both. That is a schema change to a table inside the world
+-- fingerprint's blast radius and is forces_recert TRUE. It is filed, with
+-- its shape stated, and NOT bolted on at the end of a session.
+--
+-- ---------------------------------------------------------------------
+-- 7. WHAT THIS BLOCKS RIGHT NOW
+-- ---------------------------------------------------------------------
+-- Migration 0233 is applied and UNPROVEN. Proving it needs one successful
+-- fifo arm after an otto_q arm, and fifo cannot currently complete one --
+-- it dies here. So the running order is now:
+--
+--     G37 (this)  -> a baseline can complete a second arm
+--     0233 proof  -> arm A's sessions survive arm B, with
+--                    stopped_reason='benchmark_reset' AND ended_at >= started_at
+--     then, and only then, a comparison is even measurable
+--
+-- 0147 §7's freeze is unchanged and now has a fourth blocker in front of
+-- it. Nothing about that is discouraging: four attempts to run a
+-- comparison have produced four distinct, real, previously invisible
+-- defects, three of them in the kernel rather than in the baselines.
+-- That is what an instrument is for.
+-- =====================================================================

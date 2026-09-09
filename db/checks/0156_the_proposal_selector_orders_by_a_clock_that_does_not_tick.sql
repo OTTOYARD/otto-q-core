@@ -1,0 +1,137 @@
+-- db/checks/0156 — G41
+-- THE PROPOSAL SELECTOR ORDERS BY A CLOCK THAT DOES NOT TICK
+--
+-- Found while building the replay-driven certification arm (Posture B, step 3).
+-- Before a replayed agent stream can be certified, the thing that CONSUMES that
+-- stream has to be a function of its inputs. It is not.
+--
+-- ---------------------------------------------------------------------------
+-- THE SELECTOR
+-- ---------------------------------------------------------------------------
+-- public.ottoq_l2_external_proposal(sim_run_id, action_context, entity_type,
+-- entity_id) is the ONLY read path from ottoq_external_proposals into the
+-- decide path. ottoq_decide_tick calls it twice: line 128 ('redeployment') and
+-- line 958 ('service_sequencing'). It ends:
+--
+--     ORDER BY (p.source = 'cuopt') DESC,
+--              (p.source = 'cuopt_fallback') DESC,
+--              p.created_at DESC
+--      LIMIT 1
+--
+-- Three keys. The first two are a 3-way bucket on source. The third is a wall
+-- clock. There is no fourth.
+--
+-- ---------------------------------------------------------------------------
+-- WHY THE THIRD KEY IS NOT A KEY
+-- ---------------------------------------------------------------------------
+-- ottoq_external_proposals.created_at DEFAULTS TO now(). In PostgreSQL now()
+-- is the TRANSACTION timestamp, not the statement or wall timestamp -- it is
+-- frozen for the life of the transaction. And a certification pair runs BOTH
+-- ARMS AND EVERY TICK IN ONE TRANSACTION; that is the whole design of
+-- ottoq_determinism_pair.
+--
+-- So inside a certification, every proposal ever written carries the SAME
+-- created_at, and `ORDER BY created_at DESC` sorts nothing.
+--
+-- Measured, whole table, 2026-09-09:
+--
+--   runs carrying proposals                                    827
+--   runs where ALL proposals share one created_at              822   (99.4%)
+--   ...and that run had more than one proposal                 821
+--   proposals living in such a run              14,282 of 14,502   (98.5%)
+--
+-- That is not an edge case. It is the normal case, and the exceptions are the
+-- six runs that were ticked from pg_cron (one transaction per tick) rather than
+-- from a pair.
+--
+-- ---------------------------------------------------------------------------
+-- SO WHAT DECIDES? INSERTION ORDER. PROVEN, NOT ARGUED.
+-- ---------------------------------------------------------------------------
+-- Two proposals, same run, same entity, same action_context, same source,
+-- differing only in content. Submitted in one order, then the other. Rolled
+-- back afterwards, so this left no residue:
+--
+--   submitted A,B  ->  the selector chose A
+--   submitted B,A  ->  the selector chose B
+--
+-- and the plan says why:
+--
+--   Limit
+--     -> Sort  Sort Key: ((source='cuopt')) DESC, ((source='cuopt_fallback')) DESC,
+--                        created_at DESC
+--        -> Index Scan using ottoq_extprop_lookup_idx
+--
+-- All three sort keys tie, so the Sort passes the scan through and LIMIT 1
+-- takes whatever the index handed it. The enacted action is a function of the
+-- order rows were written, which is not an input to the decision.
+--
+-- ---------------------------------------------------------------------------
+-- THIS EXACT DEFECT HAS ALREADY BEEN CONVICTED ONCE, IN A NEIGHBOURING FUNCTION
+-- ---------------------------------------------------------------------------
+-- ottoq_l2_optimize_assignments carries migration 0067's comment verbatim:
+--
+--     "the score above is byte-identical for two stalls of the same type at the
+--      same distance, so LIMIT 1 returned heap order. Measured in re-cert #19
+--      at tick 10: stalls NASH-L2-STALL-03 and NASH-L2-STALL-29 ... were handed
+--      to the same two vehicles in OPPOSITE order across two same-seed arms,
+--      and by tick 18 fifty vehicles had diverged."
+--
+-- Same function family, same LIMIT 1, same fix shape. 0067 closed it for stalls
+-- and did not sweep the proposal selector beside it.
+--
+-- ---------------------------------------------------------------------------
+-- TWO LIVE SITES, BOTH ON THE DECIDE PATH
+-- ---------------------------------------------------------------------------
+--   1. public.ottoq_l2_external_proposal
+--      the only read path from ottoq_external_proposals into ottoq_decide_tick;
+--      called at lines 128 ('redeployment') and 958 ('service_sequencing').
+--      ORDER BY: source bucket, source bucket, created_at DESC. Ties.
+--
+--   2. ottoq.ottoq_reoptimize_reservation_book line 39
+--      called from public.ottoq_sim_decide_and_dispatch. Picks the STALL a
+--      vehicle is swapped to, out of pending cuOpt proposals.
+--      ORDER BY: p.created_at DESC. Nothing else -- source is already pinned to
+--      'cuopt' by the WHERE, so the bucket keys would not have helped. Two cuOpt
+--      proposals naming different stalls means an arbitrary stall.
+--
+-- Why the certification pair has not caught it: both arms insert in the same
+-- logical order, so the index hands back the same row twice and the pair agrees.
+-- It agrees for a reason the query does not state. That is the 0067 situation
+-- exactly -- and 0067 only surfaced because a real re-cert happened to reorder
+-- the heap. This is stable by luck.
+--
+-- ---------------------------------------------------------------------------
+-- AND IT IS LOAD-BEARING FOR POSTURE B, WHICH IS WHY IT SURFACED NOW
+-- ---------------------------------------------------------------------------
+-- 0237 records an agent stream and replays it. Its capture is CONTENT-ordered
+-- (A2 asserts that, deliberately, so a replay is reproducible). The original run
+-- consumed those proposals in SUBMISSION order. If insertion order decides, then
+-- a faithful-looking replay of a faithfully recorded stream can enact a
+-- different proposal than the run it was recorded from -- silently, with every
+-- hash matching, because h_prop hashes the SET of proposals and not the choice.
+--
+-- A replay cannot certify a disposer whose output depends on something the
+-- replay does not reproduce. Fix the selector first; then Posture B's
+-- content-ordered capture is faithful BY CONSTRUCTION rather than by hope.
+--
+-- ---------------------------------------------------------------------------
+-- THE FIX (migration 0238)
+-- ---------------------------------------------------------------------------
+-- Make both orders total on CONTENT. After the existing keys:
+--
+--   ..., p.tick_seq DESC NULLS LAST,   -- 0236: freshest tick wins. This is what
+--                                      -- created_at DESC was trying to say and
+--                                      -- could not, now() being frozen.
+--       p.source ASC,
+--       p.proposal::text ASC           -- jsonb renders canonically
+--
+-- and NOT p.proposal_id: it is gen_random_uuid(), so ordering by it would be
+-- stable within an arm and DIFFERENT between arms -- the exact failure being
+-- fixed, reintroduced as its own remedy. Stopping at proposal::text is correct:
+-- two rows equal on (source, created_at, tick_seq, proposal) are interchangeable
+-- in the value returned, so the order is total ON THE ANSWER, which is the only
+-- place totality is needed.
+--
+-- forces_recert: TRUE. Nothing DEFINED changes -- every outcome this alters was
+-- undefined before -- but the decide path's behaviour can move, and a canon that
+-- was standing on heap order should be made to say so.
