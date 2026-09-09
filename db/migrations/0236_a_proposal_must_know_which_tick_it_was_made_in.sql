@@ -60,10 +60,11 @@
 -- expiry floor is a behaviour change to the disposer, not a provenance fix.
 -- Recorded here, deliberately not bundled in.
 --
--- forces_recert: FALSE. The column is nullable and additive; no verdict atom
--- hashes it (asserted in A3 against the live ottoq_determinism_pair body); the
--- only function changed is outside the decide path; and ottoq_decide_tick's md5
--- is asserted unchanged.
+-- forces_recert: FALSE. The column is nullable and additive; the h_prop atom
+-- does not hash it (asserted in A3 against public.ottoq_hash_proposals, the one
+-- function h_prop delegates to and the only verdict path that reads
+-- ottoq_external_proposals); the only function changed is outside the decide
+-- path; and ottoq_decide_tick's md5 is asserted unchanged.
 
 -- (no explicit BEGIN/COMMIT: apply_migration supplies the transaction.)
 
@@ -190,11 +191,31 @@ END $A2$;
 -- A3  NO VERDICT ATOM HASHES THE NEW COLUMN. This is the actual justification
 --     for forces_recert FALSE, so it is asserted rather than asserted-in-prose.
 -- ---------------------------------------------------------------------------
+--     FIRST VERSION OF THIS ASSERTION WAS WRONG AND THE APPLY FAILED ON IT.
+--     It read: ottoq_determinism_pair must not reference 'tick_seq' anywhere.
+--     It does -- twice, and legitimately: h_dec hashes
+--     sim_clock|tick_seq|action_context|entity_id|outcome_status over
+--     ottoq_decisions, and h_nrg hashes c.tick_seq over ottoq_energy_commands.
+--     Neither is ottoq_external_proposals. A whole-body grep for a column name
+--     cannot tell which TABLE the column belongs to, so it asserted something
+--     far broader than the claim and refused a correct migration. The whole
+--     apply rolled back atomically -- column absent, registry row absent,
+--     verified -- which is the protocol working.
+--
+--     The precise claim is: the h_prop atom must not hash tick_seq. h_prop
+--     delegates to one function, public.ottoq_hash_proposals, which is the only
+--     verdict path that reads ottoq_external_proposals. So assert on that, and
+--     also assert that h_prop still delegates there -- otherwise this test could
+--     silently start checking a function the verdict no longer uses.
 DO $A3$
 BEGIN
-  IF (SELECT prosrc FROM pg_proc WHERE proname='ottoq_determinism_pair') ~* 'tick_seq' THEN
-    RAISE EXCEPTION 'A3 FAILED: ottoq_determinism_pair references tick_seq; a canon could move '
+  IF (SELECT prosrc FROM pg_proc WHERE proname='ottoq_hash_proposals') ~* 'tick_seq' THEN
+    RAISE EXCEPTION 'A3 FAILED: ottoq_hash_proposals hashes tick_seq; h_prop would move '
                     'and forces_recert FALSE is wrong';
+  END IF;
+  IF (SELECT prosrc FROM pg_proc WHERE proname='ottoq_determinism_pair') !~ 'ottoq_hash_proposals' THEN
+    RAISE EXCEPTION 'A3 FAILED: h_prop no longer delegates to ottoq_hash_proposals; '
+                    'this assertion is testing a function the verdict does not use';
   END IF;
 END $A3$;
 
