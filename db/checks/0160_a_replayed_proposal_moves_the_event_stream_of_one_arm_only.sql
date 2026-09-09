@@ -180,3 +180,71 @@
 -- It also means the arms are NOT booted from the same world, which is the one
 -- property the whole pair rig assumes. Every canon recorded to date was taken
 -- under an assumption that is only usually true.
+
+-- ===========================================================================
+-- 3. THE BLIND-SPOT INVENTORY -- HOW MANY MORE OF THESE ARE THERE
+-- ===========================================================================
+--
+-- Once the mechanism is "a mutable column that the reset does not clear and the
+-- boot fingerprint cannot see", the obvious question is how many such columns
+-- exist. Enumerated from the catalog:
+--
+--   SELECT c.table_name, c.column_name
+--     FROM information_schema.columns c, defs d
+--    WHERE c.table_name IN ('vehicles','stalls')
+--      AND pg_get_functiondef(ottoq_tick_invariance_reset_fleet) NOT LIKE '%'||c.column_name||'%'
+--      AND pg_get_functiondef(ottoq_boot_state_fingerprint)      NOT LIKE '%'||c.column_name||'%';
+--
+--   -> 49 columns (26 on vehicles, 23 on stalls)
+--
+-- THE TEST IS TEXTUAL AND ITS ASYMMETRY IS THE WHOLE POINT: a column name
+-- appearing in a function body does NOT prove the function resets or hashes it.
+-- A column name being ABSENT from both bodies DOES prove neither can. So this
+-- list is sound as an upper bound on what is covered and a hard lower bound on
+-- what is not. Every one of these 49 is provably invisible to both.
+--
+-- Most of the 49 are harmless because they are STATIC -- identity and geometry
+-- that no tick ever writes: make, model, vin, year, color, license_plate,
+-- battery_capacity_kwh, stall_width_ft, absolute_lat/lng, fiducial_marker_id,
+-- uwb_beacon_id, and so on. A column a run never writes cannot carry residue
+-- between arms.
+--
+-- The dangerous subset is the MUTABLE ones, and it is short enough to name:
+--
+--   vehicles.robotic_tether_phase       <-- CONVICTED, this pair
+--   vehicles.robotic_tether_until       <-- CONVICTED, this pair
+--   vehicles.robotic_tether_stall_id    <-- CONVICTED, this pair
+--   vehicles.robotic_tether_direction   <-- same family, same exposure
+--   vehicles.current_depot_id
+--   vehicles.owning_sim_run_id
+--   vehicles.is_active
+--   stalls.reserved_for_mission_id
+--   stalls.staging_role
+--
+--   vehicles.current_soc_updated_at     <-- NOT a defect. This is 0137's column,
+--                                           deliberately outside the fingerprint
+--                                           because it is a write timestamp.
+--                                           Excluding it is the fix, not the bug.
+--
+-- So the tether family is four columns of a nine-column mutable blind spot, and
+-- the fix is tractable rather than whack-a-mole. It is NOT enough to clear the
+-- four that were convicted: the same coin can be flipped by any of the others.
+--
+-- THE FIX HAS TO BE BOTH HALVES, IN THIS ORDER, PER THE BLIND-SPOT PROMOTION
+-- DOCTRINE (CLAUDE.md 2.9a):
+--
+--   1. WIDEN THE BOOT FINGERPRINT first, MEASURED. If fp had covered these
+--      columns, this pair would have failed at 'fp' saying "the two arms did not
+--      boot from the same world" -- which is true, actionable, and immediate --
+--      instead of failing at h_evt nine ticks later with no indication why.
+--      The harness must be able to SEE an unequal boot before anyone tries to
+--      guarantee an equal one.
+--
+--   2. THEN MAKE THE RESET TOTAL for the mutable set, so the boot is actually
+--      equal and fp can be promoted to ENFORCED.
+--
+-- Doing (2) without (1) would close this instance and leave the class invisible,
+-- which is the mistake that let V7's residue sweep (task #40) miss these four in
+-- the first place. This finding is that sweep's escapee, and the lesson is that
+-- a residue sweep driven by reading code misses what a sweep driven by the
+-- catalog does not.
