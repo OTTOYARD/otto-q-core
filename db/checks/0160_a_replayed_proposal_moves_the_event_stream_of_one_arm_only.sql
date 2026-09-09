@@ -72,3 +72,111 @@
 --
 -- Round 31 finished at 04:58 (r31_f) and no cert job is scheduled after it, so
 -- both controls run alone on the flagship depot.
+
+-- ===========================================================================
+-- 2. THE MECHANISM, FOUND BEFORE THE CONTROLS FINISHED -- AND IT IS NOT REPLAY
+-- ===========================================================================
+--
+-- The clean comparison is arm A of the replay pair against arm A of the
+-- no-replay pair on the same column. Both are FIRST arms, so both carry the
+-- identical post-hash contamination described above, and it cancels. Done that
+-- way, the entire in-run divergence is NINE EVENTS AT ONE SIM CLOCK:
+--
+--   sim_clock_at           event_type             replay armA   no-replay armA
+--   --------------------   --------------------   -----------   --------------
+--   2026-09-01 06:30:00    stall.state_changed              2                0
+--   2026-09-01 06:30:00    vehicle.state_changed            7                0
+--
+-- and NOTHING anywhere else, at any other clock. The +116 at 08:00 is present
+-- in both and cancels exactly, which is what confirms it was contamination.
+--
+-- 06:30 is tick 10 of 12 (02:00 + 9 x 30 min).
+--
+-- THE NINE PAYLOADS NAME THE CAUSE. Every one of them is a clearing diff:
+--
+--   {"diff": {"updated_at":              {"to": "2026-09-09T05:24:00.957086+00",
+--                                        "from": "2026-09-09T05:22:18.994724+00"},
+--             "robotic_tether_phase":    {"to": null, "from": "unstow"},
+--             "robotic_tether_until":    {"to": null, "from": "2026-09-01T06:00:18.5+00"},
+--             "robotic_tether_stall_id": {"to": null, "from": "7361..."}}}
+--
+--   {"diff": {"status":             {"to": "available", "from": "occupied"},
+--             "current_vehicle_id": {"to": null, "from": "36ff94e5-..."}}}
+--
+-- Read the "from" on updated_at: 2026-09-09 05:22:18.994724 -- a WALL CLOCK
+-- timestamp from 102 seconds BEFORE this pair's transaction began at
+-- 05:24:00.957086. Those rows were carrying robotic-tether state written by
+-- something that ran before the pair. They survived the boot. They survived nine
+-- ticks. At tick 10 the tether deadline (sim 06:00:18.5) came due, the engine
+-- cleared them, and nine events were emitted that the canonical run does not
+-- emit.
+--
+-- Arm B never had them, because arm A had already cleared them.
+--
+-- WHY THE RESET DOES NOT SAVE IT -- read from the catalog, not inferred:
+--
+--   SELECT pg_get_functiondef(oid) ILIKE '%robotic_tether%'
+--     FROM pg_proc WHERE proname IN
+--          ('ottoq_tick_invariance_reset_fleet','ottoq_sim_stop_and_reset');
+--
+--   ottoq_tick_invariance_reset_fleet(uuid,bigint,timestamptz)   false
+--   ottoq_sim_stop_and_reset(uuid,text)                          false
+--
+-- NEITHER FUNCTION MENTIONS robotic_tether AT ALL. The per-arm fleet reset does
+-- not clear it and the run teardown does not clear it. So any robotic-tether
+-- state live in the world when a pair starts is inherited by ARM A ONLY, and
+-- arm B always boots from the world arm A left.
+--
+-- THIS IS NOT ABOUT REPLAY. Nothing in the mechanism involves a proposal, an
+-- injection, or 0239. The replay pair is simply the pair that happened to start
+-- 102 seconds after something left tether state on seven flagship vehicles.
+--
+-- SO THE STATED PREDICTIONS FOR C1 AND C2 ARE NOW CONFOUNDED, AND SAYING SO IS
+-- THE POINT OF HAVING WRITTEN THEM DOWN. Arm A of the 05:24 pair CONSUMED the
+-- residue. Measured immediately after, on the flagship depot:
+--
+--   vehicles with robotic_tether_phase / _until / _stall_id    0 / 0 / 0
+--   max(updated_at)                     2026-09-09 05:24:00.957086  (the pair)
+--
+-- The world is clean. C1 and C2 therefore both run on a clean world and are
+-- both expected to PASS -- and a C1 pass CANNOT exonerate replay, because the
+-- condition that produced the failure is gone. My C1 prediction ("C1 passes,
+-- therefore replay is the cause") was the right experiment to schedule and the
+-- WRONG INFERENCE TO HANG ON IT. They are kept and judged as run, but the
+-- decisive test is a third one.
+--
+-- C3 -- PLANT THE RESIDUE, RUN THE ORIGINAL PAIR WITH NO REPLAY AT ALL
+--
+--   UPDATE public.vehicles SET robotic_tether_phase='unstow',
+--          robotic_tether_direction='mate',
+--          robotic_tether_until='2026-09-01 06:00:18.5+00',
+--          robotic_tether_stall_id=<a flagship stall>
+--    WHERE id IN (<7 flagship vehicles>);
+--   SELECT public.ottoq_determinism_pair(314159, 12, 'busy_day', <flagship>,
+--                                        '2026-09-01 02:00:00+00', 900);
+--
+-- ottoq_determinism_pair, not the replay function. No p_replay_id anywhere.
+-- Planting and pair are in ONE cron job so nothing can run between them.
+--
+--   PREDICTION: C3 FAILS on h_evt, arm A only, with arm B landing on the canon
+--   9c631343... I hold this with high confidence, because the mechanism is not
+--   inferred from the failure -- it is read out of the two reset functions,
+--   which demonstrably do not touch these columns.
+--
+--   If C3 PASSES, tether residue alone is not sufficient, the replay is back in
+--   the frame, and this section is wrong and must be rewritten rather than
+--   patched.
+--
+-- WHAT THIS MEANS IF C3 CONFIRMS, STATED PLAINLY
+--
+-- The six green certification columns have been green partly by luck. A pair
+-- fails whenever the world happens to carry live robotic-tether state at the
+-- moment it starts, and passes when it does not, and nothing in the harness
+-- distinguishes the two. That is not a replay defect and not an agent-layer
+-- defect. It is a determinism defect in the certification itself, and it is the
+-- sharp form of G26 -- "production and the proof harness share one database" --
+-- because the residue is left by whatever touched the depot last.
+--
+-- It also means the arms are NOT booted from the same world, which is the one
+-- property the whole pair rig assumes. Every canon recorded to date was taken
+-- under an assumption that is only usually true.
