@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909051529
 -- migration-name:    the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row
 --
 -- G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge
