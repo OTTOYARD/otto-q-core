@@ -26,7 +26,7 @@ unchanged?*
 | `ottoq_events` (HMAC-signed, 20.8k) + signing-key registry, `ottoq_telemetry_packets` (25k), `ottoq_oem_webhook_log`/`_patterns` | L1_TELEMETRY | KERNEL | The signed-event foothold. Event *vocabulary* (~130 types) is robotaxi-flavored → C7 audits against the canonical set. |
 | `ottoq_rule_evaluations` (792k), `ai_decision_log`, `decision_fusion_log`, `ottoq_decisions` (1,340), `ottoq_decision_snapshots` (content-hashed) | L1_TELEMETRY | KERNEL | Decision audit trail; anti-cheat substrate. |
 | `ottoq_run_archives` (145), `ottoq_ab_runs` (CRN-paired), `ottoq_run_scope_registry` (219 cols), `depot_state_snapshots`, `ottoq_schema_snapshots` | L1_TELEMETRY | KERNEL | Reproducibility spine — "no number ships without a run ID" already has its substrate. |
-| `ottoq_visit_cost_attribution`, `tariff_schedules`, `ottoq_depot_tariffs`, `ottoq_fleet_operator_slas` (4 OEM, versioned), `ottoq_sla_violations`/`_sla_conformance_daily` | L2_SETTLEMENT | KERNEL | The L2 foothold: cost attribution + tariffs + versioned multi-tenant terms. **Not yet one signed settlement object** (§2 L2). |
+| `ottoq_visit_cost_attribution`, `tariff_schedules`, `ottoq_depot_tariffs`, `ottoq_fleet_operator_slas` (4 OEM, versioned), `ottoq_sla_violations`/`_sla_conformance_daily` | L2_SETTLEMENT | KERNEL | The L2 foothold: cost attribution + tariffs + versioned multi-tenant terms. **Not yet one signed settlement object** (§2 L2). **And `ottoq_visit_cost_attribution` holds 0 rows with no writer — see §2 L2's 2026-09-09 correction. The foothold is schema, not data.** |
 | `ottoq_ocpp_chargers` (90, OCPP 2.0.1), `ottoq_ocpp_messages` (6.9k), `ocpp_sessions`, `ocpp_meter_values` | L3_PROTOCOL | KERNEL | Real protocol substrate, charger-side. |
 | `ottoq_rules` (52, versioned, tenant-parameterizable) | L4_KERNEL | KERNEL | Layer 1 of the decision architecture. Rule *parameters* are tenant/sector data → PACK-shaped. |
 | Decide path: `ottoq_decide_tick`, `ottoq_cron_tick`, `ottoq_orchestrate-tick` fn family, `ottoq_vehicle_commands`, refusal path (mig 0036), boundary (mig 0039) | L4_KERNEL | KERNEL | The disposer. Plain-language reconstruction owed by C4. |
@@ -89,8 +89,45 @@ this substrate (C6).
 **Absent:** nothing structural. This layer is the moat as it stands today.
 
 ### L2_SETTLEMENT — **PARTIAL, the biggest gap-to-leverage ratio**
-**Exists:** per-visit cost attribution; two tariff tables; 4 versioned OEM SLAs with violation and
-daily-conformance tracking; a *retail* billing rail (Stripe, `ottoq_ps_*`) on the MVP — a separate
+
+> #### CORRECTION 2026-09-09, measured — this section said "Exists" of something that has never run
+>
+> `db/checks/0168`. The verdict below listed **per-visit cost attribution** under
+> *Exists*. That was true of the schema and false of the data, and the difference
+> is the entire layer:
+>
+> | link | measured 2026-09-09 14:40 UTC |
+> |---|---|
+> | `ottoq_compute_visit_cost` | exists, **0 callers** |
+> | `ottoq_visit_cost_attribution` | **0 rows**, and **no function anywhere inserts into it** |
+> | `trg_0043_attribution_attach` | enabled, correct, **never fired** |
+> | `ottoq_service_detail_records` | **220,946 rows · 100% with `tariff_id` · 0% with energy, cost or cost components** |
+> | `ottoq_events` | `sdr_issued` 125,648 · `sdr_costs_attached` **0** |
+>
+> **So the settlement rail is a pipe with nothing flowing through it.** Every SDR
+> carries a pointer to a tariff and no quantity to apply it to. The SDR terminus
+> is real and structural — 0043 made every completed operation end in one and
+> 0220 fixed its emitter — so the *telemetry* moat and the *protocol shape* stand.
+> What does not stand is any claim that money moves through this layer, or that
+> `energy_cost` (one of only five `intent_v1` objectives with a **sourced** dollar
+> value) can be computed for any run.
+>
+> **And the multi-tenant half needs the same correction.** "4 versioned OEM SLAs"
+> is a true row count and a misleading capability claim:
+> `ottoq_rule_parameters` has **0 rows**, `ottoq_rule_overrides` has **0 rows**,
+> and all four SLA rows carry identical values on every enforceable field — so
+> **no active rule currently produces a different verdict for a different
+> operator.** The mechanism is real and read at evaluation time; the
+> differentiation is empty.
+>
+> This correction exists because the original was written from the schema. A
+> table with the right columns and no rows reads as "exists" to anyone counting
+> tables, and this layer is the one CLAUDE.md 2.6 calls the strategic instruction
+> of the entire build — so it is the worst possible place to count tables.
+
+**Exists:** the *shape* of per-visit cost attribution (table, trigger, compute function — all
+correct, none invoked; see the correction above); two tariff tables; 4 OEM SLA rows, versioned,
+carrying identical terms; a *retail* billing rail (Stripe, `ottoq_ps_*`) on the MVP — a separate
 product, but proof the org can run money flows.
 **Partial:** SDR = cost attribution + signed events **still two objects, not one signed,
 tariffed, operator-attributed, asset-class-tagged record per completed operation**. Tariffs are not
