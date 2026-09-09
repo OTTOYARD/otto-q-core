@@ -185,21 +185,42 @@ BEGIN
   --     never a hand-maintained array, which is the whole lesson of 0163/0164.
   --     ottoq_sim_runs is class 'run_ledger' and is therefore not selected here;
   --     there is no DELETE against it anywhere in this body, and A2/A3 assert so.
+  --     BIGGEST FIRST, NOT ALPHABETICALLY. This ordering is load-bearing and the
+  --     first draft had it wrong. Under ORDER BY table_name the three largest
+  --     engine tables sit at alphabetical ranks 9, 15 and 26 of 47
+  --     (ottoq_decisions 2,129 MB / ottoq_events 3,441 MB /
+  --     ottoq_rule_evaluations 5,577 MB), and ottoq_stall_bookings -- the table
+  --     0163 wrote this whole line of work about -- sits at rank 29 with
+  --     ottoq_variability_cards at 35. A 60-second budget would be spent before
+  --     the loop ever reached them, on every pass, forever: not a slow purge but
+  --     a permanently starved one. Size-descending is also self-correcting,
+  --     because a table that has been drained shrinks and yields its place.
+  --     table_name breaks ties so the order stays deterministic.
+  --
+  --     to_regclass guards a registry row whose table has since been dropped:
+  --     format('%I') would happily build a DELETE naming a table that is not
+  --     there, and the whole pass would abort on it.
   FOR r IN
     SELECT table_name AS t, column_name AS c
       FROM public.ottoq_run_scope_registry
      WHERE class = 'engine' AND table_schema = 'public'
-     ORDER BY table_name
+       AND to_regclass('public.' || table_name) IS NOT NULL
+     ORDER BY pg_total_relation_size(('public.' || table_name)::regclass) DESC, table_name
   LOOP
     LOOP
       EXIT WHEN clock_timestamp() > v_t0 + make_interval(secs => p_time_budget_s);
 
       IF p_dry_run THEN
-        EXECUTE format(
-          'SELECT count(*) FROM (SELECT 1 FROM public.%1$I WHERE %2$I = ANY($1) LIMIT $2) s',
-          r.t, r.c) INTO v_n USING v_doomed, p_micro_batch;
+        -- A TRUE COUNT, DELIBERATELY UNBOUNDED. The first draft applied
+        -- p_micro_batch here, which would have reported '2000' for every large
+        -- table and told the operator nothing -- a dry run whose number is the
+        -- batch size is not a dry run. This is a read-only full count, run by
+        -- hand in a quiet window, and the scan is the price of knowing.
+        EXECUTE format('SELECT count(*) FROM public.%1$I WHERE %2$I = ANY($1)', r.t, r.c)
+          INTO v_n USING v_doomed;
+        RAISE NOTICE '  dry run: % would lose % row(s)', r.t, v_n;
         v_total := v_total + v_n;
-        EXIT;                      -- one probe per table, then move on
+        EXIT;                      -- one count per table, then move on
       END IF;
 
       -- Re-arm each transaction: COMMIT resets a LOCAL set_config, and the
@@ -306,6 +327,15 @@ BEGIN
      AND NOT EXISTS (SELECT 1 FROM public.ottoq_run_archives a WHERE a.sim_run_id = r.sim_run_id);
   RAISE NOTICE 'A6: % finished non-production run(s) older than 48h are UNARCHIVED and therefore protected', v_n;
 
+  -- A8. The loop filters table_schema='public'. Assert that filter hides nothing,
+  --     rather than letting a non-public engine table be silently skipped.
+  SELECT count(*) INTO v_n FROM public.ottoq_run_scope_registry
+   WHERE class = 'engine' AND table_schema <> 'public';
+  IF v_n <> 0 THEN
+    RAISE EXCEPTION 'A8 FAILED: % engine column(s) live outside schema public and '
+                    'the purge loop would skip them silently', v_n;
+  END IF;
+
   -- A7. Nothing is scheduled by this migration. Asserting the absence, so that
   --     a later edit that quietly adds a cron entry here fails loudly.
   SELECT count(*) INTO v_n FROM cron.job WHERE command ILIKE '%ottoq_retention_purge_runs%';
@@ -314,7 +344,7 @@ BEGIN
                     'the first run of this procedure is manual and observed by design', v_n;
   END IF;
 
-  RAISE NOTICE 'A1-A7 PASSED (all structural; no behavioural assertion is possible '
+  RAISE NOTICE 'A1-A8 PASSED (all structural; no behavioural assertion is possible '
                'inside a transaction block for a COMMITting procedure)';
 END $$;
 
