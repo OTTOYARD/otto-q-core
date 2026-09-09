@@ -39,7 +39,7 @@
 DO $round$
 DECLARE
   ---------------------------------------------------------------- constants --
-  v_round      int         := 26;          -- round number; jobs are named r<N>_<letter>_...
+  v_round      int         := 31;          -- round number; jobs are named r<N>_<letter>_...
   v_first_fire timestamptz := NULL;        -- NULL = now() + v_lead
   v_lead       interval    := '10 min';    -- gap before the first pair fires
   v_margin     numeric     := 1.35;        -- slot = slowest recent run x this
