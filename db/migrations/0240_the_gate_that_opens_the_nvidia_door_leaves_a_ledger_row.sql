@@ -346,3 +346,26 @@ VALUES (
   'own errors, so a test that only checked "it did not raise" would pass on a ledger '
   'that never wrote.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-09 00:19 CT (05:19 UTC), version 20260909051529, on the
+-- SECOND attempt. The first failed on A3 and rolled back atomically -- the
+-- asymmetry between the two lifts is recorded above A3 rather than quietly
+-- corrected. Rollback verified before retrying:
+--
+--   ottoq_cron_tick md5   0562fbd6579524bf71f6c733b9295268   UNCHANGED
+--   lineage rows          0
+--   snapshot rows         0
+--   probe ledger rows     0
+--   recert floor          2026-09-09 03:15:07, unmoved
+--
+-- Second attempt, all five assertions green:
+--
+--   A1  shape: exactly 2 ledger references, SELECT net.http_post, gate reads v_prun
+--   A2  the OPEN-gate block lifted from the live catalog and EXECUTED -> 1 row,
+--       stage=sql_gate, on the resolved run, no abstention
+--   A3  the CLOSED-gate block, same treatment -> 1 row, abstained_reason=policy_disabled
+--   A4  the two rows are distinguishable on abstained_reason (2 distinct values)
+--   A5  0 probe rows left, decide_tick md5 unchanged
+--
+--   recert floor          2026-09-09 03:15:07, UNMOVED (forces_recert FALSE holds)

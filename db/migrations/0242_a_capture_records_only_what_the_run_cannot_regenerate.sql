@@ -250,3 +250,29 @@ VALUES (
   'stream was hand-written with a source nothing regenerates. forces_recert FALSE: a '
   'recording tool, called by no tick and by neither pair; A5 pins decide_tick.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-09 00:19 CT (05:19 UTC), version 20260909051927, first
+-- attempt, all five assertions green.
+--
+-- The test run was checked BEFORE applying rather than hoped about: run
+-- d5a8b7e8-df87-4ed4-95db-8ec88070dbcd carries 93 proposals, all 93 from
+-- registered proposers and none unregistered -- so A1's "exactly 1" and A2's
+-- "exactly 93" are genuinely different numbers and A3's distinguishability
+-- guard is met rather than vacuous.
+--
+--   A1  default capture took 1 row of 94 -- only the unregistered probe; no
+--       registered proposer reached the recording
+--   A2  explicit p_sources naming the three registered proposers took 93 --
+--       the override works, AND the 93 excluded rows were really there, which
+--       is what stops A1 passing on a capture that took nothing
+--   A3  93 <> 1, so A1 and A2 are distinguishable by count
+--   A4  idempotence survives: two consecutive captures, byte-identical stream
+--       (0237 A2's property, re-proved under the new filter)
+--   A5  no probe residue; decide_tick md5 unchanged
+--
+--   recert floor          2026-09-09 03:15:07, UNMOVED
+--
+-- NEXT: this is the fix db/checks/0159 predicted the need for. Its three
+-- predictions (P1/P2/P3) are about what a capture-and-replay of a REAL run does,
+-- and they are judged in that file.
