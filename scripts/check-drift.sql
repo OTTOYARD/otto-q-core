@@ -343,8 +343,8 @@ repo_manifest(version, name, file) AS (
     ('20260909051812'::text, 'a_certification_hears_only_the_proposers_it_certified'::text, '0241_a_certification_hears_only_the_proposers_it_certified.sql'::text),
     ('20260909051927'::text, 'a_capture_records_only_what_the_run_cannot_regenerate'::text, '0242_a_capture_records_only_what_the_run_cannot_regenerate.sql'::text),
     ('20260909060909'::text, '0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether'::text, '0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql'::text),
-    ('PENDING'::text, '0244_the_end_state_fingerprint_cannot_see_the_assets_either'::text, '0244_the_end_state_fingerprint_cannot_see_the_assets_either.sql'::text),
-    ('PENDING'::text, '0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing'::text, '0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing.sql'::text)
+    ('20260909075534'::text, '0244_the_end_state_fingerprint_cannot_see_the_assets_either'::text, '0244_the_end_state_fingerprint_cannot_see_the_assets_either.sql'::text),
+    ('20260909075605'::text, '0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing'::text, '0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

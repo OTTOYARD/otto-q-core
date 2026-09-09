@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909075605
 -- migration-name: 0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing
 -- ===========================================================================
 -- 0245  current_depot_id IS WRITTEN IN THE TICK AND CLEARED BY NOTHING
@@ -185,3 +185,37 @@ VALUES ('0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing',
         'ottoq_world_fingerprint now hashes it. A no-op against the world as measured '
         '(all 116 flagship vehicles already equal home); a guarantee against the '
         'two-lane case. fp moves, so canons below the new floor are invalidated.');
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-09 07:56:05 UTC (2:56 AM CT) as version 20260909075605
+-- ---------------------------------------------------------------------------
+-- Applied immediately after 0244, same window, same quiet database.
+--
+--   ottoq_tick_invariance_reset_fleet  md5  8784bb1245160b035385270b2ec88187
+--                                       ->  a5fd7a504aa26b53b0ccd4cffb1bd109
+--   ottoq.ottoq_world_fingerprint      md5  f2ab1fb907ee1f63a5d25cfcf193fea9
+--                                       ->  0da0c0d1bba07c95386b58b4f1e75dc1
+--   fp on a clean flagship world                00337543b1e20fc3ced75c8b43e3a419
+--
+-- A5 passed: 0 autonomous flagship vehicles had current_depot_id <> home_depot_id,
+-- so the reset half really is the no-op the header claimed. A4 passed: pointing
+-- one vehicle at another depot inside a rolled-back subtransaction MOVED the
+-- fingerprint, which is the property the old definition did not have. A4b
+-- confirmed the probe row came back to exactly its prior value.
+--
+-- A FALSE ALARM IN MY OWN VERIFICATION, RECORDED BECAUSE IT WAS NEARLY REPORTED
+-- AS A DEFECT. The post-apply check counted 4 flagship vehicles with
+-- current_depot_id <> home_depot_id and looked like probe residue. It was not:
+-- I had dropped the category filter that A5 and both functions use.
+--
+--   category      n    mismatched   current_depot_id NULL   last write
+--   autonomous  116             0                       0   2026-09-09 07:36
+--   retail        4             4                       4   2026-08-13 02:52
+--
+-- The four are retail vehicles with a NULL current_depot_id, untouched since
+-- 2026-08-13 -- three weeks before this session. They are outside the reset
+-- (category='autonomous') and outside the fingerprint (same filter), so they
+-- cannot carry residue into a certification. The migration's own assertion was
+-- scoped correctly and my verification query was not.
+--
+-- Recert floor now 2026-09-09 07:56:05.981718. Round 33 earns the canons above it.

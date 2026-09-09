@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909075534
 -- migration-name: 0244_the_end_state_fingerprint_cannot_see_the_assets_either
 -- ===========================================================================
 -- 0244  THE END-STATE FINGERPRINT CANNOT SEE THE ASSETS EITHER
@@ -161,3 +161,29 @@ VALUES ('0244_the_end_state_fingerprint_cannot_see_the_assets_either',
         'now carries ottoq_world_fingerprint under a world key, so endst covers the assets '
         'and the service points instead of only the records about them. endst is enforced, '
         'so every canon recorded against the narrow end-state hash is invalidated.');
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-09 07:55:34 UTC (2:55 AM CT) as version 20260909075534
+-- ---------------------------------------------------------------------------
+-- Applied with 0245 in one window, immediately after round 32 completed and
+-- was judged. Pre-flight: 0 busy client backends, 0 tether residue, recert floor
+-- still at 0243's 06:09:09.360796.
+--
+--   ottoq_boot_state_fingerprint  md5  5b52e61a5ae9717f5b6791eb50415f99
+--                                  ->  db87dd6cd332287a010d5919d43c617a
+--
+-- A2 measured the thing this migration exists for:
+--
+--   ottoq.ottoq_world_fingerprint(flagship)                 00337543b1e20fc3ced75c8b43e3a419
+--   ottoq_boot_state_fingerprint(flagship, ...)->>'world'   00337543b1e20fc3ced75c8b43e3a419
+--
+-- Identical, which is the design and not a coincidence: at boot the new key is
+-- the same computation as fp on the same depot at the same moment. The value is
+-- at the END of an arm, where endst is taken and nothing else looks at the
+-- assets. A3 confirmed all six pre-existing keys survived -- a fingerprint that
+-- got NARROWER while claiming to get wider would have been the worst outcome.
+--
+-- Recert floor moved again by this migration and 0245 together, to
+-- 2026-09-09 07:56:05.981718. Round 32's canons, earned twenty minutes earlier,
+-- are below it and do not survive. That is the correct and intended cost: they
+-- were recorded against an end-state hash that could not see the fleet.
