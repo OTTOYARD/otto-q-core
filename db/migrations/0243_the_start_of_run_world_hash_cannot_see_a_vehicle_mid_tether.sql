@@ -1,7 +1,8 @@
+-- migration-version: PENDING
+-- migration-name: 0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether
 -- ===========================================================================
 -- 0243  THE START-OF-RUN WORLD HASH CANNOT SEE A VEHICLE MID-TETHER
 -- ===========================================================================
--- version:        <stamped ahead of apply>
 -- probe:          db/checks/0160   (G43)
 -- forces_recert:  TRUE
 --
