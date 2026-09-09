@@ -116,3 +116,75 @@
 --
 -- If P3 is wrong and the pair FAILS, the defect is worse than described, not
 -- better -- it would mean the doubled stream is also nondeterministic.
+
+-- ===========================================================================
+-- 6. THE EXPERIMENT, RUN 2026-09-09 00:2x CT (05:2x UTC)
+-- ===========================================================================
+-- Setup, and one thing found while doing it that matters more than the setup:
+--
+-- To generate a REAL stream the run must be non-cert, which opens
+-- ottoq_cron_tick's gate to ottoq-orchestrate-tick and therefore to NVIDIA. The
+-- plan was to shut that with a depot-scoped cuopt_propose_enabled=0. On writing
+-- it, the resolution order turned out to already answer the question:
+-- ottoq_policy_get resolves run -> depot -> GLOBAL -> default, and there has
+-- been a GLOBAL row since 0152:
+--
+--   scope_type global, param cuopt_propose_enabled, value 0, by 0152_deterministic_only
+--
+-- So line 24's `default 1` is never reached. The orchestrate dispatch has been
+-- shut globally since 0152, for every run, not just certifications.
+--
+-- THAT IS A THIRD LEG UNDER db/checks/0158's CONCLUSION, and a better one than
+-- either of the first two. 0158 argued "the endpoint has not been called since
+-- 2026-08-30" from (a) the ledger, which was blind to two doors, and (b) cron
+-- durations, which are circumstantial and get pruned. This is a standing
+-- configuration row that closes the unattended door outright. 0158's verdict is
+-- unchanged; its evidence is now much stronger than when it was written.
+--
+-- (The depot-scoped rows for the Benchmark depot were written anyway and kept.
+-- They are correct standing policy for a benchmark depot regardless of what the
+-- global tier happens to say, and they do not depend on it.)
+--
+-- ---------------------------------------------------------------------------
+-- THE REAL STREAM
+-- ---------------------------------------------------------------------------
+--   ottoq_cert_arm(seed 159001, otto_q, 8 ticks, Benchmark depot 22222222-...)
+--   -> run 70733335-639c-47f0-84ce-c24c64cdec0c
+--      8 ticks, 618 decisions, 7 external proposals
+--      sources: greedy_constrained, ottoq_service_priority
+--
+-- Not synthetic. Written by the engine's own proposers during a real tick loop.
+--
+-- ---------------------------------------------------------------------------
+-- P1 -- CONFIRMED, AND THE PREDICTION WAS PARTLY WRONG
+-- ---------------------------------------------------------------------------
+-- P1 said: "Captured with today's default (p_sources NULL), the replay will
+-- contain greedy_constrained and/or ottoq_service_priority rows, ALL AT TICK -1."
+--
+-- Measured, capturing the same run twice -- once reproducing the OLD default by
+-- naming the registered proposers explicitly, once with 0242's new default:
+--
+--   OLD default (every source)   7 rows      <- the defect
+--   NEW default (0242)           0 rows      <- the fix
+--
+-- and the old-style capture splits:
+--
+--   tick_seq   rows   source
+--   --------   ----   ----------------------
+--        -1       6   greedy_constrained
+--         2       1   ottoq_service_priority
+--
+-- The main claim holds: 6 of 7 land in the -1 bucket, exactly as predicted, and
+-- 0242's default correctly records none of them.
+--
+-- **"ALL at tick -1" was too strong.** The one ottoq_service_priority row carries
+-- a REAL tick, because that proposal came through the agent door, which 0236
+-- stamps -- while greedy_constrained is written directly by
+-- ottoq_l2_optimize_assignments, which 0236 deliberately left alone.
+--
+-- That is the two-write-paths inconsistency 0241 recorded and declined to fix,
+-- showing up as a measurement: ONE PROPOSER'S OUTPUT SPLITS ACROSS TWO TICK
+-- DOMAINS DEPENDING ON WHICH WRITE PATH IT TOOK. A replay of a mixed stream
+-- would therefore have put some rows back at their real tick and the rest at
+-- -1 -- a worse failure than the uniform one predicted, because it looks
+-- partially correct.
