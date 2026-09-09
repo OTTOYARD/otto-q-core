@@ -710,3 +710,67 @@
 -- Round 32 (six columns, 06:20-07:36 UTC) establishes the canons above the new
 -- floor. Until it completes, NO COLUMN HAS A CANON, and that is the correct
 -- state to be in, not a regression.
+
+-- ===========================================================================
+-- 11. THE FIVE "UNCONVICTED" COLUMNS, SWEPT -- ONE IS CONVICTED, THREE ARE OUT
+-- ===========================================================================
+--
+-- Section 8 listed five mutable columns invisible to both the reset and the
+-- fingerprint and declined to sweep them into 0243 without a probe. Leaving them
+-- as "plausible, unconvicted" is only honest if somebody then goes and looks, so:
+--
+--   SELECT ... FROM pg_proc WHERE pg_get_functiondef(oid) ~* ('SET[^;]*'||col||'\s*=')
+--   over schemas public, ottoq, twin.
+--
+--   column                            assigning functions
+--   -------------------------------   ---------------------------------------
+--   vehicles.current_depot_id         4  <- INCLUDING A TICK-PATH FUNCTION
+--   vehicles.owning_sim_run_id        2  (differs per arm BY DESIGN; stays out)
+--   stalls.staging_role               1  <- FALSE POSITIVE, see below
+--   stalls.reserved_for_mission_id    0
+--   vehicles.is_active                0
+--
+-- WHAT THE TEST CAN AND CANNOT SAY. It reads function bodies textually across
+-- three schemas. It cannot see trigger-driven writes, dynamic SQL, writes from
+-- edge functions or any client, or `UPDATE ... SET (a,b) = (...)` row-form
+-- assignment. So a count of 0 is EVIDENCE THAT NO FUNCTION IN THOSE SCHEMAS
+-- ASSIGNS THE COLUMN -- a lower bound on writers, not a proof of immutability.
+-- It is enough to stop treating the column as a live suspect; it is not enough
+-- to call it constant.
+--
+-- stalls.staging_role -- MY REGEX WAS WRONG, and the sweep is worth nothing if I
+-- do not say so. The one "writer" is
+-- ottoq.ottoq_stall_free_between(...), which is a RETURNS TABLE query helper.
+-- staging_role appears there twice, in the return column list and in
+-- "AND (p_staging_role IS NULL OR s.staging_role = p_staging_role)". It is a
+-- SELECT and a comparison. Nothing assigns it. The pattern 'SET[^;]*col\s*='
+-- matched across a stretch with no semicolon in it. Count it as ZERO writers.
+--
+-- vehicles.current_depot_id -- CONVICTED, and it is the tether defect one column
+-- over. From twin.ottoq_sim_start_charge_session(uuid,uuid,uuid,numeric,timestamptz):
+--
+--   UPDATE vehicles SET current_state = v_state, current_stall_id = p_stall_id,
+--          current_depot_id = v_stall.depot_id, last_state_change = v_clock
+--    WHERE id = p_vehicle_id;
+--
+-- That runs INSIDE a tick. And current_depot_id is named by neither
+-- ottoq_tick_invariance_reset_fleet nor ottoq.ottoq_world_fingerprint -- it was
+-- on section 3's list of 49. So it is written during a run, not cleared between
+-- runs, and not hashed at boot: the exact three properties that made the tether
+-- family able to fail a certification.
+--
+-- It is LESS LIKELY to bite than the tether family, and the reason is worth
+-- recording rather than hand-waving: it is assigned v_stall.depot_id, the depot
+-- of the stall being plugged into, so within a single-depot run it converges to
+-- a constant. To carry residue across arms it needs a vehicle left pointing at
+-- a DIFFERENT depot than the one being certified -- which the two-lane cadence
+-- (flagship + Benchmark) makes possible rather than hypothetical.
+--
+-- Lower likelihood is not a reason to leave it. 0245 closes it on the same two
+-- halves as 0243, and it is scheduled into the same apply window as 0244 so one
+-- recert round covers both rather than two rounds covering one each.
+--
+-- NET: of section 8's five, one is convicted (current_depot_id), three are out
+-- on evidence (is_active, reserved_for_mission_id, staging_role), and one stays
+-- deliberately excluded (owning_sim_run_id). The residue class is now named
+-- rather than estimated.
