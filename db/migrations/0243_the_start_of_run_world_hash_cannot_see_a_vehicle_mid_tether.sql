@@ -76,6 +76,32 @@
 --                            and differs between arms by design.
 --   current_soc_updated_at -- correctly excluded already, by 0137.
 --
+-- DRY RUN, 2026-09-09 05:54 UTC, BEFORE APPLYING
+--
+-- Both substitutions and every assertion were executed against the live database
+-- inside a transaction deliberately aborted by a final RAISE, so nothing was
+-- committed. This is not a claim that the migration "should" work:
+--
+--   fp, old definition, clean world     49121f67efc726d0a2759ede4a8049fb
+--   fp, NEW definition, clean world     4249329e7dc6aaba3df29ce27eeee5a5   <- A5 moves
+--   fp, NEW definition, one vehicle
+--       put mid-tether by the probe     6b411b02e65a8bd29d622f5802596217   <- A4 moves again
+--   probe residue after subtransaction  0                                  <- A4b clean
+--   reset names robotic_tether_direction   t                               <- A1
+--   fp   hashes robotic_tether_direction   t                               <- A2
+--
+-- Both anchors resolved to exactly one occurrence, both rewritten function
+-- bodies compiled, and the new fingerprint ran and returned an md5.
+--
+-- Rollback verified afterwards: reset md5 back to b6371136cd4ba924cb7953c5fd15216e,
+-- fingerprint md5 back to ae1cb9d9659029584c373bc10ce5c6fc, zero tether rows at
+-- the flagship depot, zero rows in ottoq_cert_lineage matching '0243%'.
+--
+-- (The dry-run "before" value differs from the 803698f3... that the failing pair
+-- recorded as fp. That is expected and is not a discrepancy: 803698f3 was the
+-- world at that pair's boot; 49121f67 is the world as it stands now, after C1
+-- and C2 have each run and reset it.)
+--
 -- No explicit BEGIN/COMMIT: apply_migration supplies the transaction.
 -- ===========================================================================
 
