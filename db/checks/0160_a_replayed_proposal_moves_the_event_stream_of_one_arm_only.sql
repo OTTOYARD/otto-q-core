@@ -248,3 +248,76 @@
 -- the first place. This finding is that sweep's escapee, and the lesson is that
 -- a residue sweep driven by reading code misses what a sweep driven by the
 -- catalog does not.
+
+-- ===========================================================================
+-- 4. C1 JUDGED, AND THE BOOT FINGERPRINT IS BLIND TO THE FLEET
+-- ===========================================================================
+--
+-- C1 (same column, ottoq_determinism_pair_replay, p_replay_id NULL), fired
+-- 05:40:00 UTC, ran alone (pg_stat_activity confirmed; cron.job_run_details
+-- reported "succeeded / SET" after 1 s, which is the known two-statement-job
+-- artefact and NOT a completion):
+--
+--   status  passed
+--   arm A   h_evt 9c631343c32cca7a861b17bc5bc8f4b7
+--   arm B   h_evt 9c631343c32cca7a861b17bc5bc8f4b7   <- both on the canon
+--
+-- The C1 prediction is CONFIRMED as written. It also confirms nothing about
+-- replay, exactly as section 2 said in advance: the world was already clean, so
+-- a pass was the expected outcome under BOTH hypotheses. C1's real value is
+-- narrower and still worth having -- it rules out the possibility that 0239
+-- shipped a pair function that is broken on every run, which was the other thing
+-- worth being afraid of. The replay-vs-residue question is C3's.
+--
+-- ---------------------------------------------------------------------------
+-- AND NOW THE PART THAT MAKES THIS A HARNESS FINDING RATHER THAN A BUG REPORT
+-- ---------------------------------------------------------------------------
+--
+-- The pair already computes a boot fingerprint per arm, at line 68, and stores
+-- it in the verdict as arm_a.boot / arm_b.boot. On the pair that FAILED:
+--
+--   SELECT arm_a->'boot' = arm_b->'boot' ...
+--
+--   3a224796 (the failed replay pair)   boot_equal = TRUE
+--   54b1c04a (the passing control)      boot_equal = TRUE
+--
+-- The two arms of the failed pair booted from provably different fleet states --
+-- seven vehicles carried live tether state in arm A and none in arm B -- and the
+-- boot fingerprint reported them IDENTICAL.
+--
+-- Reading ottoq_boot_state_fingerprint(uuid,uuid) explains why. It hashes six
+-- things: visit_needs, stall_bookings, itinerary_legs, vehicle_dispatches,
+-- ocpp_chargers, calibration. public.vehicles and public.stalls appear in its
+-- body ONLY inside EXISTS(...) subqueries used to scope the other tables to the
+-- depot. Neither table is ever hashed.
+--
+--   THE BOOT STATE FINGERPRINT DOES NOT INCLUDE THE ASSETS OR THE SERVICE
+--   POINTS. It hashes everything ABOUT them -- their bookings, their needs,
+--   their legs, their dispatches, their chargers -- and not them.
+--
+-- Two consequences, and the second is worse than the first:
+--
+--   (a) 'boot' is not in the pair's equality list at all. The list is fp, h_cmd,
+--       h_dec, h_evt, h_bkg, h_nrg, h_prop, h_defr, h_cal, h_rule, h_rcl, h_sdr,
+--       ticks, endst -- fourteen atoms, and 'boot' is not one of them. The pair
+--       records both arms' boot state and never compares them.
+--
+--   (b) Even if it did compare them, it would not have caught this, because the
+--       fingerprint is blind to the columns that differed. Promoting 'boot' to
+--       the equality list as it stands would be G25's defect again -- enforcing
+--       a comparison narrower than the property being claimed.
+--
+-- So the fix is NOT "add boot to the equality list". It is: widen first, so
+-- there is something worth comparing, and only then enforce.
+--
+-- WHY NOT SIMPLY WIDEN ottoq_boot_state_fingerprint ITSELF: because the same
+-- function computes 'endst', which IS enforced. Widening it moves endst for
+-- every column, forces a full recert, and invalidates all six canons in one
+-- migration -- to fix a defect whose blast radius is not yet measured. That is
+-- the wrong order.
+--
+-- THE SHAPE OF THE FIX, then, is a separate boot-time fleet fingerprint added as
+-- a MEASURED atom, disturbing no existing canon (forces_recert FALSE), promoted
+-- to ENFORCED only after a flagship round shows the arms agree on it -- which is
+-- precisely the doctrine CLAUDE.md 2.9a lays down and precisely what 0139, 0206,
+-- 0217 and 0225 each did. It is drafted only after C3 reports.
