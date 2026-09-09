@@ -1,0 +1,146 @@
+-- db/checks/0158 — G40
+-- TWO LIVE EDGE FUNCTIONS CALL NVIDIA AND THE cuOpt LEDGER CANNOT SEE THEM
+--
+-- Measured 2026-09-08 22:4x CT (2026-09-09 03:4x UTC) against the LIVE deployed
+-- edge functions (Management API), not the repo copies.
+--
+-- CLAUDE.md Part 1 rule 6: "cuOpt is live; cuopt_invocation_log exists precisely
+-- to make 'never invoked' distinguishable from 'invoked N times, abstained M.'
+-- Any cuOpt statement -- docs, decks, comments -- is quantified from that
+-- ledger." SOLVER_STATE.md 9.2 does exactly that and publishes:
+--
+--     "The NVIDIA endpoint has not been called since 2026-08-30."
+--
+-- This check asks whether the ledger can support that sentence. Two findings,
+-- and they point in opposite directions, so both are stated.
+--
+-- ===========================================================================
+-- FINDING 1 -- THE LEDGER IS NOT COMPLETE. PROVEN BY READING THE LIVE CODE.
+-- ===========================================================================
+-- Three ACTIVE edge functions hold the NVIDIA cuOpt URL. Only one writes the
+-- ledger:
+--
+--   ottoq-cuopt-propose      v25  WRITES cuopt_invocation_log   <- the ledgered
+--                                                                  path, and the
+--                                                                  only one 9.2
+--                                                                  can see
+--   ottoq-orchestrate-tick   v8   NO LEDGER WRITE               <- reachable
+--                                                                  UNATTENDED
+--   ottoq-assign-optimize    v4   NO LEDGER WRITE               <- manual only
+--
+-- Both unledgered functions contain, verbatim:
+--
+--   const CUOPT = "https://optimize.api.nvidia.com/v1/nvidia/cuopt";
+--   ...
+--   const res = await fetch(CUOPT, { method: "POST", headers: { ...
+--     Authorization: "Bearer " + apiKey ... } });
+--
+-- and neither mentions cuopt_invocation_log anywhere. ottoq-orchestrate-tick
+-- records its outcome only as `charge_source: "cuopt" | "fallback" | "none"` in
+-- the JSON it returns to its caller -- which is never persisted.
+--
+-- THE REPOSITORY ALREADY KNEW. public.ottoq_cron_tick line 23 carries this
+-- comment, from migration 0113:
+--
+--     -- 0113: this edge function calls cuOpt DIRECTLY; a deterministic-only
+--     -- session gates it off.
+--
+-- 0113 gated the path for certification sessions. Nobody made it write a row.
+-- So the gap is not a discovery about the code -- it is a discovery about the
+-- LEDGER: a claim quantified from cuopt_invocation_log is quantified from an
+-- instrument that is blind to two of the three doors.
+--
+-- ---------------------------------------------------------------------------
+-- HOW THE UNATTENDED ONE IS REACHED
+-- ---------------------------------------------------------------------------
+--   cron 'ottoq-depot-tick'  */2 * * * *
+--     -> public.ottoq_cron_tick()
+--        line  5  RETURN unless a run exists with status='running'
+--                 AND run_by <> 'cert_harness'          (0106)
+--        line 24  IF ottoq_policy_get(<that run>, 'cuopt_propose_enabled', 1) > 0
+--        line 28  net.http_post .../ottoq-orchestrate-tick
+--                 body {submit:true, shadow:false}
+--        -> the edge function fetches NVIDIA directly
+--
+-- Note the DEFAULT on line 24: `ottoq_policy_get(..., 'cuopt_propose_enabled', 1)`.
+-- Unset means ENABLED. A run has to opt OUT.
+--
+-- ===========================================================================
+-- FINDING 2 -- AND YET THE SENTENCE SURVIVES. THE GATE HAS BARELY OPENED.
+-- ===========================================================================
+-- Measured over the last 10 days from cron.job_run_details:
+--
+--   ottoq-depot-tick fires                                 5,996
+--   ...that returned in under 200 ms (the line-5 early return)   5,986   99.83%
+--   ...between 200 ms and 1 s                                        3
+--   ...over 1 s, i.e. that did real work                             7
+--   slowest                                                    700.93 s
+--   last fire that did real work            2026-09-08 10:52:00 UTC
+--
+-- All seven of the over-1-s fires are 2026-08-30 04:34 -> 04:46 UTC, and that
+-- window is exactly the one production_live run of that day
+-- (04:32:03 -> 04:46:52) -- which carries
+--
+--   ottoq_policy_params: scope run, cuopt_propose_enabled = 0
+--
+-- explicitly set. So line 24's gate was CLOSED for every fire that got past
+-- line 5. The 1-2 s each of those took is ottoq_world_advance() plus the
+-- ottoq-wave-admit POST, not an orchestrate dispatch.
+--
+-- Corroborating, independently: the unified log stream holds NO
+-- function_edge_logs source at all between 2026-09-08 22:30 and 2026-09-09
+-- 03:40 UTC -- five hours in which 148 depot-ticks fired, every one of them
+-- 'succeeded' with a mean duration of 0.015 s. Fifteen milliseconds is a
+-- line-5 return; ottoq_world_advance() alone cannot run in it.
+--
+-- VERDICT ON THE PUBLISHED SENTENCE: it stands, but its derivation did not.
+-- "The NVIDIA endpoint has not been called since 2026-08-30" was resting on
+-- cuopt_invocation_log alone, and that ledger cannot see two of the three
+-- doors. It now rests on two legs -- the ledger, AND the measured fact that the
+-- unledgered unattended door has opened at most ten times in ten days and was
+-- policy-gated shut on all seven occasions it could have mattered. The second
+-- leg is real evidence but it is CIRCUMSTANTIAL, reconstructed from cron
+-- durations, and it will rot: cron.job_run_details is pruned, and the next
+-- production run that omits cuopt_propose_enabled=0 opens the door silently.
+--
+-- ===========================================================================
+-- FINDING 3 -- THE ONE NOBODY WAS LOOKING FOR: THE PRODUCTION BRAIN IS IDLE
+-- ===========================================================================
+-- 5,986 of 5,996 ticks were 15 ms no-ops because line 5 found nothing to do.
+-- Runs started in the last 10 days, by actor:
+--
+--   cert_harness      824
+--   benchmark           8
+--   production_live     2      <- both on 2026-08-30, both completed
+--
+-- There has been no running production_live run for TEN DAYS. Every 15-second
+-- heartbeat of this system is the proof harness certifying itself. That is not
+-- a defect in the engine, but it is a fact that belongs beside every sentence
+-- about "the live production brain," and it is G26 (production and the proof
+-- harness share one database) seen from the other end: they do not merely share
+-- a database, the harness is the only tenant.
+--
+-- One loose end recorded rather than explained: the 2026-09-08 10:52:00 UTC
+-- fire ran 700.93 s and ended status='failed'. A twelve-minute ottoq_cron_tick
+-- that raised. Not diagnosed here.
+--
+-- ===========================================================================
+-- THE FIX
+-- ===========================================================================
+-- Two halves, because the blind spot has two halves:
+--
+--   (a) THE DISPATCH, database side (migration 0240): ottoq_cron_tick writes a
+--       cuopt_invocation_log row with stage='orchestrate_dispatch' every time it
+--       POSTs to ottoq-orchestrate-tick. This can never observe what NVIDIA
+--       said -- pg_net is fire-and-forget and net._http_response is pruned
+--       (2 rows survive today, both from 2026-09-06) -- but it makes the door
+--       OPENING a ledger fact, which is precisely what a claim of the form
+--       "has not been called since X" needs.
+--
+--   (b) THE CALL, edge side: ottoq-orchestrate-tick and ottoq-assign-optimize
+--       each write their own row around the fetch -- stage='edge',
+--       http_status, latency_ms, proposals_out, abstained_reason -- the same
+--       shape ottoq-cuopt-propose already writes. Wrapped so a ledger failure
+--       can never fail the function.
+--
+-- With both, the next derivation needs one leg again, and it is the ledger.
