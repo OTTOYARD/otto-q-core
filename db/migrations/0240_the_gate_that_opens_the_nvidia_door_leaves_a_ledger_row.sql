@@ -270,12 +270,20 @@ BEGIN
   -- A3  THE CLOSED-GATE ROW, EXECUTED. Its abstained_reason is what makes
   --     "a run chose not to" distinguishable from "no run existed".
   ---------------------------------------------------------------------------
+  -- FIRST ATTEMPT FAILED HERE (2026-09-09 05:15 UTC) and rolled back atomically.
+  -- The lift is bounded by '  END IF;', and the closed block's OWN '  END;' sits
+  -- just inside that bound -- so v_closed already terminates itself. Appending
+  -- another ' END;' produced "END; END;" and a 42601 syntax error. The open block
+  -- above is bounded by '  ELSIF ...' instead, which lands BEFORE its END, which is
+  -- why that one needs no terminator and passed. Two lifts, two different bounds,
+  -- one of them self-terminating: recorded rather than quietly corrected, because
+  -- the asymmetry is the trap.
   v_closed := split_part(v_def,
     E'  BEGIN\n    INSERT INTO public.cuopt_invocation_log\n      (sim_run_id, stage, tick_seq, called_at, abstained_reason, source_note, detail)', 2);
   v_closed := split_part(v_closed, E'  END IF;', 1);
   IF v_closed = '' THEN RAISE EXCEPTION 'A3 FAILED: could not lift the closed-gate ledger block'; END IF;
   v_closed := 'BEGIN INSERT INTO public.cuopt_invocation_log (sim_run_id, stage, tick_seq, called_at, abstained_reason, source_note, detail)'
-           || v_closed || ' END;';
+           || v_closed;
 
   EXECUTE 'DO $probe$ DECLARE v_prun uuid := ' || quote_literal(v_run) || '::uuid; v_req bigint := -240; '
        || v_closed || ' $probe$;';
