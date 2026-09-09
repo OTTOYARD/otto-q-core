@@ -919,3 +919,51 @@ search (see `CLAUDE.md` Part 1 rule 3, amended the same day):
 - https://github.com/google/or-tools/issues/3842 — optimal at 1 worker, infeasible at 8
 - https://d-krupke.github.io/cpsat-primer/05_parameters.html — `interleave_batch_size` and batch determinism
 - https://github.com/google/or-tools/issues/2604 — `max_time_in_seconds` behaviour
+
+---
+
+## 11. Posture B, stress-tested 2026-09-09 — the replay path is exonerated by evidence, not by assumption
+
+§8.3b closed the Posture A/B sequence. Overnight the replay rig was pushed at
+flagship scale for the first time, and the first thing it did was **fail** —
+which is worth recording, because the failure was not the replay's.
+
+The pair `busy_day / 314159 / 12t` with a recorded agent stream injected came
+back `failed` with exactly one of the fourteen atoms moved, `h_evt`, and it
+moved on **one arm only**. The investigation is `db/checks/0160` and the finding
+is opened as **G43**; the short version is that the two arms did not boot from
+the same world, and the enforced atom whose job is to detect exactly that — `fp`,
+the start-of-run world fingerprint — reported them identical, because it does not
+hash the four `robotic_tether_*` columns and neither does the per-arm fleet reset.
+
+**What matters for this document is what the controls established about the
+replay itself**, and they are unambiguous:
+
+| control | what it ran | result |
+|---|---|---|
+| C1 | the replay function with `p_replay_id NULL` | passed, both arms on the canon |
+| C2 | the identical replay pair, run again | **passed**, both arms on the canon |
+
+C2 is the one that settles it. It replayed the same recorded stream into the same
+column and produced `h_prop = 0299e5e6b7112f6978a1177ba12230fe` — byte-identical
+to the `h_prop` of the pair that failed, identical across its own two arms, with
+the same `replay_injected = 5`. Four arms, two transactions, half an hour apart,
+one proposal ledger.
+
+**The injection is reproducible.** Whatever moved `h_evt`, it was not the replay
+being nondeterministic, because it is not. `db/checks/0157`'s Posture B proof
+stands, and `0239` is not implicated.
+
+Two smaller things the same investigation settled, both worth having:
+
+- **The double-count is real and is invisible to a pair.** `0159`'s P2 was
+  confirmed exactly — a no-replay arm holds 5 proposals, each replay arm holds 9:
+  the same 5 the run regenerates for itself, plus 4 injected copies. Both arms
+  double-count *identically*, so `h_prop` agrees and the certification cannot see
+  it. That is why `0242` had to fix the capture rather than the comparison, and
+  it is a standing caution: **a determinism pair is the wrong instrument for a
+  defect that is symmetric across arms.**
+- **`0159`'s P3 was falsified.** It predicted the pair would pass. It failed —
+  for an unrelated reason. The prediction was wrong; the mechanism it asserted
+  (symmetry hides the double-count) was right, and is now measured.
+
