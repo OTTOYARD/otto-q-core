@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0239 — GENERATED, not a log
+## Index, 0134–0240 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -226,7 +226,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0237](db/migrations/0237_record_and_replay_an_agent_proposal_stream.sql) | `20260909022308` | yes — ledger | AGENT LAYER, step 2 -- Posture B from SOLVER_STATE.md §8.2, which §8.3 calls |
 | [0238](db/migrations/0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql) | `20260909031408` | yes — ledger | G41 / db/checks/0156 |
 | [0239](db/migrations/0239_a_certification_that_replays_a_recorded_agent_stream.sql) | `20260909032226` | yes — ledger | AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door |
+| [0240](db/migrations/0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql) | `PENDING` | no — pending | G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge |
 
-107 migrations indexed.
+108 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
