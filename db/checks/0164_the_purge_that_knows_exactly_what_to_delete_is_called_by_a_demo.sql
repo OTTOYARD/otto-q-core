@@ -1,0 +1,139 @@
+-- 0164 — G23, questions 1–4 answered. The calendar is not unprotected; the
+--        machinery that would protect it is never invoked.
+--
+-- 0163 measured the problem and refused to prescribe, listing four things that
+-- had to be established before a single row was deleted. All four are answered
+-- here, from the catalog, and the answer to the first one changes the fix.
+--
+-- Read 2026-09-09 13:05–13:12 UTC (8:05–8:12 AM CT), between round 35's fifth
+-- and sixth pairs. Catalog and pg_stat only. Nothing scanned the calendar.
+--
+-- ---------------------------------------------------------------------------
+-- Q1. WHAT IS THE CALENDAR FOR, AFTER ITS RUN ENDS?  — ANSWERED: nothing.
+-- ---------------------------------------------------------------------------
+--
+--   SELECT class, note FROM ottoq_run_scope_registry
+--    WHERE table_name = 'ottoq_stall_bookings';
+--   -->  class = 'engine'
+--        note  = 'run-scoped working data; must not outlive its run'
+--
+-- The registry has classified this table since 0022. `engine` is the ONE class
+-- that any code acts on: ottoq_purge_prior_runs loops `WHERE class='engine'`
+-- and issues `DELETE FROM <t> WHERE <c> = ANY(v_doomed)` per table. The
+-- calendar is IN that loop. It is not an oversight in the registry, and 0163's
+-- instinct — "the purge decision belongs there, not in a hand-maintained
+-- array" — was right for a reason 0163 did not yet know.
+--
+-- SO THE ONE-LINE FIX 0163 WARNED AGAINST IS ALSO THE WRONG FIX. Adding
+-- 'ottoq_stall_bookings' to the nightly worker's ARRAY would build a SECOND
+-- deleter for a table a FIRST deleter already covers correctly, by run rather
+-- than by wall clock. Two mechanisms deleting the same table on two different
+-- keys is how you get a purge that races a run.
+--
+-- ---------------------------------------------------------------------------
+-- THE ACTUAL FINDING: ottoq_purge_prior_runs HAS ONE CALLER, AND IT IS A DEMO.
+-- ---------------------------------------------------------------------------
+--
+--   SELECT n.nspname||'.'||p.proname FROM pg_proc p JOIN pg_namespace n
+--     ON n.oid=p.pronamespace
+--    WHERE p.prokind='f' AND p.prosrc ILIKE '%ottoq_purge_prior_runs%'
+--      AND p.proname <> 'ottoq_purge_prior_runs';
+--   -->  public.ottoq_start_demo_run          (exactly one row)
+--
+--   SELECT jobid, jobname FROM cron.job
+--    WHERE command ILIKE '%purge%' OR command ILIKE '%retention%';
+--   -->  11 | ottoq-retention-nightly  (the wall-clock worker, three tables)
+--        — and NOTHING else. The run purge is on no schedule at all.
+--
+-- The database has a purge that knows precisely which 47 engine tables belong
+-- to a dead run and deletes them by run id, and the only thing that ever calls
+-- it is starting a demo. Every certification round since — 35 rounds, 787+ sim
+-- runs — has left its full engine footprint behind unless a demo happened to
+-- run afterwards. That is the whole of G23, and it is not a missing feature.
+-- It is a scheduled job that was never scheduled.
+--
+-- ---------------------------------------------------------------------------
+-- Q2. DOES h_bkg DEPEND ON HISTORY?  — ANSWERED: no. Asserted, not assumed.
+-- ---------------------------------------------------------------------------
+--
+-- From the live body of ottoq_determinism_pair:
+--
+--   'h_bkg', (SELECT md5(COALESCE(string_agg( ...
+--               FROM ottoq_stall_bookings k WHERE k.sim_run_id = v_run),
+--
+-- The atom reads the arm's OWN run and nothing else. Purging another run's
+-- rows cannot move h_bkg. The same predicate shape holds for h_dec, h_evt,
+-- h_rule, h_rcl and h_sdr, whose hash functions each take v_run.
+--
+-- ---------------------------------------------------------------------------
+-- Q3. WHAT DOES ottoq_run_archives NEED?  — ANSWERED: counts, not rows.
+-- ---------------------------------------------------------------------------
+--
+-- ottoq_archive_run reads ottoq_sim_runs, then counts:
+--     commands_issued   <- ottoq_vehicle_commands WHERE sim_run_id = p_sim_run_id
+--     commands_refused  <- same, status='refused'
+--     dispatches        <- ottoq_vehicle_dispatches WHERE sim_run_id = ...
+-- and INSERTs a summary row into public.ottoq_run_archives.
+--
+-- It does not reference ottoq_stall_bookings anywhere. The reproducibility key
+-- is (scenario, seed, policy, depot) — an archived run is replayed by re-deriving
+-- it, not by reading its old rows back. Bookings are not archive inputs.
+--
+-- CAVEAT WORTH STATING: the counts are computed AT ARCHIVE TIME. A purge that
+-- ran before ottoq_archive_run would zero them. Ordering therefore matters, and
+-- any scheduled purge must exclude runs that are not archived yet.
+--
+-- ---------------------------------------------------------------------------
+-- Q4. THE EXCLUDE INDEX — ANSWERED, and it found a second thing.
+-- ---------------------------------------------------------------------------
+--
+-- 1,028 MB of table carries 561 MB of index across ten indexes. The three
+-- largest are all GiST on the SAME key (sim_run_id =, stall_id =, during &&),
+-- and all three are EXCLUDE CONSTRAINTS, not bare indexes:
+--
+--   no_overlap     32 MB  WHERE state IN ('held','active')
+--   no_overlap_v2 170 MB  WHERE state IN ('held','active','done')
+--                          AND booked_at >= '2026-08-02 03:19:00+00'
+--   no_overlap_v3 183 MB  WHERE state IN ('held','active','done','interrupted')
+--                          AND booked_at >= '2026-08-02 03:19:00+00'
+--
+-- v3's state list is a strict SUPERSET of v2's and the booked_at predicate is
+-- byte-identical, so every pair of rows v2 would reject, v3 rejects too. v2 is
+-- redundant given v3 — it cannot refuse an insert v3 lets through. The scan
+-- counters show them moving in lockstep, which is what two constraints doing
+-- the same job on every insert look like:
+--
+--   no_overlap_v3   idx_scan 2,267,598
+--   no_overlap_v2   idx_scan 2,261,936     (0.25% apart)
+--
+-- 170 MB of index, and its share of every insert's constraint check, buys no
+-- exclusion that v3 does not already provide.
+--
+-- NOT ACTED ON HERE, DELIBERATELY. Dropping an EXCLUDE constraint is a schema
+-- change, it would be the fourth forces_recert migration in a night that has
+-- already spent two recerts on my own 0244 error, and the streak is at one.
+-- Recorded as a finding, sequenced after the streak reaches 2. Note also what
+-- it would and would not do: it cannot change any verdict (it never rejects
+-- what v3 admits), so it is a cost change, not a correctness change.
+--
+-- And 0163's question stands unanswered in one respect: deleting rows does not
+-- shrink a GiST index. A purge must be followed by REINDEX (or the space is
+-- reused only by future inserts) before the read cost 0163 measured comes back.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE FIX IS, THEN
+-- ---------------------------------------------------------------------------
+--
+--   NOT: add the calendar to the nightly wall-clock array.
+--   BUT: schedule ottoq_purge_prior_runs — the deleter that already exists,
+--        already reads the registry, already knows the 47 engine tables, and
+--        already deletes by run id rather than by age — with a keep window
+--        that protects (a) any run still running, (b) any run not yet
+--        archived, and (c) the runs a canon still cites.
+--
+-- (c) is the one that needs care and is not yet established: which sim_run_ids
+-- does the cert matrix / canon machinery still read? That is the last question,
+-- and it is question 1 of the migration, not of this check.
+--
+-- G23 stays OPEN. It is now open on a named next step rather than on four
+-- unknowns.
