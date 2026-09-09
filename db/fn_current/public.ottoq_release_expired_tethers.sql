@@ -1,6 +1,6 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- VERIFIED AGAINST THE LIVE CATALOG 2026-09-09: body md5 == live md5 (e94a3f04180f68e02a456a0448fbbc1a)
 -- md5 at capture: e94a3f04180f68e02a456a0448fbbc1a
--- VERIFIED AGAINST THE LIVE CATALOG 2026-09-08: body md5 == live md5 (e94a3f04180f68e02a456a0448fbbc1a).
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg
 CREATE OR REPLACE FUNCTION public.ottoq_release_expired_tethers(p_now timestamp with time zone DEFAULT NULL::timestamp with time zone)
  RETURNS integer
  LANGUAGE plpgsql
@@ -59,4 +59,3 @@ EXCEPTION WHEN OTHERS THEN
   RETURN 0;
 END;
 $function$
-

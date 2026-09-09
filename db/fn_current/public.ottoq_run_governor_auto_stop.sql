@@ -1,6 +1,6 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- VERIFIED AGAINST THE LIVE CATALOG 2026-09-09: body md5 == live md5 (3725c0c2ceb218ee9d124719c19238b5)
 -- md5 at capture: 3725c0c2ceb218ee9d124719c19238b5
--- VERIFIED AGAINST THE LIVE CATALOG 2026-09-08: body md5 == live md5 (3725c0c2ceb218ee9d124719c19238b5).
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg
 CREATE OR REPLACE FUNCTION public.ottoq_run_governor_auto_stop()
  RETURNS integer
  LANGUAGE plpgsql
@@ -124,4 +124,3 @@ BEGIN
   RETURN v_stopped;
 END;
 $function$
-

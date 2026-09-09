@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run3/C7)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: 11af2d80d71ec33e690f789dda765042
+--   live      md5: 264d4600e731d996154e176ca8bf8967
 -- md5 at capture: 11af2d80d71ec33e690f789dda765042
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live 264d4600e731d996154e176ca8bf8967
---   here 11af2d80d71ec33e690f789dda765042
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('twin.ottoq_sim_emit_arrival_webhook'::regproc);
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_emit_arrival_webhook(p_vehicle_id uuid, p_sim_run_id uuid, p_sim_clock_now timestamp with time zone, p_dispatch_id uuid, p_arrival_soc numeric)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -221,4 +220,3 @@ BEGIN
   RETURN v_webhook_id;
 END;
 $function$
-
