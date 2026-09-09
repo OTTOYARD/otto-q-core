@@ -635,6 +635,52 @@ Re-derived here against the live ledger on 2026-09-08. **Every earlier figure in
 and in CLAUDE.md is superseded, including the ones that were correct when written.** They are
 left in place as the point-in-time records they are.
 
+> ### ⚠ AMENDMENT, 2026-09-08 22:4x CT (2026-09-09 03:4x UTC) — THE LEDGER THIS SECTION IS DERIVED FROM WAS INCOMPLETE
+>
+> Everything below is a correct reading of `cuopt_invocation_log`. What was not
+> checked, until tonight, is whether that ledger sees every call.
+>
+> **It did not.** `db/checks/0158` (G40): three ACTIVE edge functions hold the NVIDIA
+> cuOpt URL and only one of them wrote the ledger.
+>
+> | function | writes `cuopt_invocation_log` | reachable |
+> |---|---|---|
+> | `ottoq-cuopt-propose` | yes — the path §9 measures | from the decide path |
+> | `ottoq-orchestrate-tick` | **no** | **unattended, from `ottoq_cron_tick` every 2 min** |
+> | `ottoq-assign-optimize` | **no** | manual |
+>
+> `ottoq_cron_tick`'s own line 23 has said so since migration 0113 — *"this edge
+> function calls cuOpt DIRECTLY; a deterministic-only session gates it off"*. 0113
+> gated the path for certifications and nobody made it write a row.
+>
+> **§9.2's headline sentence still stands, but it was standing on one leg.** The
+> second leg, measured tonight: over ten days `ottoq-depot-tick` fired 5,996 times
+> and **5,986 (99.83%) returned in under 200 ms** — the line-5 early return, no work
+> at all. Only 7 fires did real work, all inside the single `production_live` window
+> of 2026-08-30, which carried `cuopt_propose_enabled = 0` explicitly, so the
+> orchestrate dispatch was gated shut on every one. Independently: no
+> `function_edge_logs` at all in a five-hour window during which 148 depot-ticks
+> averaged 0.015 s.
+>
+> That second leg is real evidence but it is **circumstantial and perishable** —
+> reconstructed from `cron.job_run_details`, which is pruned, and one
+> `ottoq_policy_params` row. **Both doors now write the ledger** (edge versions
+> `orchestrate-tick:v9` and `assign-optimize:v5`, deployed and verified 03:42 UTC —
+> a row appears even on the abstaining early-return path), and migration 0240 makes
+> the database-side *dispatch* a row too, because `net.http_post` is fire-and-forget
+> and a request that dies before the function runs is otherwise indistinguishable
+> from a gate that never opened.
+>
+> **Nothing in §9 needs its arithmetic redone. What needed redoing was the claim
+> that the arithmetic was complete.** From 0240 onward the next derivation needs one
+> leg again, and it is the ledger.
+>
+> One more fact from the same measurement, which belongs beside every sentence in
+> this document about "the live production brain": in the last ten days this
+> database has started **824 `cert_harness` runs, 8 `benchmark` runs, and 2
+> `production_live` runs** — both of the latter on 2026-08-30. The production loop
+> has not run in ten days. The proof harness is the only tenant.
+
 ### 9.1 The number everyone has been quoting is a log-row count
 
 `cuopt_invocation_log` holds **15,250 rows**, spanning 2026-08-02 → 2026-09-08. CLAUDE.md's
