@@ -341,7 +341,7 @@ repo_manifest(version, name, file) AS (
     ('20260909032226'::text, 'a_certification_that_replays_a_recorded_agent_stream'::text, '0239_a_certification_that_replays_a_recorded_agent_stream.sql'::text),
     ('20260909051529'::text, 'the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row'::text, '0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql'::text),
     ('20260909051812'::text, 'a_certification_hears_only_the_proposers_it_certified'::text, '0241_a_certification_hears_only_the_proposers_it_certified.sql'::text),
-    ('PENDING'::text, 'a_capture_records_only_what_the_run_cannot_regenerate'::text, '0242_a_capture_records_only_what_the_run_cannot_regenerate.sql'::text)
+    ('20260909051927'::text, 'a_capture_records_only_what_the_run_cannot_regenerate'::text, '0242_a_capture_records_only_what_the_run_cannot_regenerate.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

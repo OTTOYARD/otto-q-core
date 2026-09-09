@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909051927
 -- migration-name:    a_capture_records_only_what_the_run_cannot_regenerate
 --
 -- G42 / db/checks/0159. APPLY AFTER 0241 -- it consults the registry 0241
