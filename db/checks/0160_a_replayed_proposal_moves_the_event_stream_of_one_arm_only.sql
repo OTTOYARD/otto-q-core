@@ -519,3 +519,54 @@
 -- intact, and 0239 is not implicated.
 --
 -- What remains is C3.
+
+-- ===========================================================================
+-- 8. WHAT 0243 WILL NOT CLOSE -- STATED BEFORE IT IS APPLIED, NOT AFTER
+-- ===========================================================================
+--
+-- First, the fix's core assumption, verified from the pair's own line order
+-- rather than assumed:
+--
+--   line 35   PERFORM public.ottoq_tick_invariance_reset_fleet(p_depot, ...)
+--   line 36   v_run := twin.ottoq_sim_start_run(...)   <- this stamps world_fingerprint
+--   line 47   v_boot := public.ottoq_boot_state_fingerprint(p_depot, v_run)
+--
+-- fp is computed immediately AFTER the reset. So clearing the tether family in
+-- the reset genuinely makes both arms' fp equal, and -- the other half of the
+-- same fact -- fp WOULD have caught this pair had it hashed those columns,
+-- because the reset ran, left the residue, and fp was taken with the residue
+-- present in arm A and absent in arm B. The two halves of 0243 meet exactly.
+--
+-- THREE THINGS REMAIN OPEN AFTER IT, AND NONE OF THEM IS CLOSED BY PRETENDING
+-- OTHERWISE:
+--
+-- (1) endst IS STILL BLIND TO THE FLEET. 'endst' is another call to
+--     ottoq_boot_state_fingerprint, which hashes visit_needs, bookings, legs,
+--     dispatches, chargers and calibration -- and, as section 4 established,
+--     never public.vehicles or public.stalls. So two arms ending in different
+--     ASSET states are not caught by endst. In practice a divergence that big
+--     also moves h_evt, h_dec or h_bkg, which is why this has not bitten; but
+--     "caught by a different atom, usually" is not the same as "covered", and
+--     it should be written down as the former.
+--
+-- (2) FIVE MUTABLE COLUMNS ARE STILL INVISIBLE TO BOTH FUNCTIONS --
+--     vehicles.current_depot_id, vehicles.is_active,
+--     stalls.reserved_for_mission_id, stalls.staging_role, and
+--     vehicles.owning_sim_run_id (which must stay invisible: it differs between
+--     arms by design). 0243 adds only the four columns a probe convicted,
+--     because the fingerprint's own contract requires a probe per column. The
+--     other four are unconvicted, not cleared.
+--
+-- (3) THE REAL ROOT IS STILL G26. The residue existed because something outside
+--     the certification wrote to the depot the certification runs on -- at
+--     05:22:18.994724, 102 seconds before the pair, from a client session, on
+--     the same tables. 0243 makes that condition VISIBLE and makes the common
+--     case SURVIVABLE. It does not make the certification's world private.
+--     While production, the demo metronome, the depot tick and any interactive
+--     session share one database with the proof harness, the harness's inputs
+--     are writable by things that are not the harness, and the correct fix for
+--     that is the separate project already open as G26 -- not another column in
+--     a hash.
+--
+-- The order is still right: make it visible now, because an invisible failure
+-- cannot be measured, and G26 is a database, not an afternoon.
