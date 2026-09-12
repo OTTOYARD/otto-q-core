@@ -32,8 +32,13 @@ CP-SAT, from a machine with a DSN (`bridge/README.md`):
 ```bash
 python3 -m bridge.proposer_bridge --dsn "$DATABASE_URL" --run <run> \
   --depot 11111111-1111-1111-1111-111111111111 --site bridge/sites/nashville-flagship.json \
-  --via batch --max-assets 8 --loop --interval-s 30
+  --via batch --max-assets 8 --loop --interval-s 30 --start-within 30 --default-ready-delta 240
 ```
+
+`--start-within` is the tick window: rows the plan starts later than that are submitted as
+`bridge:not_due` abstains and re-offered when due, so a stall planned twice over time is never
+offered twice in one tick (a refusal that would be the bridge's, not the shield's). Every refusal
+counted in §3 must therefore carry a rule code, not a stall-already-taken from a stale plan.
 
 Or, without a DSN (this is how the first proof is run from the build session): per cycle,
 `SELECT ottoq_build_decision_frame(depot, run)` → `frame.json`; the committed

@@ -56,6 +56,15 @@ python3 -m bridge.proposer_bridge --dsn "$DATABASE_URL" \
 Each fire is its own transaction, so the door's tick stamp (0236) names the tick the batch
 landed in. The loop stops when the run is no longer `running`.
 
+**The plan is a schedule; the door takes this tick's assignments.** The solver returns a plan
+over time (`planned_start_min` per row) whose peak-minimising pass staggers starts and, on the
+first dry run against real depot data (2026-09-12 20:58 UTC), put two vehicles on one L2 stall
+174 min apart. Flattened into one tick that is a manufactured shield refusal, so the bridge
+turns every row planned beyond `--start-within` (default 30 min) into an abstain row that names
+its planned start and stall (`abstained_by: bridge:not_due`) and re-offers it when due. The fire
+record counts them as `n_not_due`. `--default-ready-delta` (default 240 min) is the ready-by the
+plan is built against when the frame declares none; a tighter one (e.g. 90) pulls DCFC forward.
+
 ## Sizing (from proposer/README.md, measured)
 
 | frame | `--max-assets` | wall |

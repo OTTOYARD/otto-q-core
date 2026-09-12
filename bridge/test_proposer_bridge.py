@@ -107,11 +107,23 @@ def test_fire_produces_one_door_shaped_row_per_serviceable_vehicle():
 
 
 def test_the_l2_only_class_is_never_sent_to_a_dcfc_point():
-    rows = _fire()["rows"]
+    # The whole plan: every vehicle is due, and V3 (l2-only, 19 kW) is on S3.
+    rows = _fire(start_within_min=10**6)["rows"]
     v3 = next(r for r in rows if r["entity_id"] == V3)
     assert v3["proposal"]["abstain"] is False
     assert v3["proposal"]["stall_type"] == "l2"
     assert v3["proposal"]["stall_id"] == S3
+    # Under the default window the peak-minimising pass staggers V3 behind V1,
+    # so its row is a not-due abstain -- and the stall it names is still S3.
+    rows = _fire()["rows"]
+    v3 = next(r for r in rows if r["entity_id"] == V3)
+    if v3["proposal"]["abstain"]:
+        assert v3["proposal"]["rationale"]["abstained_by"] == "bridge:not_due"
+        assert v3["proposal"]["rationale"]["planned_stall_id"] == S3
+    else:
+        assert v3["proposal"]["stall_id"] == S3
+    for r in rows:
+        assert r["proposal"].get("stall_id") != S3 or r["entity_id"] == V3
 
 
 def test_two_fires_on_one_frame_are_byte_identical():
@@ -296,3 +308,48 @@ def test_cli_offline_needs_both_inputs(tmp_path):
     with pytest.raises(SystemExit):
         pb.main(["--run", RUN, "--depot", DEPOT,
                  "--site", str(HERE / "sites" / "nashville-flagship.json")])
+
+
+# ---- the plan is a schedule; the door takes this tick's assignments ------------------
+
+def _row(vid, sid, start, end=None):
+    return {"action_context": "stall_assignment", "entity_type": "vehicle", "entity_id": vid,
+            "source": "forward_lex",
+            "proposal": {"verb": "assign_stall", "abstain": False, "stall_id": sid, "stall_type": "l2",
+                         "vehicle_id": vid, "requested_kw": 19,
+                         "rationale": {"optimizer": "forward_lex", "planned_start_min": start,
+                                       "planned_end_min": end or start + 100, "ready_by_source": "default"},
+                         "resolved_action_context": "stall_assignment"}}
+
+
+def test_a_charge_planned_beyond_the_window_abstains_with_its_planned_start():
+    rows, not_due = pb.only_due_now([_row(V1, S3, 0), _row(V2, S3, 174)], start_within_min=30)
+    assert not_due == [V2]
+    assert rows[0]["proposal"]["abstain"] is False and rows[0]["proposal"]["stall_id"] == S3
+    p = rows[1]["proposal"]
+    assert p["abstain"] is True and "stall_id" not in p
+    assert p["rationale"]["planned_start_min"] == 174 and p["rationale"]["planned_stall_id"] == S3
+    assert p["rationale"]["abstained_by"] == "bridge:not_due"
+    assert "+174 min" in p["rationale"]["reason"]
+
+
+def test_the_window_is_inclusive_and_proposer_abstentions_pass_through():
+    ab = {"action_context": "stall_assignment", "entity_type": "vehicle", "entity_id": V3,
+          "source": "forward_lex", "proposal": {"verb": "assign_stall", "abstain": True,
+          "vehicle_id": V3, "rationale": {"reason": "x", "optimizer": "forward_lex"},
+          "resolved_action_context": "stall_assignment"}}
+    rows, not_due = pb.only_due_now([_row(V1, S1, 30), ab], start_within_min=30)
+    assert not_due == [] and rows[0]["proposal"]["abstain"] is False and rows[1] is ab
+
+
+def test_a_batch_never_names_one_stall_twice_for_immediate_starts():
+    #: Six vehicles, few stalls, a tight window: whatever the solver sequences
+    #: onto one point, only the first occupant is submitted as an assignment.
+    vehicles = [_vehicle(f"6e7d0b1c-0000-4000-8000-0000000000{i:02x}", soc=20 + i) for i in range(6)]
+    frame = _frame(vehicles=vehicles, stalls=[_stall(S1, kind="l2", kw=19), _stall(S2, kind="l2", kw=19)])
+    r = pb.fire(frame, CLASS_ROWS, site=SITE, sim_run_id=RUN, depot_id=DEPOT, start_within_min=30)
+    live = [x["proposal"]["stall_id"] for x in r["rows"] if not x["proposal"]["abstain"]]
+    assert len(live) == len(set(live))
+    assert r["fire"]["n_not_due"] == len(r["rows"]) - len(live)
+    assert r["fire"]["n_planned"] == len(live)
+    assert r["fire"]["start_within_min"] == 30 and r["fire"]["default_ready_delta_min"] == 240

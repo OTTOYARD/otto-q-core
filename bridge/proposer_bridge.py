@@ -119,12 +119,24 @@ def _require_ident(value: Any, what: str) -> str:
     return value
 
 
+#: One tick of the certification clock (30 sim-minutes); a charge the plan
+#: starts later than this is not this tick's assignment (see only_due_now).
+DEFAULT_START_WITHIN_MIN = 30
+#: The kernel's own default deadline when the frame carries none; recorded on
+#: every row as ready_by_source=default. A demo that knows its turnaround
+#: passes its own value; a value nobody declared is an ASSUMPTION, so it is a
+#: parameter and on the fire record, never a constant hidden in the plan.
+DEFAULT_READY_DELTA_MIN = 240
+
+
 def fire(frame: dict, class_rows: list[dict], *, site: dict,
          sim_run_id: str, depot_id: str,
          hour_of_day: int | None = None,
          max_assets: int | None = None,
          det_budget_s: float = DEFAULT_DET_BUDGET_S,
          ready_by_min: dict[str, int] | None = None,
+         default_ready_delta_min: int = DEFAULT_READY_DELTA_MIN,
+         start_within_min: int = DEFAULT_START_WITHIN_MIN,
          allow_rejection: bool = False,
          fired_at: str | None = None) -> dict:
     """One proposer invocation over one frame. Pure: writes nothing.
@@ -167,6 +179,7 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
         result = propose(frame, class_table, site=site,
                          hour_of_day=hour_of_day, max_assets=max_assets,
                          det_budget_s=det_budget_s, ready_by_min=ready_by_min,
+                         default_ready_delta_min=default_ready_delta_min,
                          allow_rejection=allow_rejection)
     except FrameError as exc:
         #: e.g. "frame has no charge-capable stalls that declare an accepted
@@ -184,16 +197,71 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
         if row.get("action_context") != ACTION_CONTEXT:
             raise BridgeError(f"unexpected action_context {row.get('action_context')!r}")
 
+    rows, not_due = only_due_now(rows, start_within_min=start_within_min)
+
     record.update(
+        #: the same vocabulary as the ledger (0260): 'submitted' whenever a row
+        #: reaches the door, abstains included, 'empty' only when none does. An
+        #: all-abstain fire is told apart by n_planned == 0, not by its status.
         status="proposed" if rows else "empty",
         n_rows=len(rows),
-        n_planned=int(result.get("planned") or 0),
-        n_abstained=int(result.get("abstained") or 0),
+        n_planned=int(result.get("planned") or 0) - len(not_due),
+        n_abstained=int(result.get("abstained") or 0) + len(not_due),
         n_deferred=int(result.get("deferred") or 0),
+        n_not_due=len(not_due),
+        start_within_min=start_within_min,
+        default_ready_delta_min=default_ready_delta_min,
         solver=result.get("solver"),
         note=result.get("note"),
     )
     return {"rows": rows, "fire": record}
+
+
+def only_due_now(rows: list[dict], *, start_within_min: int) -> tuple[list[dict], list[str]]:
+    """THE PLAN IS A SCHEDULE; THE DOOR TAKES THIS TICK'S ASSIGNMENTS.
+
+    Found on the first dry run against real depot data (2026-09-12 20:58 UTC):
+    with six vehicles at the gate the solver returned an OPTIMAL plan that put
+    two of them on the same L2 stall -- one starting now, the other at +174
+    min, after the first finishes. Both rows would have reached the door in the
+    same tick, the tick would have enacted the first and the shield would have
+    refused the second for a stall already taken: a refusal manufactured by
+    flattening time, not a safety finding, and it would have been counted as one.
+
+    So a charge whose planned start lies beyond this tick's window becomes an
+    ABSTAIN row carrying its planned start -- "invoked, not yet due" is a ledger
+    fact -- and is re-offered by the next fire, whose plan will have moved it
+    forward. Rows whose planned start is within the window pass unchanged. An
+    abstain row from the proposer passes unchanged too.
+    """
+    kept: list[dict] = []
+    deferred: list[str] = []
+    for row in rows:
+        p = row["proposal"]
+        start = (p.get("rationale") or {}).get("planned_start_min")
+        if p.get("abstain") or start is None or int(start) <= int(start_within_min):
+            kept.append(row)
+            continue
+        deferred.append(row["entity_id"])
+        kept.append({
+            **row,
+            "proposal": {
+                "verb": "assign_stall", "abstain": True, "vehicle_id": p.get("vehicle_id", row["entity_id"]),
+                "rationale": {
+                    "optimizer": p["rationale"].get("optimizer", SOURCE),
+                    "reason": f"planned to start at +{int(start)} min on {p.get('stall_type')} "
+                              f"{p.get('stall_id')}, beyond this tick's {int(start_within_min)}-min "
+                              f"window; re-offered when due",
+                    "planned_start_min": int(start),
+                    "planned_end_min": p["rationale"].get("planned_end_min"),
+                    "planned_stall_id": p.get("stall_id"),
+                    "ready_by_source": p["rationale"].get("ready_by_source"),
+                    "abstained_by": "bridge:not_due",
+                },
+                "resolved_action_context": ACTION_CONTEXT,
+            },
+        })
+    return kept, deferred
 
 
 def _jsonb_literal(obj: Any) -> str:
@@ -322,7 +390,9 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              ttl_seconds: int = DEFAULT_TTL_S, max_assets: int | None = None,
              det_budget_s: float = DEFAULT_DET_BUDGET_S, via: str = "door",
              regime: bool = False, loop: bool = False, interval_s: float = 10.0,
-             max_fires: int | None = None, log=print) -> list[dict]:
+             max_fires: int | None = None, log=print,
+             default_ready_delta_min: int = DEFAULT_READY_DELTA_MIN,
+             start_within_min: int = DEFAULT_START_WITHIN_MIN) -> list[dict]:
     """Fetch → propose → submit, once or in a loop while the run is running.
 
     Every fire is committed in its own transaction so the door's tick_seq stamp
@@ -349,7 +419,9 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                 result = fire(frame, class_rows, site=site, sim_run_id=sim_run_id,
                               depot_id=depot_id,
                               hour_of_day=(run["sim_hour"] if regime else None),
-                              max_assets=max_assets, det_budget_s=det_budget_s)
+                              max_assets=max_assets, det_budget_s=det_budget_s,
+                              default_ready_delta_min=default_ready_delta_min,
+                              start_within_min=start_within_min)
                 rows, record = result["rows"], result["fire"]
                 record["tick_count_at_fetch"] = run["tick_count"]
                 receipt: dict[str, Any] = {"fire": record}
@@ -409,6 +481,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ttl", type=int, default=DEFAULT_TTL_S)
     ap.add_argument("--max-assets", type=int, default=None)
     ap.add_argument("--det-budget", type=float, default=DEFAULT_DET_BUDGET_S)
+    ap.add_argument("--default-ready-delta", type=int, default=DEFAULT_READY_DELTA_MIN,
+                    help="minutes until a vehicle with no declared deadline must be ready "
+                         "(recorded as ready_by_source=default on every row)")
+    ap.add_argument("--start-within", type=int, default=DEFAULT_START_WITHIN_MIN,
+                    help="submit only charges the plan starts within this many minutes; "
+                         "later ones abstain with their planned start")
     ap.add_argument("--regime", action="store_true",
                     help="live only: resolve the regime from the run's sim hour "
                          "(the expensive chain; default is the cheap two-pass)")
@@ -426,7 +504,9 @@ def main(argv: list[str] | None = None) -> int:
                                 max_assets=args.max_assets,
                                 det_budget_s=args.det_budget, via=args.via,
                                 regime=args.regime, loop=args.loop,
-                                interval_s=args.interval_s, max_fires=args.max_fires)
+                                interval_s=args.interval_s, max_fires=args.max_fires,
+                                default_ready_delta_min=args.default_ready_delta,
+                                start_within_min=args.start_within)
             if args.json_out:
                 Path(args.json_out).write_text(json.dumps(receipts, indent=1, default=str))
             return 0
@@ -434,7 +514,9 @@ def main(argv: list[str] | None = None) -> int:
             ap.error("offline mode needs --frame and --classes (or use --dsn)")
         result = fire(_load_json(args.frame), _load_json(args.classes), site=site,
                       sim_run_id=args.run, depot_id=args.depot,
-                      max_assets=args.max_assets, det_budget_s=args.det_budget)
+                      max_assets=args.max_assets, det_budget_s=args.det_budget,
+                      default_ready_delta_min=args.default_ready_delta,
+                      start_within_min=args.start_within)
         sql = emit_sql(result, sim_run_id=args.run, depot_id=args.depot,
                        ttl_seconds=args.ttl, via=args.via)
         if args.emit_sql:
