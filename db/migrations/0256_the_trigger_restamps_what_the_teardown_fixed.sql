@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260912165023
 -- migration-name: 0256_the_trigger_restamps_what_the_teardown_fixed
 -- ===========================================================================
 -- 0256  THE TRIGGER RE-STAMPS WHAT THE TEARDOWN FIXED

@@ -355,9 +355,9 @@ repo_manifest(version, name, file) AS (
     ('20260912033843'::text, '0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four'::text, '0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four.sql'::text),
     ('20260912035032'::text, '0254_the_world_hash_moved_and_could_not_say_where'::text, '0254_the_world_hash_moved_and_could_not_say_where.sql'::text),
     ('20260912130622'::text, '0255_the_teardown_stamps_the_wall_clock_into_a_hashed_column'::text, '0255_the_teardown_stamps_the_wall_clock_into_a_hashed_column.sql'::text),
-    ('PENDING'::text, '0256_the_trigger_restamps_what_the_teardown_fixed'::text, '0256_the_trigger_restamps_what_the_teardown_fixed.sql'::text),
-    ('PENDING'::text, '0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached'::text, '0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql'::text),
-    ('PENDING'::text, '0258_the_comment_states_the_invariant_and_no_code_holds_it'::text, '0258_the_comment_states_the_invariant_and_no_code_holds_it.sql'::text)
+    ('20260912165023'::text, '0256_the_trigger_restamps_what_the_teardown_fixed'::text, '0256_the_trigger_restamps_what_the_teardown_fixed.sql'::text),
+    ('20260912165137'::text, '0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached'::text, '0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql'::text),
+    ('20260912165243'::text, '0258_the_comment_states_the_invariant_and_no_code_holds_it'::text, '0258_the_comment_states_the_invariant_and_no_code_holds_it.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

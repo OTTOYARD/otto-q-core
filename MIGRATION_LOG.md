@@ -242,9 +242,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0253](db/migrations/0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four.sql) | `20260912033843` | yes — ledger | SM.006 POINTS AT A FIVE-ARGUMENT EVALUATOR AND THE DISPATCHER PASSES |
 | [0254](db/migrations/0254_the_world_hash_moved_and_could_not_say_where.sql) | `20260912035032` | yes — ledger | THE WORLD HASH MOVED AND COULD NOT SAY WHERE |
 | [0255](db/migrations/0255_the_teardown_stamps_the_wall_clock_into_a_hashed_column.sql) | `20260912130622` | yes — ledger | THE TEARDOWN STAMPS THE WALL CLOCK INTO A HASHED COLUMN |
-| [0256](db/migrations/0256_the_trigger_restamps_what_the_teardown_fixed.sql) | `PENDING` | no — pending | THE TRIGGER RE-STAMPS WHAT THE TEARDOWN FIXED |
-| [0257](db/migrations/0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql) | `PENDING` | no — pending | THE SECOND FLOOR SHIPS AS A COUNT, WITH ITS OWN LIMITS ATTACHED |
-| [0258](db/migrations/0258_the_comment_states_the_invariant_and_no_code_holds_it.sql) | `PENDING` | no — pending | THE COMMENT STATES THE INVARIANT AND NO CODE HOLDS IT |
+| [0256](db/migrations/0256_the_trigger_restamps_what_the_teardown_fixed.sql) | `20260912165023` | yes — ledger | THE TRIGGER RE-STAMPS WHAT THE TEARDOWN FIXED |
+| [0257](db/migrations/0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql) | `20260912165137` | yes — ledger | THE SECOND FLOOR SHIPS AS A COUNT, WITH ITS OWN LIMITS ATTACHED |
+| [0258](db/migrations/0258_the_comment_states_the_invariant_and_no_code_holds_it.sql) | `20260912165243` | yes — ledger | THE COMMENT STATES THE INVARIANT AND NO CODE HOLDS IT |
 
 126 migrations indexed.
 

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260912165243
 -- migration-name: 0258_the_comment_states_the_invariant_and_no_code_holds_it
 -- ===========================================================================
 -- 0258  THE COMMENT STATES THE INVARIANT AND NO CODE HOLDS IT
