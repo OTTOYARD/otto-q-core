@@ -146,7 +146,9 @@ INSERT INTO public.ottoq_proposer_precedence (source, rank, holds_tick, greedy_y
 ('cuopt_fallback', 1,  true, false,
  '0259 seed. Was literal #2 in the selector and the second of two in the hold/arm predicates. FR-3 never yielded to it, so greedy_yields=false preserves that.'),
 ('forward_lex',    10, true, true,
- '0259. The CP-SAT proposer (proposer/forward_proposer.py via bridge/proposer_bridge.py). 0 rows in ottoq_external_proposals at seed time; NOT a certified proposer (0241) -- it reaches a certification only through record-and-replay (0237/0239).')
+ '0259. The CP-SAT proposer (proposer/forward_proposer.py via bridge/proposer_bridge.py). 0 rows in ottoq_external_proposals at seed time; NOT a certified proposer (0241) -- it reaches a certification only through record-and-replay (0237/0239).'),
+('llm_advisor',    20, true, true,
+ '0259. The language-model advisor (bridge/llm_proposer.py): a model''s PHYSICAL proposals through the same door, so the L1 shield disposes them -- the path the dial-writing Nemotron agent never had. Ranked after the CP-SAT proposer. 0 rows at seed time; NOT a certified proposer (0241); reaches a certification only by replay, which is what makes a nondeterministic proposer safe to consume.')
 ON CONFLICT (source) DO NOTHING;
 
 -- ---------------------------------------------------------------------------

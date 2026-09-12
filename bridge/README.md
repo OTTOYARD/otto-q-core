@@ -98,3 +98,45 @@ service, 1620 kW soft target derived from the DCFC concurrent cap and safety mar
 cooldown is CLAUDE.md 2.5's 18 minutes (the SQL engine holds none, BUILD_QUEUE #5), and the
 four movement/cold-start values are marked `ASSUMPTION` because no measured value exists for
 this depot. The NES GSA-3 tariff has no time-of-use window, so `onpeak_window_min` is empty.
+
+## The LLM advisor — `bridge/llm_proposer.py`
+
+The second proposer, and the D3 showpiece: a language model proposes stall assignments through
+the **same door**, the L1 shield disposes them, and a refusal is a decision row with rule codes.
+This is the path the existing Nemotron agent never had — it writes policy dials, and the
+2026-07-30 audit recorded that "the 52-rule L1 shield is NOT in that path."
+
+- **The model never writes.** It answers with JSON; `rows_from_answer` turns that into door-shaped
+  rows; the caller submits; the tick disposes.
+- **The harness checks shape, not safety.** A stall id must be one the digest showed the model (an
+  invented uuid would blow up the selector's cast inside the tick); one row per vehicle; a stall
+  named once per batch; `requested_kw` computed from plug and stall, never trusted. Occupied
+  stalls, wrong connectors, the power cap, SLAs — all left for the shield, because the shield
+  refusing them with a reason code *is* the demonstration.
+- **Every fire is priced and capped.** `usage × PRICES_USD_PER_MTOK` → `usd` on the fire record
+  (source: claude-api skill table cached 2026-06-24, mirroring
+  https://platform.claude.com/docs/en/pricing.md); a per-run cap (`--cap-usd`, default $2.00)
+  refuses to fire *before* the call; a model with no price row cannot run without
+  `--allow-unpriced`.
+- **Latency is not in the tick.** The model runs between ticks under the one-tick
+  right-of-first-refusal (0259 seats `llm_advisor` at rank 20). A slow answer costs that
+  proposal its chance; the local path assigns as it always has.
+- **Providers:** `anthropic` (official SDK, structured output, `--model claude-opus-5` default,
+  `claude-sonnet-5` at $2/$10 per MTok for volume) and `nvidia` (the chat/completions endpoint the
+  existing agent uses; no price row, so `--allow-unpriced` is required and the cap cannot be
+  enforced — pricing needs a sourced row first). Both import lazily; CI runs on `FakeClient`.
+
+```bash
+# offline, no model called: a canned answer through the whole harness
+python3 -m bridge.llm_proposer --run <run> --depot <depot> --frame frame.json \
+  --provider fake --answer answer.json --emit-sql out.sql
+
+# live (ANTHROPIC_API_KEY in the environment, never in the repo)
+python3 -m bridge.llm_proposer --run <run> --depot <depot> --frame frame.json \
+  --model claude-opus-5 --cap-usd 2.00 --spend-file .spend.json --via batch --emit-sql out.sql
+```
+
+Per fire, a 24-vehicle / 40-stall digest is on the order of 3–6K input tokens and under 1K
+output: about 1–3¢ on Sonnet 5, 3–8¢ on Opus 5. A 48-tick demo run firing every decide tick is
+therefore well under the cap either way; the cap is what makes that a guarantee rather than an
+estimate.

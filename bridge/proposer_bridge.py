@@ -236,7 +236,13 @@ def batch_call_sql(rows: list[dict], fire_record: dict, *, sim_run_id: str,
     payload = [{"action_context": r["action_context"], "entity_type": r["entity_type"],
                 "entity_id": r["entity_id"].lower(), "proposal": r["proposal"]}
                for r in rows]
-    return (f"SELECT {BATCH}('{run}'::uuid, '{depot}'::uuid, '{SOURCE}', "
+    #: One batch, one source: the door stamps p_source on every row, so a mixed
+    #: batch would misattribute. The record names the source for an empty batch.
+    sources = {r["source"] for r in rows} or {fire_record.get("source", SOURCE)}
+    if len(sources) != 1:
+        raise BridgeError(f"a batch must carry one source, got {sorted(sources)}")
+    source = _require_ident(next(iter(sources)), "source")
+    return (f"SELECT {BATCH}('{run}'::uuid, '{depot}'::uuid, '{source}', "
             f"{_jsonb_literal(payload)}, {_jsonb_literal(fire_record)}, "
             f"{ttl_seconds});")
 
