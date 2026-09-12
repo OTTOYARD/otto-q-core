@@ -75,3 +75,45 @@ it applies to, and a URL per claim.
 
 **A weight without a source is exactly what `intent_v1` refused to invent, and this
 request exists so we do not quietly invent four of them in the solver instead.**
+
+---
+
+## NARROWING, added 2026-09-12 by Claude Code — read this before answering
+
+The request stands, but two of its questions are now **less open than when it was
+filed**, and answering the wrong ones would waste a Hermes run.
+
+What changed is measurement, not the world. The Python layer turns out to already
+implement a complete regime-aware lexicographic objective: `intent/intent_v1.json`
+declares 11 ranked objectives and 6 regimes, `intent/solve.py` resolves a regime to
+a pass sequence, `policies/regime.py` drives the solver from the declared intent,
+and `solvers/cpsat/model.py` implements `min_tardy` / `min_peak` / `min_flow` with
+ε-constraints and a `rejection_saving_ceiling` that stops a weight set from scoring
+better by dropping assets. It is tested, with measured trade-offs
+(`policies/test_regime.py`: `grid_peak` → flow 2937 min / peak 150 kW; `rush` →
+1676 min / 400 kW). It has **zero production callers** — that is a wiring defect on
+our side, not a research question.
+
+**So please DE-PRIORITISE** the "what structure" half: whether to use a weighted sum,
+lexicographic ordering, or ε-constraint. We have chosen lexicographic-with-ε and
+built it. A one-paragraph sanity check against published practice is useful; a
+survey is not.
+
+**And please PRIORITISE these, in this order:**
+
+1. **The weights and the ranking.** Our objectives are ranked by assertion, not by
+   evidence. What does an operator of a depot-like facility actually trade off, and
+   is there any published or vendor-documented ordering between *asset readiness*,
+   *demand-charge exposure*, and *labour/bay occupancy*? A source for the ordering
+   matters more to us than a source for any single weight.
+2. **Cost of unavailability.** The one number that makes `readiness` rankable
+   against `energy_cost` in the same unit. Per asset-hour, for any fleet type with
+   a published figure (robotaxi, yard tractor, delivery van — whichever is
+   sourceable). Without it the first-ranked objective and the third cannot be
+   compared at all.
+3. **Demand-charge representation.** Whether practitioners optimise the 15-minute
+   rolling peak directly or a proxy, and over what horizon a commitment is made.
+4. **DCFC cooldown minimum gap** (unchanged, still needed, BUILD_QUEUE #5).
+
+Every answer still needs the claim, the version or date it applies to, and a URL —
+a fact without a URL is not a fact, whoever fetched it (CLAUDE.md Part 1 §3).
