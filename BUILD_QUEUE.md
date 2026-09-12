@@ -94,6 +94,12 @@ a known set or does not, there is no safe side: pin it and assert the count
 | 8d | **`dispatch_due_at` coverage is correct, and I nearly filed it as a bug** | 52,817 of 104,957 needs carry a due time — which looks like 50% blindness until you group it: `overnight_hold` 100%, `immediate_dispatch` 100%, `standard` 0%, `tech_hold` 0%. It is populated for exactly the urgency classes that *have* a deadline. A standard visit cannot be late; a tech hold is open-ended. **Recorded as a non-finding on purpose** — the near-miss is the useful part, and it is the same shape as `track_functions='none'`: a ratio that looks alarming until you ask what the denominator means. | closed, no action |
 | 9 | **Cold-start, and segmented charging** | Both reach planning only as durations/derates. Scheduled segments with a per-segment power profile are CP-SAT-only. | not started |
 
+## P0b — the named carrier of the one uncertified column
+
+| # | item | measured evidence | status |
+|---|---|---|---|
+| 0b | **G46: the sim teardown stamps the wall clock into hashed world state (`0173`)** | `ottoq_sim_advance_tick` → `ottoq_sim_release_depot` on reaching the scenario's sim-clock end (`0102`'s teardown) → `last_state_change = now()` on every vehicle → hashed by `ottoq_world_fingerprint`. Measured: all 116 vehicles carry the single value `2026-09-12 06:20:00.190665`, the wall-clock instant the job fired, against a sim clock of Sep 1–2. `now()` is the TRANSACTION timestamp and both arms share one transaction, so **a determinism pair can never fail on it** — invisible by construction. The teardown fires only at 1,440 sim minutes = **exactly tick 48**, which is why six columns reproduce across three days and the seventh cannot across 32 minutes. Third instance of the G15/`0137` family. | **fully scoped, not applied.** Sweep done the general way: of all 28 hashed columns across the five fingerprint sections, `vehicles.last_state_change` is the ONLY wall-clock-written one, by exactly three routines (`ottoq_sim_release_depot`, `twin.ottoq_sim_seed_fleet` ×2, `ottoq_benchmark_reset`) — all sim setup/teardown, none production, and release_depot's write already sits inside a sim-only `v_world_reset` branch (`0114`). Fix: stamp the sim clock each already holds. `forces_recert=TRUE` — lands at the START of a window with a full round behind it. **Blocks certifying `busy_day/171717/48t`.** |
+
 ## P2 — registered but unreachable capability
 
 | # | item | measured evidence | status |

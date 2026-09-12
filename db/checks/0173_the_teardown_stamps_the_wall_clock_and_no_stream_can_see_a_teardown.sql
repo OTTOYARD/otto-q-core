@@ -157,6 +157,52 @@
 --     not been done and is the honest next step before (B) is called complete.
 --
 -- ---------------------------------------------------------------------------
+-- THE SWEEP THE FINDING IMPLIES, DONE -- AND IT COMES BACK BOUNDED
+-- ---------------------------------------------------------------------------
+--
+-- Above I listed "a sweep of every writer reachable from a teardown" as open and
+-- gating the fix. Done, and done the general way rather than the narrow one: every
+-- routine in public/ottoq/twin cross-checked against ALL TWENTY-EIGHT columns the
+-- five fingerprint sections hash, for an assignment of now(), clock_timestamp() or
+-- CURRENT_TIMESTAMP.
+--
+-- RESULT -- one column, three writers, and nothing else:
+--
+--   vehicles.last_state_change   public.ottoq_benchmark_reset
+--                                public.ottoq_sim_release_depot      <- the carrier
+--                                twin.ottoq_sim_seed_fleet  (two sites)
+--
+-- Zero hits on any stalls column (status, current_vehicle_id, reserved_by,
+-- reserved_at, reservation_expires_at), any charger column (station_state,
+-- last_fault_code) or any of the nine BESS columns. So `stalls` and `bess` -- the two
+-- sections 0170 predicted -- carry no wall-clock writer at all, which is a second,
+-- independent reason the prediction was wrong and worth stating: the hypothesis was
+-- not merely unlucky, it was pointing at the only two sections that could not have
+-- done it this way.
+--
+-- All three writers are sim-world setup or teardown. NONE is a production path, and
+-- the ottoq_sim_release_depot write is additionally already inside a branch guarded
+-- by `IF v_world_reset THEN`, which 0114's own comment marks "sim only. On an
+-- external feed the tether mirrors a real latch on a real arm; only real events
+-- release it." So the first gate named above is RESOLVED: the fix can stamp sim time
+-- inside that branch without touching production behaviour, and ottoq_production_stop
+-- (one of release_depot's three callers) does not reach it.
+--
+-- THE FIX IS THEREFORE FULLY SCOPED: three routines, one column, sim paths only,
+-- each stamping the sim clock it already has in hand -- release_depot the run's
+-- ottoq_sim_runs.sim_clock_current, seed_fleet and benchmark_reset their own
+-- sim-start argument. forces_recert=TRUE (48t end-state values change; the floor
+-- moves for all columns), so it lands at the START of a window with a full round
+-- behind it.
+--
+-- NOT APPLIED TONIGHT, deliberately. It is 02:30 CT at the end of a long session,
+-- the change rewrites three functions that write hashed world state, and two of
+-- tonight's near-misses (0252's stripped body, 0172's 45-minute deadline) were caught
+-- only because something was measured rather than assumed. A coordinated three-function
+-- edit to hashed state is the worst possible thing to hand-write tired. The draft and
+-- its dry-run come first, with attention, and the round goes behind it.
+--
+-- ---------------------------------------------------------------------------
 -- AND A GAP BETWEEN THE TWO NEW INSTRUMENTS, FOUND BY USING BOTH
 -- ---------------------------------------------------------------------------
 --
