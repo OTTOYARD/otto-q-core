@@ -188,6 +188,43 @@
 -- inside that branch without touching production behaviour, and ottoq_production_stop
 -- (one of release_depot's three callers) does not reach it.
 --
+-- CORRECTION 2026-09-12 13:00 UTC, BEFORE THE FIX WAS WRITTEN. The sweep above is
+-- described as done "the general way". IT WAS NOT, and re-measuring it with the regexp
+-- returning the MATCHED TEXT instead of a boolean found three errors in my own
+-- analysis:
+--
+--   1. IT MISSED AN ENTIRE SHAPE. The pattern required `col = now()` literally, so a
+--      variable assigned from now() and used later was invisible. Four such sites
+--      exist:
+--        twin.ottoq_world_advance()        v_now timestamptz := now()         wall clock
+--        public.ottoq_cert_arm_wave        v_now timestamptz := now()         wall clock
+--        twin.ottoq_sim_confirm_commands   v_now := COALESCE(p_clock, now())  safe on the
+--                                          cert path, which passes p_clock
+--        public.ottoq_cert_arm             v_now := COALESCE(p_start, now())  same shape
+--      "Done the general way" was the wrong claim to make about a single regexp.
+--   2. twin.ottoq_sim_seed_fleet is TWO OVERLOADS with ONE site each, not "two sites",
+--      and its write is `NOW() - ((r.stagger*90)||' min')::interval`, a staggered wall
+--      clock rather than a plain now(). The duplicate row in my sweep output was the
+--      second overload, and I read it as a second write site.
+--   3. public.ottoq_benchmark_reset has NO clock argument -- (p_depot, p_arrival_soc,
+--      p_target_soc) -- so "stamp its own sim-start argument" named something that does
+--      not exist.
+--
+-- WHAT SURVIVES THE CORRECTION, and it is the part the fix rests on: of everything
+-- that writes a hashed column with a wall clock, exactly ONE is on the
+-- determinism-pair path -- ottoq_sim_release_depot. The pair calls
+-- ottoq_sim_advance_tick -> ottoq_sim_advance_tick_world (which stamps
+-- v_new_sim_clock), never twin.ottoq_world_advance (the demo metronome's entry) and
+-- never the cert_arm family; seed_fleet's only caller is ottoq_sim_run_scenario, which
+-- the pair does not call either. So 0255 changes one function, and the other four are
+-- filed as BUILD_QUEUE P0b-b rather than swept into it.
+--
+-- THE LESSON IS THE ONE THIS FILE ALREADY TEACHES, TURNED ON ITSELF. I wrote above
+-- that a stream hash covers what the engine DECIDED and misses housekeeping. The same
+-- blind spot applied to my sweep: a regexp over assignments covers what is written
+-- DIRECTLY and misses what is written through a variable. An instrument's coverage is
+-- a claim that needs its own evidence -- db/checks/0167, for the third time.
+--
 -- THE FIX IS THEREFORE FULLY SCOPED: three routines, one column, sim paths only,
 -- each stamping the sim clock it already has in hand -- release_depot the run's
 -- ottoq_sim_runs.sim_clock_current, seed_fleet and benchmark_reset their own

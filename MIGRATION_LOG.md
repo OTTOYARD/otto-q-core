@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0254 — GENERATED, not a log
+## Index, 0134–0255 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -241,7 +241,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0252](db/migrations/0252_a_certification_column_nobody_schedules_is_invisible.sql) | `20260912033615` | yes — ledger | A CERTIFICATION COLUMN NOBODY SCHEDULES IS INVISIBLE |
 | [0253](db/migrations/0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four.sql) | `20260912033843` | yes — ledger | SM.006 POINTS AT A FIVE-ARGUMENT EVALUATOR AND THE DISPATCHER PASSES |
 | [0254](db/migrations/0254_the_world_hash_moved_and_could_not_say_where.sql) | `20260912035032` | yes — ledger | THE WORLD HASH MOVED AND COULD NOT SAY WHERE |
+| [0255](db/migrations/0255_the_teardown_stamps_the_wall_clock_into_a_hashed_column.sql) | `20260912130622` | yes — ledger | THE TEARDOWN STAMPS THE WALL CLOCK INTO A HASHED COLUMN |
 
-122 migrations indexed.
+123 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
