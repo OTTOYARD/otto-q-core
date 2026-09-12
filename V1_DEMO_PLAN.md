@@ -148,8 +148,8 @@ stopping rule, stop and ship what works rather than deepening.
 
 ## 6. Checklist
 
-- [ ] Phase 0 — round 38 judged; 0256/0257/0258 applied; round 39 scheduled
-- [ ] Phase 0 — two consecutive rounds, 7/7 agree; `CERTIFICATION_STATUS.md` written; core FROZEN
+- [x] Phase 0 — round 38 judged; 0256/0257/0258 applied; round 39 scheduled *(2026-09-12)*
+- [x] Phase 0 — two consecutive rounds, 7/7 agree; `CERTIFICATION_STATUS.md` written; core FROZEN *(rounds 39 + 40, judged 2026-09-12 23:29 UTC; `db/canons/round40.md`)*
 - [ ] Phase 1 — `p_policy` in the pair rig; shield held constant; one committed comparison
       *(2026-09-12: rig drafted as `db/migrations/0261` + `db/checks/0185` + `policies/AB_TWIN.md`; the seat is a proposer, so the shield is held constant by construction; applies after round 40 is judged)*
 - [ ] Phase 2 — CP-SAT proposer certified; `h_prop` non-trivial in one pair *(2026-09-12: `bridge/` built and tested; `0259` precedence + `0260` fire ledger drafted, apply after round 39; then one live run, then the replay pair)*
