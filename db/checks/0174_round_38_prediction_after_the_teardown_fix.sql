@@ -1,4 +1,23 @@
 -- ===========================================================================
+-- PREDICTION 2 FALSIFIED 2026-09-12 13:30 UTC -- see db/checks/0175
+--
+-- The prediction below is left EXACTLY as committed at 13:09:17 UTC. Prediction 2 is
+-- WRONG: grid endst.world is STABLE (239001 held 4926be34f0e995a3 across 09-09, and
+-- across 0255 at 04:05 and 13:40; 424242 held e51fb295975c3e8c across the fix).
+--
+-- The premise I did not verify: grid_smoke's sim_duration_minutes is 1440, the same as
+-- busy_day -- not 180. A 6-tick grid run ends at 180 minutes because it runs out of
+-- TICKS, not because the world runs out of DAY. 0173 had already drawn exactly that
+-- distinction six hours earlier and I conflated it again in the other direction.
+--
+-- CONSEQUENCE FOR JUDGING: the grid columns are NOT a test of 0255 -- they never reach
+-- the teardown, so grid endst holding steady is correct and means nothing about the
+-- fix. Do NOT act on prediction 2's "if grid endst does NOT move, the conviction is
+-- incomplete". PREDICTIONS 1 AND 3 STAND UNCHANGED: the six 12t/24t columns are the
+-- control, and busy_day/171717/48t is the only test of the fix.
+-- ===========================================================================
+
+-- ===========================================================================
 -- 0174  ROUND 38 PREDICTION, COMMITTED BEFORE THE FIRST PAIR FIRES
 -- ===========================================================================
 -- Written 2026-09-12 ~13:15 UTC (08:15 AM CT). 0255 applied at 13:06:22 UTC; round
