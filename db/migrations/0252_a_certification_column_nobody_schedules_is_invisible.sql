@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260912033615
 -- migration-name: 0252_a_certification_column_nobody_schedules_is_invisible
 -- ===========================================================================
 -- 0252  A CERTIFICATION COLUMN NOBODY SCHEDULES IS INVISIBLE
@@ -201,4 +201,33 @@ END $$;
 -- fix and is BUILD_QUEUE P0 #3. Shipping the instrument first is deliberate:
 -- an auto-scheduler built on an unproven coverage query would be the same
 -- mistake as 0247's purge built on an unexamined delete list.
+-- ===========================================================================
+-- ===========================================================================
+-- APPLIED 2026-09-12 03:36:15 UTC (2026-09-11 10:36 PM CT) -- version 20260912033615
+--
+-- A1-A3 passed: 0 UNREGISTERED, 0 MISSING, and busy_day/171717/48t read OVERDUE.
+-- Dry-run beforehand confirmed both A1 and A2 would hold.
+--
+-- FIRST ANSWER, and it is the honest one: ALL NINE columns read OVERDUE. Nothing
+-- had been paired in 59-92 hours (the session was stalled on a weekly limit from
+-- 2026-09-09 16:10 to 2026-09-12 03:31 UTC). The old instrument would have shown
+-- six green canons and said nothing about the silence.
+--
+-- DEVIATION + REPAIR, declared per APPLYING.md step 4. The header was condensed
+-- at the apply call, and FOUR comment-only lines inside the $function$ body went
+-- with it -- so the stored ottoq_cert_coverage body was 1385 chars against this
+-- file's 1708. That is file-vs-database drift of exactly the kind G18 exists to
+-- prevent.
+--
+-- Worse, and the part worth keeping: the digest check run at the time said MATCH.
+-- It compared the comment-STRIPPED file against the comment-STRIPPED live body,
+-- so it was structurally incapable of detecting a dropped in-body comment -- the
+-- single deviation it was there to catch. An instrument whose normalisation
+-- removes the thing it is testing for. Same class as db/checks/0167.
+--
+-- Repaired the same session by re-issuing CREATE OR REPLACE with the body
+-- verbatim from this file; live prosrc now md5 039a7059474928622dbe6eb5e6319b86
+-- at 1708 chars, byte-identical. scripts/exec-digest.py --check now refuses any
+-- file carrying comments inside a $function$/$procedure$ body, and names the
+-- lines.
 -- ===========================================================================

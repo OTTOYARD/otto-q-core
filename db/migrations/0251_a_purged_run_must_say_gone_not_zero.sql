@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260912034252
 -- migration-name: 0251_a_purged_run_must_say_gone_not_zero
 -- ===========================================================================
 -- 0251  A PURGED RUN MUST SAY "GONE", NOT "ZERO"
@@ -413,3 +413,20 @@ BEGIN
   END IF;
   RAISE NOTICE 'A1-A7 PASSED; % run(s) marked purged, matching the doomed set exactly', v_n;
 END $$;
+-- ===========================================================================
+-- APPLIED 2026-09-12 03:42:52 UTC (2026-09-11 10:42 PM CT) -- version 20260912034252
+--
+-- A1-A7 all passed. 729 runs stamped, matching the doomed set exactly; A7's pin
+-- held on re-measurement 60 hours after the cutoff was computed.
+--
+-- DEVIATION, declared per APPLYING.md step 4: the 42-line header above was
+-- condensed to 16 lines at the apply call. The EXECUTABLE SQL was submitted
+-- unedited, and that is proven rather than claimed -- both stored bodies digest
+-- byte-identical to this file:
+--     $procedure$ ottoq_retention_purge_runs  md5 b786dbd09548e39f5f35abe22dd467bb  5900 chars
+--     $function$  ottoq_kpi_five              md5 281ff76cc7182d277ceffab41b84cdee  1930 chars
+-- against live pg_proc.prosrc. Note this is the RAW digest, comments included --
+-- scripts/exec-digest.py's comment-stripped digest cannot see a dropped in-body
+-- comment, which is exactly how 0252 was applied with four comment lines missing
+-- from a stored body before the repair. Verify stored bodies raw.
+-- ===========================================================================

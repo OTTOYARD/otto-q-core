@@ -350,9 +350,10 @@ repo_manifest(version, name, file) AS (
     ('20260909133442'::text, '0248_the_refusal_ledger_was_registered_engine_without_the_key_that_makes_it_true'::text, '0248_the_refusal_ledger_was_registered_engine_without_the_key_that_makes_it_true.sql'::text),
     ('20260909133615'::text, '0249_the_purge_loop_variable_shadowed_the_table_it_was_selecting_from'::text, '0249_the_purge_loop_variable_shadowed_the_table_it_was_selecting_from.sql'::text),
     ('20260909134546'::text, '0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat'::text, '0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat.sql'::text),
-    ('PENDING'::text, '0251_a_purged_run_must_say_gone_not_zero'::text, '0251_a_purged_run_must_say_gone_not_zero.sql'::text),
-    ('PENDING'::text, '0252_a_certification_column_nobody_schedules_is_invisible'::text, '0252_a_certification_column_nobody_schedules_is_invisible.sql'::text),
-    ('PENDING'::text, '0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four'::text, '0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four.sql'::text)
+    ('20260912034252'::text, '0251_a_purged_run_must_say_gone_not_zero'::text, '0251_a_purged_run_must_say_gone_not_zero.sql'::text),
+    ('20260912033615'::text, '0252_a_certification_column_nobody_schedules_is_invisible'::text, '0252_a_certification_column_nobody_schedules_is_invisible.sql'::text),
+    ('20260912033843'::text, '0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four'::text, '0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four.sql'::text),
+    ('PENDING'::text, '0254_the_world_hash_moved_and_could_not_say_where'::text, '0254_the_world_hash_moved_and_could_not_say_where.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

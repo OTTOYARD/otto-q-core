@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260912033843
 -- migration-name: 0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four
 -- ===========================================================================
 -- 0253  SM.006 POINTS AT A FIVE-ARGUMENT EVALUATOR AND THE DISPATCHER PASSES
@@ -199,4 +199,22 @@ END $$;
 -- four action contexts and they listen outside that set. 0253 removes the one
 -- booby trap in that set so the routing fix can be judged on its own behaviour
 -- instead of on a cascade of BESS refusals. It does NOT close G44.
+-- ===========================================================================
+-- ===========================================================================
+-- APPLIED 2026-09-12 03:38:43 UTC (2026-09-11 10:38 PM CT) -- version 20260912033843
+--
+-- A1-A5 all passed. The defect was re-confirmed from the live catalog
+-- immediately before applying, not taken on the workflow's report:
+--     active rules whose evaluator the 4-arg dispatcher cannot call:  1  -> 0
+--     active rules naming a non-existent 4-arg signature:             1  -> 0
+--     rules listening for bess_state_change:                          1 (SM.006)
+--     SM.006 evaluations, all time:                                   0
+--     active bess transitions available to the wrapper:              17
+--
+-- Submitted whole and unedited; scripts/exec-digest.py --check confirms this file
+-- carries no comments inside a stored body, so there was nothing to condense.
+--
+-- WHAT THIS DID NOT DO: G44 is still open. SM.006 remains unreachable by design --
+-- that is what A5 asserts and what forces_recert=FALSE rests on. The landmine is
+-- defused; the routing fix that would have stepped on it is still to come.
 -- ===========================================================================
