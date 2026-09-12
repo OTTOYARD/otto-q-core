@@ -1,0 +1,194 @@
+-- ===========================================================================
+-- 0173  THE TEARDOWN STAMPS THE WALL CLOCK, AND NO STREAM CAN SEE A TEARDOWN
+-- ===========================================================================
+-- Convicted 2026-09-12 07:05-07:20 UTC (2:05-2:20 AM CT), read-only, from the
+-- round 37 verdicts plus the live catalog. Nothing in flight (pg_stat_activity 0).
+--
+-- This closes the question db/checks/0169 opened and db/migrations/0254 built the
+-- instrument for. It also records a WRONG PREDICTION of mine, because 0170
+-- committed in advance that a `vehicles` answer would mean my reasoning had a hole,
+-- and it did.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE INSTRUMENT SAID, IN ONE ROUND
+-- ---------------------------------------------------------------------------
+--
+-- The two 48-tick pairs (05:48 and 06:20 UTC, jobids 552 and 553) each passed
+-- internally -- equal=true, 0 of 14 atoms between arms -- and disagreed with each
+-- other on `endst` alone, and within endst on `world` alone. Exactly as 2026-09-09.
+--
+-- `wsec` then named the section, which is the whole reason it exists:
+--
+--   vehicles      aae9b73da32ee3a4ac051539bfdf1846  vs  6018dec523efaad332233e7703723bfe
+--   stalls        3e03db4aa74a4655b6bb10f20b450a48      identical
+--   bess          d06508b990e4780f947ca04afea56f5c      identical
+--   chargers      4895c66ad941383fbc0dff3b0db9ed57      identical
+--   need_profile  b24639271b27f6a93f99c8886a57fd94      identical
+--   n             {bess 1, stalls 158, vehicles 116, chargers 40, need_profile 116}
+--                                                       identical -- a VALUE change,
+--                                                       not a row change
+--
+-- 0170 predicted `bess` or `stalls`. The answer is `vehicles`. One round, one name,
+-- and a falsified hypothesis instead of another "something moved".
+--
+-- ---------------------------------------------------------------------------
+-- THE CARRIER, NAMED AND MEASURED
+-- ---------------------------------------------------------------------------
+--
+-- Per-column hashes of the surviving 06:20 end state (the live flagship fleet was
+-- still byte-identical to it at 07:09, so it could be inspected directly):
+--
+--   all 116 vehicles  current_state = 'offline'
+--   current_stall_id, robotic_tether_phase / _until / _stall_id / _direction
+--                     all hash to 0f7519880cdc19d3d23c43e2babbad10 -- i.e. all NULL
+--   current_soc       44 distinct values, 30..100
+--   last_state_change ONE distinct value across all 116 rows:
+--                       2026-09-12 06:20:00.190665+00
+--
+-- That is not sim time. Sim time for this run is 2026-09-01 02:00 -> 2026-09-02
+-- 02:00. 06:20:00.190665 is the WALL-CLOCK INSTANT THE 06:20 CRON JOB FIRED.
+--
+-- The path, read from the live body of public.ottoq_sim_advance_tick -- the function
+-- the pair's own loop calls once per tick:
+--
+--   SELECT * INTO w FROM ottoq_sim_advance_tick_world(p_sim_run_id);
+--   IF w.out_completed AND w.out_sim_clock_after IS NULL THEN
+--     -- 0102: a run that completes naturally gets the SAME teardown as a stopped one.
+--     PERFORM set_config('ottoq.sim_run_id', p_sim_run_id::text, true);
+--     PERFORM ottoq_sim_release_depot(p_sim_run_id, 'sim_clock_end_reached');
+--     ...
+--
+-- and public.ottoq_sim_release_depot writes `last_state_change = now()`. It is one
+-- of only three routines in the database that assign now() to that column (the
+-- others are ottoq_benchmark_reset and twin.ottoq_sim_seed_fleet, neither on this
+-- path). ottoq.ottoq_world_fingerprint hashes last_state_change -- added by 0115
+-- behind a pair-17 probe.
+--
+-- ---------------------------------------------------------------------------
+-- WHY THIS DEFECT IS INVISIBLE TO THE THING BUILT TO CATCH IT
+-- ---------------------------------------------------------------------------
+--
+-- Two properties, and together they explain every observation exactly:
+--
+-- 1. now() IS THE TRANSACTION TIMESTAMP, NOT THE STATEMENT CLOCK. ottoq_determinism_pair
+--    runs both arms in ONE transaction, so arm A and arm B receive the IDENTICAL
+--    stamp. A determinism pair therefore CANNOT EVER FAIL on this column. It is
+--    invisible to the instrument by construction -- not by bad luck. Every one of the
+--    ten round-37 pairs agreed on wsec between its own arms, including these two.
+--
+-- 2. THE TEARDOWN FIRES ONLY AT THE SCENARIO'S SIM-CLOCK END. busy_day runs
+--    02:00 -> 02:00 next day = 1,440 sim minutes, and a tick is 30 sim minutes, so
+--    out_completed first becomes true at EXACTLY tick 48. The 12- and 24-tick arms
+--    exit on `v_ticks >= p_ticks` before that, never reach the teardown, and keep
+--    sim-clock values in last_state_change.
+--
+-- Which is why six columns reproduce across three consecutive rounds spanning THREE
+-- DAYS while the seventh cannot reproduce across thirty-two minutes. The horizon
+-- dependence is not a deeper bug at long horizons; 48 ticks is simply the only
+-- horizon that reaches the teardown.
+--
+-- A HYPOTHESIS KILLED ON THE WAY, recorded because it was wrong and cheap to test:
+-- "natural completion is the discriminator" predicted that only the 48t runs would
+-- be status='completed'. Measured: 12t (8 runs), 24t (4) and 48t (4) are ALL
+-- 'completed'. Completion is not the discriminator; reaching the sim-clock END is,
+-- and those are different things -- the arm loop marks a run complete when it has
+-- run the requested ticks, which is not the same as the world having run out of day.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT I GOT WRONG, AND THE GENERAL LESSON
+-- ---------------------------------------------------------------------------
+--
+-- 0169 argued that because twelve stream hashes agreed, the divergence had to be in
+-- a section no stream covers, and named `stalls` and `bess` because h_bkg hashes the
+-- booking calendar rather than the stalls table and h_nrg hashes energy commands
+-- rather than BESS state. That reasoning was sound as far as it went and it went to
+-- the wrong place.
+--
+-- THE HOLE: I asked which TABLES the streams fail to cover. I never asked which
+-- WRITES happen outside the streams entirely. A teardown is not a decision, not a
+-- command, not an event, not a booking -- so no stream hash could contain it no
+-- matter which table it touched. `vehicles` was reachable all along through a writer
+-- that no stream describes.
+--
+-- The general form, worth carrying: a stream hash covers WHAT THE ENGINE DECIDED.
+-- End-of-run housekeeping, resets, teardowns and janitors decide nothing and are
+-- therefore outside every stream by construction. When an end-state hash disagrees
+-- and every stream agrees, LOOK AT THE HOUSEKEEPING FIRST, not at the tables.
+--
+-- This is the same family as G15 (the shield reading the wall clock inside the twin)
+-- and 0137 (the world fingerprint hashing a write timestamp, current_soc_updated_at,
+-- which 0137 removed for exactly this reason). It is the third instance.
+--
+-- ---------------------------------------------------------------------------
+-- THE TWO CANDIDATE FIXES, AND WHY ONE IS RIGHT
+-- ---------------------------------------------------------------------------
+--
+-- (A) STOP HASHING last_state_change. One line in ottoq_world_fingerprint, the exact
+--     move 0137 made for current_soc_updated_at on the argument that a write
+--     timestamp is not world state. Cheap. forces_recert=TRUE (fp moves on every
+--     column). BUT it deletes evidence rather than fixing a write: 0115 added the
+--     column behind a probe, and a vehicle's last transition time genuinely is part
+--     of the start-relevant world -- it is what a cold-start or dwell rule would
+--     read. Hashing it is not the mistake.
+--
+-- (B) STOP WRITING WALL CLOCK INTO WORLD STATE. ottoq_sim_release_depot already
+--     receives p_sim_run_id, so it can stamp the run's own sim clock
+--     (ottoq_sim_runs.sim_clock_current) instead of now(). RECOMMENDED, because the
+--     wall-clock write is wrong independently of whether anything hashes it: it
+--     makes a twin run's end state depend on when the run happened, which also
+--     corrupts any duration or dwell measured from that column, and it is precisely
+--     the class G15 was opened to remove. The fingerprint hashing it is the
+--     fingerprint DOING ITS JOB -- it surfaced a real defect.
+--
+-- (B) is also the one that makes the 48-tick column certifiable rather than merely
+-- quiet. It is forces_recert=TRUE (end-state values change on the 48t column, and
+-- the floor moves for all), so it must land at the START of a window with a full
+-- round behind it, not at the end of one.
+--
+-- NOT YET ESTABLISHED, and it gates the draft:
+--   * whether ottoq_sim_release_depot is also called on paths with NO sim run
+--     (ottoq_production_stop is one of its three callers), where sim_clock_current
+--     does not exist and now() is the only correct answer. The fix must be
+--     conditional on being inside a sim run, and must not change production
+--     behaviour. P2 of 0039's production/sim split applies.
+--   * whether any OTHER column in the five hashed sections is written by a teardown
+--     or janitor the same way. The sweep this finding implies is: every writer
+--     reachable from a teardown, not every table in the fingerprint. That sweep has
+--     not been done and is the honest next step before (B) is called complete.
+--
+-- ---------------------------------------------------------------------------
+-- AND A GAP BETWEEN THE TWO NEW INSTRUMENTS, FOUND BY USING BOTH
+-- ---------------------------------------------------------------------------
+--
+-- ottoq_cert_coverage() reports all NINE registered columns OK after round 37,
+-- ages 0.9h-3.1h against their max_ages. It is right and it is not enough:
+-- busy_day/171717/48t is OK on coverage and FAILED its bar. Coverage answers "has
+-- this column been exercised recently"; the matrix answers "did the pairs agree".
+-- NEITHER ALONE MEANS CERTIFIED, and a reader glancing at nine green OKs would
+-- conclude the opposite of the truth. Said here so the sentence "nine of nine OK"
+-- is never quoted without its other half.
+--
+-- STATUS: flagship matrix SIX OF SEVEN. The 48-tick column has a named mechanism
+-- and is still not certified. A mechanism is progress, not a pass.
+-- ===========================================================================
+
+-- The conviction, re-runnable while the 06:20 end state survives.
+SELECT count(*) AS vehicles,
+       count(DISTINCT last_state_change) AS distinct_last_state_change,
+       min(last_state_change) AS the_single_value,
+       (min(last_state_change) > '2026-09-12 00:00:00+00') AS is_wall_clock_not_sim,
+       count(DISTINCT current_state) AS distinct_states,
+       count(DISTINCT current_soc) AS distinct_soc
+  FROM public.vehicles
+ WHERE home_depot_id = '11111111-1111-1111-1111-111111111111'::uuid
+   AND category = 'autonomous';
+
+-- The path: one tick function, one teardown, one wall-clock write.
+SELECT n.nspname||'.'||p.proname AS fn,
+       (p.prosrc LIKE '%ottoq_sim_release_depot(%')              AS calls_the_teardown,
+       (p.prosrc ~* 'last_state_change[[:space:]]*=[[:space:]]*now\(\)') AS writes_wall_clock,
+       (p.prosrc LIKE '%sim_clock_end_reached%')                 AS names_the_reason
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE n.nspname IN ('public','ottoq','twin')
+   AND p.proname IN ('ottoq_sim_advance_tick','ottoq_sim_release_depot','ottoq_world_fingerprint')
+ ORDER BY 1;
