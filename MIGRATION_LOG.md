@@ -240,7 +240,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0251](db/migrations/0251_a_purged_run_must_say_gone_not_zero.sql) | `20260912034252` | yes — ledger | A PURGED RUN MUST SAY "GONE", NOT "ZERO" |
 | [0252](db/migrations/0252_a_certification_column_nobody_schedules_is_invisible.sql) | `20260912033615` | yes — ledger | A CERTIFICATION COLUMN NOBODY SCHEDULES IS INVISIBLE |
 | [0253](db/migrations/0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four.sql) | `20260912033843` | yes — ledger | SM.006 POINTS AT A FIVE-ARGUMENT EVALUATOR AND THE DISPATCHER PASSES |
-| [0254](db/migrations/0254_the_world_hash_moved_and_could_not_say_where.sql) | `PENDING` | no — pending | THE WORLD HASH MOVED AND COULD NOT SAY WHERE |
+| [0254](db/migrations/0254_the_world_hash_moved_and_could_not_say_where.sql) | `20260912035032` | yes — ledger | THE WORLD HASH MOVED AND COULD NOT SAY WHERE |
 
 122 migrations indexed.
 

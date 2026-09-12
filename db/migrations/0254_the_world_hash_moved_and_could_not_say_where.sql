@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260912035032
 -- migration-name: 0254_the_world_hash_moved_and_could_not_say_where
 -- ===========================================================================
 -- 0254  THE WORLD HASH MOVED AND COULD NOT SAY WHERE
@@ -283,4 +283,30 @@ END $$;
 -- COST: one extra pass over five small depot-scoped tables per arm (226 vehicles
 -- and 330 stalls at flagship). Measured against the ~9.4 billion heap blocks
 -- ottoq_stall_bookings alone has served (db/checks/0163), this is noise.
+-- ===========================================================================
+-- ===========================================================================
+-- APPLIED 2026-09-12 03:50:32 UTC (2026-09-11 10:50 PM CT) -- version 20260912035032
+--
+-- A1-A5 all passed. A1 verified the transcription on two depots of different shape
+-- BEFORE applying, by running the five section expressions as a plain query and
+-- comparing to the untouched original:
+--     flagship 11111111  combined = monolith = 4ae38da2ddd951224e2cb8e3641bd252
+--     grid     aacd0bb0  combined = monolith = 31c97c250c8eb33cb75199c177bf9d16
+-- so the only real hazard -- two copies of five expressions drifting apart -- was
+-- closed before the migration ran rather than after.
+--
+-- Submitted WHOLE; scripts/exec-digest.py --check flags this file UNSAFE TO CONDENSE
+-- (three comment lines inside the $function$ body), which is the tool working.
+--
+-- IT EARNED ITS KEEP IN ONE ROUND. Round 37's two 48-tick pairs (05:48 and 06:20,
+-- jobids 552/553) disagreed on endst again, and wsec named the section immediately:
+-- `vehicles` moved (aae9b73d... -> 6018dec5...) while stalls, bess, chargers,
+-- need_profile and every row count were byte-identical. That falsified 0170's
+-- committed prediction of `bess` or `stalls` and pointed straight at the carrier,
+-- convicted the same session in db/checks/0173: ottoq_sim_release_depot stamps
+-- last_state_change = now() on the natural-completion teardown, and the world
+-- fingerprint hashes that column.
+--
+-- Without this migration that round would have produced, for the second time, the
+-- single uninformative sentence "world moved".
 -- ===========================================================================
