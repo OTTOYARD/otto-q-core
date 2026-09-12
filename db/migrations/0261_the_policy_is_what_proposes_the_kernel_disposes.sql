@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260912233647
 -- migration-name: 0261_the_policy_is_what_proposes_the_kernel_disposes
 -- ===========================================================================
 -- 0261  THE POLICY IS WHAT PROPOSES; THE KERNEL DISPOSES  (Phase 1 / D2: the A/B pair)
@@ -28,6 +28,31 @@
 --
 -- NOT TO BE APPLIED WHILE A ROUND IS IN FLIGHT OR SCHEDULED. pg_stat_activity is the
 -- only authority for in-flight; cron.job (r<NN>_* one-shot rows) for scheduled.
+--
+-- APPLY LOG. Applied 2026-09-12 23:36:47 UTC (6:36 PM CT), first attempt, byte-identical to
+-- this file (the five new bodies hash identically when created from the committed text on
+-- the dry cluster: ab_arm_atoms 99917154, ab_pair a02d6601, ab_write_score 8875406e,
+-- l2_propose_seat b63d77a2, l2_propose_stall_seat bb65c449). Round 40 had been judged a
+-- clean sweep 23:29 UTC and its r40_* rows unscheduled; the P guard then found 48 stale
+-- one-shot rows (r28_*..r36_*, fired once each on 09-08/09-09, due to re-fire in 2027)
+-- and they were unscheduled before this ran -- the guard doing its job on old debris.
+--
+--   A1/A1b/A1c   all three splices reversed to their pinned bodies. Post-splice:
+--                decide_and_dispatch 5a3ff8f2 (8272), l2_propose_stall_assignment
+--                335d111f (6806), decide_tick fd0bf428 (82992).
+--   A4  self-test otto_q/otto_q on the grid: outcome passed, moved [], group
+--       4d21ca43-c3b3-4890-a171-2d3baa737ff6, arms 093e19cb / 5bc58b01, 2.4 s.
+--   A5  otto_q/fifo on the grid: outcome compared, moved [endst, h_bkg, h_cmd, h_dec,
+--       h_evt, h_nrg, h_rcl, h_rule, h_sdr]; h_arr and h_prop did NOT move (no pre-tick
+--       proposal fired on a 6-tick grid: proposals {} in both arms); arm_a stall_sources
+--       {local_heuristic 1, reservation_honoured 1, reservation_broken 1}, arm_b
+--       {fifo 1, reservation_honoured 1, reservation_broken 1} -- the one assignment the
+--       seat could decide, it decided, and it is stamped. Group
+--       f686efa4-09da-3e44-1921-f31c66b86f24, arms ddc3adbd / d5a3603b.
+--   ottoq_ab_runs: four rows, first non-otto_q row ever (policy fifo). On the grid the
+--       scores are equal to the row (14 decisions, 2 sessions, peak 8.2 kW) -- the grid
+--       is too small to separate the seats; the flagship pairs are the measurement.
+--
 --
 -- DRY RUN 2026-09-12 21:28 UTC, before apply, on a local PostgreSQL 16 loaded with the
 -- LIVE column shapes of the sixteen tables this file reads (pulled from the catalog the
