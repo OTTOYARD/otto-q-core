@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0242 — GENERATED, not a log
+## Index, 0134–0261 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -226,10 +226,29 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0237](db/migrations/0237_record_and_replay_an_agent_proposal_stream.sql) | `20260909022308` | yes — ledger | AGENT LAYER, step 2 -- Posture B from SOLVER_STATE.md §8.2, which §8.3 calls |
 | [0238](db/migrations/0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql) | `20260909031408` | yes — ledger | G41 / db/checks/0156 |
 | [0239](db/migrations/0239_a_certification_that_replays_a_recorded_agent_stream.sql) | `20260909032226` | yes — ledger | AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door |
-| [0240](db/migrations/0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql) | `PENDING` | no — pending | G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge |
-| [0241](db/migrations/0241_a_certification_hears_only_the_proposers_it_certified.sql) | `PENDING` | no — pending | POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that |
-| [0242](db/migrations/0242_a_capture_records_only_what_the_run_cannot_regenerate.sql) | `PENDING` | no — pending | G42 / db/checks/0159. APPLY AFTER 0241 -- it consults the registry 0241 |
+| [0240](db/migrations/0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql) | `20260909051529` | yes — ledger | G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge |
+| [0241](db/migrations/0241_a_certification_hears_only_the_proposers_it_certified.sql) | `20260909051812` | yes — ledger | POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that |
+| [0242](db/migrations/0242_a_capture_records_only_what_the_run_cannot_regenerate.sql) | `20260909051927` | yes — ledger | G42 / db/checks/0159. APPLY AFTER 0241 -- it consults the registry 0241 |
+| [0243](db/migrations/0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql) | `20260909060909` | yes — ledger | THE START-OF-RUN WORLD HASH CANNOT SEE A VEHICLE MID-TETHER |
+| [0244](db/migrations/0244_the_end_state_fingerprint_cannot_see_the_assets_either.sql) | `20260909075534` | yes — ledger | THE END-STATE FINGERPRINT CANNOT SEE THE ASSETS EITHER |
+| [0245](db/migrations/0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing.sql) | `20260909075605` | yes — ledger | current_depot_id IS WRITTEN IN THE TICK AND CLEARED BY NOTHING |
+| [0246](db/migrations/0246_the_world_hash_is_id_blind_everywhere_except_inside_config.sql) | `20260909094627` | yes — ledger | THE WORLD HASH IS ID-BLIND EVERYWHERE EXCEPT INSIDE config |
+| [0247](db/migrations/0247_a_dead_runs_working_rows_outlive_it_because_nothing_deletes_them.sql) | `20260909133254` | yes — ledger | A DEAD RUN'S WORKING ROWS OUTLIVE IT BECAUSE NOTHING DELETES THEM |
+| [0248](db/migrations/0248_the_refusal_ledger_was_registered_engine_without_the_key_that_makes_it_true.sql) | `20260909133442` | yes — ledger | THE REFUSAL LEDGER WAS REGISTERED engine WITHOUT THE KEY THAT MAKES |
+| [0249](db/migrations/0249_the_purge_loop_variable_shadowed_the_table_it_was_selecting_from.sql) | `20260909133615` | yes — ledger | THE PURGE LOOP VARIABLE SHADOWED THE TABLE IT WAS SELECTING FROM |
+| [0250](db/migrations/0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat.sql) | `20260909134546` | yes — ledger | THE engine CLASS IS NOT A DELETE LIST, AND IT HOLDS THE MOAT |
+| [0251](db/migrations/0251_a_purged_run_must_say_gone_not_zero.sql) | `20260912034252` | yes — ledger | A PURGED RUN MUST SAY "GONE", NOT "ZERO" |
+| [0252](db/migrations/0252_a_certification_column_nobody_schedules_is_invisible.sql) | `20260912033615` | yes — ledger | A CERTIFICATION COLUMN NOBODY SCHEDULES IS INVISIBLE |
+| [0253](db/migrations/0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four.sql) | `20260912033843` | yes — ledger | SM.006 POINTS AT A FIVE-ARGUMENT EVALUATOR AND THE DISPATCHER PASSES |
+| [0254](db/migrations/0254_the_world_hash_moved_and_could_not_say_where.sql) | `20260912035032` | yes — ledger | THE WORLD HASH MOVED AND COULD NOT SAY WHERE |
+| [0255](db/migrations/0255_the_teardown_stamps_the_wall_clock_into_a_hashed_column.sql) | `20260912130622` | yes — ledger | THE TEARDOWN STAMPS THE WALL CLOCK INTO A HASHED COLUMN |
+| [0256](db/migrations/0256_the_trigger_restamps_what_the_teardown_fixed.sql) | `20260912165023` | yes — ledger | THE TRIGGER RE-STAMPS WHAT THE TEARDOWN FIXED |
+| [0257](db/migrations/0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql) | `20260912165137` | yes — ledger | THE SECOND FLOOR SHIPS AS A COUNT, WITH ITS OWN LIMITS ATTACHED |
+| [0258](db/migrations/0258_the_comment_states_the_invariant_and_no_code_holds_it.sql) | `20260912165243` | yes — ledger | THE COMMENT STATES THE INVARIANT AND NO CODE HOLDS IT |
+| [0259](db/migrations/0259_the_proposer_seat_is_declared_data_not_three_literals.sql) | `20260912205202` | yes — ledger | THE PROPOSER SEAT IS DECLARED DATA, NOT THREE LITERALS |
+| [0260](db/migrations/0260_every_proposer_fire_is_a_ledger_row.sql) | `20260912205301` | yes — ledger | EVERY PROPOSER FIRE IS A LEDGER ROW |
+| [0261](db/migrations/0261_the_policy_is_what_proposes_the_kernel_disposes.sql) | `20260912233647` | yes — ledger | THE POLICY IS WHAT PROPOSES; THE KERNEL DISPOSES  (Phase 1 / D2: the A/B pair) |
 
-110 migrations indexed.
+129 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

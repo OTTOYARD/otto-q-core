@@ -1,0 +1,97 @@
+-- ===========================================================================
+-- 0163  THE TABLE THE DATABASE READS MOST IS THE ONE THE PURGE NEVER TOUCHES
+-- ===========================================================================
+-- G23, measured 2026-09-09 11:45 UTC (6:45 AM CT), read-only, from catalog
+-- statistics rather than by scanning anything. Run between round 34's
+-- judgement and round 35's start, on a quiet database.
+--
+-- db/checks/0127 recorded that ottoq_stall_bookings was "53% of every disk block
+-- this database has ever read". That number is stale in the direction that makes
+-- the finding worse.
+--
+--   table                          live rows   inserts    deletes    size     heap blocks touched
+--   ---------------------------   ---------   --------   --------   ------   -------------------
+--   ottoq_stall_bookings            892,129   1,037,285    134,089   1025 MB      9,380,247,938
+--   ottoq_events                  2,416,069  10,078,009  9,710,520   3441 MB      2,321,420,685
+--   ottoq_rule_evaluations        5,906,985  11,325,789  5,144,150   5568 MB      2,119,310,875
+--   ottoq_telemetry_packets         321,309   3,391,864  3,239,161    128 MB        112,835,023
+--   ottoq_decisions               1,862,993   3,182,946  4,854,763   2110 MB         92,722,531
+--   ottoq_energy_commands            28,185     155,837    166,339     19 MB         45,062,502
+--   ottoq_incident_reports                0   1,057,319    847,134     64 kB         11,412,137
+--   ottoq_service_detail_records    216,590     229,731     12,589    127 MB          1,805,561
+--
+-- THE ONE SENTENCE. ottoq_stall_bookings accounts for 9.38 BILLION of the
+-- ~14.1 billion heap blocks touched across these eight tables -- SIXTY-SIX
+-- PERCENT -- while being only the fourth largest of them at 1 GB. It is read
+-- four times as heavily as the event stream, which is three times its size.
+--
+-- AND IT IS THE LEAST PURGED THING IN THE DATABASE. Deletes as a share of
+-- lifetime inserts:
+--
+--   ottoq_events                   96.4%
+--   ottoq_telemetry_packets        95.5%
+--   ottoq_incident_reports         80.1%
+--   ottoq_rule_evaluations         45.4%
+--   ottoq_service_detail_records    5.5%
+--   ottoq_stall_bookings           12.9%   <-- the calendar
+--
+-- (ottoq_decisions and ottoq_energy_commands show MORE deletes than inserts,
+-- which is not an error in the numbers: rows are removed by run teardown and
+-- scope purges on paths that predate the current insert counters. Their ratios
+-- are not comparable and are excluded from the ranking rather than quietly
+-- included.)
+--
+-- THE CAUSE IS ONE ARRAY LITERAL IN ONE CRON JOB:
+--
+--   ottoq-retention-nightly, '0 8 * * *':
+--     CALL public.ottoq_retention_purge_worker(
+--            90, 2000, '48 hours',
+--            ARRAY['ottoq_events','ottoq_rule_evaluations','ottoq_incident_reports']);
+--
+-- Three tables. ottoq_stall_bookings is not one of them, and neither are
+-- ottoq_decisions (2110 MB, 1.86M live rows) or ottoq_service_detail_records
+-- (which is 94.5% unpurged and is the SETTLEMENT ledger, where that is arguably
+-- correct -- an SDR is the record of a completed service event and CLAUDE.md 2.6
+-- treats it as a settlement rail, not telemetry).
+--
+-- WHY THE READS ARE SO HEAVY, AND WHY THIS IS NOT MERELY A DISK-SPACE ITEM.
+-- 0222 already had to bound two boot-fingerprint CTEs that were scanning the
+-- whole booking table on every arm ("786,457 rows scanned at the flagship depot,
+-- 0 of them usable"). That fix bounded the SCAN. It did not shrink the TABLE, so
+-- every index range over the calendar still walks a structure that is 87% rows
+-- nobody will read again. The certification pair touches this table more than
+-- any other object in the system, so the calendar's size is a direct tax on
+-- every round -- and rounds are the thing this project runs continuously.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT IS NOT YET ESTABLISHED, AND MUST BE BEFORE ANYTHING IS DELETED
+-- ---------------------------------------------------------------------------
+--
+-- This check measures and does not prescribe, because the obvious fix -- add
+-- 'ottoq_stall_bookings' to that array -- is exactly the kind of one-line change
+-- that looks safe and is not. Before it:
+--
+--   1. WHAT IS THE CALENDAR FOR, AFTER ITS RUN ENDS? CLAUDE.md 2.3 calls
+--      ottoq_stall_bookings "the calendar" and its EXCLUDE constraint is the
+--      thing that makes double-booking physically impossible. Rows for a
+--      COMPLETED sim run are evidence of that run; rows for a purged run are
+--      not. The run-scope registry (223 classified columns) already knows which
+--      columns are run-scoped -- the purge decision belongs there, not in a
+--      hand-maintained array.
+--   2. DOES h_bkg DEPEND ON HISTORY? The pair hashes bookings WHERE
+--      sim_run_id = the arm's own run, so purging OTHER runs' rows cannot move
+--      h_bkg. That needs asserting, not assuming.
+--   3. WHAT DOES ottoq_run_archives NEED? 946+ archived reproducible runs are
+--      the reproducibility key. If replaying an archived run requires its
+--      bookings, they are not purgeable at any age.
+--   4. THE EXCLUDE CONSTRAINT'S INDEX is what makes the table expensive to read;
+--      deleting rows without reindexing may not return the read cost.
+--
+-- G23 is therefore MEASURED here and remains OPEN. The next step is question 1 --
+-- ask the run-scope registry what it already knows about this table -- not a
+-- migration.
+--
+-- NOT RUN DURING A ROUND: taken at 11:45 UTC with 0 busy client backends,
+-- between round 34 (finished 11:31) and round 35 (starts 12:10). Every number
+-- above comes from pg_stat_user_tables and pg_statio_user_tables. Nothing here
+-- scanned the calendar, which would have been an ironic way to measure it.

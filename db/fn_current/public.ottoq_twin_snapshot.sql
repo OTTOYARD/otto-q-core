@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: 723d1b70c3cd9fb0aba473ad33a354a4
+--   live      md5: 2aa3f6b92788785a9b3501f25d7a294f
 -- md5 at capture: 723d1b70c3cd9fb0aba473ad33a354a4
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live 2aa3f6b92788785a9b3501f25d7a294f
---   here 723d1b70c3cd9fb0aba473ad33a354a4
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('public.ottoq_twin_snapshot'::regproc);
 CREATE OR REPLACE FUNCTION public.ottoq_twin_snapshot(p_sim_run_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -351,4 +350,3 @@ BEGIN
   RETURN v_out;
 END;
 $function$
-

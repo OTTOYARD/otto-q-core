@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909051812
 -- migration-name:    a_certification_hears_only_the_proposers_it_certified
 --
 -- POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that
@@ -404,3 +404,30 @@ VALUES (
   'This is certification hygiene, not a security boundary: p_source is '
   'caller-supplied for a system caller and authorization is G2''s.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-09 00:19 CT (05:19 UTC), version 20260909051812, first
+-- attempt, all six assertions green. The two that matter most both had to
+-- SUCCEED rather than refuse:
+--
+--   A1  an unregistered proposer IS refused from a certification run, with
+--       OTTOQ_PROPOSAL_REFUSED_CERT and SQLSTATE 42501
+--   A2  ottoq_service_priority -- which proposes into cert runs 372 times through
+--       this exact door, from inside the certified tick -- is STILL ADMITTED.
+--       This is the assertion that proves the migration did not quietly narrow
+--       what the harness tests, and it is why forces_recert FALSE is honest.
+--   A3  the same unregistered proposer A1 refused IS admitted to a NON-cert run:
+--       the gate is scoped to certifications, not a ban on external proposals
+--   A4  foreign_proposals present in the arm object, ABSENT from the equality
+--       list, arm-key comparison count unchanged from the pre-image
+--   A5  the seed is complete against HISTORY: zero proposals, across every
+--       certification run ever recorded, come from a source the registry does
+--       not hold
+--   A6  no probe residue; decide_tick AND the certified pair both md5-unchanged
+--
+--   registry              cuopt, greedy_constrained, ottoq_service_priority
+--   recert floor          2026-09-09 03:15:07, UNMOVED
+--
+-- A5 is the one that converts the header's claim into a measurement. "Nothing
+-- certified changes" is not argued here; it is checked against every proposal
+-- this database has ever written to a cert run.

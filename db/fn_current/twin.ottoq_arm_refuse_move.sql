@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run3 follow-up, re-cert #3)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: e41bd0bdb025c8f46676046790666583
+--   live      md5: 477205d8039a6f5656b298f4f3004a8b
 -- md5 at capture: e41bd0bdb025c8f46676046790666583
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live 477205d8039a6f5656b298f4f3004a8b
---   here e41bd0bdb025c8f46676046790666583
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('twin.ottoq_arm_refuse_move'::regproc);
 CREATE OR REPLACE FUNCTION twin.ottoq_arm_refuse_move(p_vehicle_id uuid, p_mover text, p_intended_stall uuid DEFAULT NULL::uuid, p_sim_run_id uuid DEFAULT NULL::uuid, p_clock timestamp with time zone DEFAULT NULL::timestamp with time zone)
  RETURNS boolean
  LANGUAGE plpgsql

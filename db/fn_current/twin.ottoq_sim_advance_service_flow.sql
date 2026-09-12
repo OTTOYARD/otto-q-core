@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run3 follow-up)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: a972827df8f098fded8278c5842d00ed
+--   live      md5: e18a4aeca096a0f7267e191d41b8edcc
 -- md5 at capture: a972827df8f098fded8278c5842d00ed
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live e18a4aeca096a0f7267e191d41b8edcc
---   here a972827df8f098fded8278c5842d00ed
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('twin.ottoq_sim_advance_service_flow'::regproc);
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_advance_service_flow(p_sim_run_id uuid, p_sim_clock_now timestamp with time zone, p_tick_minutes numeric, p_depot_id uuid DEFAULT '11111111-1111-1111-1111-111111111111'::uuid)
  RETURNS TABLE(out_washing integer, out_servicing integer, out_staged integer, out_ready integer, out_overflow integer)
  LANGUAGE plpgsql

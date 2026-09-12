@@ -86,6 +86,8 @@ the proposer saw the vehicle and declined — cuOpt's abstention pattern, preser
 
 ## What integration requires (founder-gated; nothing here does it)
 
+**2026-09-12 — the integration now exists, outside this package:** `bridge/proposer_bridge.py` (a non-kernel package; `bridge/README.md`) reads the frame, calls `propose()`, and submits the rows through `ottoq_submit_external_proposal`. The generalization L-40 asks for below is migration `0259`; the fire ledger is `0260`; `db/checks/0184` is the measurement.
+
 An edge function that: reads the frame → calls `propose()` with the class-table join and
 visit-need ready-bys → inserts the rows with `sim_run_id`/`depot_id`/`expires_at` → logs the
 fire. The rows match the shape the gate router already receives from `greedy_constrained` and

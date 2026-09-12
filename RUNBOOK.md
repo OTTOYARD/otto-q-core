@@ -195,3 +195,29 @@ VALUES ('<source>', '<why this proposer belongs in a certification>');
 
 Be aware this has a second effect, by design: `ottoq_proposal_replay_capture` will then skip
 it by default, on the grounds that a certified proposer is one that regenerates.
+
+### A fourth way to get a wrong answer that looks right, found 2026-09-09
+
+**A pair can fail for a reason that has nothing to do with the replay.** The first
+flagship-scale replay pair came back `failed` with exactly one atom moved (`h_evt`)
+on one arm, and the cause was not the replay: seven vehicles were carrying live
+`robotic_tether_*` state when arm A booted, arm B inherited the world arm A left,
+and the two arms therefore ran different worlds. See `db/checks/0160` (G43).
+
+Neither `ottoq_tick_invariance_reset_fleet` nor `ottoq.ottoq_world_fingerprint`
+knew those four columns existed, so `fp` — the enforced atom whose job is "both
+arms started from the same world" — reported them identical. Migration `0243`
+closes both halves.
+
+**Practical rule while running any pair by hand, replay or not:** do not start one
+within a minute or two of touching the depot from a client session. If a pair fails
+on `h_evt` alone, check the fleet before blaming the change under test:
+
+```sql
+SELECT count(*) FILTER (WHERE robotic_tether_phase IS NOT NULL) AS mid_tether,
+       max(updated_at) AS last_write
+  FROM public.vehicles WHERE home_depot_id = '<depot>';
+```
+
+A `last_write` that predates your pair's transaction, on rows the reset does not
+own, is the signature.

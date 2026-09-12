@@ -1,0 +1,107 @@
+-- 0166 — the purge prediction, written and committed BEFORE round 36 fires.
+--
+-- Round 36 is scheduled for 14:10, 14:24, 14:38, 14:52, 15:06 and 15:26 UTC
+-- (9:10-10:26 AM CT), jobids 536-541. This file is committed at ~14:00 UTC, so
+-- the prediction below cannot be edited after the evidence arrives. That is the
+-- whole point of writing it down.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT HAPPENED BETWEEN ROUND 35 AND ROUND 36
+-- ---------------------------------------------------------------------------
+--
+-- Four migrations (0247, 0248, 0249, 0250) and, uniquely, a DATA DELETION: two
+-- passes of ottoq_retention_purge_runs removed every doomed-run row from
+-- ottoq_rule_evaluations and part of ottoq_events, across 729 runs older than
+-- 48 hours. Cancelled mid-second-pass at 13:46 UTC (see 0165).
+--
+-- All four migrations are classified forces_recert=false in ottoq_cert_lineage,
+-- and the recert floor is back at 2026-09-09 09:46:27.088143 -- unmoved from
+-- where 0246 set it. All six flagship columns read green at streak 2 again.
+--
+-- ---------------------------------------------------------------------------
+-- THE PREDICTION
+-- ---------------------------------------------------------------------------
+--
+-- Round 36 reproduces ROUND 35 byte-for-byte: six of six pass, zero of fourteen
+-- atoms differ between arms, and zero of fourteen atoms move from round 35 on
+-- any of the six columns. fp and endst included.
+--
+-- Round 35's arm_a values, recorded here so the comparison has a fixed
+-- reference and cannot be re-derived to suit the answer:
+--
+--   busy_day/314159/12t   fp b8606125f1cbd5c820fc9be94c4c4a29
+--   busy_day/171717/12t   fp 9c28854e976c8572f2cc1bf4717f85b0
+--   normal_day/171717/12t fp 9c28854e976c8572f2cc1bf4717f85b0
+--   busy_day/424242/12t   fp 7a14aa522a65cc196ca486309194573c
+--   busy_day/171717/24t   fp 9c28854e976c8572f2cc1bf4717f85b0
+--   busy_day/424242/24t   fp 7a14aa522a65cc196ca486309194573c
+--
+-- and the canon hashes the matrix holds for each column at 13:47 UTC, which are
+-- round 35's own values (canon_dec / canon_evt / canon_bkg / canon_nrg /
+-- canon_rule / canon_sdr / canon_endst):
+--
+--   314159/12t  9abdb4afb2d172f50821158698fd26be / 9c631343c32cca7a861b17bc5bc8f4b7 /
+--               174b88355d034533c8e711efecffc1b3 / a9c6b69379127aa6e9dfa38dd8bf019b /
+--               fc69953b7ea27f5b2217621a46cf68e6 / a1f79c20a2ecd2ee7853d6c15836bc5e /
+--               e46c7ff4cd58b5b95949716b1c641ab1
+--   171717/12t  cf2f44e29bd03549ea9f189ff135a675 / e16ad96493775bfb8606b33a6e658d8a /
+--               7146a8e13e91370836301fbb95b2ec5f / 08f719afbd862a9fb7aad5ae15a6d8c8 /
+--               3e57f511cb80f6edd1ea194e17874470 / a2a35e035f4df12f3d5055800a3c5e09 /
+--               b250e8fa7bfb0ea8fc40e6b8a23f7b79
+--   normal/12t  37624cdd69a92b9ee806103655c5eb61 / ac672423a3478cd1b806cb11619d375f /
+--               ed4a986ccb9198cf0601d968533876a4 / 17c9b12bc49ad835876df2229ce78651 /
+--               5b1d1dfa9f391c64052705a0da471017 / e0dfbbe8dddc208b6cb1061f718899df /
+--               3b2744f4377f937e796bb9384f79f9f6
+--   424242/12t  47757095390ee3acaf6fa4e28d802e8f / 6453c09bb1fc4693cf48acc3588a03b6 /
+--               8bc2877b48c42fcca3293ba516bb228f / 9917f7c3fd22d7386d666d08976bb5b9 /
+--               d56e09a30bac411c464a7193b35c03d4 / 6fd75365723a2e7ae39152175e9cb7c9 /
+--               349257e19901cf24cc3915d00402a04c
+--   171717/24t  0360adc952cfb784e70007cae3f08856 / b2230619d5eb5327c52d386894735fe4 /
+--               947a23169eeabde514b759a00b0b443c / 4c5035feb4367b2c582e715832be8fc0 /
+--               9564b99852ab36b5d6ee13562c36ef8a / 957abcfbfdd8559a75e03f9037bf2ce3 /
+--               5e63d8f861cf8b34dc947d9f194e66fa
+--   424242/24t  351480557c2a2683b5422006bedfcae0 / 8dc37f824db7410f0d08cda0b2135fe2 /
+--               ea8a12e2b4ef3fde9a0ee6c976c8c11e / c79957a5f9e17847156c8f777152afe5 /
+--               726f6769385c8c01bba4bcd092053e70 / f2587dbcc6cad07788c7a0eb0934f7e6 /
+--               3550457a9a71acc53ed0d623a3640d17
+--
+-- ---------------------------------------------------------------------------
+-- WHY, AND WHAT WOULD FALSIFY IT
+-- ---------------------------------------------------------------------------
+--
+-- The reasoning is one sentence: every verdict atom is run-scoped. The pair
+-- hashes bookings WHERE k.sim_run_id = v_run, and the five standalone hash
+-- functions -- ottoq_hash_rule_evaluations, ottoq_hash_recall_decisions,
+-- ottoq_hash_sdrs, ottoq_hash_proposals, ottoq_hash_deferrals -- each take
+-- (p_run uuid). A new pair creates new runs. Rows belonging to runs that ended
+-- days ago are therefore invisible to it, and deleting them changes nothing it
+-- can see.
+--
+-- THIS IS THE FIRST TIME THAT PROPERTY HAS BEEN TESTED BY DELETION RATHER THAN
+-- BY READING THE SOURCE. The 0145/0053/0054/0177 class of defect was exactly
+-- unscoped reads of run-scoped tables, and five instances were found by
+-- inspection. A purge is the experiment those five findings imply: if any
+-- sixth instance survives, an atom that reads across runs will now read a
+-- SMALLER world than it did in round 35, and its hash will move.
+--
+-- SO A MOVED ATOM IS NOT A PURGE BUG. It is a sixth instance of the 0145 class,
+-- found the way the first five should have been. If it happens:
+--   * name the atom and the column before theorising;
+--   * the two tables actually touched are ottoq_rule_evaluations (fully drained
+--     of doomed rows) and ottoq_events (partial), so h_rule and h_evt are the
+--     first suspects, and h_evt moving on a column whose rule hash held would
+--     be the more interesting result;
+--   * check ottoq_cert_lineage for an unexpected forces_recert row FIRST, as
+--     round 35's own check-in instructed -- I have added four rows to that
+--     table since round 35 and a mistake in one of them is a likelier
+--     explanation than a solver defect.
+--
+-- The alternative outcome is worth stating too, because it is not nothing:
+-- if all six columns reproduce, then a deletion of millions of rows from two
+-- of the largest tables in the database, spanning 729 historical runs, moved
+-- no atom of a fourteen-atom verdict. That is run-scoping demonstrated rather
+-- than asserted, and it is the precondition for ever purging the calendar.
+--
+-- NOT PREDICTED, AND DELIBERATELY SO: the 48-tick flagship column and both
+-- grid columns. The 48t column has not run since 2026-09-04 and is stale; the
+-- grid columns need their own pairs. Round 36 is six columns, not nine.

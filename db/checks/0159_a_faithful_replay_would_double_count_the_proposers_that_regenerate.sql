@@ -116,3 +116,184 @@
 --
 -- If P3 is wrong and the pair FAILS, the defect is worse than described, not
 -- better -- it would mean the doubled stream is also nondeterministic.
+
+-- ===========================================================================
+-- 6. THE EXPERIMENT, RUN 2026-09-09 00:2x CT (05:2x UTC)
+-- ===========================================================================
+-- Setup, and one thing found while doing it that matters more than the setup:
+--
+-- To generate a REAL stream the run must be non-cert, which opens
+-- ottoq_cron_tick's gate to ottoq-orchestrate-tick and therefore to NVIDIA. The
+-- plan was to shut that with a depot-scoped cuopt_propose_enabled=0. On writing
+-- it, the resolution order turned out to already answer the question:
+-- ottoq_policy_get resolves run -> depot -> GLOBAL -> default, and there has
+-- been a GLOBAL row since 0152:
+--
+--   scope_type global, param cuopt_propose_enabled, value 0, by 0152_deterministic_only
+--
+-- So line 24's `default 1` is never reached. The orchestrate dispatch has been
+-- shut globally since 0152, for every run, not just certifications.
+--
+-- THAT IS A THIRD LEG UNDER db/checks/0158's CONCLUSION, and a better one than
+-- either of the first two. 0158 argued "the endpoint has not been called since
+-- 2026-08-30" from (a) the ledger, which was blind to two doors, and (b) cron
+-- durations, which are circumstantial and get pruned. This is a standing
+-- configuration row that closes the unattended door outright. 0158's verdict is
+-- unchanged; its evidence is now much stronger than when it was written.
+--
+-- (The depot-scoped rows for the Benchmark depot were written anyway and kept.
+-- They are correct standing policy for a benchmark depot regardless of what the
+-- global tier happens to say, and they do not depend on it.)
+--
+-- ---------------------------------------------------------------------------
+-- THE REAL STREAM
+-- ---------------------------------------------------------------------------
+--   ottoq_cert_arm(seed 159001, otto_q, 8 ticks, Benchmark depot 22222222-...)
+--   -> run 70733335-639c-47f0-84ce-c24c64cdec0c
+--      8 ticks, 618 decisions, 7 external proposals
+--      sources: greedy_constrained, ottoq_service_priority
+--
+-- Not synthetic. Written by the engine's own proposers during a real tick loop.
+--
+-- ---------------------------------------------------------------------------
+-- P1 -- CONFIRMED, AND THE PREDICTION WAS PARTLY WRONG
+-- ---------------------------------------------------------------------------
+-- P1 said: "Captured with today's default (p_sources NULL), the replay will
+-- contain greedy_constrained and/or ottoq_service_priority rows, ALL AT TICK -1."
+--
+-- Measured, capturing the same run twice -- once reproducing the OLD default by
+-- naming the registered proposers explicitly, once with 0242's new default:
+--
+--   OLD default (every source)   7 rows      <- the defect
+--   NEW default (0242)           0 rows      <- the fix
+--
+-- and the old-style capture splits:
+--
+--   tick_seq   rows   source
+--   --------   ----   ----------------------
+--        -1       6   greedy_constrained
+--         2       1   ottoq_service_priority
+--
+-- The main claim holds: 6 of 7 land in the -1 bucket, exactly as predicted, and
+-- 0242's default correctly records none of them.
+--
+-- **"ALL at tick -1" was too strong.** The one ottoq_service_priority row carries
+-- a REAL tick, because that proposal came through the agent door, which 0236
+-- stamps -- while greedy_constrained is written directly by
+-- ottoq_l2_optimize_assignments, which 0236 deliberately left alone.
+--
+-- That is the two-write-paths inconsistency 0241 recorded and declined to fix,
+-- showing up as a measurement: ONE PROPOSER'S OUTPUT SPLITS ACROSS TWO TICK
+-- DOMAINS DEPENDING ON WHICH WRITE PATH IT TOOK. A replay of a mixed stream
+-- would therefore have put some rows back at their real tick and the rest at
+-- -1 -- a worse failure than the uniform one predicted, because it looks
+-- partially correct.
+
+-- ===========================================================================
+-- 7. P2 AND P3 -- THE REPLAY PAIR, JUDGED
+-- ===========================================================================
+--
+-- The experiment, run 2026-09-09 05:24 UTC (12:24 AM CT) on the flagship depot,
+-- alone in the window -- round 31's last job (r31_f) fired at 04:58 and no cert
+-- job is scheduled after it:
+--
+--   SELECT public.ottoq_determinism_pair_replay(
+--            p_seed => 314159, p_ticks => 12, p_scenario => 'busy_day',
+--            p_depot => '11111111-1111-1111-1111-111111111111',
+--            p_sim_start => '2026-09-01 02:00:00+00',
+--            p_arm_budget_s => 900,
+--            p_replay_id => '01590000-0000-0000-0000-0000000000cc');
+--
+--   arm A run  d06abdc4-3455-47a7-acd5-680d8c8bd98c
+--   arm B run  3a224796-177e-48e3-bd1c-d9165f23aa21
+--   verdict    {"equal": false, "outcome": "failed", "complete": true, "ticks": 12}
+--
+-- The replay stream 01590000-...-cc was captured OLD-style (pre-0242) from
+-- round-31 run 54b1c04a-99ad-4c29-9458-d9fb8b66d145 and holds 5 rows:
+-- 1 greedy_constrained at tick -1, 2 ottoq_service_priority at tick 1, 2 at tick 2.
+-- That is deliberate: this pair is the DEFECT reproduced, not the fix exercised.
+--
+-- ---------------------------------------------------------------------------
+-- P2 -- CONFIRMED, and the arithmetic is exact
+-- ---------------------------------------------------------------------------
+-- P2 said: "arm A's ottoq_external_proposals will hold MORE rows for those
+-- sources than the source run did -- the injected copies plus the regenerated
+-- ones."
+--
+-- Measured against that same column's no-replay pair from 03:42 the same
+-- morning (runs 54b1c04a / ff826272), which is the control:
+--
+--   arm                source                   submitted_by_role     rows
+--   ----------------   ----------------------   -------------------   ----
+--   no-replay ctl A    greedy_constrained       (null)                   1
+--   no-replay ctl A    ottoq_service_priority   system:db:postgres       4
+--                                                             TOTAL      5
+--   replay A           greedy_constrained       (null)                   1
+--   replay A           ottoq_service_priority   system:db:postgres       4
+--   replay A           ottoq_service_priority   system:replay            4   <-- injected
+--                                                             TOTAL      9
+--
+-- and arm B is row-for-row identical to arm A.
+--
+-- 5 -> 9. The run regenerated its own five proposals exactly as it does without
+-- a replay, and the replay laid four more on top of them. That is the
+-- double-count, measured, not argued: a "faithful" replay of a stream that
+-- contains the run's own regenerating proposers inflates the proposal ledger by
+-- the size of the captured stream, and every count, rate, or ratio computed over
+-- ottoq_external_proposals for such a run is wrong by that much.
+--
+-- 0242 is the fix and it is already applied: captured with today's default this
+-- stream would hold 0 rows (section 6), and there would be nothing to double.
+--
+-- ONE THING P2 DID NOT PREDICT AND THE MEASUREMENT SHOWS: the verdict reports
+-- replay_injected = 5 on each arm, but only 4 rows carry submitted_by_role
+-- 'system:replay'. The missing one is the greedy_constrained row injected into
+-- the -1 bucket before the loop. WHY it is absent is NOT ESTABLISHED HERE --
+-- candidates are the sim-domain proposal TTL and supersede-on-write, and
+-- picking one without measuring would be guessing. Recorded as open.
+--
+-- ---------------------------------------------------------------------------
+-- P3 -- FALSIFIED IN ITS CONCLUSION, CORRECT IN ITS MECHANISM
+-- ---------------------------------------------------------------------------
+-- P3 said: "Both arms will still AGREE (the pair will pass), because both arms
+-- are ghosted identically. That is the dangerous part: the defect does not
+-- announce itself as a failure."
+--
+-- THE PAIR FAILED. So the prediction as written is wrong, and it is wrong in the
+-- direction that flatters the harness rather than the fix.
+--
+-- But the reason it failed is not the double-count, and on the double-count P3
+-- was exactly right. Thirteen of the fourteen atoms are byte-identical across
+-- the arms, h_prop among them:
+--
+--   h_prop  A = B = 0299e5e6b7112f6978a1177ba12230fe
+--                   (the no-replay canon is a79c109534aed71bd65ad0741e0c76d0 --
+--                    so the injection DID move the proposal stream, symmetrically)
+--   h_dec   A = B = 9abdb4afb2d172f50821158698fd26be
+--                   (identical to the no-replay canon -- the replayed proposals
+--                    changed no decision at all)
+--
+-- Both arms hold 9 proposals. Both report replay_injected = 5. The double-count
+-- is perfectly symmetric and the pair cannot see it. P3's mechanism claim --
+-- "a certification pair is the wrong instrument for this defect" -- stands
+-- measured, and it is why 0242 had to fix the capture rather than the compare.
+--
+-- The pair failed on a DIFFERENT and previously unseen thing, which is the
+-- honest reason P3's conclusion is wrong: exactly one atom moved, h_evt, and it
+-- moved on one arm only.
+--
+--   h_evt   arm A  6cd5031317939de6d83bc1a3888b4ea1
+--           arm B  9c631343c32cca7a861b17bc5bc8f4b7
+--
+-- Arm B is the canon. That same h_evt, 9c631343..., is what BOTH arms of the
+-- no-replay pair produced at 03:42 today and at 20:50 yesterday. So arm B ran a
+-- canonical run and arm A did not: the divergence is an ARM-ORDER ASYMMETRY,
+-- not a symmetric shift, and that is a different animal from everything 0159
+-- was written to test. It is opened as G43 below.
+--
+-- (Post-hoc recomputation of h_evt from ottoq_events cannot judge this and was
+-- not used to: all four runs -- both replay arms and both control arms --
+-- recompute to values other than their own in-transaction verdict, because a
+-- later arm's world reset writes further events against an earlier arm's
+-- sim_run_id. Only the hash the pair took inside its own transaction is
+-- evidence. Reading the table afterwards is reading a contaminated stream.)

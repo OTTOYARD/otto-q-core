@@ -1,0 +1,140 @@
+-- ===========================================================================
+-- 0161  I ENFORCED A NEW ATOM WITHOUT MEASURING IT FIRST
+-- ===========================================================================
+-- Opened 2026-09-09 ~04:45 AM CT (09:45 UTC), out of round 33.
+--
+-- ROUND 33 FAILED SIX OF SIX, AND THE PREDICTION SAID IT WOULD PASS
+--
+-- The round-33 check-in, written at 07:56 UTC before any pair fired, predicted
+-- "six of six pass". Measured, with the runs selected by naming their firing
+-- times (08:10, 08:24, 08:38, 08:52, 09:06, 09:26) rather than by a window:
+--
+--   fired   column                    status   atoms differing between arms
+--   -----   -----------------------   ------   ----------------------------
+--   08:10   busy_day/314159/12t       FAILED   endst
+--   08:24   busy_day/171717/12t       FAILED   endst
+--   08:38   normal_day/171717/12t     FAILED   endst
+--   08:52   busy_day/424242/12t       FAILED   endst
+--   09:06   busy_day/171717/24t       FAILED   endst
+--   09:26   busy_day/424242/24t       FAILED   endst
+--
+-- Six of six, one atom, every time. THE PREDICTION IS FALSIFIED, and the cause
+-- is a migration I wrote and applied three hours ago.
+--
+-- WHAT 0244 DID, AND WHY IT WAS THE WRONG SHAPE
+--
+-- 0244 gave ottoq_boot_state_fingerprint a 'world' key holding
+-- ottoq.ottoq_world_fingerprint(p_depot), so that endst -- previously blind to
+-- vehicles and stalls -- would cover the assets. The gap it closed is real. The
+-- way it closed it was wrong, for a reason that is entirely mine:
+--
+--   ottoq.ottoq_world_fingerprint IS A START-RELEVANT HASH. Its own header says
+--   so: "The start-relevant world, hashed." It is id-blind for the columns it
+--   names, but it hashes vehicles.config nearly whole --
+--   COALESCE((v.config - 'condition_drawn_run')::text,'{}') -- stripping exactly
+--   ONE key.
+--
+--   At BOOT that is sound, because the reset leaves config in a clean shape with
+--   no run-scoped identifiers in it. Measured on the current post-reset world:
+--   config carries battery_soh_pct, calib_interval_h, charge_curve_scalar,
+--   condition_drawn_run, consumption_scalar, cycles_since_wash, lifetime_miles,
+--   pm_interval_km, scenario_interval_scale, service_speed_scalar, soil_rate,
+--   wash_cadence_cycles, wash_group -- and no service_manifest_meta at all.
+--
+--   AT THE END OF A RUN IT IS NOT SOUND. During a run config gains
+--   service_manifest, service_manifest_meta, charge_plan, deploy_gate, svc_step,
+--   and sometimes bay_eviction -- and several of those carry freshly generated
+--   uuids.
+--
+-- THE MEASUREMENT THAT SETTLES IT. Round 33's 08:10 pair, arm A against arm B,
+-- counting the visit_id inside config.service_manifest_meta as it appears in the
+-- two arms' own event streams:
+--
+--   distinct visit_ids, arm A     116
+--   distinct visit_ids, arm B     116
+--   shared between the arms         0
+--
+-- One per vehicle, disjoint by construction. A hash over config at end-of-run
+-- CANNOT agree across two arms. endst was guaranteed to fail the moment 0244
+-- landed, on every column, forever.
+--
+-- SO THIS IS A FALSE ALARM, NOT A DETERMINISM DEFECT. The arms do genuinely end
+-- with different bytes in config, but the difference is identifier churn -- the
+-- exact class 0139 made endst id-blind for. 0244 reintroduced it through a term
+-- 0139 never had to consider.
+--
+-- ---------------------------------------------------------------------------
+-- THE DOCTRINAL ERROR, WHICH IS THE PART WORTH KEEPING
+-- ---------------------------------------------------------------------------
+--
+-- CLAUDE.md 2.9a: "an atom is added MEASURED first and ENFORCED only after a
+-- flagship round shows the arms agree (0139 / 0206 / 0217 / 0225)."
+--
+-- I did not do that. I folded a NEW hash component into endst, an atom that was
+-- ALREADY ENFORCED, so it went straight into the equality list with no measured
+-- round in between. 0244's own file argues at length for reusing
+-- ottoq_world_fingerprint rather than writing a second hash -- that argument
+-- still holds -- but it never asked the question the doctrine exists to force:
+-- *do the two arms actually agree on this new component?*
+--
+-- The doctrine is not a formality about new atoms. It is about new COMPONENTS of
+-- any enforced verdict, and "I am reusing something that already exists" is
+-- exactly the reasoning that makes it feel unnecessary. A start-relevant hash
+-- reused at end-of-run is a different measurement with the same name.
+--
+-- Round 33 is the flagship round the doctrine would have required. It did its
+-- job. It cost six red columns instead of one measured disagreement, and the
+-- difference between those two outcomes is the whole value of the rule.
+--
+-- ---------------------------------------------------------------------------
+-- THE GRID FIXTURE REPRODUCES IT IN SECONDS AND ISOLATES IT COMPLETELY
+-- ---------------------------------------------------------------------------
+--
+--   ottoq_determinism_pair(239001, 6, 'grid_smoke',
+--                          'aacd0bb0-2d02-d101-72cc-33f70e950bc8', ...)
+--   -- the 0153 fixture: 4 vehicles, 10 stalls, a pair in seconds
+--
+--   boot.world    b040499b7f94c5dc7fb605e38d3c092a   IDENTICAL on both arms
+--   endst.world   3d6d645a8a397b478faec1c8f3018d90   arm A
+--                 80b55a0c4099b70ae5e178a49bbdebdf   arm B   <-- differs
+--
+--   every other endst sub-key -- legs, bookings, chargers, dispatches,
+--   calibration, visit_needs -- identical; every other atom -- fp, h_bkg, h_cal,
+--   h_cmd, h_dec, h_evt, h_nrg, h_rcl, h_sdr, h_defr, h_prop, h_rule, ticks --
+--   identical.
+--
+-- Boot agrees, end does not, and nothing else in the verdict moves. That is the
+-- diagnosis stated as an experiment rather than an argument, and it is why the
+-- fix can be verified in seconds rather than in an eighty-minute round.
+--
+-- ---------------------------------------------------------------------------
+-- THE FIX (0246), AND THE PREDICTION, WRITTEN BEFORE IT IS APPLIED
+-- ---------------------------------------------------------------------------
+--
+-- Make the config term id-blind, using the scrubber this codebase already uses
+-- for exactly this purpose -- ottoq_boot_state_fingerprint's bookings CTE
+-- already hashes jsonb_build_object('why', public.ottoq_scrub_ids(t.why)):
+--
+--   COALESCE((v.config - 'condition_drawn_run')::text,'{}')
+--   ->
+--   COALESCE(public.ottoq_scrub_ids((v.config - 'condition_drawn_run')::text),'{}')
+--
+-- ottoq_scrub_ids is IMMUTABLE and replaces every uuid with '<uuid>' and every
+-- bare 8-hex token with '<id8>'.
+--
+--   PREDICTION: the grid pair passes, with endst.world equal across arms. fp
+--   moves for every column again (scrubbing changes the boot hash too, because
+--   config.scenario_interval_scale.run is a uuid), so 0246 is forces_recert TRUE
+--   and round 34 has to re-earn the canons a third time.
+--
+--   IF THE GRID PAIR STILL FAILS ON endst.world, config is not the only
+--   end-of-run term that differs, this diagnosis is incomplete, and the honest
+--   next step is to bisect the world fingerprint's terms rather than patch again.
+--
+-- WHAT SCRUBBING COSTS, STATED RATHER THAN GLOSSED. fp and endst lose the
+-- ability to distinguish WHICH uuid a config value holds -- a different stall id
+-- inside bay_eviction, say, now hashes the same. That discrimination is not lost
+-- from the verdict, only from this term: h_bkg hashes the calendar including
+-- stall_id, and 0139 already established that the end-state fingerprint is
+-- supposed to be id-blind. This makes the config term consistent with the rest
+-- of the instrument rather than weaker than it.

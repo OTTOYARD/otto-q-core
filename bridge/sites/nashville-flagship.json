@@ -1,0 +1,23 @@
+{
+  "_provenance": {
+    "depot_id": "11111111-1111-1111-1111-111111111111",
+    "depot_slug": "nashville-flagship",
+    "read_from": "public.depots row + public.ottoq_depot_tariffs, 2026-09-12 17:10 UTC",
+    "power_cap_kw_hard": "depots.service_max_kw = 2500 (utility service, 480 V)",
+    "power_soft_target_kw": "DERIVED: depots.dcfc_max_concurrent_kw 1800 x (1 - dcfc_safety_margin_pct 10 / 100) = 1620",
+    "dcfc_cooldown_min": "CLAUDE.md 2.5 throughput model, 18 min. BUILD_QUEUE #5: the SQL engine holds no cooldown anywhere; this is the kernel's declared modelling parameter, not a value read from the depot",
+    "move_duration_min": "ASSUMPTION -- solvers/cpsat/scenario_canonical.json value (4 min); the site_layout gives 452 x 314 ft, no measured move time exists",
+    "path_capacity": "ASSUMPTION -- scenario_canonical.json value (2); site_layout.flow_doctrine is continuous_motion_no_back_out_through_service with 20/26 ft lanes",
+    "cold_start_below_c": "ASSUMPTION -- scenario_canonical.json value (5 C)",
+    "cold_start_penalty_min": "ASSUMPTION -- scenario_canonical.json value (12 min)",
+    "onpeak_window_min": "NES GSA-3 (ottoq_depot_tariffs, source nespower.com gsa-123.pdf retrieved 2026-07-09) has NO time-of-use window: the demand charge is the non-coincident 30-min peak. The kernel's on-peak term is weighted 0 on the proposer path (frame_to_scenario sets onpeak_kw_min 0), so an empty window is the truthful declaration. The TOU variant TGSA-3 (1-7 PM CT Apr-Oct) is not the depot's schedule"
+  },
+  "power_cap_kw_hard": 2500,
+  "power_soft_target_kw": 1620,
+  "dcfc_cooldown_min": 18,
+  "move_duration_min": 4,
+  "path_capacity": 2,
+  "cold_start_below_c": 5,
+  "cold_start_penalty_min": 12,
+  "onpeak_window_min": [0, 0]
+}

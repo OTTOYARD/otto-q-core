@@ -97,6 +97,7 @@ The site is a **resource-constrained flexible flow shop**, not a queue: N assets
 | Job / visit | `ottoq_visit_needs`, `ottoq_vehicle_dispatches`, itineraries/legs | naming + lifecycle doc |
 | Booking | `ottoq_stall_bookings` (EXCLUDE constraint) | keep; this is the calendar |
 | Operations catalog | `service_definitions` (9), `service_cadence_policy` | per-pack catalogs as data |
+| ^ **CORRECTION 2026-09-12 (`db/checks/0178`)** | The order above reads as though the first were the catalog. Measured: **`service_cadence_policy` is the live one** — 15 services, each with a `lane`, all active, read by 8 routines, and it covers **15 of the 16 `svc` values the engine's own work atoms actually use**. `service_definitions` is a **fallback** consulted by one bridge (`ottoq_svc_to_stall_type`, whose own comment calls it "the catalogue table named in the brief"), it holds **27 rows / 9 distinct codes** (the "(9)" above is the distinct count, not the row count), and it overlaps the atom vocabulary on **exactly one** code, `exterior_wash`. | The extension point C11 aims at is `service_cadence_policy`. One service, `perimeter_walkaround`, is declared in **neither** — derived 108 times per run, required of none, performed never. |
 | Rules layer | `ottoq_rules` (52, versioned, tenant-parameterizable) + 792k logged evaluations | keep as Layer 1 |
 | Multi-tenant terms | `ottoq_fleet_operator_slas` (4 OEM rows, versioned) | the L2 foothold |
 | Signed telemetry | `ottoq_events` (20.8k, HMAC-signed), `ottoq_telemetry_packets` (25k) | the L1 foothold |

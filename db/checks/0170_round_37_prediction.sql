@@ -1,0 +1,98 @@
+-- ===========================================================================
+-- 0170  ROUND 37 + THE 48-TICK RE-TEST: THE PREDICTION, COMMITTED FIRST
+-- ===========================================================================
+-- Written and committed 2026-09-12 ~04:00 UTC (2026-09-11 11:00 PM CT). The first
+-- pair fires at 04:05 UTC, so this cannot be edited after the evidence arrives.
+-- That is the entire point, and it is 0166's discipline repeated.
+--
+-- TEN PAIRS, jobids 544-553, firing (UTC):
+--   04:05  grid_smoke/239001/6t    @ aacd0bb0   04:54  busy_day/424242/12t  @ flagship
+--   04:08  grid_smoke/424242/6t    @ aacd0bb0   05:08  busy_day/171717/24t  @ flagship
+--   04:12  busy_day/314159/12t     @ flagship   05:28  busy_day/424242/24t  @ flagship
+--   04:26  busy_day/171717/12t     @ flagship   05:48  busy_day/171717/48t  @ flagship  (a)
+--   04:40  normal_day/171717/12t   @ flagship   06:20  busy_day/171717/48t  @ flagship  (b)
+--
+-- All nine registered columns, because ottoq_cert_coverage() reported all nine
+-- OVERDUE (59.4 h to 92.5 h) after the session was stopped by a weekly limit.
+--
+-- WHAT CHANGED SINCE ROUND 36: 0251, 0252, 0253, 0254 applied, all four classified
+-- forces_recert=FALSE in ottoq_cert_lineage, floor unmoved at
+-- 2026-09-09 09:46:27.088143. 0254 adds `wsec` to each arm -- MEASURED, asserted
+-- absent from v_equal.
+--
+-- ---------------------------------------------------------------------------
+-- PREDICTION 1 -- the six flagship 12t/24t columns: REPRODUCE ROUND 36 EXACTLY.
+-- ---------------------------------------------------------------------------
+-- Six of six pass, 0 of 14 atoms differ between arms, 0 of 14 move from round 36.
+-- Reference (round 36 arm_a fp):
+--   314159/12t b8606125f1cbd5c820fc9be94c4c4a29
+--   171717/12t 9c28854e976c8572f2cc1bf4717f85b0   normal/12t same value
+--   424242/12t 7a14aa522a65cc196ca486309194573c
+--   171717/24t 9c28854e976c8572f2cc1bf4717f85b0
+--   424242/24t 7a14aa522a65cc196ca486309194573c
+-- Confidence: high. Nothing applied touches a hashed expression (0254's A2 pins
+-- ottoq_world_fingerprint at md5 945fa4b9e7bfd0d1c027fd92dc85fa06) and round 36
+-- already survived a deletion of millions of rows.
+--
+-- ---------------------------------------------------------------------------
+-- PREDICTION 2 -- the two grid columns: PASS, and their canon is believed, not known.
+-- ---------------------------------------------------------------------------
+-- Both pass internally. I am deliberately NOT predicting their atom values:
+-- 239001/6t last ran 2026-09-09 09:55 as 0162's REPLAY (which writes
+-- run_by='cert_harness' and landed in the matrix), and 424242/6t last ran
+-- 2026-09-08 07:04. A replayed proposal moves one arm's event stream (0160), so
+-- the 239001 canon may carry a replay-shaped h_evt rather than a no-replay one.
+-- If the grid columns disagree with their stored canon, the replay is the first
+-- suspect and that is a harness artefact, not an engine defect.
+--
+-- ---------------------------------------------------------------------------
+-- PREDICTION 3 -- THE ONE THAT MATTERS: the 48-tick re-test.
+-- ---------------------------------------------------------------------------
+-- I predict THE DIVERGENCE REPRODUCES: the 05:48 and 06:20 pairs will each pass
+-- internally (equal=true, 0 of 14 between arms) and will DISAGREE WITH EACH OTHER
+-- on endst, and within endst on `world` alone.
+--
+-- AND THE FALSIFIABLE PART, which is why 0254 was built first:
+--   wsec will name `bess` or `stalls` as the section that moved -- not `vehicles`,
+--   not `chargers`, not `need_profile`.
+--
+-- The reasoning is in db/checks/0169's second narrowing and is not a hunch: boot
+-- agrees on seven of seven sub-keys, every one of the twelve stream hashes agrees,
+-- so the divergence is inside the tick loop in state no stream covers. Exactly two
+-- of the five world sections have that property -- h_bkg hashes the booking
+-- calendar and never the stalls table's own reserved_at/reservation_expires_at
+-- columns, and h_nrg hashes energy COMMANDS and never the BESS's cumulative
+-- lifetime_kwh_charged / _discharged / cycle_count.
+--
+-- Baseline to compare against, captured 03:49 UTC and byte-identical to the 16:10
+-- pair's endst.world (the flagship world has not moved in 60 hours):
+--   vehicles      d97316f9872b267b79e733a2728c88e4   116 rows
+--   stalls        3e03db4aa74a4655b6bb10f20b450a48   158 rows
+--   chargers      4895c66ad941383fbc0dff3b0db9ed57    40 rows
+--   need_profile  b24639271b27f6a93f99c8886a57fd94   116 rows
+--   bess          d06508b990e4780f947ca04afea56f5c     1 row
+--   combined      4ae38da2ddd951224e2cb8e3641bd252
+--
+-- WHAT EACH OUTCOME MEANS, decided now rather than after the fact:
+--
+--   * Reproduces, wsec says `bess`   -> the cumulative battery counters are not
+--     reset per run, or evolve from something other than the command stream. The
+--     fix is in the reset or in what BESS state the fingerprint should contain;
+--     0133's reasoning gets revisited, not reversed.
+--   * Reproduces, wsec says `stalls` -> a stall reservation column survives a run
+--     or is written non-deterministically. This is the 0145 unscoped/residue class
+--     again, in the one table whose own columns no stream atom hashes.
+--   * Reproduces, wsec says `vehicles` / `need_profile` / `chargers` -> my
+--     narrowing is WRONG, and the 0169 argument that twelve agreeing streams
+--     exclude those sections has a hole I have not found. That is the most
+--     informative outcome and must be written up as such, not quietly absorbed.
+--   * DOES NOT reproduce (the two pairs agree on all fourteen) -> then the
+--     2026-09-09 divergence was not horizon-dependent but occasion-dependent, and
+--     0193's two-consecutive bar has been met by a column that is intermittently
+--     wrong. That is WORSE than a reproducible defect, not better, and the column
+--     does NOT go green on two passes: an intermittent failure needs a mechanism
+--     before it needs a streak. Say so plainly if it happens.
+--
+-- No outcome here makes busy_day/171717/48t certified tonight. The honest status
+-- until a mechanism is named is: flagship matrix SIX of SEVEN.
+-- ===========================================================================

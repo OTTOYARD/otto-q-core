@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260909051529
 -- migration-name:    the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row
 --
 -- G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge
@@ -270,12 +270,20 @@ BEGIN
   -- A3  THE CLOSED-GATE ROW, EXECUTED. Its abstained_reason is what makes
   --     "a run chose not to" distinguishable from "no run existed".
   ---------------------------------------------------------------------------
+  -- FIRST ATTEMPT FAILED HERE (2026-09-09 05:15 UTC) and rolled back atomically.
+  -- The lift is bounded by '  END IF;', and the closed block's OWN '  END;' sits
+  -- just inside that bound -- so v_closed already terminates itself. Appending
+  -- another ' END;' produced "END; END;" and a 42601 syntax error. The open block
+  -- above is bounded by '  ELSIF ...' instead, which lands BEFORE its END, which is
+  -- why that one needs no terminator and passed. Two lifts, two different bounds,
+  -- one of them self-terminating: recorded rather than quietly corrected, because
+  -- the asymmetry is the trap.
   v_closed := split_part(v_def,
     E'  BEGIN\n    INSERT INTO public.cuopt_invocation_log\n      (sim_run_id, stage, tick_seq, called_at, abstained_reason, source_note, detail)', 2);
   v_closed := split_part(v_closed, E'  END IF;', 1);
   IF v_closed = '' THEN RAISE EXCEPTION 'A3 FAILED: could not lift the closed-gate ledger block'; END IF;
   v_closed := 'BEGIN INSERT INTO public.cuopt_invocation_log (sim_run_id, stage, tick_seq, called_at, abstained_reason, source_note, detail)'
-           || v_closed || ' END;';
+           || v_closed;
 
   EXECUTE 'DO $probe$ DECLARE v_prun uuid := ' || quote_literal(v_run) || '::uuid; v_req bigint := -240; '
        || v_closed || ' $probe$;';
@@ -338,3 +346,26 @@ VALUES (
   'own errors, so a test that only checked "it did not raise" would pass on a ledger '
   'that never wrote.'
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-09 00:19 CT (05:19 UTC), version 20260909051529, on the
+-- SECOND attempt. The first failed on A3 and rolled back atomically -- the
+-- asymmetry between the two lifts is recorded above A3 rather than quietly
+-- corrected. Rollback verified before retrying:
+--
+--   ottoq_cron_tick md5   0562fbd6579524bf71f6c733b9295268   UNCHANGED
+--   lineage rows          0
+--   snapshot rows         0
+--   probe ledger rows     0
+--   recert floor          2026-09-09 03:15:07, unmoved
+--
+-- Second attempt, all five assertions green:
+--
+--   A1  shape: exactly 2 ledger references, SELECT net.http_post, gate reads v_prun
+--   A2  the OPEN-gate block lifted from the live catalog and EXECUTED -> 1 row,
+--       stage=sql_gate, on the resolved run, no abstention
+--   A3  the CLOSED-gate block, same treatment -> 1 row, abstained_reason=policy_disabled
+--   A4  the two rows are distinguishable on abstained_reason (2 distinct values)
+--   A5  0 probe rows left, decide_tick md5 unchanged
+--
+--   recert floor          2026-09-09 03:15:07, UNMOVED (forces_recert FALSE holds)

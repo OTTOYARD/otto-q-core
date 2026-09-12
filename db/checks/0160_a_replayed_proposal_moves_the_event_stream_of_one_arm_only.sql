@@ -1,0 +1,806 @@
+-- ===========================================================================
+-- 0160  G43 -- A REPLAYED PROPOSAL MOVES THE EVENT STREAM OF ONE ARM ONLY
+-- ===========================================================================
+-- Opened 2026-09-09 ~00:35 AM CT (05:35 UTC) out of 0159 section 7.
+--
+-- WHAT HAPPENED
+--
+-- The Posture B replay pair on the flagship column busy_day / 314159 / 12t
+-- FAILED, and failed in a shape nothing in the harness has produced before:
+-- exactly one atom moved, h_evt, and it moved on ONE ARM.
+--
+--   arm A (d06abdc4-3455-47a7-acd5-680d8c8bd98c)  h_evt 6cd5031317939de6d83bc1a3888b4ea1
+--   arm B (3a224796-177e-48e3-bd1c-d9165f23aa21)  h_evt 9c631343c32cca7a861b17bc5bc8f4b7
+--
+-- Arm B's value IS the canon. Both arms of the no-replay pair at 03:42 today
+-- (54b1c04a / ff826272) and both arms at 20:50 yesterday (bd2de131 / 8291f536)
+-- produced 9c631343... So arm B ran a canonical run; arm A did not.
+--
+-- Every other atom agreed, including the two that would carry a changed
+-- decision: h_dec was identical on both arms AND identical to the no-replay
+-- canon, and h_bkg, h_nrg, h_rule, h_sdr, h_rcl, endst all matched. So arm A
+-- emitted a different EVENT STREAM while taking the same decisions, booking the
+-- same stalls, issuing the same energy commands and ending in the same state.
+--
+-- WHY THE POST-HOC TABLE READ CANNOT JUDGE THIS
+--
+-- Reading ottoq_events afterwards shows arm A holding 4,656 rows against arm B's
+-- 4,531, +116 of them at the final sim clock -- one per vehicle. That difference
+-- is REAL but it is not the finding, and it would be a false lead to treat it as
+-- one. The pair's own structure explains it:
+--
+--   FOR v_arm IN 1..2 LOOP
+--     ottoq_tick_invariance_reset_fleet(...)   <-- line 56, top of each arm
+--     ... run the tick loop ...
+--     build the arm object, h_evt included     <-- line 98-155, HASH TAKEN HERE
+--     ottoq_sim_stop_and_reset(v_run, ...)     <-- line 160, AFTER the hash
+--   END LOOP;
+--
+-- Arm A's teardown and arm B's fleet reset both write events after arm A's hash
+-- was taken, and the payloads confirm it -- they carry last_state_change moving
+-- to the transaction wall clock and then back to the sim start, with
+-- condition_drawn_run set to arm A. All four runs (both replay arms AND both
+-- control arms) recompute to values other than their own verdict for this
+-- reason. Only the hash the pair took inside its own transaction is evidence.
+--
+-- THE TWO CONTROLS, AND THE PREDICTIONS, WRITTEN BEFORE EITHER RAN
+--
+-- C1 -- ottoq_determinism_pair_replay on the same column with p_replay_id NULL.
+--       Asks: is this the replay, or is it 0239's derivation of the pair?
+--
+--       PREDICTION: C1 PASSES, both arms 9c631343... I expect this because
+--       every behavioural addition 0239 made is inside IF p_replay_id IS NOT
+--       NULL, and check 0157's P0 control (this same function, replay NULL)
+--       already passed. Confidence moderate, not high: 0157 ran on the 4-vehicle
+--       grid fixture, which is small enough to miss a whole class of thing.
+--       If C1 FAILS, the finding is not about replay at all -- it is that 0239
+--       shipped a defective certification function, and 0157's Posture B proof
+--       has to be re-read in that light.
+--
+-- C2 -- the identical replay pair, run again.
+--       Asks: is the divergence deterministic, or is it a coin?
+--
+--       PREDICTION: C2 FAILS AGAIN with arm A at exactly 6cd50313... and arm B
+--       at 9c631343... A coin would be worse news and a different investigation;
+--       a repeatable arm-A-only divergence is a mechanism, and mechanisms can be
+--       found. Confidence moderate. If arm A lands on a THIRD value, the replay
+--       path is nondeterministic in itself and Posture B is not safe to promote.
+--
+-- Both controls are scheduled through pg_cron rather than run from a client
+-- session, for the reason the rounds are: the 25-minute statement timeout and
+-- an execution that does not depend on a connection staying up.
+--
+-- Round 31 finished at 04:58 (r31_f) and no cert job is scheduled after it, so
+-- both controls run alone on the flagship depot.
+
+-- ===========================================================================
+-- 2. THE MECHANISM, FOUND BEFORE THE CONTROLS FINISHED -- AND IT IS NOT REPLAY
+-- ===========================================================================
+--
+-- The clean comparison is arm A of the replay pair against arm A of the
+-- no-replay pair on the same column. Both are FIRST arms, so both carry the
+-- identical post-hash contamination described above, and it cancels. Done that
+-- way, the entire in-run divergence is NINE EVENTS AT ONE SIM CLOCK:
+--
+--   sim_clock_at           event_type             replay armA   no-replay armA
+--   --------------------   --------------------   -----------   --------------
+--   2026-09-01 06:30:00    stall.state_changed              2                0
+--   2026-09-01 06:30:00    vehicle.state_changed            7                0
+--
+-- and NOTHING anywhere else, at any other clock. The +116 at 08:00 is present
+-- in both and cancels exactly, which is what confirms it was contamination.
+--
+-- 06:30 is tick 10 of 12 (02:00 + 9 x 30 min).
+--
+-- THE NINE PAYLOADS NAME THE CAUSE. Every one of them is a clearing diff:
+--
+--   {"diff": {"updated_at":              {"to": "2026-09-09T05:24:00.957086+00",
+--                                        "from": "2026-09-09T05:22:18.994724+00"},
+--             "robotic_tether_phase":    {"to": null, "from": "unstow"},
+--             "robotic_tether_until":    {"to": null, "from": "2026-09-01T06:00:18.5+00"},
+--             "robotic_tether_stall_id": {"to": null, "from": "7361..."}}}
+--
+--   {"diff": {"status":             {"to": "available", "from": "occupied"},
+--             "current_vehicle_id": {"to": null, "from": "36ff94e5-..."}}}
+--
+-- Read the "from" on updated_at: 2026-09-09 05:22:18.994724 -- a WALL CLOCK
+-- timestamp from 102 seconds BEFORE this pair's transaction began at
+-- 05:24:00.957086. Those rows were carrying robotic-tether state written by
+-- something that ran before the pair. They survived the boot. They survived nine
+-- ticks. At tick 10 the tether deadline (sim 06:00:18.5) came due, the engine
+-- cleared them, and nine events were emitted that the canonical run does not
+-- emit.
+--
+-- Arm B never had them, because arm A had already cleared them.
+--
+-- WHY THE RESET DOES NOT SAVE IT -- read from the catalog, not inferred:
+--
+--   SELECT pg_get_functiondef(oid) ILIKE '%robotic_tether%'
+--     FROM pg_proc WHERE proname IN
+--          ('ottoq_tick_invariance_reset_fleet','ottoq_sim_stop_and_reset');
+--
+--   ottoq_tick_invariance_reset_fleet(uuid,bigint,timestamptz)   false
+--   ottoq_sim_stop_and_reset(uuid,text)                          false
+--
+-- NEITHER FUNCTION MENTIONS robotic_tether AT ALL. The per-arm fleet reset does
+-- not clear it and the run teardown does not clear it. So any robotic-tether
+-- state live in the world when a pair starts is inherited by ARM A ONLY, and
+-- arm B always boots from the world arm A left.
+--
+-- THIS IS NOT ABOUT REPLAY. Nothing in the mechanism involves a proposal, an
+-- injection, or 0239. The replay pair is simply the pair that happened to start
+-- 102 seconds after something left tether state on seven flagship vehicles.
+--
+-- SO THE STATED PREDICTIONS FOR C1 AND C2 ARE NOW CONFOUNDED, AND SAYING SO IS
+-- THE POINT OF HAVING WRITTEN THEM DOWN. Arm A of the 05:24 pair CONSUMED the
+-- residue. Measured immediately after, on the flagship depot:
+--
+--   vehicles with robotic_tether_phase / _until / _stall_id    0 / 0 / 0
+--   max(updated_at)                     2026-09-09 05:24:00.957086  (the pair)
+--
+-- The world is clean. C1 and C2 therefore both run on a clean world and are
+-- both expected to PASS -- and a C1 pass CANNOT exonerate replay, because the
+-- condition that produced the failure is gone. My C1 prediction ("C1 passes,
+-- therefore replay is the cause") was the right experiment to schedule and the
+-- WRONG INFERENCE TO HANG ON IT. They are kept and judged as run, but the
+-- decisive test is a third one.
+--
+-- C3 -- PLANT THE RESIDUE, RUN THE ORIGINAL PAIR WITH NO REPLAY AT ALL
+--
+--   UPDATE public.vehicles SET robotic_tether_phase='unstow',
+--          robotic_tether_direction='mate',
+--          robotic_tether_until='2026-09-01 06:00:18.5+00',
+--          robotic_tether_stall_id=<a flagship stall>
+--    WHERE id IN (<7 flagship vehicles>);
+--   SELECT public.ottoq_determinism_pair(314159, 12, 'busy_day', <flagship>,
+--                                        '2026-09-01 02:00:00+00', 900);
+--
+-- ottoq_determinism_pair, not the replay function. No p_replay_id anywhere.
+-- Planting and pair are in ONE cron job so nothing can run between them.
+--
+--   PREDICTION: C3 FAILS on h_evt, arm A only, with arm B landing on the canon
+--   9c631343... I hold this with high confidence, because the mechanism is not
+--   inferred from the failure -- it is read out of the two reset functions,
+--   which demonstrably do not touch these columns.
+--
+--   If C3 PASSES, tether residue alone is not sufficient, the replay is back in
+--   the frame, and this section is wrong and must be rewritten rather than
+--   patched.
+--
+-- WHAT THIS MEANS IF C3 CONFIRMS, STATED PLAINLY
+--
+-- The six green certification columns have been green partly by luck. A pair
+-- fails whenever the world happens to carry live robotic-tether state at the
+-- moment it starts, and passes when it does not, and nothing in the harness
+-- distinguishes the two. That is not a replay defect and not an agent-layer
+-- defect. It is a determinism defect in the certification itself, and it is the
+-- sharp form of G26 -- "production and the proof harness share one database" --
+-- because the residue is left by whatever touched the depot last.
+--
+-- It also means the arms are NOT booted from the same world, which is the one
+-- property the whole pair rig assumes. Every canon recorded to date was taken
+-- under an assumption that is only usually true.
+
+-- ===========================================================================
+-- 3. THE BLIND-SPOT INVENTORY -- HOW MANY MORE OF THESE ARE THERE
+-- ===========================================================================
+--
+-- Once the mechanism is "a mutable column that the reset does not clear and the
+-- boot fingerprint cannot see", the obvious question is how many such columns
+-- exist. Enumerated from the catalog:
+--
+--   SELECT c.table_name, c.column_name
+--     FROM information_schema.columns c, defs d
+--    WHERE c.table_name IN ('vehicles','stalls')
+--      AND pg_get_functiondef(ottoq_tick_invariance_reset_fleet) NOT LIKE '%'||c.column_name||'%'
+--      AND pg_get_functiondef(ottoq_boot_state_fingerprint)      NOT LIKE '%'||c.column_name||'%';
+--
+--   -> 49 columns (26 on vehicles, 23 on stalls)
+--
+-- THE TEST IS TEXTUAL AND ITS ASYMMETRY IS THE WHOLE POINT: a column name
+-- appearing in a function body does NOT prove the function resets or hashes it.
+-- A column name being ABSENT from both bodies DOES prove neither can. So this
+-- list is sound as an upper bound on what is covered and a hard lower bound on
+-- what is not. Every one of these 49 is provably invisible to both.
+--
+-- Most of the 49 are harmless because they are STATIC -- identity and geometry
+-- that no tick ever writes: make, model, vin, year, color, license_plate,
+-- battery_capacity_kwh, stall_width_ft, absolute_lat/lng, fiducial_marker_id,
+-- uwb_beacon_id, and so on. A column a run never writes cannot carry residue
+-- between arms.
+--
+-- The dangerous subset is the MUTABLE ones, and it is short enough to name:
+--
+--   vehicles.robotic_tether_phase       <-- CONVICTED, this pair
+--   vehicles.robotic_tether_until       <-- CONVICTED, this pair
+--   vehicles.robotic_tether_stall_id    <-- CONVICTED, this pair
+--   vehicles.robotic_tether_direction   <-- same family, same exposure
+--   vehicles.current_depot_id
+--   vehicles.owning_sim_run_id
+--   vehicles.is_active
+--   stalls.reserved_for_mission_id
+--   stalls.staging_role
+--
+--   vehicles.current_soc_updated_at     <-- NOT a defect. This is 0137's column,
+--                                           deliberately outside the fingerprint
+--                                           because it is a write timestamp.
+--                                           Excluding it is the fix, not the bug.
+--
+-- So the tether family is four columns of a nine-column mutable blind spot, and
+-- the fix is tractable rather than whack-a-mole. It is NOT enough to clear the
+-- four that were convicted: the same coin can be flipped by any of the others.
+--
+-- THE FIX HAS TO BE BOTH HALVES, IN THIS ORDER, PER THE BLIND-SPOT PROMOTION
+-- DOCTRINE (CLAUDE.md 2.9a):
+--
+--   1. WIDEN THE BOOT FINGERPRINT first, MEASURED. If fp had covered these
+--      columns, this pair would have failed at 'fp' saying "the two arms did not
+--      boot from the same world" -- which is true, actionable, and immediate --
+--      instead of failing at h_evt nine ticks later with no indication why.
+--      The harness must be able to SEE an unequal boot before anyone tries to
+--      guarantee an equal one.
+--
+--   2. THEN MAKE THE RESET TOTAL for the mutable set, so the boot is actually
+--      equal and fp can be promoted to ENFORCED.
+--
+-- Doing (2) without (1) would close this instance and leave the class invisible,
+-- which is the mistake that let V7's residue sweep (task #40) miss these four in
+-- the first place. This finding is that sweep's escapee, and the lesson is that
+-- a residue sweep driven by reading code misses what a sweep driven by the
+-- catalog does not.
+
+-- ===========================================================================
+-- 4. C1 JUDGED, AND THE BOOT FINGERPRINT IS BLIND TO THE FLEET
+-- ===========================================================================
+--
+-- C1 (same column, ottoq_determinism_pair_replay, p_replay_id NULL), fired
+-- 05:40:00 UTC, ran alone (pg_stat_activity confirmed; cron.job_run_details
+-- reported "succeeded / SET" after 1 s, which is the known two-statement-job
+-- artefact and NOT a completion):
+--
+--   status  passed
+--   arm A   h_evt 9c631343c32cca7a861b17bc5bc8f4b7
+--   arm B   h_evt 9c631343c32cca7a861b17bc5bc8f4b7   <- both on the canon
+--
+-- The C1 prediction is CONFIRMED as written. It also confirms nothing about
+-- replay, exactly as section 2 said in advance: the world was already clean, so
+-- a pass was the expected outcome under BOTH hypotheses. C1's real value is
+-- narrower and still worth having -- it rules out the possibility that 0239
+-- shipped a pair function that is broken on every run, which was the other thing
+-- worth being afraid of. The replay-vs-residue question is C3's.
+--
+-- ---------------------------------------------------------------------------
+-- AND NOW THE PART THAT MAKES THIS A HARNESS FINDING RATHER THAN A BUG REPORT
+-- ---------------------------------------------------------------------------
+--
+-- The pair already computes a boot fingerprint per arm, at line 68, and stores
+-- it in the verdict as arm_a.boot / arm_b.boot. On the pair that FAILED:
+--
+--   SELECT arm_a->'boot' = arm_b->'boot' ...
+--
+--   3a224796 (the failed replay pair)   boot_equal = TRUE
+--   54b1c04a (the passing control)      boot_equal = TRUE
+--
+-- The two arms of the failed pair booted from provably different fleet states --
+-- seven vehicles carried live tether state in arm A and none in arm B -- and the
+-- boot fingerprint reported them IDENTICAL.
+--
+-- Reading ottoq_boot_state_fingerprint(uuid,uuid) explains why. It hashes six
+-- things: visit_needs, stall_bookings, itinerary_legs, vehicle_dispatches,
+-- ocpp_chargers, calibration. public.vehicles and public.stalls appear in its
+-- body ONLY inside EXISTS(...) subqueries used to scope the other tables to the
+-- depot. Neither table is ever hashed.
+--
+--   THE BOOT STATE FINGERPRINT DOES NOT INCLUDE THE ASSETS OR THE SERVICE
+--   POINTS. It hashes everything ABOUT them -- their bookings, their needs,
+--   their legs, their dispatches, their chargers -- and not them.
+--
+-- Two consequences, and the second is worse than the first:
+--
+--   (a) 'boot' is not in the pair's equality list at all. The list is fp, h_cmd,
+--       h_dec, h_evt, h_bkg, h_nrg, h_prop, h_defr, h_cal, h_rule, h_rcl, h_sdr,
+--       ticks, endst -- fourteen atoms, and 'boot' is not one of them. The pair
+--       records both arms' boot state and never compares them.
+--
+--   (b) Even if it did compare them, it would not have caught this, because the
+--       fingerprint is blind to the columns that differed. Promoting 'boot' to
+--       the equality list as it stands would be G25's defect again -- enforcing
+--       a comparison narrower than the property being claimed.
+--
+-- So the fix is NOT "add boot to the equality list". It is: widen first, so
+-- there is something worth comparing, and only then enforce.
+--
+-- WHY NOT SIMPLY WIDEN ottoq_boot_state_fingerprint ITSELF: because the same
+-- function computes 'endst', which IS enforced. Widening it moves endst for
+-- every column, forces a full recert, and invalidates all six canons in one
+-- migration -- to fix a defect whose blast radius is not yet measured. That is
+-- the wrong order.
+--
+-- THE SHAPE OF THE FIX, then, is a separate boot-time fleet fingerprint added as
+-- a MEASURED atom, disturbing no existing canon (forces_recert FALSE), promoted
+-- to ENFORCED only after a flagship round shows the arms agree on it -- which is
+-- precisely the doctrine CLAUDE.md 2.9a lays down and precisely what 0139, 0206,
+-- 0217 and 0225 each did. It is drafted only after C3 reports.
+
+-- ===========================================================================
+-- 5. THE SHARP FORM: fp IS THE BOOT WORLD FINGERPRINT, IT IS ENFORCED, AND IT
+--    WAS EQUAL
+-- ===========================================================================
+--
+-- Section 4 proposed adding a NEW boot-time fleet fingerprint as a measured
+-- atom. That was the wrong fix and it is withdrawn: the certification already
+-- has exactly that atom, it is already enforced, and the defect is that it is
+-- too narrow. Extending what exists is the job; adding a parallel instrument
+-- beside it would have been the "rebuild what exists" failure CLAUDE.md rule 5
+-- names.
+--
+--   'fp' in the arm object is r.payload->>'world_fingerprint'
+--   written by twin.ottoq_sim_start_run(...) and public.ottoq_run_boot_draw(uuid)
+--   -- both at RUN START.
+--
+-- So fp is the start-of-run world hash. Its whole purpose is the sentence "both
+-- arms began from the same world." It is one of the fourteen ENFORCED atoms.
+--
+--   On the pair that failed:  fp arm A = fp arm B = 803698f332adc0d06cbefca79dad1ce0
+--
+-- The worlds were not the same. Seven vehicles carried live robotic-tether state
+-- in arm A and none in arm B, and the atom that exists to detect precisely that
+-- reported them identical.
+--
+-- WHY, from ottoq.ottoq_world_fingerprint(uuid) -- it is an ENUMERATED column
+-- list, not a row image:
+--
+--   vehicles (WHERE home_depot_id = p_depot AND category='autonomous'; 116 rows):
+--       id, current_soc, current_state, current_stall_id, current_soc_source,
+--       target_soc, config - 'condition_drawn_run', last_state_change
+--   stalls:  id, status, current_vehicle_id, reserved_by, reserved_at,
+--            reservation_expires_at
+--   plus ocpp chargers, vehicle_need_profile, and the BESS units.
+--
+--   robotic_tether_phase, robotic_tether_until, robotic_tether_stall_id and
+--   robotic_tether_direction are NOT in that list.
+--
+-- A vehicle mid-tether is, by any reading, start-relevant world state: it has a
+-- deadline (robotic_tether_until) that will come due during the run and change
+-- what the engine does. It belongs in this hash.
+--
+-- AND THE FUNCTION ITSELF SAYS SO. Its own header comment reads:
+--
+--   "The start-relevant world, hashed. ... Extend the column set only alongside
+--    the 0046 probe that justifies it."
+--
+-- Every prior extension followed that rule and left its probe number in the
+-- body: 0115 added the pair-17 columns, 0137 REMOVED current_soc_updated_at as
+-- a write timestamp, 0107 added the needs profile, 0133 added the BESS after
+-- 0051 showed peak_site_kw differing between two byte-identical arms because
+-- the battery carried across runs, 0135 added its temperature.
+--
+-- 0160 is the next such probe, and the tether columns are the next such
+-- extension. The mechanism is identical to 0133's, one table over: state that
+-- carries across runs, that the fingerprint cannot see, that changes the run.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE FIX COSTS, STATED BEFORE IT IS BUILT
+-- ---------------------------------------------------------------------------
+--
+-- Extending ottoq_world_fingerprint moves fp for EVERY column. fp is enforced,
+-- so every canon in the matrix is invalidated and the migration is
+-- forces_recert TRUE. That is not a reason to avoid it -- it is exactly what
+-- forces_recert exists for (0192): an atom that was wrong must move, and a
+-- canon derived from a wrong atom must not survive the correction. 0133 paid
+-- the same price for the same reason.
+--
+-- THE ORDER MATTERS AND IS NOT NEGOTIABLE. Widening fp while the reset still
+-- leaves tether residue would make pairs fail whenever residue happens to be
+-- present -- correctly, but intermittently, which is the worst of both worlds
+-- for diagnosis. So ONE migration does BOTH halves:
+--
+--   (a) ottoq_tick_invariance_reset_fleet clears the tether family for the
+--       depot's fleet, so the two arms genuinely start equal; and
+--   (b) ottoq_world_fingerprint hashes the tether family, so that when they do
+--       not start equal the pair says so at fp, on tick zero, instead of at
+--       h_evt nine ticks later with no indication why.
+--
+-- (a) without (b) closes this instance and leaves the class invisible. (b)
+-- without (a) is an intermittent alarm. Both together is the fix.
+--
+-- THE OTHER MUTABLE COLUMNS ARE ASSESSED, NOT SWEPT IN. From section 3's nine:
+--   current_depot_id, is_active, stalls.reserved_for_mission_id,
+--   stalls.staging_role  -- candidates on the same argument, but no probe has
+--                            convicted them; adding them on suspicion is how a
+--                            fingerprint accretes noise it cannot justify, and
+--                            the function's own comment forbids it.
+--   owning_sim_run_id     -- MUST NOT be hashed: it holds each arm's own run id
+--                            and differs between arms BY DESIGN.
+--   current_soc_updated_at -- already correctly excluded by 0137.
+--
+-- Nothing is applied until C3 reports.
+
+-- ===========================================================================
+-- 6. HOW OFTEN HAS THIS ACTUALLY FIRED -- AND A CORRECTION TO SECTION 2
+-- ===========================================================================
+--
+-- Section 2 ended with: "the six green certification columns have been green
+-- partly by luck." That sentence is WITHDRAWN. It was an inference from the
+-- mechanism, I did not measure it before writing it, and the measurement does
+-- not support it.
+--
+-- Every distinct cert pair of the last ten days, classified by which of the
+-- fourteen atoms actually differed between its arms:
+--
+--   atoms moved                                       status         pairs
+--   -----------------------------------------------   ------------   -----
+--   (none)                                            passed           278
+--   endst                                             passed            48
+--   fp, endst                                         failed            20
+--   fp                                                failed            17
+--   h_bkg,h_cmd,h_dec,h_evt,endst                     failed             8
+--   h_cmd                                             failed             7
+--   fp,h_bkg,h_cmd,h_dec,h_evt,endst                  failed             4
+--   h_bkg,h_cmd,h_evt                                 failed             4
+--   h_bkg,h_cmd,h_dec,h_evt,h_nrg,endst               failed             4
+--   ... (single-digit tails) ...
+--   h_sdr                                             passed             1
+--   h_evt                                             failed             1   <-- 2026-09-09 05:24, this one
+--
+-- h_evt ALONE HAS HAPPENED EXACTLY ONCE IN TEN DAYS AND ~400 PAIRS, and it is
+-- the pair that opened this file. The G43 condition is RARE, not chronic, and
+-- the honest reading is:
+--
+--   - The instrument is blind: fp cannot see an unequal boot on these columns.
+--     That is established from the catalog and is true regardless of frequency.
+--   - The condition materialized once, in a pair that started 102 seconds after
+--     a client transaction touched the flagship depot -- almost certainly my own
+--     capture work for section 6's P1 experiment. Nothing in the normal cadence
+--     leaves a vehicle mid-tether between pairs.
+--
+-- So this is a LATENT defect with a real and demonstrated failure mode, not a
+-- history of false greens. The fix is still correct and still worth its recert:
+-- a certification that cannot detect an unequal boot is one manual touch away
+-- from a wrong verdict, in either direction. But "green by luck" overstated it
+-- and is not what the data says.
+--
+-- TWO OTHER THINGS THE SWEEP SURFACED, both benign and both consistent with the
+-- promotion timeline rather than defects:
+--
+--   endst moved / PASSED, 48 pairs, all between 08-30 21:39 and 09-01 00:58 --
+--     that window predates 0139, which promoted endst from MEASURED to ENFORCED.
+--     An atom moving while the pair passes is exactly what MEASURED means.
+--   h_sdr moved / PASSED, 1 pair, 2026-09-08 08:25 -- same pattern, before 0219
+--     put h_sdr in the equality list.
+--
+-- Both are the blind-spot promotion doctrine working as designed and leaving its
+-- fingerprints in the ledger. Neither is a false green.
+
+-- ===========================================================================
+-- 7. C2 JUDGED -- THE PREDICTION AS WRITTEN IS FALSIFIED
+-- ===========================================================================
+--
+-- C2 (the IDENTICAL replay pair, run again), fired 05:50:00 UTC, alone:
+--
+--   status  passed
+--   arm A   h_evt  9c631343c32cca7a861b17bc5bc8f4b7
+--   arm B   h_evt  9c631343c32cca7a861b17bc5bc8f4b7    <- both on the canon
+--   both    h_prop 0299e5e6b7112f6978a1177ba12230fe
+--   both    fp     803698f332adc0d06cbefca79dad1ce0
+--   both    replay_injected 5
+--
+-- SECTION 1 PREDICTED: "C2 FAILS AGAIN with arm A at exactly 6cd50313... and
+-- arm B at 9c631343..." IT DID NOT. C2 passed. That prediction is FALSIFIED and
+-- it is the second of the two I got wrong tonight.
+--
+-- Section 2, written and committed at 05:36 -- fourteen minutes BEFORE C2 fired
+-- and before I had any C2 result -- said the opposite: "C1 and C2 therefore both
+-- run on a clean world and are both expected to PASS." That is CONFIRMED. The
+-- record of which statement was made when is in git, not in this paragraph:
+-- commit 4ef0ab1 precedes the 05:50 firing.
+--
+-- So the honest scoring is: the prediction I wrote from the FAILURE was wrong,
+-- and the prediction I wrote from the MECHANISM was right. That is the whole
+-- argument for finding mechanisms instead of pattern-matching on symptoms, and
+-- it is worth more than either prediction.
+--
+-- ---------------------------------------------------------------------------
+-- AND C2 PROVES SOMETHING C1 COULD NOT: THE REPLAY PATH IS DETERMINISTIC
+-- ---------------------------------------------------------------------------
+--
+-- C2 replayed the same recorded stream into the same column and produced
+-- h_prop = 0299e5e6b7112f6978a1177ba12230fe -- BYTE-IDENTICAL to the h_prop of
+-- the pair that failed at 05:24, and identical across both of its own arms, with
+-- the same replay_injected count of 5.
+--
+-- The injection is reproducible. Same stream in, same proposal ledger out, twice,
+-- across four arms in two transactions half an hour apart. Whatever moved h_evt
+-- at 05:24, it was not the replay being nondeterministic -- because it is not.
+--
+-- That is the exoneration C1 could not give. C1 only showed the pair function
+-- works with replay switched off; C2 shows it works with replay switched ON and
+-- repeated. Posture B's proof in db/checks/0157 survives this investigation
+-- intact, and 0239 is not implicated.
+--
+-- What remains is C3.
+
+-- ===========================================================================
+-- 8. WHAT 0243 WILL NOT CLOSE -- STATED BEFORE IT IS APPLIED, NOT AFTER
+-- ===========================================================================
+--
+-- First, the fix's core assumption, verified from the pair's own line order
+-- rather than assumed:
+--
+--   line 35   PERFORM public.ottoq_tick_invariance_reset_fleet(p_depot, ...)
+--   line 36   v_run := twin.ottoq_sim_start_run(...)   <- this stamps world_fingerprint
+--   line 47   v_boot := public.ottoq_boot_state_fingerprint(p_depot, v_run)
+--
+-- fp is computed immediately AFTER the reset. So clearing the tether family in
+-- the reset genuinely makes both arms' fp equal, and -- the other half of the
+-- same fact -- fp WOULD have caught this pair had it hashed those columns,
+-- because the reset ran, left the residue, and fp was taken with the residue
+-- present in arm A and absent in arm B. The two halves of 0243 meet exactly.
+--
+-- THREE THINGS REMAIN OPEN AFTER IT, AND NONE OF THEM IS CLOSED BY PRETENDING
+-- OTHERWISE:
+--
+-- (1) endst IS STILL BLIND TO THE FLEET. 'endst' is another call to
+--     ottoq_boot_state_fingerprint, which hashes visit_needs, bookings, legs,
+--     dispatches, chargers and calibration -- and, as section 4 established,
+--     never public.vehicles or public.stalls. So two arms ending in different
+--     ASSET states are not caught by endst. In practice a divergence that big
+--     also moves h_evt, h_dec or h_bkg, which is why this has not bitten; but
+--     "caught by a different atom, usually" is not the same as "covered", and
+--     it should be written down as the former.
+--
+-- (2) FIVE MUTABLE COLUMNS ARE STILL INVISIBLE TO BOTH FUNCTIONS --
+--     vehicles.current_depot_id, vehicles.is_active,
+--     stalls.reserved_for_mission_id, stalls.staging_role, and
+--     vehicles.owning_sim_run_id (which must stay invisible: it differs between
+--     arms by design). 0243 adds only the four columns a probe convicted,
+--     because the fingerprint's own contract requires a probe per column. The
+--     other four are unconvicted, not cleared.
+--
+-- (3) THE REAL ROOT IS STILL G26. The residue existed because something outside
+--     the certification wrote to the depot the certification runs on -- at
+--     05:22:18.994724, 102 seconds before the pair, from a client session, on
+--     the same tables. 0243 makes that condition VISIBLE and makes the common
+--     case SURVIVABLE. It does not make the certification's world private.
+--     While production, the demo metronome, the depot tick and any interactive
+--     session share one database with the proof harness, the harness's inputs
+--     are writable by things that are not the harness, and the correct fix for
+--     that is the separate project already open as G26 -- not another column in
+--     a hash.
+--
+-- The order is still right: make it visible now, because an invisible failure
+-- cannot be measured, and G26 is a database, not an afternoon.
+
+-- ===========================================================================
+-- 9. C3 JUDGED -- CONFIRMED IN MECHANISM, AND I UNDERSTATED THE BLAST RADIUS
+-- ===========================================================================
+--
+-- C3, fired 06:04:00 UTC as one cron job so the plant and the pair are ATOMIC
+-- (nothing can run between them, and the residue is invisible outside the
+-- transaction -- measured: tether_now = 0 from another session while it ran):
+--
+--   UPDATE public.vehicles SET robotic_tether_phase='unstow',
+--          robotic_tether_direction='mate',
+--          robotic_tether_until='2026-09-01 06:00:18.5+00',
+--          robotic_tether_stall_id=<a flagship stall>
+--    WHERE id IN (<7 flagship autonomous vehicles>);
+--   SELECT public.ottoq_determinism_pair(314159, 12, 'busy_day', <flagship>,
+--                                        '2026-09-01 02:00:00+00', 900);
+--
+-- ottoq_determinism_pair. THE ORIGINAL FUNCTION. No replay, no p_replay_id, no
+-- 0239, no injected proposal anywhere in it.
+--
+--   arm A  36b19eb1-b7cf-4ade-b38c-681c5adc7e41
+--   arm B  aaef64fc-6313-4ec8-9241-83b5be887141
+--   status FAILED
+--
+-- THE PREDICTION IS CONFIRMED. It said: "C3 FAILS on h_evt, arm A only, with arm
+-- B landing on the canon 9c631343..." It did:
+--
+--   h_evt  arm A  dfbac06930cb861534e884436fd61ea7
+--          arm B  9c631343c32cca7a861b17bc5bc8f4b7   <- the canon, exactly
+--
+-- **AND I UNDERSTATED IT BADLY.** I predicted one atom would move. TEN did:
+--
+--   atom     arm A          arm B          verdict
+--   ------   ------------   ------------   ---------------
+--   fp       803698f332ad   803698f332ad   same  <<<<<<<<<<
+--   h_cal    11a246262ff7   11a246262ff7   same
+--   h_defr   d41d8cd98f00   d41d8cd98f00   same
+--   ticks    12             12             same
+--   h_bkg    6b38422746a5   174b88355d03   MOVED
+--   h_cmd    bf7e8ef3e9cd   109e340b04a1   MOVED
+--   h_dec    da8afac6304e   9abdb4afb2d1   MOVED
+--   h_evt    dfbac06930cb   9c631343c32c   MOVED
+--   h_nrg    19fe1d80db26   a9c6b6937912   MOVED
+--   h_prop   a39e90ba6b1b   a79c109534ae   MOVED
+--   h_rcl    bfa86faad267   0e67b89a32cf   MOVED
+--   h_rule   1c6fb6b13783   fc69953b7ea2   MOVED
+--   h_sdr    49130b8231b7   a1f79c20a2ec   MOVED
+--   endst    (id-blind)     (id-blind)     MOVED
+--
+-- Every one of arm B's values is the no-replay canon for this column. Arm B ran
+-- the canonical run; arm A ran a different one, and the difference reached the
+-- decisions, the calendar, the energy commands, the rule evaluations, the recall
+-- ledger, the settlement records and the end state.
+--
+-- WHY BIGGER THAN THE ORIGINAL FAILURE: the natural residue on 09-09 was seven
+-- vehicles each mid-tether at its own stall, and it perturbed only the event log.
+-- The planted residue put all seven on ONE stall, which is a heavier and less
+-- realistic disturbance. That the planted case is worse is not a flaw in the
+-- experiment -- the experiment's job was to establish CAUSATION, and it does --
+-- but the "one atom" figure belongs to the natural case, and quoting ten atoms
+-- as the typical blast radius would be overstating it in the other direction.
+--
+-- ---------------------------------------------------------------------------
+-- THE LINE THAT MATTERS
+-- ---------------------------------------------------------------------------
+--
+--   fp is IDENTICAL on both arms -- 803698f332adc0d06cbefca79dad1ce0 -- while
+--   TEN other atoms disagree.
+--
+-- fp is one of the fourteen ENFORCED atoms and it is the start-of-run world
+-- hash. Its entire purpose is the sentence "both arms began from the same
+-- world." Arm A began with seven vehicles mid-tether and arm B began with none,
+-- and fp could not tell. This is no longer an inference from a failure or a
+-- reading of a function body: it is a controlled experiment with the disturbance
+-- applied by hand and the instrument watched while it failed to notice.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE THREE CONTROLS SETTLE, TOGETHER
+-- ---------------------------------------------------------------------------
+--
+--   C1  replay fn, no stream, clean world      passed   (0239 is not broken)
+--   C2  replay fn, same stream, clean world    passed   (replay is deterministic:
+--                                                        h_prop byte-identical to
+--                                                        the failed pair's)
+--   C3  ORIGINAL fn, no replay, planted residue FAILED  (residue alone does it)
+--
+-- THE REPLAY IS EXONERATED AND THE RESIDUE IS CONVICTED. G43 is a defect in the
+-- certification harness, not in the agent layer. db/checks/0157's Posture B
+-- proof stands and 0239 is not implicated in anything.
+--
+-- Migration 0243 is now cleared to apply.
+
+-- ===========================================================================
+-- 10. C4 -- THE SAME EXPERIMENT, AFTER 0243. IT PASSES.
+-- ===========================================================================
+--
+-- 0243 applied 06:09:09 UTC. C4 fired at 06:12:00 with the SAME planted residue
+-- and the SAME original ottoq_determinism_pair as C3 -- byte-identical cron
+-- command except for the job name:
+--
+--   arm A  72dc88e8-8738-4939-9a3f-5e01096d6378
+--   arm B  d43e873c-b021-4ff4-8b96-1926eb1a2563
+--   status PASSED
+--
+--   atom     both arms                            was, in C3
+--   ------   ----------------------------------   ---------------------------
+--   h_evt    9c631343c32cca7a861b17bc5bc8f4b7     A dfbac069 / B 9c631343
+--   h_dec    9abdb4afb2d172f50821158698fd26be     A da8afac6 / B 9abdb4af
+--   fp       14fa5b5dd6d40b8142a5b58fd95bef0a     A = B = 803698f332ad
+--
+-- Read those three rows together, because each says something different:
+--
+--   h_evt and h_dec are back on the CANON on BOTH arms. Arm A no longer runs a
+--   different run: the reset clears the tether family before it boots, so the
+--   residue that produced ten divergent atoms twenty minutes ago produces none.
+--
+--   fp MOVED, to 14fa5b5dd6d40b8142a5b58fd95bef0a, and is EQUAL across arms.
+--   Moved because the hash now covers four more columns per vehicle -- which is
+--   why 0243 is forces_recert TRUE and why every canon below the 06:09:09 floor
+--   has to be re-earned. Equal because the world really is equal now.
+--
+-- THE BEFORE-AND-AFTER, ON ONE LINE EACH, SAME DISTURBANCE, SAME FUNCTION:
+--
+--   C3, before 0243:  planted residue -> FAILED, 10 of 14 atoms moved, fp blind
+--   C4, after  0243:  planted residue -> PASSED, 0 atoms moved,        fp equal
+--
+-- G43 is closed on the evidence that convicted it, which is the bar this file
+-- set for itself in section 2 and the only bar worth passing: the fix is
+-- verified against the experiment that produced the defect, not against a
+-- re-run of the case that happened to be clean.
+--
+-- WHAT IS NOT CLOSED is unchanged and still section 8: endst remains blind to
+-- the fleet, five mutable columns remain unconvicted and unhashed, and the root
+-- is still G26 -- the proof harness shares a database with everything that can
+-- write to the depot it certifies. 0243 makes that condition visible and
+-- survivable. It does not make it impossible.
+--
+-- Round 32 (six columns, 06:20-07:36 UTC) establishes the canons above the new
+-- floor. Until it completes, NO COLUMN HAS A CANON, and that is the correct
+-- state to be in, not a regression.
+
+-- ===========================================================================
+-- 11. THE FIVE "UNCONVICTED" COLUMNS, SWEPT -- ONE IS CONVICTED, THREE ARE OUT
+-- ===========================================================================
+--
+-- Section 8 listed five mutable columns invisible to both the reset and the
+-- fingerprint and declined to sweep them into 0243 without a probe. Leaving them
+-- as "plausible, unconvicted" is only honest if somebody then goes and looks, so:
+--
+--   SELECT ... FROM pg_proc WHERE pg_get_functiondef(oid) ~* ('SET[^;]*'||col||'\s*=')
+--   over schemas public, ottoq, twin.
+--
+--   column                            assigning functions
+--   -------------------------------   ---------------------------------------
+--   vehicles.current_depot_id         4  <- INCLUDING A TICK-PATH FUNCTION
+--   vehicles.owning_sim_run_id        2  (differs per arm BY DESIGN; stays out)
+--   stalls.staging_role               1  <- FALSE POSITIVE, see below
+--   stalls.reserved_for_mission_id    0
+--   vehicles.is_active                0
+--
+-- WHAT THE TEST CAN AND CANNOT SAY. It reads function bodies textually across
+-- three schemas. It cannot see trigger-driven writes, dynamic SQL, writes from
+-- edge functions or any client, or `UPDATE ... SET (a,b) = (...)` row-form
+-- assignment. So a count of 0 is EVIDENCE THAT NO FUNCTION IN THOSE SCHEMAS
+-- ASSIGNS THE COLUMN -- a lower bound on writers, not a proof of immutability.
+-- It is enough to stop treating the column as a live suspect; it is not enough
+-- to call it constant.
+--
+-- stalls.staging_role -- MY REGEX WAS WRONG, and the sweep is worth nothing if I
+-- do not say so. The one "writer" is
+-- ottoq.ottoq_stall_free_between(...), which is a RETURNS TABLE query helper.
+-- staging_role appears there twice, in the return column list and in
+-- "AND (p_staging_role IS NULL OR s.staging_role = p_staging_role)". It is a
+-- SELECT and a comparison. Nothing assigns it. The pattern 'SET[^;]*col\s*='
+-- matched across a stretch with no semicolon in it. Count it as ZERO writers.
+--
+-- vehicles.current_depot_id -- CONVICTED, and it is the tether defect one column
+-- over. From twin.ottoq_sim_start_charge_session(uuid,uuid,uuid,numeric,timestamptz):
+--
+--   UPDATE vehicles SET current_state = v_state, current_stall_id = p_stall_id,
+--          current_depot_id = v_stall.depot_id, last_state_change = v_clock
+--    WHERE id = p_vehicle_id;
+--
+-- That runs INSIDE a tick. And current_depot_id is named by neither
+-- ottoq_tick_invariance_reset_fleet nor ottoq.ottoq_world_fingerprint -- it was
+-- on section 3's list of 49. So it is written during a run, not cleared between
+-- runs, and not hashed at boot: the exact three properties that made the tether
+-- family able to fail a certification.
+--
+-- It is LESS LIKELY to bite than the tether family, and the reason is worth
+-- recording rather than hand-waving: it is assigned v_stall.depot_id, the depot
+-- of the stall being plugged into, so within a single-depot run it converges to
+-- a constant. To carry residue across arms it needs a vehicle left pointing at
+-- a DIFFERENT depot than the one being certified -- which the two-lane cadence
+-- (flagship + Benchmark) makes possible rather than hypothetical.
+--
+-- Lower likelihood is not a reason to leave it. 0245 closes it on the same two
+-- halves as 0243, and it is scheduled into the same apply window as 0244 so one
+-- recert round covers both rather than two rounds covering one each.
+--
+-- NET: of section 8's five, one is convicted (current_depot_id), three are out
+-- on evidence (is_active, reserved_for_mission_id, staging_role), and one stays
+-- deliberately excluded (owning_sim_run_id). The residue class is now named
+-- rather than estimated.
+
+-- ===========================================================================
+-- 12. ROUND 32, FIRST COLUMN -- 0243 CHANGED WHAT IS WATCHED, NOT WHAT RUNS
+-- ===========================================================================
+--
+-- The risk worth naming about 0243 was not that it would fail. It was that
+-- widening a fingerprint and adding four columns to a fleet reset might change
+-- what the ENGINE DOES, and that the recert would then quietly bless a new
+-- behaviour as if it were the old one. That risk was written into the round-32
+-- check-in prompt at 06:16 UTC -- before any round-32 pair had completed -- as:
+-- "If h_dec or h_evt moved on a clean world, 0243 did more than intended:
+-- investigate before writing anything down."
+--
+-- r32_a (busy_day / 314159 / 12t), fired 06:20, completed ~06:23:
+--
+--   verdict  PASSED
+--   fp       14fa5b5dd6d40b8142a5b58fd95bef0a   MOVED, and to exactly the value
+--                                               C4 measured after 0243 applied
+--   h_evt    9c631343c32cca7a861b17bc5bc8f4b7   UNCHANGED from the pre-0243 canon
+--   h_dec    9abdb4afb2d172f50821158698fd26be   UNCHANGED from the pre-0243 canon
+--
+-- That is the whole intended shape of the migration, measured on a clean world:
+-- the atom that WATCHES the starting world moved because it now watches more of
+-- it, and the atoms that record what the engine DECIDED and what it EMITTED did
+-- not move at all. 0243 widened the instrument and left the engine alone.
+--
+-- Five columns remain (06:34 through 07:36). This one is recorded here rather
+-- than held back because it is the answer to a specific stated risk, not a
+-- summary of the round -- db/canons/round32.md is where the round is judged, on
+-- all six, against a prediction made before the evidence.

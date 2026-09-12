@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run3/C7)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: e91eb3a811f96809202bc7b77a72ff41
+--   live      md5: 35486348dff298a567c4d56f8989bd73
 -- md5 at capture: e91eb3a811f96809202bc7b77a72ff41
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live 7777fdcb1191ce5c8530ac73281bc03a
---   here e91eb3a811f96809202bc7b77a72ff41
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('twin.ottoq_sim_advance_deployed_telemetry'::regproc);
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_advance_deployed_telemetry(p_sim_run_id uuid, p_sim_clock_now timestamp with time zone, p_tick_minutes numeric)
  RETURNS TABLE(out_vehicle_id uuid, out_action text, out_new_soc numeric, out_new_state text)
  LANGUAGE plpgsql
@@ -328,4 +327,3 @@ BEGIN
   END LOOP;
 END;
 $function$
-

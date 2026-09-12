@@ -1,0 +1,132 @@
+-- ===========================================================================
+-- PREDICTION 2 FALSIFIED 2026-09-12 13:30 UTC -- see db/checks/0175
+--
+-- The prediction below is left EXACTLY as committed at 13:09:17 UTC. Prediction 2 is
+-- WRONG: grid endst.world is STABLE (239001 held 4926be34f0e995a3 across 09-09, and
+-- across 0255 at 04:05 and 13:40; 424242 held e51fb295975c3e8c across the fix).
+--
+-- The premise I did not verify: grid_smoke's sim_duration_minutes is 1440, the same as
+-- busy_day -- not 180. A 6-tick grid run ends at 180 minutes because it runs out of
+-- TICKS, not because the world runs out of DAY. 0173 had already drawn exactly that
+-- distinction six hours earlier and I conflated it again in the other direction.
+--
+-- CONSEQUENCE FOR JUDGING: the grid columns are NOT a test of 0255 -- they never reach
+-- the teardown, so grid endst holding steady is correct and means nothing about the
+-- fix. Do NOT act on prediction 2's "if grid endst does NOT move, the conviction is
+-- incomplete". PREDICTIONS 1 AND 3 STAND UNCHANGED: the six 12t/24t columns are the
+-- control, and busy_day/171717/48t is the only test of the fix.
+-- ===========================================================================
+
+-- ===========================================================================
+-- 0174  ROUND 38 PREDICTION, COMMITTED BEFORE THE FIRST PAIR FIRES
+-- ===========================================================================
+-- Written 2026-09-12 ~13:15 UTC (08:15 AM CT). 0255 applied at 13:06:22 UTC; round
+-- 38's first pair fires at 13:40 UTC. This file is committed before that, so it
+-- cannot be edited to suit the answer. 0166 and 0170's discipline, third time.
+--
+-- WHAT CHANGED: 0255 (version 20260912130622, forces_recert=TRUE) replaced
+-- `last_state_change=now()` with `COALESCE(v_sim_clock, now())` inside
+-- ottoq_sim_release_depot's sim-only v_world_reset branch. Recert floor moved
+-- 2026-09-09 09:46:27.088143 -> 2026-09-12 13:06:22.289808, so EVERY canon is below
+-- the floor and must be re-earned. That is the accepted cost, stated in 0173.
+--
+-- ---------------------------------------------------------------------------
+-- A CORRECTION TO 0173's MECHANISM, FOUND WHILE WRITING THIS PREDICTION
+-- ---------------------------------------------------------------------------
+--
+-- 0173 and db/canons/round37.md both say the teardown "fires only at 1,440 sim
+-- minutes = exactly tick 48". That is true of busy_day and it is NOT the rule. The
+-- rule is: the teardown fires when a run reaches ITS OWN scenario's sim-clock end.
+-- Measured, all columns at 30 sim-minutes per tick:
+--
+--   scenario/ticks      sim span     reaches its scenario end?
+--   busy_day/12t          360 min    NO
+--   busy_day/24t          720 min    NO
+--   busy_day/48t        1,440 min    YES  (the 24-hour day)
+--   normal_day/12t        360 min    NO
+--   grid_smoke/6t         180 min    YES  (180 min IS the grid scenario's end)
+--
+-- And the direct evidence, read just now from the live fleet of both depots:
+--
+--   flagship 11111111   116 vehicles, ONE distinct last_state_change
+--                       = 2026-09-12 06:20:00.190665  (the 48t b job's wall clock)
+--   grid     aacd0bb0     4 vehicles, ONE distinct last_state_change
+--                       = 2026-09-12 04:08:00.145927  (the 04:08 grid job's wall clock)
+--
+-- SO THE GRID COLUMNS WERE CONTAMINATED TOO, and nobody noticed, for a structural
+-- reason worth naming: a grid column runs ONCE per round, so there is no
+-- intra-round pair-to-pair comparison for it, and its cross-ROUND comparison was
+-- never asserted -- 0170 explicitly declined to predict grid atom values because of
+-- 0162's replay. That caution was protecting me from a real failure rather than a
+-- harness artefact, which I did not know at the time.
+--
+-- The 48-tick column is not special because it is long. It is special because it is
+-- THE ONLY COLUMN RUN TWICE IN ONE ROUND, so it is the only one whose inter-pair
+-- disagreement a round can see at all. 0193's bar is the only instrument pointed at
+-- this class of defect, and it is pointed at exactly one of nine columns.
+--
+-- ---------------------------------------------------------------------------
+-- PREDICTION 1 -- the six flagship 12t/24t columns: UNCHANGED from round 37.
+-- ---------------------------------------------------------------------------
+-- Six of six pass, 0 of 14 atoms differ between arms, and 0 of 14 MOVE from round 37.
+-- Reference fp (unchanged since round 35): 314159/12t b8606125f1cbd5c820fc9be94c4c4a29,
+-- 171717/12t and normal/12t and 171717/24t 9c28854e976c8572f2cc1bf4717f85b0,
+-- 424242/12t and 424242/24t 7a14aa522a65cc196ca486309194573c.
+-- WHY: at 360 and 720 sim minutes these runs never reach the busy_day scenario end,
+-- so they never reached the teardown, so 0255 cannot have touched their end state.
+-- This is the control: if a 12t or 24t atom moves, 0255 did something I did not
+-- intend and the round must be read as a regression, not a recertification.
+--
+-- ---------------------------------------------------------------------------
+-- PREDICTION 2 -- the two grid columns: endst WILL MOVE, and that is the fix working.
+-- ---------------------------------------------------------------------------
+-- Both pass internally (equal=true, 0 of 14 between arms), AND `endst` differs from
+-- round 37 on both grid columns, specifically in `world`, and wsec will name
+-- `vehicles`. Every other atom holds.
+-- WHY: 180 sim minutes IS the grid scenario's end, so these runs DID reach the
+-- teardown and their round-37 end state carries a wall clock (04:08:00.145927,
+-- measured above). After 0255 they carry sim time instead. A moved endst here is
+-- therefore PREDICTED and is evidence the fix took effect -- the opposite of a
+-- regression. If grid endst does NOT move, 0255 did not reach this path and the
+-- conviction is incomplete.
+--
+-- ---------------------------------------------------------------------------
+-- PREDICTION 3 -- THE BAR: the 48-tick column.
+-- ---------------------------------------------------------------------------
+-- The 15:23 and 15:55 pairs each pass internally AND AGREE WITH EACH OTHER on all
+-- fourteen atoms, and their wsec.vehicles hashes are identical. That is 0193's bar
+-- met above the new floor, and it is the first time this column will have met it.
+--
+-- Their endst will also differ from round 37's (same reason as the grid columns), and
+-- that difference is expected, not judged.
+--
+-- WHAT EACH OUTCOME MEANS, decided now:
+--   * Both agree on all fourteen + wsec.vehicles identical -> G46 is CLOSED and the
+--     column is certified at streak 1 above the new floor. Streak 2 needs round 39.
+--     The flagship matrix becomes seven of seven ONLY after that second round; one
+--     agreeing round is not 0193's bar.
+--   * endst still moves, wsec says `vehicles` -> the wall clock is gone (A1 asserted
+--     it) so a SECOND writer touches a vehicles column outside every stream. The four
+--     off-path wall-clock writers found while scoping 0255 (twin.ottoq_world_advance,
+--     ottoq_cert_arm_wave, and the now() fallbacks in twin.ottoq_sim_confirm_commands
+--     and ottoq_cert_arm) are the first suspects, and the claim that none is on the
+--     pair path would be wrong.
+--   * endst moves, wsec says a section OTHER than vehicles -> a new finding, unrelated
+--     to G46, and 0255 should still be judged as having worked.
+--   * A 12t or 24t atom moves -> see prediction 1: regression, not recertification.
+--
+-- NOTHING HERE MAKES THE MATRIX GREEN TODAY. The best available outcome is seven
+-- columns agreeing once above a floor that is four hours old. Saying "green" needs
+-- two consecutive rounds, which is round 39.
+-- ===========================================================================
+
+-- Re-runnable: which columns reach their own scenario's sim-clock end.
+SELECT (validation_notes::jsonb->>'scenario')||'/'||(validation_notes::jsonb->>'ticks')||'t' AS col,
+       round(extract(epoch from max(sim_clock_current)-min(sim_clock_start))/60) AS sim_minutes,
+       round(extract(epoch from max(sim_clock_current)-min(sim_clock_start))/60
+             / NULLIF((validation_notes::jsonb->>'ticks')::int,0)) AS min_per_tick
+  FROM public.ottoq_sim_runs
+ WHERE run_by='cert_harness' AND started_at >= '2026-09-12 04:00:00+00'
+   AND started_at < '2026-09-12 07:00:00+00'
+ GROUP BY 1, validation_notes::jsonb->>'ticks'
+ ORDER BY 2;
