@@ -357,7 +357,9 @@ repo_manifest(version, name, file) AS (
     ('20260912130622'::text, '0255_the_teardown_stamps_the_wall_clock_into_a_hashed_column'::text, '0255_the_teardown_stamps_the_wall_clock_into_a_hashed_column.sql'::text),
     ('20260912165023'::text, '0256_the_trigger_restamps_what_the_teardown_fixed'::text, '0256_the_trigger_restamps_what_the_teardown_fixed.sql'::text),
     ('20260912165137'::text, '0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached'::text, '0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql'::text),
-    ('20260912165243'::text, '0258_the_comment_states_the_invariant_and_no_code_holds_it'::text, '0258_the_comment_states_the_invariant_and_no_code_holds_it.sql'::text)
+    ('20260912165243'::text, '0258_the_comment_states_the_invariant_and_no_code_holds_it'::text, '0258_the_comment_states_the_invariant_and_no_code_holds_it.sql'::text),
+    ('PENDING'::text, '0259_the_proposer_seat_is_declared_data_not_three_literals'::text, '0259_the_proposer_seat_is_declared_data_not_three_literals.sql'::text),
+    ('PENDING'::text, '0260_every_proposer_fire_is_a_ledger_row'::text, '0260_every_proposer_fire_is_a_ledger_row.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

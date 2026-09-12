@@ -151,7 +151,7 @@ stopping rule, stop and ship what works rather than deepening.
 - [ ] Phase 0 — round 38 judged; 0256/0257/0258 applied; round 39 scheduled
 - [ ] Phase 0 — two consecutive rounds, 7/7 agree; `CERTIFICATION_STATUS.md` written; core FROZEN
 - [ ] Phase 1 — `p_policy` in the pair rig; shield held constant; one committed comparison
-- [ ] Phase 2 — CP-SAT proposer certified; `h_prop` non-trivial in one pair
+- [ ] Phase 2 — CP-SAT proposer certified; `h_prop` non-trivial in one pair *(2026-09-12: `bridge/` built and tested; `0259` precedence + `0260` fire ledger drafted, apply after round 39; then one live run, then the replay pair)*
 - [ ] Phase 2 — LLM proposer (pending Chase's yes/no); one refusal with reason code
 - [ ] Phase 3 — `demo/` scripts D1–D4 run from run ids; dashboard up; slide written
 - [ ] Phase 3 — D5 if time

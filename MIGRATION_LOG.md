@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0258 — GENERATED, not a log
+## Index, 0134–0260 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -245,7 +245,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0256](db/migrations/0256_the_trigger_restamps_what_the_teardown_fixed.sql) | `20260912165023` | yes — ledger | THE TRIGGER RE-STAMPS WHAT THE TEARDOWN FIXED |
 | [0257](db/migrations/0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql) | `20260912165137` | yes — ledger | THE SECOND FLOOR SHIPS AS A COUNT, WITH ITS OWN LIMITS ATTACHED |
 | [0258](db/migrations/0258_the_comment_states_the_invariant_and_no_code_holds_it.sql) | `20260912165243` | yes — ledger | THE COMMENT STATES THE INVARIANT AND NO CODE HOLDS IT |
+| [0259](db/migrations/0259_the_proposer_seat_is_declared_data_not_three_literals.sql) | `PENDING` | no — pending | THE PROPOSER SEAT IS DECLARED DATA, NOT THREE LITERALS |
+| [0260](db/migrations/0260_every_proposer_fire_is_a_ledger_row.sql) | `PENDING` | no — pending | EVERY PROPOSER FIRE IS A LEDGER ROW |
 
-126 migrations indexed.
+128 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

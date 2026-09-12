@@ -58,7 +58,7 @@ FORBIDDEN_IMPORTS = re.compile(
     #: `load` is on this list for the same reason psycopg is: it is a
     #: database client by design (load/harness.py drives pgbench against a
     #: live URL). A kernel module importing it would have a connection.
-    r"httpx|urllib\.request|twin|load)\b", re.M)
+    r"httpx|urllib\.request|twin|load|bridge)\b", re.M)
 
 #: Identifiers of the production world. A kernel file that names them has been
 #: told which world it lives in.
@@ -131,6 +131,13 @@ NON_KERNEL_PACKAGES = {
                "is exactly why it must never be importable from a kernel package. "
                "FORBIDDEN_IMPORTS below bans `import load` from the kernel for "
                "the same reason it bans psycopg.",
+    "bridge":  "the proposer's database client (BUILD_QUEUE #4). It reads the "
+               "decision frame, calls proposer.propose(), and submits the rows "
+               "through ottoq_submit_external_proposal -- the insert the proposer "
+               "package is forbidden from performing. A DATABASE client by design, "
+               "so FORBIDDEN_IMPORTS bans `import bridge` from the kernel exactly "
+               "as it bans load and psycopg: the proposer must never learn it has "
+               "a channel.",
 }
 
 
