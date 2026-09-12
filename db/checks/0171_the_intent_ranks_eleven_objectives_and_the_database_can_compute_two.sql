@@ -134,6 +134,56 @@
 -- scorer, so step 4's `unscorable` list is not decoration -- it is the thing that
 -- keeps the output honest while steps 1-3 are incomplete.
 --
+-- ---------------------------------------------------------------------------
+-- AND THE SUBSTRATE CHECK, WHICH FOUND ONE BUILDABLE FLOOR AND ONE BLOCKED ONE
+-- ---------------------------------------------------------------------------
+--
+-- Step 1 (tardy_minutes) and step 2 (service_completion_rate) were assumed to be
+-- symmetrical pieces of work. They are not. Measured on the three most recent
+-- unpurged cert runs, all of them 48-tick:
+--
+--   READINESS IS BUILDABLE. The substrate is there and it is run-scoped on both
+--   sides. A 48-tick run spans 1,440 sim minutes (24 h at 30 sim-min per tick):
+--     ottoq_visit_needs       220 rows, sim_run_id scoped, carries dispatch_due_at
+--                             94 with a due time, and 91 of those 94 fall INSIDE
+--                             the horizon -- so deadlines are not all beyond the
+--                             end of the run, which was the real risk
+--     ottoq_vehicle_dispatches 232 rows, sim_run_id scoped, carries dispatched_at
+--   Due-time coverage by urgency reproduces BUILD_QUEUE 8d exactly:
+--     immediate_dispatch 56/56, overnight_hold 38/38, standard 0/124, tech_hold 0/2.
+--   That denominator question is already settled and must be CARRIED OVER, not
+--   re-litigated: a standard visit cannot be late.
+--
+--   SERVICE COMPLETION IS BLOCKED AT THE SOURCE, and this is the new finding.
+--   ottoq_visit_needs.status has a five-value CHECK:
+--     ('open','in_progress','complete','carried_over','superseded')
+--   Measured across every row in the table, all runs, all time:
+--     superseded = 107,055.  complete = 0.  open = 0.  in_progress = 0.
+--     carried_over = 0.
+--   FOUR OF THE FIVE DECLARED STATUSES HAVE NEVER BEEN USED. The column is a
+--   constant. So the need table records DEMAND and never records SATISFACTION, and
+--   `service_completion_rate` -- the intent's second floor, ranked first in the
+--   overnight regime -- cannot be computed from it at all. Not "is not computed":
+--   cannot be, from this table, as it is written.
+--
+--   A corollary worth flagging because it is live code: ottoq_boot_state_fingerprint
+--   filters its foreign-run branch on
+--     t.status::text IN ('open','in_progress','carried_over')
+--   which can never match a single row. 0222 bounded that CTE for cost and the
+--   bound is correct; what this measurement adds is that the branch it guards is
+--   unreachable for a second, independent reason.
+--
+--   NOT ESTABLISHED, and it decides whether this is a defect or a design: whether
+--   needs are DERIVED FRESH EACH TICK and superseded by construction (in which case
+--   the table is an append-only log of successive derivations and completion
+--   legitimately lives elsewhere -- candidates are the visit-atom path that
+--   twin.ottoq_sim_advance_visit_atoms drives, ottoq_service_detail_records, and
+--   ottoq_vehicle_dispatches.actual_return_at), or whether a completion transition
+--   was intended here and never wired. Those two readings imply completely different
+--   fixes, so the next step on the second floor is to establish which, NOT to pick
+--   a completion proxy tonight. Choosing a proxy under time pressure is how a
+--   number that measures the wrong thing acquires a run ID.
+--
 -- NOT MEASURED HERE: whether `ottoq_kpi_dispatch_readiness` could be adapted into
 -- tardy_minutes. It reports readiness as a percentage with stranded/no-charge
 -- split, not as minutes late, and BUILD_QUEUE 8c already records that its end_soc
