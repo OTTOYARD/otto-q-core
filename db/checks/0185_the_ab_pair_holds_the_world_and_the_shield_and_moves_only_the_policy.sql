@@ -15,9 +15,11 @@
 
 -- =========================================================================
 -- 1. EVERY A/B VERDICT, newest first: outcome, what moved, and the leak.
---    stall_sources.local_heuristic is the share of enacted stall assignments the
---    seat did NOT decide (the in-tick fallback fired). Read it before quoting a
---    difference: a fifo arm whose assignments are 40% local_heuristic is 60% fifo.
+--    stall_sources says who decided each enacted stall assignment. For seat 0,
+--    local_heuristic is OTTO-Q's own in-tick rule; for a baseline seat the fallback
+--    stamps the seat, so a fifo arm must read fifo + reservation_* and nothing else
+--    (0261 A5). If it reads anything else, the seat leaked and the number is not a
+--    comparison.
 -- =========================================================================
 WITH v AS (
   SELECT r.sim_run_id, r.started_at, r.validation_status, (r.validation_notes::jsonb) AS j

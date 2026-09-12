@@ -7,19 +7,24 @@
 --                 db/checks/0146 (the baselines do not pay the shield), 0230 (the
 --                 outcome scorer, "the measurement half only"), V1_DEMO_PLAN Phase 1,
 --                 task #105.
--- forces_recert:  FALSE -- asserted, not assumed. The one certified-path function this
---                 touches, ottoq_sim_decide_and_dispatch, is changed by SPLICE, not by
---                 retyping: the live definition is cut at two unique markers and the
---                 old proposer block is wrapped in `IF v_seat = 0 THEN ... ELSE <baseline>
---                 END IF`. A1 proves the splice by REVERSING it -- removing the inserted
---                 text from the new definition must yield the pinned old definition byte
---                 for byte -- so seat 0, which is every run that has ever existed,
---                 executes the same statements it executed before. A2 proves no run has
---                 ever carried a seat and adds the CHECK that makes a seat run-scoped by
---                 construction, so a certification arm can never inherit one. A6 pins
---                 ottoq_decide_tick, ottoq_determinism_pair, ottoq_l2_optimize_assignments
---                 and ottoq.ottoq_world_fingerprint by md5. Round 41 is the measurement
---                 that confirms the classification, exactly as round 40 is for 0259/0260.
+-- forces_recert:  FALSE -- asserted, not assumed. The three certified-path functions this
+--                 touches are changed by SPLICE, not by retyping: each live definition is
+--                 cut at markers measured unique (P0 pins the bodies; the counts were
+--                 taken live: 1/1/1 on every marker) and text is INSERTED around the old
+--                 text, never into it. A1/A1b/A1c prove every splice by REVERSING it --
+--                 removing the inserted text from the new definition must yield the
+--                 pinned old definition byte for byte -- so seat 0, which is every run
+--                 that has ever existed, executes the same statements it executed before:
+--                   ottoq_sim_decide_and_dispatch   the proposer block wrapped in
+--                                                    IF v_seat = 0 THEN <old> ELSE <seat> END IF
+--                   ottoq_l2_propose_stall_assignment  one early RETURN for a non-zero seat
+--                   ottoq_decide_tick               two ORDER BY keys that are NULL (constant)
+--                                                    for seat 0 and therefore sort nothing
+--                 A2 proves no run has ever carried a seat and adds the CHECK that makes a
+--                 seat run-scoped by construction, so a certification arm can never inherit
+--                 one. A6 pins ottoq_determinism_pair, ottoq_l2_optimize_assignments and
+--                 ottoq.ottoq_world_fingerprint by md5. Round 41 is the measurement that
+--                 confirms the classification, exactly as round 40 is for 0259/0260.
 --
 -- NOT TO BE APPLIED WHILE A ROUND IS IN FLIGHT OR SCHEDULED. pg_stat_activity is the
 -- only authority for in-flight; cron.job (r<NN>_* one-shot rows) for scheduled.
@@ -66,14 +71,27 @@
 --   seat 2  greedy   one proposer: most-depleted vehicle first, the fastest plug
 --                    it can take (highest connector_max_kw), myopic
 --
--- Held constant for every seat: ottoq_decide_tick (so the shield, the safe defaults,
--- the site power gate 0132, the calendar 0067, the SDR terminus), the deploy path,
--- the twin, the seed, the calibration priors, the scenario, the boot world. The
--- reservation-honour path (a vehicle arriving on a booking it already holds) is
--- kernel too and stays; the in-tick heuristic `ottoq_l2_propose_stall_assignment`
--- stays as the shared fallback for a vehicle no proposer covered, and the verdict
--- MEASURES how often it fired per arm (`stall_sources`) rather than pretending it
--- did not.
+-- Held constant for every seat: the disposer (the shield, the safe defaults, the site
+-- power gate 0132, the calendar 0067, the SDR terminus), the deploy path, the twin,
+-- the seed, the calibration priors, the scenario, the boot world, and the
+-- reservation-honour path (a vehicle arriving on a booking it already holds is placed
+-- on it by every seat -- that is the calendar, not the policy).
+--
+-- MEASURED BEFORE THIS WAS BUILT, and the reason the seat reaches three functions and
+-- not one. Over the last four flagship 12-tick certification runs, of 796 enacted
+-- stall assignments the pre-tick proposer greedy_constrained decided 204 (26%); the
+-- IN-TICK heuristic ottoq_l2_propose_stall_assignment decided 426 (54%) -- 154 at the
+-- gate and 224 for vehicles re-queued from staged_awaiting_service when a plug freed;
+-- reservations honoured 164 (21%). A seat that swapped only the pre-tick proposer would
+-- have left the baseline arm three-quarters OTTO-Q and called the result "FIFO". So a
+-- non-zero seat also owns (a) the in-tick fallback, which under a seat returns the
+-- seat's own stall choice (ottoq_l2_propose_stall_seat) and stamps `source`, and (b)
+-- the disposer's queue order for stall assignment, since which waiting vehicle gets a
+-- freed plug IS the policy: fifo queues by arrival, greedy by depletion, seat 0 keeps
+-- its order. The need's `immediate_dispatch` urgency stays ahead of every seat's key --
+-- it is the work-side signal (2.7), not the stall policy. Each arm's verdict carries
+-- `stall_sources`; under a seat every enacted assignment must read as the seat or as a
+-- reservation, and A5 asserts exactly that.
 --
 -- The seat is a run-scoped policy param, `proposer_seat`, read once per decide tick.
 -- It is set only by ottoq_ab_pair, on arms it creates with run_by = 'ab_harness'. A
@@ -129,7 +147,8 @@ INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, obje
 SELECT '0261_pre', 'function', n.nspname, p.proname,
        pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
- WHERE n.nspname = 'public' AND p.proname = 'ottoq_sim_decide_and_dispatch';
+ WHERE n.nspname = 'public'
+   AND p.proname IN ('ottoq_sim_decide_and_dispatch', 'ottoq_l2_propose_stall_assignment', 'ottoq_decide_tick');
 
 DO $P0$
 DECLARE v_md5 text;
@@ -138,6 +157,16 @@ BEGIN
    WHERE n.nspname = 'public' AND p.proname = 'ottoq_sim_decide_and_dispatch';
   IF v_md5 <> '50b598790334cd6e910ad90faee6da48' THEN
     RAISE EXCEPTION '0261 P0: ottoq_sim_decide_and_dispatch body is % (expected 50b598790334cd6e910ad90faee6da48); it was changed since this file was written -- re-derive the splice markers before applying', v_md5;
+  END IF;
+  SELECT md5(p.prosrc) INTO v_md5 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'ottoq_l2_propose_stall_assignment';
+  IF v_md5 <> '457381685b25579ee0d4ad041d1114d1' THEN
+    RAISE EXCEPTION '0261 P0: ottoq_l2_propose_stall_assignment body is % (expected 457381685b25579ee0d4ad041d1114d1); re-derive the splice markers before applying', v_md5;
+  END IF;
+  SELECT md5(p.prosrc) INTO v_md5 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'ottoq_decide_tick';
+  IF v_md5 <> '47602bef21aebadce6dbd8a3b692ca8a' THEN
+    RAISE EXCEPTION '0261 P0: ottoq_decide_tick body is % (expected 47602bef21aebadce6dbd8a3b692ca8a); re-derive the splice markers before applying', v_md5;
   END IF;
 END $P0$;
 
@@ -239,6 +268,62 @@ $fn$;
 COMMENT ON FUNCTION public.ottoq_l2_propose_seat(uuid, uuid, timestamptz, integer) IS
   '0261. The baseline stall proposers for the A/B pair: seat 1 = fifo (arrival order, first free compatible plug), seat 2 = greedy (most depleted first, fastest plug). Same stall filter and requested_kw arithmetic as greedy_constrained; only the order differs. Called from ottoq_sim_decide_and_dispatch when the run-scoped policy param proposer_seat is non-zero; the disposer (ottoq_decide_tick, the shield, the calendar) is untouched.';
 
+-- 3b. The seat's IN-TICK stall choice: what ottoq_l2_propose_stall_assignment returns
+--     for one vehicle when a non-zero seat is active (the fallback the disposer calls
+--     for any vehicle no pre-tick proposal covered, and for every vehicle re-queued from
+--     staging). The calendar comes first for every seat -- a stall booked for THIS
+--     vehicle is honoured -- then the seat's order. No headroom fit, no downgrade
+--     policy, no wanted-type: a baseline proposes and the site power gate (0132) and
+--     the shield refuse what does not fit, which is the comparison.
+CREATE OR REPLACE FUNCTION public.ottoq_l2_propose_stall_seat(
+  p_vehicle_id uuid, p_depot_id uuid, p_context jsonb, p_seat integer)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
+AS $fn$
+DECLARE
+  v_soc   numeric := COALESCE((p_context->>'current_soc')::numeric, 50);
+  v_now   timestamptz := COALESCE(NULLIF(p_context->>'now_ts','')::timestamptz, now());
+  v_inlet text; v_inlet_kw numeric; v_stall RECORD; v_source text;
+BEGIN
+  v_source := CASE p_seat WHEN 1 THEN 'fifo' WHEN 2 THEN 'greedy' END;
+  IF v_source IS NULL THEN
+    RAISE EXCEPTION 'ottoq_l2_propose_stall_seat: seat % is not a baseline (1 = fifo, 2 = greedy)', p_seat;
+  END IF;
+  SELECT inlet_type, inlet_max_kw INTO v_inlet, v_inlet_kw FROM vehicles WHERE id = p_vehicle_id;
+
+  SELECT s.id, s.stall_type, s.connector_max_kw,
+         (LEAST(COALESCE(s.connector_max_kw,50), COALESCE(v_inlet_kw,250))
+          * CASE WHEN COALESCE(s.connector_max_kw,50) <= 50 THEN 1.0
+                 WHEN v_soc < 55 THEN 0.85 WHEN v_soc < 75 THEN 0.55 ELSE 0.30 END) AS eff_kw
+    INTO v_stall
+    FROM stalls s JOIN ottoq_ocpp_chargers c ON c.charger_id = s.ocpp_charger_id
+   WHERE s.depot_id = p_depot_id AND s.stall_type IN ('dcfc','l2') AND s.current_vehicle_id IS NULL
+     AND (s.reserved_by IS NULL OR s.reserved_by = p_vehicle_id OR s.reservation_expires_at <= v_now)
+     AND c.station_state = 'Available' AND c.last_heartbeat_at >= v_now - INTERVAL '90 seconds'
+     AND (v_inlet IS NULL OR s.connector_type = v_inlet
+       OR (s.connector_type = 'Multi' AND v_inlet = ANY(COALESCE(s.supported_inlet_types, ARRAY[]::text[])))
+       OR (s.connector_type = 'NACS'  AND v_inlet IN ('NACS','Tesla_Proprietary')))
+   ORDER BY COALESCE(s.reserved_by = p_vehicle_id, false) DESC,                       -- the calendar, every seat
+            CASE WHEN p_seat = 2 THEN COALESCE(s.connector_max_kw, 0) END DESC NULLS LAST, -- greedy: the fastest plug
+            s.stall_code ASC, s.id ASC                                                  -- fifo: the first free plug
+   LIMIT 1;
+
+  IF v_stall.id IS NULL THEN
+    RETURN jsonb_build_object('abstain', true, 'reason', 'no_compatible_available_stall', 'source', v_source);
+  END IF;
+  RETURN jsonb_build_object('abstain', false, 'resolved_action_context', 'stall_assignment', 'verb', 'assign_stall',
+    'vehicle_id', p_vehicle_id, 'stall_id', v_stall.id, 'stall_type', v_stall.stall_type,
+    'requested_kw', ROUND(v_stall.eff_kw::numeric, 1), 'source', v_source,
+    'rationale', jsonb_build_object('soc', v_soc, 'inlet', v_inlet, 'optimizer', v_source, 'seat', p_seat,
+                                    'eff_draw_kw', ROUND(v_stall.eff_kw::numeric, 1)));
+END;
+$fn$;
+
+COMMENT ON FUNCTION public.ottoq_l2_propose_stall_seat(uuid, uuid, jsonb, integer) IS
+  '0261. The in-tick stall choice for one vehicle under a baseline seat (1 fifo: first free compatible plug by stall_code; 2 greedy: the fastest plug it can take), a stall already booked for this vehicle first for every seat. Returned by ottoq_l2_propose_stall_assignment when the run-scoped proposer_seat is non-zero; stamps source so ottoq_decisions attributes the assignment to the seat. STABLE, read-only.';
+
 -- ---------------------------------------------------------------------------
 -- 4. THE SPLICE. The live definition of ottoq_sim_decide_and_dispatch is cut at two
 --    unique markers and the proposer block between them is wrapped. Nothing is
@@ -303,6 +388,75 @@ BEGIN
   RAISE NOTICE '0261 A1: splice reversed to the pinned body; seat 0 executes the pre-0261 statements';
 END $splice$;
 
+-- 4b. ottoq_l2_propose_stall_assignment: one early RETURN for a non-zero seat, inserted
+--     after the statement that resolves the running run (so the seat is read off the
+--     same run the function already keys its downgrade policy on). Seat 0 falls through
+--     to the pre-0261 text.
+DO $splice2$
+DECLARE v_def text; v_new text; v_m text; v_d text; v_ins text; v_pos int;
+BEGIN
+  v_def := pg_get_functiondef('public.ottoq_l2_propose_stall_assignment(uuid, uuid, jsonb)'::regprocedure);
+  v_m := E'ORDER BY r0.started_at DESC LIMIT 1;\n';
+  v_d := 'v_want_kw numeric; v_ceiling numeric; v_wait_reason text := NULL;';
+  IF (length(v_def) - length(replace(v_def, v_m, ''))) / length(v_m) <> 1 THEN
+    RAISE EXCEPTION '0261 splice2: the run-lookup marker is not unique'; END IF;
+  IF (length(v_def) - length(replace(v_def, v_d, ''))) / length(v_d) <> 1 THEN
+    RAISE EXCEPTION '0261 splice2: the DECLARE marker is not unique'; END IF;
+  v_ins := E'  /* 0261: a non-zero proposer seat owns the in-tick fallback too, so a baseline arm\n'
+        || E'     is the baseline all the way down. Seat 0 is the text below, untouched. */\n'
+        || E'  v_seat := COALESCE(public.ottoq_policy_get(v_run, ''proposer_seat'', 0), 0)::int;\n'
+        || E'  IF v_seat <> 0 THEN\n'
+        || E'    RETURN public.ottoq_l2_propose_stall_seat(p_vehicle_id, p_depot_id, p_context, v_seat);\n'
+        || E'  END IF;\n';
+  v_pos := strpos(v_def, v_m) + length(v_m);
+  v_new := substr(v_def, 1, v_pos - 1) || v_ins || substr(v_def, v_pos);
+  v_new := replace(v_new, v_d, v_d || ' v_seat int; /* 0261 */');
+  EXECUTE v_new;
+  -- A1b. reverse it.
+  v_new := pg_get_functiondef('public.ottoq_l2_propose_stall_assignment(uuid, uuid, jsonb)'::regprocedure);
+  IF replace(replace(v_new, v_ins, ''), v_d || ' v_seat int; /* 0261 */', v_d) <> v_def THEN
+    RAISE EXCEPTION '0261 A1b FAILED: reversing the fallback splice does not return the pinned definition';
+  END IF;
+  RAISE NOTICE '0261 A1b: fallback splice reversed to the pinned body';
+END $splice2$;
+
+-- 4c. ottoq_decide_tick: the stall-assignment queue order carries the seat. Two keys are
+--     inserted ahead of the existing `v.current_soc ASC, v.id`, both CASE expressions
+--     that are NULL for seat 0 -- a constant key sorts nothing, so seat 0's order is the
+--     order it always had, and the need's immediate_dispatch key (already first) stays
+--     first for every seat. v_seat is declared on the DECLARE line the body opens with
+--     and read once, right after the tick's snapshot is captured.
+DO $splice3$
+DECLARE v_def text; v_new text; v_decl text; v_after text; v_cur text; v_set text; v_keys text;
+BEGIN
+  v_def := pg_get_functiondef('public.ottoq_decide_tick(uuid)'::regprocedure);
+  v_decl  := E'  v_depot uuid; v_clock timestamptz; v_tick bigint; v_snapshot_id uuid;\n';
+  v_after := E'  v_snapshot_id := ottoq_capture_decision_snapshot(p_sim_run_id, v_tick, v_depot, v_clock);\n';
+  v_cur   := E'              v.current_soc ASC, v.id\n     -- charging_staff gate';
+  IF (length(v_def) - length(replace(v_def, v_decl, ''))) / length(v_decl) <> 1 THEN
+    RAISE EXCEPTION '0261 splice3: the DECLARE marker is not unique in ottoq_decide_tick'; END IF;
+  IF (length(v_def) - length(replace(v_def, v_after, ''))) / length(v_after) <> 1 THEN
+    RAISE EXCEPTION '0261 splice3: the snapshot marker is not unique in ottoq_decide_tick'; END IF;
+  IF (length(v_def) - length(replace(v_def, v_cur, ''))) / length(v_cur) <> 1 THEN
+    RAISE EXCEPTION '0261 splice3: the cursor marker is not unique in ottoq_decide_tick'; END IF;
+  v_set  := E'  v_seat := COALESCE(public.ottoq_policy_get(p_sim_run_id, ''proposer_seat'', 0), 0)::int; /* 0261 */\n';
+  v_keys := E'              /* 0261: under a baseline seat the queue order IS the policy: fifo by\n'
+         || E'                 arrival, greedy by depletion. Both keys are NULL for seat 0 and sort\n'
+         || E'                 nothing; the immediate_dispatch key above stays first for every seat. */\n'
+         || E'              CASE WHEN v_seat = 1 THEN v.last_state_change END ASC NULLS FIRST,\n'
+         || E'              CASE WHEN v_seat = 2 THEN v.current_soc END ASC,\n';
+  v_new := replace(v_def, v_decl, v_decl || E'  v_seat int; /* 0261 */\n');
+  v_new := replace(v_new, v_after, v_after || v_set);
+  v_new := replace(v_new, v_cur, v_keys || v_cur);
+  EXECUTE v_new;
+  -- A1c. reverse it.
+  v_new := pg_get_functiondef('public.ottoq_decide_tick(uuid)'::regprocedure);
+  IF replace(replace(replace(v_new, E'  v_seat int; /* 0261 */\n', ''), v_set, ''), v_keys, '') <> v_def THEN
+    RAISE EXCEPTION '0261 A1c FAILED: reversing the disposer splice does not return the pinned definition';
+  END IF;
+  RAISE NOTICE '0261 A1c: disposer splice reversed to the pinned body; seat 0 sorts as before';
+END $splice3$;
+
 -- ---------------------------------------------------------------------------
 -- 5. The atoms of one arm: the fourteen the certification pair hashes, copied
 --    expression for expression (the pair's own text is untouched; A6 pins it), plus
@@ -364,9 +518,10 @@ AS $fn$
     'n_arrivals', (SELECT count(*) FROM ottoq_events e
                     WHERE e.sim_run_id = p_run AND e.event_type = 'vehicle.state_changed'
                       AND e.payload->'diff'->'current_state'->>'to' = 'arrived_at_gate'),
-    -- where each ENACTED stall assignment came from. 'local_heuristic' is the in-tick
-    -- fallback (ottoq_l2_propose_stall_assignment), shared by every seat; its share is
-    -- how much of the arm the seat did NOT decide.
+    -- where each ENACTED stall assignment came from. 'local_heuristic' is seat 0's own
+    -- in-tick rule (ottoq_l2_propose_stall_assignment, which stamps no source); under
+    -- a baseline seat the fallback stamps the seat's name, so a baseline arm may show
+    -- only its seat and the reservation_* sources -- A5 asserts it.
     'stall_sources', COALESCE((SELECT jsonb_object_agg(src, n) FROM (
         SELECT COALESCE(d.proposed_action->>'source', 'local_heuristic') AS src, count(*) AS n
           FROM ottoq_decisions d
@@ -650,6 +805,8 @@ GRANT EXECUTE ON FUNCTION public.ottoq_l2_propose_seat(uuid, uuid, timestamptz, 
 GRANT EXECUTE ON FUNCTION public.ottoq_ab_write_score(uuid, uuid, text, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.ottoq_ab_pair(bigint, integer, text, uuid, timestamptz, integer, text, text) TO service_role;
 REVOKE ALL ON FUNCTION public.ottoq_ab_arm_atoms(uuid, uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.ottoq_l2_propose_stall_seat(uuid, uuid, jsonb, integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.ottoq_l2_propose_stall_seat(uuid, uuid, jsonb, integer) TO service_role, authenticated;
 GRANT EXECUTE ON FUNCTION public.ottoq_ab_arm_atoms(uuid, uuid) TO service_role, authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -657,12 +814,14 @@ GRANT EXECUTE ON FUNCTION public.ottoq_ab_arm_atoms(uuid, uuid) TO service_role,
 -- ---------------------------------------------------------------------------
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note) VALUES
 ('0261_the_policy_is_what_proposes_the_kernel_disposes', false,
- 'Phase 1 / D2. A run-scoped proposer seat (0 otto_q, 1 fifo, 2 greedy) read once per decide tick '
- 'in ottoq_sim_decide_and_dispatch; seat 0 is the pre-0261 block verbatim (A1 reverses the splice '
- 'to the pinned body). ottoq_l2_propose_seat (the baseline proposers), ottoq_ab_arm_atoms, '
+ 'Phase 1 / D2. A run-scoped proposer seat (0 otto_q, 1 fifo, 2 greedy) spliced into three '
+ 'certified-path functions -- ottoq_sim_decide_and_dispatch (the pre-tick proposer block wrapped), '
+ 'ottoq_l2_propose_stall_assignment (one early RETURN for a non-zero seat), ottoq_decide_tick (two '
+ 'ORDER BY keys that are NULL for seat 0) -- each reversed byte-for-byte to its pinned body by '
+ 'A1/A1b/A1c. ottoq_l2_propose_seat + ottoq_l2_propose_stall_seat (the baselines), ottoq_ab_arm_atoms, '
  'ottoq_ab_write_score (the ottoq_ab_runs writer) and ottoq_ab_pair (the inverted-verdict pair, '
  'run_by ab_harness) are new objects. No certification arm can carry a seat (CHECK, A2). '
- 'forces_recert FALSE: asserted by A1/A2/A6; round 41 measures it.');
+ 'forces_recert FALSE: asserted by A1/A1b/A1c/A2/A6; round 41 measures it.');
 
 -- ---------------------------------------------------------------------------
 -- ASSERTIONS. A1 ran inside the splice. The rest here.
@@ -712,17 +871,15 @@ BEGIN
      OR COALESCE((v_b->'proposals'->>'ottoq_service_priority')::int, 0) <> 0 THEN
     RAISE EXCEPTION '0261 A5 FAILED: the fifo arm heard OTTO-Q proposers: %', v_b->'proposals';
   END IF;
-  IF COALESCE((v_b->'stall_sources'->>'greedy_constrained')::int, 0) <> 0 THEN
-    RAISE EXCEPTION '0261 A5 FAILED: the fifo arm enacted a greedy_constrained proposal: %', v_b->'stall_sources';
+  IF EXISTS (SELECT 1 FROM jsonb_object_keys(v_b->'stall_sources') k
+              WHERE k NOT IN ('fifo', 'reservation_honoured', 'reservation_reassigned', 'reservation_broken')) THEN
+    RAISE EXCEPTION '0261 A5 FAILED: the fifo arm enacted an assignment that is not fifo and not a reservation: %', v_b->'stall_sources';
   END IF;
   RAISE NOTICE '0261 A5: otto_q vs fifo on the grid: outcome %, moved %, arm_a sources %, arm_b sources %, arm_b proposals %',
     v_r->>'outcome', v_r->'moved', v_a->'stall_sources', v_b->'stall_sources', v_b->'proposals';
 
-  -- A6. Pins. The disposer, the certification pair, OTTO-Q's own proposer and the
-  --     world fingerprint are the bodies this was written against.
-  SELECT md5(p.prosrc) INTO v_md5 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-   WHERE n.nspname = 'public' AND p.proname = 'ottoq_decide_tick';
-  IF v_md5 <> '47602bef21aebadce6dbd8a3b692ca8a' THEN RAISE EXCEPTION '0261 A6 FAILED: ottoq_decide_tick moved to %', v_md5; END IF;
+  -- A6. Pins. The certification pair, OTTO-Q's own proposer and the world fingerprint
+  --     are untouched (the disposer is spliced and A1c holds its reversal).
   SELECT md5(p.prosrc) INTO v_md5 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname = 'public' AND p.proname = 'ottoq_determinism_pair';
   IF v_md5 <> '8a35b8c874fed154cc216140faec0274' THEN RAISE EXCEPTION '0261 A6 FAILED: ottoq_determinism_pair moved to %', v_md5; END IF;
@@ -756,12 +913,14 @@ SELECT '0261_post', 'function', n.nspname, p.proname,
        pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE n.nspname = 'public'
-   AND p.proname IN ('ottoq_sim_decide_and_dispatch', 'ottoq_l2_propose_seat', 'ottoq_ab_arm_atoms',
+   AND p.proname IN ('ottoq_sim_decide_and_dispatch', 'ottoq_l2_propose_stall_assignment', 'ottoq_decide_tick',
+                     'ottoq_l2_propose_seat', 'ottoq_l2_propose_stall_seat', 'ottoq_ab_arm_atoms',
                      'ottoq_ab_write_score', 'ottoq_ab_pair');
 
 SELECT p.proname, md5(p.prosrc) AS body_md5_post, length(p.prosrc) AS len_post
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE n.nspname = 'public'
-   AND p.proname IN ('ottoq_sim_decide_and_dispatch', 'ottoq_l2_propose_seat', 'ottoq_ab_arm_atoms',
+   AND p.proname IN ('ottoq_sim_decide_and_dispatch', 'ottoq_l2_propose_stall_assignment', 'ottoq_decide_tick',
+                     'ottoq_l2_propose_seat', 'ottoq_l2_propose_stall_seat', 'ottoq_ab_arm_atoms',
                      'ottoq_ab_write_score', 'ottoq_ab_pair')
  ORDER BY 1;

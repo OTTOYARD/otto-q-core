@@ -31,11 +31,24 @@ deploy path, the twin, the seed, the calibration priors, the scenario, the boot 
 reservation-honour path (a vehicle arriving on a booking it already holds is placed on it
 by every seat — that is the calendar, not the policy).
 
-**The one leak, measured rather than hidden.** `ottoq_decide_tick` keeps an in-tick
-heuristic (`ottoq_l2_propose_stall_assignment`) as the fallback for a vehicle no proposer
-covered. It is shared by every seat, and each arm's verdict carries `stall_sources`, the
-count of enacted stall assignments by proposer. `local_heuristic` there is the share the
-seat did **not** decide. Quote a difference only next to that share.
+**Why the seat reaches three functions, not one — measured before building.** Over the
+last four flagship 12-tick certification runs, of 796 enacted stall assignments the
+pre-tick proposer `greedy_constrained` decided 204 (26%); the **in-tick heuristic**
+`ottoq_l2_propose_stall_assignment` decided 426 (54%) — 154 at the gate and 224 for
+vehicles re-queued from `staged_awaiting_service` when a plug freed; reservations
+honoured 164 (21%). A seat that swapped only the pre-tick proposer would have left the
+"FIFO" arm three-quarters OTTO-Q. So under a non-zero seat:
+
+- the in-tick fallback returns the seat's own stall choice (`ottoq_l2_propose_stall_seat`)
+  and stamps `source`, so `ottoq_decisions` attributes the assignment to the seat;
+- the disposer's **queue order** for stall assignment carries the seat — which waiting
+  vehicle gets a freed plug *is* the policy: fifo by arrival, greedy by depletion, seat 0
+  unchanged. The need's `immediate_dispatch` urgency stays ahead of every seat's key; it
+  is the work-side signal (CLAUDE.md 2.7), not the stall policy.
+
+Each arm's verdict carries `stall_sources`, the count of enacted stall assignments by
+source. Under a baseline seat every entry must be the seat or a `reservation_*` source,
+and 0261's A5 asserts it; for seat 0, `local_heuristic` is OTTO-Q's own in-tick rule.
 
 ## The verdict is inverted
 
