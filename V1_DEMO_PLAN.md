@@ -151,6 +151,7 @@ stopping rule, stop and ship what works rather than deepening.
 - [ ] Phase 0 — round 38 judged; 0256/0257/0258 applied; round 39 scheduled
 - [ ] Phase 0 — two consecutive rounds, 7/7 agree; `CERTIFICATION_STATUS.md` written; core FROZEN
 - [ ] Phase 1 — `p_policy` in the pair rig; shield held constant; one committed comparison
+      *(2026-09-12: rig drafted as `db/migrations/0261` + `db/checks/0185` + `policies/AB_TWIN.md`; the seat is a proposer, so the shield is held constant by construction; applies after round 40 is judged)*
 - [ ] Phase 2 — CP-SAT proposer certified; `h_prop` non-trivial in one pair *(2026-09-12: `bridge/` built and tested; `0259` precedence + `0260` fire ledger drafted, apply after round 39; then one live run, then the replay pair)*
 - [ ] Phase 2 — LLM proposer (Chase: yes, 2026-09-12); one refusal with reason code *(harness built: `bridge/llm_proposer.py`, 27 tests, priced + capped per run, seated by 0259 as `llm_advisor`; live fire + a shield refusal pending the apply window and an API key on the runner)*
 - [ ] Phase 3 — `demo/` scripts D1–D4 run from run ids; dashboard up; slide written
