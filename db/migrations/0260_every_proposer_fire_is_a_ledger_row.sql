@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260912205301
 -- migration-name: 0260_every_proposer_fire_is_a_ledger_row
 -- ===========================================================================
 -- 0260  EVERY PROPOSER FIRE IS A LEDGER ROW

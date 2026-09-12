@@ -245,8 +245,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0256](db/migrations/0256_the_trigger_restamps_what_the_teardown_fixed.sql) | `20260912165023` | yes — ledger | THE TRIGGER RE-STAMPS WHAT THE TEARDOWN FIXED |
 | [0257](db/migrations/0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql) | `20260912165137` | yes — ledger | THE SECOND FLOOR SHIPS AS A COUNT, WITH ITS OWN LIMITS ATTACHED |
 | [0258](db/migrations/0258_the_comment_states_the_invariant_and_no_code_holds_it.sql) | `20260912165243` | yes — ledger | THE COMMENT STATES THE INVARIANT AND NO CODE HOLDS IT |
-| [0259](db/migrations/0259_the_proposer_seat_is_declared_data_not_three_literals.sql) | `PENDING` | no — pending | THE PROPOSER SEAT IS DECLARED DATA, NOT THREE LITERALS |
-| [0260](db/migrations/0260_every_proposer_fire_is_a_ledger_row.sql) | `PENDING` | no — pending | EVERY PROPOSER FIRE IS A LEDGER ROW |
+| [0259](db/migrations/0259_the_proposer_seat_is_declared_data_not_three_literals.sql) | `20260912205202` | yes — ledger | THE PROPOSER SEAT IS DECLARED DATA, NOT THREE LITERALS |
+| [0260](db/migrations/0260_every_proposer_fire_is_a_ledger_row.sql) | `20260912205301` | yes — ledger | EVERY PROPOSER FIRE IS A LEDGER ROW |
 
 128 migrations indexed.
 

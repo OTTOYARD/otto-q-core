@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260912205202
 -- migration-name: 0259_the_proposer_seat_is_declared_data_not_three_literals
 -- ===========================================================================
 -- 0259  THE PROPOSER SEAT IS DECLARED DATA, NOT THREE LITERALS
@@ -16,6 +16,15 @@
 --
 -- NOT TO BE APPLIED WHILE A ROUND IS IN FLIGHT OR SCHEDULED. pg_stat_activity is the
 -- only authority for in-flight; cron.job (r<NN>_* one-shot rows) for scheduled.
+--
+-- APPLY LOG. First attempt 2026-09-12 20:53 UTC failed on A3 and rolled back atomically
+-- (verified: no table, no lineage row, no snapshot rows, all four bodies at their pinned
+-- md5). The cause was this file, not the engine: the replacement text 3a writes into the
+-- selector carried a COMMENT quoting the old literal verbatim, and A3 scans the whole
+-- body for that literal. The substitution had succeeded; the assertion caught the
+-- explanation. The comment is reworded (same meaning, no verbatim literal); A3 is
+-- unchanged, because a check that forbids the literal anywhere in the body is the right
+-- check -- recorded here rather than quietly fixed, as 0240 did.
 --
 -- ---------------------------------------------------------------------------
 -- THE DEFECT, MEASURED
@@ -176,9 +185,9 @@ BEGIN
         E'   -- 0259: the first key is DECLARED DATA. rank comes from\n'
      || E'   -- ottoq_proposer_precedence; an unlisted source gets the maximum, i.e.\n'
      || E'   -- exactly where every non-cuOpt source sorted when the two keys below\n'
-     || E'   -- were literals. Seeded cuopt=0, cuopt_fallback=1, so the old\n'
-     || E'   --   (p.source = ''cuopt'') DESC, (p.source = ''cuopt_fallback'') DESC\n'
-     || E'   -- is reproduced exactly (A2 recomputes every historical winner).\n'
+     || E'   -- were literals. Seeded cuopt=0, cuopt_fallback=1, so the old two-literal\n'
+     || E'   -- order (cuopt first, then cuopt_fallback, then created_at) is reproduced\n'
+     || E'   -- exactly (A2 recomputes every historical winner).\n'
      || E'   ORDER BY COALESCE((SELECT pp.rank FROM public.ottoq_proposer_precedence pp\n'
      || E'                       WHERE pp.source = p.source), 2147483647) ASC,\n'
      || E'            p.created_at DESC,\n');
