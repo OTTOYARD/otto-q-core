@@ -311,3 +311,58 @@ def test_every_sql_file_closes_every_dollar_quote_it_opens():
         "string content and the migration would silently do less than it says:\n"
         + "\n".join(bad)
     )
+
+
+#: Migrations from 0255 onward are expected to classify themselves in
+#: ottoq_cert_lineage. Before that the convention was not settled, and the
+#: floor's second branch (max(classified_at) WHERE forces_recert) makes those
+#: older omissions harmless: none of them is dated after the current floor.
+CLASSIFY_FLOOR = 255
+
+#: Every exception must name the bookkeeping migration that repaired it, so the
+#: allowlist can never become a place to hide an unclassified migration.
+CLASSIFY_EXEMPT = {
+    "0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run":
+        "repaired by 0268",
+    "0271_the_outbound_command_stream_is_the_only_stream_without_provenance":
+        "repaired by 0272",
+}
+
+
+def test_recent_migrations_classify_themselves():
+    """A migration that does not write its ottoq_cert_lineage row moves the floor.
+
+    ottoq_cert_recert_floor() reads schema_migrations LEFT JOIN ottoq_cert_lineage
+    and takes COALESCE(forces_recert, TRUE). A missing row is not "unknown", it is
+    "forces recert": every certification column's streak restarts, for a change
+    whose own header may have argued at length that it changes nothing hashed.
+
+    This has happened twice -- 0267 (repaired by 0268) and 0271 (repaired by
+    0272) -- which is once more than an argument in a header can be trusted to
+    prevent. The check is cheap and needs no database: the file either mentions
+    the table or it does not.
+    """
+    missing = []
+    for path in _migration_files():
+        m = re.match(r"^(\d{4})", path.name)
+        if not m or int(m.group(1)) < CLASSIFY_FLOOR:
+            continue
+        if path.stem in CLASSIFY_EXEMPT:
+            continue
+        if "ottoq_cert_lineage" not in path.read_text():
+            missing.append(path.name)
+    assert not missing, (
+        "these migrations never write their ottoq_cert_lineage row, so the recert "
+        "floor will treat each as forcing and restart every column's streak: "
+        + ", ".join(missing)
+        + "\nAdd the INSERT to the migration, or -- if it is already applied -- "
+        "write a bookkeeping migration for it and list it in CLASSIFY_EXEMPT "
+        "naming that migration."
+    )
+
+
+def test_the_classify_allowlist_only_holds_files_that_exist():
+    """An allowlist entry for a file that is gone is an exemption nobody can audit."""
+    names = {p.stem for p in _migration_files()}
+    stale = sorted(set(CLASSIFY_EXEMPT) - names)
+    assert not stale, f"CLASSIFY_EXEMPT names migrations that do not exist: {stale}"
