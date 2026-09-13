@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913234605
 -- migration-name:    0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one
 --
 -- 0274  THERE IS NO QUEUE, SO THE ASSET CANNOT BE TOLD ITS PLACE IN ONE
@@ -456,5 +456,51 @@ VALUES ('0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one', f
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+-- Applied 2026-09-13 23:46:05 UTC as version 20260913234605 (6:46 PM CT).
+--
+-- Dry-run byte for byte inside BEGIN ... ROLLBACK first; P1-P4 and A1-A8
+-- passed there and again on apply. Two defects were caught by that dry run
+-- and fixed before any apply, both recorded because they are generic:
+--
+--   1. position is a RESERVED WORD in PostgreSQL. RETURNS TABLE(... position
+--      integer ...) is a syntax error. The column is queue_position.
+--   2. the RETURNS TABLE columns are OUT PARAMETERS and are in scope inside a
+--      SQL-language body, so an unqualified current_soc in the final SELECT
+--      is ambiguous against them. Every reference in that SELECT is now
+--      qualified with its subquery alias.
+--
+--   ottoq_hw_vehicle_status  pre-image  md5 91061f6a30f08b51376a12980ed29c02
+--                            post-image md5 ca8a62675a659222b4d76c98de9b820d
+--   ottoq_decide_tick        unchanged  md5 fd0bf428abeda40801467fd428a090f1
+--   ottoq_cert_recert_floor() unmoved at 2026-09-12 16:50:23.319089+00
+--
+-- LIVE VERIFICATION AFTER APPLY -- the loop, end to end. The vehicle first in
+-- line at the Benchmark depot calls the status RPC it already calls, and gets
+-- back, for the first time in this engine's life, a place in line:
+--
+--   { "ok": true, "queued": true,
+--     "queue_kind": "charge", "position": 1, "queue_depth": 23,
+--     "ahead_of_you": 0, "current_soc": 72, "target_soc": 100,
+--     "waiting_since": "2026-09-01T05:30:00+00:00",
+--     "basis": "mirror of ottoq_decide_tick admission order; excludes
+--               one-tick cuOpt deferral" }
+--
+-- Before this migration the same call returned pending_commands as an integer
+-- and nothing else about where the vehicle stood.
+--
+-- Note the basis string travels INSIDE the answer. A position is a snapshot
+-- of a cursor that reruns every tick, and it is a mirror rather than the
+-- cursor itself; whoever reads the number reads the caveat with it, which is
+-- not true of a caveat that lives only in a migration header.
+--
+-- WHAT IS STILL OPEN, so this is not read as more than it is:
+--   * the position is READ on request; it is not written into the appointment
+--     payload the asset receives on recall. That write is in
+--     ottoq_book_appointment, which the twin's telemetry advance calls, and
+--     it is therefore on the certified path -- a cert window, not this file.
+--   * the two locks still cannot see each other: ottoq_book_stall never
+--     consults stalls.reserved_by and ottoq_reserve_stall never consults
+--     ottoq_stall_bookings. A queue that reports a position over a calendar
+--     that can be double-claimed is honest about the order and silent about
+--     the collision. Same cert window.
 -- ---------------------------------------------------------------------------

@@ -258,7 +258,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0271](db/migrations/0271_the_outbound_command_stream_is_the_only_stream_without_provenance.sql) | `20260913231758` | yes — ledger | THE OUTBOUND COMMAND STREAM IS THE ONLY STREAM WITHOUT PROVENANCE |
 | [0272](db/migrations/0272_0271_never_classified_itself_and_the_floor_swallowed_every_column.sql) | `20260913232252` | yes — ledger | 0271 NEVER CLASSIFIED ITSELF AND THE FLOOR SWALLOWED EVERY COLUMN |
 | [0273](db/migrations/0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink.sql) | `20260913233201` | yes — ledger | THE UPLINK IS WRITTEN BY THE SAME TRANSACTION AS THE DOWNLINK |
-| [0274](db/migrations/0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one.sql) | `PENDING` | no — pending | THERE IS NO QUEUE, SO THE ASSET CANNOT BE TOLD ITS PLACE IN ONE |
+| [0274](db/migrations/0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one.sql) | `20260913234605` | yes — ledger | THERE IS NO QUEUE, SO THE ASSET CANNOT BE TOLD ITS PLACE IN ONE |
 
 140 migrations indexed.
 
