@@ -1,0 +1,93 @@
+-- 0207  G13 IS NOT A STATIC CONDITION, IT IS A LEAK — AND THE SOURCE IS NINE
+--       ABORTED RUNS THAT NEVER TORE DOWN
+--       (re-measured 2026-09-13 ~21:55 UTC / 4:55 PM CT)
+--
+-- db/checks/0138 recorded G13 on 2026-09-08: 64 of the Benchmark depot's 160
+-- stalls seated by vehicles belonging to no run, 154 expired reservations, and
+-- the diagnosis that "every cleaner in this system is run-scoped and no run has
+-- ever targeted that depot". CLAUDE.md's standing rule is to re-measure before
+-- quoting. Re-measured, two of those three statements have moved.
+--
+-- ---------------------------------------------------------------------------
+-- 1. IT IS GROWING. 0138's NUMBER IS NOT A CONDITION, IT IS A RATE.
+--
+--   depot                        stalls  seated  expired_reservations
+--   OTTOYARD Benchmark (CRN A/B)    160      74                   155
+--   OTTOYARD Nashville Flagship     158       0                     0
+--   OTTOYARD Grid Fixture            10       0                     0
+--   OTTOYARD Hardware Lab             1       0                     0
+--   P2 Ledger-Only Proof Rig          1       0                     0
+--
+--   2026-09-08: 64 seated / 154 expired  (0138)
+--   2026-09-13: 74 seated / 155 expired  (this file)
+--
+--   +10 seats in five days. 0138 called it "forty percent of the depot"; it is
+--   46% now. Quoting 64 as the size of G13 understates it and, worse, frames a
+--   leak as a mess. The flagship is still spotless, which is the teardown
+--   working where it runs.
+--
+-- ---------------------------------------------------------------------------
+-- 2. THE SOURCE, WHICH 0138 DID NOT HAVE: NINE RUNS, ALL ABORTED, NONE ENDED.
+--
+--   SELECT r.status, r.run_by, count(*), min(started_at), max(started_at),
+--          count(*) FILTER (WHERE r.ended_at IS NULL)
+--     FROM ottoq_sim_runs r WHERE r.depot_id = <benchmark> GROUP BY 1,2;
+--   MEASURED: aborted | benchmark | 9 | 2026-09-01 02:00 | 2026-09-09 02:00 | 9
+--
+--   So 0138's "no run has ever targeted that depot" is not right, and the
+--   correction is the useful part: NINE runs targeted it, every one of them
+--   ended in status 'aborted', and every one has ended_at IS NULL — the
+--   teardown that vacates seats and releases reservations never ran for any of
+--   them. The depot is not orphaned because nothing ever used it. It is
+--   orphaned because everything that used it died without cleaning up, and the
+--   last one did so on 2026-09-09, which is what the +10 is.
+--
+-- ---------------------------------------------------------------------------
+-- 3. WHY NO EXISTING CLEANER CAN REACH THEM (0138's INSIGHT, RE-CONFIRMED)
+--
+--   SELECT coalesce(r.status,'(no owning run)'), count(*), count(DISTINCT v.owning_sim_run_id)
+--     FROM stalls s JOIN vehicles v ON v.id = s.current_vehicle_id
+--     LEFT JOIN ottoq_sim_runs r ON r.sim_run_id = v.owning_sim_run_id
+--    WHERE s.depot_id = <benchmark> GROUP BY 1;
+--   MEASURED: (no owning run) | 74 | 0
+--
+--   owning_sim_run_id is NULL on all 74. 0117's claim-release did its job and
+--   let go of the vehicles; what it does not do — because it is not what it does
+--   — is vacate the seat. The result is a seat with no owner, and every cleaner
+--   in the system takes a run id as its scope. There is no run id left to pass.
+--   A janitor for this MUST be depot-scoped, not run-scoped. That is the whole
+--   shape of the fix.
+--
+-- ---------------------------------------------------------------------------
+-- 4. NEW, AND IT RAISES THE COST: THE VEHICLES ARE FROZEN MID-WORK.
+--
+--   string_agg(DISTINCT v.current_state) over those 74:
+--     arrived_at_gate, charge_complete_holding, charging_dcfc, charging_l2,
+--     in_detail_bay, in_service_bay, staged_awaiting_service, staged_for_departure
+--
+--   They are not parked. They are stopped in eight different LIVE states, two of
+--   them mid-charge. So this is not only 74 unusable stalls: it is 74 vehicles
+--   the engine still believes are working, holding charge-session-shaped and
+--   bay-shaped state. Any janitor has to walk each state to a terminal one, not
+--   just null out stalls.current_vehicle_id — otherwise it trades a seated stall
+--   for a vehicle that is charging at a stall it no longer occupies, which is
+--   worse than the leak.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THIS SETTLES, AND WHAT IT COSTS
+--
+-- The two-lane cadence plan (task #55) wanted Benchmark as a second
+-- certification lane to halve round wall-clock. 0138 answered "not viable" with
+-- a number. This file answers it with a cause: it is not viable, AND it will not
+-- become viable by waiting, because every aborted run makes it worse. Either the
+-- janitor gets built or the second lane stays closed.
+--
+-- The flagship is unaffected — 0 seated, 0 expired — and depot scoping (0146,
+-- 0147) is why Benchmark's residue cannot reach the flagship's canons. So this
+-- is a blocked capability, not a live risk to the certification.
+--
+-- NOT DRAFTED AS A MIGRATION. The janitor must walk eight vehicle states to
+-- terminal, release 155 reservations and vacate 74 seats, and it is the first
+-- DEPOT-scoped cleaner in a system whose every cleaner is run-scoped — so it can
+-- reach the flagship by construction and must be proven not to. That is a design
+-- with a blast radius, and it wants the treatment 0269 got.
