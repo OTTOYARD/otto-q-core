@@ -1,6 +1,8 @@
 # CERTIFICATION_STATUS — the deterministic core is v1-certified and frozen
 
-*Written 2026-09-12 23:29 UTC off `db/canons/round40.md`. This is D1's evidence page
+*Written 2026-09-12 23:29 UTC off `db/canons/round40.md`; **round 41 appended 2026-09-13
+04:40 UTC off `db/canons/round41.md` — read §"Round 41" before quoting the matrix below,
+because six flagship `endst` values in it are superseded.** This is D1's evidence page
 (`V1_DEMO_PLAN.md` §3): same inputs, byte-identical outputs, verified across fourteen
 independent atoms, on nine columns, in two consecutive rounds. Every number below has a run
 id next to it.*
@@ -25,6 +27,14 @@ runs on its own schedule. No new instruments. No new atoms."*
 Judged in `db/canons/round39.md` and `db/canons/round40.md`; the predictions for round 39
 were committed before it fired (`db/checks/0183`).
 
+**Round 41** (`db/canons/round41.md`, fired 01:55 → 04:10 UTC on 2026-09-13, ten pairs):
+10/10 pairs passed, 20/20 arms passed, the two 48t pairs agree with each other for the third
+round running, and **thirteen of the fourteen atoms are byte-identical to round 40 in all
+nine columns**. One atom moved, in the six flagship columns, by one number:
+`endst.legs.fgn.n` went 13 → 9 — a count of *other runs'* itinerary legs left in live
+states, which is in the fingerprint on purpose (`0125`, the cross-run hazard set). Nothing
+the engine computes moved. See §"Round 41" below.
+
 ## What is under the certification
 
 The recert floor is **`2026-09-12 16:50:23.319089`**, set by `0256` (`forces_recert TRUE`,
@@ -38,6 +48,8 @@ Applied above the floor and measured by these two rounds:
 | 20260912165243 | `0258` the comment states the invariant and no code holds it | FALSE | rounds 39–40: 0 atoms moved |
 | 20260912205202 | `0259` the proposer seat is declared data, not three literals | FALSE | round 40: 0 atoms moved vs round 39 |
 | 20260912205301 | `0260` every proposer fire is a ledger row | FALSE | round 40: 0 atoms moved vs round 39 |
+| 20260912233647 | `0261` the proposer seat (A/B pair rig, `p_policy`) | FALSE | round 41: `h_prop`/`h_defr` byte-identical in all 9 columns |
+| 20260913011239 | `0262` the hold key the setter refused (`proposer_hold_enabled`) | FALSE | round 41: 0 engine atoms moved vs round 40 |
 
 The certified tick path is the deterministic core alone: `cuopt_propose_enabled = 0` and
 `cuopt_first_refusal_max_defers = 0` run-scoped inside every arm (`0152`); Posture A refuses
@@ -49,6 +61,15 @@ by record-and-replay (`0237`/`0239`).
 
 `SELECT * FROM ottoq_cert_matrix('2026-09-12 16:50:23.319089')`, read 23:29 UTC.
 `consecutive_passes` counts pairs above the floor; the 48t column runs twice per round.
+
+**STALE AS OF ROUND 41, in one column only.** The last hash on every flagship row below is
+`endst`, and round 41 rebased all six of them because `endst.legs.fgn.n` moved 13 → 9. The
+round-41 `endst` values are, by column: busy/314159/12t `147e1b1ca4faf8e8b7f6f761d8888316`,
+busy/171717/12t `11243f0b55301074b7cf87f37504ea8f`, normal/171717/12t
+`b7baf8bdc1b0814f4e07300bba2db291`, busy/424242/12t `c3b0d1b55008f0b961ce5d85dcd5e633`,
+busy/171717/24t `e55821cae2bafafe71c0c05e4b9d2816`, busy/424242/24t
+`343bd724e48e2635de94f1148bf09261`, busy/171717/48t `063e6d957816da878083db1a3a900ddb`.
+The two grid rows are unchanged. Every other hash on every row is unchanged.
 
 | lane | column | consecutive_passes | green | history | round-40 runs (arm a / arm b) | canon: `fp` `h_cmd` `h_dec` `h_evt` `h_bkg` `h_nrg` `h_prop` `h_defr` `h_cal` `h_rule` `h_rcl` `h_sdr` `endst` |
 |---|---|---|---|---|---|---|
@@ -89,20 +110,59 @@ authority for in-flight.
 ## What "frozen" means from here
 
 - Certification continues as a **regression gate**: a round after every migration that
-  touches the tick path. **Round 41 measures `0261`** (the A/B pair rig, classified FALSE by
-  three reversal-proven splices) exactly as round 40 measured `0259`/`0260`.
+  touches the tick path. **Round 41 measured `0261` and `0262` and acquitted both.**
+  **Round 42 is not scheduled** until G46 (below) is decided — another round now would
+  re-measure the same ambiguity rather than resolve it.
 - Every migration carries a `forces_recert` classification in `ottoq_cert_lineage`; TRUE
   moves the floor and voids every canon; FALSE is a prediction the next round judges. A
   column that moves under a FALSE migration convicts the migration, not the round.
 - No new certification instruments, no new atoms (Phase 0 rule). A blind spot found later
   is logged in `BUILD_QUEUE.md` and fixed in Phase 4 unless it breaks D1.
 
+## Round 41 — and the one defect it exposed (G46)
+
+Round 41 is the cleanest engine result yet and the first round that found a hole in the
+*instrument*:
+
+| | round 40 | round 41 |
+|---|---|---|
+| pairs passed internally | 10 / 10 | 10 / 10 |
+| arm runs passed | 20 / 20 | 20 / 20 |
+| engine atoms moved vs the previous round | 0 of 14 | **0 of 13** (`fp h_cmd h_dec h_evt h_bkg h_nrg h_prop h_defr h_cal h_rule h_rcl h_sdr ticks`) |
+| `endst` moved | no | **yes, six flagship columns, one section** |
+| `consecutive_passes`, flagship 12t/24t | 2, green | **1, not green** |
+| `consecutive_passes`, 48t / grid | 4 / 2, green | 2 / 3, green |
+
+**G46 — the canon rebases when another run's residue moves.** `endst` contains `fgn`
+sections: other runs' rows still in live states, put there by `0125` because unscoped reads
+of run-scoped tables (the `0145` class) are how foreign rows reach a run's decisions.
+`ottoq_cert_matrix` takes the newest pair as canon and walks back while all atoms match, so
+a change in a *foreign* row count breaks the streak and silently installs a new canon. Last
+night's D2/D3 runs on the flagship depot did exactly that: 13 foreign live legs became 9
+(four closed by a later run's supersede), and six columns went from green to streak 1 with
+no engine change at all.
+
+Three consequences, all measured in `db/canons/round41.md`:
+
+1. Any demo or A/B run on the flagship depot can de-green every flagship column.
+2. The canon now carries `fgn.n = 9` and will rebase again when that number next moves.
+3. The residue is real and unowned: nine legs from a run that **completed on 2026-08-29**
+   are still `planned`. Nothing closes a finished run's legs — G13's janitor gap, now
+   measured on flagship.
+
+The fix is not to stop measuring foreign residue. Two candidates are written up in the canon
+(retire the residue then report non-zero residue as `inconclusive`; or judge the canon on the
+run's own sections while reporting `fgn` loudly). Neither is applied; both need the
+adversarial review that `0259`/`0261` got, and G25 is the warning about reported-not-judged
+atoms.
+
 ## Known and deferred — listed, not hidden
 
 From `V1_DEMO_PLAN.md` and `BUILD_QUEUE.md`: **G8** outbound command lifecycle, **G9** a
 producer for the forward power schedule, **G10** SDR terminus binding, **G12** CI runs the
 SQL, **G13** the Benchmark depot's phantom holds, **G14** calibration priors outside the
-reproducibility key, **G26** production and the proof harness share one database, **4h/4i**
+reproducibility key, **G26** production and the proof harness share one database, **G46** the canon rebases on
+another run's residue (round 41, open), **4h/4i**
 (the objective-function reconciliation and R-13). **S-01/S-02** (a committed shared secret;
 the code half is fixed and pinned by a test, rotation is a founder action) remain open.
 
