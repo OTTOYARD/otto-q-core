@@ -111,13 +111,22 @@ Nothing below is applied. The preconditions are the standing ones: `pg_stat_acti
 | 1 | **G46 + G48 in one migration** | the canon rebases when another run's leftover legs move (`0187`), and a replay pair is counted as a certification (`0190`) | same function, same round, same recert conversation — classification is part of the design, not an afterthought | `ottoq_cert_matrix` before/after on the same floor; the nine replay pairs must vanish from `pairs_seen`; `db/checks/0187` §1 and `0190` §1–2 re-run |
 | 2 | **`0263` the frame carries what the selector filters on** | `L-61`: the proposer plans onto stalls that are reserved, just-occupied, or behind a `Faulted` charger | the frame builder IS on the certified tick path (`ottoq_decide_tick` line 32 → `ottoq_capture_decision_snapshot`), but the frame's content is **not** one of the fourteen atoms — exposure is `ottoq_score_run`, `ottoq_certify_run`'s B1–B3 breach checks and the twin digest. Classify from that, with proof | a frame fetched for a live run must carry `reserved_by`, `reservation_expires_at`, `station_state`, `ocpp_charger_id` and a per-vehicle reservation; `proposer/` treats reserved-for-other and `Faulted` as busy; the 14 atoms unchanged in a probe pair |
 | 3 | **`0264` a pending proposal holds the resource it names for one tick** | `L-60` for stalls **and** G47 for service bays (`0188`) — so the mechanism must be **resource-generic**, not stall-specific | run-scoped key defaulting to 0, spliced with md5 pins on `prosrc` and a reversal assertion, exactly as `0259`/`0261` did | with the key off, a probe pair must be byte-identical on all fourteen atoms; with it on, a held proposal's named resource must survive the reservation book, greedy, and the local heuristic for one tick; no vehicle starved |
-| 4 | **round 42** | three flagship streaks to rebuild after G46 resets what it resets | — | `scripts/schedule-round.sql` with `v_round := 42`; judge per `db/canons/round41.md`'s format |
+| 3b | **one observed retention purge pass** (G23's next step), then REINDEX, then the nightly cron | the nine residue legs G46 is about to be blamed for; and `db/checks/0191`: the purge is a **canon-rebasing event**, so it must run after the matrix fix and before round 42, never on a nightly cron before the fix | none — the procedure already refuses on a blocking run-scope defect, refuses an allow-list wider than `class=engine`, refuses an allow-listed parent of a RESTRICT FK, and **skips while a determinism pair is in flight** | `db/checks/0191` §1 before and after; `endst.legs.fgn.n` must reach 0 and stay there; a purged run must still answer `purged` through `ottoq_kpi_five` (0251) |
+| 4 | **round 42** | three flagship streaks to rebuild, on a canon that is stable **because** the janitor already ran | — | `scripts/schedule-round.sql` with `v_round := 42`; judge per `db/canons/round41.md`'s format |
 | 5 | **the replay proof** (Posture B, `0237`/`0239`) | the claim that a nondeterministic proposer can be consumed safely is still unproven end to end | **must use a dedicated seed, never a canon column's key**, until G48 is fixed (`0190`) | `ottoq_proposal_replay_capture` from run `ccf48af1` (90 `forward_lex` rows), then `ottoq_determinism_pair_replay`; `h_prop` non-trivial and equal across arms |
 | 6 | **the live D3 run** | the demo claim itself: an agent proposes, the kernel follows or refuses with a reason | only after 2 and 3; flagship, not grid (`demo/D3_RUNBOOK.md` §6) | `db/checks/0189` afterwards — a `forward_lex` row must read `followed`, or the verdict column must say which of the two zeros it is |
 
-Order matters in exactly two places: 1 before 4 (a round judged against a rebasing canon proves
-nothing), and 2 before 3 before 6 (a hold that protects a resource the proposer cannot see is a
-hold on the wrong resource).
+Order matters in exactly three places: 1 before 3b before 4 (a round judged against a rebasing
+canon proves nothing, and the janitor rebases it — `db/checks/0191`), 2 before 3 before 6 (a hold
+that protects a resource the proposer cannot see is a hold on the wrong resource), and the nightly
+purge cron comes last of all, because switching it on before the matrix fix costs a round every
+night the purge reaches a run with live residue.
+
+**And one design simplification `0191` hands to step 1:** `0187`'s candidate (a) proposed a bespoke
+scoped `UPDATE` to retire the nine stale legs. It does not need one. `ottoq_itinerary_legs` is
+allow-listed, `class=engine`, and the run holding all nine residue legs is finished, non-production,
+three weeks old and archived — so the purge will retire them as a side effect of doing its job, with
+guards the bespoke UPDATE would have to re-earn. Fix the instrument; let the janitor clean the floor.
 
 ## P0b — the named carrier of the one uncertified column
 
