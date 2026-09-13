@@ -116,4 +116,24 @@ SELECT a.table_name,
 -- the guards above, and it will retire them as a side effect of doing its job.
 -- The migration should therefore fix the INSTRUMENT and let the janitor clean the
 -- floor -- which is the smaller change and the one with precedent.
+--
+-- ===========================================================================
+-- CORRECTION 2026-09-13 05:55 UTC — "LET THE JANITOR CLEAN THE FLOOR" IS RIGHT
+-- ABOUT THE INSTRUMENT AND WRONG ABOUT THE HAMMER (db/checks/0193).
+--
+-- The retention purge's doomed set is **939 runs carrying roughly 3.9 million
+-- rows** across four tables (measured by the review: 1,133,286 ottoq_events,
+-- 915,817 ottoq_stall_bookings, 591,871 ottoq_itinerary_legs, and the rest).
+-- Firing an irreversible multi-million-row delete to retire NINE legs is
+-- disproportionate, and this file must not be read as recommending it.
+--
+-- Corrected position: the purge stays the right mechanism for RETENTION, and its
+-- collision with the canon (everything above this note) stands unchanged -- it is
+-- still a canon-rebasing event and still must not go on a nightly cron before the
+-- matrix fix. But THIS residue is retired by a nine-row, depot-scoped, run-scoped,
+-- `ROW_COUNT = 9`-asserted UPDATE setting 'planned' -> 'skipped' (the value 0089's
+-- janitor uses; NOT 'amended', which is for 'active'). Smaller, reversible in
+-- effect, and it cannot reach a second depot -- which the sketch in 0187 could,
+-- and did in measurement: 2,301 rows across two depots.
+-- ===========================================================================
 -- ---------------------------------------------------------------------------

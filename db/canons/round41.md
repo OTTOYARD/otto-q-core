@@ -21,8 +21,11 @@ round's one finding.
 
 ## Internal result: ten of ten, twenty of twenty
 
-Every pair `outcome = passed`, `equal = true`; all twenty arm runs `validation_status =
-passed`. Atoms compared by name — `fp, h_cmd, h_dec, h_evt, h_bkg, h_nrg, h_prop, h_defr,
+Every pair `outcome = passed`, `equal = true`; all twenty arm runs read
+`validation_status = passed`. **Read that precisely** (corrected 2026-09-13 05:55 UTC,
+`db/checks/0193`): the verdict is computed **per pair**, and one statement at the end of
+`ottoq_determinism_pair` stamps it on both arm rows. So "20 of 20" is ten pair verdicts on
+twenty rows, not twenty independent checks. Atoms compared by name — `fp, h_cmd, h_dec, h_evt, h_bkg, h_nrg, h_prop, h_defr,
 h_cal, h_rule, h_rcl, h_sdr, ticks, endst`.
 
 | column | fired | arm a / arm b | `h_prop` | `endst` |
