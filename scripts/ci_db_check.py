@@ -1,26 +1,93 @@
 #!/usr/bin/env python3
 """G12 first rung: the one CI step that talks to the live database.
 
-Read-only. It asserts the half of scripts/check-drift.sql that CAN be true today
-and that a bad apply would break: EVERY migration file carrying a real version
-header has a matching row in supabase_migrations.schema_migrations.
+Read-only. Asserts the half of scripts/check-drift.sql that CAN be true today and
+that a bad apply would break: EVERY migration file carrying a real version header
+has a matching row in supabase_migrations.schema_migrations.
 
-Why only that half. db/checks/0206 measured the other two sections and both have a
-known non-zero floor that no future discipline can clear: 67 migrations were applied
-between 2026-08-10 and 08-16 with no file ever written (the pre-G18 era), and 41
-file headers carry names the ledger spells differently. Gating on CLEAN would make
-this step permanently red, which is how a gate stops being read -- the exact defect
-0206 is about. So this asserts the direction that is currently at zero and that a
-mistake would move: file exists -> ledger row exists.
+Why only that half: db/checks/0206 measured a floor of 67 applied-with-no-file (the
+pre-G18 era) plus 41 name mismatches that no future discipline can clear. Gating on
+CLEAN would make this step permanently red, which is how a gate stops being read.
 
-Soft-skips when OTTOQ_DATABASE_URL is absent so secretless PRs still pass.
+--------------------------------------------------------------------------------
+SECRET HYGIENE -- THIS FILE LEAKED A PASSWORD ONCE. 2026-09-13, run 34786828528:
+an unhandled psycopg.OperationalError printed its own message, and that message
+embeds the DSN, so the database password appeared in a public build log in
+plaintext. GitHub masks a secret only on an EXACT match of the registered value;
+the registered value was the whole DSN, so the password ALONE inside a longer
+error string was not masked and printed intact.
+
+The rules that follow from that, and they are not optional here:
+  * No exception from the driver is ever printed. Not its message, not its repr,
+    not a traceback. Only its class name.
+  * Anything this script does print goes through scrub() first.
+  * The DSN is never echoed, not even partially, not even a "safe" prefix.
+  * Structural validation happens BEFORE connecting and reports SHAPE only --
+    counts and booleans, never substrings.
+--------------------------------------------------------------------------------
 """
+import glob
 import os
 import re
 import sys
-import glob
 
 SENTINELS = {"PENDING", "APPLIED-NO-LEDGER-ROW", "UNVERIFIED-NO-LEDGER-ROW"}
+
+_SECRETS = []
+
+
+def register_secret(value):
+    """Remember a value that must never appear in output."""
+    if value and len(value) >= 4:
+        _SECRETS.append(value)
+
+
+def scrub(text):
+    """Redact every registered secret from text. Belt and braces."""
+    out = str(text)
+    for s in sorted(_SECRETS, key=len, reverse=True):
+        out = out.replace(s, "***")
+    return out
+
+
+def say(*parts):
+    print(scrub(" ".join(str(p) for p in parts)))
+
+
+def dsn_shape(dsn):
+    """Describe the DSN's SHAPE without revealing any of it.
+
+    This is what would have diagnosed the 2026-09-13 failure without the leak.
+    """
+    problems = []
+    if not re.match(r"^postgres(ql)?://", dsn):
+        problems.append(
+            "does not start with postgres:// or postgresql:// "
+            "(a psql command prefix or stray quotes will do this)"
+        )
+    authority = re.sub(r"^postgres(ql)?://", "", dsn)
+    authority = authority.split("/", 1)[0]
+    at_count = authority.count("@")
+    if at_count == 0:
+        problems.append("no '@' between credentials and host")
+    elif at_count > 1:
+        problems.append(
+            "%d '@' characters before the host -- there must be exactly one. "
+            "A password that landed on the WRONG SIDE of the '@' looks exactly "
+            "like this, and the host then parses as <password>@<host>." % at_count
+        )
+    if dsn != dsn.strip():
+        problems.append("leading or trailing whitespace/newline")
+    if any(c in dsn for c in "\r\n"):
+        problems.append("contains a newline")
+    for ch in ("&", "#", "?", " "):
+        userinfo = authority.rsplit("@", 1)[0] if at_count else ""
+        if ch in userinfo:
+            name = {"&": "&", "#": "#", "?": "?", " ": "a space"}[ch]
+            problems.append(
+                "credentials contain %s, which must be percent-encoded in a URI" % name
+            )
+    return problems
 
 
 def repo_versions():
@@ -46,46 +113,76 @@ def repo_versions():
 
 
 def main():
-    dsn = os.environ.get("OTTOQ_DATABASE_URL", "").strip()
-    if not dsn:
+    dsn = os.environ.get("OTTOQ_DATABASE_URL", "")
+    register_secret(dsn)
+    register_secret(dsn.strip())
+    # Register the password on its own: it is the part that leaked last time,
+    # precisely because it is a substring of the registered secret rather than
+    # equal to it.
+    m = re.match(r"^postgres(?:ql)?://([^@]*)@", dsn.strip())
+    if m and ":" in m.group(1):
+        register_secret(m.group(1).split(":", 1)[1])
+
+    if not dsn.strip():
         print("::notice::OTTOQ_DATABASE_URL is not set - skipping the database check.")
         return 0
 
-    import psycopg
+    problems = dsn_shape(dsn)
+    if problems:
+        print("::error::OTTOQ_DATABASE_URL is malformed. Shape problems found:")
+        for p in problems:
+            print("::error::  - " + p)
+        print("::error::Expected shape (session pooler, IPv4 - GitHub Actions has no IPv6):")
+        print("::error::  postgresql://postgres.<project-ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres")
+        print("::error::No part of the value is shown above, by design.")
+        return 1
 
     files = repo_versions()
-    print(f"repo: {len(files)} migration files carry a real version header")
+    say("repo:", len(files), "migration files carry a real version header")
 
-    with psycopg.connect(dsn, connect_timeout=20) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT current_user, current_database(), version()")
-            user, db, ver = cur.fetchone()
-            print(f"connected as {user} to {db}")
-            print(f"server: {ver.split(',')[0]}")
+    try:
+        import psycopg
+    except Exception as e:
+        print("::error::could not import psycopg: " + type(e).__name__)
+        return 1
 
-            cur.execute("SELECT version FROM supabase_migrations.schema_migrations")
-            ledger = {r[0] for r in cur.fetchall()}
-            print(f"ledger: {len(ledger)} rows")
+    try:
+        with psycopg.connect(dsn.strip(), connect_timeout=20) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT current_user, current_database()")
+                user, db = cur.fetchone()
+                say("connected as", user, "to", db)
 
-            cur.execute(
-                "SELECT version, name FROM supabase_migrations.schema_migrations "
-                "ORDER BY version DESC LIMIT 1"
-            )
-            row = cur.fetchone()
-            if row:
-                print(f"latest applied: {row[0]}  {row[1]}")
+                cur.execute("SELECT version FROM supabase_migrations.schema_migrations")
+                ledger = {r[0] for r in cur.fetchall()}
+                say("ledger:", len(ledger), "rows")
+
+                cur.execute(
+                    "SELECT version, name FROM supabase_migrations.schema_migrations "
+                    "ORDER BY version DESC LIMIT 1"
+                )
+                row = cur.fetchone()
+                if row:
+                    say("latest applied:", row[0], row[1])
+    except Exception as e:
+        # NEVER print the exception message: psycopg embeds the DSN in it, and that
+        # is exactly how the password leaked on 2026-09-13.
+        print("::error::database connection or query failed: " + type(e).__name__)
+        print("::error::The driver's message is suppressed because it embeds the DSN.")
+        print("::error::Shape validation passed, so this is a live failure: bad password,")
+        print("::error::wrong username (the pooler needs postgres.<project-ref>), unreachable")
+        print("::error::host, or the ledger table is not readable by this role.")
+        return 1
 
     missing = sorted(v for v in files if v not in ledger)
     if missing:
-        print("")
         print("::error::Migration files claim versions the ledger does not have.")
         print("::error::Either the file was never applied, or its header version is wrong.")
         for v in missing:
-            print(f"  {v}  {files[v]}")
+            say("  ", v, files[v])
         return 1
 
-    print("")
-    print(f"OK: all {len(files)} file versions are present in the ledger.")
+    say("OK: all", len(files), "file versions are present in the ledger.")
     return 0
 
 
