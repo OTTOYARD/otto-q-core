@@ -29,12 +29,20 @@ SELECT (r.validation_notes::jsonb->>'scenario')||'/'||(r.validation_notes::jsonb
   FROM public.ottoq_sim_runs r
  WHERE r.run_by = 'cert_harness' AND r.validation_notes::text LIKE '%replay_injected%'
  GROUP BY 1, 2 ORDER BY 1, 2;
--- MEASURED 2026-09-13:
+-- MEASURED 2026-09-13 (text match on 'replay_injected'):
 --   busy_day/314159/12t  | failed | 2 arm runs | 1 pair | 2026-09-09 | above_floor FALSE
 --   busy_day/314159/12t  | passed | 4 arm runs | 2 pairs| 2026-09-09 | above_floor FALSE
 --   grid_smoke/239001/6t | passed |12 arm runs | 6 pairs| 2026-09-09 | above_floor FALSE
--- Nine pairs in total, all on 2026-09-09, all BELOW the current recert floor
--- (2026-09-12 16:50:23.319089). That is the only reason today's canon is clean.
+-- Nine pairs carry the marker, all on 2026-09-09, all BELOW the current recert
+-- floor (2026-09-12 16:50:23.319089). That is the only reason today's canon is clean.
+--
+-- CORRECTION, and it matters for the predicate (measured 05:40 UTC, §4 below):
+-- NINE pairs carry the replay KEY but only SEVEN actually injected anything. Two
+-- are zero-injection controls -- run through the replay function with no stream --
+-- and those two are honest certification data. Of the seven real replays, ONE
+-- failed (busy_day/314159/12t at 05:24; the same replay_id passed at 05:50). So the
+-- sentence is "seven replay pairs, one of which failed, plus two controls", not
+-- "nine replay pairs".
 
 -- 2. AND THE MATRIX COUNTS THEM. Read the matrix from before the floor and the
 --    replay pairs appear in pairs_seen and as 'f' in history.
@@ -60,6 +68,36 @@ SELECT to_char(r.started_at,'MM-DD HH24:MI')                     AS at_utc,
 -- MEASURED: marker 'replay_injected' on every row; arm_a_type 'object';
 -- run_by 'cert_harness'. The instrument has everything it needs to exclude them
 -- and excludes nothing.
+
+-- 4. THE EXACT SHAPE, because the predicate depends on it and a near-miss here
+--    would silently drop honest certification pairs.
+SELECT to_char(started_at,'MM-DD HH24:MI')                                  AS at_utc,
+       (validation_notes::jsonb->>'replay')                                 AS replay_id,
+       (validation_notes::jsonb->'arm_a'->>'replay_injected')               AS arm_a_injected,
+       (validation_notes::jsonb->'arm_b'->>'replay_injected')               AS arm_b_injected,
+       validation_status,
+       (validation_notes::jsonb->>'scenario')||'/'||(validation_notes::jsonb->>'seed')
+         ||'/'||(validation_notes::jsonb->>'ticks')||'t'                     AS col
+  FROM public.ottoq_sim_runs
+ WHERE run_by='cert_harness' AND validation_notes IS NOT NULL
+   AND jsonb_typeof((validation_notes::jsonb)->'arm_a')='object'
+   AND (validation_notes::jsonb ? 'replay')
+ ORDER BY started_at;
+-- MEASURED 2026-09-13 05:40 UTC, 18 arm runs = 9 pairs:
+--   `replay` is a TOP-LEVEL key holding the replay_id uuid, and it is PRESENT WITH
+--   A NULL VALUE on a control pair. The injected count lives per arm as
+--   arm_a/arm_b -> 'replay_injected'.
+--     09-09 03:24  replay_id NULL                 injected 0/0   passed  grid/239001/6t
+--     09-09 03:26  0239aaaa-...0001               injected 24/24 passed  grid/239001/6t  (x2 pairs)
+--     09-09 03:26  0239aaaa-...0002               injected 24/24 passed  grid/239001/6t
+--     09-09 03:27  0239aaaa-...0003               injected 24/24 passed  grid/239001/6t
+--     09-09 05:24  01590000-...00cc               injected 5/5   FAILED  busy/314159/12t
+--     09-09 05:40  replay_id NULL                 injected 0/0   passed  busy/314159/12t
+--     09-09 05:50  01590000-...00cc               injected 5/5   passed  busy/314159/12t
+--     09-09 09:55  0239aaaa-...0001               injected 24/24 passed  grid/239001/6t
+--   Out of 1,000 pair-verdict arm runs since 2026-08-30, exactly 18 carry the key
+--   and 14 carry a non-null replay_id. Both arms of every pair always agree on the
+--   injected count, which is the replay rig working correctly.
 
 -- ---------------------------------------------------------------------------
 -- WHY THIS MATTERS MORE THAN IT LOOKS
@@ -88,10 +126,18 @@ SELECT to_char(r.started_at,'MM-DD HH24:MI')                     AS at_utc,
 -- (db/checks/0187) because it is the same function, the same round, and the same
 -- recert conversation:
 --
---   * In ottoq_cert_matrix's `pair` CTE, exclude verdicts carrying the replay
---     marker:  AND (r.validation_notes::jsonb ->> 'replay_injected') IS NULL
---     (confirm the key's exact spelling from §3 before writing it -- it is matched
---     here as text, which is evidence of presence, not of shape).
+--   * In ottoq_cert_matrix's `pair` CTE, exclude verdicts that CONSUMED an injected
+--     stream. The shape is now measured (§4), so the predicate is exact:
+--
+--       AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+--       AND COALESCE((r.validation_notes::jsonb -> 'arm_a' ->> 'replay_injected')::int, 0) = 0
+--
+--     Both clauses, deliberately: the first excludes a pair that names a replay_id,
+--     the second survives a future replay that forgets to. Note what they do NOT
+--     exclude -- the two zero-injection control pairs, which are honest
+--     certification data and must stay in the canon. A predicate of the form
+--     `? 'replay'` would wrongly drop them, because the key is PRESENT with a null
+--     value on a control.
 --   * Better, additionally: give replay pairs their own run_by ('replay_harness')
 --     so the exclusion does not depend on a jsonb key at all. That is a change to
 --     ottoq_determinism_pair_replay, which means an md5 pin and a reversal
