@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913233201
 -- migration-name:    0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink
 --
 -- 0273  THE UPLINK IS WRITTEN BY THE SAME TRANSACTION AS THE DOWNLINK
@@ -400,5 +400,34 @@ VALUES ('0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink', fa
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+-- Applied 2026-09-13 23:32:01 UTC as version 20260913233201 (6:32 PM CT).
+--
+-- Dry-run byte for byte inside BEGIN ... ROLLBACK first; P1-P4 and A1-A6
+-- passed there and again on apply.
+--
+-- LIVE VERIFICATION AFTER APPLY -- ottoq_command_handshake, read back:
+--
+--   data_source   issued   delivered   acked     by_us   by_operator  by_asset
+--   production         1           0       0         0             0         0
+--   twin         794,744           0 794,332   794,332             0         0
+--
+-- That bottom-right zero is the whole point of the migration. It was always
+-- true; it was never sayable. Every previous count of "confirmed commands"
+-- was 794,332 instances of OTTO-Q agreeing with itself, and nothing in the
+-- schema could tell you so.
+--
+-- ottoq_cert_recert_floor() unmoved at 2026-09-12 16:50:23.319089+00 -- the
+-- classification INSERT at the foot of this file is why, and it is here
+-- rather than in a follow-up because 0272 made that a CI-enforced rule after
+-- 0267 and 0271 both forgot it.
+--
+-- ottoq_command_actor_registry: 12 rows, all three kinds used.
+--
+-- NOTE FOR WHOEVER READS THE HANDSHAKE VIEW NEXT. delivered will stay 0 until
+-- something actually calls ottoq_fleet_claim_commands from outside the
+-- database. The lease exists and is proven (A4: the peek does not stamp, the
+-- claim does, a re-poll does not overwrite), but no transport calls it yet.
+-- "The mechanism exists" is not "the mechanism runs" -- that is the same
+-- DECLARED / WIRED / INVOKED / FOLLOWED distinction this file was written to
+-- make measurable, and this migration only reaches WIRED.
 -- ---------------------------------------------------------------------------

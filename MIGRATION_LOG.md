@@ -257,7 +257,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0270](db/migrations/0270_the_only_queue_depth_rule_crashes_on_two_states_that_do_not_exist.sql) | `20260913225716` | yes — ledger | THE ONLY QUEUE-DEPTH RULE CRASHES ON TWO STATES THAT DO NOT EXIST |
 | [0271](db/migrations/0271_the_outbound_command_stream_is_the_only_stream_without_provenance.sql) | `20260913231758` | yes — ledger | THE OUTBOUND COMMAND STREAM IS THE ONLY STREAM WITHOUT PROVENANCE |
 | [0272](db/migrations/0272_0271_never_classified_itself_and_the_floor_swallowed_every_column.sql) | `20260913232252` | yes — ledger | 0271 NEVER CLASSIFIED ITSELF AND THE FLOOR SWALLOWED EVERY COLUMN |
-| [0273](db/migrations/0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink.sql) | `PENDING` | no — pending | THE UPLINK IS WRITTEN BY THE SAME TRANSACTION AS THE DOWNLINK |
+| [0273](db/migrations/0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink.sql) | `20260913233201` | yes — ledger | THE UPLINK IS WRITTEN BY THE SAME TRANSACTION AS THE DOWNLINK |
 
 139 migrations indexed.
 
