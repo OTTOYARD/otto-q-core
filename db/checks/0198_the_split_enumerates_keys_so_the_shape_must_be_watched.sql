@@ -4,6 +4,14 @@
 -- ottoq_cert_residue. It exists because migration 0266 traded one property for
 -- another and the trade is only safe while this check is run.
 --
+-- ITS CARRIER IS scripts/round-report.sql §3, which inlines C1 below so the round
+-- report cannot be produced without evaluating it. That carrier exists because a
+-- review asked the right question about this file -- is a standing check nobody
+-- is scheduled to run a real mitigation, or a comfort? -- and the honest answer
+-- at the time was: a comfort. Nothing in this repo or the database ran db/checks
+-- at all. It is now at least a command someone runs and a diff someone reviews.
+-- It is still not automation: that is task G12, "CI runs the SQL".
+--
 -- WHAT WAS TRADED. Before 0266 the canon's end-state atom was
 --     md5((arm_a->'endst')::text)
 -- one opaque digest over the WHOLE object. That expression covers every key the

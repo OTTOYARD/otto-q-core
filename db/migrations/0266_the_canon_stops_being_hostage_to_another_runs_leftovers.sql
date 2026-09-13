@@ -57,7 +57,8 @@
 --
 -- NO new table, NO new column, NO DROP, nothing written to ottoq_events, one
 -- function replaced and one added. CREATE OR REPLACE preserves privileges on the
--- replaced one (A6 asserts proacl is unchanged). The replaced function keeps its
+-- replaced one (A7 asserts proacl is unchanged; A6 is the residue check). The
+-- replaced function keeps its
 -- EXACT signature, including the name and type of every RETURNS TABLE column --
 -- `canon_endst` keeps its name and changes its meaning, which is stated in the
 -- function's COMMENT -- because widening the row would be a return-type change,
@@ -79,15 +80,28 @@ BEGIN
   IF v_busy > 0 THEN
     RAISE EXCEPTION '0266 P: % certification/pair call(s) in flight', v_busy;
   END IF;
-  --: The one-shot round jobs (scripts/schedule-round.sql builds 'r<N>_...'), AND
-  --: the standing cert battery, which that regex does not match. It is inactive
-  --: today, so the old predicate passed for a reason unrelated to what it
-  --: claimed; matching on the COMMAND rather than the name means a certification
-  --: path added later is covered without anyone remembering to widen a regex.
+  --: TWO BRANCHES WITH DELIBERATELY DIFFERENT SEMANTICS, and the asymmetry is
+  --: the point rather than an oversight.
+  --:
+  --: ROUND JOBS: EXISTENCE, not activeness -- which is 0221's semantics, copied
+  --: as APPLYING.md requires. An earlier draft of this block wrote
+  --: `WHERE active AND (...)` to cover the second branch and thereby NARROWED
+  --: the first one it had copied. A round paused mid-flight for investigation
+  --: (cron.alter_job(..., active := false)) leaves its r<N>_* jobs present but
+  --: inactive: scripts/schedule-round.sql refuses to schedule over exactly that
+  --: state, and the narrowed predicate would have applied straight through it.
+  --: A migration that walks past a paused round is the thing this block exists
+  --: to prevent.
+  --:
+  --: THE CERT BATTERY: activeness, because it is a STANDING job (jobid 13,
+  --: '* * * * *') that is disabled rather than deleted when not in use, so
+  --: existence alone would refuse every migration forever. Matching on the
+  --: COMMAND rather than the name also means a certification path added later
+  --: is covered without anyone remembering to widen a regex.
   SELECT count(*) INTO v_jobs FROM cron.job
-   WHERE active AND (jobname ~ '^r[0-9]+_'
-                     OR command ILIKE '%ottoq_determinism_pair%'
-                     OR command ILIKE '%ottoq_cert_battery_step%');
+   WHERE (jobname ~ '^r[0-9]+_')
+      OR (active AND (command ILIKE '%ottoq_determinism_pair%'
+                      OR command ILIKE '%ottoq_cert_battery_step%'));
   IF v_jobs > 0 THEN
     RAISE EXCEPTION '0266 P: % certification job(s) still scheduled', v_jobs;
   END IF;
@@ -98,8 +112,14 @@ BEGIN
 END $p$;
 
 -- ---------------------------------------------------------------------------
--- S. PRE-IMAGE. Recorded so the APPLY LOG can show exactly what moved, and so a
---    reader can tell a replaced body from an unchanged one without guessing.
+-- S. PRE-IMAGE, PRINTED. Its earlier comment claimed it was "recorded so the
+--    APPLY LOG can show exactly what moved", which is not what it does: applied
+--    through apply_migration (APPLYING.md 4a) or `supabase db push` (4b) a bare
+--    SELECT's result set is discarded and reaches no log at all.
+--    It is kept because it is useful to a HUMAN running this file by hand, and
+--    it is now honest about being only that. The durable record is S2's
+--    ottoq_schema_snapshots row; the guard that actually refuses a moved body is
+--    section G. Both were added after review found the file had neither.
 -- ---------------------------------------------------------------------------
 SELECT p.proname, md5(p.prosrc) AS prosrc_md5, md5(pg_get_functiondef(p.oid)) AS def_md5
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -293,9 +313,14 @@ WITH fl AS (
             The blind spot is therefore closed deliberately and in two places:
             A9 refuses this migration unless endst is exactly these seven keys
             with exactly {vis,fgn} beneath the four sections, and
-            db/checks/0198 registers the same assertion as a STANDING check so a
-            future fingerprint change is forced to revisit both key lists rather
-            than quietly outrunning them.
+            db/checks/0198 registers the same assertion as a standing check,
+            scripts/round-report.sql §3 inlines it so the round report cannot be
+            produced without evaluating it, and
+            tests/test_endst_split_key_lists_agree.py holds the three COMMITTED
+            key lists together in CI. What none of those reaches is the
+            fingerprint function itself, which lives only in the database -- that
+            corner is discipline until G12 ("CI runs the SQL") lands, and it is
+            named rather than papered over.
             NULL when the pair predates endst, preserving the 0139/0199/0201/0225
             convention that an instrument cannot judge a pair older than itself;
             the NULL-tolerant comparison in `marked` is unchanged. */
@@ -561,7 +586,7 @@ GRANT EXECUTE ON FUNCTION public.ottoq_cert_residue(timestamptz)
    TO postgres, anon, authenticated, service_role;
 
 COMMENT ON FUNCTION public.ottoq_cert_residue(timestamptz) IS
-'0266 (G46). The half of endst that ottoq_cert_matrix no longer streaks: the four fgn sections, which count OTHER runs'' rows left in live states at this depot. Its own canon, its own streak, its own history. A break here is a HYGIENE finding (G13''s janitor), not a determinism finding -- measured 2026-09-13, these sections are identical between arm_a and arm_b in 446 of 446 pairs, so they have never once been evidence about the engine. sections_moved names which of the four differ from the canon, so the finding is actionable. Read this beside ottoq_cert_matrix in every round report; neither number may be quoted as the other.';
+'0266 (G46). The half of endst that ottoq_cert_matrix no longer streaks: the four fgn sections, which count OTHER runs'' rows left in live states at this depot. Its own canon, its own streak, its own history. A break here is a HYGIENE finding (G13''s janitor), not a determinism finding -- measured 2026-09-13, these sections are identical between arm_a and arm_b in 446 of 446 pairs, so they have never once been evidence about the engine. sections_moved names which of the four differ from the canon, so the finding is actionable. Read this beside ottoq_cert_matrix in every round report -- scripts/round-report.sql prints both plus the shape check, and exists because a review found this sentence was relying on a report that had no carrier anywhere in the repo. Neither number may be quoted as the other.';
 
 -- ---------------------------------------------------------------------------
 -- 3. LINEAGE. forces_recert = FALSE, and the reasoning has to survive being
