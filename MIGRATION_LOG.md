@@ -250,7 +250,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0261](db/migrations/0261_the_policy_is_what_proposes_the_kernel_disposes.sql) | `20260912233647` | yes — ledger | THE POLICY IS WHAT PROPOSES; THE KERNEL DISPOSES  (Phase 1 / D2: the A/B pair) |
 | [0262](db/migrations/0262_the_hold_key_the_setter_refused.sql) | `20260913011239` | yes — ledger | THE HOLD KEY THE SETTER REFUSED  (D3: the one-tick hold could not be switched on) |
 | [0265](db/migrations/0265_the_frame_carries_what_the_selector_filters_on.sql) | `20260913122605` | yes — ledger | THE FRAME CARRIES WHAT THE SELECTOR FILTERS ON |
-| [0266](db/migrations/0266_the_canon_stops_being_hostage_to_another_runs_leftovers.sql) | `PENDING` | no — pending | THE CANON STOPS BEING HOSTAGE TO ANOTHER RUN'S LEFTOVERS  (G46) |
+| [0266](db/migrations/0266_the_canon_stops_being_hostage_to_another_runs_leftovers.sql) | `PENDING` | no — pending | THE CANON STOPS BEING HOSTAGE TO ANOTHER RUN'S LEFTOVERS  (G46 + G48) |
 
 132 migrations indexed.
 
