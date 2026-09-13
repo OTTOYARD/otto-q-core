@@ -37,7 +37,7 @@ window count, not a lifetime count.
 |---|---|
 | NVIDIA HTTP receipts (`kind='nvidia_http_receipt'`, 08-01 proof table) | **51** |
 | cuOpt proposals captured (`kind='proposal'`) | **21** |
-| cuOpt-enacted decisions proofed (`kind='decision'`, `l2_engine='cuopt'`, `outcome_status='enacted'`, full 52-rule shield trace attached) | **2** |
+| cuOpt-enacted decisions proofed (`kind='decision'`, `l2_engine='cuopt'`, `outcome_status='enacted'`, full shield trace attached) | **2** |
 | Supply-side ledger rows preserved (08-02/08-03 stall-supply forensics) | 3,022 + 1,514 + 7 |
 
 The supply forensics are the story behind the numbers: the 2026-08-03 root cause (documented in
@@ -54,7 +54,7 @@ first (measured: proposals produced, 0 enacted).
 > and every invocation is ledgered: in the current retained window it was invoked 255 times and
 > abstained 253 — 249 of those because the SQL gate found no eligible vehicle — producing no
 > proposals; in the preserved 2026-08-01→03 evidence it made 51 receipted NVIDIA calls, returned
-> 21 proposals, and 2 of them were enacted through the full 52-rule shield. No measured
+> 21 proposals, and 2 of them were enacted through the full shield. No measured
 > throughput delta exists yet, because `ottoq_ab_runs` — the CRN A/B substrate built to measure
 > exactly that — currently holds zero rows (§4).*
 
@@ -142,7 +142,7 @@ policy-named backups. Cadence first, then the per-tick procedure.
    never span two ticks, so no vehicle starves). Then per candidate vehicle (ordered:
    immediate-dispatch urgency, then lowest SoC; staff-capacity-capped):
    `ottoq_honour_reservation_proposal` **proposes** (priority: honoured reservation → pending
-   cuOpt proposal → deterministic/greedy) → **52-rule shield probe** (every rule result logged;
+   cuOpt proposal → deterministic/greedy) → **L1 shield probe** (20 of 29 rules reachable, `db/checks/0192`) (every rule result logged;
    790,192 evaluations lifetime) → blocked ⇒ L1 safe default; passed ⇒ reserve stall, **emit**
    `begin_charge`, claim tick kW, start concurrent atoms (the parallel-with-charge work), plan
    the itinerary, and — the P0 invariant — **record the booking on the forward calendar in the
@@ -788,7 +788,7 @@ thousands of times and released cleanly every time but 67. Nothing has starved.
 > cuOpt is wired into the live tick as a gated proposer with a one-tick right of first refusal,
 > and the gate is instrumented end to end. Across 15,250 logged gate decisions between
 > 2026-08-02 and 2026-09-08, the NVIDIA endpoint was called 16 times — all on 29–30 August — and
-> returned 136 proposals; 27 of those were enacted through the 52-rule shield, all of them, in
+> returned 136 proposals; 27 of those were enacted through the shield, all of them, in
 > the four runs where the proposer was live. Since 30 August the proposer has been switched off
 > by policy so the deterministic core can be certified alone, which is why the other 15,234 rows
 > are abstentions rather than calls. The propose/dispose pipeline is real and audited. The claim

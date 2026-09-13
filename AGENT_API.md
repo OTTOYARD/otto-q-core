@@ -87,7 +87,8 @@ So: **an agent may propose and may not write.** Not by convention — by privile
 `bridge/proposer_bridge.py` contains no `INSERT` statement at all and a test pins
 that fact.
 
-Then the kernel disposes. The L1 shield (29 active rule codes) evaluates the
+Then the kernel disposes. The L1 shield — **20 of 29 active rule codes, at four
+probe points** (`db/checks/0192`) — evaluates the
 proposed action; the stall calendar's `EXCLUDE` constraint makes a double booking
 physically impossible; a refusal is a row with rule codes, not a silent drop. Two
 of the fourteen certification atoms (`h_prop`, `h_defr`) hash the proposal and

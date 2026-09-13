@@ -11,7 +11,7 @@ and the deterministic core enforces.
 agentic layer  ──  this artifact + the forecast + the learn loop
 proposer       ──  forward_lex (built)
 solver         ──  CP-SAT / HiGHS (built, lexicographic)
-deterministic  ──  52-rule shield + decide path (built, the legal gate)
+deterministic  ──  the L1 shield + decide path (built, the legal gate)
 ```
 
 ---
@@ -40,7 +40,7 @@ coefficient.*
 - **Tier 2 — operational levers.** The mechanisms that serve the masters: dwell,
   deadhead, staging, staff, BESS peak-shaving, degradation, risk hedge.
 - **Tier 3 — constraints.** Physics, legality, chemistry caps. **Hardcoded, never
-  weighted.** Lives in the 52-rule shield, not in this artifact (this artifact
+  weighted.** Lives in the L1 shield, not in this artifact (this artifact
   points at it and does not duplicate it).
 
 ## Regimes — weights are not constant

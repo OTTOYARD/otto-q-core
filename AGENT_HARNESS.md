@@ -152,7 +152,7 @@ table above.
    not in that path.** Whitelisted dials, clamps, drift limits and the human
    approval queue are all real and all in `ottoq-orchestrator-agent` — but that
    agent turns knobs and requests named ops actions. A dial is not a physical act,
-   so the 29-rule shield does not evaluate it. The shield governs the *other* seat.
+   so the shield does not evaluate it. The shield governs the *other* seat.
    Saying "the agent is shielded" without that split overstates it in the one place
    a diligence question would land.
 2. **"The forward proposer still requires live integration" was true yesterday and

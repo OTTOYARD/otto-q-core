@@ -51,8 +51,10 @@ depot.
 
 ## 2. The L1 shield — what is scanned on every single action
 
-29 active rules, 8 categories, every evaluation logged. This is the **constraint
-set, not the policy**: it defines which actions are feasible, and it sits on the
+29 active rules, 8 categories, every evaluation logged — **and twenty of the
+twenty-nine are the ones that actually run**, at four probe points, quantified in
+`db/checks/0192` (see the 2026-09-09 correction below, root-caused 2026-09-13).
+This is the **constraint set, not the policy**: it defines which actions are feasible, and it sits on the
 hold-constant side of every A/B (CLAUDE.md C5 correction, `db/checks/0146`).
 
 `enforcement` is one of `block` (the action cannot happen), `warn`, or

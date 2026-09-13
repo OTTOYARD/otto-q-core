@@ -61,7 +61,7 @@ the learned recall policy, sector packs. That is a better investor story than a 
 
 | PROPRIETARY (ours, keep) | TEMPORARY / OFF-THE-SHELF (say so) | NEXT (funded phase) |
 |---|---|---|
-| propose/dispose shield + 29-rule L1 layer | OR-Tools CP-SAT as proposer (permanent, not temporary) | duration model fitted to real fleet data |
+| propose/dispose shield + L1 layer (20 of 29 rules reachable, `db/checks/0192`) | OR-Tools CP-SAT as proposer (permanent, not temporary) | duration model fitted to real fleet data |
 | 14-atom certification + canon matrix | cuOpt / any LLM as proposer | learning loop on real outcomes |
 | SDR settlement object | dashboards: Grafana/Metabase over our views — **do not build UI** | sector packs (yard-logistics, mining, vertiport) |
 | Recall Decision interface + ledger | OCPP backend: an open-source CSMS if a live charger is ever demoed | OCPI / VDA 5050 adapters (C10) |
@@ -104,7 +104,7 @@ become a research program.
 ### Phase 1 — the A/B  (3–5 sessions)  → D2
 - Add `p_policy` to the pair rig; both arms tick the identical world; only the policy
   differs. Score both into `ottoq_ab_runs` (the empty instrument, 0145).
-- **The shield is held constant** (0146): every arm is evaluated by the same 29 rules, so
+- **The shield is held constant** (0146): every arm is evaluated by the same rule set — the same twenty that are reachable (`db/checks/0192`) — so
   greedy cannot "win" by checking nothing. If routing the baselines through L1 turns out
   to be more than two sessions, fall back to publishing safety and throughput together
   and labelling the baselines as "no safety layer" — and say so on the slide.

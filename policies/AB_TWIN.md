@@ -9,7 +9,7 @@ with its run id; the full write-up is `db/canons/ab_busy_day_424242_12t.md`.*
 Read the live engine and OTTO-Q's stall policy is not inside the disposer. It is a
 **proposer**: `ottoq_l2_optimize_assignments` (source `greedy_constrained`) writes
 `ottoq_external_proposals` from `ottoq_sim_decide_and_dispatch` before `ottoq_decide_tick`
-runs, and `ottoq_decide_tick` then reads the winning proposal, evaluates the 29-rule L1
+runs, and `ottoq_decide_tick` then reads the winning proposal, evaluates the L1 (20 of 29 rules reachable, `db/checks/0192`)
 shield on it, books through the stall calendar, emits the commands and the SDRs. So the
 line `db/checks/0146` drew — *the shield is part of the problem definition, not the
 policy* — is already where the code draws it:

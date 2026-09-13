@@ -149,7 +149,7 @@ never decide" is unenforceable today.
 unclaimed; the substrate to claim it from (signed events + sessions + tariffs) is live.
 
 ### L4_KERNEL — **STRONG machinery, ZERO pack separation**
-**Exists:** all three decision layers live (52 rules → local decide path → proposer ring: cuOpt
+**Exists:** all three decision layers live (the rules layer — 52 catalogue rows / 29 active codes, of which **20 are reachable**, `db/checks/0192` — → local decide path → proposer ring: cuOpt
 255 ledgered invocations, external proposals, energy MPC, four Nemotron advisories + one Anthropic
 NL surface — all propose-only); rolling re-solve with previous-feasible retention (cron ticks);
 determinism substrate (seeded runs, CRN pairing, seed 424242 fixture discipline); twin core with
