@@ -87,10 +87,42 @@ collision risk):
 | `r42_e_busy_171717_24` | 15:40 | 10:40 AM |
 | `r42_f_busy_424242_24` | 15:54 | 10:54 AM |
 
-The 48-tick column and the two grid columns are **not** in this round — the committed
-`v_cols` covers six flagship columns only. So P1 is tested on six of the nine, P3's grid
-prediction is not tested by this round at all, and `busy_day/171717/48t` keeps its streak
-of 6 without adding to it. Stated here so the judgement does not later claim nine.
+**AND FOUR MORE, ADDED 14:47 UTC — because the committed script schedules a NARROWER round
+than rounds actually run.** `scripts/schedule-round.sql`'s `v_cols` holds six flagship
+columns. Round 41 ran **ten pairs across nine columns**: those six, plus both grid columns
+and the 48-tick column TWICE (0193's proof needs two consecutive 48t pairs that agree with
+each other, not merely with the canon). Scheduling only `v_cols` would have left the
+48-tick column — our longest streak at 6, and the one the outward claim rests on — and both
+grid columns unrefreshed, while the round still read as complete:
+
+| job | fires UTC | CT | budget |
+|---|---|---|---|
+| `r42_g_grid_239001_6` | 16:08 | 11:08 AM | 120 s |
+| `r42_h_grid_424242_6` | 16:14 | 11:14 AM | 120 s |
+| `r42_i_busy_171717_48` | 16:20 | 11:20 AM | 3600 s, 60-min timeout |
+| `r42_j_busy_171717_48` | 16:36 | 11:36 AM | 3600 s, 60-min timeout |
+
+Parameters copied from the commands round 41 actually ran (`cron.job_run_details`), not
+retyped from memory: grid depot `aacd0bb0-2d02-d101-72cc-33f70e950bc8`, the same
+`sim_start` `2026-09-01 02:00:00+00` as the flagship. Ten pairs, nine columns, last pair
+ends ~16:45 UTC (11:45 AM CT). **So P1 IS tested on all nine and P3 IS tested.**
+
+### Two defects in `scripts/schedule-round.sql`, found by using it
+
+1. **`v_cols` is six of nine.** The script cannot schedule the round the project actually
+   runs. Whoever ran rounds 39–41 must have edited the constant or scheduled by hand; the
+   committed default silently drops the 48-tick and grid columns.
+2. **The grid columns cannot be sized at all.** The slot comes from the slowest of the last
+   six runs of that tick count, with rows under 60 s discarded as in-flight artefacts (the
+   round-25 trap, documented in the script's own header). The grid fixture is *designed* to
+   finish in seconds (`0153`: "a tiny depot-shaped world so a cert pair runs in seconds"),
+   so **every legitimate grid run is discarded** — measured: 13 runs in the window, `max`
+   returns NULL — and the script falls back to a 30-minute slot for a 30-second pair. It
+   costs wall clock only, which is the safe direction, but the filter cannot tell a fast
+   fixture from an in-flight row and for this column it is always wrong.
+
+Neither is fixed here; fixing a scheduling constant under time pressure is exactly what
+round 25 did wrong. Recorded for its own change.
 
 ---
 
