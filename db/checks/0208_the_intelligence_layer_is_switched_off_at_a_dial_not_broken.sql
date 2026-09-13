@@ -1,0 +1,152 @@
+-- 0208  THE INTELLIGENCE LAYER IS SWITCHED OFF AT A DIAL, NOT BROKEN
+--       (measured 2026-09-13 23:50–23:58 UTC / 6:50–6:58 PM CT)
+--
+-- Chase, 2026-09-13: "make sure we are using Nemotron, cuOpt, CP-SAT, and
+-- anthropic key, and all of our hardcoded engine design to optimally complete
+-- tasks and function as a true intelligence engine."
+--
+-- I went looking for what to build. What I found is that nothing is missing.
+-- Three of the four sources are OFF AT A POLICY DIAL, and two of those dials
+-- DEFAULT to off. The engine is not failing to use its intelligence layer; it
+-- is configured not to.
+--
+-- That is a better finding than any instrumentation I was about to build, and
+-- it is the wrong thing to fix silently, because the dials were turned off for
+-- a reason: a nondeterministic proposer inside a certified path is what the
+-- whole determinism apparatus exists to keep out.
+--
+-- ---------------------------------------------------------------------------
+-- 1. THE FOUR SOURCES, AS MEASURED
+--
+--   source     dial                            value    last decision
+--   ---------- ------------------------------- -------- ---------------------
+--   cuOpt      cuopt_propose_enabled            0        none, ever, in
+--              (default 0, global override 0)            1,057 cert runs
+--              cuopt_first_refusal_max_defers   0
+--              (global) -- zero defers allowed
+--   Nemotron   orchestrator_agent_enabled       (default 2026-08-30
+--              -- ON by default, no override     1, on)   (13 days ago)
+--   CP-SAT     proposer_hold_enabled            0        never seated live
+--              (default 0, no override)
+--   Anthropic  no dial, no consumer             --       no consumer found
+--              in the catalog
+--
+-- cuopt_propose_enabled is the sharpest of these. Its DEFAULT is 0 and the
+-- global override is also 0 -- both belts and both braces. And the ledger says
+-- so in its own words. cuopt_invocation_log, 20,424 rows, by abstain reason:
+--
+--   reason                          rows    last
+--   ------------------------------  ------  ----------
+--   policy_disabled                 10,332  2026-09-13   <- the dial, 50.6%
+--   debounce                         6,128  2026-09-02
+--   first_refusal_arm                2,830  2026-09-13
+--   (none -- a real attempt)           551  2026-09-02
+--   no_candidates_in_instance          405  2026-09-02
+--   no_free_stalls_demand_present      114  2026-08-30
+--   sql_gate_no_candidates              60  2026-08-30
+--   no_candidates                        2  2026-09-09
+--   missing_sim_run_id                   1  2026-08-02
+--   no_running_run                       1  2026-08-02
+--
+-- Half the ledger is one word: policy_disabled, still being written today.
+-- This is not a broken integration. It is an integration behind a closed
+-- switch, logging ten thousand times that the switch is closed.
+--
+-- AND A SECOND THING THE SAME TABLE SAYS, which I had not noticed before.
+-- 551 invocations carried NO abstain reason -- they were real attempts -- but
+-- only 16 ever carried an HTTP STATUS from NVIDIA. So 535 attempts got past
+-- every gate and left no evidence of a reply. Either the call did not happen
+-- or the status was never recorded, and the ledger cannot tell those apart.
+-- Total proposals ever returned: 136. Last row with a status: 2026-08-30
+-- 04:36:02 UTC. Any sentence of the form "cuOpt has been invoked N times"
+-- must say which N it means, and there are three of them here: 20,424 ledger
+-- rows, 551 attempts, 16 answered.
+--
+-- ---------------------------------------------------------------------------
+-- 2. WHAT THE DECISION LEDGER SAYS, AND THE WINDOW IT SAYS IT OVER
+--
+-- ottoq_decisions holds 2,177,338 rows from 2026-08-29 03:36 to 2026-09-13
+-- 16:36 -- a fifteen-day window, not the engine's whole life. Anything below
+-- is "within that window", and I am saying so because 262 read as a lifetime
+-- total in an earlier note of mine and it is not one.
+--
+--   l2_engine                 decisions    enacted   first        last
+--   ------------------------- ----------  ---------  -----------  -----------
+--   deterministic_v1           1,831,250  1,542,040  2026-08-29   2026-09-13
+--   inspect_seam                 186,458     91,114  2026-08-29   2026-09-13
+--   greedy_constrained            86,910     84,061  2026-08-29   2026-09-13
+--   reservation_honoured          45,001     43,882  2026-08-29   2026-09-13
+--   needs_card                    20,360      3,627  2026-08-29   2026-09-13
+--   charge_disposition             3,656      3,656  2026-08-29   2026-09-13
+--   reservation_reassigned         1,312      1,270  2026-08-29   2026-09-13
+--   reservation_broken               814        814  2026-08-29   2026-09-13
+--   ottoq_service_priority           452          0  2026-08-29   2026-09-13
+--   service_sequencing               364        364  2026-08-30   2026-09-13
+--   nemotron                         262        262  2026-08-29   2026-08-30
+--   fifo                             251        251  2026-09-12   2026-09-13
+--   cuopt                              0          0  --           --
+--
+-- Two rows deserve to be read slowly.
+--
+--   NEMOTRON: 262 decisions, every one enacted, on exactly TWO DAYS --
+--   258 on 08-29 and 4 on 08-30 -- and none in the thirteen days since, during
+--   which the engine made 2.15 million other decisions. Its gate defaults ON,
+--   so this is not the dial. Something else stopped calling it, and the 4 on
+--   08-30 were all in production_live runs, which is the loop that also
+--   stopped that day.
+--
+--   OTTOQ_SERVICE_PRIORITY: 452 proposals, ZERO enacted. A proposer that has
+--   run 452 times and changed nothing is not a proposer; it is a logger. This
+--   one is not switched off -- it is running and being ignored, which is a
+--   different and quieter failure than cuOpt's.
+--
+-- ---------------------------------------------------------------------------
+-- 3. THE FOUR STATES, APPLIED
+--
+-- DECLARED / WIRED / INVOKED / FOLLOWED. Every intelligence source in this
+-- engine sits at a different rung, and no single place in the database says
+-- which:
+--
+--   cuOpt                   WIRED    (dial 0; never invoked in this window)
+--   Nemotron                FOLLOWED (262 of 262 enacted -- but 13 days stale)
+--   CP-SAT                  DECLARED (bridge built, never seated)
+--   Anthropic               DECLARED (key present, no consumer in the catalog)
+--   ottoq_service_priority  INVOKED  (452 proposals, 0 followed)
+--
+-- Note the shape of that column: the one source that is FOLLOWED is the one
+-- that has not run in a fortnight, and the one that runs constantly is never
+-- followed. "Are we using our intelligence engine" has no honest one-word
+-- answer today, and that is the gap worth closing first.
+--
+-- ---------------------------------------------------------------------------
+-- 4. WHAT I AM NOT DOING, AND WHY
+--
+-- I am not turning cuopt_propose_enabled to 1. Two reasons, both load-bearing:
+--
+--   a. R-12 established that cuOpt's routing solver documents NO seed and NO
+--      determinism parameter, and its MIP determinism mode is labelled
+--      experimental. CLAUDE.md 2.5 is explicit that this is the argument FOR
+--      propose/dispose, not against it -- but the shield that makes it safe is
+--      the deterministic decide path, and cuopt_first_refusal_max_defers is
+--      also 0, so today a proposal would have no tick in which to be
+--      considered even if one arrived. Flipping one dial without the other
+--      buys nothing but log volume.
+--
+--   b. 1,057 certification runs have been recorded with the proposer off. A
+--      dial change mid-arc is a change to the problem definition, exactly as
+--      C5 says the L1 shield is. It belongs at a round boundary, deliberately,
+--      not as a side effect of a Tuesday evening.
+--
+-- What the next migration DOES build is the thing that is missing regardless
+-- of which way the dials go: ONE function that answers "which intelligence
+-- sources are on, when did each last decide, and was it followed" from the
+-- ledgers, so this file's archaeology never has to be repeated.
+--
+-- ---------------------------------------------------------------------------
+-- 5. THE OPEN QUESTION THIS FILE CANNOT ANSWER
+--
+-- Why did Nemotron stop on 2026-08-30 when its gate defaults on? The four
+-- 08-30 decisions were production_live, and production_live also stopped that
+-- day -- so the likeliest explanation is that the caller stopped, not the
+-- gate. But "likeliest" is not measured, and the caller is an edge function
+-- outside this database. Recorded as open rather than guessed.
