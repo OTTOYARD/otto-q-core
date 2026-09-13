@@ -1136,3 +1136,16 @@ def test_a_stall_row_without_a_status_key_is_still_a_point():
             "connector_max_kw": 150}
     r = propose(_frame([_vehicle("v-1", soc=25)], [bare]), CLASSES, site=SITE)
     assert r["planned"] == 1 and r["stalls_busy"] == 0
+
+
+def test_a_vehicle_the_plan_gives_no_charge_to_is_counted_abstained_not_planned():
+    """L-59: 'planned' means a row that names a stall. A vehicle the solver
+    admits but schedules no charge for comes back as an abstain row, and the
+    accounting must say so -- a fire record that reads 8 planned over 6 stall
+    rows is a ledger lie."""
+    frame = _frame([_vehicle("v-lo", soc=25), _vehicle("v-hi", soc=89)],
+                   [_stall("s-1")])
+    r = propose(frame, CLASSES, site=SITE)
+    stall_rows = [row for row in r["proposals"] if not row["proposal"]["abstain"]]
+    assert r["planned"] == len(stall_rows)
+    assert r["planned"] + r["abstained"] == len(r["proposals"]) == 2

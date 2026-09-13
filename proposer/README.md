@@ -94,6 +94,10 @@ modelled yet, and said so:** when the occupant will finish — that is what `ses
 until it is read, a held stall is not planned on this tick rather than planned on at a guessed
 time.
 
+And the accounting beside it (finding L-59): `planned` counts rows that **name a stall**. A vehicle the
+solver admits but gives no charge operation comes back as an abstain row and is counted as one; the
+first tick-16 fire on run `af2def1b` had read "8 planned" over six stall rows before this was fixed.
+
 ## Abstention is first-class
 
 No class-table entry, no readable `soc`, a target at or below the current charge, or no point

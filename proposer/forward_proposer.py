@@ -1000,10 +1000,16 @@ def propose(frame: dict, class_table: dict, *, site: dict,
     #: EVERY VEHICLE THE FRAME OFFERED STILL HAS EXACTLY ONE ROW: planned,
     #: abstained at translation (unknown platform, no capable point), or
     #: deferred out of this tick's batch.
+    #: L-59: plan_to_proposals emits an ABSTAIN row for a vehicle the solver
+    #: admitted but gave no charge operation ("no charge operation in the
+    #: returned plan"). Counting every row it returned as planned reported
+    #: 8 planned on a fire whose rows named 6 stalls (run af2def1b, tick 16).
+    #: Planned means a row that names a stall; everything else is an abstention.
+    n_stall_rows = sum(1 for r in rows if not r["proposal"].get("abstain"))
     return {
         "proposals": rows + abstentions + deferred,
-        "planned": len(rows),
-        "abstained": len(abstentions) + len(deferred),
+        "planned": n_stall_rows,
+        "abstained": len(abstentions) + len(deferred) + (len(rows) - n_stall_rows),
         "deferred": len(deferred),
         "solver": solver_record,
         "stalls_busy": stalls_busy,
