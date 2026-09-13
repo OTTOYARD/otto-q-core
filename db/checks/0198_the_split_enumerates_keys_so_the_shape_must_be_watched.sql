@@ -156,3 +156,84 @@ SELECT p.proname,
 --                      ottoq_cert_residue false/true/false/false/false.
 -- The world keys belong to the OWN half only; if the residue ever mentions them
 -- the split has been drawn twice and one of the two digests is double-counting.
+
+-- ---------------------------------------------------------------------------
+-- C4. THE DOOR THE SPLIT DOES NOT CLOSE (0193 blocker (i), which survives).
+--
+--     ADDED after a reviewer showed that 0266's header claimed every blocker
+--     from db/checks/0193 was "void by construction". Blocker (i) is not: it held
+--     that the run's OWN digest is not residue-independent because it hashes
+--     run-UNTAGGED state, and 0196 M3 answers that only for the four row-sections.
+--     `chargers`, `calibration` and `world` have no run filter at all, and the
+--     split KEEPS all three inside c_endst.
+--
+--     MEASURED over 30 days rather than the 11-hour post-floor window M1 used,
+--     the untagged half is the MORE volatile one:
+--
+--         column (flagship)      chargers  calibration  world  legs.fgn
+--         314159/12t busy_day       15          1         2       6
+--         171717/12t normal_day     12          1         2       6
+--         171717/24t busy_day       14          1         2       6
+--         171717/48t busy_day        5          1         7       4
+--
+--     `chargers` hashes ottoq_ocpp_chargers at the depot including station_state
+--     and last_heartbeat_at, which the metronome moves every minute. M1 showed 1
+--     only because all 30 post-floor pairs fell inside one quiet window.
+--
+--     THIS IS NOT AN ARGUMENT TO MOVE THEM OUT. Charger and world state is what
+--     the run ENDED IN and belongs to its own end state; 0244 put `world` there
+--     deliberately so two arms ending in different fleet states could not pass.
+--     It is an argument that a canon rebase through this door must be
+--     ATTRIBUTABLE rather than mysterious -- which is exactly the complaint that
+--     started G46.
+-- ---------------------------------------------------------------------------
+WITH pair AS (
+  SELECT DISTINCT ON (r.depot_id, r.started_at)
+         r.depot_id, r.started_at, (r.validation_notes::jsonb) AS j
+    FROM public.ottoq_sim_runs r
+   WHERE r.run_by = 'cert_harness' AND r.validation_notes IS NOT NULL
+     AND r.validation_status IS NOT NULL AND r.validation_status <> 'inconclusive'
+     AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a') = 'object'
+     AND (r.validation_notes::jsonb)->'arm_a' ? 'endst'
+     AND r.started_at >= public.ottoq_cert_recert_floor()
+     AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+     AND COALESCE((r.validation_notes::jsonb->'arm_a'->>'replay_injected')::int, 0) = 0
+     AND COALESCE((r.validation_notes::jsonb->'arm_b'->>'replay_injected')::int, 0) = 0
+   ORDER BY r.depot_id, r.started_at, r.sim_run_id)
+SELECT depot_id,
+       (j->>'scenario')||'/'||(j->>'seed')||'/'||(j->>'ticks')||'t' AS col,
+       count(*)                                                     AS pairs,
+       count(DISTINCT (j->'arm_a'->'endst'->'chargers')::text)       AS chargers_values,
+       count(DISTINCT (j->'arm_a'->'endst'->'calibration')::text)    AS calibration_values,
+       count(DISTINCT (j->'arm_a'->'endst'->'world')::text)          AS world_values,
+       --: More than one value in ANY of these three means the canon moved for a
+       --: reason that is NOT the engine's own rows and NOT the foreign residue
+       --: the split relocated -- the third door, which nothing else reports.
+       (count(DISTINCT (j->'arm_a'->'endst'->'chargers')::text) > 1
+        OR count(DISTINCT (j->'arm_a'->'endst'->'calibration')::text) > 1
+        OR count(DISTINCT (j->'arm_a'->'endst'->'world')::text) > 1)  AS untagged_half_moved
+  FROM pair
+ GROUP BY 1, 2
+ ORDER BY 1, 2;
+
+-- ---------------------------------------------------------------------------
+-- C4b. AND THE PREMISE OF M3 ITSELF, counted rather than assumed.
+--      0196 M3 measured zero untagged rows database-wide and stated explicitly
+--      that this is an OBSERVATION, not a guarantee. 0266's first draft restated
+--      it as fact. Two of the four tables are still NULLABLE, so the observation
+--      can stop being true without anything raising:
+--          ottoq_itinerary_legs.sim_run_id     NOT NULL
+--          ottoq_stall_bookings.sim_run_id     NOT NULL
+--          ottoq_visit_needs.sim_run_id        NULLABLE
+--          ottoq_vehicle_dispatches.sim_run_id NULLABLE
+--      A NULL-tagged row lands in `vis` -- the run's OWN half -- and rebases the
+--      canon exactly as the nine legs did. EXPECT ZERO IN EVERY COLUMN.
+-- ---------------------------------------------------------------------------
+SELECT 'visit_needs' AS tbl, count(*) FILTER (WHERE sim_run_id IS NULL) AS untagged,
+       count(*) AS total FROM public.ottoq_visit_needs
+UNION ALL SELECT 'bookings',   count(*) FILTER (WHERE sim_run_id IS NULL), count(*)
+            FROM public.ottoq_stall_bookings
+UNION ALL SELECT 'legs',       count(*) FILTER (WHERE sim_run_id IS NULL), count(*)
+            FROM public.ottoq_itinerary_legs
+UNION ALL SELECT 'dispatches', count(*) FILTER (WHERE sim_run_id IS NULL), count(*)
+            FROM public.ottoq_vehicle_dispatches;

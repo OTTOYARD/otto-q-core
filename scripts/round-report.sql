@@ -100,6 +100,40 @@ SELECT p.proname, md5(p.prosrc) AS prosrc_md5,
 
 \echo ''
 \echo '=============================================================='
+\echo '4b. THE UNTAGGED HALF — the door the split does not close'
+\echo '=============================================================='
+-- 0193 blocker (i) SURVIVES for chargers/calibration/world: they have no run
+-- filter and the split keeps them in the own half. Over 30 days `chargers` is
+-- the most volatile part of endst, not the quietest, because it hashes
+-- station_state and last_heartbeat_at and the metronome moves those every
+-- minute. If an engine column's streak breaks and §1's other atoms are clean,
+-- look HERE before blaming the engine: more than one value in any of these three
+-- means the canon moved for a reason that is neither the engine's own rows nor
+-- the foreign residue §2 relocated. db/checks/0198 C4 is this query with its
+-- reasoning; C4b counts untagged rows, whose absence is an observation and not a
+-- schema guarantee.
+SELECT depot_id,
+       (j->>'scenario')||'/'||(j->>'seed')||'/'||(j->>'ticks')||'t' AS col,
+       count(*) AS pairs,
+       count(DISTINCT (j->'arm_a'->'endst'->'chargers')::text)    AS chargers_values,
+       count(DISTINCT (j->'arm_a'->'endst'->'calibration')::text) AS calibration_values,
+       count(DISTINCT (j->'arm_a'->'endst'->'world')::text)       AS world_values
+  FROM (SELECT DISTINCT ON (r.depot_id, r.started_at)
+               r.depot_id, r.started_at, (r.validation_notes::jsonb) AS j
+          FROM public.ottoq_sim_runs r
+         WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
+           AND r.validation_status IS NOT NULL AND r.validation_status <> 'inconclusive'
+           AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
+           AND (r.validation_notes::jsonb)->'arm_a' ? 'endst'
+           AND r.started_at >= public.ottoq_cert_recert_floor()
+           AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+           AND COALESCE((r.validation_notes::jsonb->'arm_a'->>'replay_injected')::int,0) = 0
+           AND COALESCE((r.validation_notes::jsonb->'arm_b'->>'replay_injected')::int,0) = 0
+         ORDER BY r.depot_id, r.started_at, r.sim_run_id) p
+ GROUP BY 1, 2 ORDER BY 1, 2;
+
+\echo ''
+\echo '=============================================================='
 \echo '5. REPLAY PAIRS — excluded from every number above (G48)'
 \echo '=============================================================='
 -- A replay pair asks a different question from a certification and is kept out

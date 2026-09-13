@@ -21,11 +21,20 @@
 --       that has taken more than one value since the recert floor. Every other
 --       sub-path -- all eight vis sections, chargers, calibration, world -- has
 --       exactly one value across all 30 post-floor pairs.
---   M2  The fgn sections are identical between arm_a and arm_b in 446 of 446
---       pairs. They contribute NOTHING to the intra-pair verdict and all of
---       G46's noise to the inter-round one.
+--   M2  The fgn sections are identical between arm_a and arm_b in 445 of 446
+--       pairs -- bookings.fgn differs in exactly one, a pre-0139 pair; legs,
+--       visit_needs and dispatches differ in zero. They contribute essentially
+--       nothing to the intra-pair verdict and all of G46's noise to the
+--       inter-round one. (An earlier draft rounded this to "446 of 446" in three
+--       places, one of which shipped into the database as a function COMMENT.)
 --   M3  There are ZERO rows with a NULL sim_run_id in any of the four tables,
 --       database-wide, so the `vis` branch is in fact `sim_run_id = p_run`.
+--       THIS IS AN OBSERVATION, NOT A GUARANTEE -- 0196 M3 says so and an earlier
+--       draft of this bullet dropped the caveat. Measured: legs and bookings are
+--       NOT NULL in the schema; visit_needs and dispatches are NULLABLE. A future
+--       writer can reintroduce an untagged row, it would land in `vis`, and it
+--       would rebase the canon exactly as the nine legs did. db/checks/0198 C4
+--       counts untagged rows for that reason.
 --   M4  The canon digest is formed in ONE line of ottoq_cert_matrix, from the
 --       endst object the pair already recorded. So the split is computable from
 --       data already on disk: it is RETROACTIVE and re-runs nothing.
@@ -35,13 +44,41 @@
 --       weakening the grid numbers would have moved too.
 --
 -- WHY THERE IS NO GATE. Both designs reviewed in db/checks/0193 were admissibility
--- gates on the boot image, and both came back unsound. Every one of that review's
--- blockers is void here by construction, because nothing is gated: there is no
+-- gates on the boot image, and both came back unsound. Blockers (ii) and (iii)
+-- are void here BY CONSTRUCTION, because nothing is gated: there is no
 -- admissibility predicate (so not two definitions of one), no `c_fgn = 0` to fail
 -- open on NULL, no GREATEST to swallow a NULL, no boot fingerprint in
 -- ottoq_cert_coverage and therefore none of its 8.2 s (the 0098 class), and the
 -- metronome firing every minute cannot stall a column because no column waits on
 -- the boot image.
+--
+-- BLOCKER (i) IS NOT VOID, AND AN EARLIER DRAFT OF THIS PARAGRAPH SAID IT WAS.
+-- (i) held that the run's own digest is not residue-independent because it hashes
+-- run-UNTAGGED state. 0196 M3 answers that for the four row-sections (there are no
+-- untagged rows anywhere) and says so as an OBSERVATION. It does NOT answer it for
+-- chargers, calibration and world, which have no run filter at all and which this
+-- split KEEPS inside c_endst.
+--
+-- Measured over 30 days rather than the 11-hour post-floor window M1 uses, the
+-- untagged half is the MORE volatile one, not the quietest:
+--
+--     column (flagship)      chargers   calibration   world   legs.fgn
+--     314159/12t busy_day      15            1          2        6
+--     171717/12t normal_day    12            1          2        6
+--     171717/24t busy_day      14            1          2        6
+--     171717/48t busy_day       5            1          7        4
+--
+-- `chargers` hashes ottoq_ocpp_chargers at the depot including station_state and
+-- last_heartbeat_at, which the metronome moves every minute, so another run's
+-- activity rebases the canon through a door this split does not close. It did not
+-- show in M1 only because all 30 post-floor pairs fell inside one quiet window.
+--
+-- THE SPLIT IS STILL THE RIGHT CUT -- charger and world state is what the run
+-- ENDED IN and belongs to its own end state, and 0244 put `world` there
+-- deliberately so two arms ending in different fleet states could not pass. What
+-- changes is the claim and the watch: (i) survives, it is named here rather than
+-- declared void, and db/checks/0198 C4 makes a rebase through that door
+-- attributable instead of mysterious.
 --
 -- WHAT THIS DOES NOT TOUCH. ottoq_determinism_pair is NOT MODIFIED. It keeps
 --   (v_arms[1]->'endst') = (v_arms[2]->'endst')
@@ -296,8 +333,9 @@ WITH fl AS (
             the engine was byte-identical.
             Rebuilt explicitly rather than by subtraction so the key set is
             VISIBLE here: the four `vis` halves (this run's own rows -- measured
-            M3, there are no untagged rows anywhere, so `vis` IS
-            sim_run_id = p_run) plus the three world keys the run genuinely
+            M3, there are no untagged rows anywhere TODAY, which is an
+            observation and not a schema guarantee: visit_needs and dispatches
+            are still nullable, and db/checks/0198 C4 watches the count) plus the three world keys the run genuinely
             ended in.
             AND THE COST OF THAT CHOICE, STATED RATHER THAN GLOSSED. An earlier
             draft of this comment claimed the explicit list "cannot drift with
@@ -307,7 +345,8 @@ WITH fl AS (
             what drifts. If ottoq_boot_state_fingerprint ever gains an eighth
             top-level key, that atom is streaked by NEITHER instrument and
             silently leaves the canon -- and A9's arm-vs-arm shape check cannot
-            see it either, because the arms agree on everything (446 of 446), so
+            see it either, because the arms agree on every fgn section in 445 of 446 pairs
+            and on endst as a whole in 30 of 30 post-floor pairs, so
             a key that is equal WITHIN a pair but moves BETWEEN rounds is G46's
             own failure class wearing a new name.
             The blind spot is therefore closed deliberately and in two places:
@@ -586,7 +625,7 @@ GRANT EXECUTE ON FUNCTION public.ottoq_cert_residue(timestamptz)
    TO postgres, anon, authenticated, service_role;
 
 COMMENT ON FUNCTION public.ottoq_cert_residue(timestamptz) IS
-'0266 (G46). The half of endst that ottoq_cert_matrix no longer streaks: the four fgn sections, which count OTHER runs'' rows left in live states at this depot. Its own canon, its own streak, its own history. A break here is a hygiene finding OR a change in the engine''s own cleanup, reset or supersede path -- it is NOT attributable to the janitor by itself, and an earlier version of this comment said it was. The engine demonstrably touches foreign live rows (db/checks/0187 §4: four legs that vanished between rounds 40 and 41 were closed by a later run''s supersede), so a future widening of ottoq_tick_invariance_reset_fleet or ottoq_sim_release_depot to retire foreign rows would land HERE while both arms still agreed and the pair still passed. Before charging a residue break to the janitor, check whether any migration since the last round touched those paths. What IS measured: these sections are identical between arm_a and arm_b in 446 of 446 pairs, so they are not evidence about INTRA-PAIR determinism. sections_moved names which of the four differ from the canon, so the finding is actionable. Read this beside ottoq_cert_matrix in every round report -- scripts/round-report.sql prints both plus the shape check, and exists because a review found this sentence was relying on a report that had no carrier anywhere in the repo. Neither number may be quoted as the other.';
+'0266 (G46). The half of endst that ottoq_cert_matrix no longer streaks: the four fgn sections, which count OTHER runs'' rows left in live states at this depot. Its own canon, its own streak, its own history. A break here is a hygiene finding OR a change in the engine''s own cleanup, reset or supersede path -- it is NOT attributable to the janitor by itself, and an earlier version of this comment said it was. The engine demonstrably touches foreign live rows (db/checks/0187 §4: four legs that vanished between rounds 40 and 41 were closed by a later run''s supersede), so a future widening of ottoq_tick_invariance_reset_fleet or ottoq_sim_release_depot to retire foreign rows would land HERE while both arms still agreed and the pair still passed. Before charging a residue break to the janitor, check whether any migration since the last round touched those paths. What IS measured: these sections are identical between arm_a and arm_b in 445 of 446 pairs (bookings.fgn differs in one pre-0139 pair), so they are close to worthless as evidence about INTRA-PAIR determinism. sections_moved names which of the four differ from the canon, so the finding is actionable. Read this beside ottoq_cert_matrix in every round report -- scripts/round-report.sql prints both plus the shape check, and exists because a review found this sentence was relying on a report that had no carrier anywhere in the repo. Neither number may be quoted as the other.';
 
 -- ---------------------------------------------------------------------------
 -- 3. LINEAGE. forces_recert = FALSE, and the reasoning has to survive being
@@ -659,6 +698,14 @@ ON CONFLICT (name) DO UPDATE
 DO $a$
 DECLARE
   v_rf timestamptz; v_n int; v_bad int; v_worse int; v_txt text; v_src text;
+  --: A3b's spoiler. DECLARED, because the first draft of A3b wrote it as a
+  --: bare literal that Python's implicit string concatenation had silently
+  --: stripped the quotes from -- `to_jsonb(v_sentinel)` is a
+  --: COLUMN REFERENCE, so the whole DO block would have raised 42703 at
+  --: apply time, after seven assertions had already run, with an error
+  --: naming a missing column rather than a failed check. Caught by a
+  --: reviewer's live probe, not by me.
+  v_sentinel text := '__0266_sentinel__';
   v_conj text;
   v_conjuncts text[] := ARRAY[
     'r.c_fp  IS NOT DISTINCT FROM k.c_fp',
@@ -699,9 +746,13 @@ BEGIN
   --:     seven jsonb paths the split enumerates must EXTRACT SOMETHING on every
   --:     post-floor pair. This fires on exactly ONE misspelled path, which is
   --:     the failure the old A2 described and did not catch. Verified both ways
-  --:     before installing: with the paths correct, 0 of 30 pairs violate it;
-  --:     with `->'vis'` misspelled as `->'viss'` on visit_needs alone, 30 of 30
-  --:     violate it.
+  --:     before installing: with the paths correct, 0 of 60 arm rows (30 pairs)
+  --:     violate it; with `->'vis'` misspelled as `->'viss'` on visit_needs
+  --:     alone, 60 of 60 violate it. SIXTY, not thirty: neither subquery has a
+  --:     DISTINCT ON, so both walk arm ROWS. Harmless to the verdict (both arms
+  --:     carry the same validation_notes) and mislabelled until a reviewer said
+  --:     so, in the same file that added "the denominator, carried on every row"
+  --:     to db/checks/0198.
   SELECT count(*) INTO v_bad FROM (
     SELECT (r.validation_notes::jsonb)->'arm_a'->'endst' AS e
       FROM public.ottoq_sim_runs r
@@ -960,18 +1011,18 @@ BEGIN
         ON s.depot=m.depot AND s.seed=m.seed AND s.ticks=m.ticks AND s.scenario=m.scenario
       JOIN public.ottoq_sim_runs r ON r.sim_run_id = m.last_run_a)
   SELECT count(*) FILTER (WHERE md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text) = ANY(ARRAY[
-             md5(jsonb_build_object('visit_needs', to_jsonb(__0266_sentinel__::text), 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
-             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', to_jsonb(__0266_sentinel__::text), 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
-             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', to_jsonb(__0266_sentinel__::text), 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
-             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', to_jsonb(__0266_sentinel__::text), 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
-             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', to_jsonb(__0266_sentinel__::text), 'calibration', e->'calibration', 'world', e->'world')::text),
-             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', to_jsonb(__0266_sentinel__::text), 'world', e->'world')::text),
-             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', to_jsonb(__0266_sentinel__::text))::text)])),
+             md5(jsonb_build_object('visit_needs', to_jsonb(v_sentinel), 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', to_jsonb(v_sentinel), 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', to_jsonb(v_sentinel), 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', to_jsonb(v_sentinel), 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', to_jsonb(v_sentinel), 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', to_jsonb(v_sentinel), 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', to_jsonb(v_sentinel))::text)])),
          count(*) FILTER (WHERE md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', e->'bookings'->'fgn', 'legs', e->'legs'->'fgn', 'dispatches', e->'dispatches'->'fgn')::text) = ANY(ARRAY[
-             md5(jsonb_build_object('visit_needs', to_jsonb(__0266_sentinel__::text), 'bookings', e->'bookings'->'fgn', 'legs', e->'legs'->'fgn', 'dispatches', e->'dispatches'->'fgn')::text),
-             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', to_jsonb(__0266_sentinel__::text), 'legs', e->'legs'->'fgn', 'dispatches', e->'dispatches'->'fgn')::text),
-             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', e->'bookings'->'fgn', 'legs', to_jsonb(__0266_sentinel__::text), 'dispatches', e->'dispatches'->'fgn')::text),
-             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', e->'bookings'->'fgn', 'legs', e->'legs'->'fgn', 'dispatches', to_jsonb(__0266_sentinel__::text))::text)])),
+             md5(jsonb_build_object('visit_needs', to_jsonb(v_sentinel), 'bookings', e->'bookings'->'fgn', 'legs', e->'legs'->'fgn', 'dispatches', e->'dispatches'->'fgn')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', to_jsonb(v_sentinel), 'legs', e->'legs'->'fgn', 'dispatches', e->'dispatches'->'fgn')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', e->'bookings'->'fgn', 'legs', to_jsonb(v_sentinel), 'dispatches', e->'dispatches'->'fgn')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', e->'bookings'->'fgn', 'legs', e->'legs'->'fgn', 'dispatches', to_jsonb(v_sentinel))::text)])),
          count(*)
     INTO v_n, v_bad, v_worse
     FROM canon;
