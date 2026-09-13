@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913142959
 -- migration-name:    0268_0267_never_classified_itself_and_the_floor_swallowed_every_column
 --
 -- 0268  0267 NEVER CLASSIFIED ITSELF, AND THE FLOOR SWALLOWED EVERY COLUMN
@@ -209,5 +209,33 @@ END $a$;
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+--
+-- APPLIED 2026-09-13 14:29:59 UTC (9:29 AM CT) as version 20260913142959.
+-- A1-A4 passed. Pre-image confirmed by section G before anything was written:
+-- 0267 unclassified, floor at 14:14:38, matrix 0 columns at that floor, 9 at
+-- the pre-0267 floor.
+--
+-- POST-IMAGE -- byte-identical to the reading taken at 13:58, before 0267:
+--   recert floor  2026-09-12 16:50:23.319089+00   (restored exactly)
+--   matrix        9 columns, 9 green
+--   residue       9 columns
+--   11111111 171717 48t busy_day   6 pairs  streak 6  PPPPPP  endst 5a3ec345
+--   11111111 171717 24t busy_day   3        3         PPP     dc344d68
+--   11111111 424242 24t busy_day   3        3         PPP     7fb3eca5
+--   11111111 171717 12t busy_day   3        3         PPP     8b5a0ad4
+--   11111111 314159 12t busy_day   3        3         PPP     660898c9
+--   11111111 424242 12t busy_day   3        3         PPP     4f1879cf
+--   11111111 171717 12t normal_day 3        3         PPP     d801f3ce
+--   aacd0bb0 239001  6t grid_smoke 3        3         PPP     f37e1d96
+--   aacd0bb0 424242  6t grid_smoke 3        3         PPP     92c84f61
+--   residue: flagship 2d1315b9 on all seven, sections_moved 'legs';
+--            grid 13e2e154 on both, sections_moved NULL.
+--
+-- A3 IS THE ONE WORTH READING TWICE. Every engine column is still green across
+-- a purge that deleted 7,300,205 rows (db/checks/0201) -- because the matrix
+-- reads validation_notes off ottoq_sim_runs, and ottoq_sim_runs is not in
+-- ottoq_retention_engine_allowlist. The canons are stored hashes; the purge
+-- changed the WORLD, not the record. Whether the engine still REPRODUCES those
+-- hashes from the purged world is a different question, and only round 42
+-- answers it.
 -- ---------------------------------------------------------------------------
