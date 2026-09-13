@@ -1216,6 +1216,26 @@ END $a$;
 --
 -- AND A SCAN FOR THE ROOT CAUSE ACROSS THE WHOLE FILE: no bare __token__
 -- identifier survives outside a string literal anywhere in 1,200 lines.
+--
+-- THEN THE REAL TEST, which no amount of reading substitutes for: the new
+-- function was CREATED, EXERCISED AND ROLLED BACK inside one transaction against
+-- the live database. Rollback was proven to be honoured first, with a throwaway
+-- function that did not survive it, so this could not leave anything behind.
+--
+--   CREATE OR REPLACE ottoq_cert_residue   parsed and installed
+--   returns exactly 9 columns              (matches ottoq_cert_matrix's 9)
+--   A6: sections_moved names `legs` on     exactly 7 flagship columns
+--   grid columns reporting movement        0
+--   history glyph vocabulary               only S, . and -
+--   over the WIDE window every column      renders a pre-floor '-'
+--        -- which is the three-state fix working: the earlier version rendered
+--        -- those pairs as '.', i.e. as MOVED, on columns that never moved
+--   after ROLLBACK, ottoq_cert_residue     does not exist
+--
+-- This is the half the six reviews could only reason about. It is now executed.
+-- What remains unexecuted as a whole is the file end to end; every other section
+-- has been run individually, and section G's four pins, A1's floor and A7's ACL
+-- were each read straight off the live database.
 -- ---------------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------------
