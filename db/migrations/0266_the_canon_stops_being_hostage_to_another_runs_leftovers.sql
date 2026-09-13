@@ -773,11 +773,20 @@ BEGIN
   --:     and therefore none of them is load-bearing on today's data. Pinned by
   --:     substring against the POST-IMAGE body, which is the only way a dropped
   --:     conjunct is visible at all.
-  SELECT p.prosrc INTO v_src FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-   WHERE n.nspname='public' AND p.proname='ottoq_cert_matrix';
+  --: INTO STRICT, and the reason is the same defect class A8 was just inverted
+  --: for. A bare SELECT ... INTO leaves v_src NULL when the function is absent,
+  --: `position(x in NULL)` is NULL, `NULL = 0` is NULL, and `IF NULL THEN` does
+  --: not fire -- so the whole loop would pass on a missing function. STRICT
+  --: raises on zero rows AND on more than one, which also refuses an overload
+  --: appearing between section G and here.
+  SELECT p.prosrc INTO STRICT v_src FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='public' AND p.proname='ottoq_cert_matrix'
+     AND pg_get_function_identity_arguments(p.oid) = 'p_since timestamp with time zone';
   FOREACH v_conj IN ARRAY v_conjuncts LOOP
-    IF position(v_conj in v_src) = 0 THEN
-      RAISE EXCEPTION '0266 A4: the installed ottoq_cert_matrix is missing the canon conjunct %', v_conj;
+    --: EXACTLY ONCE, not merely present: a conjunct appearing twice would mean
+    --: the copy duplicated a region, which `> 0` would wave through.
+    IF (length(v_src) - length(replace(v_src, v_conj, ''))) / length(v_conj) <> 1 THEN
+      RAISE EXCEPTION '0266 A4: the installed ottoq_cert_matrix does not contain the canon conjunct % exactly once', v_conj;
     END IF;
   END LOOP;
 
@@ -895,7 +904,7 @@ BEGIN
   --: A7. PRIVILEGES UNCHANGED on the replaced function, pinned to the ACL
   --:     measured in the pre-image. CREATE OR REPLACE preserves proacl by
   --:     definition; this asserts the definition held.
-  SELECT array_to_string(p.proacl::text[], ' | ') INTO v_txt
+  SELECT array_to_string(p.proacl::text[], ' | ') INTO STRICT v_txt
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='public' AND p.proname='ottoq_cert_matrix';
   IF v_txt IS DISTINCT FROM '=X/postgres | postgres=X/postgres | anon=X/postgres | authenticated=X/postgres | service_role=X/postgres' THEN
@@ -911,7 +920,7 @@ BEGIN
   --:      above the GRANT said the residue was "granted to match
   --:      ottoq_cert_matrix exactly"; A7's own pinned string refutes that, and
   --:      the comment has been corrected rather than the grant loosened.
-  SELECT array_to_string(p.proacl::text[], ' | ') INTO v_txt
+  SELECT array_to_string(p.proacl::text[], ' | ') INTO STRICT v_txt
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='public' AND p.proname='ottoq_cert_residue';
   IF v_txt IS DISTINCT FROM 'postgres=X/postgres | anon=X/postgres | authenticated=X/postgres | service_role=X/postgres' THEN

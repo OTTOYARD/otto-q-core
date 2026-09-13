@@ -217,6 +217,18 @@ SELECT p.proname, md5(p.prosrc) AS prosrc_md5,
 --    review of a file that no longer exists. Freeze the artefact before the
 --    reviewers start -- and when a reviewer says its copy disagrees with the
 --    disk, believe it and re-run rather than reconciling the findings by hand.
+--
+--    APPLIED IMMEDIATELY, AND IMMEDIATELY STRAINED. The follow-up review of the
+--    rebuilt guards reads a frozen copy under scratchpad, pinned by md5 in its
+--    own prompt. Then two further fail-open defects were found by hand while it
+--    ran (A4 and A7 used a bare SELECT ... INTO, so a missing function left the
+--    variable NULL and `position(x in NULL) = 0` is NULL, which `IF` does not
+--    fire on -- the same class as the A8 conviction, in the rebuild FOR it) and
+--    fixing them moved HEAD away from the frozen copy.
+--    THE HONEST PRACTICE, then, is not "never edit" -- it is: the reviewers keep
+--    their stable artefact, edits QUEUE against it, and every returning finding
+--    is re-checked against HEAD before it is called stale. Silently updating the
+--    copy under a running reviewer would be worse than either.
 --    Both lenses here caught real defects anyway, but only because each one
 --    checked the live database instead of trusting the text in front of it.
 -- ---------------------------------------------------------------------------
