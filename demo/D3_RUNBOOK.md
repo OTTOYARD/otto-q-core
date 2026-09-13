@@ -176,3 +176,56 @@ slack. That is a change to the tick path and forces recert; it is a decision, no
 released next tick, no vehicle starved); every fire is a ledger row with its frame hash; the
 door superseded, never lost, a row; and the shield never once had to refuse a bad row because
 its pre-filter saw what the frame did not. That last sentence is the whole finding.
+
+## 6. Status 2026-09-13 05:20 UTC — the design question is answered, and the answer got wider
+
+**Chase answered it** (2026-09-13): *"I think the proposer comes in most handy or useful when
+there is 'tightness' or contention within the depot. So it should be in the loop always."* So
+the stall hold is to be built, and the proposer stays in the loop at a saturated depot rather
+than being used only when there is slack.
+
+**And then the kernel made the same point twice.** `db/checks/0188` root-caused G47 — a
+*certified* proposer, `ottoq_service_priority`, with 2,335 proposals over fifteen days and zero
+enactments. It is not a dead seat: `ottoq_decide_tick` line 965 asks it, 446 decisions name it
+as the enacted action's source, and **all 446 carry `outcome_status = 'noop_no_candidate'`**,
+set at line 1029 under the comment *"NO BAY -> DO NOT ENTER ONE"*. The flagship depot has **two**
+service bays and they are taken — 1,725 bookings in three days — booked by the bay loop §(4b),
+which runs **earlier in the same tick** than §(5) where the proposer is asked.
+
+That is L-60's defect on a different resource, and it settles a design question 0264 was about
+to get wrong:
+
+> **Under contention the proposer is exactly who loses, because it is asked last.** So the
+> one-tick hold must be **resource-generic** — a pending proposal protects the resource it
+> names, whether that resource is a charge stall or a service bay — not a stall-specific patch.
+
+### What is in flight
+
+| item | state |
+|---|---|
+| `0263` the frame carries `reserved_by` / `reservation_expires_at` / `station_state` / per-vehicle reservation | designed by workflow, under adversarial review; **not applied** |
+| `0264` a pending `holds_tick` proposal holds the resource it names for one tick, behind a run-scoped key defaulting to 0 | designed by workflow, under adversarial review; **not applied** |
+| G46 (`db/checks/0187`) the canon rebases when another run's leftover legs move | designed by a second workflow; **round 42 is blocked on it** |
+| the runner | `.github/workflows/proposer-loop.yml` — manual dispatch, needs repository secrets `OTTOQ_DATABASE_URL` and (for the advisory fire) `ANTHROPIC_API_KEY`, neither of which exists yet |
+
+One measurement discipline was added tonight and applies to every future demo: **run
+`db/checks/0189` afterwards.** It separates the two kinds of zero — `NEVER HEARD` (the door took
+the proposal and the selector refused it, which is what happened to all 90 `forward_lex` rows)
+from `ASKED AND NEVER FOLLOWED` (the selector returned it and physical reality overruled it,
+which is what happens to every `ottoq_service_priority` row). Conflating them is what made the
+first two runs look like one problem when they were two.
+
+### Two rules for the next live run
+
+1. **Not on the grid depot.** `grid_smoke/239001/6t` and `grid_smoke/424242/6t` are the only two
+   certification columns still green (streak 3). Until G46 is fixed, a demo run on that depot
+   can rebase their canon exactly as last night's flagship runs rebased six flagship columns —
+   without the engine changing at all. Flagship is the safe place to demo precisely because its
+   canon is already due to be reset.
+2. **The bridge now refuses to collide with a certification.** Before every fire it asks
+   `pg_stat_activity` whether `ottoq_determinism_pair` or `ottoq_ab_pair` is in flight (a pair
+   runs both arms in one transaction, so its rows are invisible until commit — the process list
+   is the only authority), and `--run auto` refuses a run whose `run_by` is `cert_harness`. In
+   loop mode an in-flight pair is a logged skip, capped at thirty in a row; fired once, it is a
+   refusal. So the old "never start a demo run overlapping a round" rule is now enforced in code
+   as well as written down here.
