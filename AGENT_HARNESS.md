@@ -15,7 +15,7 @@ because they do different kinds of damage:
 |---|---|---|
 | what an agent submits | policy dial values, named ops actions | stall assignments, service sequencing |
 | where | `edge-functions/ottoq-orchestrator-agent` (244 lines) | `public.ottoq_submit_external_proposal` — the door |
-| bounded by | a 6-knob whitelist, hard range clamp + drift limit, 3 whitelisted ops actions | the L1 shield (29 active rule codes) and the stall calendar's EXCLUDE constraint |
+| bounded by | a 6-knob whitelist, hard range clamp + drift limit, 3 whitelisted ops actions | the L1 shield (**20 of 29 active rule codes**, at four probe points — `db/checks/0192`) and the stall calendar's EXCLUDE constraint |
 | out-of-bounds goes to | the human queue, `ottoq_ops_approvals` (**50,397 rows**) | a refusal row in `ottoq_decisions` with rule codes |
 | is the safety shield in the path? | **no** — a dial change is not a physical effect (2026-07-30 audit) | **yes, always** — the shield disposes every row |
 | in the certification verdict? | indirectly (dials are run-scoped policy) | **directly**: `h_prop` and `h_defr` are 2 of the 14 atoms |
@@ -132,6 +132,10 @@ table above.
   train on run outcomes, because the twin replays OTTO-Q's own decisions and would
   tune the objective against our own bugs. That is a documented choice, not a
   missing feature, and it is the opposite of a learning claim.
+- *"A 29-rule safety shield"* — the catalogue declares 29 active; the shield
+  evaluates 20 of them at four probe points (`db/checks/0192`). Say twenty, name the
+  four, and say that six critical invariants are written and unwired. A safety
+  reviewer asks this before they ask anything about throughput.
 - *"Production-proven"*, *quantified savings*, *"guaranteed optimal"* — every
   number on this page is a **twin** number. The D2 A/B result (median turnaround
   150 min vs 180 for FIFO and greedy) is labelled "demonstrated in simulation",
