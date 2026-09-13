@@ -170,3 +170,44 @@ cannot hold it — `param_value` is `numeric` — so it needs a small precedence
 source, seeded with `('cuopt', 'cuopt_fallback')` so the default reproduces today's ordering
 exactly and no canon moves. `ottoq_cuopt_deferrals` and its arming function want the same
 treatment, parameterized by source rather than named for one.
+
+## L-63 — what the solver actually does on a real flagship frame (measured 2026-09-13 05:35 UTC)
+
+Ran the offline route over the captured flagship tick-1 frame (`frame_c1`: 39 vehicles,
+40 charge stalls, **24 of them already busy**), `--states arrived_at_gate`,
+`--default-ready-delta 30`, `--allow-rejection`, OR-Tools 9.15.6755:
+
+| | value |
+|---|---|
+| vehicles in `arrived_at_gate` | 11 |
+| rows that named a stall (`n_planned`) | **5** |
+| rows that abstained | 6 — all six `not_due` |
+| pass 1 / pass 2 status | `FEASIBLE` / `FEASIBLE` |
+| `complete` | **false** |
+| `optima_reached` | `min_tardy` 255, `min_peak` 370 |
+| total tardiness / total flow / site peak | 255 min / 554 min / 370 kW |
+| `deterministic_time` | **4.012026** against a `det_budget_s` of 2.0 |
+| `reproducible` | **true** |
+
+Four things to read correctly, because three of them look like defects and are not:
+
+1. **`deterministic_time` 4.01 against a 2.0 budget is not a budget violation.** The field
+   is the SUM across the lexicographic passes (`forward_proposer.py`: pass1 + pass2), and
+   the budget is per pass. Two passes at the cap is exactly 4.0.
+2. **`complete: false` with both passes `FEASIBLE` means neither pass PROVED its optimum
+   inside the budget.** The plan is the best found, not a proven optimum. So the honest
+   sentence is *"a deterministic-time-bounded solve that returns the best plan it found"* —
+   never "optimal", on this frame size, at this budget.
+3. **`reproducible: true` is independent of `complete`.** Same inputs, same plan, whether or
+   not optimality was proved — which is the property the certification story needs, and the
+   one `R-12` established the leading GPU solver cannot offer at all.
+4. **Five of eleven planned, six abstained as `not_due`, is the objective working.** With 24
+   of 40 stalls busy, the min-peak term defers anything it is not obliged to start; that is
+   what `--default-ready-delta` exists to override when the point of the run is to see the
+   proposer act (`demo/D3_RUNBOOK.md` §2).
+
+And one limitation confirmed rather than found: **`--regime` is live-only**, exactly as its
+help text says. The offline route cannot resolve a regime because it has no run to read a sim
+hour from, so the declared-objective path (`intent/intent_v1.json` → `intent/solve.py` →
+`policies/regime.py`) is exercised only against a live run. That is a real coverage gap for
+G45's wiring claim, not a bug in the flag.
