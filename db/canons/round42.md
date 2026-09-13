@@ -173,7 +173,81 @@ nobody wrote and it passes.
   their newest pair is still pre-purge. They will move to `13e2e154` as each runs. That is
   expected, and it is the residue column reporting a real change in the world — not drift.
 
-## JUDGEMENT
+## JUDGEMENT — 2026-09-13 16:49 UTC (11:49 AM CT). All three predictions held.
 
-*(to be completed when all ten pairs have landed; unschedule the `r42_*` jobs first, then
-read `scripts/round-report.sql` §1–§5 and record P1/P2/P3 against the table above)*
+Ten jobs, ten `succeeded`, 20 arm rows. Nothing in flight at judging (`pg_stat_activity` =
+0 non-idle pair queries, 0 running runs — the cron log is not the authority and was not
+consulted for this). The ten `r42_*` jobs were unscheduled before this section was written.
+
+### §1 ENGINE — nine of nine green, every canon unchanged
+
+| depot | seed | t | scenario | pairs | streak | history | canon_endst | before |
+|---|---|---|---|---|---|---|---|---|
+| 11111111 | 171717 | 48 | busy_day | 8 | **8** | PPPPPPPP | `5a3ec345` | `5a3ec345` ✅ |
+| 11111111 | 171717 | 24 | busy_day | 4 | 4 | PPPP | `dc344d68` | `dc344d68` ✅ |
+| 11111111 | 424242 | 24 | busy_day | 4 | 4 | PPPP | `7fb3eca5` | `7fb3eca5` ✅ |
+| 11111111 | 171717 | 12 | busy_day | 4 | 4 | PPPP | `8b5a0ad4` | `8b5a0ad4` ✅ |
+| 11111111 | 314159 | 12 | busy_day | 4 | 4 | PPPP | `660898c9` | `660898c9` ✅ |
+| 11111111 | 424242 | 12 | busy_day | 4 | 4 | PPPP | `4f1879cf` | `4f1879cf` ✅ |
+| 11111111 | 171717 | 12 | normal_day | 4 | 4 | PPPP | `d801f3ce` | `d801f3ce` ✅ |
+| aacd0bb0 | 239001 | 6 | grid_smoke | 4 | 4 | PPPP | `f37e1d96` | `f37e1d96` ✅ |
+| aacd0bb0 | 424242 | 6 | grid_smoke | 4 | 4 | PPPP | `92c84f61` | `92c84f61` ✅ |
+
+`stale = false` and `inconclusive_pairs = 0` on all nine.
+
+**P1 HELD.** Every engine canon was RE-DERIVED, not merely preserved, from a world
+7,300,205 rows lighter than when it was recorded. The falsifier — an engine column moving —
+did not fire on any column.
+
+**One correction to my own pre-round text, and it is mine.** P1 said the 48-tick streak goes
+"6 → 7". It went 6 → **8**, because when I widened the round I added TWO 48t pairs, not one.
+Worse, the first version of this file said in one place that 48t would gain a pair and in
+another that it was "not in this round" and "keeps its streak of 6 without adding to it" —
+a straight contradiction, written by me, surviving into a committed pre-round record. The
+CANON claim (`5a3ec345` unchanged) is what P1 was actually about and it is untouched by
+this; the arithmetic around it was wrong in both directions before the round even started.
+Recorded rather than quietly corrected, because a prediction file whose own numbers
+disagree is worth less than one that admits it.
+
+### §2 RESIDUE — moved on all seven flagship columns, named `legs`, and ONLY there
+
+| depot | column | canon_fgn before → after | streak | history | sections_moved |
+|---|---|---|---|---|---|
+| 11111111 | all seven | `2d1315b9` → **`13e2e154`** | 48t: 2, others: 1 | 48t `......SS`, others `...S` | **`legs`** |
+| aacd0bb0 | both grid | `13e2e154` → `13e2e154` | **4** | `SSSS` | `NULL` |
+
+**P2 HELD** and **P3 HELD**. The purge moved the residue column on exactly the seven
+columns whose depot lost foreign rows, named the right section, and moved neither
+instrument on the two grid columns — whose residue streak instead grew 3 → 4, because
+nothing about them changed.
+
+The flagship's new `13e2e154` is the same value grid has always carried: four empty
+sections hash identically regardless of depot. Two independently derived columns agree on
+the empty case — a check nobody wrote.
+
+### §3–§5 and 0193's separate proof
+
+| check | result |
+|---|---|
+| §3 `endst` shape | **0 violations over 40 pairs** (30 before the round, 40 after — the denominator grew with the round, so this is a real clean) |
+| §4 fingerprint | matches the `0266` pin `90d490c2…` |
+| §5 replay pairs above the floor | **0** |
+| **0193** — `r42_i` and `r42_j`, two consecutive 48t pairs | **agree with EACH OTHER** on all thirteen compared atoms plus `endst` whole: 2 pairs, 1 distinct value |
+
+0193's bar is stricter than the canon comparison and is the one that matters for the
+48-tick claim: two pairs run 16 minutes apart, both reproducing the same fourteen atoms,
+not merely both matching a stored hash.
+
+### What this round establishes, stated exactly
+
+**Nine of nine engine columns reproduced canons recorded before a 7.3-million-row deletion,
+while the hygiene column moved on precisely the seven columns the deletion touched and
+stayed still on the two it did not.** That is `0266`'s split tested against the largest
+deliberate change to this database's contents to date, and it is drawn in the right place.
+
+What it does NOT establish: that the engine is deterministic in general (that is what every
+round tests, and this one adds one more round of evidence to each column, no more); that
+the space the purge freed has been returned (it has not — G23's VACUUM/REINDEX is still
+open); or anything about the columns' behaviour under a purge that touches `visit_needs` or
+`dispatches`, which are not in the retention allowlist and whose `fgn` sections have
+therefore never been exercised by a purge at all.
