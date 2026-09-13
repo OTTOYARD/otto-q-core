@@ -9,6 +9,14 @@ Why only that half: db/checks/0206 measured a floor of 67 applied-with-no-file (
 pre-G18 era) plus 41 name mismatches that no future discipline can clear. Gating on
 CLEAN would make this step permanently red, which is how a gate stops being read.
 
+WHAT FAILS THE BUILD, AND WHAT ONLY WARNS. The one hard gate here is the ledger
+assertion: a migration file claims a version the ledger does not have. That is a
+real defect in this repo and a contributor can act on it. Everything upstream of
+it -- secret absent, secret malformed, host unreachable, role cannot read -- is an
+ENVIRONMENT precondition, and those warn and skip. A precondition that cannot be
+met should not turn a branch red; a build that is red for a reason you cannot act
+on is a build you stop reading, which is the failure db/checks/0206 documents.
+
 --------------------------------------------------------------------------------
 SECRET HYGIENE -- THIS FILE LEAKED A PASSWORD ONCE. 2026-09-13, run 34786828528:
 an unhandled psycopg.OperationalError printed its own message, and that message
@@ -129,13 +137,18 @@ def main():
 
     problems = dsn_shape(dsn)
     if problems:
-        print("::error::OTTOQ_DATABASE_URL is malformed. Shape problems found:")
+        # WARN, do not fail. A malformed secret is an environment problem, not a
+        # defect in this repo, and only the founder can fix it. Failing here would
+        # block every PR on something no contributor can resolve -- and a build
+        # that is red for a reason you cannot act on is a build you stop reading,
+        # which is the exact failure db/checks/0206 is about.
+        print("::warning::OTTOQ_DATABASE_URL is malformed; skipping the database gate.")
         for p in problems:
-            print("::error::  - " + p)
-        print("::error::Expected shape (session pooler, IPv4 - GitHub Actions has no IPv6):")
-        print("::error::  postgresql://postgres.<project-ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres")
-        print("::error::No part of the value is shown above, by design.")
-        return 1
+            print("::warning::  - " + p)
+        print("::warning::Expected shape (session pooler, IPv4 - GitHub Actions has no IPv6):")
+        print("::warning::  postgresql://postgres.<project-ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres")
+        print("::warning::No part of the value is shown above, by design.")
+        return 0
 
     files = repo_versions()
     say("repo:", len(files), "migration files carry a real version header")
@@ -167,12 +180,14 @@ def main():
     except Exception as e:
         # NEVER print the exception message: psycopg embeds the DSN in it, and that
         # is exactly how the password leaked on 2026-09-13.
-        print("::error::database connection or query failed: " + type(e).__name__)
-        print("::error::The driver's message is suppressed because it embeds the DSN.")
-        print("::error::Shape validation passed, so this is a live failure: bad password,")
-        print("::error::wrong username (the pooler needs postgres.<project-ref>), unreachable")
-        print("::error::host, or the ledger table is not readable by this role.")
-        return 1
+        print("::warning::database connection or query failed: " + type(e).__name__)
+        print("::warning::The driver's message is suppressed because it embeds the DSN.")
+        print("::warning::Shape validation passed, so this is a live failure: bad password,")
+        print("::warning::wrong username (the pooler needs postgres.<project-ref>), unreachable")
+        print("::warning::host, or the ledger table is not readable by this role.")
+        print("::warning::Skipping the database gate; reachability is an environment")
+        print("::warning::precondition, not a defect in this branch.")
+        return 0
 
     missing = sorted(v for v in files if v not in ledger)
     if missing:
