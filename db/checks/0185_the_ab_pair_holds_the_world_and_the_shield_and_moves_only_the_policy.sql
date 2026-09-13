@@ -17,9 +17,14 @@
 -- 1. EVERY A/B VERDICT, newest first: outcome, what moved, and the leak.
 --    stall_sources says who decided each enacted stall assignment. For seat 0,
 --    local_heuristic is OTTO-Q's own in-tick rule; for a baseline seat the fallback
---    stamps the seat, so a fifo arm must read fifo + reservation_* and nothing else
---    (0261 A5). If it reads anything else, the seat leaked and the number is not a
---    comparison.
+--    stamps the seat. MEASURED 2026-09-13 (the first flagship pairs): every arm also
+--    carries 13 gate_intake decisions onto STAGING stalls with no source -- the arrival
+--    intake at ticks 1-2, a kernel step identical in every arm -- and stall_sources
+--    counts those under local_heuristic too. So read §1b, which splits by verb: under a
+--    baseline seat the assign_stall rows must be the seat + reservation_* and nothing
+--    else (fifo 125 / greedy 122 / OTTO-Q heuristic 0 on 2026-09-13). 0261 A5 holds on
+--    the grid because the grid has no gate_intake decisions; at flagship it is §1b that
+--    carries the assertion.
 -- =========================================================================
 WITH v AS (
   SELECT r.sim_run_id, r.started_at, r.validation_status, (r.validation_notes::jsonb) AS j
@@ -36,6 +41,31 @@ SELECT started_at, j->>'outcome' AS outcome, validation_status AS instrument,
        j->'arm_a'->'blocked' AS a_blocked,      j->'arm_b'->'blocked' AS b_blocked,
        (j->>'ab_group_id')::uuid AS ab_group_id
   FROM v ORDER BY started_at DESC LIMIT 20;
+
+-- =========================================================================
+-- 1b. WHO DECIDED EACH ENACTED STALL ASSIGNMENT, by verb and source, for the arms of
+--     the newest pairs. assign_stall rows are the charger policy; gate_intake rows
+--     are the arrival intake onto staging (kernel, every seat). Under a baseline seat
+--     the assign_stall sources must be the seat and reservation_* only.
+-- =========================================================================
+WITH arms AS (
+  SELECT (j->side)->>'run' AS run, (j->side)->>'seat' AS seat, r.started_at
+    FROM public.ottoq_sim_runs r
+    CROSS JOIN LATERAL (SELECT r.validation_notes::jsonb AS j) x
+    CROSS JOIN LATERAL (VALUES ('arm_a'), ('arm_b')) s(side)
+   WHERE r.run_by = 'ab_harness' AND r.validation_notes IS NOT NULL
+     AND j->>'kind' = 'ab_pair' AND j->'arm_a'->>'run' = r.sim_run_id::text
+     AND r.started_at >= now() - interval '7 days'
+)
+SELECT a.seat, left(a.run, 8) AS run, d.proposed_action->>'verb' AS verb,
+       COALESCE(d.proposed_action->>'source', '(none: seat 0 heuristic or kernel intake)') AS src,
+       s.stall_type::text AS stall_type, count(*) AS n
+  FROM arms a
+  JOIN public.ottoq_decisions d ON d.sim_run_id = a.run::uuid
+  LEFT JOIN public.stalls s ON s.id = (d.proposed_action->>'stall_id')::uuid
+ WHERE d.action_context = 'stall_assignment' AND d.outcome_status = 'enacted'
+ GROUP BY 1,2,3,4,5
+ ORDER BY a.seat, a.run, verb, src, stall_type;
 
 -- =========================================================================
 -- 2. THE SCORE TABLE, per group: what the deck may quote, with the run ids.

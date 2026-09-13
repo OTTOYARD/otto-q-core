@@ -1,8 +1,8 @@
 # The twin A/B — OTTO-Q vs FIFO vs greedy on the identical world (V1_DEMO_PLAN D2)
 
-*Rig: `db/migrations/0261`. Reader: `db/checks/0185`. Status: **drafted 2026-09-12, not yet
-applied** — 0261 waits for round 40 to be judged. Nothing below is a result until this
-paragraph says so and a run id sits next to every number.*
+*Rig: `db/migrations/0261` (applied `20260912233647`). Reader: `db/checks/0185`. Status:
+**live; first flagship comparison judged 2026-09-13 00:21 UTC** — results below, every number
+with its run id; the full write-up is `db/canons/ab_busy_day_424242_12t.md`.*
 
 ## What "only the policy differs" means here, precisely
 
@@ -100,7 +100,28 @@ SELECT public.ottoq_ab_pair(424242, 12, 'busy_day', '11111111-1111-1111-1111-111
 Never overlapping a certification pair on the same depot; `pg_stat_activity` is the only
 authority for in-flight.
 
-## Results
+## Results — busy_day / 424242 / 12t, Nashville Flagship (2026-09-13 00:21 UTC)
 
-*None yet. This section is filled from `db/checks/0185` §2–§4 after 0261 is applied, with
-the ab_group_id and both run ids on every row.*
+Full canon: `db/canons/ab_busy_day_424242_12t.md`. Instrument: the flagship self-test
+(`otto_q`/`otto_q`, group `d025d7f9…`, runs `36caa0c4`/`6a8c9662`) is byte-identical on all
+fifteen atoms; the `otto_q`/`fifo` comparison run twice (group `1e683534…`, runs
+`b175aa13`/`0b92aa42` and `c4687665`/`64489387`) reproduces byte for byte per seat (0185 §4).
+Same 116 arrivals in every arm (`h_arr` identical); under a baseline seat every non-reservation
+charger assignment is the seat's (fifo 125, greedy 122, OTTO-Q heuristic 0).
+
+| metric | otto_q | fifo | greedy |
+|---|---|---|---|
+| decisions / enacted | 1442 / 1175 | 1487 / 1221 | 1477 / 1211 |
+| shield refusals (overrides / violations / critical) | 6 / 6 / 0 | 6 / 6 / 0 | 6 / 6 / 0 |
+| peak kW (% of 2,500 cap) | 456.6 (18.3%) | 451.7 (18.1%) | 476.1 (19.0%) |
+| vehicles turned around in 6 h | 47 | 45 | 49 |
+| median turnaround, min | **150** | 180 | 180 |
+| ready for departure at tick 12 (% of 116) | 42.2% | 40.5% | 44.0% |
+| idling on a finished charger at tick 12 | **4** | 9 | 8 |
+
+Reading: OTTO-Q turns a vehicle around 30 minutes faster at the median and leaves half as
+many vehicles parked on finished chargers, with fewer decisions; greedy readies two more
+vehicles by the end of the window at the highest peak; FIFO is slowest. Safety is identical
+by construction. The separation on volume is small in a six-hour window with no redeploys;
+longer horizons are the next measurement. Runs `otto_q` vs `greedy`: `6f8980fd`/`4c5de6a5`
+(group `c7f1ae81…`).
