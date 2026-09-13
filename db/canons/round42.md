@@ -126,7 +126,54 @@ round 25 did wrong. Recorded for its own change.
 
 ---
 
+## INTERIM — pair `a` landed 14:46 UTC, and it is the decisive one
+
+`r42_a_busy_314159_12`, one pair, `validation_status = passed`. Read against the table
+above, which was committed before it fired:
+
+| | predicted | measured |
+|---|---|---|
+| **P1** engine column holds | `canon_endst` stays `660898c9`, green, streak 3 → 4 | `660898c9`, **green**, streak **4**, history `PPPP` ✅ |
+| **P2** residue moves, names `legs` | `canon_fgn` leaves `2d1315b9`; `sections_moved` = `legs` | `canon_fgn` → **`13e2e154`**, `sections_moved` = **`legs`**, history `...S` ✅ |
+
+**P1 is the one that mattered and it held.** The engine reproduced a canon recorded BEFORE
+the purge, byte-identical, from a world 7,300,205 rows lighter. The falsifier this round
+was built around — an engine column moving — did not fire.
+
+### The mechanism, read from the pair's own `endst` rather than inferred
+
+```
+legs.fgn         {"h": "d41d8cd98f00b204e9800998ecf8427e", "n": 0}
+bookings.fgn     {"h": "d41d8cd98f00b204e9800998ecf8427e", "n": 0}
+visit_needs.fgn  {"h": "d41d8cd98f00b204e9800998ecf8427e", "n": 0}
+dispatches.fgn   {"h": "d41d8cd98f00b204e9800998ecf8427e", "n": 0}
+legs.vis         {"h": "fb1d896a0900d740447d57f2cdb7f195", "n": 685}
+```
+
+`d41d8cd98f00b204e9800998ecf8427e` is the md5 of the empty string. All four foreign
+sections are now genuinely empty — the nine legs are gone and nothing replaced them — while
+the run's own 685 legs are untouched. That is the split doing exactly what `0266` claims:
+the half that other runs write went to zero, the half this run writes did not move.
+
+**And an unplanned consistency check falls out of it.** The flagship's new `canon_fgn`
+`13e2e154` is the SAME value both grid columns have carried all along. It has to be: four
+empty sections hash identically regardless of depot, and the grid depot has never had
+foreign residue. Two independently-derived columns agreeing on the empty case is a check
+nobody wrote and it passes.
+
+### What is NOT yet judged
+
+- **P3** (both grid columns unmoved in either instrument) — not tested until `r42_g`/`r42_h`
+  at 16:08/16:14 UTC.
+- **P1 on the other eight columns** — each is tested only when its own pair runs. One column
+  holding is not nine.
+- **`0193`'s separate proof** — `r42_i` and `r42_j` (16:20, 16:36) are two consecutive 48t
+  pairs that must agree with EACH OTHER, not merely with the canon.
+- The seven flagship columns that have not re-run still show `canon_fgn 2d1315b9`, because
+  their newest pair is still pre-purge. They will move to `13e2e154` as each runs. That is
+  expected, and it is the residue column reporting a real change in the world — not drift.
+
 ## JUDGEMENT
 
-*(to be written when the six pairs have landed; unschedule the `r42_*` jobs first, then
+*(to be completed when all ten pairs have landed; unschedule the `r42_*` jobs first, then
 read `scripts/round-report.sql` §1–§5 and record P1/P2/P3 against the table above)*
