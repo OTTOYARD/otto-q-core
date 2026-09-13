@@ -157,9 +157,21 @@ WITH fl AS (
         replay_id; the second survives a future replay that forgets to. And
         neither excludes the two ZERO-INJECTION CONTROL pairs, which are honest
         certification data: `replay` is present with a NULL VALUE on a control,
-        so the obvious `NOT (notes ? 'replay')` would wrongly drop them. */
+        so the obvious `NOT (notes ? 'replay')` would wrongly drop them.
+        THREE clauses, not the two db/checks/0190 specified, and the deviation is
+        deliberate: 0190's predicate reads arm_a only. Read structurally,
+        ottoq_determinism_pair_replay writes 'replay_injected' ONCE, inside the
+        per-arm object built in its 1..2 arm loop, so both arms carry it and
+        today they never disagree (measured: 0 of 500 pairs). But that is a
+        SYMMETRY THE PREDICATE WOULD BE DEPENDING ON WITHOUT ENFORCING -- an
+        asymmetric future injection would leave arm_a at 0 and slip a replay into
+        a canon. Reading both arms costs nothing (measured: the same 7 pairs are
+        excluded either way) and removes the dependency. Two COALESCE'd clauses
+        rather than GREATEST, because GREATEST swallows a NULL and 0193 (iii)
+        names that exact failure. */
      AND (r.validation_notes::jsonb ->> 'replay') IS NULL
      AND COALESCE((r.validation_notes::jsonb -> 'arm_a' ->> 'replay_injected')::int, 0) = 0
+     AND COALESCE((r.validation_notes::jsonb -> 'arm_b' ->> 'replay_injected')::int, 0) = 0
    ORDER BY r.depot_id, r.started_at, r.sim_run_id
 ), keyed AS (
   SELECT p.c_depot, p.t0, p.ok, p.st,
@@ -327,6 +339,7 @@ WITH fl AS (
      --: coincidence rather than a guarantee.
      AND (r.validation_notes::jsonb ->> 'replay') IS NULL
      AND COALESCE((r.validation_notes::jsonb -> 'arm_a' ->> 'replay_injected')::int, 0) = 0
+     AND COALESCE((r.validation_notes::jsonb -> 'arm_b' ->> 'replay_injected')::int, 0) = 0
    ORDER BY r.depot_id, r.started_at, r.sim_run_id
 ), keyed AS (
   SELECT p.c_depot, p.t0, p.st,
@@ -638,9 +651,11 @@ BEGIN
   --:      control, so `NOT (notes ? 'replay')` would drop honest certification
   --:      data and this assertion would catch it.
   SELECT count(*) FILTER (WHERE NOT ((j->>'replay') IS NULL
-                            AND COALESCE((j->'arm_a'->>'replay_injected')::int, 0) = 0)),
+                            AND COALESCE((j->'arm_a'->>'replay_injected')::int, 0) = 0
+                            AND COALESCE((j->'arm_b'->>'replay_injected')::int, 0) = 0)),
          count(*) FILTER (WHERE (j ? 'replay') AND (j->>'replay') IS NULL
-                            AND COALESCE((j->'arm_a'->>'replay_injected')::int, 0) = 0)
+                            AND COALESCE((j->'arm_a'->>'replay_injected')::int, 0) = 0
+                            AND COALESCE((j->'arm_b'->>'replay_injected')::int, 0) = 0)
     INTO v_n, v_bad
     FROM (SELECT DISTINCT ON (r.depot_id, r.started_at) (r.validation_notes::jsonb) AS j
             FROM public.ottoq_sim_runs r
@@ -669,7 +684,8 @@ BEGIN
            ORDER BY r.depot_id, r.started_at, r.sim_run_id) q
    WHERE q.vs <> 'inconclusive'
      AND (q.j->>'replay') IS NULL
-     AND COALESCE((q.j->'arm_a'->>'replay_injected')::int, 0) = 0;
+     AND COALESCE((q.j->'arm_a'->>'replay_injected')::int, 0) = 0
+     AND COALESCE((q.j->'arm_b'->>'replay_injected')::int, 0) = 0;
   SELECT COALESCE(sum(pairs_seen), 0) INTO v_bad
     FROM public.ottoq_cert_matrix('2000-01-01'::timestamptz);
   IF v_n <> v_bad THEN

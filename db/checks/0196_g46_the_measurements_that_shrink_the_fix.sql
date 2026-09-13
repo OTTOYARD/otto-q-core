@@ -243,6 +243,7 @@ SELECT 'ottoq_cert_matrix' AS fn,
 --   about one instrument. 0266 section 1 carries the predicate
 --       AND (validation_notes::jsonb ->> 'replay') IS NULL
 --       AND COALESCE((validation_notes::jsonb->'arm_a'->>'replay_injected')::int,0) = 0
+--       AND COALESCE((validation_notes::jsonb->'arm_b'->>'replay_injected')::int,0) = 0
 --   in BOTH instruments' pair CTE, so the two cannot disagree about which pairs
 --   exist. Verified 2026-09-13 against the live database: 9 pairs carry the key,
 --   7 named a replay_id, 7 injected, and the predicate excludes exactly those 7
@@ -253,6 +254,17 @@ SELECT 'ottoq_cert_matrix' AS fn,
 --   ('{"replay": null}'::jsonb ->> 'replay') IS NULL is also TRUE.
 --   All nine predate the recert floor, so an assertion scoped to the floor would
 --   pass vacuously -- 0266's A10 runs over a wide window for that reason.
+--
+--   THREE CLAUSES, NOT 0190'S TWO, and the extra one is a deliberate deviation.
+--   0190 specified arm_a only. Read structurally, ottoq_determinism_pair_replay
+--   writes 'replay_injected' exactly ONCE, inside the per-arm jsonb_build_object
+--   in its 1..2 arm loop -- so both arms carry it, and measured across all 500
+--   pairs the two arms disagree on ZERO. But an arm_a-only predicate DEPENDS on
+--   that symmetry without ENFORCING it: an asymmetric future injection would
+--   leave arm_a at 0 and slip a replay into a canon. Measured, reading both arms
+--   excludes the same 7 pairs -- so the hardening costs nothing today and removes
+--   the dependency. Two COALESCE'd clauses rather than GREATEST, because GREATEST
+--   swallows a NULL and 0193 blocker (iii) names that exact failure mode.
 --
 --   WHAT THIS DOES NOT DO, said plainly: it does not clean the nine legs. They
 --   are pre-janitor backlog from a run that ended 12h50m before 0089 shipped the
