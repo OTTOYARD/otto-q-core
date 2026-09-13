@@ -1194,6 +1194,31 @@ BEGIN
 END $a$;
 
 -- ---------------------------------------------------------------------------
+-- PRE-APPLY DRY RUNS (APPLYING.md 3b). Every assertion whose SQL could not be
+-- checked by reading was rendered runnable and executed READ-ONLY against the
+-- live database before this file was ever applied. This section exists because
+-- the first draft of A3b would have ABORTED the migration -- a generated literal
+-- had lost its quotes and became a column reference -- and no amount of reading
+-- caught it; a reviewer's live probe did.
+--
+--   A3b  the file's own text, with v_rf -> the live floor, v_sentinel -> its
+--        declared literal, and ottoq_cert_residue (which does not exist yet)
+--        -> an inline equivalent. All eleven perturbations:
+--            own_inert 0 | fgn_inert 0 | columns_examined 9
+--   A9b  same rendering, run against the PRE-image matrix: reconciles 0 of 9.
+--        It can only pass once the new body is installed, which is what makes it
+--        a control rather than a decoration.
+--   A2/A9  0 violations over 60 post-floor arm rows; with one path deliberately
+--        misspelled, 60 of 60 violate -- so the positive control is positive.
+--   A10  7 excluded / 2 controls kept, over the wide window.
+--   A10b against the PRE-image matrix returns 2 (497 vs 490 pairs), 0 after.
+--   C1 of db/checks/0198: 0 shape violations over 30 post-floor pairs.
+--
+-- AND A SCAN FOR THE ROOT CAUSE ACROSS THE WHOLE FILE: no bare __token__
+-- identifier survives outside a string literal anywhere in 1,200 lines.
+-- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
 -- APPLY LOG
 -- (not yet applied)
 -- ---------------------------------------------------------------------------
