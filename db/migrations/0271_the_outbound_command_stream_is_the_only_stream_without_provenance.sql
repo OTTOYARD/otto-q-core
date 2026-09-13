@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913231758
 -- migration-name:    0271_the_outbound_command_stream_is_the_only_stream_without_provenance
 --
 -- 0271  THE OUTBOUND COMMAND STREAM IS THE ONLY STREAM WITHOUT PROVENANCE
@@ -410,5 +410,40 @@ END $post$;
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+-- Applied 2026-09-13 23:17:58 UTC as version 20260913231758 (6:17 PM CT).
+--
+--   ottoq_fleet_pending_commands
+--     pre-image  md5(prosrc) = b8af618b8c9b820db749858690e0375d
+--     post-image md5(prosrc) = 9e71576c141047b136bfd149b1626f05
+--   ottoq_determinism_pair prosrc pin 8a35b8c874fed154cc216140faec0274 unchanged.
+--
+-- LIVE VERIFICATION AFTER APPLY, read back independently of this file's own
+-- assertions:
+--
+--   ottoq_fleet_pending_commands(NULL,NULL,1e6)  ->  0 rows  (was 4, all twin)
+--   ottoq_vehicle_commands data_source           ->  production 1, twin 794,744
+--   trigger ottoq_vehicle_commands_provenance    ->  present, tgenabled = 'O'
+--
+-- DRY RUN. The whole file was executed byte for byte against the live database
+-- inside BEGIN ... ROLLBACK before this apply, per the rule adopted at 0270:
+-- dry-run the file, byte for byte, or do not claim it was dry-run. The FIRST
+-- dry run FAILED, on this file's own P5:
+--
+--   0271 P5: a function takes the whole ottoq_vehicle_commands row
+--
+-- The to_jsonb(c) arm had been widened and had lost its "and this function
+-- reads ottoq_vehicle_commands" predicate, so it matched
+-- twin.ottoq_grid_fixture_create -- a to_jsonb(c) over an unrelated alias in a
+-- function that never touches commands. The predicate is back and the reason
+-- is recorded in P5 itself. Nothing was applied on that attempt.
+--
+-- WHAT THIS FILE FORGOT, recorded here because the omission is the interesting
+-- part: it did not write its own ottoq_cert_lineage row. forces_recert is
+-- COALESCE(l.forces_recert, TRUE), so no row means FORCING, and the recert
+-- floor jumped from 2026-09-12 16:50:23.319089+00 to this migration's own
+-- apply stamp -- restarting every certification column's streak for a change
+-- that adds a column no hash reads. 0272 repairs it and ships the CI guard
+-- (tests/test_migration_hygiene.py::test_recent_migrations_classify_themselves)
+-- that makes the omission impossible to repeat quietly. This was the second
+-- occurrence; 0268 was the first, for 0267.
 -- ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913232252
 -- migration-name:    0272_0271_never_classified_itself_and_the_floor_swallowed_every_column
 --
 -- 0272  0271 NEVER CLASSIFIED ITSELF AND THE FLOOR SWALLOWED EVERY COLUMN
@@ -111,5 +111,24 @@ END $post$;
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+-- Applied 2026-09-13 23:22:52 UTC as version 20260913232252 (6:22 PM CT).
+--
+-- Dry-run byte for byte inside BEGIN ... ROLLBACK first: P1-P3 and A1-A3
+-- passed and the floor came back to 2026-09-12 16:50:23.319089+00.
+--
+-- LIVE VERIFICATION AFTER APPLY:
+--
+--   ottoq_cert_recert_floor()  ->  2026-09-12 16:50:23.319089+00
+--                                  (was 2026-09-13 23:17:58+00, standing on 0271)
+--   ottoq_cert_lineage rows for 0270 / 0271 / 0272  ->  3, all forces_recert = false
+--
+-- 0272's own schema_migrations row is dated after the restored floor and does
+-- not raise it, because its lineage row says FALSE -- which is the whole
+-- mechanism this migration exists to demonstrate working.
+--
+-- The CI guard shipped in the same commit was proven two-sided before that
+-- commit: with 0271 removed from CLASSIFY_EXEMPT the test fails naming exactly
+-- 0271_the_outbound_command_stream_is_the_only_stream_without_provenance.sql;
+-- restored, it passes. An allowlist entry for a file that no longer exists
+-- fails a second test, so the exemption list cannot rot into a hiding place.
 -- ---------------------------------------------------------------------------
