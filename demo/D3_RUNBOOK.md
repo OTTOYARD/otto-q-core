@@ -121,3 +121,58 @@ SELECT ottoq_sim_stop_and_reset('<run>', 'd3_demo complete');
 ```
 
 The run's proposals, decisions and fire-log rows remain (evidence class); quote them by run id.
+
+## 5. Status 2026-09-13 — two live runs, zero rows heard, and exactly why
+
+Both runs are in the ledger; every number below has a run id and re-derives from
+`db/checks/0186`. **The claim on stage is not yet shown.** What is shown is the machinery
+doing its job against a blind proposer, and a precise list of what the proposer was blind to.
+
+| run | hold | fires | rows submitted | rows naming a stall | heard by the shield |
+|---|---|---|---|---|---|
+| `af2def1b` (00:26–01:00 UTC) | OFF — `proposer_hold_enabled` refused by `ottoq_policy_set` (0262) | 3, 4 | 54 | 10 | **0** — 34 superseded, 20 pending |
+| `ccf48af1` (01:17–01:36 UTC, ticked by hand) | ON — 32 arrivals held for one tick | 5, 6 | 36 | 13 | **0** — 29 superseded, 7 pending |
+
+Six defects, found in order, each with its fix or its file:
+
+1. **L-58** — the proposer read neither `stalls[].status` nor `stalls[].vehicle_id`; every stall
+   in the frame was a point at t=0. Fixed in `proposer/forward_proposer.py` (occupied or held
+   stalls are never offered; `n_stalls_busy` on the fire record).
+2. **L-59** — `planned` counted abstain rows the solver emitted for vehicles it gave no charge.
+   Fixed; `planned + abstained == rows`.
+3. **0262** — the one-tick hold's gate key was read by 0259 but never registered, so the
+   runbook's `policy_set` returned `unknown_param` and nothing read the return. Registered;
+   the runbook now sets both keys (gate + `cuopt_first_refusal_max_defers`, whose global tier
+   0152 set to 0) and reads every return.
+4. **L-60** — a staged vehicle usually already holds a booking the frame does not show and is
+   never re-decided; 'pending' on the door never meant 'awaiting the shield'. Bridge gains
+   `--states` (narrow only); fire record carries `serviceable_states`.
+5. **L-61 — the frame hides what decides.** With the hold ON, run 2 held 19 arrivals at tick 1
+   and 6 more at tick 3, and the proposer named stalls for them on time. Every stall it named
+   was, at disposal time, one of: reserved for another vehicle by the reservation optimizer
+   (`stalls.reserved_by`, live), occupied by a vehicle the previous tick assigned and the world
+   tick then plugged in, or — the single "free" stall at tick 3, `f99a8657` — behind a charger
+   whose OCPP `station_state` was **Faulted**. `ottoq_build_decision_frame` carries none of
+   those three facts (stall `status` read `available` on all of them), so the selector's
+   pre-filter — which checks all three — returned NULL every time and the local heuristic
+   disposed. Measured at tick 3: 31 charge stalls occupied, 7 free-but-reserved, 2 faulted,
+   0 offerable. **Kernel fix (next migration, 0263):** the frame carries `reserved_by`,
+   `reservation_expires_at`, the charger `station_state` per stall, and `reserved_stall_id`
+   per vehicle. A proposer that cannot see a reservation cannot be heard at a depot that
+   reserves every stall, and busy_day reserves every stall.
+6. **L-62** — thirteen vehicles, one stall: the kernel raised `INFEASIBLE` and took the bridge
+   down. Fixed: an infeasible frame is an `empty` fire with the solver's words in `error`;
+   `--allow-rejection` lets it plan what fits and abstain, with a reason, on the rest.
+
+**The design question 0263 does not answer, recorded so nobody thinks it does.** The hold
+protects the *vehicle* for one tick; nothing protects the *stall* the proposer named.
+Between the fire and the next decide, the reservation optimizer and the greedy optimizer run
+first and may claim that stall for someone else (0259's `greedy_yields` is per vehicle, not
+per stall). At a saturated depot that is the common case. Either a pending `holds_tick`
+proposal also holds its stall for one tick, or the proposer is heard only when the depot has
+slack. That is a change to the tick path and forces recert; it is a decision, not a patch.
+
+**What did work, and is worth saying:** the hold engaged exactly as 0259 describes (32 held,
+released next tick, no vehicle starved); every fire is a ledger row with its frame hash; the
+door superseded, never lost, a row; and the shield never once had to refuse a bad row because
+its pre-filter saw what the frame did not. That last sentence is the whole finding.

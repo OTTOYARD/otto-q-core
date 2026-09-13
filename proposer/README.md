@@ -112,6 +112,20 @@ hold is holding: unreserved arrivals. `propose(..., serviceable_states=...)` and
 it as `serviceable_states`. The frame-side fix — carry the booking so the proposer can see it — is a
 kernel change and is not made here.
 
+### The frame hides what decides (finding L-61) and an infeasible frame is a fire, not a crash (L-62)
+
+Run `ccf48af1` (2026-09-13, the one-tick hold ON): 36 rows, 13 naming a stall, zero heard. The
+selector (`ottoq_l2_external_proposal`) pre-filters a proposed stall on three facts — no current
+vehicle, no live reservation for another vehicle, charger `station_state = 'Available'` — and the
+frame carries only the first (`vehicle_id`). Every stall the proposer named was reserved for
+someone else, freshly occupied, or behind a **Faulted** charger, and the frame said `available`
+for all of them. Until the frame carries `reserved_by`, `reservation_expires_at` and the charger
+state per stall (kernel migration, not made here), a proposer at a depot that reserves every
+stall cannot be heard; `demo/D3_RUNBOOK.md` §5 has the per-stall table. And when the frame is
+oversubscribed (13 vehicles, 1 stall) the kernel raises `INFEASIBLE`; the bridge now records
+that as an `empty` fire with the solver's words in `error` and `--allow-rejection` lets it plan
+what fits (L-62).
+
 ## Abstention is first-class
 
 No class-table entry, no readable `soc`, a target at or below the current charge, or no point

@@ -65,3 +65,45 @@ SELECT public.ottoq_policy_get('af2def1b-8413-4eba-a434-637444b06bb9', 'proposer
        (SELECT count(*) FROM public.ottoq_cuopt_deferrals WHERE sim_run_id = 'af2def1b-8413-4eba-a434-637444b06bb9') AS deferral_rows,
        (SELECT jsonb_object_agg(param_key, param_value) FROM public.ottoq_policy_params
          WHERE scope_type = 'run' AND scope_id = 'af2def1b-8413-4eba-a434-637444b06bb9') AS run_params;
+
+-- =========================================================================
+-- 2. RUN 2: ccf48af1-0507-4a80-ac26-ec7a303c8826 (hold ON after 0262, ticked by hand
+--    between fires). MEASURED 2026-09-13 01:36 UTC: 32 holds (19 at tick 1, 6 at tick 3,
+--    7 more); fire 5 = 23 rows / 12 stall rows, fire 6 = 13 rows / 1 stall row; door
+--    statuses 29 superseded / 7 pending; forward_lex decisions 0. Stall decisions over the
+--    run: 38 local enacted, 24 reservation_honoured, 1 greedy_constrained, 24 noop.
+-- =========================================================================
+SELECT (SELECT count(*) FROM public.ottoq_cuopt_deferrals WHERE sim_run_id = 'ccf48af1-0507-4a80-ac26-ec7a303c8826') AS holds,
+       (SELECT jsonb_agg(jsonb_build_object('fire', f.fire_id, 'tick', f.tick_seq, 'rows', f.n_submitted, 'planned', f.n_planned,
+               'door', (SELECT jsonb_object_agg(s, n) FROM (SELECT e.status s, count(*) n FROM public.ottoq_external_proposals e
+                                                            WHERE e.proposal_id = ANY (f.proposal_ids) GROUP BY 1) y)) ORDER BY f.fire_id)
+          FROM public.ottoq_proposer_fire_log f WHERE f.sim_run_id = 'ccf48af1-0507-4a80-ac26-ec7a303c8826') AS fires,
+       (SELECT count(*) FROM public.ottoq_decisions d WHERE d.sim_run_id = 'ccf48af1-0507-4a80-ac26-ec7a303c8826'
+          AND d.proposed_action->>'source' = 'forward_lex') AS heard,
+       (SELECT jsonb_object_agg(k, n) FROM (SELECT COALESCE(d.proposed_action->>'source','<local>')||'|'||d.outcome_status k, count(*) n
+          FROM public.ottoq_decisions d WHERE d.sim_run_id = 'ccf48af1-0507-4a80-ac26-ec7a303c8826'
+           AND d.action_context = 'stall_assignment' GROUP BY 1) z) AS stall_decisions;
+
+-- 2b. WHY THE SELECTOR SAID NO (L-61). For every stall row fires 5 and 6 named: the three
+--     facts ottoq_l2_external_proposal checks and ottoq_build_decision_frame does not carry.
+--     Read AFTER the run: current_vehicle_id and reserved_by are as the world left them; the
+--     frame the proposer saw said status='available', vehicle_id=null for every one of them.
+--     MEASURED at tick 3: 31 occupied, 7 free-but-live-reserved, 2 charger Faulted (one of
+--     them f99a8657, the only stall the tick-3 fire could name), 0 offerable.
+SELECT f.fire_id, left(e.entity_id::text, 8) AS veh, left(e.proposal->>'stall_id', 8) AS named_stall, e.status AS door_status,
+       s.status AS frame_said, left(s.current_vehicle_id::text, 8) AS occupied_by, left(s.reserved_by::text, 8) AS reserved_by,
+       s.reservation_expires_at, c.station_state AS charger_state
+  FROM public.ottoq_proposer_fire_log f
+  JOIN public.ottoq_external_proposals e ON e.proposal_id = ANY (f.proposal_ids)
+  JOIN public.stalls s ON s.id = (e.proposal->>'stall_id')::uuid
+  LEFT JOIN public.ottoq_ocpp_chargers c ON c.charger_id = s.ocpp_charger_id
+ WHERE f.sim_run_id = 'ccf48af1-0507-4a80-ac26-ec7a303c8826'
+   AND NOT COALESCE((e.proposal->>'abstain')::boolean, false)
+ ORDER BY f.fire_id, e.entity_id;
+
+-- 2c. THE HOLD WORKED. Every held vehicle was released the next tick and decided; none
+--     starved (defer_count = 1, cap 1). This is the 0259 mechanism doing what it says.
+SELECT armed_at_tick, count(*) AS held, count(*) FILTER (WHERE state = 'clear') AS released,
+       max(defer_count) AS max_defers
+  FROM public.ottoq_cuopt_deferrals WHERE sim_run_id = 'ccf48af1-0507-4a80-ac26-ec7a303c8826'
+ GROUP BY 1 ORDER BY 1;

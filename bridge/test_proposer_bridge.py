@@ -389,3 +389,21 @@ def test_the_fire_record_names_the_states_it_planned_for():
     assert pb._parse_states("arrived_at_gate, charging_l2") == frozenset(
         {"arrived_at_gate", "charging_l2"})
     assert pb._parse_states(None) is None
+
+
+def test_an_infeasible_frame_is_an_empty_fire_not_a_traceback():
+    """L-62: thirteen vehicles, one stall, a 720-minute horizon -- the kernel
+    raises when it can retain no plan. The bridge records that as an empty fire
+    with the solver's words in `error`, and the loop keeps running."""
+    many = [_vehicle(f"6e7d0b1c-0000-4000-8000-0000000000{i:02d}", soc=20) for i in range(10, 30)]
+    r = pb.fire(_frame(vehicles=many, stalls=[_stall(S1, kind="l2", kw=7)]),
+                CLASS_ROWS, site=SITE, sim_run_id=RUN, depot_id=DEPOT,
+                default_ready_delta_min=30)
+    assert r["fire"]["status"] == "empty" and r["rows"] == []
+    assert "declined the frame" in r["fire"]["error"]
+    # and the same frame WITH rejection allowed plans what fits and abstains on the rest
+    ok = pb.fire(_frame(vehicles=many, stalls=[_stall(S1, kind="l2", kw=7)]),
+                 CLASS_ROWS, site=SITE, sim_run_id=RUN, depot_id=DEPOT,
+                 default_ready_delta_min=30, allow_rejection=True)
+    assert ok["fire"]["status"] == "proposed"
+    assert len(ok["rows"]) == len(many)

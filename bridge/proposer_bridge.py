@@ -202,6 +202,18 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
         record.update(status="empty", n_rows=0, n_planned=0, n_abstained=0,
                       n_deferred=0, solver=None, error=str(exc))
         return {"rows": [], "fire": record}
+    except RuntimeError as exc:
+        #: L-62: the kernel raises RuntimeError when the model is INFEASIBLE and
+        #: there is no previous plan to retain -- measured on run ccf48af1 at
+        #: tick 3: 13 waiting vehicles, ONE free stall, a 720-minute horizon.
+        #: That is a fact about the site, not a fault in the loop: with
+        #: allow_rejection off the solver may decline the whole frame, and the
+        #: fire record says so. "Invoked, could not serve the frame" is a ledger
+        #: fact exactly like an abstention; a traceback is not.
+        record.update(status="empty", n_rows=0, n_planned=0, n_abstained=0,
+                      n_deferred=0, solver=None,
+                      error=f"solver declined the frame: {exc}")
+        return {"rows": [], "fire": record}
 
     rows = list(result.get("proposals") or [])
     for row in rows:
@@ -407,7 +419,8 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              max_fires: int | None = None, log=print,
              default_ready_delta_min: int = DEFAULT_READY_DELTA_MIN,
              start_within_min: int = DEFAULT_START_WITHIN_MIN,
-             serviceable_states: frozenset[str] | None = None) -> list[dict]:
+             serviceable_states: frozenset[str] | None = None,
+             allow_rejection: bool = False) -> list[dict]:
     """Fetch → propose → submit, once or in a loop while the run is running.
 
     Every fire is committed in its own transaction so the door's tick_seq stamp
@@ -437,7 +450,8 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                               max_assets=max_assets, det_budget_s=det_budget_s,
                               default_ready_delta_min=default_ready_delta_min,
                               start_within_min=start_within_min,
-                              serviceable_states=serviceable_states)
+                              serviceable_states=serviceable_states,
+                              allow_rejection=allow_rejection)
                 rows, record = result["rows"], result["fire"]
                 record["tick_count_at_fetch"] = run["tick_count"]
                 receipt: dict[str, Any] = {"fire": record}
@@ -513,6 +527,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--start-within", type=int, default=DEFAULT_START_WITHIN_MIN,
                     help="submit only charges the plan starts within this many minutes; "
                          "later ones abstain with their planned start")
+    ap.add_argument("--allow-rejection", action="store_true",
+                    help="let the solver return a plan for the vehicles it CAN serve and "
+                         "abstain, with a reason, on the rest -- instead of declining an "
+                         "oversubscribed frame outright (recorded on the fire record)")
     ap.add_argument("--states", default=None,
                     help="comma-separated SUBSET of the serviceable states to plan for "
                          "(narrows; default all four). D3: arrived_at_gate is the "
@@ -537,7 +555,8 @@ def main(argv: list[str] | None = None) -> int:
                                 interval_s=args.interval_s, max_fires=args.max_fires,
                                 default_ready_delta_min=args.default_ready_delta,
                                 start_within_min=args.start_within,
-                                serviceable_states=_parse_states(args.states))
+                                serviceable_states=_parse_states(args.states),
+                                allow_rejection=args.allow_rejection)
             if args.json_out:
                 Path(args.json_out).write_text(json.dumps(receipts, indent=1, default=str))
             return 0
@@ -548,7 +567,8 @@ def main(argv: list[str] | None = None) -> int:
                       max_assets=args.max_assets, det_budget_s=args.det_budget,
                       default_ready_delta_min=args.default_ready_delta,
                       start_within_min=args.start_within,
-                      serviceable_states=_parse_states(args.states))
+                      serviceable_states=_parse_states(args.states),
+                      allow_rejection=args.allow_rejection)
         sql = emit_sql(result, sim_run_id=args.run, depot_id=args.depot,
                        ttl_seconds=args.ttl, via=args.via)
         if args.emit_sql:
