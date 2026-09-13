@@ -586,7 +586,7 @@ GRANT EXECUTE ON FUNCTION public.ottoq_cert_residue(timestamptz)
    TO postgres, anon, authenticated, service_role;
 
 COMMENT ON FUNCTION public.ottoq_cert_residue(timestamptz) IS
-'0266 (G46). The half of endst that ottoq_cert_matrix no longer streaks: the four fgn sections, which count OTHER runs'' rows left in live states at this depot. Its own canon, its own streak, its own history. A break here is a HYGIENE finding (G13''s janitor), not a determinism finding -- measured 2026-09-13, these sections are identical between arm_a and arm_b in 446 of 446 pairs, so they have never once been evidence about the engine. sections_moved names which of the four differ from the canon, so the finding is actionable. Read this beside ottoq_cert_matrix in every round report -- scripts/round-report.sql prints both plus the shape check, and exists because a review found this sentence was relying on a report that had no carrier anywhere in the repo. Neither number may be quoted as the other.';
+'0266 (G46). The half of endst that ottoq_cert_matrix no longer streaks: the four fgn sections, which count OTHER runs'' rows left in live states at this depot. Its own canon, its own streak, its own history. A break here is a hygiene finding OR a change in the engine''s own cleanup, reset or supersede path -- it is NOT attributable to the janitor by itself, and an earlier version of this comment said it was. The engine demonstrably touches foreign live rows (db/checks/0187 §4: four legs that vanished between rounds 40 and 41 were closed by a later run''s supersede), so a future widening of ottoq_tick_invariance_reset_fleet or ottoq_sim_release_depot to retire foreign rows would land HERE while both arms still agreed and the pair still passed. Before charging a residue break to the janitor, check whether any migration since the last round touched those paths. What IS measured: these sections are identical between arm_a and arm_b in 446 of 446 pairs, so they are not evidence about INTRA-PAIR determinism. sections_moved names which of the four differ from the canon, so the finding is actionable. Read this beside ottoq_cert_matrix in every round report -- scripts/round-report.sql prints both plus the shape check, and exists because a review found this sentence was relying on a report that had no carrier anywhere in the repo. Neither number may be quoted as the other.';
 
 -- ---------------------------------------------------------------------------
 -- 3. LINEAGE. forces_recert = FALSE, and the reasoning has to survive being
@@ -708,7 +708,15 @@ BEGIN
      WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
        AND r.validation_status IS NOT NULL
        AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
-       AND r.started_at >= v_rf) q
+       AND r.started_at >= v_rf
+       --: THE SAME G48 PREDICATE THE SHIPPED BODIES USE. Without it these two
+       --: assertions walk a population the canon does not, and they depend on
+       --: the very coincidence A10's comment says must not be depended on --
+       --: that all nine replay pairs happen to predate the floor. Costs nothing
+       --: today (measured: the same 60 rows) and removes the dependency.
+       AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+       AND COALESCE((r.validation_notes::jsonb->'arm_a'->>'replay_injected')::int, 0) = 0
+       AND COALESCE((r.validation_notes::jsonb->'arm_b'->>'replay_injected')::int, 0) = 0) q
    WHERE (q.e->'visit_needs'->'vis') IS NULL OR (q.e->'bookings'->'vis') IS NULL
       OR (q.e->'legs'->'vis') IS NULL       OR (q.e->'dispatches'->'vis') IS NULL
       OR (q.e->'chargers') IS NULL          OR (q.e->'calibration') IS NULL
@@ -747,7 +755,15 @@ BEGIN
      WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
        AND r.validation_status IS NOT NULL
        AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
-       AND r.started_at >= v_rf) q
+       AND r.started_at >= v_rf
+       --: THE SAME G48 PREDICATE THE SHIPPED BODIES USE. Without it these two
+       --: assertions walk a population the canon does not, and they depend on
+       --: the very coincidence A10's comment says must not be depended on --
+       --: that all nine replay pairs happen to predate the floor. Costs nothing
+       --: today (measured: the same 60 rows) and removes the dependency.
+       AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+       AND COALESCE((r.validation_notes::jsonb->'arm_a'->>'replay_injected')::int, 0) = 0
+       AND COALESCE((r.validation_notes::jsonb->'arm_b'->>'replay_injected')::int, 0) = 0) q
    WHERE NOT (q.e ?& array['visit_needs','bookings','legs','dispatches','chargers','calibration','world'])
       OR (SELECT count(*) FROM jsonb_object_keys(q.e)) <> 7
       OR NOT ((q.e->'visit_needs') ?& array['vis','fgn'])
@@ -789,6 +805,19 @@ BEGIN
   IF v_bad > 0 THEN
     RAISE EXCEPTION '0266 A9b: % column(s) where a shipped function''s canon digest disagrees with an independent recomputation', v_bad;
   END IF;
+  --: AND IT MUST HAVE EXAMINED ALL NINE. The join above is an INNER join on
+  --: last_run_a: a column whose arm_a row is absent -- purged, or a future
+  --: change to which arm's row survives -- drops out silently and A9b passes on
+  --: the remainder. That is the vacuity A0 exists to prevent, and A9b was the
+  --: one assertion in the suite without the guard.
+  SELECT count(*) INTO v_n
+    FROM public.ottoq_cert_matrix(v_rf) m
+    JOIN public.ottoq_cert_residue(v_rf) s
+      ON s.depot=m.depot AND s.seed=m.seed AND s.ticks=m.ticks AND s.scenario=m.scenario
+    JOIN public.ottoq_sim_runs r ON r.sim_run_id = m.last_run_a;
+  IF v_n <> 9 THEN
+    RAISE EXCEPTION '0266 A9b: reconciled % column(s), expected 9 -- the check ran on a subset', v_n;
+  END IF;
 
   --: A4. THE TWELVE OTHER ATOMS SURVIVED THE COPY. Section 1 claims the body is
   --:     the live one except for the split and the G48 predicate, and until now
@@ -815,16 +844,28 @@ BEGIN
     END IF;
   END LOOP;
 
-  --: A3. THE CONTROL, MADE DISCRIMINATING. The old A3 asserted the grid columns
-  --:     were still 3/3 green -- which they were BEFORE this file, at their
-  --:     ceiling, so no weakening could have moved them and the assertion had
-  --:     no power. The real claim is ATTRIBUTABILITY: this change must improve
-  --:     exactly the columns that were being rebased by foreign residue, and no
-  --:     others. So compute the OLD digest alongside the new one, run the same
-  --:     streak logic over both, and assert the difference set exactly.
-  --:     Under the maximal weakening the reviewer simulated -- the endst
-  --:     conjunct deleted entirely -- the grid columns would also improve, and
-  --:     this fires.
+  --: A3. ATTRIBUTABILITY, AND ONLY THAT -- said plainly because the previous two
+  --:     versions of this assertion each claimed to be the control against a
+  --:     blanket weakening and neither was.
+  --:
+  --:     What it does: computes the OLD digest alongside the new one, runs the
+  --:     same streak logic over both, and asserts the difference set exactly --
+  --:     7 flagship columns improved, 0 others improved, 0 regressed. That is
+  --:     worth asserting: it fires if a NON-flagship column improves, which is
+  --:     one real shape a careless change could take.
+  --:
+  --:     WHAT IT CANNOT DO, and the second reviewer proved it by simulation
+  --:     after the rewrite was supposed to have fixed exactly this: it has NO
+  --:     POWER against a blanket weakening. Both grid columns sit at their
+  --:     ceiling before this file (n_old = 3 = pairs_seen), so `n_new > n_old`
+  --:     is unsatisfiable for them under ANY change -- the same ceiling defect
+  --:     the first A3 was convicted for, surviving a rewrite aimed at it.
+  --:     Simulated on live data: the real split gives 7/0/0, and deleting the
+  --:     endst conjunct entirely gives the identical counters.
+  --:     The defence against a blanket weakening is A3b (sensitivity), A4 (the
+  --:     thirteen conjuncts pinned in the installed body) and A9b (the shipped
+  --:     digests reconciled independently). A3 is a one-sided count and is
+  --:     labelled as one.
   WITH fl AS (SELECT v_rf AS rf),
   pair AS (
     SELECT DISTINCT ON (r.depot_id, r.started_at)
@@ -885,6 +926,55 @@ BEGIN
   END IF;
   IF v_worse > 0 THEN
     RAISE EXCEPTION '0266 A3: % column(s) got WORSE under the split', v_worse;
+  END IF;
+
+  --: A3b. THE SENSITIVITY CONTROL -- the direction A3 cannot fail in.
+  --:
+  --: A3 counts which columns improved. That is useful and it is NOT a defence
+  --: against a blanket weakening, for the reason stated above it. The question
+  --: a control has to answer is different and sharper: DOES THE DIGEST ACTUALLY
+  --: DEPEND ON EACH KEY THE SPLIT ENUMERATES?
+  --:
+  --: So perturb one path at a time and require the digest to move. If a key were
+  --: dropped from the enumeration -- the exact silent narrowing this migration
+  --: creates by trading an opaque whole-object hash for a list -- then spoiling
+  --: that key would change nothing and its perturbation would equal the truth.
+  --: Nothing else in this suite can see that: A2 sees a NULL, A9 sees the shape
+  --: of what was RECORDED, and neither notices a key the DIGEST ignores.
+  --:
+  --: MEASURED read-only before installing: 9 columns x 7 own keys = 63 distinct
+  --: perturbations, 0 inert; and 9 x 4 fgn keys, 0 inert.
+  WITH canon AS (
+    SELECT m.depot, m.canon_endst, s.canon_fgn,
+           (r.validation_notes::jsonb)->'arm_a'->'endst' AS e
+      FROM public.ottoq_cert_matrix(v_rf) m
+      JOIN public.ottoq_cert_residue(v_rf) s
+        ON s.depot=m.depot AND s.seed=m.seed AND s.ticks=m.ticks AND s.scenario=m.scenario
+      JOIN public.ottoq_sim_runs r ON r.sim_run_id = m.last_run_a)
+  SELECT count(*) FILTER (WHERE md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text) = ANY(ARRAY[
+             md5(jsonb_build_object('visit_needs', to_jsonb(__0266_sentinel__::text), 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', to_jsonb(__0266_sentinel__::text), 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', to_jsonb(__0266_sentinel__::text), 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', to_jsonb(__0266_sentinel__::text), 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', to_jsonb(__0266_sentinel__::text), 'calibration', e->'calibration', 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', to_jsonb(__0266_sentinel__::text), 'world', e->'world')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'vis', 'bookings', e->'bookings'->'vis', 'legs', e->'legs'->'vis', 'dispatches', e->'dispatches'->'vis', 'chargers', e->'chargers', 'calibration', e->'calibration', 'world', to_jsonb(__0266_sentinel__::text))::text)])),
+         count(*) FILTER (WHERE md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', e->'bookings'->'fgn', 'legs', e->'legs'->'fgn', 'dispatches', e->'dispatches'->'fgn')::text) = ANY(ARRAY[
+             md5(jsonb_build_object('visit_needs', to_jsonb(__0266_sentinel__::text), 'bookings', e->'bookings'->'fgn', 'legs', e->'legs'->'fgn', 'dispatches', e->'dispatches'->'fgn')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', to_jsonb(__0266_sentinel__::text), 'legs', e->'legs'->'fgn', 'dispatches', e->'dispatches'->'fgn')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', e->'bookings'->'fgn', 'legs', to_jsonb(__0266_sentinel__::text), 'dispatches', e->'dispatches'->'fgn')::text),
+             md5(jsonb_build_object('visit_needs', e->'visit_needs'->'fgn', 'bookings', e->'bookings'->'fgn', 'legs', e->'legs'->'fgn', 'dispatches', to_jsonb(__0266_sentinel__::text))::text)])),
+         count(*)
+    INTO v_n, v_bad, v_worse
+    FROM canon;
+  IF v_worse <> 9 THEN
+    RAISE EXCEPTION '0266 A3b: sensitivity examined % column(s), expected 9 -- the control must not run on a subset', v_worse;
+  END IF;
+  IF v_n > 0 THEN
+    RAISE EXCEPTION '0266 A3b: on % column(s) the own digest is INSENSITIVE to at least one of the seven paths it enumerates -- a key is being silently dropped from the canon', v_n;
+  END IF;
+  IF v_bad > 0 THEN
+    RAISE EXCEPTION '0266 A3b: on % column(s) the foreign digest is INSENSITIVE to at least one of its four paths', v_bad;
   END IF;
 
   --: A5. THE RESIDUE INSTRUMENT COVERS EXACTLY THE SAME COLUMNS -- over the WIDE

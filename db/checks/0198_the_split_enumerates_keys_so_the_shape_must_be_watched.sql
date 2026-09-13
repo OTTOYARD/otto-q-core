@@ -64,6 +64,9 @@ WITH pair AS (
      AND COALESCE((r.validation_notes::jsonb->'arm_b'->>'replay_injected')::int, 0) = 0
    ORDER BY r.depot_id, r.started_at, r.sim_run_id)
 SELECT depot_id, started_at,
+       --: The denominator, carried on every row so the verdict is never read
+       --: without the population it was measured over.
+       (SELECT count(*) FROM pair)                                                  AS post_floor_pairs_examined,
        (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(e) k)                 AS top_keys,
        (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(e->'visit_needs') k)  AS visit_needs_keys,
        (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(e->'bookings') k)     AS bookings_keys,
@@ -80,10 +83,39 @@ SELECT depot_id, started_at,
          IS DISTINCT FROM ARRAY['fgn','vis']
     OR (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(e->'dispatches') k)
          IS DISTINCT FROM ARRAY['fgn','vis'];
+-- 0 ROWS IS NOT THE SAME AS HEALTHY, and the difference matters most exactly
+-- when this check is most needed. C1 reads RECORDED pairs above the recert
+-- floor, so it returns nothing when the shape is fine AND when there are no
+-- post-floor pairs at all. After any forces_recert migration the floor jumps to
+-- that migration and the population is EMPTY until a round runs -- which is
+-- precisely the window in which a fingerprint change is most likely to have just
+-- landed. Read the population count printed below beside the verdict: 0 rows out
+-- of 0 pairs is UNKNOWN, not clean. C2 is the half that still works in that
+-- window, because it reads the function source rather than recorded output; when
+-- C1's population is 0, C2 is the line to trust.
+--
 -- MEASURED 2026-09-13, before 0266 was applied: 0 rows over 30 post-floor pairs.
 -- The live shape is exactly ARRAY['bookings','calibration','chargers',
 -- 'dispatches','legs','visit_needs','world'] with {fgn,vis} under each of the
 -- four sections.
+
+-- C1b. THE POPULATION, PRINTED UNCONDITIONALLY. C1 above returns nothing when
+--      healthy, so it cannot tell you what it looked at. This can.
+SELECT count(*) AS post_floor_pairs_examined,
+       min(started_at) AS oldest, max(started_at) AS newest,
+       public.ottoq_cert_recert_floor() AS recert_floor,
+       (count(*) = 0) AS verdict_is_UNKNOWN_not_clean
+  FROM (SELECT DISTINCT ON (r.depot_id, r.started_at) r.depot_id, r.started_at
+          FROM public.ottoq_sim_runs r
+         WHERE r.run_by = 'cert_harness' AND r.validation_notes IS NOT NULL
+           AND r.validation_status IS NOT NULL
+           AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a') = 'object'
+           AND (r.validation_notes::jsonb)->'arm_a' ? 'endst'
+           AND r.started_at >= public.ottoq_cert_recert_floor()
+           AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+           AND COALESCE((r.validation_notes::jsonb->'arm_a'->>'replay_injected')::int, 0) = 0
+           AND COALESCE((r.validation_notes::jsonb->'arm_b'->>'replay_injected')::int, 0) = 0
+         ORDER BY r.depot_id, r.started_at, r.sim_run_id) p;
 
 -- ---------------------------------------------------------------------------
 -- C2. THE OTHER END OF THE SAME RISK: the fingerprint FUNCTION itself. C1 reads
