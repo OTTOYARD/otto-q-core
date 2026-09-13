@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913122605
 -- migration-name: 0265_the_frame_carries_what_the_selector_filters_on
 --
 -- 0265  THE FRAME CARRIES WHAT THE SELECTOR FILTERS ON
@@ -155,11 +155,14 @@ SELECT '0265-pre', 'function', 'public',
 -- ---------------------------------------------------------------------------
 CREATE TEMP TABLE _pre0265 ON COMMIT DROP AS
 WITH pairs AS (
-  SELECT DISTINCT depot_id, sim_run_id
-    FROM public.ottoq_decision_snapshots
-   WHERE depot_id IS NOT NULL
-   ORDER BY depot_id, sim_run_id
-   LIMIT 20
+  --: The ordered branch needs its own parentheses: without them ORDER BY and
+  --: LIMIT bind to the whole UNION and Postgres refuses at the UNION keyword.
+  --: Attempt 1 of this file died exactly there (APPLY LOG).
+  (SELECT DISTINCT depot_id, sim_run_id
+     FROM public.ottoq_decision_snapshots
+    WHERE depot_id IS NOT NULL
+    ORDER BY depot_id, sim_run_id
+    LIMIT 20)
   UNION ALL
   SELECT '11111111-1111-1111-1111-111111111111'::uuid, NULL::uuid
   UNION ALL
@@ -475,7 +478,21 @@ END $a$;
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
 -- ---------------------------------------------------------------------------
--- Attempt 1: PENDING. Not yet applied. Dry-run record below, filled before apply.
+-- Attempt 1, 2026-09-13 12:25 UTC: REFUSED BY POSTGRES, nothing applied (atomic).
+--   ERROR 42601: syntax error at or near "UNION", line 89. The pre-image capture's
+--   first branch carried ORDER BY + LIMIT without parentheses, so both bound to the
+--   whole UNION. Fixed in place by parenthesising that branch; no other change.
+-- Attempt 2, 2026-09-13 12:26:05 UTC: APPLIED, version 20260913122605. Every
+--   assertion passed (any failure would have rolled the whole file back). Verified
+--   after the apply:
+--     frame prosrc md5   34c60b8f3072df7700f9d3f83b00026d -> f73ff920ae5851217d2f66f27ba01852
+--     frame functiondef  218c55825d4fbea1d9892a8811a4c876 -> f1b235b2dd58f484361837933d6b19f8
+--     delegate           810d5e9962f24e39f9a53aa6edf9ae0d (unmoved, A7)
+--     catalog            1 row for proposer_frame_facts
+--     lineage            forces_recert = false
+--     recert floor       2026-09-12 16:50:23.319089+00 (UNMOVED -- the classification held)
+--     policy rows        0 for proposer_frame_facts (A6's scratch scope left no residue)
+--   Dry-run record below, taken before attempt 1.
 --   DRY RUN 2026-09-13 06:05-06:12 UTC, read-only, each answer read:
 --     P    : 0 pair calls in flight, 0 active r<N>_ cron jobs, 0 runs running/paused.
 --     A0   : frame prosrc 34c60b8f3072df7700f9d3f83b00026d, functiondef
