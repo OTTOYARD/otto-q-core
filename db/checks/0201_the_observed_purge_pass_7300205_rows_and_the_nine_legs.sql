@@ -91,5 +91,33 @@ SELECT pass_deleted FROM public.ottoq_retention_state WHERE table_name = 'engine
 --   0267 (the blocker 0196 did not know about) ... done 14:14 UTC
 --   0268 (the floor 0267 moved) .................. done 14:29 UTC
 --   ONE observed purge pass ...................... done 14:25 UTC, this file
---   round 42 ..................................... next; it judges 0196 P1-P3
+--   round 42 ..................................... IN FLIGHT, 14:44 -> ~16:45 UTC
+-- ---------------------------------------------------------------------------
+--
+-- ROUND 42, FIRST RESULT — 14:46 UTC, and §3's caveat above is now answered.
+--
+-- `r42_a_busy_314159_12` passed. Judged against predictions committed to
+-- db/canons/round42.md BEFORE it fired:
+--
+--   P1 the ENGINE column holds ... canon_endst still 660898c9, green,
+--                                  streak 3 -> 4, history PPPP.  HELD
+--   P2 the RESIDUE column moves .. canon_fgn 2d1315b9 -> 13e2e154,
+--                                  sections_moved = 'legs'.        HELD
+--
+-- §3 above said the surviving green matrix was NOT evidence -- that a stored
+-- hash cannot move when you delete other runs' rows, so "still green after the
+-- purge" was a tautology. THIS is the evidence that sentence was waiting for:
+-- the engine RE-DERIVED 660898c9 from a world 7,300,205 rows lighter. The
+-- canon was not preserved, it was reproduced.
+--
+-- Read from the pair's own endst rather than inferred: all four fgn sections
+-- carry n=0 and hash d41d8cd98f00b204e9800998ecf8427e (the md5 of the empty
+-- string), while legs.vis carries the run's own 685 rows and its own hash.
+--
+-- NOT YET JUDGED, and one column is not nine: P3 (both grid columns, 16:08 and
+-- 16:14 UTC), P1 on the other eight columns, and 0193's proof that r42_i and
+-- r42_j (16:20, 16:36) agree with EACH OTHER. The seven flagship columns that
+-- have not re-run still read canon_fgn 2d1315b9 because their newest pair is
+-- pre-purge; each moves to 13e2e154 as it runs, and that is the residue column
+-- reporting a real change in the world rather than drift.
 -- ---------------------------------------------------------------------------
