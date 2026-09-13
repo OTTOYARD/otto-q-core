@@ -93,6 +93,16 @@ class BridgeError(ValueError):
     """An input the bridge refuses to guess around."""
 
 
+class BridgeIdle(BridgeError):
+    """The depot has nothing to propose into -- a state, not a mistake.
+
+    A scheduled poller finds an idle depot most of the time, and a red job every
+    five minutes teaches the reader to ignore red jobs. `--idle-ok` turns only
+    THIS case into exit 0; an ambiguous depot (two running runs) or a
+    certification arm is still a refusal, because those need a human decision.
+    """
+
+
 # ---------------------------------------------------------------------------
 # Pure half: fire() and the SQL emitter
 # ---------------------------------------------------------------------------
@@ -412,6 +422,60 @@ def _fetch_class_rows(cur) -> list[dict]:
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
+CERT_RUN_BY = "cert_harness"
+# The two rigs that must never share a depot with a live proposer loop. A pair
+# runs both of its arms inside ONE transaction, so its ottoq_sim_runs rows are
+# invisible to this session until it commits -- which is exactly why the house
+# rule says pg_stat_activity is the only authority for "in flight" and why this
+# guard asks the process list, not the run table.
+CERT_CALLS = ("%ottoq_determinism_pair%", "%ottoq_ab_pair%")
+
+
+def _cert_in_flight(cur) -> str | None:
+    """Name the certification rig holding the database, or None if clear."""
+    cur.execute(
+        "SELECT count(*) FROM pg_stat_activity "
+        " WHERE pid <> pg_backend_pid() AND state <> 'idle' "
+        "   AND (query ILIKE %s OR query ILIKE %s)", CERT_CALLS)
+    n = cur.fetchone()[0]
+    if n:
+        return (f"{n} certification call(s) in flight (ottoq_determinism_pair / "
+                f"ottoq_ab_pair); a proposer must not submit into a certification arm")
+    return None
+
+
+def _resolve_run(cur, depot_id: str) -> str:
+    """The depot's one live run id, or a refusal that says which case it hit.
+
+    `--run auto` exists because a scheduled loop cannot know the run id in
+    advance: the operator starts a run, the loop finds it. It refuses rather than
+    guesses in all three ambiguous cases -- no live run, more than one, or a
+    certification arm holding the depot.
+    """
+    cur.execute(
+        "SELECT r.sim_run_id::text, r.run_by, r.status "
+        "  FROM public.ottoq_sim_runs r "
+        " WHERE r.depot_id = %s::uuid AND r.status IN ('running', 'paused') "
+        " ORDER BY r.started_at DESC", (depot_id,))
+    rows = [dict(zip(("sim_run_id", "run_by", "status"), r)) for r in cur.fetchall()]
+    live = [r for r in rows if r["status"] == "running"]
+    if not live:
+        if rows:
+            held = ", ".join(f"{r['sim_run_id']} ({r['status']})" for r in rows)
+            raise BridgeIdle(f"depot {depot_id} has no running run; found {held}. "
+                             f"A paused run is ticked by hand, so the loop does not fire on it")
+        raise BridgeIdle(f"depot {depot_id} has no running or paused run to propose into")
+    if len(live) > 1:
+        named = ", ".join(r["sim_run_id"] for r in live)
+        raise BridgeError(f"depot {depot_id} has {len(live)} running runs ({named}); "
+                          f"pass --run explicitly rather than letting the bridge guess")
+    run = live[0]
+    if run["run_by"] == CERT_RUN_BY:
+        raise BridgeError(f"run {run['sim_run_id']} on depot {depot_id} is a certification "
+                          f"arm (run_by={CERT_RUN_BY}); the proposer never submits into one")
+    return run["sim_run_id"]
+
+
 def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              ttl_seconds: int = DEFAULT_TTL_S, max_assets: int | None = None,
              det_budget_s: float = DEFAULT_DET_BUDGET_S, via: str = "door",
@@ -420,21 +484,44 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              default_ready_delta_min: int = DEFAULT_READY_DELTA_MIN,
              start_within_min: int = DEFAULT_START_WITHIN_MIN,
              serviceable_states: frozenset[str] | None = None,
-             allow_rejection: bool = False) -> list[dict]:
+             allow_rejection: bool = False,
+             max_consecutive_skips: int = 30) -> list[dict]:
     """Fetch → propose → submit, once or in a loop while the run is running.
 
     Every fire is committed in its own transaction so the door's tick_seq stamp
     (0236) names the tick the batch actually landed in. Returns the receipts.
     """
     psycopg = _import_psycopg()
-    sim_run_id = _require_uuid(sim_run_id, "sim_run_id")
+    auto_run = str(sim_run_id).strip().lower() == "auto"
+    if not auto_run:
+        sim_run_id = _require_uuid(sim_run_id, "sim_run_id")
     depot_id = _require_uuid(depot_id, "depot_id")
     receipts: list[dict] = []
     with psycopg.connect(dsn) as conn:
         n = 0
+        skips = 0
         while True:
-            n += 1
             with conn.cursor() as cur:
+                held = _cert_in_flight(cur)
+            if held is not None:
+                # A certification or A/B pair owns the database. Refuse outright
+                # when fired once; when looping, wait it out -- but not forever,
+                # because a scheduled loop that silently naps through its whole
+                # window looks identical to one that worked.
+                if not loop:
+                    raise BridgeError(held)
+                skips += 1
+                log(_canonical({"skipped": held, "consecutive_skips": skips}))
+                if skips >= max_consecutive_skips:
+                    raise BridgeError(f"{held}; skipped {skips} times in a row, giving up")
+                conn.rollback()
+                time.sleep(interval_s)
+                continue
+            skips = 0
+            with conn.cursor() as cur:
+                if auto_run:
+                    sim_run_id = _resolve_run(cur, depot_id)
+                n += 1
                 run = _run_row(cur, sim_run_id)
                 if run["depot_id"].lower() != depot_id:
                     raise BridgeError(f"run {sim_run_id} is on depot {run['depot_id']}, "
@@ -454,6 +541,7 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                               allow_rejection=allow_rejection)
                 rows, record = result["rows"], result["fire"]
                 record["tick_count_at_fetch"] = run["tick_count"]
+                record["run_resolved_by"] = "auto" if auto_run else "argument"
                 receipt: dict[str, Any] = {"fire": record}
                 if via == "batch":
                     cur.execute(
@@ -509,7 +597,9 @@ def main(argv: list[str] | None = None) -> int:
         prog="python3 -m bridge.proposer_bridge",
         description="CP-SAT proposer -> ottoq_submit_external_proposal. "
                     "Offline: --frame + --classes + --emit-sql. Live: --dsn.")
-    ap.add_argument("--run", required=True, help="sim_run_id (uuid)")
+    ap.add_argument("--run", required=True,
+                    help="sim_run_id (uuid), or 'auto' in live mode to resolve the "
+                         "depot's one running non-certification run each fire")
     ap.add_argument("--depot", required=True, help="depot_id (uuid)")
     ap.add_argument("--site", required=True,
                     help="site JSON (bridge/sites/*.json)")
@@ -542,6 +632,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--interval-s", type=float, default=10.0)
     ap.add_argument("--max-fires", type=int, default=None)
     ap.add_argument("--json-out", help="write the fire result (rows + record) here")
+    ap.add_argument("--idle-ok", action="store_true",
+                    help="for schedulers: exit 0 when the depot has no running run to "
+                         "propose into. An ambiguous depot or a certification arm still "
+                         "exits non-zero -- those are decisions, not idleness.")
     args = ap.parse_args(argv)
 
     site = _load_json(args.site)
@@ -579,6 +673,12 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.json_out).write_text(json.dumps(result, indent=1, default=str))
         print(_canonical(result["fire"]), file=sys.stderr)
         return 0
+    except BridgeIdle as exc:
+        if args.idle_ok:
+            print(_canonical({"idle": str(exc)}))
+            return 0
+        print(f"bridge: {exc}", file=sys.stderr)
+        return 2
     except BridgeError as exc:
         print(f"bridge: {exc}", file=sys.stderr)
         return 2

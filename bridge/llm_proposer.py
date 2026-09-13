@@ -64,8 +64,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from bridge.proposer_bridge import (  # noqa: E402
-    ACTION_CONTEXT, ENTITY_TYPE, BridgeError, content_hash, emit_sql,
-    _require_uuid,
+    ACTION_CONTEXT, BATCH, DOOR, ENTITY_TYPE, BridgeError, BridgeIdle,
+    content_hash, emit_sql, _canonical, _cert_in_flight, _fetch_frame,
+    _import_psycopg, _require_uuid, _resolve_run, _run_row,
 )
 from proposer.forward_proposer import (  # noqa: E402
     DEFAULT_SERVICEABLE_STATES, NON_CHARGING_TYPES,
@@ -506,13 +507,81 @@ def fire_llm(frame: dict, *, client: Callable[[str, str, dict], dict], model: st
 # ---------------------------------------------------------------------------
 
 
+def run_live(dsn: str, *, sim_run_id: str, depot_id: str, client: Callable[[str, str, dict], dict],
+             model: str, cap_usd: float, ledger, allow_unpriced: bool = False,
+             max_vehicles: int = 24, max_stalls: int = 40, ttl_seconds: int = 60,
+             via: str = "door", log=print) -> dict:
+    """ONE priced advisory fire against the live engine, through the same door.
+
+    Single-shot on purpose: this proposer costs money per call, so the caller --
+    a scheduled job, usually -- decides the cadence, and every invocation is one
+    ledgered fire with one cap. It inherits the bridge's two guards verbatim: it
+    refuses while a certification or A/B pair is in flight, and it refuses a
+    certification arm's run outright. A model never reaches a certified arm.
+    """
+    psycopg = _import_psycopg()
+    auto_run = str(sim_run_id).strip().lower() == "auto"
+    if not auto_run:
+        sim_run_id = _require_uuid(sim_run_id, "sim_run_id")
+    depot_id = _require_uuid(depot_id, "depot_id")
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            held = _cert_in_flight(cur)
+        if held is not None:
+            raise BridgeError(held)
+        with conn.cursor() as cur:
+            if auto_run:
+                sim_run_id = _resolve_run(cur, depot_id)
+            run = _run_row(cur, sim_run_id)
+            if run["depot_id"].lower() != depot_id:
+                raise BridgeError(f"run {sim_run_id} is on depot {run['depot_id']}, "
+                                  f"not {depot_id}")
+            if run["status"] != "running":
+                raise BridgeIdle(f"run {sim_run_id} is {run['status']}; "
+                                 f"the advisor fires only into a running run")
+            frame = _fetch_frame(cur, depot_id, sim_run_id)
+            result = fire_llm(frame, client=client, model=model, sim_run_id=sim_run_id,
+                              depot_id=depot_id, cap_usd=cap_usd, ledger=ledger,
+                              allow_unpriced=allow_unpriced, max_vehicles=max_vehicles,
+                              max_stalls=max_stalls)
+            rows, record = result["rows"], result["fire"]
+            record["tick_count_at_fetch"] = run["tick_count"]
+            record["run_resolved_by"] = "auto" if auto_run else "argument"
+            record["sim_run_id"] = sim_run_id
+            if via == "batch":
+                cur.execute(
+                    f"SELECT {BATCH}(%s::uuid, %s::uuid, %s, %s::jsonb, %s::jsonb, %s)",
+                    (sim_run_id, depot_id, SOURCE,
+                     _canonical([{"action_context": r["action_context"],
+                                  "entity_type": r["entity_type"],
+                                  "entity_id": r["entity_id"],
+                                  "proposal": r["proposal"]} for r in rows]),
+                     _canonical(record), ttl_seconds))
+                result["batch"] = cur.fetchone()[0]
+            else:
+                ids = []
+                for r in rows:
+                    cur.execute(
+                        f"SELECT {DOOR}(%s::uuid, %s::uuid, %s, %s, %s::uuid, %s::jsonb, %s, %s)",
+                        (sim_run_id, depot_id, r["action_context"], r["entity_type"],
+                         r["entity_id"], _canonical(r["proposal"]), r["source"], ttl_seconds))
+                    ids.append(str(cur.fetchone()[0]))
+                result["proposal_ids"] = ids
+            conn.commit()
+    log(_canonical(record))
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="python3 -m bridge.llm_proposer",
         description="LLM advisor -> door-shaped rows. Offline: --frame + (--answer | a provider).")
     ap.add_argument("--run", required=True)
     ap.add_argument("--depot", required=True)
-    ap.add_argument("--frame", required=True, help="decision frame JSON")
+    ap.add_argument("--frame", help="decision frame JSON (offline route)")
+    ap.add_argument("--dsn", help="postgres DSN (live route); never commit one")
+    ap.add_argument("--idle-ok", action="store_true",
+                    help="for schedulers: exit 0 when the depot has no running run")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--provider", choices=("anthropic", "nvidia", "fake"), default="anthropic")
     ap.add_argument("--answer", help="canned answer JSON (provider=fake); no model is called")
@@ -528,7 +597,6 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json-out")
     args = ap.parse_args(argv)
     try:
-        frame = json.loads(Path(args.frame).read_text())
         if args.provider == "fake" or args.answer:
             if not args.answer:
                 ap.error("provider=fake needs --answer")
@@ -537,6 +605,19 @@ def main(argv: list[str] | None = None) -> int:
             client = AnthropicClient(args.model, effort=args.effort)
         else:
             client = OpenAICompatibleClient(args.model)
+        if args.dsn:
+            result = run_live(args.dsn, sim_run_id=args.run, depot_id=args.depot,
+                              client=client, model=args.model, cap_usd=args.cap_usd,
+                              ledger=SpendLedger(args.spend_file),
+                              allow_unpriced=args.allow_unpriced,
+                              max_vehicles=args.max_vehicles, max_stalls=args.max_stalls,
+                              ttl_seconds=args.ttl, via=args.via)
+            if args.json_out:
+                Path(args.json_out).write_text(json.dumps(result, indent=1, default=str))
+            return 0 if result["fire"]["status"] in ("proposed", "empty") else 3
+        if not args.frame:
+            ap.error("offline mode needs --frame (or use --dsn for the live route)")
+        frame = json.loads(Path(args.frame).read_text())
         result = fire_llm(frame, client=client, model=args.model, sim_run_id=args.run,
                           depot_id=args.depot, cap_usd=args.cap_usd,
                           ledger=SpendLedger(args.spend_file), allow_unpriced=args.allow_unpriced,
@@ -551,6 +632,12 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.json_out).write_text(json.dumps(result, indent=1, default=str))
         print(json.dumps(result["fire"], sort_keys=True, default=str), file=sys.stderr)
         return 0 if result["fire"]["status"] in ("proposed", "empty") else 3
+    except BridgeIdle as exc:
+        if args.idle_ok:
+            print(_canonical({"idle": str(exc)}))
+            return 0
+        print(f"llm_proposer: {exc}", file=sys.stderr)
+        return 2
     except BridgeError as exc:
         print(f"llm_proposer: {exc}", file=sys.stderr)
         return 2

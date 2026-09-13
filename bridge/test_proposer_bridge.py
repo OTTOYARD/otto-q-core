@@ -407,3 +407,121 @@ def test_an_infeasible_frame_is_an_empty_fire_not_a_traceback():
                  default_ready_delta_min=30, allow_rejection=True)
     assert ok["fire"]["status"] == "proposed"
     assert len(ok["rows"]) == len(many)
+
+
+# ---------------------------------------------------------------------------
+# The live loop's two guards, tested with a cursor-shaped fake so CI stays
+# database-free (verify.yml: "no secrets, no database").
+# ---------------------------------------------------------------------------
+
+
+class FakeCur:
+    """Enough of a psycopg cursor for the two read-only guards."""
+
+    def __init__(self, one=None, many=None):
+        self._one, self._many, self.sql = one, many or [], []
+
+    def execute(self, sql, params=None):
+        self.sql.append(" ".join(sql.split()))
+        self.params = params
+
+    def fetchone(self):
+        return self._one
+
+    def fetchall(self):
+        return self._many
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def test_a_clear_process_list_is_not_a_refusal():
+    cur = FakeCur(one=(0,))
+    assert pb._cert_in_flight(cur) is None
+    assert "pg_stat_activity" in cur.sql[0]
+    # self-exclusion matters: the guard's own query matches its own ILIKE
+    assert "pid <> pg_backend_pid()" in cur.sql[0]
+
+
+def test_a_certification_in_flight_is_named_not_guessed():
+    reason = pb._cert_in_flight(FakeCur(one=(2,)))
+    assert reason is not None
+    assert "ottoq_determinism_pair" in reason and "2" in reason
+
+
+def test_auto_resolves_the_depots_one_running_run():
+    cur = FakeCur(many=[(RUN, "proposer_demo", "running")])
+    assert pb._resolve_run(cur, DEPOT) == RUN
+
+
+def test_auto_refuses_a_paused_run_and_says_why():
+    cur = FakeCur(many=[(RUN, "proposer_demo", "paused")])
+    with pytest.raises(pb.BridgeError) as exc:
+        pb._resolve_run(cur, DEPOT)
+    assert "paused" in str(exc.value) and RUN in str(exc.value)
+
+
+def test_auto_refuses_two_running_runs_rather_than_picking_one():
+    other = "0a7d4569-888b-4633-a919-dbc4b8adca30"
+    cur = FakeCur(many=[(RUN, "proposer_demo", "running"),
+                        (other, "ab_harness", "running")])
+    with pytest.raises(pb.BridgeError) as exc:
+        pb._resolve_run(cur, DEPOT)
+    assert RUN in str(exc.value) and other in str(exc.value)
+
+
+def test_auto_never_submits_into_a_certification_arm():
+    cur = FakeCur(many=[(RUN, pb.CERT_RUN_BY, "running")])
+    with pytest.raises(pb.BridgeError) as exc:
+        pb._resolve_run(cur, DEPOT)
+    assert "certification arm" in str(exc.value)
+
+
+def test_auto_on_an_idle_depot_is_a_named_refusal():
+    with pytest.raises(pb.BridgeError) as exc:
+        pb._resolve_run(FakeCur(many=[]), DEPOT)
+    assert "no running or paused run" in str(exc.value)
+
+
+def test_the_guard_query_watches_the_ab_rig_too():
+    assert any("ab_pair" in c for c in pb.CERT_CALLS)
+    assert any("determinism_pair" in c for c in pb.CERT_CALLS)
+
+
+def test_an_idle_depot_is_a_distinct_exception_so_a_scheduler_can_pass_it():
+    with pytest.raises(pb.BridgeIdle):
+        pb._resolve_run(FakeCur(many=[]), DEPOT)
+    with pytest.raises(pb.BridgeIdle):
+        pb._resolve_run(FakeCur(many=[(RUN, "proposer_demo", "paused")]), DEPOT)
+    # ambiguity and a certification arm are NOT idleness -- a human must decide
+    two = [(RUN, "proposer_demo", "running"),
+           ("0a7d4569-888b-4633-a919-dbc4b8adca30", "ab_harness", "running")]
+    with pytest.raises(pb.BridgeError) as amb:
+        pb._resolve_run(FakeCur(many=two), DEPOT)
+    assert not isinstance(amb.value, pb.BridgeIdle)
+    with pytest.raises(pb.BridgeError) as cert:
+        pb._resolve_run(FakeCur(many=[(RUN, pb.CERT_RUN_BY, "running")]), DEPOT)
+    assert not isinstance(cert.value, pb.BridgeIdle)
+
+
+def test_idle_ok_exits_zero_only_for_idleness(monkeypatch, tmp_path, capsys):
+    site = tmp_path / "site.json"
+    site.write_text(json.dumps(SITE))
+
+    def idle(*a, **k):
+        raise pb.BridgeIdle("depot has no running or paused run to propose into")
+
+    monkeypatch.setattr(pb, "run_live", idle)
+    argv = ["--run", "auto", "--depot", DEPOT, "--site", str(site),
+            "--dsn", "postgresql://x", "--idle-ok"]
+    assert pb.main(argv) == 0
+    assert "idle" in capsys.readouterr().out
+
+    def ambiguous(*a, **k):
+        raise pb.BridgeError("depot has 2 running runs")
+
+    monkeypatch.setattr(pb, "run_live", ambiguous)
+    assert pb.main(argv) == 2
