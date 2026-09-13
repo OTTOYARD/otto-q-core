@@ -100,6 +100,25 @@ a known set or does not, there is no safe side: pin it and assert the count
 | 8d | **`dispatch_due_at` coverage is correct, and I nearly filed it as a bug** | 52,817 of 104,957 needs carry a due time — which looks like 50% blindness until you group it: `overnight_hold` 100%, `immediate_dispatch` 100%, `standard` 0%, `tech_hold` 0%. It is populated for exactly the urgency classes that *have* a deadline. A standard visit cannot be late; a tech hold is open-ended. **Recorded as a non-finding on purpose** — the near-miss is the useful part, and it is the same shape as `track_functions='none'`: a ratio that looks alarming until you ask what the denominator means. | closed, no action |
 | 9 | **Cold-start, and segmented charging** | Both reach planning only as durations/derates. Scheduled segments with a per-segment power profile are CP-SAT-only. | not started |
 
+## APPLY ORDER for the next window (written 2026-09-13 05:25 UTC, after round 41)
+
+Nothing below is applied. The preconditions are the standing ones: `pg_stat_activity` clear of
+`ottoq_determinism_pair` / `ottoq_ab_pair`, no `r4*` cron job scheduled, no `ottoq_sim_runs` row
+`running` or `paused`. Verified clean at 05:14 UTC (0 live runs, 0 cert jobs, 0 busy backends).
+
+| # | change | what it fixes | gate / recert | verify with |
+|---|---|---|---|---|
+| 1 | **G46 + G48 in one migration** | the canon rebases when another run's leftover legs move (`0187`), and a replay pair is counted as a certification (`0190`) | same function, same round, same recert conversation — classification is part of the design, not an afterthought | `ottoq_cert_matrix` before/after on the same floor; the nine replay pairs must vanish from `pairs_seen`; `db/checks/0187` §1 and `0190` §1–2 re-run |
+| 2 | **`0263` the frame carries what the selector filters on** | `L-61`: the proposer plans onto stalls that are reserved, just-occupied, or behind a `Faulted` charger | the frame builder IS on the certified tick path (`ottoq_decide_tick` line 32 → `ottoq_capture_decision_snapshot`), but the frame's content is **not** one of the fourteen atoms — exposure is `ottoq_score_run`, `ottoq_certify_run`'s B1–B3 breach checks and the twin digest. Classify from that, with proof | a frame fetched for a live run must carry `reserved_by`, `reservation_expires_at`, `station_state`, `ocpp_charger_id` and a per-vehicle reservation; `proposer/` treats reserved-for-other and `Faulted` as busy; the 14 atoms unchanged in a probe pair |
+| 3 | **`0264` a pending proposal holds the resource it names for one tick** | `L-60` for stalls **and** G47 for service bays (`0188`) — so the mechanism must be **resource-generic**, not stall-specific | run-scoped key defaulting to 0, spliced with md5 pins on `prosrc` and a reversal assertion, exactly as `0259`/`0261` did | with the key off, a probe pair must be byte-identical on all fourteen atoms; with it on, a held proposal's named resource must survive the reservation book, greedy, and the local heuristic for one tick; no vehicle starved |
+| 4 | **round 42** | three flagship streaks to rebuild after G46 resets what it resets | — | `scripts/schedule-round.sql` with `v_round := 42`; judge per `db/canons/round41.md`'s format |
+| 5 | **the replay proof** (Posture B, `0237`/`0239`) | the claim that a nondeterministic proposer can be consumed safely is still unproven end to end | **must use a dedicated seed, never a canon column's key**, until G48 is fixed (`0190`) | `ottoq_proposal_replay_capture` from run `ccf48af1` (90 `forward_lex` rows), then `ottoq_determinism_pair_replay`; `h_prop` non-trivial and equal across arms |
+| 6 | **the live D3 run** | the demo claim itself: an agent proposes, the kernel follows or refuses with a reason | only after 2 and 3; flagship, not grid (`demo/D3_RUNBOOK.md` §6) | `db/checks/0189` afterwards — a `forward_lex` row must read `followed`, or the verdict column must say which of the two zeros it is |
+
+Order matters in exactly two places: 1 before 4 (a round judged against a rebasing canon proves
+nothing), and 2 before 3 before 6 (a hold that protects a resource the proposer cannot see is a
+hold on the wrong resource).
+
 ## P0b — the named carrier of the one uncertified column
 
 **APPLY ORDER for the window after round 38's last pair (15:55 UTC + runtime), `pg_stat_activity` clear:** `0256` (trigger fix, `forces_recert=TRUE`) → `0257` (second floor + catalog pin, `forces_recert=FALSE`) → `0258` (the live-playback refusal, `forces_recert=FALSE`). **The order is not cosmetic:** `0257`'s A6 pins `ottoq_determinism_pair` by md5, so it asserts the state of the tree it was written against and must run before anything else is added. All three carry their own pre-flight and md5 guards, and all three still header `migration-version: PENDING`, which is the in-repo marker that they are drafted and unapplied. **And the CI lesson from 14:32 UTC:** adding any file to `db/migrations/` makes `MIGRATION_LOG.md` and `scripts/check-drift.sql` stale — run `scripts/gen-migration-index.py` and `scripts/gen-drift-sql.sh` in the SAME commit, or `tests/test_migration_hygiene.py` turns the PR red.
