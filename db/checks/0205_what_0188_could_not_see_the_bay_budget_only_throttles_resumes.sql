@@ -1,0 +1,118 @@
+-- 0205  WHAT 0188 COULD NOT SEE: THE BAY BUDGET ONLY THROTTLES RESUMES, AND
+--       THE TWO SECTIONS CONTENDING FOR A SERVICE BAY COUNT DIFFERENT THINGS
+--       (measured 2026-09-13 ~21:30-21:45 UTC / 4:30-4:45 PM CT)
+--
+-- 0188 root-caused G47: ottoq_service_priority is heard, consumed, and loses the
+-- service bay to decide_tick §(4b), which runs earlier in the same tick. It then
+-- offered three candidate fixes and costed them. This file is the mechanism
+-- underneath that verdict, read off the live body, because two of the three
+-- costings were made without it.
+--
+-- ---------------------------------------------------------------------------
+-- 1. THE "ANTI-STARVATION BUDGET" IS NOT A CAP ON WHAT §(4b) TAKES.
+--
+-- §(4b) looks like it restrains itself. Line 686 computes a reservation cap and
+-- line 826 enforces it:
+--
+--   686  v_svc_res_cap := GREATEST(1, CEIL(COALESCE(v_svc_open,0) * v_res_share))::int;
+--   826  IF v_need.stall_type = 'service_bay'
+--          AND v_svc_res_used >= COALESCE(v_svc_res_cap,1) THEN CONTINUE; END IF;
+--
+-- But the counter it tests is only ever incremented for a RESUME:
+--
+--   899  IF COALESCE(v_need.is_resume,false) THEN v_svc_res_used := v_svc_res_used + 1; END IF;
+--
+-- and the comment at 672-683 says so plainly once you read it as written: the
+-- 0003 budget caps "how many of THIS TICK'S admissions per lane may go to
+-- RESUMPTION". It is a fairness rule between resumed and fresh work inside
+-- §(4b). It is NOT a ceiling on how many bays §(4b) consumes in total.
+--
+-- The only thing that stops §(4b) is line 819:
+--
+--   819  IF v_need.stall_type = 'service_bay' AND COALESCE(v_svc_open,0) <= 0 THEN CONTINUE; END IF;
+--   898  v_svc_open := v_svc_open - 1;   -- on every successful admission
+--
+-- i.e. §(4b) is entitled to drain the lane to EXACTLY ZERO before §(5) is asked.
+-- Nothing in the tick reserves anything for the proposer's lane. That is G47's
+-- mechanism stated as code rather than as an outcome.
+--
+-- ---------------------------------------------------------------------------
+-- 2. THE TRAP IN 0188'S OPTION (a), AND IT IS NOT OBVIOUS
+--
+-- The two contending sections do not measure the same resource.
+--
+--   §(4b) gates on v_svc_open, a STAFF-SCALED CAPACITY COUNT (line 667-670):
+--         twin.ottoq_sim_lane_capacity(run,'service_staff', GREATEST(v_svc_phys,1))
+--           - (SELECT count(*) FROM vehicles WHERE ... current_state = 'in_service_bay')
+--         and that function returns GREATEST(1, FLOOR(p_physical * staffing_level * lane_rate)),
+--         or p_physical when the run has no variability profile.
+--
+--   §(5) does not consult v_svc_open at all. It asks for a PHYSICAL STALL:
+--         1004  v_space := ottoq.ottoq_enact_space_assignment(..., 'service_bay', 'service', ...)
+--         and takes the 'NO BAY -> DO NOT ENTER ONE' branch at 1029 when that
+--         returns no booking_id.
+--
+-- Under the default profile these two coincide — staffing_level and the lane
+-- rate are both 1, the flagship depot has 2 physical service bays, so
+-- v_svc_open starts at 2 and there are 2 stalls. They diverge the moment a
+-- scenario varies staffing: FLOOR(2 * 0.5 * 1) = 1 with two stalls still
+-- physically free, and the reverse is reachable too.
+--
+-- SO: 0188's option (a) — "a pending proposal's named resource is held for one
+-- tick" — must hold the PHYSICAL STALL. A floor expressed on v_svc_open (the
+-- obvious one-line change, `<= 0` becomes `<= v_floor` at line 819) is only
+-- equivalent to that while staffing rates are exactly 1. It would silently stop
+-- reserving anything under the variability profiles the twin exists to run.
+-- That is worth knowing BEFORE the migration is written, which is the whole
+-- reason this file exists.
+--
+-- ---------------------------------------------------------------------------
+-- 3. A CORRECTION TO AN INFERENCE I ALMOST RECORDED AS A FINDING
+--
+-- ottoq_depot_staffing_count(flagship,'service_staff') = 1, against 2 physical
+-- service bays. That looks like the binding constraint and it is NOT: the
+-- service path never calls ottoq_depot_staffing_count. Only the WASH path does
+-- (line 662-664), and it asks for 'wash_supervisor', not 'service_staff':
+--
+--   662  v_wash_open := GREATEST(0, LEAST(ottoq_sim_lane_capacity(...,'cleaning_staff',...),
+--   664                                    ottoq_depot_staffing_count(v_depot,'wash_supervisor')) - ...)
+--   667  v_svc_open  := GREATEST(0, ottoq_sim_lane_capacity(...,'service_staff',...) - ...)
+--
+-- So the 'service_staff' row in the staffing table is read by the lane-capacity
+-- function as a RATE KEY inside the variability knobs, which is a different
+-- thing from the depot staffing COUNT of the same name. 0188's "two service
+-- bays and they are taken" is correct; a staffing-starvation story would not
+-- have been. Recorded because the two same-named quantities are an easy and
+-- invisible mistake, and because reading the function body is what caught it.
+--
+-- ---------------------------------------------------------------------------
+-- 4. THE CALENDAR ALREADY LOSES THIS ARGUMENT 1,554 TIMES
+--
+--   SELECT count(*), conflict_kind, resolution, displaced_booked_by
+--     FROM public.space_conflict_ledger WHERE stall_type='service_bay' GROUP BY 2,3,4;
+--   MEASURED: 1,554 · stale_claim_displaced · reality_outranks_plan · otto_q
+--             (281,858 conflicts across all stall types)
+--
+-- Every one of those is the assignment-plus-verification pair doing its job: a
+-- service-bay claim on the calendar that physical reality overruled. It is not a
+-- defect, and it is the reason any reservation added for the proposer must be a
+-- claim on the calendar that the same verification can overrule — not a private
+-- counter in a PL/pgSQL variable that no ledger can see.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THIS CHANGES ABOUT THE THREE CANDIDATE FIXES IN 0188
+--   (a) hold the named resource for one tick — still the best, but it must hold
+--       a physical stall through the booking calendar, not decrement a counter.
+--   (b) let §(5) see what §(4b) did — now looks weaker than 0188 judged it. It
+--       makes the proposer abstain honestly instead of proposing into a wall,
+--       which is an honesty fix, not an influence fix. Under contention the
+--       proposer would still never win, which is the thing G47 is about.
+--   (c) reorder the tick — unchanged: highest risk, forces recert, and it buys
+--       one lane priority over another by fiat rather than by policy.
+--
+-- NOT DRAFTED AS A MIGRATION YET, DELIBERATELY. decide_tick is the tick path,
+-- where APPLYING.md requires a total function and a failure must never abort the
+-- tick, and any change here forces a recertification round. The mechanism is now
+-- established; the migration wants its own window and its own adversarial review,
+-- the way 0269 did — where three lenses convicted two DESIGN defects that my own
+-- review had passed.
