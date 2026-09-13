@@ -362,7 +362,8 @@ repo_manifest(version, name, file) AS (
     ('20260912205301'::text, '0260_every_proposer_fire_is_a_ledger_row'::text, '0260_every_proposer_fire_is_a_ledger_row.sql'::text),
     ('20260912233647'::text, '0261_the_policy_is_what_proposes_the_kernel_disposes'::text, '0261_the_policy_is_what_proposes_the_kernel_disposes.sql'::text),
     ('20260913011239'::text, '0262_the_hold_key_the_setter_refused'::text, '0262_the_hold_key_the_setter_refused.sql'::text),
-    ('20260913122605'::text, '0265_the_frame_carries_what_the_selector_filters_on'::text, '0265_the_frame_carries_what_the_selector_filters_on.sql'::text)
+    ('20260913122605'::text, '0265_the_frame_carries_what_the_selector_filters_on'::text, '0265_the_frame_carries_what_the_selector_filters_on.sql'::text),
+    ('PENDING'::text, '0266_the_canon_stops_being_hostage_to_another_runs_leftovers'::text, '0266_the_canon_stops_being_hostage_to_another_runs_leftovers.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
