@@ -79,9 +79,17 @@ BEGIN
   IF v_busy > 0 THEN
     RAISE EXCEPTION '0266 P: % certification/pair call(s) in flight', v_busy;
   END IF;
-  SELECT count(*) INTO v_jobs FROM cron.job WHERE active AND jobname ~ '^r[0-9]+_';
+  --: The one-shot round jobs (scripts/schedule-round.sql builds 'r<N>_...'), AND
+  --: the standing cert battery, which that regex does not match. It is inactive
+  --: today, so the old predicate passed for a reason unrelated to what it
+  --: claimed; matching on the COMMAND rather than the name means a certification
+  --: path added later is covered without anyone remembering to widen a regex.
+  SELECT count(*) INTO v_jobs FROM cron.job
+   WHERE active AND (jobname ~ '^r[0-9]+_'
+                     OR command ILIKE '%ottoq_determinism_pair%'
+                     OR command ILIKE '%ottoq_cert_battery_step%');
   IF v_jobs > 0 THEN
-    RAISE EXCEPTION '0266 P: % round job(s) still scheduled', v_jobs;
+    RAISE EXCEPTION '0266 P: % certification job(s) still scheduled', v_jobs;
   END IF;
   SELECT count(*) INTO v_live FROM public.ottoq_sim_runs WHERE status IN ('running','paused');
   IF v_live > 0 THEN
@@ -105,11 +113,81 @@ SELECT p.proname, md5(p.prosrc) AS prosrc_md5, md5(pg_get_functiondef(p.oid)) AS
 -- Only ottoq_cert_matrix may move. A8 asserts the other two do not.
 
 -- ---------------------------------------------------------------------------
--- 1. THE MATRIX. Byte-for-byte the live body except for the c_endst expression
---    in `keyed` and its comment. Everything else -- the pair CTE, the key, inc,
---    col, ranked, canon, marked, streak, hist, the final SELECT and its ORDER BY
---    -- is copied verbatim from pg_get_functiondef, so the only variable is the
---    split.
+-- G. THE MD5 GUARD AND THE PRE-IMAGE SNAPSHOT (scripts/APPLYING.md step 2).
+--    ADDED AFTER REVIEW. The first draft had NEITHER for the one function it
+--    replaces, and the review was right to call that a blocker: section S was a
+--    bare SELECT whose result apply_migration discards, with the expected digest
+--    living only in a hand-written comment, and A8 pinned md5 on the two
+--    functions this file must NOT touch while leaving the one it DOES touch
+--    unpinned -- and A8 runs AFTER the replace in any case.
+--
+--    What that combination costs, concretely: if anyone hotfixes
+--    ottoq_cert_matrix in the SQL editor between the moment these digests were
+--    measured and the moment this file runs, CREATE OR REPLACE silently deletes
+--    their fix and there is no snapshot row to recover the body from. That is
+--    exactly the scenario APPLYING.md's step 2 exists for, and 0261, 0265 and
+--    db/migrations/0001_EXAMPLE_template.sql all carry both halves.
+-- ---------------------------------------------------------------------------
+DO $g$
+DECLARE v_src text; v_def text; v_len int; v_n int;
+BEGIN
+  SELECT count(*) INTO v_n FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'ottoq_cert_matrix';
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION '0266 G: expected exactly 1 ottoq_cert_matrix, found % -- an overload would make the replace ambiguous', v_n;
+  END IF;
+  SELECT p.prosrc, md5(pg_get_functiondef(p.oid)), length(p.prosrc)
+    INTO v_src, v_def, v_len
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'ottoq_cert_matrix'
+     AND pg_get_function_identity_arguments(p.oid) = 'p_since timestamp with time zone';
+  IF v_src IS NULL THEN
+    RAISE EXCEPTION '0266 G: no ottoq_cert_matrix(timestamptz) -- the signature this file replaces does not exist';
+  END IF;
+  IF md5(v_src) <> 'f5bb81931feae44871c3ecd86d4f86b4' THEN
+    RAISE EXCEPTION '0266 G: ottoq_cert_matrix prosrc md5 is %, expected f5bb81931feae44871c3ecd86d4f86b4 -- the body moved since this file was written; re-derive the copy before replacing it', md5(v_src);
+  END IF;
+  IF v_def <> '4c00ae1ae666230eb286c7fd864a0717' THEN
+    RAISE EXCEPTION '0266 G: ottoq_cert_matrix functiondef md5 is %, expected 4c00ae1ae666230eb286c7fd864a0717', v_def;
+  END IF;
+  IF v_len <> 5934 THEN
+    RAISE EXCEPTION '0266 G: ottoq_cert_matrix prosrc length is %, expected 5934', v_len;
+  END IF;
+  --: The new function must NOT already exist: this file creates it, and a
+  --: CREATE OR REPLACE over someone else's ottoq_cert_residue would be the same
+  --: silent overwrite the guard above exists to prevent.
+  SELECT count(*) INTO v_n FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'ottoq_cert_residue';
+  IF v_n <> 0 THEN
+    RAISE EXCEPTION '0266 G: ottoq_cert_residue already exists (% row(s)); this file creates it', v_n;
+  END IF;
+END $g$;
+
+-- ---------------------------------------------------------------------------
+-- S2. THE PRE-IMAGE SNAPSHOT ITSELF (APPLYING.md step 2). Section S above prints
+--     the digests for the APPLY LOG; THIS is the row a later reader recovers the
+--     body from. The two functions this file must not touch are snapshotted
+--     alongside, because A8 pins them and a reader needs the version pinned.
+-- ---------------------------------------------------------------------------
+INSERT INTO public.ottoq_schema_snapshots
+       (label, object_kind, schema_name, object_name, definition, def_md5)
+SELECT '0266-pre', 'function', 'public',
+       p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
+       pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE n.nspname = 'public'
+   AND p.proname IN ('ottoq_cert_matrix', 'ottoq_determinism_pair', 'ottoq_boot_state_fingerprint');
+
+-- ---------------------------------------------------------------------------
+-- 1. THE MATRIX. TWO changes from the live body, and the header used to claim
+--    one -- which is the 0228 defect class (a header asserting something the
+--    body does not do) in the section a reviewer is most likely to skim:
+--      (a) the c_endst expression in `keyed` and its comment  [G46, the split]
+--      (b) two WHERE clauses in the `pair` CTE and their comment  [G48, replay]
+--    Everything else -- the key, inc, col, ranked, canon, marked, streak, hist,
+--    the final SELECT and its ORDER BY -- is copied verbatim from
+--    pg_get_functiondef, and A4 pins all thirteen canon conjuncts against the
+--    POST-IMAGE body so a conjunct dropped during the copy cannot pass silently.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.ottoq_cert_matrix(
   p_since timestamp with time zone DEFAULT (now() - '30 days'::interval))
@@ -197,10 +275,27 @@ WITH fl AS (
             legs between round 40 and round 41 rebased every flagship canon while
             the engine was byte-identical.
             Rebuilt explicitly rather than by subtraction so the key set is
-            visible here and cannot drift with the fingerprint's shape: the four
-            `vis` halves (this run's own rows -- measured M3, there are no
-            untagged rows anywhere, so `vis` IS sim_run_id = p_run) plus the three
-            world keys the run genuinely ended in.
+            VISIBLE here: the four `vis` halves (this run's own rows -- measured
+            M3, there are no untagged rows anywhere, so `vis` IS
+            sim_run_id = p_run) plus the three world keys the run genuinely
+            ended in.
+            AND THE COST OF THAT CHOICE, STATED RATHER THAN GLOSSED. An earlier
+            draft of this comment claimed the explicit list "cannot drift with
+            the fingerprint's shape". That is exactly backwards, and the review
+            caught it: the OLD opaque md5 over the whole object covered every key
+            BY CONSTRUCTION and could not drift; an enumerated list is precisely
+            what drifts. If ottoq_boot_state_fingerprint ever gains an eighth
+            top-level key, that atom is streaked by NEITHER instrument and
+            silently leaves the canon -- and A9's arm-vs-arm shape check cannot
+            see it either, because the arms agree on everything (446 of 446), so
+            a key that is equal WITHIN a pair but moves BETWEEN rounds is G46's
+            own failure class wearing a new name.
+            The blind spot is therefore closed deliberately and in two places:
+            A9 refuses this migration unless endst is exactly these seven keys
+            with exactly {vis,fgn} beneath the four sections, and
+            db/checks/0198 registers the same assertion as a STANDING check so a
+            future fingerprint change is forced to revisit both key lists rather
+            than quietly outrunning them.
             NULL when the pair predates endst, preserving the 0139/0199/0201/0225
             convention that an instrument cannot judge a pair older than itself;
             the NULL-tolerant comparison in `marked` is unchanged. */
@@ -374,16 +469,26 @@ WITH fl AS (
     FROM ranked rk WHERE rk.rn = 1
 ), marked AS (
   SELECT r.c_depot, r.c_seed, r.c_ticks, r.c_scen, r.rn,
+         (r.t0 >= fl.rf) AS above_floor,
+         --: The equality alone, floor-free, so `history` can report it honestly
+         --: at any p_since while the STREAK stays floor-scoped.
+         (r.c_fgn IS NULL OR k.c_fgn IS NULL OR r.c_fgn = k.c_fgn) AS fgn_same,
          (r.t0 >= fl.rf
           AND (r.c_fgn IS NULL OR k.c_fgn IS NULL OR r.c_fgn = k.c_fgn)) AS same,
          --: FLOOR-SCOPED, exactly as `same` is. Without the floor predicate a
          --: caller using the default 30-day p_since would have sections_moved
          --: report differences from pairs the streak cannot see -- an
          --: instrument disagreeing with itself about which pairs count.
-         (r.t0 >= fl.rf AND r.f_vn IS DISTINCT FROM k.f_vn) AS m_vn,
-         (r.t0 >= fl.rf AND r.f_bk IS DISTINCT FROM k.f_bk) AS m_bk,
-         (r.t0 >= fl.rf AND r.f_lg IS DISTINCT FROM k.f_lg) AS m_lg,
-         (r.t0 >= fl.rf AND r.f_dp IS DISTINCT FROM k.f_dp) AS m_dp
+         --: AND NULL-GUARDED, exactly as `same` is. `IS DISTINCT FROM` alone
+         --: would call a missing section "moved" while `same` called the same
+         --: pair matching -- one instrument disagreeing with itself about how to
+         --: treat `unknown`, which is the NULL asymmetry db/checks/0193 (iii)
+         --: convicted the previous designs for. Unreachable today (A2 proves
+         --: every post-floor pair carries all seven paths) and guarded anyway.
+         (r.t0 >= fl.rf AND r.f_vn IS NOT NULL AND k.f_vn IS NOT NULL AND r.f_vn <> k.f_vn) AS m_vn,
+         (r.t0 >= fl.rf AND r.f_bk IS NOT NULL AND k.f_bk IS NOT NULL AND r.f_bk <> k.f_bk) AS m_bk,
+         (r.t0 >= fl.rf AND r.f_lg IS NOT NULL AND k.f_lg IS NOT NULL AND r.f_lg <> k.f_lg) AS m_lg,
+         (r.t0 >= fl.rf AND r.f_dp IS NOT NULL AND k.f_dp IS NOT NULL AND r.f_dp <> k.f_dp) AS m_dp
     FROM ranked r
     JOIN canon k ON k.c_depot = r.c_depot AND k.c_seed = r.c_seed
                 AND k.c_ticks = r.c_ticks AND k.c_scen = r.c_scen
@@ -413,10 +518,22 @@ WITH fl AS (
          count(*)::int AS n_pairs
     FROM col c GROUP BY c.c_depot, c.c_seed, c.c_ticks, c.c_scen
 ), hstr AS (
-  --: 'S' where this pair's foreign half equals the canon's, '.' where it does
-  --: not -- oldest first, the same orientation as the matrix's history.
+  --: THREE STATES, oldest first (the same orientation as the matrix's history).
+  --:   'S' this pair's foreign half equals the canon's
+  --:   '.' it does not -- the foreign residue moved
+  --:   '-' the pair is BELOW the recert floor, so it is not judged at all
+  --: The '-' is not cosmetic. `same` is floor-scoped (it must be: the streak is),
+  --: so an earlier draft rendered every pre-floor pair as '.', i.e. as MOVED.
+  --: Measured by the review at the function's own default p_since of 30 days:
+  --: grid column 424242/6t rendered '.................SSS' where the truth is
+  --: twenty S's -- seventeen false claims of movement on a column whose foreign
+  --: half has never moved, in the instrument whose whole job is to say when it
+  --: does. The glyph now reports fgn equality alone and the floor gets its own
+  --: mark, so the string is true at every p_since a caller may pass.
   SELECT m.c_depot, m.c_seed, m.c_ticks, m.c_scen,
-         string_agg(CASE WHEN m.same THEN 'S' ELSE '.' END, '' ORDER BY m.rn DESC) AS h
+         string_agg(CASE WHEN NOT m.above_floor THEN '-'
+                         WHEN m.fgn_same       THEN 'S'
+                         ELSE '.' END, '' ORDER BY m.rn DESC) AS h
     FROM marked m GROUP BY 1,2,3,4
 )
 SELECT h.c_depot, h.c_seed, h.c_ticks, h.c_scen, h.n_pairs,
@@ -431,9 +548,14 @@ SELECT h.c_depot, h.c_seed, h.c_ticks, h.c_scen, h.n_pairs,
  ORDER BY h.c_depot, h.c_ticks DESC, h.c_scen, h.c_seed;
 $function$;
 
---: Granted to match ottoq_cert_matrix exactly -- same rows, same readers -- and
---: explicitly rather than by PostgreSQL's default EXECUTE-to-PUBLIC, so the
---: privilege is a decision in this file and not an omission. A7b asserts it.
+--: Granted EXPLICITLY rather than by PostgreSQL's default EXECUTE-to-PUBLIC, so
+--: the privilege is a decision in this file and not an omission.
+--: DELIBERATELY NOT IDENTICAL to ottoq_cert_matrix's, and an earlier draft of
+--: this comment wrongly said it was: the matrix's ACL carries a leading
+--: `=X/postgres`, which IS the PUBLIC grant, for historical reasons. The residue
+--: revokes PUBLIC and names the four roles. Same rows, one fewer grantee -- the
+--: safer direction, and A7b pins the exact string rather than merely checking
+--: the ACL is non-empty (which would still pass with PUBLIC holding EXECUTE).
 REVOKE ALL ON FUNCTION public.ottoq_cert_residue(timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.ottoq_cert_residue(timestamptz)
    TO postgres, anon, authenticated, service_role;
@@ -472,12 +594,73 @@ ON CONFLICT (name) DO UPDATE
 
 -- ---------------------------------------------------------------------------
 -- 4. ASSERTIONS. Every one refuses the migration rather than warning.
+--
+--    REWRITTEN 2026-09-13 AFTER AN ADVERSARIAL REVIEW CONVICTED THE FIRST SET.
+--    The review (db/checks/0197) found that three of the four assertions
+--    carrying this file's central honesty claims could not fail, and it proved
+--    each one by simulation rather than by argument. The specific convictions,
+--    kept here because the replacements only make sense against them:
+--
+--      A9 was a TAUTOLOGY. It asserted
+--         (arm_a.endst = arm_b.endst) <> (own_eq AND fgn_eq)
+--      and every post-floor pair has arm_a.endst = arm_b.endst (measured: 60 of
+--      60 rows), so the left side is constantly TRUE; whole-object equality
+--      trivially implies both digests equal, so the right side is constantly
+--      TRUE. The reviewer replaced the entire right-hand side with a constant
+--      compared to itself, reading nothing from the pair at all, and it still
+--      returned zero. It also never called either function -- it retyped both
+--      expressions -- so a typo in the SHIPPED body was invisible to it.
+--
+--      A2 WAS NOT THE POSITIVE CONTROL IT CLAIMED. Its own comment named the
+--      defect ("a misspelled path still produces a valid md5 of an object full
+--      of JSON nulls") and then guarded only the case where ALL SEVEN paths are
+--      wrong at once. One misspelled path yields six real values and one JSON
+--      null, whose digest is neither NULL nor the all-null constant: measured,
+--      0 of 30 pairs caught, and 9 distinct digests -- indistinguishable from
+--      correct by any count.
+--
+--      A3 AND A4 COULD NOT TELL THE SPLIT FROM DELETING endst ENTIRELY. The
+--      grid columns were already at their ceiling (3 of 3, green) before this
+--      file, so no weakening of any kind can move them upward; and A4 asserted
+--      greenness, which is the outcome the rewrite was built to produce. The
+--      reviewer simulated the maximal weakening -- the whole endst conjunct
+--      deleted from `marked`, no split at all -- and got a3_would_fire = 0,
+--      a4_would_fire = 0.
+--
+--    The replacements below assert SHAPE, ATTRIBUTABILITY and the SHIPPED BODY,
+--    which are falsifiable on today's data, instead of equalities that are
+--    constantly true.
 -- ---------------------------------------------------------------------------
 DO $a$
 DECLARE
-  v_rf timestamptz; v_n int; v_bad int; v_txt text;
+  v_rf timestamptz; v_n int; v_bad int; v_worse int; v_txt text; v_src text;
+  v_conj text;
+  v_conjuncts text[] := ARRAY[
+    'r.c_fp  IS NOT DISTINCT FROM k.c_fp',
+    'r.c_cmd IS NOT DISTINCT FROM k.c_cmd',
+    'r.c_dec IS NOT DISTINCT FROM k.c_dec',
+    'r.c_evt IS NOT DISTINCT FROM k.c_evt',
+    'r.c_bkg IS NOT DISTINCT FROM k.c_bkg',
+    'r.c_nrg IS NOT DISTINCT FROM k.c_nrg',
+    '(r.c_prop IS NULL OR k.c_prop IS NULL OR r.c_prop = k.c_prop)',
+    '(r.c_defr IS NULL OR k.c_defr IS NULL OR r.c_defr = k.c_defr)',
+    '(r.c_cal  IS NULL OR k.c_cal  IS NULL OR r.c_cal  = k.c_cal)',
+    '(r.c_rule  IS NULL OR k.c_rule  IS NULL OR r.c_rule  = k.c_rule)',
+    '(r.c_rcl   IS NULL OR k.c_rcl   IS NULL OR r.c_rcl   = k.c_rcl)',
+    '(r.c_sdr   IS NULL OR k.c_sdr   IS NULL OR r.c_sdr   = k.c_sdr)',
+    '(r.c_endst IS NULL OR k.c_endst IS NULL OR r.c_endst = k.c_endst)'];
 BEGIN
   v_rf := public.ottoq_cert_recert_floor();
+
+  --: A0. ANTI-VACUITY, FIRST, because the review found that A2, A4 and A5 all
+  --:     pass on an EMPTY matrix. An assertion suite whose subject can be the
+  --:     empty set is not a suite. Nine columns exist today; fewer than nine
+  --:     means the instrument lost one and every count below is measured over
+  --:     the wrong population.
+  SELECT count(*) INTO v_n FROM public.ottoq_cert_matrix(v_rf);
+  IF v_n <> 9 THEN
+    RAISE EXCEPTION '0266 A0: matrix returns % post-floor column(s), expected 9', v_n;
+  END IF;
 
   --: A1. THE RECERT FLOOR DID NOT MOVE. The lineage row is non-forcing, so the
   --:     floor must be exactly where it was before this file ran. If this fails
@@ -487,12 +670,28 @@ BEGIN
     RAISE EXCEPTION '0266 A1: recert floor moved to % (expected 2026-09-12 16:50:23.319089+00)', v_rf;
   END IF;
 
-  --: A2. THE POSITIVE CONTROL, and the one that would catch a typo'd key name.
-  --:     canon_endst must be NON-NULL on every post-floor column. A misspelled
-  --:     path (say 'vis ' or 'visitneeds') still produces a valid md5 of an
-  --:     object full of JSON nulls -- identical for every pair -- which would
-  --:     make every column green for the wrong reason and pass A3 and A4. So
-  --:     A2 checks the digest is not the digest of an all-null object.
+  --: A2. THE REAL POSITIVE CONTROL: PER-PATH, NOT PER-DIGEST. Every one of the
+  --:     seven jsonb paths the split enumerates must EXTRACT SOMETHING on every
+  --:     post-floor pair. This fires on exactly ONE misspelled path, which is
+  --:     the failure the old A2 described and did not catch. Verified both ways
+  --:     before installing: with the paths correct, 0 of 30 pairs violate it;
+  --:     with `->'vis'` misspelled as `->'viss'` on visit_needs alone, 30 of 30
+  --:     violate it.
+  SELECT count(*) INTO v_bad FROM (
+    SELECT (r.validation_notes::jsonb)->'arm_a'->'endst' AS e
+      FROM public.ottoq_sim_runs r
+     WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
+       AND r.validation_status IS NOT NULL
+       AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
+       AND r.started_at >= v_rf) q
+   WHERE (q.e->'visit_needs'->'vis') IS NULL OR (q.e->'bookings'->'vis') IS NULL
+      OR (q.e->'legs'->'vis') IS NULL       OR (q.e->'dispatches'->'vis') IS NULL
+      OR (q.e->'chargers') IS NULL          OR (q.e->'calibration') IS NULL
+      OR (q.e->'world') IS NULL;
+  IF v_bad > 0 THEN
+    RAISE EXCEPTION '0266 A2: % post-floor pair(s) have a NULL at one of the seven split paths -- a key is misspelled or the fingerprint shape moved', v_bad;
+  END IF;
+  --: The second net, kept: all seven wrong at once still produces a valid digest.
   SELECT count(*) INTO v_n FROM public.ottoq_cert_matrix(v_rf) WHERE canon_endst IS NULL;
   IF v_n > 0 THEN
     RAISE EXCEPTION '0266 A2: % post-floor column(s) have a NULL canon_endst', v_n;
@@ -503,44 +702,174 @@ BEGIN
                                   'world', NULL::jsonb)::text);
   SELECT count(*) INTO v_bad FROM public.ottoq_cert_matrix(v_rf) WHERE canon_endst = v_txt;
   IF v_bad > 0 THEN
-    RAISE EXCEPTION '0266 A2: % column(s) digest an all-null object -- a key path is misspelled', v_bad;
+    RAISE EXCEPTION '0266 A2: % column(s) digest an all-null object', v_bad;
   END IF;
 
-  --: A3. THE GRID COLUMNS DO NOT MOVE. This is the control that separates a
-  --:     targeted fix from a blanket weakening: the grid depot has no other runs
-  --:     leaving residue in it, so its streaks must be exactly what they were
-  --:     (3 each, measured 0196 M5). If the split made things green generally,
-  --:     these would move too.
-  SELECT count(*) INTO v_bad FROM public.ottoq_cert_matrix(v_rf)
-   WHERE depot = 'aacd0bb0-2d02-d101-72cc-33f70e950bc8'::uuid
-     AND (consecutive_passes <> 3 OR pairs_seen <> 3 OR NOT green);
-  IF v_bad > 0 THEN
-    RAISE EXCEPTION '0266 A3: % grid column(s) moved; the split is not targeted', v_bad;
-  END IF;
-
-  --: A4. PREDICTION P1 OF db/checks/0196, asserted rather than hoped: every
-  --:     post-floor column's streak now equals its pair count.
-  SELECT count(*) INTO v_bad FROM public.ottoq_cert_matrix(v_rf)
-   WHERE consecutive_passes <> pairs_seen;
-  IF v_bad > 0 THEN
-    RAISE EXCEPTION '0266 A4: % column(s) still short of their pair count', v_bad;
-  END IF;
-
-  --: A5. THE RESIDUE INSTRUMENT COVERS EXACTLY THE SAME COLUMNS. The failure
-  --:     0193 finding 4 warned about is an instrument that goes quiet while
-  --:     another keeps reporting. If these two ever disagree about which columns
-  --:     exist, one of them is hiding a column.
+  --: A9. THE SHAPE, which is what G25/G28 actually needs and what the tautology
+  --:     was standing in for. The split enumerates seven paths; if
+  --:     ottoq_boot_state_fingerprint ever grows an eighth top-level key, or a
+  --:     third sub-key under a section, the split would silently drop it from
+  --:     the canon while the pair went on enforcing it -- the comparison
+  --:     becoming narrower than the enforcement, which is the exact thing this
+  --:     file promises cannot happen. An equality between two things that are
+  --:     always equal cannot detect that; a key-set assertion can, and it fires
+  --:     the day the shape moves.
+  --:     (Numbered A9 to keep the file's existing numbering; it runs here
+  --:     because A9's subject is the same population A2 just walked.)
   SELECT count(*) INTO v_bad FROM (
-    SELECT depot, seed, ticks, scenario FROM public.ottoq_cert_matrix(v_rf)
+    SELECT (r.validation_notes::jsonb)->'arm_a'->'endst' AS e
+      FROM public.ottoq_sim_runs r
+     WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
+       AND r.validation_status IS NOT NULL
+       AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
+       AND r.started_at >= v_rf) q
+   WHERE NOT (q.e ?& array['visit_needs','bookings','legs','dispatches','chargers','calibration','world'])
+      OR (SELECT count(*) FROM jsonb_object_keys(q.e)) <> 7
+      OR NOT ((q.e->'visit_needs') ?& array['vis','fgn'])
+      OR (SELECT count(*) FROM jsonb_object_keys(q.e->'visit_needs')) <> 2
+      OR NOT ((q.e->'bookings')    ?& array['vis','fgn'])
+      OR (SELECT count(*) FROM jsonb_object_keys(q.e->'bookings'))    <> 2
+      OR NOT ((q.e->'legs')        ?& array['vis','fgn'])
+      OR (SELECT count(*) FROM jsonb_object_keys(q.e->'legs'))        <> 2
+      OR NOT ((q.e->'dispatches')  ?& array['vis','fgn'])
+      OR (SELECT count(*) FROM jsonb_object_keys(q.e->'dispatches'))  <> 2;
+  IF v_bad > 0 THEN
+    RAISE EXCEPTION '0266 A9: % post-floor pair(s) whose endst is not exactly the 7 keys x {vis,fgn} the split enumerates; a leaf would be dropped from the canon while the pair still enforces it', v_bad;
+  END IF;
+
+  --: A9b. AND THE DIGESTS ARE READ FROM THE SHIPPED FUNCTIONS, not retyped.
+  --:      The old A9 recomputed both expressions inline, so it tested its own
+  --:      copy and not the bodies being installed. This takes canon_endst from
+  --:      ottoq_cert_matrix and canon_fgn from ottoq_cert_residue and checks
+  --:      them against an INDEPENDENT recomputation from the canon pair's own
+  --:      validation_notes. A typo in either shipped body fails here.
+  SELECT count(*) INTO v_bad
+    FROM public.ottoq_cert_matrix(v_rf) m
+    JOIN public.ottoq_cert_residue(v_rf) s
+      ON s.depot=m.depot AND s.seed=m.seed AND s.ticks=m.ticks AND s.scenario=m.scenario
+    JOIN public.ottoq_sim_runs r ON r.sim_run_id = m.last_run_a
+   WHERE m.canon_endst IS DISTINCT FROM md5(jsonb_build_object(
+           'visit_needs', (r.validation_notes::jsonb)->'arm_a'->'endst'->'visit_needs'->'vis',
+           'bookings',    (r.validation_notes::jsonb)->'arm_a'->'endst'->'bookings'->'vis',
+           'legs',        (r.validation_notes::jsonb)->'arm_a'->'endst'->'legs'->'vis',
+           'dispatches',  (r.validation_notes::jsonb)->'arm_a'->'endst'->'dispatches'->'vis',
+           'chargers',    (r.validation_notes::jsonb)->'arm_a'->'endst'->'chargers',
+           'calibration', (r.validation_notes::jsonb)->'arm_a'->'endst'->'calibration',
+           'world',       (r.validation_notes::jsonb)->'arm_a'->'endst'->'world')::text)
+      OR s.canon_fgn IS DISTINCT FROM md5(jsonb_build_object(
+           'visit_needs', (r.validation_notes::jsonb)->'arm_a'->'endst'->'visit_needs'->'fgn',
+           'bookings',    (r.validation_notes::jsonb)->'arm_a'->'endst'->'bookings'->'fgn',
+           'legs',        (r.validation_notes::jsonb)->'arm_a'->'endst'->'legs'->'fgn',
+           'dispatches',  (r.validation_notes::jsonb)->'arm_a'->'endst'->'dispatches'->'fgn')::text);
+  IF v_bad > 0 THEN
+    RAISE EXCEPTION '0266 A9b: % column(s) where a shipped function''s canon digest disagrees with an independent recomputation', v_bad;
+  END IF;
+
+  --: A4. THE TWELVE OTHER ATOMS SURVIVED THE COPY. Section 1 claims the body is
+  --:     the live one except for the split and the G48 predicate, and until now
+  --:     nothing checked it -- so accidentally deleting any conjunct during the
+  --:     rewrite would have left every assertion green, because 0196 M1 measured
+  --:     that all twelve non-endst atoms already match on every post-floor pair
+  --:     and therefore none of them is load-bearing on today's data. Pinned by
+  --:     substring against the POST-IMAGE body, which is the only way a dropped
+  --:     conjunct is visible at all.
+  SELECT p.prosrc INTO v_src FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='public' AND p.proname='ottoq_cert_matrix';
+  FOREACH v_conj IN ARRAY v_conjuncts LOOP
+    IF position(v_conj in v_src) = 0 THEN
+      RAISE EXCEPTION '0266 A4: the installed ottoq_cert_matrix is missing the canon conjunct %', v_conj;
+    END IF;
+  END LOOP;
+
+  --: A3. THE CONTROL, MADE DISCRIMINATING. The old A3 asserted the grid columns
+  --:     were still 3/3 green -- which they were BEFORE this file, at their
+  --:     ceiling, so no weakening could have moved them and the assertion had
+  --:     no power. The real claim is ATTRIBUTABILITY: this change must improve
+  --:     exactly the columns that were being rebased by foreign residue, and no
+  --:     others. So compute the OLD digest alongside the new one, run the same
+  --:     streak logic over both, and assert the difference set exactly.
+  --:     Under the maximal weakening the reviewer simulated -- the endst
+  --:     conjunct deleted entirely -- the grid columns would also improve, and
+  --:     this fires.
+  WITH fl AS (SELECT v_rf AS rf),
+  pair AS (
+    SELECT DISTINCT ON (r.depot_id, r.started_at)
+           r.depot_id c_depot, r.started_at t0, r.validation_status st,
+           (r.validation_status='passed') ok, (r.validation_notes::jsonb) j
+      FROM public.ottoq_sim_runs r
+     WHERE r.run_by='cert_harness' AND r.started_at >= v_rf
+       AND r.validation_status IS NOT NULL AND r.validation_notes IS NOT NULL
+       AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
+       AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+       AND COALESCE((r.validation_notes::jsonb->'arm_a'->>'replay_injected')::int,0) = 0
+       AND COALESCE((r.validation_notes::jsonb->'arm_b'->>'replay_injected')::int,0) = 0
+     ORDER BY r.depot_id, r.started_at, r.sim_run_id),
+  keyed AS (
+    SELECT p.c_depot, p.t0, p.ok, p.st, (p.j->>'seed')::bigint c_seed,
+           COALESCE((p.j->>'ticks')::int,-1) c_ticks, COALESCE(p.j->>'scenario','?') c_scen,
+           (p.j->'arm_a'->>'run')::uuid c_run_a,
+           md5((p.j->'arm_a'->'endst')::text) AS d_old,
+           CASE WHEN (p.j->'arm_a') ? 'endst' THEN md5(jsonb_build_object(
+             'visit_needs', p.j->'arm_a'->'endst'->'visit_needs'->'vis',
+             'bookings',    p.j->'arm_a'->'endst'->'bookings'->'vis',
+             'legs',        p.j->'arm_a'->'endst'->'legs'->'vis',
+             'dispatches',  p.j->'arm_a'->'endst'->'dispatches'->'vis',
+             'chargers',    p.j->'arm_a'->'endst'->'chargers',
+             'calibration', p.j->'arm_a'->'endst'->'calibration',
+             'world',       p.j->'arm_a'->'endst'->'world')::text) END AS d_new
+      FROM pair p),
+  col AS (SELECT * FROM keyed WHERE st <> 'inconclusive'),
+  ranked AS (SELECT c.*, row_number() OVER (PARTITION BY c_depot,c_seed,c_ticks,c_scen
+                                            ORDER BY t0 DESC, c_run_a DESC) rn FROM col c),
+  canon AS (SELECT * FROM ranked WHERE rn=1),
+  marked AS (
+    SELECT r.c_depot,r.c_seed,r.c_ticks,r.c_scen,r.rn,
+           (r.ok AND r.t0>=fl.rf AND (r.d_old IS NULL OR k.d_old IS NULL OR r.d_old=k.d_old)) AS ok_old,
+           (r.ok AND r.t0>=fl.rf AND (r.d_new IS NULL OR k.d_new IS NULL OR r.d_new=k.d_new)) AS ok_new
+      FROM ranked r JOIN canon k USING (c_depot,c_seed,c_ticks,c_scen) CROSS JOIN fl),
+  st AS (
+    SELECT c_depot,c_seed,c_ticks,c_scen,
+           count(*) FILTER (WHERE u_old)::int n_old,
+           count(*) FILTER (WHERE u_new)::int n_new
+      FROM (SELECT m.*,
+              bool_and(ok_old) OVER (PARTITION BY c_depot,c_seed,c_ticks,c_scen
+                       ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) u_old,
+              bool_and(ok_new) OVER (PARTITION BY c_depot,c_seed,c_ticks,c_scen
+                       ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) u_new
+            FROM marked m) x
+     GROUP BY 1,2,3,4)
+  SELECT count(*) FILTER (WHERE n_new > n_old AND c_depot = '11111111-1111-1111-1111-111111111111'::uuid),
+         count(*) FILTER (WHERE n_new > n_old AND c_depot <> '11111111-1111-1111-1111-111111111111'::uuid),
+         count(*) FILTER (WHERE n_new < n_old)
+    INTO v_n, v_bad, v_worse
+    FROM st;
+  IF v_n <> 7 THEN
+    RAISE EXCEPTION '0266 A3: % flagship column(s) improved, expected exactly 7 (the columns foreign residue was rebasing)', v_n;
+  END IF;
+  IF v_bad > 0 THEN
+    RAISE EXCEPTION '0266 A3: % NON-flagship column(s) improved; the split is not targeted and is weakening the canon generally', v_bad;
+  END IF;
+  IF v_worse > 0 THEN
+    RAISE EXCEPTION '0266 A3: % column(s) got WORSE under the split', v_worse;
+  END IF;
+
+  --: A5. THE RESIDUE INSTRUMENT COVERS EXACTLY THE SAME COLUMNS -- over the WIDE
+  --:     window, not the floor. Scoped to the floor this examined zero replay
+  --:     pairs (all nine predate it), so it was blind to precisely the
+  --:     divergence the new G48 predicate could introduce if a later edit
+  --:     dropped it from one instrument and not the other. The file already
+  --:     makes this argument for A10 and failed to apply it here.
+  SELECT count(*) INTO v_bad FROM (
+    SELECT depot, seed, ticks, scenario FROM public.ottoq_cert_matrix('2000-01-01'::timestamptz)
     EXCEPT
-    SELECT depot, seed, ticks, scenario FROM public.ottoq_cert_residue(v_rf)) x;
+    SELECT depot, seed, ticks, scenario FROM public.ottoq_cert_residue('2000-01-01'::timestamptz)) x;
   IF v_bad > 0 THEN
     RAISE EXCEPTION '0266 A5: % column(s) in the matrix and not in the residue instrument', v_bad;
   END IF;
   SELECT count(*) INTO v_bad FROM (
-    SELECT depot, seed, ticks, scenario FROM public.ottoq_cert_residue(v_rf)
+    SELECT depot, seed, ticks, scenario FROM public.ottoq_cert_residue('2000-01-01'::timestamptz)
     EXCEPT
-    SELECT depot, seed, ticks, scenario FROM public.ottoq_cert_matrix(v_rf)) x;
+    SELECT depot, seed, ticks, scenario FROM public.ottoq_cert_matrix('2000-01-01'::timestamptz)) x;
   IF v_bad > 0 THEN
     RAISE EXCEPTION '0266 A5: % column(s) in the residue instrument and not in the matrix', v_bad;
   END IF;
@@ -550,17 +879,22 @@ BEGIN
   --:     name `legs` as the section that moved. An instrument that reported
   --:     everything stable would mean the hygiene fact was dropped, not
   --:     relocated -- which is the only way this migration could be dishonest.
+  --: MEMBERSHIP, not equality. sections_moved is a concat_ws list; if another
+  --: fgn section also moves before this file runs -- another run leaving a
+  --: booking or dispatch in a live state, which is the very phenomenon this
+  --: migration exists to tolerate -- the value becomes 'bookings,legs' and an
+  --: equality test would refuse the migration for a reason unrelated to what
+  --: A6 is checking.
   SELECT count(*) INTO v_n FROM public.ottoq_cert_residue(v_rf)
    WHERE depot = '11111111-1111-1111-1111-111111111111'::uuid
-     AND sections_moved = 'legs';
-  IF v_n < 7 THEN
-    RAISE EXCEPTION '0266 A6: only % flagship column(s) report the legs residue move (expected 7); the hygiene fact was dropped, not relocated', v_n;
+     AND 'legs' = ANY(string_to_array(COALESCE(sections_moved, ''), ','));
+  IF v_n <> 7 THEN
+    RAISE EXCEPTION '0266 A6: % flagship column(s) report the legs residue move (expected 7); the hygiene fact was dropped, not relocated', v_n;
   END IF;
 
   --: A7. PRIVILEGES UNCHANGED on the replaced function, pinned to the ACL
-  --:     measured in the pre-image rather than to another function's. CREATE OR
-  --:     REPLACE preserves proacl by definition; this asserts the definition
-  --:     held, which is the only thing worth checking.
+  --:     measured in the pre-image. CREATE OR REPLACE preserves proacl by
+  --:     definition; this asserts the definition held.
   SELECT array_to_string(p.proacl::text[], ' | ') INTO v_txt
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='public' AND p.proname='ottoq_cert_matrix';
@@ -568,88 +902,53 @@ BEGIN
     RAISE EXCEPTION '0266 A7: ottoq_cert_matrix privileges changed to %', COALESCE(v_txt, '(default)');
   END IF;
 
-  --: A7b. AND THE NEW FUNCTION IS GRANTED DELIBERATELY, not by PostgreSQL's
-  --:      default of EXECUTE-to-PUBLIC. It is a reporting read over the same
-  --:      rows ottoq_cert_matrix already exposes to the same roles, so it gets
-  --:      the same grants and no more -- stated here because a new function
-  --:      that inherits a default grant is a privilege decision nobody made.
+  --: A7b. THE NEW FUNCTION'S ACL, PINNED EXACTLY -- not merely "non-null and
+  --:      mentions service_role", which the review showed still passes with
+  --:      PUBLIC holding EXECUTE if the REVOKE line is deleted. The expected
+  --:      string DELIBERATELY DIFFERS from A7's by the leading `=X/postgres`:
+  --:      that entry IS the PUBLIC grant, the matrix carries it for historical
+  --:      reasons and the residue does not. An earlier draft of the comment
+  --:      above the GRANT said the residue was "granted to match
+  --:      ottoq_cert_matrix exactly"; A7's own pinned string refutes that, and
+  --:      the comment has been corrected rather than the grant loosened.
   SELECT array_to_string(p.proacl::text[], ' | ') INTO v_txt
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='public' AND p.proname='ottoq_cert_residue';
-  IF v_txt IS NULL OR position('service_role=X' in v_txt) = 0 THEN
-    RAISE EXCEPTION '0266 A7b: ottoq_cert_residue has no explicit grant (proacl %)', COALESCE(v_txt, '(default)');
+  IF v_txt IS DISTINCT FROM 'postgres=X/postgres | anon=X/postgres | authenticated=X/postgres | service_role=X/postgres' THEN
+    RAISE EXCEPTION '0266 A7b: ottoq_cert_residue ACL is %, expected PUBLIC revoked and the four roles granted', COALESCE(v_txt, '(default: PUBLIC holds EXECUTE)');
   END IF;
 
-  --: A8. THE ENGINE DID NOT MOVE. The two functions this migration must not
-  --:     touch, pinned by content. ottoq_determinism_pair's md5 is the standing
-  --:     pin; the boot fingerprint is what it calls.
+  --: A8. THE ENGINE DID NOT MOVE -- as a POSITIVE count, because the old shape
+  --:     (`count(*) WHERE proname=X AND md5 <> pin`, refuse if > 0) passes when
+  --:     the function does not exist at all. That is the NOT-EXISTS-skips-the-row
+  --:     failure db/checks/0193 blocker (iii) already convicted in the previous
+  --:     design; it must not be reintroduced in the fix for it. Requiring
+  --:     exactly one match also refuses a second overload appearing.
   SELECT count(*) INTO v_bad FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='public' AND p.proname='ottoq_determinism_pair'
-     AND md5(p.prosrc) <> '8a35b8c874fed154cc216140faec0274';
-  IF v_bad > 0 THEN
-    RAISE EXCEPTION '0266 A8: ottoq_determinism_pair moved; this migration must not touch it';
+     AND md5(p.prosrc) = '8a35b8c874fed154cc216140faec0274';
+  IF v_bad <> 1 THEN
+    RAISE EXCEPTION '0266 A8: expected exactly 1 ottoq_determinism_pair at the pinned md5, found %', v_bad;
   END IF;
   SELECT count(*) INTO v_bad FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='public' AND p.proname='ottoq_boot_state_fingerprint'
-     AND md5(p.prosrc) <> '90d490c24ae084d03477a8a782a9f856';
-  IF v_bad > 0 THEN
-    RAISE EXCEPTION '0266 A8: ottoq_boot_state_fingerprint moved; this migration must not touch it';
-  END IF;
-
-  --: A9. THE COMPARISON IS NOT NARROWER THAN THE ENFORCEMENT (G25/G28). The two
-  --:     digests together must cover every leaf the pair enforces: for every
-  --:     post-floor pair, own-digest AND fgn-digest equal between the arms iff
-  --:     endst is equal between the arms. Checked on the real recorded pairs
-  --:     rather than argued from the construction.
-  SELECT count(*) INTO v_bad FROM (
-    SELECT (r.validation_notes::jsonb) AS j FROM public.ottoq_sim_runs r
-     WHERE r.run_by='cert_harness' AND r.started_at >= v_rf
-       AND r.validation_notes IS NOT NULL
-       AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
-       AND (r.validation_notes::jsonb)->'arm_a' ? 'endst') q
-   WHERE ((q.j->'arm_a'->'endst') = (q.j->'arm_b'->'endst'))
-      <> ( md5(jsonb_build_object(
-             'visit_needs', q.j->'arm_a'->'endst'->'visit_needs'->'vis',
-             'bookings',    q.j->'arm_a'->'endst'->'bookings'->'vis',
-             'legs',        q.j->'arm_a'->'endst'->'legs'->'vis',
-             'dispatches',  q.j->'arm_a'->'endst'->'dispatches'->'vis',
-             'chargers',    q.j->'arm_a'->'endst'->'chargers',
-             'calibration', q.j->'arm_a'->'endst'->'calibration',
-             'world',       q.j->'arm_a'->'endst'->'world')::text)
-           = md5(jsonb_build_object(
-             'visit_needs', q.j->'arm_b'->'endst'->'visit_needs'->'vis',
-             'bookings',    q.j->'arm_b'->'endst'->'bookings'->'vis',
-             'legs',        q.j->'arm_b'->'endst'->'legs'->'vis',
-             'dispatches',  q.j->'arm_b'->'endst'->'dispatches'->'vis',
-             'chargers',    q.j->'arm_b'->'endst'->'chargers',
-             'calibration', q.j->'arm_b'->'endst'->'calibration',
-             'world',       q.j->'arm_b'->'endst'->'world')::text)
-         AND md5(jsonb_build_object(
-             'visit_needs', q.j->'arm_a'->'endst'->'visit_needs'->'fgn',
-             'bookings',    q.j->'arm_a'->'endst'->'bookings'->'fgn',
-             'legs',        q.j->'arm_a'->'endst'->'legs'->'fgn',
-             'dispatches',  q.j->'arm_a'->'endst'->'dispatches'->'fgn')::text)
-           = md5(jsonb_build_object(
-             'visit_needs', q.j->'arm_b'->'endst'->'visit_needs'->'fgn',
-             'bookings',    q.j->'arm_b'->'endst'->'bookings'->'fgn',
-             'legs',        q.j->'arm_b'->'endst'->'legs'->'fgn',
-             'dispatches',  q.j->'arm_b'->'endst'->'dispatches'->'fgn')::text) );
-  IF v_bad > 0 THEN
-    RAISE EXCEPTION '0266 A9: on % pair(s) the two digests together do not decide endst equality; the split loses a leaf', v_bad;
+     AND md5(p.prosrc) = '90d490c24ae084d03477a8a782a9f856';
+  IF v_bad <> 1 THEN
+    RAISE EXCEPTION '0266 A8: expected exactly 1 ottoq_boot_state_fingerprint at the pinned md5, found %', v_bad;
   END IF;
 
   --: A10. G48: THE REPLAY PREDICATE EXCLUDES REPLAYS AND KEEPS THE CONTROLS.
   --:      Run over a WIDE window on purpose. All nine existing replay pairs
   --:      predate the recert floor -- that coincidence is the only thing
   --:      protecting today's canon -- so an assertion scoped to the floor would
-  --:      examine zero replay pairs and pass vacuously, which is exactly the
-  --:      failure this file must not ship.
-  --:
+  --:      examine zero replay pairs and pass vacuously.
+  --:      `validation_status IS NOT NULL` included so this walks the SAME
+  --:      population the matrix's own pair CTE does; without it the predicate
+  --:      was validated over 500 pairs while protecting 493.
   --:      TWO NUMBERS, and the second is the one that matters. Excluding 7 is
   --:      easy; KEEPING the 2 zero-injection controls is what a near-miss
-  --:      predicate gets wrong. `replay` is present with a NULL VALUE on a
-  --:      control, so `NOT (notes ? 'replay')` would drop honest certification
-  --:      data and this assertion would catch it.
+  --:      predicate gets wrong, because `replay` is present with a NULL VALUE on
+  --:      a control and `NOT (notes ? 'replay')` would drop honest data.
   SELECT count(*) FILTER (WHERE NOT ((j->>'replay') IS NULL
                             AND COALESCE((j->'arm_a'->>'replay_injected')::int, 0) = 0
                             AND COALESCE((j->'arm_b'->>'replay_injected')::int, 0) = 0)),
@@ -660,6 +959,7 @@ BEGIN
     FROM (SELECT DISTINCT ON (r.depot_id, r.started_at) (r.validation_notes::jsonb) AS j
             FROM public.ottoq_sim_runs r
            WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
+             AND r.validation_status IS NOT NULL
              AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
            ORDER BY r.depot_id, r.started_at, r.sim_run_id) q;
   IF v_n <> 7 THEN
@@ -669,30 +969,45 @@ BEGIN
     RAISE EXCEPTION '0266 A10: % zero-injection control pair(s) survive, expected 2; the predicate is dropping honest certification data', v_bad;
   END IF;
 
-  --: A10b. AND THE INSTRUMENT AGREES WITH THE PREDICATE. The matrix's own pair
-  --:       count over the same wide window must equal the non-inconclusive pairs
-  --:       that pass the predicate -- so the clause is actually in the body and
-  --:       not merely in a comment.
-  SELECT count(*) INTO v_n
-    FROM (SELECT DISTINCT ON (r.depot_id, r.started_at) r.validation_status AS vs,
-                 (r.validation_notes::jsonb) AS j
-            FROM public.ottoq_sim_runs r
-           WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
-             AND r.validation_status IS NOT NULL
-             AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
-             AND r.started_at >= '2000-01-01'::timestamptz
-           ORDER BY r.depot_id, r.started_at, r.sim_run_id) q
-   WHERE q.vs <> 'inconclusive'
-     AND (q.j->>'replay') IS NULL
-     AND COALESCE((q.j->'arm_a'->>'replay_injected')::int, 0) = 0
-     AND COALESCE((q.j->'arm_b'->>'replay_injected')::int, 0) = 0;
-  SELECT COALESCE(sum(pairs_seen), 0) INTO v_bad
-    FROM public.ottoq_cert_matrix('2000-01-01'::timestamptz);
-  IF v_n <> v_bad THEN
-    RAISE EXCEPTION '0266 A10b: matrix reports % pairs, the predicate admits %', v_bad, v_n;
+  --: A10b. AND THE INSTRUMENT AGREES WITH THE PREDICATE, AS A SET. A count
+  --:       comparison balances if a mis-written predicate drops seven DIFFERENT
+  --:       pairs, so compare the pairs themselves. The matrix does not expose
+  --:       per-pair identity, so the set is compared through `last_run_a` of
+  --:       each column plus the pair totals: any column whose admitted pair
+  --:       count differs from the predicate's own count for that column fails.
+  SELECT count(*) INTO v_bad FROM (
+    SELECT m.depot, m.seed, m.ticks, m.scenario, m.pairs_seen,
+           --: THE PREDICATE IN THE SAME POSITION THE BODY PUTS IT: inside the
+           --: WHERE, BEFORE DISTINCT ON. An earlier draft filtered after
+           --: DISTINCT ON, which is a different operation -- if a
+           --: (depot_id, started_at) group ever held both a replay row and a
+           --: non-replay row the two formulations would disagree, and A10b's
+           --: whole purpose is to prove the clause is in the shipped body.
+           --: (Measured: 500 groups, 0 mixed, so they agree today; the point is
+           --: that agreement should not depend on that.)
+           (SELECT count(*) FROM (
+              SELECT DISTINCT ON (r.depot_id, r.started_at) r.validation_status vs,
+                     (r.validation_notes::jsonb) j, r.depot_id
+                FROM public.ottoq_sim_runs r
+               WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
+                 AND r.validation_status IS NOT NULL
+                 AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
+                 AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+                 AND COALESCE((r.validation_notes::jsonb->'arm_a'->>'replay_injected')::int,0) = 0
+                 AND COALESCE((r.validation_notes::jsonb->'arm_b'->>'replay_injected')::int,0) = 0
+               ORDER BY r.depot_id, r.started_at, r.sim_run_id) z
+             WHERE z.depot_id = m.depot
+               AND (z.j->>'seed')::bigint = m.seed
+               AND COALESCE((z.j->>'ticks')::int,-1) = m.ticks
+               AND COALESCE(z.j->>'scenario','?') = m.scenario
+               AND z.vs <> 'inconclusive') AS expected
+      FROM public.ottoq_cert_matrix('2000-01-01'::timestamptz) m) w
+   WHERE w.pairs_seen IS DISTINCT FROM w.expected;
+  IF v_bad > 0 THEN
+    RAISE EXCEPTION '0266 A10b: % column(s) where the matrix pair count disagrees with the predicate applied independently', v_bad;
   END IF;
 
-  RAISE NOTICE '0266: A1-A10b passed; recert floor unmoved at %', v_rf;
+  RAISE NOTICE '0266: A0-A10b passed; recert floor unmoved at %; 7 flagship columns improved, 0 grid columns moved', v_rf;
 END $a$;
 
 -- ---------------------------------------------------------------------------
