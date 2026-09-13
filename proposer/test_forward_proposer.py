@@ -1096,3 +1096,43 @@ def test_importing_the_proposer_does_not_read_the_doctrine():
                          text=True, cwd=str(HERE.parent))
     assert out.returncode == 0, out.stderr[-800:]
     assert "clean" in out.stdout
+
+
+# ---- L-58: a stall another vehicle holds is not a point this tick ---------------
+
+
+def test_an_occupied_or_held_stall_is_not_a_point_this_tick():
+    """The first live D3 cycle planned every immediate start onto a stall
+    somebody was already plugged into, because status and vehicle_id were
+    never read. Occupied, and 'available'-but-held, both drop out; only the
+    free stall is ever named in a plan, and the count of what was skipped
+    travels with the result."""
+    occupied = _stall("s-occ")
+    occupied.update(status="occupied", vehicle_id="v-other")
+    held = _stall("s-held")                    # status says free, a vehicle holds it
+    held.update(vehicle_id="v-holder")
+    free = _stall("s-free")
+    frame = _frame([_vehicle("v-1", soc=25), _vehicle("v-2", soc=40)],
+                   [occupied, held, free])
+    r = propose(frame, CLASSES, site=SITE)
+    named = {row["proposal"].get("stall_id") for row in r["proposals"]
+             if not row["proposal"]["abstain"]}
+    assert named == {"s-free"}
+    assert r["stalls_busy"] == 2
+    assert r["planned"] + r["abstained"] == 2      # nobody vanished
+
+
+def test_a_site_with_only_busy_stalls_says_so():
+    busy = _stall("s-1"); busy.update(status="occupied", vehicle_id="v-x")
+    frame = _frame([_vehicle("v-1", soc=25)], [busy])
+    with pytest.raises(FrameError, match="occupied or held"):
+        propose(frame, CLASSES, site=SITE)
+
+
+def test_a_stall_row_without_a_status_key_is_still_a_point():
+    """Absence is not occupancy: a fixture or an older producer that omits the
+    field keeps its stalls; the plan shows it rather than silently emptying."""
+    bare = {"id": "s-bare", "type": "dcfc", "connector_type": "CCS1",
+            "connector_max_kw": 150}
+    r = propose(_frame([_vehicle("v-1", soc=25)], [bare]), CLASSES, site=SITE)
+    assert r["planned"] == 1 and r["stalls_busy"] == 0

@@ -67,6 +67,7 @@ from proposer.forward_proposer import (  # noqa: E402
     DEFAULT_SERVICEABLE_STATES,
     FrameError,
     propose,
+    stall_is_free,
 )
 
 SOURCE = "forward_lex"
@@ -169,6 +170,12 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
         "n_vehicles": n_vehicles,
         "n_in_serviceable_state": n_in_serviceable_state,
         "n_stalls": len(frame.get("stalls") or []),
+        #: L-58: of those, how many the frame says are occupied or held right
+        #: now and were therefore never offered to the solver. Recorded on
+        #: every path, the empty one included, so "planned on 17 of 40" and
+        #: "nothing free" are both ledger facts and not inferences.
+        "n_stalls_busy": sum(1 for s in (frame.get("stalls") or [])
+                             if not stall_is_free(s)),
         "hour_of_day": hour_of_day,
         "max_assets": max_assets,
         "det_budget_s": det_budget_s,

@@ -353,3 +353,21 @@ def test_a_batch_never_names_one_stall_twice_for_immediate_starts():
     assert r["fire"]["n_not_due"] == len(r["rows"]) - len(live)
     assert r["fire"]["n_planned"] == len(live)
     assert r["fire"]["start_within_min"] == 30 and r["fire"]["default_ready_delta_min"] == 240
+
+
+def test_the_fire_record_counts_busy_stalls_on_every_path():
+    """L-58: 'planned on N of M' is a ledger fact. The count is on the proposed
+    path and on the empty path alike, and a held stall is never in a row."""
+    occ = _stall(S1); occ.update(status="occupied", vehicle_id=V2)
+    held = _stall(S2); held.update(vehicle_id=V3)          # status 'available', held
+    r = pb.fire(_frame(stalls=[occ, held, _stall(S3, kind="l2", kw=19)]),
+                CLASS_ROWS, site=SITE, sim_run_id=RUN, depot_id=DEPOT)
+    assert r["fire"]["n_stalls"] == 3 and r["fire"]["n_stalls_busy"] == 2
+    for row in r["rows"]:
+        assert row["proposal"].get("stall_id") not in {S1, S2}
+
+    all_busy = pb.fire(_frame(stalls=[occ, held]), CLASS_ROWS, site=SITE,
+                       sim_run_id=RUN, depot_id=DEPOT)
+    assert all_busy["fire"]["status"] == "empty"
+    assert all_busy["fire"]["n_stalls_busy"] == 2
+    assert "occupied or held" in all_busy["fire"]["error"]

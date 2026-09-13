@@ -163,6 +163,34 @@ DEFAULT_SERVICEABLE_STATES = frozenset({
 #: Stall types that can never charge anything, regardless of connector fields.
 NON_CHARGING_TYPES = frozenset({"staging"})
 
+#: THE ONE STALL STATUS THAT MEANS "FREE NOW" (finding L-58). The frame carries
+#: `stalls[].status` (= stalls.status) and `stalls[].vehicle_id`
+#: (= stalls.current_vehicle_id) since 0209, and this module read NEITHER: every
+#: charge-capable stall in the frame was a point the plan could start on at
+#: t=0. Measured on the first live D3 cycle (run af2def1b, tick 10, 40 charging
+#: stalls of which 23 occupied): all four rows the solver planned to start now
+#: were onto stalls another vehicle was already plugged into, while 17 free
+#: stalls stood idle. The shield would have refused every one of them -- with a
+#: rule code, correctly -- and the proposer would have said nothing useful all
+#: run. A stall is a point THIS tick only if its status is this literal AND no
+#: vehicle currently holds it; any other status (occupied, reserved,
+#: maintenance, offline -- the vocabulary is the database's, not guessed here)
+#: and any held stall are not offered to the solver. A frame row with no
+#: `status` key at all (a fixture, an older producer) is treated as free, so
+#: the field's absence is visible in the plan rather than silently emptying it.
+#: Not modelled yet, and said so: when the current occupant will finish. That
+#: is what `sessions[]` is for, and until it is read a held stall is simply
+#: not planned on this tick rather than planned on at a guessed time.
+FREE_STALL_STATUS = "available"
+
+
+def stall_is_free(stall: dict) -> bool:
+    """True iff the frame says this stall can take a vehicle right now."""
+    status = stall.get("status")
+    if status is not None and str(status) != FREE_STALL_STATUS:
+        return False
+    return not stall.get("vehicle_id")
+
 #: THE PRODUCTION JOIN KEY (finding L-41). `ottoq_vehicle_classes` is keyed by
 #: vehicle_class_code; this bridge keyed its class table on the frame's
 #: `platform`, which that table does not have a column for, so the join the
@@ -473,10 +501,16 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
     #: kind -> the inlets the site actually accepts for it, kept only so an
     #: abstention can say what IS on site rather than only what is not.
     connectors_by_kind: dict[str, set[str]] = {}
+    busy = 0
     for st in frame.get("stalls", []):
         kind = st.get("type")
         kw = float(st.get("connector_max_kw") or 0)
         if kind in NON_CHARGING_TYPES or kw <= 0:
+            continue
+        if not stall_is_free(st):
+            #: L-58: occupied or held. Counted so the refusal below can say
+            #: "all busy" instead of "none exist"; never offered to the solver.
+            busy += 1
             continue
         inlets = _accepted_inlets(st)
         if not inlets:
@@ -510,6 +544,10 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
         kinds_on_site.add(cap)
         connectors_by_kind.setdefault(kind, set()).update(inlets)
     if not points:
+        if busy:
+            raise FrameError(f"frame has {busy} charge-capable stall(s) and every "
+                             f"one is occupied or held this tick; nothing free "
+                             f"to propose on")
         raise FrameError("frame has no charge-capable stalls that declare an "
                          "accepted inlet; nothing to propose on")
 
@@ -775,9 +813,17 @@ def propose(frame: dict, class_table: dict, *, site: dict,
         default_ready_delta_min=default_ready_delta_min,
         class_key=class_key)
 
+    #: L-58: how many charge-capable stalls the frame offered that were NOT
+    #: points this tick. Travels with the result so the fire record can show
+    #: "planned on 17 of 40" rather than a bare stall count.
+    stalls_busy = sum(1 for st in frame.get("stalls", [])
+                      if st.get("type") not in NON_CHARGING_TYPES
+                      and float(st.get("connector_max_kw") or 0) > 0
+                      and not stall_is_free(st))
+
     if not scenario["assets_spec"]["explicit"]:
         return {"proposals": abstentions, "abstained": len(abstentions),
-                "planned": 0, "solver": None,
+                "planned": 0, "solver": None, "stalls_busy": stalls_busy,
                 "note": "no plannable vehicles in frame"}
 
     #: THE BATCH BOUND, and why it is the caller's number and not a default.
@@ -960,4 +1006,5 @@ def propose(frame: dict, class_table: dict, *, site: dict,
         "abstained": len(abstentions) + len(deferred),
         "deferred": len(deferred),
         "solver": solver_record,
+        "stalls_busy": stalls_busy,
     }

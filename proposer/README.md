@@ -77,6 +77,23 @@ equal `inlet_type`. On the flagship depot all 84 charging stalls are `Multi` wit
 and one ignoring both would propose every vehicle onto every plug. Neither is what the engine
 does.
 
+### A stall somebody holds is not a point this tick (finding L-58)
+
+The frame has carried `stalls[].status` and `stalls[].vehicle_id` (`stalls.status`,
+`stalls.current_vehicle_id`) since 0209, and `frame_to_scenario` read neither: every
+charge-capable stall was a service point the plan could start on at t=0. It showed on the
+first live D3 cycle (run `af2def1b`, tick 10 — 40 charging stalls, 23 of them occupied): all
+four immediate starts the solver planned were onto stalls another vehicle was plugged into,
+with 17 free stalls idle. The shield would have refused each with a rule code, correctly, and
+the proposer would have contributed nothing all run. Now a stall is offered to the solver only
+if its `status` is exactly `available` **and** it holds no vehicle; the skipped count travels
+as `stalls_busy` on the result and `n_stalls_busy` on the fire record, so "planned on 17 of
+40" is a ledger fact. A row with no `status` key (fixtures, older producers) is treated as
+free, so the field's absence is visible in the plan rather than silently emptying it. **Not
+modelled yet, and said so:** when the occupant will finish — that is what `sessions[]` is for;
+until it is read, a held stall is not planned on this tick rather than planned on at a guessed
+time.
+
 ## Abstention is first-class
 
 No class-table entry, no readable `soc`, a target at or below the current charge, or no point
