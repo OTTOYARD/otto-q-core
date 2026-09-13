@@ -203,9 +203,9 @@ to get wrong:
 
 | item | state |
 |---|---|
-| `0263` the frame carries `reserved_by` / `reservation_expires_at` / `station_state` / per-vehicle reservation | designed by workflow, under adversarial review; **not applied** |
-| `0264` a pending `holds_tick` proposal holds the resource it names for one tick, behind a run-scoped key defaulting to 0 | designed by workflow, under adversarial review; **not applied** |
-| G46 (`db/checks/0187`) the canon rebases when another run's leftover legs move | designed by a second workflow; **round 42 is blocked on it** |
+| **`0265`** the frame carries `reserved_by` / `reservation_expires_at` / `station_state` / per-vehicle reservation (renumbered from 0263) | designed by workflow, under adversarial review; **not applied** |
+| **`0266`** a pending proposal holds the resource it names for one tick, behind a run-scoped key defaulting to 0 (renumbered from 0264) | designed by workflow, under adversarial review; **not applied** |
+| **`0263` + `0264`** G46 (`db/checks/0187`) and G48 (`db/checks/0190`): the canon rebases when another run's leftover legs move, and a replay pair is counted as a certification | designed by a second workflow; **round 42 is blocked on them**, and they take the 0263/0264 numbers because they apply first |
 | the runner | `.github/workflows/proposer-loop.yml` — manual dispatch, needs repository secrets `OTTOQ_DATABASE_URL` and (for the advisory fire) `ANTHROPIC_API_KEY`, neither of which exists yet |
 
 One measurement discipline was added tonight and applies to every future demo: **run
