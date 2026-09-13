@@ -223,18 +223,26 @@ ON CONFLICT (name) DO UPDATE
 -- ---------------------------------------------------------------------------
 DO $a$
 DECLARE
-  v_src text; v_fo uuid; v_busy_dep uuid; v_quiet_dep uuid;
+  v_src text; v_code text; v_fo uuid; v_busy_dep uuid; v_quiet_dep uuid;
   v_res public.ottoq_rule_result; v_expect int; v_busy_n int; v_quiet_n int;
 BEGIN
   SELECT p.prosrc INTO STRICT v_src FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='public' AND p.proname='ottoq_eval_sla_002_max_queue_depth';
 
-  --: A1. THE DEAD LITERALS ARE GONE and the real ones are present.
-  IF position('''queued''' in v_src) > 0 OR position('waiting_assignment' in v_src) > 0 THEN
-    RAISE EXCEPTION '0270 A1: a non-existent vehicle_state label is still in the body';
+  -- Strip line comments before asserting on content. THIS IS NOT COSMETIC: the
+  -- first attempt at this migration was ABORTED BY THIS VERY ASSERTION, because
+  -- the new body's own comment explains the fix by quoting the two dead literals,
+  -- and prosrc includes comments. The assertion was right that the strings were
+  -- present and wrong about what that meant. An assertion about CODE must read
+  -- code; otherwise the file cannot document its own change without failing.
+  v_code := regexp_replace(v_src, '--[^' || chr(10) || ']*', '', 'g');
+
+  --: A1. THE DEAD LITERALS ARE GONE FROM THE CODE, and the real ones are present.
+  IF position('''queued''' in v_code) > 0 OR position('waiting_assignment' in v_code) > 0 THEN
+    RAISE EXCEPTION '0270 A1: a non-existent vehicle_state label is still in the executable body';
   END IF;
-  IF position('arrived_at_gate' in v_src) = 0
-     OR position('staged_awaiting_service' in v_src) = 0 THEN
+  IF position('arrived_at_gate' in v_code) = 0
+     OR position('staged_awaiting_service' in v_code) = 0 THEN
     RAISE EXCEPTION '0270 A1: the real waiting-state labels are not in the body';
   END IF;
 
