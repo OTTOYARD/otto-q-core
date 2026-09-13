@@ -364,7 +364,8 @@ repo_manifest(version, name, file) AS (
     ('20260913011239'::text, '0262_the_hold_key_the_setter_refused'::text, '0262_the_hold_key_the_setter_refused.sql'::text),
     ('20260913122605'::text, '0265_the_frame_carries_what_the_selector_filters_on'::text, '0265_the_frame_carries_what_the_selector_filters_on.sql'::text),
     ('20260913135634'::text, '0266_the_canon_stops_being_hostage_to_another_runs_leftovers'::text, '0266_the_canon_stops_being_hostage_to_another_runs_leftovers.sql'::text),
-    ('20260913141438'::text, '0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run'::text, '0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run.sql'::text)
+    ('20260913141438'::text, '0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run'::text, '0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run.sql'::text),
+    ('PENDING'::text, '0268_0267_never_classified_itself_and_the_floor_swallowed_every_column'::text, '0268_0267_never_classified_itself_and_the_floor_swallowed_every_column.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
