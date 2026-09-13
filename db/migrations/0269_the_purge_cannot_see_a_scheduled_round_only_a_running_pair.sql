@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913205636
 -- migration-name:    0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair
 --
 -- 0269  THE PURGE CANNOT SEE A SCHEDULED ROUND, ONLY A RUNNING PAIR  (G23)
@@ -459,5 +459,58 @@ END $a$;
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+--
+-- APPLIED 2026-09-13 20:56:36 UTC (3:56 PM CT) as version 20260913205636,
+-- name 0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair
+-- (prefix included -- 0266 was registered without its 0NNN_ prefix and had to be
+-- repaired by hand about twenty minutes later; check-drift Section C compares on
+-- the full name).
+--
+-- Window at apply: pairs_in_flight 0, cert_jobs 0, runs_live 0,
+-- blocking run-scope defects 0, pre-image md5 b786dbd09548e39f5f35abe22dd467bb.
+--
+-- PRE -> POST
+--   prosrc md5    b786dbd09548e39f5f35abe22dd467bb -> 65051f58027f73f07797110e0abbf726
+--   prosrc length 5900 -> 7735
+--   (the post-image md5 is byte-identical to the one the whole-file dry run
+--    predicted before commit, so what ran is what was tested)
+--   ottoq_cert_lineage row present, forces_recert = false
+--   ottoq_schema_snapshots '0269-pre' present
+--   ottoq_cert_recert_floor() 2026-09-12 16:50:23.319089+00 -- UNMOVED. This is
+--   the 0267 defect not recurring: 0267 shipped without its lineage row and the
+--   floor jumped to its apply time, blanking both instruments until 0268.
+--
+-- VERIFIED -- and "applied without error" is not verification, so this is the
+-- behaviour, measured on the INSTALLED procedure, in dry-run only.
+--
+--   The observable: the guard sits immediately before the procedure reads
+--   ottoq_retention_policy, so that table's scan counter separates "skipped"
+--   from "proceeded". THE FIRST TWO ATTEMPTS AT THIS INSTRUMENT READ ZERO IN
+--   BOTH ARMS AND WERE WRONG, NOT THE GUARD: stats_fetch_consistency = 'cache'
+--   serves one snapshot per transaction, and pg_stat_force_next_flush() only
+--   flushes at transaction end -- so a probe that CALLs and reads inside a
+--   single DO block cannot move. Split across transactions it discriminates:
+--
+--     no round scheduled            delta +1   PROCEEDED past the guard
+--     imminent round scheduled      delta  0   SKIPPED before the policy read
+--     round that fired 26 h ago     delta +1   PROCEEDED -- the guard does not latch
+--     stray r9xx_ jobs afterwards       0
+--
+--   The third line is the one that matters: it is defect (1) from the header,
+--   observed rather than argued. A presence-based guard would have read 0 there
+--   and, once the purge was on cron, stayed 0 every night forever.
+--
+--   In-migration, A6 proved the same three cases against live cron.job rows, and
+--   both counterfactuals were measured before apply: A6 RAISES on a dead regex
+--   ('^zzz[0-9]+_' -- the mutation that passed all five of the first draft's
+--   assertions), and A6 RAISES on the first draft's own presence-based
+--   predicate. An assertion that convicts the design it replaced has power.
+--
+-- NOT DONE, DELIBERATELY: no non-dry call was made. See the header -- 0251's
+-- purged_at stamp is set-wide, so a single run crossing the 48-hour boundary
+-- during the test would have marked every doomed run GONE to ottoq_kpi_five,
+-- irreversibly, to prove something A6 proves for free.
+--
+-- NEXT: G23's last item -- schedule ottoq_retention_purge_runs on cron. That is
+-- now safe with respect to rounds and was not before this file.
 -- ---------------------------------------------------------------------------

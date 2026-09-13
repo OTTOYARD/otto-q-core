@@ -253,7 +253,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0266](db/migrations/0266_the_canon_stops_being_hostage_to_another_runs_leftovers.sql) | `20260913135634` | yes — ledger | THE CANON STOPS BEING HOSTAGE TO ANOTHER RUN'S LEFTOVERS  (G46 + G48) |
 | [0267](db/migrations/0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run.sql) | `20260913141438` | yes — ledger | THE FIRE LOG REGISTERED A STAMP AND NEVER BOUND IT TO A RUN  (G23) |
 | [0268](db/migrations/0268_0267_never_classified_itself_and_the_floor_swallowed_every_column.sql) | `20260913142959` | yes — ledger | 0267 NEVER CLASSIFIED ITSELF, AND THE FLOOR SWALLOWED EVERY COLUMN |
-| [0269](db/migrations/0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair.sql) | `PENDING` | no — pending | THE PURGE CANNOT SEE A SCHEDULED ROUND, ONLY A RUNNING PAIR  (G23) |
+| [0269](db/migrations/0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair.sql) | `20260913205636` | yes — ledger | THE PURGE CANNOT SEE A SCHEDULED ROUND, ONLY A RUNNING PAIR  (G23) |
 
 135 migrations indexed.
 
