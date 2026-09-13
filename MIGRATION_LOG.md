@@ -254,7 +254,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0267](db/migrations/0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run.sql) | `20260913141438` | yes — ledger | THE FIRE LOG REGISTERED A STAMP AND NEVER BOUND IT TO A RUN  (G23) |
 | [0268](db/migrations/0268_0267_never_classified_itself_and_the_floor_swallowed_every_column.sql) | `20260913142959` | yes — ledger | 0267 NEVER CLASSIFIED ITSELF, AND THE FLOOR SWALLOWED EVERY COLUMN |
 | [0269](db/migrations/0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair.sql) | `20260913205636` | yes — ledger | THE PURGE CANNOT SEE A SCHEDULED ROUND, ONLY A RUNNING PAIR  (G23) |
-| [0270](db/migrations/0270_the_only_queue_depth_rule_crashes_on_two_states_that_do_not_exist.sql) | `PENDING` | no — pending | THE ONLY QUEUE-DEPTH RULE CRASHES ON TWO STATES THAT DO NOT EXIST |
+| [0270](db/migrations/0270_the_only_queue_depth_rule_crashes_on_two_states_that_do_not_exist.sql) | `20260913225716` | yes — ledger | THE ONLY QUEUE-DEPTH RULE CRASHES ON TWO STATES THAT DO NOT EXIST |
 
 136 migrations indexed.
 

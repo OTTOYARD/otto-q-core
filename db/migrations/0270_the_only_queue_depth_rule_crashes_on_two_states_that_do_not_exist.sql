@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913225716
 -- migration-name:    0270_the_only_queue_depth_rule_crashes_on_two_states_that_do_not_exist
 --
 -- 0270  THE ONLY QUEUE-DEPTH RULE CRASHES ON TWO STATES THAT DO NOT EXIST
@@ -314,5 +314,40 @@ END $a$;
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+-- Applied 2026-09-13 22:57:16 UTC as version 20260913225716 (5:57 PM CT).
+--
+--   pre-image  md5(prosrc) = c17ac1c04db6cb23b1f686754b175b5d
+--   post-image md5(prosrc) = f27c9c61e8bb86a91ab47316f44486c2
+--   forces_recert = false  (evaluator is not on the certified decide path;
+--                           ottoq_cert_recert_floor() unmoved at
+--                           2026-09-12 16:50:23.319089+00)
+--   snapshot present in the migration ledger.
+--
+-- LIVE VERIFICATION, after apply, against two real depots of one real operator:
+--
+--   BUSY depot:  passed=t  reason="queue depth 12 of 50 allowed"
+--   QUIET depot: passed=t  reason="queue depth 0 of 50 allowed"
+--
+-- Before this migration the same call raised
+-- 22P02: invalid input value for enum vehicle_state: "queued".
+-- So the rule now (a) runs at all, (b) counts a real non-zero population, and
+-- (c) is depot-scoped -- the same operator reads 12 at one depot and 0 at
+-- another in the same second. A4 would have refused a both-zero result as
+-- indistinguishable from the broken behaviour.
+--
+-- THE FIRST APPLY ABORTED, BY THIS FILE'S OWN A1.
+-- A1 greps pg_get_functiondef/prosrc for the dead literals 'queued' and
+-- waiting_assignment. prosrc includes COMMENTS, and the new body's explanatory
+-- comment quotes both literals to say they do not exist. So A1 fired on its own
+-- documentation and apply_migration rolled the whole transaction back -- nothing
+-- was half-applied, which is the behaviour we want from a self-aborting guard.
+-- Fixed by stripping line comments before asserting:
+--     v_code := regexp_replace(v_src, '--[^' || chr(10) || ']*', '', 'g');
+--
+-- THE PROCESS FAILURE UNDERNEATH IT, recorded because it will recur otherwise.
+-- The dry run passed. It passed because I condensed the header comments out of
+-- the dry-run payload: I dry-ran a different artifact than I applied. That is
+-- exactly the 0224 hazard, and APPLYING.md sect.4 already says to prove the digest
+-- if you condense. Rule adopted: DRY-RUN THE FILE, BYTE FOR BYTE, OR DO NOT
+-- CLAIM IT WAS DRY-RUN.
 -- ---------------------------------------------------------------------------
