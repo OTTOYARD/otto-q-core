@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913141438
 -- migration-name:    0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run
 --
 -- 0267  THE FIRE LOG REGISTERED A STAMP AND NEVER BOUND IT TO A RUN  (G23)
@@ -237,5 +237,31 @@ END $a$;
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+--
+-- APPLIED 2026-09-13 14:14:38 UTC (9:14 AM CT) as migration version
+-- 20260913141438, via apply_migration. Window verified clean immediately
+-- before: 0 pair calls in flight, 0 round jobs, 0 runs running or paused,
+-- 0 FKs on the fire log, exactly 1 blocking run-scope defect, 4 fire rows.
+--
+-- POST-IMAGE:
+--   constraint  FOREIGN KEY (sim_run_id) REFERENCES ottoq_sim_runs(sim_run_id)
+--   confdeltype 'a'  (NO ACTION -- clause (c) untripped)
+--   convalidated true (it checked the rows, it did not merely satisfy the guard)
+--   ottoq_check_run_scope_registry(): 0 'block', 0 'warn'
+--   ottoq_proposer_fire_log: 4 rows, unchanged
+--
+-- A4 CALLED THE PURGE ITSELF AND IT NO LONGER REFUSES. That assertion was
+-- proven discriminating BEFORE this file was committed: the identical CALL,
+-- run read-only against the pre-image, returned
+--   P0001 :: purge refused: 1 blocking run-scope defect(s).
+-- captured as data through set_config rather than read off a NOTICE, because
+-- this channel does not return NOTICEs and an assertion nobody can see the
+-- output of is not evidence. It can only pass after the ALTER.
+--
+-- ONE NAMING POINT, learned the hard way twenty minutes earlier on 0266 and
+-- applied here: the `name` passed to apply_migration carries the 0NNN_ prefix,
+-- matching this file's `-- migration-name:` header and every ledger row from
+-- 0243 on. 0266 was registered without it and had to be corrected in place;
+-- see db/checks/0199. scripts/check-drift.sql Section C is the instrument that
+-- would have caught it, and the rule is to run it rather than paraphrase it.
 -- ---------------------------------------------------------------------------

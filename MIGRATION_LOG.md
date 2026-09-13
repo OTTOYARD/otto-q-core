@@ -251,7 +251,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0262](db/migrations/0262_the_hold_key_the_setter_refused.sql) | `20260913011239` | yes — ledger | THE HOLD KEY THE SETTER REFUSED  (D3: the one-tick hold could not be switched on) |
 | [0265](db/migrations/0265_the_frame_carries_what_the_selector_filters_on.sql) | `20260913122605` | yes — ledger | THE FRAME CARRIES WHAT THE SELECTOR FILTERS ON |
 | [0266](db/migrations/0266_the_canon_stops_being_hostage_to_another_runs_leftovers.sql) | `20260913135634` | yes — ledger | THE CANON STOPS BEING HOSTAGE TO ANOTHER RUN'S LEFTOVERS  (G46 + G48) |
-| [0267](db/migrations/0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run.sql) | `PENDING` | no — pending | THE FIRE LOG REGISTERED A STAMP AND NEVER BOUND IT TO A RUN  (G23) |
+| [0267](db/migrations/0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run.sql) | `20260913141438` | yes — ledger | THE FIRE LOG REGISTERED A STAMP AND NEVER BOUND IT TO A RUN  (G23) |
 
 133 migrations indexed.
 
