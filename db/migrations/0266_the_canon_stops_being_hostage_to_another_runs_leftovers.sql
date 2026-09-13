@@ -1,7 +1,14 @@
 -- migration-version: PENDING
 -- migration-name: 0266_the_canon_stops_being_hostage_to_another_runs_leftovers
 --
--- 0266  THE CANON STOPS BEING HOSTAGE TO ANOTHER RUN'S LEFTOVERS  (G46)
+-- 0266  THE CANON STOPS BEING HOSTAGE TO ANOTHER RUN'S LEFTOVERS  (G46 + G48)
+--
+-- TWO FINDINGS, ONE FILE, and not for convenience: db/checks/0190 says G48's fix
+-- "belongs in the same migration as G46's ... because it is the same function, the
+-- same round, and the same recert conversation." Both change what
+-- ottoq_cert_matrix admits to a canon; applying them separately would mean two
+-- recert conversations about one instrument. G48 is section 1's `pair` CTE
+-- predicate and assertions A10/A10b; everything else is G46.
 --
 -- WHY. Round 41 passed 10 of 10 pairs with 13 of 14 atoms byte-identical to round
 -- 40 in all nine columns, and the canon rebased anyway. The one atom that moved was
@@ -132,6 +139,27 @@ WITH fl AS (
      AND r.validation_status IS NOT NULL
      AND r.validation_notes IS NOT NULL
      AND jsonb_typeof((r.validation_notes::jsonb) -> 'arm_a') = 'object'
+     /* 0266 (G48, db/checks/0190): A REPLAY PAIR IS NOT A CERTIFICATION.
+        ottoq_determinism_pair_replay builds its arms with the SAME
+        run_by='cert_harness' and the SAME validation_notes shape, then injects a
+        captured proposal stream into both. It asks a different question -- can a
+        NONDETERMINISTIC proposer's recorded stream be re-consumed identically --
+        with proposals deliberately present, where a certification runs the core
+        alone (0152). Their h_prop atoms are SUPPOSED to differ.
+        Two failure modes, and the second is the dangerous one: a failing replay
+        breaks a column's streak (noise), and a PASSING replay becomes the
+        column's canon, whose h_prop is then the injected stream's hash -- so
+        every later honest certification disagrees with it, correctly, and the
+        column reads as an engine regression. That is G46's silent rebase with a
+        worse story. Nine replay pairs already exist; the only thing protecting
+        today's canon is that all nine predate the recert floor.
+        BOTH clauses, deliberately. The first excludes a pair that names a
+        replay_id; the second survives a future replay that forgets to. And
+        neither excludes the two ZERO-INJECTION CONTROL pairs, which are honest
+        certification data: `replay` is present with a NULL VALUE on a control,
+        so the obvious `NOT (notes ? 'replay')` would wrongly drop them. */
+     AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+     AND COALESCE((r.validation_notes::jsonb -> 'arm_a' ->> 'replay_injected')::int, 0) = 0
    ORDER BY r.depot_id, r.started_at, r.sim_run_id
 ), keyed AS (
   SELECT p.c_depot, p.t0, p.ok, p.st,
@@ -294,6 +322,11 @@ WITH fl AS (
      AND r.validation_status IS NOT NULL
      AND r.validation_notes IS NOT NULL
      AND jsonb_typeof((r.validation_notes::jsonb) -> 'arm_a') = 'object'
+     --: G48, the SAME predicate as the matrix, verbatim. The two instruments
+     --: must agree about which pairs exist or A5's column-set equality is a
+     --: coincidence rather than a guarantee.
+     AND (r.validation_notes::jsonb ->> 'replay') IS NULL
+     AND COALESCE((r.validation_notes::jsonb -> 'arm_a' ->> 'replay_injected')::int, 0) = 0
    ORDER BY r.depot_id, r.started_at, r.sim_run_id
 ), keyed AS (
   SELECT p.c_depot, p.t0, p.st,
@@ -592,7 +625,58 @@ BEGIN
     RAISE EXCEPTION '0266 A9: on % pair(s) the two digests together do not decide endst equality; the split loses a leaf', v_bad;
   END IF;
 
-  RAISE NOTICE '0266: A1-A9 passed; recert floor unmoved at %', v_rf;
+  --: A10. G48: THE REPLAY PREDICATE EXCLUDES REPLAYS AND KEEPS THE CONTROLS.
+  --:      Run over a WIDE window on purpose. All nine existing replay pairs
+  --:      predate the recert floor -- that coincidence is the only thing
+  --:      protecting today's canon -- so an assertion scoped to the floor would
+  --:      examine zero replay pairs and pass vacuously, which is exactly the
+  --:      failure this file must not ship.
+  --:
+  --:      TWO NUMBERS, and the second is the one that matters. Excluding 7 is
+  --:      easy; KEEPING the 2 zero-injection controls is what a near-miss
+  --:      predicate gets wrong. `replay` is present with a NULL VALUE on a
+  --:      control, so `NOT (notes ? 'replay')` would drop honest certification
+  --:      data and this assertion would catch it.
+  SELECT count(*) FILTER (WHERE NOT ((j->>'replay') IS NULL
+                            AND COALESCE((j->'arm_a'->>'replay_injected')::int, 0) = 0)),
+         count(*) FILTER (WHERE (j ? 'replay') AND (j->>'replay') IS NULL
+                            AND COALESCE((j->'arm_a'->>'replay_injected')::int, 0) = 0)
+    INTO v_n, v_bad
+    FROM (SELECT DISTINCT ON (r.depot_id, r.started_at) (r.validation_notes::jsonb) AS j
+            FROM public.ottoq_sim_runs r
+           WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
+             AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
+           ORDER BY r.depot_id, r.started_at, r.sim_run_id) q;
+  IF v_n <> 7 THEN
+    RAISE EXCEPTION '0266 A10: predicate excludes % pair(s), expected the 7 injected replays', v_n;
+  END IF;
+  IF v_bad <> 2 THEN
+    RAISE EXCEPTION '0266 A10: % zero-injection control pair(s) survive, expected 2; the predicate is dropping honest certification data', v_bad;
+  END IF;
+
+  --: A10b. AND THE INSTRUMENT AGREES WITH THE PREDICATE. The matrix's own pair
+  --:       count over the same wide window must equal the non-inconclusive pairs
+  --:       that pass the predicate -- so the clause is actually in the body and
+  --:       not merely in a comment.
+  SELECT count(*) INTO v_n
+    FROM (SELECT DISTINCT ON (r.depot_id, r.started_at) r.validation_status AS vs,
+                 (r.validation_notes::jsonb) AS j
+            FROM public.ottoq_sim_runs r
+           WHERE r.run_by='cert_harness' AND r.validation_notes IS NOT NULL
+             AND r.validation_status IS NOT NULL
+             AND jsonb_typeof((r.validation_notes::jsonb)->'arm_a')='object'
+             AND r.started_at >= '2000-01-01'::timestamptz
+           ORDER BY r.depot_id, r.started_at, r.sim_run_id) q
+   WHERE q.vs <> 'inconclusive'
+     AND (q.j->>'replay') IS NULL
+     AND COALESCE((q.j->'arm_a'->>'replay_injected')::int, 0) = 0;
+  SELECT COALESCE(sum(pairs_seen), 0) INTO v_bad
+    FROM public.ottoq_cert_matrix('2000-01-01'::timestamptz);
+  IF v_n <> v_bad THEN
+    RAISE EXCEPTION '0266 A10b: matrix reports % pairs, the predicate admits %', v_bad, v_n;
+  END IF;
+
+  RAISE NOTICE '0266: A1-A10b passed; recert floor unmoved at %', v_rf;
 END $a$;
 
 -- ---------------------------------------------------------------------------

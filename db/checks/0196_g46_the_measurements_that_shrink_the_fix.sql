@@ -176,6 +176,36 @@ SELECT 'ottoq_cert_matrix' AS fn,
 --     recovered is not a weakened standard, it is streaks that another run's
 --     backlog reset.
 -- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- THE SEQUENCING THIS FORCES, which is the REVERSE of what db/checks/0191 implied.
+--
+-- 0191 recommended "fix the instrument and let the janitor clean the floor", and
+-- the two halves were read as independent. They are not, and the order matters:
+--
+--   THE RETENTION PURGE IS ITSELF A CANON-REBASING EVENT. Its doomed set is 939
+--   runs carrying ~3.9M rows, among them 591,871 ottoq_itinerary_legs. Every one
+--   of those rows that is FOREIGN and LIVE at the flagship depot is inside
+--   endst.legs.fgn. Round 41's rebase was caused by NINE such legs disappearing.
+--   A purge pass deletes them by the hundred.
+--
+--   So running the purge before this split would rebase every flagship canon
+--   again, harder, and the round after it would read as a mass engine regression
+--   that is nothing of the kind. G23's "one observed pass" and G46's fix are not
+--   two independent items; the fix is a PRECONDITION for the pass.
+--
+-- ORDER: 0266 applied and its assertions green -> ONE observed purge pass ->
+-- round 42. After 0266 the purge can only move the residue column, where a move
+-- is the correct and expected reading -- a purge is precisely a change in what
+-- other runs have left lying around -- and ottoq_cert_residue.sections_moved will
+-- name `legs` for a reason that is true.
+--
+-- AND THE PURGE THEN BECOMES THE FIRST REAL TEST OF THE SPLIT, better than any
+-- assertion in the migration: a large, deliberate, attributable change to foreign
+-- residue that must move the residue column and must NOT move a single engine
+-- column. If an engine column moves across an observed purge pass, the split is
+-- drawn in the wrong place and this file is wrong.
+-- ---------------------------------------------------------------------------
 -- ---------------------------------------------------------------------------
 -- THE DESIGN THESE FIVE MEASUREMENTS LEAVE
 --
@@ -205,6 +235,24 @@ SELECT 'ottoq_cert_matrix' AS fn,
 --   would discard the function's privileges. `c_endst` keeps its name and type
 --   and changes meaning; the meaning is stated in the function's COMMENT and
 --   here.
+--
+--   AND G48 RIDES ALONG, because db/checks/0190 says it must: "the fix ... belongs
+--   in the same migration as G46's ... because it is the same function, the same
+--   round, and the same recert conversation." Both change what ottoq_cert_matrix
+--   admits to a canon, and splitting them would mean two recert conversations
+--   about one instrument. 0266 section 1 carries the predicate
+--       AND (validation_notes::jsonb ->> 'replay') IS NULL
+--       AND COALESCE((validation_notes::jsonb->'arm_a'->>'replay_injected')::int,0) = 0
+--   in BOTH instruments' pair CTE, so the two cannot disagree about which pairs
+--   exist. Verified 2026-09-13 against the live database: 9 pairs carry the key,
+--   7 named a replay_id, 7 injected, and the predicate excludes exactly those 7
+--   while KEEPING the 2 zero-injection controls -- which are honest certification
+--   data. The obvious `NOT (notes ? 'replay')` would drop them, because `replay`
+--   is present with a JSON NULL value on a control; checked in SQL rather than
+--   assumed: ('{"replay": null}'::jsonb ? 'replay') is TRUE, while
+--   ('{"replay": null}'::jsonb ->> 'replay') IS NULL is also TRUE.
+--   All nine predate the recert floor, so an assertion scoped to the floor would
+--   pass vacuously -- 0266's A10 runs over a wide window for that reason.
 --
 --   WHAT THIS DOES NOT DO, said plainly: it does not clean the nine legs. They
 --   are pre-janitor backlog from a run that ended 12h50m before 0089 shipped the
