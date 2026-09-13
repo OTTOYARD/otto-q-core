@@ -1149,3 +1149,30 @@ def test_a_vehicle_the_plan_gives_no_charge_to_is_counted_abstained_not_planned(
     stall_rows = [row for row in r["proposals"] if not row["proposal"]["abstain"]]
     assert r["planned"] == len(stall_rows)
     assert r["planned"] + r["abstained"] == len(r["proposals"]) == 2
+
+
+# ---- L-60: the states a fire plans for can be narrowed, never widened ----------
+
+
+def test_serviceable_states_narrow_the_batch_to_the_held_population():
+    """A staged vehicle usually already holds a booking the frame does not show
+    and is never re-decided; the one-tick hold holds ARRIVALS. Narrowing to
+    arrived_at_gate plans for exactly those and gives the rest no row at all --
+    they are not serviceable for this fire, not abstentions."""
+    frame = _frame([_vehicle("v-gate", soc=30, state="arrived_at_gate"),
+                    _vehicle("v-staged", soc=25, state="staged_awaiting_service")],
+                   [_stall("s-1"), _stall("s-2")])
+    r = propose(frame, CLASSES, site=SITE,
+                serviceable_states=frozenset({"arrived_at_gate"}))
+    assert [row["entity_id"] for row in r["proposals"]] == ["v-gate"]
+    full = propose(frame, CLASSES, site=SITE)
+    assert {row["entity_id"] for row in full["proposals"]} == {"v-gate", "v-staged"}
+
+
+def test_serviceable_states_cannot_widen_past_the_default_set():
+    frame = _frame([_vehicle("v-1", soc=30)], [_stall("s-1")])
+    with pytest.raises(FrameError, match="only narrow"):
+        propose(frame, CLASSES, site=SITE,
+                serviceable_states=frozenset({"arrived_at_gate", "deployed"}))
+    with pytest.raises(FrameError, match="at least one"):
+        propose(frame, CLASSES, site=SITE, serviceable_states=frozenset())

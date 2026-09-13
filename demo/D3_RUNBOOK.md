@@ -15,12 +15,24 @@ last certification round judged. Never start a demo run while a certification pa
 ```sql
 SELECT public.ottoq_sim_run_scenario('busy_day', 424242, 'proposer_demo') AS run_id;
 -- <run> below is the returned uuid
-SELECT ottoq_policy_set('run', '<run>', 'cuopt_propose_enabled',     0, 'd3_demo');  -- no NVIDIA; ledgered as policy_disabled
-SELECT ottoq_policy_set('run', '<run>', 'proposer_hold_enabled',     1, 'd3_demo');  -- the one-tick hold, for any holds_tick source (0259)
-SELECT ottoq_policy_set('run', '<run>', 'orchestrator_agent_enabled',0, 'd3_demo');  -- keep the dial-writing agent out of the picture
+SELECT ottoq_policy_set('run', '<run>', 'cuopt_propose_enabled',          0, 'd3_demo');  -- no NVIDIA; ledgered as policy_disabled
+SELECT ottoq_policy_set('run', '<run>', 'proposer_hold_enabled',          1, 'd3_demo');  -- the one-tick hold GATE, for any holds_tick source (0259; key registered by 0262)
+SELECT ottoq_policy_set('run', '<run>', 'cuopt_first_refusal_max_defers', 1, 'd3_demo');  -- the hold ARM: 0152 set the global tier to 0, so nothing is armed without this
+SELECT ottoq_policy_set('run', '<run>', 'orchestrator_agent_enabled',     0, 'd3_demo');  -- keep the dial-writing agent out of the picture
+-- READ EVERY RETURN. Each call answers {"ok": true, ...}; an {"ok": false, "error": "unknown_param"}
+-- is a refusal, not a warning. The first demo run (af2def1b, 2026-09-13) issued the hold call,
+-- got ok=false, and ran with the hold OFF -- 54 proposer rows submitted, zero heard (0262).
 UPDATE ottoq_sim_runs SET payload = COALESCE(payload,'{}'::jsonb) || '{"speed_x": 0.05}'::jsonb
  WHERE sim_run_id = '<run>';  -- metronome: ~120 s per tick, decide every other tick
 ```
+
+**Why the hold matters, measured (0262 / db/checks/0186 §1).** Without it the decide path assigns
+every arriving vehicle in the tick it arrives, and a vehicle already waiting in staging carries a
+booking the frame does not show and is never re-decided. An out-of-process proposer that runs
+between ticks then sees only vehicles nobody will decide again, or free stalls the local heuristic
+will take in the same tick it re-reads them: on run `af2def1b` fires 3 and 4 submitted 54 rows and
+the shield saw none — 34 superseded, 20 left pending. With the hold, an unreserved arrival is held
+out of the local cursor for one decide tick; target those (`--states arrived_at_gate`).
 
 `run_by='proposer_demo'` is deliberately not `cert_harness`: Posture A (0241) refuses
 uncertified proposers into certification arms, which is correct, and this run is not one.
@@ -32,7 +44,8 @@ CP-SAT, from a machine with a DSN (`bridge/README.md`):
 ```bash
 python3 -m bridge.proposer_bridge --dsn "$DATABASE_URL" --run <run> \
   --depot 11111111-1111-1111-1111-111111111111 --site bridge/sites/nashville-flagship.json \
-  --via batch --max-assets 8 --loop --interval-s 30 --start-within 30 --default-ready-delta 240
+  --via batch --max-assets 8 --loop --interval-s 30 --start-within 30 --default-ready-delta 240 \
+  --states arrived_at_gate
 ```
 
 `--start-within` is the tick window: rows the plan starts later than that are submitted as

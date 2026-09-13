@@ -98,6 +98,20 @@ And the accounting beside it (finding L-59): `planned` counts rows that **name a
 solver admits but gives no charge operation comes back as an abstain row and is counted as one; the
 first tick-16 fire on run `af2def1b` had read "8 planned" over six stall rows before this was fixed.
 
+### 'Pending' is not 'heard' (finding L-60)
+
+Measured on the first live D3 run (`af2def1b`, 2026-09-13): 54 `forward_lex` rows submitted across
+two fires, **zero** reached the shield. Two reasons, neither a refusal. A vehicle waiting in staging
+usually already holds a booking the frame does not show, and the decide path re-decides a vehicle
+only while it holds none — so a proposal for it sits `pending` until its TTL and is never looked at.
+And an arrival is decided in the tick it arrives, by the local heuristic, unless the one-tick hold
+(0259) is on for the run — which it could not be, because its gate key was never registered with
+`ottoq_policy_set` (0262). The population an out-of-process proposer can be heard on is the one the
+hold is holding: unreserved arrivals. `propose(..., serviceable_states=...)` and the bridge's
+`--states` narrow the fire to it; the set can only narrow, never widen, and the fire record carries
+it as `serviceable_states`. The frame-side fix — carry the booking so the proposer can see it — is a
+kernel change and is not made here.
+
 ## Abstention is first-class
 
 No class-table entry, no readable `soc`, a target at or below the current charge, or no point

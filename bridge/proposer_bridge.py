@@ -139,7 +139,8 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
          default_ready_delta_min: int = DEFAULT_READY_DELTA_MIN,
          start_within_min: int = DEFAULT_START_WITHIN_MIN,
          allow_rejection: bool = False,
-         fired_at: str | None = None) -> dict:
+         fired_at: str | None = None,
+         serviceable_states: frozenset[str] | None = None) -> dict:
     """One proposer invocation over one frame. Pure: writes nothing.
 
     Returns {"rows": [...door-shaped rows...], "fire": {...the fire record...}}.
@@ -155,8 +156,12 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
     class_table = class_table_from_rows(class_rows)
     vehicles = frame.get("vehicles") or []
     n_vehicles = len(vehicles)
-    n_in_serviceable_state = sum(
-        1 for v in vehicles if v.get("state") in DEFAULT_SERVICEABLE_STATES)
+    #: L-60: the states this fire plans for. A narrowing only (the proposer
+    #: refuses anything outside its default set); on the record so "planned for
+    #: the held arrivals only" is a ledger fact and not a memory.
+    states = (frozenset(serviceable_states) if serviceable_states is not None
+              else DEFAULT_SERVICEABLE_STATES)
+    n_in_serviceable_state = sum(1 for v in vehicles if v.get("state") in states)
 
     record: dict[str, Any] = {
         "source": SOURCE,
@@ -169,6 +174,7 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
         "class_table_hash": content_hash(class_table),
         "n_vehicles": n_vehicles,
         "n_in_serviceable_state": n_in_serviceable_state,
+        "serviceable_states": sorted(states),
         "n_stalls": len(frame.get("stalls") or []),
         #: L-58: of those, how many the frame says are occupied or held right
         #: now and were therefore never offered to the solver. Recorded on
@@ -187,7 +193,8 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
                          hour_of_day=hour_of_day, max_assets=max_assets,
                          det_budget_s=det_budget_s, ready_by_min=ready_by_min,
                          default_ready_delta_min=default_ready_delta_min,
-                         allow_rejection=allow_rejection)
+                         allow_rejection=allow_rejection,
+                         serviceable_states=states)
     except FrameError as exc:
         #: e.g. "frame has no charge-capable stalls that declare an accepted
         #: inlet". Nothing to propose ON, which is a fact about the frame and is
@@ -399,7 +406,8 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              regime: bool = False, loop: bool = False, interval_s: float = 10.0,
              max_fires: int | None = None, log=print,
              default_ready_delta_min: int = DEFAULT_READY_DELTA_MIN,
-             start_within_min: int = DEFAULT_START_WITHIN_MIN) -> list[dict]:
+             start_within_min: int = DEFAULT_START_WITHIN_MIN,
+             serviceable_states: frozenset[str] | None = None) -> list[dict]:
     """Fetch → propose → submit, once or in a loop while the run is running.
 
     Every fire is committed in its own transaction so the door's tick_seq stamp
@@ -428,7 +436,8 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                               hour_of_day=(run["sim_hour"] if regime else None),
                               max_assets=max_assets, det_budget_s=det_budget_s,
                               default_ready_delta_min=default_ready_delta_min,
-                              start_within_min=start_within_min)
+                              start_within_min=start_within_min,
+                              serviceable_states=serviceable_states)
                 rows, record = result["rows"], result["fire"]
                 record["tick_count_at_fetch"] = run["tick_count"]
                 receipt: dict[str, Any] = {"fire": record}
@@ -467,6 +476,16 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
 # ---------------------------------------------------------------------------
 
 
+def _parse_states(spec: str | None) -> frozenset[str] | None:
+    """`--states a,b` -> frozenset; None stays None (the default set)."""
+    if spec is None:
+        return None
+    states = frozenset(s.strip() for s in spec.split(",") if s.strip())
+    if not states:
+        raise BridgeError("--states names no state")
+    return states
+
+
 def _load_json(path: str) -> Any:
     return json.loads(Path(path).read_text())
 
@@ -494,6 +513,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--start-within", type=int, default=DEFAULT_START_WITHIN_MIN,
                     help="submit only charges the plan starts within this many minutes; "
                          "later ones abstain with their planned start")
+    ap.add_argument("--states", default=None,
+                    help="comma-separated SUBSET of the serviceable states to plan for "
+                         "(narrows; default all four). D3: arrived_at_gate is the "
+                         "population the one-tick hold is holding (L-60)")
     ap.add_argument("--regime", action="store_true",
                     help="live only: resolve the regime from the run's sim hour "
                          "(the expensive chain; default is the cheap two-pass)")
@@ -513,7 +536,8 @@ def main(argv: list[str] | None = None) -> int:
                                 regime=args.regime, loop=args.loop,
                                 interval_s=args.interval_s, max_fires=args.max_fires,
                                 default_ready_delta_min=args.default_ready_delta,
-                                start_within_min=args.start_within)
+                                start_within_min=args.start_within,
+                                serviceable_states=_parse_states(args.states))
             if args.json_out:
                 Path(args.json_out).write_text(json.dumps(receipts, indent=1, default=str))
             return 0
@@ -523,7 +547,8 @@ def main(argv: list[str] | None = None) -> int:
                       sim_run_id=args.run, depot_id=args.depot,
                       max_assets=args.max_assets, det_budget_s=args.det_budget,
                       default_ready_delta_min=args.default_ready_delta,
-                      start_within_min=args.start_within)
+                      start_within_min=args.start_within,
+                      serviceable_states=_parse_states(args.states))
         sql = emit_sql(result, sim_run_id=args.run, depot_id=args.depot,
                        ttl_seconds=args.ttl, via=args.via)
         if args.emit_sql:

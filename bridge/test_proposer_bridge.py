@@ -371,3 +371,21 @@ def test_the_fire_record_counts_busy_stalls_on_every_path():
     assert all_busy["fire"]["status"] == "empty"
     assert all_busy["fire"]["n_stalls_busy"] == 2
     assert "occupied or held" in all_busy["fire"]["error"]
+
+
+def test_the_fire_record_names_the_states_it_planned_for():
+    """L-60: a fire narrowed to the held arrivals says so on the record, counts
+    the frame by that set, and plans for nothing outside it."""
+    frame = _frame(vehicles=[_vehicle(V1, soc=25, state="arrived_at_gate"),
+                             _vehicle(V2, soc=40, state="staged_awaiting_service")])
+    r = pb.fire(frame, CLASS_ROWS, site=SITE, sim_run_id=RUN, depot_id=DEPOT,
+                serviceable_states=frozenset({"arrived_at_gate"}))
+    assert r["fire"]["serviceable_states"] == ["arrived_at_gate"]
+    assert r["fire"]["n_in_serviceable_state"] == 1
+    assert {row["entity_id"] for row in r["rows"]} == {V1}
+    full = pb.fire(frame, CLASS_ROWS, site=SITE, sim_run_id=RUN, depot_id=DEPOT)
+    assert full["fire"]["serviceable_states"] == sorted(pb.DEFAULT_SERVICEABLE_STATES)
+    assert full["fire"]["n_in_serviceable_state"] == 2
+    assert pb._parse_states("arrived_at_gate, charging_l2") == frozenset(
+        {"arrived_at_gate", "charging_l2"})
+    assert pb._parse_states(None) is None

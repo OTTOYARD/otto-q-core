@@ -455,6 +455,34 @@ def _resolved_target_soc(vehicle: dict) -> float:
     return DEFAULT_TARGET_SOC_PCT if target is None else target
 
 
+def _serviceable_in(states: frozenset[str]):
+    """The default predicate, narrowed to `states` (L-60).
+
+    A vehicle waiting in staging usually already holds a booking the frame does
+    not show, and the decide path re-decides a vehicle only while it holds none
+    -- so a proposal for it sits 'pending' until its TTL and never reaches the
+    shield. The population an out-of-process proposer can actually be heard on
+    is the one the one-tick hold is holding: unreserved arrivals. `states` may
+    only NARROW the default set; widening it would need the production-label
+    check the default set already passed.
+    """
+    unknown = frozenset(states) - DEFAULT_SERVICEABLE_STATES
+    if unknown:
+        raise FrameError(f"serviceable_states may only narrow the default set; "
+                         f"{sorted(unknown)} is not in {sorted(DEFAULT_SERVICEABLE_STATES)}")
+    if not states:
+        raise FrameError("serviceable_states must name at least one state")
+
+    def pred(vehicle: dict) -> bool:
+        if vehicle.get("state") not in states:
+            return False
+        soc = _pct(vehicle.get("soc"))
+        if soc is None:
+            return True
+        return soc < _resolved_target_soc(vehicle)
+    return pred
+
+
 def _default_serviceable(vehicle: dict) -> bool:
     """On site, in a serviceable state, and not already at its target.
 
@@ -465,12 +493,7 @@ def _default_serviceable(vehicle: dict) -> bool:
     frame_to_scenario's guard, which turns it into an ABSTAIN row -- the
     disposer learns the proposer saw the vehicle and declined it.
     """
-    if vehicle.get("state") not in DEFAULT_SERVICEABLE_STATES:
-        return False
-    soc = _pct(vehicle.get("soc"))
-    if soc is None:
-        return True
-    return soc < _resolved_target_soc(vehicle)
+    return _serviceable_in(DEFAULT_SERVICEABLE_STATES)(vehicle)
 
 
 def frame_to_scenario(frame: dict, class_table: dict, *,
@@ -769,7 +792,8 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             hour_of_day: int | None = None,
             signals: frozenset = frozenset(),
             intent=None,
-            class_key: str = DEFAULT_CLASS_KEY) -> dict:
+            class_key: str = DEFAULT_CLASS_KEY,
+            serviceable_states: frozenset[str] | None = None) -> dict:
     """Frame in, advisory rows out. Writes nothing, ever.
 
     The result carries the rows AND the solve's own accounting (T*, peak,
@@ -811,7 +835,10 @@ def propose(frame: dict, class_table: dict, *, site: dict,
         frame, class_table, site=site, horizon_min=horizon_min,
         ready_by_min=ready_by_min,
         default_ready_delta_min=default_ready_delta_min,
-        class_key=class_key)
+        class_key=class_key,
+        #: L-60: narrow (never widen) which states are planned for.
+        serviceable=(_serviceable_in(frozenset(serviceable_states))
+                     if serviceable_states is not None else None))
 
     #: L-58: how many charge-capable stalls the frame offered that were NOT
     #: points this tick. Travels with the result so the fire record can show
