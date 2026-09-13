@@ -128,6 +128,16 @@ table above.
 - *"Closed-loop"* / *"adaptive replanning"* — the loop is closed for the local
   path's own proposer and for cuOpt (both have enactments). It is **not** closed
   for the new CP-SAT or LLM proposers: 90 heard, 0 followed. Say so.
+  **Still exactly true after 2026-09-13's work, and this is the distinction to
+  hold.** Migration `0265` plus its consumer closed the reason those 90 rows died:
+  the proposer could not see the three facts the proposal selector refuses on, so
+  it named stalls that were reserved for another vehicle, freshly occupied, or
+  behind a faulted charger, and the door discarded every row before the safety
+  shield ever saw one. It can see them now and stops naming them. **That changes
+  what it proposes, not what was followed.** The count stays 0 followed until a
+  `forward_lex` row is the enacted action of a decision, and the honest sentence
+  is "integrated, heard, and no longer proposing into a wall — never yet
+  followed".
 - *"Self-learning"* — `intent/learn.py` exists and **deliberately refuses** to
   train on run outcomes, because the twin replays OTTO-Q's own decisions and would
   tune the objective against our own bugs. That is a documented choice, not a
@@ -175,7 +185,10 @@ and its note that the committed production posture disables the agent by default
 
 1. **A proposal cannot win a stall** (`0263` + `0264`, in flight). Until this lands,
    "agents propose, kernel disposes" is provable for two proposers and aspirational
-   for the two new ones.
+   for the two new ones. `0265` (applied 2026-09-13) is NOT that fix and must not
+   be quoted as it: it makes the proposer able to see which stalls the door would
+   refuse, which stops it wasting its proposals, and it gives no proposal any way
+   to win one.
 2. **No agent-facing door.** There is a *database* door; there is no published API
    an outside agent can call to read depot state, submit a proposal, and read back
    what the kernel decided. That is what would make this a harness other people's
@@ -188,6 +201,15 @@ and its note that the committed production posture disables the agent by default
    resource hold generic rather than stall-specific; or show §(5) what §(4b) booked
    so it abstains honestly instead of proposing into a wall; or reorder the tick
    (a recert and a behaviour change for one lane — last resort).
+   **Partly addressed, and only partly.** `0265` + its consumer is the *visibility*
+   candidate (option b) for the **stall** seat: the proposer now abstains naming
+   the scarcity — `occupied`, `reserved`, `charger_faulted`, `charger_stale` — on
+   every fire record, instead of proposing into a wall silently. The **service-bay**
+   seat that 0188 actually measured is untouched: it has no equivalent frame fact,
+   and seeing sooner that a resource is gone is not the same as being asked before
+   it goes. The hold (option a) was reviewed and sent back (`db/checks/0194`);
+   reordering the tick (option c) remains a founder decision, not one to take
+   quietly.
 4. **Refusal reasons do not reach the next proposal.** Reason codes are recorded
    (`ottoq_decisions`), and nothing feeds them back into a proposer's next solve.
    The assessment is right that this is unwired; the sequencing argument for doing
