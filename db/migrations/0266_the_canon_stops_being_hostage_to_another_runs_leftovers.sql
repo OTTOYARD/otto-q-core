@@ -784,6 +784,14 @@ BEGIN
   --:      ottoq_cert_matrix and canon_fgn from ottoq_cert_residue and checks
   --:      them against an INDEPENDENT recomputation from the canon pair's own
   --:      validation_notes. A typo in either shipped body fails here.
+  --:
+  --:      PROVEN DISCRIMINATING BEFORE INSTALLING, which is the standard this
+  --:      file's earlier assertions failed. Run read-only against the PRE-image
+  --:      matrix -- which still returns the whole-object digest -- A9b's
+  --:      reconciliation succeeds on 0 of 9 columns. It can only pass once the
+  --:      new body is actually in place. An assertion that passes both before
+  --:      and after the change it is guarding is measuring nothing, and two of
+  --:      this file's first-draft assertions were exactly that.
   SELECT count(*) INTO v_bad
     FROM public.ottoq_cert_matrix(v_rf) m
     JOIN public.ottoq_cert_residue(v_rf) s

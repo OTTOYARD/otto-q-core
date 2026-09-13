@@ -229,6 +229,41 @@ SELECT p.proname, md5(p.prosrc) AS prosrc_md5,
 --    their stable artefact, edits QUEUE against it, and every returning finding
 --    is re-checked against HEAD before it is called stale. Silently updating the
 --    copy under a running reviewer would be worse than either.
+--
+--    AND A SECOND PROCESS ERROR, mine, worth recording because it cost real time:
+--    I started a SECOND review of the rebuilt guards while the first was still
+--    running. Two consequences, both predictable. They competed for the same two
+--    concurrency slots, so everything ran at half speed; and the second one's
+--    frozen artefact went three commits stale while the first one's findings were
+--    being applied. It was stopped without producing a result. ONE REVIEW, ONE
+--    FROZEN ARTEFACT, AT A TIME -- and the artefact is re-frozen only after the
+--    previous round's findings have all landed.
+
+-- ---------------------------------------------------------------------------
+-- 9. THE STANDARD THE REBUILT ASSERTIONS ARE HELD TO, stated because "it passes"
+--    is what every convicted assertion above also did.
+--
+--    AN ASSERTION THAT PASSES BOTH BEFORE AND AFTER THE CHANGE IT GUARDS IS
+--    MEASURING NOTHING. So the load-bearing ones were run read-only against the
+--    PRE-image and had to FAIL there:
+--
+--      A9b  reconciles the shipped canon_endst against an independent
+--           recomputation. Against the pre-image matrix -- which still returns
+--           the whole-object digest -- it reconciles 0 of 9 columns. It can only
+--           pass once the new body is in place.
+--      A10b compares the matrix's own pair count to the predicate applied
+--           independently. Against the pre-image it returns 2 (the two columns
+--           carrying the 7 replay pairs: 497 vs 490) and 0 only after the G48
+--           predicate is installed. Measured by the discipline lens.
+--      A3b  perturbs one enumerated path at a time and requires the digest to
+--           move: 9 columns x 7 own keys = 63 distinct perturbations, 0 inert.
+--           Drop a key from the list and its perturbation equals the truth.
+--
+--    A3 is the one that is NOT held to this standard, and it is labelled as such
+--    in the file rather than left to look like the others: it is a one-sided
+--    attributability count, it has no power against a blanket weakening, and two
+--    successive rewrites failed to give it one before that was admitted.
+-- ---------------------------------------------------------------------------
 --    Both lenses here caught real defects anyway, but only because each one
 --    checked the live database instead of trusting the text in front of it.
 -- ---------------------------------------------------------------------------
