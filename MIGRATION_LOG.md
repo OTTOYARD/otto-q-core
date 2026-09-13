@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0269 — GENERATED, not a log
+## Index, 0134–0270 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -254,7 +254,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0267](db/migrations/0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run.sql) | `20260913141438` | yes — ledger | THE FIRE LOG REGISTERED A STAMP AND NEVER BOUND IT TO A RUN  (G23) |
 | [0268](db/migrations/0268_0267_never_classified_itself_and_the_floor_swallowed_every_column.sql) | `20260913142959` | yes — ledger | 0267 NEVER CLASSIFIED ITSELF, AND THE FLOOR SWALLOWED EVERY COLUMN |
 | [0269](db/migrations/0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair.sql) | `20260913205636` | yes — ledger | THE PURGE CANNOT SEE A SCHEDULED ROUND, ONLY A RUNNING PAIR  (G23) |
+| [0270](db/migrations/0270_the_only_queue_depth_rule_crashes_on_two_states_that_do_not_exist.sql) | `PENDING` | no — pending | THE ONLY QUEUE-DEPTH RULE CRASHES ON TWO STATES THAT DO NOT EXIST |
 
-135 migrations indexed.
+136 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
