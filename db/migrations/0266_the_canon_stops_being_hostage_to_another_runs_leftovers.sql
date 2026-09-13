@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260913135634
 -- migration-name: 0266_the_canon_stops_being_hostage_to_another_runs_leftovers
 --
 -- 0266  THE CANON STOPS BEING HOSTAGE TO ANOTHER RUN'S LEFTOVERS  (G46 + G48)
@@ -1240,5 +1240,68 @@ END $a$;
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+--
+-- APPLIED 2026-09-13 13:56:34 UTC (8:56 AM CT) as migration version
+-- 20260913135634, via apply_migration so the ledger records it. Window verified
+-- clean immediately before: 0 pair calls in pg_stat_activity, 0 certification
+-- jobs scheduled, 0 runs running or paused, ottoq_cert_residue absent,
+-- ottoq_cert_matrix at the pinned prosrc md5 f5bb81931feae44871c3ecd86d4f86b4,
+-- recert floor at 2026-09-12 16:50:23.319089+00, the retention purge ~18 h away.
+--
+-- Every assertion A0 through A10b passed; the DO block raises on any failure and
+-- the migration returned success, so the whole suite ran. POST-IMAGE measured:
+--
+--   ottoq_cert_matrix prosrc md5  f5bb8193... -> cd15c67d283e17eb273eb8f011489206
+--   ottoq_cert_residue            absent      -> present, 9 columns
+--   recert floor                  UNMOVED at 2026-09-12 16:50:23.319089+00
+--   ottoq_schema_snapshots        3 rows at label '0266-pre'
+--   ottoq_cert_lineage            forces_recert = false, as classified
+--
+-- THE ENGINE MATRIX, all nine columns green, at the recert floor:
+--   11111111 171717 48t busy_day   6 pairs  streak 6  PPPPPP
+--   11111111 171717 24t busy_day   3 pairs  streak 3  PPP
+--   11111111 424242 24t busy_day   3 pairs  streak 3  PPP
+--   11111111 171717 12t busy_day   3 pairs  streak 3  PPP
+--   11111111 314159 12t busy_day   3 pairs  streak 3  PPP
+--   11111111 424242 12t busy_day   3 pairs  streak 3  PPP
+--   11111111 171717 12t normal_day 3 pairs  streak 3  PPP
+--   aacd0bb0 239001  6t grid_smoke 3 pairs  streak 3  PPP
+--   aacd0bb0 424242  6t grid_smoke 3 pairs  streak 3  PPP
+--
+-- THE RESIDUE INSTRUMENT, and this is the half that proves the fact was
+-- RELOCATED rather than dropped -- the seven flagship columns name `legs` as the
+-- section that moved, which is round 41's rebase, still visible, now in the
+-- instrument whose job it is:
+--   11111111 171717 48t busy_day   streak 2  ....SS  legs
+--   11111111 171717 24t busy_day   streak 1  ..S     legs
+--   11111111 424242 24t busy_day   streak 1  ..S     legs
+--   11111111 171717 12t busy_day   streak 1  ..S     legs
+--   11111111 314159 12t busy_day   streak 1  ..S     legs
+--   11111111 424242 12t busy_day   streak 1  ..S     legs
+--   11111111 171717 12t normal_day streak 1  ..S     legs
+--   aacd0bb0 239001  6t grid_smoke streak 3  SSS     (none)
+--   aacd0bb0 424242  6t grid_smoke streak 3  SSS     (none)
+--
+-- All seven flagship columns share one canon_fgn (2d1315b9...) and both grid
+-- columns share another (13e2e154...), which is what a depot-scoped hygiene
+-- number should look like: the residue is a property of the DEPOT at a moment,
+-- not of the seed or the tick count.
+--
+-- ONE PRE-APPLY SCARE, RESOLVED RATHER THAN WAVED THROUGH, because the resolution
+-- is the point. The payload generator's unbalanced-quote detector -- the one that
+-- caught the comment-stripper mangling nine lines earlier in the same session --
+-- reported 37 flagged lines where an earlier build of the same payload reported
+-- zero. Rather than assume a false positive, the payload was run through a real
+-- PostgreSQL lexer (dollar-quote tags, '' escaping, line and block comments).
+-- Three independent results, and no one of them alone would have been enough:
+--   (1) the lexer terminates in CODE with no open dollar-quote tag, so nothing is
+--       truncated or unterminated;
+--   (2) all 37 flagged lines START inside a dollar-quoted function body, which is
+--       exactly the detector's documented blind spot -- it excludes only lines
+--       CONTAINING a `$`, not lines BETWEEN the tags;
+--   (3) decisively: the dry-run payload already executed against this database
+--       and rolled back reports the SAME 37, and diffs against the apply payload
+--       at 29 blank lines and a trailing newline, zero content difference.
+-- The detector is now known to be line-local; sqllex-style lexing is the check
+-- that answers the question it raises.
 -- ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
--- migration-version: 20260908161403
+-- migration-version: 20260908161615
 -- migration-name:    the_canon_comparison_sees_every_atom_the_pair_enforces
 -- ---------------------------------------------------------------------------
 -- 0225 — the across-round comparison sees all fourteen atoms the pair

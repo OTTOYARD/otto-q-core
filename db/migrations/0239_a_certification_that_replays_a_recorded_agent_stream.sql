@@ -1,4 +1,4 @@
--- migration-version: 20260909032226
+-- migration-version: 20260909032347
 -- migration-name:    a_certification_that_replays_a_recorded_agent_stream
 --
 -- AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door.

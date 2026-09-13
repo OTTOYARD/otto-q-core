@@ -1,0 +1,102 @@
+-- ---------------------------------------------------------------------------
+-- 0199 — THE VERSION A FILE CLAIMS IS NOT THE VERSION THE LEDGER ASSIGNED,
+-- AND I ADDED THE TENTH INSTANCE TWENTY MINUTES AFTER APPLYING 0266.
+--
+-- Found 2026-09-13 14:0x UTC while running the post-apply drift check for 0266.
+-- Nothing here is about 0266's engine change, which applied cleanly and is
+-- recorded in the migration's own APPLY LOG. This is about change-control
+-- hygiene, the instrument that measures it, and how nearly I shipped a false
+-- "clean" for the second time in one afternoon.
+-- ---------------------------------------------------------------------------
+
+-- 1. WHAT WENT WRONG, MINE, TODAY.
+--    apply_migration takes a `name` and the SERVER assigns the `version`. I
+--    passed the name WITHOUT the file's `0NNN_` prefix:
+--        passed   'the_canon_stops_being_hostage_to_another_runs_leftovers'
+--        neighbours '0265_the_frame_carries_what_the_selector_filters_on'
+--                   '0262_the_hold_key_the_setter_refused'
+--                   '0261_the_policy_is_what_proposes_the_kernel_disposes'
+--    The repo's `-- migration-name:` header carries the prefix from 0243 on, so
+--    scripts/check-drift.sql Section C (NAME MISMATCH, **CRITICAL**) would have
+--    fired on 0266 at the next run. Corrected in place, one row:
+--      UPDATE supabase_migrations.schema_migrations
+--         SET name = '0266_the_canon_stops_being_hostage_to_another_runs_leftovers'
+--       WHERE version = '20260913135634' AND name = 'the_canon_...leftovers';
+--    The ledger's `name` is metadata; `version` is the key and was untouched.
+
+-- 2. AND THE SAME SEAM HAD NINE OLDER INSTANCES, IN THE OTHER DIRECTION.
+--    Nine committed files carried a `-- migration-version:` the ledger never
+--    assigned -- a timestamp measured or predicted BEFORE the apply, off by one
+--    to seven minutes from the one the server actually wrote. Each therefore
+--    showed up TWICE in the drift report: once in Section A (in database, not in
+--    repo, CRITICAL) under the real version, and once in Section B (in repo, not
+--    in database, WARN) under the claimed one.
+--
+--      file                                   claimed          ledger (truth)
+--      0225_the_canon_comparison_...          20260908161403   20260908161615
+--      0226_the_recert_floor_reads_...        20260908161129   20260908161239
+--      0227_the_load_meter_scans_...          20260908161833   20260908161809
+--      0228_provenance_asks_the_depot_...     20260908162111   20260908162004
+--      0238_the_proposal_selector_...         20260909031408   20260909031507
+--      0239_a_certification_that_replays_...  20260909032226   20260909032347
+--      0240_the_gate_that_opens_...           20260909051529   20260909051802
+--      0241_a_certification_hears_only_...    20260909051812   20260909051917
+--      0242_a_capture_records_only_...        20260909051927   20260909052026
+--
+--    EVIDENCE THEY ARE THE SAME MIGRATIONS, not nine missing ones:
+--      * the `name` is byte-identical on both sides in eight of nine;
+--      * the ledger's order matches the recorded apply sequence exactly
+--        (MIGRATION_LOG records 0226 -> 0225 -> 0227 -> 0228; the ledger reads
+--        161239, 161615, 161809, 162004, which IS that order -- note the claimed
+--        versions put 0225 BEFORE 0226, which never happened);
+--      * measured: the nine claimed versions appear NOWHERE in
+--        supabase_migrations.schema_migrations (old_versions_still_present = 0).
+--    The ninth, 0240, is the one exception and it is informative: the ledger
+--    name is `..._leaves_a_ledger_row_v2`, the file said `..._leaves_a_ledger_row`.
+--    A second attempt was applied and the file kept the first attempt's name. The
+--    file now says `_v2`, because the ledger records what actually ran.
+SELECT version, name FROM supabase_migrations.schema_migrations
+ WHERE version IN ('20260908161615','20260908161239','20260908161809','20260908162004',
+                   '20260909031507','20260909032347','20260909051802','20260909051917',
+                   '20260909052026','20260913135634')
+ ORDER BY version;
+-- MEASURED after the ten header corrections: matched_exactly 10,
+-- version_missing 0, name_mismatch 0, old_versions_still_present 0.
+
+-- 3. THE EFFECT ON THE SMOKE ALARM, which is the point of fixing it.
+--    Section A  90 -> 81 CRITICAL      (nine phantom "applied without a file")
+--    Section B   9 ->  0 WARN          (nine phantom "written but never applied")
+--    Section C   would-have-been 1 -> 0 CRITICAL   (0266, mine, today)
+--    Section B2  0                     (0266 is no longer PENDING)
+--    Sections E/E2 unchanged: 31 APPLIED-NO-LEDGER-ROW, 37 UNVERIFIED-NO-LEDGER-ROW.
+--    Eighteen of the report's lines were one repeatable mistake wearing two hats.
+--    The 81 that remain are real and mostly pre-date the file discipline; E2's 37
+--    are the genuinely unknown ones and are the next thing worth closing.
+
+-- 4. THE PROCESS FINDING, AND IT IS THE ONE THAT MATTERS.
+--    I did not run scripts/check-drift.sql. I wrote a compact query that asked
+--    what I ASSUMED the script asked. It was wrong twice, in the same half hour:
+--      (a) FIRST it did not know the sentinel vocabulary -- 'PENDING',
+--          'APPLIED-NO-LEDGER-ROW', 'UNVERIFIED-NO-LEDGER-ROW' are legal values
+--          of `migration-version`, and my version treated them as versions,
+--          inventing 68 phantom findings;
+--      (b) THEN, rewritten against the real CTEs, it still had no Section C at
+--          all -- so it reported 0266 clean while 0266 carried exactly the
+--          CRITICAL a name check is for.
+--    The defect I was hunting was findable only by the check I had skipped. The
+--    rule this earns: A GENERATED INSTRUMENT IS RUN, NOT PARAPHRASED. If it is
+--    too large to paste, strip its comments with a dollar-quote-aware lexer and
+--    run THAT (46 KB / 434 lines here, verified to preserve all 278 manifest
+--    rows and to lex to a clean terminal state) -- do not re-derive its logic
+--    from a reading of its source.
+
+-- 5. THE SEAM ITSELF IS STILL OPEN, and naming it is cheaper than re-finding it.
+--    Nothing checks, at apply time, that the `name` passed to apply_migration
+--    matches the file's `-- migration-name:`, or that the version the server
+--    assigned is written back into the header. Both are done by hand, and by
+--    hand is how ten of them went wrong. The mechanical fix belongs with G12
+--    ("CI runs the SQL"): after an apply, read back
+--    `SELECT version, name FROM supabase_migrations.schema_migrations
+--       ORDER BY version DESC LIMIT 1` and stamp the header from THAT, rather
+--    than from a timestamp measured before the call. Until G12, the discipline
+--    is: stamp the header from the ledger read-back, never from the clock.
