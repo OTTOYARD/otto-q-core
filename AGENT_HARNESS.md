@@ -51,9 +51,33 @@ Read the last two rows carefully, because they are the honest part:
   and nothing protects the stall a proposer names for the one tick its vehicle is
   held. Those are `0263` and `0264`, in flight.
 - **`ottoq_service_priority` is a *certified* proposer with 2,335 proposals over
-  15 days and not one enactment** — in a context that demonstrably enacts, since
-  `agent_probe` got 40 of 240 in the same `service_sequencing` context. Logged as
-  **G47**, unexplained as of this writing.
+  15 days and not one enactment.** Root-caused the same night in `db/checks/0188`,
+  and the answer is not a dead seat: the seat IS wired (`ottoq_decide_tick` line
+  965 calls the selector for `service_sequencing`), its proposals ARE consumed —
+  **446 decisions name it as the enacted action's source** — and every one of those
+  446 carries `outcome_status = 'noop_no_candidate'`, set by the branch at line 1029
+  whose comment reads *"NO BAY -> DO NOT ENTER ONE"*. The flagship depot has **two
+  service bays**, and they are busy: **1,725 bookings in three days**, taken by the
+  bay loop §(4b), which runs **earlier in the same tick**. So the proposer is heard,
+  consumed, and physically unable to be followed.
+
+  That is the same defect as the CP-SAT proposer's 90-and-zero, on a different
+  resource, and it sharpens the founder's own premise. "The proposer is most useful
+  under contention" is right — and **under contention the proposer is exactly who
+  loses, because it is asked last.** Whatever `0264` settles for charge stalls
+  should be resource-generic for this reason.
+
+**One caveat on the word "enacted", found while root-causing the above.** The
+lifecycle closer credits a proposal only when, at the same tick and for the same
+entity, `d.enacted_action->>'source' = p.source`. Measured over three days, 24,953
+enacted `task_start` decisions carry no `source` key at all, and several
+`stall_assignment` paths write a *path* name rather than a proposer name
+(`reservation_honoured` 5,742, `inspect_seam` 9,132, `needs_card` 892). Those paths
+owe no proposal credit — they consumed a reservation or a seam, not a proposal — so
+nothing is miscounted today. But the rule means any future proposer whose consuming
+path rewrites or drops `source` will read as "0 enacted" while being followed every
+tick. Credit by proposal id would be immune; credit by string match is not. Read an
+enactment count as *credit*, not as *influence*, until that changes.
 
 **The enforcement is in the database, not in the agent's own wrapper.** Measured
 with `has_table_privilege` / `has_function_privilege`:
@@ -153,7 +177,13 @@ and its note that the committed production posture disables the agent by default
    what the kernel decided. That is what would make this a harness other people's
    agents can enter — and it would turn the twin into a scoring rig for third-party
    optimizers.
-3. **G47: a certified proposer with 2,335 proposals and zero enactments.**
+3. **G47, now root-caused (`db/checks/0188`): the proposer is asked after the
+   resource is gone.** Two service bays, booked 1,725 times in three days by an
+   earlier section of the same tick; the service proposer's 446 consumptions all
+   land on "no bay". Fix candidates, in increasing risk: make `0264`'s one-tick
+   resource hold generic rather than stall-specific; or show §(5) what §(4b) booked
+   so it abstains honestly instead of proposing into a wall; or reorder the tick
+   (a recert and a behaviour change for one lane — last resort).
 4. **Refusal reasons do not reach the next proposal.** Reason codes are recorded
    (`ottoq_decisions`), and nothing feeds them back into a proposer's next solve.
    The assessment is right that this is unwired; the sequencing argument for doing
