@@ -49,7 +49,10 @@ Read the last two rows carefully, because they are the honest part:
   23 pending, 0 enacted. `db/checks/0186` and `demo/D3_RUNBOOK.md` §5 say exactly
   why — the decision frame does not carry the three facts the selector filters on,
   and nothing protects the stall a proposer names for the one tick its vehicle is
-  held. Those are `0263` and `0264`, in flight.
+  held. **CORRECTED 2026-09-13: those are `0265` and the one-tick hold, not `0263`/`0264` — and only
+  the first shipped.** `0265` (the frame) applied 12:26 UTC; the hold was reviewed and SENT BACK
+  (`db/checks/0194`: it cannot arm at all under contention) and currently has no number. So the second
+  half of this defect is still open, and "90 heard, 0 followed" stands unchanged.
 - **`ottoq_service_priority` is a *certified* proposer with 2,335 proposals over
   15 days and not one enactment.** Root-caused the same night in `db/checks/0188`,
   and the answer is not a dead seat: the seat IS wired (`ottoq_decide_tick` line

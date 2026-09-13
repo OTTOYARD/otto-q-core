@@ -203,9 +203,9 @@ to get wrong:
 
 | item | state |
 |---|---|
-| **`0265`** the frame carries `reserved_by` / `reservation_expires_at` / `station_state` / per-vehicle reservation (renumbered from 0263) | designed by workflow, under adversarial review; **not applied** |
-| **`0266`** a pending proposal holds the resource it names for one tick, behind a run-scoped key defaulting to 0 (renumbered from 0264) | designed by workflow, under adversarial review; **not applied** |
-| **`0263` + `0264`** G46 (`db/checks/0187`) and G48 (`db/checks/0190`): the canon rebases when another run's leftover legs move, and a replay pair is counted as a certification | designed by a second workflow; **round 42 is blocked on them**, and they take the 0263/0264 numbers because they apply first |
+| **`0265`** the frame carries `reserved_by` / `reservation_expires_at` / `station_state` / per-vehicle reservation | **APPLIED 2026-09-13 12:26 UTC**, version `20260913122605`. Consumer shipped and verified against live data (`db/checks/0195`) |
+| the one-tick resource hold — a pending proposal holds the resource it names | **SENT BACK** (`db/checks/0194`: both review lenses unsound, and it cannot arm at all under contention — the ARM needs `reserved_by IS NULL` and that set was empty at tick 3 of `ccf48af1`). **It has NO number**; the `0266` it was once assigned now means the matrix fix |
+| G46 (`db/checks/0187`) + G48 (`db/checks/0190`): the canon rebases when another run's leftover legs move, and a replay pair is counted as a certification | **APPLIED AS `0266`** 2026-09-13 13:56 UTC, version `20260913135634` — NOT as `0263`/`0264`, which were never used. `canon_endst` is now the run's own end state; the four `fgn` sections have their own canon and streak in the new `ottoq_cert_residue`. Round 42 scheduled 14:44–15:54 UTC to judge it |
 | the runner | `.github/workflows/proposer-loop.yml` — manual dispatch, needs repository secrets `OTTOQ_DATABASE_URL` and (for the advisory fire) `ANTHROPIC_API_KEY`, neither of which exists yet |
 
 One measurement discipline was added tonight and applies to every future demo: **run
