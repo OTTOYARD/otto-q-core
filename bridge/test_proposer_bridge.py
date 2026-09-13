@@ -370,7 +370,8 @@ def test_the_fire_record_counts_busy_stalls_on_every_path():
                        sim_run_id=RUN, depot_id=DEPOT)
     assert all_busy["fire"]["status"] == "empty"
     assert all_busy["fire"]["n_stalls_busy"] == 2
-    assert "occupied or held" in all_busy["fire"]["error"]
+    assert "not one is offerable" in all_busy["fire"]["error"]
+    assert "2 occupied" in all_busy["fire"]["error"]
 
 
 def test_the_fire_record_names_the_states_it_planned_for():
@@ -525,3 +526,102 @@ def test_idle_ok_exits_zero_only_for_idleness(monkeypatch, tmp_path, capsys):
 
     monkeypatch.setattr(pb, "run_live", ambiguous)
     assert pb.main(argv) == 2
+
+
+# ---------------------------------------------------------------------------
+# 0265 / L-61: the fire record says which frame contract it measured under
+# ---------------------------------------------------------------------------
+
+def _facts_stall(sid, *, kind="dcfc", kw=150, **facts):
+    st = _stall(sid, kind=kind, kw=kw)
+    st.update({"ocpp_charger_id": f"chg-{sid}", "reserved_by": None,
+               "reservation_expires_at": None, "reservation_live": False,
+               "charger_state": "Available",
+               "charger_heartbeat_at": "2026-09-13T12:00:00+00:00",
+               "charger_fresh": True, "offerable": True})
+    st.update(facts)
+    return st
+
+
+def _facts_frame(vehicles=None, stalls=None):
+    frame = _frame(vehicles, stalls)
+    frame["selector"] = {"facts_version": 1, "clock": "2026-09-13T12:00:00+00:00",
+                         "heartbeat_window_s": 90,
+                         "authority": "public.ottoq_l2_external_proposal"}
+    return frame
+
+
+def test_the_facts_version_is_detected_not_configured():
+    """A bridge that CLAIMED version 1 while reading a gate-off frame would
+    publish a blindness as a measurement. It is read off the frame's own
+    selector block or it is None."""
+    plain = pb.fire(_frame(), CLASS_ROWS, site=SITE, sim_run_id=RUN, depot_id=DEPOT)
+    assert plain["fire"]["frame_facts_version"] is None
+    assert plain["fire"]["n_vehicles_held"] == 0
+
+    facts = pb.fire(_facts_frame(), CLASS_ROWS, site=SITE, sim_run_id=RUN,
+                    depot_id=DEPOT)
+    assert facts["fire"]["frame_facts_version"] == 1
+
+
+def test_the_fire_record_carries_the_blocked_breakdown_on_every_path():
+    """0186's hand query becomes a ledger fact: WHICH scarcity the proposer hit.
+    Present on the proposed path and on the empty path alike."""
+    stalls = [_facts_stall(S1, **{"offerable": False, "vehicle_id": V3}),
+              _facts_stall(S2, **{"offerable": False, "charger_state": "Faulted"}),
+              _facts_stall(S3, kind="l2", kw=19)]
+    r = pb.fire(_facts_frame(stalls=stalls), CLASS_ROWS, site=SITE,
+                sim_run_id=RUN, depot_id=DEPOT)
+    assert r["fire"]["n_charge_stalls"] == 3
+    assert r["fire"]["stalls_blocked"] == {"occupied": 1, "charger_faulted": 1}
+    assert r["fire"]["n_stalls_busy"] == 2
+
+    none_free = pb.fire(_facts_frame(stalls=stalls[:2]), CLASS_ROWS, site=SITE,
+                        sim_run_id=RUN, depot_id=DEPOT)
+    assert none_free["fire"]["status"] == "empty"
+    assert none_free["fire"]["stalls_blocked"] == {"occupied": 1,
+                                                  "charger_faulted": 1}
+
+
+def test_vehicles_already_holding_a_place_are_counted_not_proposed_for():
+    """L-60: the decide path does not re-decide a vehicle holding a reservation
+    or a booking. The count uses the proposer's own serviceable predicate, so it
+    is narrower than n_in_serviceable_state by construction."""
+    held = _vehicle(V1, soc=25); held["reserved_stall_id"] = S1
+    booked = _vehicle(V2, soc=40); booked["has_live_booking"] = True
+    free = _vehicle(V3, soc=30, cls="generic_av_l2", kw=19.0)
+    free.update(reserved_stall_id=None, has_live_booking=False)
+    r = pb.fire(_facts_frame(vehicles=[held, booked, free]), CLASS_ROWS,
+                site=SITE, sim_run_id=RUN, depot_id=DEPOT)
+    assert r["fire"]["n_in_serviceable_state"] == 3
+    assert r["fire"]["n_vehicles_held"] == 2
+    assert {row["entity_id"] for row in r["rows"]} <= {V3}
+
+
+def test_turning_the_facts_gate_on_does_not_move_the_busy_count():
+    """THE CORRECTION 0265's CONSUMER FORCED. n_stalls_busy used to count over
+    EVERY stall in the frame, which agreed with the proposer only by luck: a
+    staging stall is 'available' with no vehicle, so it read free. 0265 emits the
+    facts for every stall at the depot and a staging stall has no charger, so it
+    is correctly not offerable -- and under the old definition all 232 staging
+    stalls at the flagship depot would have joined the count the moment the gate
+    went on, with nothing changing in the world. Same world, same number."""
+    staging = {"id": "5a11a000-0000-4000-8000-000000000009", "type": "staging",
+               "status": "available", "vehicle_id": None, "connector_type": None,
+               "connector_max_kw": 0, "supported_inlet_types": None}
+    stalls = [_stall(S1), _stall(S2), staging]
+    plain = pb.fire(_frame(stalls=stalls), CLASS_ROWS, site=SITE,
+                    sim_run_id=RUN, depot_id=DEPOT)
+
+    facts = [_facts_stall(S1), _facts_stall(S2),
+             dict(staging, ocpp_charger_id=None, reserved_by=None,
+                  reservation_expires_at=None, reservation_live=False,
+                  charger_state=None, charger_heartbeat_at=None,
+                  charger_fresh=False, offerable=False)]
+    gated = pb.fire(_facts_frame(stalls=facts), CLASS_ROWS, site=SITE,
+                    sim_run_id=RUN, depot_id=DEPOT)
+
+    assert plain["fire"]["n_stalls"] == gated["fire"]["n_stalls"] == 3
+    assert plain["fire"]["n_charge_stalls"] == gated["fire"]["n_charge_stalls"] == 2
+    assert plain["fire"]["n_stalls_busy"] == gated["fire"]["n_stalls_busy"] == 0
+    assert gated["fire"]["stalls_blocked"] == {}

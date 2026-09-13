@@ -126,7 +126,7 @@ SYSTEM_PROMPT = """You are an advisory scheduler for an autonomous-vehicle depot
 
 You are an ADVISOR. Nothing you say moves a vehicle. A deterministic safety layer reviews every proposal and refuses any that violate a rule, recording the rule code; the local scheduler assigns anything you abstain on. So: propose what you judge best, say why in one short sentence, and abstain rather than guess when the digest does not support a placement.
 
-Consider: the vehicle's inlet must match a plug the stall accepts (a 'Multi' stall lists its supported_inlet_types); prefer fast (dcfc) stalls for the lowest state of charge; do not name a stall for two vehicles; a stall with a vehicle_id is occupied; respect the site power cap when many fast charges would coincide.
+Consider: the vehicle's inlet must match a plug the stall accepts (a 'Multi' stall lists its supported_inlet_types); prefer fast (dcfc) stalls for the lowest state of charge; do not name a stall for two vehicles; a stall with a vehicle_id is occupied; respect the site power cap when many fast charges would coincide. When a stall carries "offerable": false it is already spoken for -- occupied, reserved for another vehicle, or on a charger that is faulted or not reporting -- and a proposal naming it will be discarded before the safety layer ever sees it; a stall with no "offerable" field means the digest does not say, so judge it from its status and vehicle_id.
 
 Answer with JSON only, matching the schema you were given: one entry per vehicle in the digest, each with vehicle_id, stall_id (or null), abstain (true if you are not proposing a stall), and reason."""
 
@@ -170,10 +170,21 @@ def frame_digest(frame: dict, *, max_vehicles: int = 24, max_stalls: int = 40) -
         kw = _num(s.get("connector_max_kw")) or 0.0
         if kw <= 0:
             continue
-        ss.append({"id": s["id"], "type": s.get("type"), "status": s.get("status"),
-                   "vehicle_id": s.get("vehicle_id"), "connector_type": s.get("connector_type"),
-                   "connector_max_kw": kw,
-                   "supported_inlet_types": s.get("supported_inlet_types")})
+        row = {"id": s["id"], "type": s.get("type"), "status": s.get("status"),
+               "vehicle_id": s.get("vehicle_id"), "connector_type": s.get("connector_type"),
+               "connector_max_kw": kw,
+               "supported_inlet_types": s.get("supported_inlet_types")}
+        #: 0265/L-61: the DOOR's verdict, shown but NOT enforced here. The
+        #: digest still lists every charge-capable stall including the taken
+        #: ones, because law 2 says an unsafe-but-well-formed proposal must
+        #: remain possible -- what changes is that the model can now SEE which
+        #: stalls the proposal selector would discard, instead of naming one
+        #: and having the row die unread. Included only when the frame carries
+        #: it, so a gate-off frame produces a byte-identical digest.
+        for key in ("offerable", "reservation_live", "charger_state"):
+            if key in s:
+                row[key] = s.get(key)
+        ss.append(row)
     ss.sort(key=lambda x: (0 if x["type"] == "dcfc" else 1, -x["connector_max_kw"], x["id"]))
     return {
         "vehicles": vs[:max_vehicles],

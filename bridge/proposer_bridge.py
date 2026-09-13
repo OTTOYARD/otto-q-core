@@ -66,8 +66,12 @@ from proposer.forward_proposer import (  # noqa: E402
     DEFAULT_DET_BUDGET_S,
     DEFAULT_SERVICEABLE_STATES,
     FrameError,
+    NON_CHARGING_TYPES,
+    frame_facts_version,
     propose,
-    stall_is_free,
+    serviceable_predicate,
+    stall_block_reason,
+    vehicle_is_held,
 )
 
 SOURCE = "forward_lex"
@@ -172,6 +176,34 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
     states = (frozenset(serviceable_states) if serviceable_states is not None
               else DEFAULT_SERVICEABLE_STATES)
     n_in_serviceable_state = sum(1 for v in vehicles if v.get("state") in states)
+    #: L-60 (migration 0265): of those, how many already hold a reservation or a
+    #: booking and were therefore not planned for. The decide path does not
+    #: re-decide a vehicle that holds a place, so a proposal for one sits
+    #: `pending` until its TTL and never reaches the shield. On a frame without
+    #: the 0265 facts this is 0 for every vehicle -- which is why
+    #: `frame_facts_version` travels beside it: 0 held under version 1 is a
+    #: measurement, 0 held under no version is a blindness.
+    #:
+    #: Measured with the proposer's OWN predicate, imported rather than
+    #: re-expressed here: a second nearly-identical test is how a published
+    #: count drifts from the population it claims to describe. So this is the
+    #: set that WOULD have been planned for and was not, which is narrower than
+    #: `n_in_serviceable_state` (that one is state alone, and a vehicle already
+    #: at its target SoC is in it).
+    _plannable = serviceable_predicate(states)
+    n_vehicles_held = sum(1 for v in vehicles
+                          if _plannable(v) and vehicle_is_held(v))
+    #: L-58/L-61: the charge-capable stalls, and why each one that is not a
+    #: point this tick is not. `n_stalls_busy` stays the single total it always
+    #: was; `stalls_blocked` is the breakdown 0186 had to be hand-queried for.
+    charge_stalls = [s for s in (frame.get("stalls") or [])
+                     if s.get("type") not in NON_CHARGING_TYPES
+                     and float(s.get("connector_max_kw") or 0) > 0]
+    stalls_blocked: dict[str, int] = {}
+    for stall in charge_stalls:
+        reason = stall_block_reason(stall)
+        if reason is not None:
+            stalls_blocked[reason] = stalls_blocked.get(reason, 0) + 1
 
     record: dict[str, Any] = {
         "source": SOURCE,
@@ -186,12 +218,31 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
         "n_in_serviceable_state": n_in_serviceable_state,
         "serviceable_states": sorted(states),
         "n_stalls": len(frame.get("stalls") or []),
-        #: L-58: of those, how many the frame says are occupied or held right
-        #: now and were therefore never offered to the solver. Recorded on
+        #: L-58: of the CHARGE-CAPABLE stalls, how many were not points this
+        #: tick and were therefore never offered to the solver. Recorded on
         #: every path, the empty one included, so "planned on 17 of 40" and
         #: "nothing free" are both ledger facts and not inferences.
-        "n_stalls_busy": sum(1 for s in (frame.get("stalls") or [])
-                             if not stall_is_free(s)),
+        #:
+        #: CORRECTED 2026-09-13 WITH 0265's CONSUMER, and the correction is the
+        #: point: this used to count over EVERY stall in the frame. That agreed
+        #: with the proposer's own `stalls_busy` only by luck -- a staging stall
+        #: is `available` with no vehicle, so it read free and fell out of both
+        #: counts. Under 0265 it does not: 0265 emits the facts for every stall
+        #: at the depot and a staging stall has no ocpp_charger_id, so it is
+        #: correctly not offerable and would have joined this count. At the
+        #: flagship depot that is 232 of 330 stalls, and turning the gate on
+        #: would have moved a published number from a handful to ~260 with
+        #: nothing whatever changing in the world. A count whose value depends
+        #: on which frame contract produced it is not a measurement.
+        "n_stalls_busy": sum(stalls_blocked.values()),
+        "n_charge_stalls": len(charge_stalls),
+        "stalls_blocked": stalls_blocked,
+        "n_vehicles_held": n_vehicles_held,
+        #: WHICH FRAME CONTRACT THE THREE COUNTS ABOVE WERE MEASURED UNDER.
+        #: Feature-detected off the frame's own `selector` block (0265), never
+        #: assumed and never configured: a bridge that claimed version 1 while
+        #: reading a gate-off frame would publish a blindness as a measurement.
+        "frame_facts_version": frame_facts_version(frame),
         "hour_of_day": hour_of_day,
         "max_assets": max_assets,
         "det_budget_s": det_budget_s,

@@ -183,13 +183,114 @@ NON_CHARGING_TYPES = frozenset({"staging"})
 #: not planned on this tick rather than planned on at a guessed time.
 FREE_STALL_STATUS = "available"
 
+#: THE DOOR'S OWN VERDICT, WHEN THE FRAME CARRIES IT (finding L-61, migration
+#: 0265). Everything above is the SHIELD's half of the question -- is this stall
+#: in a state a vehicle may occupy. It is not the whole question, and two live
+#: D3 runs proved it: 90 CP-SAT proposals went through the production door and
+#: ZERO reached the shield, because the proposal selector
+#: (public.ottoq_l2_external_proposal) refuses on three further facts the frame
+#: did not carry -- a live reservation for a DIFFERENT vehicle, a stall occupied
+#: since the frame was built, and a charger that is not `Available` or whose
+#: heartbeat is stale. Measured at tick 3 of run ccf48af1: 31 charge stalls
+#: occupied, 7 free but reserved, 2 faulted, 0 offerable.
+#:
+#: 0265 puts the selector's own conjunction in the frame as `offerable`, and the
+#: migration's assertion A4 recomputes it independently and refuses to apply if
+#: the two disagree. So it is the door's verdict, not a restatement of it.
+#:
+#: THE TWO TESTS ARE CONJOINED, NOT SUBSTITUTED, and that is the whole subtlety.
+#: `offerable` does NOT read `stalls.status` -- neither does the selector -- so a
+#: stall in `maintenance` with a free, healthy, unreserved charger is offerable
+#: and the DOOR would take a proposal for it. The shield is what refuses that
+#: one, later, with a rule code. Trading a refusal at the door for a refusal at
+#: the shield is not progress. A point is planned on only when BOTH layers would
+#: accept it.
+#:
+#: VEHICLE-BLIND, as 0265 says in its own comment: the selector also accepts a
+#: stall reserved for the proposal's OWN vehicle, which a per-stall boolean
+#: cannot know. That case is not lost, it is answered on the vehicle side --
+#: a vehicle holding a live reservation is not planned for at all (see
+#: `vehicle_is_held`), so the only stalls whose own-reserver exception would
+#: have mattered belong to vehicles this module has already stood down on.
+#:
+#: ABSENCE IS THE OLD BEHAVIOUR, DELIBERATELY. The facts are emitted only behind
+#: ottoq_policy_get(run,'proposer_frame_facts',1) -- every certification arm sees
+#: a frame without them, and so does every fixture written before 0265. A frame
+#: that does not carry `offerable` is read exactly as it was before, so this
+#: module never guesses a verdict the frame did not give it.
+OFFERABLE_KEY = "offerable"
+
+#: WHICH FRAME CONTRACT THIS IS, ASKED OF THE FRAME AND NOT ASSUMED. 0265 stamps
+#: a top-level `selector` block -- facts_version, the clock the verdicts were
+#: computed against, the heartbeat window, and the function that is their
+#: authority -- exactly so a consumer never has to infer the contract from which
+#: keys happen to be present. Absent means a pre-0265 frame or the gate off; it
+#: is a fact worth recording, not a default worth substituting.
+SELECTOR_KEY = "selector"
+
+
+def frame_facts_version(frame: dict) -> int | None:
+    """The selector-facts contract version this frame was built under, or None."""
+    selector = frame.get(SELECTOR_KEY)
+    if not isinstance(selector, dict):
+        return None
+    version = selector.get("facts_version")
+    try:
+        return int(version)
+    except (TypeError, ValueError):
+        return None
+
 
 def stall_is_free(stall: dict) -> bool:
-    """True iff the frame says this stall can take a vehicle right now."""
+    """True iff BOTH the shield and the door would accept this stall right now.
+
+    See OFFERABLE_KEY: the status/occupancy test is the shield's half, the
+    `offerable` verdict is the door's, and a point must pass both. When the
+    frame carries no `offerable` the door's half is unknown and only the
+    shield's half is applied -- the pre-0265 behaviour, unchanged.
+    """
     status = stall.get("status")
     if status is not None and str(status) != FREE_STALL_STATUS:
         return False
+    if OFFERABLE_KEY in stall:
+        return bool(stall[OFFERABLE_KEY])
     return not stall.get("vehicle_id")
+
+
+#: WHY a stall was not a point this tick, in the selector's own vocabulary.
+#: 0186's diagnosis -- "31 occupied, 7 reserved, 2 faulted, 0 offerable" -- is
+#: the single most useful line either live run produced, and it took a hand
+#: query to get. A fire record that carries it says WHICH scarcity the proposer
+#: hit, so "the proposer said nothing useful" stops being one undifferentiated
+#: outcome. Reasons are checked most-specific-first and exactly one is returned;
+#: a stall can be several of these at once and the first is the one to fix.
+def stall_block_reason(stall: dict) -> str | None:
+    """The reason this stall is not offerable, or None if it is free."""
+    if stall_is_free(stall):
+        return None
+    if stall.get("vehicle_id"):
+        return "occupied"
+    status = stall.get("status")
+    if status is not None and str(status) != FREE_STALL_STATUS:
+        return f"status_{str(status).lower()}"
+    if OFFERABLE_KEY not in stall:
+        #: Unreachable from the two tests above -- kept so the vocabulary is
+        #: total rather than leaving a caller to infer from a missing key.
+        return "not_free"
+    #: From here the frame carries the facts, so the door's refusal is
+    #: attributable rather than guessed.
+    if not stall.get("ocpp_charger_id"):
+        #: The selector INNER JOINs on this: a stall with no charger id is
+        #: unselectable forever, not just this tick.
+        return "no_charger"
+    state = stall.get("charger_state")
+    if state is not None and str(state) != "Available":
+        return f"charger_{str(state).lower()}"
+    if stall.get("charger_fresh") is False:
+        return "charger_stale"
+    if stall.get("reservation_live"):
+        return "reserved"
+    return "not_offerable"
 
 #: THE PRODUCTION JOIN KEY (finding L-41). `ottoq_vehicle_classes` is keyed by
 #: vehicle_class_code; this bridge keyed its class table on the frame's
@@ -483,6 +584,55 @@ def _serviceable_in(states: frozenset[str]):
     return pred
 
 
+#: THE POPULATION THE ONE-TICK HOLD IS ACTUALLY HOLDING (finding L-60, closed by
+#: migration 0265). `_serviceable_in` already states the rule -- a vehicle that
+#: already holds a place is not re-decided, so a proposal for it sits `pending`
+#: until its TTL and never reaches the shield -- and until 0265 this module had
+#: NO WAY TO SEE IT. The frame said nothing about reservations or bookings, so
+#: the docstring described a narrowing the code could not perform. 0265 carries
+#: both facts per vehicle, and this is where they are spent.
+#:
+#: `reserved_stall_id` is the stall holding a LIVE reservation for this vehicle
+#: (resolved against the sim clock, not the wall clock); `has_live_booking` is a
+#: held-or-active row on the stall calendar for this run. Either one means the
+#: decide path is not asking, and an out-of-process proposer answering anyway is
+#: writing a row that expires unread.
+#:
+#: SILENT? NO -- COUNTED. A vehicle filtered here gets no proposal row, exactly
+#: like one filtered by state, because ~200 abstentions a tick for vehicles
+#: nobody asked about is noise in the proposals table, not evidence. The count
+#: travels on the result and onto the fire record (`n_vehicles_held`), which is
+#: the same discipline `stalls_busy` follows: the population that was skipped is
+#: a ledger fact even when the individual rows are not written.
+def vehicle_is_held(vehicle: dict) -> bool:
+    """True iff the frame says this vehicle already holds a place.
+
+    A frame carrying neither key (pre-0265, or the gate off) answers False for
+    every vehicle -- the pre-0265 behaviour, unchanged, and never a guess.
+    """
+    if vehicle.get("reserved_stall_id"):
+        return True
+    return bool(vehicle.get("has_live_booking"))
+
+
+def serviceable_predicate(states: frozenset[str] | None = None):
+    """The serviceable test this module applies, as a callable a caller can reuse.
+
+    Exported so a caller counting the population -- the bridge's fire record --
+    measures it with THE SAME predicate the solve was given, rather than a
+    second, nearly-identical test that drifts. `states` narrows; None is the
+    default set.
+    """
+    return (_serviceable_in(frozenset(states)) if states is not None
+            else _default_serviceable)
+
+
+def _plannable_in(states: frozenset[str] | None):
+    """The serviceable predicate AND the not-already-held test, as one callable."""
+    base = serviceable_predicate(states)
+    return lambda v: base(v) and not vehicle_is_held(v)
+
+
 def _default_serviceable(vehicle: dict) -> bool:
     """On site, in a serviceable state, and not already at its target.
 
@@ -524,16 +674,18 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
     #: kind -> the inlets the site actually accepts for it, kept only so an
     #: abstention can say what IS on site rather than only what is not.
     connectors_by_kind: dict[str, set[str]] = {}
-    busy = 0
+    blocked: dict[str, int] = {}
     for st in frame.get("stalls", []):
         kind = st.get("type")
         kw = float(st.get("connector_max_kw") or 0)
         if kind in NON_CHARGING_TYPES or kw <= 0:
             continue
-        if not stall_is_free(st):
-            #: L-58: occupied or held. Counted so the refusal below can say
-            #: "all busy" instead of "none exist"; never offered to the solver.
-            busy += 1
+        reason = stall_block_reason(st)
+        if reason is not None:
+            #: L-58/L-61: not a point this tick. Tallied BY REASON so the
+            #: refusal below can say which scarcity the site hit rather than
+            #: "all busy"; never offered to the solver either way.
+            blocked[reason] = blocked.get(reason, 0) + 1
             continue
         inlets = _accepted_inlets(st)
         if not inlets:
@@ -567,10 +719,11 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
         kinds_on_site.add(cap)
         connectors_by_kind.setdefault(kind, set()).update(inlets)
     if not points:
-        if busy:
-            raise FrameError(f"frame has {busy} charge-capable stall(s) and every "
-                             f"one is occupied or held this tick; nothing free "
-                             f"to propose on")
+        if blocked:
+            detail = ", ".join(f"{n} {r}" for r, n in sorted(blocked.items()))
+            raise FrameError(f"frame has {sum(blocked.values())} charge-capable "
+                             f"stall(s) and not one is offerable this tick "
+                             f"({detail}); nothing free to propose on")
         raise FrameError("frame has no charge-capable stalls that declare an "
                          "accepted inlet; nothing to propose on")
 
@@ -831,26 +984,51 @@ def propose(frame: dict, class_table: dict, *, site: dict,
     intent_for_pack(pack_id) resolves a pack's artifact, and any Intent loaded
     by intent.load_intent is accepted here.
     """
+    #: L-60: narrow (never widen) which states are planned for, and drop the
+    #: vehicles that already hold a place. Built once so the counts below
+    #: describe the SAME population the solver was given.
+    plannable = _plannable_in(serviceable_states)
     scenario, abstentions = frame_to_scenario(
         frame, class_table, site=site, horizon_min=horizon_min,
         ready_by_min=ready_by_min,
         default_ready_delta_min=default_ready_delta_min,
         class_key=class_key,
-        #: L-60: narrow (never widen) which states are planned for.
-        serviceable=(_serviceable_in(frozenset(serviceable_states))
-                     if serviceable_states is not None else None))
+        serviceable=plannable)
 
-    #: L-58: how many charge-capable stalls the frame offered that were NOT
-    #: points this tick. Travels with the result so the fire record can show
-    #: "planned on 17 of 40" rather than a bare stall count.
-    stalls_busy = sum(1 for st in frame.get("stalls", [])
-                      if st.get("type") not in NON_CHARGING_TYPES
-                      and float(st.get("connector_max_kw") or 0) > 0
-                      and not stall_is_free(st))
+    #: L-58/L-61: of the charge-capable stalls the frame offered, which were NOT
+    #: points this tick and why. Travels with the result so the fire record can
+    #: show "planned on 17 of 40, 21 occupied, 2 charger_faulted" rather than a
+    #: bare stall count. Recomputed off the frame rather than threaded out of
+    #: frame_to_scenario so its signature -- and every caller of it -- is
+    #: unchanged; the predicate is the same function in both places.
+    charge_stalls = [st for st in frame.get("stalls", [])
+                     if st.get("type") not in NON_CHARGING_TYPES
+                     and float(st.get("connector_max_kw") or 0) > 0]
+    stalls_blocked: dict[str, int] = {}
+    for st in charge_stalls:
+        reason = stall_block_reason(st)
+        if reason is not None:
+            stalls_blocked[reason] = stalls_blocked.get(reason, 0) + 1
+    stalls_busy = sum(stalls_blocked.values())
+
+    #: L-60: vehicles in a serviceable state that were skipped because the frame
+    #: says they already hold a reservation or a booking. Counted, never
+    #: silently absent -- see vehicle_is_held for why they get no row.
+    base_serviceable = serviceable_predicate(serviceable_states)
+    vehicles_held = sum(1 for v in frame.get("vehicles", [])
+                        if base_serviceable(v) and vehicle_is_held(v))
+
+    #: Which frame contract produced those verdicts. None means a frame without
+    #: the 0265 facts, so `offerable`/`reserved_stall_id` were never consulted
+    #: and the counts above are the pre-0265 shield-only view. A fire record
+    #: that does not carry the version cannot be compared to one that does.
+    facts_version = frame_facts_version(frame)
 
     if not scenario["assets_spec"]["explicit"]:
         return {"proposals": abstentions, "abstained": len(abstentions),
                 "planned": 0, "solver": None, "stalls_busy": stalls_busy,
+                "stalls_blocked": stalls_blocked, "vehicles_held": vehicles_held,
+                "facts_version": facts_version,
                 "note": "no plannable vehicles in frame"}
 
     #: THE BATCH BOUND, and why it is the caller's number and not a default.
@@ -1040,4 +1218,7 @@ def propose(frame: dict, class_table: dict, *, site: dict,
         "deferred": len(deferred),
         "solver": solver_record,
         "stalls_busy": stalls_busy,
+        "stalls_blocked": stalls_blocked,
+        "vehicles_held": vehicles_held,
+        "facts_version": facts_version,
     }

@@ -283,3 +283,19 @@ def test_cli_exit_code_signals_a_refused_fire(tmp_path):
                   "--provider", "fake", "--answer", str(ans_p),
                   "--model", "some/unpriced-model", "--emit-sql", str(tmp_path / "o.sql")])
     assert rc == 3
+
+
+def test_the_digest_shows_the_door_verdict_without_enforcing_it():
+    """0265/L-61. Law 2 keeps every charge-capable stall in the digest, taken
+    ones included -- an unsafe-but-well-formed proposal must stay possible. What
+    changes is that the model can SEE which stalls the proposal selector would
+    discard. Absent on a gate-off frame, byte for byte."""
+    frame = _frame()
+    plain = lp.frame_digest(frame)
+    assert all("offerable" not in s for s in plain["stalls"])
+
+    for s in frame["stalls"]:
+        s.update(offerable=False, reservation_live=True, charger_state="Available")
+    shown = lp.frame_digest(frame)
+    assert [s["id"] for s in shown["stalls"]] == [s["id"] for s in plain["stalls"]]
+    assert all(s["offerable"] is False for s in shown["stalls"])

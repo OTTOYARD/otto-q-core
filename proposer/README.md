@@ -126,6 +126,59 @@ oversubscribed (13 vehicles, 1 stall) the kernel raises `INFEASIBLE`; the bridge
 that as an `empty` fire with the solver's words in `error` and `--allow-rejection` lets it plan
 what fits (L-62).
 
+#### L-58, L-60 and L-61 are CLOSED by migration 0265 and this package's consumer (2026-09-13)
+
+The kernel migration the three findings above each end by deferring is `0265`
+(version `20260913122605`), and the paragraphs are left standing as the record of what
+was true before it. What the frame now carries, behind
+`ottoq_policy_get(run,'proposer_frame_facts',0)` and only when that resolves 1:
+
+| per stall | per vehicle | top level |
+|---|---|---|
+| `ocpp_charger_id`, `reserved_by`, `reservation_expires_at`, `reservation_live`, `charger_state`, `charger_heartbeat_at`, `charger_fresh`, `offerable` | `reserved_stall_id`, `has_live_booking` | `selector` = `{facts_version, clock, heartbeat_window_s, authority}` |
+
+`offerable` is the selector's own conjunction, and 0265's assertion A4 recomputes it
+independently and refuses to apply if the two disagree — so it is the door's verdict, not a
+restatement of it. **Vehicle-blind on purpose:** the selector also accepts a stall reserved for
+the proposal's own vehicle, which a per-stall boolean cannot know; that case is answered on the
+vehicle side instead, because a vehicle holding a live reservation is no longer planned for at
+all.
+
+How this package reads them:
+
+- `stall_is_free()` **conjoins** the door's verdict with the shield's — `status == 'available'`
+  and no vehicle, **and** `offerable`. Not a substitution: `offerable` does not read
+  `stalls.status` and neither does the selector, so a `maintenance` stall on a free healthy
+  charger is offerable and the door would take a proposal for it; the shield is what refuses
+  that one. Trading a refusal at the door for a refusal at the shield is not progress.
+- `stall_block_reason()` names exactly one reason per stall, most specific first —
+  `occupied`, `status_<x>`, `no_charger`, `charger_<state>`, `charger_stale`, `reserved` —
+  and the tally rides the result as `stalls_blocked` and the fire record as the same key.
+  0186's diagnosis was the most useful line either live run produced and it took a hand query;
+  it is now on every fire, the empty ones included.
+- `vehicle_is_held()` performs the narrowing L-60 above could only assert. A vehicle carrying
+  `reserved_stall_id` or `has_live_booking` is skipped and **counted** (`n_vehicles_held`) —
+  not abstained on, because two hundred abstention rows a tick for vehicles nobody asked about
+  is noise in the proposals table, not evidence.
+- `frame_facts_version()` feature-detects the `selector` block, and the bridge records it beside
+  the counts: **0 held under version 1 is a measurement; 0 held under no version is a
+  blindness**, and a record that cannot tell them apart publishes the second as the first.
+- The LLM digest (`bridge/llm_proposer.py`) **shows** `offerable` and does not enforce it — law 2
+  keeps every charge-capable stall visible so an unsafe-but-well-formed proposal stays possible.
+
+**Absence is the pre-0265 behaviour, in every one of them.** Every certification arm and every
+fixture written before 0265 sees a frame without the facts and is read exactly as it was; the
+consumer never guesses a verdict the frame did not give it.
+
+**The clock is load-bearing, and it is the SIM clock.** Measured 2026-09-13 (`db/checks/0195`):
+against `now()` all 40 flagship charge stalls read `charger_fresh=false` and the proposer refuses
+the whole depot; against the twin's own clock the same 40 read 39 offerable, 1 `charger_faulted`.
+The wall clock does not make the proposer wrong quietly — it makes it silent.
+
+**What is still open:** G47. The proposer is still asked *after* the local path has taken the
+resource (`db/checks/0188`), and seeing sooner that the resource is gone is not being asked
+sooner. This is 0188's option (b), visibility; option (c), reordering the tick, is not taken here.
+
 ## Abstention is first-class
 
 No class-table entry, no readable `soc`, a target at or below the current charge, or no point
