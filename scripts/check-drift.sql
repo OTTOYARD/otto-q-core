@@ -369,7 +369,8 @@ repo_manifest(version, name, file) AS (
     ('20260913205636'::text, '0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair'::text, '0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair.sql'::text),
     ('20260913225716'::text, '0270_the_only_queue_depth_rule_crashes_on_two_states_that_do_not_exist'::text, '0270_the_only_queue_depth_rule_crashes_on_two_states_that_do_not_exist.sql'::text),
     ('20260913231758'::text, '0271_the_outbound_command_stream_is_the_only_stream_without_provenance'::text, '0271_the_outbound_command_stream_is_the_only_stream_without_provenance.sql'::text),
-    ('20260913232252'::text, '0272_0271_never_classified_itself_and_the_floor_swallowed_every_column'::text, '0272_0271_never_classified_itself_and_the_floor_swallowed_every_column.sql'::text)
+    ('20260913232252'::text, '0272_0271_never_classified_itself_and_the_floor_swallowed_every_column'::text, '0272_0271_never_classified_itself_and_the_floor_swallowed_every_column.sql'::text),
+    ('PENDING'::text, '0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink'::text, '0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
