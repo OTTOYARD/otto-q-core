@@ -20,9 +20,26 @@ SELECT (position('cron.job'          in p.prosrc) > 0) AS guards_on_cron_job,
 -- allow-listed parent of a NO ACTION/RESTRICT FK; and a determinism pair
 -- ACTIVE IN pg_stat_activity RIGHT NOW.
 --
--- It has NO guard on a SCHEDULED round. Every migration in this repo carries one
--- (`jobname ~ '^r[0-9]+_'`, by EXISTENCE not activeness, so a round paused
--- mid-flight still blocks). The purge does not.
+-- It has NO guard on a SCHEDULED round. Migration preflights carry one
+-- (`jobname ~ '^r[0-9]+_'`). The purge does not.
+--
+-- CORRECTION 2026-09-13, from the adversarial review of 0269. Two claims in the
+-- sentence above were wrong and 0269's first draft inherited both:
+--   * "Every migration in this repo" is false. 0225, 0226, 0227, 0228, 0262 and
+--     0265 all gate the round branch on ACTIVENESS, not existence, and the
+--     two-branch (name OR command) form exists only in 0266-0269 -- a convention
+--     two days old at the time of writing, not a repo-wide one.
+--   * "by EXISTENCE not activeness" is the right rule for a PREFLIGHT and the
+--     wrong rule for the purge guard this file specifies. Nothing unschedules a
+--     round job after it fires -- scripts/schedule-round.sql writes date-pinned
+--     one-shots and its only `unschedule` is an error message telling a human to
+--     do it by hand (db/canons/round27-apply-window.md:102: "round 27's seven
+--     stay active after firing"). So an existence test in a NIGHTLY job latches:
+--     the first round left uncleaned would disable the purge permanently while
+--     cron.job_run_details reported success. Activeness does not fix it either;
+--     a fired date-pinned job stays active = true.
+--   0269 therefore matches round jobs by IMMINENCE (+/- 3 h of their
+--   reconstructed fire time), and asserts both directions.
 
 -- 2. WHY THAT MATTERS, AND WHY IT IS NOT AN EMERGENCY.
 --    A round is ten pairs on 14-minute slots. A 12-tick pair runs ~130 s and a
