@@ -217,7 +217,13 @@ SELECT r.rolname,
   FROM pg_roles r WHERE r.rolname IN ('anon', 'authenticated', 'service_role');
 ```
 
+`db/checks/0189` is the standing version of the first query: run it after every
+certification round and every demo, because it separates the two kinds of zero —
+`NEVER HEARD` (the door took the proposal and the selector refused it) from
+`ASKED AND NEVER FOLLOWED` (the selector returned it and physical reality overruled
+it). Conflating those two is what cost the first live D3 run.
+
 The certification side is re-derived by `CERTIFICATION_STATUS.md`'s own block; the
-90-heard-0-followed measurement is `db/checks/0186`; the canon's current state and
-the one open defect in the instrument are `db/canons/round41.md` and
-`db/checks/0187`.
+90-heard-0-followed measurement is `db/checks/0186`; G47's root cause is
+`db/checks/0188`; the canon's current state and the one open defect in the
+instrument are `db/canons/round41.md` and `db/checks/0187`.
