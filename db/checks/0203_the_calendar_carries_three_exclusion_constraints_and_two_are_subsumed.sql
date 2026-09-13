@@ -1,0 +1,100 @@
+-- 0203  THE CALENDAR CARRIES THREE EXCLUSION CONSTRAINTS AND TWO ARE SUBSUMED
+--       (measured 2026-09-13 ~20:15-20:30 UTC, PostgreSQL 17.6, otto-q-core)
+--
+-- Found while sizing the index maintenance Chase approved. Three findings, one
+-- of which overturns the plan that maintenance was going to follow.
+--
+-- ---------------------------------------------------------------------------
+-- 1. REINDEX CONCURRENTLY CANNOT TOUCH AN EXCLUSION CONSTRAINT. MEASURED.
+--
+--   REINDEX INDEX CONCURRENTLY public.ottoq_stall_bookings_no_overlap;
+--   -> ERROR: 0A000: concurrent index creation for exclusion constraints is
+--             not supported
+--
+-- The earlier maintenance note listed ottoq_stall_bookings_no_overlap_v3
+-- (209 MB) as a REINDEX CONCURRENTLY target "pending verification that GiST
+-- EXCLUDE supports it". Verified: it does not. All three no_overlap indexes --
+-- 435 MB combined -- can only be rebuilt by plain REINDEX, which takes a lock
+-- that blocks writes to the calendar. That is a demo-pause operation, not a
+-- background one, and the "no pause needed" conclusion does not hold for them.
+-- (A plain btree REINDEX CONCURRENTLY does work here; idx_stalls_depot was
+-- rebuilt as the control before the exclusion index was attempted.)
+--
+-- ---------------------------------------------------------------------------
+-- 2. no_overlap_v2 ENFORCES NOTHING THAT v3 DOES NOT. 194 MB.
+--
+-- All three share an identical key -- EXCLUDE USING gist (sim_run_id WITH =,
+-- stall_id WITH =, during WITH &&) -- and differ only in their WHERE:
+--
+--   no_overlap     32 MB   state IN (held, active)
+--   no_overlap_v2 194 MB   state IN (held, active, done)              AND booked_at >= 2026-08-02 03:19
+--   no_overlap_v3 209 MB   state IN (held, active, done, interrupted) AND booked_at >= 2026-08-02 03:19
+--
+-- v2's predicate is a STRICT SUBSET of v3's: same key, same booked_at bound,
+-- and {held,active,done} is a subset of {held,active,done,interrupted}. So any
+-- pair of rows v2 would reject, v3 rejects first. This is true by logic, not by
+-- the current data -- there is no row set that makes v2 load-bearing.
+--
+-- Measured anyway, because the rule here is that an argument is checked:
+--   rows satisfying v2 but not v3 ......... 0
+--   rows satisfying v1 but not v3 ......... 0
+--   total rows ............................ 125,429
+--   oldest booked_at ...................... 2026-08-30 04:34  (> the 08-02 bound)
+--
+-- The v1 result is weaker than the v2 result and the difference matters. v2 is
+-- redundant UNCONDITIONALLY. v1 is redundant only because the purge has removed
+-- everything older than the 2026-08-02 bound, so its one distinct coverage
+-- region (held/active rows booked BEFORE that bound) is currently empty. A
+-- back-dated insert would make v1 load-bearing again; nothing can make v2 so.
+--
+-- COST: 194 MB of index, plus a second GiST descent on every insert and every
+-- state change to the busiest table in this database (db/checks/0127: 53% of
+-- all disk blocks this database has ever read).
+--
+-- NOT DROPPED, DELIBERATELY. scripts/APPLYING.md says "Never DROP", and while
+-- that rule is written about function signatures, this is an EXCLUDE constraint
+-- on the one table CLAUDE.md protects by name ("makes double-booking physically
+-- impossible ... never remove either side"). Dropping v2 does not remove the
+-- verification side -- v3 is strictly stronger and stays -- but a change that
+-- reads as "removed an exclusion constraint from the calendar" is one to make in
+-- a deliberate window with Chase's sign-off, not in passing. Filed, not done.
+--
+-- ---------------------------------------------------------------------------
+-- 3. THE BLOAT IS IN BOTH HEAPS AND INDEXES, AND ONLY ONE HALF IS WORTH ACTING ON
+--
+-- Sampled with TABLESAMPLE + pg_column_size (pgstattuple is not installed):
+--
+--   table                     live rows    heap now   heap at measured width   ratio
+--   ottoq_rule_evaluations    1,490,462     4,715 MB              1,273 MB      3.7x
+--   ottoq_events                718,960     2,324 MB                757 MB      3.1x
+--   ottoq_stall_bookings        127,041       530 MB                 64 MB      8.2x
+--   ottoq_variability_cards     199,691       302 MB                 49 MB      6.2x
+--   ottoq_decisions           2,179,666     1,821 MB              2,414 MB      0.8x
+--
+-- So the earlier "the bloat is in indexes, REINDEX CONCURRENTLY suffices" line
+-- was wrong about where the space is: there is more of it in the heaps. But it
+-- was right about what to DO, for a reason it did not give. These are
+-- purge-cycled tables: ottoq_events alone records 9,419,289 lifetime inserts
+-- against 9,195,864 deletes (CLAUDE.md Part 3). The heap is sized for its
+-- high-water mark and will return to it. VACUUM FULL would hand the space back
+-- to the filesystem, take an ACCESS EXCLUSIVE lock on the engine's hottest
+-- tables, and then the tables would grow into it again. That is a demo pause
+-- spent on disk we are about to re-use.
+--
+-- The index side is different only where the index cannot reuse freed space
+-- cheaply, and the largest such case is the 435 MB of GiST above -- which item 1
+-- says cannot be rebuilt online anyway. So the honest maintenance answer is:
+-- nothing here is urgent, one item (v2) is free once approved, and the rest
+-- wants a scheduled window rather than a background job.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT TO DO, IN ORDER OF VALUE PER UNIT OF RISK
+--   1. Drop ottoq_stall_bookings_no_overlap_v2 in its own migration. 194 MB and
+--      one GiST descent per calendar write, for a constraint that is provably
+--      implied by v3. Needs Chase's sign-off because of what it looks like.
+--   2. Leave v1 alone, or re-derive it without the booked_at bound so its
+--      coverage is not an accident of what the purge has removed.
+--   3. REINDEX (plain) the three no_overlap indexes during a demo pause, if the
+--      space is ever wanted. Not before.
+--   4. Do not VACUUM FULL the purge-cycled tables. The space comes back on its
+--      own use.
