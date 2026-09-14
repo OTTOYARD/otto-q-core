@@ -394,7 +394,7 @@ repo_manifest(version, name, file) AS (
     ('20260914094551'::text, '0294_the_purge_commits_inside_a_cursor_loop'::text, '0294_the_purge_commits_inside_a_cursor_loop.sql'::text),
     ('20260914095529'::text, '0295_a_procedure_with_a_set_clause_cannot_commit'::text, '0295_a_procedure_with_a_set_clause_cannot_commit.sql'::text),
     ('20260914101744'::text, '0296_the_gap_view_cannot_see_five_of_its_own_call_sites'::text, '0296_the_gap_view_cannot_see_five_of_its_own_call_sites.sql'::text),
-    ('PENDING'::text, '0297_seven_gates_whose_range_is_the_comparison_itself'::text, '0297_seven_gates_whose_range_is_the_comparison_itself.sql'::text)
+    ('20260914102812'::text, '0297_seven_gates_whose_range_is_the_comparison_itself'::text, '0297_seven_gates_whose_range_is_the_comparison_itself.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

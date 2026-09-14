@@ -281,7 +281,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0294](db/migrations/0294_the_purge_commits_inside_a_cursor_loop.sql) | `20260914094551` | yes — ledger | THE PURGE COMMITS INSIDE A CURSOR LOOP |
 | [0295](db/migrations/0295_a_procedure_with_a_set_clause_cannot_commit.sql) | `20260914095529` | yes — ledger | A PROCEDURE WITH A SET CLAUSE CANNOT COMMIT |
 | [0296](db/migrations/0296_the_gap_view_cannot_see_five_of_its_own_call_sites.sql) | `20260914101744` | yes — ledger | THE GAP VIEW CANNOT SEE FIVE OF ITS OWN CALL SITES |
-| [0297](db/migrations/0297_seven_gates_whose_range_is_the_comparison_itself.sql) | `PENDING` | no — pending | SEVEN GATES WHOSE RANGE IS THE COMPARISON ITSELF, AND THREE CLAMPS |
+| [0297](db/migrations/0297_seven_gates_whose_range_is_the_comparison_itself.sql) | `20260914102812` | yes — ledger | SEVEN GATES WHOSE RANGE IS THE COMPARISON ITSELF, AND THREE CLAMPS |
 
 163 migrations indexed.
 

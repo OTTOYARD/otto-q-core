@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914102812
 -- migration-name:    0297_seven_gates_whose_range_is_the_comparison_itself
 --
 -- 0297  SEVEN GATES WHOSE RANGE IS THE COMPARISON ITSELF, AND THREE CLAMPS
