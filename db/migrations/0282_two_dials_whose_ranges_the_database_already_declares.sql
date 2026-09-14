@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914061049
 -- migration-name:    0282_two_dials_whose_ranges_the_database_already_declares
 --
 -- 0282  THE FIRST TWO OF THE NINETY, AND NEITHER RANGE IS A JUDGEMENT CALL
@@ -374,3 +374,32 @@ VALUES ('0282_two_dials_whose_ranges_the_database_already_declares', false,
  'Two rows in ottoq_policy_param_catalog: sensor_soil_threshold [0,1] default 0.35, reserve_margin_pct [0,100] default 15. Both ranges are read off the consumers, not chosen -- soil from the CHECK constraint ottoq_vehicle_wear_soil_index_check on the column every reader compares the dial against, the margin from ottoq_recall_naive_threshold_v1''s own width_bucket(v_soc, 0, 100, ...) plus the >= 20 floor in ottoq_effective_reserve_soc; P1 and P2 pin both derivations so the file refuses to apply if either shape changes. Effect: ottoq_policy_set stops answering unknown_param for these two keys and starts clamping two-sidedly with clamped:true in the receipt. No function is replaced. forces_recert=false, asserted rather than assumed: P3 proves ottoq_policy_get never reads the catalog, so a catalog row is consumed only by ottoq_policy_set, which no certification arm calls; the 4 pre-existing rows are untouched and asserted still at their measured values (A4). First payment against the ~92-key gap 0281 measured.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 06:10:49 UTC (1:10 AM CT) as
+-- supabase_migrations.schema_migrations version 20260914061049.
+--
+-- Dry run: the file byte for byte inside BEGIN ... ROLLBACK, clean on the
+-- first attempt. P-, P0, P1, P2, P3, P4 and A1-A5 all passed, and a
+-- post-rollback re-count confirmed the dry run left nothing behind:
+-- 0 catalog rows, the original 4 live rows, 0 rows tagged 0282.
+--
+-- VERIFIED AFTER APPLY, read-only (no probe that writes -- 0279's closing
+-- note is the reason this verification asserts nothing it would have to
+-- clean up afterwards):
+--
+--   ottoq_policy_param_catalog rows for the two keys    2   (was 0)
+--   ottoq_policy_params rows for the two keys           4   (unchanged)
+--   rows left behind by the proof                       0
+--
+--   ottoq_policy_catalog_gap, status = read_uncatalogued
+--     before   90
+--     after    88
+--   ottoq_policy_catalog_gap, status = ok
+--     before   60
+--     after    62
+--
+-- Two keys down. The instrument that counts them is the same one that will
+-- say when the work is finished, which is the point of having built it
+-- before cataloguing anything.
+-- ===========================================================================
