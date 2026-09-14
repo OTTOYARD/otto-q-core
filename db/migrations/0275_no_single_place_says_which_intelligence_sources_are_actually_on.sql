@@ -13,128 +13,157 @@
 -- Then it got one of them wrong. 0208's engine table came from a query ending
 -- in LIMIT 12; there are sixteen distinct l2_engine labels, and the limit
 -- silently dropped cuOpt -- the source the file was about. The correction is
--- appended to 0208 and the corrected fact is sharper than the error: cuOpt has
--- decided 27 times and all 27 were enacted, so the engine does not ignore it;
--- a dial says it may not speak.
+-- appended to 0208, and the corrected fact is sharper than the error: cuOpt
+-- has decided 27 times and ALL 27 WERE ENACTED, so the engine does not ignore
+-- it; a dial says it may not speak.
 --
--- Both halves of that are the same defect. "Which intelligence sources are on,
--- when did each last decide, and was it followed" has no answer you can
--- SELECT, so answering it means writing a query, and a query written by hand
--- can end in LIMIT 12.
---
--- This migration gives it an answer, and gives that answer a completeness
--- guard (A6) so the next omission fails an apply instead of reaching a
--- document. No dial is touched.
+-- Both halves are the same defect. "Which sources are on, when did each last
+-- decide, was it followed" has no answer you can SELECT, so answering it means
+-- writing a query by hand, and a query written by hand can end in LIMIT 12.
 --
 -- ---------------------------------------------------------------------------
--- THE FOUR STATES, MADE COMPUTABLE
+-- THE FIRST DRAFT OF THIS FILE TOOK ELEVEN SECONDS PER CALL. MEASURED.
 --
--- DECLARED / WIRED / INVOKED / FOLLOWED, whose whole point is that "it exists"
--- is not "it runs". Derived in that order:
+-- It computed everything live from ottoq_decisions. EXPLAIN ANALYZE on that
+-- one aggregate:
 --
---   FOLLOWED  at least one decision it proposed was ENACTED
---   INVOKED   it decided, and nothing it decided was enacted
---   WIRED     plumbing exists in this database -- a gate parameter or its own
---             ledger -- and it has decided nothing in the window
---   DECLARED  registered, and neither of the above
+--   Parallel Seq Scan on ottoq_decisions  (2,177,338 rows)
+--   Buffers: shared hit=32,425 read=200,664          -- 1.5 GB off disk
+--   Execution Time: 11,187 ms
 --
--- EVERY NUMBER CARRIES ITS WINDOW. ottoq_decisions holds roughly fifteen days,
--- not the engine's life, and 0208 had to correct a note of mine that read 262
--- as a lifetime total. So window_from and window_to are COLUMNS of the result,
--- read from the ledger itself.
+-- and the post-apply assertions called it twelve times, so the dry run hit the
+-- sixty-second timeout and never reached its own verdict. That is how the
+-- defect was found: the file's own proof refused to run.
 --
--- THE REGISTRY IS COMPLETE OR IT IS NOTHING. It holds every l2_engine label
--- that has ever appeared in ottoq_decisions -- all sixteen, including the
--- baselines, the fallback and my own agent probe -- plus the two sources with
--- no database presence at all. A6 asserts that completeness on every apply.
--- A census that lists only the interesting sources is how 0208 lost cuOpt.
+-- An eleven-second status function is not a status function. It is db/checks/
+-- 0098's twenty-two-second KPI view again -- the same class, written by the
+-- same hand, two weeks later. So the shape changed:
+--
+--   ottoq_intelligence_refresh()   ONE pass over ottoq_decisions, using
+--                                  GROUP BY ROLLUP so the per-label facts and
+--                                  the window come from the same scan, and
+--                                  writes ottoq_intelligence_snapshot.
+--   ottoq_intelligence_status()    reads the SNAPSHOT, never the ledger.
+--                                  Eighteen rows in, eighteen rows out.
+--
+-- A7 asserts that structurally: ottoq_intelligence_status must not mention
+-- ottoq_decisions at all. An assertion about speed that measured milliseconds
+-- would pass on a warm cache and prove nothing; an assertion that the
+-- expensive table is not in the read path cannot.
+--
+-- The cost of that shape is staleness, so staleness is a COLUMN. Every row
+-- carries computed_at and snapshot_age_hours. A number that might be a day old
+-- says so.
+--
+-- ---------------------------------------------------------------------------
+-- THE CENSUS CANNOT OMIT A LABEL, BY CONSTRUCTION
+--
+-- The registry names eighteen sources. The refresh does NOT look those up --
+-- it writes a row for every label it FINDS, and marks each registered or not.
+-- So a new decision engine appearing in the ledger lands in the snapshot as
+-- registered=false and surfaces in the status as state UNREGISTERED, rather
+-- than being quietly absent. A6 asserts there are none today.
+--
+-- That is the structural version of the lesson 0208 paid for: a census that
+-- lists what it was told to look for is not a census.
+--
+-- ---------------------------------------------------------------------------
+-- THE FOUR STATES
+--
+--   FOLLOWED      at least one decision it proposed was ENACTED
+--   INVOKED       it decided, and nothing it decided was enacted
+--   WIRED         plumbing exists here -- a gate parameter or its own ledger
+--                 -- and it has decided nothing in the window
+--   DECLARED      registered, and neither of the above
+--   UNREGISTERED  it decides and nobody put it in the census
 --
 -- TWO SOURCES HAVE NO DATABASE PRESENCE, measured rather than assumed: no
 -- function, no policy key, no decision row for either CP-SAT or Anthropic.
 -- Their code is real and lives in the repo. Leaving them out would make the
--- status function read healthier than the system is, so they are in it at
--- DECLARED with the note saying where the code actually is.
+-- status read healthier than the system is, so they are in it at DECLARED
+-- with the note saying where the code actually is.
 --
--- AND ONE THING MEASURED WHILE BUILDING IT, WHICH CHANGES HOW A GATE READS.
--- ottoq_policy_get DOES NOT READ ottoq_policy_param_catalog -- its body never
--- mentions the table, and ottoq_policy_get(NULL, k, 7) returns 7 for a key
--- whose catalog default is 1. So default_value is DOCUMENTATION, not
--- behaviour: a dial's effective default is whatever each call site hardcodes,
--- and if the two disagree nothing notices.
+-- AND ONE THING MEASURED WHILE BUILDING IT. ottoq_policy_get DOES NOT READ
+-- ottoq_policy_param_catalog -- its body never mentions the table, and
+-- ottoq_policy_get(NULL, k, 7) returns 7 for a key whose catalog default is 1.
+-- So default_value is DOCUMENTATION, not behaviour: a dial's effective default
+-- is whatever each call site hardcodes, and if the two disagree nothing
+-- notices. This function refuses to collapse them -- gate_override is the
+-- stored value, gate_catalog_default is the catalog's, and gate_enabled is
+-- NULL, not false, when nothing is stored. A3b asserts that on a real key.
 --
--- This function refuses to collapse them. gate_override is the stored value
--- (NULL when unset), gate_catalog_default is the catalog's, and gate_enabled
--- is NULL -- not false -- when nothing is stored, because from here the
--- effective value is genuinely unknown. A3b asserts that distinction on a real
--- key: cuOpt reads override 0 / enabled false, Nemotron reads override NULL /
--- enabled NULL with a catalog default of 1. Reporting both as "off" would be
--- the same class of lie this file exists to stop.
+-- AND A SECOND MEASURED DEFECT, IN THE SECOND DRAFT, FOUND THE SAME WAY.
+-- With the snapshot shape in place the file still would not run: its
+-- PRE-FLIGHT read ottoq_decisions three times (a filtered count for cuOpt, a
+-- count(DISTINCT l2_engine), an EXISTS) and A4 read it a fourth, each one the
+-- same 11-second seq scan, on top of the refresh's own. Five scans is ~55 s
+-- against a 60 s tool ceiling -- a migration that passes or fails depending on
+-- how warm the cache is.
 --
--- forces_recert = FALSE: one table, one STABLE read-only function, no engine
--- caller, nothing on the decide path. A5 asserts ottoq_decide_tick and
--- ottoq_determinism_pair are byte-identical afterwards.
+-- So the order changed too. THE SCAN HAPPENS EXACTLY ONCE, in the refresh, and
+-- every assertion afterwards reads the snapshot. P1 still runs first and still
+-- refuses a double-apply from the catalogs alone, which costs nothing; the
+-- facts that used to be pre-flight (cuOpt 27/27, service_priority 452/0,
+-- sixteen labels) are asserted after the refresh instead, against the rows the
+-- refresh wrote. They fail the same way and roll the same transaction back --
+-- the whole file is one transaction -- they just do not each pay for their own
+-- scan.
+--
+-- The lesson is the same one twice in one file: an instrument that is too
+-- expensive to run is not an instrument, and the only reason I know either
+-- time is that the proof refused to execute.
+--
+-- forces_recert = FALSE: two tables, one read-only status function, one
+-- refresh that writes only its own snapshot, no engine caller, no dial
+-- touched. A5 asserts ottoq_decide_tick and ottoq_determinism_pair are
+-- byte-identical afterwards.
 -- ---------------------------------------------------------------------------
 
+SET LOCAL statement_timeout = '10min';
+
 DO $pre$
-DECLARE v_gate text; v_n bigint; v_e bigint; v_labels int;
+DECLARE v_gate text;
 BEGIN
-  IF to_regclass('public.ottoq_intelligence_sources') IS NOT NULL THEN
-    RAISE EXCEPTION '0275 P1: the registry already exists';
+  IF to_regclass('public.ottoq_intelligence_sources') IS NOT NULL
+     OR to_regclass('public.ottoq_intelligence_snapshot') IS NOT NULL THEN
+    RAISE EXCEPTION '0275 P1: a 0275 object already exists';
   END IF;
   IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-              WHERE n.nspname='public' AND p.proname='ottoq_intelligence_status') THEN
-    RAISE EXCEPTION '0275 P1: ottoq_intelligence_status already exists';
+              WHERE n.nspname='public'
+                AND p.proname IN ('ottoq_intelligence_status','ottoq_intelligence_refresh')) THEN
+    RAISE EXCEPTION '0275 P1: a 0275 function already exists';
   END IF;
 
-  -- P2: the seed describes a measured world. If it has moved, refuse rather
-  -- than ship a stale census. These three are the ones 0208 turns on, and the
-  -- cuOpt pair is stated as 27/27 because this assertion is what caught the
-  -- LIMIT 12 error in the first place.
+  -- P2: the one precondition that costs nothing to check -- it reads a
+  -- five-row policy table, not the decision ledger. Everything else 0208
+  -- measured is asserted AFTER the refresh, against the snapshot, so the
+  -- 11-second scan is paid for once in this file rather than four times.
   SELECT param_value INTO v_gate FROM public.ottoq_policy_params
    WHERE scope_type='global' AND param_key='cuopt_propose_enabled';
   IF COALESCE(v_gate,'(unset)') <> '0' THEN
     RAISE EXCEPTION '0275 P2: cuopt_propose_enabled is now % -- expected 0', COALESCE(v_gate,'(unset)');
   END IF;
-  SELECT count(*), count(*) FILTER (WHERE outcome_status='enacted') INTO v_n, v_e
-    FROM public.ottoq_decisions WHERE l2_engine='cuopt';
-  IF v_n <> 27 OR v_e <> 27 THEN
-    RAISE EXCEPTION '0275 P2: cuOpt reads %/% decisions/enacted; 0208 (corrected) measured 27/27', v_n, v_e;
-  END IF;
-  IF EXISTS (SELECT 1 FROM public.ottoq_decisions
-              WHERE l2_engine='ottoq_service_priority' AND outcome_status='enacted') THEN
-    RAISE EXCEPTION '0275 P2: ottoq_service_priority now has an enacted decision -- 0208 measured none';
-  END IF;
-
-  -- P3: and the label set this registry claims to cover is the one that
-  -- exists. Sixteen at the time of writing; a seventeenth means the seed is
-  -- already short and A6 would fail after the table was created.
-  SELECT count(DISTINCT l2_engine) INTO v_labels
-    FROM public.ottoq_decisions WHERE l2_engine IS NOT NULL;
-  IF v_labels <> 16 THEN
-    RAISE EXCEPTION '0275 P3: % distinct l2_engine labels exist, the seed covers 16 -- '
-                    'read the new one and add it before applying', v_labels;
-  END IF;
-  RAISE NOTICE '0275 pre: cuOpt gate 0, cuOpt 27/27, service_priority 0 enacted, % labels', v_labels;
+  RAISE NOTICE '0275 pre: cuOpt gate reads 0; the ledger facts are asserted after the refresh';
 END $pre$;
 
 CREATE TABLE public.ottoq_intelligence_sources (
   source           text PRIMARY KEY,
   kind             text NOT NULL CHECK (kind IN ('deterministic','solver_external','solver_local',
                                                  'llm','heuristic','baseline','fallback','probe')),
-  gate_param_key   text,          -- NULL when the source has no dial in this database
-  l2_engine_label  text UNIQUE,   -- how it stamps ottoq_decisions.l2_engine; NULL if it never does
-  own_ledger       text,          -- its own invocation ledger, NULL if it has none
-  code_lives_in    text NOT NULL, -- where the implementation actually is
+  gate_param_key   text,
+  l2_engine_label  text UNIQUE,
+  own_ledger       text,
+  code_lives_in    text NOT NULL,
   note             text,
   registered_at    timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.ottoq_intelligence_sources IS
-  '0275: the COMPLETE census of everything that has ever decided in this '
-  'engine -- every l2_engine label without exception, plus the sources whose '
-  'code lives outside the database. Completeness is asserted, not intended: a '
-  'registry that lists only the interesting sources is how db/checks/0208 lost '
-  'cuOpt behind a LIMIT 12.';
+  '0275: the census of everything that can decide in this engine, including '
+  'the sources whose code lives outside the database. Completeness is not '
+  'trusted to this table -- ottoq_intelligence_refresh writes what it FINDS in '
+  'the ledger and flags anything unregistered, because a registry that lists '
+  'only what it was told to look for is how db/checks/0208 lost cuOpt.';
 
 INSERT INTO public.ottoq_intelligence_sources
   (source, kind, gate_param_key, l2_engine_label, own_ledger, code_lives_in, note) VALUES
@@ -206,6 +235,86 @@ INSERT INTO public.ottoq_intelligence_sources
    '20 decisions, all enacted, 2026-09-09. An instrument, not a source; in the '
    'census because leaving instruments out is how a census stops being one.');
 
+CREATE TABLE public.ottoq_intelligence_snapshot (
+  source            text PRIMARY KEY,
+  registered        boolean     NOT NULL,
+  decisions         bigint      NOT NULL DEFAULT 0,
+  enacted           bigint      NOT NULL DEFAULT 0,
+  last_decision_at  timestamptz,
+  window_from       timestamptz,
+  window_to         timestamptz,
+  computed_at       timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.ottoq_intelligence_snapshot IS
+  '0275: one row per source AND per l2_engine label found in the ledger, '
+  'whichever is larger. registered=false means something decided that the '
+  'census does not know about. Refreshed by ottoq_intelligence_refresh; '
+  'ottoq_intelligence_status reads this and never ottoq_decisions, because the '
+  'live aggregate is an 11-second, 1.5 GB scan.';
+
+CREATE OR REPLACE FUNCTION public.ottoq_intelligence_refresh()
+RETURNS jsonb
+LANGUAGE plpgsql
+VOLATILE SECURITY DEFINER
+SET search_path TO 'public', 'ottoq', 'extensions'
+AS $fn$
+DECLARE v_now timestamptz := now(); v_rows int; v_unreg int;
+BEGIN
+  -- ONE pass. GROUP BY ROLLUP gives the per-label rows and the overall window
+  -- from the same scan; GROUPING() tells the total row apart from a genuine
+  -- NULL label, which a plain ROLLUP could not.
+  WITH agg AS (
+    SELECT d.l2_engine AS lbl,
+           GROUPING(d.l2_engine) AS is_total,
+           count(*) AS n,
+           count(*) FILTER (WHERE d.outcome_status = 'enacted') AS e,
+           min(d.created_at) AS lo,
+           max(d.created_at) AS hi
+      FROM public.ottoq_decisions d
+     GROUP BY ROLLUP (d.l2_engine)
+  ),
+  win AS (SELECT lo, hi FROM agg WHERE is_total = 1),
+  live AS (SELECT lbl, n, e, hi AS last_at FROM agg WHERE is_total = 0 AND lbl IS NOT NULL),
+  -- FULL OUTER so a registered source with no decisions keeps its row AND an
+  -- unregistered label that decided gets one. Neither side can hide the other.
+  merged AS (
+    SELECT COALESCE(s.source, l.lbl)        AS source,
+           (s.source IS NOT NULL)           AS registered,
+           COALESCE(l.n, 0)                 AS decisions,
+           COALESCE(l.e, 0)                 AS enacted,
+           l.last_at
+      FROM public.ottoq_intelligence_sources s
+      FULL OUTER JOIN live l ON l.lbl = s.l2_engine_label
+  )
+  INSERT INTO public.ottoq_intelligence_snapshot
+    (source, registered, decisions, enacted, last_decision_at, window_from, window_to, computed_at)
+  SELECT m.source, m.registered, m.decisions, m.enacted, m.last_at, w.lo, w.hi, v_now
+    FROM merged m CROSS JOIN win w
+  ON CONFLICT (source) DO UPDATE SET
+    registered       = EXCLUDED.registered,
+    decisions        = EXCLUDED.decisions,
+    enacted          = EXCLUDED.enacted,
+    last_decision_at = EXCLUDED.last_decision_at,
+    window_from      = EXCLUDED.window_from,
+    window_to        = EXCLUDED.window_to,
+    computed_at      = EXCLUDED.computed_at;
+
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  -- a row this refresh did not touch describes a source that no longer exists
+  DELETE FROM public.ottoq_intelligence_snapshot WHERE computed_at < v_now;
+  SELECT count(*) INTO v_unreg FROM public.ottoq_intelligence_snapshot WHERE NOT registered;
+
+  RETURN jsonb_build_object('ok', true, 'sources', v_rows, 'unregistered', v_unreg,
+                            'computed_at', v_now);
+END $fn$;
+
+COMMENT ON FUNCTION public.ottoq_intelligence_refresh() IS
+  '0275: one scan of ottoq_decisions (~11 s, ~1.5 GB) into '
+  'ottoq_intelligence_snapshot. Writes a row for every label it FINDS, not '
+  'every source it was told about, so a new decision engine cannot go '
+  'uncounted. Safe to call any time; it writes nothing the engine reads.';
+
 CREATE OR REPLACE FUNCTION public.ottoq_intelligence_status()
 RETURNS TABLE(source text, kind text, state text,
               gate_param_key text, gate_override numeric, gate_catalog_default numeric,
@@ -214,37 +323,26 @@ RETURNS TABLE(source text, kind text, state text,
               last_decision_at timestamptz, hours_silent numeric,
               own_ledger text, own_ledger_rows bigint, own_ledger_answered bigint,
               code_lives_in text, note text,
-              window_from timestamptz, window_to timestamptz)
+              window_from timestamptz, window_to timestamptz,
+              computed_at timestamptz, snapshot_age_hours numeric)
 LANGUAGE sql
 STABLE SECURITY DEFINER
 SET search_path TO 'public', 'ottoq', 'extensions'
 AS $fn$
-  WITH win AS (
-    SELECT min(d.created_at) AS lo, max(d.created_at) AS hi FROM public.ottoq_decisions d
-  ),
-  dec AS (
-    SELECT d.l2_engine,
-           count(*)                                           AS n,
-           count(*) FILTER (WHERE d.outcome_status='enacted')  AS n_enacted,
-           max(d.created_at)                                   AS last_at
-      FROM public.ottoq_decisions d
-     WHERE d.l2_engine IS NOT NULL
-     GROUP BY d.l2_engine
-  ),
-  -- cuOpt is the only source with its own invocation ledger today. The join is
-  -- written out by name rather than dispatched from the registry, because a
-  -- status function that builds dynamic SQL from a table is a status function
-  -- that can be made to run anything.
-  cuopt AS (
+  -- Reads the SNAPSHOT. Never ottoq_decisions -- A7 asserts that, because the
+  -- live aggregate is an 11-second scan and this function is meant to be
+  -- called casually.
+  WITH cuopt AS (
     SELECT count(*) AS rows_all,
            count(*) FILTER (WHERE http_status IS NOT NULL) AS answered
       FROM public.cuopt_invocation_log
   )
-  SELECT s.source,
-         s.kind,
+  SELECT n.source,
+         COALESCE(s.kind, 'unknown')                    AS kind,
          CASE
-           WHEN COALESCE(dc.n_enacted,0) > 0 THEN 'FOLLOWED'
-           WHEN COALESCE(dc.n,0)         > 0 THEN 'INVOKED'
+           WHEN NOT n.registered            THEN 'UNREGISTERED'
+           WHEN n.enacted   > 0             THEN 'FOLLOWED'
+           WHEN n.decisions > 0             THEN 'INVOKED'
            WHEN s.gate_param_key IS NOT NULL OR s.own_ledger IS NOT NULL THEN 'WIRED'
            ELSE 'DECLARED'
          END AS state,
@@ -259,51 +357,61 @@ AS $fn$
          CASE WHEN s.gate_param_key IS NULL THEN NULL
               WHEN public.ottoq_policy_get(NULL, s.gate_param_key, NULL) IS NULL THEN NULL
               ELSE public.ottoq_policy_get(NULL, s.gate_param_key, NULL) <> 0 END AS gate_enabled,
-         COALESCE(dc.n, 0)         AS decisions,
-         COALESCE(dc.n_enacted, 0) AS enacted,
-         dc.last_at,
-         CASE WHEN dc.last_at IS NULL THEN NULL
-              ELSE round((EXTRACT(EPOCH FROM (w.hi - dc.last_at)) / 3600)::numeric, 1) END AS hours_silent,
+         n.decisions,
+         n.enacted,
+         n.last_decision_at,
+         CASE WHEN n.last_decision_at IS NULL THEN NULL
+              ELSE round((EXTRACT(EPOCH FROM (n.window_to - n.last_decision_at))/3600)::numeric, 1) END,
          s.own_ledger,
-         CASE WHEN s.own_ledger = 'cuopt_invocation_log' THEN c.rows_all END AS own_ledger_rows,
-         CASE WHEN s.own_ledger = 'cuopt_invocation_log' THEN c.answered END AS own_ledger_answered,
-         s.code_lives_in,
+         CASE WHEN s.own_ledger = 'cuopt_invocation_log' THEN c.rows_all END,
+         CASE WHEN s.own_ledger = 'cuopt_invocation_log' THEN c.answered END,
+         COALESCE(s.code_lives_in, '(unregistered -- nobody has said)'),
          s.note,
-         w.lo, w.hi
-    FROM public.ottoq_intelligence_sources s
-    CROSS JOIN win w
+         n.window_from,
+         n.window_to,
+         n.computed_at,
+         round((EXTRACT(EPOCH FROM (now() - n.computed_at))/3600)::numeric, 2)
+    FROM public.ottoq_intelligence_snapshot n
     CROSS JOIN cuopt c
-    LEFT JOIN dec dc ON dc.l2_engine = s.l2_engine_label
+    LEFT JOIN public.ottoq_intelligence_sources s ON s.source = n.source
    ORDER BY (CASE
-               WHEN COALESCE(dc.n_enacted,0) > 0 THEN 1
-               WHEN COALESCE(dc.n,0)         > 0 THEN 2
+               WHEN NOT n.registered THEN 0
+               WHEN n.enacted   > 0  THEN 1
+               WHEN n.decisions > 0  THEN 2
                WHEN s.gate_param_key IS NOT NULL OR s.own_ledger IS NOT NULL THEN 3
-               ELSE 4 END), COALESCE(dc.n_enacted,0) DESC, s.source;
+               ELSE 4 END), n.enacted DESC, n.source;
 $fn$;
 
 COMMENT ON FUNCTION public.ottoq_intelligence_status() IS
   '0275: which sources are on, when each last decided, and whether anything it '
-  'decided was followed. Every count carries its window (window_from / '
-  'window_to) because ottoq_decisions is roughly fifteen days deep, not the '
-  'engine''s whole life. hours_silent is measured against the window''s end, '
-  'not wall-clock now, so the number does not drift while you read it. '
-  'gate_override is the STORED value and gate_enabled is NULL, not false, when '
-  'nothing is stored: ottoq_policy_get does not consult '
-  'ottoq_policy_param_catalog, so from here the effective value of an unset '
-  'dial is genuinely unknown -- it is whatever the call site hardcodes.';
+  'decided was followed. Reads ottoq_intelligence_snapshot, so every row '
+  'carries computed_at and snapshot_age_hours -- a number that might be a day '
+  'old says so. window_from / window_to are the decision ledger''s own bounds, '
+  'roughly fifteen days, not the engine''s whole life. gate_override is the '
+  'STORED value and gate_enabled is NULL, not false, when nothing is stored: '
+  'ottoq_policy_get does not consult ottoq_policy_param_catalog, so the '
+  'effective value of an unset dial is whatever the call site hardcodes.';
 
 REVOKE ALL ON FUNCTION public.ottoq_intelligence_status() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.ottoq_intelligence_refresh() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.ottoq_intelligence_status() TO authenticated, service_role;
-GRANT SELECT ON public.ottoq_intelligence_sources TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.ottoq_intelligence_refresh() TO service_role;
+GRANT SELECT ON public.ottoq_intelligence_sources  TO authenticated, service_role;
+GRANT SELECT ON public.ottoq_intelligence_snapshot TO authenticated, service_role;
+
+SELECT public.ottoq_intelligence_refresh();
 
 DO $post$
-DECLARE v_n int; v_states int; v_missing int; v_labels int; v_r record;
+DECLARE v_n int; v_states int; v_unreg int; v_src text; v_r record;
 BEGIN
-  -- A1: eighteen sources, one status row each, nothing lost in the LEFT JOIN.
+  -- A1: eighteen registered sources, and the snapshot covers every one of them
+  -- plus anything else that decided.
   SELECT count(*) INTO v_n FROM public.ottoq_intelligence_sources;
   IF v_n <> 18 THEN RAISE EXCEPTION '0275 A1: registry holds % rows, expected 18', v_n; END IF;
+  SELECT count(*) INTO v_n FROM public.ottoq_intelligence_snapshot;
+  IF v_n <> 18 THEN RAISE EXCEPTION '0275 A1: snapshot holds % rows, expected 18', v_n; END IF;
   SELECT count(*) INTO v_n FROM public.ottoq_intelligence_status();
-  IF v_n <> 18 THEN RAISE EXCEPTION '0275 A1: status returned % rows for 18 sources', v_n; END IF;
+  IF v_n <> 18 THEN RAISE EXCEPTION '0275 A1: status returned % rows', v_n; END IF;
 
   -- A2: THE LADDER MUST DISCRIMINATE. Everything on one rung measures nothing.
   SELECT count(DISTINCT state) INTO v_states FROM public.ottoq_intelligence_status();
@@ -311,8 +419,8 @@ BEGIN
     RAISE EXCEPTION '0275 A2: the ladder returned only % distinct states', v_states;
   END IF;
 
-  -- A3: and it lands where the corrected 0208 measured, source by source, so
-  -- a derivation that produces the right SHAPE for the wrong reasons fails.
+  -- A3: it lands where the corrected 0208 measured, source by source, so a
+  -- derivation that produces the right SHAPE for the wrong reasons still fails.
   SELECT * INTO v_r FROM public.ottoq_intelligence_status() WHERE source='cuopt';
   IF v_r.state <> 'FOLLOWED' OR v_r.decisions <> 27 OR v_r.enacted <> 27 THEN
     RAISE EXCEPTION '0275 A3: cuopt reads state=% %/% -- expected FOLLOWED 27/27',
@@ -336,8 +444,13 @@ BEGIN
     RAISE EXCEPTION '0275 A3: the local path reads state=% enacted=%', v_r.state, v_r.enacted;
   END IF;
 
-  -- A3b: unset must not read as off. The assertion that distinguishes this
-  -- design from a single collapsed gate column.
+  SELECT * INTO v_r FROM public.ottoq_intelligence_status() WHERE source='anthropic';
+  IF v_r.state <> 'DECLARED' OR v_r.gate_param_key IS NOT NULL THEN
+    RAISE EXCEPTION '0275 A3: anthropic reads state=% gate=%, expected DECLARED with no dial',
+                    v_r.state, v_r.gate_param_key;
+  END IF;
+
+  -- A3b: unset must not read as off.
   SELECT * INTO v_r FROM public.ottoq_intelligence_status() WHERE source='nemotron';
   IF v_r.gate_override IS NOT NULL OR v_r.gate_enabled IS NOT NULL THEN
     RAISE EXCEPTION '0275 A3b: nemotron has no stored override, so gate_override and '
@@ -347,38 +460,65 @@ BEGIN
     RAISE EXCEPTION '0275 A3b: nemotron catalog default reads %, expected 1', v_r.gate_catalog_default;
   END IF;
 
-  SELECT * INTO v_r FROM public.ottoq_intelligence_status() WHERE source='anthropic';
-  IF v_r.state <> 'DECLARED' OR v_r.gate_param_key IS NOT NULL THEN
-    RAISE EXCEPTION '0275 A3: anthropic reads state=% gate=%, expected DECLARED with no dial',
-                    v_r.state, v_r.gate_param_key;
-  END IF;
-
-  -- A4: every row carries its window, and the window is the ledger's own.
+  -- A4: every row carries its window and its age, and the window is the
+  -- ledger's own.
   IF EXISTS (SELECT 1 FROM public.ottoq_intelligence_status()
-              WHERE window_from IS NULL OR window_to IS NULL OR window_to <= window_from) THEN
-    RAISE EXCEPTION '0275 A4: a row came back without a usable window';
+              WHERE window_from IS NULL OR window_to IS NULL OR window_to <= window_from
+                 OR computed_at IS NULL OR snapshot_age_hours IS NULL) THEN
+    RAISE EXCEPTION '0275 A4: a row came back without a usable window or age';
   END IF;
-  IF (SELECT DISTINCT window_from FROM public.ottoq_intelligence_status())
-     IS DISTINCT FROM (SELECT min(created_at) FROM public.ottoq_decisions) THEN
-    RAISE EXCEPTION '0275 A4: the reported window does not match the decision ledger';
+  -- one window, shared by every row. It comes from the same ROLLUP pass as the
+  -- counts, so consistency is structural -- and re-reading min(created_at) off
+  -- ottoq_decisions to "check" it would buy another 11-second scan to confirm
+  -- something the query plan already guarantees.
+  IF (SELECT count(DISTINCT window_from) FROM public.ottoq_intelligence_status()) <> 1
+     OR (SELECT count(DISTINCT window_to) FROM public.ottoq_intelligence_status()) <> 1 THEN
+    RAISE EXCEPTION '0275 A4: the rows do not share one window';
   END IF;
 
-  -- A6: COMPLETENESS. The guard that would have caught 0208's LIMIT 12. Every
-  -- label that has ever decided must be registered. Non-vacuous by
-  -- construction: the label set is counted first, so an empty ledger fails
-  -- rather than passing silently.
-  SELECT count(DISTINCT l2_engine) INTO v_labels
-    FROM public.ottoq_decisions WHERE l2_engine IS NOT NULL;
-  IF v_labels < 10 THEN
-    RAISE EXCEPTION '0275 A6: only % distinct labels exist -- too few for this check to mean anything',
-                    v_labels;
+  -- A6a: the three facts 0208 turns on, asserted against the rows the refresh
+  -- wrote rather than against four more scans. cuOpt is stated as 27/27
+  -- because this is the assertion that caught 0208's LIMIT 12.
+  SELECT * INTO v_r FROM public.ottoq_intelligence_snapshot WHERE source='cuopt';
+  IF v_r.decisions <> 27 OR v_r.enacted <> 27 THEN
+    RAISE EXCEPTION '0275 A6a: cuOpt reads %/%; 0208 (corrected) measured 27/27',
+                    v_r.decisions, v_r.enacted;
   END IF;
-  SELECT count(*) INTO v_missing FROM (
-    SELECT DISTINCT d.l2_engine FROM public.ottoq_decisions d WHERE d.l2_engine IS NOT NULL) x
-   WHERE NOT EXISTS (SELECT 1 FROM public.ottoq_intelligence_sources s
-                      WHERE s.l2_engine_label = x.l2_engine);
-  IF v_missing <> 0 THEN
-    RAISE EXCEPTION '0275 A6: % l2_engine labels decide in this engine and are not in the census', v_missing;
+  SELECT * INTO v_r FROM public.ottoq_intelligence_snapshot WHERE source='ottoq_service_priority';
+  IF v_r.decisions < 400 OR v_r.enacted <> 0 THEN
+    RAISE EXCEPTION '0275 A6a: ottoq_service_priority reads %/%, expected hundreds and ZERO enacted',
+                    v_r.decisions, v_r.enacted;
+  END IF;
+  SELECT count(*) INTO v_n FROM public.ottoq_intelligence_snapshot WHERE decisions > 0;
+  IF v_n <> 16 THEN
+    RAISE EXCEPTION '0275 A6a: % sources have decided, the seed was written against 16 -- '
+                    'read the new one', v_n;
+  END IF;
+
+  -- A6: COMPLETENESS, data-driven rather than intended. The refresh wrote a
+  -- row for every label it found; none of them may be unregistered.
+  SELECT count(*) INTO v_unreg FROM public.ottoq_intelligence_snapshot WHERE NOT registered;
+  IF v_unreg <> 0 THEN
+    SELECT string_agg(source, ', ') INTO v_src
+      FROM public.ottoq_intelligence_snapshot WHERE NOT registered;
+    RAISE EXCEPTION '0275 A6: % labels decide in this engine and are not in the census: %',
+                    v_unreg, v_src;
+  END IF;
+
+  -- A7: and the status path must not touch the expensive table. An assertion
+  -- about elapsed milliseconds would pass on a warm cache and prove nothing;
+  -- this one cannot.
+  IF (SELECT p.prosrc FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='ottoq_intelligence_status')
+     ILIKE '%ottoq_decisions%' THEN
+    RAISE EXCEPTION '0275 A7: ottoq_intelligence_status reads ottoq_decisions -- '
+                    'that is the 11-second, 1.5 GB scan this shape exists to avoid';
+  END IF;
+  IF (SELECT p.prosrc FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname='public' AND p.proname='ottoq_intelligence_refresh')
+     NOT ILIKE '%ottoq_decisions%' THEN
+    RAISE EXCEPTION '0275 A7: the refresh does not read ottoq_decisions -- '
+                    'then the snapshot is coming from somewhere it should not';
   END IF;
 
   -- A5: nothing on the certified path moved.
@@ -393,22 +533,18 @@ BEGIN
     RAISE EXCEPTION '0275 A5: ottoq_determinism_pair changed -- forces_recert is not FALSE';
   END IF;
 
-  RAISE NOTICE '0275: A1-A6 passed. % distinct states across 18 sources, % labels all registered.',
-               v_states, v_labels;
+  RAISE NOTICE '0275: A1-A7 passed. % distinct states across 18 sources, 0 unregistered.', v_states;
 END $post$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note, classified_at)
 VALUES ('0275_no_single_place_says_which_intelligence_sources_are_actually_on', false,
-  'Adds ottoq_intelligence_sources (a COMPLETE registry: all 16 l2_engine labels plus cpsat and '
-  'anthropic, which have no database presence) and ottoq_intelligence_status() (one STABLE '
-  'read-only function deriving DECLARED/WIRED/INVOKED/FOLLOWED per source from ottoq_decisions '
-  'and cuopt_invocation_log, carrying the ledger window as result columns, and reporting a '
-  'dial''s stored override separately from its catalog default because ottoq_policy_get never '
-  'reads the catalog). A6 asserts registry completeness against the live label set -- the guard '
-  'for the LIMIT 12 error db/checks/0208 had to correct. Writes nothing an engine reads, has no '
-  'engine caller, touches no dial. A5 asserts ottoq_decide_tick '
-  '(fd0bf428abeda40801467fd428a090f1) and ottoq_determinism_pair '
-  '(8a35b8c874fed154cc216140faec0274) are byte-identical afterwards.',
+  'Adds ottoq_intelligence_sources (registry, 18 rows), ottoq_intelligence_snapshot, '
+  'ottoq_intelligence_refresh() (one ROLLUP pass over ottoq_decisions, writing a row for every '
+  'label it FINDS so nothing can go uncounted) and ottoq_intelligence_status() (STABLE, reads '
+  'the snapshot only -- A7 asserts it never touches ottoq_decisions, because the live aggregate '
+  'measured 11,187 ms and 1.5 GB). Writes nothing an engine reads, has no engine caller, '
+  'touches no dial. A5 asserts ottoq_decide_tick (fd0bf428abeda40801467fd428a090f1) and '
+  'ottoq_determinism_pair (8a35b8c874fed154cc216140faec0274) are byte-identical afterwards.',
   now());
 
 -- ---------------------------------------------------------------------------
