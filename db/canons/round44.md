@@ -160,6 +160,287 @@ energy dock) is committed PENDING and waits behind this round.
 
 ---
 
-## THE JUDGEMENT
+## THE JUDGEMENT — PART 1, 20:30 UTC (3:30 PM CT)
 
-_(pending — written when the round lands)_
+Written with the grid lane complete and four of seven flagship columns landed.
+Part 2 follows when the 24t and 48t columns land (21:14–21:32 UTC).
+
+### Post-window results so far
+
+Only a column whose last pair ran after 19:21 UTC has been through this window.
+That is the three grid columns and the four 12-tick flagship columns; the 24t and
+48t flagship columns last ran at 18:41–18:57 and still carry round 43's values.
+
+| column | fp | endst | dec | cmd | verdict |
+|---|---|---|---|---|---|
+| grid 239001/6 | HELD | **MOVED** | MOVED | MOVED | green, 2 passes |
+| grid 424242/6 | HELD | **MOVED** | MOVED | MOVED | green, 2 passes |
+| grid 171717/12 | **MOVED** | **MOVED** | MOVED | MOVED | green, 2 passes |
+| 12t/171717/busy | HELD | **MOVED** | held | held | 1 pass |
+| 12t/314159/busy | HELD | **MOVED** | held | held | 1 pass |
+| 12t/424242/busy | HELD | **MOVED** | held | held | 1 pass |
+| 12t/171717/normal | HELD | **MOVED** | held | held | 1 pass |
+| 24t/171717/busy | HELD | **MOVED** | held | held | 1 pass |
+| 24t/424242/busy | HELD | **MOVED** | held | held | 1 pass |
+| 48t/171717/busy | HELD | **MOVED** | held | held | 1 pass |
+
+**Zero determinism failures.** Every pair byte-identical across all fourteen
+atoms. That is P1's real content and it is holding.
+
+**UPDATED 20:50 UTC — all seven flagship columns have now landed, and the result
+is perfectly uniform: `fp` HELD 7 of 7, `endst` MOVED 7 of 7, `dec` and `cmd`
+HELD 7 of 7**, across three seeds, two scenarios and three horizons (12/24/48).
+Uniformity of that kind is itself evidence and it points somewhere specific --
+see the sharpened `fp` question below.
+
+### P2 — `endst` MOVES on every flagship column: **HELD, and wider than predicted.**
+
+`endst` moved on all seven post-window columns, grid included. The prediction was
+right and one of its caveats was wrong: I had noted the grid fixture's vehicles
+are "never deployed", so grid `endst` would legitimately hold. **Measured: grid
+runs dispatch 4 vehicles each** — 48 dispatches over 12 grid runs, all 48 now
+carrying an ETA. There was no grid exception to make.
+
+And the flagship movement is the fix landing inside the certified path, quantified:
+
+| | dispatches | carrying an ETA |
+|---|---|---|
+| busy_day, pre-window (24 runs) | 3,760 | 3,336 — **424 NULL** |
+| busy_day, post-window (6 runs) | 696 | **696 — none NULL** |
+| normal_day, pre-window (4 runs) | 468 | 464 — 4 NULL |
+| normal_day, post-window (2 runs) | 234 | **234 — none NULL** |
+
+### P2 — `dec` and `cmd` may hold: **they held, on all four flagship columns.**
+
+Predicted as permitted, not required. A changed ETA did not change what the decide
+path did on a 12-tick horizon. Whether it does at 24 or 48 ticks is Part 2's.
+
+### P2 — `0323` moves nothing: **HELD, by direct receipt rather than by inference.**
+
+Twenty runs have started since 0323 applied. **Zero carry an `agentic_arm`
+receipt**, and all twenty are `run_by='cert_harness'`. Both guards did their job.
+
+The same measurement says something the round cannot settle: **no non-certification
+run has started since 0323**, so the arming path has never actually fired. 0323 is
+proven inert where it must be inert and unproven where it must work. The twin run
+after this round is what closes that, and hop 1 of `scripts/watch-run.sql` is the
+receipt to read.
+
+### P2 — `fp`: retired for this window, and the cause is STILL open
+
+Six of seven post-window columns held; `grid 171717/12` moved. The 20:03
+correction above explains why the original prediction was unsound. It then offered
+a replacement expectation — *"`fp` should move wherever `prime_deployment` creates
+dispatch rows at boot"* — and **that one does not survive either**, in both
+directions: the three grid columns share a depot and a fixture and disagree with
+each other, and the four flagship columns, whose runs demonstrably do carry
+`fixture:prime_deployment` rows, all held.
+
+I looked for a third explanation in the end-of-run `eta_source` distribution —
+grid shows no `fixture:prime_deployment` label, flagship does — and **it cannot
+testify.** The per-tick refresh 0321 added overwrites the prime label within a few
+ticks, so an end-of-run label census answers "who wrote last", not "what existed
+at boot". That is the same defect class a third time today; recording it here
+rather than letting a wrong story stand.
+
+**What is settled:** the engine is not implicated. All five grid pairs and all
+four flagship pairs are byte-identical. A canon that moves is a canon update; only
+a pair that FAILS is a defect, and none failed. The `fp` asymmetry is a gap in the
+explanation, not in the determinism.
+
+### The `fp` asymmetry, narrowed to a sharper question (20:45 UTC)
+
+Two more hypotheses tested and **both refuted by measurement**, so this is now a
+smaller and more specific open question rather than a vague one.
+
+The transition itself, read per pair rather than from the canon:
+
+| column | 17:24 (pre-window) | 19:40–19:59 (post-window) |
+|---|---|---|
+| grid 239001/6 | — | `66275ea7`, `66275ea7` — **held** (round 43 banked `66275ea7`) |
+| grid 424242/6 | — | `4cac51f0`, `4cac51f0` — **held** (round 43 banked `4cac51f0`) |
+| grid 171717/12 | `5f2e25bc` | `a26925d6`, `a26925d6` — **moved, at the window** |
+
+Both arms agree in every pair; this is a canon moving, never a pair failing.
+
+**Hypothesis A — "0321 changed the SET of dispatch rows at boot."** That was the
+original falsifier. **Refuted:** every grid seed creates exactly 4 dispatches per
+run, 4.00 per run across all three, 16 of 16 carrying an ETA in each. The set is
+identical.
+
+**Hypothesis B — "one grid seed deploys at boot and the others do not."**
+**Refuted by the same measurement** — 4.00 per run for all three seeds.
+
+So the dispatch block cannot be what separates the moved column from the held
+ones, in either the row-set or the row-value direction. The remaining differences
+between grid 171717/12 and the two grid columns that held are **the seed and the
+horizon (12 ticks vs 6)** — and a BOOT fingerprint is taken before any tick runs,
+so neither should be able to reach it.
+
+That is the question now, and it is worth asking properly rather than closing:
+**why does a fingerprint of the boot world differ between two runs of the same
+fixture on the same depot that differ only in seed and horizon?** A legitimate
+answer exists (the fixture's prime step is seeded, so a seeded draw at boot
+differs by seed) and a defective one exists (the boot fingerprint is reachable
+from the horizon, which would make it not a boot fingerprint). Nothing measured
+so far distinguishes them.
+
+**SHARPENED AGAIN AT 20:50, by the flagship lane completing.** `endst` is the END
+state, taken after the ticks; `fp` is the BOOT state, taken before them. `0321`
+does two separable things: it added a per-tick refresh (which runs DURING ticks,
+and plainly explains `endst` moving 7 of 7), and it labelled
+`twin.ottoq_sim_prime_deployment`'s own INSERT (which runs at BOOT, and should
+therefore have moved `fp`). **`fp` held on all seven.**
+
+So the question is now this, and it is answerable: either
+`ottoq_sim_prime_deployment` does not execute inside a flagship pair, or the boot
+fingerprint does not see the rows it writes. One of those two is true, and both
+are worth knowing — the second would mean `fp` is blind to the state prime
+establishes, which is a gap in the instrument rather than in the engine.
+
+Note this also makes the grid `171717/12` movement the ODD ONE OUT in a new way:
+it is the only column anywhere, flagship or grid, where `fp` moved at all.
+
+**The experiment that settles it, and it does not need this round:** call
+`ottoq_boot_state_fingerprint` directly on the grid depot for the three seeds at
+a fixed horizon, then for one seed at two horizons. If the value moves with the
+horizon, that is a defect and it is a real one. Deliberately NOT run now — it
+touches the same depot a lane is certifying.
+
+**Not implicated, and worth stating so the open question is not over-read:** all
+five grid pairs and every flagship pair are byte-identical across fourteen atoms.
+Determinism is intact. This is a question about what a canon means, not about
+whether the engine repeats itself.
+
+### P3 — the recert floor moves once: **HELD.**
+
+Every flagship column reset to `consecutive_passes = 0` and the four that have run
+since are at 1. `0325` stayed unapplied for exactly this reason and still is.
+
+---
+
+## CORRECTION 20:03 UTC — P2's `fp` PREDICTION RESTS ON A FALSE PREMISE, AND IT IS MINE
+
+The grid lane finished green on all three columns, 5 pairs, zero determinism
+failures. But P2's sharp prediction — "`fp` HOLDS on every column" — is **refuted
+on `grid 171717/12`**: `5f2e25bc` → `a26925d6`. The other two grid columns held.
+
+I wrote that prediction with an explicit falsifier: *"If `fp` moves, 0321 changed
+the SET of dispatch rows rather than their ETA, and that is a defect, not a canon
+update."* **That falsifier is wrong, because the premise under it is wrong.**
+
+### The premise, and why it failed
+
+I verified the claim with:
+
+```sql
+SELECT (prosrc ~ 'return_eta_minutes') FROM pg_proc
+ WHERE proname = 'ottoq_boot_state_fingerprint';   -- false
+```
+
+and concluded the boot fingerprint cannot see the ETA. Read the body instead:
+
+```sql
+md5(((to_jsonb(t) - 'dispatch_id' - 'sim_run_id' - 'created_at' - 'return_evidence')
+     || jsonb_build_object('return_evidence', ...))::text)
+```
+
+It is a **WHOLE-ROW digest with a four-column exclusion list**, not a named-column
+list. It therefore hashes `return_eta_minutes`, `eta_refreshed_at` AND
+`eta_source` — and none of those names ever appears in the source, because the
+row is serialised rather than enumerated.
+
+**I searched for a column name in source text and concluded the column was not
+read.** That is the defect class this file's own prediction existed to catch —
+0240, 0241, 0318, 0323's A1, round 44's truncated uuid, and now this — committed
+inside the instrument built to catch it. Sixth instance today.
+
+### What the correct expectation was
+
+At boot the fingerprint's dispatch CTE admits only rows where
+`sim_run_id IS NULL OR sim_run_id = p_run OR status IN ('active','returning')`.
+Measured on the grid depot: **0 rows null-run, 0 rows active/returning** — so at
+boot it sees only THIS run's own rows, which `twin.ottoq_sim_prime_deployment`
+creates during boot. 0321 added `eta_refreshed_at` and `eta_source` to exactly
+that INSERT.
+
+So **`fp` SHOULD move wherever prime_deployment creates dispatch rows at boot**,
+and holding is the case that needs explaining, not moving. Two grid columns held
+and that asymmetry is not yet explained; it is recorded here as open rather than
+rationalised.
+
+### What this does and does not change
+
+* **It does NOT impugn the engine.** Five pairs, both arms byte-identical on all
+  fourteen atoms, three columns green. Determinism is intact. A canon that moves
+  is a canon update; only a pair that FAILS is a defect.
+* **It does retire `fp` as a "must hold" for this window.** For round 44, `fp`
+  moving on a flagship column is expected, not a finding. Judging the flagship
+  lane against the original P2 would manufacture a false alarm.
+* **The flagship lane proceeds.** Its real job is unchanged and untouched by
+  this: prove the pairs are byte-identical, and prove 0321 gave `active`
+  dispatches a forecast where 68 of 68 had none.
+
+### The rule this earns, stated so the next file inherits it
+
+**A `prosrc ~ 'column_name'` search proves a column is NOT ENUMERATED. It proves
+nothing about whether the column is READ.** Any `to_jsonb(t)`, `SELECT *`,
+`row_to_json`, or record-wide digest reads every column without naming one. Before
+claiming a hash cannot see a column, read the hash's shape — exclusion list or
+inclusion list — and say which.
+
+---
+
+## THE `fp` QUESTION, RESOLVED 21:52 UTC — THE INSTRUMENT IS SOUND
+
+Run with no certification scheduled and no pair in flight (round 44 closed, all
+19 jobs unscheduled), on the grid depot, which the live twin run does not touch.
+Read-only: `ottoq_boot_state_fingerprint` is `provolatile='s'`.
+
+**Both surviving hypotheses are dead, and one died to the signature alone.**
+
+**"The boot fingerprint is reachable from the horizon" — IMPOSSIBLE BY SIGNATURE.**
+
+```
+ottoq_boot_state_fingerprint(p_depot uuid, p_run uuid)   STABLE
+```
+
+There is no horizon, no tick count, no duration parameter. A 12-tick run and a
+6-tick run hand it exactly the same two arguments. The defective explanation —
+which would have meant `fp` is not a boot fingerprint at all — cannot be true.
+One `pg_get_function_arguments` settled what three rounds of inference could not,
+which is the same lesson as 0235: **read the assignment before measuring the
+value.**
+
+**"The fingerprint is sensitive to the run id" — REFUTED BY MEASUREMENT.** Three
+distinct run ids, none of which owns a single row, plus one repeat:
+
+| run id | fp |
+|---|---|
+| `11111111-aaaa-…0001` | `17ca6dae` |
+| `22222222-bbbb-…0002` | `17ca6dae` |
+| `33333333-cccc-…0003` | `17ca6dae` |
+| `11111111-aaaa-…0001` again | `17ca6dae` |
+
+Identical, and reproducible. This is the defect class that bit three times before
+— `0137` (the world fingerprint hashed a write timestamp), `0139` (the end-state
+fingerprint was not id-blind), `0216` (the decision snapshot hashed a minted
+session id) — and `fp` is not a fourth instance.
+
+### What this leaves, and it is a better place to stand
+
+`fp` depends on **the depot's world state at the moment it is taken**, and on
+nothing else. So a canon `fp` that moves after a migration which changes what the
+BOOT writes is a **legitimate canon update**, exactly as `endst` moving is. The
+original P2 prediction ("`fp` HOLDS") was not merely unsound in its premise — it
+was asking the wrong thing of a sound instrument.
+
+**The residual asymmetry is in the FIXTURE, not the instrument.** Why grid seed
+171717 boots into a world whose digest moved across the window while 239001 and
+424242 do not is a question about what `prime_deployment` writes per seed. That
+is worth answering, and it is a fixture question with no bearing on the
+determinism claim: every pair on every one of those columns was byte-identical
+across fourteen atoms.
+
+**Downgraded from an open defect to a fixture curiosity**, and recorded that way
+rather than left sitting on the round as though the engine owed an answer.
