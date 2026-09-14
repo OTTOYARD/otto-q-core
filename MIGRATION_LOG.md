@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0294 — GENERATED, not a log
+## Index, 0134–0295 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -278,8 +278,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0291](db/migrations/0291_eighteen_dials_whose_consumer_already_wrote_the_range.sql) | `20260914085632` | yes — ledger | EIGHTEEN DIALS WHOSE CONSUMER ALREADY WROTE THE RANGE |
 | [0292](db/migrations/0292_the_proposer_cannot_see_its_own_pending_plans.sql) | `20260914090954` | yes — ledger | THE PROPOSER CANNOT SEE ITS OWN PENDING PLANS |
 | [0293](db/migrations/0293_the_nightly_run_purge_has_never_once_run.sql) | `20260914093107` | yes — ledger | THE NIGHTLY RUN PURGE HAS NEVER ONCE RUN |
-| [0294](db/migrations/0294_the_purge_commits_inside_a_cursor_loop.sql) | `PENDING` | no — pending | THE PURGE COMMITS INSIDE A CURSOR LOOP |
+| [0294](db/migrations/0294_the_purge_commits_inside_a_cursor_loop.sql) | `20260914094551` | yes — ledger | THE PURGE COMMITS INSIDE A CURSOR LOOP |
+| [0295](db/migrations/0295_a_procedure_with_a_set_clause_cannot_commit.sql) | `PENDING` | no — pending | A PROCEDURE WITH A SET CLAUSE CANNOT COMMIT |
 
-160 migrations indexed.
+161 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

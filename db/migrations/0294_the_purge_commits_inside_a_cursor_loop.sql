@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914094551
 -- migration-name:    0294_the_purge_commits_inside_a_cursor_loop
 --
 -- 0294  THE PURGE COMMITS INSIDE A CURSOR LOOP
@@ -469,3 +469,30 @@ VALUES ('0294_the_purge_commits_inside_a_cursor_loop', false,
  'G63. public.ottoq_retention_purge_runs COMMITs inside a FOR..IN query loop, which PL/pgSQL forbids because such a loop holds an open cursor -- so cron job 625 raised 2D000 on every firing it ever had and never purged a row. The registry query is hoisted into two arrays before the loop and the loop becomes FOR v_i IN 1 .. array_length, so no cursor is open across the COMMIT; the three v_reg.t / v_reg.c references become v_tabs[v_i] / v_cols[v_i]. Nothing else changes: A2 asserts sixteen fragments survived verbatim -- the advisory lock, the run-scope refusal, both 0250 allow-list guards, the 0269 scheduled-round skip, the in-flight pair skip, the doomed-set predicates, the micro-batched DELETE, the 0251 stamping rule, the retention-state update and the time-budget exit. A3 asserts statement_timeout=10min survived, because CREATE OR REPLACE PROCEDURE REPLACES proconfig and omitting the SET clause would silently have dropped 0293 change. A4 asserts the new array ORDER BY yields the same sequence the cursor query did, largest table first, and refuses to pass vacuously on an empty registry. A5 asserts no rows were purged by the replace itself. Supersedes 0293 diagnosis, which blamed the cron command statement count on an A/B whose two jobs differed in two ways; a single-statement probe failed identically and refuted it (db/checks/0226). forces_recert=false: no engine function, no frame, no decide path; the purge only ever touches runs already archived and finished, and the 0269 round guard is preserved verbatim.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 20260914094551 -- AND IT WAS ONLY HALF THE FIX.
+--
+-- Every precondition and assertion passed. The job still failed, at line 166
+-- instead of 152 -- which is THE SAME in-loop COMMIT, displaced by the fourteen
+-- lines of comment this file added. I briefly read that as this file having
+-- failed. It had not.
+--
+-- There were TWO independent causes, and each alone was enough to break it:
+--   1. the COMMIT inside the cursor loop, which this file removed;
+--   2. the SET clause on the procedure, WHICH 0293 HAD JUST ADDED. A PostgreSQL
+--      procedure carrying a SET clause may not execute transaction control.
+--
+-- So the fix for the first arrived at the same moment as the second, and the
+-- symptom never changed. 0295 removes the SET clause; the probe then succeeded
+-- in 62 seconds.
+--
+-- A3 IN THIS FILE IS NOW WRONG AND MUST NOT BE COPIED. It asserts
+-- statement_timeout=10min survived the replace, which was correct as a guard
+-- against CREATE OR REPLACE silently dropping proconfig -- and exactly the
+-- wrong thing to want. The timeout must NOT be on the procedure at all. 0295's
+-- A1 asserts the opposite and is the one to follow.
+--
+-- The loop change in this file is sound and stays. db/checks/0226 carries the
+-- full corrected account.
+-- ===========================================================================

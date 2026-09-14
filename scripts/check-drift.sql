@@ -391,7 +391,8 @@ repo_manifest(version, name, file) AS (
     ('20260914085632'::text, '0291_eighteen_dials_whose_consumer_already_wrote_the_range'::text, '0291_eighteen_dials_whose_consumer_already_wrote_the_range.sql'::text),
     ('20260914090954'::text, '0292_the_proposer_cannot_see_its_own_pending_plans'::text, '0292_the_proposer_cannot_see_its_own_pending_plans.sql'::text),
     ('20260914093107'::text, '0293_the_nightly_run_purge_has_never_once_run'::text, '0293_the_nightly_run_purge_has_never_once_run.sql'::text),
-    ('PENDING'::text, '0294_the_purge_commits_inside_a_cursor_loop'::text, '0294_the_purge_commits_inside_a_cursor_loop.sql'::text)
+    ('20260914094551'::text, '0294_the_purge_commits_inside_a_cursor_loop'::text, '0294_the_purge_commits_inside_a_cursor_loop.sql'::text),
+    ('PENDING'::text, '0295_a_procedure_with_a_set_clause_cannot_commit'::text, '0295_a_procedure_with_a_set_clause_cannot_commit.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
