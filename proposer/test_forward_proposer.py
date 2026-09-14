@@ -31,6 +31,7 @@ from forward_proposer import (  # noqa: E402
     stall_block_reason,
     stall_is_free,
     vehicle_is_held,
+    vehicle_has_live_proposal,
 )
 
 SITE = {"power_cap_kw_hard": 600, "power_soft_target_kw": 450,
@@ -1422,3 +1423,118 @@ def test_a_version_2_frame_reports_its_version_and_its_charge_types():
     assert frame["selector"]["charge_stall_types"] == ["dcfc", "l2"]
     r = propose(frame, CLASSES, site=SITE)
     assert r["facts_version"] == 2
+
+
+# ---------------------------------------------------------------------------
+# 0292 / G60 -- facts_version 3: the proposer can see its own pending plans.
+# ---------------------------------------------------------------------------
+
+def _v3_frame(vehicles, stalls):
+    """A facts_version 3 frame -- the contract migration 0292 publishes."""
+    frame = _v2_frame(vehicles, stalls)
+    frame["selector"]["facts_version"] = 3
+    frame["selector"]["holds_tick_sources"] = [
+        "cuopt", "cuopt_fallback", "forward_lex", "llm_advisor"]
+    return frame
+
+
+def _v3_vehicle(vid, **kw):
+    """A vehicle as 0292 emits it: the version-2 place facts plus the two new ones."""
+    base = dict(reserved_stall_id=None, reserved_stall_type=None,
+                has_live_booking=False, live_booking_stall_types=[],
+                holds_charge_reservation=False, holds_charge_booking=False,
+                holds_charge_place=False,
+                has_live_holds_tick_proposal=False,
+                live_holds_tick_proposal_sources=[])
+    base.update(kw)
+    return _vehicle(vid, soc=25, **base)
+
+
+def test_a_vehicle_with_a_pending_plan_is_not_planned_again():
+    """G60, THE WHOLE DEFECT IN ONE TEST. Measured on run 91139ad8: 26 of 48
+    forward_lex proposals had an earlier holds_tick proposal for the SAME
+    vehicle, and 35 of 48 ended superseded across only 18 vehicles -- the
+    proposer overwriting its own pending plans about a tick after making them.
+
+    The vehicle below holds no place of any kind, so every version-2 fact says
+    plan it. The only thing standing in the way is a plan that already exists,
+    and ottoq_cuopt_first_refusal_arm has already declined to open a seat for
+    exactly this vehicle because of it."""
+    replanned = _v3_vehicle("v-replan",
+                            has_live_holds_tick_proposal=True,
+                            live_holds_tick_proposal_sources=["forward_lex"])
+    assert vehicle_has_live_proposal(replanned) is True
+    assert vehicle_is_held(replanned) is True
+
+    r = propose(_v3_frame([replanned], [_facts_stall("s-a")]), CLASSES, site=SITE)
+    assert r["vehicles_held"] == 1
+    assert r["proposals"] == []
+
+
+def test_another_proposer_holding_the_tick_also_stops_this_one():
+    """The fact is not about authorship. cuopt holding a pending row for this
+    vehicle closes the seat just as surely as forward_lex holding one, because
+    the arm's clause matches ANY source declaring holds_tick. A consumer that
+    skipped only its own rows would re-plan against a competitor mid-window."""
+    taken = _v3_vehicle("v-taken",
+                        has_live_holds_tick_proposal=True,
+                        live_holds_tick_proposal_sources=["cuopt"])
+    assert vehicle_is_held(taken) is True
+
+
+def test_a_free_vehicle_with_no_pending_plan_is_still_planned():
+    """The other side of the same key, and the reason this is not just a
+    blanket skip: absent a pending plan, a version-3 frame plans the vehicle
+    exactly as a version-2 one did.
+
+    HONEST LABEL: this one passes against the pre-0292 code too -- verified by
+    reverting the consumption branch and re-running. It pins that the fix did
+    not become a blanket skip; it is not evidence that the fix works. The three
+    tests above are: all three fail against the reverted module."""
+    free = _v3_vehicle("v-free")
+    assert vehicle_has_live_proposal(free) is False
+    assert vehicle_is_held(free) is False
+
+    r = propose(_v3_frame([free], [_facts_stall("s-a")]), CLASSES, site=SITE)
+    assert r["vehicles_held"] == 0
+    assert {row["entity_id"] for row in r["proposals"]} == {"v-free"}
+
+
+def test_the_pending_plan_wins_over_a_place_fact_that_says_plan_it():
+    """PRECEDENCE, pinned in the direction that can actually go wrong.
+    holds_charge_place=False means "this vehicle has no place, plan it" -- the
+    0287 fix. A vehicle that has no place AND a pending plan must still be
+    skipped, or 0287's widening re-creates G60's churn at full volume."""
+    both = _v3_vehicle("v-both",
+                       holds_charge_place=False,
+                       has_live_holds_tick_proposal=True,
+                       live_holds_tick_proposal_sources=["forward_lex"])
+    assert vehicle_is_held(both) is True
+
+
+def test_a_frame_without_the_key_behaves_exactly_as_before():
+    """THE FALLBACK, exercised. A version-2 frame does not carry the proposal
+    fact, and every vehicle must answer False to it rather than have an answer
+    invented from keys that cannot know.
+
+    HONEST LABEL: this is a REGRESSION GUARD, not evidence for 0292. It passes
+    against the pre-0292 code by construction -- that is the point of it."""
+    legacy = _vehicle("v-legacy", soc=25, reserved_stall_id=None,
+                      has_live_booking=False, holds_charge_place=False)
+    assert "has_live_holds_tick_proposal" not in legacy
+    assert vehicle_has_live_proposal(legacy) is False
+    assert vehicle_is_held(legacy) is False
+
+
+def test_a_version_3_frame_reports_its_version_and_the_sources_that_hold_a_tick():
+    """The consumer reads the source vocabulary from the PUBLISHER, never from
+    its own copy -- a copy of a list is what diverged in G54.
+
+    HONEST LABEL: a contract test, not a behaviour test. It would pass against
+    a module that ignored the key entirely."""
+    frame = _v3_frame([_v3_vehicle("v-a")], [_facts_stall("s-a")])
+    assert frame_facts_version(frame) == 3
+    assert frame["selector"]["holds_tick_sources"] == [
+        "cuopt", "cuopt_fallback", "forward_lex", "llm_advisor"]
+    r = propose(frame, CLASSES, site=SITE)
+    assert r["facts_version"] == 3

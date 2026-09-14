@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914090954
 -- migration-name:    0292_the_proposer_cannot_see_its_own_pending_plans
 --
 -- 0292  THE PROPOSER CANNOT SEE ITS OWN PENDING PLANS
@@ -572,3 +572,32 @@ VALUES ('0292_the_proposer_cannot_see_its_own_pending_plans', false,
  'G60. public.ottoq_build_decision_frame gains two vehicle facts at facts_version 3: has_live_holds_tick_proposal and live_holds_tick_proposal_sources, plus holds_tick_sources on the selector so the consumer reads the source vocabulary from the publisher instead of keeping its own copy. The boolean is a VERBATIM COPY of the clause in public.ottoq_cuopt_first_refusal_arm that already declines to open a first-refusal seat for a vehicle with a live pending proposal from a holds_tick source -- (stall_assignment, vehicle, pending, holds_tick), run-scoped, and deliberately EXPIRY-BLIND because the arm is; publishing a narrower question than the kernel asks is the G54 defect and P1 pins the arm''s clause including the absence of a proposal expiry test. Measured on run 91139ad8 (the first run on the tick-following loop): 26 of 48 forward_lex proposals had an earlier holds_tick proposal for the same vehicle, and 35 of 48 ended superseded across only 18 vehicles, against 23 proposals and ZERO such rows on the timer-driven run 36e5cc68 at the same seed. 26 is an UPPER bound and the exact number is unrecoverable -- ottoq_external_proposals.status is current, not historised, with no resolved_at column -- so the real evidence must be a live before/after, not archaeology. Nothing disposes differently: the arm, the decide path and the proposal lifecycle are untouched, and behaviour changes only once proposer/forward_proposer.py consumes the key. A1 is the forces_recert=false evidence as a digest rather than an argument: the facts-off frame is byte-identical across the replace, taken twice before to prove it was stable enough to compare. A3 evaluates the arm''s clause independently over the same vehicle population and requires zero disagreements AND at least one genuine true, so a fact hard-coded to false cannot pass it.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 20260914090954. P-, P0-P4 and A1-A4 all passed.
+--
+-- Verified read-only afterwards, against run 91139ad8 at the flagship depot:
+--
+--   selector.facts_version            3
+--   selector.holds_tick_sources       ["cuopt","cuopt_fallback","forward_lex","llm_advisor"]
+--   vehicles in the frame             116
+--   has_live_holds_tick_proposal      4    -- exactly the 4 pending rows that
+--                                             run still carries, on 4 distinct
+--                                             vehicles
+--   facts-off frame has a selector    false  -- the block is still gated
+--   ottoq_cuopt_first_refusal_arm     6fcb5196eb947a83afa44380d24bec65,
+--                                     unchanged across the whole file
+--   cert lineage forces_recert        false
+--
+-- A3 is the one that carries weight: 116 vehicles compared, published fact
+-- against an independent evaluation of the arm's own clause, ZERO
+-- disagreements, and 4 of them genuinely held -- so the agreement is not the
+-- vacuous kind a constant false would produce.
+--
+-- NOTHING HAS CHANGED YET IN BEHAVIOUR, and that is by design. The frame now
+-- carries the fact; proposer/forward_proposer.py does not read it. Until that
+-- lands, this file is publication only. The claim to make after it does is a
+-- live before/after on a new run -- fewer proposals for the same or more
+-- enactments -- and NOT the 26-of-48 figure, which is an upper bound over
+-- history that cannot be turned into a count of avoided work.
+-- ===========================================================================

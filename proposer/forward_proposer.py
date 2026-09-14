@@ -646,17 +646,56 @@ def _serviceable_in(states: frozenset[str]):
 #: off all keep the behaviour they had. Never a guess, in either direction.
 CHARGE_PLACE_KEY = "holds_charge_place"
 
+#: 0292 / G60. facts_version 3. The frame's answer to "is there already a live
+#: pending proposal for this vehicle from a source that holds the tick?" -- a
+#: verbatim copy of the clause in ottoq_cuopt_first_refusal_arm, so a True here
+#: means THE KERNEL HAS ALREADY DECLINED TO OPEN A SEAT for this vehicle.
+#: Planning it again is work with nowhere to land.
+PENDING_PROPOSAL_KEY = "has_live_holds_tick_proposal"
+
+
+def vehicle_has_live_proposal(vehicle: dict) -> bool:
+    """True iff the frame says a holds_tick source already has a pending plan here.
+
+    KEY PRESENCE IS THE VERSION TEST, the same discipline CHARGE_PLACE_KEY and
+    OFFERABLE_KEY use: a frame below facts_version 3 does not carry the key and
+    every vehicle answers False, which is the pre-0292 behaviour exactly. There
+    is deliberately no fallback derivation -- the proposal book is not in any
+    older frame, so inventing an answer from what is there would be a guess.
+
+    NOT AN EXPIRY TEST, and that is not an oversight. The kernel's own clause
+    tests status='pending' and nothing else; ottoq_cuopt_first_refusal_arm
+    contains exactly one expires_at and it is on the stall reservation. Asking a
+    narrower question here than the kernel asks is the G54 defect, which cost
+    the agentic layer every seat it was ever offered.
+    """
+    if PENDING_PROPOSAL_KEY in vehicle:
+        return bool(vehicle[PENDING_PROPOSAL_KEY])
+    return False
+
 
 def vehicle_is_held(vehicle: dict) -> bool:
-    """True iff the frame says this vehicle already holds a place worth skipping.
+    """True iff the frame says this vehicle is not worth planning right now.
 
-    facts_version >= 2 frames answer this themselves in `holds_charge_place`,
-    and that answer wins outright -- including when it is False for a vehicle
-    that does hold a staging place, which is the whole point of the key.
+    TWO INDEPENDENT REASONS, and they are different in kind:
+
+      1. IT ALREADY HAS A PLACE. facts_version >= 2 frames answer this in
+         `holds_charge_place`, and that answer wins outright -- including when
+         it is False for a vehicle that does hold a staging place, which is the
+         whole point of the key.
+      2. IT ALREADY HAS A PLAN. facts_version >= 3 frames answer this in
+         `has_live_holds_tick_proposal` (0292 / G60). Measured on run 91139ad8:
+         26 of 48 proposals had an earlier holds_tick proposal for the same
+         vehicle and 35 of 48 ended superseded across only 18 vehicles -- the
+         proposer overwriting its own pending plans about a tick after making
+         them, while the kernel had already declined to open a seat for exactly
+         those vehicles.
 
     A frame carrying none of the keys (pre-0265, or the gate off) answers False
     for every vehicle -- the pre-0265 behaviour, unchanged, and never a guess.
     """
+    if vehicle_has_live_proposal(vehicle):
+        return True
     if CHARGE_PLACE_KEY in vehicle:
         return bool(vehicle[CHARGE_PLACE_KEY])
     if vehicle.get("reserved_stall_id"):
