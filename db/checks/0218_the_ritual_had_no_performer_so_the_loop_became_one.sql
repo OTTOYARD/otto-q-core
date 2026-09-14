@@ -168,3 +168,44 @@ SELECT COALESCE(fire->>'frame_facts_version', '(null)') AS frame_facts_version,
 -- met in a live fire. The first one will be the first non-blind proposal in
 -- this engine's history, and the fire log will say so in a column that has
 -- read null on every row it has ever held.
+
+-- ===========================================================================
+-- THE LIVE FIRE. 2026-09-14 06:35 UTC (1:35 AM CT).
+-- run 97769e7e-cd44-4789-b272-f696c60c2a66, busy_day, seed 848484, flagship
+-- depot, GitHub Actions run 34814057227 on the branch carrying the fix.
+--
+-- The run was started by hand and CONFIRMED UNARMED first -- 0 of 3 keys, all
+-- three listed as missing -- so that what follows is the loop's doing and not
+-- a pre-armed run flattering itself:
+--
+--   before dispatch   verdict 'unarmed', satisfied 0 of 3
+--   after first fire  verdict 'armed',   satisfied 3 of 3,
+--                     all three rows updated_by = 'proposer_bridge'
+--
+-- THE FIRE SERIES, and the middle column is the whole point:
+--
+--   fire  tick  charge   not         blocked by            planned  submitted
+--                stalls  offerable
+--      7     1      40          0    {}                         12         12
+--      8     4      40         40    occupied 28, RESERVED 12     0          0
+--      9     6      40         39    occupied 20, RESERVED 19     0          0
+--
+--   frame_facts_version = 1 on all three. Before this run that column had
+--   exactly one distinct value across every row in its life, and it was null.
+--
+-- WHAT THE RESERVED COLUMN COSTS WHEN IT IS INVISIBLE. A reserved-but-empty
+-- stall has no vehicle_id and status 'available', so the blind stall_is_free()
+-- reads it as FREE. At tick 6 the blind frame would have offered the solver 19
+-- points that the door had already given away, on top of the one genuinely
+-- free one. CP-SAT would have planned onto them, the bridge would have
+-- submitted, and ottoq_submit_external_proposal would have refused every row
+-- -- which is precisely the shape of the 329 proposals that came to nothing.
+--
+-- Armed, the proposer planned 12 into an empty depot and then said NOTHING
+-- twice, with the reason recorded in its own vocabulary. Status 'empty' with
+-- stalls_blocked populated is not a proposer failing to think of anything. It
+-- is a proposer reporting, correctly and in the ledger, that there was nothing
+-- to offer it.
+--
+-- G53 CLOSED. Arming is performed by the process that needs it, the frame is
+-- checked rather than trusted, and both halves are now visible in a fire row.
