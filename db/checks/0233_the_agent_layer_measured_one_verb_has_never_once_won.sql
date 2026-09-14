@@ -134,3 +134,113 @@ SELECT 'ottoq_decide_tick mentions admit_service (kills H2)' AS check,
        (position('admit_service' in p.prosrc) > 0) AS mentions
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE n.nspname='public' AND p.proname='ottoq_decide_tick';
+
+-- ===========================================================================
+-- F. ADDENDUM, same day: H3 IS REPLACED. THE CAUSE IS AN ATTRIBUTION JOIN,
+--    NOT A REFUSAL.
+--
+-- Section C said the cause was not established and named H3 ("heard and
+-- refused on a real constraint") as plausible-but-unverified. It is now
+-- replaced by something measured.
+--
+-- THE WRITE-BACK, ottoq_decide_tick lines 1056-1061:
+--
+--   UPDATE ottoq_external_proposals p SET status='enacted'
+--    WHERE p.sim_run_id=p_sim_run_id AND p.status='pending'
+--      AND EXISTS (SELECT 1 FROM ottoq_decisions d
+--                   WHERE d.sim_run_id=p_sim_run_id AND d.tick_seq=v_tick
+--                     AND d.entity_id=p.entity_id AND d.outcome_status='enacted'
+--                     AND d.enacted_action->>'source' = p.source);
+--
+-- A proposal is credited only if the enacted decision's action carries a
+-- `source` EQUAL to the proposal's source.
+--
+-- MEASURED, joining proposals to decisions on (run, entity, tick) for
+-- source='ottoq_service_priority':
+--
+--   enacted_action->>'source'   outcome_status        rows
+--   -------------------------   -------------------   ----
+--   NULL                        enacted                403
+--   'inspect_seam'              noop_no_candidate      382
+--   'needs_card'                noop_no_candidate      307
+--   'ottoq_service_priority'    noop_no_candidate       43
+--   'needs_card'                enacted                  3
+--   NULL                        noop_no_candidate        3
+--
+-- 403 decisions at those exact ticks were ENACTED with a NULL source.
+-- `NULL = 'ottoq_service_priority'` is NULL, never true, so the write-back
+-- cannot match them -- and line 1063 then marks the proposal 'superseded',
+-- because the entity WAS decided this tick just not (provably) by it.
+--
+-- WHY THE SOURCE IS NULL, and this is the actual defect:
+--   ottoq_decide_tick line 964:
+--     v_proposal := COALESCE(
+--       ottoq_l2_external_proposal(p_sim_run_id,'service_sequencing','vehicle',v),
+--       ottoq_l2_propose_service(v, v_depot, v_ctx));
+--   ottoq_l2_external_proposal NORMALISES source into the jsonb it returns
+--   (its lines 2-5: add `source` when the payload lacks one).
+--   ottoq_l2_propose_service -- the HEURISTIC FALLBACK -- does not. Its output
+--   carries `l2_engine` and no `source` at all.
+--   So every tick the fallback wins, the enacted_action has no source, and the
+--   attribution join is unsatisfiable BY CONSTRUCTION.
+--
+-- WHAT IS THEREFORE ESTABLISHED:
+--   * the attribution join cannot credit a null-source enactment (arithmetic);
+--   * 403 such enactments exist on the exact ticks in question (measured);
+--   * the fallback is not source-normalised while the external path is (read).
+--
+-- WHAT IS STILL NOT ESTABLISHED -- and it decides the remedy:
+--   whether ottoq_service_priority's proposal is (a) FOUND by the lookup and
+--   genuinely beaten by the fallback, or (b) NEVER FOUND -- e.g. written after
+--   the lookup runs within the same tick, so the COALESCE always falls through.
+--   (a) means the ledger under-reports a real contest. (b) means the seat has
+--   never actually competed. The 43 rows where the decision DOES carry
+--   source='ottoq_service_priority' are all `noop_no_candidate`, which is
+--   suggestive of (b) and is not proof.
+--
+--   NEXT: establish the intra-tick ORDER of ottoq_service_priority_propose
+--   versus the line-964 lookup. Until then do not describe this seat as
+--   "refused" or as "broken" -- both are unearned.
+--
+-- AND NOTE THE SHAPE, because it is today's fourth instance: the number
+-- "0 of 2,380" is arithmetically correct and answers a different question than
+-- the one anyone asks of it. It looks like a verdict on the proposer. It is in
+-- large part a verdict on an attribution join that cannot express the credit
+-- it is asked to assign.
+
+-- re-measure the attribution join
+SELECT p.source AS proposal_source,
+       d.enacted_action->>'source' AS decision_source,
+       d.outcome_status,
+       count(*) AS rows
+  FROM public.ottoq_external_proposals p
+  JOIN public.ottoq_decisions d
+    ON d.sim_run_id = p.sim_run_id AND d.entity_id = p.entity_id
+   AND d.tick_seq = p.tick_seq
+ WHERE p.source = 'ottoq_service_priority'
+ GROUP BY 1,2,3 ORDER BY rows DESC;
+
+-- the general question the above is one instance of: how often does an
+-- ENACTED decision carry no source at all? Every one of those is an
+-- enactment no proposal can ever be credited for.
+--
+-- MEASURED 2026-09-14, and this is the number that generalises the whole file:
+--
+--   enacted decisions with NO source   1,556,209   87.1%
+--   enacted decisions WITH a source      231,157   12.9%
+--   ------------------------------------------------------
+--   total enacted decisions            1,787,366
+--
+-- THE ATTRIBUTION JOIN CAN ONLY EVER CREDIT 12.9% OF WHAT THE ENGINE DOES.
+-- 87.1% of enactments are unattributable by construction -- not because no
+-- proposer was involved, but because the action record does not say who. So
+-- "proposals enacted" (0233 section A: 4,299 of 15,905, 27%) is a floor on
+-- proposer influence and NOT a measure of it, and no per-seat enactment rate in
+-- this file should be read as a performance comparison between seats. It is a
+-- comparison of which seats happen to travel through a source-preserving path.
+SELECT (enacted_action->>'source' IS NULL) AS source_missing,
+       outcome_status,
+       count(*) AS decisions
+  FROM public.ottoq_decisions
+ WHERE outcome_status = 'enacted'
+ GROUP BY 1,2 ORDER BY decisions DESC;
