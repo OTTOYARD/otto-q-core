@@ -102,6 +102,22 @@ jobs:
             --max-fires "${{ github.event.inputs.fires || '12' }}" \
             --idle-ok \
             --json-out receipts.json
+      # The advisor's SDK is installed HERE, not in the job-wide install, because
+      # the CP-SAT loop never imports it (bridge/llm_proposer.py imports its
+      # client lazily for exactly that reason) and a package the main path does
+      # not use should not be able to break the main path.
+      #
+      # THIS STEP EXISTS BECAUSE ITS ABSENCE WAS THE WHOLE FAULT. 2026-09-14
+      # 00:58 UTC, run 34794270284: ANTHROPIC_API_KEY was present and correct,
+      # the depot was live, the CP-SAT loop had just submitted 72 proposals --
+      # and the advisory step died on "the anthropic SDK is not installed".
+      # The advisory proposer had never run once in its life, and the reason
+      # was one uninstalled package, not the key, the gate, or the code.
+      # Pinned, because an advisor's model client is part of a fire's identity
+      # the same way ortools is part of a plan's.
+      - name: Install the advisor's SDK (advisor fires only)
+        if: ${{ github.event.inputs.advisor == 'true' }}
+        run: pip install "anthropic==0.69.0"
       - name: Advisory fire (optional, priced and capped per run)
         if: ${{ github.event.inputs.advisor == 'true' }}
         env:
