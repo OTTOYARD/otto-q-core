@@ -187,11 +187,35 @@ serve(async (req) => {
         if (!KNOBS[a.key]) { await queueApproval("nemotron_policy_out_of_whitelist", { key: a.key, value: Number(a.value), why: a.why }); continue; }
         if (moves >= 3) { rejected.push({ ...a, reason: "move cap (3) reached" }); continue; }
         const c = clampDial(a.key, Number(a.value), board.policy?.[a.key]);
-        const { error } = await sb.rpc("ottoq_policy_set", { p_scope_type: "run", p_scope_id: run.sim_run_id, p_param_key: a.key, p_param_value: c.value, p_by: "ottoq_prime" });
+        const { data: setRes, error } = await sb.rpc("ottoq_policy_set", { p_scope_type: "run", p_scope_id: run.sim_run_id, p_param_key: a.key, p_param_value: c.value, p_by: "ottoq_prime" });
+        // G65 (0231-era): ottoq_policy_set REFUSES by RETURNING {"ok":false,"error":...}, not
+        // by raising. The previous code read only `error` -- the transport failure -- so every
+        // refusal arrived as error===null and was pushed to `applied` AND counted against the
+        // move cap. The agent was told it had set a dial it had not set, and the audit row
+        // agreed with it. There are now FIVE refusal reasons the setter can return
+        // (invalid_scope_type, scope_id_required, unknown_param, outside_exclusive_bound from
+        // 0303, null_value from 0306), so the number of things that could be silently wrong
+        // went UP today. An agent that cannot hear "no" has the catalog in the path and none
+        // of its benefit.
+        //
+        // The enacted value is read back from the DATABASE (setRes.applied), not from the
+        // client-side clamp: the catalog may clamp further than this file's KNOBS table, and
+        // when two allow-lists disagree the catalog is the one that actually wrote the row.
         // record BOTH the model's number and what was enacted, so a future audit can see
         // at a glance whether the model's judgement survived the guardrails.
-        if (!error) { applied.push({ type: "set_policy", key: a.key, value: c.value, requested: c.requested, limited_by: c.limiter }); moves++; }
-        else rejected.push({ ...a, reason: error.message });
+        if (error) { rejected.push({ ...a, reason: `rpc: ${error.message}` }); }
+        else if (!setRes || (<any>setRes).ok !== true) {
+          rejected.push({ ...a, reason: `catalog refused: ${(<any>setRes)?.error ?? "no ok field in response"}`, refusal: setRes });
+        } else {
+          const enacted = Number((<any>setRes).applied);
+          applied.push({
+            type: "set_policy", key: a.key,
+            value: Number.isFinite(enacted) ? enacted : c.value,
+            requested: c.requested,
+            limited_by: (<any>setRes).clamped === true ? `${c.limiter}+catalog` : c.limiter,
+          });
+          moves++;
+        }
       } else if (a?.type === "ops_action" && typeof a.action === "string") {
         if (moves >= 3 && OPS_WHITELIST.has(a.action)) { rejected.push({ ...a, reason: "move cap (3) reached" }); continue; }
         const { data: res, error } = await sb.rpc("ottoq_apply_ops_action", {

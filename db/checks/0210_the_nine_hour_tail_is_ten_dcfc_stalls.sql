@@ -1,0 +1,102 @@
+-- 0210  THE NINE-HOUR TAIL IS TEN DCFC STALLS
+--       (measured 2026-09-14 00:35-00:40 UTC / 2026-09-13 7:35-7:40 PM CT
+--        from run 7555ae47-ab2e-4b30-b5b8-c2f76c88f884)
+--
+-- The first operating run in two weeks produced the five canonical KPIs, and
+-- one of them is ugly in a way worth naming:
+--
+--   p50_time_to_service_min     60
+--   p95_time_to_service_min    540      <- nine hours
+--   max_time_to_service_min    720      <- twelve
+--   returns_unserved             0
+--
+-- Half the fleet is inside an hour and the worst five percent wait all day.
+--
+-- ---------------------------------------------------------------------------
+-- 1. FIRST, IT IS NOT AN ARTEFACT. CHECKED BEFORE IT WAS QUOTED.
+--
+-- 540 and 720 are suspiciously round -- exactly 18 and 24 ticks of a 25-tick
+-- run -- so the first hypothesis was a horizon clamp. It is not.
+-- ottoq_kpi_p95_time_to_service measures first_op_active_at - actual_return_at
+-- over dispatches that RETURNED inside the horizon, and counts a return with
+-- no started leg as unserved (0) or deferred (3) rather than folding it into
+-- the percentile. All 85 measured returns were genuinely served. The roundness
+-- is the tick grid: one tick is 30 sim-minutes, so every wait is a multiple of
+-- 30 by construction.
+--
+-- ---------------------------------------------------------------------------
+-- 2. THE TAIL BROKEN OUT BY WHAT THE ASSET WAS WAITING FOR
+--
+--   first op served by   n   avg wait   p95    max      stalls at the flagship
+--   -------------------  --  ---------  -----  -----    ----------------------
+--   charge_dcfc          26    235 min   540    540     10
+--   charge_l2            23     98       390    390     30
+--   service              12    163       720    720      2
+--   detail                8    146       260    270      (detail lane)
+--   remote_diagnostics    8     34        90     90      (no stall)
+--   depart                4     53        60     60
+--   sensor_clean          3     80       141    150
+--   inspect               1     30        30     30
+--
+-- Two things fall out, and they are different problems.
+--
+--   DCFC IS THE TAIL BY VOLUME. Twenty-six assets -- the largest group --
+--   averaged 3.9 HOURS waiting for one of TEN fast chargers, p95 nine hours.
+--
+--   THE SERVICE BAY IS THE TAIL BY DEPTH. Twelve assets against TWO bays
+--   produced the single worst wait in the run, twelve hours. Fewer assets,
+--   worse extreme.
+--
+-- The comparison that matters is the first two rows against their capacity:
+--
+--   L2    30 stalls   23 assets    98 min average
+--   DCFC  10 stalls   26 assets   235 min average
+--
+--   Three times the stalls, a quarter of the wait, and MORE assets went to the
+--   scarcer resource. That is not congestion the depot could not avoid. That
+--   is the engine preferring DCFC into a queue while L2 capacity sat available.
+--
+-- ---------------------------------------------------------------------------
+-- 3. WHY THAT IS A POLICY QUESTION, NOT A CAPACITY ONE
+--
+-- CLAUDE.md 2.5 names the live policy set from the ottoq_fn_backup_* family,
+-- and the first of them is dcfc_first. The measurement above is what
+-- dcfc_first costs on a busy day at this depot: an extra ~2.3 hours of
+-- average wait for 26 assets, bought against 20 idle L2 stalls.
+--
+-- It may still be the right policy. A DCFC session is 20-45 minutes against
+-- L2's 2-8 hours (2.4), so an asset that takes L2 is off the road far longer
+-- even though it waited less -- and asset_hours_available_per_day, not
+-- time-to-service, is KPI 1. THIS FILE DOES NOT CLAIM dcfc_first IS WRONG. It
+-- claims the trade has never been measured, and that it now can be.
+--
+-- The instrument exists as of today:
+--   * ottoq_depot_queue (0274) makes the waiting population and its order a
+--     readable object rather than a transient cursor;
+--   * ottoq_ab_runs + the p_policy seat on the pair rig (Phase 1/D2) runs two
+--     arms on one seed under common random numbers with the L1 shield held
+--     constant;
+--   * ottoq_kpi_five scores any run from its run ID, and every KPI in this run
+--     came back reproducible (not_reproducible: []).
+--
+-- So the experiment is: busy_day / 424242 / flagship, dcfc_first against a
+-- spill-to-L2 variant, scored on asset_hours_available_per_day AND
+-- p95_time_to_service together. Either dcfc_first buys back more asset-hours
+-- than the queue costs, or it does not, and the number decides.
+--
+-- Recorded rather than run because it is a policy experiment and it deserves
+-- its own window, not the tail of a Saturday evening.
+--
+-- ---------------------------------------------------------------------------
+-- 4. THE THIRD NUMBER, UNPROMPTED
+--
+-- 154 of 506 commands in this run were REFUSED -- 30% -- all by
+-- otto_q_preflight, the engine refusing its own conflicting instructions
+-- before they reach the twin. That is the safety layer doing exactly its job
+-- and it is why space_conflict_ledger exists.
+--
+-- But a 30% self-conflict rate means the decide path proposes an assignment it
+-- then overrules roughly once in three. Whether that is healthy (the world
+-- moved between propose and enact, and the guard caught it) or wasteful (the
+-- proposer is reading stale occupancy) is not established here. It is the
+-- next thing worth measuring, and the reason codes are already on every row.

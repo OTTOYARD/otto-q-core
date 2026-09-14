@@ -1,0 +1,166 @@
+-- db/checks/0237
+-- THE SCENARIO LIBRARY DECLARES STRESSES THAT NO DATABASE FUNCTION IMPLEMENTS
+-- -- INCLUDING ONE INSIDE A CERTIFIED CANON COLUMN
+--
+-- Measured 2026-09-14, ~15:45 UTC (10:45 AM CT), while looking for a
+-- declarative way to make power scarce (db/checks/0236 §D.1).
+--
+-- ===========================================================================
+-- A. WHAT WAS BEING LOOKED FOR
+--
+-- 0236 established that the self-improvement loop's energy lever binds in 0.6%
+-- of ticks because the depot runs at 4-7% of its power ceiling, and named
+-- "stress the power dimension" as the first move. The scenario grammar looked
+-- like the declarative place to do it, so the knobs were enumerated before
+-- being used -- per 0235's method rule, read the assignment before trusting
+-- the name.
+--
+-- ===========================================================================
+-- B. THE CENSUS
+--
+-- Every knob appearing in live scenario payloads, against the count of
+-- database functions in public/twin/ottoq whose source mentions it by name:
+--
+--   READ, with a real consumer
+--     target_deployed_fraction   ottoq_decide_tick, ottoq_sim_run_scenario,
+--                                twin.ottoq_sim_auto_dispatch_tick
+--     dispatch_rate_multiplier   twin.ottoq_sim_auto_dispatch_tick
+--     policy_overrides           ottoq_scenario_apply_fleet_overrides
+--     vehicle_overrides          ottoq_scenario_apply_fleet_overrides
+--     arrival_profile            ottoq_sim_run_scenario
+--     grid_overrides
+--        .force_bess_starting_soc_pct   ottoq_sim_run_scenario -- interpreted
+--
+--   NOT READ BY ANY DATABASE FUNCTION
+--     charger_overrides.force_offline_dcfc_count       (none)
+--     charger_overrides.force_offline_window_hours     (none)
+--     fault_injection.dtc_rate_multiplier              (none)
+--     fault_injection.incident_rate_multiplier         (none)
+--     stress_params                                    (none; empty in all rows)
+--
+-- The containers `charger_overrides`, `fault_injection` and `weather_overrides`
+-- ARE mentioned -- but only inside a jsonb_build_object in
+-- ottoq_sim_run_scenario that PACKS them into the run payload. Packing is not
+-- interpreting. The one key that entry point genuinely acts on is
+--
+--     IF v_scenario.grid_overrides ? 'force_bess_starting_soc_pct' THEN
+--       ... SET current_soc_pct = (...)::numeric ...
+--
+-- and nothing else. twin.ottoq_sim_advance_charge_sessions matches
+-- 'fault_injection' only in a literal message string -- 'Calibrated fault
+-- injection per ChargerHelp mix: ' -- it runs its own calibrated fault model
+-- and never consults the scenario's.
+--
+-- ===========================================================================
+-- C. WHAT THAT MAKES FALSE, AND ONE OF THEM IS CERTIFIED
+--
+--   charger_outage_morning_rush  declares charger_overrides
+--                                {force_offline_dcfc_count: 3,
+--                                 force_offline_window_hours: [7,9]}
+--   Its entire defining feature -- three DCFC stalls offline through the
+--   morning rush -- is not implemented. The scenario runs as an ordinary day
+--   under a name that promises a failure mode. It is in the active library and
+--   0309 cloned it to Benchmark as bench_charger_outage_morning_rush, so the
+--   inert copy is now on two depots.
+--
+--   busy_day                     declares fault_injection
+--                                {dtc_rate_multiplier: 7,
+--                                 incident_rate_multiplier: 0.4}
+--   AND busy_day IS A CERTIFIED CANON COLUMN -- four of the nine columns in
+--   ottoq_cert_columns are busy_day, including the 48-tick flagship. A sevenfold
+--   diagnostic-trouble-code rate is declared and not applied, so what the canon
+--   certifies is reproducibility of a scenario that is milder than its own
+--   declaration says.
+--
+--   aggressive_fleet_turnover    is PARTLY live: dispatch_rate_multiplier 2
+--   and target_deployed_fraction 0.75 are read; its dtc/incident multipliers
+--   are not. A scenario can be half-implemented, which is worse than either
+--   extreme because it looks like it works.
+--
+-- NOTE PRECISELY WHAT IS AND IS NOT CLAIMED. This is a census of DATABASE
+-- function sources in public, twin and ottoq. It does NOT prove these knobs
+-- are read nowhere in the system -- an edge function or an external harness
+-- could consume them. What it does establish is that the in-database twin,
+-- which is what ottoq_sim_run_scenario starts and what every certification
+-- pair and every metronome tick executes, contains no code that reads them.
+-- For a twin that runs entirely in the database, that is the operative fact.
+--
+-- ===========================================================================
+-- D. THE CLASS THIS BELONGS TO
+--
+-- Same shape as G66 / db/checks/0232 (catalogued dials with no effective
+-- reader) and as 0192's nine rule evaluators that exist and are never called:
+-- a declaration that reads as configuration and is inert. The engine is full
+-- of well-shaped empty instruments, and the pattern is always that the
+-- DECLARATION was built and the CONSUMER was not -- or was replaced later by
+-- something with its own opinion, as the ChargerHelp-calibrated fault model
+-- replaced whatever fault_injection was meant to drive.
+--
+-- CLAUDE.md C7.3 calls for the failure library to be extended to nine canonical
+-- scenarios, each a committed data file. That work should not start until this
+-- is fixed: adding five more declarative scenarios to a grammar whose stress
+-- knobs are inert would produce five more scenarios that certify nothing.
+--
+-- ===========================================================================
+-- E. WHAT THIS MEANS FOR 0236'S QUESTION
+--
+-- The original errand -- find a declarative way to make power scarce -- is
+-- answered, and the answer is no. The knobs that would concentrate demand or
+-- remove chargers (force_offline_dcfc_count) are exactly the inert ones. The
+-- live knobs are target_deployed_fraction and dispatch_rate_multiplier, which
+-- move how many vehicles are OUT, and policy_overrides, which can set dials.
+-- A power-stress scenario is buildable from those three, but it is a different
+-- and less direct construction than the grammar advertises, and it should be
+-- built only after deciding whether to implement the inert knobs instead.
+--
+-- NOT DONE HERE, deliberately: no fix is attempted. Implementing
+-- force_offline_dcfc_count changes what charger_outage_morning_rush does, and
+-- that scenario's flagship sibling is one migration away from the certified
+-- busy_day family. Anything that changes what a certified scenario simulates
+-- is forces_recert=TRUE and wants its own window and its own recert, not a
+-- drive-by.
+
+-- ===========================================================================
+-- F. ADDENDUM -- THE MECHANISM ALREADY EXISTS, so the fix is wiring
+--    (mapped 2026-09-14 ~15:50 UTC, same session; NOT implemented)
+--
+-- Section E said a fix was not attempted. Before leaving it, the recon, so
+-- whoever picks this up does not rebuild what is there (CLAUDE.md rule 5):
+--
+--   public.ottoq_ocpp_chargers carries
+--     station_state, station_state_changed_at,
+--     last_fault_code, last_fault_at, last_fault_payload
+--
+--   twin.ottoq_report_charger_fault   -- existing: reports a charger fault
+--   twin.ottoq_sim_bay_fault_handler  -- existing: the handler
+--
+-- So implementing force_offline_dcfc_count does NOT need new state, a new
+-- column, or a new vocabulary. It needs a call to the fault reporter for N
+-- DCFC chargers when the sim clock enters force_offline_window_hours, and a
+-- restore when it leaves. That is the whole change.
+--
+-- THE DETERMINISM HAZARD, named in advance because this engine has been bitten
+-- by it three times (0137 hashed a write timestamp, 0139 an id, 0216 a minted
+-- uuid): "take 3 DCFC chargers offline" must choose the SAME three every run.
+-- Order by a stable business key -- ocpp_identifier -- never by charger_id and
+-- never by an unordered LIMIT. A LIMIT without ORDER BY is not deterministic
+-- in Postgres even on identical data.
+--
+-- AND THE SAFE/UNSAFE SPLIT, which is what makes this tractable:
+--
+--   SAFE, forces_recert=FALSE, provable
+--     force_offline_dcfc_count / force_offline_window_hours are declared by
+--     charger_outage_morning_rush and its bench_ clone ONLY. Neither is in
+--     ottoq_cert_columns. A change gated on a key no certified scenario
+--     declares cannot alter any canon's behaviour -- the same argument 0308
+--     and 0309 made, and it is assertable: no certified column's scenario
+--     declares the key.
+--
+--   NOT SAFE, forces_recert=TRUE, needs its own window and recert
+--     dtc_rate_multiplier / incident_rate_multiplier are declared by busy_day,
+--     which IS four of the nine certification columns. Implementing them
+--     changes what those columns simulate. That is a deliberate recert, not a
+--     fix to slip in beside the other.
+--
+-- Do the safe half first and independently. Doing both in one migration would
+-- drag a certified family into a change that did not need to touch it.

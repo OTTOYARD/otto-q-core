@@ -625,3 +625,172 @@ def test_turning_the_facts_gate_on_does_not_move_the_busy_count():
     assert plain["fire"]["n_charge_stalls"] == gated["fire"]["n_charge_stalls"] == 2
     assert plain["fire"]["n_stalls_busy"] == gated["fire"]["n_stalls_busy"] == 0
     assert gated["fire"]["stalls_blocked"] == {}
+
+
+# ---------------------------------------------------------------------------
+# ARMING AND THE BLIND-FRAME GUARD (2026-09-14)
+#
+# db/checks/0214: 0278 built the one-call arming ritual and nothing ever
+# performed it. Of the seven runs that have ever carried a proposer_frame_facts
+# row exactly one did -- a probe created to measure the blindness -- so all six
+# `proposer_live` runs and all 329 CP-SAT proposals they produced were solved
+# against a frame with the gate off, where a reserved-but-empty stall reads as
+# free. These tests hold the two halves of the fix: the loop arms, and the loop
+# refuses to plan against a frame that came back blind anyway.
+# ---------------------------------------------------------------------------
+
+
+def _arming(verdict="armed", missing=None):
+    return {"verdict": verdict, "sim_run_id": RUN, "run_by": "proposer_live",
+            "satisfied": 3 if verdict == "armed" else 1, "required": 3,
+            "missing": missing or []}
+
+
+def test_the_loop_arms_the_run_it_is_about_to_propose_into():
+    cur = FakeCur(one=({"ok": True, "sim_run_id": RUN, "armed_by": "proposer_bridge",
+                        "receipts": [], "arming": _arming()},))
+    assert pb._arm_run(cur, RUN, pb.ARMED_BY)["verdict"] == "armed"
+    assert pb.ARM in cur.sql[0]
+    assert cur.params == (RUN, pb.ARMED_BY)
+
+
+def test_an_arming_that_returns_ok_but_is_not_armed_is_still_a_refusal():
+    # The receipt and the verdict are two different claims. 0278's own function
+    # reads every ottoq_policy_set receipt; this reads what the run REPORTS
+    # afterwards, so a partial arm cannot pass as a whole one.
+    cur = FakeCur(one=({"ok": True, "receipts": [],
+                        "arming": _arming("partial", ["proposer_frame_facts"])},))
+    with pytest.raises(pb.BridgeError) as exc:
+        pb._arm_run(cur, RUN, pb.ARMED_BY)
+    assert "partial" in str(exc.value)
+    assert "proposer_frame_facts" in str(exc.value)
+
+
+def test_an_arming_call_that_does_not_say_ok_is_a_refusal():
+    with pytest.raises(pb.BridgeError):
+        pb._arm_run(FakeCur(one=({"ok": False, "error": "nope"},)), RUN, pb.ARMED_BY)
+    with pytest.raises(pb.BridgeError):
+        pb._arm_run(FakeCur(one=None), RUN, pb.ARMED_BY)
+
+
+def test_a_frame_with_no_facts_version_is_refused_by_name():
+    with pytest.raises(pb.BlindFrameError) as exc:
+        pb._require_seeing_frame({"stalls": [], "vehicles": []}, RUN)
+    message = str(exc.value)
+    assert "selector.facts_version" in message
+    assert "reserved but empty" in message
+    assert "--allow-blind-frame" in message
+
+
+def test_a_frame_that_carries_the_facts_passes_and_returns_its_version():
+    frame = {"stalls": [], "vehicles": [],
+             "selector": {"facts_version": 1, "clock": "2026-09-13T12:00:00+00:00"}}
+    assert pb._require_seeing_frame(frame, RUN) == 1
+
+
+def test_the_guard_reads_the_frame_rather_than_trusting_the_arming():
+    # This is the whole design: arming is what was ASKED for, facts_version is
+    # what CAME BACK, and 0214 is the gap between them. A frame that arrives
+    # blind is refused even though the arming above said 'armed'.
+    assert pb.BlindFrameError.__mro__[1] is pb.BridgeError
+    with pytest.raises(pb.BlindFrameError):
+        pb._require_seeing_frame({"selector": {"facts_version": None}}, RUN)
+    with pytest.raises(pb.BlindFrameError):
+        pb._require_seeing_frame({"selector": "not-a-dict"}, RUN)
+
+
+# --- G58: the seat and the fire must be the same event ----------------------
+
+
+class FakeConnForWait:
+    """A connection whose every cursor answers the next scripted row."""
+
+    def __init__(self, rows, raise_on=None):
+        self._rows = list(rows)
+        self._raise_on = raise_on
+        self.polls = 0
+        self.rollbacks = 0
+
+    def cursor(self):
+        self.polls += 1
+        if self._raise_on is not None and self.polls >= self._raise_on:
+            raise RuntimeError("connection lost mid-poll")
+        row = self._rows.pop(0) if self._rows else self._rows_last
+        self._rows_last = row
+        return FakeCur(one=row)
+
+    def rollback(self):
+        self.rollbacks += 1
+
+
+def test_the_waiter_returns_as_soon_as_the_tick_moves():
+    """THE WHOLE POINT (db/checks/0223). The first-refusal seat is one tick
+    wide, so the loop must wake on the tick, not on a clock."""
+    conn = FakeConnForWait([(7, "running"), (7, "running"), (8, "running")])
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=5,
+                                  poll_s=0.001) == "tick_change"
+    assert conn.polls == 3
+    # every poll is rolled back, so it never leaves a transaction open across
+    # the next fire's commit
+    assert conn.rollbacks == 3
+
+
+def test_the_waiter_is_bounded_and_says_so():
+    """A loop that naps silently through its whole window looks identical to one
+    that worked. The wait is a bound, not a target."""
+    conn = FakeConnForWait([(7, "running")])
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=0.01,
+                                  poll_s=0.001) == "timeout"
+
+
+def test_the_waiter_stops_when_the_run_does():
+    for status, expected in (("completed", "run_ended"), ("paused", "run_ended")):
+        conn = FakeConnForWait([(9, status)])
+        assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=5,
+                                      poll_s=0.001) == expected
+
+
+def test_the_waiter_notices_a_run_that_is_gone():
+    conn = FakeConnForWait([None])
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=5,
+                                  poll_s=0.001) == "run_gone"
+
+
+def test_a_failed_poll_is_a_reason_to_fire_not_a_reason_to_crash():
+    """The waiter must never raise. Losing the poll is not worse than the old
+    behaviour -- the old behaviour was to sleep blindly."""
+    conn = FakeConnForWait([(7, "running")], raise_on=1)
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=5,
+                                  poll_s=0.001) == "poll_failed"
+    assert conn.rollbacks == 1
+
+
+def test_a_null_after_tick_fires_immediately_rather_than_waiting_for_nothing():
+    conn = FakeConnForWait([(None, "running")])
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=None, max_wait_s=5,
+                                  poll_s=0.001) == "tick_change"
+
+
+def test_following_the_tick_is_the_default_not_an_opt_in():
+    """0218's lesson, applied: apparatus built correctly with the switch left
+    off is apparatus nobody turned on. Opting OUT is the explicit act."""
+    import inspect
+    sig = inspect.signature(pb.run_live)
+    assert sig.parameters["follow_ticks"].default is True
+    assert sig.parameters["tick_wait_s"].default == pb.DEFAULT_TICK_WAIT_S
+
+
+def test_the_loop_actually_waits_on_the_tick():
+    """STRUCTURAL, AND LABELLED AS SUCH. The waiter above is unit-tested in
+    isolation; this asserts the loop reaches it, which is the half a unit test
+    of the waiter cannot see. It reads run_live's source rather than driving a
+    full fake connection -- weaker evidence than a live fire, and the live
+    evidence is db/checks/0224."""
+    import inspect
+    src = inspect.getsource(pb.run_live)
+    assert "_wait_for_next_tick" in src, "the loop never calls the waiter"
+    # the old unconditional sleep must no longer be the only path out
+    assert "if follow_ticks:" in src
+    assert src.index("if follow_ticks:") < src.index("trigger = \"interval\"")
+    # and the reason travels on the fire record
+    assert '"fire_trigger"' in src and '"ticks_since_last_fire"' in src

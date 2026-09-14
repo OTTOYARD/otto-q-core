@@ -81,6 +81,18 @@ the box. Cost: none — CP-SAT is local, no endpoint, no tokens.
 
 ## Why the bridge alone changes nothing (read this before demoing)
 
+> **SUPERSEDED 2026-09-14.** The paragraph below is written in the present
+> tense about the world before migration 0259, which has been applied since
+> 20260912205202. Measured today: `ottoq_l2_external_proposal` orders by
+> `ottoq_proposer_precedence.rank`, not by `(source='cuopt') DESC`;
+> `forward_lex` sits at rank 10 with `holds_tick = true`; and the table holds
+> **329 forward_lex proposals, 6 of them enacted** — so "heard, never followed"
+> is no longer true either. What IS still true, and is the live reason the
+> proposer rarely wins, is `db/checks/0214`: `proposer_frame_facts` has never
+> been set at any scope, so every proposer run so far has read a frame that
+> could not see which service points were already reserved. Kept below as the
+> record of what 0259 was for.
+
 `db/checks/0184`: today the decide path picks a pending proposal by
 `ORDER BY (source='cuopt') DESC, (source='cuopt_fallback') DESC, created_at DESC`, and the
 local greedy proposer regenerates its row *inside* the tick. A `forward_lex` row submitted

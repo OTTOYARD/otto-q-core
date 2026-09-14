@@ -31,6 +31,7 @@ from forward_proposer import (  # noqa: E402
     stall_block_reason,
     stall_is_free,
     vehicle_is_held,
+    vehicle_has_live_proposal,
 )
 
 SITE = {"power_cap_kw_hard": 600, "power_soft_target_kw": 450,
@@ -1312,3 +1313,228 @@ def test_a_site_whose_every_stall_is_unofferable_names_the_scarcity():
     assert "3 charge-capable" in msg
     for fragment in ("1 occupied", "1 reserved", "1 charger_faulted"):
         assert fragment in msg
+
+
+# --- 0287: which KIND of place, and whose ledger says so --------------------
+
+
+def _v2_frame(vehicles, stalls):
+    """A facts_version 2 frame -- the contract migration 0287 publishes."""
+    frame = _facts_frame(vehicles, stalls, version=2)
+    frame["selector"]["charge_stall_types"] = ["dcfc", "l2"]
+    return frame
+
+
+def test_a_staging_hold_is_a_parking_spot_and_no_longer_hides_the_vehicle():
+    """db/checks/0221, THE WHOLE DEFECT IN ONE TEST. Under version 1 a vehicle
+    parked on a staging stall answered has_live_booking and was skipped -- while
+    ottoq_cuopt_first_refusal_arm was holding a one-tick seat open for exactly
+    that vehicle, because the kernel disqualifies only a live DCFC/L2
+    reservation. Measured on run c288555a: 19 seats armed, 18 of them carrying
+    nothing but a staging booking, 0 ever answered. Under version 2 the frame
+    says which kind of place it is, and the vehicle is planned for."""
+    staged = _vehicle("v-staged", soc=25, reserved_stall_id=None,
+                      has_live_booking=True,
+                      live_booking_stall_types=["staging"],
+                      holds_charge_reservation=False,
+                      holds_charge_booking=False,
+                      holds_charge_place=False)
+    assert vehicle_is_held(staged) is False
+
+    r = propose(_v2_frame([staged], [_facts_stall("s-a")]), CLASSES, site=SITE)
+    assert r["vehicles_held"] == 0
+    assert {row["entity_id"] for row in r["proposals"]} == {"v-staged"}
+
+    #: AND THE SAME VEHICLE UNDER THE OLD CONTRACT IS STILL SKIPPED. The version
+    #: -1 keys are byte-identical after 0287, so a frame that does not carry the
+    #: new fact keeps the behaviour it had -- that is the fallback, exercised.
+    legacy = {k: v for k, v in staged.items()
+              if k not in ("holds_charge_place", "holds_charge_reservation",
+                           "holds_charge_booking", "live_booking_stall_types")}
+    assert vehicle_is_held(legacy) is True
+
+
+def test_a_charge_place_from_either_ledger_still_hides_the_vehicle():
+    """UNION, NOT INTERSECTION. The reservation ledger and the booking calendar
+    disagree in practice -- 0221 found a vehicle the kernel called unplaced
+    while the calendar held an L2 for it -- so either one saying 'charge place'
+    is enough. Both directions are exercised, and so is neither.
+
+    HONEST LABEL: this one is a REGRESSION GUARD, not a change-detector. Every
+    vehicle here answers the same under version 1 and version 2, because a real
+    frame never sets holds_charge_booking without has_live_booking. It passes
+    against the old code too, and is kept so the union cannot silently become an
+    intersection later. The tests that actually convict the old behaviour are
+    test_a_staging_hold_is_a_parking_spot_and_no_longer_hides_the_vehicle and
+    test_the_published_fact_wins_over_the_keys_it_supersedes -- both verified to
+    FAIL when vehicle_is_held is reverted to the version-1 body."""
+    by_reservation = _vehicle("v-res", soc=25, reserved_stall_id="s-9",
+                              reserved_stall_type="dcfc",
+                              holds_charge_reservation=True,
+                              holds_charge_booking=False,
+                              holds_charge_place=True)
+    by_calendar = _vehicle("v-cal", soc=25, has_live_booking=True,
+                           live_booking_stall_types=["l2"],
+                           holds_charge_reservation=False,
+                           holds_charge_booking=True,
+                           holds_charge_place=True)
+    free = _vehicle("v-free", soc=25, holds_charge_reservation=False,
+                    holds_charge_booking=False, holds_charge_place=False)
+    assert vehicle_is_held(by_reservation) is True
+    assert vehicle_is_held(by_calendar) is True
+    assert vehicle_is_held(free) is False
+
+    r = propose(_v2_frame([by_reservation, by_calendar, free],
+                          [_facts_stall("s-a"), _facts_stall("s-b")]),
+                CLASSES, site=SITE)
+    assert r["vehicles_held"] == 2
+    assert {row["entity_id"] for row in r["proposals"]} == {"v-free"}
+
+
+def test_the_published_fact_wins_over_the_keys_it_supersedes():
+    """THE PUBLISHER DECIDES, NOT THIS MODULE. holds_charge_place is the
+    kernel's own answer; when it is present this function must not re-derive
+    one from the older keys, in EITHER direction. Both conflicts are pinned:
+    a reservation the publisher says is not a charge place, and no reservation
+    at all where the publisher says there is one."""
+    parked = _vehicle("v-parked", soc=25, reserved_stall_id="s-stage",
+                      reserved_stall_type="staging",
+                      has_live_booking=True,
+                      holds_charge_place=False)
+    assert vehicle_is_held(parked) is False
+
+    invisible = _vehicle("v-hidden", soc=25, reserved_stall_id=None,
+                         has_live_booking=False,
+                         holds_charge_place=True)
+    assert vehicle_is_held(invisible) is True
+
+
+def test_a_version_2_frame_reports_its_version_and_its_charge_types():
+    """The contract is asked of the frame, never inferred from which keys
+    happen to be present -- and charge_stall_types travels with it so a
+    consumer never needs a second copy of the list. The copy is what
+    diverged.
+
+    HONEST LABEL: a contract test, not a behaviour test -- it would pass against
+    the old vehicle_is_held as well."""
+    frame = _v2_frame([_vehicle("v-1", soc=25, holds_charge_place=False)],
+                      [_facts_stall("s-a")])
+    assert frame_facts_version(frame) == 2
+    assert frame["selector"]["charge_stall_types"] == ["dcfc", "l2"]
+    r = propose(frame, CLASSES, site=SITE)
+    assert r["facts_version"] == 2
+
+
+# ---------------------------------------------------------------------------
+# 0292 / G60 -- facts_version 3: the proposer can see its own pending plans.
+# ---------------------------------------------------------------------------
+
+def _v3_frame(vehicles, stalls):
+    """A facts_version 3 frame -- the contract migration 0292 publishes."""
+    frame = _v2_frame(vehicles, stalls)
+    frame["selector"]["facts_version"] = 3
+    frame["selector"]["holds_tick_sources"] = [
+        "cuopt", "cuopt_fallback", "forward_lex", "llm_advisor"]
+    return frame
+
+
+def _v3_vehicle(vid, **kw):
+    """A vehicle as 0292 emits it: the version-2 place facts plus the two new ones."""
+    base = dict(reserved_stall_id=None, reserved_stall_type=None,
+                has_live_booking=False, live_booking_stall_types=[],
+                holds_charge_reservation=False, holds_charge_booking=False,
+                holds_charge_place=False,
+                has_live_holds_tick_proposal=False,
+                live_holds_tick_proposal_sources=[])
+    base.update(kw)
+    return _vehicle(vid, soc=25, **base)
+
+
+def test_a_vehicle_with_a_pending_plan_is_not_planned_again():
+    """G60, THE WHOLE DEFECT IN ONE TEST. Measured on run 91139ad8: 26 of 48
+    forward_lex proposals had an earlier holds_tick proposal for the SAME
+    vehicle, and 35 of 48 ended superseded across only 18 vehicles -- the
+    proposer overwriting its own pending plans about a tick after making them.
+
+    The vehicle below holds no place of any kind, so every version-2 fact says
+    plan it. The only thing standing in the way is a plan that already exists,
+    and ottoq_cuopt_first_refusal_arm has already declined to open a seat for
+    exactly this vehicle because of it."""
+    replanned = _v3_vehicle("v-replan",
+                            has_live_holds_tick_proposal=True,
+                            live_holds_tick_proposal_sources=["forward_lex"])
+    assert vehicle_has_live_proposal(replanned) is True
+    assert vehicle_is_held(replanned) is True
+
+    r = propose(_v3_frame([replanned], [_facts_stall("s-a")]), CLASSES, site=SITE)
+    assert r["vehicles_held"] == 1
+    assert r["proposals"] == []
+
+
+def test_another_proposer_holding_the_tick_also_stops_this_one():
+    """The fact is not about authorship. cuopt holding a pending row for this
+    vehicle closes the seat just as surely as forward_lex holding one, because
+    the arm's clause matches ANY source declaring holds_tick. A consumer that
+    skipped only its own rows would re-plan against a competitor mid-window."""
+    taken = _v3_vehicle("v-taken",
+                        has_live_holds_tick_proposal=True,
+                        live_holds_tick_proposal_sources=["cuopt"])
+    assert vehicle_is_held(taken) is True
+
+
+def test_a_free_vehicle_with_no_pending_plan_is_still_planned():
+    """The other side of the same key, and the reason this is not just a
+    blanket skip: absent a pending plan, a version-3 frame plans the vehicle
+    exactly as a version-2 one did.
+
+    HONEST LABEL: this one passes against the pre-0292 code too -- verified by
+    reverting the consumption branch and re-running. It pins that the fix did
+    not become a blanket skip; it is not evidence that the fix works. The three
+    tests above are: all three fail against the reverted module."""
+    free = _v3_vehicle("v-free")
+    assert vehicle_has_live_proposal(free) is False
+    assert vehicle_is_held(free) is False
+
+    r = propose(_v3_frame([free], [_facts_stall("s-a")]), CLASSES, site=SITE)
+    assert r["vehicles_held"] == 0
+    assert {row["entity_id"] for row in r["proposals"]} == {"v-free"}
+
+
+def test_the_pending_plan_wins_over_a_place_fact_that_says_plan_it():
+    """PRECEDENCE, pinned in the direction that can actually go wrong.
+    holds_charge_place=False means "this vehicle has no place, plan it" -- the
+    0287 fix. A vehicle that has no place AND a pending plan must still be
+    skipped, or 0287's widening re-creates G60's churn at full volume."""
+    both = _v3_vehicle("v-both",
+                       holds_charge_place=False,
+                       has_live_holds_tick_proposal=True,
+                       live_holds_tick_proposal_sources=["forward_lex"])
+    assert vehicle_is_held(both) is True
+
+
+def test_a_frame_without_the_key_behaves_exactly_as_before():
+    """THE FALLBACK, exercised. A version-2 frame does not carry the proposal
+    fact, and every vehicle must answer False to it rather than have an answer
+    invented from keys that cannot know.
+
+    HONEST LABEL: this is a REGRESSION GUARD, not evidence for 0292. It passes
+    against the pre-0292 code by construction -- that is the point of it."""
+    legacy = _vehicle("v-legacy", soc=25, reserved_stall_id=None,
+                      has_live_booking=False, holds_charge_place=False)
+    assert "has_live_holds_tick_proposal" not in legacy
+    assert vehicle_has_live_proposal(legacy) is False
+    assert vehicle_is_held(legacy) is False
+
+
+def test_a_version_3_frame_reports_its_version_and_the_sources_that_hold_a_tick():
+    """The consumer reads the source vocabulary from the PUBLISHER, never from
+    its own copy -- a copy of a list is what diverged in G54.
+
+    HONEST LABEL: a contract test, not a behaviour test. It would pass against
+    a module that ignored the key entirely."""
+    frame = _v3_frame([_v3_vehicle("v-a")], [_facts_stall("s-a")])
+    assert frame_facts_version(frame) == 3
+    assert frame["selector"]["holds_tick_sources"] == [
+        "cuopt", "cuopt_fallback", "forward_lex", "llm_advisor"]
+    r = propose(frame, CLASSES, site=SITE)
+    assert r["facts_version"] == 3

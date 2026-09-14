@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0275 — GENERATED, not a log
+## Index, 0134–0311 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -260,7 +260,43 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0273](db/migrations/0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink.sql) | `20260913233201` | yes — ledger | THE UPLINK IS WRITTEN BY THE SAME TRANSACTION AS THE DOWNLINK |
 | [0274](db/migrations/0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one.sql) | `20260913234605` | yes — ledger | THERE IS NO QUEUE, SO THE ASSET CANNOT BE TOLD ITS PLACE IN ONE |
 | [0275](db/migrations/0275_no_single_place_says_which_intelligence_sources_are_actually_on.sql) | `20260914001937` | yes — ledger | NO SINGLE PLACE SAYS WHICH INTELLIGENCE SOURCES ARE ACTUALLY ON |
+| [0276](db/migrations/0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger.sql) | `20260914005147` | yes — ledger | CP-SAT ENACTED THREE TIMES AND THE SCOREBOARD CALLED IT A STRANGER |
+| [0277](db/migrations/0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same.sql) | `20260914012023` | yes — ledger | A SOURCE THAT HAS PROPOSED AND ONE THAT HAS NEVER EXISTED READ THE SAME |
+| [0278](db/migrations/0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four.sql) | `20260914040338` | yes — ledger | ARMING THE AGENTIC LAYER IS A HAND RITUAL, AND A RUN ARMED FOUR WAYS |
+| [0279](db/migrations/0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog.sql) | `20260914040837` | yes — ledger | THE ONE DIAL THAT CAN KILL A CERTIFICATION ARM IS THE ONE DIAL THE |
+| [0280](db/migrations/0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid.sql) | `20260914043322` | yes — ledger | A TAMPER CHECK THAT CANNOT TELL TAMPERING FROM A FRESH UUID |
+| [0281](db/migrations/0281_the_setter_refuses_ninety_two_of_the_keys_the_engine_reads.sql) | `20260914054506` | yes — ledger | THE SUPPORTED WAY TO CHANGE A DIAL REFUSES SIXTY PERCENT OF THE DIALS |
+| [0282](db/migrations/0282_two_dials_whose_ranges_the_database_already_declares.sql) | `20260914061049` | yes — ledger | THE FIRST TWO OF THE NINETY, AND NEITHER RANGE IS A JUDGEMENT CALL |
+| [0283](db/migrations/0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_does_not.sql) | `20260914062112` | yes — ledger | SEVEN MORE DIALS, AND THE FIRST HONEST NULLS |
+| [0284](db/migrations/0284_a_hold_whose_outcome_is_invisible_can_only_be_argued_about.sql) | `20260914064710` | yes — ledger | THE RIGHT OF FIRST REFUSAL GETS AN OUTCOME LEDGER |
+| [0285](db/migrations/0285_nine_more_dials_and_two_ceilings_the_rng_declares.sql) | `20260914065559` | yes — ledger | NINE MORE DIALS, AND THE TWO CEILINGS THE RNG DECLARES |
+| [0286](db/migrations/0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you.sql) | `20260914071810` | yes — ledger | ELEVEN MORE DIALS, AND THREE THAT ARE ONE SWITCH |
+| [0287](db/migrations/0287_the_two_halves_disagree_about_what_already_placed_means.sql) | `20260914073900` | yes — ledger | THE FRAME PUBLISHES WHICH KIND OF PLACE, AND WHOSE LEDGER SAYS SO |
+| [0288](db/migrations/0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer.sql) | `PENDING` | no — pending | A SEAT IS ONLY WORTH HOLDING IF THERE IS SOMETHING TO OFFER |
+| [0289](db/migrations/0289_five_gates_and_the_one_that_tests_a_different_threshold.sql) | `20260914081939` | yes — ledger | FIVE GATES, AND THE ONE THAT TESTS A DIFFERENT THRESHOLD |
+| [0290](db/migrations/0290_three_geometry_dials_and_one_the_catalog_cannot_express.sql) | `20260914083734` | yes — ledger | THREE GEOMETRY DIALS, AND ONE THE CATALOG CANNOT EXPRESS |
+| [0291](db/migrations/0291_eighteen_dials_whose_consumer_already_wrote_the_range.sql) | `20260914085632` | yes — ledger | EIGHTEEN DIALS WHOSE CONSUMER ALREADY WROTE THE RANGE |
+| [0292](db/migrations/0292_the_proposer_cannot_see_its_own_pending_plans.sql) | `20260914090954` | yes — ledger | THE PROPOSER CANNOT SEE ITS OWN PENDING PLANS |
+| [0293](db/migrations/0293_the_nightly_run_purge_has_never_once_run.sql) | `20260914093107` | yes — ledger | THE NIGHTLY RUN PURGE HAS NEVER ONCE RUN |
+| [0294](db/migrations/0294_the_purge_commits_inside_a_cursor_loop.sql) | `20260914094551` | yes — ledger | THE PURGE COMMITS INSIDE A CURSOR LOOP |
+| [0295](db/migrations/0295_a_procedure_with_a_set_clause_cannot_commit.sql) | `20260914095529` | yes — ledger | A PROCEDURE WITH A SET CLAUSE CANNOT COMMIT |
+| [0296](db/migrations/0296_the_gap_view_cannot_see_five_of_its_own_call_sites.sql) | `20260914101744` | yes — ledger | THE GAP VIEW CANNOT SEE FIVE OF ITS OWN CALL SITES |
+| [0297](db/migrations/0297_seven_gates_whose_range_is_the_comparison_itself.sql) | `20260914102812` | yes — ledger | SEVEN GATES WHOSE RANGE IS THE COMPARISON ITSELF, AND THREE CLAMPS |
+| [0298](db/migrations/0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired.sql) | `20260914103801` | yes — ledger | FOUR HOURS, THREE PROBABILITIES, A FRACTION -- AND ONE DIAL THAT IS |
+| [0299](db/migrations/0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check.sql) | `20260914104618` | yes — ledger | A DIAL THAT DEFAULTS FOR A CHECK-CONSTRAINED COLUMN INHERITS THE CHECK |
+| [0300](db/migrations/0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment.sql) | `20260914105135` | yes — ledger | THREE DIALS WHOSE FLOOR IS ON THE OTHER SIDE OF THE ASSIGNMENT |
+| [0301](db/migrations/0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column.sql) | `20260914105943` | yes — ledger | FIVE FILES NEVER CLASSIFIED THEMSELVES, AND THE FLOOR SWALLOWED EVERY |
+| [0302](db/migrations/0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog.sql) | `20260914121021` | yes — ledger | THE ONLY AGENT THAT TUNES DIALS IS THE ONE THAT BYPASSES THE CATALOG |
+| [0303](db/migrations/0303_a_bound_that_cannot_be_clamped_must_refuse.sql) | `20260914122818` | yes — ledger | A BOUND THAT CANNOT BE CLAMPED MUST REFUSE |
+| [0304](db/migrations/0304_five_more_floors_and_six_dials_admitted_without_a_clamp.sql) | `20260914124522` | yes — ledger | FIVE MORE FLOORS, AND SIX DIALS ADMITTED WITHOUT A CLAMP |
+| [0305](db/migrations/0305_the_catalog_becomes_the_allow_list_for_every_writer.sql) | `20260914125444` | yes — ledger | THE CATALOG BECOMES THE ALLOW-LIST FOR EVERY WRITER, NOT JUST THE SETTER |
+| [0306](db/migrations/0306_a_null_dial_value_silently_wrote_the_maximum.sql) | `20260914131308` | yes — ledger | A NULL DIAL VALUE SILENTLY WROTE THE MAXIMUM, AND SAID ok:true |
+| [0307](db/migrations/0307_the_dial_audit_reads_functions_and_never_looked_at_a_view.sql) | `20260914134225` | yes — ledger | THE DIAL AUDIT READS FUNCTIONS, AND NEVER LOOKED AT A VIEW |
+| [0308](db/migrations/0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on.sql) | `20260914144046` | yes — ledger | THE SELF-IMPROVEMENT LOOP GETS THE ONE GUARD IT NEEDS BEFORE IT MAY |
+| [0309](db/migrations/0309_benchmark_had_everything_except_a_scenario.sql) | `20260914144547` | yes — ledger | THE BENCHMARK DEPOT HAD 160 STALLS, 100 VEHICLES AND NO WAY TO START |
+| [0310](db/migrations/0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row.sql) | `20260914150516` | yes — ledger | 0308 AND 0309 EACH ARGUED forces_recert=false AT LENGTH AND NEITHER |
+| [0311](db/migrations/0311_a_column_that_looks_like_the_price_and_is_not.sql) | `20260914153500` | yes — ledger | site_energy_snapshots.lmp_usd_mwh IS NULL IN EVERY ROW EVER WRITTEN, |
 
-141 migrations indexed.
+177 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

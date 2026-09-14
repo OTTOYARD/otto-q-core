@@ -147,6 +147,16 @@ include every point corresponding to a stage with no proposer.
 > four times against the live engine on 2026-09-13 and submitted **90 proposals through the
 > real door — and zero were enacted, or even quoted by a decision row.**
 
+> **CORRECTION 2026-09-14 (`db/checks/0211`) — the last clause is no longer true.** On run
+> `33f87a41-3f0e-41c6-8da8-608376d56d6a` (busy_day / 424242 / Nashville flagship) the proposer
+> loop fired twelve times and the deterministic kernel **ENACTED three CP-SAT proposals**, at
+> ticks 2, 8 and 18, each with `enacted_action` equal to `proposed_action` and a full L1
+> `rule_results` array attached. Of 83 proposals in that run, **29 (35%) were CP-SAT's own
+> abstentions**, 23 met a `noop_no_candidate` from the disposer after CP-SAT had named a
+> specific stall (the open lead, G49), 17 lost to the local path on a different stall — which
+> is the right-of-first-refusal working — and 3 were taken. "Least consequential" still holds
+> on volume; "never enacted" does not.
+
 > **The Anthropic advisory proposer has never been asked anything by the live engine**:
 > zero proposals, zero fires, zero cost incurred. The key went live 2026-09-13 evening; the
 > path is written and guarded and has still never run.

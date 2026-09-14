@@ -79,6 +79,14 @@ ACTION_CONTEXT = "stall_assignment"
 ENTITY_TYPE = "vehicle"
 DOOR = "public.ottoq_submit_external_proposal"
 BATCH = "public.ottoq_proposer_submit_batch"
+#: 0278's one-call arming ritual. It sets proposer_frame_facts,
+#: proposer_hold_enabled and cuopt_first_refusal_max_defers at RUN scope,
+#: all-or-nothing, reads every ottoq_policy_set receipt rather than assuming it,
+#: and refuses a run whose run_by is cert_harness with ERRCODE 42501 -- arming a
+#: certification arm would change the frame its canon was measured against.
+ARM = "public.ottoq_agentic_arm"
+#: Who the arming is attributed to in ottoq_policy_params.updated_by.
+ARMED_BY = "proposer_bridge"
 FRAME_FN = "public.ottoq_build_decision_frame"
 DEFAULT_TTL_S = 60
 
@@ -527,6 +535,123 @@ def _resolve_run(cur, depot_id: str) -> str:
     return run["sim_run_id"]
 
 
+class BlindFrameError(BridgeError):
+    """The frame the solver was handed does not carry the selector's facts."""
+
+
+def _arm_run(cur, sim_run_id: str, by: str) -> dict:
+    """Arm the run for agentic proposal, and return 0278's arming verdict.
+
+    WHY THE LOOP ARMS RATHER THAN THE OPERATOR. 0278 built the ritual; nothing
+    performed it. Measured 2026-09-14 (db/checks/0214): of the seven runs that
+    have ever carried a proposer_frame_facts row, exactly ONE did -- a probe run
+    created to measure the blindness. All six `proposer_live` runs, and all 329
+    CP-SAT proposals they produced, were solved against a frame with the gate
+    off. A ritual that must be remembered before every run is a ritual that will
+    not be performed, so the process that needs it performs it.
+
+    Raises rather than warns. A proposer that plans against a blind frame does
+    not fail -- it succeeds at the wrong problem, offering points the door had
+    already given away, which is worse than not proposing at all.
+    """
+    cur.execute(f"SELECT {ARM}(%s::uuid, %s)", (sim_run_id, ARMED_BY))
+    row = cur.fetchone()
+    receipt = row[0] if row else None
+    if not isinstance(receipt, dict) or not receipt.get("ok"):
+        raise BridgeError(f"{ARM} did not confirm the arming of run {sim_run_id}: {receipt}")
+    verdict = (receipt.get("arming") or {}).get("verdict")
+    if verdict != "armed":
+        raise BridgeError(f"run {sim_run_id} reports arming verdict {verdict!r} after "
+                          f"{ARM} returned ok; missing "
+                          f"{(receipt.get('arming') or {}).get('missing')}")
+    return receipt["arming"]
+
+
+def _require_seeing_frame(frame: dict, sim_run_id: str) -> int:
+    """Refuse a frame that does not carry the selector facts (0265).
+
+    This does NOT trust the arming above -- it reads the frame that actually
+    came back. The two are deliberately independent: arming is what we asked
+    for, `selector.facts_version` is what we got, and the gap between those is
+    the entire finding of db/checks/0214.
+
+    What is at stake, measured on the flagship depot at tick 4: the blind frame
+    offered 25 charge points to the solver and the facts frame offered 0 -- 24
+    reserved by the door, 1 charger faulted. The solver was not choosing badly
+    among scarce points; it was choosing among points that were already gone.
+    """
+    version = frame_facts_version(frame)
+    if version is None:
+        raise BlindFrameError(
+            f"the decision frame for run {sim_run_id} carries no selector.facts_version, "
+            f"so `offerable`, `reserved_by` and `charger_state` are absent and a reserved "
+            f"but empty stall reads as free. Either proposer_frame_facts is off for this "
+            f"run or the database predates 0265. Pass --allow-blind-frame only to MEASURE "
+            f"the blind behaviour; never to propose into a live depot with it.")
+    return version
+
+
+#: THE SEAT AND THE FIRE MUST BE THE SAME EVENT (G58, db/checks/0223).
+#:
+#: ottoq_cuopt_defer_roll binds a first-refusal seat at EXACTLY ONE TICK -- step
+#: 2 moves armed -> spent at the current tick, step 1 clears anything spent
+#: before it. That one-tick bound is the starvation guarantee and must not be
+#: widened. So the only way a seat can be answered is for the proposer to fire
+#: inside that tick, and until now this loop slept a fixed wall-clock interval
+#: against a twin advancing on its own metronome. Nothing aligned them.
+#:
+#: Measured on run 36e5cc68 with an 18-second interval, the separation was
+#: total: every seat armed at a tick the loop happened to fire on was answered
+#: (15 of 15, including one where a single charge stall was free), and every
+#: seat armed at a tick it did not fire on went unanswered (12 of 12). Across
+#: two runs the twenty unanswered seats split 7 saturation / 13 cadence.
+#:
+#: So the loop waits for the TICK, not for the clock. It polls tick_count and
+#: fires when it moves. The poll is cheap (one indexed row) and the wait is
+#: bounded: if the tick does not move within `tick_wait_s` the loop fires
+#: anyway, because a proposer that silently naps through its whole window looks
+#: identical to one that worked -- the same rule `max_consecutive_skips`
+#: already enforces for the certification guard.
+#:
+#: WHY THE REASON TRAVELS ON THE NEXT FIRE. 0223 had to RECONSTRUCT this
+#: alignment by joining the fire log to the deferral ledger on tick number. It
+#: should not have had to: the fire record now carries what woke it and how many
+#: ticks passed, so the question is a column rather than a join.
+TICK_POLL_S = 1.0
+DEFAULT_TICK_WAIT_S = 90.0
+
+
+def _wait_for_next_tick(conn, sim_run_id: str, *, after_tick: int | None,
+                        max_wait_s: float, poll_s: float = TICK_POLL_S) -> str:
+    """Block until this run's tick_count passes `after_tick`.
+
+    Returns why the wait ended -- 'tick_change', 'timeout', 'run_ended' or
+    'run_gone' -- and never raises: a poll that cannot answer is a reason to
+    fire, not a reason to stop.
+    """
+    deadline = time.monotonic() + max_wait_s
+    while True:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT tick_count, status FROM public.ottoq_sim_runs "
+                            "WHERE sim_run_id = %s::uuid", (sim_run_id,))
+                row = cur.fetchone()
+            conn.rollback()
+        except Exception:
+            conn.rollback()
+            return "poll_failed"
+        if row is None:
+            return "run_gone"
+        tick, status = row[0], row[1]
+        if status != "running":
+            return "run_ended"
+        if after_tick is None or (tick is not None and tick > after_tick):
+            return "tick_change"
+        if time.monotonic() >= deadline:
+            return "timeout"
+        time.sleep(poll_s)
+
+
 def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              ttl_seconds: int = DEFAULT_TTL_S, max_assets: int | None = None,
              det_budget_s: float = DEFAULT_DET_BUDGET_S, via: str = "door",
@@ -536,6 +661,10 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              start_within_min: int = DEFAULT_START_WITHIN_MIN,
              serviceable_states: frozenset[str] | None = None,
              allow_rejection: bool = False,
+             arm: bool = True,
+             allow_blind_frame: bool = False,
+             follow_ticks: bool = True,
+             tick_wait_s: float = DEFAULT_TICK_WAIT_S,
              max_consecutive_skips: int = 30) -> list[dict]:
     """Fetch → propose → submit, once or in a loop while the run is running.
 
@@ -548,6 +677,15 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
         sim_run_id = _require_uuid(sim_run_id, "sim_run_id")
     depot_id = _require_uuid(depot_id, "depot_id")
     receipts: list[dict] = []
+    #: Arm ONCE per resolved run, not once per fire. `--run auto` can hand the
+    #: loop a different run mid-window (an operator restarts one), so the trigger
+    #: is a CHANGE of run id rather than a flag set on the first pass.
+    armed_run: str | None = None
+    arming: dict | None = None
+    #: What woke this fire, and how far the world moved since the last one.
+    #: 'first' until something has woken it; see _wait_for_next_tick.
+    trigger: str = "first"
+    last_fired_tick: int | None = None
     with psycopg.connect(dsn) as conn:
         n = 0
         skips = 0
@@ -580,7 +718,14 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                 if run["status"] != "running":
                     log(f"run {sim_run_id} is {run['status']}; stopping")
                     break
+                if arm and sim_run_id != armed_run:
+                    arming = _arm_run(cur, sim_run_id, ARMED_BY)
+                    armed_run = sim_run_id
+                    log(_canonical({"armed": arming}))
                 frame = _fetch_frame(cur, depot_id, sim_run_id)
+                #: Read what came back, never what was asked for.
+                if not allow_blind_frame:
+                    _require_seeing_frame(frame, sim_run_id)
                 class_rows = _fetch_class_rows(cur)
                 result = fire(frame, class_rows, site=site, sim_run_id=sim_run_id,
                               depot_id=depot_id,
@@ -593,6 +738,16 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                 rows, record = result["rows"], result["fire"]
                 record["tick_count_at_fetch"] = run["tick_count"]
                 record["run_resolved_by"] = "auto" if auto_run else "argument"
+                #: G58: what woke this fire, and how many ticks passed since the
+                #: last one. 0223 had to reconstruct both by joining the fire log
+                #: to the deferral ledger; they are columns now.
+                record["fire_trigger"] = trigger
+                record["ticks_since_last_fire"] = (
+                    None if last_fired_tick is None or run["tick_count"] is None
+                    else run["tick_count"] - last_fired_tick)
+                #: So a fire row says whether the frame it planned against was
+                #: armed by this loop, armed already, or deliberately blind.
+                record["arming"] = arming if arm else {"verdict": "not_armed_by_loop"}
                 receipt: dict[str, Any] = {"fire": record}
                 if via == "batch":
                     cur.execute(
@@ -618,9 +773,20 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                 conn.commit()
             receipts.append(receipt)
             log(_canonical(receipt))
+            last_fired_tick = run["tick_count"]
             if not loop or (max_fires is not None and n >= max_fires):
                 break
-            time.sleep(interval_s)
+            if follow_ticks:
+                trigger = _wait_for_next_tick(conn, sim_run_id,
+                                              after_tick=last_fired_tick,
+                                              max_wait_s=tick_wait_s,
+                                              poll_s=min(TICK_POLL_S, interval_s))
+                if trigger in ("run_ended", "run_gone") and not auto_run:
+                    log(_canonical({"stopping": trigger, "run": sim_run_id}))
+                    break
+            else:
+                trigger = "interval"
+                time.sleep(interval_s)
     return receipts
 
 
@@ -683,6 +849,30 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--interval-s", type=float, default=10.0)
     ap.add_argument("--max-fires", type=int, default=None)
     ap.add_argument("--json-out", help="write the fire result (rows + record) here")
+    ap.add_argument("--no-arm", action="store_true",
+                    help="do NOT call ottoq_agentic_arm on the resolved run. The default "
+                         "is to arm, because 0278 built the ritual and nothing performed "
+                         "it: all six live runs and all 329 proposals before 2026-09-14 "
+                         "were solved against a gate-off frame. Opting out is explicit.")
+    ap.add_argument("--no-follow-ticks", action="store_true",
+                    help="sleep --interval-s between fires instead of waiting for the "
+                         "run's tick to move. The default is to FOLLOW THE TICK, "
+                         "because the first-refusal seat is exactly one tick wide "
+                         "(ottoq_cuopt_defer_roll) and a loop on a wall clock answers "
+                         "it only by coincidence: measured on run 36e5cc68, every seat "
+                         "armed at a tick this loop fired on was answered (15 of 15) "
+                         "and every seat armed at a tick it missed was not (12 of 12). "
+                         "See db/checks/0223.")
+    ap.add_argument("--tick-wait-s", type=float, default=DEFAULT_TICK_WAIT_S,
+                    help="how long to wait for the tick to move before firing anyway. "
+                         "A bound, not a target: a loop that naps silently through its "
+                         "whole window looks identical to one that worked.")
+    ap.add_argument("--allow-blind-frame", action="store_true",
+                    help="propose even when the frame carries no selector.facts_version, "
+                         "so `offerable` is absent and a reserved-but-empty stall reads as "
+                         "free. For MEASURING the blind behaviour only -- at tick 4 on the "
+                         "flagship depot the blind frame offered 25 points and the facts "
+                         "frame offered 0.")
     ap.add_argument("--idle-ok", action="store_true",
                     help="for schedulers: exit 0 when the depot has no running run to "
                          "propose into. An ambiguous depot or a certification arm still "
@@ -701,7 +891,11 @@ def main(argv: list[str] | None = None) -> int:
                                 default_ready_delta_min=args.default_ready_delta,
                                 start_within_min=args.start_within,
                                 serviceable_states=_parse_states(args.states),
-                                allow_rejection=args.allow_rejection)
+                                allow_rejection=args.allow_rejection,
+                                arm=not args.no_arm,
+                                allow_blind_frame=args.allow_blind_frame,
+                                follow_ticks=not args.no_follow_ticks,
+                                tick_wait_s=args.tick_wait_s)
             if args.json_out:
                 Path(args.json_out).write_text(json.dumps(receipts, indent=1, default=str))
             return 0

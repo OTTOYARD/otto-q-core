@@ -1,0 +1,188 @@
+-- db/checks/0236
+-- THE LOOP'S ENERGY LEVER IS MOSTLY SLACK, AND THE REASON IS NOT A DEFECT:
+-- THE DEPOT RUNS AT ~4-7% OF ITS OWN POWER CEILING
+--
+-- Measured 2026-09-14, ~15:30-15:35 UTC (10:30-10:35 AM CT).
+--
+-- This file answers the one question that survived all three corrections in
+-- db/checks/0235: does the self-improvement loop's 3-tick horizon ever land in
+-- a window where its energy lever actually bites?
+--
+-- ===========================================================================
+-- A. THE LEVER'S REAL USE SITE, READ RATHER THAN INFERRED
+--
+-- 0235's method rule, applied: read the assignment AND the use, not a
+-- plausible nearby comparison. ottoq_energy_orchestrate:
+--
+--   v_demand_target := v_service_max * (CASE WHEN v_expensive
+--        THEN ottoq_policy_get(...,'energy_demand_factor_expensive',0.35)
+--        ELSE ottoq_policy_get(...,'energy_demand_factor_peak',   0.50) END);
+--   ...
+--   v_charge_cap := GREATEST(50, v_demand_target - v_base_load
+--                                + v_solar + v_bess_dispatch);
+--
+-- and three secondary uses: v_recharge_ceiling := 0.40 * v_demand_target,
+-- v_wave_incoming := v_forecast_kw > v_demand_target * 0.4, and the BESS
+-- discharge branch ELSIF v_net_load > v_demand_target.
+--
+-- THE IMPORTANT STRUCTURAL FACT: v_charge_cap is computed UNCONDITIONALLY --
+-- it is not inside an `IF net_load > target`. So the dial ALWAYS changes the
+-- cap. Its effect is not gated by a branch. What is conditional is whether the
+-- cap BINDS: a cap above what the depot wanted to draw anyway changes nothing
+-- observable.
+--
+-- That is why 0235's probes disagreed with each other. It was never a branch,
+-- a table, or a broken dial. It is whether the window had enough demand for a
+-- ceiling to matter.
+--
+-- ===========================================================================
+-- B. THE MEASUREMENT
+--
+--   depot                       service_max_kw   avg EV kW   max EV kW   rows
+--   OTTOYARD Benchmark (CRN A/B)         2,500          94       1,423     648
+--   OTTOYARD Nashville Flagship          2,500         176       1,960  23,794
+--
+-- The average depot draws 3.8% (Benchmark) and 7.0% (flagship) of the site's
+-- own service capacity. Even the all-time maximum reaches 57% and 78%.
+--
+-- Against the ceiling the loop is allowed to move -- service_max x factor:
+--
+--   factor 0.90 -> 2,250 kW    ticks where EV load exceeds it:      0 of 648
+--                                                                   0 of 23,794
+--   factor 0.50 -> 1,250 kW (default)                               2 of 648
+--                                                                  12 of 23,794
+--   factor 0.15 ->   375 kW                                        77 of 648
+--                                                               5,819 of 23,794
+--
+-- CAVEAT STATED PLAINLY, because 0235 is a cautionary tale about exactly this:
+-- those counts compare total_ev_charging_kw against service_max x factor. The
+-- engine's actual binding condition is desired_ev > v_charge_cap, and
+-- v_charge_cap subtracts base load and adds solar and BESS. So these counts
+-- are a PROXY and will differ from the true binding rate -- base load in
+-- particular pulls the effective cap DOWN, so the true rate is higher than the
+-- 0.50 row suggests. What the proxy establishes is the shape, not the number:
+-- demand sits far below the ceiling, and the gap widens as the factor rises.
+--
+-- ===========================================================================
+-- C. WHAT THIS EXPLAINS, AND WHAT IT MEANS FOR THE LOOP
+--
+-- ottoq_cil_propose offers exactly two energy plans:
+--   energy_shave_more   factor - 0.10   (tightens the ceiling)
+--   energy_relax        factor + 0.10   (loosens it)
+--
+-- Loosening an ceiling that is already slack in the overwhelming majority of
+-- ticks cannot change anything -- at 0.90 the proxy finds ZERO ticks, on
+-- either depot, in 24,442 rows, where EV load reaches it. So `energy_relax` is
+-- structurally close to a no-op on this twin as configured. `energy_shave_more`
+-- is the only energy plan with real leverage, and only in the minority of
+-- ticks where load is high enough to be clipped.
+--
+-- So the loop's first live decision -- "Current policy is best (0.469); no
+-- tweak beat it on a 0-unsafe basis" -- was not a failure of the loop. It is
+-- the correct answer for a window with nothing to shave.
+--
+-- AND THE RISK THAT FOLLOWS, which is the reason the loop is still not
+-- scheduled: a loop that mostly samples slack windows produces a long ledger
+-- of honest non-adoptions. That is indistinguishable, at a glance, from a loop
+-- that converged on a good policy. The adoption ledger is the only evidence
+-- the loop works, and filling it from slack windows would make it unreadable.
+--
+-- ===========================================================================
+-- D. THE ACTIONABLE PART -- a scenario question, not an engine defect
+--
+-- Nothing here is a bug. The engine shapes demand correctly; the twin simply
+-- does not generate enough concurrent demand for demand-shaping to matter
+-- most of the time. Three ways forward, none taken here:
+--
+--   1. STRESS THE POWER DIMENSION. A scenario whose arrivals concentrate DCFC
+--      draw -- the 10 DCFC stalls at Benchmark are the lever -- would put the
+--      ceiling in play. CLAUDE.md C8's Site Alpha is specified at a 3,000 kW
+--      cap with three anti-correlated tenants precisely to make this bite; the
+--      bench_* clones inherit flagship's single-tenant shape and do not.
+--   2. CHECK THE CAP AGAINST THE FLEET. 2,500 kW against a fleet whose average
+--      draw is 94 kW is a very generous site. Whether that reflects a real
+--      depot is a question for Chase, not a measurement -- but if the real
+--      constraint is smaller, the twin is easier than reality and every
+--      energy number it produces is optimistic.
+--   3. LET THE LOOP CHOOSE ITS WINDOW. The loop currently evaluates wherever
+--      the run happens to be. Nothing requires that: it could evaluate at the
+--      forecast peak instead, which is where its lever exists.
+--
+-- ===========================================================================
+-- E. NOT ESTABLISHED
+--
+--   - The true binding rate of v_charge_cap (section B's caveat). Measuring it
+--     needs base_load, solar and bess_dispatch per tick, not just EV load.
+--   - Whether 0.90 is genuinely a no-op or merely rare. Zero in 24,442 proxy
+--     rows is strong but it is still a proxy.
+--   - Whether any of this changes under a scenario built to stress power. That
+--     is the experiment section D.1 describes and it has not been run.
+
+-- ===========================================================================
+-- F. ADDENDUM -- section E's first open item, CLOSED with the real formula
+--    (measured 2026-09-14 ~15:40 UTC, same session)
+--
+-- Section B used total_ev_charging_kw vs service_max x factor and said plainly
+-- that it was a proxy, that the engine's real condition is
+-- desired_ev > v_charge_cap, and that base load would pull the effective cap
+-- DOWN so the true rate would be HIGHER than the proxy suggested.
+--
+-- Computed with the engine's actual expression, over every historical snapshot
+-- of both depots:
+--
+--     cap(f) = GREATEST(50, service_max*f - base_load + solar + bess_output)
+--     binds  = total_ev_charging_kw > cap(f)
+--
+--   depot        ticks   avg base_load   avg cap @0.50
+--   Benchmark      648            68 kW         1,170 kW
+--   Flagship    23,794            69 kW         1,244 kW
+--
+--   factor     Benchmark binds      Flagship binds
+--   0.15          89  (13.7%)        7,219  (30.3%)
+--   0.35          11   (1.7%)          390   (1.6%)
+--   0.50 (default) 4   (0.62%)         142   (0.60%)
+--   0.90           0   (0.00%)           0   (0.00%)
+--
+-- THE PREDICTION HELD. Proxy said 2 and 12 binding ticks at the default;
+-- the real formula says 4 and 142. Higher, as section B said it would be, and
+-- for the stated reason. Recorded because a prediction that holds is worth as
+-- much as a correction -- this file made one and it was right.
+--
+-- WHAT IT SETTLES, now with the engine's own arithmetic rather than a proxy:
+--
+--   1. AT THE DEFAULT FACTOR THE LEVER BINDS 0.6% OF TICKS. Both depots agree
+--      to two decimal places (0.62% and 0.60%) across a 37x difference in
+--      sample size, which is a strong signal that this is a property of the
+--      configuration and not of one run.
+--
+--   2. AT 0.90 IT BINDS ZERO TIMES IN 24,442 TICKS. `energy_relax` raises the
+--      factor. From the 0.50 default it moves toward a region measured at
+--      exactly zero effect. It is not merely weak -- on this configuration
+--      there is no observed tick where it could change anything.
+--
+--   3. EVEN THE EXPENSIVE-WINDOW DIAL IS SLACK. energy_demand_factor_expensive
+--      defaults to 0.35 and binds 1.6-1.7%. So the tighter ceiling the engine
+--      imposes during price spikes is itself rarely the constraint.
+--
+--   4. AND THE HORIZON ARITHMETIC, which is the answer to the question this
+--      file was written for. The loop evaluates 3 ticks. If binding ticks were
+--      independent at 0.6%, the chance that a 3-tick window contains one is
+--      about 1.8%. Binding ticks cluster (they are demand peaks), so the true
+--      figure differs -- but the order of magnitude is the point: the loop's
+--      energy plans are indistinguishable from `current` in roughly 98% of the
+--      windows it will ever evaluate.
+--
+-- That is not a defect in the loop, the evaluator, the dial or the engine. It
+-- is a statement about the world the twin generates: a 2,500 kW site serving a
+-- fleet whose average draw is 94-176 kW has almost no scarcity to manage, and
+-- an optimiser given a non-scarce resource correctly reports that nothing it
+-- can do matters.
+--
+-- Section D's three options are unchanged and D.1 is now the clear first move:
+-- until a scenario makes power scarce, scheduling the loop would measure the
+-- twin's generosity, not the loop's intelligence.
+--
+-- Section E's remaining two items stay open: whether 0.90 is genuinely
+-- unreachable or merely unreached (zero in 24,442 is strong, still finite),
+-- and whether any of this survives a scenario built to stress power -- which
+-- is the experiment, and it has still not been run.

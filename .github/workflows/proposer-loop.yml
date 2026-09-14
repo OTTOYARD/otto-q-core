@@ -85,7 +85,34 @@ jobs:
           fi
         env:
           OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
-      - name: CP-SAT proposer loop (submits through the door; the kernel disposes)
+      # WHY --via batch, added 2026-09-14 (db/checks/0218). The default is
+      # --via door: one ottoq_submit_external_proposal call per row. That route
+      # writes NO ottoq_proposer_fire_log record -- bridge/proposer_bridge.py
+      # says so in as many words ("NOT ledgered on the door route; use
+      # via='batch' (0260) for that") -- so the four live runs of 2026-09-14
+      # produced 239 proposals and all 6 enactments while leaving zero fire
+      # rows, and the fire log looked like CP-SAT had fired four times in its
+      # life when it had fired across six runs.
+      #
+      # The batch route also submits the plan as ONE sub-transaction: a refusal
+      # on row k rolls back rows 1..k-1, because a half-submitted plan is not a
+      # plan. The door route gives that up silently, one row at a time.
+      # THE LOOP NOW ARMS THE RUN IT PROPOSES INTO, and refuses a blind frame.
+      # Added 2026-09-14 (db/checks/0214). 0278 built ottoq_agentic_arm -- one
+      # call, all-or-nothing, receipt-checked -- and nothing ever called it. Of
+      # the seven runs that have ever carried a proposer_frame_facts row exactly
+      # ONE did, and it was a probe created to measure the blindness. So all six
+      # `proposer_live` runs, and all 329 CP-SAT proposals they produced, were
+      # solved against a frame with the selector facts off, where a stall the
+      # door had already reserved reads as free. At tick 4 on this depot the
+      # blind frame offered the solver 25 charge points and the facts frame
+      # offered 0 -- 24 reserved, 1 charger faulted.
+      #
+      # No flag appears below because arming is the DEFAULT now; --no-arm and
+      # --allow-blind-frame exist for measurement and both are explicit. Arming
+      # also refuses a certification arm outright (ERRCODE 42501), which closes
+      # that hole on the explicit --run path as well as the resolved one.
+      - name: CP-SAT proposer loop (one batch per fire; ledgered; the kernel disposes)
         env:
           OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
         run: |
@@ -101,7 +128,38 @@ jobs:
             --interval-s "${{ github.event.inputs.interval_s || '20' }}" \
             --max-fires "${{ github.event.inputs.fires || '12' }}" \
             --idle-ok \
+            --via batch \
             --json-out receipts.json
+      # The advisor's SDK is installed HERE, not in the job-wide install, because
+      # the CP-SAT loop never imports it (bridge/llm_proposer.py imports its
+      # client lazily for exactly that reason) and a package the main path does
+      # not use should not be able to break the main path.
+      #
+      # THIS STEP EXISTS BECAUSE ITS ABSENCE WAS THE WHOLE FAULT. 2026-09-14
+      # 00:58 UTC, run 34794270284: ANTHROPIC_API_KEY was present and correct,
+      # the depot was live, the CP-SAT loop had just submitted 72 proposals --
+      # and the advisory step died on "the anthropic SDK is not installed".
+      # The advisory proposer had never run once in its life, and the reason
+      # was one uninstalled package, not the key, the gate, or the code.
+      # Pinned, because an advisor's model client is part of a fire's identity
+      # the same way ortools is part of a plan's.
+      #
+      # WHY 1.5.0 AND NOT SOMETHING OLDER. The first pin here was 0.69.0, chosen
+      # without checking, and the next fire died on
+      #   TypeError: Messages.create() got an unexpected keyword argument 'output_config'
+      # bridge/llm_proposer.py asks for structured output via
+      #   output_config={"effort": ..., "format": {"type": "json_schema", ...}}
+      # and that parameter does not exist in 0.69.0. Measured against the
+      # published wheels rather than guessed again: anthropic/resources/messages/
+      # messages.py contains no occurrence of output_config in 0.76.0 and 75 in
+      # 0.77.0, so 0.77.0 is the floor. 1.5.0 (the current release, checked
+      # 2026-09-14) carries OutputConfigParam with exactly the two keys the code
+      # sends -- effort, one of low|medium|high|xhigh|max, and
+      # format.JSONOutputFormatParam {type: "json_schema", schema} -- so the
+      # call site was right all along and only the pin was wrong.
+      - name: Install the advisor's SDK (advisor fires only)
+        if: ${{ github.event.inputs.advisor == 'true' }}
+        run: pip install "anthropic==1.5.0"
       - name: Advisory fire (optional, priced and capped per run)
         if: ${{ github.event.inputs.advisor == 'true' }}
         env:

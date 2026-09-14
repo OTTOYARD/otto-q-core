@@ -967,3 +967,132 @@ Two smaller things the same investigation settled, both worth having:
   for an unrelated reason. The prediction was wrong; the mechanism it asserted
   (symmetry hides the double-count) was right, and is now measured.
 
+
+---
+
+## 12. The CP-SAT proposer was solving the wrong problem, 2026-09-14 — and the reason was one policy row nobody had ever written
+
+§11 established that the replay path is sound. This section is about something
+upstream of soundness: for its entire life the CP-SAT proposer was handed a
+picture of the depot in which **stalls the door had already given away looked
+free**, and no part of the pipeline noticed, because the field that would have
+said so was recorded faithfully and read by nothing.
+
+### 12.1 The mechanism
+
+`ottoq_build_decision_frame` emits the selector's facts — `offerable`,
+`reserved_by`, `reservation_live`, `charger_state`, `charger_fresh`,
+`has_live_booking`, and a `selector` block carrying `facts_version` — **only
+when the run-scoped policy key `proposer_frame_facts` is set** (0265). With it
+absent the frame is byte-identical to its pre-0265 output, which is deliberate:
+that is what every certification arm must keep seeing.
+
+Downstream, `proposer/forward_proposer.py` degrades exactly as designed:
+
+```python
+def stall_is_free(stall) -> bool:
+    if status is not None and str(status) != FREE_STALL_STATUS: return False
+    if OFFERABLE_KEY in stall:  return bool(stall[OFFERABLE_KEY])   # the door's half
+    return not stall.get("vehicle_id")                             # pre-0265 fallback
+```
+
+A **reserved but empty** stall has `status='available'` and no `vehicle_id`. On
+the fallback branch it reads free. The consumer chain is
+`frame_to_scenario` → `stall_block_reason` → `stall_is_free`, and the comment on
+the filter branch says what happens to a stall that fails it: *"never offered to
+the solver either way."* So the blindness does not produce a warning or a worse
+plan. It produces a **plan over points that no longer exist**.
+
+### 12.2 What was actually set, across the engine's whole life
+
+`proposer_frame_facts` had been written **once**, at run scope, on 2026-09-14 at
+04:17 UTC — by a probe created that morning to measure this. Every run that ever
+proposed was blind:
+
+| run_by | runs | armed | unarmed | partial |
+|---|---|---|---|---|
+| `proposer_live` | 6 | 0 | **6** | 0 |
+| `proposer_demo` | 2 | 0 | 0 | **2** |
+| `proposer_facts_probe` | 1 | 1 | 0 | 0 |
+
+0278 had already built the one-call ritual — `ottoq_agentic_arm`, run scope,
+all-or-nothing, every `ottoq_policy_set` receipt read rather than assumed, a
+certification arm refused with ERRCODE 42501. It was never called by anything.
+
+And the evidence was in the ledger the whole time. The bridge has recorded
+`frame_facts_version` on every fire record since 0265, feature-detected off the
+frame's own `selector` block precisely so the contract could not be inferred.
+Across every fire row the table had ever held there was **one distinct value,
+and it was null**. A field that is recorded and never asserted on documents a
+defect instead of preventing one.
+
+### 12.3 The fix, and why it is two halves that do not trust each other
+
+In `bridge/proposer_bridge.py`, both default-on:
+
+- **`_arm_run()`** calls `ottoq_agentic_arm` on the resolved run — once per run,
+  not once per fire — and refuses unless the run *afterwards reports*
+  `verdict='armed'`. `ok:true` is a claim about the call; the verdict is a claim
+  about the run, so a partial arm cannot pass as a whole one.
+- **`_require_seeing_frame()`** reads `selector.facts_version` off the frame that
+  came back and raises `BlindFrameError` without it.
+
+The second deliberately does not trust the first. Arming is what was *asked
+for*; `facts_version` is what *arrived*; and the distance between those two is
+the entire finding. `--no-arm` and `--allow-blind-frame` exist for measurement
+and are explicit.
+
+Arming also closes a second hole on the way past: `_resolve_run` refuses a
+certification arm under `--run auto`, but an explicit `--run <uuid>` was guarded
+only by the process-level `_cert_in_flight` check. `ottoq_agentic_arm` refuses
+`run_by='cert_harness'` outright, so that path is guarded now too.
+
+### 12.4 The measurement, with a run ID
+
+Run `97769e7e-cd44-4789-b272-f696c60c2a66` — busy_day, seed 848484, flagship
+depot, GitHub Actions run 34814057227 — started by hand and **confirmed unarmed
+first** (0 of 3 keys, all three listed missing), then left to the loop:
+
+| fire | tick | charge stalls | not offerable | blocked by | planned | submitted |
+|---|---|---|---|---|---|---|
+| 7 | 1 | 40 | 0 | — | 12 | 12 |
+| 8 | 4 | 40 | 40 | occupied 28, **reserved 12** | 0 | 0 |
+| 9 | 6 | 40 | 39 | occupied 20, **reserved 19** | 0 | 0 |
+
+`frame_facts_version = 1` on all three, and the arming verdict went from
+`unarmed` to `armed` with all three rows stamped `updated_by='proposer_bridge'`.
+
+**The reserved column is the finding.** Blind, those 12 and then 19 stalls read
+as free. CP-SAT would have planned onto them, the bridge would have submitted,
+and `ottoq_submit_external_proposal` would have refused row by row — which is
+the exact shape of the 329 proposals that came to nothing. Armed, the proposer
+planned 12 into an empty depot and then said **nothing**, twice, with the reason
+recorded in its own vocabulary.
+
+### 12.5 The sentence that may be said, and the one that may not
+
+**SAY:** "The CP-SAT proposer plans against the door's own view of the depot;
+when the points are gone it abstains and the ledger records which scarcity it
+hit." That is now true and has a run ID behind it.
+
+**DO NOT SAY** that the proposer's historical proposals were good and merely
+unlucky in enactment. They were computed over stalls that were already taken.
+The shield did its job — every one of those enactments was correctly refused —
+but "the deterministic core overruled the optimizer" was never the right reading
+of that ledger. **The optimizer was answering a question about a depot that did
+not exist.**
+
+### 12.6 The pattern this is the fifth instance of
+
+| what was built | the switch that was left off |
+|---|---|
+| the selector facts (0265) | `proposer_frame_facts`, never set at any scope |
+| the A/B baseline selector (0261) | `proposer_seat`, dispatched on, never catalogued (0279) |
+| the proposer fire ledger (0260) | written only on `--via batch`; the loop ran `--via door` |
+| exec-digest's stored-region classifier | exempted every `$$` region it was meant to catch |
+| the arming ritual (0278) | `ottoq_agentic_arm`, built and never called |
+
+Five for five, the apparatus was correct and nobody was named as the one who
+turns it on. That is not a coding defect and it will not be fixed by better
+code. Where a default can be on, it is now on, and the opt-out is explicit and
+named.

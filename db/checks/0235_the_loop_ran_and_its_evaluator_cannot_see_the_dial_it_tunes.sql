@@ -1,0 +1,572 @@
+-- db/checks/0235
+-- THE SELF-IMPROVEMENT LOOP RAN FOR THE FIRST TIME -- AND ITS EVALUATOR
+-- CANNOT SEE HALF THE DIALS IT IS TUNING
+--
+-- Measured 2026-09-14, 14:46-14:55 UTC (9:46-9:55 AM CT), on the first live
+-- run the loop has ever been pointed at.
+--
+-- Task #129. Chase authorised (b): twin-only. This file is why it is NOT yet
+-- on a schedule.
+--
+-- ===========================================================================
+-- A. WHAT WORKED, STATED PLAINLY BEFORE THE DEFECT
+--
+-- 0308 installed the guard, 0309 gave Benchmark its scenarios, and the lane
+-- came up:
+--
+--   run          834b3a59-f582-4aec-9317-a30a4989bf4b
+--   scenario     bench_normal_day   depot 22222222 (Benchmark)   seed 12345
+--   run_by       cil_lane           started 2026-09-14 14:46 UTC
+--
+-- and three things were measured on it rather than assumed:
+--
+--   ottoq_policy_get(run,'run_governor_max_sim_minutes',139) -> 1440
+--       the depot-scope write resolves for the run, so the scope chain works
+--   ottoq_cil_tune_refusal(run) -> NULL
+--       0308's guard permits Benchmark, as designed
+--   tick_count 0 -> 5 in under a minute, sim clock 02:00 -> 04:30
+--       ottoq_demo_metronome ticks a cil_lane run with no change required.
+--       Benchmark was never unfit; 0309 was the whole fix.
+--
+-- Then ottoq_cil_tick ran end to end for the first time in the engine's life.
+-- It proposed four plans, evaluated every one, found all four feasible, scored
+-- `current` best at 0.4691, adopted nothing, and wrote no dial:
+--
+--   "Current policy is best (0.469); no tweak beat it on a 0-unsafe basis."
+--
+-- Mechanically that is a complete propose -> simulate -> score -> decide ->
+-- record loop, and it declined to act. If the story stopped here it would read
+-- as a success.
+--
+-- ===========================================================================
+-- B. THE NUMBER THAT DID NOT SIT RIGHT
+--
+-- From that first tick's own eval block:
+--
+--     current             peak  718 kW   throughput 2   readiness 48
+--     energy_shave_more   peak 1145 kW   throughput 1   readiness 50
+--     energy_relax        peak 1145 kW   throughput 1   readiness 59
+--     deploy_more         peak 1064 kW   throughput 0   readiness 61
+--
+-- energy_shave_more and energy_relax are OPPOSITE interventions on the same
+-- dial -- ottoq_cil_propose builds them as GREATEST(0.15, v-0.10) and
+-- LEAST(0.90, v+0.10). They predicted the SAME peak. And both predicted a peak
+-- 60% HIGHER than doing nothing, which is backwards for a plan whose name is
+-- "shave more".
+--
+-- ===========================================================================
+-- C. THE PROBE THAT CONVICTED IT
+--
+-- Six plans in one call, including a deliberate duplicate, then the same six
+-- again in REVERSED order. Within a call (14:52 UTC):
+--
+--     A1_dup        {deploy_peak_fraction: 0.10}       0.5578  peak 270
+--     A2_dup        {deploy_peak_fraction: 0.10}       0.5578  peak 270
+--     B_deploy_hi   {deploy_peak_fraction: 0.95}       0.8046  peak 284
+--     C_energy_lo   {energy_demand_factor_peak: 0.20}  0.8046  peak 284
+--     D_energy_hi   {energy_demand_factor_peak: 0.85}  0.7866  peak 284
+--     E_current     {}                                 0.7866  peak 284
+--
+-- Three readings, and the third is the one that matters:
+--
+--   1. IDENTICAL PLANS AGREE. A1_dup = A2_dup on every column. So the
+--      evaluator is not simply noisy, and that had to be established first --
+--      otherwise every other difference here is unreadable.
+--   2. A PLAN SETTING A DIAL TIES WITH THE EMPTY PLAN. D_energy_hi, which
+--      sets energy_demand_factor_peak to 0.85, returned exactly what E_current
+--      returned setting nothing at all.
+--   3. TWO DIFFERENT DIALS AT DIFFERENT VALUES TIE. B_deploy_hi (deploy 0.95)
+--      and C_energy_lo (energy 0.20) agreed on score, peak, throughput AND
+--      readiness -- and did so again in the reversed-order run.
+--
+-- Separately, the SAME plan across three calls minutes apart:
+--
+--     E_current   0.7500 / peak 444   then   0.7866 / 284   then  0.7741 / 343
+--
+-- so the base the plans are compared against is moving between calls.
+--
+-- ===========================================================================
+-- D. ROOT CAUSE -- TWO BEATS, AND THE EVALUATOR RUNS THE THIN ONE
+--
+-- ottoq_mpc_lookahead forward-simulates each plan with:
+--
+--     PERFORM ottoq_sim_advance_tick(p_sim_run_id) FROM generate_series(1,p_horizon_ticks);
+--
+-- while ottoq_demo_metronome -- the thing that actually drives the twin --
+-- beats the run with a DIFFERENT function:
+--
+--     SELECT out_sim_clock_after FROM public.ottoq_sim_advance_tick_world(...)
+--
+-- and they are not the same beat:
+--
+--     public.ottoq_sim_advance_tick         2,426 chars   energy orchestration: NO
+--     public.ottoq_sim_advance_tick_world  11,516 chars   energy orchestration: YES
+--
+-- ottoq_sim_advance_tick runs the decide path (ottoq_sim_decide_and_dispatch
+-- -> ottoq_decide_tick, confirmed from a live stack trace today). It does NOT
+-- call ottoq_energy_orchestrate. ottoq_sim_advance_tick_world does.
+--
+-- Now the reader census for the two dials the loop tunes:
+--
+--   deploy_peak_fraction       ottoq_decide_tick                    IN the MPC's path
+--                              twin.ottoq_sim_advance_service_flow
+--                              twin.ottoq_sim_auto_dispatch_tick
+--                              ottoq_agent_board
+--
+--   energy_demand_factor_peak  ottoq_energy_orchestrate             NOT in the MPC's path
+--                              ottoq_mpc_energy_lookahead
+--                              ottoq_agent_board
+--                              ottoq_nl_status_brief
+--
+-- THE EVALUATOR'S FORWARD PATH NEVER EXECUTES A SINGLE READER OF
+-- energy_demand_factor_peak. So two of the loop's four candidate plans --
+-- energy_shave_more and energy_relax, half the candidate set -- are
+-- STRUCTURALLY INCAPABLE of differing from `current` on anything that dial
+-- drives. C's reading 2 and 3 are not a coincidence; they are the only
+-- possible result.
+--
+-- The second half of the defect is the metric. predicted_peak_kw is:
+--
+--     SELECT ROUND(MAX(peak_demand_kw_15min),0) FROM site_energy_snapshots
+--      WHERE sim_run_id = p_sim_run_id AND timestamp > v_clock
+--
+-- site_energy_snapshots is written by the energy path -- the half the MPC's
+-- own ticks do not run. So the peak the lookahead reports is not produced by
+-- the simulation it just performed; it is read from rows the CONCURRENT
+-- METRONOME wrote for the same run. That is why the same plan returns 444,
+-- then 284, then 343 in three calls, and why the numbers cluster by when a
+-- plan happened to be evaluated rather than by what the plan said.
+--
+-- Note also that the lookahead sets ottoq.dryrun='on' for its whole body, and
+-- ottoq_evaluate_return_need and ottoq_evaluate_rule_core both branch on it --
+-- so the L1 shield and the recall evaluator behave differently inside a
+-- lookahead than in a real tick. Not the cause of the above, recorded because
+-- it is a second way the simulated world is not the real one.
+--
+-- ===========================================================================
+-- E. WHAT THIS MEANS, AND THE DECISION TAKEN
+--
+-- The loop is NOT scheduled, and this file is the reason. Scheduling it today
+-- would produce an ottoq_cil_adoptions ledger -- rows with run IDs, scores,
+-- timestamps and a 0-unsafe gate -- in which the energy comparisons are
+-- decided by metronome timing rather than by policy. That is the exact failure
+-- this build has convicted twice already and written into CLAUDE.md C5:
+--
+--     "A run ID makes a number reproducible; it does not make it meaningful."
+--
+-- An adoption ledger is the ONLY evidence that the loop converges. Filling it
+-- with noise first would poison the one instrument the claim rests on.
+--
+-- AND THE HONEST FRAMING OF WHAT THE LOOP IS, which must not be overstated
+-- even once it works: ottoq_cil_propose offers four plans over TWO dials with
+-- hardcoded +/-0.10 and +0.05 steps. It is a two-dial hill-climber with a
+-- fixed step, evaluated forward in the twin under a 0-unsafe gate. That is a
+-- real closed loop and it is worth having. It is not "the engine tunes
+-- itself".
+--
+-- ===========================================================================
+-- F. THE FIX, NOT APPLIED HERE
+--
+-- Three parts, in order, each wanting its own reviewed window:
+--
+--   1. THE EVALUATOR MUST RUN THE BEAT IT IS PREDICTING. Point
+--      ottoq_mpc_lookahead at ottoq_sim_advance_tick_world so a forward tick
+--      is the same beat the metronome runs. This is the whole of the energy
+--      blindness. It is also the more expensive tick, so horizon cost must be
+--      re-measured, not assumed.
+--
+--   2. THE BASE MUST BE HELD CONSTANT ACROSS PLANS. Today plan N and plan N+1
+--      are evaluated against different worlds because the metronome is
+--      advancing the same run between them. The engine already solved exactly
+--      this for certification: ottoq_determinism_pair holds seed, scenario,
+--      depot and sim-clock start constant across arms, and
+--      twin.ottoq_sim_seeded_random is stateless and content-addressed so CRN
+--      survives policy variation by construction (CLAUDE.md C5). The loop
+--      needs the same discipline: either the lane is quiesced while a
+--      lookahead runs, or the lookahead forks from a pinned snapshot rather
+--      than from a live run.
+--
+--   3. ONLY THEN SCHEDULE IT, and judge the first adoptions against a stated
+--      bar rather than against "it produced rows".
+--
+-- Two smaller things found on the way, both real, both left for their own
+-- change:
+--
+--   - ottoq_cil_propose hardcodes the bounds 0.15, 0.90 and 1.00, duplicating
+--     the catalogue, which floors energy_demand_factor_peak at 0.25. The
+--     catalogue wins since 0302, so the clamp would fire on every adoption of
+--     an energy plan and the agent would never get what it asked for. Two
+--     sources of truth for one bound is the G54 class. Since the dial
+--     catalogue is CLOSED (0304, 92 -> 0), the proposer should read its
+--     candidate bounds FROM the catalogue instead of restating them.
+--   - ottoq_mpc_lookahead's per-plan rollback deletes its own overrides with
+--     updated_by='mpc' AFTER the subtransaction it already rolled back. That
+--     is belt-and-braces and harmless, and its own comment says so; noted only
+--     so a future reader does not mistake it for the leak.
+
+-- ===========================================================================
+-- CORRECTION -- appended 2026-09-14 ~15:05 UTC, within the hour, by the same
+-- author. Sections A-C and E stand. SECTION D'S ROOT CAUSE IS WRONG AND IS
+-- RETRACTED. The file's title is also wrong and is corrected below.
+--
+-- Same convention as db/checks/0212: appended, not rewritten, because a
+-- retracted cause is evidence about how the mistake was made.
+--
+-- ---------------------------------------------------------------------------
+-- D1. WHAT D CLAIMED, AND WHY IT IS FALSE
+--
+-- D claimed the MPC's forward path never runs energy orchestration, because
+-- ottoq_mpc_lookahead ticks with ottoq_sim_advance_tick while the metronome
+-- uses ottoq_sim_advance_tick_world, and only the latter contains the string
+-- 'ottoq_energy_orchestrate'.
+--
+-- ottoq_sim_advance_tick CALLS ottoq_sim_advance_tick_world. It is the FULLER
+-- path, not the thinner one. Its fifth line is:
+--
+--     SELECT * INTO w FROM ottoq_sim_advance_tick_world(p_sim_run_id);
+--     ...
+--     SELECT * INTO d FROM ottoq_sim_decide_and_dispatch(p_sim_run_id);
+--
+-- i.e. advance_tick = world + decide. The metronome calls the world half every
+-- tick and the decide half on odd ticks; the MPC and the certification pair
+-- both call advance_tick, which is BOTH halves every tick.
+--
+-- HOW THE MISTAKE WAS MADE, because it is the defect class this very file
+-- accuses other instruments of: the reader census asked
+-- `prosrc ILIKE '%ottoq_energy_orchestrate%'` and read a FALSE for
+-- ottoq_sim_advance_tick as "does not run energy orchestration". The predicate
+-- answers "does this function's own text mention it", not "does this function
+-- reach it". A one-level call graph read as a full one. Exactly 0307's shape
+-- (an audit that read functions and never looked at a view) and exactly the
+-- thing sections A and C were careful about.
+--
+-- ---------------------------------------------------------------------------
+-- D2. THE CONTROLLED EXPERIMENT THAT SHOULD HAVE COME FIRST
+--
+-- Section C's probes all ran against run 834b3a59 WHILE ottoq_demo_metronome
+-- was ticking it, so the base moved between plans and nothing could be
+-- concluded about plan sensitivity. The control: a run the metronome refuses
+-- to touch. Its predicate skips run_by IN ('production_live','cert_harness'),
+-- so a run started as cert_harness is frozen except for what the caller does.
+--
+--   run 45c8cc1b-818c-4fb3-a69d-74a9baa2e263, bench_busy_day, seed 555001,
+--   advanced by hand to tick 22 (sim 13:00) -- 63 deploys, all productive, so
+--   the base HAS dynamic range. The first attempt at this control was run at
+--   tick 10 and returned throughput 0 for all six plans; that is a base where
+--   nothing happens, and it was discarded rather than reported, because a test
+--   with no range cannot distinguish plans and would have "confirmed" anything.
+--
+-- Six plans, horizon 4, frozen base, including a duplicate placed LAST:
+--
+--   A_deploy_lo        {deploy_peak_fraction: 0.05}       0.3620  peak 406  tp 0  rd 9
+--   F_deploy_lo_again  {deploy_peak_fraction: 0.05}       0.3620  peak 406  tp 0  rd 9
+--   B_deploy_hi        {deploy_peak_fraction: 1.00}       0.4350  peak 406  tp 5  rd 0
+--   C_energy_lo        {energy_demand_factor_peak: 0.15}  0.4350  peak 406  tp 5  rd 0
+--   D_energy_hi        {energy_demand_factor_peak: 0.90}  0.4350  peak 406  tp 5  rd 0
+--   E_current          {}                                 0.4350  peak 406  tp 5  rd 0
+--
+-- ---------------------------------------------------------------------------
+-- D3. THE CORRECTED FINDING -- NARROWER, SHARPER, AND STILL DISQUALIFYING
+--
+--   (i)   THE RIG IS SOUND. A and F carry identical params, sit at opposite
+--         ends of the plan list, and agree on every column. The lookahead is
+--         deterministic and position-independent. Section C's "results cluster
+--         by position" was the metronome, not the rig, and that reading is
+--         withdrawn too.
+--
+--   (ii)  deploy_peak_fraction WORKS. 0.05 -> throughput 0, readiness 9.
+--         1.00 -> throughput 5, readiness 0. The evaluator does apply plan
+--         parameters and the simulated world does respond to them.
+--
+--   (iii) energy_demand_factor_peak IS INERT. 0.15 and 0.90 -- the extremes of
+--         its catalogued range -- return EXACTLY what the EMPTY plan returns,
+--         on every column. So energy_shave_more and energy_relax, HALF the
+--         loop's candidate set, cannot differ from `current`. That conclusion
+--         from section B survives; only its explanation changes.
+--
+--   (iv)  predicted_peak_kw DOES NOT RESPOND TO ANY PLAN. 406 for all six,
+--         including the pair whose throughput differs 0 vs 5. This is the
+--         worse half and it was not stated clearly before. The balanced score
+--         is
+--             0.40 * energy  +  0.30 * throughput  +  0.30 * readiness
+--         with the energy term computed from predicted_demand_charge_usd =
+--         peak * 10. A constant peak makes 40% of the objective a CONSTANT.
+--         The loop can therefore only ever move the remaining 60%, and its two
+--         energy plans can move neither part of it.
+--
+-- THE HONEST ONE-LINE VERSION, which replaces this file's title:
+--   "the loop tunes two dials; one of them changes nothing the evaluator can
+--    see, and the peak the objective weighs at 40% does not move at all."
+--
+-- WHY energy_demand_factor_peak is inert is NOT established here, and no third
+-- theory is offered. What is established is that it is inert, by measurement,
+-- on a frozen base with demonstrated range. The next step is to instrument
+-- ottoq_energy_orchestrate directly -- confirm it is reached inside a
+-- lookahead, and whether the value it reads there is the plan's.
+--
+-- ---------------------------------------------------------------------------
+-- D4. WHAT DOES NOT CHANGE
+--
+-- The decision in section E stands, and stands harder: THE LOOP IS NOT
+-- SCHEDULED. Two of its four plans are inert and 40% of its objective is a
+-- constant, so its adoption ledger would record preferences it cannot
+-- actually evaluate.
+--
+-- Section F step 1 ("point the lookahead at ottoq_sim_advance_tick_world") is
+-- WITHDRAWN -- it already reaches it. Step 2 (hold the base constant across
+-- plans) is CONFIRMED as necessary by D2: it is the only reason section C's
+-- numbers moved at all, and any future comparison run against a live-ticked
+-- lane is unreadable. Step 3 is unchanged.
+
+-- ===========================================================================
+-- CORRECTION 2 -- appended 2026-09-14 ~15:20 UTC. The FIRST correction was
+-- also wrong, in two of its four numbered claims, and this one says why and
+-- names the pattern.
+--
+-- Correction 1 established (i) the rig is sound and (ii) deploy_peak_fraction
+-- works. Those stand. Its (iii) and (iv) do not.
+--
+-- ---------------------------------------------------------------------------
+-- E1. WHAT (iii) AND (iv) CLAIMED, AND THE MEASUREMENT THAT BREAKS THEM
+--
+--   (iii) said "energy_demand_factor_peak IS INERT".
+--   (iv)  said "predicted_peak_kw DOES NOT RESPOND TO ANY PLAN", and built on
+--         it the stronger claim that 40% of the balanced objective is a
+--         constant.
+--
+-- Second frozen run, same scenario and depot, different seed --
+-- 103c7b46-5612-4bd6-9e31-e673e28de7f1, bench_busy_day, seed 555002,
+-- advanced by hand to tick 22 (sim 13:00), 73 deploys, metronome excluded:
+--
+--   1_current        {}                                   0.4031  peak  718
+--   2_peak_hi        {energy_demand_factor_peak:   0.90}  0.3391  peak 1118
+--   3_expensive_lo   {energy_demand_factor_expensive:0.05} 0.4031  peak  718
+--   4_expensive_hi   {energy_demand_factor_expensive:0.95} 0.4031  peak  718
+--
+-- energy_demand_factor_peak moved the predicted peak by 400 kW and the score
+-- by 0.064. So it is NOT inert, and predicted_peak_kw DOES respond to a plan.
+-- Both of correction 1's headline claims are false as written.
+--
+-- ---------------------------------------------------------------------------
+-- E2. THE PATTERN, NAMED, BECAUSE IT IS NOW THREE FOR THREE
+--
+-- Original section D: generalised from ONE run whose base was moving.
+-- Correction 1: generalised from ONE frozen window.
+-- The tariff-branch theory below: generalised from ONE line of source.
+--
+-- Every one of those was a single sample presented as a property of the
+-- system. The measurements were real each time; the SCOPE of the conclusion
+-- was not. Correction 1 even criticised the original for exactly this and then
+-- did it again with a better-controlled sample.
+--
+-- ---------------------------------------------------------------------------
+-- E3. THE TARIFF-BRANCH THEORY -- RAISED AND KILLED IN THE SAME PASS
+--
+-- ottoq_energy_orchestrate reads the dial in one place:
+--
+--   v_lmp := COALESCE(v_lmp, 40);  v_expensive := v_lmp > 60;
+--   v_demand_target := v_service_max * (CASE WHEN v_expensive
+--        THEN ottoq_policy_get(...,'energy_demand_factor_expensive',0.35)
+--        ELSE ottoq_policy_get(...,'energy_demand_factor_peak',   0.50) END);
+--
+-- so exactly one of the two energy dials is live at any instant, selected by
+-- price. That looked like a clean explanation for a window where the peak dial
+-- did nothing: the window must be "expensive", so the other dial governs.
+--
+-- IT IS NOT THE EXPLANATION. Measured: lmp_usd_mwh is NULL in every
+-- site_energy_snapshots row of BOTH runs, so v_lmp is 40, v_expensive is
+-- FALSE, and energy_demand_factor_peak is the governing dial in BOTH. The
+-- branch is identical in the window where the dial worked and the window where
+-- it did not.
+--
+-- ---------------------------------------------------------------------------
+-- E4. AND THAT KILL TURNED UP THE MOST USEFUL FINDING IN THIS FILE
+--
+-- The NULL is not local to these two probes:
+--
+--   public.site_energy_snapshots   24,898 rows over 1,108 distinct sim runs
+--   rows with a non-NULL lmp_usd_mwh                                     0
+--   runs with a non-NULL lmp_usd_mwh                                     0
+--
+-- THE TWIN HAS NO ELECTRICITY PRICE. Not once, in the engine's whole history.
+-- Two consequences, and the second is a product statement:
+--
+--   1. v_expensive has been FALSE for every tick ever simulated, so
+--      energy_demand_factor_expensive -- a catalogued dial with a default of
+--      0.35 -- has never governed anything. It is live code on an unreachable
+--      branch. (This is the G66 / db/checks/0232 class: a catalogued dial
+--      nothing effectively reads. It belongs on that list.)
+--
+--   2. Chase's instruction for the live loop was that it should analyse "what
+--      they would come in contact with from a real time scenario with live
+--      vehicles... It should mimic work models and variables." Price is one of
+--      the largest real variables in depot energy economics -- it is what makes
+--      load-shifting worth money -- and the twin does not model it. The
+--      engine is BUILT to respond to it (the branch exists, the dial exists,
+--      the column exists) and has never been given one. That is a gap in the
+--      twin, not in the engine.
+--
+-- ---------------------------------------------------------------------------
+-- E5. WHAT IS ACTUALLY ESTABLISHED NOW -- and this list is deliberately short
+--
+--   ESTABLISHED
+--   1. The MPC rig is deterministic and position-independent. A duplicate plan
+--      placed at the opposite end of the list returns identical results, in
+--      both frozen runs.
+--   2. Plan parameters take effect. deploy_peak_fraction changed throughput
+--      0 vs 5 and readiness 9 vs 0 (run 45c8cc1b);
+--      energy_demand_factor_peak changed peak 718 vs 1118 (run 103c7b46).
+--   3. predicted_peak_kw responds to a plan. (Refutes correction 1 (iv).)
+--   4. THE EFFECT IS CONDITIONAL ON WORLD STATE. In run 45c8cc1b's window both
+--      extremes of energy_demand_factor_peak tied with the empty plan; in run
+--      103c7b46's window they did not. Same scenario, same depot, same tick
+--      index, different seed.
+--   5. lmp_usd_mwh is NULL across all 24,898 rows / 1,108 runs.
+--   6. energy_demand_factor_expensive was inert in run 103c7b46 -- which is
+--      CORRECT behaviour given (5), not a defect in the dial.
+--
+--   NOT ESTABLISHED -- and no theory is offered for any of it
+--   a. Why run 45c8cc1b's window was insensitive to the peak dial. The
+--      plausible mechanic is that v_demand_target was not binding there
+--      (the dial only multiplies a ceiling; a ceiling above actual load
+--      changes nothing). NOT TESTED. Testing it means reading v_demand_target
+--      and the realised load in the same window, not inferring from outcomes.
+--   b. Whether 40% of the objective is meaningfully movable in a typical
+--      window. Correction 1 asserted it was constant; that is withdrawn, but
+--      "it moves sometimes" is not the same as "the loop can steer it".
+--
+-- ---------------------------------------------------------------------------
+-- E6. THE DECISION, UNCHANGED, FOR A BETTER-UNDERSTOOD REASON
+--
+-- The loop stays OFF the schedule. But the reason is now different and much
+-- less alarming than section E of the original implied:
+--
+-- The loop is not broken. It is MYOPIC. It evaluates a 3-tick horizon from
+-- wherever the run happens to be, and in a window where the demand ceiling is
+-- not binding, every energy plan ties with doing nothing -- so it correctly
+-- adopts nothing. That is exactly what it did on its first live tick
+-- ("Current policy is best (0.469)"). A loop that only ever samples windows
+-- where its levers are slack will produce an adoption ledger of honest
+-- non-adoptions and look like it converged.
+--
+-- So before scheduling, the open question is no longer "is the evaluator
+-- broken" but "does the loop ever evaluate a window where its levers bite,
+-- and how would we know". That is answerable and it is the next piece of work.
+
+-- ===========================================================================
+-- CORRECTION 3 -- appended 2026-09-14 ~15:30 UTC. RETRACTS CORRECTION 2's
+-- headline finding entirely. The twin HAS an electricity price, and the engine
+-- reads it correctly.
+--
+-- This is the fourth time in one session that a claim in this file has had to
+-- be narrowed or withdrawn. That is itself the most reliable thing this file
+-- records, and E7 below states it as a rule rather than an apology.
+--
+-- ---------------------------------------------------------------------------
+-- E6a. WHAT CORRECTION 2 CLAIMED
+--
+--   "THE TWIN HAS NO ELECTRICITY PRICE. Not once, in the engine's whole
+--    history... v_expensive has been FALSE for every tick ever simulated, so
+--    energy_demand_factor_expensive has never governed anything."
+--
+-- FALSE. Every sentence of it.
+--
+-- ---------------------------------------------------------------------------
+-- E6b. THE MEASUREMENT THAT BREAKS IT
+--
+--   public.ottoq_grid_snapshots
+--     rows                                        22,319   over 1,109 runs
+--     rows with a non-NULL lmp_usd_per_mwh         22,319   -- ALL of them
+--     range                              $8.00 .. $282.80 / MWh
+--     rows above the $60 expensive threshold        1,178   = 5.3%
+--     rows with a non-NULL current_rate_usd_per_kwh 22,319
+--
+--   public.site_energy_snapshots
+--     rows with a non-NULL current_rate_per_kwh    24,898 of 24,898  (100%)
+--     range                             $0.052 .. $0.235 / kWh, 3 tariff labels
+--
+-- And the assignment I should have read before claiming anything:
+--
+--     SELECT lmp_usd_per_mwh INTO v_lmp FROM ottoq_grid_snapshots ...
+--     v_lmp := COALESCE(v_lmp, 40);  v_expensive := v_lmp > 60;
+--
+-- ottoq_energy_orchestrate reads the RIGHT table, and that table is FULLY
+-- POPULATED with a realistic wholesale price series. So v_expensive fires, the
+-- expensive branch is reachable, and energy_demand_factor_expensive governs in
+-- roughly 5.3% of ticks. It is not dead code and does not belong on the
+-- G66/0232 list. The twin models both a wholesale price and a retail
+-- time-of-use rate, and has all along.
+--
+-- ---------------------------------------------------------------------------
+-- E6c. HOW THE MISTAKE WAS MADE -- and it is the same one, a fourth time
+--
+-- ottoq_energy_orchestrate contains the line `INTO v_se FROM
+-- site_energy_snapshots`. I saw that, saw a column called lmp_usd_mwh on
+-- site_energy_snapshots, measured it, found it NULL in all 24,898 rows, and
+-- concluded the engine had no price. I never read where v_lmp is ASSIGNED.
+--
+-- site_energy_snapshots.lmp_usd_mwh is a vestigial column: it exists, it is
+-- NULL in every row ever written, and NOTHING READS IT. The column the engine
+-- uses is ottoq_grid_snapshots.lmp_usd_per_mwh -- different table, different
+-- spelling, fully populated.
+--
+-- The pattern across all four errors in this file is one thing:
+--   D   -- inferred a call graph from a function's own text
+--   C1  -- inferred a property from one window
+--   C2  -- inferred a branch from one line of source
+--   C3  -- inferred a value's source from a nearby SELECT
+-- Every time: a real measurement of the wrong referent.
+--
+-- ---------------------------------------------------------------------------
+-- E7. THE ONE DURABLE FINDING, WHICH IS A METHOD RULE
+--
+-- BEFORE MEASURING A VALUE, READ ITS ASSIGNMENT. Not the function that
+-- mentions it, not a table that carries a column of that name, not a plausible
+-- nearby SELECT -- the line that puts the value in the variable. Every wrong
+-- conclusion in this file would have been prevented by that one step, and
+-- three of them were made while explicitly warning about the previous one.
+--
+-- This is the same class as 0098, 0137/0216, 0145/0146, 0227, 0231, 0296,
+-- 0304, 0307 -- an instrument answering a slightly different question than the
+-- one being asked -- except here the instrument was me.
+--
+-- ---------------------------------------------------------------------------
+-- E8. WHAT STANDS, AFTER ALL THREE CORRECTIONS
+--
+--   STANDS (measured, twice, on frozen bases)
+--   1. The MPC rig is deterministic and position-independent.
+--   2. Plan parameters take effect: deploy_peak_fraction moved throughput
+--      0 vs 5 (run 45c8cc1b); energy_demand_factor_peak moved predicted peak
+--      718 vs 1118 (run 103c7b46).
+--   3. The effect is CONDITIONAL on world state -- the same dial at the same
+--      extremes did nothing in 45c8cc1b's window and 400 kW in 103c7b46's.
+--   4. The loop ran end to end, adopted nothing, wrote no dial, left no
+--      residue. Section A stands untouched.
+--   5. Benchmark completes a full 24 sim-hour day (run 834b3a59, 48 ticks).
+--
+--   WITHDRAWN
+--   - "the evaluator never runs energy orchestration" (D)
+--   - "energy_demand_factor_peak is inert" (C1 iii)
+--   - "predicted_peak_kw does not respond to any plan" (C1 iv)
+--   - "40% of the objective is a constant" (C1 iv)
+--   - "the twin has no electricity price" (C2 E4)
+--   - "energy_demand_factor_expensive is dead code / a G66 item" (C2 E4)
+--
+--   STILL OPEN, no theory offered
+--   - Why 45c8cc1b's window was insensitive to energy_demand_factor_peak.
+--   - Whether the loop's 3-tick horizon ever lands in a window where its
+--     levers bite, and how that would be detected. This is the question that
+--     actually gates scheduling, and it survives every correction above.
+--
+--   MINOR, REAL, WORTH FIXING SEPARATELY
+--   - site_energy_snapshots.lmp_usd_mwh is NULL in all 24,898 rows and has no
+--     reader. A column that looks like the price and is not. It cost this
+--     session a false finding; it will cost the next reader the same. Either
+--     populate it from the grid snapshot or drop it -- and per APPLYING.md,
+--     dropping is not available, so populate or comment it.
+--
+-- THE DECISION IS UNCHANGED AND IS NOW THE ONLY THING THIS FILE ASKS FOR:
+-- the loop stays off the schedule until the horizon question in E8 is
+-- answered. Not because anything is broken -- nothing established here is --
+-- but because an adoption ledger full of honest non-adoptions from slack
+-- windows would look exactly like a loop that converged.

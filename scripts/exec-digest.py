@@ -28,6 +28,34 @@ import hashlib, re, sys
 
 STORED_TAGS = ('$function$', '$procedure$', '$body$')
 
+#: A BARE `$$` IS NOT EVIDENCE OF ANYTHING, AND TREATING IT AS EXEMPT WAS A HOLE.
+#: The tags above are a naming CONVENTION, not a rule Postgres enforces:
+#: `CREATE OR REPLACE FUNCTION f() ... AS $$ ... $$` stores its body exactly as
+#: `$function$` does. Until 0278 this file exempted every `$$` region because DO
+#: blocks use `$$` -- so a migration whose function bodies were quoted `$$` was
+#: reported "safe to condense" while carrying comment-only lines the database
+#: would store, which is the precise drift the docstring above says this tool
+#: refuses to walk into. 0278 has 12 such lines across two functions and got a
+#: clean bill of health from this script.
+#:
+#: So a `$$` region is classified by WHAT OPENS IT, not by its tag: the nearest
+#: preceding statement keyword. CREATE ... FUNCTION/PROCEDURE => stored. DO =>
+#: executes once, never stored, exempt. Unknown => stored, because the failure
+#: that matters is a false CLEAR, not a false alarm.
+OPENER = re.compile(r'(?is)(\bDO\b|\bCREATE\b(?:\s+OR\s+REPLACE)?\s+(?:FUNCTION|PROCEDURE)\b)')
+
+
+def region_is_stored(text, open_at, tag):
+    """Does the database STORE the body opened by this dollar tag?"""
+    if tag != '$$':
+        return tag in STORED_TAGS
+    last = None
+    for m in OPENER.finditer(text, 0, open_at):
+        last = m.group(1)
+    if last is None:
+        return True
+    return not re.match(r'(?is)^do$', last.strip())
+
 
 def bodies(text):
     """(start, end, tag) for each dollar-quoted region, outermost-first."""
@@ -47,7 +75,7 @@ def bodies(text):
 
 def stored_body_comments(text):
     """Comment-only lines that live inside a body the database will STORE."""
-    spans = [(a, b, t) for a, b, t in bodies(text) if t in STORED_TAGS]
+    spans = [(a, b, t) for a, b, t in bodies(text) if region_is_stored(text, a, t)]
     hits = []
     for m in re.finditer(r'(?m)^[ \t]*--.*$', text):
         for a, b, t in spans:
