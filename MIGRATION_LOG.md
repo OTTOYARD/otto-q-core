@@ -303,7 +303,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0316](db/migrations/0316_the_eta_function_starts_answering_its_own_arguments.sql) | `20260914165752` | yes — ledger | WIRE THE COMPUTED ETA IN. THE DIAL BECOMES THE FALLBACK |
 | [0317](db/migrations/0317_the_twin_writes_where_each_asset_is_not_only_how_charged.sql) | `20260914170416` | yes — ledger | OTTO-TWIN PERSISTS POSITION ON EVERY TELEMETRY PACKET IT EMITS |
 | [0318](db/migrations/0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess.sql) | `20260914170807` | yes — ledger | THE ETA IS COMPUTED NOW AND eta_source STILL SAYS 'policy_constant' |
-| [0319](db/migrations/0319_i_seeded_a_deterministic_draw_on_a_random_uuid.sql) | `PENDING` | no — pending | THE POSITION MODEL'S SEEDED DRAWS WERE SALTED WITH gen_random_uuid() |
+| [0319](db/migrations/0319_i_seeded_a_deterministic_draw_on_a_random_uuid.sql) | `20260914171845` | yes — ledger | THE POSITION MODEL'S SEEDED DRAWS WERE SALTED WITH gen_random_uuid() |
 
 185 migrations indexed.
 

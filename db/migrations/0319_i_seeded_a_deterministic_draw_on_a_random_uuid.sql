@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914171845
 -- migration-name:    0319_i_seeded_a_deterministic_draw_on_a_random_uuid
 --
 -- 0319  THE POSITION MODEL'S SEEDED DRAWS WERE SALTED WITH gen_random_uuid()
