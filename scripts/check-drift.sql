@@ -388,7 +388,7 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, '0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer'::text, '0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer.sql'::text),
     ('20260914081939'::text, '0289_five_gates_and_the_one_that_tests_a_different_threshold'::text, '0289_five_gates_and_the_one_that_tests_a_different_threshold.sql'::text),
     ('20260914083734'::text, '0290_three_geometry_dials_and_one_the_catalog_cannot_express'::text, '0290_three_geometry_dials_and_one_the_catalog_cannot_express.sql'::text),
-    ('PENDING'::text, '0291_eighteen_dials_whose_consumer_already_wrote_the_range'::text, '0291_eighteen_dials_whose_consumer_already_wrote_the_range.sql'::text)
+    ('20260914085632'::text, '0291_eighteen_dials_whose_consumer_already_wrote_the_range'::text, '0291_eighteen_dials_whose_consumer_already_wrote_the_range.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

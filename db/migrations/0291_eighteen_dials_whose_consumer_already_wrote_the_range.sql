@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914085632
 -- migration-name:    0291_eighteen_dials_whose_consumer_already_wrote_the_range
 --
 -- 0291  EIGHTEEN DIALS WHOSE CONSUMER ALREADY WROTE THE RANGE
@@ -552,3 +552,43 @@ VALUES ('0291_eighteen_dials_whose_consumer_already_wrote_the_range', false,
  'Eighteen rows in ottoq_policy_param_catalog whose min, max and default are COPIED, not derived: each of these consumers already clamps its dial inline at the read site with a literal, and this file lifts that literal into the catalog. P1 pins all eighteen inline clamps by regex over live prosrc, with an exact site count (run_governor_max_sim_minutes has two, both flooring at 1), so an edited clamp refuses the file rather than leaving a stale copy behind. Reframes what the catalog is: ottoq_policy_set REFUSES every uncatalogued key, so an uncatalogued dial is unwritable through the sanctioned path -- measured, three refused writes of yard_taxi_speed_mps while the consumer went on using its own 3.5. Fifteen of the eighteen had no live row at all and had only ever run on the consumer fallback. A3 is end-to-end and self-consistent: it plans the SAME leg twice inside one probe -- once with no run-scoped row, so public.ottoq_itin_travel_leg uses its own hard-coded speed, then again after the catalog admits 0.1 and clamps it to 0.5 -- and asserts the slower one takes longer, with no threshold constant, because the probe picks whatever finished run is most recent and the leg length is therefore not fixed. An earlier draft compared against the 37 s measured beforehand, which is the magic-number contamination 0290's A3 had already been caught by once. The probe runs inside a nested BEGIN/EXCEPTION block that raises on success, so every row it wrote against the real run is discarded by the implicit savepoint while the measured values survive to be asserted. Records the two extraction traps that made five of eight first-pass readings wrong: a COALESCE fallback repeating the policy_get default reads exactly like a bound, and the bounding literal sits on either side of the GREATEST. forces_recert=false, asserted in P0: ottoq_policy_get never reads the catalog, so nothing on any decide or tick path changes.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 20260914085632. Every prediction held.
+--
+--   gap (read_uncatalogued)   53 -> 35
+--   ok                        97 -> 115
+--   catalog rows             105 -> 123
+--   0291_proof residue          0   (A5 removed all eighteen scratch rows)
+--   itinerary legs left by A3   0   (the nested savepoint discarded both)
+--   metres_per_plan_unit     read_uncatalogued, as G61 requires
+--   cert lineage             forces_recert = false
+--
+-- P-, P0, P1, P2 passed. P1 is the one that matters: all eighteen inline clamps
+-- matched at their expected site counts, including the two sites
+-- run_governor_max_sim_minutes has, so every number in the catalog is still the
+-- number its consumer enforces.
+--
+-- A3 IS THE RESULT WORTH READING. Before this file the setter refused
+-- yard_taxi_speed_mps outright and ottoq_itin_travel_leg planned at its own
+-- hard-coded 3.5 m/s. A3 planned the same leg twice in one probe and the
+-- consumer's own duration_basis moved: same vehicle, same two stalls, same
+-- metres, faster speed on leg one and 0.5 m/s on leg two, with leg two longer.
+-- No threshold constant was used, deliberately -- the probe picks whatever
+-- finished run is most recent, so the leg length is not fixed, and comparing
+-- against the 37 s measured beforehand would have been measuring a different
+-- leg. That is the trap 0290's A3 was already caught by once.
+--
+-- AND THE 0286 READ-BACK. All eighteen rows were re-read from the database,
+-- digested, and compared against the literals parsed out of THIS file: eighteen
+-- md5s, eighteen lengths, and eighteen (default, min, max, affects) tuples, all
+-- matching, zero mismatches.
+--
+-- The first run of that read-back reported seventeen. The parser's `affects`
+-- character class excluded digits, so the tuple for night_wave_bands -- whose
+-- consumer is ottoq_recall_naive_threshold_v1 -- failed to match and the
+-- non-greedy scan swallowed it into its neighbour. The DATA was never wrong;
+-- the CHECKER was. It now asserts it parsed eighteen tuples before it compares
+-- anything, because a verification that silently covers less than it claims is
+-- the same defect this file's A2 guards against in SQL.
+-- ===========================================================================
