@@ -282,8 +282,25 @@ ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCL
 --     FROM public.ottoq_policy_catalog_gap WHERE status = 'catalogued_unread';
 --
 -- THE ORDER TO CATALOGUE IN is readers DESC, then live_rows DESC: a key with
--- eleven readers and rows already written by hand is where an invented value
--- does the most damage. calib_interval_h and pm_interval_km head that list.
+-- several readers and rows already written by hand is where an invented value
+-- does the most damage. Measured from the view itself:
+--
+--   reserve_margin_pct       3 readers, 2 live rows, caller default 15
+--   sensor_soil_threshold    3 readers, 2 live rows, caller default 0.35
+--   depot_night_start_hour   2 readers, 1 live row,  caller default 20
+--
+-- CORRECTED IN THE SAME SESSION, AND THE INSTRUMENT IS WHAT CORRECTED IT. An
+-- earlier draft of this block said "calib_interval_h and pm_interval_km head
+-- that list with eleven readers each". They do not. Eleven is how many
+-- functions MENTION those strings -- they appear inside jsonb payloads and rule
+-- definitions -- and the number came from an ad-hoc `prosrc LIKE '%key%'` scan
+-- written before this view existed. Each is read by exactly ONE call site,
+-- public.ottoq_recall_naive_threshold_v1. The view counts ottoq_policy_get call
+-- sites and was right; the hand query counted substrings and was wrong.
+--
+-- That is the whole argument for shipping the instrument rather than a list:
+-- the first thing it did was contradict the person who shipped it, one hour
+-- after 0277 was written about exactly the same experience.
 --
 -- AND THE RULE FOR EACH ONE, unchanged from 0279: read the range OFF the
 -- consumer, pin the consumer's shape in a P block so the file refuses to apply
