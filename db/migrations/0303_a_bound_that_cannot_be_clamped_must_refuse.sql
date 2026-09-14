@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914122818
 -- migration-name:    0303_a_bound_that_cannot_be_clamped_must_refuse
 --
 -- 0303  A BOUND THAT CANNOT BE CLAMPED MUST REFUSE
