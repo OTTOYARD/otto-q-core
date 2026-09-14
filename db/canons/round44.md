@@ -88,6 +88,47 @@ First eight hex characters, depot `11111111` except where noted.
 | grid 424242/6 | 4cac51f0 | e4158c95 | 8671fb10 | bf98853e | 8fd0046c | 11a24626 |
 | grid 171717/12 | 5f2e25bc | d2ee7186 | 322fac8d | 376b4991 | 604049ea | 11a24626 |
 
+## The schedule as actually scheduled
+
+Applied window, read back from `supabase_migrations.schema_migrations`:
+
+| | stamp |
+|---|---|
+| `0320` | `20260914192115` |
+| `0321` | `20260914192306` |
+| `0322` | `20260914192410` |
+| `0323` | `20260914192648` |
+| `0324` | `20260914192738` |
+
+Recert floor therefore **`2026-09-14 19:27:38.39239+00`**, and all ten columns
+returned to `consecutive_passes = 0` — P3's first half, already confirmed.
+
+Twenty pairs. Lane 1 (grid) runs first and cheapest, exactly as round 43 did,
+so that a nondeterministic computed ETA shows on a 4-vehicle fixture in fifteen
+minutes rather than on the flagship after two hours.
+
+| job | fires UTC | CT | ticks |
+|---|---|---|---|
+| `r44_ga1` grid 239001 | 19:32 | 2:32 PM | 6 |
+| `r44_gb1` grid 424242 | 19:35 | 2:35 PM | 6 |
+| `r44_gc1` grid 171717 | 19:38 | 2:38 PM | 12 |
+| `r44_ga2` / `gb2` / `gc2` | 19:42 / 19:45 / 19:48 | 2:42 / 2:45 / 2:48 PM | second pass |
+| `r44_b1` busy 171717 | 19:52 | 2:52 PM | 12 |
+| `r44_a1` busy 314159 | 19:57 | 2:57 PM | 12 |
+| `r44_c1` normal 171717 | 20:02 | 3:02 PM | 12 |
+| `r44_d1` busy 424242 | 20:07 | 3:07 PM | 12 |
+| `r44_e1` busy 171717 | 20:12 | 3:12 PM | 24 |
+| `r44_f1` busy 424242 | 20:20 | 3:20 PM | 24 |
+| `r44_g1` busy 171717 | 20:28 | 3:28 PM | 48 |
+| `r44_b2` … `r44_g2` | 20:43 – 21:19 | 3:43 – 4:19 PM | second pass |
+
+Last pair ends about **21:28 UTC (4:28 PM CT)**. Slots are sized from round 43's
+measured durations — 12t 125 s, 24t 231–246 s, 48t 507–511 s — not from the
+stale constants in `scripts/schedule-round.sql`.
+
+**Nothing may be applied until every one of these is unscheduled.** `0325` (the
+energy dock) is committed PENDING and waits behind this round.
+
 ---
 
 ## THE JUDGEMENT
