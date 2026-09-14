@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914081939
 -- migration-name:    0289_five_gates_and_the_one_that_tests_a_different_threshold
 --
 -- 0289  FIVE GATES, AND THE ONE THAT TESTS A DIFFERENT THRESHOLD
@@ -325,3 +325,29 @@ VALUES ('0289_five_gates_and_the_one_that_tests_a_different_threshold', false,
  'Five rows in ottoq_policy_param_catalog, all boolean gates at [0,1] default 1, every range read off the single consumer that reads each key: bay_reservation_reconcile_enabled (< 1, ottoq_reconcile_bay_reservations), indepot_guard_enforce and indepot_critical_requires_immobilizing (both < 1, ottoq_indepot_reassignment_guard), metronome_ceiling_guard (>= 1, ottoq_demo_metronome), deploy_ready_gate_enabled (> 0, twin.ottoq_sim_advance_service_flow). RECORDED BECAUSE IT IS LATENT AND WILL BITE: deploy_ready_gate_enabled is the only one of the five testing against ZERO rather than ONE, so a fractional value would be OFF in the other four and ON in it; P4 pins the > 0 and P5 demonstrates the two idioms disagreeing, so the note cannot go stale silently. Unifying the idiom is a decide-path change and is not attempted. There are ZERO live rows across all five keys (P6 measures it), so the pass-through assertion 0282-0286 all carried is NOT written here rather than allowed to pass vacuously; A3 replaces it with a check that the catalog has not made either state of a gate unreachable. forces_recert=false, asserted in P0: ottoq_policy_get never reads the catalog.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 08:19:39 UTC (3:19 AM CT) as
+-- supabase_migrations.schema_migrations version 20260914081939.
+--
+-- Dry run: the WHOLE file byte for byte inside BEGIN ... ROLLBACK, no
+-- abbreviation anywhere, clean on the first attempt. P-, P0-P6 and A1-A5 all
+-- passed. All seven precondition literals were pre-verified against live prosrc
+-- beforehand and every one returned a non-zero position, so none of them is
+-- passing vacuously.
+--
+-- VERIFIED AFTER APPLY, read-only:
+--
+--   ottoq_policy_catalog_gap, read_uncatalogued   61 -> 56
+--   ottoq_policy_catalog_gap, ok                  89 -> 94
+--   ottoq_policy_param_catalog rows               97 -> 102
+--   ottoq_policy_params rows across the five      0, unchanged
+--   rows tagged updated_by = '0289_proof'         0 (A4 removed its own scratch)
+--   ottoq_cert_lineage.forces_recert              false
+--
+-- AND THE PROCESS NOTE THIS FILE OWES THE PREVIOUS ONE. 0288 was added to
+-- db/migrations/ without running scripts/regen-artefacts.sh, and CI caught it:
+-- MIGRATION_LOG.md and scripts/check-drift.sql both index the FILES on disk,
+-- not the applied set, and the index has a "PENDING / no -- pending" column for
+-- exactly the held case. The rule is about the file existing. The regen for
+-- THIS file is in the same commit as its APPLIED banner, where it belongs.

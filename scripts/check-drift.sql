@@ -385,7 +385,8 @@ repo_manifest(version, name, file) AS (
     ('20260914065559'::text, '0285_nine_more_dials_and_two_ceilings_the_rng_declares'::text, '0285_nine_more_dials_and_two_ceilings_the_rng_declares.sql'::text),
     ('20260914071810'::text, '0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you'::text, '0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you.sql'::text),
     ('20260914073900'::text, '0287_the_two_halves_disagree_about_what_already_placed_means'::text, '0287_the_two_halves_disagree_about_what_already_placed_means.sql'::text),
-    ('PENDING'::text, '0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer'::text, '0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer.sql'::text)
+    ('PENDING'::text, '0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer'::text, '0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer.sql'::text),
+    ('20260914081939'::text, '0289_five_gates_and_the_one_that_tests_a_different_threshold'::text, '0289_five_gates_and_the_one_that_tests_a_different_threshold.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

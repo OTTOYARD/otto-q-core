@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0288 — GENERATED, not a log
+## Index, 0134–0289 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -273,7 +273,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0286](db/migrations/0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you.sql) | `20260914071810` | yes — ledger | ELEVEN MORE DIALS, AND THREE THAT ARE ONE SWITCH |
 | [0287](db/migrations/0287_the_two_halves_disagree_about_what_already_placed_means.sql) | `20260914073900` | yes — ledger | THE FRAME PUBLISHES WHICH KIND OF PLACE, AND WHOSE LEDGER SAYS SO |
 | [0288](db/migrations/0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer.sql) | `PENDING` | no — pending | A SEAT IS ONLY WORTH HOLDING IF THERE IS SOMETHING TO OFFER |
+| [0289](db/migrations/0289_five_gates_and_the_one_that_tests_a_different_threshold.sql) | `20260914081939` | yes — ledger | FIVE GATES, AND THE ONE THAT TESTS A DIFFERENT THRESHOLD |
 
-154 migrations indexed.
+155 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
