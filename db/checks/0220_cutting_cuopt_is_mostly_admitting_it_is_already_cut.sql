@@ -129,3 +129,75 @@ SELECT n.nspname||'.'||p.proname AS fn,
 --
 -- Step 4 is free and can be done now. Steps 1 and 2 are one small migration
 -- each and want a quiesced window. Step 3 waits on evidence.
+
+-- ===========================================================================
+-- CORRECTION, SAME SESSION, ~40 MINUTES LATER. I went to build step 1 and the
+-- consumer said something the plan above had not accounted for.
+--
+-- ---------------------------------------------------------------------------
+-- (a) THE DEFAULT OF 1 IS DELIBERATE, DOCUMENTED, AND LOAD-BEARING FOR A
+--     LEDGER DISTINCTION -- not an oversight to be quietly corrected.
+--
+-- Step 1 above says to change the caller default from 1 to 0 "so the off state
+-- stops depending on a single data row." Three functions read the key with a
+-- default of 1: ottoq_cuopt_defer_hold, ottoq_cuopt_refresh, and
+-- ottoq_cron_tick. The third carries this comment, from 0240:
+--
+--     -- 0240: a CLOSED gate is a fact too. cuopt_propose_enabled defaults to 1,
+--     -- so a run has to opt out, and "a run was live and chose not to call cuOpt"
+--     -- is a different sentence from "no run was live". 0158 had to reconstruct
+--     -- that difference from cron durations nine days after the fact.
+--
+-- The default is the mechanism by which a live run is REQUIRED to record an
+-- opt-out. Flipping it is a deliberate reversal of a decision someone made for
+-- a stated reason, which is a different act from fixing an oversight -- so it
+-- is NOT being done here, and step 1 above should be read as a proposal rather
+-- than a plan until that reversal is argued on its own terms.
+--
+-- Also worth recording, because it weakens step 1's urgency: five functions
+-- WRITE cuopt_propose_enabled = 0 explicitly per run -- ottoq_ab_pair,
+-- ottoq_cert_arm_start, ottoq_determinism_pair, ottoq_determinism_pair_replay
+-- and ottoq_production_start. Every certification, A/B and production path
+-- already belts-and-braces its own run rather than trusting the global row.
+-- The single-row dependency is real only for ordinary twin runs.
+--
+-- ---------------------------------------------------------------------------
+-- (b) WHERE THE GATE ROWS ACTUALLY COME FROM. Step 2 above is right that
+--     retiring ottoq_cuopt_refresh stops them, but the shape is different from
+--     what I implied, and the difference matters for what to expect afterwards.
+
+SELECT stage, COALESCE(source_note,'(null)') AS source_note,
+       COALESCE(abstained_reason,'(null)') AS abstained_reason,
+       count(*) AS rows, count(*) FILTER (WHERE called_at > now() - interval '2 days') AS last_2d
+  FROM public.cuopt_invocation_log GROUP BY 1,2,3 ORDER BY 4 DESC;
+
+--   source_note                     abstained_reason      rows   last 2d
+--   sql_gate:v2                     policy_disabled     10,412     2,217
+--   sql_gate:v2                     debounce             6,128         0
+--   p7_first_refusal                first_refusal_arm    2,839        12
+--   sql_gate:v2                     (null)                 535         0
+--   edge:v25                        no_candidates_...      405         0
+--   cron_tick:orchestrate_dispatch  policy_disabled         20        20
+--
+-- NOT A BACKGROUND DRIP -- PER TICK. ottoq_cuopt_refresh is called by
+-- ottoq_demo_metronome, ottoq_sim_decide_and_dispatch and ottoq_cert_arm_start,
+-- so it runs on every tick of every run, reads the gate, logs 'policy_disabled'
+-- and returns NULL at line 34. The rows scale with tick activity, not with wall
+-- time: 9 rows in the 06:00 hour (one run, 18 ticks), 35 in the 01:00 hour
+-- (four runs). "2,249 every two days" reads like a daemon; it is the twin
+-- ticking.
+--
+-- And 0240's own cron ledger is 20 rows, all from the last two days -- new,
+-- tiny, and not the noise. My step-2 sentence blamed the wrong function for the
+-- volume even though it named the right one to retire.
+--
+-- ---------------------------------------------------------------------------
+-- (c) A METHOD NOTE WORTH MORE THAN THIS FILE.
+--
+-- `SELECT ... FROM pg_proc WHERE prosrc LIKE '%sql_gate:v2%'` returns ZERO ROWS
+-- across the entire database, yet 17,075 rows carry that source_note. The
+-- literal is a PARAMETER DEFAULT on cuopt_log_gate, and parameter defaults live
+-- in pg_proc.proargdefaults, NOT in prosrc. Every prosrc grep in this repo --
+-- including the ones that built 0281's catalog-gap view -- is blind to default
+-- arguments. That has not bitten anything yet; it is written down here so that
+-- when it does, the cause is one lookup away.
