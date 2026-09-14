@@ -31,8 +31,43 @@
 -- defect survived it, one migration later, because there were four. A fourth
 -- careful site is a fourth thing that can fall out of step with a fifth.
 --
--- So the value and its provenance are made inseparable: ONE function writes all
--- three columns in ONE statement, and the other writers call it.
+-- So the value and its provenance are made inseparable. HOW they are made
+-- inseparable changed once while this file was being written, and the reason is
+-- worth more than the file.
+--
+-- THE FIRST DESIGN WAS A FUNNEL: one function writes all three columns and
+-- every other writer calls it. Then the three other call sites were actually
+-- read, and two of them do not have an ETA to recompute -- they have one that
+-- came from somewhere legitimate and is not the geometry's to overrule:
+--
+--   ottoq_sim_auto_dispatch_tick  v_eta := (v_sec.d->>'eta_minutes')  -- the SECURED BOOKING
+--   ottoq_ingest_vehicle_signal   (v_dec->>'eta_min')::numeric        -- an EXTERNAL signal
+--   ottoq_sim_prime_deployment    the dial, at t=0                    -- a FIXTURE
+--
+-- Funnelling those through a recompute would replace three true values with a
+-- fourth and call it tidier. The booking's ETA is what the stall was actually
+-- held for; the signal's ETA is what the vehicle actually said. Each has a real
+-- and DIFFERENT provenance, and the defect was never that they disagree -- it
+-- is that the label does not say which one you are looking at.
+--
+-- THE SECOND DESIGN, which is what ships: each writer keeps its own value and
+-- states its own true provenance, and the invariant "the value and its stamp
+-- move together" is made PHYSICAL rather than disciplinary -- a trigger that
+-- refuses any write changing return_eta_minutes without also moving
+-- eta_refreshed_at. That is this repo's own pattern: ottoq_stall_bookings makes
+-- double-booking impossible with an EXCLUDE constraint rather than asking
+-- callers to be careful, and 0302/0305 made the dial catalogue the allow-list
+-- for every writer rather than for one function. A fourth writer added in six
+-- months cannot forget, because the database will not let it.
+--
+-- The sequence, therefore:
+--   0320 (this file)  the refresh function. Called by nobody yet.
+--   0321              each of the three writers states its own provenance,
+--                     AND the ETA is refreshed for `active` dispatches -- which
+--                     is what the function above is actually for (defect 1).
+--   0322              the trigger, once every writer is already compliant.
+--                     Applied last deliberately: a trigger installed first would
+--                     refuse the writers 0321 has not fixed yet.
 --
 -- ---------------------------------------------------------------------------
 -- WHAT THIS MIGRATION DOES, AND DELIBERATELY DOES NOT DO
@@ -186,13 +221,20 @@ END;
 $fn$;
 
 COMMENT ON FUNCTION public.ottoq_refresh_return_eta(uuid,uuid,timestamptz,uuid) IS
-'THE ONLY function that may write ottoq_vehicle_dispatches.return_eta_minutes. Writes the '
-'value, eta_refreshed_at and eta_source in one statement so the number and its provenance '
-'cannot fall out of step -- db/checks/0240 measured 21 of 61 rows labelled policy_constant '
-'while holding 17 distinct values, because four functions wrote the value and one wrote the '
-'label. Returns the ETA written, or NULL when the vehicle has no open dispatch (NULL means '
-'nothing to refresh, never zero). eta_refreshed_at is the SIM clock passed in; a wall clock '
-'here would be the G15 class. 0320.';
+'Recomputes a vehicle''s return ETA from the trip geometry and writes the value, '
+'eta_refreshed_at and eta_source in ONE statement, with the label branching on the same '
+'variable the value is COALESCEd from -- so this writer''s number and its provenance cannot '
+'fall out of step. NOT the only writer, and deliberately so: ottoq_sim_auto_dispatch_tick '
+'takes its ETA from the secured booking, ottoq_ingest_vehicle_signal from an external '
+'signal, and ottoq_sim_prime_deployment from the t=0 fixture -- three real and different '
+'provenances that a recompute would overrule rather than record (0321 labels each). The '
+'shared invariant is enforced by the trigger in 0322, not by funnelling. Its own job is the '
+'PER-TICK refresh of dispatches still `active`: db/checks/0240 measured 36 of 36 active '
+'dispatches with a NULL ETA, because the only write lived in the branch that also flips '
+'status to returning -- so the forecast could not exist before the decision it informs. '
+'Returns the ETA written, or NULL when there is no open dispatch (NULL means nothing to '
+'refresh, never zero). eta_refreshed_at is the SIM clock passed in; a wall clock here would '
+'be the G15 class. 0320.';
 
 DO $post$
 DECLARE v_src text; v_def text;
@@ -249,10 +291,12 @@ END $post$;
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note, classified_at)
 VALUES
   ('0320_one_function_writes_the_return_eta_and_writes_its_label_with_it', true,
-   'Creates public.ottoq_refresh_return_eta as the single writer of return_eta_minutes + '
-   'eta_refreshed_at + eta_source. This file creates the function only; it does not yet '
-   'convert the three unlabelled writers and does not refresh active dispatches (0321). '
-   'Classified TRUE rather than false: the intent is that values are unchanged, but that is '
-   'a prediction for round 44 to judge, not a classification.',
+   'Creates public.ottoq_refresh_return_eta, which writes return_eta_minutes + '
+   'eta_refreshed_at + eta_source in one statement. NOT a funnel: the other three writers '
+   'keep their own legitimate values (secured booking / external signal / t=0 fixture) and '
+   'state their own provenance in 0321; the shared invariant becomes a trigger in 0322. '
+   'This file creates the function and calls it from nowhere, so it cannot move a canon. '
+   'Classified TRUE rather than false anyway: an uncalled function should change nothing, '
+   'but that is a prediction for round 44 to judge, not a classification.',
    now())
 ON CONFLICT (name) DO NOTHING;
