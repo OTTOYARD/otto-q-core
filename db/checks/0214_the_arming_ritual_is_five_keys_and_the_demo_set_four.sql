@@ -211,3 +211,71 @@ SELECT (SELECT count(*) FROM public.ottoq_policy_params WHERE param_key='propose
 -- Both changes are true positives. 0030 declares
 -- public.ottoq_check_layout_geometry with a `$$` body carrying 52 comment-only
 -- lines; the old tool would have cleared it to be condensed.
+
+-- ===========================================================================
+-- CORRECTION 2026-09-14, SAME NIGHT, BY THE AUTHOR -- THE FIRE COUNT ABOVE IS
+-- WRONG, AND THE INSTRUMENT IT CAME FROM IS INCOMPLETE
+--
+-- Section 3 and this file's header both say "CP-SAT has fired four times in its
+-- life, across two runs", sourced from ottoq_proposer_fire_log. That is what
+-- the fire log says. It is not what happened.
+--
+-- Measured from the PROPOSAL ledger instead, which is the primary source:
+--
+--   run        run_by          proposals  enacted  fire rows
+--   33f87a41   proposer_live          83        3          0
+--   2dadebee   proposer_live          72        0          0
+--   af2def1b   proposer_demo          54        0          2
+--   fd552ee4   proposer_live          49        1          0
+--   ccf48af1   proposer_demo          36        0          2
+--   ef9c3ade   proposer_live          35        2          0
+--                                    ---       --         --
+--                                    329        6          4
+--
+-- SIX runs, not two. 329 proposals, not 90. And the four runs that produced 239
+-- of those proposals AND EVERY ONE OF THE SIX ENACTMENTS left no fire record at
+-- all. Those four ran 2026-09-14 00:34-01:10 UTC, hours AFTER the two that did
+-- leave records, so retention did not eat them.
+--
+-- WHY: bridge/proposer_bridge.py takes --via, which defaults to "door" -- one
+-- ottoq_submit_external_proposal call per row. Only the "batch" route
+-- (ottoq_proposer_submit_batch, migration 0260) writes ottoq_proposer_fire_log.
+-- The bridge says so itself at line 429: "NOT ledgered on the door route; use
+-- via='batch' (0260) for that." .github/workflows/proposer-loop.yml never
+-- passed --via, so every live fire took the unledgered route.
+--
+-- SO THIS IS THE SAME SHAPE AS THE FINDING THIS FILE IS ABOUT, A THIRD TIME:
+-- the apparatus is built (0260 built the ledger AND the batch door), and the
+-- default leaves it off. proposer_frame_facts, proposer_seat's catalog row, and
+-- now the fire ledger.
+--
+-- WHAT THE CORRECTION DOES NOT CHANGE, and this matters more than the count:
+-- the finding stands and is STRENGTHENED. proposer_frame_facts has zero rows at
+-- every scope over the whole life of the database (Section 1, re-runnable), so
+-- ALL SIX runs read a blind frame, not just the two the fire log happened to
+-- record. The evidence base for the defect is 329 proposals across six runs
+-- rather than 90 across two.
+--
+-- WHAT IT DOES CHANGE: Section 3's argument. That section reasoned from
+-- `frame_facts_version IS NULL` on four fire rows. NULL on those four is still
+-- true, but it is no longer the load-bearing evidence, because the instrument
+-- does not see most of the fires. The load-bearing evidence is Section 1 --
+-- the key was never set at any scope -- which does not depend on the fire log
+-- at all. Section 3 is now corroboration, not proof.
+--
+-- FIXED IN THE SAME COMMIT: proposer-loop.yml now passes --via batch. That also
+-- recovers a property the door route was silently giving up -- the batch is ONE
+-- sub-transaction, so a refusal on row k rolls back rows 1..k-1, because a
+-- half-submitted plan is not a plan.
+--
+-- SECTION 6 -- the corrected census, re-runnable. Read the PROPOSAL ledger for
+-- what a proposer did; read the fire log only for what it recorded about it.
+SELECT p.sim_run_id,
+       (SELECT r.run_by FROM public.ottoq_sim_runs r WHERE r.sim_run_id=p.sim_run_id) AS run_by,
+       count(*)                                       AS proposals,
+       count(*) FILTER (WHERE p.status='enacted')     AS enacted,
+       (SELECT count(*) FROM public.ottoq_proposer_fire_log f
+         WHERE f.sim_run_id = p.sim_run_id)           AS fire_rows
+  FROM public.ottoq_external_proposals p
+ WHERE p.source = 'forward_lex'
+ GROUP BY 1 ORDER BY 3 DESC;

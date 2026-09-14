@@ -85,7 +85,19 @@ jobs:
           fi
         env:
           OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
-      - name: CP-SAT proposer loop (submits through the door; the kernel disposes)
+      # WHY --via batch, added 2026-09-14 (db/checks/0218). The default is
+      # --via door: one ottoq_submit_external_proposal call per row. That route
+      # writes NO ottoq_proposer_fire_log record -- bridge/proposer_bridge.py
+      # says so in as many words ("NOT ledgered on the door route; use
+      # via='batch' (0260) for that") -- so the four live runs of 2026-09-14
+      # produced 239 proposals and all 6 enactments while leaving zero fire
+      # rows, and the fire log looked like CP-SAT had fired four times in its
+      # life when it had fired across six runs.
+      #
+      # The batch route also submits the plan as ONE sub-transaction: a refusal
+      # on row k rolls back rows 1..k-1, because a half-submitted plan is not a
+      # plan. The door route gives that up silently, one row at a time.
+      - name: CP-SAT proposer loop (one batch per fire; ledgered; the kernel disposes)
         env:
           OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
         run: |
@@ -101,6 +113,7 @@ jobs:
             --interval-s "${{ github.event.inputs.interval_s || '20' }}" \
             --max-fires "${{ github.event.inputs.fires || '12' }}" \
             --idle-ok \
+            --via batch \
             --json-out receipts.json
       # The advisor's SDK is installed HERE, not in the job-wide install, because
       # the CP-SAT loop never imports it (bridge/llm_proposer.py imports its
