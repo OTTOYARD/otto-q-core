@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0283 — GENERATED, not a log
+## Index, 0134–0284 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -268,7 +268,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0281](db/migrations/0281_the_setter_refuses_ninety_two_of_the_keys_the_engine_reads.sql) | `20260914054506` | yes — ledger | THE SUPPORTED WAY TO CHANGE A DIAL REFUSES SIXTY PERCENT OF THE DIALS |
 | [0282](db/migrations/0282_two_dials_whose_ranges_the_database_already_declares.sql) | `20260914061049` | yes — ledger | THE FIRST TWO OF THE NINETY, AND NEITHER RANGE IS A JUDGEMENT CALL |
 | [0283](db/migrations/0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_does_not.sql) | `20260914062112` | yes — ledger | SEVEN MORE DIALS, AND THE FIRST HONEST NULLS |
+| [0284](db/migrations/0284_a_hold_whose_outcome_is_invisible_can_only_be_argued_about.sql) | `20260914064710` | yes — ledger | THE RIGHT OF FIRST REFUSAL GETS AN OUTCOME LEDGER |
 
-149 migrations indexed.
+150 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

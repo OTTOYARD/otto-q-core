@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914064710
 -- migration-name:    0284_a_hold_whose_outcome_is_invisible_can_only_be_argued_about
 --
 -- 0284  THE RIGHT OF FIRST REFUSAL GETS AN OUTCOME LEDGER
@@ -354,3 +354,30 @@ VALUES ('0284_a_hold_whose_outcome_is_invisible_can_only_be_argued_about', false
  'Two read-only views, no function replaced and no behaviour changed. ottoq_first_refusal_outcomes gives every first-refusal hold the outcome the engine never recorded -- answered / unanswered / enacted -- using ottoq_cuopt_defer_hold''s own predicate (a proposal from a source whose ottoq_proposer_precedence row declares holds_tick, read live so the two cannot drift) over ottoq_cuopt_defer_roll''s own window (the tick the row was SPENT in, the only tick it binds). ottoq_first_refusal_summary rolls it up per run. Because it is derived it covers every historical run. Baseline at apply: proposer_live 25 holds / 0 answered (today, the first armed run), proposer_demo 32 / 25 answered (the control that proves the predicate is not vacuous, asserted in A3), cert_harness 29,598 / 0 but all before 2026-09-03 -- holds on certification runs went 10,644 / 8,510 / 7,620 / 1,368 / 0 over 08-30..09-03 and have been zero across 622 certification runs since, which vindicates 0152''s quiesce rather than indicting it (A4 asserts it is still intact). forces_recert=false: nothing but two views is created, no engine function is touched, and no certification arm reads either. G54 step 2, the liveness check on ottoq_cuopt_first_refusal_arm, is deliberately NOT in this file -- it needs a staleness dial whose range must be read off a consumer, and the consumer to read is a tuning decision to make against these numbers rather than ahead of them.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 06:47:10 UTC (1:47 AM CT) as
+-- supabase_migrations.schema_migrations version 20260914064710.
+--
+-- Dry run: the file's whole body byte for byte inside BEGIN ... ROLLBACK,
+-- clean on the first attempt, P-, P1-P3 and A1, A1b, A2-A5 all passing.
+--
+-- ONE DEVIATION, RECORDED RATHER THAN GLOSSED: the cert_lineage note was
+-- ABBREVIATED in that pass to save transmission, so the bytes actually
+-- exercised were not the file's bytes for that one literal -- and that literal
+-- is the one carrying embedded apostrophes (defer_hold''s, defer_roll''s,
+-- 0152''s), which is exactly where a quoting error would hide. The real text
+-- was therefore dry-run on its own, inside its own BEGIN ... ROLLBACK, and
+-- stored at 1,436 bytes with forces_recert false. Between the two passes every
+-- byte of this file has been executed and rolled back. Saying "dry-run byte for
+-- byte" of the first pass alone would have been false.
+--
+-- VERIFIED AFTER APPLY, read-only:
+--
+--   ottoq_first_refusal_outcomes rows      29,797
+--   ottoq_cuopt_deferrals rows             29,797   (A1's equality, live)
+--
+-- The instrument now exists and covers every hold this engine has ever armed.
+-- What it should be used for next is G54 step 2, and the number it has to move
+-- is ottoq_first_refusal_summary.answered_pct on armed runs -- 0.0 today.
+-- ===========================================================================
