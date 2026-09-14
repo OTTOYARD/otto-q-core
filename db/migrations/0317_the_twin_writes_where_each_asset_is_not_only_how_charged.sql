@@ -133,8 +133,14 @@ DECLARE
   c_decl_new CONSTANT text := '  v_fleet_op_id      UUID;' || E'\n' ||
                               '  v_lat              DOUBLE PRECISION;   -- 0317' || E'\n' ||
                               '  v_lng              DOUBLE PRECISION;   -- 0317';
-  c_endif_old CONSTANT text := '  END IF;';
+  -- SECOND REFUSAL, also correct. Anchored on '  END IF;' this counted 2:
+  -- replace() matches SUBSTRINGS, and a deeper-indented '    END IF;' contains
+  -- the two-space anchor inside it. An earlier check that counted whole LINES
+  -- returned 1 and was measuring a different thing than the substitution does.
+  -- The anchor is now the two-line block, verified to occur exactly once.
+  c_endif_old CONSTANT text := E'    RETURN v_id;\n  END IF;';
   c_endif_new CONSTANT text :=
+    '    RETURN v_id;' || E'\n' ||
     '  END IF;' || E'\n' ||
     '' || E'\n' ||
     '  -- 0317: persist WHERE the asset is, not only how charged it is. Computed' || E'\n' ||
