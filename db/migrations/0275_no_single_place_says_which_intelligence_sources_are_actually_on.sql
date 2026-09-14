@@ -109,9 +109,25 @@
 -- the whole file is one transaction -- they just do not each pay for their own
 -- scan.
 --
--- The lesson is the same one twice in one file: an instrument that is too
--- expensive to run is not an instrument, and the only reason I know either
--- time is that the proof refused to execute.
+-- AND A THIRD, ON THE FIRST APPLY, WHICH IS THE WORST OF THE THREE BECAUSE I
+-- HAD ALREADY FIXED IT TODAY. A7 greps the status function's prosrc for
+-- 'ottoq_decisions'. prosrc INCLUDES COMMENTS, and that function's own comment
+-- says "Never ottoq_decisions". So A7 aborted the apply on the documentation
+-- of the thing it was checking -- exactly what 0270's A1 did this morning,
+-- with exactly the same fix (strip line comments before asserting).
+--
+-- It reached apply rather than the dry run for one reason: I trimmed the
+-- comments out of the dry-run paste to save tokens, so I dry-ran an artifact
+-- that differed from the one I applied, in precisely the region that broke it.
+-- That is the rule I wrote into 0270's own apply log eight hours earlier --
+-- DRY-RUN THE FILE, BYTE FOR BYTE, OR DO NOT CLAIM IT WAS DRY-RUN -- and I
+-- broke it the same day. Nothing was applied; apply_migration is transactional
+-- and the assertion aborted the whole thing.
+--
+-- The lesson is the same one three times in one file: an instrument that is
+-- too expensive to run is not an instrument, an assertion that reads prose is
+-- not reading code, and the only reason I know any of it is that the proof
+-- refused to execute.
 --
 -- forces_recert = FALSE: two tables, one read-only status function, one
 -- refresh that writes only its own snapshot, no engine caller, no dial
@@ -402,7 +418,7 @@ GRANT SELECT ON public.ottoq_intelligence_snapshot TO authenticated, service_rol
 SELECT public.ottoq_intelligence_refresh();
 
 DO $post$
-DECLARE v_n int; v_states int; v_unreg int; v_src text; v_r record;
+DECLARE v_n int; v_states int; v_unreg int; v_src text; v_code text; v_r record;
 BEGIN
   -- A1: eighteen registered sources, and the snapshot covers every one of them
   -- plus anything else that decided.
@@ -505,19 +521,28 @@ BEGIN
                     v_unreg, v_src;
   END IF;
 
-  -- A7: and the status path must not touch the expensive table. An assertion
-  -- about elapsed milliseconds would pass on a warm cache and prove nothing;
-  -- this one cannot.
-  IF (SELECT p.prosrc FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-       WHERE n.nspname='public' AND p.proname='ottoq_intelligence_status')
-     ILIKE '%ottoq_decisions%' THEN
-    RAISE EXCEPTION '0275 A7: ottoq_intelligence_status reads ottoq_decisions -- '
-                    'that is the 11-second, 1.5 GB scan this shape exists to avoid';
+  -- A7: the status path must not touch the expensive table. An assertion about
+  -- elapsed milliseconds would pass on a warm cache and prove nothing; this
+  -- one cannot.
+  --
+  -- COMMENTS ARE STRIPPED FIRST, and the reason is that this file's own first
+  -- apply attempt ABORTED HERE. prosrc includes comments, and the status
+  -- function's explanatory comment contains the words "Never ottoq_decisions"
+  -- -- so A7 fired on the documentation of the thing it was checking. 0270's
+  -- A1 made the identical mistake this morning and the fix was identical. The
+  -- assertion must read the CODE, not the prose about the code.
+  SELECT regexp_replace(p.prosrc, '--[^' || chr(10) || ']*', '', 'g') INTO v_code
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='public' AND p.proname='ottoq_intelligence_status';
+  IF v_code ILIKE '%ottoq_decisions%' THEN
+    RAISE EXCEPTION '0275 A7: ottoq_intelligence_status reads ottoq_decisions in its executable '
+                    'body -- that is the 11-second, 1.5 GB scan this shape exists to avoid';
   END IF;
-  IF (SELECT p.prosrc FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-       WHERE n.nspname='public' AND p.proname='ottoq_intelligence_refresh')
-     NOT ILIKE '%ottoq_decisions%' THEN
-    RAISE EXCEPTION '0275 A7: the refresh does not read ottoq_decisions -- '
+  SELECT regexp_replace(p.prosrc, '--[^' || chr(10) || ']*', '', 'g') INTO v_code
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='public' AND p.proname='ottoq_intelligence_refresh';
+  IF v_code NOT ILIKE '%ottoq_decisions%' THEN
+    RAISE EXCEPTION '0275 A7: the refresh does not read ottoq_decisions in its executable body -- '
                     'then the snapshot is coming from somewhere it should not';
   END IF;
 
