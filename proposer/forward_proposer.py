@@ -615,12 +615,50 @@ def _serviceable_in(states: frozenset[str]):
 #: travels on the result and onto the fire record (`n_vehicles_held`), which is
 #: the same discipline `stalls_busy` follows: the population that was skipped is
 #: a ledger fact even when the individual rows are not written.
-def vehicle_is_held(vehicle: dict) -> bool:
-    """True iff the frame says this vehicle already holds a place.
+#:
+#: AND THE 0265 RULE WAS TOO WIDE BY EXACTLY ONE STALL TYPE (db/checks/0221,
+#: fixed on the publishing side by migration 0287). "Already holds a place" was
+#: read as ANY reservation and ANY held-or-active booking, on ANY stall type --
+#: so a vehicle parked on a STAGING stall under a `temp_hold` was skipped here.
+#: But staging is a parking spot, not a service assignment, and the kernel knows
+#: that: `ottoq_cuopt_first_refusal_arm` disqualifies a vehicle only for a live
+#: DCFC or L2 reservation, and holds a one-tick right-of-first-refusal seat open
+#: for everyone else. The two halves therefore meant different things by the
+#: same phrase, and the seat was being held for precisely the population this
+#: function had decided not to look at. Measured on run c288555a: 19 seats
+#: armed, 18 of them carrying nothing but a staging booking, 0 ever answered --
+#: while the one fire whose frame happened to hold nobody produced six
+#: proposals and four enactments.
+#:
+#: SO THE FRAME ANSWERS IT NOW, AND THIS FUNCTION STOPS DERIVING IT. Under
+#: facts_version 2 the frame carries `holds_charge_place`: the union of the
+#: KERNEL's ledger (`holds_charge_reservation`, from stalls.reserved_by) and the
+#: CALENDAR's (`holds_charge_booking`, from ottoq_stall_bookings), each already
+#: narrowed to the stall types the kernel itself counts. Union, not
+#: intersection, because those two ledgers do disagree -- 0221 found a vehicle
+#: the kernel called unplaced while the calendar held an L2 for it -- and the
+#: safe reading is that either ledger saying "placed" means placed.
+#:
+#: KEY PRESENCE IS THE VERSION TEST, exactly as OFFERABLE_KEY is for stalls. A
+#: vehicle object that carries the fact is answered by the fact; one that does
+#: not falls back to the version-1 pair, which migration 0287 left byte
+#: identical. A certification arm, a pre-0265 fixture and a frame with the gate
+#: off all keep the behaviour they had. Never a guess, in either direction.
+CHARGE_PLACE_KEY = "holds_charge_place"
 
-    A frame carrying neither key (pre-0265, or the gate off) answers False for
-    every vehicle -- the pre-0265 behaviour, unchanged, and never a guess.
+
+def vehicle_is_held(vehicle: dict) -> bool:
+    """True iff the frame says this vehicle already holds a place worth skipping.
+
+    facts_version >= 2 frames answer this themselves in `holds_charge_place`,
+    and that answer wins outright -- including when it is False for a vehicle
+    that does hold a staging place, which is the whole point of the key.
+
+    A frame carrying none of the keys (pre-0265, or the gate off) answers False
+    for every vehicle -- the pre-0265 behaviour, unchanged, and never a guess.
     """
+    if CHARGE_PLACE_KEY in vehicle:
+        return bool(vehicle[CHARGE_PLACE_KEY])
     if vehicle.get("reserved_stall_id"):
         return True
     return bool(vehicle.get("has_live_booking"))

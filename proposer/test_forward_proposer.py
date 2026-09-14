@@ -1312,3 +1312,113 @@ def test_a_site_whose_every_stall_is_unofferable_names_the_scarcity():
     assert "3 charge-capable" in msg
     for fragment in ("1 occupied", "1 reserved", "1 charger_faulted"):
         assert fragment in msg
+
+
+# --- 0287: which KIND of place, and whose ledger says so --------------------
+
+
+def _v2_frame(vehicles, stalls):
+    """A facts_version 2 frame -- the contract migration 0287 publishes."""
+    frame = _facts_frame(vehicles, stalls, version=2)
+    frame["selector"]["charge_stall_types"] = ["dcfc", "l2"]
+    return frame
+
+
+def test_a_staging_hold_is_a_parking_spot_and_no_longer_hides_the_vehicle():
+    """db/checks/0221, THE WHOLE DEFECT IN ONE TEST. Under version 1 a vehicle
+    parked on a staging stall answered has_live_booking and was skipped -- while
+    ottoq_cuopt_first_refusal_arm was holding a one-tick seat open for exactly
+    that vehicle, because the kernel disqualifies only a live DCFC/L2
+    reservation. Measured on run c288555a: 19 seats armed, 18 of them carrying
+    nothing but a staging booking, 0 ever answered. Under version 2 the frame
+    says which kind of place it is, and the vehicle is planned for."""
+    staged = _vehicle("v-staged", soc=25, reserved_stall_id=None,
+                      has_live_booking=True,
+                      live_booking_stall_types=["staging"],
+                      holds_charge_reservation=False,
+                      holds_charge_booking=False,
+                      holds_charge_place=False)
+    assert vehicle_is_held(staged) is False
+
+    r = propose(_v2_frame([staged], [_facts_stall("s-a")]), CLASSES, site=SITE)
+    assert r["vehicles_held"] == 0
+    assert {row["entity_id"] for row in r["proposals"]} == {"v-staged"}
+
+    #: AND THE SAME VEHICLE UNDER THE OLD CONTRACT IS STILL SKIPPED. The version
+    #: -1 keys are byte-identical after 0287, so a frame that does not carry the
+    #: new fact keeps the behaviour it had -- that is the fallback, exercised.
+    legacy = {k: v for k, v in staged.items()
+              if k not in ("holds_charge_place", "holds_charge_reservation",
+                           "holds_charge_booking", "live_booking_stall_types")}
+    assert vehicle_is_held(legacy) is True
+
+
+def test_a_charge_place_from_either_ledger_still_hides_the_vehicle():
+    """UNION, NOT INTERSECTION. The reservation ledger and the booking calendar
+    disagree in practice -- 0221 found a vehicle the kernel called unplaced
+    while the calendar held an L2 for it -- so either one saying 'charge place'
+    is enough. Both directions are exercised, and so is neither.
+
+    HONEST LABEL: this one is a REGRESSION GUARD, not a change-detector. Every
+    vehicle here answers the same under version 1 and version 2, because a real
+    frame never sets holds_charge_booking without has_live_booking. It passes
+    against the old code too, and is kept so the union cannot silently become an
+    intersection later. The tests that actually convict the old behaviour are
+    test_a_staging_hold_is_a_parking_spot_and_no_longer_hides_the_vehicle and
+    test_the_published_fact_wins_over_the_keys_it_supersedes -- both verified to
+    FAIL when vehicle_is_held is reverted to the version-1 body."""
+    by_reservation = _vehicle("v-res", soc=25, reserved_stall_id="s-9",
+                              reserved_stall_type="dcfc",
+                              holds_charge_reservation=True,
+                              holds_charge_booking=False,
+                              holds_charge_place=True)
+    by_calendar = _vehicle("v-cal", soc=25, has_live_booking=True,
+                           live_booking_stall_types=["l2"],
+                           holds_charge_reservation=False,
+                           holds_charge_booking=True,
+                           holds_charge_place=True)
+    free = _vehicle("v-free", soc=25, holds_charge_reservation=False,
+                    holds_charge_booking=False, holds_charge_place=False)
+    assert vehicle_is_held(by_reservation) is True
+    assert vehicle_is_held(by_calendar) is True
+    assert vehicle_is_held(free) is False
+
+    r = propose(_v2_frame([by_reservation, by_calendar, free],
+                          [_facts_stall("s-a"), _facts_stall("s-b")]),
+                CLASSES, site=SITE)
+    assert r["vehicles_held"] == 2
+    assert {row["entity_id"] for row in r["proposals"]} == {"v-free"}
+
+
+def test_the_published_fact_wins_over_the_keys_it_supersedes():
+    """THE PUBLISHER DECIDES, NOT THIS MODULE. holds_charge_place is the
+    kernel's own answer; when it is present this function must not re-derive
+    one from the older keys, in EITHER direction. Both conflicts are pinned:
+    a reservation the publisher says is not a charge place, and no reservation
+    at all where the publisher says there is one."""
+    parked = _vehicle("v-parked", soc=25, reserved_stall_id="s-stage",
+                      reserved_stall_type="staging",
+                      has_live_booking=True,
+                      holds_charge_place=False)
+    assert vehicle_is_held(parked) is False
+
+    invisible = _vehicle("v-hidden", soc=25, reserved_stall_id=None,
+                         has_live_booking=False,
+                         holds_charge_place=True)
+    assert vehicle_is_held(invisible) is True
+
+
+def test_a_version_2_frame_reports_its_version_and_its_charge_types():
+    """The contract is asked of the frame, never inferred from which keys
+    happen to be present -- and charge_stall_types travels with it so a
+    consumer never needs a second copy of the list. The copy is what
+    diverged.
+
+    HONEST LABEL: a contract test, not a behaviour test -- it would pass against
+    the old vehicle_is_held as well."""
+    frame = _v2_frame([_vehicle("v-1", soc=25, holds_charge_place=False)],
+                      [_facts_stall("s-a")])
+    assert frame_facts_version(frame) == 2
+    assert frame["selector"]["charge_stall_types"] == ["dcfc", "l2"]
+    r = propose(frame, CLASSES, site=SITE)
+    assert r["facts_version"] == 2
