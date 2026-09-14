@@ -126,6 +126,35 @@ Last pair ends about **21:28 UTC (4:28 PM CT)**. Slots are sized from round 43's
 measured durations — 12t 125 s, 24t 231–246 s, 48t 507–511 s — not from the
 stale constants in `scripts/schedule-round.sql`.
 
+### CORRECTION 19:33 UTC — I guessed a uuid off a truncated display value
+
+`r44_ga1` failed in 0 s, before the pair ran at all:
+
+> `determinism_pair: scenario grid_smoke is bound to depot
+> aacd0bb0-2d02-d101-72cc-33f70e950bc8, but the pair was told to run depot
+> aacd0bb0-0000-4000-8000-000000000001. The arms would tick one world and be
+> fingerprinted against another.`
+
+I had written the grid depot as `aacd0bb0-0000-4000-8000-000000000001`. The
+first eight characters are real — they came from my own matrix query, which
+selected `left(depot::text,8)` for display — and **I invented the remaining
+twenty-four.** A truncation read as a value. Same defect class as 0240, 0241,
+0318 and 0323's own A1: an instrument answering a different question from the
+one it appears to ask, except here the instrument was a display column.
+
+The engine's guard caught it exactly as designed, and the guard is worth
+quoting because it is the shape every check in this repo aims at: it did not
+compare a name, it compared the depot the scenario is BOUND to against the
+depot it was TOLD to run, and refused rather than fingerprinting one world
+against another.
+
+All twenty jobs were unscheduled before the next could fire, both uuids were
+then read from `ottoq_cert_matrix()` rather than typed, and every rescheduled
+job was verified to carry the right one for its scenario (6 grid / 14 flagship,
+no crossover). The lane moved back: grid 19:36–19:56, flagship pass 1
+20:00–20:36, pass 2 20:50–21:26, last pair ending about **21:35 UTC
+(4:35 PM CT)**.
+
 **Nothing may be applied until every one of these is unscheduled.** `0325` (the
 energy dock) is committed PENDING and waits behind this round.
 
