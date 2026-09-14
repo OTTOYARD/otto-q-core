@@ -97,28 +97,69 @@ BEGIN
   END IF;
 END $pre$;
 
-DO $swap$
+-- ---------------------------------------------------------------------------
+-- A2 REFUSED THE FIRST APPLY, and it found a SECOND instance I had missed.
+-- Repointing the two salts was not enough: the function also used dispatch_id
+-- as its cursor tiebreak --
+--     ORDER BY d.dispatched_at DESC, d.dispatch_id DESC
+-- -- which orders by a random UUID whenever two dispatches share a timestamp,
+-- and is therefore arm-unstable for exactly the same reason. A check written to
+-- forbid the COLUMN rather than the two call sites caught what a narrower one
+-- would have passed.
+--
+-- So the function is replaced outright and dispatch_id is not selected at all.
+-- The "no dispatch" test becomes dispatched_at IS NULL (already required
+-- non-null by the WHERE), and the tiebreak becomes planned_duration_min, which
+-- is deterministic. If two rows still tie they are identical in every field
+-- this function reads, so either pick yields the same geometry.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.ottoq_trip_geometry(
+  p_vehicle_id uuid, p_sim_run_id uuid, p_sim_clock timestamp with time zone)
+ RETURNS TABLE(bearing_deg numeric, radius_km numeric, progress numeric, distance_km numeric)
+ LANGUAGE plpgsql STABLE SECURITY DEFINER
+ SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
+AS $function$
 DECLARE
-  v_def text; v_new text;
-  c_bear_old CONSTANT text := '''trip_bearing:''||p_vehicle_id::text||'':''||v_disp.dispatch_id::text';
-  c_bear_new CONSTANT text := '''trip_bearing:''||p_vehicle_id::text||'':''||v_disp.dispatched_at::text';
-  c_rad_old  CONSTANT text := '''trip_radius:''||p_vehicle_id::text||'':''||v_disp.dispatch_id::text';
-  c_rad_new  CONSTANT text := '''trip_radius:''||p_vehicle_id::text||'':''||v_disp.dispatched_at::text';
+  v_disp record; v_seed bigint; v_elapsed numeric; v_miles numeric; v_raw numeric;
+  c_trips_per_day CONSTANT numeric := 4.00;   -- MEASURED over all dispatches with >=3 trips
+  c_km_per_mile   CONSTANT numeric := 1.609;
+  c_open_floor_km CONSTANT numeric := 1.0;    -- an OPEN dispatch is not at the depot
 BEGIN
-  SELECT pg_get_functiondef(p.oid) INTO v_def
-    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-   WHERE n.nspname='public' AND p.proname='ottoq_trip_geometry';
+  -- 0319: the dispatch PRIMARY KEY is deliberately not selected. Its column
+  -- default is gen_random_uuid(), so it differs between two arms of one seed --
+  -- unusable in a salt AND unusable as an ORDER BY tiebreak. A2 asserts the
+  -- column name appears nowhere in this body, which is why it is not named here.
+  SELECT d.dispatched_at, d.planned_duration_min INTO v_disp
+    FROM public.ottoq_vehicle_dispatches d
+   WHERE d.vehicle_id = p_vehicle_id
+     AND d.sim_run_id = p_sim_run_id
+     AND d.status IN ('active','returning')
+     AND d.dispatched_at IS NOT NULL
+   ORDER BY d.dispatched_at DESC, d.planned_duration_min DESC   -- both deterministic
+   LIMIT 1;
+  IF v_disp.dispatched_at IS NULL OR COALESCE(v_disp.planned_duration_min,0) <= 0 THEN RETURN; END IF;
 
-  IF (length(v_def) - length(replace(v_def, c_bear_old, ''))) / length(c_bear_old) <> 1 THEN
-    RAISE EXCEPTION '0319 SWAP: the bearing salt does not occur exactly once'; END IF;
-  IF (length(v_def) - length(replace(v_def, c_rad_old,  ''))) / length(c_rad_old)  <> 1 THEN
-    RAISE EXCEPTION '0319 SWAP: the radius salt does not occur exactly once'; END IF;
+  SELECT r.random_seed INTO v_seed FROM public.ottoq_sim_runs r WHERE r.sim_run_id = p_sim_run_id;
+  IF v_seed IS NULL THEN RETURN; END IF;
 
-  v_new := replace(v_def, c_bear_old, c_bear_new);
-  v_new := replace(v_new, c_rad_old,  c_rad_new);
-  IF v_new = v_def THEN RAISE EXCEPTION '0319 SWAP: identical definition'; END IF;
-  EXECUTE v_new;
-END $swap$;
+  -- 0319: salted on (vehicle, dispatched_at) -- a shared world object plus a
+  -- deterministic sim timestamp. Both are identical across arms.
+  bearing_deg := round((twin.ottoq_sim_seeded_random(
+                          v_seed, 'trip_bearing:'||p_vehicle_id::text||':'||v_disp.dispatched_at::text) * 360.0)::numeric, 3);
+
+  v_miles := public.ottoq_sample_calibrated(
+               'daily_miles_driven', 'global', v_seed,
+               'trip_radius:'||p_vehicle_id::text||':'||v_disp.dispatched_at::text);
+  radius_km := round((COALESCE(v_miles, 122.07) * c_km_per_mile / (2.0 * c_trips_per_day))::numeric, 3);
+
+  v_elapsed := EXTRACT(EPOCH FROM (p_sim_clock - v_disp.dispatched_at))/60.0;
+  progress  := round(LEAST(1.0, GREATEST(0.0, v_elapsed / v_disp.planned_duration_min))::numeric, 6);
+
+  v_raw := radius_km * (1.0 - abs(2.0*progress - 1.0));
+  distance_km := round(GREATEST(v_raw, c_open_floor_km)::numeric, 3);
+  RETURN NEXT;
+END;
+$function$;
 
 DO $post$
 DECLARE v_src text;
