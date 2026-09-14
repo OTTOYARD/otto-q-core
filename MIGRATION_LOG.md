@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0291 — GENERATED, not a log
+## Index, 0134–0292 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -276,7 +276,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0289](db/migrations/0289_five_gates_and_the_one_that_tests_a_different_threshold.sql) | `20260914081939` | yes — ledger | FIVE GATES, AND THE ONE THAT TESTS A DIFFERENT THRESHOLD |
 | [0290](db/migrations/0290_three_geometry_dials_and_one_the_catalog_cannot_express.sql) | `20260914083734` | yes — ledger | THREE GEOMETRY DIALS, AND ONE THE CATALOG CANNOT EXPRESS |
 | [0291](db/migrations/0291_eighteen_dials_whose_consumer_already_wrote_the_range.sql) | `20260914085632` | yes — ledger | EIGHTEEN DIALS WHOSE CONSUMER ALREADY WROTE THE RANGE |
+| [0292](db/migrations/0292_the_proposer_cannot_see_its_own_pending_plans.sql) | `PENDING` | no — pending | THE PROPOSER CANNOT SEE ITS OWN PENDING PLANS |
 
-157 migrations indexed.
+158 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
