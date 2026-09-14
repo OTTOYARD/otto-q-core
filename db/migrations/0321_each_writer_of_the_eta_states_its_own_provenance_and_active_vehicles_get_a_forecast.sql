@@ -74,6 +74,29 @@
 -- exactly once BY LENGTH ARITHMETIC, the way replace() will see it.
 --
 -- ---------------------------------------------------------------------------
+-- ONE ASSUMPTION S1 RESTS ON, MEASURED RATHER THAN ASSUMED
+--
+-- The loop iterates dispatches; ottoq_refresh_return_eta re-resolves one from
+-- (vehicle, run). If a vehicle had TWO open dispatches in one run, the refresh
+-- could write to a different row than the loop is standing on, and would do so
+-- once per iteration.
+--
+-- Measured 2026-09-14 18:17 UTC across every run: 156 vehicle-run pairs hold an
+-- open dispatch, **0** hold more than one, max is 1. So the case does not arise.
+--
+-- It is left resolved-by-lookup rather than passed in, deliberately: the
+-- function picks the dispatch with exactly the ORDER BY that ottoq_trip_geometry
+-- uses (0319), so the ETA and the geometry it derives from can never be about
+-- different dispatches. Passing the loop's dispatch_id in would break that tie
+-- and re-open the 0319 class from the other side.
+--
+-- AND THIS IS AN OBSERVATION, NOT A SCHEMA GUARANTEE -- the same distinction
+-- 0266 drew about untagged rows. Nothing constrains a vehicle to one open
+-- dispatch; today none has two. If that ever changes, A1's "exactly one call
+-- per vehicle per tick" stays true while the ROW it lands on stops being
+-- obvious, and this note is where to start.
+--
+-- ---------------------------------------------------------------------------
 -- forces_recert: TRUE, and not marginally. S1 causes ~36 extra dispatch rows
 -- per run to carry an ETA where they carried NULL, and ottoq_vehicle_dispatches
 -- is inside endst.dispatches.vis. Every flagship canon is expected to move.
