@@ -151,3 +151,81 @@ SELECT (SELECT frame->'selector'->>'facts_version' FROM f) AS facts_version,
 --      the proposer works harder. If this change reduces self-supersession,
 --      that metric should IMPROVE for reasons unrelated to the vehicle being
 --      better off -- so it must not be quoted as evidence for this fix either.
+
+-- ===========================================================================
+-- E. THE RESULT. Measured 2026-09-14 09:24 UTC (4:24 AM CT), run 5712f828.
+--
+-- THE PREDICTION IN SECTION D WAS MET. Stating it before restating it: section
+-- D said "proposals should fall substantially from 48 while enactments should
+-- NOT fall from 9. If both fall, the skip is too wide and this should be
+-- REVERTED, not tuned."
+--
+--   run       5712f828-0c55-4852-a1bb-253c2c2c46da
+--   scenario  busy_day, seed 848484, time_scale 60, 30s ticks
+--   clock     2026-09-14 06:00:00+00 start -- identical to the baseline
+--   depot     11111111-1111-1111-1111-111111111111
+--   loop      proposer-loop.yml, fires=26, on the 0292 code
+--
+--   metric                          BEFORE 91139ad8   AFTER 5712f828
+--   ticks                                        32               20
+--   sim minutes covered                         960              600
+--   forward_lex proposals                        48               24
+--   distinct vehicles proposed for               22               24
+--   proposals per distinct vehicle             2.18             1.00
+--   enacted                                       9               12
+--   superseded                                   35               12
+--   pending                                       0                0
+--   RE-PLANS (earlier holds_tick row,
+--     same vehicle)                              26                0
+--   enactment rate                            18.8%            50.0%
+--   proposals per tick                        1.500            1.200
+--   enacted per tick                          0.281            0.600
+--
+-- THE THREE NUMBERS THAT ARE SCALE-FREE, and therefore the ones to quote,
+-- because the two runs are NOT the same length (see the caveats):
+--
+--   1. RE-PLANS 26 -> 0. The defect this file is about, gone. Not one proposal
+--      in the new run was preceded by a holds_tick proposal for the same
+--      vehicle.
+--   2. PROPOSALS PER DISTINCT VEHICLE 2.18 -> 1.00. Twenty-four proposals
+--      across twenty-four vehicles: exactly one each, no vehicle planned twice.
+--   3. ENACTMENT RATE 18.8% -> 50.0%. The proposer did half the work and a
+--      larger share of it survived to be enacted.
+--
+-- And the direction holds on the rates too: proposals per tick 1.500 -> 1.200
+-- while enacted per tick 0.281 -> 0.600. Fewer plans, more assignments.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THIS IS NOT. Three caveats, none of which the numbers above conceal:
+--
+--   a. ONE SEED, ONE RUN PER ARM. This is not a CRN-paired A/B. The instrument
+--      that would hold the world constant across the two arms -- ottoq_ab_pair
+--      with p_policy -- exists and was not used here. Two separate runs on one
+--      seed is the same standard 0224's three-run table used, and it was called
+--      out as insufficient there too.
+--   b. THE RUNS ARE DIFFERENT LENGTHS: 20 ticks / 600 sim-minutes against 32 /
+--      960. Both ended on the same rule -- 'run_governor: reached the 540
+--      sim-minute ceiling' -- and both advance exactly 30 sim-minutes per tick;
+--      the difference is that the governor polls every 2 minutes and caught the
+--      new run sooner in wall time (215 s against 361 s). That is a scheduling
+--      artifact, not a behavioural difference, but it does mean every ABSOLUTE
+--      count above is over a shorter horizon and must be read per-tick.
+--   c. SEATS ARMED FELL AND THIS FILE DOES NOT EXPLAIN IT: 29 seats over 32
+--      ticks (0.91/tick) against 12 over 20 (0.60/tick). It could be the arm
+--      legitimately declining more often because more vehicles now hold an
+--      un-churned pending proposal -- which is the fix working -- or it could
+--      be run-to-run variation over a shorter horizon. UNRESOLVED. Do not
+--      quote the seat counts as evidence in either direction until a paired
+--      run separates them.
+--
+-- ---------------------------------------------------------------------------
+-- AND THE 12 SUPERSESSIONS IN THE NEW RUN ARE NOT SELF-SUPERSESSION. With
+-- re-plans at 0 and one proposal per vehicle, no proposal in this run was
+-- overwritten by the proposer. The 12 are the decide path assigning the vehicle
+-- itself -- the same shape as the timer-driven run 36e5cc68's 13, which also
+-- had 0 re-plans. That is the kernel disposing, which is what it is for.
+--
+-- G59 IS STILL NOT FIXED BY THIS and must not be quoted as if it were.
+-- answered_enacted still measures "did the specific proposal that released this
+-- seat survive". It should look better now for a reason unrelated to any
+-- vehicle being better off: the proposer stopped competing with itself.
