@@ -1,0 +1,214 @@
+-- db/checks/0234
+-- THE TWIN SPENDS HALF OF EVERY TICK ASKING A PROPOSER THAT IS SWITCHED OFF --
+-- AND THAT SLOT IS WHERE THE LIVE AGENT LOOP BELONGS
+--
+-- Measured 2026-09-14, 14:20-14:32 UTC (9:20-9:32 AM CT).
+--
+-- Chase, 2026-09-14: "just because something 'hasn't fired', doesn't mean we
+-- don't need it. It could just be wired incorrectly. So make sure you're
+-- framing this with the intention of having the active agentic layer and loop."
+--
+-- That instruction turned out to be a prediction. This file is the measurement
+-- behind it, plus the canon verification that had to come first.
+--
+-- ===========================================================================
+-- A. FIRST, THE VERIFICATION THAT LICENSES EVERYTHING BELOW
+--
+-- Five migrations were applied earlier today -- 0303, 0304, 0305, 0306, 0307 --
+-- and every one was classified forces_recert=false. That classification is a
+-- CLAIM: it asserts the change cannot alter engine behaviour, and therefore
+-- that the certification canon need not be re-established. The recert floor
+-- stayed at 2026-09-12 16:50:23.319089+00 through all five, which is the
+-- claim's consequence, not its evidence.
+--
+-- Converted to measurement. At 14:23 UTC the canon for the grid_smoke column
+-- (seed 239001 / 6 ticks / depot aacd0bb0) was READ AND RECORDED FIRST, from
+-- pairs that all predate the five migrations:
+--
+--   canon_fp   66275ea7a5d8711f45be206faeae5e7c
+--   canon_cmd  0c6eadd40b3e5991a7dbf5a00669d45a
+--   canon_dec  c16074c6a8f136965666c009a3176eb9
+--   canon_evt  162997d702edd557d45cb0470209f59b
+--   canon_bkg  bff0499da0e21550020a60db1f7b2036
+--   canon_nrg  93e74c9cc28d273007aa6c2f7f654092
+--   canon_prop d41d8cd98f00b204e9800998ecf8427e   (empty: the core runs alone)
+--   canon_defr d41d8cd98f00b204e9800998ecf8427e   (empty)
+--   canon_cal  11a246262ff7a2c929483b1ee0a7cd2d
+--   canon_rule 9ec9ff51c925e3d1344b40074dd9037a
+--   canon_rcl  c0faa97c3f609b37798c24e7457c6b5c
+--   canon_sdr  26c63b1e6e05e35dae80beb2ab413f2c
+--
+-- Then the pair was fired (14:23:16 -> 14:24:04 UTC, 48 s), and all twelve
+-- came back identical, arm A to arm B and both to the pre-migration canon.
+--
+-- READING THE CANON FIRST IS THE WHOLE POINT, and it is worth saying why.
+-- ottoq_cert_matrix defines canon as the MOST RECENT pair (ranked rn=1) and
+-- counts the streak BACKWARDS from it. So a pair that disagreed with every
+-- earlier pair would not show as a failure -- it would silently BECOME the
+-- canon and collapse consecutive_passes to 1. Reading "5 of 5, canon
+-- unchanged" off the matrix AFTER the fact is therefore circular. Reading the
+-- hashes BEFORE firing and comparing by eye is not. Same defect class this
+-- build keeps meeting: an instrument that answers a slightly different
+-- question than the one being asked (0098, 0137/0139/0216, 0145/0146, 0227,
+-- 0231, 0296, 0304, 0307).
+--
+-- The matrix afterwards: pairs_seen 5, consecutive_passes 5, history PPPPP,
+-- stale false, inconclusive 0, recert_floor unmoved.
+--
+-- WHAT THIS DOES NOT ESTABLISH. One column, six ticks, four vehicles, ten
+-- stalls, and an EMPTY proposal stream. It is the thinnest column in the
+-- matrix. The five migrations were all to the policy catalogue and its setter,
+-- and ottoq_policy_get is called most heavily on a busy 158-stall depot, which
+-- grid_smoke is not. A 12-tick busy_day pair on the flagship depot is the
+-- column that actually exercises them (see section D).
+--
+-- ===========================================================================
+-- B. THE FINDING: TICK PARITY SPLITS THE TWIN'S WORK IN HALF, AND ONE HALF
+--    GOES TO A DEAD ENDPOINT
+--
+-- public.ottoq_demo_metronome -- cron job 12, every minute, the thing that
+-- actually drives every non-certification twin run -- alternates on tick
+-- parity:
+--
+--     IF (v_run.ticks % 2) = 1 THEN
+--       PERFORM public.ottoq_sim_decide_and_dispatch(v_run.sim_run_id);
+--     ELSE
+--       IF v_run.policy = 'otto_q' THEN
+--         v_window_ms := ottoq_policy_get(v_run.sim_run_id,
+--                                         'cuopt_solve_window_ms', 4000);
+--         IF v_window_ms > 0 THEN
+--           v_req := ottoq_cuopt_refresh(v_run.sim_run_id);
+--         END IF;
+--       END IF;
+--     END IF;
+--
+-- ODD ticks decide. EVEN ticks ask cuOpt. That is a 50/50 split of the twin's
+-- entire tick budget, and it is invisible unless you read the metronome.
+--
+-- IS THE GATE OPEN? Yes, and by ACCIDENT rather than by decision. Measured:
+-- ottoq_policy_params holds exactly ONE row for cuopt_solve_window_ms
+-- (scope_type='run', one single run, value 5500). There is NO global row and
+-- no depot row. So for every other run ottoq_policy_get falls through to the
+-- CALL SITE DEFAULT of 4000, which is > 0, so the branch is taken. Nobody
+-- switched this on; the absence of a row switched it on.
+--
+-- AND THE THING IT CALLS IS SWITCHED OFF. cuopt_propose_enabled = 0 at global
+-- scope AND at depot 22222222, and is written 0 per-run on ~600 runs. So
+-- ottoq_cuopt_refresh is invoked, consults the gate, declines, and writes a
+-- row recording that it declined.
+--
+--   cuopt_invocation_log, last 48 hours:   2,255 rows, ALL stage='sql_gate'
+--     abstained_reason 'policy_disabled'       2,212
+--     abstained_reason 'first_refusal_arm'        43
+--   real calls to the NVIDIA endpoint (http_status IS NOT NULL), ALL TIME: 16
+--   most recent real call:                 2026-08-30 04:36:02 UTC (15 days)
+--   most recent ledger row:                2026-09-14 14:24:11 UTC
+--
+-- That last pair of lines is the finding in two numbers. The ledger took a row
+-- DURING today's grid_smoke certification pair, eleven minutes ago. It has not
+-- taken a call in fifteen days.
+--
+-- THIS ALSO EXPLAINS THE 19,995. db/checks/0231 and CLAUDE.md rule 6 record
+-- that the 20,533-row ledger is 19,995 gate refusals and 538 edge rows, and
+-- call it "the gate, not the solver". Section B says WHERE the refusals come
+-- from: the metronome manufactures one every even tick of every otto_q twin
+-- run, forever, at ~1,100/day. The row count climbs because the twin runs, not
+-- because anything is being solved.
+--
+-- ===========================================================================
+-- C. WHY THIS IS NOT AN ARGUMENT FOR DELETING THE SLOT
+--
+-- The tempting read is "the even branch is waste, remove it." That is wrong,
+-- and it is wrong in the specific way Chase named.
+--
+-- What the even branch IS, structurally: a PROPOSER SEAT that already fires on
+-- a fixed beat, inside the transaction the decide path runs in, on every twin
+-- run, with its refusals already ledgered. That is the hard part of an agentic
+-- loop and it is already built. The only defect is WHO IS SITTING IN IT.
+--
+-- So the cuOpt cut (task #116) stops being a deletion and becomes a HANDOVER:
+-- the beat stays, the occupant changes to the live agent layer. This is
+-- CLAUDE.md rule 5 exactly -- verify, consolidate, extend; duplicating an
+-- existing capability is a failure, wrapping and re-pointing one is the job --
+-- and it is why "cut everything named cuopt" was always the wrong instrument
+-- (rule 6's own warning: five of the eight cuopt* functions are the deferral
+-- machinery the CP-SAT proposer depends on).
+--
+-- THE SEAT TABLE SAYS THE SAME THING INDEPENDENTLY. public.ottoq_proposer_precedence
+-- (0259, declared data) currently holds FOUR rows:
+--
+--     cuopt           rank  0   holds_tick  greedy_yields
+--     cuopt_fallback  rank  1   holds_tick
+--     forward_lex     rank 10   holds_tick  greedy_yields
+--     llm_advisor     rank 20   holds_tick  greedy_yields
+--
+-- and ottoq_external_proposals says who is actually proposing:
+--
+--     source                  proposals  enacted  seat_rank  last seen
+--     greedy_constrained         12,654    4,191   (none)    2026-09-14 09:23
+--     ottoq_service_priority      2,380        0   (none)    2026-09-14 00:57
+--     forward_lex                   447       41       10    2026-09-14 09:23
+--     agent_probe                   240       40   (none)    2026-09-09 09:55
+--     cuopt                         136       27        0    2026-08-30 04:36
+--     llm_advisor                    48        0       20    2026-09-14 01:28
+--
+-- The two highest seats in the engine, ranks 0 and 1, belong to a proposer that
+-- has not spoken in fifteen days. The proposer responsible for 12,654 of the
+-- 15,905 proposals and 4,191 of the enactments holds NO SEAT AT ALL -- and per
+-- 0259's own selector comment, an unlisted source sorts at
+-- COALESCE(rank, 2147483647), i.e. LAST.
+--
+-- Vacating ranks 0 and 1 is therefore not a side effect of the cut. It is the
+-- point of it.
+--
+-- ===========================================================================
+-- D. WHERE THE LIVE LOOP RUNS, AND THE CLAIM THIS FILE REFUSES TO MAKE
+--
+-- Chase authorised bringing the CIL self-improvement loop live, twin-only
+-- (task #129, option b). public.ottoq_cil_tick proposes four candidate policy
+-- plans, evaluates every one forward in the twin under a 0-unsafe hard gate,
+-- adopts the best feasible improvement, and -- this is the constraint that
+-- picks the depot -- writes the winning dials at DEPOT scope through
+-- ottoq_policy_set.
+--
+-- Depot-scoped writes are permanent and are read by every later run on that
+-- depot, certification pairs included. So:
+--
+--     depot 11111111 Flagship    1,019 sim runs   987 cert_harness  FORBIDDEN
+--     depot aacd0bb0 Grid           76 sim runs    72 cert_harness  FORBIDDEN
+--     depot 22222222 Benchmark       9 sim runs     0 cert_harness  -> TARGET
+--
+-- Running the loop on either certified depot would rewrite the policy the
+-- canon was established under, every column on that depot would disagree with
+-- its canon, and the matrix would report an engine regression that was
+-- actually an agent doing its job. Benchmark is a full-size world -- 160
+-- stalls (115 staging, 30 l2, 10 dcfc, 3 wash_bay, 2 service_bay), 1 BESS --
+-- with zero certification history. It is the only depot where this loop can
+-- run without lying about something else.
+--
+-- AND THE CLAIM THIS FILE WILL NOT MAKE. All nine Benchmark runs carry
+-- status='aborted', which reads as "the depot is broken," and an earlier draft
+-- of this section said so. It is not established. Measured: failure_reason is
+-- NULL on all nine, validation_notes is NULL on all nine, and the
+-- sim_run_stalled / sim_run_auto_stopped events that would name the cause are
+-- gone -- those runs are from 2026-09-08/09 and the retention purge keeps 48
+-- hours. The cause is NOT RECOVERABLE from the record.
+--
+-- What IS established, from ottoq_demo_metronome's own predicate: it ticks any
+-- running run whose run_by is not in ('production_live','cert_harness'), and
+-- Benchmark runs carry run_by='benchmark'. So the existing metronome WILL tick
+-- a Benchmark run; no second metronome is needed. Whether Benchmark completes
+-- a run is a question to be answered by starting one and watching it, not by
+-- theorising about six-day-old rows whose evidence has been purged.
+--
+-- ===========================================================================
+-- E. ONE MORE THING THE CUT MUST CARRY
+--
+-- ottoq_cil_propose floors energy_demand_factor_peak at 0.15. The catalogue
+-- floors it at 0.25. Since 0302 the agent adopts through ottoq_policy_set, so
+-- the catalogue wins and the adoption records that it was clamped -- correct
+-- behaviour, but it means the clamp will fire on EVERY adoption of that plan
+-- and the agent will never get what it asked for. Two sources of truth for one
+-- floor is the G54 class. The catalogue holds for now because it is the
+-- conservative side; which number is right is a separate, decidable question
+-- and is not settled here.
