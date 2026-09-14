@@ -625,3 +625,75 @@ def test_turning_the_facts_gate_on_does_not_move_the_busy_count():
     assert plain["fire"]["n_charge_stalls"] == gated["fire"]["n_charge_stalls"] == 2
     assert plain["fire"]["n_stalls_busy"] == gated["fire"]["n_stalls_busy"] == 0
     assert gated["fire"]["stalls_blocked"] == {}
+
+
+# ---------------------------------------------------------------------------
+# ARMING AND THE BLIND-FRAME GUARD (2026-09-14)
+#
+# db/checks/0214: 0278 built the one-call arming ritual and nothing ever
+# performed it. Of the seven runs that have ever carried a proposer_frame_facts
+# row exactly one did -- a probe created to measure the blindness -- so all six
+# `proposer_live` runs and all 329 CP-SAT proposals they produced were solved
+# against a frame with the gate off, where a reserved-but-empty stall reads as
+# free. These tests hold the two halves of the fix: the loop arms, and the loop
+# refuses to plan against a frame that came back blind anyway.
+# ---------------------------------------------------------------------------
+
+
+def _arming(verdict="armed", missing=None):
+    return {"verdict": verdict, "sim_run_id": RUN, "run_by": "proposer_live",
+            "satisfied": 3 if verdict == "armed" else 1, "required": 3,
+            "missing": missing or []}
+
+
+def test_the_loop_arms_the_run_it_is_about_to_propose_into():
+    cur = FakeCur(one=({"ok": True, "sim_run_id": RUN, "armed_by": "proposer_bridge",
+                        "receipts": [], "arming": _arming()},))
+    assert pb._arm_run(cur, RUN, pb.ARMED_BY)["verdict"] == "armed"
+    assert pb.ARM in cur.sql[0]
+    assert cur.params == (RUN, pb.ARMED_BY)
+
+
+def test_an_arming_that_returns_ok_but_is_not_armed_is_still_a_refusal():
+    # The receipt and the verdict are two different claims. 0278's own function
+    # reads every ottoq_policy_set receipt; this reads what the run REPORTS
+    # afterwards, so a partial arm cannot pass as a whole one.
+    cur = FakeCur(one=({"ok": True, "receipts": [],
+                        "arming": _arming("partial", ["proposer_frame_facts"])},))
+    with pytest.raises(pb.BridgeError) as exc:
+        pb._arm_run(cur, RUN, pb.ARMED_BY)
+    assert "partial" in str(exc.value)
+    assert "proposer_frame_facts" in str(exc.value)
+
+
+def test_an_arming_call_that_does_not_say_ok_is_a_refusal():
+    with pytest.raises(pb.BridgeError):
+        pb._arm_run(FakeCur(one=({"ok": False, "error": "nope"},)), RUN, pb.ARMED_BY)
+    with pytest.raises(pb.BridgeError):
+        pb._arm_run(FakeCur(one=None), RUN, pb.ARMED_BY)
+
+
+def test_a_frame_with_no_facts_version_is_refused_by_name():
+    with pytest.raises(pb.BlindFrameError) as exc:
+        pb._require_seeing_frame({"stalls": [], "vehicles": []}, RUN)
+    message = str(exc.value)
+    assert "selector.facts_version" in message
+    assert "reserved but empty" in message
+    assert "--allow-blind-frame" in message
+
+
+def test_a_frame_that_carries_the_facts_passes_and_returns_its_version():
+    frame = {"stalls": [], "vehicles": [],
+             "selector": {"facts_version": 1, "clock": "2026-09-13T12:00:00+00:00"}}
+    assert pb._require_seeing_frame(frame, RUN) == 1
+
+
+def test_the_guard_reads_the_frame_rather_than_trusting_the_arming():
+    # This is the whole design: arming is what was ASKED for, facts_version is
+    # what CAME BACK, and 0214 is the gap between them. A frame that arrives
+    # blind is refused even though the arming above said 'armed'.
+    assert pb.BlindFrameError.__mro__[1] is pb.BridgeError
+    with pytest.raises(pb.BlindFrameError):
+        pb._require_seeing_frame({"selector": {"facts_version": None}}, RUN)
+    with pytest.raises(pb.BlindFrameError):
+        pb._require_seeing_frame({"selector": "not-a-dict"}, RUN)

@@ -97,6 +97,21 @@ jobs:
       # The batch route also submits the plan as ONE sub-transaction: a refusal
       # on row k rolls back rows 1..k-1, because a half-submitted plan is not a
       # plan. The door route gives that up silently, one row at a time.
+      # THE LOOP NOW ARMS THE RUN IT PROPOSES INTO, and refuses a blind frame.
+      # Added 2026-09-14 (db/checks/0214). 0278 built ottoq_agentic_arm -- one
+      # call, all-or-nothing, receipt-checked -- and nothing ever called it. Of
+      # the seven runs that have ever carried a proposer_frame_facts row exactly
+      # ONE did, and it was a probe created to measure the blindness. So all six
+      # `proposer_live` runs, and all 329 CP-SAT proposals they produced, were
+      # solved against a frame with the selector facts off, where a stall the
+      # door had already reserved reads as free. At tick 4 on this depot the
+      # blind frame offered the solver 25 charge points and the facts frame
+      # offered 0 -- 24 reserved, 1 charger faulted.
+      #
+      # No flag appears below because arming is the DEFAULT now; --no-arm and
+      # --allow-blind-frame exist for measurement and both are explicit. Arming
+      # also refuses a certification arm outright (ERRCODE 42501), which closes
+      # that hole on the explicit --run path as well as the resolved one.
       - name: CP-SAT proposer loop (one batch per fire; ledgered; the kernel disposes)
         env:
           OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
