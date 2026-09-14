@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914193928
 -- migration-name:    0326_the_stamp_must_be_present_and_not_older_not_different
 -- ============================================================================
 -- 0326 — 0322's TRIGGER REFUSES A CORRECT WRITE, BECAUSE "THE STAMP MUST MOVE"

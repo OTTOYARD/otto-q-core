@@ -310,7 +310,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0323](db/migrations/0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql) | `20260914192648` | yes — ledger | ACROSS 1,147 SIM RUNS, NOTHING THAT STARTS A RUN HAS EVER ARMED THE |
 | [0324](db/migrations/0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql) | `20260914192738` | yes — ledger | THE RUN GUARD REFUSES CORRECTLY AND EXPLAINS ITSELF WRONGLY |
 | [0325](db/migrations/0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql) | `PENDING` | no — pending | ENERGY COMMANDS GET THE DOCK THAT VEHICLE COMMANDS ALREADY HAVE, |
-| [0326](db/migrations/0326_the_stamp_must_be_present_and_not_older_not_different.sql) | `PENDING` | no — pending | 0322's TRIGGER REFUSES A CORRECT WRITE, BECAUSE "THE STAMP MUST MOVE" |
+| [0326](db/migrations/0326_the_stamp_must_be_present_and_not_older_not_different.sql) | `20260914193928` | yes — ledger | 0322's TRIGGER REFUSES A CORRECT WRITE, BECAUSE "THE STAMP MUST MOVE" |
 
 192 migrations indexed.
 
