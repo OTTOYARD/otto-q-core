@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914073900
 -- migration-name:    0287_the_two_halves_disagree_about_what_already_placed_means
 --
 -- 0287  THE FRAME PUBLISHES WHICH KIND OF PLACE, AND WHOSE LEDGER SAYS SO
@@ -625,3 +625,32 @@ VALUES ('0287_the_two_halves_disagree_about_what_already_placed_means', false,
  'ottoq_build_decision_frame publishes five vehicle place-facts inside the existing proposer_frame_facts block -- reserved_stall_type, live_booking_stall_types, holds_charge_reservation (stalls.reserved_by, the kernel ledger), holds_charge_booking (ottoq_stall_bookings, the calendar) and their UNION holds_charge_place -- and selector.facts_version goes 1 to 2 with charge_stall_types beside it. Evidence db/checks/0221: on run c288555a the kernel armed 19 first-refusal seats and the proposer answered none, because vehicle_is_held treated ANY reservation or booking of ANY stall type as a place while ottoq_cuopt_first_refusal_arm disqualifies only a live dcfc/l2 reservation; 18 of the 19 carried nothing but a staging temp_hold. The dcfc/l2 list is READ OFF the arm predicate and P1 pins that literal. UNION not intersection because the two ledgers genuinely disagree -- 0221 found one vehicle the kernel called unplaced while the calendar held an L2 for it (filed G56); the union keeps that one skipped. The decide path is NOT touched. has_live_booking and reserved_stall_id keep their version-1 meaning and A2 proves the refactored reserved_stall_id equals the original scalar expression for every vehicle. All three facts gates widened from = 1 to >= 1: a latent trap where turning the dial up to 2 turned the block off entirely, currently masked by the catalog ceiling of 1 (A4 proves both halves). forces_recert=false is EXECUTED, not argued: A1 digests the whole facts-off frame before and after the replace and requires equality, and P3 asserts there is no global proposer_frame_facts row and the function default is still 0, so a certification arm sees an unchanged frame.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 07:39:00 UTC (2:39 AM CT) as
+-- supabase_migrations.schema_migrations version 20260914073900.
+--
+-- Dry run: the WHOLE file byte for byte inside BEGIN ... ROLLBACK, no
+-- abbreviation anywhere, clean on the first attempt. P-, P0-P4 and A1-A5 all
+-- passed, including A1's before/after equality on the facts-off frame -- so
+-- the forces_recert=false classification is a measurement, not a claim.
+--
+-- VERIFIED AFTER APPLY, read-only:
+--
+--   schema_migrations version                     20260914073900
+--   ottoq_cert_lineage.forces_recert              false
+--   rows tagged updated_by = '0287_proof'         0 (A5 removed its own scratch)
+--   ottoq_policy_params proposer_frame_facts      3, unchanged, all still 1
+--   facts-OFF frame carries a selector block      false  <-- a cert arm is blind
+--                                                          to this change
+--   prosrc contains 'CASE WHEN g.facts >= 1'      true   <-- gate widened
+--
+-- WHAT THIS FILE DOES NOT YET DO, STATED PLAINLY. The frame now PUBLISHES the
+-- five place-facts; nothing reads them yet. proposer/forward_proposer.py's
+-- vehicle_is_held still tests reserved_stall_id and has_live_booking, both of
+-- which this file left byte-identical, so the live behaviour is unchanged until
+-- the Python side consumes holds_charge_place. That ordering is deliberate: the
+-- publisher lands first and is proven inert, then the consumer changes against
+-- a frame that already carries what it needs. A frame that emits a fact nobody
+-- reads is the safe half of the change; a consumer reading a fact nobody emits
+-- is not.

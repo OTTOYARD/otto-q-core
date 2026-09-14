@@ -383,7 +383,8 @@ repo_manifest(version, name, file) AS (
     ('20260914062112'::text, '0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_does_not'::text, '0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_does_not.sql'::text),
     ('20260914064710'::text, '0284_a_hold_whose_outcome_is_invisible_can_only_be_argued_about'::text, '0284_a_hold_whose_outcome_is_invisible_can_only_be_argued_about.sql'::text),
     ('20260914065559'::text, '0285_nine_more_dials_and_two_ceilings_the_rng_declares'::text, '0285_nine_more_dials_and_two_ceilings_the_rng_declares.sql'::text),
-    ('20260914071810'::text, '0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you'::text, '0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you.sql'::text)
+    ('20260914071810'::text, '0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you'::text, '0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you.sql'::text),
+    ('20260914073900'::text, '0287_the_two_halves_disagree_about_what_already_placed_means'::text, '0287_the_two_halves_disagree_about_what_already_placed_means.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
