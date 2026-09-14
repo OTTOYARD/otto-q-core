@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914054506
 -- migration-name:    0281_the_setter_refuses_ninety_two_of_the_keys_the_engine_reads
 --
 -- 0281  THE SUPPORTED WAY TO CHANGE A DIAL REFUSES SIXTY PERCENT OF THE DIALS
@@ -243,3 +243,52 @@ VALUES ('0281_the_setter_refuses_ninety_two_of_the_keys_the_engine_reads', false
  'Adds ONE read-only view, public.ottoq_policy_catalog_gap, over pg_proc and ottoq_policy_param_catalog. Reports which policy dials ottoq_policy_set will write and which it silently refuses (92 of 152 read keys at ship time), plus catalogued-but-unread rows and the caller-supplied default at each call site. Deliberately catalogues NOTHING: 0279 established that a range must be read off its consumer, and 92 invented ranges would make ottoq_policy_set clamp real values to guessed bounds while reporting ok:true. No function is replaced, no table is written, no engine behaviour changes, and the view has no caller on the tick path. forces_recert=false: a view over the system catalogs is read-only by construction and no certification atom reads it.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 05:45:06 UTC (12:45 AM CT) as
+-- supabase_migrations.schema_migrations version 20260914054506.
+--
+-- Dry run: the file byte for byte inside BEGIN ... ROLLBACK, clean, and it is
+-- what caught the 90-vs-92 discrepancy documented above -- the looser header
+-- scan and the view's stricter one disagree by exactly two keys, both named.
+--
+-- VERIFIED AFTER APPLY, against the live database:
+--
+--   view rows                                        158
+--   status = 'ok'          (setter will write it)     60
+--   status = 'read_uncatalogued' (setter refuses)     90
+--   status = 'catalogued_unread' (dead catalog row)    8
+--   rows for refused keys, i.e. written around
+--     ottoq_policy_set with no validation at all       57
+--
+-- ---------------------------------------------------------------------------
+-- HOW TO USE THIS, because a gap report nobody runs is not a gap report
+--
+--   -- what can I actually set, and what will be silently refused?
+--   SELECT param_key, status, readers, live_rows, caller_defaults
+--     FROM public.ottoq_policy_catalog_gap
+--    WHERE status = 'read_uncatalogued'
+--    ORDER BY readers DESC, live_rows DESC;
+--
+--   -- which refused keys already have rows somebody wrote by hand?
+--   SELECT param_key, readers, live_rows, reader_functions
+--     FROM public.ottoq_policy_catalog_gap
+--    WHERE status = 'read_uncatalogued' AND live_rows > 0
+--    ORDER BY live_rows DESC;
+--
+--   -- catalog rows nothing reads (candidates for retirement, NOT for deletion
+--   -- without checking an edge function or the UI does not read them)
+--   SELECT param_key, min_value, max_value, default_value
+--     FROM public.ottoq_policy_catalog_gap WHERE status = 'catalogued_unread';
+--
+-- THE ORDER TO CATALOGUE IN is readers DESC, then live_rows DESC: a key with
+-- eleven readers and rows already written by hand is where an invented value
+-- does the most damage. calib_interval_h and pm_interval_km head that list.
+--
+-- AND THE RULE FOR EACH ONE, unchanged from 0279: read the range OFF the
+-- consumer, pin the consumer's shape in a P block so the file refuses to apply
+-- if that shape changes, and prove the clamp with a two-sided assertion. The
+-- `caller_defaults` column gives the honest default to start from. A key whose
+-- call sites DISAGREE on the default is not a cataloguing task -- it is a bug
+-- report, and it should be filed as one before any row is written.
+-- ===========================================================================
