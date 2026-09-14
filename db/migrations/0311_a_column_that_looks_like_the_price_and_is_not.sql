@@ -71,11 +71,29 @@ BEGIN
   END IF;
 
   -- P2. NOTHING READS IT. The claim the comment makes, asserted.
+  --
+  -- THIS PRECONDITION REFUSED THE FIRST APPLY, and it was right to. Written
+  -- without the exemption below it found ONE match and stopped the migration
+  -- rather than let it assert "no reader" falsely. The match is
+  -- twin.ottoq_sim_sample_lmp_usd_mwh -- the function that GENERATES the price
+  -- series (seasonal shape plus storm cards), whose own NAME contains the
+  -- quantity and which uses 'lmp_usd_mwh' as a feed-plan key and a plan label
+  -- ('lmp_usd_mwh.v1'). Those are string literals and an identifier, not a read
+  -- of public.site_energy_snapshots.lmp_usd_mwh.
+  --
+  -- It is exempted BY NAME rather than by loosening the pattern, because a
+  -- pattern relaxed until it passes is not a precondition. Any NEW function
+  -- that references the column still fails this block.
+  --
+  -- And the exemption is itself evidence for the comment this migration adds:
+  -- a dedicated sampler for this quantity exists, which is the opposite of the
+  -- retracted claim that the twin has no price.
   SELECT count(*) INTO v_readers
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname IN ('public','twin','ottoq')
      AND p.prosrc LIKE '%lmp_usd_mwh%'
-     AND p.prosrc NOT LIKE '%lmp_usd_per_mwh%';
+     AND p.prosrc NOT LIKE '%lmp_usd_per_mwh%'
+     AND p.proname <> 'ottoq_sim_sample_lmp_usd_mwh';
   IF v_readers <> 0 THEN
     RAISE EXCEPTION '0311 P2: % function(s) reference lmp_usd_mwh without the live spelling; '
                     'the column is not unread', v_readers;
