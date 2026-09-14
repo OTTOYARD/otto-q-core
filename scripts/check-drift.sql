@@ -375,7 +375,7 @@ repo_manifest(version, name, file) AS (
     ('20260914001937'::text, '0275_no_single_place_says_which_intelligence_sources_are_actually_on'::text, '0275_no_single_place_says_which_intelligence_sources_are_actually_on.sql'::text),
     ('20260914005147'::text, '0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger'::text, '0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger.sql'::text),
     ('20260914012023'::text, '0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same'::text, '0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same.sql'::text),
-    ('PENDING'::text, '0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four'::text, '0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four.sql'::text)
+    ('20260914040338'::text, '0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four'::text, '0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

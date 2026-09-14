@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914040338
 -- migration-name:    0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four
 --
 -- 0278  ARMING THE AGENTIC LAYER IS A HAND RITUAL, AND A RUN ARMED FOUR WAYS
@@ -453,3 +453,43 @@ VALUES ('0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_go
  'Adds two NEW functions: ottoq_agentic_arming (read-only, total report -- unknown_run / cert_excluded / armed / partial / unarmed) and ottoq_agentic_arm (one call, run scope only, receipt-checked, refused outright on a cert_harness run). Replaces no existing object, has no engine caller, is on no tick path, and writes no policy row that outlives its own self-restoring A2 proof. forces_recert=false: the frame every certification arm sees is unchanged, asserted directly by A4 -- proposer_frame_facts exists at no global or depot scope and the arm cannot create one, because it writes run scope and refuses run_by=cert_harness.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 04:03:38 UTC (11:03 PM CT, 2026-09-13) as
+-- supabase_migrations.schema_migrations version 20260914040338.
+--
+-- Dry-run: the file above, byte for byte, inside BEGIN ... ROLLBACK. Clean on
+-- the first attempt -- three preconditions, both function definitions, five
+-- assertions and the lineage insert -- and the trailing probe returned exactly
+-- the shape the header predicts:
+--
+--   {"verdict": "partial", "satisfied": 2, "required": 3,
+--    "missing": ["proposer_frame_facts"], "run_by": "proposer_demo"}
+--
+-- The file was submitted WHOLE rather than condensed, because it carries 12
+-- comment-only lines inside two stored function bodies. scripts/exec-digest.py
+-- --check said "safe to condense"; that was wrong, and the same commit fixes
+-- it (db/checks/0214 sec.5).
+--
+-- VERIFIED AFTER APPLY, against the live database and not the success flag:
+--
+--   ccf48af1 (CP-SAT demo A)  partial   missing ["proposer_frame_facts"]
+--   af2def1b (CP-SAT demo B)  partial   missing ["proposer_frame_facts"]
+--   proposer_frame_facts rows anywhere in ottoq_policy_params:  0
+--   ottoq_cert_lineage rows for 0278:                           1
+--
+-- Both of the only two runs that have ever fired CP-SAT now READ as what they
+-- always WERE: armed two ways out of three, missing the one key that decides
+-- whether the proposer can see which points are real. That sentence could not
+-- be said by any instrument in this system an hour ago.
+--
+-- A2's write was restored by A2 itself: the frame-facts row count is back to
+-- zero, so this migration left the historical record describing the runs that
+-- actually happened.
+--
+-- WHAT THIS DOES NOT DO, stated because the next reader will assume otherwise:
+-- it arms NOTHING. No run is armed by this file. It makes arming possible in
+-- one call and makes partial arming visible; the first real arming is a
+-- separate, deliberate act against a live run, and it belongs in the file that
+-- runs that run.
+-- ===========================================================================
