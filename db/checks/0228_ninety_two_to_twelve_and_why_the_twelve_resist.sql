@@ -1,0 +1,161 @@
+-- db/checks/0228
+-- THE DIAL CATALOGUE: 92 -> 12, THE FIVE DERIVATIONS THAT WORKED, AND WHY THE
+-- TWELVE THAT REMAIN ARE NOT WAITING ON MORE READING
+--
+-- Task #117. ottoq_policy_set REFUSES any key absent from
+-- ottoq_policy_param_catalog -- it answers {"ok":false,"error":"unknown_param"}
+-- -- so an uncatalogued dial is not a knob with an unknown range. It is a knob
+-- the agent layer physically cannot turn. That is why this mattered.
+--
+-- ===========================================================================
+-- A. THE ARC, measured at each step, not estimated
+--
+--   file   dials  gap after   what it derived the bounds from
+--   -----  -----  ---------   -------------------------------
+--   0282       ?     92 -> …  (earlier tranches)
+--   0283/5/6   ?        …      behavioural derivation, per-dial probes
+--   0289       5        61     five gates
+--   0290       3        56     INVERSION -- a negative reverses the meaning
+--   0291      18        35*    inline GREATEST/LEAST clamps, copied verbatim
+--   0296       0        37     * the 35 was WRONG; the gap view was blind
+--   0297      10        27     the comparison itself + 3 clamps 0291 missed
+--   0298       8        19     hour domain, [0,1) draw, percentage scale
+--   0299       4        15     a CHECK constraint; a clamp on the RESULT
+--   0300       3        12     a floor on the compared quantity; domain inheritance
+--
+-- 0296 is the one that moved the number the wrong way, and it is the most
+-- important entry in the table: the instrument measuring the gap was blind to
+-- five of its own call sites and reported 35 where the truth was 37. Two keys
+-- were lost to a non-overlapping global regex scan swallowing a nested call.
+-- I had quoted the 35 in a task title and a migration footer.
+--
+-- ===========================================================================
+-- B. THE FIVE DERIVATIONS, in the order of how much they prove
+--
+--   1. A CHECK CONSTRAINT on the column the dial defaults for.  (0299)
+--      vehicle_target_soc_default 20..100, copied from
+--      vehicles_target_soc_check. The database already enforces the bound on
+--      the same number; the dial inherits it.
+--
+--   2. AN INLINE CLAMP at the read site.  (0291, 0297)
+--      GREATEST(1, get(...)) is the consumer telling you its own floor. Copy
+--      it verbatim; never round it.
+--
+--   3. THE COMPARISON ITSELF.  (0297, 0298)
+--      A dial whose only use is `x >= dial` against a bounded x has exactly as
+--      many distinguishable values as x has meaningful thresholds. Against a
+--      boolean test that is {0,1}; against EXTRACT(HOUR ...) it is 0..23;
+--      against a [0,1) draw it is 0..1. The range is the COMPARAND's range.
+--
+--   4. A CLAMP ON THE RESULT, one line later.  (0299, 0300)
+--      GREATEST(1, CEIL(dial * k)) collapses every dial <= 0 onto one
+--      behaviour, so 0 is the smallest value that says anything -- even
+--      though the dial itself is never clamped.
+--
+--   5. DOMAIN INHERITANCE from a sibling producer.  (0300)
+--      When a variable is assigned from sqrt(...) on one branch and from the
+--      dial on the other, the dial cannot legitimately hold what the sqrt
+--      cannot produce.
+--
+-- What none of them is: a judgement about what value seems sensible. Every
+-- bound in the catalogue is pinned by a P block to the exact source text it
+-- was copied from, so an edited consumer refuses the migration rather than
+-- leaving a stale copy behind.
+--
+-- ===========================================================================
+-- C. THE TWELVE, AND THE SPECIFIC REASON EACH RESISTS
+--
+-- (A) BOTH SIGNS ARE MEANINGFUL -- there is no bound to read, because the
+--     consumer does something real with a negative. 6 dials.
+--
+--   timer_backstop_min        p_sim_clock_now >= scheduled_return_at +
+--                             (v_backstop_ticks || ' minutes')::interval
+--                             -- negative fires BEFORE the scheduled return.
+--   overnight_recall_hysteresis
+--                             v_to_recall := GREATEST(0, deployed - desired - hyst)
+--                             -- negative recalls MORE than the surplus.
+--   service_hold_patience_min COALESCE(v_wait_min,0) <= v_patience
+--                             -- negative means never hold; 0 means hold only a
+--                             zero-length wait. Distinguishable.
+--   staging_hold_default_min  v_clock + make_interval(mins => dial)
+--   staging_hold_max_min      -- negative is a hold that has already expired.
+--   contention_wait_cap_min   LEAST(v_wait_ticks * 30.0, v_wait_cap) <= v_max_wait_min
+--                             -- whether values below 0 collapse depends on
+--                             v_max_wait_min's sign, WHICH I HAVE NOT
+--                             ESTABLISHED. Stated as unknown rather than
+--                             assumed.
+--
+-- (B) BLOCKED BEHIND A SIBLING IN (A). 2 dials.
+--
+--   contention_wait_cap_ticks  These supply the CALLER DEFAULT of their _min
+--   timer_backstop_ticks       sibling, as `get(..._ticks, N) * 30`, so they
+--                              only take effect when the _min dial has no row
+--                              at all. Their range is the _min range divided by
+--                              30 and cannot be settled first.
+--
+-- (C) THE ONLY CATALOGUED SIBLING'S BOUND IS ITS AUTHOR'S CHOICE. 2 dials.
+--
+--   indepot_defer_max_min           Three arms of one CASE produce v_budget;
+--   indepot_defer_max_min_critical  the third, indepot_defer_max_min_immobilizing,
+--                                   is catalogued 10..720 with a rationale about
+--                                   service windows. That is reasoning ABOUT the
+--                                   engine, not a property OF it. Copying 10
+--                                   would also silently forbid a 5-minute
+--                                   critical budget, and the critical arm's own
+--                                   default is exactly 10. The comparison that
+--                                   consumes v_budget has not been read.
+--
+-- (D) NOT A SCALAR BOUND AT ALL. 1 dial.
+--
+--   l2_overflow_penalty       A weight inside an ORDER BY CASE. Its meaningful
+--                             range is relative to the magnitudes of the other
+--                             sort terms, not an interval. A min/max pair is
+--                             the wrong shape for it.
+--
+-- (E) NEEDS A BOUND THE CATALOG CANNOT EXPRESS -- G61. 1 dial.
+--
+--   metres_per_plan_unit      Needs an EXCLUSIVE minimum: 0 collapses the site
+--                             geometry. ottoq_policy_set clamps with
+--                             GREATEST(v_min, LEAST(v_max, value)), which is
+--                             inclusive on both sides and cannot express "> 0".
+--                             Held since 0290, deliberately.
+--
+-- ===========================================================================
+-- D. THE PROPOSAL FOR (A) AND (B) -- EIGHT OF THE TWELVE, ONE DECISION
+--
+-- The catalog has TWO jobs and they have been conflated. Its first job is the
+-- ALLOW-LIST: a key in it can be written, a key out of it cannot. Its second
+-- is the CLAMP. Refusing to catalogue a dial because no bound can be read
+-- treats "I have no bound" as "it must not be written" -- which is not the
+-- same claim, and is the more damaging of the two to the agent layer.
+--
+-- ottoq_policy_set's clamp is GREATEST(v_min, LEAST(v_max, value)), and
+-- LEAST/GREATEST IGNORE NULLS. So a catalog row with min_value NULL and
+-- max_value NULL admits the key and clamps nothing. That is exactly the right
+-- row for a dial whose meaningful range is genuinely unbounded.
+--
+-- This is a NEW CONVENTION and it gets its own file: measured 2026-09-14, not
+-- one of the 148 catalog rows has a NULL min_value, so nothing establishes it
+-- yet, and a reader seeing NULL/NULL today would reasonably read it as an
+-- unfinished row rather than a deliberate one. The file that introduces it has
+-- to say so in the descriptions and prove the admit-without-clamp behaviour.
+--
+-- That would leave FOUR genuinely open: the two indepot budgets (needs the
+-- comparison read), l2_overflow_penalty (wrong shape), and
+-- metres_per_plan_unit (needs G61's exclusive bounds).
+--
+-- ===========================================================================
+-- E. RE-MEASURE
+
+SELECT status, count(*) AS keys
+  FROM public.ottoq_policy_catalog_gap
+ GROUP BY status ORDER BY status;
+
+SELECT param_key, readers, live_rows, array_to_string(reader_functions, ', ') AS read_by
+  FROM public.ottoq_policy_catalog_gap
+ WHERE status = 'read_uncatalogued'
+ ORDER BY param_key;
+
+-- and the residual the key scanner cannot parse (0296), which must stay
+-- explained rather than merely small:
+SELECT * FROM public.ottoq_policy_read_site_census WHERE n_unparsed > 0 ORDER BY fn;

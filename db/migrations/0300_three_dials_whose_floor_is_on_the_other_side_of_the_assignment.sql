@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914105135
 -- migration-name:    0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment
 --
 -- 0300  THREE DIALS WHOSE FLOOR IS ON THE OTHER SIDE OF THE ASSIGNMENT
