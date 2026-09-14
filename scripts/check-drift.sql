@@ -389,7 +389,8 @@ repo_manifest(version, name, file) AS (
     ('20260914081939'::text, '0289_five_gates_and_the_one_that_tests_a_different_threshold'::text, '0289_five_gates_and_the_one_that_tests_a_different_threshold.sql'::text),
     ('20260914083734'::text, '0290_three_geometry_dials_and_one_the_catalog_cannot_express'::text, '0290_three_geometry_dials_and_one_the_catalog_cannot_express.sql'::text),
     ('20260914085632'::text, '0291_eighteen_dials_whose_consumer_already_wrote_the_range'::text, '0291_eighteen_dials_whose_consumer_already_wrote_the_range.sql'::text),
-    ('20260914090954'::text, '0292_the_proposer_cannot_see_its_own_pending_plans'::text, '0292_the_proposer_cannot_see_its_own_pending_plans.sql'::text)
+    ('20260914090954'::text, '0292_the_proposer_cannot_see_its_own_pending_plans'::text, '0292_the_proposer_cannot_see_its_own_pending_plans.sql'::text),
+    ('PENDING'::text, '0293_the_nightly_run_purge_has_never_once_run'::text, '0293_the_nightly_run_purge_has_never_once_run.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
