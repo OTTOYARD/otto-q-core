@@ -388,3 +388,59 @@ nothing about whether the column is READ.** Any `to_jsonb(t)`, `SELECT *`,
 `row_to_json`, or record-wide digest reads every column without naming one. Before
 claiming a hash cannot see a column, read the hash's shape — exclusion list or
 inclusion list — and say which.
+
+---
+
+## THE `fp` QUESTION, RESOLVED 21:52 UTC — THE INSTRUMENT IS SOUND
+
+Run with no certification scheduled and no pair in flight (round 44 closed, all
+19 jobs unscheduled), on the grid depot, which the live twin run does not touch.
+Read-only: `ottoq_boot_state_fingerprint` is `provolatile='s'`.
+
+**Both surviving hypotheses are dead, and one died to the signature alone.**
+
+**"The boot fingerprint is reachable from the horizon" — IMPOSSIBLE BY SIGNATURE.**
+
+```
+ottoq_boot_state_fingerprint(p_depot uuid, p_run uuid)   STABLE
+```
+
+There is no horizon, no tick count, no duration parameter. A 12-tick run and a
+6-tick run hand it exactly the same two arguments. The defective explanation —
+which would have meant `fp` is not a boot fingerprint at all — cannot be true.
+One `pg_get_function_arguments` settled what three rounds of inference could not,
+which is the same lesson as 0235: **read the assignment before measuring the
+value.**
+
+**"The fingerprint is sensitive to the run id" — REFUTED BY MEASUREMENT.** Three
+distinct run ids, none of which owns a single row, plus one repeat:
+
+| run id | fp |
+|---|---|
+| `11111111-aaaa-…0001` | `17ca6dae` |
+| `22222222-bbbb-…0002` | `17ca6dae` |
+| `33333333-cccc-…0003` | `17ca6dae` |
+| `11111111-aaaa-…0001` again | `17ca6dae` |
+
+Identical, and reproducible. This is the defect class that bit three times before
+— `0137` (the world fingerprint hashed a write timestamp), `0139` (the end-state
+fingerprint was not id-blind), `0216` (the decision snapshot hashed a minted
+session id) — and `fp` is not a fourth instance.
+
+### What this leaves, and it is a better place to stand
+
+`fp` depends on **the depot's world state at the moment it is taken**, and on
+nothing else. So a canon `fp` that moves after a migration which changes what the
+BOOT writes is a **legitimate canon update**, exactly as `endst` moving is. The
+original P2 prediction ("`fp` HOLDS") was not merely unsound in its premise — it
+was asking the wrong thing of a sound instrument.
+
+**The residual asymmetry is in the FIXTURE, not the instrument.** Why grid seed
+171717 boots into a world whose digest moved across the window while 239001 and
+424242 do not is a question about what `prime_deployment` writes per seed. That
+is worth answering, and it is a fixture question with no bearing on the
+determinism claim: every pair on every one of those columns was byte-identical
+across fourteen atoms.
+
+**Downgraded from an open defect to a fixture curiosity**, and recorded that way
+rather than left sitting on the round as though the engine owed an answer.
