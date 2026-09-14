@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914125444
 -- migration-name:    0305_the_catalog_becomes_the_allow_list_for_every_writer
 --
 -- 0305  THE CATALOG BECOMES THE ALLOW-LIST FOR EVERY WRITER, NOT JUST THE SETTER
