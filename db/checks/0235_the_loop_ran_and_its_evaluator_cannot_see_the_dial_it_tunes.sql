@@ -317,3 +317,138 @@
 -- plans) is CONFIRMED as necessary by D2: it is the only reason section C's
 -- numbers moved at all, and any future comparison run against a live-ticked
 -- lane is unreadable. Step 3 is unchanged.
+
+-- ===========================================================================
+-- CORRECTION 2 -- appended 2026-09-14 ~15:20 UTC. The FIRST correction was
+-- also wrong, in two of its four numbered claims, and this one says why and
+-- names the pattern.
+--
+-- Correction 1 established (i) the rig is sound and (ii) deploy_peak_fraction
+-- works. Those stand. Its (iii) and (iv) do not.
+--
+-- ---------------------------------------------------------------------------
+-- E1. WHAT (iii) AND (iv) CLAIMED, AND THE MEASUREMENT THAT BREAKS THEM
+--
+--   (iii) said "energy_demand_factor_peak IS INERT".
+--   (iv)  said "predicted_peak_kw DOES NOT RESPOND TO ANY PLAN", and built on
+--         it the stronger claim that 40% of the balanced objective is a
+--         constant.
+--
+-- Second frozen run, same scenario and depot, different seed --
+-- 103c7b46-5612-4bd6-9e31-e673e28de7f1, bench_busy_day, seed 555002,
+-- advanced by hand to tick 22 (sim 13:00), 73 deploys, metronome excluded:
+--
+--   1_current        {}                                   0.4031  peak  718
+--   2_peak_hi        {energy_demand_factor_peak:   0.90}  0.3391  peak 1118
+--   3_expensive_lo   {energy_demand_factor_expensive:0.05} 0.4031  peak  718
+--   4_expensive_hi   {energy_demand_factor_expensive:0.95} 0.4031  peak  718
+--
+-- energy_demand_factor_peak moved the predicted peak by 400 kW and the score
+-- by 0.064. So it is NOT inert, and predicted_peak_kw DOES respond to a plan.
+-- Both of correction 1's headline claims are false as written.
+--
+-- ---------------------------------------------------------------------------
+-- E2. THE PATTERN, NAMED, BECAUSE IT IS NOW THREE FOR THREE
+--
+-- Original section D: generalised from ONE run whose base was moving.
+-- Correction 1: generalised from ONE frozen window.
+-- The tariff-branch theory below: generalised from ONE line of source.
+--
+-- Every one of those was a single sample presented as a property of the
+-- system. The measurements were real each time; the SCOPE of the conclusion
+-- was not. Correction 1 even criticised the original for exactly this and then
+-- did it again with a better-controlled sample.
+--
+-- ---------------------------------------------------------------------------
+-- E3. THE TARIFF-BRANCH THEORY -- RAISED AND KILLED IN THE SAME PASS
+--
+-- ottoq_energy_orchestrate reads the dial in one place:
+--
+--   v_lmp := COALESCE(v_lmp, 40);  v_expensive := v_lmp > 60;
+--   v_demand_target := v_service_max * (CASE WHEN v_expensive
+--        THEN ottoq_policy_get(...,'energy_demand_factor_expensive',0.35)
+--        ELSE ottoq_policy_get(...,'energy_demand_factor_peak',   0.50) END);
+--
+-- so exactly one of the two energy dials is live at any instant, selected by
+-- price. That looked like a clean explanation for a window where the peak dial
+-- did nothing: the window must be "expensive", so the other dial governs.
+--
+-- IT IS NOT THE EXPLANATION. Measured: lmp_usd_mwh is NULL in every
+-- site_energy_snapshots row of BOTH runs, so v_lmp is 40, v_expensive is
+-- FALSE, and energy_demand_factor_peak is the governing dial in BOTH. The
+-- branch is identical in the window where the dial worked and the window where
+-- it did not.
+--
+-- ---------------------------------------------------------------------------
+-- E4. AND THAT KILL TURNED UP THE MOST USEFUL FINDING IN THIS FILE
+--
+-- The NULL is not local to these two probes:
+--
+--   public.site_energy_snapshots   24,898 rows over 1,108 distinct sim runs
+--   rows with a non-NULL lmp_usd_mwh                                     0
+--   runs with a non-NULL lmp_usd_mwh                                     0
+--
+-- THE TWIN HAS NO ELECTRICITY PRICE. Not once, in the engine's whole history.
+-- Two consequences, and the second is a product statement:
+--
+--   1. v_expensive has been FALSE for every tick ever simulated, so
+--      energy_demand_factor_expensive -- a catalogued dial with a default of
+--      0.35 -- has never governed anything. It is live code on an unreachable
+--      branch. (This is the G66 / db/checks/0232 class: a catalogued dial
+--      nothing effectively reads. It belongs on that list.)
+--
+--   2. Chase's instruction for the live loop was that it should analyse "what
+--      they would come in contact with from a real time scenario with live
+--      vehicles... It should mimic work models and variables." Price is one of
+--      the largest real variables in depot energy economics -- it is what makes
+--      load-shifting worth money -- and the twin does not model it. The
+--      engine is BUILT to respond to it (the branch exists, the dial exists,
+--      the column exists) and has never been given one. That is a gap in the
+--      twin, not in the engine.
+--
+-- ---------------------------------------------------------------------------
+-- E5. WHAT IS ACTUALLY ESTABLISHED NOW -- and this list is deliberately short
+--
+--   ESTABLISHED
+--   1. The MPC rig is deterministic and position-independent. A duplicate plan
+--      placed at the opposite end of the list returns identical results, in
+--      both frozen runs.
+--   2. Plan parameters take effect. deploy_peak_fraction changed throughput
+--      0 vs 5 and readiness 9 vs 0 (run 45c8cc1b);
+--      energy_demand_factor_peak changed peak 718 vs 1118 (run 103c7b46).
+--   3. predicted_peak_kw responds to a plan. (Refutes correction 1 (iv).)
+--   4. THE EFFECT IS CONDITIONAL ON WORLD STATE. In run 45c8cc1b's window both
+--      extremes of energy_demand_factor_peak tied with the empty plan; in run
+--      103c7b46's window they did not. Same scenario, same depot, same tick
+--      index, different seed.
+--   5. lmp_usd_mwh is NULL across all 24,898 rows / 1,108 runs.
+--   6. energy_demand_factor_expensive was inert in run 103c7b46 -- which is
+--      CORRECT behaviour given (5), not a defect in the dial.
+--
+--   NOT ESTABLISHED -- and no theory is offered for any of it
+--   a. Why run 45c8cc1b's window was insensitive to the peak dial. The
+--      plausible mechanic is that v_demand_target was not binding there
+--      (the dial only multiplies a ceiling; a ceiling above actual load
+--      changes nothing). NOT TESTED. Testing it means reading v_demand_target
+--      and the realised load in the same window, not inferring from outcomes.
+--   b. Whether 40% of the objective is meaningfully movable in a typical
+--      window. Correction 1 asserted it was constant; that is withdrawn, but
+--      "it moves sometimes" is not the same as "the loop can steer it".
+--
+-- ---------------------------------------------------------------------------
+-- E6. THE DECISION, UNCHANGED, FOR A BETTER-UNDERSTOOD REASON
+--
+-- The loop stays OFF the schedule. But the reason is now different and much
+-- less alarming than section E of the original implied:
+--
+-- The loop is not broken. It is MYOPIC. It evaluates a 3-tick horizon from
+-- wherever the run happens to be, and in a window where the demand ceiling is
+-- not binding, every energy plan ties with doing nothing -- so it correctly
+-- adopts nothing. That is exactly what it did on its first live tick
+-- ("Current policy is best (0.469)"). A loop that only ever samples windows
+-- where its levers are slack will produce an adoption ledger of honest
+-- non-adoptions and look like it converged.
+--
+-- So before scheduling, the open question is no longer "is the evaluator
+-- broken" but "does the loop ever evaluate a window where its levers bite,
+-- and how would we know". That is answerable and it is the next piece of work.
