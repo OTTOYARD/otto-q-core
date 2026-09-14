@@ -3,6 +3,30 @@
 --
 -- 0288  A SEAT IS ONLY WORTH HOLDING IF THERE IS SOMETHING TO OFFER
 --
+-- ############################################################################
+-- HELD. DRAFTED, DRY-RUN, AND DELIBERATELY NOT APPLIED. See db/checks/0223.
+--
+-- This file was written believing saturation explained every unanswered seat.
+-- The second post-fix run was then checked and it does not: of the twenty
+-- unanswered seats across both runs, 7 are saturation and 13 are CADENCE --
+-- the proposer never fired inside the seat's one tick at all. On run 36e5cc68
+-- the separation is perfect: every seat armed at a tick the loop fired on was
+-- answered (15 of 15, including one where a single charge stall was free), and
+-- every seat armed at a tick it did not fire on went unanswered (12 of 12).
+--
+-- Three reasons this is not applied tonight:
+--   1. Its justification shrank from "all twenty" to "seven of twenty".
+--   2. Fixing cadence moves where seats are armed and whether they are
+--      answered, so this guard's value can only be sized honestly afterwards.
+--      Tuning against a number that is about to move is how a change gets
+--      credited with someone else's improvement.
+--   3. It edits the DECIDE PATH, the one place where "small, safe and probably
+--      fine" is not a good enough reason to ship.
+--
+-- Everything below is kept as drafted, measurements intact, so it can be
+-- re-argued rather than re-derived once G58 (cadence) is closed.
+-- ############################################################################
+--
 -- 0219 filed G54 as "the hold has no liveness check" and proposed asking
 -- whether a proposer is alive. 0221 showed the proposer was very much alive and
 -- the two halves simply disagreed about "already placed"; 0287 fixed that and
