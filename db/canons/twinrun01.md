@@ -83,6 +83,99 @@ consumer for either dock is still unbuilt (G70, G8).
 
 ---
 
-## THE JUDGEMENT
+## THE JUDGEMENT — 2026-09-14 21:45 UTC (4:45 PM CT)
 
-_(pending — written when the run lands)_
+**Run `34ffb2d9-bcc6-4232-bbfc-d2c4d51e4ec5`**, `busy_day`, seed 909090,
+`run_by='otto_twin'`, started 21:43:32 UTC through `public.ottoq_sim_run_scenario`
+— the function `otto-twin-control`'s `POST /scenarios/start` calls. Advanced by
+pg_cron job 12, not by hand. Read at tick 7.
+
+**All five predictions held.** The chain moves end to end.
+
+| hop | | reading |
+|---|---|---|
+| 0 | RUN | busy_day seed=909090 running, 7 ticks, clock 09-15 01:13 |
+| 1 | **ARM** | **armed** — all three dials verified set on the run itself |
+| 2 | world: telemetry | 205 packets, 201 positioned, 71 vehicles |
+| 3 | world: energy commands | 14 — bess_setpoint_kw, charge_cap_kw |
+| 4 | need: visit needs | 66 — open=40 in_progress=26 |
+| 5 | **FORECAST coverage** | **14/14**, all stamped, newest stamp = the run's own clock |
+| 6 | FORECAST provenance | computed:distance_over_speed=56 (**14 distinct**), fixture:prime_deployment=15 (1 distinct) |
+| 7 | recall | 205 decisions, naive_threshold_v1 |
+| 8 | **AGENT proposals** | 19 — greedy_constrained: 8 enacted, 8 pending, 3 superseded |
+| 9 | AGENT deferrals | 32 |
+| 10 | KERNEL disposed | 420 — (no source)=360, inspect_seam=30, reservation_honoured=18, **greedy_constrained=9**, deterministic_fallback=2 |
+| 11 | SHIELD | 1,118 evaluations, 1 refusal |
+| 12 | ASSET bookings | 315 |
+| 13 | ASSET commands | 175 — begin_charge, proceed_to_stall, stage |
+| 14 | OUTBOUND delivered | **0/175** — correct, and predicted |
+| 15 | OUTCOME SDRs | 50 |
+
+### P1 — hop 1 reads `armed`: **HELD.**
+
+`payload->'agentic_arm' = {"ok": true}`, and the receipt is not a claim: read
+back through `ottoq_policy_get` on this run, `proposer_frame_facts=1`,
+`proposer_hold_enabled=1`, `cuopt_first_refusal_max_defers=1`. Before 0323,
+across 1,147 runs, no database function and no edge function had ever called
+`ottoq_agentic_arm`. **This is the first run in the engine's life to arm itself
+at the door**, and the twenty certification runs since 0323 correctly refused.
+
+### P2 — hop 5 stops reading 0 of N: **HELD, and this was the one that mattered.**
+
+**14 of 14 active dispatches carry a forecast**, every one stamped, newest stamp
+equal to the run's own sim clock. The pre-0321 baseline was **0 of 68** — and
+every one of those 68 was an orphan of a completed or aborted run, which is why
+this could not be settled without a live run. **0321's per-tick refresh is on
+the live path.** The forecast work is now proven on live traffic, not only on
+completed traffic (db/checks/0245).
+
+### P3 — a `computed:*` label holding more than one value: **HELD.**
+
+`computed:distance_over_speed` = 56 rows over **14 distinct** minute values, and
+`fixture:prime_deployment` = 15 rows over exactly **1** — which is correct, it is
+a fixture constant. The distinct-value column separates a real computation from a
+constant wearing a computation's name in the same glance, which is what it was
+added for.
+
+### P4 — hop 8 not required to be non-zero: **it was non-zero, and disposed.**
+
+19 proposals from `greedy_constrained` — 8 enacted, 8 pending, 3 superseded — and
+hop 10 attributes **9 disposed decisions to `greedy_constrained`**. 32 deferrals:
+32 ticks where the kernel held a seat for a proposer before deciding itself.
+**"Agents propose, solver disposes" is measured here, not asserted.**
+
+### P5 — hop 14 reads 0 of N and that is correct: **HELD.**
+
+0 of 175. Predicted in advance precisely so it could not be misread: the twin
+executes a command in-process and never takes delivery. G70 is unmoved by this
+run and was never going to be.
+
+---
+
+## WHAT THE RUN ALSO SHOWED, unprompted
+
+**1. `ottoq_agentic_arm` does not arm the cuOpt post path, and the name invites
+the opposite reading.** Measured on this run: `cuopt_propose_enabled = 0`. There
+is no run-scoped row — it resolves from the **global** tier, set to 0 on 09-02 by
+`0152_deterministic_only`, whose catalog entry says in its own words: *"global
+tier is 0 - the deterministic core runs alone. Re-enable per run with a
+run-scoped 1."* Arming sets three dials and that is not one of them.
+
+Given the standing decision to cut cuOpt this is the RIGHT state, not a defect —
+and the dial gates `cuopt_refresh` and the `cron_tick` orchestrate-tick edge post
+specifically, neither of which is the in-database proposer that produced hop 8's
+19 proposals, nor the external CP-SAT bridge. But "armed" must not be read as
+"every proposer path is open", and this file is where that is written down.
+
+**2. Attribution is still the weak column.** Hop 10: 360 of 420 disposed
+decisions carry no `source` in `enacted_action`, i.e. 86% — consistent with G67's
+~87% fleet-wide. The 60 that do carry one are the only decisions attributable to
+anything at all. The hop's own note says this; it is the reason the source
+breakdown, not the total, is the number to read.
+
+**3. The two doors have different scenario libraries.** `ottoq_sim_run_scenario`
+resolves against `ottoq_sim_scenarios WHERE status='available'` — ten scenarios,
+and `bench_busy_day` is not among them. The certification's door,
+`twin.ottoq_sim_start_run`, runs `bench_*` scenarios the UI cannot reach. Not a
+defect; worth knowing before anyone assumes a scenario name works at both doors.
+This run used `busy_day`, the flagship scenario, with a seed no canon uses.
