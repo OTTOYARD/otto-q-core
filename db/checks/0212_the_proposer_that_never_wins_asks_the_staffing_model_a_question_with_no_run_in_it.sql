@@ -198,3 +198,153 @@ SELECT ln, l FROM lines
  WHERE l LIKE '%ottoq_l2_external_proposal(p_sim_run_id, ''service_sequencing''%'
     OR l LIKE '%ottoq_l2_propose_service(v_req.vehicle_id%'
  ORDER BY ln;
+
+-- =====================================================================
+-- CORRECTION 2026-09-14 03:30 UTC (10:30 PM CT, 2026-09-13)
+-- THIS FILE REDISCOVERED G47 AND GAVE IT A SHALLOWER CAUSE
+-- =====================================================================
+-- db/checks/0188 -- "the service proposer is heard, consumed, and
+-- physically unable to win" -- root-caused this same 0-for-N on
+-- 2026-09-13, THE DAY BEFORE this file was written, and its answer is
+-- the better one:
+--
+--   "a resource is taken earlier in the same tick than the proposer's
+--    turn to use it"
+--
+-- 0188 measured 446 decisions naming ottoq_service_priority as the
+-- enacted source, every one noop_no_candidate, and found the two
+-- service bays booked 1,725 times in three days by section (4b) --
+-- which runs at decide_tick line ~846, EARLIER IN THE SAME FUNCTION
+-- BODY than section (5)'s seat at line 965.
+--
+-- WHAT THAT MEANS FOR THE FINDING ABOVE. The NULL run argument is real
+-- -- ottoq_service_priority_propose does pass NULL to a run-scoped
+-- staffing function, and twin.ottoq_sim_lane_capacity does return the
+-- raw physical number for a NULL run. That is a genuine defect of the
+-- 0145 class and it is worth fixing. But it is NOT why this proposer
+-- has never won, and this file implied that it was.
+--
+-- Fixing the argument would make the proposer propose LESS OFTEN. On
+-- the occasions it still proposed, section (4b) would already have
+-- taken the bays and the outcome would be identical. The header above
+-- says "the fix is one argument"; that is wrong, and the sentence
+-- "MECHANISM" should be read as "a second, independent defect".
+--
+-- G50 is therefore DEMOTED to a secondary bug, and G47/0188 holds the
+-- root cause. The two are not in conflict; they are at different
+-- depths, and this file mistook the shallower one for the whole story.
+--
+-- ---------------------------------------------------------------------
+-- AND THE SAME DEFECT EXPLAINS G49, MEASURED HERE
+--
+-- db/checks/0211 recorded 23 CP-SAT proposals that met
+-- noop_no_candidate as a LEAD, saying the state that would settle it
+-- was gone. It was not gone -- ottoq_stall_bookings still holds it.
+-- Measured on run 33f87a41-3f0e-41c6-8da8-608376d56d6a (query in §8):
+--
+--   23 of 23   the stall CP-SAT named was booked in that same run
+--   23 of 23   booked for a DIFFERENT vehicle
+--   18 of 23   booked BEFORE CP-SAT proposed
+--    5 of 23   booked between proposing and being considered
+--    0 of 23   booked after the decision
+--
+--   who took them: otto_q / otto_q_enacted / otto_q_reaction
+--   for what:      charge_dcfc, charge_l2
+--
+-- So the dominant cause for CP-SAT (18 of 23, 78%) is NOT the in-tick
+-- race that beats the service proposer -- it is that THE FRAME CP-SAT
+-- SOLVED AGAINST WAS ALREADY STALE WHEN IT SOLVED. Same family, one
+-- level earlier: the proposer's view of the world and the kernel's
+-- commitment of the world are not synchronised, and nothing compares
+-- them.
+--
+-- THE DETECTOR IS HALF-BUILT, AND MEASURING IT CORRECTED THE FIRST
+-- DRAFT OF THIS PARAGRAPH. The claim I started to write -- that
+-- ottoq_build_decision_frame stamps frame_hash -- IS FALSE. Measured
+-- (query in §9): frame_hash exists in exactly two places in this
+-- database, the column ottoq_proposer_fire_log.frame_hash and the
+-- function ottoq_proposer_submit_batch that writes it.
+-- ottoq_build_decision_frame does not compute it, ottoq_decide_tick does
+-- not read it, ottoq_l2_external_proposal does not read it, and
+-- ottoq_submit_external_proposal does not carry it.
+--
+-- So the hash is computed CLIENT-SIDE by the bridge and deposited in a
+-- log. The kernel neither computes the identity of the world it handed
+-- out nor compares it to the world it is judging against. A proposal is
+-- never checked against the world it was computed from, and the engine
+-- has no way to check it even if it wanted to.
+--
+-- ONE DEFECT, THREE SYMPTOMS, previously filed as three findings:
+--   G47 / 0188   service proposer   446/446  resource taken earlier in tick
+--   G49 / 0211   CP-SAT              23/23   frame stale before it solved
+--   (advisor)    llm_advisor         22/24   stall occupied or reserved
+-- G49 is CLOSED by the measurement below. G47 stands. G50 is demoted.
+-- =====================================================================
+
+-- §8  THE MEASUREMENT THAT CLOSES G49. Re-runnable against any run.
+WITH p AS (
+  SELECT pr.proposal_id, pr.entity_id, pr.created_at AS proposed_at,
+         (pr.proposal->>'stall_id')::uuid AS want_stall
+    FROM public.ottoq_external_proposals pr
+   WHERE pr.sim_run_id = '33f87a41-3f0e-41c6-8da8-608376d56d6a'
+     AND pr.source = 'forward_lex'
+     AND NOT COALESCE((pr.proposal->>'abstain')::boolean, false)
+), nxt AS (
+  SELECT p.proposal_id, p.entity_id, p.proposed_at, p.want_stall,
+         d.outcome_status, d.created_at AS decided_at,
+         row_number() OVER (PARTITION BY p.proposal_id ORDER BY d.created_at) rn
+    FROM p LEFT JOIN public.ottoq_decisions d
+      ON d.sim_run_id = '33f87a41-3f0e-41c6-8da8-608376d56d6a'
+     AND d.action_context = 'stall_assignment'
+     AND d.entity_id = p.entity_id
+     AND d.created_at >= p.proposed_at
+), lost AS (SELECT * FROM nxt WHERE rn = 1 AND outcome_status = 'noop_no_candidate'),
+   b AS (
+  SELECT l.proposal_id, l.proposed_at, l.decided_at,
+         min(bk.booked_at)                     AS first_rival_booking,
+         string_agg(DISTINCT bk.booked_by, ',') AS rival_bookers,
+         string_agg(DISTINCT bk.purpose,   ',') AS rival_purposes
+    FROM lost l
+    JOIN public.ottoq_stall_bookings bk
+      ON bk.stall_id   = l.want_stall
+     AND bk.sim_run_id = '33f87a41-3f0e-41c6-8da8-608376d56d6a'
+     AND bk.vehicle_id <> l.entity_id
+   GROUP BY 1,2,3)
+SELECT count(*)                                                          AS n,
+       count(*) FILTER (WHERE first_rival_booking <  proposed_at)        AS taken_BEFORE_proposed,
+       count(*) FILTER (WHERE first_rival_booking >= proposed_at
+                          AND first_rival_booking <= decided_at)         AS taken_BETWEEN,
+       count(*) FILTER (WHERE first_rival_booking >  decided_at)         AS taken_AFTER_decision,
+       string_agg(DISTINCT rival_bookers,  ' | ')                        AS who_took_them,
+       string_agg(DISTINCT rival_purposes, ' | ')                        AS for_what
+  FROM b;
+-- MEASURED 2026-09-14 03:2x UTC: 23 | 18 | 5 | 0 |
+--   otto_q_enacted | otto_q,otto_q_enacted | otto_q,otto_q_enacted,otto_q_reaction
+--   charge_dcfc | charge_l2
+
+-- §9  WHERE frame_hash ACTUALLY LIVES. Two places, and neither is on
+--     the read or the disposal path. Run both halves.
+SELECT n.nspname||'.'||p.proname AS fn,
+       (regexp_replace(regexp_replace(p.prosrc,'/\*.*?\*/','','g'),
+                       '--[^' || chr(10) || ']*','','g') ~ 'frame_hash') AS mentions_frame_hash
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE n.nspname IN ('public','ottoq','twin')
+   AND p.proname IN ('ottoq_build_decision_frame','ottoq_decide_tick',
+                     'ottoq_l2_external_proposal','ottoq_submit_external_proposal')
+ ORDER BY 1;
+-- MEASURED: false for all four, including the frame builder itself.
+
+SELECT 'column' AS kind, table_name||'.'||column_name AS where_it_is
+  FROM information_schema.columns
+ WHERE table_schema='public' AND column_name ILIKE '%frame_hash%'
+UNION ALL
+SELECT 'function', n.nspname||'.'||p.proname
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE n.nspname IN ('public','ottoq','twin')
+   AND regexp_replace(regexp_replace(p.prosrc,'/\*.*?\*/','','g'),
+                      '--[^' || chr(10) || ']*','','g') ~ 'frame_hash'
+ ORDER BY 1,2;
+-- MEASURED: exactly two rows --
+--   column   ottoq_proposer_fire_log.frame_hash
+--   function public.ottoq_proposer_submit_batch
+-- The bridge computes it, one function logs it, nothing compares it.
