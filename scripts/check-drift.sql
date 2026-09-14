@@ -379,7 +379,8 @@ repo_manifest(version, name, file) AS (
     ('20260914040837'::text, '0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog'::text, '0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog.sql'::text),
     ('20260914043322'::text, '0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid'::text, '0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid.sql'::text),
     ('20260914054506'::text, '0281_the_setter_refuses_ninety_two_of_the_keys_the_engine_reads'::text, '0281_the_setter_refuses_ninety_two_of_the_keys_the_engine_reads.sql'::text),
-    ('20260914061049'::text, '0282_two_dials_whose_ranges_the_database_already_declares'::text, '0282_two_dials_whose_ranges_the_database_already_declares.sql'::text)
+    ('20260914061049'::text, '0282_two_dials_whose_ranges_the_database_already_declares'::text, '0282_two_dials_whose_ranges_the_database_already_declares.sql'::text),
+    ('20260914062112'::text, '0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_does_not'::text, '0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_does_not.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

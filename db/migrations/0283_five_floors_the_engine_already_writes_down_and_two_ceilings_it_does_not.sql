@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914062112
 -- migration-name:    0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_does_not
 --
 -- 0283  SEVEN MORE DIALS, AND THE FIRST HONEST NULLS
@@ -453,3 +453,34 @@ VALUES ('0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_doe
  'Seven rows in ottoq_policy_param_catalog: depot_night_start_hour [0,23]/20 and depot_night_end_hour [0,23]/6 (compared against EXTRACT(HOUR ...) in ottoq_is_depot_night), overnight_holdout_pct [1,100]/1 (both bounds in one line of ottoq_is_overnight_holdout: (hash % 100) < GREATEST(1, pct)), and four half-bounded dials whose floor the consumer writes down and whose ceiling nothing in the engine declares -- return_eta_minutes min 1 (GREATEST(1, ...) in its own accessor), service_bay_default_min and wash_bay_default_min min 1 (both readers floor the window at interval ''1 minute''), visit_readmit_max_attempts min 0 (GREATEST(..., 0) in both readers). Those four carry max_value NULL on purpose: ottoq_policy_set computes GREATEST(min, LEAST(max, v)) and LEAST/GREATEST ignore NULLs, so a NULL bound is no clamp on that side rather than a broken one, and A3 proves it two ways (a huge value passes unclamped with an open safe_range, every declared floor still fires). Inventing a ceiling would be the exact failure this task exists to avoid. P1-P5 pin each derivation; P6 checks the 2 live rows first. forces_recert=false, asserted in P0: ottoq_policy_get never reads the catalog, so these rows are consumed only by ottoq_policy_set, which no certification arm calls. The 2 live rows (the global night window, 20 -> 6) are untouched and re-asserted in A5.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 06:21:12 UTC (1:21 AM CT) as
+-- supabase_migrations.schema_migrations version 20260914062112.
+--
+-- Dry run: the file byte for byte inside BEGIN ... ROLLBACK, clean on the
+-- first attempt. P-, P0-P6 and A1-A6 all passed, and a post-rollback re-count
+-- confirmed it left nothing behind: 0 catalog rows, the original 2 live rows,
+-- 0 rows tagged 0283.
+--
+-- VERIFIED AFTER APPLY, read-only (0279's closing note: a probe that mutates
+-- is part of the change and belongs inside the transaction that can roll it
+-- back -- so the clamps are proven by A2/A3, not re-poked afterwards):
+--
+--   ottoq_policy_catalog_gap, read_uncatalogued   88 -> 81
+--   ottoq_policy_catalog_gap, ok                  62 -> 69
+--   ottoq_policy_param_catalog rows               70 -> 77
+--   rows left behind by the proof                       0
+--
+-- THE ASSERTION WORTH KEEPING FROM THIS FILE IS A3.
+-- Four of these seven rows carry max_value NULL, and every one of them would
+-- be a serious defect if LEAST(NULL, v) behaved the way it looks -- a bay
+-- duration pinned to one minute, an ETA pinned to one minute, readmit pinned
+-- to zero attempts, silently, on every write through the supported setter.
+-- A3 proved it in both directions inside the transaction: 100000 minutes came
+-- back applied verbatim with clamped:false and an open upper bound in
+-- safe_range, and the floors still fired on 0 and -5.
+--
+-- Nine of the ninety are catalogued now, and none of the nine ranges was
+-- chosen. That is the only pace this work can honestly go.
+-- ===========================================================================
