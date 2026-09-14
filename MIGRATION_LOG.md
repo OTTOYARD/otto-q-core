@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0311 — GENERATED, not a log
+## Index, 0134–0312 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -296,7 +296,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0309](db/migrations/0309_benchmark_had_everything_except_a_scenario.sql) | `20260914144547` | yes — ledger | THE BENCHMARK DEPOT HAD 160 STALLS, 100 VEHICLES AND NO WAY TO START |
 | [0310](db/migrations/0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row.sql) | `20260914150516` | yes — ledger | 0308 AND 0309 EACH ARGUED forces_recert=false AT LENGTH AND NEITHER |
 | [0311](db/migrations/0311_a_column_that_looks_like_the_price_and_is_not.sql) | `20260914153500` | yes — ledger | site_energy_snapshots.lmp_usd_mwh IS NULL IN EVERY ROW EVER WRITTEN, |
+| [0312](db/migrations/0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql) | `PENDING` | no — pending | ottoq_forecast_net_load's FUTURE-ARRIVAL LOOP COMPUTES EACH VEHICLE'S |
 
-177 migrations indexed.
+178 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
