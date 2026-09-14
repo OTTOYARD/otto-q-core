@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914012023
 -- migration-name:    0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same
 --
 -- 0277  A SOURCE THAT HAS PROPOSED AND ONE THAT HAS NEVER EXISTED READ THE SAME
@@ -530,3 +530,36 @@ VALUES ('0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the
         'ottoq_intelligence_snapshot gains proposals/proposals_enacted/last_proposal_at; the refresh scans ottoq_external_proposals (15,709 rows) alongside the decision ledger and attributes both through l2_engine_labels; ottoq_intelligence_status gains a fifth state PROPOSED, ranked below INVOKED. Read-only census objects, no engine caller, no dial, no tick-path change; ottoq_decide_tick and ottoq_determinism_pair pinned byte-identical by A6.',
         now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 01:20:23 UTC (8:20 PM CT, 2026-09-13) as
+-- supabase_migrations.schema_migrations version 20260914012023.
+--
+-- Dry-run: the file above, byte for byte, inside BEGIN ... ROLLBACK, twice --
+-- and the FIRST dry run is the reason this file has the shape it has. It
+-- refused with 42P13 (cannot change return type of existing function) because
+-- the draft added three OUT parameters to ottoq_intelligence_status(). Postgres
+-- wants a DROP for that and APPLYING.md says never DROP, so the signature was
+-- reverted to 0275's exactly and the counts moved to the snapshot table, where
+-- the assertions read them. That is the better shape anyway: the defect was a
+-- proposer reading DECLARED, and the state column already existed.
+--
+-- The second dry run ran clean and the rollback was verified afterwards
+-- (no column, no lineage row, no schema snapshot, anthropic still DECLARED).
+--
+-- VERIFIED AFTER APPLY:
+--
+--   state      source                  dec   enacted  props  props_enacted  silent
+--   FOLLOWED   greedy_constrained   87,004    84,155 12,600          4,169     0.0
+--   FOLLOWED   nemotron                301       301      0              0     0.0
+--   FOLLOWED   cuopt                    27        27    136             27   356.6
+--   FOLLOWED   cpsat                     6         6    329              6     0.0
+--   INVOKED    ottoq_service_priority  462         0  2,380              0     0.2
+--   PROPOSED   anthropic                 0         0     24              0     0.0
+--
+-- Six rows, six different true things. anthropic is PROPOSED rather than
+-- DECLARED, which is the whole point. ottoq_service_priority keeps INVOKED with
+-- 2,380 proposals and nothing enacted on either stream -- db/checks/0212's
+-- finding, now legible at a glance. cuopt is followed and switched off. cpsat
+-- is followed and live.
+-- ===========================================================================
