@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914131308
 -- migration-name:    0306_a_null_dial_value_silently_wrote_the_maximum
 --
 -- 0306  A NULL DIAL VALUE SILENTLY WROTE THE MAXIMUM, AND SAID ok:true

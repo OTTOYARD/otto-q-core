@@ -402,7 +402,8 @@ repo_manifest(version, name, file) AS (
     ('20260914121021'::text, '0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog'::text, '0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog.sql'::text),
     ('20260914122818'::text, '0303_a_bound_that_cannot_be_clamped_must_refuse'::text, '0303_a_bound_that_cannot_be_clamped_must_refuse.sql'::text),
     ('20260914124522'::text, '0304_five_more_floors_and_six_dials_admitted_without_a_clamp'::text, '0304_five_more_floors_and_six_dials_admitted_without_a_clamp.sql'::text),
-    ('20260914125444'::text, '0305_the_catalog_becomes_the_allow_list_for_every_writer'::text, '0305_the_catalog_becomes_the_allow_list_for_every_writer.sql'::text)
+    ('20260914125444'::text, '0305_the_catalog_becomes_the_allow_list_for_every_writer'::text, '0305_the_catalog_becomes_the_allow_list_for_every_writer.sql'::text),
+    ('20260914131308'::text, '0306_a_null_dial_value_silently_wrote_the_maximum'::text, '0306_a_null_dial_value_silently_wrote_the_maximum.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
