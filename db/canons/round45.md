@@ -183,3 +183,64 @@ So the honest statement is: *the schedule is merged to the default branch and it
 certification guard is verified; it has not yet fired on its own.* Whether it
 does is a measurement for the next check, not something to assert because the
 file says `*/5`.
+
+
+---
+
+## FINAL VERDICT — 23:40 UTC, ROUND STOPPED EARLY AND DELIBERATELY
+
+**All ten columns ran post-migration. Every canon is identical to its pre-round
+value. Zero determinism failures.**
+
+| column | passes | fp | endst | dec | cmd |
+|---|---|---|---|---|---|
+| grid 239001/6 | 2 | 66275ea7 | 1155bdfe | bd7f4e92 | 1b9920dc |
+| grid 424242/6 | 2 | 4cac51f0 | a7746025 | 8671fb10 | e4158c95 |
+| grid 171717/12 | 2 | a26925d6 | 2613677a | 3522066d | 2a1d2c32 |
+| 12t/171717/busy | 2 | 9c28854e | 3caf508f | 5e03ebd0 | e07b4d2f |
+| 12t/171717/normal | 2 | 9c28854e | d3953462 | 5a8a186d | 68dcd195 |
+| 12t/314159/busy | 2 | b8606125 | 59f5d813 | 69e6a60a | 0c6a5fb5 |
+| 12t/424242/busy | 1 | 7a14aa52 | a6c72d36 | 3670a7e2 | c5278b05 |
+| 24t/171717/busy | 1 | 9c28854e | a0490528 | cf474410 | aa851116 |
+| 24t/424242/busy | 1 | 7a14aa52 | de5389db | 7d901d85 | 231293b7 |
+| 48t/171717/busy | 1 | 9c28854e | afd9f58d | 508e9323 | 700c0bd1 |
+
+**P2 — `0325` moves nothing: HELD, on all ten columns.** The dock's own argument
+survived its widest available test. `h_nrg` hashes an explicit column list that
+contains none of the four delivery columns; the claim path is gated to production
+while a certification is entirely twin; the columns stayed NULL in both arms. A
+migration classified `forces_recert = TRUE` on the principle that *"should change
+nothing" is a prediction, not a classification* — and the prediction was right.
+
+**P3 — the floor lands on `0325`, not `0327`: HELD, exactly.** `0327` applied 52
+seconds later and was correctly excluded because it is `forces_recert = false`.
+The flag is enforced by the mechanism, not merely recorded.
+
+**P1 — every column green: NOT COMPLETED, and stopped on purpose.** Six columns
+reached two passes; four sat at one. The four remaining second arms were
+unscheduled at 23:40.
+
+### Why stopping was right, and what it says about rounds
+
+**The second arms could not have added anything to the question this round asked.**
+P2 is "did `0325` disturb any canon" — and that is answered by a column's FIRST
+post-migration pair. The second arm only converts `1 pass` into `green / 2
+passes`, which is a *streak* property of the canon matrix, not evidence about the
+migration. Ten of ten columns had already answered.
+
+Chase's point, and it is correct: **a two-hour round is a release gate, not a
+development loop.** During an iteration phase — where the staging and
+orchestration work now heading in will legitimately move canons on purpose — a
+long round mostly buys stale reference values while holding the depot hostage
+against the testing that actually advances the product. The depot can only do one
+thing at a time: certify, or be tested on.
+
+**What replaces it during iteration:** the grid fixture's 6-tick pair, which runs
+in about three minutes on its own depot. That is enough to catch a determinism
+BREAK (the property that must never regress) without pretending to re-bank canons
+that the next change is going to move anyway. Full rounds return when the
+staging/orchestration work is ready to be frozen and shipped.
+
+This is a change of instrument, not of standard. Byte-identical reproducibility
+is still the property; the canon values are just not worth re-banking hourly
+while the engine is deliberately being changed.
