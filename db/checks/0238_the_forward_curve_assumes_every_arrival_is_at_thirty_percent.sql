@@ -223,3 +223,65 @@ SELECT d.status,
 -- ottoq queries and no cert cron armed at 2026-09-14 15:55 UTC; only
 -- ottoq-demo-metronome is scheduled. pg_stat_activity is the ONLY authority
 -- here -- ottoq_sim_runs.status is MVCC-invisible to an uncommitted pair.
+
+-- ===========================================================================
+-- ADDENDUM, same day, after 0312 was applied (20260914161504)
+--
+-- F. THE BIGGER FINDING THIS CHECK ALMOST MISSED: THE CURVE IS SWITCHED OFF.
+--
+-- Section E proposed fixing the 30 and warned the fix would force a recert.
+-- Both halves needed correcting, and reading the CONTROL FLOW rather than the
+-- assignment line is what corrected them. public.ottoq_energy_orchestrate:
+--
+--   61: v_demand_target := v_service_max * (CASE WHEN v_expensive THEN ... END);
+--   64: IF ottoq_policy_get(p_sim_run_id, 'energy_reserve_shave', 0) >= 0.5 THEN
+--   65:   v_demand_target := COALESCE(ottoq_bess_reserve_target(...), v_demand_target);
+--   67: END IF;
+--
+-- The ENTIRE forward-forecast path -- ottoq_bess_reserve_target and therefore
+-- ottoq_forecast_net_load, the only 8-hour predicted-kW curve in the engine --
+-- is gated behind a dial that DEFAULTS TO 0. Measured:
+--
+--   energy_reserve_shave rows: 239 at run scope with value 1; one depot row = 0
+--   run_by='cert_harness': 1,063 runs, shave ON in 6, OFF in 1,057  (99.4% off)
+--   the six shave-on cert runs ALL started 2026-08-29, ALL below the recert
+--   floor -- not one contributes to a live canon column
+--   six most recent runs of any kind: resolved shave = 0 on all six, and
+--   demand_target is the static path exactly: 1250 = 2500*0.50,
+--   1325 = 2650*0.50, 318 = 636*0.50, each constant for the whole run
+--
+-- So: the site's demand target is a static fraction of nameplate in effectively
+-- every run, and the forward curve is not consulted at all. That also means the
+-- fourteen-atom certification has never meaningfully exercised the forecast
+-- path -- a genuine blind spot in the cert, not merely an unused feature.
+--
+-- AND IT INVERTED THE COST OF THE FIX. Because the function is unreachable in
+-- every canon-contributing run, correcting it moves no hash. 0312 shipped with
+-- forces_recert=FALSE, asserted by a precondition (P3) that refuses if a
+-- shave-on cert run ever appears above the floor. Verified after apply: recert
+-- floor unchanged at 2026-09-12 16:50:23.319089+00, ottoq_cert_matrix still
+-- returns 9 columns.
+--
+-- G. WHAT 0312 ACTUALLY CHANGED, on the witness it was applied against
+--    (run 834b3a59, depot 22222222, sim clock 2026-09-02 02:00:00+00,
+--     23 inbound vehicles, measured SoC averaging 84.4%):
+--
+--      predicted energy need   1,409.7 kWh  ->  292.4 kWh   (4.82x removed)
+--      predicted charge time      38.0 min  ->    7.9 min   per vehicle
+--
+--    The duration figure is the one that bites. The forecast believed each
+--    arriving vehicle would hold a charger for 38 minutes when the real figure
+--    is about eight, so it was inflating both how much energy was coming AND
+--    how long it would occupy the site -- it would have held BESS reserve and
+--    suppressed charging against a peak that was never going to arrive.
+--
+-- H. ORDER OF THE REMAINING WORK, and why this order.
+--    1. DONE (0312): make the curve trustworthy -- read measured SoC.
+--    2. NEXT: return_eta_minutes, the literal 30 (section B). Until this lands
+--       the curve's TIME axis is still a constant, so switching the curve on
+--       would consult a forecast that is right about magnitude and wrong about
+--       when. This one moves arrival times and therefore the booking calendar:
+--       forces_recert TRUE, own window.
+--    3. THEN: turn energy_reserve_shave on by default and measure.
+--       NEVER before 1 and 2 -- doing it first would expose a forecast wrong
+--       for 99.5% of arrivals to 100% of ticks instead of 0.6% of them.

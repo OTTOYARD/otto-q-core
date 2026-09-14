@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914161504
 -- migration-name:    0312_the_forward_curve_reads_the_soc_the_twin_already_tracks
 --
 -- 0312  ottoq_forecast_net_load's FUTURE-ARRIVAL LOOP COMPUTES EACH VEHICLE'S

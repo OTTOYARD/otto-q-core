@@ -296,7 +296,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0309](db/migrations/0309_benchmark_had_everything_except_a_scenario.sql) | `20260914144547` | yes — ledger | THE BENCHMARK DEPOT HAD 160 STALLS, 100 VEHICLES AND NO WAY TO START |
 | [0310](db/migrations/0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row.sql) | `20260914150516` | yes — ledger | 0308 AND 0309 EACH ARGUED forces_recert=false AT LENGTH AND NEITHER |
 | [0311](db/migrations/0311_a_column_that_looks_like_the_price_and_is_not.sql) | `20260914153500` | yes — ledger | site_energy_snapshots.lmp_usd_mwh IS NULL IN EVERY ROW EVER WRITTEN, |
-| [0312](db/migrations/0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql) | `PENDING` | no — pending | ottoq_forecast_net_load's FUTURE-ARRIVAL LOOP COMPUTES EACH VEHICLE'S |
+| [0312](db/migrations/0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql) | `20260914161504` | yes — ledger | ottoq_forecast_net_load's FUTURE-ARRIVAL LOOP COMPUTES EACH VEHICLE'S |
 
 178 migrations indexed.
 
