@@ -419,7 +419,8 @@ repo_manifest(version, name, file) AS (
     ('20260914171845'::text, '0319_i_seeded_a_deterministic_draw_on_a_random_uuid'::text, '0319_i_seeded_a_deterministic_draw_on_a_random_uuid.sql'::text),
     ('PENDING'::text, '0320_one_function_writes_the_return_eta_and_writes_its_label_with_it'::text, '0320_one_function_writes_the_return_eta_and_writes_its_label_with_it.sql'::text),
     ('PENDING'::text, '0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast'::text, '0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast.sql'::text),
-    ('PENDING'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused.sql'::text)
+    ('PENDING'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused.sql'::text),
+    ('PENDING'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
