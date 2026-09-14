@@ -239,6 +239,54 @@ four flagship pairs are byte-identical. A canon that moves is a canon update; on
 a pair that FAILS is a defect, and none failed. The `fp` asymmetry is a gap in the
 explanation, not in the determinism.
 
+### The `fp` asymmetry, narrowed to a sharper question (20:45 UTC)
+
+Two more hypotheses tested and **both refuted by measurement**, so this is now a
+smaller and more specific open question rather than a vague one.
+
+The transition itself, read per pair rather than from the canon:
+
+| column | 17:24 (pre-window) | 19:40–19:59 (post-window) |
+|---|---|---|
+| grid 239001/6 | — | `66275ea7`, `66275ea7` — **held** (round 43 banked `66275ea7`) |
+| grid 424242/6 | — | `4cac51f0`, `4cac51f0` — **held** (round 43 banked `4cac51f0`) |
+| grid 171717/12 | `5f2e25bc` | `a26925d6`, `a26925d6` — **moved, at the window** |
+
+Both arms agree in every pair; this is a canon moving, never a pair failing.
+
+**Hypothesis A — "0321 changed the SET of dispatch rows at boot."** That was the
+original falsifier. **Refuted:** every grid seed creates exactly 4 dispatches per
+run, 4.00 per run across all three, 16 of 16 carrying an ETA in each. The set is
+identical.
+
+**Hypothesis B — "one grid seed deploys at boot and the others do not."**
+**Refuted by the same measurement** — 4.00 per run for all three seeds.
+
+So the dispatch block cannot be what separates the moved column from the held
+ones, in either the row-set or the row-value direction. The remaining differences
+between grid 171717/12 and the two grid columns that held are **the seed and the
+horizon (12 ticks vs 6)** — and a BOOT fingerprint is taken before any tick runs,
+so neither should be able to reach it.
+
+That is the question now, and it is worth asking properly rather than closing:
+**why does a fingerprint of the boot world differ between two runs of the same
+fixture on the same depot that differ only in seed and horizon?** A legitimate
+answer exists (the fixture's prime step is seeded, so a seeded draw at boot
+differs by seed) and a defective one exists (the boot fingerprint is reachable
+from the horizon, which would make it not a boot fingerprint). Nothing measured
+so far distinguishes them.
+
+**The experiment that settles it, and it does not need this round:** call
+`ottoq_boot_state_fingerprint` directly on the grid depot for the three seeds at
+a fixed horizon, then for one seed at two horizons. If the value moves with the
+horizon, that is a defect and it is a real one. Deliberately NOT run now — it
+touches the same depot a lane is certifying.
+
+**Not implicated, and worth stating so the open question is not over-read:** all
+five grid pairs and every flagship pair are byte-identical across fourteen atoms.
+Determinism is intact. This is a question about what a canon means, not about
+whether the engine repeats itself.
+
 ### P3 — the recert floor moves once: **HELD.**
 
 Every flagship column reset to `consecutive_passes = 0` and the four that have run
