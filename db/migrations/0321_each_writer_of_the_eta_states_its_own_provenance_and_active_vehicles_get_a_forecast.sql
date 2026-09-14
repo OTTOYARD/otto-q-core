@@ -88,7 +88,6 @@ DECLARE
   a_ivs CONSTANT text := E'             return_eta_minutes   = (v_dec->>''eta_min'')::numeric,';
   a_pri CONSTANT text := E'        returning_started_at, return_eta_minutes, return_trigger, return_evidence)';
   a_prv CONSTANT text := E'        p_sim_clock_now - (v_lead || '' minutes'')::interval, v_eta, ''prime_inbound'',';
-  FUNCTION_MISSING CONSTANT text := '0321 P0: % not found';
 BEGIN
   SELECT p.prosrc INTO v_adt FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='twin'   AND p.proname='ottoq_sim_advance_deployed_telemetry';
@@ -98,10 +97,15 @@ BEGIN
    WHERE n.nspname='public' AND p.proname='ottoq_ingest_vehicle_signal';
   SELECT p.prosrc INTO v_pri FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='twin'   AND p.proname='ottoq_sim_prime_deployment';
-  IF v_adt IS NULL THEN RAISE EXCEPTION '%', format(FUNCTION_MISSING,'twin.ottoq_sim_advance_deployed_telemetry'); END IF;
-  IF v_aut IS NULL THEN RAISE EXCEPTION '%', format(FUNCTION_MISSING,'twin.ottoq_sim_auto_dispatch_tick'); END IF;
-  IF v_ivs IS NULL THEN RAISE EXCEPTION '%', format(FUNCTION_MISSING,'public.ottoq_ingest_vehicle_signal'); END IF;
-  IF v_pri IS NULL THEN RAISE EXCEPTION '%', format(FUNCTION_MISSING,'twin.ottoq_sim_prime_deployment'); END IF;
+  -- Spelled out rather than routed through a format() template. The template
+  -- version read `format('0321 P0: % not found', x)` and PostgreSQL rejects it
+  -- with `unrecognized format() type specifier " "`: RAISE accepts a bare %,
+  -- format() demands %s. Caught by compile-checking this file against a local
+  -- PostgreSQL before the apply window, which is the whole argument for G12.
+  IF v_adt IS NULL THEN RAISE EXCEPTION '0321 P0: twin.ottoq_sim_advance_deployed_telemetry not found'; END IF;
+  IF v_aut IS NULL THEN RAISE EXCEPTION '0321 P0: twin.ottoq_sim_auto_dispatch_tick not found'; END IF;
+  IF v_ivs IS NULL THEN RAISE EXCEPTION '0321 P0: public.ottoq_ingest_vehicle_signal not found'; END IF;
+  IF v_pri IS NULL THEN RAISE EXCEPTION '0321 P0: twin.ottoq_sim_prime_deployment not found'; END IF;
 
   -- P1..P5: EVERY anchor occurs EXACTLY ONCE, counted the way replace() counts.
   IF (length(v_adt)-length(replace(v_adt,a_adt,'')))/length(a_adt) <> 1 THEN
