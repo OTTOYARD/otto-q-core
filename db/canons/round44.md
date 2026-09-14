@@ -180,9 +180,18 @@ That is the three grid columns and the four 12-tick flagship columns; the 24t an
 | 12t/314159/busy | HELD | **MOVED** | held | held | 1 pass |
 | 12t/424242/busy | HELD | **MOVED** | held | held | 1 pass |
 | 12t/171717/normal | HELD | **MOVED** | held | held | 1 pass |
+| 24t/171717/busy | HELD | **MOVED** | held | held | 1 pass |
+| 24t/424242/busy | HELD | **MOVED** | held | held | 1 pass |
+| 48t/171717/busy | HELD | **MOVED** | held | held | 1 pass |
 
 **Zero determinism failures.** Every pair byte-identical across all fourteen
 atoms. That is P1's real content and it is holding.
+
+**UPDATED 20:50 UTC — all seven flagship columns have now landed, and the result
+is perfectly uniform: `fp` HELD 7 of 7, `endst` MOVED 7 of 7, `dec` and `cmd`
+HELD 7 of 7**, across three seeds, two scenarios and three horizons (12/24/48).
+Uniformity of that kind is itself evidence and it points somewhere specific --
+see the sharpened `fp` question below.
 
 ### P2 — `endst` MOVES on every flagship column: **HELD, and wider than predicted.**
 
@@ -275,6 +284,22 @@ answer exists (the fixture's prime step is seeded, so a seeded draw at boot
 differs by seed) and a defective one exists (the boot fingerprint is reachable
 from the horizon, which would make it not a boot fingerprint). Nothing measured
 so far distinguishes them.
+
+**SHARPENED AGAIN AT 20:50, by the flagship lane completing.** `endst` is the END
+state, taken after the ticks; `fp` is the BOOT state, taken before them. `0321`
+does two separable things: it added a per-tick refresh (which runs DURING ticks,
+and plainly explains `endst` moving 7 of 7), and it labelled
+`twin.ottoq_sim_prime_deployment`'s own INSERT (which runs at BOOT, and should
+therefore have moved `fp`). **`fp` held on all seven.**
+
+So the question is now this, and it is answerable: either
+`ottoq_sim_prime_deployment` does not execute inside a flagship pair, or the boot
+fingerprint does not see the rows it writes. One of those two is true, and both
+are worth knowing — the second would mean `fp` is blind to the state prime
+establishes, which is a gap in the instrument rather than in the engine.
+
+Note this also makes the grid `171717/12` movement the ODD ONE OUT in a new way:
+it is the only column anywhere, flagship or grid, where `fp` moved at all.
 
 **The experiment that settles it, and it does not need this round:** call
 `ottoq_boot_state_fingerprint` directly on the grid depot for the three seeds at
