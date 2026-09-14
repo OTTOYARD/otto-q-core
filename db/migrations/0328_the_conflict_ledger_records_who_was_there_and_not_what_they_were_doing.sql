@@ -87,11 +87,15 @@ END $pre$;
 
 -- PRE-SNAPSHOT: this rewrites a live body by substitution, so the prior source
 -- is captured first and the replacement is verifiable against it.
-INSERT INTO public.ottoq_schema_snapshots (taken_at, reason, payload)
-SELECT now(), '0328 pre: ottoq_emit_vehicle_command before the ledger-state fix',
-       jsonb_build_object('function', 'ottoq.ottoq_emit_vehicle_command',
-                          'src_md5', md5(p.prosrc), 'src_len', length(p.prosrc),
-                          'src', p.prosrc)
+-- Columns read from information_schema before writing, not remembered: the
+-- first attempt at this file invented (taken_at, reason, payload) and was
+-- refused by the database with 42703. The snapshot stores the FUNCTIONDEF,
+-- because that -- not prosrc -- is the text the substitution below operates on.
+INSERT INTO public.ottoq_schema_snapshots
+       (label, object_kind, schema_name, object_name, definition, def_md5)
+SELECT '0328 pre: ottoq_emit_vehicle_command before the ledger-state fix',
+       'function', 'ottoq', 'ottoq_emit_vehicle_command',
+       pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
  WHERE n.nspname='ottoq' AND p.proname='ottoq_emit_vehicle_command';
 
