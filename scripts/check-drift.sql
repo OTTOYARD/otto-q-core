@@ -415,7 +415,8 @@ repo_manifest(version, name, file) AS (
     ('20260914164649'::text, '0315_the_speed_cancelled_out_of_my_own_eta'::text, '0315_the_speed_cancelled_out_of_my_own_eta.sql'::text),
     ('20260914165752'::text, '0316_the_eta_function_starts_answering_its_own_arguments'::text, '0316_the_eta_function_starts_answering_its_own_arguments.sql'::text),
     ('20260914170416'::text, '0317_the_twin_writes_where_each_asset_is_not_only_how_charged'::text, '0317_the_twin_writes_where_each_asset_is_not_only_how_charged.sql'::text),
-    ('20260914170807'::text, '0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess'::text, '0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess.sql'::text)
+    ('20260914170807'::text, '0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess'::text, '0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess.sql'::text),
+    ('PENDING'::text, '0319_i_seeded_a_deterministic_draw_on_a_random_uuid'::text, '0319_i_seeded_a_deterministic_draw_on_a_random_uuid.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
