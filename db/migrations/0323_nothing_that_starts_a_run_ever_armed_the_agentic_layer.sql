@@ -178,10 +178,24 @@ BEGIN
    WHERE n.nspname='twin' AND p.proname='ottoq_sim_start_run';
 
   -- A1. BOTH doors arm, and each exactly once. Twice would double-write dials.
-  IF (length(v_scn)-length(replace(v_scn,'ottoq_agentic_arm','')))/length('ottoq_agentic_arm') <> 1 THEN
-    RAISE EXCEPTION '0323 A1: ottoq_sim_run_scenario does not arm exactly once'; END IF;
-  IF (length(v_str)-length(replace(v_str,'ottoq_agentic_arm','')))/length('ottoq_agentic_arm') <> 1 THEN
-    RAISE EXCEPTION '0323 A1: ottoq_sim_start_run does not arm exactly once'; END IF;
+  --
+  --     COUNTS THE CALL, NOT THE NAME, and the first draft did not -- it counted
+  --     occurrences of 'ottoq_agentic_arm', which appears TWICE in the injected
+  --     block: once as the PERFORM and once inside the block's own comment
+  --     explaining why the cert_harness guard is not optional. The apply aborted
+  --     on A1 with the substitution having worked perfectly. The assertion was
+  --     measuring TEXT where it claimed to measure CALLS -- the same defect class
+  --     as 0321's A6, which counted string literals I had typed myself, and the
+  --     reason this file's sibling 0320 exists at all.
+  --
+  --     The transaction rolled back cleanly (0 snapshot rows, 0 lineage rows,
+  --     0 stamp, both functions unchanged), so the cost was one apply attempt.
+  IF (length(v_scn)-length(replace(v_scn,'PERFORM public.ottoq_agentic_arm(','')))
+       /length('PERFORM public.ottoq_agentic_arm(') <> 1 THEN
+    RAISE EXCEPTION '0323 A1: ottoq_sim_run_scenario does not CALL the arm exactly once'; END IF;
+  IF (length(v_str)-length(replace(v_str,'PERFORM public.ottoq_agentic_arm(','')))
+       /length('PERFORM public.ottoq_agentic_arm(') <> 1 THEN
+    RAISE EXCEPTION '0323 A1: ottoq_sim_start_run does not CALL the arm exactly once'; END IF;
 
   -- A2. BOTH guard on cert_harness BEFORE calling. This is the assertion that
   --     protects every canon in the matrix, so it is checked structurally and
@@ -190,9 +204,11 @@ BEGIN
     RAISE EXCEPTION '0323 A2: ottoq_sim_run_scenario arms without a cert_harness guard'; END IF;
   IF v_str !~ 'cert_harness' THEN
     RAISE EXCEPTION '0323 A2: ottoq_sim_start_run arms without a cert_harness guard'; END IF;
-  IF position('cert_harness' in v_scn) > position('ottoq_agentic_arm' in v_scn) THEN
+  -- Reads the CALL, for the same reason A1 now does: position() of the bare
+  -- name would find the comment, not the PERFORM.
+  IF position('cert_harness' in v_scn) > position('PERFORM public.ottoq_agentic_arm(' in v_scn) THEN
     RAISE EXCEPTION '0323 A2: in ottoq_sim_run_scenario the guard does not precede the call'; END IF;
-  IF position('cert_harness' in v_str) > position('ottoq_agentic_arm' in v_str) THEN
+  IF position('cert_harness' in v_str) > position('PERFORM public.ottoq_agentic_arm(' in v_str) THEN
     RAISE EXCEPTION '0323 A2: in ottoq_sim_start_run the guard does not precede the call'; END IF;
 
   -- A3. THE REFUSAL THIS FILE LEANS ON IS STILL THERE. If a later edit removed
