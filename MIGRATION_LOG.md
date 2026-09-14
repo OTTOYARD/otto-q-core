@@ -308,7 +308,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0321](db/migrations/0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast.sql) | `20260914192306` | yes — ledger | THE TWO DEFECTS 0320 BUILT THE TOOL FOR |
 | [0322](db/migrations/0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused.sql) | `20260914192410` | yes — ledger | THE INVARIANT BECOMES PHYSICAL |
 | [0323](db/migrations/0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql) | `20260914192648` | yes — ledger | ACROSS 1,147 SIM RUNS, NOTHING THAT STARTS A RUN HAS EVER ARMED THE |
-| [0324](db/migrations/0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql) | `PENDING` | no — pending | THE RUN GUARD REFUSES CORRECTLY AND EXPLAINS ITSELF WRONGLY |
+| [0324](db/migrations/0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql) | `20260914192738` | yes — ledger | THE RUN GUARD REFUSES CORRECTLY AND EXPLAINS ITSELF WRONGLY |
 | [0325](db/migrations/0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql) | `PENDING` | no — pending | ENERGY COMMANDS GET THE DOCK THAT VEHICLE COMMANDS ALREADY HAVE, |
 
 191 migrations indexed.

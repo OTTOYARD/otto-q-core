@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914192738
 -- migration-name:    0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate
 --
 -- 0324  THE RUN GUARD REFUSES CORRECTLY AND EXPLAINS ITSELF WRONGLY
