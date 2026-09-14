@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914093107
 -- migration-name:    0293_the_nightly_run_purge_has_never_once_run
 --
 -- 0293  THE NIGHTLY RUN PURGE HAS NEVER ONCE RUN
@@ -281,3 +281,75 @@ VALUES ('0293_the_nightly_run_purge_has_never_once_run', false,
  'Fixes cron job 625 (ottoq-run-purge-nightly), whose first and only automated firing on 2026-09-14 09:00 UTC failed in 0.26 s with "invalid transaction termination ... ottoq_retention_purge_runs line 152 at COMMIT", purging nothing. Its command was two statements -- a SET statement_timeout followed by a CALL -- and a procedure cannot COMMIT inside an enclosing transaction block. Measured A/B on the same database the same night: jobid 11 calls a COMMIT-ing procedure as a SINGLE statement and succeeded at 08:00 in 71 seconds. Confound named in the file: they are different procedures. The fix moves the timeout onto the procedure (ALTER PROCEDURE ... SET statement_timeout = 10min, needed because this database resets statement_timeout to 2 minutes) so the cron command becomes a single CALL. Also records that the verification written for this firing would have PASSED it: ottoq_retention_state.updated_at was named the discriminator but is written by BOTH purge jobs, and the 08:00 events purge moved it an hour before the 09:00 run purge failed. Residual uncertainty stated and not resolved: whether a procedure-level SET survives the procedure own COMMITs was not testable from the available channel, which wraps every submission in a transaction and pools connections; worst case the timeout reverts to the 2-minute default, which jobid 11 already proves survivable for this shape. forces_recert=false: touches no engine function, no frame, no decide path -- only a cron command and a procedure attribute, and A4 asserts no rows were purged.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 20260914093107 -- AND THE CAUSE THIS FILE NAMES IS WRONG.
+--
+-- All preconditions and assertions passed; the job command is now a single
+-- CALL and the procedure carries statement_timeout=10min. THE DEFECT IS NOT
+-- FIXED. Read this banner before quoting anything above it.
+--
+-- ---------------------------------------------------------------------------
+-- HOW IT WAS CAUGHT. The verification probe scheduled straight after apply --
+-- cron job 626, a SINGLE-statement CALL of the same procedure with a 999-day
+-- keep window matching zero rows -- failed twice, identically:
+--
+--   jobid 626   CALL public.ottoq_retention_purge_runs(60, 2000, '999 days', false);
+--   ERROR:  invalid transaction termination
+--   CONTEXT:  PL/pgSQL function ottoq_retention_purge_runs(...) line 152 at COMMIT
+--
+-- One statement. No SET. Same error, same line. The multi-statement hypothesis
+-- this file argues at length is REFUTED.
+--
+-- ---------------------------------------------------------------------------
+-- WHY THE A/B IN THE HEADER MISLED. It compared job 11 against job 625 and
+-- found them differing in statement count -- and attributed the failure to
+-- that. But they differed in TWO ways at once, and the header even says so:
+-- "CONFOUND, named rather than hidden: they are different procedures." The
+-- confound was named and then reasoned past anyway. The variable that mattered
+-- was the one set aside.
+--
+-- THE REAL CAUSE, located by line number rather than inferred:
+--
+--   line 111   FOR v_reg IN
+--   line 112     SELECT g.table_name, g.column_name FROM ottoq_run_scope_registry ...
+--   line 118   LOOP
+--   line 119     LOOP
+--   line 152       COMMIT;          <-- inside a query-driven FOR loop
+--   line 154     END LOOP;
+--   line 155   END LOOP;
+--
+-- PL/pgSQL implements `FOR rec IN <query> LOOP` with an internal cursor, and a
+-- procedure may not commit while one is open. The second COMMIT, at line 167,
+-- sits outside both loops and would have been fine.
+--
+-- AND THE CORRECTED A/B, differing in the right variable this time:
+--
+--   procedure                                    FOR..IN loops  COMMITs  result
+--   ottoq_retention_purge_runs                               1        2  FAILS
+--   ottoq_retention_purge_worker(int,int,interval,text[])    0        8  succeeds
+--                                                                        nightly
+--
+-- The working sibling has NO query-driven loop and eight COMMITs. Also checked
+-- and ruled out: an enclosing exception handler, the other classic cause of
+-- 2D000. The procedure has exactly one BEGIN, at line 14, and all three of its
+-- EXCEPTION keywords are RAISE EXCEPTION at lines 26, 37 and 49 -- none is a
+-- handler, and none encloses line 152.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THIS FILE LEAVES BEHIND, and why it is not reverted. Both changes are
+-- harmless and one is needed by the real fix:
+--   - the single-statement CALL is what the working sibling uses, and the real
+--     fix will still want it;
+--   - statement_timeout on the procedure is where that guard belongs, and this
+--     database resets the session value to two minutes.
+-- Neither causes the failure and neither masks it. Reverting would only churn.
+--
+-- THE REAL FIX is a restructure of the procedure: hoist the registry query out
+-- of the loop into arrays and iterate by index, so no cursor is open across the
+-- COMMIT. Filed as G63 with the remedy specified; NOT done here, because
+-- rewriting a procedure that DELETEs rows deserves its own window rather than
+-- the tail of another change. Evidence and the probe transcript: db/checks/0226.
+--
+-- THE JOB WILL FAIL AGAIN AT 09:00 UTC TOMORROW. That is the honest state.
+-- ===========================================================================
