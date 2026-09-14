@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914065559
 -- migration-name:    0285_nine_more_dials_and_two_ceilings_the_rng_declares
 --
 -- 0285  NINE MORE DIALS, AND THE TWO CEILINGS THE RNG DECLARES
@@ -462,3 +462,31 @@ VALUES ('0285_nine_more_dials_and_two_ceilings_the_rng_declares', false,
  'Nine rows in ottoq_policy_param_catalog, every range read off the single consumer that reads each key. Floors the engine writes down: demo_max_ticks and demo_max_ticks_live min 10 (GREATEST(10, ...) twice in ottoq_demo_metronome), calib_interval_h min 1 (GREATEST(1, ...) in the scenario override path, and guarded as a divisor in ottoq_twin_wear_window). Floors by saturation: comms_stale_ticks and dtc_debt_threshold min 0 (both compare a non-negative quantity with >=, so 0 is already unconditionally true), rider_flag_daily_pct and litter_p_per_active_min min 0, rider_flag_window_h min 0 (a negative hour becomes a negative interval). ONE REAL CEILING, and it is the generator''s: rider_flag_interior_share [0,1], because ottoq_sim_seeded_random normalizes to [0,1) in its own comment and the share is compared against a draw from it. SEVEN NULL CEILINGS ON PURPOSE -- most notably rider_flag_daily_pct, where 100 is the obvious wrong answer (saturation is at 100/v_rf_days, and the run length is runtime), and litter_p_per_active_min, where the 0.95 in the consumer caps the PRODUCT rather than the dial. A3 proves a NULL ceiling imposes nothing and that every declared floor still fires; A4 re-offers every distinct live value and requires it through unclamped. forces_recert=false, asserted in P0: ottoq_policy_get never reads the catalog, so these rows are consumed only by ottoq_policy_set, which no certification arm calls. 21 live rows untouched.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 06:55:59 UTC (1:55 AM CT) as
+-- supabase_migrations.schema_migrations version 20260914065559.
+--
+-- Dry run: the WHOLE file byte for byte inside BEGIN ... ROLLBACK, with no
+-- abbreviation anywhere (0284 had to abbreviate one literal and say so; this
+-- one did not), clean on the first attempt. P-, P0-P6 and A1-A6 all passed and
+-- a post-rollback re-count confirmed 0 catalog rows, 0 rows tagged 0285, and no
+-- lineage row.
+--
+-- ONE DEFECT CAUGHT BEFORE THE DRY RUN, worth naming because it is the second
+-- time in four files: a %% inside a plain SQL string literal. %% is an escape
+-- only in a RAISE format string; in an ordinary literal it stores two percent
+-- signs, and this one sat in the rider_flag_interior_share description -- the
+-- row whose whole argument is what the generator returns. Same class as 0283's.
+--
+-- VERIFIED AFTER APPLY, read-only:
+--
+--   ottoq_policy_catalog_gap, read_uncatalogued   81 -> 72
+--   ottoq_policy_catalog_gap, ok                  69 -> 78
+--   ottoq_policy_param_catalog rows               77 -> 86
+--   rows left behind by the proof                        0
+--
+-- Eighteen dials catalogued across 0282, 0283 and 0285, and not one range was
+-- chosen. The gap instrument 0281 built has gone 90 -> 72 without a single
+-- guessed bound being written into it.
+-- ===========================================================================
