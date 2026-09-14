@@ -115,9 +115,23 @@ jobs:
       # was one uninstalled package, not the key, the gate, or the code.
       # Pinned, because an advisor's model client is part of a fire's identity
       # the same way ortools is part of a plan's.
+      #
+      # WHY 1.5.0 AND NOT SOMETHING OLDER. The first pin here was 0.69.0, chosen
+      # without checking, and the next fire died on
+      #   TypeError: Messages.create() got an unexpected keyword argument 'output_config'
+      # bridge/llm_proposer.py asks for structured output via
+      #   output_config={"effort": ..., "format": {"type": "json_schema", ...}}
+      # and that parameter does not exist in 0.69.0. Measured against the
+      # published wheels rather than guessed again: anthropic/resources/messages/
+      # messages.py contains no occurrence of output_config in 0.76.0 and 75 in
+      # 0.77.0, so 0.77.0 is the floor. 1.5.0 (the current release, checked
+      # 2026-09-14) carries OutputConfigParam with exactly the two keys the code
+      # sends -- effort, one of low|medium|high|xhigh|max, and
+      # format.JSONOutputFormatParam {type: "json_schema", schema} -- so the
+      # call site was right all along and only the pin was wrong.
       - name: Install the advisor's SDK (advisor fires only)
         if: ${{ github.event.inputs.advisor == 'true' }}
-        run: pip install "anthropic==0.69.0"
+        run: pip install "anthropic==1.5.0"
       - name: Advisory fire (optional, priced and capped per run)
         if: ${{ github.event.inputs.advisor == 'true' }}
         env:
