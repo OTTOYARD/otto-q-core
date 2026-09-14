@@ -260,7 +260,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0273](db/migrations/0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink.sql) | `20260913233201` | yes — ledger | THE UPLINK IS WRITTEN BY THE SAME TRANSACTION AS THE DOWNLINK |
 | [0274](db/migrations/0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one.sql) | `20260913234605` | yes — ledger | THERE IS NO QUEUE, SO THE ASSET CANNOT BE TOLD ITS PLACE IN ONE |
 | [0275](db/migrations/0275_no_single_place_says_which_intelligence_sources_are_actually_on.sql) | `20260914001937` | yes — ledger | NO SINGLE PLACE SAYS WHICH INTELLIGENCE SOURCES ARE ACTUALLY ON |
-| [0276](db/migrations/0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger.sql) | `PENDING` | no — pending | CP-SAT ENACTED THREE TIMES AND THE SCOREBOARD CALLED IT A STRANGER |
+| [0276](db/migrations/0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger.sql) | `20260914005147` | yes — ledger | CP-SAT ENACTED THREE TIMES AND THE SCOREBOARD CALLED IT A STRANGER |
 
 142 migrations indexed.
 

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914005147
 -- migration-name:    0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger
 --
 -- 0276  CP-SAT ENACTED THREE TIMES AND THE SCOREBOARD CALLED IT A STRANGER
@@ -559,3 +559,37 @@ VALUES ('0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger'
         'ottoq_intelligence_sources gains l2_engine_labels text[] so one source can claim several ledger labels; cpsat claims forward_lex (the objective name it submits under, ottoq_proposer_precedence rank 10), anthropic claims llm_advisor, cuopt claims cuopt_fallback. Refresh attributes through the array. A trigger keeps the scalar label a member of the array and every label claimed once. No engine caller, no dial, no tick-path change; ottoq_decide_tick and ottoq_determinism_pair pinned byte-identical by A7.',
         now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 00:51:47 UTC (7:51 PM CT, 2026-09-13) as
+-- supabase_migrations.schema_migrations version 20260914005147.
+--
+-- Dry-run: the file above, byte for byte, inside BEGIN ... ROLLBACK. It ran
+-- clean and the rollback was verified afterwards (column absent, forward_lex
+-- row still present, no lineage row, no schema snapshot). The one deviation
+-- from the committed file in the dry-run submission was the added BEGIN/
+-- ROLLBACK wrapper; nothing was trimmed. This is the rule 0275 broke on its
+-- first apply eight hours earlier -- it trimmed comments out of the dry-run
+-- paste and aborted on an assertion that read one of them.
+--
+-- APPLY OUTPUT, verified afterwards by ottoq_intelligence_status():
+--
+--   source                 state       decisions  enacted  hours_silent
+--   deterministic_v1       FOLLOWED    1,833,982  1,544,376        0.0
+--   nemotron               FOLLOWED          280      280          0.0
+--   cuopt                  FOLLOWED           27       27        356.0
+--   cpsat                  FOLLOWED            3        3          0.0
+--   ottoq_service_priority  INVOKED          458        0          0.0
+--   anthropic              DECLARED            0        0            -
+--
+-- CP-SAT reads FOLLOWED for the first time, and the four states now say four
+-- different true things about four different failure modes: cuOpt is followed
+-- and switched off (356 hours silent behind a dial); service_priority is
+-- running and ignored (458 proposals, none enacted); anthropic has a seat and
+-- has never sat in it; CP-SAT decides and is obeyed.
+--
+-- A6's guard test ran and raised as required, so the label guard is proven
+-- rather than assumed. A7 confirmed ottoq_decide_tick
+-- (fd0bf428abeda40801467fd428a090f1) and ottoq_determinism_pair
+-- (8a35b8c874fed154cc216140faec0274) are byte-identical.
+-- ===========================================================================
