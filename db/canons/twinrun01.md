@@ -253,3 +253,45 @@ backlog, not silently absorbed.
 **Nothing about this weakens the end-to-end result.** The chain ran, the run armed
 itself, the forecast covered every active dispatch, the proposer's influence grew
 tick over tick, and the run ended for a declared, recorded reason.
+
+---
+
+## CORRECTION 22:05 UTC — THE BASELINE I QUOTED WAS A DIFFERENT POPULATION
+
+Checked before round 45's first pair fired, to rule out the twin run leaving
+stale `active` dispatches where a flagship boot fingerprint would see them. It
+did not — and the same query corrects something I wrote earlier today.
+
+Measured, `status IN ('active','returning')`, grouped by the vehicle's home depot:
+
+| status | rows | runs | on flagship | on grid | elsewhere |
+|---|---|---|---|---|---|
+| active | 117 | 9 | **0** | **0** | **117** |
+| returning | 40 | 7 | **0** | **0** | **40** |
+
+**Round 45 is safe**, which is what I went looking for: the boot fingerprint's
+dispatch CTE requires `v.home_depot_id = p_depot`, so 157 stale rows homed at
+neither certification depot cannot enter any pair's fingerprint.
+
+**AND THE CORRECTION.** In `db/checks/0245` and in P2 above I framed those rows as
+the forecast baseline — *"0 of 68 active dispatches carry an ETA"*, then *"0 of
+117"* — and described them as orphans the live run would settle. They are
+orphans, and they carry no ETA, both true. But **they are on OTHER DEPOTS**, so a
+flagship twin run was never going to touch them, and calling them "the baseline"
+implied a before/after on one population when there were two.
+
+**What the twin run actually proved, stated correctly:** on the 14 dispatches
+**this run created**, every one carried a forecast, stamped at the run's own sim
+clock. That is the proof, it stands unchanged, and it is proof about *newly
+created dispatches on a live run* — not about the 157 stale rows, which no run
+was going to refresh because nothing ticks them.
+
+The 157 are a separate finding and stay open: dispatches left `active` after
+their run ended, on nine runs, the G13 teardown-leak class. Nothing in the
+forecast window addressed them and nothing in this file should be read as
+claiming it did.
+
+**Same defect class as everything else corrected today** — a measurement
+answering a slightly different question than the one it was quoted for. Twice in
+one day on this same subject, both mine. The rule that catches it is the one
+already written down: read what the population IS before calling it a baseline.
