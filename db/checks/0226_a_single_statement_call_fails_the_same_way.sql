@@ -135,3 +135,68 @@ SELECT n, ln FROM (
 -- UNTIL THEN, THE JOB FAILS NIGHTLY AT 09:00 UTC. 0293 made its command a
 -- single statement and moved the timeout onto the procedure -- both correct in
 -- themselves, neither the cause, and neither a fix.
+
+-- ===========================================================================
+-- G. CORRECTION, 09:55 UTC. SECTIONS D AND F WERE BOTH INCOMPLETE, AND
+--    SECTION C's SAFETY CLAIM WAS WRONG.
+--
+-- D said the cursor loop was "the real cause". It was A real cause, not the
+-- only one. After 0294 removed it the job still failed -- at line 166 rather
+-- than 152, which is THE SAME in-loop COMMIT displaced by fourteen lines of new
+-- comment. There were two independent causes:
+--
+--   1. COMMIT inside the query-driven FOR loop.     Original. 0294 removed it.
+--   2. A SET clause on the procedure.               ADDED BY 0293. A PostgreSQL
+--      procedure carrying one may not execute transaction control at all.
+--
+-- Each alone was sufficient, so fixing the first while introducing the second
+-- left the symptom unchanged and made a correct fix look like a failed one.
+--
+-- RESET statement_timeout at 09:49; the probe SUCCEEDED at 09:50 in 62 seconds.
+-- 0295 captures that.
+--
+-- The control arm carried the answer the whole time:
+--
+SELECT 'G. proconfig is the discriminator' AS section;
+SELECT p.oid::regprocedure::text AS procedure,
+       COALESCE(array_to_string(p.proconfig,' | '), '(none)') AS set_clause
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE n.nspname = 'public'
+   AND p.proname IN ('ottoq_retention_purge_runs','ottoq_retention_purge_worker')
+ ORDER BY 1;
+-- All three must read (none). The sibling that has always worked never had one.
+--
+-- ---------------------------------------------------------------------------
+-- AND SECTION C's PROBE WAS NOT THE NO-OP IT CLAIMS. IT PURGED 20 RUNS.
+--
+-- C asserts a 999-day keep window "deletes nothing" because zero rows are that
+-- old. Zero rows ARE that old. The procedure never uses the parameter:
+--
+--   SELECT keep_interval INTO v_keep
+--     FROM public.ottoq_retention_policy WHERE policy_key = 'engine_rows' AND enabled;
+--   v_keep := COALESCE(v_keep, p_keep);        -- p_keep is the FALLBACK
+--
+-- ottoq_retention_policy has an enabled engine_rows row of 48:00:00, so every
+-- probe firing ran the REAL retention window. The two that succeeded purged 20
+-- runs between them.
+--
+-- Measured afterwards rather than assumed: 20 runs, all started 2026-09-12
+-- 04:05-06:20, youngest 2 days 3.5 h; 20 of 20 had a row in ottoq_run_archives,
+-- 0 were status='running', 0 were run_by='production_live'; and 91139ad8,
+-- 5712f828 and 36e5cc68 -- the runs this session's G60 evidence rests on -- are
+-- untouched. So it did exactly what the nightly job is designed to do, on
+-- exactly its intended population, about ten hours early, with every guard
+-- holding. The outcome is fine. The claim was not, and the difference between
+-- those two is eligibility, which is luck rather than care.
+--
+-- THE RULE: NEVER CALL THIS PROCEDURE TO TEST IT. Its keep window comes from
+-- ottoq_retention_policy, not from the caller, so there is no safe
+-- parameterisation -- p_keep is inert whenever that table has an enabled row. A
+-- future probe must disable the policy row inside a rolled-back transaction, or
+-- run against a scratch database, or not run.
+--
+SELECT 'G2. the parameter the probe thought it was setting' AS section;
+SELECT (SELECT keep_interval::text FROM public.ottoq_retention_policy
+         WHERE policy_key='engine_rows' AND enabled)          AS policy_wins,
+       '999 days'                                             AS what_the_caller_passed,
+       (SELECT count(*) FROM public.ottoq_sim_runs WHERE purged_at IS NOT NULL) AS purged_total;

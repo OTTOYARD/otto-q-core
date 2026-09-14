@@ -279,7 +279,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0292](db/migrations/0292_the_proposer_cannot_see_its_own_pending_plans.sql) | `20260914090954` | yes — ledger | THE PROPOSER CANNOT SEE ITS OWN PENDING PLANS |
 | [0293](db/migrations/0293_the_nightly_run_purge_has_never_once_run.sql) | `20260914093107` | yes — ledger | THE NIGHTLY RUN PURGE HAS NEVER ONCE RUN |
 | [0294](db/migrations/0294_the_purge_commits_inside_a_cursor_loop.sql) | `20260914094551` | yes — ledger | THE PURGE COMMITS INSIDE A CURSOR LOOP |
-| [0295](db/migrations/0295_a_procedure_with_a_set_clause_cannot_commit.sql) | `PENDING` | no — pending | A PROCEDURE WITH A SET CLAUSE CANNOT COMMIT |
+| [0295](db/migrations/0295_a_procedure_with_a_set_clause_cannot_commit.sql) | `20260914095529` | yes — ledger | A PROCEDURE WITH A SET CLAUSE CANNOT COMMIT |
 
 161 migrations indexed.
 

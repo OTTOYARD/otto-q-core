@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914095529
 -- migration-name:    0295_a_procedure_with_a_set_clause_cannot_commit
 --
 -- 0295  A PROCEDURE WITH A SET CLAUSE CANNOT COMMIT
@@ -242,3 +242,30 @@ VALUES ('0295_a_procedure_with_a_set_clause_cannot_commit', false,
  'Removes the SET clause from public.ottoq_retention_purge_runs, the second of two independent causes that kept cron job 625 from ever running. A PostgreSQL procedure carrying a SET clause may not execute transaction control; the sibling ottoq_retention_purge_worker, which succeeds nightly, has never had one. THE SET CLAUSE WAS ADDED BY 0293 while trying to fix the first cause, so 0294 removing the cursor loop looked like a failed fix when it was really a new fault arriving. RESET was executed live at 09:49 UTC as the diagnostic that settled it and the probe succeeded at 09:50 in 62 seconds; this file re-states it idempotently so the repo is the source of truth. The timeout does not come back: it was never there before 0293, the working sibling lacks one, the successful run took 62 s under the 2-minute default, and the procedure already self-limits via p_time_budget_s in 2000-row micro-batches. ALSO RECORDS A WRONG SAFETY CLAIM: the verification probe was described in 0293, db/checks/0226 and G63 as deleting nothing because a 999-day keep window matches zero rows. The procedure reads keep_interval from ottoq_retention_policy and only falls back to p_keep when that table has no enabled row; it has one, at 48 hours, so the probe ran the real retention window and purged 20 runs. Measured afterwards: all 20 archived, none running, none production_live, youngest 2 days 3.5 h, and the three runs carrying this session G60 evidence untouched -- the intended nightly behaviour about ten hours early, with every guard holding. The rule earned: never call this procedure to test it, because no caller parameterisation makes it safe. forces_recert=false: a procedure attribute only.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 20260914095529. P-, P0, P1, P2 and A1-A4 all passed.
+--
+--   proconfig on ottoq_retention_purge_runs   NULL
+--   proconfig on either purge_worker overload NULL
+--   successful firings on record (2 h)        2, longest 62 s
+--   job 625                                   CALL ...(300, 2000, '48 hours', false);
+--                                             on 0 9 * * *, active
+--   transient probe jobs remaining            none
+--
+-- THE JOB NOW WORKS. That is proven by a real pg_cron firing, not by argument:
+-- 09:50:00 UTC, status succeeded, 62 seconds, return message 'CALL'.
+--
+-- STILL UNPROVEN AND WORTH SAYING: the 09:00 UTC scheduled firing has not yet
+-- happened under the fixed code. The two successes on record are probe firings
+-- of the same procedure through the same single-statement CALL, which is the
+-- same code path job 625 uses -- but the scheduled job itself has not run green
+-- yet. It next fires 2026-09-15 09:00 UTC (4:00 AM CT). Close G23 on THAT, and
+-- on a rising count of ottoq_sim_runs.purged_at, not on this banner.
+--
+-- AND CLOSE IT ON THE OBSERVED EFFECT, NEVER ON THE SCHEDULE EXISTING. Task #87
+-- recorded "run purge scheduled" and it was read later as "run purge working";
+-- that is how a job that had never once succeeded stayed marked closed for
+-- weeks. Not on ottoq_retention_state.updated_at either -- both purge jobs
+-- write that row, so it cannot tell them apart.
+-- ===========================================================================
