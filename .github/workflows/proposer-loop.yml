@@ -52,11 +52,34 @@ on:
         description: "also run the LLM advisor fire (costs money; needs ANTHROPIC_API_KEY)"
         required: false
         default: "false"
-  # Switch this on once a long-running twin run is the norm rather than the
-  # exception. --idle-ok means an idle depot is a green no-op, and the
-  # certification guard means a round in flight is a logged skip.
-  # schedule:
-  #   - cron: "*/10 * * * *"
+  # ENABLED 2026-09-14 at Chase's direction ("I don't want to switch off GitHub
+  # yet. So just optimize for what we need now. Your call").
+  #
+  # */5 IS THE FLOOR, NOT A PREFERENCE. GitHub Actions documents "the shortest
+  # interval you can run scheduled workflows is once every 5 minutes"
+  # (https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows,
+  # read 2026-09-14). Anything smaller is silently rounded, not honoured, so */5
+  # is the most responsive this host can be.
+  #
+  # TWO THINGS THIS DOES NOT DO, stated so nobody reads more into it:
+  #   1. It does not fire from a feature branch. The same page: scheduled
+  #      workflows run on the latest commit on the DEFAULT branch. This block is
+  #      inert until the PR merges.
+  #   2. It does not decide where an arriving vehicle goes. That is the decide
+  #      tick (every 2 min live, p95 29 ms of compute). This loop is the external
+  #      CP-SAT PROPOSER -- an optimisation overlay the kernel is free to
+  #      dispose. A vehicle never waits on it.
+  #
+  # Safe to leave on: --idle-ok makes an idle depot a green no-op, and the
+  # certification guard makes a round-in-flight a logged skip, so a 5-minute
+  # beat against a quiet depot costs a runner minute and writes nothing.
+  #
+  # The better design is event-driven -- fire from the tick, gated on whether the
+  # frame changed -- because a proposer solving a stale frame is worse than no
+  # proposer (G49). That needs a migration and a certification round; this is the
+  # best available answer inside GitHub Actions today.
+  schedule:
+    - cron: "*/5 * * * *"
 
 concurrency:
   # One loop per depot at a time. Two loops would both read the same frame and

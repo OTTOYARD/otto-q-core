@@ -409,7 +409,21 @@ repo_manifest(version, name, file) AS (
     ('20260914144547'::text, '0309_benchmark_had_everything_except_a_scenario'::text, '0309_benchmark_had_everything_except_a_scenario.sql'::text),
     ('20260914150516'::text, '0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row'::text, '0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row.sql'::text),
     ('20260914153500'::text, '0311_a_column_that_looks_like_the_price_and_is_not'::text, '0311_a_column_that_looks_like_the_price_and_is_not.sql'::text),
-    ('20260914161504'::text, '0312_the_forward_curve_reads_the_soc_the_twin_already_tracks'::text, '0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql'::text)
+    ('20260914161504'::text, '0312_the_forward_curve_reads_the_soc_the_twin_already_tracks'::text, '0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql'::text),
+    ('20260914163515'::text, '0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle'::text, '0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle.sql'::text),
+    ('20260914164237'::text, '0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant'::text, '0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant.sql'::text),
+    ('20260914164649'::text, '0315_the_speed_cancelled_out_of_my_own_eta'::text, '0315_the_speed_cancelled_out_of_my_own_eta.sql'::text),
+    ('20260914165752'::text, '0316_the_eta_function_starts_answering_its_own_arguments'::text, '0316_the_eta_function_starts_answering_its_own_arguments.sql'::text),
+    ('20260914170416'::text, '0317_the_twin_writes_where_each_asset_is_not_only_how_charged'::text, '0317_the_twin_writes_where_each_asset_is_not_only_how_charged.sql'::text),
+    ('20260914170807'::text, '0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess'::text, '0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess.sql'::text),
+    ('20260914171845'::text, '0319_i_seeded_a_deterministic_draw_on_a_random_uuid'::text, '0319_i_seeded_a_deterministic_draw_on_a_random_uuid.sql'::text),
+    ('20260914192115'::text, '0320_one_function_writes_the_return_eta_and_writes_its_label_with_it'::text, '0320_one_function_writes_the_return_eta_and_writes_its_label_with_it.sql'::text),
+    ('20260914192306'::text, '0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast'::text, '0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast.sql'::text),
+    ('20260914192410'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused.sql'::text),
+    ('20260914192648'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql'::text),
+    ('20260914192738'::text, '0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate'::text, '0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql'::text),
+    ('PENDING'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql'::text),
+    ('20260914193928'::text, '0326_the_stamp_must_be_present_and_not_older_not_different'::text, '0326_the_stamp_must_be_present_and_not_older_not_different.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

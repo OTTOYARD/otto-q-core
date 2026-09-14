@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0312 — GENERATED, not a log
+## Index, 0134–0326 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -297,7 +297,21 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0310](db/migrations/0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row.sql) | `20260914150516` | yes — ledger | 0308 AND 0309 EACH ARGUED forces_recert=false AT LENGTH AND NEITHER |
 | [0311](db/migrations/0311_a_column_that_looks_like_the_price_and_is_not.sql) | `20260914153500` | yes — ledger | site_energy_snapshots.lmp_usd_mwh IS NULL IN EVERY ROW EVER WRITTEN, |
 | [0312](db/migrations/0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql) | `20260914161504` | yes — ledger | ottoq_forecast_net_load's FUTURE-ARRIVAL LOOP COMPUTES EACH VEHICLE'S |
+| [0313](db/migrations/0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle.sql) | `20260914163515` | yes — ledger | THE PREDICTIVE RECALL RUNG CANNOT SEE THE VEHICLE IT IS PREDICTING FOR |
+| [0314](db/migrations/0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant.sql) | `20260914164237` | yes — ledger | GIVE THE TWIN A POSITION, AND DERIVE AN ETA THAT MOVES |
+| [0315](db/migrations/0315_the_speed_cancelled_out_of_my_own_eta.sql) | `20260914164649` | yes — ledger | THE ETA 0314 SHIPPED LOOKED LIKE DISTANCE OVER SPEED AND WAS NOT |
+| [0316](db/migrations/0316_the_eta_function_starts_answering_its_own_arguments.sql) | `20260914165752` | yes — ledger | WIRE THE COMPUTED ETA IN. THE DIAL BECOMES THE FALLBACK |
+| [0317](db/migrations/0317_the_twin_writes_where_each_asset_is_not_only_how_charged.sql) | `20260914170416` | yes — ledger | OTTO-TWIN PERSISTS POSITION ON EVERY TELEMETRY PACKET IT EMITS |
+| [0318](db/migrations/0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess.sql) | `20260914170807` | yes — ledger | THE ETA IS COMPUTED NOW AND eta_source STILL SAYS 'policy_constant' |
+| [0319](db/migrations/0319_i_seeded_a_deterministic_draw_on_a_random_uuid.sql) | `20260914171845` | yes — ledger | THE POSITION MODEL'S SEEDED DRAWS WERE SALTED WITH gen_random_uuid() |
+| [0320](db/migrations/0320_one_function_writes_the_return_eta_and_writes_its_label_with_it.sql) | `20260914192115` | yes — ledger | FOUR FUNCTIONS WRITE return_eta_minutes AND EXACTLY ONE WRITES |
+| [0321](db/migrations/0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast.sql) | `20260914192306` | yes — ledger | THE TWO DEFECTS 0320 BUILT THE TOOL FOR |
+| [0322](db/migrations/0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused.sql) | `20260914192410` | yes — ledger | THE INVARIANT BECOMES PHYSICAL |
+| [0323](db/migrations/0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql) | `20260914192648` | yes — ledger | ACROSS 1,147 SIM RUNS, NOTHING THAT STARTS A RUN HAS EVER ARMED THE |
+| [0324](db/migrations/0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql) | `20260914192738` | yes — ledger | THE RUN GUARD REFUSES CORRECTLY AND EXPLAINS ITSELF WRONGLY |
+| [0325](db/migrations/0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql) | `PENDING` | no — pending | ENERGY COMMANDS GET THE DOCK THAT VEHICLE COMMANDS ALREADY HAVE, |
+| [0326](db/migrations/0326_the_stamp_must_be_present_and_not_older_not_different.sql) | `20260914193928` | yes — ledger | 0322's TRIGGER REFUSES A CORRECT WRITE, BECAUSE "THE STAMP MUST MOVE" |
 
-178 migrations indexed.
+192 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
