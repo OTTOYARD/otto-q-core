@@ -244,7 +244,11 @@ BEGIN
   IF position(c_old in v_def) = 0 THEN
     RAISE EXCEPTION '0313 SWAP: the exact target line was not found in the live definition';
   END IF;
-  IF (SELECT count(*) FROM regexp_matches(v_def, regexp_replace(c_old,'([().*+?\[\]{}|^$\\])','\\\1','g'), 'g')) <> 1 THEN
+  -- Count LITERAL occurrences by length arithmetic. An earlier draft escaped
+  -- c_old into a regex to use regexp_matches; escaping a 78-character line
+  -- containing parentheses, quotes and a dot into a correct regex is exactly
+  -- the kind of cleverness that fails silently and passes. This cannot.
+  IF (length(v_def) - length(replace(v_def, c_old, ''))) / length(c_old) <> 1 THEN
     RAISE EXCEPTION '0313 SWAP: the target line does not occur exactly once';
   END IF;
 
