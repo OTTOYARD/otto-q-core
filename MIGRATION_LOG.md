@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0276 — GENERATED, not a log
+## Index, 0134–0277 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -261,7 +261,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0274](db/migrations/0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one.sql) | `20260913234605` | yes — ledger | THERE IS NO QUEUE, SO THE ASSET CANNOT BE TOLD ITS PLACE IN ONE |
 | [0275](db/migrations/0275_no_single_place_says_which_intelligence_sources_are_actually_on.sql) | `20260914001937` | yes — ledger | NO SINGLE PLACE SAYS WHICH INTELLIGENCE SOURCES ARE ACTUALLY ON |
 | [0276](db/migrations/0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger.sql) | `20260914005147` | yes — ledger | CP-SAT ENACTED THREE TIMES AND THE SCOREBOARD CALLED IT A STRANGER |
+| [0277](db/migrations/0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same.sql) | `PENDING` | no — pending | A SOURCE THAT HAS PROPOSED AND ONE THAT HAS NEVER EXISTED READ THE SAME |
 
-142 migrations indexed.
+143 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

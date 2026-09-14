@@ -373,7 +373,8 @@ repo_manifest(version, name, file) AS (
     ('20260913233201'::text, '0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink'::text, '0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink.sql'::text),
     ('20260913234605'::text, '0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one'::text, '0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one.sql'::text),
     ('20260914001937'::text, '0275_no_single_place_says_which_intelligence_sources_are_actually_on'::text, '0275_no_single_place_says_which_intelligence_sources_are_actually_on.sql'::text),
-    ('20260914005147'::text, '0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger'::text, '0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger.sql'::text)
+    ('20260914005147'::text, '0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger'::text, '0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger.sql'::text),
+    ('PENDING'::text, '0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same'::text, '0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
