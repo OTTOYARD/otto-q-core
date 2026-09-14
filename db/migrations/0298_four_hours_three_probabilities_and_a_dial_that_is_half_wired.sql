@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914103801
 -- migration-name:    0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired
 --
 -- 0298  FOUR HOURS, THREE PROBABILITIES, A FRACTION -- AND ONE DIAL THAT IS
