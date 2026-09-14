@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914104618
 -- migration-name:    0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check
 --
 -- 0299  A DIAL THAT DEFAULTS FOR A CHECK-CONSTRAINED COLUMN INHERITS THE CHECK

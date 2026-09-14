@@ -396,7 +396,7 @@ repo_manifest(version, name, file) AS (
     ('20260914101744'::text, '0296_the_gap_view_cannot_see_five_of_its_own_call_sites'::text, '0296_the_gap_view_cannot_see_five_of_its_own_call_sites.sql'::text),
     ('20260914102812'::text, '0297_seven_gates_whose_range_is_the_comparison_itself'::text, '0297_seven_gates_whose_range_is_the_comparison_itself.sql'::text),
     ('20260914103801'::text, '0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired'::text, '0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired.sql'::text),
-    ('PENDING'::text, '0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check'::text, '0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check.sql'::text)
+    ('20260914104618'::text, '0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check'::text, '0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
