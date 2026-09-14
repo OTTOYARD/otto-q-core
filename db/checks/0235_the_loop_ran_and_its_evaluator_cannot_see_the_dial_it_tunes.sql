@@ -452,3 +452,121 @@
 -- So before scheduling, the open question is no longer "is the evaluator
 -- broken" but "does the loop ever evaluate a window where its levers bite,
 -- and how would we know". That is answerable and it is the next piece of work.
+
+-- ===========================================================================
+-- CORRECTION 3 -- appended 2026-09-14 ~15:30 UTC. RETRACTS CORRECTION 2's
+-- headline finding entirely. The twin HAS an electricity price, and the engine
+-- reads it correctly.
+--
+-- This is the fourth time in one session that a claim in this file has had to
+-- be narrowed or withdrawn. That is itself the most reliable thing this file
+-- records, and E7 below states it as a rule rather than an apology.
+--
+-- ---------------------------------------------------------------------------
+-- E6a. WHAT CORRECTION 2 CLAIMED
+--
+--   "THE TWIN HAS NO ELECTRICITY PRICE. Not once, in the engine's whole
+--    history... v_expensive has been FALSE for every tick ever simulated, so
+--    energy_demand_factor_expensive has never governed anything."
+--
+-- FALSE. Every sentence of it.
+--
+-- ---------------------------------------------------------------------------
+-- E6b. THE MEASUREMENT THAT BREAKS IT
+--
+--   public.ottoq_grid_snapshots
+--     rows                                        22,319   over 1,109 runs
+--     rows with a non-NULL lmp_usd_per_mwh         22,319   -- ALL of them
+--     range                              $8.00 .. $282.80 / MWh
+--     rows above the $60 expensive threshold        1,178   = 5.3%
+--     rows with a non-NULL current_rate_usd_per_kwh 22,319
+--
+--   public.site_energy_snapshots
+--     rows with a non-NULL current_rate_per_kwh    24,898 of 24,898  (100%)
+--     range                             $0.052 .. $0.235 / kWh, 3 tariff labels
+--
+-- And the assignment I should have read before claiming anything:
+--
+--     SELECT lmp_usd_per_mwh INTO v_lmp FROM ottoq_grid_snapshots ...
+--     v_lmp := COALESCE(v_lmp, 40);  v_expensive := v_lmp > 60;
+--
+-- ottoq_energy_orchestrate reads the RIGHT table, and that table is FULLY
+-- POPULATED with a realistic wholesale price series. So v_expensive fires, the
+-- expensive branch is reachable, and energy_demand_factor_expensive governs in
+-- roughly 5.3% of ticks. It is not dead code and does not belong on the
+-- G66/0232 list. The twin models both a wholesale price and a retail
+-- time-of-use rate, and has all along.
+--
+-- ---------------------------------------------------------------------------
+-- E6c. HOW THE MISTAKE WAS MADE -- and it is the same one, a fourth time
+--
+-- ottoq_energy_orchestrate contains the line `INTO v_se FROM
+-- site_energy_snapshots`. I saw that, saw a column called lmp_usd_mwh on
+-- site_energy_snapshots, measured it, found it NULL in all 24,898 rows, and
+-- concluded the engine had no price. I never read where v_lmp is ASSIGNED.
+--
+-- site_energy_snapshots.lmp_usd_mwh is a vestigial column: it exists, it is
+-- NULL in every row ever written, and NOTHING READS IT. The column the engine
+-- uses is ottoq_grid_snapshots.lmp_usd_per_mwh -- different table, different
+-- spelling, fully populated.
+--
+-- The pattern across all four errors in this file is one thing:
+--   D   -- inferred a call graph from a function's own text
+--   C1  -- inferred a property from one window
+--   C2  -- inferred a branch from one line of source
+--   C3  -- inferred a value's source from a nearby SELECT
+-- Every time: a real measurement of the wrong referent.
+--
+-- ---------------------------------------------------------------------------
+-- E7. THE ONE DURABLE FINDING, WHICH IS A METHOD RULE
+--
+-- BEFORE MEASURING A VALUE, READ ITS ASSIGNMENT. Not the function that
+-- mentions it, not a table that carries a column of that name, not a plausible
+-- nearby SELECT -- the line that puts the value in the variable. Every wrong
+-- conclusion in this file would have been prevented by that one step, and
+-- three of them were made while explicitly warning about the previous one.
+--
+-- This is the same class as 0098, 0137/0216, 0145/0146, 0227, 0231, 0296,
+-- 0304, 0307 -- an instrument answering a slightly different question than the
+-- one being asked -- except here the instrument was me.
+--
+-- ---------------------------------------------------------------------------
+-- E8. WHAT STANDS, AFTER ALL THREE CORRECTIONS
+--
+--   STANDS (measured, twice, on frozen bases)
+--   1. The MPC rig is deterministic and position-independent.
+--   2. Plan parameters take effect: deploy_peak_fraction moved throughput
+--      0 vs 5 (run 45c8cc1b); energy_demand_factor_peak moved predicted peak
+--      718 vs 1118 (run 103c7b46).
+--   3. The effect is CONDITIONAL on world state -- the same dial at the same
+--      extremes did nothing in 45c8cc1b's window and 400 kW in 103c7b46's.
+--   4. The loop ran end to end, adopted nothing, wrote no dial, left no
+--      residue. Section A stands untouched.
+--   5. Benchmark completes a full 24 sim-hour day (run 834b3a59, 48 ticks).
+--
+--   WITHDRAWN
+--   - "the evaluator never runs energy orchestration" (D)
+--   - "energy_demand_factor_peak is inert" (C1 iii)
+--   - "predicted_peak_kw does not respond to any plan" (C1 iv)
+--   - "40% of the objective is a constant" (C1 iv)
+--   - "the twin has no electricity price" (C2 E4)
+--   - "energy_demand_factor_expensive is dead code / a G66 item" (C2 E4)
+--
+--   STILL OPEN, no theory offered
+--   - Why 45c8cc1b's window was insensitive to energy_demand_factor_peak.
+--   - Whether the loop's 3-tick horizon ever lands in a window where its
+--     levers bite, and how that would be detected. This is the question that
+--     actually gates scheduling, and it survives every correction above.
+--
+--   MINOR, REAL, WORTH FIXING SEPARATELY
+--   - site_energy_snapshots.lmp_usd_mwh is NULL in all 24,898 rows and has no
+--     reader. A column that looks like the price and is not. It cost this
+--     session a false finding; it will cost the next reader the same. Either
+--     populate it from the grid snapshot or drop it -- and per APPLYING.md,
+--     dropping is not available, so populate or comment it.
+--
+-- THE DECISION IS UNCHANGED AND IS NOW THE ONLY THING THIS FILE ASKS FOR:
+-- the loop stays off the schedule until the horizon question in E8 is
+-- answered. Not because anything is broken -- nothing established here is --
+-- but because an adoption ledger full of honest non-adoptions from slack
+-- windows would look exactly like a loop that converged.
