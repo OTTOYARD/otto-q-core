@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0316 — GENERATED, not a log
+## Index, 0134–0317 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -301,7 +301,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0314](db/migrations/0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant.sql) | `20260914164237` | yes — ledger | GIVE THE TWIN A POSITION, AND DERIVE AN ETA THAT MOVES |
 | [0315](db/migrations/0315_the_speed_cancelled_out_of_my_own_eta.sql) | `20260914164649` | yes — ledger | THE ETA 0314 SHIPPED LOOKED LIKE DISTANCE OVER SPEED AND WAS NOT |
 | [0316](db/migrations/0316_the_eta_function_starts_answering_its_own_arguments.sql) | `PENDING` | no — pending | WIRE THE COMPUTED ETA IN. THE DIAL BECOMES THE FALLBACK |
+| [0317](db/migrations/0317_the_twin_writes_where_each_asset_is_not_only_how_charged.sql) | `PENDING` | no — pending | OTTO-TWIN PERSISTS POSITION ON EVERY TELEMETRY PACKET IT EMITS |
 
-182 migrations indexed.
+183 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
