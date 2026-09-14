@@ -1,0 +1,205 @@
+-- db/checks/0235
+-- THE SELF-IMPROVEMENT LOOP RAN FOR THE FIRST TIME -- AND ITS EVALUATOR
+-- CANNOT SEE HALF THE DIALS IT IS TUNING
+--
+-- Measured 2026-09-14, 14:46-14:55 UTC (9:46-9:55 AM CT), on the first live
+-- run the loop has ever been pointed at.
+--
+-- Task #129. Chase authorised (b): twin-only. This file is why it is NOT yet
+-- on a schedule.
+--
+-- ===========================================================================
+-- A. WHAT WORKED, STATED PLAINLY BEFORE THE DEFECT
+--
+-- 0308 installed the guard, 0309 gave Benchmark its scenarios, and the lane
+-- came up:
+--
+--   run          834b3a59-f582-4aec-9317-a30a4989bf4b
+--   scenario     bench_normal_day   depot 22222222 (Benchmark)   seed 12345
+--   run_by       cil_lane           started 2026-09-14 14:46 UTC
+--
+-- and three things were measured on it rather than assumed:
+--
+--   ottoq_policy_get(run,'run_governor_max_sim_minutes',139) -> 1440
+--       the depot-scope write resolves for the run, so the scope chain works
+--   ottoq_cil_tune_refusal(run) -> NULL
+--       0308's guard permits Benchmark, as designed
+--   tick_count 0 -> 5 in under a minute, sim clock 02:00 -> 04:30
+--       ottoq_demo_metronome ticks a cil_lane run with no change required.
+--       Benchmark was never unfit; 0309 was the whole fix.
+--
+-- Then ottoq_cil_tick ran end to end for the first time in the engine's life.
+-- It proposed four plans, evaluated every one, found all four feasible, scored
+-- `current` best at 0.4691, adopted nothing, and wrote no dial:
+--
+--   "Current policy is best (0.469); no tweak beat it on a 0-unsafe basis."
+--
+-- Mechanically that is a complete propose -> simulate -> score -> decide ->
+-- record loop, and it declined to act. If the story stopped here it would read
+-- as a success.
+--
+-- ===========================================================================
+-- B. THE NUMBER THAT DID NOT SIT RIGHT
+--
+-- From that first tick's own eval block:
+--
+--     current             peak  718 kW   throughput 2   readiness 48
+--     energy_shave_more   peak 1145 kW   throughput 1   readiness 50
+--     energy_relax        peak 1145 kW   throughput 1   readiness 59
+--     deploy_more         peak 1064 kW   throughput 0   readiness 61
+--
+-- energy_shave_more and energy_relax are OPPOSITE interventions on the same
+-- dial -- ottoq_cil_propose builds them as GREATEST(0.15, v-0.10) and
+-- LEAST(0.90, v+0.10). They predicted the SAME peak. And both predicted a peak
+-- 60% HIGHER than doing nothing, which is backwards for a plan whose name is
+-- "shave more".
+--
+-- ===========================================================================
+-- C. THE PROBE THAT CONVICTED IT
+--
+-- Six plans in one call, including a deliberate duplicate, then the same six
+-- again in REVERSED order. Within a call (14:52 UTC):
+--
+--     A1_dup        {deploy_peak_fraction: 0.10}       0.5578  peak 270
+--     A2_dup        {deploy_peak_fraction: 0.10}       0.5578  peak 270
+--     B_deploy_hi   {deploy_peak_fraction: 0.95}       0.8046  peak 284
+--     C_energy_lo   {energy_demand_factor_peak: 0.20}  0.8046  peak 284
+--     D_energy_hi   {energy_demand_factor_peak: 0.85}  0.7866  peak 284
+--     E_current     {}                                 0.7866  peak 284
+--
+-- Three readings, and the third is the one that matters:
+--
+--   1. IDENTICAL PLANS AGREE. A1_dup = A2_dup on every column. So the
+--      evaluator is not simply noisy, and that had to be established first --
+--      otherwise every other difference here is unreadable.
+--   2. A PLAN SETTING A DIAL TIES WITH THE EMPTY PLAN. D_energy_hi, which
+--      sets energy_demand_factor_peak to 0.85, returned exactly what E_current
+--      returned setting nothing at all.
+--   3. TWO DIFFERENT DIALS AT DIFFERENT VALUES TIE. B_deploy_hi (deploy 0.95)
+--      and C_energy_lo (energy 0.20) agreed on score, peak, throughput AND
+--      readiness -- and did so again in the reversed-order run.
+--
+-- Separately, the SAME plan across three calls minutes apart:
+--
+--     E_current   0.7500 / peak 444   then   0.7866 / 284   then  0.7741 / 343
+--
+-- so the base the plans are compared against is moving between calls.
+--
+-- ===========================================================================
+-- D. ROOT CAUSE -- TWO BEATS, AND THE EVALUATOR RUNS THE THIN ONE
+--
+-- ottoq_mpc_lookahead forward-simulates each plan with:
+--
+--     PERFORM ottoq_sim_advance_tick(p_sim_run_id) FROM generate_series(1,p_horizon_ticks);
+--
+-- while ottoq_demo_metronome -- the thing that actually drives the twin --
+-- beats the run with a DIFFERENT function:
+--
+--     SELECT out_sim_clock_after FROM public.ottoq_sim_advance_tick_world(...)
+--
+-- and they are not the same beat:
+--
+--     public.ottoq_sim_advance_tick         2,426 chars   energy orchestration: NO
+--     public.ottoq_sim_advance_tick_world  11,516 chars   energy orchestration: YES
+--
+-- ottoq_sim_advance_tick runs the decide path (ottoq_sim_decide_and_dispatch
+-- -> ottoq_decide_tick, confirmed from a live stack trace today). It does NOT
+-- call ottoq_energy_orchestrate. ottoq_sim_advance_tick_world does.
+--
+-- Now the reader census for the two dials the loop tunes:
+--
+--   deploy_peak_fraction       ottoq_decide_tick                    IN the MPC's path
+--                              twin.ottoq_sim_advance_service_flow
+--                              twin.ottoq_sim_auto_dispatch_tick
+--                              ottoq_agent_board
+--
+--   energy_demand_factor_peak  ottoq_energy_orchestrate             NOT in the MPC's path
+--                              ottoq_mpc_energy_lookahead
+--                              ottoq_agent_board
+--                              ottoq_nl_status_brief
+--
+-- THE EVALUATOR'S FORWARD PATH NEVER EXECUTES A SINGLE READER OF
+-- energy_demand_factor_peak. So two of the loop's four candidate plans --
+-- energy_shave_more and energy_relax, half the candidate set -- are
+-- STRUCTURALLY INCAPABLE of differing from `current` on anything that dial
+-- drives. C's reading 2 and 3 are not a coincidence; they are the only
+-- possible result.
+--
+-- The second half of the defect is the metric. predicted_peak_kw is:
+--
+--     SELECT ROUND(MAX(peak_demand_kw_15min),0) FROM site_energy_snapshots
+--      WHERE sim_run_id = p_sim_run_id AND timestamp > v_clock
+--
+-- site_energy_snapshots is written by the energy path -- the half the MPC's
+-- own ticks do not run. So the peak the lookahead reports is not produced by
+-- the simulation it just performed; it is read from rows the CONCURRENT
+-- METRONOME wrote for the same run. That is why the same plan returns 444,
+-- then 284, then 343 in three calls, and why the numbers cluster by when a
+-- plan happened to be evaluated rather than by what the plan said.
+--
+-- Note also that the lookahead sets ottoq.dryrun='on' for its whole body, and
+-- ottoq_evaluate_return_need and ottoq_evaluate_rule_core both branch on it --
+-- so the L1 shield and the recall evaluator behave differently inside a
+-- lookahead than in a real tick. Not the cause of the above, recorded because
+-- it is a second way the simulated world is not the real one.
+--
+-- ===========================================================================
+-- E. WHAT THIS MEANS, AND THE DECISION TAKEN
+--
+-- The loop is NOT scheduled, and this file is the reason. Scheduling it today
+-- would produce an ottoq_cil_adoptions ledger -- rows with run IDs, scores,
+-- timestamps and a 0-unsafe gate -- in which the energy comparisons are
+-- decided by metronome timing rather than by policy. That is the exact failure
+-- this build has convicted twice already and written into CLAUDE.md C5:
+--
+--     "A run ID makes a number reproducible; it does not make it meaningful."
+--
+-- An adoption ledger is the ONLY evidence that the loop converges. Filling it
+-- with noise first would poison the one instrument the claim rests on.
+--
+-- AND THE HONEST FRAMING OF WHAT THE LOOP IS, which must not be overstated
+-- even once it works: ottoq_cil_propose offers four plans over TWO dials with
+-- hardcoded +/-0.10 and +0.05 steps. It is a two-dial hill-climber with a
+-- fixed step, evaluated forward in the twin under a 0-unsafe gate. That is a
+-- real closed loop and it is worth having. It is not "the engine tunes
+-- itself".
+--
+-- ===========================================================================
+-- F. THE FIX, NOT APPLIED HERE
+--
+-- Three parts, in order, each wanting its own reviewed window:
+--
+--   1. THE EVALUATOR MUST RUN THE BEAT IT IS PREDICTING. Point
+--      ottoq_mpc_lookahead at ottoq_sim_advance_tick_world so a forward tick
+--      is the same beat the metronome runs. This is the whole of the energy
+--      blindness. It is also the more expensive tick, so horizon cost must be
+--      re-measured, not assumed.
+--
+--   2. THE BASE MUST BE HELD CONSTANT ACROSS PLANS. Today plan N and plan N+1
+--      are evaluated against different worlds because the metronome is
+--      advancing the same run between them. The engine already solved exactly
+--      this for certification: ottoq_determinism_pair holds seed, scenario,
+--      depot and sim-clock start constant across arms, and
+--      twin.ottoq_sim_seeded_random is stateless and content-addressed so CRN
+--      survives policy variation by construction (CLAUDE.md C5). The loop
+--      needs the same discipline: either the lane is quiesced while a
+--      lookahead runs, or the lookahead forks from a pinned snapshot rather
+--      than from a live run.
+--
+--   3. ONLY THEN SCHEDULE IT, and judge the first adoptions against a stated
+--      bar rather than against "it produced rows".
+--
+-- Two smaller things found on the way, both real, both left for their own
+-- change:
+--
+--   - ottoq_cil_propose hardcodes the bounds 0.15, 0.90 and 1.00, duplicating
+--     the catalogue, which floors energy_demand_factor_peak at 0.25. The
+--     catalogue wins since 0302, so the clamp would fire on every adoption of
+--     an energy plan and the agent would never get what it asked for. Two
+--     sources of truth for one bound is the G54 class. Since the dial
+--     catalogue is CLOSED (0304, 92 -> 0), the proposer should read its
+--     candidate bounds FROM the catalogue instead of restating them.
+--   - ottoq_mpc_lookahead's per-plan rollback deletes its own overrides with
+--     updated_by='mpc' AFTER the subtransaction it already rolled back. That
+--     is belt-and-braces and harmless, and its own comment says so; noted only
+--     so a future reader does not mistake it for the leak.
