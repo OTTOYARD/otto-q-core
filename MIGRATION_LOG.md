@@ -298,8 +298,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0311](db/migrations/0311_a_column_that_looks_like_the_price_and_is_not.sql) | `20260914153500` | yes — ledger | site_energy_snapshots.lmp_usd_mwh IS NULL IN EVERY ROW EVER WRITTEN, |
 | [0312](db/migrations/0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql) | `20260914161504` | yes — ledger | ottoq_forecast_net_load's FUTURE-ARRIVAL LOOP COMPUTES EACH VEHICLE'S |
 | [0313](db/migrations/0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle.sql) | `20260914163515` | yes — ledger | THE PREDICTIVE RECALL RUNG CANNOT SEE THE VEHICLE IT IS PREDICTING FOR |
-| [0314](db/migrations/0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant.sql) | `PENDING` | no — pending | GIVE THE TWIN A POSITION, AND DERIVE AN ETA THAT MOVES |
-| [0315](db/migrations/0315_the_speed_cancelled_out_of_my_own_eta.sql) | `PENDING` | no — pending | THE ETA 0314 SHIPPED LOOKED LIKE DISTANCE OVER SPEED AND WAS NOT |
+| [0314](db/migrations/0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant.sql) | `20260914164237` | yes — ledger | GIVE THE TWIN A POSITION, AND DERIVE AN ETA THAT MOVES |
+| [0315](db/migrations/0315_the_speed_cancelled_out_of_my_own_eta.sql) | `20260914164649` | yes — ledger | THE ETA 0314 SHIPPED LOOKED LIKE DISTANCE OVER SPEED AND WAS NOT |
 
 181 migrations indexed.
 

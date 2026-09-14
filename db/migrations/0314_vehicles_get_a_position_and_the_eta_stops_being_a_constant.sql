@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914164237
 -- migration-name:    0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant
 --
 -- 0314  GIVE THE TWIN A POSITION, AND DERIVE AN ETA THAT MOVES
