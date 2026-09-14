@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914105943
 -- migration-name:    0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column
 --
 -- 0301  FIVE FILES NEVER CLASSIFIED THEMSELVES, AND THE FLOOR SWALLOWED EVERY
@@ -279,3 +279,38 @@ BEGIN
   END IF;
   RAISE NOTICE 'A3 OK: every applied migration from 0255 up carries a lineage row';
 END $a3$;
+
+-- ===========================================================================
+-- APPLIED 20260914105943. All four P blocks and A1-A3 passed, and the SQL that
+-- ran md5s to 28adeedd6a4ab9c9ef7369fb2e3c2d78 -- identical to this file with
+-- its trailing newline stripped, measured before the apply.
+--
+--   ottoq_cert_recert_floor()   2026-09-14 10:51:35+00
+--                            -> 2026-09-12 16:50:23.319089+00
+--   owned by                    0256_the_trigger_restamps_what_the_teardown_fixed
+--   the six lineage rows        all present, all forces_recert=false
+--
+-- CORRECTION, AND IT IS THE SAME CLASS THIS FILE IS ABOUT.
+--
+-- A1's SECOND check could not fail. It reads
+--
+--     WHERE (name LIKE '029[6-9]%' OR name LIKE '030[01]%') AND forces_recert
+--
+-- and SQL LIKE has no character classes -- only % and _. Those patterns match
+-- a LITERAL '029[6-9]' prefix, so they select zero rows and the EXISTS is
+-- always false. Measured after the apply: that predicate returns 0 rows, while
+-- the six rows plainly exist under an explicit IN list. A1's FIRST check (the
+-- IN list, v_n <> 6) is real and did the work.
+--
+-- THE PROPERTY IS STILL PROVEN, by A2 rather than by the assertion written for
+-- it: if any of the six carried forces_recert=true, the floor's second branch
+-- (max classified_at WHERE forces_recert) would have been this file's own
+-- now() -- 2026-09-14 10:59:43 -- and A2 asserts the floor is
+-- 2026-09-12 16:50:23.319089+00 exactly. A2 passed, so none of the six forces
+-- recert. Verified again directly afterwards, six rows, all false.
+--
+-- Recorded rather than edited, because the executable half is the SQL that
+-- ran. The lesson is the one this whole file exists for: an argument -- or an
+-- assertion -- that the engine cannot actually evaluate is worth nothing, and
+-- writing three P blocks that can fail does not excuse one A block that cannot.
+-- ===========================================================================
