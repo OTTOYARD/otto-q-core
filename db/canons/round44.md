@@ -160,9 +160,89 @@ energy dock) is committed PENDING and waits behind this round.
 
 ---
 
-## THE JUDGEMENT
+## THE JUDGEMENT — PART 1, 20:30 UTC (3:30 PM CT)
 
-_(pending — written when the round lands)_
+Written with the grid lane complete and four of seven flagship columns landed.
+Part 2 follows when the 24t and 48t columns land (21:14–21:32 UTC).
+
+### Post-window results so far
+
+Only a column whose last pair ran after 19:21 UTC has been through this window.
+That is the three grid columns and the four 12-tick flagship columns; the 24t and
+48t flagship columns last ran at 18:41–18:57 and still carry round 43's values.
+
+| column | fp | endst | dec | cmd | verdict |
+|---|---|---|---|---|---|
+| grid 239001/6 | HELD | **MOVED** | MOVED | MOVED | green, 2 passes |
+| grid 424242/6 | HELD | **MOVED** | MOVED | MOVED | green, 2 passes |
+| grid 171717/12 | **MOVED** | **MOVED** | MOVED | MOVED | green, 2 passes |
+| 12t/171717/busy | HELD | **MOVED** | held | held | 1 pass |
+| 12t/314159/busy | HELD | **MOVED** | held | held | 1 pass |
+| 12t/424242/busy | HELD | **MOVED** | held | held | 1 pass |
+| 12t/171717/normal | HELD | **MOVED** | held | held | 1 pass |
+
+**Zero determinism failures.** Every pair byte-identical across all fourteen
+atoms. That is P1's real content and it is holding.
+
+### P2 — `endst` MOVES on every flagship column: **HELD, and wider than predicted.**
+
+`endst` moved on all seven post-window columns, grid included. The prediction was
+right and one of its caveats was wrong: I had noted the grid fixture's vehicles
+are "never deployed", so grid `endst` would legitimately hold. **Measured: grid
+runs dispatch 4 vehicles each** — 48 dispatches over 12 grid runs, all 48 now
+carrying an ETA. There was no grid exception to make.
+
+And the flagship movement is the fix landing inside the certified path, quantified:
+
+| | dispatches | carrying an ETA |
+|---|---|---|
+| busy_day, pre-window (24 runs) | 3,760 | 3,336 — **424 NULL** |
+| busy_day, post-window (6 runs) | 696 | **696 — none NULL** |
+| normal_day, pre-window (4 runs) | 468 | 464 — 4 NULL |
+| normal_day, post-window (2 runs) | 234 | **234 — none NULL** |
+
+### P2 — `dec` and `cmd` may hold: **they held, on all four flagship columns.**
+
+Predicted as permitted, not required. A changed ETA did not change what the decide
+path did on a 12-tick horizon. Whether it does at 24 or 48 ticks is Part 2's.
+
+### P2 — `0323` moves nothing: **HELD, by direct receipt rather than by inference.**
+
+Twenty runs have started since 0323 applied. **Zero carry an `agentic_arm`
+receipt**, and all twenty are `run_by='cert_harness'`. Both guards did their job.
+
+The same measurement says something the round cannot settle: **no non-certification
+run has started since 0323**, so the arming path has never actually fired. 0323 is
+proven inert where it must be inert and unproven where it must work. The twin run
+after this round is what closes that, and hop 1 of `scripts/watch-run.sql` is the
+receipt to read.
+
+### P2 — `fp`: retired for this window, and the cause is STILL open
+
+Six of seven post-window columns held; `grid 171717/12` moved. The 20:03
+correction above explains why the original prediction was unsound. It then offered
+a replacement expectation — *"`fp` should move wherever `prime_deployment` creates
+dispatch rows at boot"* — and **that one does not survive either**, in both
+directions: the three grid columns share a depot and a fixture and disagree with
+each other, and the four flagship columns, whose runs demonstrably do carry
+`fixture:prime_deployment` rows, all held.
+
+I looked for a third explanation in the end-of-run `eta_source` distribution —
+grid shows no `fixture:prime_deployment` label, flagship does — and **it cannot
+testify.** The per-tick refresh 0321 added overwrites the prime label within a few
+ticks, so an end-of-run label census answers "who wrote last", not "what existed
+at boot". That is the same defect class a third time today; recording it here
+rather than letting a wrong story stand.
+
+**What is settled:** the engine is not implicated. All five grid pairs and all
+four flagship pairs are byte-identical. A canon that moves is a canon update; only
+a pair that FAILS is a defect, and none failed. The `fp` asymmetry is a gap in the
+explanation, not in the determinism.
+
+### P3 — the recert floor moves once: **HELD.**
+
+Every flagship column reset to `consecutive_passes = 0` and the four that have run
+since are at 1. `0325` stayed unapplied for exactly this reason and still is.
 
 ---
 
