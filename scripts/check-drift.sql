@@ -422,7 +422,8 @@ repo_manifest(version, name, file) AS (
     ('20260914192410'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused.sql'::text),
     ('20260914192648'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql'::text),
     ('20260914192738'::text, '0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate'::text, '0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql'::text),
-    ('PENDING'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql'::text)
+    ('PENDING'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql'::text),
+    ('PENDING'::text, '0326_the_stamp_must_be_present_and_not_older_not_different'::text, '0326_the_stamp_must_be_present_and_not_older_not_different.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

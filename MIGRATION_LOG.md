@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0325 — GENERATED, not a log
+## Index, 0134–0326 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -310,7 +310,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0323](db/migrations/0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql) | `20260914192648` | yes — ledger | ACROSS 1,147 SIM RUNS, NOTHING THAT STARTS A RUN HAS EVER ARMED THE |
 | [0324](db/migrations/0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql) | `20260914192738` | yes — ledger | THE RUN GUARD REFUSES CORRECTLY AND EXPLAINS ITSELF WRONGLY |
 | [0325](db/migrations/0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql) | `PENDING` | no — pending | ENERGY COMMANDS GET THE DOCK THAT VEHICLE COMMANDS ALREADY HAVE, |
+| [0326](db/migrations/0326_the_stamp_must_be_present_and_not_older_not_different.sql) | `PENDING` | no — pending | 0322's TRIGGER REFUSES A CORRECT WRITE, BECAUSE "THE STAMP MUST MOVE" |
 
-191 migrations indexed.
+192 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
