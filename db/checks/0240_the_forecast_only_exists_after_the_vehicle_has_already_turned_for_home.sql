@@ -225,3 +225,54 @@ SELECT 'ottoq_gc_stale_reservations callers' AS check,
 --     value is a question for measurement, not for taste: how much does the ETA
 --     actually move as N varies, on a fixed seed. That measurement belongs in
 --     the same window as the fix, and its result is reported with the run ID.
+
+-- ---------------------------------------------------------------------------
+-- §G  HOW MUCH A WINDOWED SPEED ACTUALLY MOVES THE ETA -- the measurement §F
+--     said the window size is a question for data, not taste
+--
+--     Read-only over run a5bd449f's telemetry: per vehicle, the lifetime
+--     avg(speed_kmh) the ETA uses today, against the average of that vehicle's
+--     most recent N packets. 60 vehicles with >= 5 moving packets, 23.0 packets
+--     each on average.
+--
+--       estimator      mean km/h    mean |move| vs lifetime    max |move|
+--       lifetime         34.43              --                    --
+--       last 10          34.41             6.6%                   --
+--       last 5           33.62            11.0%                   --
+--       last 3           32.34            16.4%                 56.6%
+--
+--     TWO THINGS TO READ OUT OF THAT, and the second is the one that decides it.
+--
+--     First, responsiveness. A 3-packet window moves a vehicle's speed -- and
+--     therefore its ETA, which is distance/speed -- by 16.4% on average and by
+--     more than HALF in the worst case. The lifetime average moves by
+--     definition 0%. That difference is the entire requirement: an ETA that
+--     shifts when a vehicle hits traffic.
+--
+--     Second, and this is why N=3 is safe rather than merely lively: the FLEET
+--     MEAN barely moves (34.43 -> 32.34). The window lets individual vehicles
+--     deviate without re-scaling the fleet's average speed -- exactly the
+--     property ottoq_congestion_factor was built to preserve (0.75 on four peak
+--     hours and 1.05 on the other twenty, averaging to 1.0). Two independent
+--     parts of the timing model would then share one discipline: re-time
+--     arrivals, do not re-scale the fleet.
+--
+--     RECOMMENDATION: N = 3, as a catalogued dial (0302/0304/0305 make the
+--     catalogue the allow-list, so a new dial is registered or it is refused).
+--
+--     AND THE LIMIT OF THIS MEASUREMENT, stated rather than glossed: it is ONE
+--     run and 60 vehicles, and it measures the SPREAD of a windowed estimator,
+--     not whether the windowed number is closer to the truth. The twin has no
+--     ground-truth arrival time to score against -- scheduled_return_at is
+--     written by the same machinery, which would be circular, exactly the
+--     circularity 0009 recorded when it found 116 of 116 rows arriving at
+--     dispatch + 30 min and noted there was no training signal. What can
+--     honestly be claimed is that a windowed estimator RESPONDS and a lifetime
+--     one does not, and that the fix is also the cheaper one (§F). Claiming it
+--     is more ACCURATE needs an arrival ledger that does not derive from the
+--     ETA, and that is its own piece of work.
+--
+--     NOT BUILT HERE, and not in the same window as 0321. 0321 already changes
+--     what the ETA is for ~36 rows per run; changing the estimator in the same
+--     recert would make a moved canon unattributable between the two. Separate
+--     file, after round 44.
