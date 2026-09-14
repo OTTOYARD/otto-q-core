@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914121021
 -- migration-name:    0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog
 --
 -- 0302  THE ONLY AGENT THAT TUNES DIALS IS THE ONE THAT BYPASSES THE CATALOG

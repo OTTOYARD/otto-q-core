@@ -286,7 +286,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0299](db/migrations/0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check.sql) | `20260914104618` | yes — ledger | A DIAL THAT DEFAULTS FOR A CHECK-CONSTRAINED COLUMN INHERITS THE CHECK |
 | [0300](db/migrations/0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment.sql) | `20260914105135` | yes — ledger | THREE DIALS WHOSE FLOOR IS ON THE OTHER SIDE OF THE ASSIGNMENT |
 | [0301](db/migrations/0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column.sql) | `20260914105943` | yes — ledger | FIVE FILES NEVER CLASSIFIED THEMSELVES, AND THE FLOOR SWALLOWED EVERY |
-| [0302](db/migrations/0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog.sql) | `PENDING` | no — pending | THE ONLY AGENT THAT TUNES DIALS IS THE ONE THAT BYPASSES THE CATALOG |
+| [0302](db/migrations/0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog.sql) | `20260914121021` | yes — ledger | THE ONLY AGENT THAT TUNES DIALS IS THE ONE THAT BYPASSES THE CATALOG |
 
 168 migrations indexed.
 
