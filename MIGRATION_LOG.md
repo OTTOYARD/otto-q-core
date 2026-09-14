@@ -304,7 +304,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0317](db/migrations/0317_the_twin_writes_where_each_asset_is_not_only_how_charged.sql) | `20260914170416` | yes — ledger | OTTO-TWIN PERSISTS POSITION ON EVERY TELEMETRY PACKET IT EMITS |
 | [0318](db/migrations/0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess.sql) | `20260914170807` | yes — ledger | THE ETA IS COMPUTED NOW AND eta_source STILL SAYS 'policy_constant' |
 | [0319](db/migrations/0319_i_seeded_a_deterministic_draw_on_a_random_uuid.sql) | `20260914171845` | yes — ledger | THE POSITION MODEL'S SEEDED DRAWS WERE SALTED WITH gen_random_uuid() |
-| [0320](db/migrations/0320_one_function_writes_the_return_eta_and_writes_its_label_with_it.sql) | `PENDING` | no — pending | FOUR FUNCTIONS WRITE return_eta_minutes AND EXACTLY ONE WRITES |
+| [0320](db/migrations/0320_one_function_writes_the_return_eta_and_writes_its_label_with_it.sql) | `20260914192115` | yes — ledger | FOUR FUNCTIONS WRITE return_eta_minutes AND EXACTLY ONE WRITES |
 | [0321](db/migrations/0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast.sql) | `PENDING` | no — pending | THE TWO DEFECTS 0320 BUILT THE TOOL FOR |
 | [0322](db/migrations/0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused.sql) | `PENDING` | no — pending | THE INVARIANT BECOMES PHYSICAL |
 | [0323](db/migrations/0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql) | `PENDING` | no — pending | ACROSS 1,147 SIM RUNS, NOTHING THAT STARTS A RUN HAS EVER ARMED THE |
