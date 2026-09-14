@@ -176,3 +176,86 @@ be quoted as evidence for a property it does not test.
 ## THE JUDGEMENT
 
 *(written when the pairs land)*
+
+---
+
+## THE JUDGEMENT
+
+Written 2026-09-14 19:20 UTC (2:20 PM CT), after the last pair landed.
+
+### P1 — every flagship column passes twice and goes green. **HELD, at a cost I caused.**
+
+Ten columns green: three grid, seven flagship. **Zero determinism failures in the
+entire round** — every pair that ran to completion returned `equal: true` with all
+fourteen atoms matching. So 0313–0319 carry no nondeterminism the flagship depot can
+express, and the `0319` fix holds at full size and not merely on the 4-vehicle grid.
+
+The cost is mine and belongs in the record. I started a twin demo run
+(`e02e92b4-8351-4ac2-a069-6719c3a3852a`) on depot `11111111` at 18:26 UTC while lane 2
+was mid-flight. `twin.ottoq_sim_start_run`'s one-world guard is **global** — it has no
+depot predicate, whatever its message says — so it refused the next two certification
+pairs outright:
+
+| | fired | result |
+|---|---|---|
+| `r43_c2` normal_day/171717/12t | 18:31 | **failed**, 56 s, `OTTOQ_RUN_ALREADY_ACTIVE` |
+| `r43_d2` busy_day/424242/12t | 18:36 | **failed**, 2 s, `OTTOQ_RUN_ALREADY_ACTIVE` |
+
+Nothing was corrupted — the guard checks before it writes — but two columns sat at one
+pass instead of two and the round needed a tail. Re-run as `r43_c2b` (19:12) and
+`r43_d2b` (19:18); both passed and both columns went green.
+
+Two things came out of it, and they are the only reason it was worth anything.
+`db/migrations/0324` rewrites the guard's message, which said *"is still moving this
+depot"* and described a check that reads no depot at all. And the operational rule is
+now explicit: **a twin run anywhere on the instance is a certification outage.**
+
+### P2 — the canons MOVE, and the atoms that move name what the change reached. **HELD, on every column.**
+
+Seven flagship columns, first eight hex characters, pre-round value from the table above
+against the value banked this round:
+
+| column | cmd | dec | rcl | endst | fp | cal |
+|---|---|---|---|---|---|---|
+| 48t/171717/busy | 5727d446 → **700c0bd1** | 7a8ac80f → **508e9323** | d66783aa → **38d46cee** | 5a3ec345 → **e21d765c** | 9c28854e = | 11a24626 = |
+| 24t/171717/busy | 050c4606 → **aa851116** | 0360adc9 → **cf474410** | fa8ab72c → **139af2f6** | dc344d68 → **070d08f1** | 9c28854e = | 11a24626 = |
+| 24t/424242/busy | 8f232001 → **231293b7** | 35148055 → **7d901d85** | 928262d2 → **bf6e0fb8** | 7fb3eca5 → **584f6557** | 7a14aa52 = | 11a24626 = |
+| 12t/171717/busy | 1ae7ba68 → **e07b4d2f** | cf2f44e2 → **5e03ebd0** | 0a4ca4d3 → **e8062941** | 8b5a0ad4 → **65f26efe** | 9c28854e = | 11a24626 = |
+| 12t/314159/busy | 109e340b → **0c6a5fb5** | 9abdb4af → **69e6a60a** | 0e67b89a → **4ee0187d** | 660898c9 → **c847d9b8** | b8606125 = | 11a24626 = |
+| 12t/424242/busy | 76134009 → **c5278b05** | 47757095 → **3670a7e2** | f58ee562 → **86bf1c8f** | 4f1879cf → **1bb3ed03** | 7a14aa52 = | 11a24626 = |
+| 12t/171717/normal | 5921ef70 → **68dcd195** | 37624cdd → **5a8a186d** | e4e41e69 → **536db755** | d801f3ce → **d6257ac4** | 9c28854e = | 11a24626 = |
+
+**`endst` moved 7 of 7. `rcl` moved 7 of 7. `dec` moved 7 of 7. `cmd` moved 7 of 7.
+`cal` held 7 of 7.** Each was named in advance and each behaved as named: `endst`
+because `ottoq_vehicle_dispatches` sits inside `endst.dispatches.vis` and
+`return_eta_minutes` stopped being the literal 30; `rcl` because `0313` gave the recall
+rung a measured burn rate; `dec` and `cmd` because a changed recall and a changed ETA
+changed what the decide path did; `cal` because no prior was refitted.
+
+**One observation P2 did not predict, recorded because it is evidence either way.**
+`fp` held on all seven — and it should have. `fp` is the boot-world fingerprint, and
+0313–0319 changed in-run behaviour, not the world the arms boot from. It is also the
+independent check that the two halves are separable: had `fp` moved, the arms would
+have started from different worlds and every other atom's agreement would have meant
+nothing. Predicting it explicitly is a note for round 44's pre-round file.
+
+### P3 — the grid columns do not move again. **HELD, and measured rather than assumed.**
+
+`supabase_migrations.schema_migrations` holds **zero rows** with a version after
+`20260914171845` (`0319`'s stamp). The recert floor is a single distinct value across
+all ten columns — `2026-09-14 17:18:45.095549+00` — exactly where the round started.
+Nothing was applied while lane 2 was in flight, so no pair banked this round was
+invalidated by a later floor. That is the 0308/0309/0311 lesson observed rather than
+re-learned.
+
+### Verdict
+
+**Round 43 passes on all three predictions.** 0313–0319 are certified: ten columns
+green, fourteen atoms byte-identical on every completed pair, canons moved exactly where
+the work reached and held exactly where it did not.
+
+The apply window queued behind this round is `0320 → 0321 → 0322 → 0323 → 0324`, and
+round 44 certifies it. The round-44 pre-round file must predict `fp` explicitly, and
+must note that `0323` changes what an ordinary run *arms* — which is a behaviour change
+to the twin's own entry points, not to the certified path, since `ottoq_agentic_arm`
+refuses a `cert_harness` run.
