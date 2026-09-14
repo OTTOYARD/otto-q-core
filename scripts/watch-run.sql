@@ -72,6 +72,14 @@
 --          measured ~87% source-less fleet-wide. Read that line before quoting
 --          the count above it.
 --
+--   hop 14 A TWIN RUN CANNOT PASS THIS HOP, and that is the finding, not a bug
+--          in the watcher. The twin executes a command in-process and never
+--          takes delivery, so delivered_at stays NULL through a perfect run.
+--          The hop is here so the outbound half of the hub is visible in the
+--          same view as the rest of the chain rather than only in a check file:
+--          OTTO-Q is closed IN and THROUGH, and open OUT (G70). Read 0/N as
+--          "no consumer is wired yet", never as "the run failed".
+--
 --   hop 11 0 refusals is ambiguous. It means either the shield refused nothing
 --          or the shield was not asked. Compare the evaluation count against
 --          the decision count at hop 10; db/checks/0146 convicted baseline
@@ -173,7 +181,18 @@ SELECT * FROM (
     (SELECT COALESCE(string_agg(DISTINCT command_type,', '),'(none)')
        FROM public.ottoq_vehicle_commands, R WHERE sim_run_id=R.id)
 
-  UNION ALL SELECT 14,'OUTCOME: service detail records',
+  UNION ALL SELECT 14,'OUTBOUND: commands taken delivery of',
+    (SELECT count(*) FILTER (WHERE delivered_at IS NOT NULL)||'/'||count(*)
+       FROM public.ottoq_vehicle_commands, R WHERE sim_run_id=R.id),
+    (SELECT CASE
+       WHEN count(*) = 0 THEN 'no commands issued'
+       WHEN count(*) FILTER (WHERE delivered_at IS NOT NULL) = 0
+         THEN 'NOBODY CLAIMED THEM: 0 of '||count(*)||'. Fleet-wide that is 0 of 822,887 (db/checks/0243).'
+       ELSE count(*) FILTER (WHERE confirmed_at IS NOT NULL)||' also confirmed, '||
+            count(DISTINCT delivered_to)||' distinct consumers' END
+       FROM public.ottoq_vehicle_commands, R WHERE sim_run_id=R.id)
+
+  UNION ALL SELECT 15,'OUTCOME: service detail records',
     (SELECT count(*)::text FROM public.ottoq_service_detail_records, R WHERE sim_run_id=R.id),
     'CLAUDE.md 2.6: every completed operation must terminate in an SDR'
 ) x ORDER BY hop;
