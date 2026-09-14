@@ -295,7 +295,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0308](db/migrations/0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on.sql) | `20260914144046` | yes — ledger | THE SELF-IMPROVEMENT LOOP GETS THE ONE GUARD IT NEEDS BEFORE IT MAY |
 | [0309](db/migrations/0309_benchmark_had_everything_except_a_scenario.sql) | `20260914144547` | yes — ledger | THE BENCHMARK DEPOT HAD 160 STALLS, 100 VEHICLES AND NO WAY TO START |
 | [0310](db/migrations/0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row.sql) | `20260914150516` | yes — ledger | 0308 AND 0309 EACH ARGUED forces_recert=false AT LENGTH AND NEITHER |
-| [0311](db/migrations/0311_a_column_that_looks_like_the_price_and_is_not.sql) | `PENDING` | no — pending | site_energy_snapshots.lmp_usd_mwh IS NULL IN EVERY ROW EVER WRITTEN, |
+| [0311](db/migrations/0311_a_column_that_looks_like_the_price_and_is_not.sql) | `20260914153500` | yes — ledger | site_energy_snapshots.lmp_usd_mwh IS NULL IN EVERY ROW EVER WRITTEN, |
 
 177 migrations indexed.
 

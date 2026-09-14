@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914153500
 -- migration-name:    0311_a_column_that_looks_like_the_price_and_is_not
 --
 -- 0311  site_energy_snapshots.lmp_usd_mwh IS NULL IN EVERY ROW EVER WRITTEN,
