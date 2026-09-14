@@ -298,3 +298,25 @@ BEGIN
 
   RAISE NOTICE '0325: energy dock created -- claim gated to production and to schedule-shaped commands, ack requires prior delivery';
 END $assert$;
+
+-- CERT LINEAGE ---------------------------------------------------------------
+-- Without this row ottoq_cert_recert_floor() reads COALESCE(forces_recert, TRUE)
+-- and treats the file as forcing anyway -- so omitting it does not get you a
+-- cheap migration, it gets you an UNEXPLAINED recert. Caught by
+-- tests/test_migration_hygiene.py::test_recent_migrations_classify_themselves,
+-- which is the third time that test has earned its keep (0267/0268, 0271/0272).
+INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note, classified_at)
+VALUES
+  ('0325_energy_commands_get_the_dock_that_vehicle_commands_already_have', true,
+   'Additive: four delivery columns on ottoq_energy_commands plus '
+   'ottoq_energy_claim_commands and ottoq_energy_ack_command. It SHOULD move no canon, '
+   'and the argument is read from the live function rather than assumed -- h_nrg hashes '
+   'an explicit column list (tick_seq|command_type|source|setpoint_kw|horizon_min|'
+   'issued_at|reason) that contains none of the four, exactly as h_cmd has never hashed '
+   'ottoq_vehicle_commands.delivered_at; and the claim path is gated data_source='
+   '''production'' so a certification, which is entirely twin, cannot reach it. '
+   'Classified TRUE regardless, on 0320''s reasoning: "should change nothing" is a '
+   'prediction for the next round to judge, not a classification. If a canon moves, the '
+   'column-list argument above is wrong and that is the finding.',
+   now())
+ON CONFLICT (name) DO NOTHING;
