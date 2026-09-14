@@ -146,3 +146,82 @@ SELECT o.armed_at_tick, count(*) AS seats,
  GROUP BY o.sim_run_id, o.armed_at_tick ORDER BY o.armed_at_tick;
 -- measured at tick 4: 10 seats, 1 answered, 1 planned. The loop fired at that
 -- tick -- it just could not plan for the other nine.
+
+-- ===========================================================================
+-- CORRECTION, SAME SESSION. "A METRIC DEFECT, NOT A REGRESSION" WAS HALF WRONG.
+--
+-- The section above attributes the answered_enacted collapse to the proposer
+-- superseding its own rows, and calls it a bookkeeping artefact because "the
+-- vehicle is not worse off -- 9 CP-SAT proposals were enacted against 8". Then
+-- the proposal chains were actually followed, and the second half of that
+-- sentence does not survive.
+--
+-- EVERY forward_lex PROPOSAL IN BOTH RUNS, BY STATUS, AND WHETHER THE SAME
+-- VEHICLE GOT ANOTHER PROPOSAL AFTERWARDS:
+--
+--   run       status      n   has successor   successor same source   avg ticks
+--   36e5cc68  enacted     8               0                       0           -
+--   36e5cc68  expired     2               0                       0           -
+--   36e5cc68  superseded 13               0                       0           -
+--   91139ad8  enacted     9               5                       5        1.20
+--   91139ad8  pending     4               0                       0           -
+--   91139ad8  superseded 35              21                      21        1.14
+--
+-- TWO DIFFERENT WORLDS, and the timer run is the clean one. In 36e5cc68 NOT ONE
+-- proposal was followed by another proposal for the same vehicle: its thirteen
+-- supersessions were all by something that is not a proposal -- the kernel
+-- assigning the vehicle itself. Nothing churned.
+--
+-- In 91139ad8, 26 of 48 proposals were followed by another proposal for the
+-- SAME vehicle from the SAME source, about ONE TICK later. Twenty-one of the
+-- thirty-five supersessions are the proposer invalidating its own pending row
+-- before the decide path ever acted on it -- and five ENACTED rows were
+-- re-proposed too. Four rows are still 'pending', resolved by nothing.
+--
+-- SO: proposals 23 -> 48, enactments 8 -> 9, and roughly half the extra volume
+-- is the proposer overwriting itself. That is not bookkeeping. It is CHURN, and
+-- it is a real cost of firing every tick: a pending proposal's window to be
+-- enacted is shorter than the interval to the next re-plan, so most plans never
+-- get the chance.
+--
+-- WHAT THIS CHANGES:
+--
+--   - G59 as filed ("a metric defect, not a regression") is corrected. There IS
+--     a metric problem -- answered_enacted moves for reasons unrelated to
+--     outcomes -- but underneath it is a behaviour problem, and the behaviour
+--     one is the bigger of the two.
+--   - 0224's "kept, on narrow grounds" stands, but the grounds are narrower
+--     again: unanswered seats still fell 12 to 10 and enactments did not fall,
+--     so nothing got worse for a vehicle. What got worse is work done for
+--     nothing, which is exactly the cost this file already declined to claim as
+--     a benefit.
+--   - The fix is NOT to slow the loop back down. It is to stop re-planning a
+--     vehicle that already has a live pending proposal from a holds_tick
+--     source -- and the proposer cannot currently see that, because the frame
+--     does not carry it. Same shape as 0287: a decision the proposer must make
+--     about a fact it was never given. Filed G60.
+--
+-- The measurement below is the one to re-run after any change to the loop's
+-- cadence; it is the difference between "the proposer is working harder" and
+-- "the proposer is working against itself".
+
+-- Q5. THE CHURN MEASUREMENT. Successor = the next proposal for the same vehicle
+--     in the same run. A same-source successor one tick later is the proposer
+--     overwriting its own pending plan.
+WITH p AS (
+  SELECT sim_run_id, entity_id, tick_seq, created_at, source, status,
+         lead(tick_seq) OVER w AS next_tick,
+         lead(source)   OVER w AS next_source
+    FROM public.ottoq_external_proposals
+   WHERE action_context = 'stall_assignment' AND entity_type = 'vehicle'
+     AND source = 'forward_lex'
+  WINDOW w AS (PARTITION BY sim_run_id, entity_id ORDER BY tick_seq NULLS FIRST, created_at)
+)
+SELECT left(sim_run_id::text,8) AS run, status, count(*) AS n,
+       count(*) FILTER (WHERE next_tick IS NOT NULL) AS has_successor,
+       count(*) FILTER (WHERE next_source = source) AS successor_same_source,
+       round(avg(next_tick - tick_seq), 2) AS avg_ticks_to_successor
+  FROM p
+ WHERE sim_run_id IN ('36e5cc68-fd4b-435c-9371-b497ae5d71f3',
+                      '91139ad8-441c-4c68-8f03-b00f15a89cdd')
+ GROUP BY 1, 2 ORDER BY 1, 2;
