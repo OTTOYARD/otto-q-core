@@ -138,3 +138,33 @@ SELECT COALESCE(fire->>'frame_facts_version', '(null)') AS frame_facts_version,
 -- who flips it. The defect is never in the mechanism. It is in the absence of
 -- a performer. Where a default can be on, this repo now puts it on and makes
 -- the opt-out explicit and named.
+
+-- ===========================================================================
+-- THE GUARD'S PREDICATE, VERIFIED AGAINST THE LIVE FRAME BUILDER
+-- 2026-09-14 ~06:50 UTC (1:50 AM CT). Read-only; ottoq_build_decision_frame
+-- called twice at the same moment on the same depot, differing only in which
+-- run id (and therefore which policy scope) it was asked for.
+--
+--   run                              facts_version  stalls  with `offerable`
+--   09a1e9d1 proposer_facts_probe    1                 158               158
+--   d775f104 proposer_live           (null)            158                 0
+--
+-- Identical world, identical stall count, and the unarmed run's frame carries
+-- the `offerable` key on NOT ONE of its 158 stalls. That is exactly the
+-- predicate _require_seeing_frame() tests, so an unarmed run is refused before
+-- the solver ever sees a point, and an armed run is handed the door's own
+-- verdict on every stall at the depot.
+--
+-- (offerable=true was 40 of 158 at this reading because the depot is idle --
+-- no run is ticking, so nothing is reserved. The contention number that
+-- matters is 0215's, taken under load at tick 4: 25 offered blind, 0 with the
+-- facts. The gate's value is a function of contention, which is to say it is
+-- largest exactly when scheduling matters.)
+--
+-- STILL UNPROVEN AT THIS WRITING, and named rather than glossed: no CP-SAT
+-- fire has yet gone out against an armed frame. The DB half is proven above,
+-- the Python half is unit-tested (bridge/test_proposer_bridge.py, six cases
+-- covering both halves and the partial-arm refusal), and the two have not yet
+-- met in a live fire. The first one will be the first non-blind proposal in
+-- this engine's history, and the fire log will say so in a column that has
+-- read null on every row it has ever held.
