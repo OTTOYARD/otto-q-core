@@ -276,3 +276,72 @@ SELECT 'ottoq_gc_stale_reservations callers' AS check,
 --     what the ETA is for ~36 rows per run; changing the estimator in the same
 --     recert would make a moved canon unattributable between the two. Separate
 --     file, after round 44.
+
+-- ---------------------------------------------------------------------------
+-- §H  THE ALTERNATIVE EXPLANATION FOR §B, TESTED AND REJECTED -- plus the one
+--     claim in this file's neighbourhood that is now PROVEN rather than argued
+--
+--     Measured 2026-09-14 18:12 UTC, across EVERY run rather than the two §B
+--     looked at. Two things came out of widening the window.
+--
+-- (1) THE OBJECTION §B DESERVED AND DID NOT GET.
+--
+--     §B says "a constant does not take seventeen values". But the fallback is
+--
+--         GREATEST(1, COALESCE(ottoq_policy_get(run,'return_eta_minutes',30), 30))
+--
+--     and ottoq_policy_get reads a PER-RUN dial. Different runs may legitimately
+--     set different values, so a label reading 'policy_constant' across many
+--     runs SHOULD show many values, and §B's headline would prove nothing. That
+--     objection is fatal to §B as stated and I did not raise it there.
+--
+--     The test that separates the two explanations is not "how many values does
+--     this label take" but "how many does it take WITHIN ONE RUN", because the
+--     dial is fixed per run:
+--
+--       runs with policy_constant rows                1,102
+--       runs where the label takes >1 distinct value       1
+--       max distinct values within one run                17
+--       and that one run is a5bd449f                21 rows, 17 distinct, 1.6-48.8
+--
+--     1,101 of 1,102 runs show exactly ONE value, which is what a per-run dial
+--     looks like and is the label being honest. The dial explanation is
+--     therefore REJECTED for the remaining case: one value per run is what a
+--     dial does; seventeen within a single run is not.
+--
+--     AND THE WIDER MEASUREMENT EXPLAINS WHY IT IS EXACTLY ONE RUN, which the
+--     two-run window could not. Before 0316, ottoq_return_eta_minutes returned
+--     the constant 30, so the later writer
+--     (twin.ottoq_sim_auto_dispatch_tick, which sets the value and not the
+--     label) overwrote 30 with 30 and the stale label was INVISIBLE. The defect
+--     is not new; it became observable only once 0316 made the number vary.
+--     a5bd449f is the first run in which it could be seen at all.
+--
+--     So §B's finding stands and its evidence is now 1-of-1,102 rather than
+--     21-of-61, and its mechanism is dated rather than asserted.
+--
+-- (2) 0318 IS PROVEN ON LIVE ROWS. PR #188 originally said the relabel was
+--     verified in source but "not yet observed on a live row", and declined to
+--     call it proven. Measured now, across all runs:
+--
+--       eta_source                            rows     runs   distinct ETAs   range
+--       policy_constant:return_eta_minutes   44,067    1,102        18       1.6-48.8
+--       twin_eta_delay_card:congestion        5,670    1,032        15       1.1-33.5
+--       twin_eta_delay_card:heavy_traffic     2,014    1,008         7       1.2-30
+--       twin_eta_delay_card:accident          1,138      580         4       1.7-30
+--       computed:distance_over_speed            532       26       101       1.0-153.4
+--
+--     532 rows across 26 runs carry the computed label, with 101 distinct ETAs.
+--     Every one of them was written after 0318 applied, because eta_source did
+--     not exist as a written value before it. That claim can now be made.
+--
+--     NOTE THE SHAPE OF THAT TABLE, because it is the §B finding in one line:
+--     the label that claims to be a CONSTANT carries 18 distinct values over
+--     44,067 rows, and the label that claims to be COMPUTED carries 101 over
+--     532. The computed path is a hundredth the volume and five times the
+--     variety.
+--
+--     A fourth delay-card cause, 'accident', appears here and not in §B's
+--     two-run window -- the vocabulary is five provenances plus three card
+--     causes, not the five §B implied. 0321's A6 asserts the five it writes;
+--     the card causes are the twin's own and are not 0321's to enumerate.
