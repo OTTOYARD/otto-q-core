@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914040837
 -- migration-name:    0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog
 --
 -- 0279  THE ONE DIAL THAT CAN KILL A CERTIFICATION ARM IS THE ONE DIAL THE
@@ -237,3 +237,36 @@ VALUES ('0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog',
  'One row in ottoq_policy_param_catalog for proposer_seat (0261''s A/B baseline selector), range [0,2] read off the dispatch in ottoq_l2_propose_stall_seat (0 = otto_q, 1 = fifo, 2 = greedy; anything else RAISES into ottoq_ab_arm_atoms and ottoq_cert_arm_start, neither of which has a handler). Effect: ottoq_policy_set stops answering unknown_param and starts clamping, so a mistyped seat becomes greedy with clamped:true in the receipt instead of a dead certification arm. No function is replaced, no engine behaviour changes for any in-range value, and the 12 pre-existing rows are untouched and asserted still in range (A3/A4). forces_recert=false: a catalog row is read only by ottoq_policy_set, which no certification arm calls.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 04:08:37 UTC (11:08 PM CT, 2026-09-13) as
+-- supabase_migrations.schema_migrations version 20260914040837.
+--
+-- Dry run: the file byte for byte inside BEGIN ... ROLLBACK, clean on the first
+-- attempt. P-, P1, P2, P3 and A1-A4 all passed.
+--
+-- VERIFIED AFTER APPLY, against the live database:
+--
+--   ottoq_policy_param_catalog rows for proposer_seat   1   (was 0)
+--   ottoq_policy_params rows for proposer_seat         12   (unchanged)
+--   rows left behind by the proof                       0
+--
+--   ottoq_policy_set('run', <scratch>, 'proposer_seat', 7, ...)
+--     -> {"ok": true, "applied": 2, "clamped": true,
+--         "requested": 7, "safe_range": [0, 2]}
+--
+-- Seat 7 was, an hour ago, a value that could only be written by hand straight
+-- into the table and would have raised inside ottoq_cert_arm_start with no
+-- handler. It now lands on greedy and says so.
+--
+-- AND THE VERIFICATION ITSELF LEFT A DIAL BEHIND, which is worth writing down
+-- rather than quietly cleaning up. The clamp probe above is a WRITE: it created
+-- a live proposer_seat row at a scratch scope, tagged 0279_verify -- exactly
+-- the litter A4 exists to forbid, produced by the step that checked A4's work.
+-- Removed immediately and re-counted: 12 rows, zero rows tagged 0279%.
+--
+-- The lesson generalises past this file: an assertion that a migration leaves
+-- nothing behind does not cover the operator confirming it afterwards. A probe
+-- that mutates is part of the change, and belongs inside the transaction that
+-- can roll it back.
+-- ===========================================================================

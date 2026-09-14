@@ -263,7 +263,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0276](db/migrations/0276_cpsat_enacted_three_times_and_the_scoreboard_called_it_a_stranger.sql) | `20260914005147` | yes — ledger | CP-SAT ENACTED THREE TIMES AND THE SCOREBOARD CALLED IT A STRANGER |
 | [0277](db/migrations/0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same.sql) | `20260914012023` | yes — ledger | A SOURCE THAT HAS PROPOSED AND ONE THAT HAS NEVER EXISTED READ THE SAME |
 | [0278](db/migrations/0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four.sql) | `20260914040338` | yes — ledger | ARMING THE AGENTIC LAYER IS A HAND RITUAL, AND A RUN ARMED FOUR WAYS |
-| [0279](db/migrations/0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog.sql) | `PENDING` | no — pending | THE ONE DIAL THAT CAN KILL A CERTIFICATION ARM IS THE ONE DIAL THE |
+| [0279](db/migrations/0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog.sql) | `20260914040837` | yes — ledger | THE ONE DIAL THAT CAN KILL A CERTIFICATION ARM IS THE ONE DIAL THE |
 
 145 migrations indexed.
 
