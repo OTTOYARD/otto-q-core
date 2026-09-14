@@ -103,6 +103,18 @@
 -- That is the prediction round 44 judges.
 -- ===========================================================================
 
+-- SNAPSHOT BEFORE REPLACE (scripts/APPLYING.md §2) ----------------------------
+-- Every function this file rewrites, recorded verbatim with its md5 BEFORE it is
+-- touched. This file substitutes into live bodies rather than issuing CREATE OR
+-- REPLACE from source, so without this row there is no recorded "before" to
+-- restore from if a substitution lands wrong.
+INSERT INTO public.ottoq_schema_snapshots
+       (label, object_kind, schema_name, object_name, definition, def_md5)
+SELECT '0321_pre', 'function', n.nspname, p.proname,
+       pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE (n.nspname = 'twin' AND p.proname = 'ottoq_sim_advance_deployed_telemetry') OR (n.nspname = 'twin' AND p.proname = 'ottoq_sim_auto_dispatch_tick') OR (n.nspname = 'public' AND p.proname = 'ottoq_ingest_vehicle_signal') OR (n.nspname = 'twin' AND p.proname = 'ottoq_sim_prime_deployment');
+
 DO $pre$
 DECLARE
   v_adt text; v_aut text; v_ivs text; v_pri text;

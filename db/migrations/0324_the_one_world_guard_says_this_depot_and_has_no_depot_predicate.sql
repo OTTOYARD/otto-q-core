@@ -72,6 +72,18 @@
 -- classification costs nothing and a wrong FALSE is what 0308/0309 did.
 -- ===========================================================================
 
+-- SNAPSHOT BEFORE REPLACE (scripts/APPLYING.md §2) ----------------------------
+-- Every function this file rewrites, recorded verbatim with its md5 BEFORE it is
+-- touched. This file substitutes into live bodies rather than issuing CREATE OR
+-- REPLACE from source, so without this row there is no recorded "before" to
+-- restore from if a substitution lands wrong.
+INSERT INTO public.ottoq_schema_snapshots
+       (label, object_kind, schema_name, object_name, definition, def_md5)
+SELECT '0324_pre', 'function', n.nspname, p.proname,
+       pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE (n.nspname = 'twin' AND p.proname = 'ottoq_sim_start_run');
+
 DO $pre$
 DECLARE v_src text; v_anchor CONSTANT text := 'is still moving this depot.';
 BEGIN
