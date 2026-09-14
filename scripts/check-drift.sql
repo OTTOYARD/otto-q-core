@@ -420,7 +420,7 @@ repo_manifest(version, name, file) AS (
     ('20260914192115'::text, '0320_one_function_writes_the_return_eta_and_writes_its_label_with_it'::text, '0320_one_function_writes_the_return_eta_and_writes_its_label_with_it.sql'::text),
     ('20260914192306'::text, '0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast'::text, '0321_each_writer_of_the_eta_states_its_own_provenance_and_active_vehicles_get_a_forecast.sql'::text),
     ('20260914192410'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused'::text, '0322_the_eta_and_its_provenance_move_together_or_the_write_is_refused.sql'::text),
-    ('PENDING'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql'::text),
+    ('20260914192648'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer'::text, '0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer.sql'::text),
     ('PENDING'::text, '0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate'::text, '0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql'::text),
     ('PENDING'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql'::text)
 -- <<< END GENERATED MANIFEST

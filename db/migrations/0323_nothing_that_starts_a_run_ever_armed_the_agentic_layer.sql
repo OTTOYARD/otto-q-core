@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914192648
 -- migration-name:    0323_nothing_that_starts_a_run_ever_armed_the_agentic_layer
 --
 -- 0323  ACROSS 1,147 SIM RUNS, NOTHING THAT STARTS A RUN HAS EVER ARMED THE
