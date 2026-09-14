@@ -201,3 +201,21 @@ SELECT stage, COALESCE(source_note,'(null)') AS source_note,
 -- including the ones that built 0281's catalog-gap view -- is blind to default
 -- arguments. That has not bitten anything yet; it is written down here so that
 -- when it does, the cause is one lookup away.
+--
+-- (c) VERIFIED, rather than left as a worry. "Has not bitten anything yet" was
+-- an assumption when I wrote it two paragraphs ago, so here is the check:
+
+SELECT n.nspname||'.'||p.proname AS fn, pg_get_expr(p.proargdefaults, 0) AS defaults
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE p.proargdefaults IS NOT NULL
+   AND n.nspname IN ('public','twin','ottoq')
+   AND pg_get_expr(p.proargdefaults, 0) ~ '(policy|param_key|_enabled|_pct|_min|_max|_ticks|_threshold)';
+
+--   ZERO ROWS. No function in public, twin or ottoq passes a policy key -- or
+--   anything shaped like one -- as a parameter default. So 0281's 152-key
+--   census is NOT undercounting, and the only live instance of the blindness
+--   is cuopt_log_gate's source_note, which is a label rather than a key.
+--
+--   The hazard is real and the bound is now measured: it costs nothing today,
+--   and any future policy read hidden in a parameter default would be invisible
+--   to the gap view. That is a one-line query to re-run, not a standing worry.
