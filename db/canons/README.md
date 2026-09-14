@@ -24,16 +24,56 @@ is the finding, and rewriting history destroys it.
 
 ## Regenerating
 
+**Run `scripts/round-report.sql`.** It prints all five sections below in the
+order they have to be read, and exists because migration `0266`'s comments leaned
+on "a round report prints both" when no round report existed anywhere in this
+repo — the query here was the whole of the committed procedure and it did not
+even carry `canon_endst`. If you run the sections by hand instead, run all of
+them; §2 is not optional (see **The residue column**).
+
 ```sql
+-- §1 the ENGINE columns — the reproducibility claim
 SELECT depot::text AS depot, scenario, seed, ticks,
        canon_fp, canon_cmd, canon_dec, canon_evt, canon_bkg, canon_nrg,
        canon_prop, canon_defr,            -- 0199: written by the pair from round 19 on
        canon_cal,                         -- 0201
        canon_rule, canon_rcl,             -- carried and printed, NOT compared (see below)
+       canon_sdr,                         -- 0225
+       canon_endst,                       -- 0266: the run's OWN end state, not the depot's
        pairs_seen, consecutive_passes, green
   FROM public.ottoq_cert_matrix(public.ottoq_cert_recert_floor())
  ORDER BY scenario, seed, ticks;
+
+-- §2 the RESIDUE columns — other runs' leftovers. NOT the same claim.
+SELECT depot::text AS depot, scenario, seed, ticks,
+       canon_fgn, consecutive_same, sections_moved, history
+  FROM public.ottoq_cert_residue(public.ottoq_cert_recert_floor())
+ ORDER BY scenario, seed, ticks;
 ```
+
+### The residue column (0266)
+
+`canon_endst` used to be a digest of the WHOLE end-state object, foreign rows
+included, so a canon rebased whenever another run's leftovers moved — which is
+what happened in round 41, where the engine was byte-identical on 13 of 14 atoms
+and every flagship streak reset anyway. `0266` split it: the matrix streaks the
+run's own end state, `ottoq_cert_residue` streaks the four foreign sections.
+
+**Copy BOTH into every round file, and never quote one as the other.** The engine
+streak is the reproducibility claim. The residue streak is not — but it is also
+not automatically the janitor's. A break there is a hygiene finding **or** a
+change in the engine's own cleanup, reset or supersede path: the engine does
+touch foreign live rows (`db/checks/0187` §4 — four legs closed by a later run's
+supersede), and a future widening of `ottoq_tick_invariance_reset_fleet` or
+`ottoq_sim_release_depot` would land in the residue column while both arms still
+agreed and the pair still passed. Before charging a residue break to the janitor,
+check what migrations landed since the last round.
+
+And run `scripts/round-report.sql` §3/§4 (the shape check, `db/checks/0198`): the
+split ENUMERATES seven keys where the old digest covered every key by
+construction, so an eighth key on `ottoq_boot_state_fingerprint` would be
+streaked by neither instrument. §3's empty result means healthy **or** no
+post-floor pairs; read the population count beside it.
 
 **This query is not the whole canon, and the matrix is not the whole judge.**
 Corrected 2026-09-08: the version above previously listed six canon columns when

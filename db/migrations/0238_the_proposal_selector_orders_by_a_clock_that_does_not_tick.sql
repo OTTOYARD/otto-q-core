@@ -1,4 +1,4 @@
--- migration-version: 20260909031408
+-- migration-version: 20260909031507
 -- migration-name:    the_proposal_selector_orders_by_a_clock_that_does_not_tick
 --
 -- G41 / db/checks/0156.

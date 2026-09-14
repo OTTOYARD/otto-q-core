@@ -1,0 +1,71 @@
+-- ===========================================================================
+-- 0162  THE REPLAY PATH SURVIVED FOUR FINGERPRINT MIGRATIONS
+-- ===========================================================================
+-- Run 2026-09-09 09:57 UTC (4:57 AM CT), between round 33's post-mortem and
+-- round 34, on the 0153 grid fixture -- a different depot from the flagship
+-- lane, so it contends with nothing.
+--
+-- WHY THIS NEEDED CHECKING AT ALL
+--
+-- public.ottoq_determinism_pair_replay was created by 0239 as an anchored copy
+-- of ottoq_determinism_pair. Since then FOUR migrations have changed the
+-- functions a pair depends on:
+--
+--   0243  ottoq_tick_invariance_reset_fleet clears the tether family;
+--         ottoq.ottoq_world_fingerprint hashes it
+--   0244  ottoq_boot_state_fingerprint gains a 'world' key
+--   0245  the reset restores current_depot_id; the fingerprint hashes it
+--   0246  the fingerprint's config term is scrubbed of identifiers
+--
+-- All four changed SHARED functions, so the replay copy should inherit every
+-- fix without being touched. "Should" is the word that earns a check: 0244 also
+-- "should" have been safe.
+--
+-- THE RUN
+--
+--   ottoq_determinism_pair_replay(239001, 6, 'grid_smoke',
+--     'aacd0bb0-2d02-d101-72cc-33f70e950bc8', '2026-09-01 02:00:00+00', 120,
+--     p_replay_id => '0239aaaa-0000-0000-0000-000000000001')   -- stream R, 24 rows
+--
+--   outcome              passed
+--   replay_injected      24 / 24     agrees
+--   foreign_proposals     0 / 0      agrees
+--   endst                            agrees  (now including 0246's scrubbed world key)
+--   h_prop               c270c2c590ec6d2d64b299bf5523685c
+--
+-- THE h_prop IS THE INTERESTING NUMBER. db/checks/0157 recorded exactly
+-- c270c2c590ec6d2d64b299bf5523685c for this same stream on this same fixture --
+-- before any of the four migrations existed. Same stream in, byte-identical
+-- proposal ledger out, across four migrations that rewrote the world
+-- fingerprint, the end-state fingerprint and the fleet reset.
+--
+-- That is the separation the architecture claims: those migrations changed what
+-- the certification WATCHES, not what the engine or the agent layer DOES. If
+-- h_prop had moved here, one of them had reached further than its own file said.
+--
+-- ---------------------------------------------------------------------------
+-- THIS IS THE FIRST LEG OF THE MEASURED -> ENFORCED PROMOTION, NOT THE WHOLE OF IT
+-- ---------------------------------------------------------------------------
+--
+-- replay_injected (0239) and foreign_proposals (0241) are both MEASURED: they sit
+-- in the arm object and NOT in the equality list. Promoting them needs, per
+-- CLAUDE.md 2.9a, a flagship round showing the arms agree.
+--
+-- This run shows them agreeing. It is NOT that evidence, and the distinction
+-- matters more than usual today, because ignoring exactly this distinction is
+-- what 0244 did:
+--
+--   - it is the GRID fixture: 4 vehicles, 10 stalls, 6 ticks. The flagship depot
+--     is 116 vehicles, 330 stalls, 12-24 ticks.
+--   - it is ONE pair on ONE column, not a round.
+--   - the only flagship replay evidence that exists is db/checks/0160 s7, and it
+--     predates 0243 through 0246.
+--
+-- SO THE PROMOTION IS NOT YET EARNED. What it needs, in order: round 34 clean on
+-- all six columns; then a flagship replay pair post-0246 with replay_injected and
+-- foreign_proposals agreeing on both arms; and only then a migration moving them
+-- into the equality list.
+--
+-- Recording a passing grid run as if it were the flagship evidence would be the
+-- 0244 mistake in a new costume -- reusing something that exists and is already
+-- justified, in a place whose requirements are different.

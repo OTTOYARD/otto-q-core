@@ -1,6 +1,6 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- VERIFIED AGAINST THE LIVE CATALOG 2026-09-09: body md5 == live md5 (d1c3c6e01319dc74c2c0317e465d96fe)
 -- md5 at capture: d1c3c6e01319dc74c2c0317e465d96fe
--- VERIFIED AGAINST THE LIVE CATALOG 2026-09-08: body md5 == live md5 (d1c3c6e01319dc74c2c0317e465d96fe).
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_stop_charge_session(p_session_id uuid, p_reason text DEFAULT 'completed'::text, p_sim_clock_now timestamp with time zone DEFAULT NULL::timestamp with time zone, p_fault_message text DEFAULT NULL::text, p_sim_run_id uuid DEFAULT NULL::uuid)
  RETURNS void
  LANGUAGE plpgsql
@@ -253,4 +253,3 @@ BEGIN
     p_ingest_source := 'twin', p_data_source := 'twin', p_sim_run_id := p_sim_run_id);
 END;
 $function$
-

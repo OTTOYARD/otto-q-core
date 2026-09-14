@@ -1,7 +1,6 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- VERIFIED AGAINST THE LIVE CATALOG 2026-09-09: body md5 == live md5 (30fb5ae4f76ed2f083be333624926bc6)
 -- md5 at capture: 30fb5ae4f76ed2f083be333624926bc6
--- NOT IN THE CATALOG as of 2026-09-08: no function of this name exists in gxdrcyphqjzjsuhxuqtg.
---   This file is a record of something that was dropped, not a mirror of anything live.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg
 CREATE OR REPLACE PROCEDURE public.ottoq_demo_metronome(IN p_budget_s integer DEFAULT 50)
  LANGUAGE plpgsql
 AS $procedure$
@@ -154,4 +153,3 @@ BEGIN
   END LOOP;
 END;
 $procedure$
-

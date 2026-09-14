@@ -1,0 +1,132 @@
+name: proposer-loop
+# THE PROPOSER IN THE LOOP (founder decision, 2026-09-13: "it should be in the
+# loop always"). This job runs bridge/proposer_bridge.py against the LIVE engine:
+# read the decision frame, solve it with CP-SAT, and submit every row through
+# public.ottoq_submit_external_proposal -- the same door cuOpt uses. It never
+# writes a booking, never INSERTs a proposal, never touches a vehicle. The
+# deterministic kernel still disposes of every row it submits.
+#
+# WHY MANUAL BY DEFAULT. A cron that fires at an idle depot finds nothing to
+# propose into, and a red job every ten minutes teaches everyone to ignore red
+# jobs. `--idle-ok` makes idleness exit 0, so a schedule is safe to switch on --
+# see the commented block below -- but the default here is deliberate: start a
+# twin run first, then dispatch this.
+#
+# WHY IT CANNOT CONTAMINATE A CERTIFICATION. The bridge refuses, before every
+# fire, if pg_stat_activity shows ottoq_determinism_pair or ottoq_ab_pair in
+# flight, and refuses outright if the depot's running run is a cert_harness arm.
+# A pair runs both arms in ONE transaction, so its rows are invisible to this
+# session until it commits -- which is why the guard asks the process list, the
+# only authority the house rules recognise for "in flight".
+#
+# SECRETS IT NEEDS (repository secrets, Settings -> Secrets and variables -> Actions):
+#   OTTOQ_DATABASE_URL  Supabase Postgres URI for otto-q-core (gxdrcyphqjzjsuhxuqtg).
+#   ANTHROPIC_API_KEY   only for the advisory fire; the CP-SAT loop does not use it.
+# Neither is ever echoed: the DSN is passed as an env var, and the advisor reads
+# its key from the environment (bridge/llm_proposer.py holds no key material).
+
+on:
+  workflow_dispatch:
+    inputs:
+      depot:
+        description: depot_id (default Nashville flagship)
+        required: false
+        default: "11111111-1111-1111-1111-111111111111"
+      run:
+        description: "sim_run_id, or 'auto' to resolve the depot's one running run"
+        required: false
+        default: "auto"
+      fires:
+        description: how many fires before stopping
+        required: false
+        default: "12"
+      interval_s:
+        description: seconds between fires
+        required: false
+        default: "20"
+      states:
+        description: vehicle states to propose for (narrowing only)
+        required: false
+        default: "arrived_at_gate"
+      advisor:
+        description: "also run the LLM advisor fire (costs money; needs ANTHROPIC_API_KEY)"
+        required: false
+        default: "false"
+  # Switch this on once a long-running twin run is the norm rather than the
+  # exception. --idle-ok means an idle depot is a green no-op, and the
+  # certification guard means a round in flight is a logged skip.
+  # schedule:
+  #   - cron: "*/10 * * * *"
+
+concurrency:
+  # One loop per depot at a time. Two loops would both read the same frame and
+  # submit rows the selector then has to order, which proves nothing.
+  group: proposer-loop-${{ github.event.inputs.depot || 'flagship' }}
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # requirements.txt carries the OR-Tools pin; the solver's version is part of
+      # a run's identity, so the loop must install THE pin, not the latest.
+      - run: pip install -r requirements.txt "psycopg[binary]"
+      - name: Refuse to start without the connection secret
+        run: |
+          if [ -z "${OTTOQ_DATABASE_URL}" ]; then
+            echo "::error::OTTOQ_DATABASE_URL is not set. Add it as a repository secret;"
+            echo "::error::the loop reads the live engine and there is no offline fallback here."
+            exit 1
+          fi
+        env:
+          OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
+      - name: CP-SAT proposer loop (submits through the door; the kernel disposes)
+        env:
+          OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
+        run: |
+          python3 -m bridge.proposer_bridge \
+            --dsn "$OTTOQ_DATABASE_URL" \
+            --run "${{ github.event.inputs.run || 'auto' }}" \
+            --depot "${{ github.event.inputs.depot || '11111111-1111-1111-1111-111111111111' }}" \
+            --site bridge/sites/nashville-flagship.json \
+            --states "${{ github.event.inputs.states || 'arrived_at_gate' }}" \
+            --default-ready-delta 30 \
+            --allow-rejection \
+            --loop \
+            --interval-s "${{ github.event.inputs.interval_s || '20' }}" \
+            --max-fires "${{ github.event.inputs.fires || '12' }}" \
+            --idle-ok \
+            --json-out receipts.json
+      - name: Advisory fire (optional, priced and capped per run)
+        if: ${{ github.event.inputs.advisor == 'true' }}
+        env:
+          OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "::error::advisor requested but ANTHROPIC_API_KEY is not set"
+            exit 1
+          fi
+          # --idle-ok for the same reason the loop step has it: if the depot went
+          # idle between the two steps, that is not a failure of the advisor.
+          python3 -m bridge.llm_proposer \
+            --dsn "$OTTOQ_DATABASE_URL" \
+            --run "${{ github.event.inputs.run || 'auto' }}" \
+            --depot "${{ github.event.inputs.depot || '11111111-1111-1111-1111-111111111111' }}" \
+            --cap-usd 0.25 \
+            --idle-ok \
+            --json-out advisor.json
+      - name: Keep the receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proposer-receipts
+          path: |
+            receipts.json
+            advisor.json
+          if-no-files-found: ignore

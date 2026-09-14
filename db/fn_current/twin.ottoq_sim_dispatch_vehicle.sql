@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run3/C7)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: 1fdcb54cfbeea71bbb15ddce6273857c
+--   live      md5: 21cf1945f019b186b9ca85a51c37df3e
 -- md5 at capture: 1fdcb54cfbeea71bbb15ddce6273857c
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live 21cf1945f019b186b9ca85a51c37df3e
---   here 1fdcb54cfbeea71bbb15ddce6273857c
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('twin.ottoq_sim_dispatch_vehicle'::regproc);
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_dispatch_vehicle(p_vehicle_id uuid, p_sim_run_id uuid, p_sim_clock_now timestamp with time zone)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -124,4 +123,3 @@ BEGIN
   RETURN v_dispatch_id;
 END;
 $function$
-

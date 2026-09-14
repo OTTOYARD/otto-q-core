@@ -1,5 +1,34 @@
 # `db/fn_current/` — a point-in-time capture, not a live mirror
 
+**RE-MEASURED against `gxdrcyphqjzjsuhxuqtg` 2026-09-09 14:15 UTC: 7 of 35 files
+match the catalog. 28 are stale. No file captures a function the catalog lacks.**
+
+Two things moved since the 2026-09-08 measurement below, and only one of them is
+a change in the world:
+
+* **`public.ottoq_demo_metronome` was mislabelled.** Its header read `NOT IN THE
+  CATALOG as of 2026-09-08`. The function is present, and its capture matches the
+  catalog **byte-for-byte** — which is near-conclusive that it was never dropped,
+  because a drop-and-recreate would have to reproduce the definition exactly.
+  Yesterday's lookup was wrong, not yesterday's database. *How* it was wrong is
+  not established here; the fix is the measurement, not a theory about it. It is
+  now `VERIFIED`, and 6-of-35 was really 7-of-35.
+* **Ten migrations landed (0242–0250) and the match count did not fall.** None of
+  them touched a captured function. `public.ottoq_decide_tick` was already stale
+  and still is: file `1cc03538…`, live `ae98f71b…`. It is the one worth naming,
+  because it is the largest function in the engine and the capture predates
+  `0132` — so it **lacks the site power gate**, and anyone reading the file to
+  learn whether OTTO-Q refuses on the ceiling gets the wrong answer.
+
+**The ratio has not improved, and re-labelling is not a fix.** 28 of 35 files
+still hold bodies the database does not have. This directory is useful only as
+dated evidence; for current behaviour, read the catalog. Every file now says so
+in its own last header line, with the exact query to run.
+
+---
+
+*The 2026-09-08 record, left as the point-in-time statement it was:*
+
 **Measured against `gxdrcyphqjzjsuhxuqtg` on 2026-09-08: 6 of 35 files match the
 catalog. 28 are stale and 1 captures a function the catalog no longer has.**
 

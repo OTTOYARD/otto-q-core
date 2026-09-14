@@ -1,13 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, date not recorded
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: f98acd974d73f094dd9e214a2de344b9
+--   live      md5: 66e7bd98c34ba0c0aef5676b2aa9ce62
 -- md5 at capture: f98acd974d73f094dd9e214a2de344b9
---   (this pin was computed FROM THIS FILE on 2026-09-08 because the capture shipped without one.
---    It therefore proves only that the file has not been edited SINCE; it is not evidence
---    about the catalog. The live comparison on the next line is.)
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live 66e7bd98c34ba0c0aef5676b2aa9ce62
---   here f98acd974d73f094dd9e214a2de344b9
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('twin.ottoq_sim_auto_dispatch_tick'::regproc);
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_auto_dispatch_tick(p_sim_run_id uuid, p_sim_clock_now timestamp with time zone, p_tick_minutes numeric)
  RETURNS integer
  LANGUAGE plpgsql

@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: 89c6f1fc756a6995a88e12720d4c3886
+--   live      md5: 682866083aee6c99d7ddd39de82f3596
 -- md5 at capture: 89c6f1fc756a6995a88e12720d4c3886
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live 682866083aee6c99d7ddd39de82f3596
---   here 89c6f1fc756a6995a88e12720d4c3886
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('twin.ottoq_sim_confirm_commands'::regproc);
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_confirm_commands(p_sim_run_id uuid, p_clock timestamp with time zone)
  RETURNS integer
  LANGUAGE plpgsql
@@ -242,4 +241,3 @@ BEGIN
   RETURN v_executed + v_refused;
 END;
 $function$
-

@@ -1,0 +1,99 @@
+-- 0204  THE RUN PURGE IS ON CRON, AND THE GUARD DOES NOT BLOCK IT
+--       (2026-09-13 21:11 UTC / 4:11 PM CT — G23's last item)
+--
+-- ottoq_retention_purge_runs was on no cron job at all. db/checks/0200 measured
+-- that and 0202 explained why it could not safely go on one: the procedure
+-- guarded on a determinism pair ACTIVE in pg_stat_activity but was blind to a
+-- SCHEDULED round, so a nightly purge could land in a 14-minute inter-pair gap
+-- and move the residue canon mid-round. Migration 0269 closed that. This file
+-- records the scheduling and the checks run before and after it.
+--
+-- ---------------------------------------------------------------------------
+-- THE JOB
+--
+--   jobid     625
+--   jobname   ottoq-run-purge-nightly
+--   schedule  0 9 * * *          -- 09:00 UTC = 4:00 AM CT (CDT, UTC-5)
+--   command   SET statement_timeout TO '10min';
+--             CALL public.ottoq_retention_purge_runs(300, 2000, '48 hours', false);
+--
+-- WHY 09:00 UTC. jobid 11 (ottoq-retention-nightly — the THREE-TABLE WORKER, a
+-- different procedure; 0200 §1) runs at 08:00 UTC, so this is clear of it by an
+-- hour. 4:00 AM CT is also far outside the working day when certification rounds
+-- are scheduled, so the 0269 guard should rarely have cause to fire.
+--
+-- WHY THOSE ARGUMENTS. The signature is (p_time_budget_s DEFAULT 60,
+-- p_micro_batch DEFAULT 2000, p_keep DEFAULT '48:00:00', p_dry_run DEFAULT
+-- false). The '48 hours' passed here is NOT the operative interval: the body
+-- does `SELECT keep_interval INTO v_keep FROM ottoq_retention_policy WHERE
+-- policy_key='engine_rows' AND enabled; v_keep := COALESCE(v_keep, p_keep);`
+-- so the POLICY ROW WINS and p_keep is only a fallback for when no enabled
+-- policy exists. Retention policy today: events=7 days, engine_rows=48:00:00.
+-- Changing retention means changing the policy row, not this cron command.
+--
+-- ---------------------------------------------------------------------------
+-- THE JOB CANNOT BLOCK ITSELF — CHECKED, NOT ASSUMED
+--
+-- 0269's guard skips when a round job is imminent OR when an ACTIVE job's
+-- command mentions ottoq_determinism_pair / ottoq_cert_battery_step. A purge job
+-- named or worded carelessly could therefore switch itself off permanently —
+-- the same latching failure the 0269 review caught in its first draft, arriving
+-- by a different door. So the predicate was evaluated against the world that
+-- includes job 625:
+--
+--   guard_would_block_now = FALSE
+--
+-- The name 'ottoq-run-purge-nightly' does not match '^r[0-9]+_', and the command
+-- mentions neither of the two certification entry points. Both facts are load
+-- bearing; a future rename must preserve them.
+--
+-- ---------------------------------------------------------------------------
+-- THE NON-DRY PATH, EXERCISED ONCE BEFORE SCHEDULING
+--
+-- Everything 0269 proved was proved in DRY-RUN. The combination cron will
+-- actually use — non-dry, with the new guard installed — had never run. It was
+-- run once, at a moment measured to make it a no-op rather than at a moment
+-- assumed to be one (which is exactly the distinction 0269's header refuses to
+-- blur):
+--
+--   IMMEDIATELY BEFORE:  939 doomed runs, 0 of them unstamped, and 0 purgeable
+--                        rows across all seven allow-listed tables
+--                        (bay_binding_witness, comms_messages, events,
+--                        itinerary_legs, rule_evaluations, stall_bookings,
+--                        variability_cards).
+--   CALL ottoq_retention_purge_runs(120, 2000, '48 hours', false);
+--   AFTER:               ottoq_retention_state.updated_at moved
+--                        14:25:42.553305+00 -> 21:10:56.088031+00, so the full
+--                        path ran to completion rather than skipping; and
+--                        runs_stamped_total stayed at 939, so nothing new was
+--                        stamped. A real run, and a measured no-op.
+--
+-- The set-wide stamp that made a non-dry call dangerous during the migration
+-- (0251: one row crossing the boundary stamps purged_at on EVERY unstamped
+-- doomed run, permanently reporting them GONE to ottoq_kpi_five) had nothing to
+-- act on here precisely because doomed_unstamped was 0. That is why this call
+-- was safe now and would not have been safe at apply time.
+--
+-- ---------------------------------------------------------------------------
+-- A NUMBER QUOTED EARLIER TODAY THAT THE LIVE DATA DOES NOT SUPPORT
+--
+-- The 0269 review derived "~2.7 runs/hour cross the 48-hour boundary, at ~7,775
+-- engine rows each" from db/checks/0200 + 0201, and 0269's header repeats it as
+-- the reason a "0 purgeable rows" premise decays. The decay argument is sound
+-- and the non-dry call was rightly dropped from the migration. The RATE is not
+-- currently true: between 14:25 and 21:10 UTC — 6.7 hours — the doomed set did
+-- not move at all (939 before, 939 after, 0 unstamped). At 2.7/hour it should
+-- have gained ~18. So that figure describes the moment 0200 measured, not a
+-- standing rate, and should not be quoted as one. Cite the run, not the table.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT TO WATCH ON THE FIRST FIRING (09:00 UTC / 4:00 AM CT, 2026-09-14)
+--   SELECT * FROM cron.job_run_details WHERE jobid = 625 ORDER BY start_time DESC;
+--   SELECT updated_at FROM ottoq_retention_state ORDER BY updated_at DESC LIMIT 1;
+-- A run that reports 'succeeded' having SKIPPED is indistinguishable in
+-- job_run_details from one that purged — the skip is a NOTICE, by design, so the
+-- log does not fill with errors. updated_at is the discriminator: it moves only
+-- when the procedure runs past the guard. If it ever stops moving night after
+-- night, the guard is latching on something and that is the thing to look at.
+--
+-- TO TURN IT OFF:  SELECT cron.unschedule('ottoq-run-purge-nightly');

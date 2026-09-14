@@ -1,6 +1,6 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- VERIFIED AGAINST THE LIVE CATALOG 2026-09-09: body md5 == live md5 (51d7c228da928cde0f000b5dbe2eaba6)
 -- md5 at capture: 51d7c228da928cde0f000b5dbe2eaba6
--- VERIFIED AGAINST THE LIVE CATALOG 2026-09-08: body md5 == live md5 (51d7c228da928cde0f000b5dbe2eaba6).
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg
 CREATE OR REPLACE FUNCTION public.ottoq_charge_plan_for_visit(p_vehicle_id uuid, p_clock timestamp with time zone DEFAULT now(), p_hours_until_deploy numeric DEFAULT NULL::numeric)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -67,4 +67,3 @@ BEGIN
     'dcfc_cap_at_plan_time', v_dc_cap,
     'est_l2_minutes_to_target', v_l2_min, 'reason', v_reason, 'no_mid_session_switch', true);
 END; $function$
-

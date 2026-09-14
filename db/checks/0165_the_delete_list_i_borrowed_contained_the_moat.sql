@@ -1,0 +1,109 @@
+-- 0165 — the delete list I borrowed contained the moat, and a workflow caught it
+--        while the purge was running.
+--
+-- SEQUENCE, with times. All 2026-09-09 UTC (subtract 5 for CT).
+--
+--   13:32:54  0247 applied. Purge created, loops ottoq_run_scope_registry
+--             class='engine' (47 tables). Nothing scheduled, by design.
+--   13:33     First dry run REFUSED by its own run-scope gate: 1 blocking defect.
+--   13:34:42  0248 applied. ottoq_recall_refusals had been registered engine by
+--             0211 with no FK to ottoq_sim_runs; its sibling ottoq_recall_decisions
+--             got one from 0206 five migrations earlier. Added, validated, clean.
+--   13:35     Second dry run FAILED: "record r is not assigned yet". The loop
+--             record `r` shadowed the `r` alias on ottoq_sim_runs forty lines up.
+--   13:36:15  0249 applied. Renamed to v_reg, aliased the run table sr.
+--   13:37     Dry run clean. Measured: 729 doomed runs; 750,576 of 897k calendar
+--             rows (84%), 1,131,618 variability cards, 1,215,797 witness rows.
+--   13:38     FIRST REAL PASS. 120 s budget. Drained ottoq_rule_evaluations of
+--             every doomed row (rule_evals_left: 0).
+--   13:44     SECOND REAL PASS started, 300 s budget.
+--   13:45     A background workflow's synthesis landed naming two defects.
+--   13:46     Pass CANCELLED at 75 s via pg_cancel_backend.
+--
+-- WHAT THE WORKFLOW FOUND, VERIFIED BY ME AGAINST THE LIVE DOOMED SET
+--
+--   cuopt_invocation_log           14,746 of  17,492   84.3%
+--   ottoq_service_detail_records  168,398 of 220,378   76.4%
+--   space_conflict_ledger         248,849 of 265,074   93.9%
+--   site_energy_snapshots          11,540
+--   ottoq_recall_decisions              0 of  66,294   0% TODAY ONLY
+--
+-- All five are class='engine' and all five were inside the loop. Each is named
+-- in CLAUDE.md as unloseable: rule 6 requires every cuOpt claim be derived from
+-- cuopt_invocation_log and says of space_conflict_ledger "never remove either
+-- side"; 2.6 calls the SDR terminus the strategic instruction of the entire
+-- build; KPI 3 has site_energy_snapshots as its only base table. The recall
+-- ledger reads 0% because it is two days old -- it is not safe, it is young.
+--
+-- Second defect, also verified: ottoq_ops_approvals.visit_id references
+-- ottoq_visit_needs with NO ACTION and 4,379 approval rows point at doomed
+-- visit_needs. Size-descending order reaches the parent (rank 11) long before
+-- the child (rank 22), so a full pass would have raised a foreign-key violation
+-- and died -- after ten tables had already committed.
+--
+-- WHAT WAS ACTUALLY LOST
+--
+-- Two passes reached exactly two tables: ottoq_rule_evaluations (drained of
+-- doomed rows) and ottoq_events (partially). Both were already on the nightly
+-- wall-clock worker at a 7-day keep, so the only loss beyond what that worker
+-- takes anyway is the replayability of runs aged 2-7 days. Their VERDICTS are
+-- intact -- validation_notes lives on ottoq_sim_runs, which this purge never
+-- touches (0164's correction, asserted as A2). No moat table was reached.
+--
+-- WHY IT WAS NOT REACHED, STATED HONESTLY
+--
+-- Because the moat ledgers are small and the loop is ordered biggest-first. I
+-- added that ordering in 0247's own adversarial review to stop ottoq_stall_bookings
+-- being starved behind alphabetical neighbours. It had nothing to do with safety.
+-- It is the reason a 120-second budget expired inside a 5.5 GB table instead of
+-- reaching a 3 MB one. Recorded as luck standing on a deliberate choice, because
+-- calling it anything else would be a lie about how close this came.
+--
+-- THE ROOT CAUSE IS A CLASSIFICATION ERROR, NOT A CODING ONE
+--
+-- class='engine' means "these rows die with their run" and was written for
+-- ottoq_purge_prior_runs -- a DEMO RESET, where losing everything but one run is
+-- the entire point. I borrowed that class as the delete list for a RETENTION
+-- purge, silently promoting "safe to wipe when starting a demo" into "safe to
+-- delete every night forever". The registry never claimed those were the same
+-- predicate. 0164 read the registry correctly and drew the wrong conclusion from
+-- it, and 0247 built on that conclusion.
+--
+-- AND THE ASSERTIONS COULD NOT HAVE CAUGHT IT. 0247's header says every one of
+-- A1-A8 is structural and none is behavioural. A structural assertion checks
+-- that the loop reads the registry; it cannot check what the registry CONTAINS.
+-- The file was honest about the gap and the gap is exactly where the defect sat.
+--
+-- THE FIX (0250): AN ALLOW-LIST, NOT A DENY-LIST
+--
+-- The purge now deletes only from tables affirmatively listed in
+-- ottoq_retention_engine_allowlist, each with a written reason. 7 of 47 engine
+-- tables are on it; 40 are unreachable. Fail-closed by construction: an engine
+-- table added tomorrow is not purged until someone classifies it, rather than
+-- being purged until someone notices. A3 asserts the nine moat tables by NAME,
+-- so a future edit that adds one fails at apply time. GUARD 2 refuses the whole
+-- pass if any allow-listed table parents a NO ACTION or RESTRICT foreign key,
+-- which makes the ops_approvals abort structurally impossible instead of
+-- hand-ordered around.
+--
+-- WHAT THIS SAYS ABOUT THE METHOD
+--
+-- The finding came from a background workflow reading the same database with a
+-- different question. I had already reviewed 0247 adversarially and found three
+-- real defects in it -- the starvation ordering, a useless dry-run count, a
+-- dropped-table guard -- and none of them was this one. Reviewing my own work
+-- found bugs in the implementation; a second reader with a different question
+-- found the error in the premise. Those are different classes and only the
+-- second one was going to delete the cuOpt ledger.
+--
+-- STILL OPEN, from the same synthesis and not yet acted on:
+--   * A purged run still answers. ottoq_run_archives.metrics holds seven keys
+--     and none of the five canonical KPIs; ottoq_kpi_five COALESCEs missing rows
+--     to empty objects, so a purged run returns a well-formed answer with
+--     nothing behind it. It needs a purged_at marker and a KPI that says "gone"
+--     rather than "zero" BEFORE the calendar is purged.
+--   * ottoq_decisions (2.1 GB), ottoq_visit_needs, ottoq_vehicle_commands and 37
+--     others are deliberately absent from the allow-list and each needs its own
+--     decision on its own evidence.
+--   * The three GiST EXCLUDE constraints on the calendar are not shrunk by
+--     deleting rows; a purge needs a REINDEX to return the read cost (0164 Q4).

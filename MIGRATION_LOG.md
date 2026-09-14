@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0242 — GENERATED, not a log
+## Index, 0134–0275 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -211,10 +211,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0222](db/migrations/0222_the_fingerprint_hashed_a_million_rows_to_report_thirteen.sql) | `20260908112038` | yes — ledger | G19. ottoq_boot_state_fingerprint serialized and hashed 1.36 MILLION |
 | [0223](db/migrations/0223_the_load_meter_asks_which_run_is_running_once_per_row.sql) | `20260908133954` | yes — ledger | G21. twin.ottoq_sim_compute_charger_load_kw evaluates |
 | [0224](db/migrations/0224_the_refusal_reactor_says_production_and_hands_you_a_sim_run_id.sql) | `20260908134109` | yes — ledger | 71,944 signed events assert `data_source = 'production'` while |
-| [0225](db/migrations/0225_the_canon_comparison_sees_every_atom_the_pair_enforces.sql) | `20260908161403` | yes — ledger | the across-round comparison sees all fourteen atoms the pair |
-| [0226](db/migrations/0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql) | `20260908161129` | yes — ledger | the recert floor can read the classifications that were written for |
-| [0227](db/migrations/0227_the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred.sql) | `20260908161833` | yes — ledger | G21 FIX 2. The site load meter reads every charge session this |
-| [0228](db/migrations/0228_provenance_asks_the_depot_not_the_run_id.sql) | `20260908162111` | yes — ledger | G16. The state-change triggers decide whether an event is production |
+| [0225](db/migrations/0225_the_canon_comparison_sees_every_atom_the_pair_enforces.sql) | `20260908161615` | yes — ledger | the across-round comparison sees all fourteen atoms the pair |
+| [0226](db/migrations/0226_the_recert_floor_reads_a_name_the_ledger_never_writes.sql) | `20260908161239` | yes — ledger | the recert floor can read the classifications that were written for |
+| [0227](db/migrations/0227_the_load_meter_scans_forty_five_thousand_rows_to_sum_three_hundred.sql) | `20260908161809` | yes — ledger | G21 FIX 2. The site load meter reads every charge session this |
+| [0228](db/migrations/0228_provenance_asks_the_depot_not_the_run_id.sql) | `20260908162004` | yes — ledger | G16. The state-change triggers decide whether an event is production |
 | [0229](db/migrations/0229_the_approach_band_scans_every_run_to_answer_about_one.sql) | `20260908204137` | yes — ledger | G29. `public.ottoq_approach_band` resolves three policy parameters for EVERY |
 | [0230](db/migrations/0230_a_score_that_cannot_be_gamed_by_not_checking.sql) | `20260908220518` | yes — ledger | Part B groundwork. `public.ottoq_ab_score_run(uuid) RETURNS jsonb` — a |
 | [0231](db/migrations/0231_a_comparative_score_may_read_only_what_every_arm_writes.sql) | `20260908222953` | yes — ledger | G32 / db/checks/0149. public.ottoq_ab_score_run was applied earlier today |
@@ -224,12 +224,43 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0235](db/migrations/0235_the_ab_rig_takes_a_clock_anchor_and_ignores_it.sql) | `20260909015606` | yes — ledger | G39 / db/checks/0155. public.ottoq_cert_arm's signature is |
 | [0236](db/migrations/0236_a_proposal_must_know_which_tick_it_was_made_in.sql) | `20260909021833` | yes — ledger | AGENT LAYER, step 1 of the Posture-B sequence in SOLVER_STATE.md §8.3 |
 | [0237](db/migrations/0237_record_and_replay_an_agent_proposal_stream.sql) | `20260909022308` | yes — ledger | AGENT LAYER, step 2 -- Posture B from SOLVER_STATE.md §8.2, which §8.3 calls |
-| [0238](db/migrations/0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql) | `20260909031408` | yes — ledger | G41 / db/checks/0156 |
-| [0239](db/migrations/0239_a_certification_that_replays_a_recorded_agent_stream.sql) | `20260909032226` | yes — ledger | AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door |
-| [0240](db/migrations/0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql) | `PENDING` | no — pending | G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge |
-| [0241](db/migrations/0241_a_certification_hears_only_the_proposers_it_certified.sql) | `PENDING` | no — pending | POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that |
-| [0242](db/migrations/0242_a_capture_records_only_what_the_run_cannot_regenerate.sql) | `PENDING` | no — pending | G42 / db/checks/0159. APPLY AFTER 0241 -- it consults the registry 0241 |
+| [0238](db/migrations/0238_the_proposal_selector_orders_by_a_clock_that_does_not_tick.sql) | `20260909031507` | yes — ledger | G41 / db/checks/0156 |
+| [0239](db/migrations/0239_a_certification_that_replays_a_recorded_agent_stream.sql) | `20260909032347` | yes — ledger | AGENT LAYER, step 3 of the SOLVER_STATE.md 8.3 sequence. The door |
+| [0240](db/migrations/0240_the_gate_that_opens_the_nvidia_door_leaves_a_ledger_row.sql) | `20260909051802` | yes — ledger | G40 / db/checks/0158, half (a). Half (b) shipped 2026-09-08 22:42 CT as edge |
+| [0241](db/migrations/0241_a_certification_hears_only_the_proposers_it_certified.sql) | `20260909051917` | yes — ledger | POSTURE A. SOLVER_STATE.md 8.3 step 2, and the last open item in that |
+| [0242](db/migrations/0242_a_capture_records_only_what_the_run_cannot_regenerate.sql) | `20260909052026` | yes — ledger | G42 / db/checks/0159. APPLY AFTER 0241 -- it consults the registry 0241 |
+| [0243](db/migrations/0243_the_start_of_run_world_hash_cannot_see_a_vehicle_mid_tether.sql) | `20260909060909` | yes — ledger | THE START-OF-RUN WORLD HASH CANNOT SEE A VEHICLE MID-TETHER |
+| [0244](db/migrations/0244_the_end_state_fingerprint_cannot_see_the_assets_either.sql) | `20260909075534` | yes — ledger | THE END-STATE FINGERPRINT CANNOT SEE THE ASSETS EITHER |
+| [0245](db/migrations/0245_current_depot_id_is_written_in_the_tick_and_cleared_by_nothing.sql) | `20260909075605` | yes — ledger | current_depot_id IS WRITTEN IN THE TICK AND CLEARED BY NOTHING |
+| [0246](db/migrations/0246_the_world_hash_is_id_blind_everywhere_except_inside_config.sql) | `20260909094627` | yes — ledger | THE WORLD HASH IS ID-BLIND EVERYWHERE EXCEPT INSIDE config |
+| [0247](db/migrations/0247_a_dead_runs_working_rows_outlive_it_because_nothing_deletes_them.sql) | `20260909133254` | yes — ledger | A DEAD RUN'S WORKING ROWS OUTLIVE IT BECAUSE NOTHING DELETES THEM |
+| [0248](db/migrations/0248_the_refusal_ledger_was_registered_engine_without_the_key_that_makes_it_true.sql) | `20260909133442` | yes — ledger | THE REFUSAL LEDGER WAS REGISTERED engine WITHOUT THE KEY THAT MAKES |
+| [0249](db/migrations/0249_the_purge_loop_variable_shadowed_the_table_it_was_selecting_from.sql) | `20260909133615` | yes — ledger | THE PURGE LOOP VARIABLE SHADOWED THE TABLE IT WAS SELECTING FROM |
+| [0250](db/migrations/0250_the_engine_class_is_not_a_delete_list_and_it_holds_the_moat.sql) | `20260909134546` | yes — ledger | THE engine CLASS IS NOT A DELETE LIST, AND IT HOLDS THE MOAT |
+| [0251](db/migrations/0251_a_purged_run_must_say_gone_not_zero.sql) | `20260912034252` | yes — ledger | A PURGED RUN MUST SAY "GONE", NOT "ZERO" |
+| [0252](db/migrations/0252_a_certification_column_nobody_schedules_is_invisible.sql) | `20260912033615` | yes — ledger | A CERTIFICATION COLUMN NOBODY SCHEDULES IS INVISIBLE |
+| [0253](db/migrations/0253_sm006_points_at_a_five_argument_evaluator_and_the_dispatcher_passes_four.sql) | `20260912033843` | yes — ledger | SM.006 POINTS AT A FIVE-ARGUMENT EVALUATOR AND THE DISPATCHER PASSES |
+| [0254](db/migrations/0254_the_world_hash_moved_and_could_not_say_where.sql) | `20260912035032` | yes — ledger | THE WORLD HASH MOVED AND COULD NOT SAY WHERE |
+| [0255](db/migrations/0255_the_teardown_stamps_the_wall_clock_into_a_hashed_column.sql) | `20260912130622` | yes — ledger | THE TEARDOWN STAMPS THE WALL CLOCK INTO A HASHED COLUMN |
+| [0256](db/migrations/0256_the_trigger_restamps_what_the_teardown_fixed.sql) | `20260912165023` | yes — ledger | THE TRIGGER RE-STAMPS WHAT THE TEARDOWN FIXED |
+| [0257](db/migrations/0257_the_second_floor_ships_as_a_count_with_its_own_limits_attached.sql) | `20260912165137` | yes — ledger | THE SECOND FLOOR SHIPS AS A COUNT, WITH ITS OWN LIMITS ATTACHED |
+| [0258](db/migrations/0258_the_comment_states_the_invariant_and_no_code_holds_it.sql) | `20260912165243` | yes — ledger | THE COMMENT STATES THE INVARIANT AND NO CODE HOLDS IT |
+| [0259](db/migrations/0259_the_proposer_seat_is_declared_data_not_three_literals.sql) | `20260912205202` | yes — ledger | THE PROPOSER SEAT IS DECLARED DATA, NOT THREE LITERALS |
+| [0260](db/migrations/0260_every_proposer_fire_is_a_ledger_row.sql) | `20260912205301` | yes — ledger | EVERY PROPOSER FIRE IS A LEDGER ROW |
+| [0261](db/migrations/0261_the_policy_is_what_proposes_the_kernel_disposes.sql) | `20260912233647` | yes — ledger | THE POLICY IS WHAT PROPOSES; THE KERNEL DISPOSES  (Phase 1 / D2: the A/B pair) |
+| [0262](db/migrations/0262_the_hold_key_the_setter_refused.sql) | `20260913011239` | yes — ledger | THE HOLD KEY THE SETTER REFUSED  (D3: the one-tick hold could not be switched on) |
+| [0265](db/migrations/0265_the_frame_carries_what_the_selector_filters_on.sql) | `20260913122605` | yes — ledger | THE FRAME CARRIES WHAT THE SELECTOR FILTERS ON |
+| [0266](db/migrations/0266_the_canon_stops_being_hostage_to_another_runs_leftovers.sql) | `20260913135634` | yes — ledger | THE CANON STOPS BEING HOSTAGE TO ANOTHER RUN'S LEFTOVERS  (G46 + G48) |
+| [0267](db/migrations/0267_the_fire_log_registered_a_stamp_and_never_bound_it_to_a_run.sql) | `20260913141438` | yes — ledger | THE FIRE LOG REGISTERED A STAMP AND NEVER BOUND IT TO A RUN  (G23) |
+| [0268](db/migrations/0268_0267_never_classified_itself_and_the_floor_swallowed_every_column.sql) | `20260913142959` | yes — ledger | 0267 NEVER CLASSIFIED ITSELF, AND THE FLOOR SWALLOWED EVERY COLUMN |
+| [0269](db/migrations/0269_the_purge_cannot_see_a_scheduled_round_only_a_running_pair.sql) | `20260913205636` | yes — ledger | THE PURGE CANNOT SEE A SCHEDULED ROUND, ONLY A RUNNING PAIR  (G23) |
+| [0270](db/migrations/0270_the_only_queue_depth_rule_crashes_on_two_states_that_do_not_exist.sql) | `20260913225716` | yes — ledger | THE ONLY QUEUE-DEPTH RULE CRASHES ON TWO STATES THAT DO NOT EXIST |
+| [0271](db/migrations/0271_the_outbound_command_stream_is_the_only_stream_without_provenance.sql) | `20260913231758` | yes — ledger | THE OUTBOUND COMMAND STREAM IS THE ONLY STREAM WITHOUT PROVENANCE |
+| [0272](db/migrations/0272_0271_never_classified_itself_and_the_floor_swallowed_every_column.sql) | `20260913232252` | yes — ledger | 0271 NEVER CLASSIFIED ITSELF AND THE FLOOR SWALLOWED EVERY COLUMN |
+| [0273](db/migrations/0273_the_uplink_is_written_by_the_same_transaction_as_the_downlink.sql) | `20260913233201` | yes — ledger | THE UPLINK IS WRITTEN BY THE SAME TRANSACTION AS THE DOWNLINK |
+| [0274](db/migrations/0274_there_is_no_queue_so_the_asset_cannot_be_told_its_place_in_one.sql) | `20260913234605` | yes — ledger | THERE IS NO QUEUE, SO THE ASSET CANNOT BE TOLD ITS PLACE IN ONE |
+| [0275](db/migrations/0275_no_single_place_says_which_intelligence_sources_are_actually_on.sql) | `20260914001937` | yes — ledger | NO SINGLE PLACE SAYS WHICH INTELLIGENCE SOURCES ARE ACTUALLY ON |
 
-110 migrations indexed.
+141 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

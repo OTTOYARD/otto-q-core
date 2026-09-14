@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run3/C7)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: ec6fc85ada1fa81c6e75a9313994b182
+--   live      md5: a7243c00c4a53d5bb5787194389cf925
 -- md5 at capture: ec6fc85ada1fa81c6e75a9313994b182
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live a7243c00c4a53d5bb5787194389cf925
---   here ec6fc85ada1fa81c6e75a9313994b182
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('twin.ottoq_sim_advance_site_energy'::regproc);
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_advance_site_energy(p_depot_id uuid, p_sim_run_id uuid, p_sim_clock_now timestamp with time zone, p_tick_minutes numeric)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -156,4 +155,3 @@ BEGIN
   RETURN v_snap_id;
 END;
 $function$
-

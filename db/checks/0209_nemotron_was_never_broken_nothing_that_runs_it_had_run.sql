@@ -1,0 +1,104 @@
+-- 0209  NEMOTRON WAS NEVER BROKEN. NOTHING THAT RUNS IT HAD RUN.
+--       (diagnosed and closed 2026-09-14 00:20-00:24 UTC / 2026-09-13 7:20-7:24 PM CT)
+--
+-- db/checks/0208 left one question open and refused to guess at it:
+--
+--   "Why did Nemotron stop on 2026-08-30 when its gate defaults on? ...
+--    the likeliest explanation is that the caller stopped, not the gate.
+--    But 'likeliest' is not measured, and the caller is an edge function
+--    outside this database. Recorded as open rather than guessed."
+--
+-- It is now measured, and the answer is better than the guess.
+--
+-- ---------------------------------------------------------------------------
+-- 1. THE GATE, READ OUT OF ottoq_sim_decide_and_dispatch
+--
+-- The Nemotron call fires only when ALL of these hold:
+--
+--   IF COALESCE(v_run.run_by,'') NOT IN ('benchmark', 'cert_harness')  -- 0105
+--      AND NOT v_is_benchmark
+--      AND v_run.policy IS NOT DISTINCT FROM 'otto_q'
+--      AND ottoq_policy_get(p_sim_run_id,'orchestrator_agent_enabled',1) > 0  -- 0112
+--      AND ( (COALESCE(v_run.tick_count,0) % 3) = 0
+--            OR ottoq_orchestrator_trigger(v_run.depot_id) )
+--   THEN  net.http_post(.../functions/v1/ottoq-orchestrator-agent ...)
+--
+-- The first condition is the whole story. 0105 -- "the cert run quiesces the
+-- LLM proposer" -- deliberately excludes cert_harness and benchmark runs, so
+-- that a certification measures the deterministic core ALONE. That is correct
+-- and load-bearing: it is why the fourteen-atom verdict means anything.
+--
+-- And since 2026-08-30, EVERY RUN IN THIS DATABASE HAS BEEN A cert_harness
+-- RUN. 1,057 of them. production_live last ran on 08-30 -- the same day
+-- Nemotron's last decision was recorded, and the same day cuOpt's last real
+-- NVIDIA call went out.
+--
+-- So Nemotron did not stop. Nothing that is allowed to call it has run for two
+-- weeks. The engine has been in a PROVING posture, not an OPERATING one, and
+-- the intelligence layer is switched off in the proving posture on purpose.
+--
+-- ---------------------------------------------------------------------------
+-- 2. THE TEST: START AN OPERATING RUN AND SEE IF IT WAKES UP
+--
+-- A hypothesis about a gate is worth what its prediction is worth. Prediction:
+-- start a run whose run_by is neither 'cert_harness' nor 'benchmark', with
+-- policy otto_q, and Nemotron fires on the third tick without anyone touching
+-- a dial, a function or a secret.
+--
+--   run       7555ae47-ab2e-4b30-b5b8-c2f76c88f884
+--   scenario  busy_day, seed 424242, Nashville flagship
+--   run_by    proposer_live        <- the first non-cert run since 2026-08-30
+--   policy    otto_q
+--
+--   t+16 s   tick 0    queue  9   commands   0   decisions   0   nemotron 0
+--   t+50 s   tick 3    queue 22   commands  83   decisions  97   nemotron 0
+--   t+~3 m   tick 11   queue 16   commands 285   decisions 692   nemotron 2
+--
+-- Held. Nothing was changed to make it happen -- no migration, no dial, no
+-- redeploy. The gate opened because a run appeared that it was willing to
+-- open for.
+--
+-- ottoq_intelligence_status() before and after, same function, same day:
+--
+--   nemotron   262 / 262 enacted   silent 347.9 h      (00:19 UTC)
+--   nemotron   265 / 265 enacted   silent   0.0 h      (00:24 UTC)
+--
+-- ---------------------------------------------------------------------------
+-- 3. WHAT THIS CHANGES ABOUT 0208'S HEADLINE
+--
+-- 0208 said three of four sources are "off at a dial". That stands for cuOpt
+-- (cuopt_propose_enabled = 0, still 355.8 h silent as this is written) and for
+-- CP-SAT and Anthropic, which have no database presence at all. It was too
+-- harsh on Nemotron. Nemotron's gate is open and always was; what it lacked
+-- was a caller, and what the caller lacked was a run it was permitted to act
+-- on.
+--
+-- The corrected sentence: the engine has spent two weeks proving itself and no
+-- time operating, and every symptom that looked like a dead intelligence layer
+-- is downstream of that one fact.
+--
+-- ---------------------------------------------------------------------------
+-- 4. TWO SILENT FAILURE MODES IN THAT BLOCK, FOUND WHILE READING IT
+--
+-- Neither fired here -- vault.decrypted_secrets does hold 'ottoq_anon_key'
+-- (verified, 1 row) -- but both are real and both are the kind of thing this
+-- file exists to name:
+--
+--   a. IF v_k IS NOT NULL THEN ... END IF
+--      If the vault secret were missing, the call is skipped with NO warning,
+--      no event and no ledger row. Nemotron would read as "never fired" and
+--      nothing would say why.
+--
+--   b. EXCEPTION WHEN OTHERS THEN NULL
+--      Every error in the whole block -- DNS, timeout, 401, a malformed body
+--      -- is swallowed silently. An agent that cannot be reached is
+--      indistinguishable from an agent that was never called.
+--
+-- Both are defensible as written: a failing proposer must never break a tick,
+-- and that is the correct priority. But "must not break the tick" and "must
+-- not be recordable" are different requirements, and this block conflates
+-- them. The fix is a per-call ledger row -- attempted / reached / answered /
+-- followed -- written whether or not the call succeeds, which is exactly what
+-- cuopt_invocation_log already does for cuOpt and what Nemotron has never had.
+-- Tracked as the Nemotron half of the intelligence-engine work; not built here
+-- because this file is a diagnosis, not a fix.

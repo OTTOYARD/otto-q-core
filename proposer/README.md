@@ -77,6 +77,108 @@ equal `inlet_type`. On the flagship depot all 84 charging stalls are `Multi` wit
 and one ignoring both would propose every vehicle onto every plug. Neither is what the engine
 does.
 
+### A stall somebody holds is not a point this tick (finding L-58)
+
+The frame has carried `stalls[].status` and `stalls[].vehicle_id` (`stalls.status`,
+`stalls.current_vehicle_id`) since 0209, and `frame_to_scenario` read neither: every
+charge-capable stall was a service point the plan could start on at t=0. It showed on the
+first live D3 cycle (run `af2def1b`, tick 10 — 40 charging stalls, 23 of them occupied): all
+four immediate starts the solver planned were onto stalls another vehicle was plugged into,
+with 17 free stalls idle. The shield would have refused each with a rule code, correctly, and
+the proposer would have contributed nothing all run. Now a stall is offered to the solver only
+if its `status` is exactly `available` **and** it holds no vehicle; the skipped count travels
+as `stalls_busy` on the result and `n_stalls_busy` on the fire record, so "planned on 17 of
+40" is a ledger fact. A row with no `status` key (fixtures, older producers) is treated as
+free, so the field's absence is visible in the plan rather than silently emptying it. **Not
+modelled yet, and said so:** when the occupant will finish — that is what `sessions[]` is for;
+until it is read, a held stall is not planned on this tick rather than planned on at a guessed
+time.
+
+And the accounting beside it (finding L-59): `planned` counts rows that **name a stall**. A vehicle the
+solver admits but gives no charge operation comes back as an abstain row and is counted as one; the
+first tick-16 fire on run `af2def1b` had read "8 planned" over six stall rows before this was fixed.
+
+### 'Pending' is not 'heard' (finding L-60)
+
+Measured on the first live D3 run (`af2def1b`, 2026-09-13): 54 `forward_lex` rows submitted across
+two fires, **zero** reached the shield. Two reasons, neither a refusal. A vehicle waiting in staging
+usually already holds a booking the frame does not show, and the decide path re-decides a vehicle
+only while it holds none — so a proposal for it sits `pending` until its TTL and is never looked at.
+And an arrival is decided in the tick it arrives, by the local heuristic, unless the one-tick hold
+(0259) is on for the run — which it could not be, because its gate key was never registered with
+`ottoq_policy_set` (0262). The population an out-of-process proposer can be heard on is the one the
+hold is holding: unreserved arrivals. `propose(..., serviceable_states=...)` and the bridge's
+`--states` narrow the fire to it; the set can only narrow, never widen, and the fire record carries
+it as `serviceable_states`. The frame-side fix — carry the booking so the proposer can see it — is a
+kernel change and is not made here.
+
+### The frame hides what decides (finding L-61) and an infeasible frame is a fire, not a crash (L-62)
+
+Run `ccf48af1` (2026-09-13, the one-tick hold ON): 36 rows, 13 naming a stall, zero heard. The
+selector (`ottoq_l2_external_proposal`) pre-filters a proposed stall on three facts — no current
+vehicle, no live reservation for another vehicle, charger `station_state = 'Available'` — and the
+frame carries only the first (`vehicle_id`). Every stall the proposer named was reserved for
+someone else, freshly occupied, or behind a **Faulted** charger, and the frame said `available`
+for all of them. Until the frame carries `reserved_by`, `reservation_expires_at` and the charger
+state per stall (kernel migration, not made here), a proposer at a depot that reserves every
+stall cannot be heard; `demo/D3_RUNBOOK.md` §5 has the per-stall table. And when the frame is
+oversubscribed (13 vehicles, 1 stall) the kernel raises `INFEASIBLE`; the bridge now records
+that as an `empty` fire with the solver's words in `error` and `--allow-rejection` lets it plan
+what fits (L-62).
+
+#### L-58, L-60 and L-61 are CLOSED by migration 0265 and this package's consumer (2026-09-13)
+
+The kernel migration the three findings above each end by deferring is `0265`
+(version `20260913122605`), and the paragraphs are left standing as the record of what
+was true before it. What the frame now carries, behind
+`ottoq_policy_get(run,'proposer_frame_facts',0)` and only when that resolves 1:
+
+| per stall | per vehicle | top level |
+|---|---|---|
+| `ocpp_charger_id`, `reserved_by`, `reservation_expires_at`, `reservation_live`, `charger_state`, `charger_heartbeat_at`, `charger_fresh`, `offerable` | `reserved_stall_id`, `has_live_booking` | `selector` = `{facts_version, clock, heartbeat_window_s, authority}` |
+
+`offerable` is the selector's own conjunction, and 0265's assertion A4 recomputes it
+independently and refuses to apply if the two disagree — so it is the door's verdict, not a
+restatement of it. **Vehicle-blind on purpose:** the selector also accepts a stall reserved for
+the proposal's own vehicle, which a per-stall boolean cannot know; that case is answered on the
+vehicle side instead, because a vehicle holding a live reservation is no longer planned for at
+all.
+
+How this package reads them:
+
+- `stall_is_free()` **conjoins** the door's verdict with the shield's — `status == 'available'`
+  and no vehicle, **and** `offerable`. Not a substitution: `offerable` does not read
+  `stalls.status` and neither does the selector, so a `maintenance` stall on a free healthy
+  charger is offerable and the door would take a proposal for it; the shield is what refuses
+  that one. Trading a refusal at the door for a refusal at the shield is not progress.
+- `stall_block_reason()` names exactly one reason per stall, most specific first —
+  `occupied`, `status_<x>`, `no_charger`, `charger_<state>`, `charger_stale`, `reserved` —
+  and the tally rides the result as `stalls_blocked` and the fire record as the same key.
+  0186's diagnosis was the most useful line either live run produced and it took a hand query;
+  it is now on every fire, the empty ones included.
+- `vehicle_is_held()` performs the narrowing L-60 above could only assert. A vehicle carrying
+  `reserved_stall_id` or `has_live_booking` is skipped and **counted** (`n_vehicles_held`) —
+  not abstained on, because two hundred abstention rows a tick for vehicles nobody asked about
+  is noise in the proposals table, not evidence.
+- `frame_facts_version()` feature-detects the `selector` block, and the bridge records it beside
+  the counts: **0 held under version 1 is a measurement; 0 held under no version is a
+  blindness**, and a record that cannot tell them apart publishes the second as the first.
+- The LLM digest (`bridge/llm_proposer.py`) **shows** `offerable` and does not enforce it — law 2
+  keeps every charge-capable stall visible so an unsafe-but-well-formed proposal stays possible.
+
+**Absence is the pre-0265 behaviour, in every one of them.** Every certification arm and every
+fixture written before 0265 sees a frame without the facts and is read exactly as it was; the
+consumer never guesses a verdict the frame did not give it.
+
+**The clock is load-bearing, and it is the SIM clock.** Measured 2026-09-13 (`db/checks/0195`):
+against `now()` all 40 flagship charge stalls read `charger_fresh=false` and the proposer refuses
+the whole depot; against the twin's own clock the same 40 read 39 offerable, 1 `charger_faulted`.
+The wall clock does not make the proposer wrong quietly — it makes it silent.
+
+**What is still open:** G47. The proposer is still asked *after* the local path has taken the
+resource (`db/checks/0188`), and seeing sooner that the resource is gone is not being asked
+sooner. This is 0188's option (b), visibility; option (c), reordering the tick, is not taken here.
+
 ## Abstention is first-class
 
 No class-table entry, no readable `soc`, a target at or below the current charge, or no point
@@ -85,6 +187,8 @@ drop, and never an exception that takes the rest of the batch with it. The dispo
 the proposer saw the vehicle and declined — cuOpt's abstention pattern, preserved.
 
 ## What integration requires (founder-gated; nothing here does it)
+
+**2026-09-12 — the integration now exists, outside this package:** `bridge/proposer_bridge.py` (a non-kernel package; `bridge/README.md`) reads the frame, calls `propose()`, and submits the rows through `ottoq_submit_external_proposal`. The generalization L-40 asks for below is migration `0259`; the fire ledger is `0260`; `db/checks/0184` is the measurement.
 
 An edge function that: reads the frame → calls `propose()` with the class-table join and
 visit-need ready-bys → inserts the rows with `sim_run_id`/`depot_id`/`expires_at` → logs the
@@ -119,3 +223,44 @@ cannot hold it — `param_value` is `numeric` — so it needs a small precedence
 source, seeded with `('cuopt', 'cuopt_fallback')` so the default reproduces today's ordering
 exactly and no canon moves. `ottoq_cuopt_deferrals` and its arming function want the same
 treatment, parameterized by source rather than named for one.
+
+## L-63 — what the solver actually does on a real flagship frame (measured 2026-09-13 05:35 UTC)
+
+Ran the offline route over the captured flagship tick-1 frame (`frame_c1`: 39 vehicles,
+40 charge stalls, **24 of them already busy**), `--states arrived_at_gate`,
+`--default-ready-delta 30`, `--allow-rejection`, OR-Tools 9.15.6755:
+
+| | value |
+|---|---|
+| vehicles in `arrived_at_gate` | 11 |
+| rows that named a stall (`n_planned`) | **5** |
+| rows that abstained | 6 — all six `not_due` |
+| pass 1 / pass 2 status | `FEASIBLE` / `FEASIBLE` |
+| `complete` | **false** |
+| `optima_reached` | `min_tardy` 255, `min_peak` 370 |
+| total tardiness / total flow / site peak | 255 min / 554 min / 370 kW |
+| `deterministic_time` | **4.012026** against a `det_budget_s` of 2.0 |
+| `reproducible` | **true** |
+
+Four things to read correctly, because three of them look like defects and are not:
+
+1. **`deterministic_time` 4.01 against a 2.0 budget is not a budget violation.** The field
+   is the SUM across the lexicographic passes (`forward_proposer.py`: pass1 + pass2), and
+   the budget is per pass. Two passes at the cap is exactly 4.0.
+2. **`complete: false` with both passes `FEASIBLE` means neither pass PROVED its optimum
+   inside the budget.** The plan is the best found, not a proven optimum. So the honest
+   sentence is *"a deterministic-time-bounded solve that returns the best plan it found"* —
+   never "optimal", on this frame size, at this budget.
+3. **`reproducible: true` is independent of `complete`.** Same inputs, same plan, whether or
+   not optimality was proved — which is the property the certification story needs, and the
+   one `R-12` established the leading GPU solver cannot offer at all.
+4. **Five of eleven planned, six abstained as `not_due`, is the objective working.** With 24
+   of 40 stalls busy, the min-peak term defers anything it is not obliged to start; that is
+   what `--default-ready-delta` exists to override when the point of the run is to see the
+   proposer act (`demo/D3_RUNBOOK.md` §2).
+
+And one limitation confirmed rather than found: **`--regime` is live-only**, exactly as its
+help text says. The offline route cannot resolve a regime because it has no run to read a sim
+hour from, so the declared-objective path (`intent/intent_v1.json` → `intent/solve.py` →
+`policies/regime.py`) is exercised only against a live run. That is a real coverage gap for
+G45's wiring claim, not a bug in the flag.

@@ -1,0 +1,111 @@
+-- 0168 — the settlement rail is structurally complete and financially empty.
+--
+-- Measured 2026-09-09 14:35-14:45 UTC, catalog and count reads only, round 36
+-- in flight throughout and nothing here touches a run-scoped table.
+--
+-- WHY I WENT LOOKING. Chase asked whether the model has what it needs to
+-- orchestrate optimally. Working the objective question (BUILD_QUEUE #4) I went
+-- through intent_v1's eleven objectives asking a narrower question than "is it
+-- optimised" -- CAN WE EVEN MEASURE IT? energy_cost is one of only five with a
+-- sourced dollar value (NES GSA-3, $21.40/kW demand). Its base table is empty.
+--
+-- ---------------------------------------------------------------------------
+-- THE CHAIN, END TO END, EACH LINK MEASURED
+-- ---------------------------------------------------------------------------
+--
+--   1. ottoq_compute_visit_cost(...)          exists. Computes the cost split:
+--                                             kwh from grid / solar / bess, rate,
+--                                             demand charge, labor, consumables,
+--                                             billable amount, carbon intensity.
+--        CALLERS: 0.
+--
+--   2. ottoq_visit_cost_attribution           the table CLAUDE.md 2.6 names as
+--                                             the SDR's origin.
+--        ROWS: 0.
+--        Functions that INSERT into it, anywhere in the database: NONE.
+--        (Catalog search for INSERT INTO ottoq_visit_cost_attribution across
+--         every function in public, ottoq and twin returns zero rows.)
+--
+--   3. trg_0043_attribution_attach            AFTER INSERT ON that table.
+--        STATE: enabled. Body is correct -- it updates the matching SDRs with
+--        attribution_id, cost_components, total_cost_usd, billable_amount_usd
+--        and emits sdr_costs_attached.
+--        TIMES FIRED: 0, necessarily, because (2) has no rows.
+--
+--   4. ottoq_service_detail_records           220,946 rows.
+--        with tariff_id ......... 220,946   (100%)
+--        with energy_kwh ........       0
+--        with total_cost_usd ....       0
+--        with cost_components ...       0
+--
+--   5. ottoq_events
+--        sdr_issued ............ 125,648
+--        sdr_costs_attached ....       0
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THAT MEANS, SAID WITHOUT SOFTENING
+-- ---------------------------------------------------------------------------
+--
+-- CLAUDE.md 2.6 calls this the strategic instruction of the entire build:
+--
+--   "a scheduler that logs assignment(asset, point, t) builds the commodity
+--    layer only. A scheduler that emits an SDR for every completed operation
+--    builds the telemetry moat, the settlement rail, and the protocol claim
+--    simultaneously, at nearly identical cost."
+--
+-- We emit the SDR. Every completed operation terminates in one and that is
+-- enforced structurally by triggers -- 0043 did its job and 0220 fixed its
+-- emitter. So the TELEMETRY moat is real and the PROTOCOL shape is real.
+--
+-- THE SETTLEMENT RAIL IS A PIPE WITH NOTHING FLOWING THROUGH IT. Every SDR
+-- carries a pointer to a tariff and no quantity to apply it to. "Signed,
+-- tariffed, operator-attributed" is true of signed, true of operator-attributed,
+-- and true of tariffed only in the sense that the foreign key is populated.
+-- There is no money in the settlement rail. Not a rounding error -- zero rows
+-- of 220,946.
+--
+-- AND IT IS THE FOURTH INSTANCE OF ONE PATTERN, IN ONE DAY.
+--
+--   G23   ottoq_purge_prior_runs        correct, no scheduler
+--   P0#3  ottoq_cert_matrix.stale       correct, no consumer
+--   0167  six assert_/check_ functions  correct, no caller
+--   0168  the whole cost chain           correct, no caller at link 1
+--
+-- Every one of these is working machinery whose only defect is that nothing
+-- invokes it. That is now the most predictive heuristic this codebase has: when
+-- looking for what is broken, do not look for what is missing -- look for what
+-- exists and is never called. 0167 built the instrument for exactly this and
+-- ottoq_compute_visit_cost was sitting in its output.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THIS BLOCKS
+-- ---------------------------------------------------------------------------
+--
+--   * intent_v1's energy_cost objective cannot be computed for any run. It is
+--     one of the five with a SOURCED dollar value, so this is not the R-10
+--     "nobody publishes a price" problem -- we know the price and have nothing
+--     to multiply it by.
+--   * MOAT_AUDIT's L2_SETTLEMENT coverage verdict needs re-reading against this.
+--     The layer is scaffolded, not populated, and the audit should say so in
+--     those words.
+--   * CLAUDE.md 2.6's ServiceDetailRecord -- "signed, tariffed,
+--     operator-attributed, asset-class-tagged" -- is three-quarters true today
+--     and the missing quarter is the one that makes it a settlement object
+--     rather than a log line.
+--   * Any tariff-aware scheduling decision (BUILD_QUEUE #6) has no feedback
+--     signal to learn from or be measured against.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT I AM NOT DOING, AND WHY
+-- ---------------------------------------------------------------------------
+--
+-- Not wiring it today. The fix is to call ottoq_compute_visit_cost at visit
+-- completion, which means deciding WHERE in the completion path it belongs, what
+-- happens when a visit completes with no charge session, and whether the twin's
+-- simulated energy is allowed to produce a dollar figure that looks like
+-- production revenue. That last one is a judgement about what a number means,
+-- not a wiring question, and it is exactly the kind I have been told to bring up
+-- rather than decide alone. It is BUILD_QUEUE P1 and it is written down.
+--
+-- What is NOT in doubt: the chain is broken at link 1, the break is total, and
+-- nothing downstream can be right until it is closed.

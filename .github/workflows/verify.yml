@@ -32,3 +32,18 @@ jobs:
       # ever looked at db/migrations at all. Both are properties of committed files.
       - name: Pytest suite (conformance, site profiles, tariffs, recall, adapters, migration hygiene)
         run: python3 -m pytest -q
+      # G12, first rung: the only step in this file that talks to a database.
+      # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
+      #
+      # It gates the one direction of scripts/check-drift.sql that is currently at zero
+      # and that a mistake would move: every migration file carrying a real version
+      # header has a ledger row. It deliberately does NOT gate on the drift check
+      # returning CLEAN -- db/checks/0206 measured a floor of 67 applied-with-no-file
+      # (the pre-G18 era) plus 41 name mismatches that no future discipline can clear,
+      # and a permanently-red gate is a gate nobody reads, which is what 0206 is about.
+      - name: Database reachability + migration ledger gate (read-only)
+        env:
+          OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
+        run: |
+          if [ -n "${OTTOQ_DATABASE_URL}" ]; then pip install "psycopg[binary]"; fi
+          python3 scripts/ci_db_check.py

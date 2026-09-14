@@ -24,8 +24,13 @@ from forward_proposer import (  # noqa: E402
     DEFAULT_SERVICEABLE_STATES,
     DEFAULT_TARGET_SOC_PCT,
     FrameError,
+    frame_facts_version,
     frame_to_scenario,
     propose,
+    serviceable_predicate,
+    stall_block_reason,
+    stall_is_free,
+    vehicle_is_held,
 )
 
 SITE = {"power_cap_kw_hard": 600, "power_soft_target_kw": 450,
@@ -1096,3 +1101,214 @@ def test_importing_the_proposer_does_not_read_the_doctrine():
                          text=True, cwd=str(HERE.parent))
     assert out.returncode == 0, out.stderr[-800:]
     assert "clean" in out.stdout
+
+
+# ---- L-58: a stall another vehicle holds is not a point this tick ---------------
+
+
+def test_an_occupied_or_held_stall_is_not_a_point_this_tick():
+    """The first live D3 cycle planned every immediate start onto a stall
+    somebody was already plugged into, because status and vehicle_id were
+    never read. Occupied, and 'available'-but-held, both drop out; only the
+    free stall is ever named in a plan, and the count of what was skipped
+    travels with the result."""
+    occupied = _stall("s-occ")
+    occupied.update(status="occupied", vehicle_id="v-other")
+    held = _stall("s-held")                    # status says free, a vehicle holds it
+    held.update(vehicle_id="v-holder")
+    free = _stall("s-free")
+    frame = _frame([_vehicle("v-1", soc=25), _vehicle("v-2", soc=40)],
+                   [occupied, held, free])
+    r = propose(frame, CLASSES, site=SITE)
+    named = {row["proposal"].get("stall_id") for row in r["proposals"]
+             if not row["proposal"]["abstain"]}
+    assert named == {"s-free"}
+    assert r["stalls_busy"] == 2
+    assert r["planned"] + r["abstained"] == 2      # nobody vanished
+
+
+def test_a_site_with_only_busy_stalls_says_so():
+    busy = _stall("s-1"); busy.update(status="occupied", vehicle_id="v-x")
+    frame = _frame([_vehicle("v-1", soc=25)], [busy])
+    with pytest.raises(FrameError, match="not one is offerable.*1 occupied"):
+        propose(frame, CLASSES, site=SITE)
+
+
+def test_a_stall_row_without_a_status_key_is_still_a_point():
+    """Absence is not occupancy: a fixture or an older producer that omits the
+    field keeps its stalls; the plan shows it rather than silently emptying."""
+    bare = {"id": "s-bare", "type": "dcfc", "connector_type": "CCS1",
+            "connector_max_kw": 150}
+    r = propose(_frame([_vehicle("v-1", soc=25)], [bare]), CLASSES, site=SITE)
+    assert r["planned"] == 1 and r["stalls_busy"] == 0
+
+
+def test_a_vehicle_the_plan_gives_no_charge_to_is_counted_abstained_not_planned():
+    """L-59: 'planned' means a row that names a stall. A vehicle the solver
+    admits but schedules no charge for comes back as an abstain row, and the
+    accounting must say so -- a fire record that reads 8 planned over 6 stall
+    rows is a ledger lie."""
+    frame = _frame([_vehicle("v-lo", soc=25), _vehicle("v-hi", soc=89)],
+                   [_stall("s-1")])
+    r = propose(frame, CLASSES, site=SITE)
+    stall_rows = [row for row in r["proposals"] if not row["proposal"]["abstain"]]
+    assert r["planned"] == len(stall_rows)
+    assert r["planned"] + r["abstained"] == len(r["proposals"]) == 2
+
+
+# ---- L-60: the states a fire plans for can be narrowed, never widened ----------
+
+
+def test_serviceable_states_narrow_the_batch_to_the_held_population():
+    """A staged vehicle usually already holds a booking the frame does not show
+    and is never re-decided; the one-tick hold holds ARRIVALS. Narrowing to
+    arrived_at_gate plans for exactly those and gives the rest no row at all --
+    they are not serviceable for this fire, not abstentions."""
+    frame = _frame([_vehicle("v-gate", soc=30, state="arrived_at_gate"),
+                    _vehicle("v-staged", soc=25, state="staged_awaiting_service")],
+                   [_stall("s-1"), _stall("s-2")])
+    r = propose(frame, CLASSES, site=SITE,
+                serviceable_states=frozenset({"arrived_at_gate"}))
+    assert [row["entity_id"] for row in r["proposals"]] == ["v-gate"]
+    full = propose(frame, CLASSES, site=SITE)
+    assert {row["entity_id"] for row in full["proposals"]} == {"v-gate", "v-staged"}
+
+
+def test_serviceable_states_cannot_widen_past_the_default_set():
+    frame = _frame([_vehicle("v-1", soc=30)], [_stall("s-1")])
+    with pytest.raises(FrameError, match="only narrow"):
+        propose(frame, CLASSES, site=SITE,
+                serviceable_states=frozenset({"arrived_at_gate", "deployed"}))
+    with pytest.raises(FrameError, match="at least one"):
+        propose(frame, CLASSES, site=SITE, serviceable_states=frozenset())
+
+
+# ---------------------------------------------------------------------------
+# 0265 / L-61: the frame carries what the SELECTOR filters on
+# ---------------------------------------------------------------------------
+
+def _facts_stall(sid, **kw):
+    """A stall row as migration 0265 emits it with the facts gate ON."""
+    st = _stall(sid)
+    st.update({"ocpp_charger_id": f"chg-{sid}", "reserved_by": None,
+               "reservation_expires_at": None, "reservation_live": False,
+               "charger_state": "Available", "charger_heartbeat_at": "2026-09-13T12:00:00+00:00",
+               "charger_fresh": True, "offerable": True})
+    st.update(kw)
+    return st
+
+
+def _facts_frame(vehicles, stalls, *, version=1):
+    frame = _frame(vehicles, stalls)
+    frame["selector"] = {"facts_version": version, "clock": "2026-09-13T12:00:00+00:00",
+                         "heartbeat_window_s": 90,
+                         "authority": "public.ottoq_l2_external_proposal"}
+    return frame
+
+
+def test_a_frame_without_the_facts_is_read_exactly_as_before():
+    """Absence is the pre-0265 behaviour, never a guessed verdict. Every
+    certification arm sees a gate-off frame and must plan identically."""
+    assert frame_facts_version(FRAME) is None
+    r = propose(FRAME, CLASSES, site=SITE)
+    assert r["facts_version"] is None
+    assert r["vehicles_held"] == 0
+    #: the two DCFC and the L2 stall are points; the staging stall is not a
+    #: charge stall at all, so it is not in the blocked tally either.
+    assert r["stalls_blocked"] == {} and r["stalls_busy"] == 0
+
+
+def test_an_unofferable_stall_is_never_planned_on_even_when_status_is_available():
+    """THE DOOR'S HALF. status='available' and vehicle_id=None both pass, and the
+    selector still refuses: a live reservation for another vehicle. Before 0265
+    this stall was a point and the proposal died at the door unread (L-61)."""
+    reserved = _facts_stall("s-res", reserved_by="v-other", reservation_live=True,
+                            offerable=False)
+    free = _facts_stall("s-free")
+    frame = _facts_frame([_vehicle("v-1", soc=25)], [reserved, free])
+    r = propose(frame, CLASSES, site=SITE)
+    named = {row["proposal"].get("stall_id") for row in r["proposals"]
+             if not row["proposal"]["abstain"]}
+    assert named == {"s-free"}
+    assert r["facts_version"] == 1
+    assert r["stalls_blocked"] == {"reserved": 1}
+
+
+@pytest.mark.parametrize("mutation,reason", [
+    ({"offerable": False, "ocpp_charger_id": None}, "no_charger"),
+    ({"offerable": False, "charger_state": "Faulted"}, "charger_faulted"),
+    ({"offerable": False, "charger_state": "Unavailable"}, "charger_unavailable"),
+    ({"offerable": False, "charger_fresh": False}, "charger_stale"),
+    ({"offerable": False, "reservation_live": True, "reserved_by": "v-x"}, "reserved"),
+    ({"offerable": False, "vehicle_id": "v-x"}, "occupied"),
+    ({"status": "maintenance"}, "status_maintenance"),
+])
+def test_every_refusal_the_selector_can_make_is_named(mutation, reason):
+    """0186's diagnosis -- '31 occupied, 7 reserved, 2 faulted' -- as a fire-record
+    fact rather than a hand query. Exactly one reason per stall, most specific
+    first, and the vocabulary is total."""
+    bad = _facts_stall("s-bad", **mutation)
+    assert stall_block_reason(bad) == reason
+    assert stall_is_free(bad) is False
+    good = _facts_stall("s-good")
+    frame = _facts_frame([_vehicle("v-1", soc=25)], [bad, good])
+    r = propose(frame, CLASSES, site=SITE)
+    assert r["stalls_blocked"] == {reason: 1}
+
+
+def test_offerable_does_not_override_a_status_the_shield_would_refuse():
+    """CONJOINED, NOT SUBSTITUTED. The selector never reads stalls.status, so a
+    maintenance stall with a healthy unreserved charger is offerable -- and the
+    shield would still refuse it. Trading a refusal at the door for one at the
+    shield is not progress."""
+    lab = _facts_stall("s-maint", status="maintenance", offerable=True)
+    assert stall_is_free(lab) is False
+    assert stall_block_reason(lab) == "status_maintenance"
+
+
+def test_a_vehicle_that_already_holds_a_place_is_not_planned_for():
+    """L-60. The decide path does not re-decide a vehicle holding a reservation
+    or a booking, so a proposal for one sits pending until its TTL and never
+    reaches the shield. Skipped, and COUNTED -- never silently absent."""
+    held_res = _vehicle("v-res", soc=25, reserved_stall_id="s-1",
+                        has_live_booking=False)
+    held_bkg = _vehicle("v-bkg", soc=25, reserved_stall_id=None,
+                        has_live_booking=True)
+    free = _vehicle("v-free", soc=25, reserved_stall_id=None,
+                    has_live_booking=False)
+    frame = _facts_frame([held_res, held_bkg, free],
+                         [_facts_stall("s-a"), _facts_stall("s-b")])
+    r = propose(frame, CLASSES, site=SITE)
+    assert r["vehicles_held"] == 2
+    entities = {row["entity_id"] for row in r["proposals"]}
+    assert entities == {"v-free"}
+    assert vehicle_is_held(held_res) and vehicle_is_held(held_bkg)
+    assert not vehicle_is_held(free)
+
+
+def test_a_held_vehicle_at_target_soc_is_not_counted_as_held():
+    """The count is measured with the proposer's OWN serviceable predicate, so it
+    describes the population that WOULD have been planned for. A vehicle already
+    at its target was never going to be planned for, held or not."""
+    done = _vehicle("v-done", soc=95, reserved_stall_id="s-1")
+    frame = _facts_frame([done, _vehicle("v-1", soc=25)],
+                         [_facts_stall("s-a")])
+    r = propose(frame, CLASSES, site=SITE)
+    assert r["vehicles_held"] == 0
+    assert serviceable_predicate()(done) is False
+
+
+def test_a_site_whose_every_stall_is_unofferable_names_the_scarcity():
+    """0186's line, as the refusal message. 'nothing free' told you nothing about
+    WHICH scarcity to go fix."""
+    stalls = [_facts_stall("s-1", offerable=False, vehicle_id="v-x"),
+              _facts_stall("s-2", offerable=False, reservation_live=True,
+                           reserved_by="v-y"),
+              _facts_stall("s-3", offerable=False, charger_state="Faulted")]
+    frame = _facts_frame([_vehicle("v-1", soc=25)], stalls)
+    with pytest.raises(FrameError) as exc:
+        propose(frame, CLASSES, site=SITE)
+    msg = str(exc.value)
+    assert "3 charge-capable" in msg
+    for fragment in ("1 occupied", "1 reserved", "1 charger_faulted"):
+        assert fragment in msg

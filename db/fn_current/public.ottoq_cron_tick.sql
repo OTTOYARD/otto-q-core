@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: 0000aacc9027798730952daa214d5ece
+--   live      md5: fd1834d4dd291ed46f004e93e3de5632
 -- md5 at capture: 0000aacc9027798730952daa214d5ece
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live 0562fbd6579524bf71f6c733b9295268
---   here 0000aacc9027798730952daa214d5ece
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('public.ottoq_cron_tick'::regproc);
 CREATE OR REPLACE FUNCTION public.ottoq_cron_tick()
  RETURNS void
  LANGUAGE plpgsql
@@ -54,4 +53,3 @@ BEGIN
     body := jsonb_build_object('depot_id','11111111-1111-1111-1111-111111111111','commit',true),
     timeout_milliseconds := 12000);
 END $function$
-

@@ -1,10 +1,9 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- STALE: this body is NOT what the catalog holds.
+--   file body md5: ee334e23ddb819483810abc33418b3ad
+--   live      md5: 4536b07e5003388813ca6b6e89472f70
 -- md5 at capture: ee334e23ddb819483810abc33418b3ad
--- STALE: this body is NOT what the catalog holds. Measured 2026-09-08:
---   live 4536b07e5003388813ca6b6e89472f70
---   here ee334e23ddb819483810abc33418b3ad
---   Read it as a point-in-time record, never as 'what the engine does now'.
---   db/fn_current/README.md carries the whole drift table and how to refresh.
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg.
+-- Read the catalog, not this file: SELECT pg_get_functiondef('twin.ottoq_sim_start_charge_session'::regproc);
 CREATE OR REPLACE FUNCTION twin.ottoq_sim_start_charge_session(p_vehicle_id uuid, p_stall_id uuid, p_sim_run_id uuid, p_target_soc numeric DEFAULT NULL::numeric, p_sim_clock_now timestamp with time zone DEFAULT NULL::timestamp with time zone)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -146,4 +145,3 @@ BEGIN
   RETURN v_session_id;
 END;
 $function$
-

@@ -1,6 +1,6 @@
--- CAPTURED LIVE from gxdrcyphqjzjsuhxuqtg via pg_get_functiondef, 2026-08-19 (run2/C4)
+-- VERIFIED AGAINST THE LIVE CATALOG 2026-09-09: body md5 == live md5 (809257934e4314ee8d70d84005c93c81)
 -- md5 at capture: 809257934e4314ee8d70d84005c93c81
--- VERIFIED AGAINST THE LIVE CATALOG 2026-09-08: body md5 == live md5 (809257934e4314ee8d70d84005c93c81).
+-- re-measured 2026-09-09 14:15 UTC against gxdrcyphqjzjsuhxuqtg
 CREATE OR REPLACE FUNCTION public.cuopt_log_gate(p_run uuid, p_reason text, p_cands integer DEFAULT NULL::integer, p_detail jsonb DEFAULT NULL::jsonb, p_t0 timestamp with time zone DEFAULT NULL::timestamp with time zone, p_note text DEFAULT 'sql_gate:v2'::text)
  RETURNS void
  LANGUAGE plpgsql
@@ -26,4 +26,3 @@ EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'cuopt_invocation_log write FAILED (reason=%): % / %', p_reason, SQLSTATE, SQLERRM;
 END;
 $function$
-

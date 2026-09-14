@@ -1,0 +1,110 @@
+-- 0206  THE CLOSING GATE CANNOT RETURN CLEAN, AND HAS NOT FOR WEEKS
+--       (measured 2026-09-13 ~21:20-21:50 UTC / 4:20-4:50 PM CT)
+--
+-- scripts/APPLYING.md step 8 is the last line of the migration procedure:
+--
+--   "Run scripts/check-drift.sql against the live database. It must return
+--    CLEAN. If it does not, you are not finished."
+--
+-- That instruction is currently unsatisfiable. check-drift CANNOT return CLEAN
+-- on this database, for two pre-existing reasons, neither of which any migration
+-- applied today caused and neither of which a person can fix by being careful.
+-- A gate whose answer never changes is not a gate — it is the same defect class
+-- this repo has spent the week convicting elsewhere (0192 G44, 0197, 0225 G25,
+-- and 0269's own first draft, whose five assertions passed on a dead guard).
+--
+-- HOW THIS WAS FOUND. Applying 0269 today, step 8 wanted check-drift run. The
+-- file is 65 KB and this session has no psql route to the database
+-- (OTTOQ_DATABASE_URL is an unset repository secret — G12), so rather than ship
+-- it through the MCP tool I ran its three set comparisons directly, using the
+-- generated manifest inside check-drift.sql as the repo side and
+-- supabase_migrations.schema_migrations as the ledger side. The verdict logic is
+-- quoted from the file verbatim below.
+--
+-- ---------------------------------------------------------------------------
+-- THE VERDICT RULE, FROM check-drift.sql ITSELF
+--
+--   CASE WHEN t.n_drift > 0 OR t.n_mismatch > 0 THEN 'DRIFT'
+--        WHEN t.n_countdiff > 0 OR t.n_unledgered_unknown > 0 THEN 'INVESTIGATE'
+--        ELSE 'CLEAN' END
+--
+-- So CLEAN requires n_drift = 0 AND n_mismatch = 0. Measured today:
+--
+--   n_drift    = 67    (Section A: applied past the baseline, no file in repo)
+--   n_mismatch = 41    (Section C: file header name <> ledger name)
+--
+-- ---------------------------------------------------------------------------
+-- 1. SECTION A — 67 APPLIED MIGRATIONS HAVE NO FILE. REAL, NOT AN ARTIFACT.
+--
+-- All 67 fall between 2026-08-10 and 2026-08-16. Spot-checked the first one
+-- rather than trusting the join: ledger version 20260810194053, name
+-- 'a_mated_vehicle_cannot_move'. `grep -rl a_mated_vehicle_cannot_move
+-- db/migrations/*.sql` returns NOTHING. There is no file. The repo's own
+-- migration numbering shows the same gap from the other side: files run
+-- 0002..0057 and then jump to 0073.
+--
+-- These are the pre-G18 era — the weeks the repo "stopped following" the
+-- discipline APPLYING.md documents (task G18). The work is in the engine; the
+-- files were never written. That is not fixable by future discipline, and it
+-- means Section A reports 67 CRITICAL rows on every run, forever, until someone
+-- decides what to do about it.
+--
+-- NOT the same thing as the APPLIED-NO-LEDGER-ROW convention, which is the
+-- OPPOSITE direction and IS documented (MIGRATION_LOG.md:116): 31 files say
+-- APPLIED-NO-LEDGER-ROW and 37 say UNVERIFIED-NO-LEDGER-ROW, meaning a file
+-- exists and the ledger has no row, because it was applied through the Dashboard
+-- SQL editor. Those are handled by Section E and are deliberate. The 67 here are
+-- ledger rows with no file.
+--
+-- ---------------------------------------------------------------------------
+-- 2. SECTION C — 41 NAME MISMATCHES, IN THREE MECHANICAL SHAPES
+--
+-- check-drift compares with no tolerance:
+--   mismatch AS (... FROM mf m JOIN led d ON d.version = m.version
+--                    WHERE d.name IS DISTINCT FROM m.name)
+--
+-- Every one of the 41 is a naming-convention difference, not a wrong migration:
+--
+--   (a) LEDGER CARRIES A SUFFIX the header does not
+--       20260819161838  file 'schema_v2_service_objects'
+--                       ledger 'schema_v2_service_objects_0043'
+--       20260829160154  file 'provenance_says_what_it_is'
+--                       ledger 'provenance_says_what_it_is_0073'
+--   (b) LEDGER CARRIES A PREFIX the header does not
+--       20260907213653  file 'the_verdict_sees_what_the_shield_read'
+--                       ledger '0208_the_verdict_sees_what_the_shield_read'
+--   (c) ONE FILE, MANY LEDGER ROWS, EACH WITH ITS OWN NAME
+--       0045 was applied as 0045a..0045e, 0050 as 0050a..0050e, 0051 and 0052
+--       in two parts each. scripts/gen-drift-sql.sh already handles the VERSION
+--       side of this via the `migration-also-covers:` header — and its comment
+--       says exactly why ("14 false alarms are how a real one gets ignored") —
+--       but it stamps every covered version with the FILE's single name, so each
+--       extra row is a guaranteed name mismatch. The mechanism that was built to
+--       prevent false alarms in Section A manufactures them in Section C.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT TO DO — A DECISION, NOT A CLEANUP, AND IT IS CHASE'S
+--
+--   FOR SECTION A. Either move check-drift's baseline forward from
+--   '20260803210034' to cover the pre-G18 era (honest: it says "everything
+--   before the discipline is baseline, and we do not claim files for it"), or
+--   backfill 67 files describing work whose reasoning nobody recorded at the
+--   time. The first is one line and true. The second is archaeology and would
+--   invent prose after the fact — which MIGRATION_LOG.md:107 explicitly refused
+--   to do for the same era, for the same reason.
+--
+--   FOR SECTION C. Extend `migration-also-covers:` to carry `version=name`
+--   pairs, and correct the ~30 single-version headers to the name the ledger
+--   actually assigned. Mechanical, low risk, no database change — the ledger is
+--   the record of what happened and the file header is what should move.
+--
+-- DO NOT "FIX" THIS BY WIDENING THE COMPARISON. A tolerance that lets a name
+-- differ would have let 0266 through: it was registered WITHOUT its 0NNN_
+-- prefix today and had to be repaired by hand, and Section C is precisely the
+-- check that catches that. The comparison is right; the data under it is wrong.
+--
+-- UNTIL THEN, SAY SO. APPLYING.md step 8 should state that check-drift returns
+-- DRIFT with a known floor of 67 + 41, and that the thing to look for is a
+-- CHANGE in those numbers, not CLEAN. An instruction that cannot be satisfied
+-- trains people to skip the step — and the step is the one that would have
+-- caught today's 0266 naming defect on its own.
