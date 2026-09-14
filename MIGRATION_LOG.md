@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0298 — GENERATED, not a log
+## Index, 0134–0299 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -283,7 +283,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0296](db/migrations/0296_the_gap_view_cannot_see_five_of_its_own_call_sites.sql) | `20260914101744` | yes — ledger | THE GAP VIEW CANNOT SEE FIVE OF ITS OWN CALL SITES |
 | [0297](db/migrations/0297_seven_gates_whose_range_is_the_comparison_itself.sql) | `20260914102812` | yes — ledger | SEVEN GATES WHOSE RANGE IS THE COMPARISON ITSELF, AND THREE CLAMPS |
 | [0298](db/migrations/0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired.sql) | `20260914103801` | yes — ledger | FOUR HOURS, THREE PROBABILITIES, A FRACTION -- AND ONE DIAL THAT IS |
+| [0299](db/migrations/0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check.sql) | `PENDING` | no — pending | A DIAL THAT DEFAULTS FOR A CHECK-CONSTRAINED COLUMN INHERITS THE CHECK |
 
-164 migrations indexed.
+165 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
