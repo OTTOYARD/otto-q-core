@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0303 — GENERATED, not a log
+## Index, 0134–0304 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -288,7 +288,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0301](db/migrations/0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column.sql) | `20260914105943` | yes — ledger | FIVE FILES NEVER CLASSIFIED THEMSELVES, AND THE FLOOR SWALLOWED EVERY |
 | [0302](db/migrations/0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog.sql) | `20260914121021` | yes — ledger | THE ONLY AGENT THAT TUNES DIALS IS THE ONE THAT BYPASSES THE CATALOG |
 | [0303](db/migrations/0303_a_bound_that_cannot_be_clamped_must_refuse.sql) | `20260914122818` | yes — ledger | A BOUND THAT CANNOT BE CLAMPED MUST REFUSE |
+| [0304](db/migrations/0304_five_more_floors_and_six_dials_admitted_without_a_clamp.sql) | `20260914124522` | yes — ledger | FIVE MORE FLOORS, AND SIX DIALS ADMITTED WITHOUT A CLAMP |
 
-169 migrations indexed.
+170 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

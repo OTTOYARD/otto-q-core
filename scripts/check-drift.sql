@@ -400,7 +400,8 @@ repo_manifest(version, name, file) AS (
     ('20260914105135'::text, '0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment'::text, '0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment.sql'::text),
     ('20260914105943'::text, '0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column'::text, '0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column.sql'::text),
     ('20260914121021'::text, '0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog'::text, '0302_the_only_agent_that_tunes_dials_is_the_one_that_bypasses_the_catalog.sql'::text),
-    ('20260914122818'::text, '0303_a_bound_that_cannot_be_clamped_must_refuse'::text, '0303_a_bound_that_cannot_be_clamped_must_refuse.sql'::text)
+    ('20260914122818'::text, '0303_a_bound_that_cannot_be_clamped_must_refuse'::text, '0303_a_bound_that_cannot_be_clamped_must_refuse.sql'::text),
+    ('20260914124522'::text, '0304_five_more_floors_and_six_dials_admitted_without_a_clamp'::text, '0304_five_more_floors_and_six_dials_admitted_without_a_clamp.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

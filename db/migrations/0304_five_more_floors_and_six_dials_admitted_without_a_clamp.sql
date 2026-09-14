@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914124522
 -- migration-name:    0304_five_more_floors_and_six_dials_admitted_without_a_clamp
 --
 -- 0304  FIVE MORE FLOORS, AND SIX DIALS ADMITTED WITHOUT A CLAMP
