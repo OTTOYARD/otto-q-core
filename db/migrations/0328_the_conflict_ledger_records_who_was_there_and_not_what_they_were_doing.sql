@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914235653
 -- migration-name:    0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing
 -- ============================================================================
 -- 0328 — THE CONFLICT LEDGER RECORDS *WHO* WAS IN THE STALL AND NOT *WHAT THEY
@@ -178,12 +178,60 @@ VALUES
    'Adds present_vehicle_state to the assignment_refused_occupied row written by '
    'ottoq.ottoq_emit_vehicle_command, via a LEFT JOIN on the blocker vehicle. Measured gap: '
    '226 such rows across runs 34ffb2d9 and 2235ce6e carry present_vehicle_id and none carry '
-   'the state, so 96% of recorded conflicts cannot be explained from the ledger -- and the '
-   'state is what separates "the blocker finished and has not left" (fix the release path) '
-   'from "the blocker is mid-service" (fix the selection predicate). space_conflict_ledger is '
-   'NOT one of the fourteen atoms, so this SHOULD move no canon. Classified TRUE anyway on '
-   '0320''s rule: "should change nothing" is a prediction for a round to judge, not a '
-   'classification. It changes no decision, no selection and no command; A4 pins the refusal '
-   'write unchanged.',
+   'the state (285,782 whole-table), so 96% of recorded conflicts cannot be explained from the '
+   'ledger -- and the state is what separates "the blocker finished and has not left" (fix the '
+   'release path) from "the blocker is mid-service" (fix the selection predicate). '
+   'space_conflict_ledger is NOT one of the fourteen atoms, so this SHOULD move no canon. '
+   'Classified TRUE anyway on 0320''s rule: "should change nothing" is a prediction for a round '
+   'to judge, not a classification. It changes no decision, no selection and no command; A4 '
+   'pins the refusal write unchanged.',
    now())
 ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================================
+-- APPLIED 20260914235653 (2026-09-14 23:56:53 UTC / 6:56 PM CT)
+-- ============================================================================
+-- Window: quiesced and verified first -- 0 active backends other than this one,
+-- 0 engine-pattern queries, 0 active r4*/cert cron jobs.
+--
+-- FIRST ATTEMPT REFUSED, 42703: the snapshot INSERT named (taken_at, reason,
+-- payload), a shape I wrote from memory. ottoq_schema_snapshots actually has
+-- (label, object_kind, schema_name, object_name, definition, def_md5). The
+-- migration is transactional, so nothing applied -- the emitter's md5 was
+-- re-read afterwards and was still 1f1df91284c57936a108cc600cc43a28 with
+-- present_vehicle_state absent. Corrected in 7eff50d before re-applying.
+--
+-- HEADER CONDENSED AT APPLY -- and here is the digest that proves it was only
+-- the header. Normalising BOTH the committed file and the stored migration text
+-- from `DO $pre$` onward by dropping blank lines and lines whose trimmed form
+-- begins with `--`:
+--
+--   committed file  ->  351b9cbd522c25395f22b77a0d82b37f   6239 bytes
+--   applied text    ->  351b9cbd522c25395f22b77a0d82b37f   6239 bytes
+--
+-- Identical. Every difference between the two is a comment line; no executable
+-- text differs. (Raw, un-normalised: file body 7480 bytes, applied body 6254 --
+-- the 1,226-byte gap is exactly the commentary stripped to fit the apply call.)
+--
+-- RESULT, measured after apply:
+--   ottoq.ottoq_emit_vehicle_command  md5 1f1df912...  ->  3c19552b2e8a5edd9fa3a52246ec9543
+--                                     len 3705         ->  4272
+--   A1 bv.current_state::text present  : true
+--   A2 assignment_refused_occupied kept: true
+--   A3 LEFT JOIN public.vehicles bv    : true
+--   A4 refusal write untouched         : asserted in-transaction, passed
+--   pre-snapshot rows                  : 1  (def_md5 62acc28c788e55eba896293dad13aeca,
+--                                            the FUNCTIONDEF, which is the text the
+--                                            three substitutions operate on)
+--   lineage forces_recert              : true
+--
+-- P3 printed the gap at apply time: 285,782 assignment_refused_occupied rows
+-- carrying no present_vehicle_state. The 226 in the header is the two-run
+-- scoped figure; 285,782 is the whole table since the ledger began. Both are
+-- stated because they answer different questions and the smaller one is the
+-- one this fix was reasoned from.
+--
+-- NOT YET PROVEN, and this is the next step, not a claim: that the column now
+-- POPULATES on live traffic. A function body containing the assignment is not
+-- a ledger row containing the state. That takes a twin run.
+-- ============================================================================

@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0327 — GENERATED, not a log
+## Index, 0134–0328 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -312,7 +312,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0325](db/migrations/0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql) | `20260914214010` | yes — ledger | ENERGY COMMANDS GET THE DOCK THAT VEHICLE COMMANDS ALREADY HAVE, |
 | [0326](db/migrations/0326_the_stamp_must_be_present_and_not_older_not_different.sql) | `20260914193928` | yes — ledger | 0322's TRIGGER REFUSES A CORRECT WRITE, BECAUSE "THE STAMP MUST MOVE" |
 | [0327](db/migrations/0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql) | `20260914214102` | yes — ledger | THE cuOpt LEDGER'S OWN COMMENT ASSERTS A PROTECTION THAT HAS NEVER |
+| [0328](db/migrations/0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing.sql) | `20260914235653` | yes — ledger | THE CONFLICT LEDGER RECORDS *WHO* WAS IN THE STALL AND NOT *WHAT THEY |
 
-193 migrations indexed.
+194 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
