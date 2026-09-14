@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914144547
 -- migration-name:    0309_benchmark_had_everything_except_a_scenario
 --
 -- 0309  THE BENCHMARK DEPOT HAD 160 STALLS, 100 VEHICLES AND NO WAY TO START
