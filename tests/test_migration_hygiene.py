@@ -326,6 +326,22 @@ CLASSIFY_EXEMPT = {
         "repaired by 0268",
     "0271_the_outbound_command_stream_is_the_only_stream_without_provenance":
         "repaired by 0272",
+    # Five in a row, all applied before the omission was noticed, all repaired
+    # by the one bookkeeping migration 0301. The floor had already been dragged
+    # to 0300's apply time -- every column unstreaked -- by files whose headers
+    # each argued forces_recert=false at length and never wrote the row the
+    # floor actually reads. No certification pair ran in the window, so it was
+    # caught latent; see 0301's header for the measurement.
+    "0296_the_gap_view_cannot_see_five_of_its_own_call_sites":
+        "repaired by 0301",
+    "0297_seven_gates_whose_range_is_the_comparison_itself":
+        "repaired by 0301",
+    "0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired":
+        "repaired by 0301",
+    "0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check":
+        "repaired by 0301",
+    "0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment":
+        "repaired by 0301",
 }
 
 

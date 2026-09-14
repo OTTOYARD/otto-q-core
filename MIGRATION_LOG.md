@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0300 — GENERATED, not a log
+## Index, 0134–0301 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -285,7 +285,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0298](db/migrations/0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired.sql) | `20260914103801` | yes — ledger | FOUR HOURS, THREE PROBABILITIES, A FRACTION -- AND ONE DIAL THAT IS |
 | [0299](db/migrations/0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check.sql) | `20260914104618` | yes — ledger | A DIAL THAT DEFAULTS FOR A CHECK-CONSTRAINED COLUMN INHERITS THE CHECK |
 | [0300](db/migrations/0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment.sql) | `20260914105135` | yes — ledger | THREE DIALS WHOSE FLOOR IS ON THE OTHER SIDE OF THE ASSIGNMENT |
+| [0301](db/migrations/0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column.sql) | `PENDING` | no — pending | FIVE FILES NEVER CLASSIFIED THEMSELVES, AND THE FLOOR SWALLOWED EVERY |
 
-166 migrations indexed.
+167 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

@@ -397,7 +397,8 @@ repo_manifest(version, name, file) AS (
     ('20260914102812'::text, '0297_seven_gates_whose_range_is_the_comparison_itself'::text, '0297_seven_gates_whose_range_is_the_comparison_itself.sql'::text),
     ('20260914103801'::text, '0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired'::text, '0298_four_hours_three_probabilities_and_a_dial_that_is_half_wired.sql'::text),
     ('20260914104618'::text, '0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check'::text, '0299_a_dial_that_defaults_for_a_checked_column_inherits_the_check.sql'::text),
-    ('20260914105135'::text, '0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment'::text, '0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment.sql'::text)
+    ('20260914105135'::text, '0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment'::text, '0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment.sql'::text),
+    ('PENDING'::text, '0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column'::text, '0301_five_files_never_classified_themselves_and_the_floor_swallowed_every_column.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
