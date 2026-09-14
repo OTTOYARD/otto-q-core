@@ -163,3 +163,75 @@ energy dock) is committed PENDING and waits behind this round.
 ## THE JUDGEMENT
 
 _(pending — written when the round lands)_
+
+---
+
+## CORRECTION 20:03 UTC — P2's `fp` PREDICTION RESTS ON A FALSE PREMISE, AND IT IS MINE
+
+The grid lane finished green on all three columns, 5 pairs, zero determinism
+failures. But P2's sharp prediction — "`fp` HOLDS on every column" — is **refuted
+on `grid 171717/12`**: `5f2e25bc` → `a26925d6`. The other two grid columns held.
+
+I wrote that prediction with an explicit falsifier: *"If `fp` moves, 0321 changed
+the SET of dispatch rows rather than their ETA, and that is a defect, not a canon
+update."* **That falsifier is wrong, because the premise under it is wrong.**
+
+### The premise, and why it failed
+
+I verified the claim with:
+
+```sql
+SELECT (prosrc ~ 'return_eta_minutes') FROM pg_proc
+ WHERE proname = 'ottoq_boot_state_fingerprint';   -- false
+```
+
+and concluded the boot fingerprint cannot see the ETA. Read the body instead:
+
+```sql
+md5(((to_jsonb(t) - 'dispatch_id' - 'sim_run_id' - 'created_at' - 'return_evidence')
+     || jsonb_build_object('return_evidence', ...))::text)
+```
+
+It is a **WHOLE-ROW digest with a four-column exclusion list**, not a named-column
+list. It therefore hashes `return_eta_minutes`, `eta_refreshed_at` AND
+`eta_source` — and none of those names ever appears in the source, because the
+row is serialised rather than enumerated.
+
+**I searched for a column name in source text and concluded the column was not
+read.** That is the defect class this file's own prediction existed to catch —
+0240, 0241, 0318, 0323's A1, round 44's truncated uuid, and now this — committed
+inside the instrument built to catch it. Sixth instance today.
+
+### What the correct expectation was
+
+At boot the fingerprint's dispatch CTE admits only rows where
+`sim_run_id IS NULL OR sim_run_id = p_run OR status IN ('active','returning')`.
+Measured on the grid depot: **0 rows null-run, 0 rows active/returning** — so at
+boot it sees only THIS run's own rows, which `twin.ottoq_sim_prime_deployment`
+creates during boot. 0321 added `eta_refreshed_at` and `eta_source` to exactly
+that INSERT.
+
+So **`fp` SHOULD move wherever prime_deployment creates dispatch rows at boot**,
+and holding is the case that needs explaining, not moving. Two grid columns held
+and that asymmetry is not yet explained; it is recorded here as open rather than
+rationalised.
+
+### What this does and does not change
+
+* **It does NOT impugn the engine.** Five pairs, both arms byte-identical on all
+  fourteen atoms, three columns green. Determinism is intact. A canon that moves
+  is a canon update; only a pair that FAILS is a defect.
+* **It does retire `fp` as a "must hold" for this window.** For round 44, `fp`
+  moving on a flagship column is expected, not a finding. Judging the flagship
+  lane against the original P2 would manufacture a false alarm.
+* **The flagship lane proceeds.** Its real job is unchanged and untouched by
+  this: prove the pairs are byte-identical, and prove 0321 gave `active`
+  dispatches a forecast where 68 of 68 had none.
+
+### The rule this earns, stated so the next file inherits it
+
+**A `prosrc ~ 'column_name'` search proves a column is NOT ENUMERATED. It proves
+nothing about whether the column is READ.** Any `to_jsonb(t)`, `SELECT *`,
+`row_to_json`, or record-wide digest reads every column without naming one. Before
+claiming a hash cannot see a column, read the hash's shape — exclusion list or
+inclusion list — and say which.
