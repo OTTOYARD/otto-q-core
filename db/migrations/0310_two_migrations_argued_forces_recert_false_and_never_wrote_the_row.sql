@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914150516
 -- migration-name:    0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row
 --
 -- 0310  0308 AND 0309 EACH ARGUED forces_recert=false AT LENGTH AND NEITHER
