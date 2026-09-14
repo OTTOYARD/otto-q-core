@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914170416
 -- migration-name:    0317_the_twin_writes_where_each_asset_is_not_only_how_charged
 --
 -- 0317  OTTO-TWIN PERSISTS POSITION ON EVERY TELEMETRY PACKET IT EMITS
