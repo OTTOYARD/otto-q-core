@@ -150,3 +150,60 @@
 -- day -- so the likeliest explanation is that the caller stopped, not the
 -- gate. But "likeliest" is not measured, and the caller is an edge function
 -- outside this database. Recorded as open rather than guessed.
+--
+-- ===========================================================================
+-- CORRECTION, 2026-09-14 00:15 UTC (2026-09-13 7:15 PM CT), BEFORE ANYTHING
+-- WAS BUILT ON IT. THE TABLE IN SECTION 2 IS INCOMPLETE AND ONE ROW OF IT IS
+-- WRONG.
+-- ===========================================================================
+--
+-- I built the section-2 table from a query ending in LIMIT 12. There are
+-- SIXTEEN distinct l2_engine labels, not twelve. The limit silently dropped
+-- the four smallest, and one of the four is cuOpt -- the source this entire
+-- file is about.
+--
+-- 0275's pre-flight refused to apply because of it: "cuOpt now has 27
+-- decisions in the window -- 0208 measured 0". The assertion was right and
+-- the file was wrong. Recording it here rather than editing the table above,
+-- because the mistake is more instructive than the number.
+--
+--   THE FOUR ROWS THE LIMIT HID
+--
+--   l2_engine                decisions   enacted   first          last
+--   ----------------------- ----------  --------  -------------  -------------
+--   greedy                         122       122  2026-09-12     2026-09-12
+--   deterministic_fallback          79         7  2026-08-29     2026-08-29
+--   cuopt                           27        27  2026-08-29     2026-08-30
+--   agent_probe                     20        20  2026-09-09     2026-09-09
+--
+-- WHAT THIS CHANGES, AND IT IS NOT COSMETIC.
+--
+-- Section 1 said cuOpt had made no decision "ever, in 1,057 cert runs". The
+-- cert-run half is true -- all 27 are in production_live (21) and
+-- claude_v2_validation (6). The "ever" is false. cuOpt has decided 27 times
+-- in this window and ALL 27 WERE ENACTED.
+--
+-- So cuOpt's rung on the ladder is not WIRED. It is FOLLOWED, on a 100%
+-- enactment rate over a small sample, and it has been switched off since. The
+-- corrected sentence is sharper than the one it replaces, and it is sharper in
+-- the direction that costs us something to say: cuOpt's problem was never that
+-- the engine ignores it. Every proposal it ever landed was taken. Its problem
+-- is that a dial says it may not speak.
+--
+-- Section 3's ladder therefore reads:
+--
+--   cuOpt                   FOLLOWED  (27 of 27 enacted -- then gated off)
+--   Nemotron                FOLLOWED  (262 of 262 -- then silent 13 days)
+--   CP-SAT                  DECLARED
+--   Anthropic               DECLARED
+--   ottoq_service_priority  INVOKED   (452 proposals, 0 followed)
+--
+-- The observation that survives intact, and is now better supported: the two
+-- sources this engine actually follows when they speak are the two that have
+-- not spoken in a fortnight.
+--
+-- WHY IT HAPPENED, so it does not again. A census with a LIMIT is not a
+-- census. The migration that follows this file (0275) therefore ships an
+-- assertion that every distinct l2_engine label in ottoq_decisions must be
+-- registered -- so the next omission fails an apply instead of reaching a
+-- check file, exactly as this one did.
