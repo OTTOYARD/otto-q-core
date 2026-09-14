@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0306 — GENERATED, not a log
+## Index, 0134–0307 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -291,7 +291,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0304](db/migrations/0304_five_more_floors_and_six_dials_admitted_without_a_clamp.sql) | `20260914124522` | yes — ledger | FIVE MORE FLOORS, AND SIX DIALS ADMITTED WITHOUT A CLAMP |
 | [0305](db/migrations/0305_the_catalog_becomes_the_allow_list_for_every_writer.sql) | `20260914125444` | yes — ledger | THE CATALOG BECOMES THE ALLOW-LIST FOR EVERY WRITER, NOT JUST THE SETTER |
 | [0306](db/migrations/0306_a_null_dial_value_silently_wrote_the_maximum.sql) | `20260914131308` | yes — ledger | A NULL DIAL VALUE SILENTLY WROTE THE MAXIMUM, AND SAID ok:true |
+| [0307](db/migrations/0307_the_dial_audit_reads_functions_and_never_looked_at_a_view.sql) | `20260914134225` | yes — ledger | THE DIAL AUDIT READS FUNCTIONS, AND NEVER LOOKED AT A VIEW |
 
-172 migrations indexed.
+173 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914134225
 -- migration-name:    0307_the_dial_audit_reads_functions_and_never_looked_at_a_view
 --
 -- 0307  THE DIAL AUDIT READS FUNCTIONS, AND NEVER LOOKED AT A VIEW
