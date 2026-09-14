@@ -342,6 +342,19 @@ CLASSIFY_EXEMPT = {
         "repaired by 0301",
     "0300_three_dials_whose_floor_is_on_the_other_side_of_the_assignment":
         "repaired by 0301",
+    # Third occurrence, and the first where the damage was already VISIBLE
+    # rather than latent: the floor had moved to 0309's apply stamp and
+    # ottoq_cert_matrix returned zero columns -- three minutes after
+    # db/checks/0234 had just recorded two of them reproducing canon. Both
+    # headers argued forces_recert=false correctly and at length; neither wrote
+    # the row the floor reads. This guard is what caught it, but it runs on the
+    # file in CI and the migrations were already applied by then -- the gap
+    # between "impossible to merge" and "impossible to apply" is named in
+    # 0310's header and belongs to G12.
+    "0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on":
+        "repaired by 0310",
+    "0309_benchmark_had_everything_except_a_scenario":
+        "repaired by 0310",
 }
 
 

@@ -406,7 +406,8 @@ repo_manifest(version, name, file) AS (
     ('20260914131308'::text, '0306_a_null_dial_value_silently_wrote_the_maximum'::text, '0306_a_null_dial_value_silently_wrote_the_maximum.sql'::text),
     ('20260914134225'::text, '0307_the_dial_audit_reads_functions_and_never_looked_at_a_view'::text, '0307_the_dial_audit_reads_functions_and_never_looked_at_a_view.sql'::text),
     ('20260914144046'::text, '0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on'::text, '0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on.sql'::text),
-    ('20260914144547'::text, '0309_benchmark_had_everything_except_a_scenario'::text, '0309_benchmark_had_everything_except_a_scenario.sql'::text)
+    ('20260914144547'::text, '0309_benchmark_had_everything_except_a_scenario'::text, '0309_benchmark_had_everything_except_a_scenario.sql'::text),
+    ('PENDING'::text, '0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row'::text, '0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
