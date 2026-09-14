@@ -441,3 +441,31 @@ BEGIN
   END IF;
   RAISE NOTICE 'A6 OK: recert floor unmoved at %', v_floor;
 END $a6$;
+
+-- ===========================================================================
+-- APPLIED CORRECTION, 2026-09-14, after this file was applied as
+-- 20260914134225. The body above is the SQL that ran and is not edited; this
+-- footer is appended per the precedent 0301 set.
+--
+-- ONE CLAIM IN THE HEADER IS FALSE. It says the three reopt_* rows document
+-- "a reservation re-optimizer that does not exist in this database."
+--
+-- MEASURED AFTERWARDS (db/checks/0232): ottoq.ottoq_reoptimize_reservation_book
+-- EXISTS (5,591 chars) and is CALLED FROM public.ottoq_sim_decide_and_dispatch,
+-- a tick function -- so it runs in the decide path. It reads none of its three
+-- dials and contains no ottoq_policy_get call at all.
+--
+-- I took the claim from the six-dimension audit and wrote it into this header
+-- without measuring it -- in the file whose whole subject is an instrument that
+-- reported something absent because it had not looked properly.
+--
+-- The executable content is unaffected: A4 asserts the LIST of five key names,
+-- which is correct, and this file deletes nothing.
+--
+-- AND THE LARGER CORRECTION, which changes what the remaining five MEAN:
+-- checked one by one, NOT ONE of them is a dial for a component that does not
+-- exist. All five are LIVE components ignoring a control surface they declare
+-- -- including one with a cron job (ottoq_demo_metronome, 111 live rows in
+-- force) and one in the decide path. `catalogued_unread` is therefore NOT a
+-- delete list in this database; it is a WIRE-IT-UP list. See 0232 section B.
+-- ===========================================================================
