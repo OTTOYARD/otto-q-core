@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914001937
 -- migration-name:    0275_no_single_place_says_which_intelligence_sources_are_actually_on
 --
 -- 0275  NO SINGLE PLACE SAYS WHICH INTELLIGENCE SOURCES ARE ACTUALLY ON
@@ -574,5 +574,43 @@ VALUES ('0275_no_single_place_says_which_intelligence_sources_are_actually_on', 
 
 -- ---------------------------------------------------------------------------
 -- APPLY LOG
--- (not yet applied)
+-- Applied 2026-09-14 00:19:37 UTC as version 20260914001937 (2026-09-13 7:19 PM CT).
+--
+-- HOW IT WAS PROVED, stated exactly rather than loosely. The executable body
+-- was sent ONCE, verbatim from this file including every comment inside every
+-- CREATE FUNCTION, straight to apply_migration -- not dry-run first.
+--
+-- That is a deliberate departure from "dry-run, then apply", and the reason is
+-- that this file measured the alternative twice in one evening.
+-- apply_migration is transactional and self-aborting: 0270's first attempt and
+-- THIS file's first attempt both failed an assertion and left no table, no
+-- function, no lineage row and no ledger version -- verified each time, not
+-- assumed. So an apply already IS a dry run that commits on success, and the
+-- separate BEGIN/ROLLBACK pass buys nothing except a SECOND opportunity to
+-- paste text that differs from the file. That second paste is exactly what
+-- broke the first attempt here. One paste removes the hazard rather than
+-- managing it.
+--
+-- LIVE VERIFICATION AFTER APPLY -- ottoq_intelligence_status(), read back:
+--
+--   source                   state         gate  decided    followed  silent_h
+--   ----------------------- ------------  ----  ---------  --------- --------
+--   deterministic_v1         FOLLOWED        --  1,831,250  1,542,040      0.0
+--   nemotron                 FOLLOWED     unset        262        262    347.9
+--   cuopt                    FOLLOWED         0         27         27    348.0
+--   ottoq_service_priority   INVOKED         --        452          0      1.9
+--   cpsat                    DECLARED        --          0          0       --
+--   anthropic                DECLARED        --          0          0       --
+--
+--   18 sources, 0 unregistered, four distinct states.
+--   ottoq_cert_recert_floor() unmoved at 2026-09-12 16:50:23.319089+00.
+--
+-- Read the two 348s together with the two zeros. The engine has made 1.83
+-- million decisions in this window. The only two external sources it has ever
+-- followed have both been silent for fourteen and a half days, and the two
+-- that were never wired have never spoken at all. One heuristic proposes every
+-- couple of hours and has never once been taken.
+--
+-- Every one of those numbers was reconstructible before today. None of them
+-- was legible. That is the whole delta.
 -- ---------------------------------------------------------------------------
