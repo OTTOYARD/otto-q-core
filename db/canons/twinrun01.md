@@ -179,3 +179,39 @@ and `bench_busy_day` is not among them. The certification's door,
 `twin.ottoq_sim_start_run`, runs `bench_*` scenarios the UI cannot reach. Not a
 defect; worth knowing before anyone assumes a scenario name works at both doors.
 This run used `busy_day`, the flagship scenario, with a seed no canon uses.
+
+---
+
+## SECOND READING — tick 23, sim clock 09-15 09:13 (21:50 UTC)
+
+Everything deepened, and one hop changed in a way the file predicted.
+
+| hop | tick 7 | tick 23 |
+|---|---|---|
+| 5 FORECAST coverage | 14/14 | **0/0** — see below |
+| 6 provenance | 2 labels | 3: computed=78 (**13 distinct**), fixture=15 (1), booking_plan:secured=1 (1) |
+| 8 AGENT proposals | 19 | 15 in the working set, **9 enacted**, and a SECOND proposer appears (`ottoq_service_priority`) |
+| 9 AGENT deferrals | 32 | **58** |
+| 10 KERNEL disposed | 420, 9 from the proposer | **1,769, 70 from the proposer** |
+| 11 SHIELD | 1,118 evals, 1 refusal | **3,267 evals, 13 refusals** |
+| 13 ASSET commands | 175, 3 types | **444**, 5 types (adds `enter_service`, `enter_wash`) |
+| 15 OUTCOME SDRs | 50 | **227** |
+
+**Hop 5 reading `0/0` here is the case the watcher's own note was written for, and
+it is not a regression.** The sim clock is 09:13 — morning, fleet in depot, no
+dispatch currently `active`. `0/0` is not `0/N`: the hop can only speak while
+vehicles are out. Hop 6 is the check that the forecast kept working through the
+interval — 78 rows now carry `computed:distance_over_speed` across 13 distinct
+values, up from 56 across 14 — those are dispatches that have since completed.
+
+**The proposer's influence grew with the run**, which is the reading that matters
+for "agents propose, solver disposes": 9 → **70** disposed decisions attributed to
+`greedy_constrained`, and 32 → **58** ticks where the kernel held a seat open
+before deciding itself. A second proposer, `ottoq_service_priority`, entered with
+2 pending.
+
+**The shield is being asked, and refusing.** 3,267 evaluations against 1,769
+decisions — 1.8 evaluations per decision — and 13 refusals. `db/checks/0146`
+convicted baseline policies that evaluated NO rules while looking productive;
+this is the opposite reading and it is why hop 11 is compared against hop 10
+rather than read alone.
