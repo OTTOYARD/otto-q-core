@@ -215,3 +215,41 @@ decisions — 1.8 evaluations per decision — and 13 refusals. `db/checks/0146`
 convicted baseline policies that evaluated NO rules while looking productive;
 this is the opposite reading and it is why hop 11 is compared against hop 10
 rather than read alone.
+
+---
+
+## HOW THE RUN ENDED — 21:48 UTC, 25 ticks, 11.1 real minutes
+
+`status='completed'`, and the engine recorded WHY on the row rather than leaving
+it to be inferred:
+
+```
+failure_reason: run_governor: reached the 540 sim-minute ceiling
+```
+
+**That is the right behaviour and it is worth saying so.** A demo run that stops
+without a recorded reason is indistinguishable from one that died; this one names
+the governor and the ceiling. The scenario's declared window was 24 sim-hours
+(21:43 → 21:43); the governor is what ends it early, by design, not a fault.
+
+The run's own numbers: `time_scale` 60, `tick_interval_seconds` 30 →
+`tick_minutes_actual` **30.0**, so 25 ticks advanced the sim clock 750 minutes,
+21:43 → 10:13.
+
+**AND ONE WRINKLE, recorded because it is this repo's recurring defect class in
+miniature.** The message says the run "reached the 540 sim-minute ceiling", and
+the clock shows **750** sim-minutes elapsed — 210 minutes, i.e. 7 ticks, past the
+number the message names. The metronome advances in batches (`CALL
+ottoq_demo_metronome(50)`) and checks ceilings between batches, so overshooting a
+ceiling by part of a batch is expected mechanically. What is not ideal is that
+the sentence reads as "it stopped AT 540" to anyone who does not go and measure
+the clock.
+
+Not a defect in the orchestration and not fixed here: it is a message that
+describes a slightly different quantity from the one that governed, which is the
+same shape as `0320`'s ETA label and `0231`'s ledger comment. Logged for the
+backlog, not silently absorbed.
+
+**Nothing about this weakens the end-to-end result.** The chain ran, the run armed
+itself, the forecast covered every active dispatch, the proposer's influence grew
+tick over tick, and the run ended for a declared, recorded reason.
