@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0319 — GENERATED, not a log
+## Index, 0134–0320 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -304,7 +304,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0317](db/migrations/0317_the_twin_writes_where_each_asset_is_not_only_how_charged.sql) | `20260914170416` | yes — ledger | OTTO-TWIN PERSISTS POSITION ON EVERY TELEMETRY PACKET IT EMITS |
 | [0318](db/migrations/0318_the_engine_stopped_guessing_and_the_label_kept_saying_guess.sql) | `20260914170807` | yes — ledger | THE ETA IS COMPUTED NOW AND eta_source STILL SAYS 'policy_constant' |
 | [0319](db/migrations/0319_i_seeded_a_deterministic_draw_on_a_random_uuid.sql) | `20260914171845` | yes — ledger | THE POSITION MODEL'S SEEDED DRAWS WERE SALTED WITH gen_random_uuid() |
+| [0320](db/migrations/0320_one_function_writes_the_return_eta_and_writes_its_label_with_it.sql) | `PENDING` | no — pending | FOUR FUNCTIONS WRITE return_eta_minutes AND EXACTLY ONE WRITES |
 
-185 migrations indexed.
+186 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
