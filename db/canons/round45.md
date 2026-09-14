@@ -125,6 +125,61 @@ certify a different column.
 
 ---
 
-## THE JUDGEMENT
+## THE JUDGEMENT — PART 1, 22:45 UTC (5:45 PM CT)
 
-_(pending — written when the round lands)_
+Grid lane complete, first two flagship arms landed. **Five of ten columns have
+now run against the applied migrations, and NOTHING HAS MOVED.**
+
+| column | fp | endst | dec | cmd | vs pre-round |
+|---|---|---|---|---|---|
+| grid 239001/6 | 66275ea7 | 1155bdfe | bd7f4e92 | 1b9920dc | **identical** — green, 2 passes |
+| grid 424242/6 | 4cac51f0 | a7746025 | 8671fb10 | e4158c95 | **identical** — green, 2 passes |
+| grid 171717/12 | a26925d6 | 2613677a | 3522066d | 2a1d2c32 | **identical** — green, 2 passes |
+| 12t/171717/busy | 9c28854e | 3caf508f | 5e03ebd0 | e07b4d2f | **identical** — 1 pass |
+| 12t/314159/busy | b8606125 | 59f5d813 | 69e6a60a | 0c6a5fb5 | **identical** — 1 pass |
+
+Zero determinism failures. Every atom on every landed column matches the
+pre-round table above, character for character.
+
+### P2 — `0325` moves nothing: **HOLDING on five of ten, nothing refuted.**
+
+`0325`'s own argument is surviving its trial so far. The claim was specific and
+falsifiable: `h_nrg` hashes an explicit column list containing none of the four
+delivery columns, and the claim path is gated to production while a certification
+is entirely twin — so the dock is unreachable from inside a pair and the columns
+stay NULL in both arms. Five columns of evidence and no movement.
+
+**Not yet complete.** Five columns remain — both 24-tick, the 48-tick, normal_day
+and 424242/12 — and the second arms of everything. A prediction that "nothing
+moves" is only as good as its widest test, and the long-horizon columns are the
+ones with the most surface for something to move on.
+
+### P3 — the floor lands on `0325`, not `0327`: **HELD, exactly.**
+
+```
+ottoq_cert_recert_floor()  =  2026-09-14 21:40:10.627356+00
+0325 stamp                 =  20260914214010   <-- the floor
+0327 stamp                 =  20260914214102   (later, and correctly ignored)
+0325 forces_recert         =  true
+0327 forces_recert         =  false
+```
+
+`0327` applied **52 seconds later** than `0325` and was still correctly excluded
+from the floor. `forces_recert = false` is honoured by the mechanism, not merely
+recorded — which means every "this file cannot move a canon" classification in
+the lineage is load-bearing rather than decorative. That was a free test riding
+along on this round and it passed.
+
+### A correction to what I said at the merge
+
+I described the `#189` merge as putting the proposer loop "on a real schedule,
+running." **Enabled, yes; running, not yet.** Measured at 22:45, 36 minutes after
+the merge: `proposer-loop.yml` has **zero runs with `event: schedule`** — every
+run in its history is a manual `workflow_dispatch`. GitHub documents that
+scheduled workflows can be delayed, and a newly-added schedule may not fire
+promptly.
+
+So the honest statement is: *the schedule is merged to the default branch and its
+certification guard is verified; it has not yet fired on its own.* Whether it
+does is a measurement for the next check, not something to assert because the
+file says `*/5`.
