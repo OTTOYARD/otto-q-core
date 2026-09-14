@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914214102
 -- migration-name:    0327_the_ledger_comment_claims_a_protection_that_has_never_existed
 -- ============================================================================
 -- 0327 — THE cuOpt LEDGER'S OWN COMMENT ASSERTS A PROTECTION THAT HAS NEVER
@@ -225,3 +225,19 @@ VALUES
    'function body is touched, so no canon can move: forces_recert false.',
    now())
 ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================================
+-- APPLIED 2026-09-14 21:41:02 UTC as 20260914214102.
+--
+-- HEADER CONDENSED AT THE APPLY STEP: the explanatory header was omitted and
+-- every executable line submitted verbatim. This file creates no function, so
+-- nothing is stored that could drift from the text here; the COMMENT itself is
+-- the artefact, and A1/A2/A3 verified it after the write.
+--
+-- VERIFIED AFTER APPLY:
+--   false clause "cannot delete prior-run evidence" .............. GONE
+--   "A ROW IS NOT AN INVOCATION" present in the new comment ...... yes
+--   registry class for cuopt_invocation_log.sim_run_id ........... engine
+--     (unchanged -- A3's whole point; reclassification is a later file)
+--   ottoq_cert_lineage row ....................................... written
+-- ============================================================================

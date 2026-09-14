@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914214010
 -- migration-name:    0325_energy_commands_get_the_dock_that_vehicle_commands_already_have
 -- ============================================================================
 -- 0325 — ENERGY COMMANDS GET THE DOCK THAT VEHICLE COMMANDS ALREADY HAVE,
@@ -320,3 +320,27 @@ VALUES
    'column-list argument above is wrong and that is the finding.',
    now())
 ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================================
+-- APPLIED 2026-09-14 21:40:10 UTC as 20260914214010.
+--
+-- HEADER CONDENSED AT THE APPLY STEP, and APPLYING.md step 4 requires that be
+-- said rather than quietly done. The ~75-line explanatory header was replaced by
+-- a three-line pointer back to this file. Every executable line was submitted
+-- verbatim, INCLUDING the comments inside the two $fn$ bodies -- those are stored
+-- in pg_proc, so stripping them would have created exactly the file-vs-database
+-- drift G18 exists to prevent.
+--
+-- PROVEN, not asserted. The stored bodies were digested against the bodies in
+-- this file:
+--
+--   ottoq_energy_claim_commands   md5 542f1219bfe7adec45596cb8c9baa390   1,135 ch
+--   ottoq_energy_ack_command      md5 91ea3812c783e56577e6173eb1024ddd     848 ch
+--
+-- Both identical to this file's text. That is a stronger check than the header
+-- digest APPLYING.md offers, because it measures the thing drift actually is.
+--
+-- RESULT: 4 delivery columns present, both functions created, lineage row
+-- written, and 0 rows carry delivered_at -- so A4's self-test rolled back
+-- cleanly and delivered nothing as a side effect of asserting.
+-- ============================================================================
