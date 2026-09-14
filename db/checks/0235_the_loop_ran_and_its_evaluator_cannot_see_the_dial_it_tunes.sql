@@ -203,3 +203,117 @@
 --     updated_by='mpc' AFTER the subtransaction it already rolled back. That
 --     is belt-and-braces and harmless, and its own comment says so; noted only
 --     so a future reader does not mistake it for the leak.
+
+-- ===========================================================================
+-- CORRECTION -- appended 2026-09-14 ~15:05 UTC, within the hour, by the same
+-- author. Sections A-C and E stand. SECTION D'S ROOT CAUSE IS WRONG AND IS
+-- RETRACTED. The file's title is also wrong and is corrected below.
+--
+-- Same convention as db/checks/0212: appended, not rewritten, because a
+-- retracted cause is evidence about how the mistake was made.
+--
+-- ---------------------------------------------------------------------------
+-- D1. WHAT D CLAIMED, AND WHY IT IS FALSE
+--
+-- D claimed the MPC's forward path never runs energy orchestration, because
+-- ottoq_mpc_lookahead ticks with ottoq_sim_advance_tick while the metronome
+-- uses ottoq_sim_advance_tick_world, and only the latter contains the string
+-- 'ottoq_energy_orchestrate'.
+--
+-- ottoq_sim_advance_tick CALLS ottoq_sim_advance_tick_world. It is the FULLER
+-- path, not the thinner one. Its fifth line is:
+--
+--     SELECT * INTO w FROM ottoq_sim_advance_tick_world(p_sim_run_id);
+--     ...
+--     SELECT * INTO d FROM ottoq_sim_decide_and_dispatch(p_sim_run_id);
+--
+-- i.e. advance_tick = world + decide. The metronome calls the world half every
+-- tick and the decide half on odd ticks; the MPC and the certification pair
+-- both call advance_tick, which is BOTH halves every tick.
+--
+-- HOW THE MISTAKE WAS MADE, because it is the defect class this very file
+-- accuses other instruments of: the reader census asked
+-- `prosrc ILIKE '%ottoq_energy_orchestrate%'` and read a FALSE for
+-- ottoq_sim_advance_tick as "does not run energy orchestration". The predicate
+-- answers "does this function's own text mention it", not "does this function
+-- reach it". A one-level call graph read as a full one. Exactly 0307's shape
+-- (an audit that read functions and never looked at a view) and exactly the
+-- thing sections A and C were careful about.
+--
+-- ---------------------------------------------------------------------------
+-- D2. THE CONTROLLED EXPERIMENT THAT SHOULD HAVE COME FIRST
+--
+-- Section C's probes all ran against run 834b3a59 WHILE ottoq_demo_metronome
+-- was ticking it, so the base moved between plans and nothing could be
+-- concluded about plan sensitivity. The control: a run the metronome refuses
+-- to touch. Its predicate skips run_by IN ('production_live','cert_harness'),
+-- so a run started as cert_harness is frozen except for what the caller does.
+--
+--   run 45c8cc1b-818c-4fb3-a69d-74a9baa2e263, bench_busy_day, seed 555001,
+--   advanced by hand to tick 22 (sim 13:00) -- 63 deploys, all productive, so
+--   the base HAS dynamic range. The first attempt at this control was run at
+--   tick 10 and returned throughput 0 for all six plans; that is a base where
+--   nothing happens, and it was discarded rather than reported, because a test
+--   with no range cannot distinguish plans and would have "confirmed" anything.
+--
+-- Six plans, horizon 4, frozen base, including a duplicate placed LAST:
+--
+--   A_deploy_lo        {deploy_peak_fraction: 0.05}       0.3620  peak 406  tp 0  rd 9
+--   F_deploy_lo_again  {deploy_peak_fraction: 0.05}       0.3620  peak 406  tp 0  rd 9
+--   B_deploy_hi        {deploy_peak_fraction: 1.00}       0.4350  peak 406  tp 5  rd 0
+--   C_energy_lo        {energy_demand_factor_peak: 0.15}  0.4350  peak 406  tp 5  rd 0
+--   D_energy_hi        {energy_demand_factor_peak: 0.90}  0.4350  peak 406  tp 5  rd 0
+--   E_current          {}                                 0.4350  peak 406  tp 5  rd 0
+--
+-- ---------------------------------------------------------------------------
+-- D3. THE CORRECTED FINDING -- NARROWER, SHARPER, AND STILL DISQUALIFYING
+--
+--   (i)   THE RIG IS SOUND. A and F carry identical params, sit at opposite
+--         ends of the plan list, and agree on every column. The lookahead is
+--         deterministic and position-independent. Section C's "results cluster
+--         by position" was the metronome, not the rig, and that reading is
+--         withdrawn too.
+--
+--   (ii)  deploy_peak_fraction WORKS. 0.05 -> throughput 0, readiness 9.
+--         1.00 -> throughput 5, readiness 0. The evaluator does apply plan
+--         parameters and the simulated world does respond to them.
+--
+--   (iii) energy_demand_factor_peak IS INERT. 0.15 and 0.90 -- the extremes of
+--         its catalogued range -- return EXACTLY what the EMPTY plan returns,
+--         on every column. So energy_shave_more and energy_relax, HALF the
+--         loop's candidate set, cannot differ from `current`. That conclusion
+--         from section B survives; only its explanation changes.
+--
+--   (iv)  predicted_peak_kw DOES NOT RESPOND TO ANY PLAN. 406 for all six,
+--         including the pair whose throughput differs 0 vs 5. This is the
+--         worse half and it was not stated clearly before. The balanced score
+--         is
+--             0.40 * energy  +  0.30 * throughput  +  0.30 * readiness
+--         with the energy term computed from predicted_demand_charge_usd =
+--         peak * 10. A constant peak makes 40% of the objective a CONSTANT.
+--         The loop can therefore only ever move the remaining 60%, and its two
+--         energy plans can move neither part of it.
+--
+-- THE HONEST ONE-LINE VERSION, which replaces this file's title:
+--   "the loop tunes two dials; one of them changes nothing the evaluator can
+--    see, and the peak the objective weighs at 40% does not move at all."
+--
+-- WHY energy_demand_factor_peak is inert is NOT established here, and no third
+-- theory is offered. What is established is that it is inert, by measurement,
+-- on a frozen base with demonstrated range. The next step is to instrument
+-- ottoq_energy_orchestrate directly -- confirm it is reached inside a
+-- lookahead, and whether the value it reads there is the plan's.
+--
+-- ---------------------------------------------------------------------------
+-- D4. WHAT DOES NOT CHANGE
+--
+-- The decision in section E stands, and stands harder: THE LOOP IS NOT
+-- SCHEDULED. Two of its four plans are inert and 40% of its objective is a
+-- constant, so its adoption ledger would record preferences it cannot
+-- actually evaluate.
+--
+-- Section F step 1 ("point the lookahead at ottoq_sim_advance_tick_world") is
+-- WITHDRAWN -- it already reaches it. Step 2 (hold the base constant across
+-- plans) is CONFIRMED as necessary by D2: it is the only reason section C's
+-- numbers moved at all, and any future comparison run against a live-ticked
+-- lane is unreadable. Step 3 is unchanged.
