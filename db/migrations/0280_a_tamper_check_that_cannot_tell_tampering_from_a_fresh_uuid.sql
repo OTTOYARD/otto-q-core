@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914043322
 -- migration-name:    0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid
 --
 -- 0280  A TAMPER CHECK THAT CANNOT TELL TAMPERING FROM A FRESH UUID
@@ -437,3 +437,47 @@ VALUES ('0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid', fals
  'Makes ottoq_decision_snapshots.content_hash id-blind. Adds nullable hash_algo (NULL = the original raw-frame digest, never backfilled; 2 = the new payload), public.ottoq_frame_hash_payload (IMMUTABLE; drops the minted session id and re-sorts sessions on stall_id/vehicle_id/started_at, everything else passed through), and moves ottoq_capture_decision_snapshot and ottoq_assert_snapshot_integrity together so the writer and the verifier remain one algorithm. ottoq_build_decision_frame is NOT modified and the stored frame column is unchanged, so no proposer, selector or decide-path consumer sees a different frame and no scheduling behaviour changes. forces_recert=false: content_hash is not one of the fourteen atoms (which is why db/checks/0216 could find it broken while pairs passed), ottoq_determinism_pair does not read ottoq_decision_snapshots, and legacy rows keep verifying under their own algorithm (A1, 200 sampled). NOTE: this classification is about the ATOMS. The fix itself is unproven until a determinism pair shows 48 of 48 agreement instead of 4 -- that is a round, not a migration step, and this file must be applied inside such a window.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 04:33:22 UTC (11:33 PM CT, 2026-09-13) as
+-- supabase_migrations.schema_migrations version 20260914043322.
+--
+-- Dry run: the file byte for byte inside BEGIN ... ROLLBACK, clean, reaching
+-- the end. Submitted WHOLE rather than condensed -- 9 comment-only lines live
+-- inside the two stored $function$ bodies, and scripts/exec-digest.py --check
+-- says so correctly now that 0278's commit fixed its classifier.
+--
+-- VERIFIED AFTER APPLY, against the live database and not the success flag:
+--
+--   hash_algo column present                                        yes
+--   rows carrying hash_algo                                           0   (no run
+--                                                                         has ticked
+--                                                                         since; the
+--                                                                         next one
+--                                                                         writes 2)
+--   rows left at the A5 probe value 99                                0
+--   two frames differing ONLY in session id now hash identically    TRUE
+--
+-- That last line is the fix, live, in one boolean.
+--
+-- WHAT IS STILL NOT PROVEN, and must not be claimed: that a certification pair
+-- now agrees on 48 of 48 ticks. Nothing here shows that. The known CAUSE of the
+-- divergence is removed and its removal is proven in isolation (A3, two-sided);
+-- whether it was the ONLY cause is a question only a round can answer, and the
+-- 44 differing ticks in the reference pair may yet have a residual underneath.
+-- content_hash accordingly stays OUT of the fourteen atoms.
+--
+-- THE NEXT STEP IS THEREFORE A ROUND, and it has a pre-registered prediction:
+-- run a pair at seed 171717 / busy_day / 48 ticks and compare content_hash
+-- tick-by-tick between the arms.
+--
+--   PASS      48 of 48 identical -> the session id was the whole cause, and
+--             content_hash becomes a candidate atom under the promotion
+--             doctrine.
+--   PARTIAL   more than 4 but fewer than 48 -> a residual exists; the count and
+--             the first differing tick name where to look next.
+--   FAIL      still 4 -> the session id was not the cause at all, db/checks/0216
+--             misread a coincidence, and this migration is cosmetic. Written
+--             down here, in advance, because that outcome must be reportable
+--             rather than quietly re-explained.
+-- ===========================================================================

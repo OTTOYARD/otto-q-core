@@ -377,7 +377,7 @@ repo_manifest(version, name, file) AS (
     ('20260914012023'::text, '0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same'::text, '0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same.sql'::text),
     ('20260914040338'::text, '0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four'::text, '0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four.sql'::text),
     ('20260914040837'::text, '0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog'::text, '0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog.sql'::text),
-    ('PENDING'::text, '0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid'::text, '0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid.sql'::text)
+    ('20260914043322'::text, '0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid'::text, '0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

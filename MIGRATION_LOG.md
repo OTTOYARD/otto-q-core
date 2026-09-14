@@ -264,7 +264,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0277](db/migrations/0277_a_source_that_has_proposed_and_one_that_has_never_existed_read_the_same.sql) | `20260914012023` | yes — ledger | A SOURCE THAT HAS PROPOSED AND ONE THAT HAS NEVER EXISTED READ THE SAME |
 | [0278](db/migrations/0278_arming_the_agentic_layer_is_a_five_key_hand_ritual_and_the_demo_got_four.sql) | `20260914040338` | yes — ledger | ARMING THE AGENTIC LAYER IS A HAND RITUAL, AND A RUN ARMED FOUR WAYS |
 | [0279](db/migrations/0279_the_dial_that_can_kill_a_certification_arm_is_not_in_the_catalog.sql) | `20260914040837` | yes — ledger | THE ONE DIAL THAT CAN KILL A CERTIFICATION ARM IS THE ONE DIAL THE |
-| [0280](db/migrations/0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid.sql) | `PENDING` | no — pending | A TAMPER CHECK THAT CANNOT TELL TAMPERING FROM A FRESH UUID |
+| [0280](db/migrations/0280_a_tamper_check_that_cannot_tell_tampering_from_a_fresh_uuid.sql) | `20260914043322` | yes — ledger | A TAMPER CHECK THAT CANNOT TELL TAMPERING FROM A FRESH UUID |
 
 146 migrations indexed.
 
