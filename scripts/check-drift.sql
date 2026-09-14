@@ -405,7 +405,7 @@ repo_manifest(version, name, file) AS (
     ('20260914125444'::text, '0305_the_catalog_becomes_the_allow_list_for_every_writer'::text, '0305_the_catalog_becomes_the_allow_list_for_every_writer.sql'::text),
     ('20260914131308'::text, '0306_a_null_dial_value_silently_wrote_the_maximum'::text, '0306_a_null_dial_value_silently_wrote_the_maximum.sql'::text),
     ('20260914134225'::text, '0307_the_dial_audit_reads_functions_and_never_looked_at_a_view'::text, '0307_the_dial_audit_reads_functions_and_never_looked_at_a_view.sql'::text),
-    ('PENDING'::text, '0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on'::text, '0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on.sql'::text)
+    ('20260914144046'::text, '0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on'::text, '0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

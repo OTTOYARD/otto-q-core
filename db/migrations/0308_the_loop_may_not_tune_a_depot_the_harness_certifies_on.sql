@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914144046
 -- migration-name:    0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on
 --
 -- 0308  THE SELF-IMPROVEMENT LOOP GETS THE ONE GUARD IT NEEDS BEFORE IT MAY
@@ -570,3 +570,36 @@ BEGIN
     RAISE EXCEPTION 'A6 FAILED: % adoption row(s) and % cil dial(s) survived the rolled-back probe', v_ad, v_dials;
   END IF;
 END $a6$;
+
+-- ===========================================================================
+-- APPLIED CORRECTION -- added 2026-09-14 after apply (20260914144046).
+-- Body above is untouched: it is what ran. Same convention as 0301 and 0307.
+--
+-- TWO STATEMENTS IN THE HEADER ARE WRONG, and one of them is exactly the kind
+-- of unre-measured claim this repo keeps convicting other files of.
+--
+-- 1. The header says: "The claim is checked rather than asserted: A5 re-runs
+--    the grid_smoke certification column after this migration and requires it
+--    to reproduce its pre-migration canon."
+--
+--    A5 DOES NO SUCH THING. A5 calls ottoq_cil_tick against a flagship run,
+--    asserts it refuses with depot_under_certification, asserts no dial row
+--    was written, asserts the refusal was recorded, and rolls back. It never
+--    touches the certification harness.
+--
+--    The forces_recert=false claim IS backed by measurement -- but by
+--    measurement taken BEFORE this migration and recorded in db/checks/0234,
+--    not by anything inside this file:
+--      grid_smoke 239001/6t   fired 14:23:16 -> 14:24:04 UTC, 12 atoms, all
+--                             matching a canon read BEFORE the pair was run
+--      busy_day 171717/12t    fired 14:36:00 -> 14:37:57 UTC, 13 atoms, all
+--                             matching the canon recorded at 14:23
+--    Those verify migrations 0303-0307. This migration's own
+--    forces_recert=false rests on P1: the loop has never been called, so no
+--    canon can depend on it. That argument stands. The sentence describing
+--    how it was checked did not.
+--
+-- 2. The header says "THE FOUR REFUSALS" and then lists FIVE
+--    (depot_under_certification, production_run, certification_in_flight,
+--    run_not_running, unknown_run). Five is correct; the heading is a
+--    leftover from a draft that folded unknown_run into the first case.

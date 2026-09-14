@@ -292,7 +292,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0305](db/migrations/0305_the_catalog_becomes_the_allow_list_for_every_writer.sql) | `20260914125444` | yes — ledger | THE CATALOG BECOMES THE ALLOW-LIST FOR EVERY WRITER, NOT JUST THE SETTER |
 | [0306](db/migrations/0306_a_null_dial_value_silently_wrote_the_maximum.sql) | `20260914131308` | yes — ledger | A NULL DIAL VALUE SILENTLY WROTE THE MAXIMUM, AND SAID ok:true |
 | [0307](db/migrations/0307_the_dial_audit_reads_functions_and_never_looked_at_a_view.sql) | `20260914134225` | yes — ledger | THE DIAL AUDIT READS FUNCTIONS, AND NEVER LOOKED AT A VIEW |
-| [0308](db/migrations/0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on.sql) | `PENDING` | no — pending | THE SELF-IMPROVEMENT LOOP GETS THE ONE GUARD IT NEEDS BEFORE IT MAY |
+| [0308](db/migrations/0308_the_loop_may_not_tune_a_depot_the_harness_certifies_on.sql) | `20260914144046` | yes — ledger | THE SELF-IMPROVEMENT LOOP GETS THE ONE GUARD IT NEEDS BEFORE IT MAY |
 
 174 migrations indexed.
 
