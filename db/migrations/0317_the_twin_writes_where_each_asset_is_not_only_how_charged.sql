@@ -90,10 +90,18 @@ BEGIN
 
   -- P2. IT REALLY IS THE ONLY WRITER. The claim that every run gets positions
   --     rests entirely on this, so assert it rather than repeat it.
+  -- THIS PRECONDITION REFUSED THE FIRST APPLY, and it was right to. Written as
+  -- ILIKE '%INSERT INTO%ottoq_telemetry_packets%' it counted 2, because that
+  -- pattern matches any function containing both strings ANYWHERE -- and
+  -- twin.ottoq_sim_advance_deployed_telemetry contains an unrelated INSERT and,
+  -- 260 lines later, a SELECT ... FROM ottoq_telemetry_packets. The claim was
+  -- right and the test was wrong, which is the harder way round to catch. A
+  -- real INSERT is asserted with a real pattern; the loose one is not loosened
+  -- until it passes, it is replaced by one that means what it says.
   SELECT count(*) INTO v_writers
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname IN ('public','twin','ottoq')
-     AND p.prosrc ILIKE '%INSERT INTO%ottoq_telemetry_packets%';
+     AND p.prosrc ~* 'insert\s+into\s+(public\.)?ottoq_telemetry_packets';
   IF v_writers <> 1 THEN
     RAISE EXCEPTION '0317 P2: % functions INSERT into ottoq_telemetry_packets, expected exactly 1; '
                     'patching one emitter would leave the others writing NULL positions', v_writers;
