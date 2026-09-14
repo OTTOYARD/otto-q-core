@@ -244,3 +244,57 @@ SELECT (enacted_action->>'source' IS NULL) AS source_missing,
   FROM public.ottoq_decisions
  WHERE outcome_status = 'enacted'
  GROUP BY 1,2 ORDER BY decisions DESC;
+
+-- ===========================================================================
+-- G. ADDENDUM 2: THE (a)/(b) QUESTION IS SETTLED. THE SEAT DOES COMPETE.
+--
+-- Addendum F left one thing open and said it decided the remedy: is the
+-- ottoq_service_priority proposal (a) FOUND by the lookup and genuinely
+-- beaten, or (b) NEVER FOUND because it is written after the lookup runs?
+--
+-- (b) IS FALSE. public.ottoq_sim_decide_and_dispatch calls, in this order:
+--
+--   line 87   PERFORM ottoq_l2_optimize_assignments(...)
+--   line 88   PERFORM ottoq_service_priority_propose(p_sim_run_id)   <- WRITES
+--   line 90   PERFORM public.ottoq_l2_propose_seat(...)
+--   line 98   ottoq_decide_tick(p_sim_run_id)                        <- READS
+--
+-- The proposer runs TEN LINES BEFORE the consumer, in the same function and
+-- the same transaction. The proposals are present, pending and fresh when
+-- ottoq_decide_tick's line-964 lookup runs. The wiring order is correct.
+--
+-- AND THE DIRECT EVIDENCE: 43 decisions carry
+-- enacted_action->>'source' = 'ottoq_service_priority'. A source only reaches
+-- enacted_action by travelling through ottoq_l2_external_proposal's
+-- normalisation, so the proposal WAS found and consumed at least 43 times.
+--
+-- SO THE SEAT COMPETES. It is not unwired and it is not ignored. What remains
+-- is narrower and is NOT claimed here: those 43 consumed proposals produced
+-- decisions with outcome_status 'noop_no_candidate' rather than 'enacted', and
+-- why a consumed proposal yields a no-op is a separate question in a different
+-- branch. It does not change the attribution finding, which stands on its own
+-- and is much larger: 87.1% of ALL enacted decisions carry no source at all.
+--
+-- WHAT MAY NOW BE SAID ABOUT ottoq_service_priority, and nothing more:
+--   "Its proposals are written before the consumer reads them, and are
+--    demonstrably consumed. Its enactment count of zero is not evidence that
+--    it is unwired; the ledger cannot credit 87.1% of enactments to anyone."
+--
+-- WHAT MAY NOT BE SAID: that it is working correctly, or that it is broken.
+-- Neither is earned. The measurement that would earn it is a refusal reason
+-- (section D step 2) -- until a disposal says why, a restrained proposer and a
+-- broken one are the same row.
+
+-- re-measure the call order that settles (b)
+SELECT l.lineno, trim(l.line) AS line
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace,
+       LATERAL unnest(string_to_array(p.prosrc, E'\n')) WITH ORDINALITY AS l(line, lineno)
+ WHERE n.nspname = 'public' AND p.proname = 'ottoq_sim_decide_and_dispatch'
+   AND l.line ~ 'ottoq_service_priority_propose|ottoq_decide_tick\('
+ ORDER BY l.lineno;
+
+-- and the 43 that prove consumption
+SELECT d.enacted_action->>'source' AS decision_source, d.outcome_status, count(*) AS n
+  FROM public.ottoq_decisions d
+ WHERE d.enacted_action->>'source' = 'ottoq_service_priority'
+ GROUP BY 1,2 ORDER BY n DESC;
