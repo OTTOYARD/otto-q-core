@@ -697,3 +697,100 @@ def test_the_guard_reads_the_frame_rather_than_trusting_the_arming():
         pb._require_seeing_frame({"selector": {"facts_version": None}}, RUN)
     with pytest.raises(pb.BlindFrameError):
         pb._require_seeing_frame({"selector": "not-a-dict"}, RUN)
+
+
+# --- G58: the seat and the fire must be the same event ----------------------
+
+
+class FakeConnForWait:
+    """A connection whose every cursor answers the next scripted row."""
+
+    def __init__(self, rows, raise_on=None):
+        self._rows = list(rows)
+        self._raise_on = raise_on
+        self.polls = 0
+        self.rollbacks = 0
+
+    def cursor(self):
+        self.polls += 1
+        if self._raise_on is not None and self.polls >= self._raise_on:
+            raise RuntimeError("connection lost mid-poll")
+        row = self._rows.pop(0) if self._rows else self._rows_last
+        self._rows_last = row
+        return FakeCur(one=row)
+
+    def rollback(self):
+        self.rollbacks += 1
+
+
+def test_the_waiter_returns_as_soon_as_the_tick_moves():
+    """THE WHOLE POINT (db/checks/0223). The first-refusal seat is one tick
+    wide, so the loop must wake on the tick, not on a clock."""
+    conn = FakeConnForWait([(7, "running"), (7, "running"), (8, "running")])
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=5,
+                                  poll_s=0.001) == "tick_change"
+    assert conn.polls == 3
+    # every poll is rolled back, so it never leaves a transaction open across
+    # the next fire's commit
+    assert conn.rollbacks == 3
+
+
+def test_the_waiter_is_bounded_and_says_so():
+    """A loop that naps silently through its whole window looks identical to one
+    that worked. The wait is a bound, not a target."""
+    conn = FakeConnForWait([(7, "running")])
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=0.01,
+                                  poll_s=0.001) == "timeout"
+
+
+def test_the_waiter_stops_when_the_run_does():
+    for status, expected in (("completed", "run_ended"), ("paused", "run_ended")):
+        conn = FakeConnForWait([(9, status)])
+        assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=5,
+                                      poll_s=0.001) == expected
+
+
+def test_the_waiter_notices_a_run_that_is_gone():
+    conn = FakeConnForWait([None])
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=5,
+                                  poll_s=0.001) == "run_gone"
+
+
+def test_a_failed_poll_is_a_reason_to_fire_not_a_reason_to_crash():
+    """The waiter must never raise. Losing the poll is not worse than the old
+    behaviour -- the old behaviour was to sleep blindly."""
+    conn = FakeConnForWait([(7, "running")], raise_on=1)
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=7, max_wait_s=5,
+                                  poll_s=0.001) == "poll_failed"
+    assert conn.rollbacks == 1
+
+
+def test_a_null_after_tick_fires_immediately_rather_than_waiting_for_nothing():
+    conn = FakeConnForWait([(None, "running")])
+    assert pb._wait_for_next_tick(conn, RUN, after_tick=None, max_wait_s=5,
+                                  poll_s=0.001) == "tick_change"
+
+
+def test_following_the_tick_is_the_default_not_an_opt_in():
+    """0218's lesson, applied: apparatus built correctly with the switch left
+    off is apparatus nobody turned on. Opting OUT is the explicit act."""
+    import inspect
+    sig = inspect.signature(pb.run_live)
+    assert sig.parameters["follow_ticks"].default is True
+    assert sig.parameters["tick_wait_s"].default == pb.DEFAULT_TICK_WAIT_S
+
+
+def test_the_loop_actually_waits_on_the_tick():
+    """STRUCTURAL, AND LABELLED AS SUCH. The waiter above is unit-tested in
+    isolation; this asserts the loop reaches it, which is the half a unit test
+    of the waiter cannot see. It reads run_live's source rather than driving a
+    full fake connection -- weaker evidence than a live fire, and the live
+    evidence is db/checks/0224."""
+    import inspect
+    src = inspect.getsource(pb.run_live)
+    assert "_wait_for_next_tick" in src, "the loop never calls the waiter"
+    # the old unconditional sleep must no longer be the only path out
+    assert "if follow_ticks:" in src
+    assert src.index("if follow_ticks:") < src.index("trigger = \"interval\"")
+    # and the reason travels on the fire record
+    assert '"fire_trigger"' in src and '"ticks_since_last_fire"' in src
