@@ -8,6 +8,17 @@ disposes"):
      ottoq_external_proposals. The DISPOSER remains the production decide path
      -- exactly the seat cuOpt occupies today, and deliberately no more.
 
+     SUPERSEDED 2026-09-14 -- READ THIS FIRST. Finding L-40 below is the
+     PRE-0259 state and both of its closing claims are now false. Migration
+     0259 (applied 20260912205202) moved the selector's cuOpt literals into
+     ottoq_proposer_precedence, which today holds forward_lex at rank 10 with
+     holds_tick = true, and ottoq_l2_external_proposal now orders by that
+     table's rank rather than by (source='cuopt') DESC. So this module DOES get
+     a one-tick window and is NOT last. And "the table holds zero forward_lex
+     rows" is 329 rows, 6 of them enacted. L-40 is kept because it is the
+     record of WHY the precedence table exists -- not because it still
+     describes the engine.
+
      THE DEFERRAL WINDOW IS NOT YET THIS MODULE'S (finding L-40). This law used
      to say the deferral pattern gives "an in-flight proposal" its one-tick
      right-of-first-refusal, which reads as though it applied to any proposer.
