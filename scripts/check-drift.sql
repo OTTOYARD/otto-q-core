@@ -387,7 +387,7 @@ repo_manifest(version, name, file) AS (
     ('20260914073900'::text, '0287_the_two_halves_disagree_about_what_already_placed_means'::text, '0287_the_two_halves_disagree_about_what_already_placed_means.sql'::text),
     ('PENDING'::text, '0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer'::text, '0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer.sql'::text),
     ('20260914081939'::text, '0289_five_gates_and_the_one_that_tests_a_different_threshold'::text, '0289_five_gates_and_the_one_that_tests_a_different_threshold.sql'::text),
-    ('PENDING'::text, '0290_three_geometry_dials_and_one_the_catalog_cannot_express'::text, '0290_three_geometry_dials_and_one_the_catalog_cannot_express.sql'::text)
+    ('20260914083734'::text, '0290_three_geometry_dials_and_one_the_catalog_cannot_express'::text, '0290_three_geometry_dials_and_one_the_catalog_cannot_express.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

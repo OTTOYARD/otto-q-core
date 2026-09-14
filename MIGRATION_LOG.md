@@ -274,7 +274,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0287](db/migrations/0287_the_two_halves_disagree_about_what_already_placed_means.sql) | `20260914073900` | yes — ledger | THE FRAME PUBLISHES WHICH KIND OF PLACE, AND WHOSE LEDGER SAYS SO |
 | [0288](db/migrations/0288_a_seat_is_only_worth_holding_if_there_is_something_to_offer.sql) | `PENDING` | no — pending | A SEAT IS ONLY WORTH HOLDING IF THERE IS SOMETHING TO OFFER |
 | [0289](db/migrations/0289_five_gates_and_the_one_that_tests_a_different_threshold.sql) | `20260914081939` | yes — ledger | FIVE GATES, AND THE ONE THAT TESTS A DIFFERENT THRESHOLD |
-| [0290](db/migrations/0290_three_geometry_dials_and_one_the_catalog_cannot_express.sql) | `PENDING` | no — pending | THREE GEOMETRY DIALS, AND ONE THE CATALOG CANNOT EXPRESS |
+| [0290](db/migrations/0290_three_geometry_dials_and_one_the_catalog_cannot_express.sql) | `20260914083734` | yes — ledger | THREE GEOMETRY DIALS, AND ONE THE CATALOG CANNOT EXPRESS |
 
 156 migrations indexed.
 

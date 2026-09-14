@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914083734
 -- migration-name:    0290_three_geometry_dials_and_one_the_catalog_cannot_express
 --
 -- 0290  THREE GEOMETRY DIALS, AND ONE THE CATALOG CANNOT EXPRESS
@@ -357,3 +357,34 @@ VALUES ('0290_three_geometry_dials_and_one_the_catalog_cannot_express', false,
  'Three rows in ottoq_policy_param_catalog for the site geometry dials read by public.ottoq_site_geometry: car_length_plan_units, car_width_plan_units and stall_pitch_perimeter_pu, all min 0 max NULL. min 0 by INVERSION and MEASURED, not reasoned -- each was written to a scratch run and the consumer called inside a rolled-back transaction: at -5 the function returns length_m and width_m of -2.3925 without raising, and a negative WIDTH inflates perimeter_body_gap_m from 0.7178 m to 5.1200 m, so the engine would report seven times the clearance it has. 0 stays inside the range for the pitch because 0 there is meaningful (gap -2.0097 m, i.e. body wider than pitch). MAX NULL because the consumer caps no dimension. THE FOURTH DIAL, metres_per_plan_unit, IS DELIBERATELY NOT CATALOGUED: ottoq_site_geometry divides by it (round(1.0/a.mpu,6)) and 0 raises division_by_zero, measured -- so it needs a bound that admits every positive number and excludes zero, and ottoq_policy_set clamps with an INCLUSIVE GREATEST, so min 0 would advertise the fatal value as safe and any positive epsilon would be invented. Left out with the reason recorded rather than shipped unsafe or made up; the missing exclusive bound is filed as G61. P1 pins the division so the omission cannot go stale, P2 pins the gap expression the width argument rests on, A3 proves the clamp stops the inversion at the CONSUMER rather than just at the setter, and A4 proves the setter still refuses metres_per_plan_unit at apply time. forces_recert=false, asserted in P0: ottoq_policy_get never reads the catalog.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 20260914083734. Every prediction in the PENDING commit hit exactly.
+--
+--   gap (read_uncatalogued)   56 -> 53
+--   ok                        94 -> 97
+--   catalog rows             102 -> 105
+--   0290_proof residue          0   (A5 removed all three scratch rows)
+--   metres_per_plan_unit     read_uncatalogued, as the file argues it must be
+--   cert lineage             forces_recert = false
+--
+-- P-, P0, P1, P2, P3 all passed. A1 re-offered the three live values and none
+-- was clamped. A2 clamped -5 to 0 on all three and accepted 5000 with an open
+-- upper bound. A3 read the CONSUMER back: with the dials clamped the body is
+-- 0 x 0 m and perimeter_body_gap_m equals perimeter_m, so the inflated
+-- clearance is gone. A4 confirmed ottoq_policy_set still refuses
+-- metres_per_plan_unit with error = 'unknown_param'. A6 agreed with the gap
+-- instrument on both halves: three closed, one deliberately open.
+--
+-- AND THE 0286 READ-BACK, because a description is a claim the catalog will
+-- repeat to whoever reads it. The three rows were re-read from the database
+-- and digested, then compared against the literals parsed out of THIS file:
+--
+--   car_length_plan_units     38912fc620708d7fded5d5076290cace  556 chars
+--   car_width_plan_units      f69444efa72dedc77cf555b44138fb5b  526 chars
+--   stall_pitch_perimeter_pu  6bbf0db9fcef3ae0913b7d23cff150c9  540 chars
+--
+-- All three md5s, all three lengths, and all three (default, min, max, affects)
+-- tuples matched the committed file exactly. What the database will tell a
+-- reader is what this file says.
+-- ===========================================================================
