@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0285 — GENERATED, not a log
+## Index, 0134–0286 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -270,7 +270,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0283](db/migrations/0283_five_floors_the_engine_already_writes_down_and_two_ceilings_it_does_not.sql) | `20260914062112` | yes — ledger | SEVEN MORE DIALS, AND THE FIRST HONEST NULLS |
 | [0284](db/migrations/0284_a_hold_whose_outcome_is_invisible_can_only_be_argued_about.sql) | `20260914064710` | yes — ledger | THE RIGHT OF FIRST REFUSAL GETS AN OUTCOME LEDGER |
 | [0285](db/migrations/0285_nine_more_dials_and_two_ceilings_the_rng_declares.sql) | `20260914065559` | yes — ledger | NINE MORE DIALS, AND THE TWO CEILINGS THE RNG DECLARES |
+| [0286](db/migrations/0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you.sql) | `20260914071810` | yes — ledger | ELEVEN MORE DIALS, AND THREE THAT ARE ONE SWITCH |
 
-151 migrations indexed.
+152 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

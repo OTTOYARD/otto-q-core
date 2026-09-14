@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260914071810
 -- migration-name:    0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you
 --
 -- 0286  ELEVEN MORE DIALS, AND THREE THAT ARE ONE SWITCH
@@ -501,3 +501,45 @@ VALUES ('0286_eleven_dials_and_the_ceiling_a_check_constraint_hands_you', false,
  'Eleven rows in ottoq_policy_param_catalog, every range read off a consumer. New derivation shape: the dcfc_target_soc_day / dcfc_target_soc_night / l2_target_soc trio takes max 100 from CHECK (target_soc <= 100) on vehicles.target_soc, reached through the LEAST that both twin charge consumers use to apply the cap -- a ceiling handed over by a constraint the dial never touches; min 0 is labelled the weaker half in each row (the SoC scale, not a declared bound). All three catalogued together because one CASE in ottoq_target_soc_cap chooses between them. Established shapes: pm_interval_km min 1 (GREATEST(1,...) in the override path plus a divisor guard in ottoq_twin_wear_window, identical to calib_interval_h); wash_soil_threshold [0,1] (compared against the CHECK-bounded soil_index, identical to sensor_soil_threshold); allow_concurrent_runs and enforce_site_charge_cap [0,1] (boolean gates); p99_burn_pct_per_min min 0 (a negative rate inverts the recall guard). The three soil dials -- soil_rate_per_km, soil_decay_per_tick, precip_soil_coupling -- take min 0 and MAX NULL because twin.ottoq_sim_advance_wear_counters clamps its PRODUCTS at LEAST(1.0, GREATEST(0, ...)), not its dials; writing 1.0 as their ceiling is the same trap 0285 avoided with litter_p_per_active_min and 0.95, and A3 proves the open ceiling on soil_rate_per_km at 40. Also recorded: precip_soil_coupling exists twice under one name -- the policy dial (0.5) and an unrelated plan field read by twin.ottoq_sim_observe_asset (0.6). Noted that the single live enforce_site_charge_cap row is 0 at run scope. forces_recert=false, asserted in P0: ottoq_policy_get never reads the catalog. 17 live rows untouched.',
  now())
 ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCLUDED.note, classified_at=EXCLUDED.classified_at;
+
+-- ===========================================================================
+-- APPLIED 2026-09-14 07:18:10 UTC (2:18 AM CT) as
+-- supabase_migrations.schema_migrations version 20260914071810.
+--
+-- Dry run: the WHOLE file byte for byte inside BEGIN ... ROLLBACK, no
+-- abbreviation anywhere, clean on the first attempt. P-, P0-P7 and A1-A6 all
+-- passed. The eight consumer positions P1-P6 pin were each pre-verified
+-- against live prosrc before the dry run and every one returned a non-zero
+-- position, so none of those preconditions was passing vacuously.
+--
+-- A VERIFICATION THIS FILE ADDS, AND THE REASON FOR IT. The file is committed
+-- and then re-typed into the apply call, so "the file was dry-run clean" and
+-- "what the database stored is the file" are two different claims, and only
+-- the first was ever checked. This time the second was too: after apply,
+-- md5(description) and md5(affects) for all eleven rows were read back from
+-- ottoq_policy_param_catalog and compared against the same literals parsed out
+-- of the committed file with the doubled quotes undone. All twenty-two digests
+-- matched, as did all eleven lengths, defaults, minima and maxima. What the
+-- engine now reads is what this file says, character for character.
+--
+-- VERIFIED AFTER APPLY, read-only:
+--
+--   ottoq_policy_catalog_gap, read_uncatalogued   72 -> 61
+--   ottoq_policy_catalog_gap, ok                  78 -> 89
+--   ottoq_policy_param_catalog rows               86 -> 97
+--   ottoq_policy_params rows across the eleven    17, unchanged
+--   rows tagged updated_by = '0286_proof'         0 (A5 removed its own scratch)
+--   ottoq_cert_lineage.forces_recert              false
+--
+-- AND ONE THING MEASURED ON THE WAY PAST, NOT FIXED HERE. The gap instrument
+-- reports a third status this file does not touch: 8 keys are
+-- catalogued_unread -- approach_freeze_minutes, approach_horizon_minutes,
+-- approach_stale_heartbeat_sec, cuopt_contention_min, reopt_cooldown_min,
+-- reopt_max_per_tick, reopt_min_eta_min, wash_cadence_cycles. None of the
+-- eleven here is among them; all eight predate this batch. A dial with a
+-- declared safe range and no consumer is the mirror image of what 0281 set out
+-- to close -- a labelled knob wired to nothing -- and it is the same shape as
+-- the five-instance pattern in checks/0218. Filed, not fixed: it wants its own
+-- file, because the honest answer for each is either "delete the catalog row"
+-- or "the consumer was removed and should not have been", and telling those
+-- apart is a per-key argument, not a batch.
