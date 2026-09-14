@@ -9,6 +9,19 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # G12, second rung. A scratch PostgreSQL that holds NOTHING -- no engine
+    # schema, no data. It exists so plpgsql can be compiled, which is all the
+    # compile-check step needs and all it claims.
+    services:
+      scratch_pg:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,6 +45,40 @@ jobs:
       # ever looked at db/migrations at all. Both are properties of committed files.
       - name: Pytest suite (conformance, site profiles, tariffs, recall, adapters, migration hygiene)
         run: python3 -m pytest -q
+      # G12, second rung: compile every PENDING migration against a throwaway
+      # PostgreSQL. It runs each file (execution stops at the first precondition
+      # that fails, which against an empty database is early and by design) and
+      # separately compiles every DO block, which is how blocks AFTER that first
+      # failure get checked at all.
+      #
+      # WHY ONLY PENDING FILES. A migration that has been applied to production
+      # has passed the strongest check there is. Gating on all 186 would risk a
+      # permanently-red step for an old file whose compile error never mattered,
+      # and this workflow's own comments are about why a permanently-red gate is
+      # a gate nobody reads.
+      #
+      # WHAT IT WOULD HAVE CAUGHT, both on 2026-09-14, both in files already
+      # committed as PENDING: 0322's `RAISE '% -> %% ... (still %)', a, b, c, d`
+      # (three placeholders, four arguments) and 0321's
+      # `format('... % ...', x)` (RAISE takes a bare %, format() demands %s).
+      # Each would otherwise have failed during an apply window, after a
+      # certification round had been waited out.
+      - name: Compile-check PENDING migrations (scratch database, nothing applied)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGDATABASE: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          mapfile -t PENDING < <(grep -l 'migration-version: PENDING' db/migrations/*.sql || true)
+          if [ ${#PENDING[@]} -eq 0 ]; then
+            echo "no PENDING migrations to compile-check"; exit 0
+          fi
+          printf 'compile-checking %d PENDING migration(s)\n' "${#PENDING[@]}"
+          python3 scripts/compile-check.py "${PENDING[@]}"
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #

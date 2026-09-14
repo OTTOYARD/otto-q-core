@@ -52,11 +52,19 @@ USAGE
   scripts/compile-check.py db/migrations/0321_*.sql
   Needs a scratch server on /var/tmp:55432 (initdb + pg_ctl; see tests).
 """
+import os
 import re
 import subprocess
 import sys
 
-PSQL = ["psql", "-h", "/var/tmp", "-p", "55432", "-U", "postgres", "-d", "postgres",
+# Connection is environment-driven so the same script serves a local scratch
+# cluster (unix socket) and a CI service container (TCP). Defaults are the local
+# cluster these tests were developed against.
+PSQL = ["psql",
+        "-h", os.environ.get("PGHOST", "/var/tmp"),
+        "-p", os.environ.get("PGPORT", "55432"),
+        "-U", os.environ.get("PGUSER", "postgres"),
+        "-d", os.environ.get("PGDATABASE", "postgres"),
         "-v", "ON_ERROR_STOP=1", "-q", "-t", "-A"]
 
 # Errors that mean "compiled fine, then could not run here" -- expected, because
@@ -102,6 +110,18 @@ def run_file(path):
 
 
 def main(paths):
+    # NO SILENT SKIP. A gate that quietly passes when its database is missing is
+    # a gate nobody reads -- the failure mode verify.yml's own comments warn
+    # about for the drift check. Exit 2 is distinguishable from exit 1 (a real
+    # finding), so a caller that legitimately has no server can tell them apart;
+    # CI treats any non-zero as failure, because CI always has one.
+    rc, err = run("select 1")
+    if rc != 0:
+        print("compile-check: NO DATABASE. Set PGHOST/PGPORT/PGUSER/PGDATABASE, or "
+              "start a scratch cluster. Refusing to report a pass without checking.")
+        print(f"  {err.splitlines()[0] if err else ''}")
+        return 2
+
     # twin/ottoq are referenced by SET search_path on the real functions; a
     # missing schema there is a compile-time error and would be a false positive.
     run("CREATE SCHEMA IF NOT EXISTS twin; CREATE SCHEMA IF NOT EXISTS ottoq;")
