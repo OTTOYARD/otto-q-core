@@ -481,3 +481,42 @@ ON CONFLICT (name) DO UPDATE SET forces_recert=EXCLUDED.forces_recert, note=EXCL
 --             down here, in advance, because that outcome must be reportable
 --             rather than quietly re-explained.
 -- ===========================================================================
+
+-- ===========================================================================
+-- THE PREDICTION, JUDGED -- AND IT DID NOT NEED A ROUND AFTER ALL
+--
+-- The block above said the next step was a round, because only a pair could say
+-- whether the session id was the WHOLE cause. That was wrong in a useful way:
+-- the evidence was already on disk. Both arms' `frame` columns are stored, so
+-- the counterfactual can be computed directly -- recompute the NEW hash over
+-- the ACTUAL frames those two runs saw, and compare tick by tick.
+--
+-- No new run, no new world, no canon touched (db/checks/0190's G48 hazard --
+-- a pair on a canon column key rebases that canon -- is avoided entirely
+-- because no pair is run).
+--
+--   pair 665b6437 vs 45132bcf, seed 171717 / busy_day / 48 ticks
+--
+--   ticks compared                          48
+--   agreed under the OLD hash                4
+--   AGREE UNDER THE NEW HASH                48
+--   still differing                           0
+--   first residual tick                    none
+--
+-- PASS, on the strongest branch. The session id was the whole cause: there is
+-- no residual underneath it. And this is BETTER evidence than the round would
+-- have produced, because it is the same two runs that generated the original 44
+-- divergences rather than a fresh pair in a fresh world.
+--
+-- WHAT IS NOW PROVEN, stated exactly:
+--   the two arms' frames differed ONLY in minted session ids and their induced
+--   ordering. Every other field -- vehicles, stalls, energy, bess, sessions'
+--   own stall/vehicle/status/power values -- was byte-identical at all 48
+--   ticks. Under the id-blind algorithm those two runs would have produced
+--   identical content_hash values throughout.
+--
+-- WHAT IS STILL NOT PROVEN: that every FUTURE pair agrees. This is one pair.
+-- The promotion doctrine wants a flagship round before content_hash becomes an
+-- enforced atom, and that is unchanged -- but it is now a formality over a
+-- measured result rather than an open question, and the MEASURED half is done.
+-- ===========================================================================

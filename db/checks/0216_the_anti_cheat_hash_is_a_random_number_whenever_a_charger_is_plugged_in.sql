@@ -147,3 +147,39 @@ SELECT column_name, column_default
 -- round shows the arms agree. The order is: land the id-blind hash, run a
 -- round, show a pair now agrees on 48 of 48, and only then let anything depend
 -- on it. That wants its own file and its own cert window.
+
+-- ---------------------------------------------------------------------------
+-- CLOSED 2026-09-14 by migration 0280 (applied 20260914043322), and the close
+-- is measured on this very pair rather than on a fresh one.
+--
+-- 0280 makes content_hash id-blind: public.ottoq_frame_hash_payload drops the
+-- minted session id and re-sorts sessions on (stall_id, vehicle_id,
+-- started_at), and ottoq_assert_snapshot_integrity moves with it, switching on
+-- a new nullable hash_algo column so legacy rows keep verifying under the
+-- algorithm that actually wrote them.
+--
+-- The counterfactual is computable without running anything, because both arms'
+-- `frame` columns are stored. Recomputing the NEW hash over the frames these
+-- two runs actually saw:
+--
+--   ticks compared              48
+--   agreed under the OLD hash    4
+--   AGREE UNDER THE NEW HASH    48
+--   still differing               0
+--
+-- So the session id was the WHOLE cause, with no residual underneath -- and the
+-- two arms' frames were otherwise byte-identical at all 48 ticks.
+--
+-- The honest sentence is now: "the decision frame's content hash is id-blind,
+-- and the pair that exposed the defect agrees on 48 of 48 ticks under it."
+-- content_hash remains OUT of the fourteen enforced atoms until a flagship
+-- round promotes it, per the blind-spot doctrine -- but that is now a formality
+-- over a measured result.
+SELECT count(*) AS ticks,
+       count(*) FILTER (WHERE a.content_hash = b.content_hash) AS agreed_before,
+       count(*) FILTER (WHERE encode(digest(jsonb_pretty(public.ottoq_frame_hash_payload(a.frame)),'sha256'),'hex')
+                            = encode(digest(jsonb_pretty(public.ottoq_frame_hash_payload(b.frame)),'sha256'),'hex')) AS agree_now
+  FROM public.ottoq_decision_snapshots a
+  JOIN public.ottoq_decision_snapshots b USING (tick_seq)
+ WHERE a.sim_run_id='665b6437-cb1d-4819-bb03-878e97d6aed7'
+   AND b.sim_run_id='45132bcf-aa31-41da-92f2-c38932e4de36';
