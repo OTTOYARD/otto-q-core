@@ -410,7 +410,7 @@ repo_manifest(version, name, file) AS (
     ('20260914150516'::text, '0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row'::text, '0310_two_migrations_argued_forces_recert_false_and_never_wrote_the_row.sql'::text),
     ('20260914153500'::text, '0311_a_column_that_looks_like_the_price_and_is_not'::text, '0311_a_column_that_looks_like_the_price_and_is_not.sql'::text),
     ('20260914161504'::text, '0312_the_forward_curve_reads_the_soc_the_twin_already_tracks'::text, '0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql'::text),
-    ('PENDING'::text, '0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle'::text, '0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle.sql'::text)
+    ('20260914163515'::text, '0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle'::text, '0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
