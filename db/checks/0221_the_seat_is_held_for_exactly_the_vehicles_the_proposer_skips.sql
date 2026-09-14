@@ -245,3 +245,37 @@ SELECT scope_type, param_value, updated_by
 -- No global row: the default in ottoq_build_decision_frame is 0, which is why
 -- a certification arm (which sets nothing) sees no facts block at all -- and
 -- that is 0287's forces_recert=false argument.
+
+-- ===========================================================================
+-- CORRECTION, SAME DAY, BY db/checks/0222 -- AND IT IS THIS FILE'S MECHANISM
+-- THAT IS WRONG, NOT ITS CONCLUSION.
+--
+-- Section B above says the eighteen held vehicles were hidden BY THEIR STAGING
+-- BOOKING. That is an inference wearing a measurement's clothes. Two problems:
+--
+--   1. WRONG PREDICATE. Q2 joins bookings with `during @> armed_at_sim` -- the
+--      booking whose WINDOW covered the arm instant. vehicle_is_held never
+--      tested a window. It tested `state IN ('held','active')` and nothing
+--      else. A vehicle whose staging booking covered that instant may equally
+--      have held a CHARGE booking for a later window, and that would have
+--      hidden it just as well -- in which case narrowing by stall type frees
+--      nobody.
+--
+--   2. UNRECONSTRUCTABLE. ottoq_stall_bookings.state is current, not
+--      historised. For a finished run there is no way to ask what
+--      has_live_booking returned at tick 6. c288555a's mechanism cannot now be
+--      established either way, and this file should have said so.
+--
+-- WHAT STANDS, unchanged and still measured: the two predicates DID mean
+-- different things; the kernel DID arm seats for a population the proposer
+-- skipped; the answer rate WAS 0 of 19 and 0 of 25.
+--
+-- WHAT REPLACES THE INFERENCE: 0222 measured the two predicates against a LIVE
+-- frame at tick 23 of the post-fix run -- 116 vehicles, 33 held under version
+-- 1, 17 under holds_charge_place, 16 freed, 0 newly hidden. No inference in it.
+-- And the outcome moved: 11 seats, 3 answered, 2 enacted, the first non-zero
+-- answered_pct this engine has recorded.
+--
+-- 0222 also found what this file walked past: has_live_booking has NO TIME
+-- BOUND, and 21 of 36 live-state booking rows described windows that were
+-- already over. Filed as G57.
