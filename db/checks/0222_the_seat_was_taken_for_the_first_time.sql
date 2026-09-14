@@ -9,14 +9,19 @@
 -- THE RESULT
 --
 --   run       seed    ticks  holds  answered  answered_pct  enacted
---   97769e7e  848484     18     25         0           0.0        0
---   c288555a  171717     20     19         0           0.0        0
---   1bd41105  171717     26     11         3          27.3        2
+--   97769e7e  848484     18     25         0           0.0        0   before
+--   c288555a  171717     20     19         0           0.0        0   before
+--   1bd41105  171717     26     11         3          27.3        2   after
+--   36e5cc68  848484     20     27        15          55.6        7   after
 --
--- The first two are the pre-fix runs 0219 and 0284 measured. The third is the
--- same seed and scenario as the second, after the fix. `answered_pct` has never
--- been anything but 0.0 in this engine's life; it is 27.3 now, and two of the
--- three answers were ENACTED by the deterministic path.
+-- BOTH SEEDS, BEFORE AND AFTER, and the before rows are the runs 0219 and 0284
+-- measured. `answered_pct` had never been anything but 0.0 in this engine's
+-- life. It is 27.3 and 55.6 now, on the same two seeds that produced 0.0 and
+-- 0.0, and nine of the eighteen answers were ENACTED by the deterministic path.
+--
+-- The second seed was run specifically because one run is not evidence, and it
+-- is the stronger of the two: 27 seats, 15 answered, 7 enacted, against 25
+-- seats and 0 answered on the same seed before the fix.
 --
 -- THE CHAIN, OBSERVED END TO END ON ONE VEHICLE. At tick 15 the live frame
 -- carried 77ecd026 at the gate with no reservation, no booking, and
@@ -37,8 +42,18 @@
 --   NEWLY held by 0287                      0
 --
 -- Sixteen of the thirty-three vehicles version 1 called placed were holding
--- something that is not a charge place. The change is one-directional: it never
--- hides a vehicle version 1 would have shown.
+-- something that is not a charge place.
+--
+-- SAMPLED AGAIN ON THE SECOND SEED, run 36e5cc68, while it was running:
+--
+--   tick   fleet   v1_held   v2_held   freed   newly held
+--      7     116        63        41      22            0
+--     12     116        61        13      48            0
+--
+-- Across all three samples on two seeds the freed count is 16, 22 and 48, and
+-- NEWLY HELD IS ZERO EVERY TIME. The change is one-directional by construction
+-- -- holds_charge_place is a narrowing of the version-1 test -- and measured
+-- that way on 348 vehicle-observations.
 --
 -- ---------------------------------------------------------------------------
 -- CORRECTION TO 0221, AND IT IS A CORRECTION TO THE MECHANISM, NOT THE OUTCOME
@@ -102,16 +117,19 @@
 -- ---------------------------------------------------------------------------
 -- WHAT THIS RUN DOES NOT PROVE, STATED BEFORE ANYONE QUOTES THE 27.3
 --
---   - It is ONE run, not a pair. The tick counts differ (26 vs 20), the loop
---     fired at different ticks, and depot congestion varied within the run
---     (charge stalls busy ranged from 1 to 40 of 40 across the 14 fires). Seed
---     and scenario are held constant; nothing else is.
+--   - These are TWO RUNS, not two pairs. Tick counts differ from their
+--     pre-fix counterparts (26 vs 20, and 20 vs 18), the loop fired at
+--     different ticks, and depot congestion varied within each run (charge
+--     stalls busy ranged from 1 to 40 of 40 across seed 171717's 14 fires).
+--     Seed, scenario and depot are held constant; nothing else is. A pair rig
+--     would hold the world constant too, and the A/B rig that could do it
+--     (0145's ottoq_ab_runs work) has never been pointed at this question.
 --   - Hold COUNT also moved, 19 -> 11, and this file does not claim to know
 --     why. Fewer seats armed is consistent with vehicles being served rather
 --     than re-armed, and equally consistent with a different tick alignment.
---   - Three answers is three. The honest sentence is "the right of first
---     refusal has been exercised, and enacted, for the first time" -- not
---     "the hold now works", which wants a pair and a second seed.
+--   - The honest sentence is "the right of first refusal has been exercised,
+--     and enacted, on both seeds, where it never had been" -- not "the hold
+--     now works", which wants a pair rig holding the world constant.
 --   - SATURATION IS A SECOND, INDEPENDENT BLOCKER and it is untouched. At
 --     several fires all 40 charge stalls were busy, so there was no point to
 --     offer whatever the frame said. A seat held at a saturated depot cannot
