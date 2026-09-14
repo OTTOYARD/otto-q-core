@@ -119,3 +119,48 @@
 -- busy_day family. Anything that changes what a certified scenario simulates
 -- is forces_recert=TRUE and wants its own window and its own recert, not a
 -- drive-by.
+
+-- ===========================================================================
+-- F. ADDENDUM -- THE MECHANISM ALREADY EXISTS, so the fix is wiring
+--    (mapped 2026-09-14 ~15:50 UTC, same session; NOT implemented)
+--
+-- Section E said a fix was not attempted. Before leaving it, the recon, so
+-- whoever picks this up does not rebuild what is there (CLAUDE.md rule 5):
+--
+--   public.ottoq_ocpp_chargers carries
+--     station_state, station_state_changed_at,
+--     last_fault_code, last_fault_at, last_fault_payload
+--
+--   twin.ottoq_report_charger_fault   -- existing: reports a charger fault
+--   twin.ottoq_sim_bay_fault_handler  -- existing: the handler
+--
+-- So implementing force_offline_dcfc_count does NOT need new state, a new
+-- column, or a new vocabulary. It needs a call to the fault reporter for N
+-- DCFC chargers when the sim clock enters force_offline_window_hours, and a
+-- restore when it leaves. That is the whole change.
+--
+-- THE DETERMINISM HAZARD, named in advance because this engine has been bitten
+-- by it three times (0137 hashed a write timestamp, 0139 an id, 0216 a minted
+-- uuid): "take 3 DCFC chargers offline" must choose the SAME three every run.
+-- Order by a stable business key -- ocpp_identifier -- never by charger_id and
+-- never by an unordered LIMIT. A LIMIT without ORDER BY is not deterministic
+-- in Postgres even on identical data.
+--
+-- AND THE SAFE/UNSAFE SPLIT, which is what makes this tractable:
+--
+--   SAFE, forces_recert=FALSE, provable
+--     force_offline_dcfc_count / force_offline_window_hours are declared by
+--     charger_outage_morning_rush and its bench_ clone ONLY. Neither is in
+--     ottoq_cert_columns. A change gated on a key no certified scenario
+--     declares cannot alter any canon's behaviour -- the same argument 0308
+--     and 0309 made, and it is assertable: no certified column's scenario
+--     declares the key.
+--
+--   NOT SAFE, forces_recert=TRUE, needs its own window and recert
+--     dtc_rate_multiplier / incident_rate_multiplier are declared by busy_day,
+--     which IS four of the nine certification columns. Implementing them
+--     changes what those columns simulate. That is a deliberate recert, not a
+--     fix to slip in beside the other.
+--
+-- Do the safe half first and independently. Doing both in one migration would
+-- drag a certified family into a change that did not need to touch it.
