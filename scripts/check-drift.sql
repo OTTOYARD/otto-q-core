@@ -412,7 +412,8 @@ repo_manifest(version, name, file) AS (
     ('20260914161504'::text, '0312_the_forward_curve_reads_the_soc_the_twin_already_tracks'::text, '0312_the_forward_curve_reads_the_soc_the_twin_already_tracks.sql'::text),
     ('20260914163515'::text, '0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle'::text, '0313_the_predictive_recall_rung_takes_eight_values_and_none_of_them_is_the_vehicle.sql'::text),
     ('20260914164237'::text, '0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant'::text, '0314_vehicles_get_a_position_and_the_eta_stops_being_a_constant.sql'::text),
-    ('20260914164649'::text, '0315_the_speed_cancelled_out_of_my_own_eta'::text, '0315_the_speed_cancelled_out_of_my_own_eta.sql'::text)
+    ('20260914164649'::text, '0315_the_speed_cancelled_out_of_my_own_eta'::text, '0315_the_speed_cancelled_out_of_my_own_eta.sql'::text),
+    ('PENDING'::text, '0316_the_eta_function_starts_answering_its_own_arguments'::text, '0316_the_eta_function_starts_answering_its_own_arguments.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
