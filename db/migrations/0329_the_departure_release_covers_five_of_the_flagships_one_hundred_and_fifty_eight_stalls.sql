@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260915001355
 -- migration-name:    0329_the_departure_release_covers_five_of_the_flagships_one_hundred_and_fifty_eight_stalls
 -- ============================================================================
 -- 0329 — A BOOKING ENDS WHEN ITS WINDOW RUNS OUT, NOT WHEN THE VEHICLE LEAVES,
@@ -476,3 +476,59 @@ VALUES
    'judge, not a classification.',
    now())
 ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================================
+-- APPLIED 20260915001355 (2026-09-15 00:13:55 UTC / 2026-09-14 7:13 PM CT)
+-- ============================================================================
+-- Window: quiesced and re-verified immediately before apply -- 0 active
+-- backends, 0 engine-pattern queries, 0 live sim runs, 0 cert cron jobs.
+--
+-- DIGEST. The header was condensed to a 7-line note at apply. Anchoring both
+-- sides on the LINE `DO $pre$` (not the phrase):
+--
+--   committed file body   205227a32ff0bcc248734915b529e015   20117 chars
+--   applied migration body 205227a32ff0bcc248734915b529e015   20117 chars
+--
+-- Identical, and identical again with all whitespace stripped
+-- (3d5f2b124ea59c1a3dcdb5beedea599a / 15711). This file is a faithful record
+-- of what ran.
+--
+-- A NOTE ON HOW THAT WAS NEARLY MISREPORTED, because it is this repo's oldest
+-- defect class and it caught me inside the fix for it. The first digest probe
+-- anchored with position('DO $pre$' in txt) and reported the applied body 13
+-- characters LONGER than the file, which would have meant the file was not
+-- what ran. It was not: the condensed apply header contains the sentence
+-- "byte-identical to that file from DO $pre$ on", so `position` matched inside
+-- that sentence and the "body" it measured began in the prose. The claim of
+-- byte-identity was the thing that broke the byte-identity measurement. The
+-- instrument answered a slightly different question than the one asked; the
+-- fix was to anchor on E'\nDO $pre$\n'.
+--
+-- RESULT, measured after apply:
+--   version                     : 20260915001355
+--   new functions               : 2 (ottoq_release_departed_spaces,
+--                                    ottoq_occupancy_cut_short)
+--   pre-snapshots captured      : 2 (release_vacated_spaces, booking_interrupted)
+--   wired into the release path : true (call present AND its count reaches the
+--                                 RETURN -- A1 checks both)
+--   dial registered             : 1, default 0, range 0..1
+--   dial SET anywhere           : 0  -- ships inert
+--   A6 (inertness proven by CALL, not by reading): passed
+--   E1 (bay test equivalence, 200-row grid): 0 differences
+--   lineage forces_recert       : true
+--
+-- CONTROL BASELINE for the paired comparison, already captured and untouched
+-- by this migration -- run c9b05a04, seed 771771 / busy_day / flagship /
+-- 29 ticks, config_hash b69927c08b83cfa3eda1285556b701bf:
+--   p95_time_to_service  243 min      p50  60 min      max  840 min
+--   returns_unserved     0            conflicts 134    turns/point/day 2.13
+--   bookings 1,009       turns 332    released_never_occupied 380
+--
+-- WHAT IS NOT PROVEN, and it is the whole point of the next step: that turning
+-- the dial on shortens the wait. The code exists and is inert. The claim will
+-- come from re-running seed 771771 with the dial at 1 and comparing against
+-- the baseline above -- same seed, same scenario, same depot, so CRN holds by
+-- construction (twin.ottoq_sim_seeded_random is keyed on seed + entity +
+-- sim-seconds, not on run id or wall clock). Until that run exists, this file
+-- has fixed nothing that can be quoted.
+-- ============================================================================

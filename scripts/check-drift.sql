@@ -425,7 +425,8 @@ repo_manifest(version, name, file) AS (
     ('20260914214010'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql'::text),
     ('20260914193928'::text, '0326_the_stamp_must_be_present_and_not_older_not_different'::text, '0326_the_stamp_must_be_present_and_not_older_not_different.sql'::text),
     ('20260914214102'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql'::text),
-    ('20260914235653'::text, '0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing'::text, '0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing.sql'::text)
+    ('20260914235653'::text, '0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing'::text, '0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing.sql'::text),
+    ('20260915001355'::text, '0329_the_departure_release_covers_five_of_the_flagships_one_hundred_and_fifty_eight_stalls'::text, '0329_the_departure_release_covers_five_of_the_flagships_one_hundred_and_fifty_eight_stalls.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
