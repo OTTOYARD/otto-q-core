@@ -427,7 +427,8 @@ repo_manifest(version, name, file) AS (
     ('20260914214102'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql'::text),
     ('20260916000638'::text, 'the_agent_hands_one_solver_request_to_the_kernel'::text, '0331_the_agent_hands_one_solver_request_to_the_kernel.sql'::text),
     ('20260916002025'::text, 'one_agent_claim_per_run_tick'::text, '0332_one_agent_claim_per_run_tick.sql'::text),
-    ('20260916144203'::text, 'every_solver_proposal_gets_a_deterministic_disposition'::text, '0333_every_solver_proposal_gets_a_deterministic_disposition.sql'::text)
+    ('20260916144203'::text, 'every_solver_proposal_gets_a_deterministic_disposition'::text, '0333_every_solver_proposal_gets_a_deterministic_disposition.sql'::text),
+    ('20260916180920'::text, 'a_newer_solver_packet_explains_what_it_superseded'::text, '0334_a_newer_solver_packet_explains_what_it_superseded.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
