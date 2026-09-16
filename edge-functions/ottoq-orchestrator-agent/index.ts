@@ -258,12 +258,11 @@ serve(async (req) => {
       }
     }
 
-    // ---- ONE PROCESS: agent analysis -> solver request -> deterministic core ----
-    // The wrapper sets a transaction-local handoff and calls the existing cuOpt
-    // gate. That gate still owns candidate selection, right-of-first-refusal and
-    // the asynchronous edge request. Independent cuOpt callers stand down while
-    // agent_solver_chain_enabled=1, so this is the only solver entrance for the
-    // run rather than a second parallel proposer.
+    // ---- ONE PROCESS: agent analysis -> CP-SAT proposal -> deterministic core ----
+    // This edge call is detached because the parent request comes from pg_net's
+    // short timeout. The CP-SAT bridge records its result under this chain id and
+    // submits through the same kernel door as every proposer. cuOpt runs only if
+    // the primary service or submission door fails.
     const chainId = crypto.randomUUID();
     let solverHandoff: Record<string, unknown> = {
       chain_id: chainId,
@@ -288,13 +287,16 @@ serve(async (req) => {
         queued,
         rejected,
       };
-      const { data: requestId, error: solverError } = await sb.rpc("ottoq_agent_solver_refresh", {
-        p_sim_run_id: run.sim_run_id,
-        p_agent_handoff: handoff,
-      });
-      solverHandoff = solverError
-        ? { ...solverHandoff, status: "refused", error: solverError.message }
-        : { ...solverHandoff, status: requestId == null ? "abstained" : "queued", request_id: requestId };
+      const solverUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ottoq-cpsat-propose`;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      EdgeRuntime.waitUntil(fetch(solverUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ sim_run_id: run.sim_run_id, agent_handoff: handoff }),
+      }).then(async (response) => {
+        if (!response.ok) console.error("CP-SAT handoff failed", response.status, (await response.text()).slice(0, 500));
+      }).catch((error) => console.error("CP-SAT handoff threw", error)));
+      solverHandoff = { ...solverHandoff, status: "queued", engine: "cp_sat_forward_lex" };
     }
 
     const totalMs = Date.now() - tStart;
