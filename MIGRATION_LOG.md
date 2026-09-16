@@ -2,6 +2,7 @@
 
 | Date | File | What changed | Why | Applied by | Verified |
 |---|---|---|---|---|---|
+| 2026-09-16 | `db/migrations/0335_cp_sat_becomes_the_primary_agent_solver.sql` | Makes deterministic CP-SAT (`forward_lex`) the rank-0 assignment proposer, moves cuOpt to specialist/fallback ranks, and joins the agent chain to its async solver receipt in the live activity feed. | The product loop must be one traceable process: agent objective → deterministic solve → kernel disposition → dispatch, with bounded rejection feedback visible in OTTO-Twin. | Codex (registered via Supabase apply_migration) | Self-verifying preflight/assert blocks passed; production apply returned success. |
 | 2026-08-29 | `db/migrations/0073_provenance_says_what_it_is.sql` | SDR `data_source` now derived from `depots.feed_mode` instead of from whether a run id was passed; the twin labels its burn-model SoC `estimated`, not `oem_telemetry`. | Both fields reported something other than the truth; every live-path SDR was stamped `twin` regardless of feed. | Claude Code (founder-merged PR #98 authorized; first apply attempt 2026-08-27 was blocked by the harness permission layer, applied 2026-08-29 after founder granted full DB access; registered via MCP apply_migration) | Self-verifying DO block: anchors found exactly once, post-conditions RAISE on survival; success returned. |
 | 2026-08-29 | `db/migrations/0074_the_archive_carries_its_key.sql` | `ottoq_archive_run` stamps `config_hash` at archive time (INSERT, upsert, and `reproducible_from`); `ottoq_run_archive_stamp` no longer fabricates `md5('')` on a missing config. | 153 of 155 archives carried no reproducibility key; the stamping helper was defined and never called, and configs are purged with the run so the hash must be taken at archive time. | Claude Code (same authorization as 0073) | Self-verifying DO block; `config_hash` present at exactly 4 positions post-patch. K3 (db/checks/0044) stays red until unstamped archives age out — by design, not regression. |
 | 2026-08-29 | `db/migrations/0086_refusals_carry_their_reason.sql` | `twin.ottoq_sim_confirm_commands` refusal branch now writes `reason_code` (`target_occupied` / `vehicle_state_incompatible` / `command_malformed`) and a pre-sweep refuses commands whose vehicle row is missing (`target_unknown`) instead of leaving them invisible to the INNER JOIN loop; `public.ottoq_ack_vehicle_command` stamps `vehicle_declined` + detail on vehicle-side refusals; reason-code vocabulary +3 (`vehicle_state_incompatible`, `run_ended`, `vehicle_declined`); new `NOT VALID` CHECK: a refused command must carry a code. | 0045 R3: 14 of 73 refusals on run 9291ec6d carried no reason code — "every directive carries a reason code" was silently violated on the refusal side. | Claude Code (founder's full-DB grant 2026-08-29; registered via MCP apply_migration) | Self-verifying DO block: pins 55acfdfa/36a8f8a4 matched, all anchors exactly once, post-conditions RAISE on survival. Historical NULLs stay as evidence (NOT VALID). |
@@ -100,10 +101,10 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0334 — GENERATED, not a log
+## Index, 0134–0335 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
-resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
+resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
 the one that says what was VERIFIED.
 Everything else from 0134 on went unlogged at the time. Rather than invent prose after the
 fact about work whose reasoning already lives in the migration files, this block is
@@ -316,7 +317,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0332](db/migrations/0332_one_agent_claim_per_run_tick.sql) | `20260916002025` | yes — ledger | The first 0331 live run proved the chain itself, then exposed two entrances: |
 | [0333](db/migrations/0333_every_solver_proposal_gets_a_deterministic_disposition.sql) | `20260916144203` | yes — ledger | The first live 0331/0332 Sim Start proved one product process: |
 | [0334](db/migrations/0334_a_newer_solver_packet_explains_what_it_superseded.sql) | `20260916180920` | yes — ledger | Live 0333 proof, run a2b246ed-80d1-4fe3-8dc0-362514eeb58e: |
+| [0335](db/migrations/0335_cp_sat_becomes_the_primary_agent_solver.sql) | `20260916194021` | yes — ledger | The agent now sends one bounded objective to the deterministic CP-SAT |
 
-197 migrations indexed.
+198 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

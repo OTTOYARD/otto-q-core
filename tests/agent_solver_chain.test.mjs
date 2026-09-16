@@ -6,6 +6,10 @@ import {
   assignmentPairCost,
   normalizeSolverDirective,
 } from "../edge-functions/_shared/agent_solver_chain.ts";
+import {
+  assignmentRequest,
+  rejectionFeedback,
+} from "../edge-functions/_shared/cpsat_agent_chain.ts";
 
 const lowSoc = { current_soc: 20, inlet_max_kw: 250 };
 const midSoc = { current_soc: 50, inlet_max_kw: 250 };
@@ -62,8 +66,47 @@ test("agent binds an explicit run before handing off to the solver", () => {
   );
   assert.match(source, /requestedRun/);
   assert.match(source, /eq\("sim_run_id", requestedRun\)/);
-  assert.match(source, /ottoq_agent_solver_refresh/);
+  assert.match(source, /ottoq-cpsat-propose/);
+  assert.match(source, /EdgeRuntime\.waitUntil/);
   assert.match(source, /ottoq_agent_chain_claim/);
+});
+
+test("CP-SAT request bounds agent influence and retries", () => {
+  const request = assignmentRequest({
+    simRunId: "11111111-1111-1111-1111-111111111111",
+    depotId: "22222222-2222-2222-2222-222222222222",
+    frame: { vehicles: [], stalls: [] },
+    classRows: [],
+    directive: { objective: "throughput_first", why: "return wave" },
+    feedback: [],
+    hourOfDay: 29,
+  });
+  assert.equal(request.directive.objective, "throughput_first");
+  assert.equal(request.max_retries, 2);
+  assert.equal(request.hour_of_day, 23);
+  assert.equal(request.site.dcfc_cooldown_min, 18);
+});
+
+test("rejection feedback is pair-specific and deduplicated", () => {
+  const feedback = rejectionFeedback([
+    { entity_id: "vehicle-1", proposal: { stall_id: "stall-1" }, disposition_reason: "stall_occupied" },
+    { entity_id: "vehicle-1", proposal: { stall_id: "stall-1" }, disposition_reason: "stall_occupied" },
+    { entity_id: "vehicle-2", proposal: { abstain: true } },
+  ]);
+  assert.deepEqual(feedback, [{
+    entity_id: "vehicle-1", stall_id: "stall-1", reason: "stall_occupied", rule_codes: [],
+  }]);
+});
+
+test("CP-SAT bridge is internal and falls back to cuOpt only on failure", () => {
+  const source = readFileSync(
+    new URL("../edge-functions/ottoq-cpsat-propose/index.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /internal service role required/);
+  assert.match(source, /ottoq_proposer_submit_batch/);
+  assert.match(source, /queueCuOptFallback/);
+  assert.match(source, /p_source: "forward_lex"/);
 });
 
 test("migration routes the legacy cron solver through the agent chain", () => {
