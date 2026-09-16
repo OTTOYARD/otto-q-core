@@ -167,30 +167,43 @@ serve(async (req) => {
     // ---- the ONE model call (three lenses). Reasoning disabled for reliable, fast JSON. ----
     let parsed: any = null; let modelUsed = "none"; let raw = "";
     let proposeMs = 0;
-    const key = NV_KEYS.map((k) => Deno.env.get(k)).find(Boolean);
-    if (key) {
+    const keys = NV_KEYS
+      .map((name) => ({ name, value: Deno.env.get(name) }))
+      .filter((candidate): candidate is { name: string; value: string } => Boolean(candidate.value));
+    if (keys.length > 0) {
       const tModel = Date.now();
-      try {
-        const r = await fetch(NV_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify({
-            model: MODEL, temperature: 0.1, max_tokens: 1400,
-            chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
-            response_format: { type: "json_object" },
-            messages: [
-              { role: "system", content: SYSTEM },
-              { role: "user", content: `BOARD DIGEST:\n${JSON.stringify(board, null, 1)}\n\nReturn ONLY the JSON object.` },
-            ],
-          }),
-        });
-        if (r.ok) {
-          const j = await r.json();
+      const requestBody = JSON.stringify({
+        model: MODEL, temperature: 0.1, max_tokens: 1400,
+        chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: `BOARD DIGEST:\n${JSON.stringify(board, null, 1)}\n\nReturn ONLY the JSON object.` },
+        ],
+      });
+      for (const candidate of keys) {
+        try {
+          const r = await fetch(NV_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${candidate.value}` },
+            body: requestBody,
+          });
+          const responseText = await r.text();
+          if (!r.ok) {
+            // A legacy NVCF key can be valid yet point at a retired function and return
+            // 404. Keep trying the remaining configured NVIDIA keys before falling safe.
+            raw = `HTTP ${r.status}: ${responseText.slice(0, 240)}`;
+            continue;
+          }
+          const j = JSON.parse(responseText);
           raw = j?.choices?.[0]?.message?.content ?? "";
           parsed = extractJson(raw);
-          modelUsed = MODEL;
-        } else { raw = `HTTP ${r.status}`; }
-      } catch (_e) { /* deterministic fallback below */ }
+          if (parsed && Array.isArray(parsed.actions)) modelUsed = MODEL;
+          break;
+        } catch (error) {
+          raw = `request error: ${error instanceof Error ? error.message : "unknown"}`;
+        }
+      }
       proposeMs = Date.now() - tModel;
     }
     if (!parsed || !Array.isArray(parsed.actions)) parsed = { actions: [], solver: { objective: "readiness_first", why: "model unavailable" }, rationale: `fallback: model unavailable or unparseable (${raw ? raw.slice(0,40) : "no key"}) — no action taken` };
@@ -291,7 +304,11 @@ serve(async (req) => {
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       EdgeRuntime.waitUntil(fetch(solverUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
         body: JSON.stringify({ sim_run_id: run.sim_run_id, agent_handoff: handoff }),
       }).then(async (response) => {
         if (!response.ok) console.error("CP-SAT handoff failed", response.status, (await response.text()).slice(0, 500));
