@@ -6,6 +6,10 @@ const sql = readFileSync(
   new URL("../db/migrations/0333_every_solver_proposal_gets_a_deterministic_disposition.sql", import.meta.url),
   "utf8",
 );
+const supersedeSql = readFileSync(
+  new URL("../db/migrations/0334_a_newer_solver_packet_explains_what_it_superseded.sql", import.meta.url),
+  "utf8",
+);
 
 test("proposal payload stays separate from deterministic disposition", () => {
   assert.match(sql, /ADD COLUMN IF NOT EXISTS disposition_reason text/);
@@ -48,4 +52,11 @@ test("proposal finalizer is service-role-only", () => {
   assert.match(sql, /REVOKE ALL ON FUNCTION public\.ottoq_dispose_external_proposals[\s\S]*FROM PUBLIC, anon, authenticated/);
   assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.ottoq_dispose_external_proposals[\s\S]*TO service_role/);
   assert.match(sql, /has_function_privilege\('anon'/);
+});
+
+test("new proposal packets explain submission-time supersession", () => {
+  assert.match(supersedeSql, /disposition_reason=''newer_proposal_same_entity''/);
+  assert.match(supersedeSql, /disposed_at=clock_timestamp\(\)/);
+  assert.match(supersedeSql, /disposed_tick=\(SELECT r\.tick_count/);
+  assert.match(supersedeSql, /status='superseded' AND disposition_reason IS NULL/);
 });

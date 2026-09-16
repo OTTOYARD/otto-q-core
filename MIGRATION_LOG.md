@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0333 — GENERATED, not a log
+## Index, 0134–0334 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -315,7 +315,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0331](db/migrations/0331_the_agent_hands_one_solver_request_to_the_kernel.sql) | `20260916000638` | yes — ledger | THE AGENT AND THE SOLVER WERE BOTH LIVE, BUT THEY WERE TWO PARALLEL |
 | [0332](db/migrations/0332_one_agent_claim_per_run_tick.sql) | `20260916002025` | yes — ledger | The first 0331 live run proved the chain itself, then exposed two entrances: |
 | [0333](db/migrations/0333_every_solver_proposal_gets_a_deterministic_disposition.sql) | `20260916144203` | yes — ledger | The first live 0331/0332 Sim Start proved one product process: |
+| [0334](db/migrations/0334_a_newer_solver_packet_explains_what_it_superseded.sql) | `20260916180920` | yes — ledger | Live 0333 proof, run a2b246ed-80d1-4fe3-8dc0-362514eeb58e: |
 
-196 migrations indexed.
+197 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
