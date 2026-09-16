@@ -51,13 +51,18 @@
 // ============================================================================
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  assignmentPairCost,
+  normalizeSolverDirective,
+  type SolverDirective,
+} from "../_shared/agent_solver_chain.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const CUOPT_ENDPOINT = "https://optimize.api.nvidia.com/v1/nvidia/cuopt";
-const FN_VERSION = "edge:v25";
+const FN_VERSION = "edge:v26-agent-chain";
 
 // v25: a charger is unusable only when BROKEN. Occupancy is read from the stall.
 const CHARGER_BROKEN = new Set(["Faulted", "Unavailable"]);
@@ -104,15 +109,6 @@ function effKw(v: any, s: any): number {
   return Math.round(base * taper * 10) / 10;
 }
 
-// The pairwise preference score. Lower is better. Unchanged from v16.
-function pairCost(v: any, s: any): number {
-  const soc = num(v.current_soc, 100);
-  let c = (100 - soc) + (s.stall_type === "dcfc" ? 0 : 35);
-  if (s.stall_type === "dcfc" && soc > 60) c += 60;      // conserve DCFC for the needy
-  c += Math.round(num(s.relative_y, 200) / 20);           // nearest-wash spatial policy
-  return c;
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   const t0 = Date.now();
@@ -129,6 +125,10 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const sim_run_id = body?.sim_run_id;
+    const agentHandoff = body?.agent_handoff && typeof body.agent_handoff === "object"
+      ? body.agent_handoff
+      : null;
+    const solverDirective = normalizeSolverDirective(agentHandoff?.solver);
     // v23: the gate ships the instance it authorised. Absent ⇒ v22 behaviour.
     const pinnedIds: string[] = Array.isArray(body?.vehicle_ids)
       ? body.vehicle_ids.filter((x: unknown) => typeof x === "string" && x.length > 0)
@@ -340,6 +340,7 @@ serve(async (req) => {
           dcfc_free: freeDcfc.length,
           stalls_scanned: (stalls ?? []).length,
           cohort_mode: cohortMode, gate_tick: gateTick, pinned_requested: pinnedRequested,
+          agent_handoff: agentHandoff, solver_directive: solverDirective,
           pinned_dropped: { by_state_or_soc: pinnedDroppedByState,
                             on_charge_stall: pinnedDroppedOnStall,
                             already_reserved: pinnedDroppedReserved },
@@ -350,6 +351,7 @@ serve(async (req) => {
         zone_a_candidates: zoneAAll.length, zone_a_in_instance: 0, zone_a_proposed: 0,
         zone_a_reserve_fraction: reserveFrac, zone_a_error: zoneAError,
         stalls: freeStalls.length, dcfc_free: freeDcfc.length, source: "none",
+        agent_handoff: agentHandoff, solver_directive: solverDirective,
         cohort_mode: cohortMode, pinned_requested: pinnedRequested, ...supplyDetail });
     }
 
@@ -392,14 +394,14 @@ serve(async (req) => {
       let raw: any[] = [];
       if (apiKey) {
         try {
-          const r = await cuoptAssign(apiKey, cands, freeStalls, tele);
+          const r = await cuoptAssign(apiKey, cands, freeStalls, solverDirective, tele);
           raw = r.assignments; source = "cuopt";
           solveMs = r.solverTimeMs; solveStatus = r.status; bindingHint = r.binding;
         }
-        catch (e) { cuoptError = e instanceof Error ? e.message : String(e); console.error("cuOpt LP gate solve failed; heuristic fallback:", cuoptError); raw = heuristic(cands, freeStalls); source = "cuopt_fallback"; }
+        catch (e) { cuoptError = e instanceof Error ? e.message : String(e); console.error("cuOpt LP gate solve failed; heuristic fallback:", cuoptError); raw = heuristic(cands, freeStalls, solverDirective); source = "cuopt_fallback"; }
         if (tele.httpStatus !== undefined) nvidiaStatuses.push(tele.httpStatus);
       } else {
-        raw = heuristic(cands, freeStalls);
+        raw = heuristic(cands, freeStalls, solverDirective);
       }
       assignments.push(...raw.map((a: any) => ({ ...a, enroute: false, src: source })));
     }
@@ -411,11 +413,11 @@ serve(async (req) => {
         const eCands = enrouteCands.slice(0, upgradeStalls.length);
         let raw: any[] = [];
         if (apiKey) {
-          try { const r = await cuoptAssign(apiKey, eCands, upgradeStalls, tele); raw = r.assignments; enrouteSource = "cuopt"; }
-          catch (e) { const msg = e instanceof Error ? e.message : String(e); cuoptError = cuoptError ? cuoptError + " | enroute: " + msg : "enroute: " + msg; console.error("cuOpt LP enroute solve failed; heuristic fallback:", msg); raw = heuristic(eCands, upgradeStalls); enrouteSource = "cuopt_fallback"; }
+          try { const r = await cuoptAssign(apiKey, eCands, upgradeStalls, solverDirective, tele); raw = r.assignments; enrouteSource = "cuopt"; }
+          catch (e) { const msg = e instanceof Error ? e.message : String(e); cuoptError = cuoptError ? cuoptError + " | enroute: " + msg : "enroute: " + msg; console.error("cuOpt LP enroute solve failed; heuristic fallback:", msg); raw = heuristic(eCands, upgradeStalls, solverDirective); enrouteSource = "cuopt_fallback"; }
           if (tele.httpStatus !== undefined) nvidiaStatuses.push(tele.httpStatus);
         } else {
-          raw = heuristic(eCands, upgradeStalls);
+          raw = heuristic(eCands, upgradeStalls, solverDirective);
           enrouteSource = "cuopt_fallback";
         }
         assignments.push(...raw.map((a: any) => ({ ...a, enroute: true, src: enrouteSource })));
@@ -463,7 +465,21 @@ serve(async (req) => {
     let zoneAProposed = 0;
     let submitErrors = 0;
     for (const a of assignments) {
-      const proposal: any = { abstain: false, stall_id: a.stallId, stall_type: a.stallType, requested_kw: a.kw, source: a.src };
+      const proposal: any = {
+        abstain: false,
+        stall_id: a.stallId,
+        stall_type: a.stallType,
+        requested_kw: a.kw,
+        source: a.src,
+        solver_directive: solverDirective,
+      };
+      if (agentHandoff) {
+        proposal.agent_handoff = {
+          chain_id: agentHandoff.chain_id ?? null,
+          agent_model: agentHandoff.agent_model ?? null,
+          agent_tick: agentHandoff.agent_tick ?? null,
+        };
+      }
       if (a.enroute) proposal.cohort = "enroute_reserved";
       else if (zoneAIds.has(a.vehicleId)) {
         proposal.cohort = "approach_band_zone_a";
@@ -510,6 +526,8 @@ serve(async (req) => {
                   proposed_kw: Math.round(proposedKw * 10) / 10, over_cap_kw: overCapKw,
                   cap_enforced: enforceCap, would_trim_by_cap: wouldTrim, trimmed_by_cap: trimmed },
         cuopt_error: cuoptError,
+        agent_handoff: agentHandoff,
+        solver_directive: solverDirective,
         ...supplyDetail,
       },
     });
@@ -526,6 +544,8 @@ serve(async (req) => {
       zone_a_proposed: zoneAProposed, zone_a_cap: zoneACap,
       zone_a_reserve_fraction: reserveFrac, zone_a_error: zoneAError,
       sim_clock: clock,
+      agent_handoff: agentHandoff,
+      solver_directive: solverDirective,
       energy: { cap_kw: capKw, committed_kw: Math.round(committedKw * 10) / 10,
                 proposed_kw: Math.round(proposedKw * 10) / 10, over_cap_kw: overCapKw,
                 cap_enforced: enforceCap, would_trim_by_cap: wouldTrim, trimmed_by_cap: trimmed },
@@ -539,12 +559,14 @@ serve(async (req) => {
 });
 
 // Deterministic fallback: neediest → DCFC first, COMPATIBLE + north-first only.
-function heuristic(vehicles: any[], stalls: any[]) {
-  const byY = (a: any, b: any) => num(a.relative_y, 999) - num(b.relative_y, 999);
-  const ordered = [...stalls.filter((s) => s.stall_type === "dcfc").sort(byY), ...stalls.filter((s) => s.stall_type === "l2").sort(byY)];
+function heuristic(vehicles: any[], stalls: any[], directive: SolverDirective) {
   const used = new Set<string>();
   const out: any[] = [];
   for (const v of vehicles) {
+    const ordered = [...stalls].sort((a, b) =>
+      assignmentPairCost(v, a, directive) - assignmentPairCost(v, b, directive) ||
+      num(a.relative_y, 999) - num(b.relative_y, 999) ||
+      String(a.id).localeCompare(String(b.id)));
     const s = ordered.find((x) => !used.has(x.id) && compatible(v.inlet_type, x));
     if (!s) continue;
     used.add(s.id);
@@ -563,7 +585,7 @@ function heuristic(vehicles: any[], stalls: any[]) {
 // optimum is integral — no MILP needed, and the solver terminates on OPTIMALITY.
 // Objective: minimise sum((cost - R) * x), R = maxCost + 1, so every assignment has a
 // negative coefficient → assign as MANY vehicles as possible, cheapest-first.
-async function cuoptAssign(apiKey: string, vehicles: any[], stalls: any[], tele?: { httpStatus?: number }) {
+async function cuoptAssign(apiKey: string, vehicles: any[], stalls: any[], directive: SolverDirective, tele?: { httpStatus?: number }) {
   const n = vehicles.length, m = stalls.length;
   if (n === 0 || m === 0) return { assignments: [], solverTimeMs: 0, status: "empty", binding: null };
 
@@ -574,7 +596,7 @@ async function cuoptAssign(apiKey: string, vehicles: any[], stalls: any[], tele?
     for (let j = 0; j < m; j++) {
       if (!compatible(vehicles[i].inlet_type, stalls[j])) continue;   // structural: no variable
       const idx = pairs.length;
-      pairs.push({ i, j, cost: pairCost(vehicles[i], stalls[j]) });
+      pairs.push({ i, j, cost: assignmentPairCost(vehicles[i], stalls[j], directive) });
       byVeh[i].push(idx);
       byStall[j].push(idx);
     }

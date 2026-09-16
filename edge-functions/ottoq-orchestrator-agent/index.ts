@@ -40,6 +40,7 @@
 //      max_tokens → ~60% fell to fallback).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeSolverDirective } from "../_shared/agent_solver_chain.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 function json(o: unknown, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json" } }); }
@@ -117,10 +118,11 @@ LENS 3 — ENERGY: grid draw vs forecast vs battery. Peak shaving comes ONLY fro
 
 INVIOLABLE: vehicles/chargers are never held back; a vehicle needing charge with a free charger charges immediately; you communicate — you never move vehicles.
 
-Return EXACTLY: {"actions":[...],"rationale":"<3-6 sentences citing board numbers>"} where each action is one of:
+Return EXACTLY: {"actions":[...],"solver":{"objective":"readiness_first|throughput_first|energy_balanced","why":"<short>"},"rationale":"<3-6 sentences citing board numbers>"} where each action is one of:
   {"type":"set_policy","key":"<dial>","value":<number>,"why":"<short>"}  dials: deploy_peak_fraction | energy_demand_factor_peak | energy_demand_factor_expensive | deploy_surge_catchup | forecast_horizon_min | energy_reserve_shave(0|1)
   {"type":"ops_action","action":"<name>","args":{},"why":"<short>"}  ops: raise_deploy_surge | extend_forecast_horizon | enable_energy_reserve (any OTHER name → human approval queue)
   {"type":"directive","text":"<advisory>","severity":"info|warning"}
+The solver objective ranks feasible assignments only: readiness_first protects low-SoC readiness, throughput_first prefers faster service, and energy_balanced conserves DCFC for vehicles that need it. It never changes eligibility and never holds a vehicle back.
 At most 3 policy/ops actions; dial values near current (max ±30%); prefer the smallest effective change; empty actions is a good answer when healthy. Fractional dials accept fractional values — send the precise number you intend, not a rounded one. Output ONLY the JSON object.`;
 
 serve(async (req) => {
@@ -128,13 +130,36 @@ serve(async (req) => {
   const tStart = Date.now();
   try {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const depot = body.depot_id ?? "11111111-1111-1111-1111-111111111111";
+    const requestedDepot = body.depot_id ?? "11111111-1111-1111-1111-111111111111";
+    const requestedRun = typeof body.sim_run_id === "string" && body.sim_run_id.length > 0
+      ? body.sim_run_id
+      : null;
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    const { data: run } = await sb.from("ottoq_sim_runs").select("sim_run_id, tick_count, sim_clock_current")
-      .eq("depot_id", depot).eq("status", "running")
-      .order("started_at", { ascending: false }).limit(1).maybeSingle();
+    let runQuery = sb.from("ottoq_sim_runs")
+      .select("sim_run_id, depot_id, tick_count, sim_clock_current")
+      .eq("status", "running");
+    runQuery = requestedRun
+      ? runQuery.eq("sim_run_id", requestedRun)
+      : runQuery.eq("depot_id", requestedDepot).order("started_at", { ascending: false }).limit(1);
+    const { data: run } = await runQuery.maybeSingle();
     if (!run) return json({ ok: true, skipped: "no running run" });
+    const depot = run.depot_id;
+
+    // 0332: multiple clocks can request an agent pass at the same run tick.
+    // Claim the tick atomically before spending a model call or changing policy.
+    // Chain-disabled sessions preserve the legacy behavior and are admitted by
+    // the RPC without writing a claim.
+    const { data: claim, error: claimError } = await sb.rpc("ottoq_agent_chain_claim", {
+      p_sim_run_id: run.sim_run_id,
+      p_source: "edge:ottoq-orchestrator-agent",
+    });
+    if (claimError) return json({ ok: false, error: `agent chain claim: ${claimError.message}` }, 500);
+    if (claim?.claimed === false) {
+      return json({ ok: true, run: run.sim_run_id, skipped: claim.reason ?? "agent tick already claimed",
+        tick_seq: claim.tick_seq ?? run.tick_count });
+    }
+    const chainTriggerTick = Number(claim?.tick_seq ?? run.tick_count);
 
     const { data: board, error: bErr } = await sb.rpc("ottoq_agent_board", { p_sim_run_id: run.sim_run_id });
     if (bErr || !board) return json({ ok: false, error: bErr?.message ?? "no board" }, 500);
@@ -168,7 +193,8 @@ serve(async (req) => {
       } catch (_e) { /* deterministic fallback below */ }
       proposeMs = Date.now() - tModel;
     }
-    if (!parsed || !Array.isArray(parsed.actions)) parsed = { actions: [], rationale: `fallback: model unavailable or unparseable (${raw ? raw.slice(0,40) : "no key"}) — no action taken` };
+    if (!parsed || !Array.isArray(parsed.actions)) parsed = { actions: [], solver: { objective: "readiness_first", why: "model unavailable" }, rationale: `fallback: model unavailable or unparseable (${raw ? raw.slice(0,40) : "no key"}) — no action taken` };
+    const solverDirective = normalizeSolverDirective(parsed.solver);
 
     // ---- SQL disposes: whitelist + clamps + drift, execute or QUEUE FOR APPROVAL ----
     const applied: unknown[] = []; const queued: unknown[] = []; const rejected: unknown[] = [];
@@ -232,6 +258,45 @@ serve(async (req) => {
       }
     }
 
+    // ---- ONE PROCESS: agent analysis -> solver request -> deterministic core ----
+    // The wrapper sets a transaction-local handoff and calls the existing cuOpt
+    // gate. That gate still owns candidate selection, right-of-first-refusal and
+    // the asynchronous edge request. Independent cuOpt callers stand down while
+    // agent_solver_chain_enabled=1, so this is the only solver entrance for the
+    // run rather than a second parallel proposer.
+    const chainId = crypto.randomUUID();
+    let solverHandoff: Record<string, unknown> = {
+      chain_id: chainId,
+      status: "disabled",
+      directive: solverDirective,
+    };
+    const { data: chainGate, error: chainGateError } = await sb.rpc("ottoq_policy_get", {
+      p_sim_run_id: run.sim_run_id,
+      p_param_key: "agent_solver_chain_enabled",
+      p_default: 0,
+    });
+    if (chainGateError) {
+      solverHandoff = { ...solverHandoff, status: "gate_error", error: chainGateError.message };
+    } else if (Number(chainGate) >= 1) {
+      const handoff = {
+        chain_id: chainId,
+        agent_model: modelUsed !== "none" ? modelUsed : "deterministic_fallback",
+        agent_tick: chainTriggerTick,
+        solver: solverDirective,
+        rationale: String(parsed.rationale ?? "").slice(0, 1200),
+        applied,
+        queued,
+        rejected,
+      };
+      const { data: requestId, error: solverError } = await sb.rpc("ottoq_agent_solver_refresh", {
+        p_sim_run_id: run.sim_run_id,
+        p_agent_handoff: handoff,
+      });
+      solverHandoff = solverError
+        ? { ...solverHandoff, status: "refused", error: solverError.message }
+        : { ...solverHandoff, status: requestId == null ? "abstained" : "queued", request_id: requestId };
+    }
+
     const totalMs = Date.now() - tStart;
     // 0088-era audit fix (check 0045 R5). Two defects lived in this one insert:
     //  * no `verb` anywhere -- 100 of 822 enacted decisions on run 9291ec6d could not say WHAT
@@ -241,8 +306,10 @@ serve(async (req) => {
     // The verb is derived from what actually happened, never from what was proposed: one
     // applied ops_action names itself; one set_policy names the dial; several name the batch.
     const a0 = applied[0] as any;
+    const solverQueued = solverHandoff.status === "queued";
     const verb =
-      applied.length === 0 ? "no_op"
+      solverQueued ? "analyze_and_solve"
+      : applied.length === 0 ? "no_op"
       : applied.length === 1
         ? (a0.type === "ops_action" ? String(a0.action ?? "ops_action")
            : a0.type === "set_policy" ? `set_policy:${a0.key}`
@@ -252,15 +319,19 @@ serve(async (req) => {
       sim_run_id: run.sim_run_id, tick_seq: run.tick_count, sim_clock: run.sim_clock_current,
       depot_id: depot, action_context: "task_start", resolved_action_context: "orchestrator_agent",
       entity_type: "depot", entity_id: depot,
-      context_frame: { board_tick: board.tick, lens: "board+return_wave+energy", fr4: true },
-      proposed_action: { actions: parsed.actions, model: modelUsed },
+      context_frame: { board_tick: board.tick, lens: "board+return_wave+energy", fr4: true,
+                       agent_solver_chain_id: chainId, agent_chain_trigger_tick: chainTriggerTick },
+      proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
+                         agent_solver_chain_id: chainId },
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
+                        solver_handoff: solverHandoff,
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
-      outcome_status: applied.length > 0 ? "enacted" : "noop_no_candidate",
+      outcome_status: applied.length > 0 || solverQueued ? "enacted" : "noop_no_candidate",
       propose_latency_ms: proposeMs, total_latency_ms: totalMs,
     });
 
     return json({ ok: true, run: run.sim_run_id, model: modelUsed, applied, queued, rejected,
+      solver_handoff: solverHandoff,
       latency_ms: { propose: proposeMs, total: totalMs }, rationale: parsed.rationale });
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : "unknown" }, 500);

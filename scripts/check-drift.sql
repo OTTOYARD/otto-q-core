@@ -424,7 +424,10 @@ repo_manifest(version, name, file) AS (
     ('20260914192738'::text, '0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate'::text, '0324_the_one_world_guard_says_this_depot_and_has_no_depot_predicate.sql'::text),
     ('20260914214010'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have'::text, '0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql'::text),
     ('20260914193928'::text, '0326_the_stamp_must_be_present_and_not_older_not_different'::text, '0326_the_stamp_must_be_present_and_not_older_not_different.sql'::text),
-    ('20260914214102'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql'::text)
+    ('20260914214102'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql'::text),
+    ('20260916000638'::text, 'the_agent_hands_one_solver_request_to_the_kernel'::text, '0331_the_agent_hands_one_solver_request_to_the_kernel.sql'::text),
+    ('20260916002025'::text, 'one_agent_claim_per_run_tick'::text, '0332_one_agent_claim_per_run_tick.sql'::text),
+    ('20260916144203'::text, 'every_solver_proposal_gets_a_deterministic_disposition'::text, '0333_every_solver_proposal_gets_a_deterministic_disposition.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
