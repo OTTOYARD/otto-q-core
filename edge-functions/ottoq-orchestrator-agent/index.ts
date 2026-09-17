@@ -272,10 +272,9 @@ serve(async (req) => {
     }
 
     // ---- ONE PROCESS: agent analysis -> CP-SAT proposal -> deterministic core ----
-    // This edge call is detached because the parent request comes from pg_net's
-    // short timeout. The CP-SAT bridge records its result under this chain id and
-    // submits through the same kernel door as every proposer. cuOpt runs only if
-    // the primary service or submission door fails.
+    // The bridge response is awaited so the audit trail records completion,
+    // fallback, or failure instead of claiming that an unobserved request queued.
+    // The bridge bounds the external solver call and falls back to cuOpt.
     const chainId = crypto.randomUUID();
     let solverHandoff: Record<string, unknown> = {
       chain_id: chainId,
@@ -302,18 +301,43 @@ serve(async (req) => {
       };
       const solverUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ottoq-cpsat-propose`;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      EdgeRuntime.waitUntil(fetch(solverUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
-        },
-        body: JSON.stringify({ sim_run_id: run.sim_run_id, agent_handoff: handoff }),
-      }).then(async (response) => {
-        if (!response.ok) console.error("CP-SAT handoff failed", response.status, (await response.text()).slice(0, 500));
-      }).catch((error) => console.error("CP-SAT handoff threw", error)));
-      solverHandoff = { ...solverHandoff, status: "queued", engine: "cp_sat_forward_lex" };
+      try {
+        const response = await fetch(solverUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
+          },
+          body: JSON.stringify({ sim_run_id: run.sim_run_id, agent_handoff: handoff }),
+        });
+        const responseText = await response.text();
+        let receipt: any = null;
+        try { receipt = JSON.parse(responseText); } catch { /* bounded raw detail below */ }
+        if (!response.ok || receipt?.ok !== true) {
+          solverHandoff = {
+            ...solverHandoff,
+            status: "failed",
+            engine: "cp_sat_forward_lex",
+            error: String(receipt?.error ?? receipt?.primary_error ?? responseText ?? `HTTP ${response.status}`).slice(0, 600),
+          };
+        } else {
+          solverHandoff = {
+            ...solverHandoff,
+            status: receipt.fallback === true ? "fallback" : "completed",
+            engine: receipt.engine ?? "cp_sat_forward_lex",
+            receipt: receipt.receipt ?? null,
+            fallback_reason: receipt.fallback_reason ?? null,
+          };
+        }
+      } catch (error) {
+        solverHandoff = {
+          ...solverHandoff,
+          status: "failed",
+          engine: "cp_sat_forward_lex",
+          error: error instanceof Error ? error.message.slice(0, 600) : "solver handoff failed",
+        };
+      }
     }
 
     const totalMs = Date.now() - tStart;
@@ -325,9 +349,9 @@ serve(async (req) => {
     // The verb is derived from what actually happened, never from what was proposed: one
     // applied ops_action names itself; one set_policy names the dial; several name the batch.
     const a0 = applied[0] as any;
-    const solverQueued = solverHandoff.status === "queued";
+    const solverAccepted = ["completed", "fallback"].includes(String(solverHandoff.status));
     const verb =
-      solverQueued ? "analyze_and_solve"
+      solverAccepted ? "analyze_and_solve"
       : applied.length === 0 ? "no_op"
       : applied.length === 1
         ? (a0.type === "ops_action" ? String(a0.action ?? "ops_action")
@@ -345,7 +369,7 @@ serve(async (req) => {
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
                         solver_handoff: solverHandoff,
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
-      outcome_status: applied.length > 0 || solverQueued ? "enacted" : "noop_no_candidate",
+      outcome_status: applied.length > 0 || solverAccepted ? "enacted" : "noop_no_candidate",
       propose_latency_ms: proposeMs, total_latency_ms: totalMs,
     });
 
