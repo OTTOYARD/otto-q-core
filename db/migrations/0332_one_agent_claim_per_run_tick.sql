@@ -64,6 +64,8 @@ SECURITY DEFINER
 SET search_path TO 'twin','ottoq','public','extensions'
 AS $fn$
 DECLARE v_tick bigint; v_claimed bigint; v_enabled boolean;
+        v_prev_tick bigint; v_prev_at timestamptz; v_done boolean := false;
+        v_timeout_s integer;
 BEGIN
   IF p_sim_run_id IS NULL OR NULLIF(p_source,'') IS NULL THEN
     RAISE EXCEPTION 'ottoq_agent_chain_claim: run and source are required'
@@ -71,8 +73,12 @@ BEGIN
   END IF;
 
   SELECT COALESCE(r.tick_count,0),
-         public.ottoq_policy_get(r.sim_run_id,'agent_solver_chain_enabled',0) >= 1
-    INTO v_tick, v_enabled
+         public.ottoq_policy_get(r.sim_run_id,'agent_solver_chain_enabled',0) >= 1,
+         CASE WHEN COALESCE(r.payload->'agent_chain_claim'->>'tick_seq','') ~ '^[0-9]+$'
+              THEN (r.payload->'agent_chain_claim'->>'tick_seq')::bigint END,
+         CASE WHEN COALESCE(r.payload->'agent_chain_claim'->>'claimed_at','') <> ''
+              THEN (r.payload->'agent_chain_claim'->>'claimed_at')::timestamptz END
+    INTO v_tick, v_enabled, v_prev_tick, v_prev_at
     FROM public.ottoq_sim_runs r
    WHERE r.sim_run_id=p_sim_run_id AND r.status='running';
   IF NOT FOUND THEN
@@ -80,6 +86,24 @@ BEGIN
   END IF;
   IF NOT v_enabled THEN
     RETURN jsonb_build_object('claimed',true,'chain_enabled',false,'tick_seq',v_tick);
+  END IF;
+
+  v_timeout_s := GREATEST(10,
+    public.ottoq_policy_get(p_sim_run_id,'agent_chain_inflight_timeout_s',45)::integer);
+  IF v_prev_tick IS NOT NULL
+     AND v_prev_at >= clock_timestamp() - make_interval(secs => v_timeout_s) THEN
+    SELECT EXISTS (
+      SELECT 1 FROM public.ottoq_decisions d
+       WHERE d.sim_run_id=p_sim_run_id
+         AND d.resolved_action_context='orchestrator_agent'
+         AND COALESCE(CASE WHEN COALESCE(d.context_frame->>'agent_chain_trigger_tick','') ~ '^[0-9]+$'
+                           THEN (d.context_frame->>'agent_chain_trigger_tick')::bigint END,
+                      d.tick_seq) = v_prev_tick
+    ) INTO v_done;
+    IF NOT v_done THEN
+      RETURN jsonb_build_object('claimed',false,'reason','agent_run_in_flight',
+        'tick_seq',v_tick,'inflight_tick',v_prev_tick,'retry_after_s',v_timeout_s);
+    END IF;
   END IF;
 
   UPDATE public.ottoq_sim_runs r

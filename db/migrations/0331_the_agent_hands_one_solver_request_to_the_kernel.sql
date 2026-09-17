@@ -81,7 +81,7 @@ BEGIN
              || E'       ''0265: the frame carries the facts the door pre-filters on''),\n'
              || E'      (''proposer_hold_enabled'',          1::numeric,\n'
              || E'       ''0259/0262: one-tick right of first refusal for a non-cuOpt proposer''),\n'
-             || E'      (''cuopt_first_refusal_max_defers'', 1::numeric,\n'
+             || E'      (''cuopt_first_refusal_max_defers'', 6::numeric,\n'
              || E'       ''0152 set the global tier to 0; without a run row nothing is ever armed'')';
   new_report := E'      (''agent_solver_chain_enabled'',     1::numeric,\n'
              || E'       ''0331: one chain owns analysis -> solve -> deterministic disposal''),\n'
@@ -100,7 +100,7 @@ BEGIN
 
   old_arm := E'      (''proposer_frame_facts'',           1::numeric),\n'
           || E'      (''proposer_hold_enabled'',          1::numeric),\n'
-          || E'      (''cuopt_first_refusal_max_defers'', 1::numeric)';
+          || E'      (''cuopt_first_refusal_max_defers'', 6::numeric)';
   new_arm := E'      (''agent_solver_chain_enabled'',     1::numeric),\n'
           || E'      (''cuopt_propose_enabled'',          1::numeric),\n'
           || E'      (''orchestrator_agent_enabled'',     1::numeric),\n'
@@ -186,7 +186,7 @@ BEGIN
          || E'      PERFORM public.cuopt_log_gate(v_run,''agent_policy_disabled'',NULL,NULL,v_t0);\n'
          || E'      RETURN NULL;\n'
          || E'    END IF;\n'
-         || E'    SELECT r.depot_id INTO v_depot FROM public.ottoq_sim_runs r\n'
+         || E'    SELECT r.depot_id, COALESCE(r.tick_count,0) INTO v_depot,v_tick FROM public.ottoq_sim_runs r\n'
          || E'     WHERE r.sim_run_id=v_run AND r.status=''running'';\n'
          || E'    IF v_depot IS NULL THEN\n'
          || E'      PERFORM public.cuopt_log_gate(v_run,''no_depot'',NULL,NULL,v_t0);\n'
@@ -198,6 +198,10 @@ BEGIN
          || E'      PERFORM public.cuopt_log_gate(v_run,''no_anon_key_in_vault'',NULL,NULL,v_t0);\n'
          || E'      RETURN NULL;\n'
          || E'    END IF;\n'
+         || E'    -- Reserve one deterministic beat for the slower agent + solver chain.\n'
+         || E'    -- The existing deferral ledger bounds this to one refusal, then fails open.\n'
+         || E'    BEGIN PERFORM public.ottoq_cuopt_first_refusal_arm(v_run,v_tick);\n'
+         || E'    EXCEPTION WHEN OTHERS THEN NULL; END;\n'
          || E'    SELECT net.http_post(\n'
          || E'      url := ''https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-orchestrator-agent'',\n'
          || E'      headers := jsonb_build_object(''Content-Type'',''application/json'',''Authorization'',''Bearer ''||v_key,''apikey'',v_key),\n'
@@ -302,7 +306,8 @@ BEGIN
      OR v_report !~ 'cuopt_propose_enabled' THEN
     RAISE EXCEPTION '0331 A2: arming report does not measure all three execution controls';
   END IF;
-  IF v_refresh !~ 'delegated_to_agent_chain' OR v_refresh !~ 'agent_handoff' THEN
+  IF v_refresh !~ 'delegated_to_agent_chain' OR v_refresh !~ 'agent_handoff'
+     OR v_refresh !~ 'ottoq_cuopt_first_refusal_arm' THEN
     RAISE EXCEPTION '0331 A3: cuOpt refresh lacks delegation or handoff';
   END IF;
   IF v_cron !~ 'agent_solver_chain_enabled' OR v_cron !~ 'ottoq_cuopt_refresh' THEN

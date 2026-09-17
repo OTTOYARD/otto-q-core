@@ -78,7 +78,7 @@ COMMENT ON COLUMN public.ottoq_external_proposals.disposed_tick IS
 
 CREATE OR REPLACE FUNCTION public.ottoq_dispose_external_proposals(
   p_sim_run_id uuid,
-  p_tick_seq integer DEFAULT NULL,
+  p_tick_seq bigint DEFAULT NULL,
   p_sim_clock timestamptz DEFAULT NULL,
   p_finalize boolean DEFAULT false
 ) RETURNS integer
@@ -178,12 +178,12 @@ BEGIN
 END;
 $function$;
 
-COMMENT ON FUNCTION public.ottoq_dispose_external_proposals(uuid,integer,timestamptz,boolean) IS
+COMMENT ON FUNCTION public.ottoq_dispose_external_proposals(uuid,bigint,timestamptz,boolean) IS
   '0333: closes pending external proposals with a deterministic reason. Tick mode refuses unavailable stall targets and expires real-time TTLs; finalize mode expires every remaining proposal before archive.';
 
-REVOKE ALL ON FUNCTION public.ottoq_dispose_external_proposals(uuid,integer,timestamptz,boolean)
+REVOKE ALL ON FUNCTION public.ottoq_dispose_external_proposals(uuid,bigint,timestamptz,boolean)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.ottoq_dispose_external_proposals(uuid,integer,timestamptz,boolean)
+GRANT EXECUTE ON FUNCTION public.ottoq_dispose_external_proposals(uuid,bigint,timestamptz,boolean)
   TO service_role;
 
 DO $patch_decide$
@@ -279,9 +279,9 @@ BEGIN
     RAISE EXCEPTION '0333 A3: stop finalizer is absent';
   END IF;
 
-  IF has_function_privilege('anon','public.ottoq_dispose_external_proposals(uuid,integer,timestamptz,boolean)','EXECUTE')
-     OR has_function_privilege('authenticated','public.ottoq_dispose_external_proposals(uuid,integer,timestamptz,boolean)','EXECUTE')
-     OR NOT has_function_privilege('service_role','public.ottoq_dispose_external_proposals(uuid,integer,timestamptz,boolean)','EXECUTE') THEN
+  IF has_function_privilege('anon','public.ottoq_dispose_external_proposals(uuid,bigint,timestamptz,boolean)','EXECUTE')
+     OR has_function_privilege('authenticated','public.ottoq_dispose_external_proposals(uuid,bigint,timestamptz,boolean)','EXECUTE')
+     OR NOT has_function_privilege('service_role','public.ottoq_dispose_external_proposals(uuid,bigint,timestamptz,boolean)','EXECUTE') THEN
     RAISE EXCEPTION '0333 A4: finalizer privileges are not service-role-only';
   END IF;
 

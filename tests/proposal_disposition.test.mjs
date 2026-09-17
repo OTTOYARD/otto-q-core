@@ -10,6 +10,10 @@ const supersedeSql = readFileSync(
   new URL("../db/migrations/0334_a_newer_solver_packet_explains_what_it_superseded.sql", import.meta.url),
   "utf8",
 );
+const tickTypeFixSql = readFileSync(
+  new URL("../db/migrations/0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql", import.meta.url),
+  "utf8",
+);
 
 test("proposal payload stays separate from deterministic disposition", () => {
   assert.match(sql, /ADD COLUMN IF NOT EXISTS disposition_reason text/);
@@ -59,4 +63,14 @@ test("new proposal packets explain submission-time supersession", () => {
   assert.match(supersedeSql, /disposed_at=clock_timestamp\(\)/);
   assert.match(supersedeSql, /disposed_tick=\(SELECT r\.tick_count/);
   assert.match(supersedeSql, /status='superseded' AND disposition_reason IS NULL/);
+});
+
+test("proposal finalizer accepts the kernel bigint tick without an ambiguous overload", () => {
+  assert.match(sql, /p_tick_seq bigint DEFAULT NULL/);
+  assert.match(tickTypeFixSql, /p_tick_seq bigint DEFAULT NULL/);
+  assert.match(
+    tickTypeFixSql,
+    /DROP FUNCTION IF EXISTS public\.ottoq_dispose_external_proposals\(uuid,integer,timestamptz,boolean\)/,
+  );
+  assert.match(tickTypeFixSql, /to_regprocedure\('public\.ottoq_dispose_external_proposals\(uuid,bigint,timestamp with time zone,boolean\)'\)/);
 });
