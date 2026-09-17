@@ -1,4 +1,4 @@
--- migration-version: 20260917040000
+-- migration-version: 20260917124150
 -- migration-name:    one_inflight_agent_gets_a_bounded_solver_window
 --
 -- Live run 911a5d0d measured Nemotron at about 29 seconds. A one-beat refusal

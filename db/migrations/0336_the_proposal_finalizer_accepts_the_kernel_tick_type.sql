@@ -1,4 +1,4 @@
--- migration-version: 20260917024500
+-- migration-version: 20260917122803
 -- migration-name:    the_proposal_finalizer_accepts_the_kernel_tick_type
 --
 -- Live proof on Peak Turnover run 1ac6b6a4 showed 397 deterministic beats

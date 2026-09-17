@@ -1,4 +1,4 @@
--- migration-version: 20260917033000
+-- migration-version: 20260917123453
 -- migration-name:    the_agent_chain_gets_first_refusal_before_greedy_dispatch
 --
 -- Run a7a364e7 proved Nemotron, policy enactment and the deterministic kernel,
