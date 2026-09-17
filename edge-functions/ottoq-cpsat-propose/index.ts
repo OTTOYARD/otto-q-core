@@ -95,6 +95,9 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${intelligenceToken}` },
       body: JSON.stringify(requestBody),
+      // The solver host may be intentionally stopped between development sessions.
+      // Fail over promptly instead of leaving the agent chain waiting on TCP timeout.
+      signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) throw new Error(`intelligence /assign returned ${response.status}: ${(await response.text()).slice(0, 400)}`);
     const result = await response.json();
