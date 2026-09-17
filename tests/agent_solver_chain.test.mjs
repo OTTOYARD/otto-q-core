@@ -67,7 +67,8 @@ test("agent binds an explicit run before handing off to the solver", () => {
   assert.match(source, /requestedRun/);
   assert.match(source, /eq\("sim_run_id", requestedRun\)/);
   assert.match(source, /ottoq-cpsat-propose/);
-  assert.match(source, /EdgeRuntime\.waitUntil/);
+  assert.match(source, /const response = await fetch\(solverUrl/);
+  assert.match(source, /status: receipt\.fallback === true \? "fallback" : "completed"/);
   assert.match(source, /apikey: serviceKey/);
   assert.match(source, /ottoq_agent_chain_claim/);
 });
@@ -115,6 +116,7 @@ test("CP-SAT bridge is internal and falls back to cuOpt only on failure", () => 
     "utf8",
   );
   assert.match(source, /internal service role required/);
+  assert.match(source, /AbortSignal\.timeout\(5_000\)/);
   assert.match(source, /ottoq_proposer_submit_batch/);
   assert.match(source, /queueCuOptFallback/);
   assert.match(source, /p_source: "forward_lex"/);
