@@ -128,3 +128,31 @@ test("tick claim migration suppresses the legacy parallel agent trigger", () => 
   assert.match(source, /agent_chain_claim/);
   assert.match(source, /agent_solver_chain_enabled/);
 });
+
+test("agent delegation reserves one bounded beat before greedy dispatch", () => {
+  const migration = readFileSync(
+    new URL("../db/migrations/0331_the_agent_hands_one_solver_request_to_the_kernel.sql", import.meta.url),
+    "utf8",
+  );
+  const fix = readFileSync(
+    new URL("../db/migrations/0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(migration, /ottoq_cuopt_first_refusal_arm\(v_run,v_tick\)/);
+  assert.match(fix, /ottoq_cuopt_first_refusal_arm\(v_run,v_tick\)/);
+  assert.match(
+    fix,
+    /strpos\(d,'ottoq_cuopt_first_refusal_arm\(v_run,v_tick\)'\) > strpos\(d,'ottoq-orchestrator-agent'\)/,
+  );
+});
+
+test("one in-flight agent owns a bounded multi-beat solver window", () => {
+  const source = readFileSync(
+    new URL("../db/migrations/0338_one_inflight_agent_gets_a_bounded_solver_window.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /agent_run_in_flight/);
+  assert.match(source, /agent_chain_inflight_timeout_s/);
+  assert.match(source, /cuopt_first_refusal_max_defers'', 6::numeric/);
+  assert.match(source, /resolved_action_context='orchestrator_agent'/);
+});

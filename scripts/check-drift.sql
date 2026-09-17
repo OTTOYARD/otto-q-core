@@ -429,7 +429,10 @@ repo_manifest(version, name, file) AS (
     ('20260916002025'::text, 'one_agent_claim_per_run_tick'::text, '0332_one_agent_claim_per_run_tick.sql'::text),
     ('20260916144203'::text, 'every_solver_proposal_gets_a_deterministic_disposition'::text, '0333_every_solver_proposal_gets_a_deterministic_disposition.sql'::text),
     ('20260916180920'::text, 'a_newer_solver_packet_explains_what_it_superseded'::text, '0334_a_newer_solver_packet_explains_what_it_superseded.sql'::text),
-    ('20260916194021'::text, 'cp_sat_becomes_the_primary_agent_solver'::text, '0335_cp_sat_becomes_the_primary_agent_solver.sql'::text)
+    ('20260916194021'::text, 'cp_sat_becomes_the_primary_agent_solver'::text, '0335_cp_sat_becomes_the_primary_agent_solver.sql'::text),
+    ('20260917122803'::text, 'the_proposal_finalizer_accepts_the_kernel_tick_type'::text, '0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql'::text),
+    ('20260917123453'::text, 'the_agent_chain_gets_first_refusal_before_greedy_dispatch'::text, '0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql'::text),
+    ('20260917124150'::text, 'one_inflight_agent_gets_a_bounded_solver_window'::text, '0338_one_inflight_agent_gets_a_bounded_solver_window.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
