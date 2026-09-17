@@ -68,7 +68,18 @@ test("agent binds an explicit run before handing off to the solver", () => {
   assert.match(source, /eq\("sim_run_id", requestedRun\)/);
   assert.match(source, /ottoq-cpsat-propose/);
   assert.match(source, /EdgeRuntime\.waitUntil/);
+  assert.match(source, /apikey: serviceKey/);
   assert.match(source, /ottoq_agent_chain_claim/);
+});
+
+test("agent retries the remaining NVIDIA keys when a legacy endpoint is gone", () => {
+  const source = readFileSync(
+    new URL("../edge-functions/ottoq-orchestrator-agent/index.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /for \(const candidate of keys\)/);
+  assert.match(source, /if \(!r\.ok\)[\s\S]*continue;/);
+  assert.match(source, /Authorization: `Bearer \$\{candidate\.value\}`/);
 });
 
 test("CP-SAT request bounds agent influence and retries", () => {
