@@ -119,6 +119,7 @@ test("CP-SAT bridge is internal and falls back to cuOpt only on failure", () => 
   assert.match(source, /AbortSignal\.timeout\(5_000\)/);
   assert.match(source, /ottoq_proposer_submit_batch/);
   assert.match(source, /queueCuOptFallback/);
+  assert.match(source, /throw new Error\("CP-SAT service is not configured"\)/);
   assert.match(source, /p_source: "forward_lex"/);
 });
 
