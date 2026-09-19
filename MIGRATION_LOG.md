@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0338 — GENERATED, not a log
+## Index, 0134–0350 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -321,7 +321,19 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0336](db/migrations/0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql) | `20260917122803` | yes — ledger | Live proof on Peak Turnover run 1ac6b6a4 showed 397 deterministic beats |
 | [0337](db/migrations/0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql) | `20260917123453` | yes — ledger | Run a7a364e7 proved Nemotron, policy enactment and the deterministic kernel, |
 | [0338](db/migrations/0338_one_inflight_agent_gets_a_bounded_solver_window.sql) | `20260917124150` | yes — ledger | Live run 911a5d0d measured Nemotron at about 29 seconds. A one-beat refusal |
+| [0339](db/migrations/0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql) | `20260919042514` | yes — ledger | CP-SAT WAS MADE THE PRIMARY PROPOSER AND HAS PROPOSED NOTHING SINCE, |
+| [0340](db/migrations/0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql) | `20260919045051` | yes — ledger | THE THREE INTELLIGENCE PATHS KEEP NO DURABLE PER-CALL RECORD, AND THE |
+| [0341](db/migrations/0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql) | `20260919045936` | yes — ledger | THE VIEW 0340 SHIPPED COUNTED 515 OF 1,676 ROWS AND REPORTED THE OTHER |
+| [0342](db/migrations/0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql) | `20260919052746` | yes — ledger | THE LOOP RUNS AGENT -> SOLVER -> KERNEL AND STOPS. NOTHING COMES BACK |
+| [0343](db/migrations/0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql) | `20260919053350` | yes — ledger | 0342's REVIEW REPORTED "kernel: enacted 0, solver: null" FOR A CHAIN |
+| [0344](db/migrations/0344_the_purge_cannot_complete_and_the_twin_start_door_has_no_handler.sql) | `20260919154650` | yes — ledger | ottoq_purge_prior_runs RAISES, ottoq_start_demo_run DOES NOT CATCH IT, |
+| [0345](db/migrations/0345_the_purge_deletes_engine_tables_alphabetically_not_by_dependency.sql) | `20260919155936` | yes — ledger | "CHILDREN FIRST" WAS ORDER BY table_name. THAT IS ALPHABETICAL, NOT |
+| [0346](db/migrations/0346_the_cockpits_solver_join_has_never_matched_a_row.sql) | `20260919161259` | yes — ledger | THE OTTO-TWIN COCKPIT HAS DISPLAYED "CP-SAT" AND ZERO THROUGHPUT FOR |
+| [0347](db/migrations/0347_one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes.sql) | `20260919163943` | yes — ledger | THE PURGE IS NOT BLOCKED ANY MORE. IT IS QUADRATIC. ONE UNINDEXED |
+| [0348](db/migrations/0348_a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol.sql) | `20260919170057` | yes — ledger | FOUR ENGINE TABLES ARE APPEND-ONLY. THREE LET THE PURGE THROUGH. THE |
+| [0349](db/migrations/0349_a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable.sql) | `20260919173442` | yes — ledger | THE ATTESTATION SAYS "ARMED, 7 OF 7". THE RANK-0 PROPOSER HAS NOT RUN |
+| [0350](db/migrations/0350_the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters.sql) | `20260919191701` | yes — ledger | THE WORLD MODEL CARRIES ~120 PER-ASSET VARIABLES. THE AGENT SEES ZERO |
 
-201 migrations indexed.
+213 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

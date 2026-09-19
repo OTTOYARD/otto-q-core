@@ -42,6 +42,28 @@ protected still holds: *every external fact in this repo carries a source and a 
      A fact without a URL is not a fact, no matter who fetched it.
    - **Never guess silently.** Unchanged, and the whole point.
 
+   **RE-AFFIRMED AND SHARPENED 2026-09-19, in Chase's words, because the agent side of
+   this rule kept getting re-litigated from scratch every session.** Two different
+   permissions live here and they are NOT the same permission:
+
+   - **WEB SEARCH IS STANDING AND OPEN. Do not ask.** *"You can always do web search
+     if needed. Make sure you save that and that doesn't get lost. I don't want you to
+     feel like you're on an island with our own information. If you ever need to go
+     search for external sources, you can do that on the web."* So: no permission
+     request, no "should I look this up", no reasoning from memory about a versioned
+     external fact when the answer is one fetch away. The provenance rule above is the
+     only condition — claim, version/date, URL.
+   - **RESEARCH *AGENTS* STILL STOP FIRST.** *"Maintain the same posture with research
+     agents. If needed, you have to let me know first, stop building, and we can
+     discuss what it will be needed for and if it's necessary, or if it's more
+     important just to test and build line by line."* Fanning out subagents for
+     research is what burns token budget, so it is an explicit ask-first action every
+     time. Note the asymmetry: **fanning out to BUILD is allowed** (*"If you need to
+     fan out and build, do that"*) — it is deep *research* with agents that stops.
+
+   The distinction to hold: one search is free, twelve agents reading the internet is a
+   budget decision that belongs to Chase.
+
 When information is missing:
    - Write `docs/research/requests/R-<n>-<slug>.md` with precise, answerable questions (field names, units, versions — never "tell me about X") and commit it. Hermes polls that folder at the start of its sessions.
    - Then proceed with labeled assumptions (`ASSUMPTION — pending R-<n>`) or park the step and continue the run.
@@ -60,6 +82,11 @@ When information is missing:
      **The table's own COMMENT asserts the opposite** — *"Deliberately NOT named ottoq\* so `ottoq_purge_prior_runs` cannot delete prior-run evidence"* — a naming convention relied upon to defeat a mechanism that does not read names. It has never worked. (Note the nightly job is NOT the deleter: cron 625 runs `ottoq_retention_purge_runs`, whose allowlist holds 7 tables and not this one.)
      The damage, measured: `n_tup_ins` **48,897** against `n_tup_del` **63,755**; `max(invocation_id)` 48,897 with **28,262 allocated ids absent**; and the decisive independent witness — the earliest surviving `called_at` is **2026-08-02**, while sibling table `ottoq_cuopt_fire_log` still holds firings from **2026-07-18**, fifteen days earlier. (28,262 is ids absent, not rows deleted: `nextval` is non-transactional and `cuopt_log_gate`'s INSERT sits in an exception handler, so an aborted insert burns an id too. `n_tup_del` is what proves the deletion.)
      **SAY INSTEAD:** *"Sixteen calls to the NVIDIA endpoint survive in the invocation ledger, the last on 2026-08-30. The true lifetime count is at least sixteen and is not recoverable from this table — it is registered as run-scoped engine data and the demo-run purge has deleted from it, leaving 28,262 allocated ids absent and no surviving row older than 2026-08-02, while `ottoq_cuopt_fire_log` still holds firings from 2026-07-18."*
+     **CORRECTION 2026-09-19 (`db/checks/0247`, fixed by `0340`/`0341`) — THE SENTENCE ABOVE IS NOW WRONG BY 499 CALLS, IN THE DIRECTION THAT UNDERSTATES US, AND cuOpt IS NOT DARK.** Measured today: `cuopt_invocation_log` holds **27,340 rows of which 515 carry an `http_status`**, and that column is set only from `nvidiaStatuses` in `ottoq-cuopt-propose`, so each one is a real call to `optimize.api.nvidia.com`. All 515 returned 200. **507 answered with `source='cuopt'` for 2,738 proposals**; 8 returned `solved_but_zero_proposals`. The most recent call is **2026-09-17 12:42:07 UTC**, not 2026-08-30 — the endpoint came back to life on 2026-09-16 under `edge:v26-agent-chain` (485 of the 515 calls). "Sixteen calls, the last on 2026-08-30" was true when written and has been quoted past its evidence.
+     **AND THE UNDERLYING FRAGILITY IS NOW FIXED RATHER THAN DESCRIBED.** The reason that sentence had to hedge — the ledger is `class='engine'` and the demo-run purge deletes it — is closed by `0340`: `public.ottoq_model_call_ledger` is an append-only, `class='evidence'` ledger with **deliberately no FK to `ottoq_sim_runs`** (the registry's own check (b) requires an FK of `engine`/`stamp` only, and an enforcing FK on evidence can only block the purge or, as CASCADE, erase what check (c) forbids erasing). It carries one row per external model or solver call — cuOpt, Nemotron, CP-SAT, the Anthropic advisor — filled by two error-swallowing capture triggers plus a backfill of the 515 surviving NVIDIA calls and 1,161 intelligence decisions. No chain-of-thought is stored.
+     **SO STOP QUOTING A SENTENCE AND READ THE VIEW.** `SELECT * FROM public.ottoq_intelligence_ledger` computes the rule-6 answer per provider, and its five outcome classes are asserted to sum to its call count — the check `0340`'s first view lacked, which is why that view silently reported 515 of 1,676 rows and bucketed the other 1,161 nowhere (`0341`). As of 2026-09-19 it reads: **nvidia_cuopt 515 calls / 515 reaching NVIDIA / 507 answered / 2,738 proposals, last 2026-09-17 12:42 UTC · nvidia_nemotron 1,120 calls, last 2026-09-17 12:44 UTC · cpsat_service 41 calls, last 2026-09-14 09:23 UTC.** Re-derive; never quote this paragraph's numbers without re-running it.
+     **AND TWO THINGS THAT VIEW MAKES VISIBLE FOR THE FIRST TIME, both of which are product findings rather than hygiene.** (a) **G62 — the agent is on average exactly one tick late.** Nemotron's mean latency over 1,120 calls is **30,394 ms** with a maximum of **180,743 ms**, against a 30-second beat, and **433 of 1,120 calls (39%) took longer than one tick**. That is the mechanism behind the 721 `deterministic_fallback` decisions sitting beside 729 `nemotron` ones: an advisory agent cannot be a synchronous dependency of a 30-second tick. (b) **`agent_calls_with_no_l1_rules` = 1,120 of 1,120.** Every Nemotron call in the ledger carries an empty `rule_results`, so the one path where an AI changes engine state is still the one path the L1 shield does not gate — now countable from evidence that survives its run.
+
      **AND NOTE WHICH DIRECTION THIS CUTS.** Rule 6 forbids unquantified cuOpt claims *in both directions*. A purged ledger makes the LOW direction unquantifiable too: "cuOpt has barely been used" is now exactly as unsupported as "cuOpt is heavily used." The fix — reclassifying the ledger to `evidence`, and deleting the false comment — belongs in the cuOpt cut window, because prior-run rows surviving would expose any unscoped cuOpt reader (the 0145/0146 class), and that audit happens there anyway.
      **And a warning attached to cutting it.** Of the eight database functions named `cuopt*`, **five are not cuOpt**: they are the propose/dispose deferral machinery, which carries a cuOpt name for historical reasons and is **load-bearing for the CP-SAT proposer** (`ottoq_proposer_precedence` declares `holds_tick` for `cuopt`, `cuopt_fallback`, `forward_lex` and `llm_advisor`; `ottoq_agentic_arm` writes `cuopt_first_refusal_max_defers=1` on every armed run). Cutting "everything cuopt" by name would remove the CP-SAT proposer's right of first refusal. `db/checks/0220` has the safe order.
    - **Assignment plus verification, always.** Already embodied: `ottoq_stall_bookings` makes double-booking physically impossible via EXCLUDE constraint; `space_conflict_ledger` records every calendar claim overruled by physical reality. Never remove either side.

@@ -2,20 +2,97 @@
 
 Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core). Read-only snapshot.
 
-- **Captured:** 2026-08-03
-- **Previous snapshot:** 2026-07-13
-- **Live ACTIVE functions:** 27
-- **New since 2026-07-13:** 5 (`ottoq-energy-mpc` moved under `supabase/functions/`, plus 4 that were never in the repo)
-- **Redeployed since 2026-07-13:** 8 (marked ⭐ below)
+- **Captured:** 2026-09-19
+- **Previous snapshot:** 2026-08-03
+- **Live ACTIVE functions:** 28
+- **Changed since 2026-08-03:** **6 — and every one is on the agent/solver/twin loop**
 
-`version` is the platform's deploy counter — it increments on every deploy, so a changed
-version between snapshots is proof the function was redeployed. `verify_jwt` is the
-gateway auth setting: `true` requires a Supabase JWT (the publishable anon key satisfies
-it); `false` means the function is open at the gateway and must do its own auth.
+## ⚠️ READ THIS BEFORE TRUSTING A COPY IN THIS DIRECTORY
 
-Functions whose `updated_at` predates 2026-07-13 were re-pulled or verified against the
-committed copy and are byte-identical — `otto-q-api` was re-pulled in full and produced
-no diff, confirming the on-disk copies are current.
+**Six on-disk copies are STALE against what is deployed.** This was found while
+tracing G66 (the rank-0 proposer never fires): the repo's
+`ottoq-orchestrator-agent/index.ts` ends its solver handoff with
+`EdgeRuntime.waitUntil(fetch(...))` — fire-and-forget, failures only
+`console.error`'d — and can emit only `status: "queued" | "disabled" |
+"gate_error"`. The **deployed** v26 `await`s the bridge and emits
+`"completed" | "fallback" | "failed"` with `engine` and `fallback_reason`.
+Every live agent decision on run `dde654cc` records
+`{status: "fallback", engine: "cuopt", fallback_reason: "CP-SAT service is not configured"}`
+— **a shape the repo's copy cannot produce.** Anyone reading the repo to
+understand the agent→solver handoff reads code that is not running.
+
+The deployed version is NEWER and better in both cases. The repo is behind.
+
+**These six were NOT hand-synced, deliberately.** Transcribing ~400 lines of
+deployed TypeScript out of an API response risks a silent one-character
+divergence, and a copy that *looks* synced is more dangerous than one that is
+labelled stale. They must be pulled with the Management API
+(`GET /v1/projects/{ref}/functions/{slug}/body`) and verified against the
+`sha256` below before being committed. Tracked as **G67**.
+
+| Function | Deployed v | verify_jwt | Deployed (UTC) | Repo copy | Deployed sha256 |
+|---|---:|---|---|---|---|
+| ottoq-cpsat-propose | 5 | false | 2026-09-17 00:26 | **STALE — not in the 08-03 snapshot at all; repo returns HTTP 500 `"CP-SAT bridge is not configured"`, deployed returns 200 + cuOpt fallback** | `d46f3edc0a96524f96fa7257d7141d496a302b5fb4e139f485a3481d1b9cb11f` |
+| ottoq-orchestrator-agent | 26 | true | 2026-09-17 00:23 | **STALE — repo is fire-and-forget `waitUntil`; deployed awaits and records fallback** | `1626cc71f05d05176a20c880ed27bab97c5ff1177c63cadda3467f6a9c6faf37` |
+| otto-twin-control | 24 | false | 2026-09-16 18:06 | **STALE — not re-read; this is the Twin start door** | `dcf430dcc1a6ab4f4c1d738a6c1e1481eedc48a73243d99a318a0bd7a5ce0603` |
+| ottoq-cuopt-propose | 29 | true | 2026-09-16 00:10 | **STALE — not re-read; this is the proposer doing 100% of live assignment work** | `71181a5d1216b7b18f5d459f6a749d8175343b4cc3678036c130698cf7756b94` |
+| ottoq-orchestrate-tick | 12 | true | 2026-09-09 03:42 | **STALE — not re-read** | `645251b19f7654778691ccc533f92db17f00fc20c908add729d8fa8e53b01c20` |
+| ottoq-assign-optimize | 8 | true | 2026-09-09 03:41 | **STALE — not re-read** | `4adf545e0e3170b76b7c8ecc32c5637a3ef5e41b3c413ba4ca1e21987e2e001a` |
+
+### Unchanged since the 2026-08-03 snapshot (22)
+
+`updated_at` predates the previous snapshot, so the committed copies stand.
+
+| Function | Deployed v | verify_jwt | Deployed (UTC) |
+|---|---:|---|---|
+| ottoq-cuopt-lp-probe | 8 | true | 2026-08-01 17:43 |
+| ottoq-approval-copilot | 4 | true | 2026-07-25 01:46 |
+| ottoq-ingest | 12 | true | 2026-07-23 19:00 |
+| ottoq-webhook-echo | 4 | false | 2026-07-20 22:30 |
+| ottoq-run-blackbox | 5 | false | 2026-07-18 00:23 |
+| ottoq-energy-mpc | 4 | false | 2026-07-15 04:33 |
+| ottoq-benchmark-run | 7 | true | 2026-07-11 15:55 |
+| ottoq-feed-agents | 6 | true | 2026-07-09 18:31 |
+| ottoq-twin-ingest | 6 | true | 2026-06-27 19:03 |
+| ottoq-ottocommand | 8 | true | 2026-06-27 18:47 |
+| ottoq-jobs-request | 6 | true | 2026-06-19 13:49 |
+| ottoq-wave-admit | 5 | true | 2026-06-19 13:17 |
+| ottoq-jobs-active | 5 | true | 2026-06-19 12:41 |
+| ottoq-depot-resources | 5 | true | 2026-06-19 02:57 |
+| ottoq-fleet-vehicles | 5 | true | 2026-06-19 02:56 |
+| ottoq-cleaning-cadence | 7 | true | 2026-06-18 18:21 |
+| ottoq-sequence-optimize | 9 | true | 2026-06-18 18:19 |
+| ottoq-amend | 9 | true | 2026-06-18 04:24 |
+| ottoq-progress | 9 | true | 2026-06-18 04:05 |
+| ottoq-energy-optimize | 8 | true | 2026-06-17 01:33 |
+| ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 |
+| otto-q-api | 26 | false | 2026-04-19 01:54 |
+
+## THE PREVIOUS SNAPSHOT'S `version` COLUMN WAS NOT COMPARABLE, AND THAT MATTERED
+
+The 2026-08-03 table recorded `ottoq-wave-admit` at **version 2** deployed
+2026-06-19. Live it reads **version 5** with the *same* `updated_at`
+of 2026-06-19 13:17 — the function was not redeployed, so the two numbers are
+measuring different things. Nearly every row disagrees the same way, which means
+**diffing this column against a previous snapshot reports ~26 of 28 functions as
+changed when 6 changed.** That is a drift detector with a 77% false-positive
+rate, which is the same as no detector.
+
+`updated_at` is the reliable signal and is what the 6-vs-22 split above uses.
+`sha256` is better still and is now recorded, so the next snapshot can compare
+content rather than a counter. The old note claiming "a changed version between
+snapshots is proof the function was redeployed" is withdrawn.
+
+## NOTHING DETECTS THIS AUTOMATICALLY
+
+`scripts/check-drift.sql` covers database objects only. No test, no CI job, and
+no script compares deployed edge-function source to this directory — which is why
+the loop-critical copies drifted for 47 days unnoticed while the repo was the
+thing being audited. See G67.
+
+---
+
+## Historical: the 2026-08-03 snapshot, left as the point-in-time record it is
 
 | Function | Version | verify_jwt | Last deployed (UTC) | Status |
 |---|---:|---|---|---|
