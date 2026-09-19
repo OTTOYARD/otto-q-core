@@ -433,7 +433,8 @@ repo_manifest(version, name, file) AS (
     ('20260917122803'::text, 'the_proposal_finalizer_accepts_the_kernel_tick_type'::text, '0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql'::text),
     ('20260917123453'::text, 'the_agent_chain_gets_first_refusal_before_greedy_dispatch'::text, '0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql'::text),
     ('20260917124150'::text, 'one_inflight_agent_gets_a_bounded_solver_window'::text, '0338_one_inflight_agent_gets_a_bounded_solver_window.sql'::text),
-    ('20260919000001'::text, 'the_charge_stall_was_reserved_before_any_solver_could_see_it'::text, '0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql'::text)
+    ('20260919000001'::text, 'the_charge_stall_was_reserved_before_any_solver_could_see_it'::text, '0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql'::text),
+    ('PENDING'::text, 'every_external_model_call_gets_a_ledger_that_outlives_its_run'::text, '0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
