@@ -100,7 +100,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0329 — GENERATED, not a log
+## Index, 0134–0330 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231 — which are indexed below as well as logged above; the log row is
@@ -314,7 +314,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0327](db/migrations/0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql) | `20260914214102` | yes — ledger | THE cuOpt LEDGER'S OWN COMMENT ASSERTS A PROTECTION THAT HAS NEVER |
 | [0328](db/migrations/0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing.sql) | `20260914235653` | yes — ledger | THE CONFLICT LEDGER RECORDS *WHO* WAS IN THE STALL AND NOT *WHAT THEY |
 | [0329](db/migrations/0329_the_departure_release_covers_five_of_the_flagships_one_hundred_and_fifty_eight_stalls.sql) | `20260915001355` | yes — ledger | A BOOKING ENDS WHEN ITS WINDOW RUNS OUT, NOT WHEN THE VEHICLE LEAVES, |
+| [0330](db/migrations/0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming.sql) | `20260919161129` | yes — ledger | SWEEP 2 TOOK SPACES AWAY FROM VEHICLES THAT WERE STANDING IN THE YARD |
 
-195 migrations indexed.
+196 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

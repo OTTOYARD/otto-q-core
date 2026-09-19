@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260919161129
 -- migration-name:    0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming
 -- ============================================================================
 -- 0330 — SWEEP 2 TOOK SPACES AWAY FROM VEHICLES THAT WERE STANDING IN THE YARD
@@ -396,3 +396,39 @@ VALUES
    'canon; classified TRUE on 0320''s rule anyway.',
    now())
 ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================================
+-- APPLIED 20260919161129 (2026-09-19 16:11:29 UTC / 11:11 AM CT)
+-- ============================================================================
+-- Window: quiesced and verified -- 0 other active backends, 0 live sim runs,
+-- 0 certification cron jobs.
+--
+-- DIGEST, anchored on the LINE rather than the phrase (0329's lesson, and this
+-- header deliberately does not contain that literal anywhere):
+--   committed file body    635b4fd839fb6ce43dd22579ccedd93d   16806 chars
+--   applied migration body 635b4fd839fb6ce43dd22579ccedd93d   16806 chars
+-- Identical on the first attempt. Only the header was condensed.
+--
+-- RESULT, measured after apply:
+--   dials registered            : 2   (departure + no-show, both default 0)
+--   new dial SET anywhere       : 0   -- ships inert
+--   witness function            : present
+--   pre-snapshot                : 1
+--   enum partition by witness   : 5 releasable / 12 protected  (W1's assertion,
+--                                 re-measured from pg_enum after the fact)
+--   A1-A6                       : all passed in the apply transaction
+--   lineage forces_recert       : true
+--
+-- WHAT IS NOT PROVEN. P1, P2 and P3 in the header are predictions, not results.
+-- The file changes no behaviour until a run sets a dial. Judging them needs a
+-- fresh pair on seed 771771 against the control already captured in
+-- db/checks/0249 (p95 243, p50 60, conflicts 134, turns 332, unserved 0,
+-- 30 vehicles losing a claim, worst 3).
+--
+-- AND THE HONEST LIMIT OF W1. W1 proves the witness CLASSIFIES the twelve
+-- at-site states as protected. It does not prove sweep 2 will therefore stop
+-- starving vehicles -- that depends on which states the blockers are actually
+-- in at the moment the sweep runs, which only a run can show. W1 is a test of
+-- the predicate, not of the outcome, and the distinction is exactly the one
+-- this repo keeps having to relearn.
+-- ============================================================================
