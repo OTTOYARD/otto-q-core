@@ -78,6 +78,18 @@
 -- asserted by A4, which digests the board before and after the replace on a run
 -- that has not been armed and requires equality.
 --
+-- AND ONE TRAP THIS FILE FELL INTO FIRST, because it is the kind that ships.
+-- The gate was originally written as `'review', CASE ... ELSE NULL END` INSIDE
+-- the board's jsonb_build_object. A4c refused the migration:
+-- jsonb_build_object('review', NULL) produces {"review": null} -- the key is
+-- PRESENT -- and the `?` operator answers true for a key whose value is JSON
+-- null. An unarmed board would have grown a thirteenth key, which is precisely
+-- the certification-visible change this file claims not to make. The key is now
+-- CONCATENATED onto the assembled board only when the dial is up, so at 0 it is
+-- absent. jsonb_strip_nulls was the other candidate and would have been wrong:
+-- the unarmed board legitimately carries approvals_pending: null and
+-- assignment_last_tick: null, and removing those IS a change.
+--
 -- forces_recert: FALSE, executed by A4 rather than argued.
 
 DO $preflight$
@@ -114,12 +126,13 @@ BEGIN
        ILIKE '%ottoq_agent_review%' THEN
     RAISE EXCEPTION '0342 P4: the board already publishes a review key';
   END IF;
-  -- P5. The anchor this file appends after must be present exactly once.
-  IF (SELECT (length(prosrc)-length(replace(prosrc,
-        E'      ''energy_demand_factor_expensive'', ottoq_policy_get(p_sim_run_id,''energy_demand_factor_expensive'',0.35)))\n', '')))
-      / length(E'      ''energy_demand_factor_expensive'', ottoq_policy_get(p_sim_run_id,''energy_demand_factor_expensive'',0.35)))\n')
+  -- P5. The anchor this file appends after must be present exactly once. It is
+  -- the RETURN, not the policy block: the key is concatenated after assembly so
+  -- that an unarmed board does not gain a present-and-null thirteenth key.
+  IF (SELECT (length(prosrc)-length(replace(prosrc, E'  ) INTO v_board;\n  RETURN v_board;\n', '')))
+             / length(E'  ) INTO v_board;\n  RETURN v_board;\n')
         FROM pg_proc WHERE oid='public.ottoq_agent_board(uuid)'::regprocedure) <> 1 THEN
-    RAISE EXCEPTION '0342 P5: the board policy-block anchor is not present exactly once';
+    RAISE EXCEPTION '0342 P5: the board return anchor is not present exactly once';
   END IF;
 END $preflight$;
 
@@ -292,24 +305,41 @@ COMMENT ON FUNCTION public.ottoq_agent_review(uuid,integer) IS
 '0342. The return leg of the agent/solver/kernel loop: what the deterministic kernel DID with the agent''s last objectives, so the next analysis can reason about its own consequence instead of re-reading the world. Before this, ottoq_agent_board -- the only thing ottoq-orchestrator-agent reads -- published twelve keys and not one of them reported an outcome of the agent''s own action; on run ac402e07, where 17 of 17 proposals were enacted, the board read assignment_last_tick=null. Introduces no table: it joins ottoq_decisions (agent leg and shield leg), ottoq_proposer_fire_log (solver leg) and ottoq_external_proposals (kernel disposition) on the chain id 0331 stamps. BOUNDED: p_chains clamps to 1..10, the payload is counts, codes and one reason string, and no rationale text or chain-of-thought is carried (the 0335 boundary). The `verdict` is six machine-actionable words in precedence order -- no_chain_yet, agent_slower_than_tick, solver_saw_empty_frame, solver_returned_nothing, kernel_refused_all, proposals_enacted -- so the agent is told the FIRST thing that went wrong. solver_saw_empty_frame is the G60 starvation signature by name.';
 
 -- ── the board publishes it, gated ────────────────────────────────────────────
+-- CONCATENATED AFTER ASSEMBLY, NOT PASSED AS A NULL VALUE, and that distinction
+-- is the whole gate. A first version wrote `'review', CASE ... ELSE NULL END`
+-- inside the board's jsonb_build_object and assertion A4c refused the migration:
+-- jsonb_build_object('review', NULL) yields {"review": null}, the key IS present,
+-- and `?` answers true for a key whose value is JSON null. An unarmed board would
+-- have gained a thirteenth key -- exactly the certification-visible change this
+-- file claims not to make.
+--
+-- jsonb_strip_nulls would also remove it, and would be wrong: the unarmed board
+-- legitimately carries approvals_pending: null and assignment_last_tick: null,
+-- and stripping those IS a change to what the agent reads.
 DO $board$
 DECLARE d text; old text; new text; n int;
 BEGIN
   d := pg_get_functiondef('public.ottoq_agent_board(uuid)'::regprocedure);
-  old := E'      ''energy_demand_factor_expensive'', ottoq_policy_get(p_sim_run_id,''energy_demand_factor_expensive'',0.35))\n';
-  new := old
-      || E'    --: 0342. THE RETURN LEG, gated exactly as 0287 gated the frame facts.\n'
-      || E'    --: At 0 -- the default, and what every certification arm and every\n'
-      || E'    --: production run resolves -- this is SQL NULL and the board is\n'
-      || E'    --: byte-identical to its pre-0342 self (asserted by 0342 A4).\n'
-      || E'    , ''review'', CASE WHEN COALESCE(ottoq_policy_get(p_sim_run_id,''agent_review_enabled'',0),0) >= 1\n'
-      || E'                     THEN public.ottoq_agent_review(p_sim_run_id, 3)\n'
-      || E'                     ELSE NULL END\n';
+  old := E'  ) INTO v_board;\n  RETURN v_board;\n';
+  new := E'  ) INTO v_board;\n'
+      || E'\n'
+      || E'  --: 0342. THE RETURN LEG, gated exactly as 0287 gated the frame facts.\n'
+      || E'  --: CONCATENATED, so at the default of 0 -- what every certification arm\n'
+      || E'  --: and every production run resolves -- the key is ABSENT rather than\n'
+      || E'  --: present-and-null, and the board is byte-identical to its pre-0342\n'
+      || E'  --: self. Asserted by 0342 A4c/A4d, which refused the first version of\n'
+      || E'  --: this patch for getting exactly that wrong.\n'
+      || E'  IF COALESCE(ottoq_policy_get(p_sim_run_id,''agent_review_enabled'',0),0) >= 1 THEN\n'
+      || E'    v_board := v_board || jsonb_build_object(\n'
+      || E'      ''review'', public.ottoq_agent_review(p_sim_run_id, 3));\n'
+      || E'  END IF;\n'
+      || E'\n'
+      || E'  RETURN v_board;\n';
   n := (length(d)-length(replace(d,old,'')))/length(old);
   IF n = 1 THEN
     EXECUTE replace(d, old, new);
   ELSIF d NOT LIKE '%ottoq_agent_review%' THEN
-    RAISE EXCEPTION '0342 B1: board anchor occurs % times', n;
+    RAISE EXCEPTION '0342 B1: board return anchor occurs % times', n;
   END IF;
 END $board$;
 
