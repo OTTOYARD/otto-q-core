@@ -68,11 +68,28 @@
 -- provider nobody had thought of would lose exactly the call most worth having.
 -- The vocabulary lives in the COMMENT, where being wrong is cheap.
 --
--- AND ONE FK IS REMOVED. ottoq_proposer_fire_log is class='evidence' and check
--- (b) therefore does not ask it for an FK, but 0267 gave it one anyway, ON
--- DELETE NO ACTION. Measured: 112 of its rows name runs that are in the purge's
--- doomed set, so that FK can only ever block step (5). Its definition is
--- snapshotted before it goes.
+-- AND ONE THING THIS FILE DELIBERATELY DOES NOT DO, because trying it failed an
+-- assertion and the failure was instructive. A first draft also dropped
+-- ottoq_proposer_fire_log's ON DELETE NO ACTION FK to ottoq_sim_runs, on the
+-- reasoning that the table is class='evidence' and check (b) asks engine/stamp
+-- only. A3b refused the whole migration: the guard reported a blocking defect
+-- the moment the FK went.
+--
+-- The reason is a real seam in the guard, filed as G61 and left for its own file.
+-- THE REGISTRY IS PER-COLUMN; CHECK (b) IS PER-TABLE. ottoq_proposer_fire_log
+-- has TWO registry rows -- sim_run_id class='evidence' and tick_seq
+-- class='stamp' -- and check (b) reads "this table has some FK to
+-- ottoq_sim_runs", not "this column does". So the stamp row demands the very FK
+-- the evidence row's purpose requires it not to have, and 0267 added it to
+-- satisfy exactly that demand. A mixed-class table is therefore required to
+-- block the purge it is registered to survive. Measured: 112 fire-log rows name
+-- runs in the purge's doomed set.
+--
+-- That is not this file's concern to settle, and guessing at it is how a guard
+-- gets weakened. THE NEW LEDGER SIDESTEPS IT BY CONSTRUCTION: it registers
+-- exactly one column, sim_run_id, as evidence. Its tick_seq is NOT registered
+-- and does not need to be -- check (a) watches only sim_run_id, run_id,
+-- owning_sim_run_id and source_run_id -- so no stamp row exists to demand an FK.
 --
 -- forces_recert: FALSE, and this is executed rather than argued (A6). Nothing
 -- on the decide path reads the new table, no existing function body changes, and
@@ -113,21 +130,6 @@ BEGIN
     RAISE EXCEPTION '0340 P2: the run-scope registry already reports % blocking defect(s)', v_block;
   END IF;
 
-  -- P3. The FK this file removes must be exactly the one described above:
-  -- present, NO ACTION, and on a table the guard does NOT require an FK for.
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint
-                  WHERE conname='ottoq_proposer_fire_log_sim_run_id_fkey'
-                    AND conrelid='public.ottoq_proposer_fire_log'::regclass
-                    AND confrelid='public.ottoq_sim_runs'::regclass
-                    AND confdeltype='a') THEN
-    RAISE EXCEPTION '0340 P3a: the proposer_fire_log FK is not the NO ACTION one this file removes';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.ottoq_run_scope_registry
-                  WHERE table_name='ottoq_proposer_fire_log' AND column_name='sim_run_id'
-                    AND class='evidence') THEN
-    RAISE EXCEPTION '0340 P3b: ottoq_proposer_fire_log is not registered as evidence';
-  END IF;
-
   -- P4. The backfill sources must be non-empty, or the assertions below would
   -- pass trivially on a ledger that copied nothing.
   SELECT count(*) INTO v_http FROM public.cuopt_invocation_log WHERE http_status IS NOT NULL;
@@ -137,12 +139,6 @@ BEGIN
   END IF;
   RAISE NOTICE '0340: backfilling % NVIDIA cuOpt calls and % Nemotron decisions', v_http, v_nem;
 END $preflight$;
-
-INSERT INTO public.ottoq_schema_snapshots
-       (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0340-pre', 'constraint', 'public', 'ottoq_proposer_fire_log_sim_run_id_fkey',
-       pg_get_constraintdef(oid), md5(pg_get_constraintdef(oid))
-  FROM pg_constraint WHERE conname='ottoq_proposer_fire_log_sim_run_id_fkey';
 
 -- ── 1. the ledger ────────────────────────────────────────────────────────────
 CREATE TABLE public.ottoq_model_call_ledger (
@@ -358,10 +354,6 @@ INSERT INTO public.ottoq_run_scope_registry (table_schema, table_name, column_na
 VALUES ('public', 'ottoq_model_call_ledger', 'sim_run_id', 'evidence',
         '0340: the per-call ledger for every external model and solver call. Evidence, not engine: CLAUDE.md rule 6 quantifies every cuOpt, Nemotron and CP-SAT sentence from it, so it must survive its run. Deliberately carries NO foreign key to ottoq_sim_runs -- check (b) asks for one from engine/stamp only, and an enforcing FK on an evidence table can only block ottoq_purge_prior_runs step (5) or, as CASCADE, erase the history check (c) forbids erasing.');
 
--- ── 6. the gratuitous FK that can only block the purge ──────────────────────
-ALTER TABLE public.ottoq_proposer_fire_log
-  DROP CONSTRAINT ottoq_proposer_fire_log_sim_run_id_fkey;
-
 -- ── 7. backfill what is still alive ──────────────────────────────────────────
 INSERT INTO public.ottoq_model_call_ledger
   (sim_run_id, tick_seq, sim_clock, provider, role, model, endpoint,
@@ -474,6 +466,19 @@ BEGIN
     RAISE EXCEPTION '0340 A3c: the guard reports the new ledger at all';
   END IF;
 
+  -- A3d. THE SIDESTEP, PINNED. This ledger must stay single-class: exactly one
+  -- registry row, class='evidence'. A stamp or engine row added later would make
+  -- check (b) demand an FK to ottoq_sim_runs, and A2 forbids that FK -- so the
+  -- two assertions would become unsatisfiable together. That is G61 arriving
+  -- here, and it should fail loudly in a migration rather than quietly at a
+  -- purge.
+  IF (SELECT count(*) FROM public.ottoq_run_scope_registry
+       WHERE table_name='ottoq_model_call_ledger') <> 1
+     OR EXISTS (SELECT 1 FROM public.ottoq_run_scope_registry
+                 WHERE table_name='ottoq_model_call_ledger' AND class IN ('engine','stamp')) THEN
+    RAISE EXCEPTION '0340 A3d: the ledger has a non-evidence registry row, which would demand the FK A2 forbids';
+  END IF;
+
   -- A4. Append-only is REAL, not declared: attempt a delete and require refusal.
   BEGIN
     DELETE FROM public.ottoq_model_call_ledger WHERE call_id = (
@@ -532,6 +537,6 @@ END $assertions$;
 
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
 VALUES ('0340_every_external_model_call_gets_a_ledger_that_outlives_its_run', false,
-  'Additive evidence ledger plus two swallowing capture triggers and one gratuitous FK removed. No certified function body changes and no certification atom reads the new table; A6 asserts no pre-existing routine does either. Recertification not required.',
+  'Purely additive: an evidence ledger, two swallowing capture triggers, one view. No FK was removed -- see G61 in the header. No certified function body changes and no certification atom reads the new table; A6 asserts no pre-existing routine does either. Recertification not required.',
   now())
 ON CONFLICT(name) DO NOTHING;
