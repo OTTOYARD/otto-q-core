@@ -443,7 +443,8 @@ repo_manifest(version, name, file) AS (
     ('20260919161259'::text, 'the_cockpits_solver_join_has_never_matched_a_row'::text, '0346_the_cockpits_solver_join_has_never_matched_a_row.sql'::text),
     ('20260919163943'::text, 'one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes'::text, '0347_one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes.sql'::text),
     ('20260919170057'::text, 'a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol'::text, '0348_a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol.sql'::text),
-    ('20260919173442'::text, 'a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable'::text, '0349_a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable.sql'::text)
+    ('20260919173442'::text, 'a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable'::text, '0349_a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable.sql'::text),
+    ('20260919191701'::text, 'the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters'::text, '0350_the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

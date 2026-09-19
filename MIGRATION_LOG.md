@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0349 — GENERATED, not a log
+## Index, 0134–0350 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -332,7 +332,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0347](db/migrations/0347_one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes.sql) | `20260919163943` | yes — ledger | THE PURGE IS NOT BLOCKED ANY MORE. IT IS QUADRATIC. ONE UNINDEXED |
 | [0348](db/migrations/0348_a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol.sql) | `20260919170057` | yes — ledger | FOUR ENGINE TABLES ARE APPEND-ONLY. THREE LET THE PURGE THROUGH. THE |
 | [0349](db/migrations/0349_a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable.sql) | `20260919173442` | yes — ledger | THE ATTESTATION SAYS "ARMED, 7 OF 7". THE RANK-0 PROPOSER HAS NOT RUN |
+| [0350](db/migrations/0350_the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters.sql) | `20260919191701` | yes — ledger | THE WORLD MODEL CARRIES ~120 PER-ASSET VARIABLES. THE AGENT SEES ZERO |
 
-212 migrations indexed.
+213 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
