@@ -85,6 +85,33 @@ BEGIN
   END IF;
   RAISE NOTICE '0341: % of % ledger rows carry an outcome the old view bucketed nowhere',
     v_unbucketed, v_rows;
+
+  -- P3. THIS FILE MUST DROP THE VIEW, NOT REPLACE IT, and that is a real
+  -- difference. CREATE OR REPLACE VIEW cannot rename a column, and the whole
+  -- point is to retire `calls_with_provider_status` -- the column that reported
+  -- 1,120 Nemotron calls as never reaching NVIDIA. Postgres refuses the replace
+  -- with 42P16; a DROP is therefore required rather than chosen.
+  --
+  -- APPLYING.md's "never DROP" is about functions and signatures, where a drop
+  -- silently breaks callers. So the safety condition is made explicit instead of
+  -- assumed: NOTHING may depend on this view. It was created yesterday by 0340
+  -- and has no consumers, and this refuses to run if that has stopped being true.
+  IF EXISTS (
+    SELECT 1
+      FROM pg_depend d
+      JOIN pg_rewrite rw ON rw.oid = d.objid
+      JOIN pg_class dep  ON dep.oid = rw.ev_class
+     WHERE d.refobjid = 'public.ottoq_intelligence_ledger'::regclass
+       AND d.classid  = 'pg_rewrite'::regclass
+       AND dep.oid   <> 'public.ottoq_intelligence_ledger'::regclass
+  ) THEN
+    RAISE EXCEPTION '0341 P3a: another view or rule depends on ottoq_intelligence_ledger';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+              WHERE n.nspname IN ('public','ottoq','twin')
+                AND p.prosrc ILIKE '%ottoq_intelligence_ledger%') THEN
+    RAISE EXCEPTION '0341 P3b: a routine reads ottoq_intelligence_ledger; dropping it would break that caller';
+  END IF;
 END $preflight$;
 
 INSERT INTO public.ottoq_schema_snapshots
@@ -123,7 +150,11 @@ $fn$;
 COMMENT ON FUNCTION public.ottoq_model_call_outcome_class(text) IS
 '0341. Maps the raw outcome word a capture path inherited from its source onto one comparable class. Two vocabularies meet in ottoq_model_call_ledger -- 0340 classifies the cuOpt side (answered/abstained/fallback) while the ottoq_decisions side passes outcome_status through verbatim (enacted/noop_no_candidate/...) -- and the view that shipped in 0340 knew only the first, so it counted 515 of 1,676 rows and reported the rest nowhere. The RAW word is never rewritten in the table, because the table is evidence and the distinction between a response and a disposition is real. An unrecognised word returns ''unclassified'', which is counted and asserted on, never dropped.';
 
-CREATE OR REPLACE VIEW public.ottoq_intelligence_ledger AS
+--: DROP, not REPLACE: see P3. Postgres refuses to rename a view column in
+--: place (42P16), and retiring calls_with_provider_status is the point.
+DROP VIEW public.ottoq_intelligence_ledger;
+
+CREATE VIEW public.ottoq_intelligence_ledger AS
 SELECT provider, role,
        count(*)                                                     AS calls,
        --: 0341: absence of a captured status is NOT absence of a call.
@@ -196,6 +227,14 @@ BEGIN
 
   -- A4. The two corrected columns exist and are distinct, so a reader cannot
   -- fall back into reading "no status captured" as "provider not reached".
+  -- A5. The dropped definition survives, because a DROP with no recoverable
+  -- prior text is an unreviewable change.
+  IF NOT EXISTS (SELECT 1 FROM public.ottoq_schema_snapshots
+                  WHERE label='0341-pre' AND object_name='ottoq_intelligence_ledger'
+                    AND definition ILIKE '%calls_with_provider_status%') THEN
+    RAISE EXCEPTION '0341 A5: the pre-drop view definition was not snapshotted';
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                   WHERE table_schema='public' AND table_name='ottoq_intelligence_ledger'
                     AND column_name='provider_status_unknown')
