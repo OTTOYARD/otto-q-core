@@ -440,7 +440,9 @@ repo_manifest(version, name, file) AS (
     ('20260919053350'::text, 'the_review_joined_on_the_tick_and_the_chain_crosses_ticks'::text, '0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql'::text),
     ('20260919154650'::text, 'the_purge_cannot_complete_and_the_twin_start_door_has_no_handler'::text, '0344_the_purge_cannot_complete_and_the_twin_start_door_has_no_handler.sql'::text),
     ('20260919155936'::text, 'the_purge_deletes_engine_tables_alphabetically_not_by_dependency'::text, '0345_the_purge_deletes_engine_tables_alphabetically_not_by_dependency.sql'::text),
-    ('20260919161259'::text, 'the_cockpits_solver_join_has_never_matched_a_row'::text, '0346_the_cockpits_solver_join_has_never_matched_a_row.sql'::text)
+    ('20260919161259'::text, 'the_cockpits_solver_join_has_never_matched_a_row'::text, '0346_the_cockpits_solver_join_has_never_matched_a_row.sql'::text),
+    ('20260919163943'::text, 'one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes'::text, '0347_one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes.sql'::text),
+    ('20260919170057'::text, 'a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol'::text, '0348_a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

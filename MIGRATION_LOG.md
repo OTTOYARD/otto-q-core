@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0346 — GENERATED, not a log
+## Index, 0134–0348 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -329,7 +329,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0344](db/migrations/0344_the_purge_cannot_complete_and_the_twin_start_door_has_no_handler.sql) | `20260919154650` | yes — ledger | ottoq_purge_prior_runs RAISES, ottoq_start_demo_run DOES NOT CATCH IT, |
 | [0345](db/migrations/0345_the_purge_deletes_engine_tables_alphabetically_not_by_dependency.sql) | `20260919155936` | yes — ledger | "CHILDREN FIRST" WAS ORDER BY table_name. THAT IS ALPHABETICAL, NOT |
 | [0346](db/migrations/0346_the_cockpits_solver_join_has_never_matched_a_row.sql) | `20260919161259` | yes — ledger | THE OTTO-TWIN COCKPIT HAS DISPLAYED "CP-SAT" AND ZERO THROUGHPUT FOR |
+| [0347](db/migrations/0347_one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes.sql) | `20260919163943` | yes — ledger | THE PURGE IS NOT BLOCKED ANY MORE. IT IS QUADRATIC. ONE UNINDEXED |
+| [0348](db/migrations/0348_a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol.sql) | `20260919170057` | yes — ledger | FOUR ENGINE TABLES ARE APPEND-ONLY. THREE LET THE PURGE THROUGH. THE |
 
-209 migrations indexed.
+211 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
