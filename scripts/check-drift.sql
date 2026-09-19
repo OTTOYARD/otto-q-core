@@ -436,7 +436,8 @@ repo_manifest(version, name, file) AS (
     ('20260919000001'::text, 'the_charge_stall_was_reserved_before_any_solver_could_see_it'::text, '0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql'::text),
     ('PENDING'::text, 'every_external_model_call_gets_a_ledger_that_outlives_its_run'::text, '0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql'::text),
     ('PENDING'::text, 'the_intelligence_view_dropped_two_thirds_of_its_own_rows'::text, '0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql'::text),
-    ('PENDING'::text, 'the_agent_never_learns_what_the_kernel_did_with_its_objective'::text, '0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql'::text)
+    ('PENDING'::text, 'the_agent_never_learns_what_the_kernel_did_with_its_objective'::text, '0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql'::text),
+    ('PENDING'::text, 'the_review_joined_on_the_tick_and_the_chain_crosses_ticks'::text, '0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
