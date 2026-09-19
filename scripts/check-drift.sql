@@ -432,7 +432,20 @@ repo_manifest(version, name, file) AS (
     ('20260916194021'::text, 'cp_sat_becomes_the_primary_agent_solver'::text, '0335_cp_sat_becomes_the_primary_agent_solver.sql'::text),
     ('20260917122803'::text, 'the_proposal_finalizer_accepts_the_kernel_tick_type'::text, '0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql'::text),
     ('20260917123453'::text, 'the_agent_chain_gets_first_refusal_before_greedy_dispatch'::text, '0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql'::text),
-    ('20260917124150'::text, 'one_inflight_agent_gets_a_bounded_solver_window'::text, '0338_one_inflight_agent_gets_a_bounded_solver_window.sql'::text)
+    ('20260917124150'::text, 'one_inflight_agent_gets_a_bounded_solver_window'::text, '0338_one_inflight_agent_gets_a_bounded_solver_window.sql'::text),
+    ('20260919042514'::text, 'the_charge_stall_was_reserved_before_any_solver_could_see_it'::text, '0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql'::text),
+    ('20260919045051'::text, 'every_external_model_call_gets_a_ledger_that_outlives_its_run'::text, '0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql'::text),
+    ('20260919045936'::text, 'the_intelligence_view_dropped_two_thirds_of_its_own_rows'::text, '0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql'::text),
+    ('20260919052746'::text, 'the_agent_never_learns_what_the_kernel_did_with_its_objective'::text, '0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql'::text),
+    ('20260919053350'::text, 'the_review_joined_on_the_tick_and_the_chain_crosses_ticks'::text, '0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql'::text),
+    ('20260919154650'::text, 'the_purge_cannot_complete_and_the_twin_start_door_has_no_handler'::text, '0344_the_purge_cannot_complete_and_the_twin_start_door_has_no_handler.sql'::text),
+    ('20260919155936'::text, 'the_purge_deletes_engine_tables_alphabetically_not_by_dependency'::text, '0345_the_purge_deletes_engine_tables_alphabetically_not_by_dependency.sql'::text),
+    ('20260919161259'::text, 'the_cockpits_solver_join_has_never_matched_a_row'::text, '0346_the_cockpits_solver_join_has_never_matched_a_row.sql'::text),
+    ('20260919163943'::text, 'one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes'::text, '0347_one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes.sql'::text),
+    ('20260919170057'::text, 'a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol'::text, '0348_a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol.sql'::text),
+    ('20260919173442'::text, 'a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable'::text, '0349_a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable.sql'::text),
+    ('20260919191701'::text, 'the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters'::text, '0350_the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters.sql'::text),
+    ('20260919195941'::text, 'the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack'::text, '0351_the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

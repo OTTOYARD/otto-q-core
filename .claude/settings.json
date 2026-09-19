@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "//": "WHY THIS FILE EXISTS. Every SQL call in this repo was prompting the founder for approval, dozens per session, because the Supabase allowlist lived only in ottoyarddepot-sim/.claude/settings.json and this repo had no .claude/ directory at all. 'Accept all edits' does not help: acceptEdits auto-approves FILE EDITS, not MCP tool calls. Two mechanisms below, deliberately both: the allow list covers the canonical server name, and the PreToolUse hook covers the case where the MCP server is registered under a generated UUID instead (which is why the sibling repo carries a second copy of every entry under mcp__821b36d8-...). The hook matches on the tool SUFFIX so it works under any server name, present or future.",
+
+  "permissions": {
+    "allow": [
+      "mcp__Supabase__execute_sql",
+      "mcp__Supabase__apply_migration",
+      "mcp__Supabase__query_logs",
+      "mcp__Supabase__list_tables",
+      "mcp__Supabase__list_projects",
+      "mcp__Supabase__list_branches",
+      "mcp__Supabase__list_migrations",
+      "mcp__Supabase__list_extensions",
+      "mcp__Supabase__list_edge_functions",
+      "mcp__Supabase__get_edge_function",
+      "mcp__Supabase__deploy_edge_function",
+      "mcp__Supabase__list_organizations",
+      "mcp__Supabase__get_organization",
+      "mcp__Supabase__get_project",
+      "mcp__Supabase__get_project_url",
+      "mcp__Supabase__get_publishable_keys",
+      "mcp__Supabase__get_advisors",
+      "mcp__Supabase__get_cost",
+      "mcp__Supabase__confirm_cost",
+      "mcp__Supabase__search_docs",
+      "mcp__Supabase__generate_typescript_types",
+      "mcp__Supabase__create_branch",
+      "mcp__Supabase__merge_branch",
+      "mcp__Supabase__rebase_branch",
+      "mcp__Supabase__reset_branch",
+
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git fetch:*)",
+      "Bash(git branch:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(python3 scripts/compile-check.py:*)",
+      "Bash(python3 -m pytest:*)",
+      "Bash(./scripts/regen-artefacts.sh:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(sed -n:*)",
+      "Bash(awk:*)"
+    ],
+
+    "//deny": "NOT auto-approved, on purpose: create_project, delete_branch, pause_project and restore_project are account-level and destructive. They stay behind a prompt. Nothing in this build track needs them.",
+    "deny": [
+      "mcp__Supabase__create_project",
+      "mcp__Supabase__delete_branch",
+      "mcp__Supabase__pause_project",
+      "mcp__Supabase__restore_project"
+    ]
+  },
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -c \"if (.tool_name | test(\\\"^mcp__.*__(execute_sql|apply_migration|query_logs|list_tables|list_projects|list_branches|list_migrations|list_extensions|list_edge_functions|get_edge_function|deploy_edge_function|list_organizations|get_organization|get_project|get_project_url|get_publishable_keys|get_advisors|get_cost|confirm_cost|search_docs|generate_typescript_types|create_branch|merge_branch|rebase_branch|reset_branch)$\\\")) then {hookSpecificOutput:{hookEventName:\\\"PreToolUse\\\",permissionDecision:\\\"allow\\\",permissionDecisionReason:\\\"Supabase MCP auto-approved by otto-q-core project policy — see .claude/settings.json\\\"}} else {} end\" 2>/dev/null || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
