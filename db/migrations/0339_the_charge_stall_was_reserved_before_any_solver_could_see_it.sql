@@ -1,4 +1,4 @@
--- migration-version: 20260919000001
+-- migration-version: 20260919042514
 -- migration-name:    the_charge_stall_was_reserved_before_any_solver_could_see_it
 --
 -- 0339  CP-SAT WAS MADE THE PRIMARY PROPOSER AND HAS PROPOSED NOTHING SINCE,

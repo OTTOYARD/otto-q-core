@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260919053350
 -- migration-name:    the_review_joined_on_the_tick_and_the_chain_crosses_ticks
 --
 -- 0343  0342's REVIEW REPORTED "kernel: enacted 0, solver: null" FOR A CHAIN

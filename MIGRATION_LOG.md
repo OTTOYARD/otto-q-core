@@ -321,11 +321,11 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0336](db/migrations/0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql) | `20260917122803` | yes — ledger | Live proof on Peak Turnover run 1ac6b6a4 showed 397 deterministic beats |
 | [0337](db/migrations/0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql) | `20260917123453` | yes — ledger | Run a7a364e7 proved Nemotron, policy enactment and the deterministic kernel, |
 | [0338](db/migrations/0338_one_inflight_agent_gets_a_bounded_solver_window.sql) | `20260917124150` | yes — ledger | Live run 911a5d0d measured Nemotron at about 29 seconds. A one-beat refusal |
-| [0339](db/migrations/0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql) | `20260919000001` | yes — ledger | CP-SAT WAS MADE THE PRIMARY PROPOSER AND HAS PROPOSED NOTHING SINCE, |
-| [0340](db/migrations/0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql) | `PENDING` | no — pending | THE THREE INTELLIGENCE PATHS KEEP NO DURABLE PER-CALL RECORD, AND THE |
-| [0341](db/migrations/0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql) | `PENDING` | no — pending | THE VIEW 0340 SHIPPED COUNTED 515 OF 1,676 ROWS AND REPORTED THE OTHER |
-| [0342](db/migrations/0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql) | `PENDING` | no — pending | THE LOOP RUNS AGENT -> SOLVER -> KERNEL AND STOPS. NOTHING COMES BACK |
-| [0343](db/migrations/0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql) | `PENDING` | no — pending | 0342's REVIEW REPORTED "kernel: enacted 0, solver: null" FOR A CHAIN |
+| [0339](db/migrations/0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql) | `20260919042514` | yes — ledger | CP-SAT WAS MADE THE PRIMARY PROPOSER AND HAS PROPOSED NOTHING SINCE, |
+| [0340](db/migrations/0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql) | `20260919045051` | yes — ledger | THE THREE INTELLIGENCE PATHS KEEP NO DURABLE PER-CALL RECORD, AND THE |
+| [0341](db/migrations/0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql) | `20260919045936` | yes — ledger | THE VIEW 0340 SHIPPED COUNTED 515 OF 1,676 ROWS AND REPORTED THE OTHER |
+| [0342](db/migrations/0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql) | `20260919052746` | yes — ledger | THE LOOP RUNS AGENT -> SOLVER -> KERNEL AND STOPS. NOTHING COMES BACK |
+| [0343](db/migrations/0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql) | `20260919053350` | yes — ledger | 0342's REVIEW REPORTED "kernel: enacted 0, solver: null" FOR A CHAIN |
 
 206 migrations indexed.
 

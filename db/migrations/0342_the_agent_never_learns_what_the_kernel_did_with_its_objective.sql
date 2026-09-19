@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260919052746
 -- migration-name:    the_agent_never_learns_what_the_kernel_did_with_its_objective
 --
 -- 0342  THE LOOP RUNS AGENT -> SOLVER -> KERNEL AND STOPS. NOTHING COMES BACK.

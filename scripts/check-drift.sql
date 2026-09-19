@@ -433,11 +433,11 @@ repo_manifest(version, name, file) AS (
     ('20260917122803'::text, 'the_proposal_finalizer_accepts_the_kernel_tick_type'::text, '0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql'::text),
     ('20260917123453'::text, 'the_agent_chain_gets_first_refusal_before_greedy_dispatch'::text, '0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql'::text),
     ('20260917124150'::text, 'one_inflight_agent_gets_a_bounded_solver_window'::text, '0338_one_inflight_agent_gets_a_bounded_solver_window.sql'::text),
-    ('20260919000001'::text, 'the_charge_stall_was_reserved_before_any_solver_could_see_it'::text, '0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql'::text),
-    ('PENDING'::text, 'every_external_model_call_gets_a_ledger_that_outlives_its_run'::text, '0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql'::text),
-    ('PENDING'::text, 'the_intelligence_view_dropped_two_thirds_of_its_own_rows'::text, '0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql'::text),
-    ('PENDING'::text, 'the_agent_never_learns_what_the_kernel_did_with_its_objective'::text, '0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql'::text),
-    ('PENDING'::text, 'the_review_joined_on_the_tick_and_the_chain_crosses_ticks'::text, '0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql'::text)
+    ('20260919042514'::text, 'the_charge_stall_was_reserved_before_any_solver_could_see_it'::text, '0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql'::text),
+    ('20260919045051'::text, 'every_external_model_call_gets_a_ledger_that_outlives_its_run'::text, '0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql'::text),
+    ('20260919045936'::text, 'the_intelligence_view_dropped_two_thirds_of_its_own_rows'::text, '0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql'::text),
+    ('20260919052746'::text, 'the_agent_never_learns_what_the_kernel_did_with_its_objective'::text, '0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql'::text),
+    ('20260919053350'::text, 'the_review_joined_on_the_tick_and_the_chain_crosses_ticks'::text, '0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260919045936
 -- migration-name:    the_intelligence_view_dropped_two_thirds_of_its_own_rows
 --
 -- 0341  THE VIEW 0340 SHIPPED COUNTED 515 OF 1,676 ROWS AND REPORTED THE OTHER

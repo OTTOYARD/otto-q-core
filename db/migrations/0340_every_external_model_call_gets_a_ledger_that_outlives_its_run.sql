@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260919045051
 -- migration-name:    every_external_model_call_gets_a_ledger_that_outlives_its_run
 --
 -- 0340  THE THREE INTELLIGENCE PATHS KEEP NO DURABLE PER-CALL RECORD, AND THE
