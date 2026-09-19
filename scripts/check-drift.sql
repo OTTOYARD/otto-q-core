@@ -445,7 +445,9 @@ repo_manifest(version, name, file) AS (
     ('20260919170057'::text, 'a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol'::text, '0348_a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol.sql'::text),
     ('20260919173442'::text, 'a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable'::text, '0349_a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable.sql'::text),
     ('20260919191701'::text, 'the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters'::text, '0350_the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters.sql'::text),
-    ('20260919195941'::text, 'the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack'::text, '0351_the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack.sql'::text)
+    ('20260919195941'::text, 'the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack'::text, '0351_the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack.sql'::text),
+    ('20260919205659'::text, 'the_agents_dial_limits_live_in_edge_typescript_and_not_in_this_database'::text, '0352_the_agents_dial_limits_live_in_edge_typescript_and_not_in_this_database.sql'::text),
+    ('20260919210336'::text, 'the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger'::text, '0353_the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
