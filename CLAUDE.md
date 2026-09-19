@@ -42,6 +42,28 @@ protected still holds: *every external fact in this repo carries a source and a 
      A fact without a URL is not a fact, no matter who fetched it.
    - **Never guess silently.** Unchanged, and the whole point.
 
+   **RE-AFFIRMED AND SHARPENED 2026-09-19, in Chase's words, because the agent side of
+   this rule kept getting re-litigated from scratch every session.** Two different
+   permissions live here and they are NOT the same permission:
+
+   - **WEB SEARCH IS STANDING AND OPEN. Do not ask.** *"You can always do web search
+     if needed. Make sure you save that and that doesn't get lost. I don't want you to
+     feel like you're on an island with our own information. If you ever need to go
+     search for external sources, you can do that on the web."* So: no permission
+     request, no "should I look this up", no reasoning from memory about a versioned
+     external fact when the answer is one fetch away. The provenance rule above is the
+     only condition — claim, version/date, URL.
+   - **RESEARCH *AGENTS* STILL STOP FIRST.** *"Maintain the same posture with research
+     agents. If needed, you have to let me know first, stop building, and we can
+     discuss what it will be needed for and if it's necessary, or if it's more
+     important just to test and build line by line."* Fanning out subagents for
+     research is what burns token budget, so it is an explicit ask-first action every
+     time. Note the asymmetry: **fanning out to BUILD is allowed** (*"If you need to
+     fan out and build, do that"*) — it is deep *research* with agents that stops.
+
+   The distinction to hold: one search is free, twelve agents reading the internet is a
+   budget decision that belongs to Chase.
+
 When information is missing:
    - Write `docs/research/requests/R-<n>-<slug>.md` with precise, answerable questions (field names, units, versions — never "tell me about X") and commit it. Hermes polls that folder at the start of its sessions.
    - Then proceed with labeled assumptions (`ASSUMPTION — pending R-<n>`) or park the step and continue the run.
