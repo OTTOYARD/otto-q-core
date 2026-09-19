@@ -313,6 +313,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0325](db/migrations/0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql) | `20260914214010` | yes — ledger | ENERGY COMMANDS GET THE DOCK THAT VEHICLE COMMANDS ALREADY HAVE, |
 | [0326](db/migrations/0326_the_stamp_must_be_present_and_not_older_not_different.sql) | `20260914193928` | yes — ledger | 0322's TRIGGER REFUSES A CORRECT WRITE, BECAUSE "THE STAMP MUST MOVE" |
 | [0327](db/migrations/0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql) | `20260914214102` | yes — ledger | THE cuOpt LEDGER'S OWN COMMENT ASSERTS A PROTECTION THAT HAS NEVER |
+| [0328](db/migrations/0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing.sql) | `20260914235653` | yes — ledger | THE CONFLICT LEDGER RECORDS *WHO* WAS IN THE STALL AND NOT *WHAT THEY |
+| [0329](db/migrations/0329_the_departure_release_covers_five_of_the_flagships_one_hundred_and_fifty_eight_stalls.sql) | `20260915001355` | yes — ledger | A BOOKING ENDS WHEN ITS WINDOW RUNS OUT, NOT WHEN THE VEHICLE LEAVES, |
+| [0330](db/migrations/0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming.sql) | `20260919161129` | yes — ledger | SWEEP 2 TOOK SPACES AWAY FROM VEHICLES THAT WERE STANDING IN THE YARD |
 | [0331](db/migrations/0331_the_agent_hands_one_solver_request_to_the_kernel.sql) | `20260916000638` | yes — ledger | THE AGENT AND THE SOLVER WERE BOTH LIVE, BUT THEY WERE TWO PARALLEL |
 | [0332](db/migrations/0332_one_agent_claim_per_run_tick.sql) | `20260916002025` | yes — ledger | The first 0331 live run proved the chain itself, then exposed two entrances: |
 | [0333](db/migrations/0333_every_solver_proposal_gets_a_deterministic_disposition.sql) | `20260916144203` | yes — ledger | The first live 0331/0332 Sim Start proved one product process: |
@@ -322,6 +325,6 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0337](db/migrations/0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql) | `20260917123453` | yes — ledger | Run a7a364e7 proved Nemotron, policy enactment and the deterministic kernel, |
 | [0338](db/migrations/0338_one_inflight_agent_gets_a_bounded_solver_window.sql) | `20260917124150` | yes — ledger | Live run 911a5d0d measured Nemotron at about 29 seconds. A one-beat refusal |
 
-201 migrations indexed.
+204 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
