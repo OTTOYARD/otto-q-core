@@ -427,7 +427,15 @@ repo_manifest(version, name, file) AS (
     ('20260914214102'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed'::text, '0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql'::text),
     ('20260914235653'::text, '0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing'::text, '0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing.sql'::text),
     ('20260915001355'::text, '0329_the_departure_release_covers_five_of_the_flagships_one_hundred_and_fifty_eight_stalls'::text, '0329_the_departure_release_covers_five_of_the_flagships_one_hundred_and_fifty_eight_stalls.sql'::text),
-    ('20260919161129'::text, '0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming'::text, '0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming.sql'::text)
+    ('20260919161129'::text, '0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming'::text, '0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming.sql'::text),
+    ('20260916000638'::text, 'the_agent_hands_one_solver_request_to_the_kernel'::text, '0331_the_agent_hands_one_solver_request_to_the_kernel.sql'::text),
+    ('20260916002025'::text, 'one_agent_claim_per_run_tick'::text, '0332_one_agent_claim_per_run_tick.sql'::text),
+    ('20260916144203'::text, 'every_solver_proposal_gets_a_deterministic_disposition'::text, '0333_every_solver_proposal_gets_a_deterministic_disposition.sql'::text),
+    ('20260916180920'::text, 'a_newer_solver_packet_explains_what_it_superseded'::text, '0334_a_newer_solver_packet_explains_what_it_superseded.sql'::text),
+    ('20260916194021'::text, 'cp_sat_becomes_the_primary_agent_solver'::text, '0335_cp_sat_becomes_the_primary_agent_solver.sql'::text),
+    ('20260917122803'::text, 'the_proposal_finalizer_accepts_the_kernel_tick_type'::text, '0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql'::text),
+    ('20260917123453'::text, 'the_agent_chain_gets_first_refusal_before_greedy_dispatch'::text, '0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql'::text),
+    ('20260917124150'::text, 'one_inflight_agent_gets_a_bounded_solver_window'::text, '0338_one_inflight_agent_gets_a_bounded_solver_window.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

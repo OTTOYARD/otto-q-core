@@ -132,6 +132,21 @@ def test_two_fires_on_one_frame_are_byte_identical():
     assert a["fire"] == b["fire"]
 
 
+@pytest.mark.parametrize(
+    ("signals", "regime", "passes"),
+    [
+        (frozenset(), "steady_state", ["min_tardy", "min_peak", "min_flow"]),
+        (frozenset({"demand_surge"}), "demand_surge", ["min_tardy", "min_flow"]),
+        (frozenset({"grid_peak_imminent"}), "grid_peak", ["min_tardy", "min_peak"]),
+    ],
+)
+def test_agent_objective_signals_select_the_declared_solver_regime(signals, regime, passes):
+    r = _fire(hour_of_day=12, signals=signals, max_assets=1, det_budget_s=0.05)
+    assert r["fire"]["signals"] == sorted(signals)
+    assert r["fire"]["solver"]["regime"] == regime
+    assert r["fire"]["solver"]["pass_modes"] == passes
+
+
 def test_frame_hash_ignores_key_order_and_whitespace():
     f1 = _frame()
     f2 = json.loads(json.dumps(f1, indent=3))
