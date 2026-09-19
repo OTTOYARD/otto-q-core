@@ -447,7 +447,8 @@ repo_manifest(version, name, file) AS (
     ('20260919191701'::text, 'the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters'::text, '0350_the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters.sql'::text),
     ('20260919195941'::text, 'the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack'::text, '0351_the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack.sql'::text),
     ('20260919205659'::text, 'the_agents_dial_limits_live_in_edge_typescript_and_not_in_this_database'::text, '0352_the_agents_dial_limits_live_in_edge_typescript_and_not_in_this_database.sql'::text),
-    ('20260919210336'::text, 'the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger'::text, '0353_the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger.sql'::text)
+    ('20260919210336'::text, 'the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger'::text, '0353_the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger.sql'::text),
+    ('20260919224417'::text, 'the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt'::text, '0354_the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

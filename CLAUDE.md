@@ -104,6 +104,48 @@ When information is missing:
    - `now()`, `started_at`, and every timestamptz in the database are UTC. Read them as UTC; convert only when reporting.
    - Never restate a stored UTC timestamp as though it were CT, and never rewrite a working cron schedule just to make it read nicely.
 
+**8. ONE SITE. THE TWIN DEPOT, AND NOTHING ELSE — added 2026-09-19 in Chase's words, and it overrides Part 4 where they conflict.**
+
+   *"The only depot, installs and chargers and staging spaces I ever want you to test
+   against is Otto-twin depot. I don't wanna do multiple depot with 200 stalls. I wanna
+   start with that depot and see effectively if OTTO-Q functions first. If it does, then
+   we will see potentially how many vehicles at one time we can comfortably stage and
+   sort an orchestrate through there. That's the ultimate goal. We are nowhere near that
+   yet. We still need to test and validate everything. Just letting you know, do not test
+   or validate across multiple sites. Only use the simulation twin Depot as the test site."*
+
+   **The site is `11111111-1111-1111-1111-111111111111`, "OTTOYARD Nashville Flagship"** —
+   158 stalls (113 staging, 30 L2, 10 DCFC, 3 wash bay, 2 service bay), 8 sim runs, the
+   only depot that has ever hosted one but the retired P2 fixture. Four other depots exist
+   in `depots` and **none of them is a test target**: `22222222-…` "OTTOYARD Benchmark
+   (CRN A/B)" carries 160 stalls and has hosted **zero** runs, and three fixtures carry
+   1–10 stalls between them.
+
+   - **Every measurement predicated on a depot carries `depot_id = '11111111-…'`.** A
+     stall, vehicle, booking, session or occupancy count without that predicate is not a
+     weaker number, it is a number about a different question. `db/checks/0250` is the
+     retraction that produced this rule: an unscoped stall census reported 36 L2 stalls
+     available when the site under test had **4**, and the "no capacity wall" conclusion
+     drawn from it was wrong — every refused proposal on the live run was asking for one
+     of the two stall types at 87% and 80% occupancy. Same defect class as 0145 / 0146 /
+     0229.
+   - **This supersedes Phase C8's "Site Alpha"** (§C8.1's three-tenant, 28-point config)
+     as a *build target*. Its power cap, capability pairs and anti-correlation sweep stay
+     in the brief as the design of the eventual multi-tenant config; they are not what
+     gets run. The anti-correlation curve needs tenants, not sites — so it can still be
+     expressed on the twin depot by phase-shifting tenant demand within it, and that is
+     the only form of it to build.
+   - **And it collides with 2.5's forced decomposition, which is the more interesting
+     conflict.** 2.5 gives CP-SAT the inside of a site and cuOpt the routing of recalls
+     *between* sites "at 18-depot scale." On one depot there is no inter-site layer, so
+     cuOpt has no routing problem to solve and its present contribution is whatever it
+     does as a stall-assignment proposer — currently, on the live run, 1 enacted against
+     7 refused and 11 superseded (`0250` §2–3). Do not quote 2.5's inter-site sentence as
+     a live architecture. It is a plan gated on a second site existing.
+   - **The goal, in Chase's framing, is depth not breadth:** prove OTTO-Q functions on this
+     one depot, then find how many vehicles it can stage, sort and orchestrate at once. A
+     result from a second site does not advance that and is not evidence about it.
+
 ---
 
 # PART 2 — THE KERNEL BRIEF
