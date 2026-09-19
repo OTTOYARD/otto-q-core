@@ -435,7 +435,8 @@ repo_manifest(version, name, file) AS (
     ('20260917124150'::text, 'one_inflight_agent_gets_a_bounded_solver_window'::text, '0338_one_inflight_agent_gets_a_bounded_solver_window.sql'::text),
     ('20260919000001'::text, 'the_charge_stall_was_reserved_before_any_solver_could_see_it'::text, '0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql'::text),
     ('PENDING'::text, 'every_external_model_call_gets_a_ledger_that_outlives_its_run'::text, '0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql'::text),
-    ('PENDING'::text, 'the_intelligence_view_dropped_two_thirds_of_its_own_rows'::text, '0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql'::text)
+    ('PENDING'::text, 'the_intelligence_view_dropped_two_thirds_of_its_own_rows'::text, '0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql'::text),
+    ('PENDING'::text, 'the_agent_never_learns_what_the_kernel_did_with_its_objective'::text, '0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

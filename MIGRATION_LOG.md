@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0341 — GENERATED, not a log
+## Index, 0134–0342 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -324,7 +324,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0339](db/migrations/0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql) | `20260919000001` | yes — ledger | CP-SAT WAS MADE THE PRIMARY PROPOSER AND HAS PROPOSED NOTHING SINCE, |
 | [0340](db/migrations/0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql) | `PENDING` | no — pending | THE THREE INTELLIGENCE PATHS KEEP NO DURABLE PER-CALL RECORD, AND THE |
 | [0341](db/migrations/0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql) | `PENDING` | no — pending | THE VIEW 0340 SHIPPED COUNTED 515 OF 1,676 ROWS AND REPORTED THE OTHER |
+| [0342](db/migrations/0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql) | `PENDING` | no — pending | THE LOOP RUNS AGENT -> SOLVER -> KERNEL AND STOPS. NOTHING COMES BACK |
 
-204 migrations indexed.
+205 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
