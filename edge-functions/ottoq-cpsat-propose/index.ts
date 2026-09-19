@@ -42,8 +42,8 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const intelligenceUrl = Deno.env.get("OTTOQ_INTEL_URL");
   const intelligenceToken = Deno.env.get("OTTOQ_INTEL_TOKEN");
-  if (!supabaseUrl || !serviceKey || !intelligenceUrl || !intelligenceToken) {
-    return json({ ok: false, error: "CP-SAT bridge is not configured" }, 500);
+  if (!supabaseUrl || !serviceKey) {
+    return json({ ok: false, error: "Supabase service configuration is unavailable" }, 500);
   }
   if (req.headers.get("authorization") !== `Bearer ${serviceKey}`) {
     return json({ ok: false, error: "internal service role required" }, 401);
@@ -59,6 +59,9 @@ Deno.serve(async (req) => {
 
   const sb = createClient(supabaseUrl, serviceKey);
   try {
+    if (!intelligenceUrl || !intelligenceToken) {
+      throw new Error("CP-SAT service is not configured");
+    }
     const { data: run, error: runError } = await sb.from("ottoq_sim_runs")
       .select("sim_run_id,depot_id,status,sim_clock_current,tick_count")
       .eq("sim_run_id", simRunId).maybeSingle();
@@ -95,6 +98,9 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${intelligenceToken}` },
       body: JSON.stringify(requestBody),
+      // The solver host may be intentionally stopped between development sessions.
+      // Fail over promptly instead of leaving the agent chain waiting on TCP timeout.
+      signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) throw new Error(`intelligence /assign returned ${response.status}: ${(await response.text()).slice(0, 400)}`);
     const result = await response.json();
