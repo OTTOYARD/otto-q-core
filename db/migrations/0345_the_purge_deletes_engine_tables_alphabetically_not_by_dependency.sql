@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260919155936
 -- migration-name:    the_purge_deletes_engine_tables_alphabetically_not_by_dependency
 --
 -- 0345  "CHILDREN FIRST" WAS ORDER BY table_name. THAT IS ALPHABETICAL, NOT

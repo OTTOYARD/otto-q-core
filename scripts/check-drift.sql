@@ -438,8 +438,9 @@ repo_manifest(version, name, file) AS (
     ('20260919045936'::text, 'the_intelligence_view_dropped_two_thirds_of_its_own_rows'::text, '0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql'::text),
     ('20260919052746'::text, 'the_agent_never_learns_what_the_kernel_did_with_its_objective'::text, '0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql'::text),
     ('20260919053350'::text, 'the_review_joined_on_the_tick_and_the_chain_crosses_ticks'::text, '0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql'::text),
-    ('PENDING'::text, 'the_purge_cannot_complete_and_the_twin_start_door_has_no_handler'::text, '0344_the_purge_cannot_complete_and_the_twin_start_door_has_no_handler.sql'::text),
-    ('PENDING'::text, 'the_purge_deletes_engine_tables_alphabetically_not_by_dependency'::text, '0345_the_purge_deletes_engine_tables_alphabetically_not_by_dependency.sql'::text)
+    ('20260919154650'::text, 'the_purge_cannot_complete_and_the_twin_start_door_has_no_handler'::text, '0344_the_purge_cannot_complete_and_the_twin_start_door_has_no_handler.sql'::text),
+    ('20260919155936'::text, 'the_purge_deletes_engine_tables_alphabetically_not_by_dependency'::text, '0345_the_purge_deletes_engine_tables_alphabetically_not_by_dependency.sql'::text),
+    ('20260919161259'::text, 'the_cockpits_solver_join_has_never_matched_a_row'::text, '0346_the_cockpits_solver_join_has_never_matched_a_row.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260919154650
 -- migration-name:    the_purge_cannot_complete_and_the_twin_start_door_has_no_handler
 --
 -- 0344  ottoq_purge_prior_runs RAISES, ottoq_start_demo_run DOES NOT CATCH IT,
