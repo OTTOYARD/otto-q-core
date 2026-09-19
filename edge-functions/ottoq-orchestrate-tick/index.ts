@@ -187,4 +187,3 @@ serve(async (req) => {
     return json(out);
   } catch (e) { return json({ error: e instanceof Error ? e.message : "unknown" }, 500); }
 });
-
