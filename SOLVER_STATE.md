@@ -1111,7 +1111,7 @@ this file's own numbers were once quoted past their evidence.
 |---|---|---|---|---|---|---|---|---|---|
 | `nvidia_cuopt` | proposer | 865 | 865 (all 2xx) | 851 | **3,889** | 2,783 ms | 116,056 ms | 14 | 2026-09-20 04:09:04 |
 | `nvidia_nemotron` | agent | 2,446 | — | 2,445 | **0** (by design) | **23,130 ms** | 180,743 ms | **629 (26%)** | 2026-09-20 04:19:21 |
-| `cpsat_service` | proposer | 49 | — | 41 enacted, 8 deferred on the site power cap | 0 | **23 ms** | 42 ms | **0** | 2026-09-14 02:45:00 |
+| `cpsat_service` | proposer | 49 | — | 41 enacted, 8 deferred on the site power cap | 0 | **23 ms** | 42 ms | **0** | 2026-09-20 02:45:00 |
 
 **The three sentences this table supports, and nothing wider.**
 
@@ -1133,8 +1133,12 @@ this file's own numbers were once quoted past their evidence.
 3. **CP-SAT is the fastest thing in this architecture by three orders of magnitude
    and it is switched off.** 23 ms mean, 42 ms maximum, **zero** calls over one tick,
    41 of 49 enacted and the other 8 deferred on the site power cap — which is a
-   *correct* deferral, not a failure. It has not been called since **2026-09-14
-   02:45 UTC** because `OTTOQ_INTEL_URL` has no host behind it.
+   *correct* deferral, not a failure. **CORRECTED 05:13 UTC:** its 49 calls span
+   `first_call` **2026-09-14 00:35** to `last_call` **2026-09-20 02:45** — I first
+   wrote the last call as 2026-09-14, which is the FIRST call's date. So CP-SAT went
+   quiet about two and a half hours before this section was written, not six days
+   before it; the substance is unchanged (`OTTOQ_INTEL_URL` has no host behind it now)
+   and the six-day version overstated it.
 
 ### 13.1 What the matched-frame comparison added, and it is not a ranking
 

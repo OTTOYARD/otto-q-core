@@ -19,8 +19,12 @@
 --     file was produced that way.
 --   * **CP-SAT PROPOSING INSIDE THE ENGINE does need the host**, because that path
 --     is the `ottoq-cpsat-propose` edge function calling `OTTOQ_INTEL_URL` — the
---     same env pair `ottoq-energy-mpc` uses. That is what has been dark since
---     2026-09-14 02:45 UTC.
+--     same env pair `ottoq-energy-mpc` uses. That is what is dark now: `cpsat_service`
+--     has 49 calls spanning `first_call` 2026-09-14 00:35 to `last_call` **2026-09-20
+--     02:45**. (Corrected: an earlier draft of this line and of SOLVER_STATE §13 gave
+--     the last call as 2026-09-14, which is the FIRST call's date — a six-day silence
+--     where the truth is a few hours. The conclusion does not move; the overstatement
+--     would have.)
 -- The recommendation is unchanged, but the cost of NOT doing it is now precise: we
 -- lose CP-SAT in the live decide loop, not our ability to judge it.
 --
