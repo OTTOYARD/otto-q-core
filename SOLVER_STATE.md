@@ -1096,3 +1096,104 @@ Five for five, the apparatus was correct and nobody was named as the one who
 turns it on. That is not a coding defect and it will not be fixed by better
 code. Where a default can be on, it is now on, and the opt-out is explicit and
 named.
+
+---
+
+## 13. All three solvers re-derived, 2026-09-20 — and the one that has never proposed in anger is the fastest by three orders of magnitude
+
+Read from `public.ottoq_intelligence_ledger` at **2026-09-20 04:19 UTC** and from a
+matched-frame comparison at ticks 740–759 of run
+`5b37ee46-ee1e-4b6f-a4c8-eec126ab7a10` (busy_day, seed 777777, twin depot per rule 8,
+speed 8.0). **Re-derive before quoting any of it** — rule 6, and §9 exists because
+this file's own numbers were once quoted past their evidence.
+
+| provider | role | calls | reached vendor | answered | proposals | mean latency | max | over one tick | last call |
+|---|---|---|---|---|---|---|---|---|---|
+| `nvidia_cuopt` | proposer | 865 | 865 (all 2xx) | 851 | **3,889** | 2,783 ms | 116,056 ms | 14 | 2026-09-20 04:09:04 |
+| `nvidia_nemotron` | agent | 2,446 | — | 2,445 | **0** (by design) | **23,130 ms** | 180,743 ms | **629 (26%)** | 2026-09-20 04:19:21 |
+| `cpsat_service` | proposer | 49 | — | 41 enacted, 8 deferred on the site power cap | 0 | **23 ms** | 42 ms | **0** | 2026-09-14 02:45:00 |
+
+**The three sentences this table supports, and nothing wider.**
+
+1. **cuOpt is alive and productive.** 865 calls, every one a 2xx from
+   `optimize.api.nvidia.com`, 851 answered, 3,889 proposals. §9's "sixteen calls, the
+   last on 2026-08-30" and CLAUDE.md's successive corrections to it are all history
+   now; the endpoint has been called 865 times. What has *not* changed is the rule:
+   the figure moves hourly, so a cuOpt number without its timestamp is already wrong.
+
+2. **Nemotron cannot be a synchronous dependency of a 30-second tick, and the sample
+   is now large enough to stop arguing about it.** Mean latency **23,130 ms** against
+   a 30-second beat, maximum **180,743 ms**, and **629 of 2,446 calls (26%) took
+   longer than one tick**. G62 stands with 2.2× the evidence it had. And
+   `agent_calls_with_no_l1_rules` is **2,446 of 2,446** — every agent call still
+   carries an empty `rule_results`, so the one path where an AI influences engine
+   state remains the one path the L1 shield does not gate. Countable only because
+   `0340`'s ledger is `class='evidence'` and survives its run.
+
+3. **CP-SAT is the fastest thing in this architecture by three orders of magnitude
+   and it is switched off.** 23 ms mean, 42 ms maximum, **zero** calls over one tick,
+   41 of 49 enacted and the other 8 deferred on the site power cap — which is a
+   *correct* deferral, not a failure. It has not been called since **2026-09-14
+   02:45 UTC** because `OTTOQ_INTEL_URL` has no host behind it.
+
+### 13.1 What the matched-frame comparison added, and it is not a ranking
+
+`scripts/compare-plans-on-one-frame.sh` judges both solvers on the **identical**
+decision frame and **never submits** (contamination asserted 0 on every pass). Four
+consecutive frames, ticks 740–759, 116 vehicles and 158 stalls each:
+
+CP-SAT returned `empty` on all four — and said why, every time:
+
+> `frame has 40 charge-capable stall(s) and not one is offerable this tick
+> (N charger_faulted, M occupied, K reserved); nothing free to propose`
+
+with the three buckets summing to exactly 40, the site's whole charge inventory, on
+every pass. **It did not fail to find a plan; it established that no legal move
+existed and named the missing resource.** cuOpt on the same frames moved 22 → 23
+proposals and 16 → 16 enacted across 19 ticks — so it is not proposing into that wall
+either. **The two solvers agree the charge layer is closed, and that agreement is the
+result.** A comparison that produces no winner because both proposers correctly
+decline is the propose/dispose contract working; `0361` exists so the disposer records
+such a decline as `proposer_abstained` rather than as a refusal.
+
+### 13.2 The finding that only a solver would have produced
+
+CP-SAT's refusal message disagreed with our own census, and the solver was right.
+The capture's `charge_free` column — pointer-only, `current_vehicle_id IS NULL AND
+reserved_by IS NULL AND status='available'` — read **4**. CP-SAT read **zero
+offerable**. Both correct: the four pointer-free charge stalls were the ones whose
+**OCPP charger was `Faulted`**.
+
+So availability has **three** gates, not one, and neither dominates:
+
+| type | charge-capable | pointer-free | calendar-free | charger faulted | **offerable** |
+|---|---|---|---|---|---|
+| dcfc | 10 | **0** | 10 | 0 | **0** |
+| l2 | 30 | 3 | **1** | 4 | **0** |
+| staging (`0261`) | 113 | 59 | **12** | — | **11** |
+
+On DCFC the pointer is the tighter gate, on L2 and staging the calendar is, and on
+staging by five-fold. **Whichever single gate you quote, some stall type makes it look
+generous.** `db/checks/0261` and `0264` carry this; it is the same defect shape
+`0250` established for depot scope.
+
+### 13.3 CP-SAT can be judged with no host at all — which narrows the AWS question
+
+OR-Tools **9.15.6755** with `ortools.sat.python.cp_model` is installed in the build
+environment, so `bridge.proposer_bridge` solves **locally**; every figure in §13.1
+was produced with no network call. 2.5 requires that version to be pinned and
+asserted rather than assumed — 9.4 and 9.5 both shipped nondeterministic results even
+single-worker — so it is recorded here as the version behind these numbers.
+
+That separates two things the AWS discussion had been treating as one:
+
+* **Evaluating CP-SAT needs no host.** The offline bridge fetches a frame, solves,
+  and emits SQL it never executes.
+* **CP-SAT proposing inside the engine does need one**, because that path is the
+  `ottoq-cpsat-propose` edge function calling `OTTOQ_INTEL_URL` — the same env pair
+  `ottoq-energy-mpc` uses, so it is one host for the whole intelligence layer.
+
+The recommendation is unchanged (a small always-on managed container — Fargate, App
+Runner or Fly — not EC2, not Lambda, with CP-SAT invoked as a periodic re-planner
+rather than a synchronous per-tick dependency). What is now precise is the cost of
+declining it: **we lose CP-SAT in the live decide loop, not our ability to judge it.**
