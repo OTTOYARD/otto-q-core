@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260920023610
 -- migration-name:    a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall
 --
 -- 0361  THE DISPOSER HAS NO CONCEPT OF AN ABSTENTION, SO A PROPOSER THAT

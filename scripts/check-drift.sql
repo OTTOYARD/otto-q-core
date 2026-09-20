@@ -455,7 +455,7 @@ repo_manifest(version, name, file) AS (
     ('20260920005644'::text, 'a_single_stall_proposal_gives_the_disposer_nothing_to_dispose_over'::text, '0358_a_single_stall_proposal_gives_the_disposer_nothing_to_dispose_over.sql'::text),
     ('20260920010111'::text, 'a_promoted_candidate_must_carry_its_own_kilowatts_or_the_shield_judges_the_wrong_load'::text, '0359_a_promoted_candidate_must_carry_its_own_kilowatts_or_the_shield_judges_the_wrong_load.sql'::text),
     ('20260920022145'::text, 'a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it'::text, '0360_a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it.sql'::text),
-    ('PENDING'::text, 'a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall'::text, '0361_a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall.sql'::text)
+    ('20260920023610'::text, 'a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall'::text, '0361_a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
