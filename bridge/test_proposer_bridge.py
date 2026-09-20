@@ -809,3 +809,88 @@ def test_the_loop_actually_waits_on_the_tick():
     assert src.index("if follow_ticks:") < src.index("trigger = \"interval\"")
     # and the reason travels on the fire record
     assert '"fire_trigger"' in src and '"ticks_since_last_fire"' in src
+
+
+# ---------------------------------------------------------------------------
+# 0389 / 0282: --site auto and --max-wall-s. Both exist because of measured
+# failures of the scheduled loop, so both are tested at the boundary that
+# failed rather than only where they are convenient to assert.
+# ---------------------------------------------------------------------------
+
+def test_site_auto_refuses_offline_because_there_is_nothing_to_ask(tmp_path, capsys):
+    """`--site auto` reads the descriptor from the database, so it needs --dsn.
+
+    The failure mode this forecloses is silent: offline, `auto` is not a path, so
+    _load_json would raise a FileNotFoundError naming a file called "auto" and the
+    reader would go looking for a missing site file that never existed.
+    """
+    with pytest.raises(SystemExit) as e:
+        pb.main(["--run", RUN, "--depot", DEPOT, "--site", "auto"])
+    assert e.value.code == 2
+    assert "needs --dsn" in capsys.readouterr().err
+
+
+def test_site_auto_reaches_run_live_and_does_not_read_a_file(monkeypatch):
+    seen = {}
+
+    def spy(dsn, **kw):
+        seen.update(kw)
+        return []
+
+    monkeypatch.setattr(pb, "run_live", spy)
+    #: if anything tried to load "auto" as a path this would raise instead.
+    monkeypatch.setattr(pb, "_load_json",
+                        lambda p: (_ for _ in ()).throw(AssertionError(f"read {p!r}")))
+    assert pb.main(["--run", "auto", "--depot", DEPOT, "--site", "auto",
+                    "--dsn", "postgresql://x"]) == 0
+    assert seen["site_auto"] is True
+    assert seen["site"] == {}
+
+
+def test_max_wall_s_reaches_run_live(monkeypatch, tmp_path):
+    site = tmp_path / "site.json"
+    site.write_text(json.dumps(SITE))
+    seen = {}
+    monkeypatch.setattr(pb, "run_live", lambda dsn, **kw: seen.update(kw) or [])
+    assert pb.main(["--run", "auto", "--depot", DEPOT, "--site", str(site),
+                    "--dsn", "postgresql://x", "--max-wall-s", "780"]) == 0
+    assert seen["max_wall_s"] == 780.0
+    #: absent means unbounded, which is the pre-0282 behaviour and must stay the default.
+    seen.clear()
+    assert pb.main(["--run", "auto", "--depot", DEPOT, "--site", str(site),
+                    "--dsn", "postgresql://x"]) == 0
+    assert seen["max_wall_s"] is None
+
+
+def test_fetch_site_refuses_a_descriptor_the_solver_cannot_use():
+    """0389's floor asserted on THIS side too.
+
+    solvers/cpsat/model.py spends power_cap_kw_hard as a NewIntVar bound, and
+    OR-Tools 9.15.6755 raises TypeError on a non-integral one -- reported as a
+    solver fault rather than the data fault it is. Both halves assert it.
+    """
+    ok = pb._fetch_site(FakeCur(one=({"power_cap_kw_hard": 595,
+                                      "power_soft_target_kw": 595},)),
+                        DEPOT, RUN, None)
+    assert ok["power_cap_kw_hard"] == 595 and isinstance(ok["power_cap_kw_hard"], int)
+
+    with pytest.raises(pb.BridgeError, match="power_soft_target_kw"):
+        pb._fetch_site(FakeCur(one=({"power_cap_kw_hard": 595},)), DEPOT, RUN, None)
+
+    with pytest.raises(pb.BridgeError, match="non-integral"):
+        pb._fetch_site(FakeCur(one=({"power_cap_kw_hard": 659.5,
+                                     "power_soft_target_kw": 595},)),
+                       DEPOT, RUN, None)
+
+
+def test_fetch_site_accepts_a_zero_cap_rather_than_flooring_it_up():
+    """A zero cap is a legitimate MPC decision: no charging right now.
+
+    Returning it truthfully makes the model INFEASIBLE, which run_live already
+    records as status='empty' with "solver declined the frame" (L-62). Flooring it
+    to 1 would let a charge through against a cap of nothing.
+    """
+    site = pb._fetch_site(FakeCur(one=({"power_cap_kw_hard": 0,
+                                        "power_soft_target_kw": 0},)),
+                          DEPOT, RUN, None)
+    assert site["power_cap_kw_hard"] == 0

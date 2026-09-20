@@ -711,7 +711,8 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              follow_ticks: bool = True,
              tick_wait_s: float = DEFAULT_TICK_WAIT_S,
              max_consecutive_skips: int = 30,
-             site_auto: bool = False) -> list[dict]:
+             site_auto: bool = False,
+             max_wall_s: float | None = None) -> list[dict]:
     """Fetch → propose → submit, once or in a loop while the run is running.
 
     Every fire is committed in its own transaction so the door's tick_seq stamp
@@ -732,6 +733,7 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
     #: 'first' until something has woken it; see _wait_for_next_tick.
     trigger: str = "first"
     last_fired_tick: int | None = None
+    started_at = time.monotonic()
     with psycopg.connect(dsn) as conn:
         n = 0
         skips = 0
@@ -829,6 +831,24 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
             last_fired_tick = run["tick_count"]
             if not loop or (max_fires is not None and n >= max_fires):
                 break
+            #: A CLEAN STOP BEFORE THE HOST KILLS US, and it is why --max-fires can now be
+            #: set generously. `db/checks/0282`: the scheduled loop fired fifty times and
+            #: proposed nothing, because GitHub throttles a */5 cron to roughly three-hourly
+            #: and the depot was idle at each of those moments. The answer is to make each
+            #: catch cover a long window -- but --max-fires alone cannot, because the loop
+            #: FOLLOWS THE TICK and a tick's real duration depends on the run's
+            #: demo_speed_x. 400 fires is twelve minutes at 8x and two hours at 1x, and the
+            #: second one hits the job's timeout-minutes and turns a working loop red.
+            #: A wall bound is the only thing that makes a generous fire count safe, and it
+            #: stops by CHOICE -- with its reason on the record -- rather than by SIGKILL,
+            #: which would lose the receipts the run is judged from.
+            if max_wall_s is not None and (time.monotonic() - started_at) >= max_wall_s:
+                log(_canonical({"stopping": "max_wall_s",
+                                "wall_s": round(time.monotonic() - started_at, 1),
+                                "max_wall_s": max_wall_s, "fires": n,
+                                "why": "bounded stop so the host does not kill the loop "
+                                       "mid-fire and lose its receipts"}))
+                break
             if follow_ticks:
                 trigger = _wait_for_next_tick(conn, sim_run_id,
                                               after_tick=last_fired_tick,
@@ -906,6 +926,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--loop", action="store_true")
     ap.add_argument("--interval-s", type=float, default=10.0)
     ap.add_argument("--max-fires", type=int, default=None)
+    ap.add_argument("--max-wall-s", type=float, default=None,
+                    help="live loop only: stop cleanly after this many wall seconds. Set "
+                         "it BELOW the host's own kill (a GitHub job's timeout-minutes) so "
+                         "the loop stops by choice with its reason on the record instead "
+                         "of by SIGKILL, which loses the receipts. This is what makes a "
+                         "generous --max-fires safe: the loop follows the TICK, so 400 "
+                         "fires is twelve minutes at demo_speed_x 8 and two hours at 1.")
     ap.add_argument("--json-out", help="write the fire result (rows + record) here")
     ap.add_argument("--no-arm", action="store_true",
                     help="do NOT call ottoq_agentic_arm on the resolved run. The default "
@@ -960,7 +987,8 @@ def main(argv: list[str] | None = None) -> int:
                                 arm=not args.no_arm,
                                 allow_blind_frame=args.allow_blind_frame,
                                 follow_ticks=not args.no_follow_ticks,
-                                tick_wait_s=args.tick_wait_s)
+                                tick_wait_s=args.tick_wait_s,
+                                max_wall_s=args.max_wall_s)
             if args.json_out:
                 Path(args.json_out).write_text(json.dumps(receipts, indent=1, default=str))
             return 0
