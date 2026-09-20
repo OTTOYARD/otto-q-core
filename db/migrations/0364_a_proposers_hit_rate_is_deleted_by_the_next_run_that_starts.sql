@@ -93,6 +93,33 @@
 -- one arm partial capture and the other full, which is a confound inside the
 -- instrument measuring the confound.
 --
+-- ══ 6. VALIDATED ON A SCRATCH CLUSTER, BECAUSE compile-check CANNOT SEE THIS ═
+--
+-- `scripts/compile-check.py` pass 1 stops at the first failing precondition --
+-- early and by design in a scratch database -- so every statement after P0 was
+-- never executed, and pass 2 compiles only `DO $tag$` blocks. **The CREATE TABLE,
+-- CREATE VIEW, CREATE TRIGGER and the view's column references were therefore
+-- unchecked by it.** That is exactly how a PENDING migration fails at apply time
+-- with an error nothing warned about.
+--
+-- So the DDL was executed for real against the local PG16 scratch cluster
+-- (`/var/tmp:55432`) with stub parents, and four promises were checked rather than
+-- asserted:
+--
+--   * the whole DDL section applies clean (exit 0): table, 3 indexes, both
+--     trigger functions, both triggers, and the view;
+--   * **the view's arithmetic is right.** Synthetic rows -- `forward_lex` with 2
+--     enacted / 5 abstained / 1 real refusal -- give
+--     `enacted_pct_of_committed = 66.67`, i.e. 2 / (8 - 5), so abstentions are out
+--     of the denominator; and `refused_real` reads **1**, not 6, so an abstention
+--     recorded as `status='refused'` is not double-counted as a miss;
+--   * **the divide-by-zero guard holds.** A source that only ever abstained gives
+--     `NULL`, not an error -- which is the case CP-SAT will actually hit on a tick
+--     where every row is deferred;
+--   * **append-only really refuses.** UPDATE and DELETE both raise, and the named
+--     `ottoq.disposition_ledger_unlock = 'on'` override then permits the write --
+--     so a future migration can still correct the ledger deliberately.
+--
 -- ══════════════════════════════════════════════════════════════════════════════
 
 -- P0/P1. No certification scheduled or in flight.
