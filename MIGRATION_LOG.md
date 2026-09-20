@@ -342,7 +342,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0357](db/migrations/0357_the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere.sql) | `20260920004021` | yes — ledger | `released_at - booked_at` IS NEGATIVE ON 100% OF ROWS, AND THE FIX IS NOT |
 | [0358](db/migrations/0358_a_single_stall_proposal_gives_the_disposer_nothing_to_dispose_over.sql) | `20260920005644` | yes — ledger | THE RANKED PROPOSAL CONTRACT. A PROPOSER MAY NOW NAME AN ORDERED SET OF |
 | [0359](db/migrations/0359_a_promoted_candidate_must_carry_its_own_kilowatts_or_the_shield_judges_the_wrong_load.sql) | `20260920010111` | yes — ledger | 0358 REWROTE THE STALL AND LEFT THE KILOWATTS BEHIND. FOUR ENERGY RULES |
-| [0360](db/migrations/0360_a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it.sql) | `PENDING` | no — pending | THE DEPOT IS 98% RESERVED AND 13% OCCUPIED. NOTHING RELEASES A |
+| [0360](db/migrations/0360_a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it.sql) | `20260920022145` | yes — ledger | THE DEPOT IS 98% RESERVED AND 13% OCCUPIED. NOTHING RELEASES A |
 
 223 migrations indexed.
 

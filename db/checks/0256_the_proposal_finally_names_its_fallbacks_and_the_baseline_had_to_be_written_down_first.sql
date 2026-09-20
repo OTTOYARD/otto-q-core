@@ -80,9 +80,27 @@
 -- G67 is why that check is not optional.
 --
 --   (a) SAME SERVICE ONLY. A candidate always matches the primary's `stall_type`.
---       Promoting a dcfc vehicle onto an l2 stall would change what the vehicle
---       came for, and choosing a service is a scheduling decision -- CLAUDE.md 2.5:
---       proposers propose, the decide path disposes. A proposer must not make it.
+--
+--       CORRECTION, AND IT IS A CORRECTION TO THIS FILE'S OWN RATIONALE. The
+--       sentence originally here said promoting a dcfc vehicle onto an l2 stall
+--       "would change what the vehicle came for, and choosing a service is a
+--       scheduling decision a proposer must not make." **That reasoning conflicts
+--       with the consumer's deliberate design and the consumer is right.**
+--       `ottoq_promote_proposal_candidates`' own COMMENT (0359) says: *"Stall TYPE
+--       is deliberately not constrained -- l2 to a free dcfc is a legitimate
+--       rescue once the load and the plug are right."* And it is: both stalls
+--       deliver CHARGE. What differs is the rate, not the service, and 0359
+--       already checks the two things that actually differ -- the plug fits
+--       (`ottoq_inlet_fits_stall`) and the load is the candidate's own.
+--
+--       So the honest position: **v27 is CONSERVATIVE, not correct.** The producer
+--       offers less than the consumer permits, which is safe in that direction --
+--       the consumer can handle anything the producer emits -- but it leaves a
+--       legitimate rescue unused, and the principled-sounding reason given for it
+--       was wrong. Widening to cross-type candidates is a real improvement and is
+--       deliberately NOT bundled here: it changes which rescues are possible, so
+--       it wants its own before/after on a paired seed rather than riding along
+--       inside the change that introduced the array at all.
 --
 --   (b) DETERMINISTIC BY CONSTRUCTION. `freeStalls` comes from a `.limit(120)`
 --       query with **no ORDER BY**, so Postgres does not guarantee its row order.

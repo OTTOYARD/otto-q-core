@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260920022145
 -- migration-name:    a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it
 --
 -- 0360  THE DEPOT IS 98% RESERVED AND 13% OCCUPIED. NOTHING RELEASES A
