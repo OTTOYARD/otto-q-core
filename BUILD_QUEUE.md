@@ -124,6 +124,70 @@ wired into a function the live engine never calls. G86 — `perimeter_walkaround
 produced for 90% of arrivals, mandatory, and with no executor. **Do not look for
 what is missing; look for what exists and is never called.**
 
+### ADDENDUM, 05:15 CT-minus-5 (05:15 UTC) — four more findings, and the one number that answers the CP-SAT question
+
+Written after the section above, so it is the later half of the same night.
+
+| # | what | state |
+|---|---|---|
+| G87 | `reliability.stranded_recharges` counts **neither recharges nor vehicles** — 239 events carrying 1,333 vehicle-requeues, published as `count(*)` of events under a name that says "recharge", when the writer grants no charge at all (it re-queues and temp-stages, per the never-bounce-to-the-gate doctrine). Wrong twice in opposite directions. | named; **do not quote that field** |
+| G88 | **`ottoq_stall_free_between` offered charge stalls whose OCPP charger was `Faulted`** — the shared candidate source every proposer and the reroute walk go through. **CP-SAT caught it:** it declined four frames as having no offerable charge stall while our own pointer census said 4 were free, and the four were the faulted ones. **FIXED by 0372.** | fixed |
+| G89 | **Two independently legal decisions summed to 239 kW over the depot's declared service maximum.** EV charging 1,691.8 kW (under its 1,800 nameplate) + BESS **charging at 968 kW** + 79 kW base load = **2,738.8 kW against `service_max_kw` 2,500**, reconstructing to 0.1 kW. `bess_dispatch` evaluates exactly **one** rule (`EN.003.bess_limits`, 234 evals, 0 failures) and it checks the battery's own envelope. **Nothing asserts the sum.** | **open — yours** |
+| G90 | `site_energy_snapshots.peak_demand_kw_15min` is a **running peak of instantaneous import**, not a 15-minute quantity: ≥ `grid_import_kw` in 1,139 of 1,139 snapshots, never less. Reading it for demand billing overstates by 79%. **KPI 3 is correct** and derives its own rolling mean — the investigation started as "the KPI understates the peak by 44%" and that accusation was wrong. | named, low severity |
+
+**G89 IS THE ANSWER TO YOUR CP-SAT QUESTION, AND IT IS BETTER THAN AN OPINION.** The
+shared site power cap is one of the four load-bearing constructs CLAUDE.md 2.3 names,
+and 2.5 — on R-12's evidence — records that **cuOpt cannot express a cumulative
+resource at all.** G89 is the first time that constraint has actually been breached on
+the twin depot, and the breach shape is exactly the one a per-consumer rule cannot
+catch: each consumer legal, the sum not checked. A rule can be added (and should be,
+measured-only first), but **what structurally holds a cumulative site cap while
+scheduling inside it is CP-SAT.** That is what the always-on container buys, stated as
+a measured breach rather than a preference.
+
+**AND THE LOOP RESULT, FINAL SHAPE.** On run `5b37ee46`, with 0367–0372 live: **482
+refusals, 203 rerouted (42% of ALL refusals, 73–79% of the reroutable class), 277
+escalations over 1,223 ticks = 0.227 per tick against the pre-fix baseline's 0.316 — a
+28% reduction** — and `reservation_reclaim_blocked` **zero for the entire run**, so the
+reclaimer never once deadlocked or fell silent. `db/checks/0262` attributes **54 of the
+first 78 reroutes to 0368 specifically**: they are the cases where the refused command
+carried no `stall_type`, its real target was staging, and before 0368 the walk would
+have hunted ten DCFC stalls instead of 113 staging ones.
+
+**AND THE RE-LEARNING SUBSTRATE IS POPULATED AND ALREADY SAYING SOMETHING** (`db/checks/0266`):
+
+| source | rank | disp | enacted | refused | superseded | rescued | enacted % | runs |
+|---|---|---|---|---|---|---|---|---|
+| `cuopt` | 10 | 24 | 16 | 7 | 1 | **4** | **66.67** | 1 |
+| `greedy_constrained` | — | 111 | 25 | 33 | 53 | 0 | **22.52** | **2** |
+| `ottoq_service_priority` | — | 2 | 0 | 0 | 2 | 0 | 0.00 | 2 |
+
+`rescued_by_promotion = 4` is the ranked-candidate rescue path (0358/0359 + cuOpt v27)
+firing for the first time — `0256` had recorded it as inert for two migrations.
+`greedy_constrained` spans **two** runs and one of them was deleted outright by
+tonight's purge, so the evidence-class property is now visible in a column. **And the
+honest reading of 66.67% against 22.52% is "of the proposals each source commits,
+cuOpt's are enacted three times as often" — a statement about selectivity as much as
+quality**, because cuOpt proposes behind a gate that declines when there is nothing to
+propose while greedy proposes on everything, and greedy's 53 `superseded` are a better
+proposal displacing it rather than a failure. Settling which it is needs C5's
+`p_policy`.
+
+**A NEW STANDING INSTRUMENT: `scripts/coverage-guard.sql`.** It mechanises this file's
+own heuristic and found G88 on its first run. Two bugs in it are worth knowing because
+both made it lie toward manufacturing findings: matching a bare function name instead
+of `name(` (the G82 prefix trap), and excluding PROCEDURES, which hid the fact that
+`ottoq_demo_metronome` is one. Fixed, and the validation is that its known false
+positive disappeared while its known true positive stayed.
+
+**Four date/measurement corrections of mine are recorded in the files rather than
+quietly fixed:** the 0360 attribution (above), the 6.5% reroute denominator (above),
+`cpsat_service`'s last call (I quoted the FIRST call's date, turning a few hours of
+silence into six days), and a first cut of `coverage-guard` that reported 883 of 1,335
+routines as uncalled.
+
+---
+
 ### Negative result, recorded so the hour is not spent twice
 
 The wash bays looked wrong — 3 stalls reading 0 reserved / 0 occupied while
