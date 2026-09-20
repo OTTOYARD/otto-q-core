@@ -475,7 +475,8 @@ repo_manifest(version, name, file) AS (
     ('20260920134500'::text, 'the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run'::text, '0378_the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run.sql'::text),
     ('20260920132449'::text, 'the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time'::text, '0379_the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time.sql'::text),
     ('20260920135731'::text, 'joining_an_evidence_table_to_sim_runs_silently_undoes_the_reason_it_is_evidence'::text, '0380_joining_an_evidence_table_to_sim_runs_silently_undoes_the_reason_it_is_evidence.sql'::text),
-    ('20260920141533'::text, 'the_published_reliability_field_names_an_action_that_never_happened_and_undercounts_the_one_that_did'::text, '0381_the_published_reliability_field_names_an_action_that_never_happened_and_undercounts_the_one_that_did.sql'::text)
+    ('20260920141533'::text, 'the_published_reliability_field_names_an_action_that_never_happened_and_undercounts_the_one_that_did'::text, '0381_the_published_reliability_field_names_an_action_that_never_happened_and_undercounts_the_one_that_did.sql'::text),
+    ('20260920155947'::text, 'a_column_named_for_a_fifteen_minute_quantity_that_is_a_running_peak_in_sim_and_not_even_that_in_production'::text, '0382_a_column_named_for_a_fifteen_minute_quantity_that_is_a_running_peak_in_sim_and_not_even_that_in_production.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
