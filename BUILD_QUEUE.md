@@ -195,6 +195,18 @@ propose while greedy proposes on everything, and greedy's 53 `superseded` are a 
 proposal displacing it rather than a failure. Settling which it is needs C5's
 `p_policy`.
 
+**AND THE VALIDATION THAT MATTERED MOST: THE DETERMINISM PAIR PASSES.** Run the moment
+the twin depot was free (`db/checks/0268`) — `ottoq_determinism_pair(171717, 12,
+'busy_day', …)`, 110.5 s, **both arms `validation_status = 'passed'`**, and
+`ottoq_twin_determinism_verdict` reads **12 ticks compared, 12 identical, 0 divergent,
+`deterministic = true`**. Six migrations touched the decide path tonight and five are
+`forces_recert TRUE`; if the fourteen-atom property had not survived them, everything
+above this line would be worthless. **It survived** — including 0371's replacement of
+0367's `SKIP LOCKED` with a deterministic ascending-id selection, which is the change
+this pair existed to test. The other half of that evidence is the 1,260-tick demo run
+logging **zero** `ottoq.reservation_reclaim_blocked` events: the alarm never fired, so
+the reclaimer neither deadlocked nor fell silent.
+
 **A NEW STANDING INSTRUMENT: `scripts/coverage-guard.sql`.** It mechanises this file's
 own heuristic and found G88 on its first run. Two bugs in it are worth knowing because
 both made it lie toward manufacturing findings: matching a bare function name instead
