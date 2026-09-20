@@ -202,11 +202,24 @@ of `name(` (the G82 prefix trap), and excluding PROCEDURES, which hid the fact t
 `ottoq_demo_metronome` is one. Fixed, and the validation is that its known false
 positive disappeared while its known true positive stayed.
 
-**Four date/measurement corrections of mine are recorded in the files rather than
-quietly fixed:** the 0360 attribution (above), the 6.5% reroute denominator (above),
-`cpsat_service`'s last call (I quoted the FIRST call's date, turning a few hours of
-silence into six days), and a first cut of `coverage-guard` that reported 883 of 1,335
-routines as uncalled.
+**Five corrections of mine are recorded in the files rather than quietly fixed:** the
+0360 attribution (above), the 6.5% reroute denominator (above), `cpsat_service`'s last
+call (I quoted the FIRST call's date, turning a few hours of silence into six days), a
+first cut of `coverage-guard` that reported 883 of 1,335 routines as uncalled, and the
+partial-run figures in `0263` §2 that `0267` retracts.
+
+**And a sixth that is the most instructive, because the trap was written down and I read
+it an hour before I fell into it.** `scripts/schedule-round.sql` says, in its own header:
+*"an IN-FLIGHT job of this shape reports `status='succeeded'`, `return_message='SET'`,
+duration ~1 s, because the command is two statements and the row reflects the first until
+the job ends. Rows under 60 s are therefore discarded as in-flight artefacts rather than
+trusted as fast pairs."* I then wrote a watcher for the determinism pair that polled
+`cron.job_run_details`, saw `succeeded / SET / 0.7 s`, called the pair complete and
+**unscheduled the job while it was still executing.** Nothing was lost — `cron.unschedule`
+removes the definition, not the running backend, and the pair was still live at 78 s when
+I checked `pg_stat_activity` — but the watcher would have reported a determinism pass
+that had not happened. **Reading a warning is not the same as encoding it**, and the fixed
+watcher now discards any row under 60 s exactly as that header says to.
 
 ---
 
