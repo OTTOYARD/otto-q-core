@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0357 — GENERATED, not a log
+## Index, 0134–0359 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -340,7 +340,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0355](db/migrations/0355_the_energy_shield_declared_five_block_rules_at_the_moment_power_flows_and_none_had_ever_run.sql) | `20260919235525` | yes — ledger | FIVE BLOCK-ENFORCEMENT RULES DECLARE `charge_session_start`. THAT PROBE |
 | [0356](db/migrations/0356_the_shield_finally_sees_the_moment_power_begins.sql) | `20260919235738` | yes — ledger | THE SIXTH CALLED PROBE POINT, AND THE FIRST ONE THAT WATCHES ELECTRONS |
 | [0357](db/migrations/0357_the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere.sql) | `20260920004021` | yes — ledger | `released_at - booked_at` IS NEGATIVE ON 100% OF ROWS, AND THE FIX IS NOT |
+| [0358](db/migrations/0358_a_single_stall_proposal_gives_the_disposer_nothing_to_dispose_over.sql) | `20260920005644` | yes — ledger | THE RANKED PROPOSAL CONTRACT. A PROPOSER MAY NOW NAME AN ORDERED SET OF |
+| [0359](db/migrations/0359_a_promoted_candidate_must_carry_its_own_kilowatts_or_the_shield_judges_the_wrong_load.sql) | `20260920010111` | yes — ledger | 0358 REWROTE THE STALL AND LEFT THE KILOWATTS BEHIND. FOUR ENERGY RULES |
 
-220 migrations indexed.
+222 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

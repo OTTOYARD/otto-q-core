@@ -451,7 +451,9 @@ repo_manifest(version, name, file) AS (
     ('20260919224417'::text, 'the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt'::text, '0354_the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt.sql'::text),
     ('20260919235525'::text, 'the_energy_shield_declared_five_block_rules_at_the_moment_power_flows_and_none_had_ever_run'::text, '0355_the_energy_shield_declared_five_block_rules_at_the_moment_power_flows_and_none_had_ever_run.sql'::text),
     ('20260919235738'::text, 'the_shield_finally_sees_the_moment_power_begins'::text, '0356_the_shield_finally_sees_the_moment_power_begins.sql'::text),
-    ('20260920004021'::text, 'the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere'::text, '0357_the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere.sql'::text)
+    ('20260920004021'::text, 'the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere'::text, '0357_the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere.sql'::text),
+    ('20260920005644'::text, 'a_single_stall_proposal_gives_the_disposer_nothing_to_dispose_over'::text, '0358_a_single_stall_proposal_gives_the_disposer_nothing_to_dispose_over.sql'::text),
+    ('20260920010111'::text, 'a_promoted_candidate_must_carry_its_own_kilowatts_or_the_shield_judges_the_wrong_load'::text, '0359_a_promoted_candidate_must_carry_its_own_kilowatts_or_the_shield_judges_the_wrong_load.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
