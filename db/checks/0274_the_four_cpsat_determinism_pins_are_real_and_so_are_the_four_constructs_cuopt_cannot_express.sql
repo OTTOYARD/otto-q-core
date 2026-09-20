@@ -1,0 +1,130 @@
+-- 0274  2.5's FOUR CP-SAT DETERMINISM PINS ARE ALL IN PLACE AND ASSERTED IN CI —
+--       AND THE FOUR CONSTRUCTS cuOpt CANNOT EXPRESS ARE ALL EXERCISED BY TESTS
+--       THAT CAN FAIL.
+--
+-- Read-only, and a POSITIVE verification rather than a defect — which is rare enough
+-- here to be worth a file of its own. No database object is touched; the evidence is
+-- `solvers/cpsat/test_cpsat_prototype.py` **run**, not read.
+--
+-- CLAUDE.md 2.5 is the reason: *"CP-SAT is **determinizable**, not deterministic, and
+-- the difference is four pins that must be asserted, not assumed."* Asserting them is
+-- therefore work the brief asks for, and nothing had recorded that it was done.
+--
+-- ══ 1. THE FOUR PINS, CHECKED AGAINST THE LIVE SOURCE ═══════════════════════
+--
+--   2.5 demands                          state in solvers/cpsat/model.py
+--   ---------------------------------    --------------------------------------------
+--   pin the OR-Tools version             requirements.txt pins `ortools==`; T12
+--   (9.4 and 9.5 both shipped            asserts the `==` is still there and that the
+--   nondeterminism even single-worker)   pin lives in that file ALONE; every plan
+--                                        records `ortools_version`. Measured: 9.15.6755
+--   use max_deterministic_time,          `solver.parameters.max_deterministic_time =
+--   never max_time_in_seconds            det_budget_s` unconditionally; the wall clock
+--                                        is set ONLY when a caller explicitly asks —
+--                                        and then the plan is stamped
+--                                        **`reproducible: false`**, which is more than
+--                                        2.5 asks for
+--   pin num_workers or                   `solver.parameters.num_search_workers = 1`
+--   interleave_batch_size
+--   a determinism canary in CI           `.github/workflows/verify.yml` line 34 runs
+--   that would have caught 9.4/9.5       `solvers/cpsat/test_cpsat_prototype.py`
+--
+-- **A METHOD CORRECTION WORTH RECORDING.** I first grepped for `num_workers` and
+-- concluded the third pin was missing. The parameter is `num_search_workers`; the code
+-- was right and my pattern was wrong. Caught only by reading the block instead of
+-- trusting the grep — the same shape as the `_`-is-a-LIKE-wildcard trap and the
+-- `position('ottoq_sim_advance_tick' in prosrc)` prefix trap this repo already records.
+-- **Three instances of one class: a negative result from a pattern match is not a
+-- finding until the pattern is verified against the thing it claims is absent.**
+--
+-- ══ 2. THE CANARY RUN, NOT CITED ════════════════════════════════════════════
+--
+-- `python3 solvers/cpsat/test_cpsat_prototype.py` on **ortools 9.15.6755**:
+-- **ALL TESTS PASS — 20 checks, T1..T15.** The determinism group, verbatim:
+--
+--   T1   PASS  sha256 2b7f40fb41e0297a… **identical across 2 solves**
+--              (status=OPTIMAL, objective=135)
+--   T1b  PASS  truncated solve (FEASIBLE, det budget 0.03) **byte-identical idle vs
+--              5 contending processes**, sha256 37e677cf2fcaa0eb…
+--   T1c  PASS  default solve is deterministically budgeted with **no wall-clock
+--              limit**; wall-clocked plans are labelled `reproducible=False`
+--   T1d  PASS  **fresh-process** solve matches: sha256 2b7f40fb41e0297a…
+--   T12  PASS  the OR-Tools pin lives in requirements.txt alone (9.15.6755)
+--
+-- **T1b is the one with teeth and T1d is the one that closes it.** T1b truncates the
+-- search — determinism only has teeth when the budget CUTS, because an unconstrained
+-- solve can agree by finishing — and then runs it against five busy cores, which is
+-- precisely the condition under which `max_time_in_seconds` yields a different plan
+-- from the same seed. T1d then reproduces T1's hash **in a fresh process**, so the
+-- agreement is not an artifact of warm state inside one interpreter.
+--
+-- **AND ONE THING THE TEST SAYS ABOUT ITSELF, which is why it is trustworthy:** T1c
+-- notes *"the 1.2 s wall clock did not bind on this machine (OPTIMAL); the truncated
+-- branch is exercised via the retained-plan route."* So the binding-wall-clock branch
+-- was NOT exercised as a wall clock here, and the test reports that rather than
+-- claiming coverage it does not have.
+--
+-- ══ 3. AND THIS IS THE EVIDENCE I SHOULD HAVE CITED THIS MORNING ════════════
+--
+-- `0374` and `db/checks/0269` both called the 2,738.8 kW site-power excursion *"the
+-- first measured instance of the cumulative-resource construct cuOpt cannot express"*,
+-- and `db/checks/0271` §4 retracted that as overreach — a cumulative site-power
+-- resource **is** reasoned about in SQL, per tick, by `ottoq_energy_orchestrate`.
+--
+-- **The honest evidence for the same claim was here the whole time, and it is stronger.**
+-- All four load-bearing constructs of 2.3 that R-12 established are absent from cuOpt
+-- 26.08 are not merely expressible in this prototype — each has a test that can fail:
+--
+--   construct (2.3 / 2.5)              test, and why it can fail
+--   --------------------------------   --------------------------------------------
+--   **cumulative resource**            T3  true peak 550 kW <= hard cap 1000 kW
+--   (the shared site power cap)        **T3b the cap BINDS: free peak 550 kW -> 320 kW
+--                                      under a 330 kW cap** — the file's own comment
+--                                      calls this "a check that can fail", i.e. it
+--                                      would catch a cap that was declared and ignored
+--   **disjunctive machine**            T2  point exclusivity held on every point
+--   (one stall, no overlap)
+--   **sequence-dependent gap**         T2  the 18-min DCFC cooldown held on every
+--   (DCFC cooldown on the POINT)       point — the gap is on the service point, which
+--                                      is where 2.3 puts it
+--   **a scheduling solver family**     T5  concurrency-within-point (ops may outlast
+--                                      the charge; departure waits for both) and
+--                                      4-min moves as scheduled operations
+--
+-- Plus the two modelling requirements 2.5 names beside them: **T4** piecewise segments
+-- taper above 70% SoC with the cold-start modifier applied, and **T6** rolling re-solve
+-- with previous-feasible retention — *"7 started ops retained, no new work on the
+-- blocked point"*, which is 2.5's "the site is never without a schedule".
+--
+-- **SO THE CLAIM TO MAKE, AND IT NEEDS NO EXCURSION TO SUPPORT IT:** *"Every one of the
+-- four constructs the vendor documentation places outside cuOpt 26.08 is modelled in our
+-- CP-SAT prototype, each covered by a test that can fail, and the plan is byte-identical
+-- across solves, across processes, and under CPU contention on a truncated budget."*
+-- That is a statement about our own instrument rather than about a competitor's limits,
+-- which makes it both stronger and harder to argue with.
+--
+-- ══ 4. WHAT THIS STILL DOES NOT SAY ════════════════════════════════════════
+--
+--   * **Not that CP-SAT is in the live decide loop.** It is not. `forward_lex` has zero
+--     rows in `ottoq_proposal_disposition_ledger`, and `scripts/check-intel-wiring.sh`
+--     now names why in two parts: the host does not answer, AND
+--     `OTTOQ_INTEL_URL` / `OTTOQ_INTEL_TOKEN` / `OTTOQ_BRIDGE_TOKEN` are absent from the
+--     project entirely.
+--   * **Not that the prototype scales to the twin depot's frame.** These are the
+--     prototype's own reduced scenarios (12 assets), which is what C4 step 4 asked for.
+--     `db/checks/0264` is the separate evidence that it runs on real frames — four
+--     matched live frames, declined all four with a reasoned breakdown.
+--   * **Not that 9.15.6755 is deterministic in general.** It is deterministic on these
+--     scenarios under these pins, which is exactly the distinction 2.5 draws with
+--     "determinizable". The canary is what makes a future version's regression visible;
+--     it is not a proof about the solver.
+--
+-- No query here: the subject is a solver prototype and a CI workflow, not a table. The
+-- reproduction is one command, and it prints its own seed and hashes:
+--
+--   python3 solvers/cpsat/test_cpsat_prototype.py
+--   # -> ALL TESTS PASS — 20 checks, T1..T15
+--   # -> plan_seed424242.json matches byte-for-byte
+--   #    (plan_sha256 2b7f40fb41e0297a…, file sha256 6ea7d2af33c8aedb…)
+
+SELECT 'see solvers/cpsat/test_cpsat_prototype.py — run it, do not cite it' AS note;
