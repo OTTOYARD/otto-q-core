@@ -450,7 +450,8 @@ repo_manifest(version, name, file) AS (
     ('20260919210336'::text, 'the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger'::text, '0353_the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger.sql'::text),
     ('20260919224417'::text, 'the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt'::text, '0354_the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt.sql'::text),
     ('20260919235525'::text, 'the_energy_shield_declared_five_block_rules_at_the_moment_power_flows_and_none_had_ever_run'::text, '0355_the_energy_shield_declared_five_block_rules_at_the_moment_power_flows_and_none_had_ever_run.sql'::text),
-    ('20260919235738'::text, 'the_shield_finally_sees_the_moment_power_begins'::text, '0356_the_shield_finally_sees_the_moment_power_begins.sql'::text)
+    ('20260919235738'::text, 'the_shield_finally_sees_the_moment_power_begins'::text, '0356_the_shield_finally_sees_the_moment_power_begins.sql'::text),
+    ('20260920004021'::text, 'the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere'::text, '0357_the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
