@@ -484,6 +484,48 @@ def _fetch_class_rows(cur) -> list[dict]:
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
+#: 0389. The site descriptor, DERIVED rather than read from a file.
+SITE_FN = "public.ottoq_build_site_descriptor"
+
+
+def _fetch_site(cur, depot_id: str, sim_run_id: str | None, clock) -> dict:
+    """The site descriptor as the ENGINE currently defines it (0389).
+
+    WHY THIS EXISTS AND WHY IT IS RE-READ EVERY FIRE. `power_cap_kw_hard` is spent
+    by solvers/cpsat/model.py as a CP-SAT cumulative capacity, so it is the site
+    power cap the plan is actually constrained by -- and until 0389 it came from a
+    constant, 2500, in bridge/sites/nashville-flagship.json. The cap the decide
+    path enforces is `ottoq_active_charge_cap_kw`, an MPC setpoint with a horizon,
+    and on run 1efeb1cd it read 795 / 659.5 / 595.3 kW across three consecutive
+    measurements. A descriptor loaded once at startup is therefore wrong twice
+    over: wrong in level, and stale by construction.
+
+    The function tightens only -- with no live cap in force it returns exactly the
+    constants it replaces -- so a fire that reads it can never plan against MORE
+    headroom than the file gave.
+    """
+    cur.execute(f"SELECT {SITE_FN}(%s::uuid, %s::uuid, %s::timestamptz)",
+                (depot_id, sim_run_id, clock))
+    site = cur.fetchone()[0]
+    if isinstance(site, str):
+        site = json.loads(site)
+    #: Read what came back, never what was asked for. A descriptor missing either
+    #: power key would reach OR-Tools as a KeyError inside the model build, which
+    #: reports as a solver fault rather than as the data fault it is.
+    for key in ("power_cap_kw_hard", "power_soft_target_kw"):
+        if key not in site:
+            raise BridgeError(f"{SITE_FN} returned no {key!r}; refusing to plan "
+                              f"against an undeclared site power cap")
+        if isinstance(site[key], float) and not site[key].is_integer():
+            #: OR-Tools 9.15.6755: Domain(arg0: int, arg1: int) -- a fractional
+            #: bound is a TypeError inside NewIntVar, not a worse plan. 0389 floors
+            #: in SQL; this is the assertion that the flooring happened.
+            raise BridgeError(f"{SITE_FN} returned non-integral {key}={site[key]!r}; "
+                              f"model.py spends it as a NewIntVar bound")
+        site[key] = int(site[key])
+    return site
+
+
 CERT_RUN_BY = "cert_harness"
 # The two rigs that must never share a depot with a live proposer loop. A pair
 # runs both of its arms inside ONE transaction, so its ottoq_sim_runs rows are
@@ -668,7 +710,8 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              allow_blind_frame: bool = False,
              follow_ticks: bool = True,
              tick_wait_s: float = DEFAULT_TICK_WAIT_S,
-             max_consecutive_skips: int = 30) -> list[dict]:
+             max_consecutive_skips: int = 30,
+             site_auto: bool = False) -> list[dict]:
     """Fetch → propose → submit, once or in a loop while the run is running.
 
     Every fire is committed in its own transaction so the door's tick_seq stamp
@@ -730,7 +773,14 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                 if not allow_blind_frame:
                     _require_seeing_frame(frame, sim_run_id)
                 class_rows = _fetch_class_rows(cur)
-                result = fire(frame, class_rows, site=site, sim_run_id=sim_run_id,
+                #: 0389. `--site auto` re-derives the descriptor from the engine on
+                #: EVERY fire, because the live charge cap moves within a run. The
+                #: file route is unchanged and still the default, so nothing that
+                #: passes a path behaves differently than it did.
+                fire_site = (_fetch_site(cur, depot_id, sim_run_id,
+                                         run["sim_clock_current"])
+                             if site_auto else site)
+                result = fire(frame, class_rows, site=fire_site, sim_run_id=sim_run_id,
                               depot_id=depot_id,
                               hour_of_day=(run["sim_hour"] if regime else None),
                               max_assets=max_assets, det_budget_s=det_budget_s,
@@ -822,7 +872,12 @@ def main(argv: list[str] | None = None) -> int:
                          "depot's one running non-certification run each fire")
     ap.add_argument("--depot", required=True, help="depot_id (uuid)")
     ap.add_argument("--site", required=True,
-                    help="site JSON (bridge/sites/*.json)")
+                    help="site JSON (bridge/sites/*.json), or the literal 'auto' to "
+                         "derive it from the engine each fire via 0389's "
+                         "ottoq_build_site_descriptor -- which is the only route that "
+                         "sees the LIVE charge cap. The committed files carry the "
+                         "site's STRUCTURAL limits (2500 kW here); the engine was "
+                         "enforcing 595-795 kW on run 1efeb1cd. 'auto' needs --dsn.")
     ap.add_argument("--frame", help="decision frame JSON (offline)")
     ap.add_argument("--classes", help="ottoq_vehicle_classes rows JSON (offline)")
     ap.add_argument("--emit-sql", help="write the door calls here (offline)")
@@ -882,11 +937,18 @@ def main(argv: list[str] | None = None) -> int:
                          "exits non-zero -- those are decisions, not idleness.")
     args = ap.parse_args(argv)
 
-    site = _load_json(args.site)
+    #: 0389. `--site auto` means "ask the engine", and it is live-only: offline mode
+    #: has no database to ask, so it must say so rather than fall back to a file it
+    #: was not given.
+    site_auto = str(args.site).strip().lower() == "auto"
+    if site_auto and not args.dsn:
+        ap.error("--site auto derives the descriptor from the database; it needs --dsn. "
+                 "Offline, pass a site file (bridge/sites/*.json).")
+    site = {} if site_auto else _load_json(args.site)
     try:
         if args.dsn:
             receipts = run_live(args.dsn, sim_run_id=args.run, depot_id=args.depot,
-                                site=site, ttl_seconds=args.ttl,
+                                site=site, site_auto=site_auto, ttl_seconds=args.ttl,
                                 max_assets=args.max_assets,
                                 det_budget_s=args.det_budget, via=args.via,
                                 regime=args.regime, loop=args.loop,
