@@ -145,11 +145,33 @@ measured-only first), but **what structurally holds a cumulative site cap while
 scheduling inside it is CP-SAT.** That is what the always-on container buys, stated as
 a measured breach rather than a preference.
 
-**AND THE LOOP RESULT, FINAL SHAPE.** On run `5b37ee46`, with 0367–0372 live: **482
-refusals, 203 rerouted (42% of ALL refusals, 73–79% of the reroutable class), 277
-escalations over 1,223 ticks = 0.227 per tick against the pre-fix baseline's 0.316 — a
-28% reduction** — and `reservation_reclaim_blocked` **zero for the entire run**, so the
-reclaimer never once deadlocked or fell silent. `db/checks/0262` attributes **54 of the
+**AND THE LOOP RESULT, NOW THAT THE RUN HAS FINISHED — `db/checks/0267` is the
+definitive pair.** Both runs stopped on the same 540 sim-minute ceiling, 1,245 against
+1,260 ticks, same seed, scenario, depot and speed:
+
+| per tick | before | after | |
+|---|---|---|---|
+| **tasks completed** | 0.38956 | 0.42857 | **+10.0%** |
+| commands issued | 8.120 | 6.258 | **−23.0%** |
+| commands per dispatch | 60.2 | 45.3 | **−24.8%** |
+| escalations | 0.3157 | 0.2325 | **−26.4%** |
+| refusals | 0.3494 | 0.4032 | **+15.4%** |
+| dispatches | 0.13494 | 0.13810 | +2.3% |
+
+**Ten percent more work finished per tick, a quarter less command churn per dispatch, a
+quarter fewer escalations — on identical inputs, and on three fewer vehicles.** The
+extra refusals are the point rather than a regression: **210 of the 283 reroutable
+refusals (74.2%) now find a stall**, against 2 of 7 measured just before 0368/0369.
+`reservation_reclaim_blocked` was **zero across all 1,260 ticks**, which is the evidence
+that 0371's removal of `SKIP LOCKED` did not reintroduce 0360's deadlock.
+
+**AND I HAVE TO FLAG MY OWN OVERSTATEMENT, because it was in this file an hour ago.** At
+halfway I read commands per tick as down **3.3x** and dispatches as up **29%**. Both were
+artefacts of comparing a 51%-complete run against a finished one — command volume
+accelerates in the second half of a busy_day. `0263` §2 named that confound explicitly
+and then printed the numbers anyway, which is how a caveat fails to do its job. The real
+delta is +10%, and +10% on identical inputs is a good night's work that does not need
+help. `db/checks/0262` attributes **54 of the
 first 78 reroutes to 0368 specifically**: they are the cases where the refused command
 carried no `stall_type`, its real target was staging, and before 0368 the walk would
 have hunted ten DCFC stalls instead of 113 staging ones.

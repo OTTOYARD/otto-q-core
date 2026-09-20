@@ -55,6 +55,19 @@ SELECT b.purpose, b.booked_by, count(*) AS bookings
 
 -- ══ 2. "THE REFUSAL RATE TRIPLED" — ALSO NOT A FINDING, AND THE OPPOSITE ════
 --
+-- **RETRACTED IN PART, 2026-09-20 05:17 — READ `db/checks/0267` INSTEAD.** Everything
+-- below was measured at tick 671 of a run that finished at 1,260, and two of its
+-- numbers do not survive completion: commands per tick was NOT down 3.3x (it is down
+-- 23%, because command volume accelerated sharply in the second half — 1,637 commands
+-- at tick 671, 7,885 by 1,260), and dispatches per tick was NOT up 29% (it is up
+-- 2.3%). The refusals-per-tick identity to three decimals was a coincidence of the
+-- halfway point: finished, it is 0.3494 before against 0.4032 after, i.e. refusals per
+-- tick are **up 15%**. The conclusion that survives is the one about the denominator —
+-- the refusal PERCENTAGE rose because commands fell — plus the real result, which is
+-- +10% tasks completed per tick and -25% commands per dispatch. **The caveat at the
+-- end of this section named the confound correctly and the numbers were quotable
+-- anyway. A caveat has to be the headline or it is decoration.**
+--
 -- The CRN pair is `3fb415d8` (pre-fix, whole life, purged but archived) against
 -- `5b37ee46` (same seed 777777, same scenario, same depot, same speed 8.0, with
 -- 0367–0371 live). From `ottoq_run_archives`, which survives the purge:
