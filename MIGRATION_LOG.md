@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0365 — GENERATED, not a log
+## Index, 0134–0366 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -348,7 +348,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0363](db/migrations/0363_the_gate_0362_installed_could_never_be_opened.sql) | `20260920025230` | yes — ledger | 0362 SHIPPED A POLICY GATE THAT CANNOT BE SET. REGISTER THE KEY |
 | [0364](db/migrations/0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql) | `PENDING` | no — pending | WHETHER A PROPOSAL WAS ENACTED IS RECORDED ONLY IN A TABLE THE NEXT |
 | [0365](db/migrations/0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql) | `20260920033500` | yes — ledger | `window_elapsed_occupied` HAS ONE WRITER AND ZERO READERS. MAKE THE |
+| [0366](db/migrations/0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql) | `PENDING` | no — pending | PUBLISH THE OVERSTAY TO THE DECISION FRAME, SO THE SIGNAL REACHES A |
 
-228 migrations indexed.
+229 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
