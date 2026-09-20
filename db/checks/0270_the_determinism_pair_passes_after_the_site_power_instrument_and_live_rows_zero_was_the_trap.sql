@@ -200,3 +200,33 @@ SELECT i.indisunique, i.indpred IS NOT NULL AS is_partial,
 --   armed        live        2    39.7 -    39.7
 --   excursion    backfill    1  2,738.8 - 2,738.8
 --   high_water   backfill   15  1,514.8 - 1,713.8
+
+-- ══ 6. AND TWO TEST FAILURES THAT WERE MY OWN CONCURRENCY, NOT A REGRESSION ══
+--
+-- Recorded because the next person will see it and start diagnosing a migration.
+--
+-- The suite run started at **12:50** reported **2 failed, 1244 passed**. Re-run after
+-- the depot was quiet, with `0376` AND `0377` both applied, it reported **1247 passed,
+-- 8 skipped, 0 failed**. Nothing was broken.
+--
+-- **The second determinism pair started at 12:48:31 and runs about 110 seconds**, so it
+-- was still holding the twin depot when that suite began. Two DB-dependent tests
+-- asserted depot state against a world a live pair was mutating.
+--
+-- This is the hazard `scripts/schedule-round.sql` was written for, in a direction its
+-- header does not cover: it spaces *pairs* apart from each other because "two pairs on
+-- one depot contaminate both", and the same applies to **anything else that reads the
+-- depot while a pair holds it** -- including the test suite. The standing precondition
+-- for running a pair is already "no `ottoq_sim_runs` row `running` or `paused`"; the
+-- converse needs stating too.
+--
+-- **So: do not run the DB-dependent suite while a pair is live, and do not read a
+-- failure from such a run as a finding.** The check is the same one-liner used before
+-- applying anything:
+--
+--   SELECT count(*) FROM public.ottoq_sim_runs WHERE status IN ('running','paused');
+--
+-- One more instance of the night's theme, and a cheap one: I had the precondition, I
+-- apply it religiously before migrations, and I did not think to apply it before a test
+-- run. Then spent twenty minutes testing five guard files in isolation -- all of which
+-- passed, which was itself the clue -- before noticing the clock.
