@@ -473,7 +473,8 @@ repo_manifest(version, name, file) AS (
     ('20260920131500'::text, 'i_built_a_detector_whose_silence_cannot_be_told_from_absence_which_is_the_defect_i_spent_tonight_fixing'::text, '0376_i_built_a_detector_whose_silence_cannot_be_told_from_absence_which_is_the_defect_i_spent_tonight_fixing.sql'::text),
     ('20260920132500'::text, 'removing_the_one_row_my_own_path_test_left_in_an_evidence_table'::text, '0377_removing_the_one_row_my_own_path_test_left_in_an_evidence_table.sql'::text),
     ('20260920134500'::text, 'the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run'::text, '0378_the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run.sql'::text),
-    ('20260920132449'::text, 'the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time'::text, '0379_the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time.sql'::text)
+    ('20260920132449'::text, 'the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time'::text, '0379_the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time.sql'::text),
+    ('20260920135731'::text, 'joining_an_evidence_table_to_sim_runs_silently_undoes_the_reason_it_is_evidence'::text, '0380_joining_an_evidence_table_to_sim_runs_silently_undoes_the_reason_it_is_evidence.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
