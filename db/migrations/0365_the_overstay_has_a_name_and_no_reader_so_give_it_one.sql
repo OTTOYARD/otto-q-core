@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260920033500
 -- migration-name:    the_overstay_has_a_name_and_no_reader_so_give_it_one
 --
 -- 0365  `window_elapsed_occupied` HAS ONE WRITER AND ZERO READERS. MAKE THE

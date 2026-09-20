@@ -347,7 +347,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0362](db/migrations/0362_a_worse_ranked_proposer_removes_a_better_one_from_the_pool_before_rank_is_read.sql) | `20260920024530` | yes — ledger | RANK DECIDES WHICH PENDING PROPOSAL WINS. SUPERSESSION DECIDES WHICH |
 | [0363](db/migrations/0363_the_gate_0362_installed_could_never_be_opened.sql) | `20260920025230` | yes — ledger | 0362 SHIPPED A POLICY GATE THAT CANNOT BE SET. REGISTER THE KEY |
 | [0364](db/migrations/0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql) | `PENDING` | no — pending | WHETHER A PROPOSAL WAS ENACTED IS RECORDED ONLY IN A TABLE THE NEXT |
-| [0365](db/migrations/0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql) | `PENDING` | no — pending | `window_elapsed_occupied` HAS ONE WRITER AND ZERO READERS. MAKE THE |
+| [0365](db/migrations/0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql) | `20260920033500` | yes — ledger | `window_elapsed_occupied` HAS ONE WRITER AND ZERO READERS. MAKE THE |
 
 228 migrations indexed.
 
