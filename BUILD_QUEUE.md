@@ -426,6 +426,39 @@ advisory publication plus an unclamped heuristic, where a scheduler carrying it 
 first-class hard constraint would not need either.** Still a point for CP-SAT. A weaker
 and truer one, and I would rather you quote that version to anyone hostile.
 
+**AND ONE MORE THING BUILT, 09:00 AM CT — `0379`, plus a bug it caught in my own key.**
+`0378` deferred the "did we draw more than our own published budget" question to a
+view. **That was wrong, and the reason is a real observability gap:**
+`ottoq_active_charge_cap_kw` filters `status='executed'`, and
+`twin.ottoq_sim_energy_controller` rewrites each prior cap to `superseded` — so on the
+run, **1,259 of 1,260 caps read superseded and the single `executed` row is the run's
+final command.** No query afterwards can reconstruct which cap was in force at tick N.
+It has to be captured at tick time, which `0379` now does as a fourth ledger tier.
+
+I nearly recorded the opposite: probing the accessor across all 1,260 clocks returned
+non-NULL every time, which reads as "the cap was always available" and is the reverse —
+it returned that one surviving row for every tick, because its 15-minute horizon is
+later than every earlier clock. A historical question asked with a present-tense
+predicate, caught because the answer was suspiciously clean.
+
+**The bug `0379` caught before shipping:** `0376` keyed the ledger on `snapshot_id`
+alone, on the invariant "one row per metered instant" — correct while `excursion` and
+`high_water` came from one `if/elsif` and couldn't both fire. The new tier is
+**independent** of both, so a tick over the site cap *and* over the published cap would
+have had its second finding **silently dropped** by `ON CONFLICT DO NOTHING`. The exact
+suppression `0376` existed to prevent. Key widened to `(snapshot_id, severity_tier)`.
+
+**Validated:** determinism **12/12 for the third consecutive pair**; beacon at 4 `armed`
+rows across 4 runs; the new tier exercised by a path test that this time ran inside
+`BEGIN … ROLLBACK` and left **nothing** behind — which is the method `0377` should have
+used, and confirms there was never a reason to write to evidence to test a write path.
+`db/checks/0272`.
+
+**One number to watch on your next busy_day run:** `ev_over_published_cap` should start
+appearing — `0271` §2's reconstruction says it happened 26 times in 1,260 ticks, worst
+205 kW. **If it stays at zero, that reconstruction is the thing to doubt first**, not the
+detector.
+
 ---
 
 ## THE DISCIPLINE FIX — why the misses happened, and what changes
