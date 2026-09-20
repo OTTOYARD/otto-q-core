@@ -338,6 +338,29 @@ COMMENT ON FUNCTION public.ottoq_assert_site_descriptor(uuid, uuid) IS
   'no-op wherever no live cap is in force, which is why the change is safe to make on a '
   'live run.';
 
+-- ── CERT LINEAGE ───────────────────────────────────────────────────────────────
+INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
+VALUES ('0389_cp_sat_was_told_the_site_could_draw_2500_kw_while_the_engine_was_enforcing_795', false,
+  'Adds public.ottoq_build_site_descriptor and public.ottoq_assert_site_descriptor. Both '
+  'are new, STABLE, read-only functions; no existing object is altered, no schema changes, '
+  'no data written, and nothing on the decide-tick path calls either one. A canon is '
+  'invalidated by a change to what the engine DOES, and at the moment this file is applied '
+  'nothing calls these functions at all -- the companion changes that do (the bridge''s '
+  '--site auto and the ottoq-cpsat-propose resolveSite call) live outside the database and '
+  'cannot move a canon by themselves either, because they alter an ADVISORY proposer''s '
+  'input rather than the deterministic path that disposes of its output. The descriptor '
+  'also tightens only: with no live charge cap in force it returns exactly the 2500/1620 '
+  'constants it replaces, which is asserted as the first of seven checks in P3, so even a '
+  'caller that adopts it immediately reproduces prior behaviour wherever the engine has '
+  'issued no cap. Applied while run 1efeb1cd-f9b6-4515-8e61-2e5a04121112 was live and '
+  'ticking, deliberately, because that is the only state in which the live-cap assertions '
+  'have anything to assert.',
+  now())
+ON CONFLICT (name) DO UPDATE
+  SET forces_recert = EXCLUDED.forces_recert,
+      note          = EXCLUDED.note,
+      classified_at = EXCLUDED.classified_at;
+
 -- ══ P3. POSTFLIGHT — the assertions must pass before this commits ══════════
 DO $p3$
 DECLARE r record; v_fail text := '';

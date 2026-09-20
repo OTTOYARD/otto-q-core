@@ -482,7 +482,8 @@ repo_manifest(version, name, file) AS (
     ('20260920172340'::text, 'the_catch_up_that_stopped_one_state_short_strands_a_vehicle_for_the_whole_run'::text, '0385_the_catch_up_that_stopped_one_state_short_strands_a_vehicle_for_the_whole_run.sql'::text),
     ('20260920173700'::text, 'the_fourteen_atom_verdict_is_the_one_thing_the_permanent_run_record_does_not_keep'::text, '0386_the_fourteen_atom_verdict_is_the_one_thing_the_permanent_run_record_does_not_keep.sql'::text),
     ('20260920185425'::text, 'two_critical_state_machine_rules_had_a_caller_shaped_hole_and_the_input_they_need_did_not_exist'::text, '0387_two_critical_state_machine_rules_had_a_caller_shaped_hole_and_the_input_they_need_did_not_exist.sql'::text),
-    ('20260920185739'::text, 'my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do'::text, '0388_my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do.sql'::text)
+    ('20260920185739'::text, 'my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do'::text, '0388_my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do.sql'::text),
+    ('20260920194102'::text, 'cp_sat_was_told_the_site_could_draw_2500_kw_while_the_engine_was_enforcing_795'::text, '0389_cp_sat_was_told_the_site_could_draw_2500_kw_while_the_engine_was_enforcing_795.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

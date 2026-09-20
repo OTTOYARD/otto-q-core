@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0388 — GENERATED, not a log
+## Index, 0134–0389 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -371,7 +371,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0386](db/migrations/0386_the_fourteen_atom_verdict_is_the_one_thing_the_permanent_run_record_does_not_keep.sql) | `20260920173700` | yes — ledger | G93: EVERY DETERMINISM VERDICT THIS ENGINE HAS EVER PRODUCED IS GONE. 1,166 |
 | [0387](db/migrations/0387_two_critical_state_machine_rules_had_a_caller_shaped_hole_and_the_input_they_need_did_not_exist.sql) | `20260920185425` | yes — ledger | G44: SM.001 AND SM.003 NOW HAVE A CALLER. AND THE REASON THEY COULD NOT SIMPLY |
 | [0388](db/migrations/0388_my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do.sql) | `20260920185739` | yes — ledger | 0387's PROBE IS MEASURE-ONLY AND ITS LOG ROWS SAY `enforcement_taken='blocked'` |
+| [0389](db/migrations/0389_cp_sat_was_told_the_site_could_draw_2500_kw_while_the_engine_was_enforcing_795.sql) | `20260920194102` | yes — ledger | THE SITE POWER CAP CP-SAT PLANS AGAINST IS A CONSTANT IN TWO PLACES, AND THE |
 
-251 migrations indexed.
+252 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
