@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0375 — GENERATED, not a log
+## Index, 0134–0377 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -358,7 +358,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0373](db/migrations/0373_three_comments_that_stop_the_next_person_repeating_tonight.sql) | `20260920050351` | yes — ledger | THREE COMMENTS THAT STOP THE NEXT PERSON REPEATING TONIGHT |
 | [0374](db/migrations/0374_two_legal_decisions_summed_past_the_service_contract_and_the_meter_that_would_have_seen_it_is_not_read.sql) | `20260920123000` | yes — ledger | THE SITE ALREADY METERS 2,738.8 kW AGAINST A 2,500 kW SERVICE CONTRACT, |
 | [0375](db/migrations/0375_my_own_new_column_says_throttle_the_vehicles_when_the_answer_is_defer_the_battery.sql) | `20260920124500` | yes — ledger | 0374's READER ANSWERS "WHAT IS THE BIGGEST LOAD" UNDER A COLUMN NAME THAT |
+| [0376](db/migrations/0376_i_built_a_detector_whose_silence_cannot_be_told_from_absence_which_is_the_defect_i_spent_tonight_fixing.sql) | `20260920131500` | yes — ledger | 0374's DETECTOR WRITES NOTHING WHEN THE SITE IS QUIET, AND WRITES NOTHING |
+| [0377](db/migrations/0377_removing_the_one_row_my_own_path_test_left_in_an_evidence_table.sql) | `20260920132500` | yes — ledger | I TESTED 0376's `ON CONFLICT` PATH BY LOWERING THE THRESHOLD BY HAND, AND |
 
-238 migrations indexed.
+240 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

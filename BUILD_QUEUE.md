@@ -325,6 +325,31 @@ that were wrong, which is the class of defect no assertion catches.** Same shape
 `0371` correcting `0367` earlier the same night: the instrument wrong, not the
 finding, and both mine.
 
+**AND A SECOND CORRECTION, WHICH IS THE ONE I MIND.** After applying `0374` I ran the
+determinism pair — **12 of 12 identical, `deterministic = true`**, so the per-tick call
+did not break the byte-identical property. The ledger then read **`live_rows = 0`**,
+which is *correct* (the pair peaked at 1,050 kW against a 1,500 kW threshold, and
+calling the detector by hand returned `{"tier": null, "total_kw": 498.2, "headroom_kw":
+2001.8}` and wrote nothing). **But `live_rows = 0` is also exactly what a detector that
+never executed would produce, and nothing in the ledger told the two apart — which is
+G82, the finding I spent the night on, reproduced by me in the code that fixed it.** I
+had proved the function works and *inferred* the tick runs it from `prosrc`. Better
+evidence than 0360 ever had; still inference.
+
+`0376` closes it: a third tier `armed`, one row per run on first execution, so a run
+absent from it was never covered. It needed the `snapshot_id` unique index made
+**partial** — an `armed` row shares its snapshot with whatever that instant later turns
+out to be, and an unconditional index would have let the beacon **silently suppress a
+real excursion**. A second pair then ran and the ledger holds **2 `armed` rows,
+`source_kind='live'`, one per arm**, with determinism still **12 of 12**. *That* is
+observation rather than inference, and it also proved the beacon is symmetric across
+arms and that the partial index suppressed nothing. `db/checks/0270`.
+
+**Seventh instance of this file's own standing heuristic, and the first where the thing
+that exists and might never be called is something I wrote hours after writing the
+heuristic down.** Which is the argument for `scripts/coverage-guard.sql` over
+remembering it.
+
 ---
 
 ## THE DISCIPLINE FIX — why the misses happened, and what changes
