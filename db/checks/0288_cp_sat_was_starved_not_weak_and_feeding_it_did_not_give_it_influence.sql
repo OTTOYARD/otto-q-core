@@ -176,3 +176,89 @@ SELECT state, count(*) AS holds, count(DISTINCT vehicle_id) AS vehicles,
   FROM public.ottoq_cuopt_deferrals
  WHERE sim_run_id = 'c8f678fb-a04a-4c18-a937-9b93673f3fe9'
  GROUP BY 1 ORDER BY holds DESC;
+
+-- ══ 6. ADDENDUM — THE DENOMINATOR §5 REFUSED TO GUESS, AND IT IS A WIRING
+--       GAP: THE RIGHT-OF-FIRST-REFUSAL IS ARMED BY THE DECIDER, NOT BY THE
+--       DOOR ════════════════════════════════════════════════════════════════
+--
+-- §5 declined to call the one-tick hold broken on a bare 63-against-610 ratio. Here is the
+-- denominator it was missing — hold coverage per proposal, asking whether a deferral row for
+-- THAT vehicle spans THAT proposal's tick:
+--
+--   status       proposals   hold covered THIS tick   vehicle held at SOME tick
+--   superseded        559          **14  (2.5%)**          414  (74.1%)
+--   refused           36            1                      21
+--   enacted           12            2                       9
+--   expired            3            0                       0
+--
+-- **So the hold is armed for three quarters of these vehicles at some point in the run, and
+-- almost never at the moment the proposal was made.** 2.5% coverage on the population it
+-- would have to cover to matter.
+--
+-- **And the cause is one query, not a theory.** Neither door arms a hold:
+--
+--   ottoq_proposer_submit_batch       mentions first_refusal: NO   writes deferrals: NO
+--   ottoq_submit_external_proposal    mentions first_refusal: NO   writes deferrals: NO
+--   ottoq_cuopt_first_refusal_arm     mentions first_refusal: YES  writes deferrals: YES
+--   ottoq_cuopt_defer_roll            —                            writes deferrals: YES
+--   ottoq_decide_tick                 mentions first_refusal: YES  writes deferrals: NO
+--
+-- The hold is armed by `ottoq_decide_tick` through `ottoq_cuopt_first_refusal_arm`, on the
+-- DECIDER's schedule and by the decider's criteria. **Submitting a proposal does not itself
+-- buy a tick of protection.**
+--
+-- **Why that is coherent rather than careless, which is the part worth understanding.** The
+-- mechanism's own name says `cuopt`, and the cuOpt path runs the other way round: the decide
+-- tick itself initiates the cuOpt request, so the decider naturally arms the hold *before*
+-- dispatching and the proposal comes back into a seat already reserved for it. The CP-SAT
+-- bridge inverts that — an external process pushes a proposal through the door at an
+-- arbitrary moment between ticks — and the hold was never adapted to that direction. A
+-- proposal that lands at tick T+0.4 has no seat, and by tick T+1 the local path has decided
+-- the entity. That is the 96.2% in §2, mechanically.
+--
+-- **NOT FIXED, and this one is a design decision rather than a repair.** Arming a hold from
+-- the door would change WHEN the deterministic decide path is required to defer — it makes an
+-- external proposer able to make the kernel wait. That is a change to what the local path is
+-- allowed to do, on the tick path, affecting throughput, and it is exactly the class of
+-- decision CLAUDE.md 2.5 reserves ("do not rip out a working propose/dispose pipeline") and
+-- rule 6 puts on the product side. Three shapes it could take, with different meanings:
+--
+--   (a) **Arm at the door.** `ottoq_proposer_submit_batch` arms a one-tick hold per row for a
+--       `holds_tick` source. Strongest, and it lets any external proposer stall the kernel.
+--   (b) **Arm at the tick boundary for whatever is pending.** The decide tick, before
+--       deciding, reads pending `holds_tick` proposals and arms holds for those entities.
+--       Keeps arming with the decider, costs one extra read per tick, and cannot be abused
+--       by submission timing.
+--   (c) **Leave it and accept CP-SAT as advisory.** Honest, and it means the 2% enactment
+--       rate is the designed outcome rather than a defect — in which case every claim about
+--       CP-SAT's contribution must be quoted at 2%.
+--
+-- **(b) is what I would build**, because it preserves "the decider decides when to defer"
+-- while closing the timing gap. It is not built here. **Recorded as the G98 follow-up.**
+
+SELECT p.proname,
+       (p.prosrc ILIKE '%first_refusal%') AS mentions_first_refusal,
+       (p.prosrc ILIKE '%cuopt_deferrals%') AS writes_deferrals
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE p.proname IN ('ottoq_proposer_submit_batch', 'ottoq_submit_external_proposal',
+                     'ottoq_cuopt_first_refusal_arm', 'ottoq_cuopt_defer_roll',
+                     'ottoq_decide_tick')
+ ORDER BY 1;
+
+WITH fl AS (
+  SELECT entity_id::uuid AS vid, tick_seq, status
+    FROM public.ottoq_external_proposals
+   WHERE sim_run_id = 'c8f678fb-a04a-4c18-a937-9b93673f3fe9' AND source = 'forward_lex')
+SELECT status, count(*) AS proposals,
+       count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_cuopt_deferrals df
+          WHERE df.sim_run_id = 'c8f678fb-a04a-4c18-a937-9b93673f3fe9'
+            AND df.vehicle_id = fl.vid
+            AND fl.tick_seq BETWEEN df.armed_at_tick
+                                AND COALESCE(df.cleared_at_tick, df.armed_at_tick + 1)))
+         AS hold_covered_this_tick,
+       count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_cuopt_deferrals df
+          WHERE df.sim_run_id = 'c8f678fb-a04a-4c18-a937-9b93673f3fe9'
+            AND df.vehicle_id = fl.vid)) AS vehicle_held_at_some_tick
+  FROM fl GROUP BY 1 ORDER BY proposals DESC;
