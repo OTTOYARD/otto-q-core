@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260920035200
 -- migration-name:    a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts
 --
 -- 0364  WHETHER A PROPOSAL WAS ENACTED IS RECORDED ONLY IN A TABLE THE NEXT

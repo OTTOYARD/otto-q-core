@@ -346,7 +346,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0361](db/migrations/0361_a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall.sql) | `20260920023610` | yes — ledger | THE DISPOSER HAS NO CONCEPT OF AN ABSTENTION, SO A PROPOSER THAT |
 | [0362](db/migrations/0362_a_worse_ranked_proposer_removes_a_better_one_from_the_pool_before_rank_is_read.sql) | `20260920024530` | yes — ledger | RANK DECIDES WHICH PENDING PROPOSAL WINS. SUPERSESSION DECIDES WHICH |
 | [0363](db/migrations/0363_the_gate_0362_installed_could_never_be_opened.sql) | `20260920025230` | yes — ledger | 0362 SHIPPED A POLICY GATE THAT CANNOT BE SET. REGISTER THE KEY |
-| [0364](db/migrations/0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql) | `PENDING` | no — pending | WHETHER A PROPOSAL WAS ENACTED IS RECORDED ONLY IN A TABLE THE NEXT |
+| [0364](db/migrations/0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql) | `20260920035200` | yes — ledger | WHETHER A PROPOSAL WAS ENACTED IS RECORDED ONLY IN A TABLE THE NEXT |
 | [0365](db/migrations/0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql) | `20260920033500` | yes — ledger | `window_elapsed_occupied` HAS ONE WRITER AND ZERO READERS. MAKE THE |
 | [0366](db/migrations/0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql) | `20260920034500` | yes — ledger | PUBLISH THE OVERSTAY TO THE DECISION FRAME, SO THE SIGNAL REACHES A |
 
