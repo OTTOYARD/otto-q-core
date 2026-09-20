@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0377 — GENERATED, not a log
+## Index, 0134–0378 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -360,7 +360,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0375](db/migrations/0375_my_own_new_column_says_throttle_the_vehicles_when_the_answer_is_defer_the_battery.sql) | `20260920124500` | yes — ledger | 0374's READER ANSWERS "WHAT IS THE BIGGEST LOAD" UNDER A COLUMN NAME THAT |
 | [0376](db/migrations/0376_i_built_a_detector_whose_silence_cannot_be_told_from_absence_which_is_the_defect_i_spent_tonight_fixing.sql) | `20260920131500` | yes — ledger | 0374's DETECTOR WRITES NOTHING WHEN THE SITE IS QUIET, AND WRITES NOTHING |
 | [0377](db/migrations/0377_removing_the_one_row_my_own_path_test_left_in_an_evidence_table.sql) | `20260920132500` | yes — ledger | I TESTED 0376's `ON CONFLICT` PATH BY LOWERING THE THRESHOLD BY HAND, AND |
+| [0378](db/migrations/0378_the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run.sql) | `20260920134500` | yes — ledger | EVERY NUMBER IN `db/checks/0271` LIVES IN A `class='engine'` TABLE. CAPTURE |
 
-240 migrations indexed.
+241 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

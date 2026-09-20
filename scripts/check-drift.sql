@@ -471,7 +471,8 @@ repo_manifest(version, name, file) AS (
     ('20260920123000'::text, 'two_legal_decisions_summed_past_the_service_contract_and_the_meter_that_would_have_seen_it_is_not_read'::text, '0374_two_legal_decisions_summed_past_the_service_contract_and_the_meter_that_would_have_seen_it_is_not_read.sql'::text),
     ('20260920124500'::text, 'my_own_new_column_says_throttle_the_vehicles_when_the_answer_is_defer_the_battery'::text, '0375_my_own_new_column_says_throttle_the_vehicles_when_the_answer_is_defer_the_battery.sql'::text),
     ('20260920131500'::text, 'i_built_a_detector_whose_silence_cannot_be_told_from_absence_which_is_the_defect_i_spent_tonight_fixing'::text, '0376_i_built_a_detector_whose_silence_cannot_be_told_from_absence_which_is_the_defect_i_spent_tonight_fixing.sql'::text),
-    ('20260920132500'::text, 'removing_the_one_row_my_own_path_test_left_in_an_evidence_table'::text, '0377_removing_the_one_row_my_own_path_test_left_in_an_evidence_table.sql'::text)
+    ('20260920132500'::text, 'removing_the_one_row_my_own_path_test_left_in_an_evidence_table'::text, '0377_removing_the_one_row_my_own_path_test_left_in_an_evidence_table.sql'::text),
+    ('20260920134500'::text, 'the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run'::text, '0378_the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

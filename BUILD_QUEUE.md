@@ -350,6 +350,82 @@ that exists and might never be called is something I wrote hours after writing t
 heuristic down.** Which is the argument for `scripts/coverage-guard.sql` over
 remembering it.
 
+### THIRD ADDENDUM, 08:45 AM CT (13:45 UTC) — I HAD G89 WRONG, AND THE TRUE CAUSE IS A ONE-LINE FIX THAT IS YOURS
+
+**Read this one before the two above it.** CI is green on every head (`0b47fe1` at
+08:05 AM CT). Then I went to build the projected-sum check G89 asked for — and rule 5
+stopped me, because **it already exists**, and what it turned up is better than the
+finding it was checking.
+
+**`ottoq_energy_orchestrate` computes the site sum every tick.** Literally:
+`v_charge_cap := GREATEST(50, v_demand_target − v_base_load + v_solar + v_bess_dispatch)`.
+The battery's own draw is subtracted kW for kW — that *is* the cumulative reasoning
+G89 said was absent — and the result is published as a `charge_cap_kw` command.
+**So "nothing asserts the sum" is false, and I had repeated it in `0374`'s header, its
+table comment, its registry note and its lineage note.** `db/checks/0271` is the
+retraction; `FINDINGS.md` G89 carries it.
+
+**What survives of G89 is narrower and still real: no RULE asserts it.** The
+orchestrator publishes, it does not refuse. **All 1,260** caps on the run carry
+`"advisory": true` in their own payload. Measured against what actually flowed, the
+advisory cap is mostly respected anyway — **26 of 1,260 snapshots (2.1%) drew more EV
+load than the cap in force, worst overshoot 205 kW** — which is what makes this a
+finding rather than an emergency.
+
+**AND THE EXCURSION'S REAL CAUSE IS A PLANNING DEFECT WITH A ONE-LINE FIX.**
+`v_demand_target` starts as `service_max_kw × factor` (2,500 × **0.9** = 2,250), then
+is **replaced outright** by `ottoq_bess_reserve_target(...)` — with **no
+`LEAST(v_service_max, …)`**. That function binary-searches for the lowest grid-import
+ceiling the battery can hold, and **returns the forecast peak when it can hold
+nothing.** It answers *"what can I do"*; the orchestrator uses it as *"what am I
+allowed to do."* At **13.81% SoC** it returned **2,802** against a **2,500** contract,
+producing a **1,762 kW** EV cap where the contract-derived arithmetic gives **1,210**.
+
+| | |
+|---|---|
+| caps published on the run | 1,260 |
+| demand targets above the 2,500 contract | **16** |
+| worst demand target | **2,959** (459 kW over) |
+| worst published EV cap | **2,804.4** — itself above the contract |
+| **median demand target** | **1,048** |
+
+**The median is why this is not a case for ripping the mechanism out.** At 1,048 against
+a contract-derived 2,250, the reserve-shave override normally tightens the target by
+more than half — it is doing its job. It loosens past the contract only when the
+battery is empty and demand is high, which is exactly when it must not.
+
+**THE DECISION, AND IT IS NARROWER AND CHEAPER THAN THE ONE I HANDED YOU AT 07:45:**
+
+```sql
+v_demand_target := LEAST(v_service_max,
+                         COALESCE(ottoq_bess_reserve_target(...), v_demand_target));
+```
+
+I have not applied it. It lowers the EV charge cap in exactly those 16 ticks — trading
+charging throughput at the worst moment for staying inside the utility contract. **On
+the evidence that is the right trade** (a demand-charge excursion is expensive, a
+breaker trip worse), but it is a throughput call on the one depot whose capacity is the
+open question, so rule 8 says it is yours. Separately, making `charge_cap_kw` *binding*
+inside the decide path is the larger question; per 2.9a it lands measured first, and
+§2 of `0271` is that measurement: it would have bitten 26 times in 1,260 ticks at a
+mean 67.7 kW.
+
+**`0378` captures the 16 rows into `class='evidence'` first**, because
+`ottoq_energy_commands` is `class='engine'` and the next demo run deletes every number
+in this section. Fourth instance of the 0231 fragility in one night, after `0340`,
+`0364` and `0374`. Read it with `SELECT * FROM public.ottoq_site_power_plan_audit`,
+whose `all_advisory` and `all_reserve_shave` columns are assertions rather than
+statistics — both read **true** over all 16, so the single-cause diagnosis covers every
+row.
+
+**AND A cuOpt CLAIM OF MINE THAT NEEDS WALKING BACK.** `0374` and `db/checks/0269` both
+call this "the first measured instance of the cumulative-resource construct cuOpt cannot
+express." **Overreach** — a cumulative site-power resource *is* reasoned about here, in
+SQL, every tick. The honest version: **the site power cap is currently held by an
+advisory publication plus an unclamped heuristic, where a scheduler carrying it as a
+first-class hard constraint would not need either.** Still a point for CP-SAT. A weaker
+and truer one, and I would rather you quote that version to anyone hostile.
+
 ---
 
 ## THE DISCIPLINE FIX — why the misses happened, and what changes
