@@ -348,7 +348,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0363](db/migrations/0363_the_gate_0362_installed_could_never_be_opened.sql) | `20260920025230` | yes — ledger | 0362 SHIPPED A POLICY GATE THAT CANNOT BE SET. REGISTER THE KEY |
 | [0364](db/migrations/0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql) | `PENDING` | no — pending | WHETHER A PROPOSAL WAS ENACTED IS RECORDED ONLY IN A TABLE THE NEXT |
 | [0365](db/migrations/0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql) | `20260920033500` | yes — ledger | `window_elapsed_occupied` HAS ONE WRITER AND ZERO READERS. MAKE THE |
-| [0366](db/migrations/0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql) | `PENDING` | no — pending | PUBLISH THE OVERSTAY TO THE DECISION FRAME, SO THE SIGNAL REACHES A |
+| [0366](db/migrations/0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql) | `20260920034500` | yes — ledger | PUBLISH THE OVERSTAY TO THE DECISION FRAME, SO THE SIGNAL REACHES A |
 
 229 migrations indexed.
 

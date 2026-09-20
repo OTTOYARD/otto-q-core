@@ -460,7 +460,7 @@ repo_manifest(version, name, file) AS (
     ('20260920025230'::text, 'the_gate_0362_installed_could_never_be_opened'::text, '0363_the_gate_0362_installed_could_never_be_opened.sql'::text),
     ('PENDING'::text, 'a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts'::text, '0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql'::text),
     ('20260920033500'::text, 'the_overstay_has_a_name_and_no_reader_so_give_it_one'::text, '0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql'::text),
-    ('PENDING'::text, 'the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall'::text, '0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql'::text)
+    ('20260920034500'::text, 'the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall'::text, '0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

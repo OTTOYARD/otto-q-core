@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260920034500
 -- migration-name:    the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall
 --
 -- 0366  PUBLISH THE OVERSTAY TO THE DECISION FRAME, SO THE SIGNAL REACHES A
