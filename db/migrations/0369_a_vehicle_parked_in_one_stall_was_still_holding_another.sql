@@ -1,4 +1,5 @@
 -- migration-version: 20260920041750
+-- migration-name:    a_vehicle_parked_in_one_stall_was_still_holding_another
 -- ════════════════════════════════════════════════════════════════════════════
 -- 0369  A VEHICLE PARKED IN ONE STALL WAS STILL HOLDING ANOTHER, AND THE
 --       RECLAIMER HAD NO RIGHT TO TAKE IT BACK.
@@ -319,3 +320,28 @@ COMMENT ON FUNCTION public.ottoq_release_unusable_reservations(uuid, timestamptz
 'ottoq.reservation_reclaim_blocked when eligible > 0 and released = 0. Called from '
 'ottoq_sim_decide_and_dispatch, above the policy branch, so every arm of an A/B '
 'gets the same world.';
+
+-- ── CERT LINEAGE ───────────────────────────────────────────────────────────────
+-- Written HERE and not only through a side call, which is why CI went red five ways
+-- on this branch: tests/test_migration_hygiene.py reads the FILE, and
+-- ottoq_cert_recert_floor() treats a migration with no lineage row as forcing a
+-- recert, so a missing INSERT restarts every certification column's streak. The row
+-- is already in the database under the unprefixed name; this INSERT carries the
+-- current PREFIXED convention and ON CONFLICT keeps them one row rather than two.
+-- Both join correctly either way -- 0226 strips the NNNN_ prefix from both sides.
+INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
+VALUES ('0369_a_vehicle_parked_in_one_stall_was_still_holding_another', true,
+  'Engine: ottoq_release_unusable_reservations gains a third release class -- the '
+  'unbacked orphan, where the reservation holder is physically sitting in a different '
+  'stall AND the calendar holds no held/active booking for that holder on the reserved '
+  'stall. Measured on run 5b37ee46: of 50 reserved-empty unexpired stalls, 36 were held '
+  'by a vehicle sitting elsewhere, 21 of those unbacked (releasable) and 15 '
+  'calendar-backed (legitimate forward plans that must survive). Gated on p_sim_run_id IS '
+  'NOT NULL because ottoq_stall_bookings.sim_run_id is NOT NULL and a production call '
+  'would otherwise see every hold as unbacked. Three buckets are first-true so they sum '
+  'to released. Changes which stalls are free on every tick, so it invalidates canons.',
+  now())
+ON CONFLICT (name) DO UPDATE
+  SET forces_recert = EXCLUDED.forces_recert,
+      note          = EXCLUDED.note,
+      classified_at = EXCLUDED.classified_at;

@@ -1,4 +1,5 @@
 -- migration-version: 20260920041500
+-- migration-name:    the_reclaimer_0360_installed_has_never_run_on_the_live_metronome_path
 -- ════════════════════════════════════════════════════════════════════════════
 -- 0367  THE RECLAIMER 0360 INSTALLED HAS NEVER RUN: THE LIVE METRONOME DOES NOT
 --       CALL THE FUNCTION IT WAS WIRED INTO.
@@ -516,3 +517,27 @@ BEGIN
   END IF;
   RAISE NOTICE 'P9 ok: reclaimer wired into the live path, SKIP LOCKED in place, event type registered';
 END $p9$;
+
+-- ── CERT LINEAGE ───────────────────────────────────────────────────────────────
+-- Written HERE and not only through a side call, which is why CI went red five ways
+-- on this branch: tests/test_migration_hygiene.py reads the FILE, and
+-- ottoq_cert_recert_floor() treats a migration with no lineage row as forcing a
+-- recert, so a missing INSERT restarts every certification column's streak. The row
+-- is already in the database under the unprefixed name; this INSERT carries the
+-- current PREFIXED convention and ON CONFLICT keeps them one row rather than two.
+-- Both join correctly either way -- 0226 strips the NNNN_ prefix from both sides.
+INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
+VALUES ('0367_the_reclaimer_0360_installed_has_never_run_on_the_live_metronome_path', true,
+  'Engine: ottoq_release_unusable_reservations is now called from '
+  'ottoq_sim_decide_and_dispatch, above the policy branch, which is the path '
+  'ottoq_demo_metronome actually uses -- 0360 wired it only into ottoq_sim_advance_tick, '
+  'which the live metronome never calls, so it had never run. The reclaimer now takes '
+  'rows FOR UPDATE SKIP LOCKED (it was silently returning deadlock detected / 40P01 / '
+  'released 0 on every direct call), counts eligible without locking, and emits '
+  'ottoq.reservation_reclaim_blocked when eligible > 0 and released = 0. Changes what '
+  'every tick of every arm does, so it invalidates canons.',
+  now())
+ON CONFLICT (name) DO UPDATE
+  SET forces_recert = EXCLUDED.forces_recert,
+      note          = EXCLUDED.note,
+      classified_at = EXCLUDED.classified_at;

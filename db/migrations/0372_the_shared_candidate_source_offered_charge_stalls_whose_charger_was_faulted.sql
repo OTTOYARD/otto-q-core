@@ -1,4 +1,5 @@
 -- migration-version: 20260920045844
+-- migration-name:    the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted
 -- ════════════════════════════════════════════════════════════════════════════
 -- 0372  THE SHARED CANDIDATE SOURCE OFFERED CHARGE STALLS WHOSE CHARGER WAS
 --       FAULTED, AND CP-SAT IS WHAT NOTICED.
@@ -235,3 +236,28 @@ COMMENT ON FUNCTION ottoq.ottoq_stall_free_between(uuid, uuid, timestamptz, time
 'function should not choose. The occupancy guard (calendar_occupancy_guard policy) '
 'additionally excludes a stall a vehicle is physically in for the horizon it is '
 'expected to stay. Ordered by distance from the entrance, then stall code.';
+
+-- ── CERT LINEAGE ───────────────────────────────────────────────────────────────
+-- Written HERE and not only through a side call, which is why CI went red five ways
+-- on this branch: tests/test_migration_hygiene.py reads the FILE, and
+-- ottoq_cert_recert_floor() treats a migration with no lineage row as forcing a
+-- recert, so a missing INSERT restarts every certification column's streak. The row
+-- is already in the database under the unprefixed name; this INSERT carries the
+-- current PREFIXED convention and ON CONFLICT keeps them one row rather than two.
+-- Both join correctly either way -- 0226 strips the NNNN_ prefix from both sides.
+INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
+VALUES ('0372_the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted', true,
+  'Engine: ottoq.ottoq_stall_free_between, the shared candidate source for every proposer '
+  'and for the reroute walk, now excludes dcfc/l2 stalls whose OCPP charger reports '
+  'Faulted. Found because CP-SAT declined four matched frames as having no offerable '
+  'charge stall while our own pointer census reported 4 free -- the four were the faulted '
+  'ones (db/checks/0264). Of five placement routines only ottoq_l2_optimize_assignments '
+  'consulted charger health; ottoq_replan_after_charger_fault does too but is reachable '
+  'only from a human-reported fault, so the twin''s own 18 faults never reached it. '
+  'Heartbeat freshness deliberately not checked. Changes the candidate set every proposer '
+  'sees, so it invalidates canons.',
+  now())
+ON CONFLICT (name) DO UPDATE
+  SET forces_recert = EXCLUDED.forces_recert,
+      note          = EXCLUDED.note,
+      classified_at = EXCLUDED.classified_at;

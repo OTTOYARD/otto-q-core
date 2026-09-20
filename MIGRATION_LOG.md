@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0366 — GENERATED, not a log
+## Index, 0134–0373 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -349,7 +349,14 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0364](db/migrations/0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql) | `20260920035200` | yes — ledger | WHETHER A PROPOSAL WAS ENACTED IS RECORDED ONLY IN A TABLE THE NEXT |
 | [0365](db/migrations/0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql) | `20260920033500` | yes — ledger | `window_elapsed_occupied` HAS ONE WRITER AND ZERO READERS. MAKE THE |
 | [0366](db/migrations/0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql) | `20260920034500` | yes — ledger | PUBLISH THE OVERSTAY TO THE DECISION FRAME, SO THE SIGNAL REACHES A |
+| [0367](db/migrations/0367_the_reclaimer_0360_installed_has_never_run_on_the_live_metronome_path.sql) | `20260920041500` | yes — ledger | THE RECLAIMER 0360 INSTALLED HAS NEVER RUN: THE LIVE METRONOME DOES NOT |
+| [0368](db/migrations/0368_the_reroute_hunted_the_scarcest_stall_type_for_vehicles_that_wanted_the_most_plentiful.sql) | `20260920041236` | yes — ledger | THE REROUTE HUNTED THE SCARCEST STALL TYPE ON THE SITE FOR VEHICLES |
+| [0369](db/migrations/0369_a_vehicle_parked_in_one_stall_was_still_holding_another.sql) | `20260920041750` | yes — ledger | A VEHICLE PARKED IN ONE STALL WAS STILL HOLDING ANOTHER, AND THE |
+| [0370](db/migrations/0370_fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them.sql) | `20260920042835` | yes — ledger | FIFTY-NINE CALENDAR CLAIMS WERE ALREADY OVERRULED BY A VEHICLE SITTING |
+| [0371](db/migrations/0371_i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out.sql) | `20260920043723` | yes — ledger | I PUT A NONDETERMINISM SOURCE INSIDE THE TICK PATH FOUR MIGRATIONS AGO |
+| [0372](db/migrations/0372_the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted.sql) | `20260920045844` | yes — ledger | THE SHARED CANDIDATE SOURCE OFFERED CHARGE STALLS WHOSE CHARGER WAS |
+| [0373](db/migrations/0373_three_comments_that_stop_the_next_person_repeating_tonight.sql) | `20260920050351` | yes — ledger | THREE COMMENTS THAT STOP THE NEXT PERSON REPEATING TONIGHT |
 
-229 migrations indexed.
+236 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

@@ -1,4 +1,5 @@
 -- migration-version: 20260920050351
+-- migration-name:    three_comments_that_stop_the_next_person_repeating_tonight
 -- ════════════════════════════════════════════════════════════════════════════
 -- 0373  THREE COMMENTS THAT STOP THE NEXT PERSON REPEATING TONIGHT.
 --
@@ -119,3 +120,25 @@ BEGIN
   END IF;
   RAISE NOTICE 'P9 ok: three comments in place, no executable code touched';
 END $p9$;
+
+-- ── CERT LINEAGE ───────────────────────────────────────────────────────────────
+-- Written HERE and not only through a side call, which is why CI went red five ways
+-- on this branch: tests/test_migration_hygiene.py reads the FILE, and
+-- ottoq_cert_recert_floor() treats a migration with no lineage row as forcing a
+-- recert, so a missing INSERT restarts every certification column's streak. The row
+-- is already in the database under the unprefixed name; this INSERT carries the
+-- current PREFIXED convention and ON CONFLICT keeps them one row rather than two.
+-- Both join correctly either way -- 0226 strips the NNNN_ prefix from both sides.
+INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
+VALUES ('0373_three_comments_that_stop_the_next_person_repeating_tonight', false,
+  'Documentation only -- three COMMENT ON FUNCTION statements, no prosrc touched, so no '
+  'engine or config hash moves. Marks ottoq_gc_stale_reservations SUPERSEDED '
+  '(0367/0369/0371 replaced it; its own comment said the danger was fixed, which could '
+  'read as an invitation to schedule it), and marks twin.ottoq_report_charger_fault and '
+  'ottoq.ottoq_replan_after_charger_fault as an operator entry point and its callee -- '
+  'the three rows coverage-guard.sql will report forever and which are correct.',
+  now())
+ON CONFLICT (name) DO UPDATE
+  SET forces_recert = EXCLUDED.forces_recert,
+      note          = EXCLUDED.note,
+      classified_at = EXCLUDED.classified_at;

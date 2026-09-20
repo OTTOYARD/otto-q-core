@@ -1,4 +1,5 @@
 -- migration-version: 20260920043723
+-- migration-name:    i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out
 -- ════════════════════════════════════════════════════════════════════════════
 -- 0371  I PUT A NONDETERMINISM SOURCE INSIDE THE TICK PATH FOUR MIGRATIONS AGO.
 --       TAKING IT BACK OUT.
@@ -321,3 +322,31 @@ BEGIN
   END IF;
   RAISE NOTICE 'P9 ok: no locking clause, ascending id order, all three classes and every guard intact';
 END $p9$;
+
+-- ── CERT LINEAGE ───────────────────────────────────────────────────────────────
+-- Written HERE and not only through a side call, which is why CI went red five ways
+-- on this branch: tests/test_migration_hygiene.py reads the FILE, and
+-- ottoq_cert_recert_floor() treats a migration with no lineage row as forcing a
+-- recert, so a missing INSERT restarts every certification column's streak. The row
+-- is already in the database under the unprefixed name; this INSERT carries the
+-- current PREFIXED convention and ON CONFLICT keeps them one row rather than two.
+-- Both join correctly either way -- 0226 strips the NNNN_ prefix from both sides.
+INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
+VALUES ('0371_i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out', true,
+  'Engine, self-correction: ottoq_release_unusable_reservations no longer carries FOR '
+  'UPDATE OF s SKIP LOCKED. 0367 added it to kill a real deadlock (0360 returned 40P01 on '
+  'every call, silently), but it made the candidate set a function of who else held a row '
+  'at that instant, and this function runs inside ottoq_sim_decide_and_dispatch on every '
+  'tick of every arm: under ottoq_determinism_pair both arms share one transaction, so a '
+  'row held during arm A and released before arm B is skipped once and taken once and the '
+  'world diverges. The set is now a pure function of state and the row-by-row UPDATE '
+  'acquires locks in ascending id order, which is the deadlock-avoidance discipline 0360 '
+  'planner-ordered bulk UPDATE lacked; a deadlock is still possible and is now loud '
+  'rather than silent via the eligible counter and ottoq.reservation_reclaim_blocked. '
+  'Return key skipped_locked renamed not_released. Changes which rows the reclaimer '
+  'takes, so it invalidates canons.',
+  now())
+ON CONFLICT (name) DO UPDATE
+  SET forces_recert = EXCLUDED.forces_recert,
+      note          = EXCLUDED.note,
+      classified_at = EXCLUDED.classified_at;

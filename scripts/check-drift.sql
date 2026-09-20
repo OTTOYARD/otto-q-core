@@ -460,7 +460,14 @@ repo_manifest(version, name, file) AS (
     ('20260920025230'::text, 'the_gate_0362_installed_could_never_be_opened'::text, '0363_the_gate_0362_installed_could_never_be_opened.sql'::text),
     ('20260920035200'::text, 'a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts'::text, '0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql'::text),
     ('20260920033500'::text, 'the_overstay_has_a_name_and_no_reader_so_give_it_one'::text, '0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql'::text),
-    ('20260920034500'::text, 'the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall'::text, '0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql'::text)
+    ('20260920034500'::text, 'the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall'::text, '0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql'::text),
+    ('20260920041500'::text, 'the_reclaimer_0360_installed_has_never_run_on_the_live_metronome_path'::text, '0367_the_reclaimer_0360_installed_has_never_run_on_the_live_metronome_path.sql'::text),
+    ('20260920041236'::text, 'the_reroute_hunted_the_scarcest_stall_type_for_vehicles_that_wanted_the_most_plentiful'::text, '0368_the_reroute_hunted_the_scarcest_stall_type_for_vehicles_that_wanted_the_most_plentiful.sql'::text),
+    ('20260920041750'::text, 'a_vehicle_parked_in_one_stall_was_still_holding_another'::text, '0369_a_vehicle_parked_in_one_stall_was_still_holding_another.sql'::text),
+    ('20260920042835'::text, 'fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them'::text, '0370_fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them.sql'::text),
+    ('20260920043723'::text, 'i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out'::text, '0371_i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out.sql'::text),
+    ('20260920045844'::text, 'the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted'::text, '0372_the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted.sql'::text),
+    ('20260920050351'::text, 'three_comments_that_stop_the_next_person_repeating_tonight'::text, '0373_three_comments_that_stop_the_next_person_repeating_tonight.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

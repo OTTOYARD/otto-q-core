@@ -1,4 +1,5 @@
 -- migration-version: 20260920041236
+-- migration-name:    the_reroute_hunted_the_scarcest_stall_type_for_vehicles_that_wanted_the_most_plentiful
 -- ════════════════════════════════════════════════════════════════════════════
 -- 0368  THE REROUTE HUNTED THE SCARCEST STALL TYPE ON THE SITE FOR VEHICLES
 --       THAT WANTED THE MOST PLENTIFUL ONE.
@@ -292,3 +293,27 @@ BEGIN
   END IF;
   RAISE NOTICE 'P9 ok: reroute asks the stall, reports what it looked for, and kept every prior behaviour';
 END $p9$;
+
+-- ── CERT LINEAGE ───────────────────────────────────────────────────────────────
+-- Written HERE and not only through a side call, which is why CI went red five ways
+-- on this branch: tests/test_migration_hygiene.py reads the FILE, and
+-- ottoq_cert_recert_floor() treats a migration with no lineage row as forcing a
+-- recert, so a missing INSERT restarts every certification column's streak. The row
+-- is already in the database under the unprefixed name; this INSERT carries the
+-- current PREFIXED convention and ON CONFLICT keeps them one row rather than two.
+-- Both join correctly either way -- 0226 strips the NNNN_ prefix from both sides.
+INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
+VALUES ('0368_the_reroute_hunted_the_scarcest_stall_type_for_vehicles_that_wanted_the_most_plentiful', true,
+  'Engine: ottoq.ottoq_react_to_refusals now reads the wanted stall type from '
+  'payload->>stall_type, then from the stall the refused command was actually sent to, '
+  'and only then from a command-type default. Before this a proceed_to_stall with no '
+  'stall_type was assumed to want dcfc (10 stalls) when its target was often staging (113 '
+  'stalls); four of eight reroutable refusals on run 5b37ee46 escalated no_capacity with '
+  '41 stalls unclaimed. Escalations now carry wanted_stall_type, stall_type_source and '
+  'candidates_seen. Changes which stall a rerouted vehicle is offered, so it invalidates '
+  'canons.',
+  now())
+ON CONFLICT (name) DO UPDATE
+  SET forces_recert = EXCLUDED.forces_recert,
+      note          = EXCLUDED.note,
+      classified_at = EXCLUDED.classified_at;

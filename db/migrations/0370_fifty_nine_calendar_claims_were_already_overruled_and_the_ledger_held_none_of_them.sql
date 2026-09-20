@@ -1,4 +1,5 @@
 -- migration-version: 20260920042835
+-- migration-name:    fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them
 -- ════════════════════════════════════════════════════════════════════════════
 -- 0370  FIFTY-NINE CALENDAR CLAIMS WERE ALREADY OVERRULED BY A VEHICLE SITTING
 --       IN THE STALL, AND THE LEDGER THAT PROMISES TO RECORD EVERY SUCH CLAIM
@@ -446,3 +447,28 @@ BEGIN
   END IF;
   RAISE NOTICE 'P9 ok: detector exists, is wired, and declares itself measured-only';
 END $p9$;
+
+-- ── CERT LINEAGE ───────────────────────────────────────────────────────────────
+-- Written HERE and not only through a side call, which is why CI went red five ways
+-- on this branch: tests/test_migration_hygiene.py reads the FILE, and
+-- ottoq_cert_recert_floor() treats a migration with no lineage row as forcing a
+-- recert, so a missing INSERT restarts every certification column's streak. The row
+-- is already in the database under the unprefixed name; this INSERT carries the
+-- current PREFIXED convention and ON CONFLICT keeps them one row rather than two.
+-- Both join correctly either way -- 0226 strips the NNNN_ prefix from both sides.
+INSERT INTO public.ottoq_cert_lineage(name, forces_recert, note, classified_at)
+VALUES ('0370_fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them', true,
+  'Evidence: ottoq.ottoq_detect_contradicted_claims, a per-tick sweep recording bookings '
+  'in state held/active whose window contains the sim clock on a stall a DIFFERENT '
+  'vehicle physically occupies, as space_conflict_ledger conflict_kind '
+  'standing_claim_contradicted / resolution recorded_not_acted. MEASURED ONLY per 2.9a '
+  'blind-spot promotion; no assignment changes. Exists because the ledger previously '
+  'caught such conflicts only at assignment refusal: on run 5b37ee46, 59 live claims were '
+  'contradicted and 0 appeared in the ledger by booking id, while 98 of 113 staging '
+  'stalls were held by perimeter_hold at an average 248-minute window for a service '
+  'performed 0 of 36 times. Adds a per-tick write to every arm, so it invalidates canons.',
+  now())
+ON CONFLICT (name) DO UPDATE
+  SET forces_recert = EXCLUDED.forces_recert,
+      note          = EXCLUDED.note,
+      classified_at = EXCLUDED.classified_at;
