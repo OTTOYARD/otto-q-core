@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260920025230
 -- migration-name:    the_gate_0362_installed_could_never_be_opened
 --
 -- 0363  0362 SHIPPED A POLICY GATE THAT CANNOT BE SET. REGISTER THE KEY.

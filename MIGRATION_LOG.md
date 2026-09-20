@@ -345,7 +345,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0360](db/migrations/0360_a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it.sql) | `20260920022145` | yes — ledger | THE DEPOT IS 98% RESERVED AND 13% OCCUPIED. NOTHING RELEASES A |
 | [0361](db/migrations/0361_a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall.sql) | `20260920023610` | yes — ledger | THE DISPOSER HAS NO CONCEPT OF AN ABSTENTION, SO A PROPOSER THAT |
 | [0362](db/migrations/0362_a_worse_ranked_proposer_removes_a_better_one_from_the_pool_before_rank_is_read.sql) | `20260920024530` | yes — ledger | RANK DECIDES WHICH PENDING PROPOSAL WINS. SUPERSESSION DECIDES WHICH |
-| [0363](db/migrations/0363_the_gate_0362_installed_could_never_be_opened.sql) | `PENDING` | no — pending | 0362 SHIPPED A POLICY GATE THAT CANNOT BE SET. REGISTER THE KEY |
+| [0363](db/migrations/0363_the_gate_0362_installed_could_never_be_opened.sql) | `20260920025230` | yes — ledger | 0362 SHIPPED A POLICY GATE THAT CANNOT BE SET. REGISTER THE KEY |
 
 226 migrations indexed.
 

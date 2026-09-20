@@ -457,7 +457,7 @@ repo_manifest(version, name, file) AS (
     ('20260920022145'::text, 'a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it'::text, '0360_a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it.sql'::text),
     ('20260920023610'::text, 'a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall'::text, '0361_a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall.sql'::text),
     ('20260920024530'::text, 'a_worse_ranked_proposer_removes_a_better_one_from_the_pool_before_rank_is_read'::text, '0362_a_worse_ranked_proposer_removes_a_better_one_from_the_pool_before_rank_is_read.sql'::text),
-    ('PENDING'::text, 'the_gate_0362_installed_could_never_be_opened'::text, '0363_the_gate_0362_installed_could_never_be_opened.sql'::text)
+    ('20260920025230'::text, 'the_gate_0362_installed_could_never_be_opened'::text, '0363_the_gate_0362_installed_could_never_be_opened.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
