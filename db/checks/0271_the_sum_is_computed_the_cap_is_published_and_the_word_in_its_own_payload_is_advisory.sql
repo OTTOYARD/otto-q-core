@@ -226,3 +226,60 @@ SELECT public.ottoq_policy_get('5b37ee46-ee1e-4b6f-a4c8-eec126ab7a10'::uuid,
 -- they are purged.** `ottoq_energy_commands` is `class='engine'`, so the next demo run
 -- deletes the entire causal record above -- every number in this file. That is the
 -- 0231 fragility for the third time in one night.
+
+-- ══ 6. CORRECTION TO §2, AND A REAL OBSERVABILITY GAP UNDER IT ══════════════
+--
+-- **§2's "26 of 1,260 drew more than the cap in force" is a RECONSTRUCTION under an
+-- assumption I did not state, not the engine's own pairing.** It takes, for each
+-- snapshot, the most recent `charge_cap_kw` by `issued_at`, ignoring `status` and
+-- `horizon_min`. The engine reads its cap through
+-- `public.ottoq_active_charge_cap_kw(run, depot, clock)`, which is stricter:
+--
+--   WHERE command_type = 'charge_cap_kw' AND status = 'executed'
+--     AND issued_at + (COALESCE(horizon_min,15) || ' minutes')::interval >= p_sim_clock
+--   ORDER BY issued_at DESC, tick_seq DESC NULLS LAST, setpoint_kw DESC
+--
+-- (The ORDER BY is itself a fix, 0060: two energy commands share an `issued_at` within
+-- a tick, so "latest" was heap order.)
+--
+-- **AND THE STRICT VERSION CANNOT BE REPLAYED AFTER THE FACT.** Measured on this run:
+--
+--   charge_cap_kw commands       **1,260**
+--   status = 'superseded'        **1,259**
+--   status = 'executed'              **1**   <- and it is the FINAL command, 15:58:12
+--
+-- `status` is mutated in place as each cap replaces the last, so only the last command
+-- of the run still reads `executed`. I probed the accessor across all 1,260 snapshot
+-- clocks and it returned non-NULL every time -- **which looked at first like the cap
+-- being readable throughout, and is the opposite.** It returned the ONE surviving
+-- executed row, the final cap of 1,031.4 kW, for every tick, because that row's
+-- `issued_at + 15 min` is later than every earlier clock. The probe measured an
+-- artifact of asking a historical question with a present-tense predicate.
+--
+-- **So "what cap did the decide path actually see at tick N" is not answerable from
+-- this data at all.** At tick N the then-current command was `executed`; it has since
+-- been rewritten to `superseded`, and nothing recorded the value the accessor returned.
+-- That is the same family as everything else tonight -- the engine's own decision is
+-- not recoverable from what survives -- and it is why this comparison belongs in a
+-- TICK-TIME detector rather than a view. A view over `ottoq_energy_commands` cannot
+-- reconstruct it no matter how the join is written.
+--
+-- **What §2 may and may not be quoted as.** SAY: *"reconstructed against the most
+-- recently published cap, EV load exceeded it in 26 of 1,260 snapshots, worst 205.0
+-- kW."* That is a fair reconstruction of "the budget just published was exceeded", and
+-- it is the number that matters for whether making the cap binding would bite. DO NOT
+-- say the decide path saw that cap and ignored it -- the accessor may have returned a
+-- different value or NULL at the time, and the evidence to tell is gone.
+
+SELECT c.status, count(*) AS commands,
+       count(*) FILTER (WHERE c.issued_at = m.last_issued) AS includes_final_command,
+       round(min(c.setpoint_kw),1) AS min_cap, round(max(c.setpoint_kw),1) AS max_cap
+  FROM public.ottoq_energy_commands c
+ CROSS JOIN (SELECT max(issued_at) AS last_issued
+               FROM public.ottoq_energy_commands
+              WHERE sim_run_id = '5b37ee46-ee1e-4b6f-a4c8-eec126ab7a10'
+                AND command_type = 'charge_cap_kw') m
+ WHERE c.sim_run_id = '5b37ee46-ee1e-4b6f-a4c8-eec126ab7a10'
+   AND c.command_type = 'charge_cap_kw'
+ GROUP BY c.status
+ ORDER BY commands DESC;
