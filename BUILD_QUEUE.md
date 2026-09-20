@@ -28,6 +28,116 @@ correct, no caller at link 1).
 
 ---
 
+## OVERNIGHT 2026-09-19 → 20 — WHAT LANDED, AND THE THREE DECISIONS THAT ARE YOURS
+
+Chase, 2026-09-19 ~11:30 PM CT: *"Just keep building and testing in the background
+and save any architecture or major issues for me in the morning… build and test
+logic that doesn't require me."* This section is that report. Every number in it
+is on the twin depot (`11111111-…`, rule 8), and the two runs are `3fb415d8`
+(pre-fix baseline, 1,245 ticks, governor-stopped) and `5b37ee46` (busy_day, seed
+777777, speed 8.0, the same seed so the pair is CRN-comparable).
+
+**THE HEADLINE, AND IT IS A GOOD ONE.** The rejection → re-solve loop you asked
+for **already existed and already ran** — `ottoq.ottoq_react_to_refusals`, called
+every tick from `decide_and_dispatch`, walks up to 25 calendar-free stalls,
+reserves, books and re-emits the command with `reroute_after`. Nothing needed
+building. It was being handed a world that lied to it. With that fixed, its
+success rate on the refusals it can actually act on went **2 of 7 (29%) → 61 of
+83 (73.5%)**.
+
+### What landed (all applied, all committed, all on the twin depot)
+
+| # | migration | what it fixes | recert |
+|---|---|---|---|
+| 0364 | proposal outcomes survive their run | G72 — an append-only `class='evidence'` disposition ledger. **Now witnessed, not asserted:** starting `5b37ee46` purged 352,673 rows and deleted the prior run outright; all 12 ledger rows describing that deleted run survived. | false |
+| 0367 | the reclaimer on the path that actually runs | **G82 — 0360's reservation reclaimer had never executed once.** `ottoq_demo_metronome` calls `ottoq_sim_advance_tick_world` + `decide_and_dispatch` directly and never `ottoq_sim_advance_tick`, which is where 0360 put it. | **true** |
+| 0368 | the reroute stops guessing `dcfc` | G83 — a `proceed_to_stall` with no `stall_type` fell through to the scarcest type on site (10 stalls) when its real target was staging (113). 4 of 8 reroutable refusals. | **true** |
+| 0369 | the unbacked orphan | G84 — a vehicle parked in stall A still holding stall B, with nothing in the calendar behind it. 21 releasable against **15 calendar-backed plans that must survive** — the booking test is the whole safety of it. | **true** |
+| 0370 | count the contradicted claims | G85 — 59 live calendar claims already overruled by a vehicle in the stall, **0 of them in `space_conflict_ledger`**. Measured only; changes no assignment. | **true** |
+| 0371 | take my own nondeterminism back out | 0367 used `FOR UPDATE … SKIP LOCKED`, which makes the candidate set depend on who else held a row at that instant — inside a path the determinism pair certifies. Replaced with an unlocked, ascending-id selection. | **true** |
+
+Checks: `0257`–`0261`. Findings: **G82–G86** in `FINDINGS.md`, with G72 closed and
+the 0360 attribution retracted (see below).
+
+### The three decisions that are yours
+
+1. **`perimeter_walkaround` — a mandatory service no code in this engine can
+   perform, holding 98 of 113 staging stalls.** This is the big one. `db/checks/0261`
+   has the full trace: a producer (`ottoq_derive_visit_needs`, night-gated and the
+   gating is *correct*), two observers that say yes for 90% of arrivals, `must_do:
+   true`, and **no executor anywhere** — every completion path takes a fixed service
+   list and this service is in none of them. So the hold clears on expiry, which is
+   what the measured **248-minute average window** is. Meanwhile **258
+   `twin.staging_overflow`** events fired on the same run. Three answers, all of
+   which change what "ready for work" means: **(a) make it performable** — add it to
+   the twin's atom advancer as a `concurrency='hold'` service completed in place
+   after its 12-minute `est_min`, turning a 248-minute hold into a 12-minute one
+   (**my recommendation**, and it makes the twin *more* faithful); (b) stop it
+   holding a stall; (c) stop deriving it until something can perform it. **I
+   implemented none — writing a completer for a service nothing performs would be
+   fabricating work completion.**
+
+2. **Act on G85, or leave it measured?** 0370 now counts the standing
+   contradictions (59, average age **114.6 minutes**, average **140.5 minutes**
+   still to run). Acting on them — rebooking a holder whose stall is already taken,
+   *before* it travels — would convert the 25 late `assignment_refused_occupied`
+   refusals into early rebookings. That is an assignment-policy change, so it waits
+   for you.
+
+3. **CP-SAT's host.** Unchanged and still yours: `ottoq-intelligence` as an
+   always-on container plus `OTTOQ_INTEL_URL` / `OTTOQ_INTEL_TOKEN`. Re-derived from
+   `ottoq_intelligence_ledger` at 04:19 UTC, and this is the argument in one row:
+   **`cpsat_service` averages 23 ms against cuOpt's 2,783 ms and Nemotron's 23,130
+   ms** — fastest thing in the table by three orders of magnitude, 41 of 49 calls
+   enacted, and it has not been called since 02:45 because the host is not running.
+
+### Two retractions, mine
+
+* **The improvement I credited to 0360 was not 0360's.** "Free stalls 2 → 30,
+  charge 0 → 11, occupancy 21 → 43" was real but came from the one-off *manual*
+  invocation I made while verifying that migration — the tick wiring never ran. A
+  single manual call is not a fix; it looked like one because the numbers moved.
+  G76/G77 are annotated.
+* **"6.5% reroute success" was the wrong denominator.** It divided by all 31
+  refusals when 24 of them are `superseded` or `vehicle_state_incompatible`, which
+  the reactor is *right* to escalate and cannot reroute. The honest figure was 2 of
+  7. G78's defect — an honest refusal scored as a miss — committed by me on the
+  instrument measuring the fix.
+
+### Two rules this night earned
+
+* **A free-stall count is only meaningful as the INTERSECTION of the pointer gate
+  (`stalls.reserved_by`) and the calendar gate (`ottoq_stall_bookings`).** Measured
+  on staging: **59 pointer-free, 12 calendar-free, 11 free on both.** Anyone
+  quoting `reserved_by` overstates availability five-fold. Third direction this
+  two-authorities theme appeared in tonight (G84, the wash bays in `0260`, this).
+* **A caller check must match the call syntax, not the bare name.**
+  `position('ottoq_sim_advance_tick' in prosrc)` returned 4179 for the metronome and
+  was read as "it calls advance_tick". 4179 is the offset of
+  `ottoq_sim_advance_tick_***world***`. Third instance of one mistake class tonight,
+  after the `_`-is-a-LIKE-wildcard trap and testing raw source instead of
+  comment-stripped executable SQL — which bit again in `0371`'s own P9.
+
+**And the standing heuristic at the top of this file earned two more instances, both
+tonight, which is now six:** G82 — `ottoq_release_unusable_reservations`, correct,
+wired into a function the live engine never calls. G86 — `perimeter_walkaround`,
+produced for 90% of arrivals, mandatory, and with no executor. **Do not look for
+what is missing; look for what exists and is never called.**
+
+### Negative result, recorded so the hour is not spent twice
+
+The wash bays looked wrong — 3 stalls reading 0 reserved / 0 occupied while
+`exterior_wash` completed 11 times — and **both hypotheses were wrong.** They *are*
+booked (31 bookings), through the calendar without `stalls.reserved_by`, which is
+why a reservation census reads zero; and the 8 `interrupted` bookings whose planned
+equals actual are not mislabelled — `ottoq_release_vacated_spaces` clips `during` to
+the actual occupancy in the same UPDATE that sets the state, and the pre-clip
+planned/actual survive in the `ottoq.booking_interrupted` event. The
+`interruption_emission_ratio` invariant reads **16/16 = 1.000** on this run, so
+interruption numbers here are trustworthy. `db/checks/0260` §2.
+
+---
+
 ## THE DISCIPLINE FIX — why the misses happened, and what changes
 
 Three misses, one cause: **I audited behaviour, never coverage.** The certification
