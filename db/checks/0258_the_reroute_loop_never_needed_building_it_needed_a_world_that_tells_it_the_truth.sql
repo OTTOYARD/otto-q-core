@@ -154,6 +154,15 @@ SELECT r.sim_run_id, r.tick_count,
 --
 -- Twelve outcome rows survive a purge that deleted the run they describe and the
 -- working-set rows they were captured from. That is the property, observed.
+--
+-- AND A SECOND, INDEPENDENT WITNESS ARRIVED WHILE THE SESSION WAS IDLE. Both
+-- nightly retention jobs ran on schedule -- cron 11 `ottoq_retention_purge_worker`
+-- at 08:00 UTC and cron 625 `ottoq_retention_purge_runs` at 09:00 -- and the ledger
+-- came through at **332 rows** (up from 128, the cert pair's own arms having added
+-- to it). So the evidence class now survives THREE distinct deleters: the demo-run
+-- purge, and both nightly retention passes. `0231`'s failure mode was a table that
+-- looked protected by its name; this one is protected by its registry class and the
+-- absence of an FK, and all three purges have now been observed to leave it alone.
 
 SELECT (SELECT count(*) FROM public.ottoq_proposal_disposition_ledger) AS ledger_rows,
        (SELECT count(*) FROM public.ottoq_proposal_disposition_ledger l
