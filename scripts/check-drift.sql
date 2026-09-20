@@ -479,7 +479,8 @@ repo_manifest(version, name, file) AS (
     ('20260920155947'::text, 'a_column_named_for_a_fifteen_minute_quantity_that_is_a_running_peak_in_sim_and_not_even_that_in_production'::text, '0382_a_column_named_for_a_fifteen_minute_quantity_that_is_a_running_peak_in_sim_and_not_even_that_in_production.sql'::text),
     ('20260920161631'::text, 'the_whole_of_g86_is_one_concurrency_class_that_no_executor_admits_and_the_walkaround_is_its_only_member'::text, '0383_the_whole_of_g86_is_one_concurrency_class_that_no_executor_admits_and_the_walkaround_is_its_only_member.sql'::text),
     ('20260920162559'::text, 'my_own_new_detector_raises_on_the_malformed_data_it_exists_to_find'::text, '0384_my_own_new_detector_raises_on_the_malformed_data_it_exists_to_find.sql'::text),
-    ('20260920172340'::text, 'the_catch_up_that_stopped_one_state_short_strands_a_vehicle_for_the_whole_run'::text, '0385_the_catch_up_that_stopped_one_state_short_strands_a_vehicle_for_the_whole_run.sql'::text)
+    ('20260920172340'::text, 'the_catch_up_that_stopped_one_state_short_strands_a_vehicle_for_the_whole_run'::text, '0385_the_catch_up_that_stopped_one_state_short_strands_a_vehicle_for_the_whole_run.sql'::text),
+    ('20260920173700'::text, 'the_fourteen_atom_verdict_is_the_one_thing_the_permanent_run_record_does_not_keep'::text, '0386_the_fourteen_atom_verdict_is_the_one_thing_the_permanent_run_record_does_not_keep.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
