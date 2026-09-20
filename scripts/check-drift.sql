@@ -467,7 +467,9 @@ repo_manifest(version, name, file) AS (
     ('20260920042835'::text, 'fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them'::text, '0370_fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them.sql'::text),
     ('20260920043723'::text, 'i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out'::text, '0371_i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out.sql'::text),
     ('20260920045844'::text, 'the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted'::text, '0372_the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted.sql'::text),
-    ('20260920050351'::text, 'three_comments_that_stop_the_next_person_repeating_tonight'::text, '0373_three_comments_that_stop_the_next_person_repeating_tonight.sql'::text)
+    ('20260920050351'::text, 'three_comments_that_stop_the_next_person_repeating_tonight'::text, '0373_three_comments_that_stop_the_next_person_repeating_tonight.sql'::text),
+    ('20260920123000'::text, 'two_legal_decisions_summed_past_the_service_contract_and_the_meter_that_would_have_seen_it_is_not_read'::text, '0374_two_legal_decisions_summed_past_the_service_contract_and_the_meter_that_would_have_seen_it_is_not_read.sql'::text),
+    ('20260920124500'::text, 'my_own_new_column_says_throttle_the_vehicles_when_the_answer_is_defer_the_battery'::text, '0375_my_own_new_column_says_throttle_the_vehicles_when_the_answer_is_defer_the_battery.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

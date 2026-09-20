@@ -247,6 +247,84 @@ planned/actual survive in the `ottoq.booking_interrupted` event. The
 `interruption_emission_ratio` invariant reads **16/16 = 1.000** on this run, so
 interruption numbers here are trustworthy. `db/checks/0260` §2.
 
+### SECOND ADDENDUM, 07:45 AM CT (12:45 UTC) — G89 is now instrumented, and it turned out to be the CP-SAT argument in a stronger form than I filed it
+
+CI on PR #200 went green at **07:22 AM CT** after the migration-file fix; that was the
+one thing outstanding and it is closed. Then, with the queue's own top item being
+G89, I built its measurable half. Two migrations, `0374` and `0375`, plus
+`db/checks/0269`. **Neither enforces anything** — no assignment changes, EN.001 is
+untouched, and the enforcement decision is still yours for the reason below.
+
+**WHAT RE-MEASURING G89 CHANGED, AND ONE THING IT DID NOT.** The finding holds
+exactly. Three refinements:
+
+1. **Nothing needed reconstructing — the site total is already a stored column.**
+   `site_energy_snapshots.grid_import_kw` equals the component sum in **8,050 of
+   8,050** snapshots on the twin depot, worst residual **0.10 kW**. So `0374` reads
+   the twin's own meter rather than computing a second opinion, which is `0264`'s
+   lesson applied on purpose.
+
+2. **The mechanism is an incomplete meter, not just an unchecked sum** — and this is
+   the sharper version of the finding. EN.001 *does* compare against
+   `service_max_kw`. But its load term is
+   `ottoq_depot_current_demand_kw` → `twin.ottoq_sim_compute_charger_load_kw` =
+   `SUM(ocpp_sessions power)` **and nothing else**. So it asks a true question,
+   correctly answered, **about a quantity that is not the site's load.** That is a
+   better sentence than "nothing asserts the sum", because it says where to look.
+
+3. **The rate is 1 in 8,050 snapshots across 9 runs — and the distribution is why
+   that is not reassurance.** I nearly filed the rate as a downgrade. The histogram
+   stopped me: buckets covering **1,800–2,700 kW are empty.** The site has never once
+   operated between **1,714** and **2,739** kW. It does not climb toward the cap and
+   occasionally tip over — it sits comfortably below and takes a single ~1,000 kW step
+   clean over, and ~1,000 kW is the BESS charge magnitude. **A megawatt discontinuity
+   in a metered load is the signature of a second decision adding, not of demand
+   building.** So the rarity is the rarity of the coincidence. Nothing prevents it.
+   That is the difference between a system that rides a limit and one that is blind to
+   it, and only the second kind produces an empty middle.
+
+**AND THE LIMITATION, because the queue's own G89 row asked for something else.** G89
+recommended a projected-sum check **at `bess_dispatch`** — i.e. *before* the decision.
+What I built is a **meter, not a projection**: it witnesses an excursion after the
+fact and can neither prevent nor predict one. Deliberate, because it catches an
+excursion however it arises rather than only via a BESS decision, and because it is
+what makes the historical rate answerable across purges — which is the precondition
+for deciding whether the pre-decision check is worth building. **But it does not
+discharge that check, and I am not claiming it does.**
+
+**THE DECISION THIS PUTS IN FRONT OF YOU, AND IT IS NARROWER THAN BEFORE.** Read
+`SELECT * FROM public.ottoq_site_power_ledger`. It says **1 excursion, 1 clearable by
+deferring the BESS charge, 0 needing EV action.** That last column is the point:
+*every excursion on record would have been cleared by deferring the battery, and none
+required refusing a vehicle.* At the excursion, deferring the 968 kW BESS charge
+leaves **1,770.8 kW — 729 kW under the cap.** So the question is not "should the
+shield refuse charging sessions" (which is what a naive site-cap rule would do) but
+"should the BESS charge window yield to site headroom", which is an arbitrage
+decision against demand charges. **That is a much cheaper change than a shield rule,
+and it is still yours.**
+
+**AND IT IS THE FIRST MEASURED INSTANCE OF THE CONSTRUCT cuOpt CANNOT EXPRESS.** A
+shared site power cap across concurrent activities is a cumulative resource — one of
+the four load-bearing constructs of CLAUDE.md 2.3 that R-12 established are absent
+from cuOpt 26.08. Until tonight that was a vendor-documentation argument. It is now an
+observed excursion on our own run: two legal decisions, no shared constraint between
+them, 238.8 kW over a utility service contract. **Stronger than the doc citation,
+because it is ours.**
+
+**ONE SELF-CORRECTION, TWENTY MINUTES AFTER SHIPPING.** `0374` exposed a column
+`usual_dominant_component` and its own comment claimed it answered *"what pushed us
+over … whether enforcement should refuse a vehicle or defer a battery."* **It does
+not.** It computes the largest single load, and here the two disagree: it reads
+`ev_charging` (1,691.8, the biggest) while deferring the battery is what clears the
+cap. A reader following that column **throttles vehicles for nothing.** `0375`
+renames it `largest_component` and adds the pair that actually decides, asserted to
+partition the excursions. Found by reading the instrument's own output once,
+immediately after applying it — nothing else would have caught it, because the column
+was correctly computed and internally consistent. **It was the name and the comment
+that were wrong, which is the class of defect no assertion catches.** Same shape as
+`0371` correcting `0367` earlier the same night: the instrument wrong, not the
+finding, and both mine.
+
 ---
 
 ## THE DISCIPLINE FIX — why the misses happened, and what changes
