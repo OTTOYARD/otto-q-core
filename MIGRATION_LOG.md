@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0380 — GENERATED, not a log
+## Index, 0134–0381 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -363,7 +363,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0378](db/migrations/0378_the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run.sql) | `20260920134500` | yes — ledger | EVERY NUMBER IN `db/checks/0271` LIVES IN A `class='engine'` TABLE. CAPTURE |
 | [0379](db/migrations/0379_the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time.sql) | `20260920132449` | yes — ledger | "EV LOAD EXCEEDED THE CAP IN FORCE" CANNOT BE ANSWERED BY ANY QUERY AFTER THE |
 | [0380](db/migrations/0380_joining_an_evidence_table_to_sim_runs_silently_undoes_the_reason_it_is_evidence.sql) | `20260920135731` | yes — ledger | EVERY EVIDENCE LEDGER WE BUILT EXISTS TO SURVIVE THE PURGE, AND THE OBVIOUS |
+| [0381](db/migrations/0381_the_published_reliability_field_names_an_action_that_never_happened_and_undercounts_the_one_that_did.sql) | `20260920141533` | yes — ledger | `reliability.stranded_recharges` IS WRONG TWICE, IN OPPOSITE DIRECTIONS, IN A |
 
-243 migrations indexed.
+244 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

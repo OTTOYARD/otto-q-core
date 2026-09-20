@@ -89,7 +89,11 @@ the 0360 attribution retracted (see below).
    `ottoq_intelligence_ledger` at 04:19 UTC, and this is the argument in one row:
    **`cpsat_service` averages 23 ms against cuOpt's 2,783 ms and Nemotron's 23,130
    ms** — fastest thing in the table by three orders of magnitude, 41 of 49 calls
-   enacted, and it has not been called since 02:45 because the host is not running.
+   enacted, and it has not been called since 02:45. **CORRECTED ~09:20 AM CT: not
+   because the host is down.** The box answers a CONNECT probe on 8080 and always
+   did; what was missing is `OTTOQ_INTEL_URL` / `OTTOQ_INTEL_TOKEN` /
+   `OTTOQ_BRIDGE_TOKEN`, absent from the project entirely. I could not have known
+   the host's state either way — plain HTTP cannot egress from this container.
 
 ### Two retractions, mine
 
@@ -458,6 +462,42 @@ used, and confirms there was never a reason to write to evidence to test a write
 appearing — `0271` §2's reconstruction says it happened 26 times in 1,260 ticks, worst
 205 kW. **If it stays at zero, that reconstruction is the thing to doubt first**, not the
 detector.
+
+### G78's STATUS HALF — DELIBERATELY NOT BUILT, and the reason is the whole point
+
+The queue carried *"the G78 status half (`status='abstained'`) must land in one file with
+`ottoq_agent_review`, `ottoq_intelligence_stack` and `ottoq_activity_feed` or it recreates
+0341's non-summing buckets; forces_recert TRUE."* I picked it up, measured first, and
+**stopped.**
+
+`ottoq_proposer_scorecard` shows `abstained = 0` across **890** ledger rows, which looks
+like the abstention machinery `0361` and `0364` built sitting inert. **It is not inert. It
+is correct.** Measured:
+
+| | |
+|---|---|
+| `forward_lex` (CP-SAT) rows in the disposition ledger | **0** |
+| `forward_lex` declared in `ottoq_proposer_precedence` | 1 |
+| rows with `abstained = true` | 0 of 890 |
+| **distinct `disposition_reason` values containing "abstain"** | **0** |
+
+Every reason in the ledger is concrete — `enacted_by_kernel`, `stall_reserved`,
+`stall_occupied`, `entity_decided_by_other_proposal`. **cuOpt and `greedy_constrained`
+genuinely never abstain**; CP-SAT is the one that abstains by design (`0364` records 9–11
+of ~13–16 rows per fire), and it has never proposed in-engine because the host is
+unreachable.
+
+**So building it now would mean adding a status transition and three reader buckets,
+forcing a recert, with zero rows to validate against and no way to produce one until the
+instance exists.** That is a speculative abstraction, which rule 4 forbids — and worse, it
+is precisely how you get an eighth instance of this file's own standing heuristic. Seven
+things found today that existed and were never called; I am not adding the eighth on
+purpose.
+
+**It is blocked on the instance, not on effort.** The moment `ottoq-cpsat-propose` can
+reach `/assign`, CP-SAT abstains on its first fire, and then the bucket has data the day
+it is written. Building it in that order also means the three readers can be tested rather
+than reasoned about.
 
 ---
 
