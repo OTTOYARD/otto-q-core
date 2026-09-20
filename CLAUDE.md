@@ -352,6 +352,47 @@ has not been called since 2026-08-30 — is the part that matters and is unaffec
 
 **Why this refresh exists.** `db/checks/0098` records a 22-second KPI view that survived because it scanned a table CLAUDE.md said held 20,799 rows and which actually held 2.49M. Reasoning from a stale ground-truth line is how that happened. Re-measure before quoting; the queries are one `SELECT count(*)` each.
 
+**REFRESH 2026-09-20 05:01 UTC — AND THIS ONE IS A LESSON RATHER THAN A TABLE, BECAUSE EVERY FIGURE ABOVE JUST FELL BY ONE TO TWO ORDERS OF MAGNITUDE.** A single demo run started at 04:08 UTC purged **352,673 rows** and deleted one prior run. Measured immediately afterwards:
+
+| | 2026-09-08 | 2026-09-20 05:01 | |
+|---|---|---|---|
+| rule evaluations | 5,464,682 | **74,719** | 0.014x |
+| HMAC-signed events | 2,231,792 | **34,761** | 0.016x |
+| telemetry packets | 272,919 | **17,724** | 0.065x |
+| `cuopt_invocation_log` rows | 15,346 | **957** | 0.062x |
+| decisions | 1,650,636 | **9,125** | 0.006x |
+| sim runs | 787 | **9** | 0.011x |
+| service detail records | 179,423 | **491** | 0.003x |
+| stall bookings | 783,276 | **1,245** | 0.002x |
+| archived reproducible runs | 946 | **1,396** | **1.48x — up** |
+
+**Nothing broke. This is `ottoq_purge_prior_runs` doing exactly what it is for.** Every table that fell is registered `class='engine'` in `ottoq_run_scope_registry` — run-scoped working data that must not outlive its run — and `ottoq_run_archives` is the one that ROSE, because it is the durable reproducibility key. **So the standing instruction is stronger than "re-measure before quoting": these are not slow-moving totals that drift, they are per-run working sets that a colleague starting a demo can take to near zero between your measurement and your sentence.** Cite the run, never the table.
+
+**AND THE SHARPEST DEMONSTRATION THIS FILE HAS OF WHY `0340` EXISTS, measured in the same minute.** Rule 6's cuOpt sentence is derived from calls carrying an `http_status`:
+
+| | rows | calls to NVIDIA |
+|---|---|---|
+| `cuopt_invocation_log` (`class='engine'`) | 957 | **14** |
+| `public.ottoq_model_call_ledger` (`class='evidence'`) | 3,502 | **865** |
+
+**The invocation log lost 851 of its 865 NVIDIA calls in tonight's purge. The evidence ledger kept every one.** `SOLVER_STATE.md` §13 quotes 865 because it reads the ledger; anyone reading `cuopt_invocation_log` today gets **14** and would conclude cuOpt is nearly dark. That is the 0231 fragility, closed by 0340, observed rather than argued. **Read `public.ottoq_intelligence_ledger`. Never `cuopt_invocation_log`.** The same now holds for proposal outcomes: `ottoq_proposal_disposition_ledger` (0364, `class='evidence'`) held **128** rows through the purge while `ottoq_external_proposals` lost its 24.
+
+**Two counts that are structural rather than run-scoped, and one correction:**
+
+| | value | note |
+|---|---|---|
+| stalls, ALL depots | **330** | unchanged since 09-08; 2.3's "427" remains stale |
+| **stalls, the twin depot** | **158** | **the only number rule 8 makes relevant** — 113 staging, 30 L2, 10 DCFC, 3 wash bay, 2 service bay |
+| vehicles | **226** | unchanged |
+| vehicle classes | **9** | unchanged |
+| OCPP chargers | **94** all depots / **45** the twin depot | of the twin's 45, **6 were `Faulted`** at this reading and ~**13.8% of charger-time** is lost to faults on a busy_day run (`db/checks/0264` §3) — so **effective charge capacity is about 86% of nameplate, continuously, by design** |
+| deterministic rules | **53** rows / **30** codes | was 52/29; one code added since 09-08. The "twenty of twenty-nine at four probe points" sentence in 2.5 needs re-deriving before it is spoken again |
+| run-scope registry | **229** classified columns | 223 at the 09-08 pull |
+
+**CORRECTION to 2.3's `perimeter_walkaround` note, and it is the one that matters operationally.** That note says the service is *"derived 108 times per run, required of none, performed never."* **The middle clause is false.** Measured 2026-09-20: **75 atoms, 0 done, and 25 of them `must_do`** — mandatory, never completed, and declared in neither `service_cadence_policy` nor `service_definitions`. Its `perimeter_hold` bookings held **98 of the twin depot's 113 staging stalls** at an average **248-minute** window on a run whose whole life is 540 sim-minutes, while **258 `twin.staging_overflow`** events fired. The cause is traced end to end in `db/checks/0261`: a producer, two observers that say yes for 90% of arrivals, and **no executor anywhere in the engine** — so the hold cannot clear on completion and clears on expiry instead. **This is G86 and it is an open product decision, not a bug to route around.**
+
+**AND A RULE FOR EVERY AVAILABILITY NUMBER, earned three times in one night.** A stall is offerable only as the **intersection of three gates**: the pointer (`stalls.reserved_by` / `current_vehicle_id` / `status`), the CALENDAR (`ottoq_stall_bookings` in `held`/`active`/`done`/`interrupted` overlapping the window), and, for `dcfc`/`l2`, the **OCPP charger not being `Faulted`** (0372). **Neither of the first two dominates:** measured on the twin depot in one moment, DCFC read 0 pointer-free against 10 calendar-free, L2 read 3 against 1, and staging read 59 against 12. Whichever single gate you quote, some stall type makes it look generous — the same defect shape `db/checks/0250` established for depot scope. CP-SAT is what caught it: it declined a frame our own pointer census called four-free, and all four were faulted.
+
 **Agent access map (topology facts C1 documents):** Hermes (cloud agent, Telegram-fronted) holds a GitHub token authenticating as the OTTOYARD user — push + PR proven, **no `issues` scope** (Issues API 403) — and a Supabase Management API token executing SQL as the postgres role across all three projects. By standing policy in HERMES.md, Hermes's database use is **read-only** (its pre-existing `intelligence_events` ingestion excepted); all Hermes deliverables arrive as PRs into `docs/research/**`. Claude Code is the only agent that changes schema or engine state.
 
 **Known hazards:** duplicate table names across projects (`ottoq_events` exists in both core and MVP with different meaning — a client pointed at the wrong ref fails silently); ~100 scratch tables in core's `public` schema (`proof*/cert*/smoke*/fwd*/mig*/build*`) awaiting classification; cross-region split (core us-east-1, MVP us-east-2); **AGENTS.md drift** — the repo's AGENTS.md labels `gxdrc…` "the one database that matters" and calls `ycsis…` "OrchestrAV's legacy database," which conflicts with live naming and contents. Treat AGENTS.md as unreliable until C1 reconciles it.
