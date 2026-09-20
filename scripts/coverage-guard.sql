@@ -45,7 +45,13 @@ WITH fns AS (
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname IN ('public','ottoq','twin')
-     AND p.prokind = 'f'
+     --: PROCEDURES TOO. The first cut said prokind='f' and therefore did not contain
+     --: `ottoq_demo_metronome`, which is a PROCEDURE invoked by `CALL` from cron job
+     --: 12. Excluding it made every routine the live metronome drives look
+     --: unreachable in section 1b, including `ottoq_sim_advance_tick_world`. One
+     --: character of over-narrowing, and the instrument lies in the direction that
+     --: manufactures findings.
+     AND p.prokind IN ('f','p')
 ), callers AS (
   SELECT f.nm,
          --: MATCH THE CALL SYNTAX, NOT THE BARE NAME. This is the G82 fix.
@@ -65,13 +71,38 @@ WITH fns AS (
          f.sch
     FROM fns f
 )
+-- UNFILTERED THIS RETURNS 883 OF 1,335 ROUTINES AND IS THEREFORE USELESS: most of
+-- them are the RPC surface the UI and edge functions call by name over PostgREST,
+-- which no in-database query can see. So it is narrowed to the class where "exists
+-- and is never called" has actually been a bug every time -- MAINTENANCE routines,
+-- the ones that reclaim, sweep, reconcile, expire, purge or replan. Every one of the
+-- six historical instances of the heuristic is in that class, G82 included. Widen the
+-- regex when you want the long tail; do not read the long tail as findings.
 SELECT sch, nm, fn_callers, view_callers, trigger_callers, cron_callers, default_callers
   FROM callers
  WHERE fn_callers + view_callers + trigger_callers + cron_callers + default_callers = 0
    --: the engine's own API surface is called from TypeScript and is expected here
    AND nm NOT LIKE 'ottoq_api_%'
    AND nm NOT LIKE '%_rpc'
+   AND (nm ~ '_(release|reclaim|gc|sweep|reconcile|detect|purge|advance|recover|expire|close|settle|bind|repair|rebook|replan)_'
+     OR nm ~ '_(release|reclaim|gc|sweep|reconcile|detect|purge|advance|recover|expire|close|settle|bind|repair|rebook|replan)$')
  ORDER BY sch, nm;
+
+-- VALIDATED OUTPUT, 2026-09-20 04:58 UTC — eleven rows, which is a list a person can
+-- actually work through:
+--
+--   ottoq.ottoq_release_stall_reservation         ottoq.ottoq_stage_advance_approval
+--   public.ottoq_energy_mpc_replan (×3 overloads) public.ottoq_gc_stale_reservations
+--   public.ottoq_purge_orphan_rows               public.ottoq_sim_advance_due_runs
+--   public.ottoq_sweep_orphaned_visit_artifacts  twin.ottoq_sim_advance_clock
+--                                                twin.ottoq_sim_advance_grid
+--
+-- Two of those are already understood and neither is a new finding:
+-- `ottoq_gc_stale_reservations` is **G77** — its sim/wall clock defect was fixed by
+-- 0360 and it was deliberately never scheduled, because 0367 and 0369 replaced what
+-- it was for; and `ottoq_energy_mpc_replan` is the shape of an edge-function entry
+-- point (`ottoq-energy-mpc` calls it), which is precisely the caller class this query
+-- cannot see. The rest are unexamined and are questions for whoever runs this next.
 
 \echo ''
 \echo '=== 1b. AND THE SHARPER QUESTION: CALLED, BUT NOT FROM THE LIVE TICK PATH ====='
@@ -84,12 +115,12 @@ SELECT sch, nm, fn_callers, view_callers, trigger_callers, cron_callers, default
 -- commands plus the two the metronome drives directly.
 
 WITH RECURSIVE fns AS (
-  SELECT p.oid, n.nspname AS sch, p.proname AS nm,
+  SELECT p.oid, n.nspname AS sch, p.proname AS nm, p.prokind,
          (SELECT COALESCE(string_agg(l, E'\n'), '')
             FROM unnest(string_to_array(p.prosrc, E'\n')) AS t(l)
            WHERE ltrim(l) NOT LIKE '--%') AS body
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-   WHERE n.nspname IN ('public','ottoq','twin') AND p.prokind = 'f'
+   WHERE n.nspname IN ('public','ottoq','twin') AND p.prokind IN ('f','p')
 ), roots AS (
   SELECT DISTINCT f.nm
     FROM fns f
@@ -107,7 +138,7 @@ WITH RECURSIVE fns AS (
     JOIN fns g      ON g.oid <> caller.oid
                    AND position(g.nm || '(' in caller.body) > 0
 )
-SELECT f.sch, f.nm,
+SELECT f.sch, f.nm, f.prokind,
        --: it HAS callers (so section 1 is silent) but none of them run
        (SELECT count(*) FROM fns g WHERE g.oid <> f.oid
          AND position(f.nm || '(' in g.body) > 0) AS in_db_callers
@@ -117,7 +148,25 @@ SELECT f.sch, f.nm,
                 AND position(f.nm || '(' in g.body) > 0)
    AND f.nm NOT LIKE 'ottoq_api_%'
    AND f.nm NOT LIKE '%_rpc'
+   AND (f.nm ~ '_(release|reclaim|gc|sweep|reconcile|detect|purge|advance|recover|expire|close|settle|bind|repair|rebook|replan)_'
+     OR f.nm ~ '_(release|reclaim|gc|sweep|reconcile|detect|purge|advance|recover|expire|close|settle|bind|repair|rebook|replan)$')
  ORDER BY f.sch, f.nm;
+
+-- VALIDATED OUTPUT, 2026-09-20 04:55 UTC — 45 roots, 314 routines reachable from
+-- them, and FOUR rows here, which is what a sharp instrument looks like:
+--
+--   public.ottoq_sim_advance_tick              10 in-db callers   <- **G82, mechanically**
+--   public.ottoq_sim_advance_and_snapshot        5
+--   public.ottoq_purge_prior_runs                1   (known: called by dynamic SQL
+--                                                     from ottoq_start_demo_run,
+--                                                     which is RPC-invoked)
+--   ottoq.ottoq_replan_after_charger_fault       1   <- **G88, and it led to 0372**
+--
+-- The validation that matters is the false positive that DISAPPEARED:
+-- `ottoq_sim_advance_tick_world` was flagged by the prokind='f' version and is gone
+-- from the fixed one, while `ottoq_sim_advance_tick` — the true finding — stayed. An
+-- instrument that loses its known false positive and keeps its known true positive
+-- is one you can believe on a row you have not seen before.
 
 \echo ''
 \echo '=== 2. SERVICES THE ENGINE DERIVES THAT NOTHING CAN COMPLETE =================='
