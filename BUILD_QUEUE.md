@@ -61,8 +61,37 @@ the 0360 attribution retracted (see below).
 
 ### The three decisions that are yours
 
-1. **`perimeter_walkaround` — a mandatory service no code in this engine can
-   perform, holding 98 of 113 staging stalls.** This is the big one. `db/checks/0261`
+1. **`perimeter_walkaround` — RESOLVED AND BUILT 2026-09-20 (`0383`/`0384`, check
+   `0277`), so this is no longer a decision you owe me; what follows is the record,
+   and the "holding 98 of 113 staging stalls" half is RETRACTED.** The service is now
+   performable, mandatory and declared: derived as `concurrency='exterior'` beside
+   `sensor_clean`, admitted by the starter that was already there, metered against the
+   `general_tech` pool (10 at the twin depot), completed in place by the general atom
+   advancer at exactly its declared 12 minutes. Proven end to end on a rolled-back
+   probe. **No completer needed writing** — `twin.ottoq_sim_advance_visit_atoms`
+   completes any atom whose `ends_at` has passed and names no service; the walkaround
+   was simply derived into `concurrency='hold'`, a seventh class with one member that
+   no starter admits. Measured: every other class completes (cabin 75/127, gate 33/98,
+   anchor 28/67, bay 23/64), `hold` 0 of 63 with not one atom ever reaching
+   `in_progress`. **The retraction: `perimeter_hold` is the depot's perimeter RING —
+   long-dwell parking chosen on duration alone, `need_atom IS NULL`, and no function in
+   the database mentions both strings.** Those 82–98 staging holds were never this
+   service's, so closing it frees not one stall and the 258 `twin.staging_overflow`
+   events remain open as a staging-capacity-under-dwell question. **What IS still
+   yours:** the fix makes a critical gate real. SLA.004 blocks redeploy on any
+   non-deferrable `must_do` atom, and before `0383` it passed on 39 of 63 walkarounds
+   because `ottoq_atoms_guard` had *withdrawn the requirement*, not because it was met.
+   At night every arriving vehicle now needs 12 metered technician-minutes before it
+   may deploy (~76 min of pool time for 63 walkarounds across 10 techs, competing with
+   cabin work), and the advancer ranks a vehicle already in `staged_for_departure`
+   BELOW charging vehicles for that same pool — a plausible starvation path I have
+   deliberately not pre-empted, because both mitigations (rank a dispatch-blocked
+   vehicle up, or make the walkaround `deferrable`) change what "ready for work"
+   means. **That is the measurement for the next fresh run.** Original framing below,
+   left as the record:
+
+   **`perimeter_walkaround` — a mandatory service no code in this engine can
+   perform, holding 98 of 113 staging stalls.** This was the big one. `db/checks/0261`
    has the full trace: a producer (`ottoq_derive_visit_needs`, night-gated and the
    gating is *correct*), two observers that say yes for 90% of arrivals, `must_do:
    true`, and **no executor anywhere** — every completion path takes a fixed service

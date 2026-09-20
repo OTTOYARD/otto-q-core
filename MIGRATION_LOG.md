@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0382 — GENERATED, not a log
+## Index, 0134–0384 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -365,7 +365,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0380](db/migrations/0380_joining_an_evidence_table_to_sim_runs_silently_undoes_the_reason_it_is_evidence.sql) | `20260920135731` | yes — ledger | EVERY EVIDENCE LEDGER WE BUILT EXISTS TO SURVIVE THE PURGE, AND THE OBVIOUS |
 | [0381](db/migrations/0381_the_published_reliability_field_names_an_action_that_never_happened_and_undercounts_the_one_that_did.sql) | `20260920141533` | yes — ledger | `reliability.stranded_recharges` IS WRONG TWICE, IN OPPOSITE DIRECTIONS, IN A |
 | [0382](db/migrations/0382_a_column_named_for_a_fifteen_minute_quantity_that_is_a_running_peak_in_sim_and_not_even_that_in_production.sql) | `20260920155947` | yes — ledger | G90: `site_energy_snapshots.peak_demand_kw_15min` IS NOT A 15-MINUTE QUANTITY |
+| [0383](db/migrations/0383_the_whole_of_g86_is_one_concurrency_class_that_no_executor_admits_and_the_walkaround_is_its_only_member.sql) | `20260920161631` | yes — ledger | G86: `perimeter_walkaround` IS NOT MISSING AN EXECUTOR. IT IS DERIVED INTO A |
+| [0384](db/migrations/0384_my_own_new_detector_raises_on_the_malformed_data_it_exists_to_find.sql) | `20260920162559` | yes — ledger | HARDENING `public.ottoq_atom_class_coverage` (0383) AGAINST THE ONE INPUT IT IS |
 
-245 migrations indexed.
+247 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
