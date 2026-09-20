@@ -5,3 +5,4 @@ __pycache__/
 
 # Claude Code machine-local settings (may contain a permission mode; never shared)
 .claude/settings.local.json
+supabase/.temp/
