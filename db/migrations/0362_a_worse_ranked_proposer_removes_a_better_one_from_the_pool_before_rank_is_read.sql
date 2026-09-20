@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260920024530
 -- migration-name:    a_worse_ranked_proposer_removes_a_better_one_from_the_pool_before_rank_is_read
 --
 -- 0362  RANK DECIDES WHICH PENDING PROPOSAL WINS. SUPERSESSION DECIDES WHICH
