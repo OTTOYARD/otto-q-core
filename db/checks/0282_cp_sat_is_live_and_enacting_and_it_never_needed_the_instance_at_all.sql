@@ -214,3 +214,43 @@ SELECT left(detail->'agent_handoff'->>'fallback_reason', 300) AS reason,
 -- return type from `pg_get_function_result`, not from what the name suggests it returns.
 SELECT pg_get_function_result(oid) AS ottoq_start_demo_run_actually_returns
   FROM pg_proc WHERE proname = 'ottoq_start_demo_run';
+
+-- ══ 7. ADDENDUM — `0389` VERIFIED IN THE REAL CI PATH, NOT JUST IN SQL ══════
+--
+-- Added after §1-§6, same run, once `--site auto` existed. The `proposer-loop` workflow was
+-- dispatched from the feature branch so the new route ran as CI runs it -- same runner, same
+-- pinned OR-Tools, same batch door -- rather than from this session. The `site_hash` on the
+-- fire record is the whole proof, because it is a digest of the descriptor the solver was
+-- actually handed:
+--
+--   before, `--site bridge/sites/nashville-flagship.json`   105 fires, **1** distinct site_hash
+--   after,  `--site auto`                                    36 fires, **36** distinct site_hashes
+--
+-- One hash across 105 fires is the constant. Thirty-six across thirty-six is the descriptor
+-- being re-derived every fire while the MPC's charge cap moves every tick -- which is the
+-- behaviour `0389` was built for, observed rather than asserted. `--max-wall-s 780` and the
+-- widened `arrived_at_gate,staged_awaiting_service` population ran in the same job.
+--
+-- **And the dispositions on the new route say something worth keeping.** Of 4 rows submitted:
+-- **3 refused `stall_reserved`** and **2 superseded `entity_decided_by_other_proposal`**, no
+-- new enactments. That is `db/checks/0255`'s finding recurring verbatim -- 74% of refusals
+-- name a stall already held when the proposal was created -- and it is CONTENTION AND
+-- STALENESS, not the descriptor: a tighter power cap cannot help a proposer whose chosen
+-- stall was taken between the frame read and the disposal. The ranked-candidate contract
+-- (`0357`-`0359`) is the mechanism aimed at this, and 0255 already measured its reach at 7 of
+-- 74 proposals. **So nothing here says CP-SAT's plans are good or bad; it says the depot is
+-- full.** Same conclusion as §3, from the opposite direction.
+
+SELECT CASE WHEN fired_at < '2026-09-20 20:03:00+00' THEN 'A --site FILE (constant)'
+            ELSE 'B --site auto (0389, re-derived per fire)' END AS route,
+       count(*) AS fires,
+       count(DISTINCT fire->>'site_hash') AS distinct_site_hashes,
+       sum(n_planned) AS planned, sum(n_submitted) AS rows_submitted
+  FROM public.ottoq_proposer_fire_log
+ WHERE sim_run_id = '1efeb1cd-f9b6-4515-8e61-2e5a04121112'
+ GROUP BY 1 ORDER BY 1;
+
+SELECT status, disposition_reason, count(*) AS n, max(created_at)::timestamp(0) AS last_at
+  FROM public.ottoq_external_proposals
+ WHERE sim_run_id = '1efeb1cd-f9b6-4515-8e61-2e5a04121112' AND source = 'forward_lex'
+ GROUP BY 1, 2 ORDER BY n DESC;
