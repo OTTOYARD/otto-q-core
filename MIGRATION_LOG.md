@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0354 — GENERATED, not a log
+## Index, 0134–0356 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -337,7 +337,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0352](db/migrations/0352_the_agents_dial_limits_live_in_edge_typescript_and_not_in_this_database.sql) | `20260919205659` | yes — ledger | THE LIMITS THE AI OBEYS ARE NOT IN THIS DATABASE, AND THE CATALOG IS |
 | [0353](db/migrations/0353_the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger.sql) | `20260919210336` | yes — ledger | NO AI-ORIGINATED STATE CHANGE HAS EVER APPEARED IN THE SHIELD'S LEDGER |
 | [0354](db/migrations/0354_the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt.sql) | `20260919224417` | yes — ledger | THE RETURN LEG WORKS AND ITS VERDICT SAID "solver_returned_nothing" ON A |
+| [0355](db/migrations/0355_the_energy_shield_declared_five_block_rules_at_the_moment_power_flows_and_none_had_ever_run.sql) | `20260919235525` | yes — ledger | FIVE BLOCK-ENFORCEMENT RULES DECLARE `charge_session_start`. THAT PROBE |
+| [0356](db/migrations/0356_the_shield_finally_sees_the_moment_power_begins.sql) | `20260919235738` | yes — ledger | THE SIXTH CALLED PROBE POINT, AND THE FIRST ONE THAT WATCHES ELECTRONS |
 
-217 migrations indexed.
+219 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
