@@ -154,3 +154,77 @@ SELECT r.rule_code, r.severity, r.enforcement,
  ORDER BY (SELECT count(*) FROM public.ottoq_rule_evaluations e WHERE e.rule_code = r.rule_code), r.rule_code;
 
 -- OPEN-ITEM: SM.006's first three minutes found a BESS state change with sim_run_id NULL and actor 'unknown', which fails the role gate -- 19 of 19 in-run transitions pass under ottoq_engine and this one does not, because 0399's attribution deliberately refuses to invent an actor outside a run and no bess transition admits 'unknown'. The probe is telling the truth: something changed a battery's power state and nothing can say what. The writer is not yet identified (ten functions UPDATE ottoq_bess_units; the row's 12:30:00 UTC timestamp with no run points at the arm/reset family, not the tick). Until it is, SM.006 cannot be promoted from MEASURE-ONLY to block, because promotion would refuse that writer. Widening the matrix to admit 'unknown' is forbidden -- it would make the rule pass by deleting the question. Tracked as G111.
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ══ 6. G111's WRITER IS IDENTIFIED (2026-09-21 16:2x UTC / 11:2x CT), AND THE
+--       FIX IS DELIBERATELY NOT APPLIED YET. The reason is arithmetic.
+-- ══════════════════════════════════════════════════════════════════════════════
+--
+-- §3 named the arm/reset family as the suspect. It is **`public.ottoq_tick_invariance_reset_fleet`**,
+-- and three facts converge on it:
+--
+--   * **Timing.** The single failing evaluation is at **12:30:00.178**, and two cert runs
+--     (`c951e4b2`, `1cf2c17a`) carry `started_at = ended_at = 12:30:00` — the pair boundary, the
+--     one moment `ottoq.ottoq_active_sim_run_id()` returns NULL.
+--   * **The write.** Of the three functions that write `standby` into `ottoq_bess_units`, this is
+--     the only fixture reset, and its own comment states the intent:
+--     *"0397 / G96. WAS 'idle' … The fixture reset must leave the BESS in a state the transition
+--     matrix recognises, or the first commanded change out of it is unrepresentable."*
+--     `current_state = 'standby'` — which from `charging` is exactly the observed transition.
+--   * **The callers.** `ottoq_determinism_pair`, `ottoq_ab_pair`, `ottoq_determinism_pair_replay`,
+--     `ottoq_tick_invariance_arm` — the pair rig, i.e. precisely what the `0399` recert sweep runs.
+--
+-- And **none of the three `standby` writers sets `ottoq.actor_type`**, nor calls
+-- `ottoq_active_sim_run_id`. So the probe sees `unknown`, no `bess` transition admits `unknown`
+-- (`0387`: 0 of 82), and the role gate fails. **The probe is right, and the rate fits**: one such
+-- write per boundary against 92 evaluations, which is why this is a single event rather than a
+-- pattern.
+--
+-- ══ 6a. WHY IT IS NOT FIXED IN THIS PASS, AND THE NUMBER IS THE ARGUMENT ════
+--
+-- The fix is one line — have that writer set `ottoq.actor_type` around its BESS update, per
+-- `0399` §5. But the probe's logged `context` is part of `ottoq_rule_evaluations`, and **the rules
+-- atom is one of the fourteen**. Changing what that row records moves the atom, so the change is
+-- `forces_recert` **TRUE** and costs **nine re-certifications** — to alter one evaluation row
+-- written by a test fixture, on a MEASURE-ONLY probe that blocks nothing.
+--
+-- **And `0397` §1b is explicit about the batching rule:** forces_recert changes are free only when
+-- they land TOGETHER, before the sweep starts clearing. The canon drained at 12:58 today. A
+-- granularity decision on G112 (`0308` §8f) would itself force a recert, and if it is taken this
+-- change rides with it for nothing. Spending nine pairs now, and nine again later, is the exact
+-- mistake `0397` recorded against itself.
+--
+-- **So: identified, recorded, and queued to batch.** Not deferred for lack of a fix — deferred
+-- because landing it alone costs more than it is worth and landing it with G112 costs nothing.
+--
+-- ══ 6b. AND THE ACTOR TO USE IS A REAL QUESTION, NOT A BLANK TO FILL ═══════
+--
+-- Three options, and the wrong one is available and tempting:
+--   (a) `ottoq_engine` — matches `0387`'s vehicle/stall precedent and passes the gate, but it is
+--       **not true**: a certification fixture resetting the world is not the engine deciding.
+--   (b) a new declared actor (`cert_harness`) added to the `bess` matrix rows — honest, and it
+--       widens the matrix for a fixture, which is adjacent to the `0231` move this repo forbids.
+--   (c) leave it — the row stands as a true record that a fixture wrote engine state with no
+--       attribution, on a probe that blocks nothing.
+--
+-- (a) is the one to be careful about. It would make the finding disappear by asserting something
+-- false, which is how a rule stops being able to disagree with the mechanism it describes.
+--
+-- **AND ONE THING WORTH NOTING IN PASSING, because C5 has been planned around its absence:**
+-- `public.ottoq_ab_pair` EXISTS and calls this same reset. `db/checks/0145` established that
+-- `ottoq_ab_runs` is an empty instrument with no writer; whether `ottoq_ab_pair` is the missing
+-- writer or another well-shaped shell is not established here and is not assumed.
+
+SELECT 'writer'  AS what, 'public.ottoq_tick_invariance_reset_fleet' AS detail
+UNION ALL
+SELECT 'callers', string_agg(n.nspname||'.'||p.proname, ', ' ORDER BY p.proname)
+  FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+ WHERE p.prosrc ~* 'ottoq_tick_invariance_reset_fleet' AND p.proname <> 'ottoq_tick_invariance_reset_fleet'
+UNION ALL
+SELECT 'standby writers that set ottoq.actor_type',
+       COALESCE(string_agg(n.nspname||'.'||p.proname, ', '), '(none -- that is the finding)')
+  FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+ WHERE p.prosrc ~* 'UPDATE\s+(public\.)?ottoq_bess_units' AND p.prosrc ~* 'standby'
+   AND p.prosrc ~* 'ottoq\.actor_type';
+
+-- OPEN-ITEM: G111's writer is IDENTIFIED as public.ottoq_tick_invariance_reset_fleet -- the fixture reset called by ottoq_determinism_pair / ottoq_ab_pair / ottoq_determinism_pair_replay / ottoq_tick_invariance_arm, which sets the BESS to 'standby' at the pair boundary where ottoq_active_sim_run_id() is NULL, and sets no ottoq.actor_type. None of the three standby writers sets it. The one-line fix is NOT applied in this pass on purpose: the probe's logged context lives in ottoq_rule_evaluations, the rules atom is one of the fourteen, so the change is forces_recert TRUE and costs NINE re-certifications to alter one row written by a test fixture on a measure-only probe. 0397 §1b's rule says batch it -- a G112 granularity decision would force a recert anyway and this rides along for nothing. Also unresolved and NOT a blank to fill: which actor to claim. 'ottoq_engine' passes the gate but is false (a cert fixture is not the engine deciding) and would make the finding vanish by asserting something untrue. Tracked as G111.
