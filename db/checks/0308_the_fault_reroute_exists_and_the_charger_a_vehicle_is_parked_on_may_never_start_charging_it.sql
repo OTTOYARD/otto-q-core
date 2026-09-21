@@ -321,3 +321,132 @@ SELECT r.started_at, left(r.sim_run_id::text,8) AS run, r.tick_count, r.run_by,
  GROUP BY 1,2,3,4 ORDER BY r.started_at;
 
 -- OPEN-ITEM: G112 RESTATED. The claim that a vehicle can occupy a charge stall and never be charged is RETRACTED as a statement about operation -- measured per run, the full-length operator demo f13fc580 shows 84 of 84 occupied charge turns WITH a charging session, and the entire no-session population sits in the 12/24/48-tick cert_harness pairs at ~50%. The initiator I failed to look for is twin.ottoq_sim_confirm_commands, whose own comment documents this exact defect as already found and fixed (0039: "135 begin_charge executed, 0 ocpp_sessions"). WHAT SURVIVES is smaller and still real: all nine determinism canon columns are cert pairs, so the canon certifies a world where about half the charge turns never charge -- the G25/G28 shape, where the comparison is narrower than what it is trusted to cover, and no atom notices because both arms are equally inert. Separate the two candidate causes: truncation (6 sim-minutes against a 31-44 minute charge window) versus the arm fixtures seating vehicles directly (ottoq_tick_invariance_reset_fleet calls ottoq_sim_start_charge_session itself). Also untouched by the retraction: ottoq_replan_after_charger_fault reads the pointer and the charger but not the calendar, against the three-gate rule. Tracked as G112.
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ══ 8. THE MECHANISM, FOUND (2026-09-21 16:0x UTC / 11:0x CT). §7b offered two
+--       candidate causes and BOTH ARE WRONG. The real one is a clock, and it is
+--       measurable to the second.
+-- ══════════════════════════════════════════════════════════════════════════════
+--
+-- §7b guessed **truncation** or **fixture seating**. The first query that could separate them
+-- killed both, on run `b4d5f76d` (48 ticks, cert_harness), over its 183 occupied charge turns:
+--
+--   had_session   n    earliest start   latest start   at/before run start   window outlasts run
+--   true        109       01:00:00        23:00:00            **0**                **0**
+--   false        74       00:30:00        23:00:00            **0**                **0**
+--
+-- **Nothing is seeded at or before the run clock** (so not fixture seating) and **no window
+-- outlasts the run** (so not truncation). The two populations are interleaved across the whole
+-- sim day.
+--
+-- ══ 8a. TWO BROKEN WITNESSES BEFORE THE WORKING ONE, AND THE SECOND IS THE CLUE ══
+--
+-- Probing the command chain first returned **zero `begin_charge` commands for BOTH groups** —
+-- including the 109 that demonstrably charged. A witness that reads zero on the population known
+-- to work is broken, not informative; that is `0307` §2's lesson, met again within the hour, and
+-- it was NOT interpreted.
+--
+-- Validating it found the defect in MY query, and it is this repo's own signature:
+--
+--   `ottoq_vehicle_commands.created_at`  **WALL CLOCK** — identical for all 1,689 rows of this
+--                                        run (2026-09-21 12:58:09.622219), because a cert pair
+--                                        writes them in one transaction
+--   `ottoq_vehicle_commands.issued_at`   **SIM CLOCK** — 2026-09-01 02:30 → 2026-09-02 02:00
+--
+-- I had compared a wall-clock column to a sim-clock range. **That is G107's defect class, in the
+-- measuring instrument rather than the engine.** (`status='confirmed'` was wrong too; the
+-- vocabulary is `executed` / `expired` / `refused`.)
+--
+-- ══ 8b. CORRECTED, THE COMMAND CHAIN IS NOT THE BREAK EITHER ════════════════
+--
+--   had_session   bookings   any begin_charge   **executed**   refused
+--   true             109           107              107          35
+--   false             74            74            **74**         11
+--
+-- **Every one of the 74 no-session bookings had an EXECUTED `begin_charge`.** So the break is
+-- downstream of the command executing — which rules out the third hypothesis too.
+--
+-- ══ 8c. THREE ROWS READ IN FULL, AND THE ANSWER IS IN THEM ══════════════════
+--
+--   vehicle    purpose     booking window              cmd issued   cmd executed   payload new_state
+--   091fa637   charge_l2   02:30:00 → **02:41:24**     02:30:00     **03:00:00**   charging_l2
+--   1b9b6ea1   charge_l2   02:30:00 → **02:44:00**     02:30:00     **03:00:00**   charging_l2
+--   6fdd7f85   charge_l2   02:30:00 → **02:45:00**     02:30:00     **03:00:00**   charging_l2
+--
+-- **The command executes AFTER the booking window has already closed.** The payload is correct,
+-- the stall matches the booking, `new_state` is right — and `twin.ottoq_sim_confirm_commands`
+-- runs it one tick later, by which time the booking has expired `window_elapsed_occupied` and
+-- been counted as a completed turn.
+--
+-- ══ 8d. QUANTIFIED ═════════════════════════════════════════════════════════
+--
+--   run b4d5f76d: 48 ticks over **1 day** of sim  =  **30 sim-minutes per tick**
+--   `begin_charge` confirm lag:  min **00:30:00**, max **00:30:00**  — ALWAYS exactly one tick
+--   average booking window WITH a session:     **70.8 min**   (longer than the lag)
+--   average booking window WITHOUT a session:  **28.4 min**   (shorter than the lag)
+--   no-session bookings whose window is SHORTER than the confirm lag:  **53 of 74**
+--
+-- **So the confirm→state→session chain costs exactly one tick, and a charge booking whose window
+-- is shorter than one tick cannot complete it.** 53 of 74 are explained outright. **The other 21
+-- are NOT**, and are left open rather than folded in — a mechanism that covers 72% is a mechanism,
+-- not the whole story.
+--
+-- ══ 8e. AND THIS IS WHY THE REAL RUN WAS 84 OF 84 ══════════════════════════
+--
+-- The tick granularity is not a constant of the engine. Measured across every run with ticks:
+--
+--   run        run_by            ticks   sim per tick
+--   35aa33e3   production_live    4050   **00:01:59**
+--   f13fc580   operator_demo      1136   **00:00:29**
+--   fef8cc01   production_live     328     00:02:00
+--   237029f1   production_live     241     00:01:59
+--   b4d5f76d   cert_harness         48   **00:30:00**
+--   bf895408   cert_harness         48   **00:30:00**
+--
+-- **The cert harness runs 62x coarser than the operator demo and 15x coarser than production.**
+-- One tick of confirm latency is **29 seconds** on `f13fc580` against a 30–45 minute charge
+-- window — negligible, hence 84 of 84. The same latency is **30 minutes** in the cert fixture,
+-- which exceeds most charge windows outright. Same engine, same code path, opposite outcome,
+-- and the only variable is how much sim time a tick buys.
+--
+-- ══ 8f. WHAT THIS MEANS, AND IT IS NOT "THE FIXTURE IS WRONG" ═══════════════
+--
+-- **(1) The canon finding from §7b stands and now has a mechanism.** All nine determinism canon
+-- columns are `cert_harness` pairs at 30 sim-min/tick, so **the canon certifies a world in which
+-- roughly half the charge turns are structurally unable to charge** — not because the engine is
+-- broken but because a tick is longer than a booking. No verdict is invalidated: both arms are
+-- equally inert, so they remain byte-identical, which is the whole claim. It is the **G25/G28
+-- shape** — the comparison is narrower than what it is trusted to cover — and it is now a
+-- measured property rather than a suspicion.
+--
+-- **(2) It bears directly on C5's A/B work.** `0145`/`0146` want policies compared under common
+-- random numbers. Comparing policies on a fixture where the charging chain cannot complete
+-- would measure the tick granularity, not the policy. Any A/B rig must either run at a
+-- granularity where a booking outlives a tick, or hold that granularity constant and say so.
+--
+-- **(3) The one-tick confirm latency is itself worth a decision.** It is the same shape as G62,
+-- where Nemotron's mean latency exceeded the 30-second beat: an engine whose commands take a
+-- full tick to land has a floor on how finely it can schedule anything. On a 29-second tick that
+-- floor is invisible. It is not a defect to fix blindly — the confirmation delay models a real
+-- vehicle taking time to act — but the fixture should not be asking it to act faster than a tick.
+--
+-- **NOT CLAIMED:** that any production or operator run is affected. Measured, they are not: at
+-- 29 s – 2 min per tick the lag is far below any charge window, and `f13fc580` charged 84 of 84.
+
+-- The mechanism, reproducible in one query: confirm lag against booking window, per run.
+WITH r AS (
+  SELECT sim_run_id, tick_count,
+         (sim_clock_current - sim_clock_start) / GREATEST(tick_count,1) AS per_tick
+    FROM public.ottoq_sim_runs WHERE tick_count > 0
+), lag AS (
+  SELECT c.sim_run_id, min(c.executed_at - c.issued_at) AS lag_min, max(c.executed_at - c.issued_at) AS lag_max
+    FROM public.ottoq_vehicle_commands c
+   WHERE c.command_type = 'begin_charge' AND c.status = 'executed'
+   GROUP BY 1
+)
+SELECT left(r.sim_run_id::text,8) AS run, r.tick_count, r.per_tick,
+       lag.lag_min AS begin_charge_confirm_lag_min, lag.lag_max AS begin_charge_confirm_lag_max
+  FROM r LEFT JOIN lag ON lag.sim_run_id = r.sim_run_id
+ ORDER BY r.tick_count DESC;
+
+-- OPEN-ITEM: G112 MECHANISM FOUND, and both causes §7b proposed were wrong. The confirm->state->session chain costs EXACTLY ONE TICK (begin_charge lag min=max=00:30:00 on run b4d5f76d), and a charge booking whose window is shorter than one tick expires window_elapsed_occupied -- counted as a completed turn -- before its session can start. 53 of 74 no-session bookings have windows shorter than the lag; avg window with a session 70.8 min against 28.4 min without. The cert harness runs at 30 sim-MINUTES per tick against the operator demo's 29 seconds and production's 2 minutes, which is why f13fc580 charged 84 of 84 and the cert pairs charge about half. STILL OPEN: the 21 of 74 that the lag does NOT explain; and the decision about whether all nine determinism canon columns running at 30 min/tick is acceptable, since they certify a world where the charging chain is structurally half inert (no verdict is invalidated -- both arms are equally inert -- but it is the G25/G28 shape, now with a mechanism). Bears directly on C5's A/B rig: comparing policies at that granularity would measure the tick, not the policy. Tracked as G112.
