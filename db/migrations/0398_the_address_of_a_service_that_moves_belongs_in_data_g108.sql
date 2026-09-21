@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260921073824
 -- migration-name:    the_address_of_a_service_that_moves_belongs_in_data_g108
 --
 -- 0398  G108, THE LAST LINK. **The CP-SAT service's address lives in a deploy-time secret, and the
