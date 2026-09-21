@@ -87,6 +87,61 @@ SELECT 'fire log (submit_path)' AS witness,
 -- assignment. CLAUDE.md rule 6's "agents propose, solver disposes" is now exercised through the
 -- agent chain and not only through cuOpt.
 --
+-- ┌─────────────────────────────────────────────────────────────────────────┐
+-- │ §4 AND §7 ARE RETRACTED, 2026-09-21 11:45 UTC. G109 AS STATED IS WRONG,  │
+-- │ AND THE COMMENT I DELETED FOR BEING FALSE WAS TRUE.                      │
+-- └─────────────────────────────────────────────────────────────────────────┘
+--
+-- §4 concluded that CP-SAT "returned two vehicles for one stall in a single plan" and that
+-- `_shared/agent_solver_chain.ts`'s claim — *"one-vehicle/one-stall constraints remain structural
+-- in the LP"* — "is not true of the batch this produced". **I inferred a violated constraint from
+-- two rows sharing a `stall_id` and never opened the payload.** The payload settles it:
+--
+--   cc86db35 · vehicle 54aeb4ca · stall 609910b1 · planned_start_min  **0** → planned_end_min  **5**
+--   40486606 · vehicle fd6ec8c7 · stall 609910b1 · planned_start_min **23** → planned_end_min **41**
+--
+-- **0–5 and 23–41 do not overlap.** That is not a conflict, it is a SCHEDULE: one stall serving two
+-- vehicles in sequence, five minutes at 120 kW and then eighteen minutes at 200/120 kW, with the
+-- segments, kWh and tardiness all carried in each proposal's `rationale`.
+--
+-- And the model enforces exactly that, at `solvers/cpsat/model.py`:
+--
+--     for pid, ivs in per_point_intervals.items():
+--         if ivs:
+--             m.AddNoOverlap(ivs)          # a point serves one asset
+--
+-- Per point, temporal. **This is the disjunctive-machine construct CLAUDE.md 2.5 names as one of
+-- the four things cuOpt cannot express and CP-SAT can** — and it held perfectly. The comment was
+-- right; my reading of it was wrong, and deleting it removed a true statement from the codebase.
+-- It is restored.
+--
+-- ══ 4b. THE REAL FINDING, WHICH IS LARGER THAN THE ONE I RETRACTED ══════════
+--
+-- **CP-SAT plans a schedule and the engine consumes only its first assignment.** The solver
+-- returned two time-separated slots on one stall; `ottoq_proposer_submit_batch` received two
+-- `assign_stall` rows; and the disposer, which keys on `stall_id` and has no notion of a future
+-- window, enacted the 23–41 slot and **refused the 0–5 slot with `stall_reserved`**. Half a valid
+-- plan was discarded as a conflict.
+--
+-- Read what that costs. `2.5` chose CP-SAT over cuOpt *specifically* because the site layer needs
+-- cumulative resource, disjunctive machine and sequence-dependent gap — scheduling constructs. The
+-- solver is producing exactly that, in the payload, right now: start minute, end minute, per-segment
+-- kW, planned kWh, tardiness. **The proposal envelope then flattens it to "put vehicle X in stall
+-- Y", and the scheduling is thrown away at the boundary.** The engine is paying for a scheduler and
+-- consuming a matcher.
+--
+-- Note which direction this cuts, because it is the opposite of the retracted finding's: the
+-- retracted G109 said the solver was less careful than the code claimed. The real one says the
+-- solver is **more capable than the interface it is given**, and the loss is ours.
+--
+-- This is not a defect in `ottoq_proposer_submit_batch` or in the disposer — both behave correctly
+-- for the envelope they are handed, and refusing a second claim on an occupied stall is exactly the
+-- safety behaviour that must not change. The gap is that `assign_stall` has no time dimension. Any
+-- fix belongs in the proposal vocabulary (a windowed assignment, or an explicit "this is slot 2 of
+-- a plan" marker the disposer can defer rather than refuse), and it is a design question, not a
+-- patch. **Re-filed as G109 with this statement; the original is left below, wrong, for the
+-- record.**
+--
 -- ══ 4. A NEW FINDING, AND IT IS A MODEL CLAIM THAT OVERSTATES ITSELF ════════
 --
 -- **Both real proposals in that batch name the SAME stall.** Measured:
@@ -165,6 +220,11 @@ SELECT left(proposal_id::text,8) AS pid, left(entity_id::text,8) AS vehicle,
 -- the dial-writing agent is the one path the shield does not gate. **The CP-SAT proposer is gated.**
 -- It reaches the world only through `stall_assignment`, where the shield evaluates, and the evidence
 -- for that is on the enactment row itself rather than argued from the architecture diagram.
+--
+-- (§7 below is retracted with §4: there was no conflict for the architecture to contain. What it
+-- actually observed is the disposer refusing the FIRST slot of a two-slot schedule because the
+-- envelope gave it no way to see that the slots do not overlap. The refusal is correct given what
+-- it was told; the telling is what is lossy. See §4b.)
 --
 -- ══ 7. AND G109's CONTAINMENT IS NOW OBSERVED RATHER THAN PREDICTED ═════════
 --
