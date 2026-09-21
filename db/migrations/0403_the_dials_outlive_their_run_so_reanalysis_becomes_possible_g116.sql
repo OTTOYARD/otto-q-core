@@ -52,6 +52,33 @@
 -- 408-run cell becomes a real learning population** — for dial settings, not for policies, because
 -- no cell varies policy (which is G113/`0146`'s open gap and is NOT what this file addresses).
 --
+-- ══ 🔴 ADDENDUM 2026-09-21 18:0x — ARCHIVING IS NOT AUTOMATIC, AND THAT ═════
+--       NEARLY MADE THIS WHOLE FILE INERT.
+--
+-- Found by starting a real demo run (`c23de1b8`, busy_day, seed 700001) and watching the ledger stay
+-- at **0**. The capture fires on an INSERT into `ottoq_run_archives`. Measured: **only two functions
+-- call `ottoq_archive_run`** — `ottoq_determinism_pair` (which is why **1,307 of 1,526** archives are
+-- `cert_harness`) and `ottoq_sim_release_depot`. **No cron job archives, and
+-- `ottoq_sim_stop_and_reset` does NOT archive** — verified directly, its source does not mention the
+-- archiver. So **a demo run that starts, ticks and stops is never archived, and never captured.**
+--
+-- **AND THE SECOND HALF IS WORSE THAN THE FIRST.** The one path that DOES archive automatically is
+-- the determinism pair, driven by the recert runner — so left alone, this ledger would fill almost
+-- entirely with **`cert_harness` rows, which `0312` measured at 30.00 sim-min/tick against
+-- production's 2.00, one policy, and which `0311` showed are structurally half-inert on charging.**
+-- The learner's default diet would be the least representative runs the engine produces. And right
+-- now even that is not happening: **0 canon columns need recert**, so the runner has nothing to do
+-- and no archive has been written since this migration was applied.
+--
+-- **WHAT THIS DOES NOT MEAN.** The capture is not broken — it was proven to fire, and it fires on the
+-- right event. What is missing is that the event does not happen for demo runs. **The fix is a
+-- decision about where archiving belongs, not a change to this trigger**, and the candidates are:
+-- call `ottoq_archive_run` from `ottoq_sim_stop_and_reset` (widest, and touches a function the
+-- cockpit calls); archive from the metronome's own ceiling-stop path (narrower, catches auto-stopped
+-- demo runs); or require an explicit archive call per demo run (what the 157 `operator_demo` archives
+-- evidently did). **Not chosen here** — it changes when engine state is written at the end of every
+-- run, which is not a decision to fold into a reporting addendum.
+--
 -- ══ WHY A TRIGGER ON THE ARCHIVE, AND NOT AN EDIT TO `ottoq_archive_run` ═══
 --
 -- `public.ottoq_archive_run` is the single writer of the archive, so editing it is the obvious move.
