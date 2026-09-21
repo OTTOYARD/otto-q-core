@@ -52,7 +52,7 @@ import json
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -360,6 +360,78 @@ def only_due_now(rows: list[dict], *, start_within_min: int) -> tuple[list[dict]
             },
         })
     return kept, deferred
+
+
+def suppress_not_due(frame: dict, not_due_until: dict[str, datetime],
+                     clock: datetime | None) -> tuple[dict, int]:
+    """Drop the vehicles whose own earlier abstention said they are not due yet.
+
+    ══ 0295 / G102. AN ABSTENTION CARRIES ITS OWN DUE TIME AND NOTHING READ IT ══
+
+    `only_due_now`'s docstring says a not-due row *"is re-offered by the next fire,
+    whose plan will have moved it forward."* Measured on run `e8b8eb3e`'s return
+    wave, where the loop fires every 8 seconds: **a plan 131 minutes out has not
+    moved forward in 8 seconds**, so the SAME abstention is re-submitted on every
+    fire. **259 of 350 `forward_lex` rows (74%) were abstentions**, against 35% on
+    `c8f678fb` -- and every one of them carries `planned_start_min` in its own
+    rationale, which no code path consulted.
+
+    So a vehicle is withheld until the sim clock reaches the moment its own
+    abstention declared: when its planned start comes WITHIN `start_within_min` of
+    now. This is the proposer-side half of `0290` §4's ordering -- cut the churn
+    first, then read the standing -- and it needs no migration, no tick-path change
+    and no recert, because the suppression is this loop's memory of what it has
+    already said, not a new fact about the world.
+
+    FAIL-OPEN AND DELIBERATELY FORGETFUL, both load-bearing. No clock, no entry for
+    a vehicle, or an unreadable due time all mean "plan it", i.e. exactly today's
+    behaviour, so the change can only ever REMOVE redundant rows and never withhold
+    a vehicle nobody has answered for. And the memory lives in one process, so a
+    fresh CI invocation starts blind rather than inheriting a suppression it cannot
+    verify: withholding a vehicle on the strength of a plan from a previous loop
+    would be the G54 defect, asking a narrower question than the kernel asks.
+
+    Returns `(frame, n_suppressed)`. The frame is a COPY when anything was dropped,
+    because the frame is hashed into the fire record and mutating the fetched object
+    would make that hash describe a frame the engine never emitted.
+    """
+    if clock is None or not not_due_until:
+        return frame, 0
+    keep, n = [], 0
+    for vehicle in (frame.get("vehicles") or []):
+        due = not_due_until.get(str(vehicle.get("id")))
+        if due is not None and clock < due:
+            n += 1
+            continue
+        keep.append(vehicle)
+    return ({**frame, "vehicles": keep}, n) if n else (frame, 0)
+
+
+def remember_not_due(rows: list[dict], not_due_until: dict[str, datetime],
+                     clock: datetime | None, *, start_within_min: int) -> None:
+    """Record, per vehicle, when its not-due abstention becomes due. Mutates the map.
+
+    Reads only what `only_due_now` already wrote: `abstained_by == 'bridge:not_due'`
+    and `planned_start_min`. A row that is not one of those, an absent clock, or an
+    unreadable start is skipped, so the map only ever gains entries this loop can
+    justify from its own output -- see suppress_not_due for why that matters.
+
+    A vehicle that is planned again later OVERWRITES its entry, so a plan that moves
+    earlier shortens the suppression rather than being trapped by the first answer.
+    """
+    if clock is None:
+        return
+    for row in rows:
+        rationale = ((row.get("proposal") or {}).get("rationale") or {})
+        if rationale.get("abstained_by") != "bridge:not_due":
+            continue
+        try:
+            start = int(rationale.get("planned_start_min"))
+        except (TypeError, ValueError):
+            continue  #: fail open: an unreadable due time means plan it again
+        if start > int(start_within_min):
+            not_due_until[str(row.get("entity_id"))] = clock + timedelta(
+                minutes=start - int(start_within_min))
 
 
 def _jsonb_literal(obj: Any) -> str:
@@ -733,6 +805,12 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
     #: 'first' until something has woken it; see _wait_for_next_tick.
     trigger: str = "first"
     last_fired_tick: int | None = None
+    #: 0295 / G102. vehicle_id -> the sim clock at which its own not-due abstention
+    #: becomes due. This loop's memory of what it has already said, and the only state
+    #: that survives between fires. One invocation, never persisted; see the suppression
+    #: site for why forgetting between CI runs is the correct behaviour rather than a
+    #: limitation.
+    not_due_until: dict[str, datetime] = {}
     started_at = time.monotonic()
     with psycopg.connect(dsn) as conn:
         n = 0
@@ -774,6 +852,11 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                 #: Read what came back, never what was asked for.
                 if not allow_blind_frame:
                     _require_seeing_frame(frame, sim_run_id)
+                #: 0295 / G102. Withhold the vehicles whose own earlier abstention said they
+                #: are not due yet. See suppress_not_due for the measurement and the reasoning.
+                fire_clock = run.get("sim_clock_current")
+                frame, n_suppressed_not_due = suppress_not_due(
+                    frame, not_due_until, fire_clock)
                 class_rows = _fetch_class_rows(cur)
                 #: 0389. `--site auto` re-derives the descriptor from the engine on
                 #: EVERY fire, because the live charge cap moves within a run. The
@@ -791,6 +874,16 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                               serviceable_states=serviceable_states,
                               allow_rejection=allow_rejection)
                 rows, record = result["rows"], result["fire"]
+                #: 0295 / G102. Both halves on the record: how many vehicles this fire withheld
+                #: because their own earlier abstention is not due yet, and how many it is now
+                #: carrying. Published rather than silent, because a suppressed vehicle is a
+                #: vehicle the ledger would otherwise show no row for -- and "absent because
+                #: already answered" must be distinguishable from "absent because unseen",
+                #: which is the whole lesson of `n_vehicles_held` and `frame_facts_version`.
+                record["n_suppressed_not_due"] = n_suppressed_not_due
+                remember_not_due(rows, not_due_until, fire_clock,
+                                 start_within_min=start_within_min)
+                record["n_not_due_remembered"] = len(not_due_until)
                 record["tick_count_at_fetch"] = run["tick_count"]
                 record["run_resolved_by"] = "auto" if auto_run else "argument"
                 #: G58: what woke this fire, and how many ticks passed since the

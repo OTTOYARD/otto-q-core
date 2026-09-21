@@ -894,3 +894,72 @@ def test_fetch_site_accepts_a_zero_cap_rather_than_flooring_it_up():
                                         "power_soft_target_kw": 0},)),
                           DEPOT, RUN, None)
     assert site["power_cap_kw_hard"] == 0
+
+
+# ── 0295 / G102: an abstention carries its own due time ────────────────────────
+def _not_due_row(vid, start):
+    """A row shaped exactly as only_due_now emits a not-due abstention."""
+    return {"action_context": "stall_assignment", "entity_type": "vehicle", "entity_id": vid,
+            "source": "forward_lex",
+            "proposal": {"verb": "assign_stall", "abstain": True, "vehicle_id": vid,
+                         "rationale": {"optimizer": "forward_lex", "planned_start_min": start,
+                                       "abstained_by": "bridge:not_due"},
+                         "resolved_action_context": "stall_assignment"}}
+
+
+def test_remember_not_due_stores_the_moment_the_plan_comes_into_the_window():
+    from datetime import datetime, timedelta, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    seen: dict = {}
+    pb.remember_not_due([_not_due_row(V1, 131)], seen, clock, start_within_min=30)
+    #: 131 minutes out, a 30-minute window: due in 101 minutes, not in 131.
+    assert seen[V1] == clock + timedelta(minutes=101)
+
+
+def test_remember_not_due_ignores_rows_it_cannot_justify():
+    from datetime import datetime, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    seen: dict = {}
+    #: a live assignment, a proposer-side abstention, and an unreadable start.
+    bad = _not_due_row(V2, 60)
+    bad["proposal"]["rationale"]["planned_start_min"] = "soon"
+    other = _not_due_row(V3, 90)
+    other["proposal"]["rationale"]["abstained_by"] = "proposer:no_capable_point"
+    pb.remember_not_due([_row(V1, S1, 0), bad, other], seen, clock, start_within_min=30)
+    assert seen == {}
+    #: and no clock is fail-open too: nothing is remembered, so nothing is withheld.
+    pb.remember_not_due([_not_due_row(V1, 131)], seen, None, start_within_min=30)
+    assert seen == {}
+
+
+def test_suppress_not_due_withholds_only_while_the_vehicle_is_not_yet_due():
+    from datetime import datetime, timedelta, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    frame = {"vehicles": [{"id": V1}, {"id": V2}, {"id": V3}]}
+    seen = {V1: clock + timedelta(minutes=101),   # not due
+            V2: clock - timedelta(minutes=1)}     # became due a minute ago
+    out, n = pb.suppress_not_due(frame, seen, clock)
+    assert n == 1
+    assert [v["id"] for v in out["vehicles"]] == [V2, V3]
+    #: the ORIGINAL frame is untouched -- it is hashed into the fire record.
+    assert len(frame["vehicles"]) == 3
+
+
+def test_suppress_not_due_is_a_no_op_without_a_clock_or_a_memory():
+    from datetime import datetime, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    frame = {"vehicles": [{"id": V1}]}
+    assert pb.suppress_not_due(frame, {}, clock) == (frame, 0)
+    assert pb.suppress_not_due(frame, {V1: clock}, None) == (frame, 0)
+
+
+def test_a_replan_that_moves_earlier_shortens_the_suppression():
+    from datetime import datetime, timedelta, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    seen: dict = {}
+    pb.remember_not_due([_not_due_row(V1, 200)], seen, clock, start_within_min=30)
+    assert seen[V1] == clock + timedelta(minutes=170)
+    later = clock + timedelta(minutes=10)
+    pb.remember_not_due([_not_due_row(V1, 45)], seen, later, start_within_min=30)
+    #: overwritten, not trapped by the first answer.
+    assert seen[V1] == later + timedelta(minutes=15)
