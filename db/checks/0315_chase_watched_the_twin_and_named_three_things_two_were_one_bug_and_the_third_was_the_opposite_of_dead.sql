@@ -1,3 +1,22 @@
+-- ██ §3 OF THIS FILE IS RETRACTED BY `db/checks/0318`. §1 AND §2 STAND. ██
+-- ██
+-- ██  §3 concluded that `ottoq_events` holds zero arm or tether rows and therefore "the arms can
+-- ██  never appear in the audit trail." **Backwards.** `twin.ottoq_arm_advance_cycles` has been
+-- ██  calling `ottoq_record_event` per closed cycle all along — 2,678 rows, six `arm.*` types,
+-- ██  41 runs, including 84 rows on `c23de1b8`, the very run Chase was watching.
+-- ██
+-- ██  The zero came from my own query: fixing an unrelated `0A000` error, I retyped the census
+-- ██  and dropped `%arm%` and `%mate%` from the predicate, leaving one that could not match. The
+-- ██  key was still called `arm_events`. `0318` §1 has both versions.
+-- ██
+-- ██  §3d's open question ("does `vehicles.robotic_tether_*` populate mid-run?") is also closed:
+-- ██  `twin.ottoq_arm_advance_cycles` writes `robotic_tether_phase` in its own body, so the
+-- ██  renderer's binding IS populated while a run ticks.
+-- ██
+-- ██  What survives from §3: the six `arm.*` types were absent from `ottoq_event_types_catalog`
+-- ██  (fixed by `db/migrations/0408`), and `twin.arm_cycles` is unclassified in the run-scope
+-- ██  registry (surfaced by `0408`, classification still an open decision — `0318` §5).
+-- ██
 -- 0315  **Chase watched run `c23de1b8` in the cockpit and reported three things. Two of them are
 --       ONE bug. The third is the opposite of what it looks like.** In his words:
 --
