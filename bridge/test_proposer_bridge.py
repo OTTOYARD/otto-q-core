@@ -963,3 +963,52 @@ def test_a_replan_that_moves_earlier_shortens_the_suppression():
     pb.remember_not_due([_not_due_row(V1, 45)], seen, later, start_within_min=30)
     #: overwritten, not trapped by the first answer.
     assert seen[V1] == later + timedelta(minutes=15)
+
+
+# ── 0396 / G105: the arming gate conflated two independent CP-SAT paths ────────
+# Reuses FakeCur and _arming from above. My first draft of this block defined its own
+# _FakeCur AND its own _arming, and the second SHADOWED the existing helper at line 658 --
+# breaking two passing tests that call it with no arguments. Rule 5 applies to tests too.
+
+
+def _receipt(verdict, missing=None):
+    return ({"ok": True, "receipts": [], "arming": dict(
+        _arming(verdict, missing), primary_proposer={"reachable": False, "fires": 0})},)
+
+
+def test_armed_proceeds_and_is_not_annotated():
+    out = pb._arm_run(FakeCur(one=_receipt("armed")), RUN, pb.ARMED_BY)
+    assert out["verdict"] == "armed"
+    assert "accepted_despite_verdict" not in out
+
+
+def test_armed_primary_unreachable_proceeds_because_it_describes_the_other_path():
+    """The EC2 path being dead must not stop the loop that solves in the runner.
+
+    Measured on run c9b0a87e at 01:26 UTC: the job died on this verdict with `missing []` --
+    every dial set. PATH A (this loop, OR-Tools inside the CI runner) is also the only thing
+    that can make fires > 0, so refusing on it is refusing to do the very thing whose absence
+    is the complaint.
+    """
+    out = pb._arm_run(FakeCur(one=_receipt("armed_primary_unreachable")), RUN, pb.ARMED_BY)
+    assert out["verdict"] == "armed_primary_unreachable"
+    #: accepted, and NEVER silently: the annotation rides the dict the caller already logs.
+    assert "does not use" in out["accepted_despite_verdict"]["why"]
+    assert out["accepted_despite_verdict"]["verdict"] == "armed_primary_unreachable"
+
+
+def test_a_genuinely_unarmed_run_is_still_refused():
+    """The permit is narrow: anything meaning "the dials are NOT set" must still raise."""
+    for verdict in ("not_armed", "partial", "unknown_future_value", None):
+        with pytest.raises(pb.BridgeError) as exc:
+            pb._arm_run(FakeCur(one=_receipt(verdict, ["cuopt_propose_enabled"])),
+                        RUN, pb.ARMED_BY)
+        assert "arming verdict" in str(exc.value)
+        assert "cuopt_propose_enabled" in str(exc.value)
+
+
+def test_widening_the_verdicts_did_not_widen_ok_false():
+    with pytest.raises(pb.BridgeError) as exc:
+        pb._arm_run(FakeCur(one=({"ok": False, "arming": _arming("armed")},)),
+                    RUN, pb.ARMED_BY)
+    assert "did not confirm the arming" in str(exc.value)

@@ -87,6 +87,38 @@ BATCH = "public.ottoq_proposer_submit_batch"
 ARM = "public.ottoq_agentic_arm"
 #: Who the arming is attributed to in ottoq_policy_params.updated_by.
 ARMED_BY = "proposer_bridge"
+
+#: ══ 0396 / G105. TWO INDEPENDENT CP-SAT PATHS, AND THE ARMING GATE CONFLATED THEM ══
+#:
+#: `_arm_run` refused on any verdict that was not exactly `'armed'`. Migration `0349` then added
+#: a FOURTH value, `armed_primary_unreachable`, and this consumer silently turned it into a hard
+#: refusal. Measured on run `c9b0a87e` at 01:26 UTC: the job died with
+#: "reports arming verdict 'armed_primary_unreachable' ... missing []" -- **nothing missing**,
+#: every dial set, and the loop refused anyway.
+#:
+#: WHY THAT IS WRONG, and it is the distinction that matters. CP-SAT reaches this engine by TWO
+#: routes that share nothing but a name:
+#:
+#:   PATH A  this loop. `bridge/proposer_bridge.py` imports `proposer.forward_proposer` and
+#:           solves with OR-Tools **inside the CI runner**, then submits through
+#:           `ottoq_submit_external_proposal`. It never touches EC2. On run `e8b8eb3e` it
+#:           produced 973 proposals.
+#:   PATH B  the agent chain. `ottoq-cpsat-propose` (edge) calls the `ottoq-intelligence`
+#:           service on its EC2 box, which solves there.
+#:
+#: `0349`'s `reachable` is judged from PATH B's evidence — `ottoq_proposer_fire_log` rows and
+#: `ottoq_decisions.enacted_action->solver_handoff` over `orchestrator_agent` chains. So a dead
+#: EC2 image made PATH A refuse to run, **and PATH A is the only thing that can make `fires > 0`.**
+#: A startup race on top: `reachable` is three-valued and needs >= 3 agent chains to judge, so at
+#: `demo_speed_x = 8.0` the chains cross that threshold before a dispatch can land.
+#:
+#: WHAT THIS DOES NOT DO: hide the finding. The verdict is logged at accept time with its whole
+#: `primary_proposer` block, and on `c9b0a87e` it carried the real diagnosis in its own words --
+#: *"/health does not list cp_sat_forward_lex -- THE RUNNING IMAGE PREDATES CP-SAT"*, with
+#: `/health` answering `{"optimizers":["energy_mpc"]}` against main's
+#: `["energy_mpc","cp_sat_forward_lex"]`. That is a live PATH B outage and it is tracked as G105;
+#: it is not a reason to stop PATH A, which is the half that works.
+ARMING_VERDICTS_THIS_LOOP_MAY_PROCEED_ON: tuple[str, ...] = ("armed_primary_unreachable",)
 FRAME_FN = "public.ottoq_build_decision_frame"
 DEFAULT_TTL_S = 60
 
@@ -676,12 +708,24 @@ def _arm_run(cur, sim_run_id: str, by: str) -> dict:
     receipt = row[0] if row else None
     if not isinstance(receipt, dict) or not receipt.get("ok"):
         raise BridgeError(f"{ARM} did not confirm the arming of run {sim_run_id}: {receipt}")
-    verdict = (receipt.get("arming") or {}).get("verdict")
-    if verdict != "armed":
+    arming = receipt.get("arming") or {}
+    verdict = arming.get("verdict")
+    if verdict not in ("armed",) + ARMING_VERDICTS_THIS_LOOP_MAY_PROCEED_ON:
         raise BridgeError(f"run {sim_run_id} reports arming verdict {verdict!r} after "
-                          f"{ARM} returned ok; missing "
-                          f"{(receipt.get('arming') or {}).get('missing')}")
-    return receipt["arming"]
+                          f"{ARM} returned ok; missing {arming.get('missing')}")
+    if verdict != "armed":
+        #: 0396 / G105. LOUD, NEVER SILENT -- and logged by the CALLER, not here. `log` is a
+        #: parameter of run_live (`log=print`), not a module-level name, so calling it from this
+        #: module-level function would raise NameError and break the loop worse than the bug it
+        #: is fixing. The caller already emits `{"armed": arming}` for every arming, and this
+        #: annotation travels inside that same dict, so the acceptance and its reason reach the
+        #: job log through the path that already works.
+        arming = dict(arming, accepted_despite_verdict={
+            "verdict": verdict,
+            "why": "the dials this loop needs are all set (missing is empty); this verdict "
+                   "describes the edge->EC2 proposer path, which this loop does not use",
+        })
+    return arming
 
 
 def _require_seeing_frame(frame: dict, sim_run_id: str) -> int:
