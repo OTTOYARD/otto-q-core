@@ -1,4 +1,6 @@
--- 0304  **G108 CLOSED. THE AGENT PATH PROPOSED.** Nemotron → `ottoq-cpsat-propose` → the EC2
+-- 0304  **G108 CLOSED. THE AGENT PATH PROPOSED, AND THE KERNEL ENACTED IT — §6/§7, added minutes
+--       later, take this from a proposal to two vehicles physically charging on CP-SAT's plan with
+--       the L1 shield evaluated on both.** Nemotron → `ottoq-cpsat-propose` → the EC2
 --       CP-SAT service → `ottoq_proposer_submit_batch` → the deterministic shield, end to end, on
 --       live run f13fc580 at 2026-09-21 07:53:12 UTC. Three independent witnesses agree and their
 --       numbers reconcile exactly.
@@ -133,5 +135,72 @@ SELECT left(proposal_id::text,8) AS pid, left(entity_id::text,8) AS vehicle,
 -- real proposals were `pending` at capture. Enactment is the decide path's call and is not required
 -- for G108 — the finding was that the path produced nothing, and it now produces proposals — but it
 -- is a separate claim and needs its own row.
+--
+-- ══ 6. IT CAN NOW BE SAID. ENACTED AT TICK 726, AND THE WORLD CHANGED. ══════
+--
+-- Three minutes after §5 was written, at **tick 726**, the decide path enacted two of them:
+--
+--   proposal 40486606 · vehicle fd6ec8c7 · stall 609910b1 · **enacted_by_kernel**
+--   proposal b64c589c · vehicle b97789b5 · stall bcff04b2 · **enacted_by_kernel**
+--
+-- **And the world moved, with the booking naming who caused it:**
+--
+--   booking c8a8f5bd · stall 609910b1 (NASH-DCFC-STALL-02) · vehicle fd6ec8c7
+--     purpose charge_dcfc · state **active** · **source `forward_lex`**
+--     why: "…to satisfy need 'charge' (visit_atom); SoC 47% -> target 90%"
+--   booking de07adaf · stall bcff04b2 (NASH-DCFC-STALL-03) · vehicle b97789b5
+--     purpose charge_dcfc · state **active** · **source `forward_lex`**
+--     why: "…to satisfy need 'charge' (visit_atom); SoC 69% -> target 90%"
+--
+-- and the vehicles are physically in them, charging, with SoC climbing:
+--
+--   fd6ec8c7 · current_state **charging_dcfc** · current_stall NASH-DCFC-STALL-02 · SoC 47 -> **64**
+--   b97789b5 · current_state **charging_dcfc** · current_stall NASH-DCFC-STALL-03 · SoC 69 -> **77**
+--
+-- **THE L1 SHIELD GATED BOTH, AND THAT IS THE LINE WORTH THE MOST.** The two `ottoq_decisions` rows
+-- recording the enactments — `68d78210` and `516fe75f`, `action_context='stall_assignment'`,
+-- `l2_engine='forward_lex'`, `outcome_status='enacted'`, tick 726 — each carry
+-- **`jsonb_array_length(rule_results) = 5`**. Contrast CLAUDE.md rule 6's standing finding about the
+-- other AI path: `agent_calls_with_no_l1_rules` is **3,699 of 3,699** for `nvidia_nemotron`, because
+-- the dial-writing agent is the one path the shield does not gate. **The CP-SAT proposer is gated.**
+-- It reaches the world only through `stall_assignment`, where the shield evaluates, and the evidence
+-- for that is on the enactment row itself rather than argued from the architecture diagram.
+--
+-- ══ 7. AND G109's CONTAINMENT IS NOW OBSERVED RATHER THAN PREDICTED ═════════
+--
+-- §4 said the two-proposals-for-one-stall pair was "contained today by the EXCLUDE constraint and by
+-- the decide path disposing one proposal per entity". That was a prediction. Measured at the same
+-- tick 726:
+--
+--   40486606 · vehicle fd6ec8c7 · stall 609910b1 · **enacted**  · enacted_by_kernel
+--   cc86db35 · vehicle 54aeb4ca · stall 609910b1 · **refused**  · **stall_reserved**
+--
+-- One enacted, one refused **with the reason named** — `stall_reserved`, not a generic rejection.
+-- The kernel resolved a conflict its proposer should not have emitted, at the same tick, and said
+-- why. G109 stays open on the code's claim (`_shared/agent_solver_chain.ts` asserts the LP enforces
+-- one-vehicle/one-stall structurally, and this batch shows it does not), but the safety question it
+-- raised is answered: the architecture absorbs it, demonstrably.
+
+SELECT left(p.proposal_id::text,8) AS pid, left(p.entity_id::text,8) AS vehicle,
+       left(p.proposal->>'stall_id',8) AS stall, p.status, p.disposition_reason, p.disposed_tick
+  FROM public.ottoq_external_proposals p
+ WHERE p.source = 'forward_lex' AND p.submitted_by_role = 'system:service_role'
+   AND coalesce((p.proposal->>'abstain')::bool, false) = false
+ ORDER BY p.disposed_tick DESC NULLS LAST, p.created_at DESC;
+
+-- The enactment's own audit rows, with the L1 rule count that makes the gating checkable.
+SELECT left(decision_id::text,8) AS did, action_context, l2_engine, outcome_status,
+       left(entity_id::text,8) AS vehicle, tick_seq,
+       jsonb_array_length(coalesce(rule_results,'[]'::jsonb)) AS l1_rules_evaluated
+  FROM public.ottoq_decisions
+ WHERE l2_engine = 'forward_lex' AND outcome_status = 'enacted'
+ ORDER BY created_at DESC LIMIT 6;
+
+-- The world, which is the only witness that cannot be argued with.
+SELECT left(b.booking_id::text,8) AS booking, s.stall_code, left(b.vehicle_id::text,8) AS vehicle,
+       b.purpose, b.state, b.source, b.booked_at
+  FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id
+ WHERE b.source = 'forward_lex'
+ ORDER BY b.booked_at DESC LIMIT 6;
 
 -- OPEN-ITEM: G109 -- CP-SAT returned two assign_stall proposals for the SAME stall (609910b1, the depot's only offerable charge stall) in one batch at 07:53:12, while _shared/agent_solver_chain.ts asserts "one-vehicle/one-stall constraints remain structural in the LP". Either the LP does not enforce it or the rows are deliberate ranked alternatives and the comment must say so. Contained today by ottoq_stall_bookings' EXCLUDE constraint and by the decide path disposing one proposal per entity, but that containment disappears if CP-SAT is ever promoted from proposer to decide-path successor. Also still unclaimed: no agent-path CP-SAT proposal has yet been ENACTED (both were pending at capture).
