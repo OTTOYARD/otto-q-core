@@ -140,3 +140,81 @@ SELECT 'ottoq-orchestrator-agent' AS function_slug,
        'a8da8e509e03104e02cdf22917403b39648015055d1e6fcd9d837c860aab49ff' AS ezbr_sha256,
        'repo edge-functions/ottoq-orchestrator-agent/index.ts + _shared/agent_solver_chain.ts'
                                   AS deployed_from;
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ══ 7. G110's SECOND HALF IS NOW WIRED BUT DELIBERATELY INERT (2026-09-21 15:1x
+--       UTC / 10:1x CT). The CI step exists; it cannot compare anything until a
+--       secret lands, and it says so rather than going green.
+-- ══════════════════════════════════════════════════════════════════════════════
+--
+-- §5 left this open: `scripts/check-edge-drift.sh` is the only thing that can prove
+-- `edge-functions/` matches what is deployed, and it ran NOWHERE. `verify.yml` now carries
+-- **Edge-function drift, repo vs deployed**. **This does NOT close G110** — the step is a no-op
+-- until `SUPABASE_ACCESS_TOKEN` exists as a repository secret, and pretending otherwise would be
+-- the same defect as the success line nothing reads.
+--
+-- ══ 7a. THE DESIGN DECISION, WHICH IS THE ONLY INTERESTING PART ══════════════
+--
+-- The naive wiring — run it on every event, fail on drift — would have produced **the
+-- permanently-red gate this very workflow warns about twice**. The script compares the REPO
+-- against the DEPLOYED function, and **on a pull request the repo copy is the PROPOSED state**.
+-- So every PR that edits an edge function legitimately differs from deployed until the change is
+-- deployed, and such a PR would go red for being exactly what it is. `0206`'s lesson, arriving
+-- from a new direction.
+--
+-- So the step is **asymmetric by ref**: a WARNING on a pull request, a FAILURE on push to `main`.
+-- `main` is where the repo and the deployment are supposed to agree; a disagreement there is real
+-- drift and is worth stopping for. On a branch it is a work-in-progress signal.
+--
+-- **And the script's own exit codes are respected rather than reinterpreted**, which matters
+-- because it was written to refuse a false pass:
+--
+--   0  compared, no unexpected drift                      → step passes
+--   1  unexpected drift, files named                      → FAIL on main, WARN on a PR
+--   2  COULD NOT COMPARE (no CLI, no token, download fail) → WARN, never a green tick
+--   *  anything undocumented                              → FAIL, because an exit code the
+--                                                            script does not document is not a
+--                                                            result to interpret charitably
+--
+-- `ottoq-energy-mpc` needs no handling here: it is an acknowledged exception INSIDE the script
+-- (G69 — the deployed copy still carries hardcoded credential fallbacks, and syncing it into the
+-- repo would re-commit a live secret, so the fix is to deploy the repo's version and rotate).
+--
+-- ══ 7b. TESTED BEFORE COMMITTING, BOTH BRANCHES AND THE WHOLE TRUTH TABLE ════
+--
+-- The skip path, which is what CI executes today:
+--
+--   SUPABASE_ACCESS_TOKEN=""   → `::notice::no SUPABASE_ACCESS_TOKEN -- edge drift NOT checked.
+--                                 This is a skip, not a pass.`  exit 0
+--
+-- The script's own refusal, with a token present but unusable:
+--
+--   SUPABASE_ACCESS_TOKEN=fake → `check-edge-drift: download failed: ... REFUSING to report a
+--                                 pass without comparing. exit 2`  → step warns, exit 0
+--
+-- (That second test incidentally proved the CLI guard works and that the Supabase CLI IS present
+-- in this environment — the script got past its `command -v supabase` check and failed at the
+-- download, which is the correct place to fail with a fake token.)
+--
+-- And the ref/exit matrix, exercised directly rather than reasoned about:
+--
+--   ref                  rc=0    rc=1              rc=2     rc=7
+--   refs/heads/main      exit 0  **exit 1** ERROR  exit 0    exit 1
+--   refs/pull/201/merge  exit 0  exit 0   WARN     exit 0    exit 1
+--
+-- So the gate can fail — on drift on main, and on an exit code the script does not document —
+-- and cannot fail for being a PR. That is the property `0206` asks for, stated as a table.
+--
+-- ══ 7c. WHAT REMAINS, PRECISELY ═════════════════════════════════════════════
+--
+-- One repository secret: `SUPABASE_ACCESS_TOKEN`, at
+-- github.com/OTTOYARD/otto-q-core → Settings → Secrets and variables → Actions. The same token
+-- also removes the Supabase MCP server's own per-statement confirmations for in-session SQL, by
+-- letting the Management API be called over HTTPS instead — which is what
+-- `.claude/settings.json`'s `//2` note already prescribed and what blocked two queries at
+-- 13:45 UTC today. Supabase's own documentation is explicit that a personal access token
+-- "carries your full account privileges", so it wants a finite expiry and a rotation habit
+-- rather than a permanent grant
+-- (https://supabase.com/docs/reference/api/introduction, fetched 2026-09-21).
+--
+-- OPEN-ITEM: G110's drift half is WIRED BUT INERT. verify.yml now carries an edge-drift step that warns on PRs and fails on push-to-main, respects the script's exit 2 as "could not compare" rather than a pass, and soft-skips without the secret -- the ref/exit matrix was exercised directly and is in §7b. It compares NOTHING until SUPABASE_ACCESS_TOKEN exists as a repository secret, so repo-vs-deployed drift is still ungated in practice and G110 stays OPEN. Do not record it as closed on the strength of the step existing; that is the same defect as a success line nothing reads. Tracked as G110.
