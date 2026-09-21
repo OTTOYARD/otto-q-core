@@ -494,11 +494,14 @@ repo_manifest(version, name, file) AS (
     ('20260921031935'::text, 'one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96'::text, '0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql'::text),
     ('20260921073824'::text, 'the_address_of_a_service_that_moves_belongs_in_data_g108'::text, '0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql'::text),
     ('20260921122812'::text, 'the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96'::text, '0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql'::text),
-    ('PENDING'::text, 'the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114'::text, '0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql'::text),
-    ('PENDING'::text, 'the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114'::text, '0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql'::text),
+    ('20260921191243'::text, 'the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114'::text, '0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql'::text),
+    ('20260921192817'::text, 'the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114'::text, '0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql'::text),
     ('20260921165330'::text, 'a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112'::text, '0402_a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112.sql'::text),
     ('20260921172038'::text, 'the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116'::text, '0403_the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116.sql'::text),
-    ('20260921174317'::text, 'the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116'::text, '0404_the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116.sql'::text)
+    ('20260921174317'::text, 'the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116'::text, '0404_the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116.sql'::text),
+    ('20260921190250'::text, 'the_cockpit_gets_its_reads_back_after_0198_revoked_them_on_a_grep_over_the_wrong_repo'::text, '0405_the_cockpit_gets_its_reads_back_after_0198_revoked_them_on_a_grep_over_the_wrong_repo.sql'::text),
+    ('20260921190457'::text, 'thirteen_writers_were_reachable_with_the_browser_key_including_three_i_shipped_this_afternoon'::text, '0406_thirteen_writers_were_reachable_with_the_browser_key_including_three_i_shipped_this_afternoon.sql'::text),
+    ('20260921193848'::text, 'a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough'::text, '0407_a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

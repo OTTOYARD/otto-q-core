@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0404 — GENERATED, not a log
+## Index, 0134–0407 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -382,12 +382,15 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0397](db/migrations/0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql) | `20260921031935` | yes — ledger | G96, STEPS 0 AND 1. **THE BESS GETS ONE WORD FOR REST.** Three places in this schema declare |
 | [0398](db/migrations/0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql) | `20260921073824` | yes — ledger | G108, THE LAST LINK. **The CP-SAT service's address lives in a deploy-time secret, and the |
 | [0399](db/migrations/0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql) | `20260921122812` | yes — ledger | G96, STEP 2 — THE LAST ONE. **SM.006 has had a callable evaluator and no caller since it |
-| [0400](db/migrations/0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql) | `PENDING` | no — pending | G114, item (a) and item (b) — **the fault reroute reads the calendar, and stops ignoring |
-| [0401](db/migrations/0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql) | `PENDING` | no — pending | **G114 items (c) and (d), decided under delegated authority** — Chase, 2026-09-21: *"You make |
+| [0400](db/migrations/0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql) | `20260921191243` | yes — ledger | G114, item (a) and item (b) — **the fault reroute reads the calendar, and stops ignoring |
+| [0401](db/migrations/0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql) | `20260921192817` | yes — ledger | **G114 items (c) and (d), decided under delegated authority** — Chase, 2026-09-21: *"You make |
 | [0402](db/migrations/0402_a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112.sql) | `20260921165330` | yes — ledger | **G112, decision (3a): a determinism verdict can state its own clock.** `db/checks/0312` §3 |
 | [0403](db/migrations/0403_the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116.sql) | `20260921172038` | yes — ledger | **THE PREREQUISITE FOR ANY LEARNING: THE DIALS OUTLIVE THEIR RUN.** `db/checks/0313` §3 |
 | [0404](db/migrations/0404_the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116.sql) | `20260921174317` | yes — ledger | **G116, PART TWO: THE REWARD FUNCTION, AND DIAL PROMOTION ENABLED.** Chase instructed both on |
+| [0405](db/migrations/0405_the_cockpit_gets_its_reads_back_after_0198_revoked_them_on_a_grep_over_the_wrong_repo.sql) | `20260921190250` | yes — ledger | **Ten read-only twin RPCs get `anon` EXECUTE back. Three mutating ones deliberately do not.** |
+| [0406](db/migrations/0406_thirteen_writers_were_reachable_with_the_browser_key_including_three_i_shipped_this_afternoon.sql) | `20260921190457` | yes — ledger | **Thirteen SECURITY DEFINER functions that WRITE were executable by `anon`. Three of them I |
+| [0407](db/migrations/0407_a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough.sql) | `20260921193848` | yes — ledger | **A demo run picks its hour of day uniformly at random. Nothing ties a scenario to the time |
 
-267 migrations indexed.
+270 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
