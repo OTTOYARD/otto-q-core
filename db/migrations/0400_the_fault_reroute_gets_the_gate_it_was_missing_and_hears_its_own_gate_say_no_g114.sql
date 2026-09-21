@@ -90,6 +90,18 @@ BEGIN;
 -- ══════════════════════════ PREFLIGHT ══════════════════════════
 -- Five assertions. Each tests something that is load-bearing for the change below and that a
 -- reasonable person would otherwise assume.
+--
+-- **MESSAGE PREFIXES ARE `0400 P<n>:` BECAUSE `scripts/compile-check.py` PARSES THEM, and this
+-- file is what taught me that.** Pass 1 runs the migration against an empty scratch database and
+-- treats a failure as real UNLESS it matches `does not exist` or the regex `ERROR:\s+0\d{3} P\d`.
+-- A precondition RAISEing its own message is the file working correctly against an empty database,
+-- and that second pattern is how the script tells the two apart. Written as
+-- `0400 preflight (1): ...` these read as genuine failures and CI went red -- correctly, since the
+-- gate cannot distinguish them. **Note WHY this file is the first PENDING migration to hit it:**
+-- `0288`'s preflights query engine TABLES, which a scratch database lacks, so they fail with
+-- `relation ... does not exist` and are tolerated by the first pattern. Assertion (1) below queries
+-- `pg_proc`, which EXISTS everywhere, so it is reached, returns 0, and RAISEs. Any preflight that
+-- interrogates a catalog rather than a table lands here.
 DO $preflight$
 DECLARE
   v_n int;
@@ -103,7 +115,7 @@ BEGIN
      AND pg_get_function_identity_arguments(p.oid) =
          'p_vehicle_id uuid, p_sim_run_id uuid, p_depot_id uuid, p_stall_type text, p_charger_id uuid, p_fault_code text, p_clock timestamp with time zone';
   IF v_n <> 1 THEN
-    RAISE EXCEPTION '0400 preflight (1): expected exactly 1 ottoq.ottoq_replan_after_charger_fault with the known signature, found %', v_n;
+    RAISE EXCEPTION '0400 P1: expected exactly 1 ottoq.ottoq_replan_after_charger_fault with the known signature, found %', v_n;
   END IF;
 
   -- (2) The shared helper exists with the 8-argument signature this file calls positionally.
@@ -113,7 +125,7 @@ BEGIN
      AND pg_get_function_identity_arguments(p.oid) =
          'p_sim_run_id uuid, p_depot_id uuid, p_from timestamp with time zone, p_to timestamp with time zone, p_stall_type text, p_staging_role text, p_limit integer, p_zones text[]';
   IF v_n <> 1 THEN
-    RAISE EXCEPTION '0400 preflight (2): ottoq.ottoq_stall_free_between missing or its signature moved (found % matching)', v_n;
+    RAISE EXCEPTION '0400 P2: ottoq.ottoq_stall_free_between missing or its signature moved (found % matching)', v_n;
   END IF;
 
   -- (3) The fact that makes the NULL-run case safe: the calendar cannot hold an unscoped booking.
@@ -122,7 +134,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns
               WHERE table_schema='public' AND table_name='ottoq_stall_bookings'
                 AND column_name='sim_run_id' AND is_nullable='YES') THEN
-    RAISE EXCEPTION '0400 preflight (3): ottoq_stall_bookings.sim_run_id is now NULLABLE -- the NULL-run argument in this file no longer holds';
+    RAISE EXCEPTION '0400 P3: ottoq_stall_bookings.sim_run_id is now NULLABLE -- the NULL-run argument in this file no longer holds';
   END IF;
 
   -- (4) The helper's calendar state set still matches the constraint. This is the 2026-08-02
@@ -130,17 +142,17 @@ BEGIN
   SELECT pg_get_constraintdef(oid) INTO v_def
     FROM pg_constraint WHERE conname = 'ottoq_stall_bookings_no_overlap_v3';
   IF v_def IS NULL THEN
-    RAISE EXCEPTION '0400 preflight (4): ottoq_stall_bookings_no_overlap_v3 not found';
+    RAISE EXCEPTION '0400 P4: ottoq_stall_bookings_no_overlap_v3 not found';
   END IF;
   IF NOT (v_def ~ 'held' AND v_def ~ 'active' AND v_def ~ 'done' AND v_def ~ 'interrupted') THEN
-    RAISE EXCEPTION '0400 preflight (4): the EXCLUDE state set changed (%); ottoq_stall_free_between must be realigned BEFORE this function leans on it', v_def;
+    RAISE EXCEPTION '0400 P4: the EXCLUDE state set changed (%); ottoq_stall_free_between must be realigned BEFORE this function leans on it', v_def;
   END IF;
 
   -- (5) The top-N margin. p_limit below the candidate count would silently truncate the
   --     admissible set and make this reroute refuse genuinely free stalls.
   SELECT count(*) INTO v_n FROM public.stalls;
   IF v_n >= 10000 THEN
-    RAISE EXCEPTION '0400 preflight (5): % stalls exist, which is no longer safely under the p_limit of 10000 this file passes', v_n;
+    RAISE EXCEPTION '0400 P5: % stalls exist, which is no longer safely under the p_limit of 10000 this file passes', v_n;
   END IF;
 END
 $preflight$;
