@@ -1,0 +1,137 @@
+-- 0304  **G108 CLOSED. THE AGENT PATH PROPOSED.** Nemotron → `ottoq-cpsat-propose` → the EC2
+--       CP-SAT service → `ottoq_proposer_submit_batch` → the deterministic shield, end to end, on
+--       live run f13fc580 at 2026-09-21 07:53:12 UTC. Three independent witnesses agree and their
+--       numbers reconcile exactly.
+--
+-- Read-only. Scope: twin depot 11111111-1111-1111-1111-111111111111 (rule 8).
+-- Captured 07:54–07:56 UTC, immediately, because two of the three witnesses are `class='engine'`
+-- and the next demo run deletes them.
+--
+-- ══ 1. THE THREE WITNESSES, AND WHY THREE ═══════════════════════════════════
+--
+-- `0301`'s retraction is the reason this is not one query. An audit label read as an event cost an
+-- hour of believing the loop was closed, so the criterion `0302` §4 set requires three records
+-- written by three different things:
+--
+--   **WITNESS 1 — `ottoq_model_call_ledger`, written by the CALLER** (so on its own it is only the
+--   caller's word for it):
+--     07:53:13 · outcome **answered** · http_status **200** · latency **37 ms**
+--     proposals_out **2** · rows 10 · real_rows 2 · abstained 8
+--     objective readiness_first · receipt_status **submitted**
+--     endpoint_source **db:ottoq_service_endpoints**
+--
+--   **WITNESS 2 — `ottoq_external_proposals`, where `submitted_by_role` is assigned by POSTGRES**
+--   rather than claimed by the client, which is what makes it load-bearing. PATH A reads
+--   `system:db:postgres` there; this reads:
+--     **submitted_by_role `system:service_role`**, source forward_lex — 19 rows at first capture,
+--     of which **2 carry `abstain:false` and `verb:'assign_stall'`**.
+--
+--   **WITNESS 3 — `ottoq_proposer_fire_log.fire`, where `submit_path` rides the fire record:**
+--     07:53:12 · **submit_path `edge:ottoq-cpsat-propose`** · endpoint_source db:ottoq_service_endpoints
+--     assign_latency_ms 37 · status submitted · n_rows 10 · n_planned **2** · n_abstained 8 · n_submitted 10
+--     (and a second at 07:53:56: assign_ms 23, n_rows 9, n_planned 0, n_abstained 9)
+--
+-- **The numbers reconcile across all three:** 10 rows = 2 planned + 8 abstained; `proposals_out 2`
+-- in the ledger equals `n_planned 2` in the fire log equals the 2 non-abstain proposal rows. Three
+-- writers, one arithmetic.
+
+SELECT 'ledger (caller)' AS witness,
+       to_char(called_at,'HH24:MI:SS') AS at_utc, outcome, http_status, latency_ms, proposals_out,
+       detail->>'endpoint_source' AS endpoint_source,
+       detail->>'rows' AS rows, detail->>'real_rows' AS real_rows, detail->>'abstained' AS abstained,
+       detail->>'receipt_status' AS receipt_status
+  FROM public.ottoq_model_call_ledger
+ WHERE provider = 'cpsat_service' AND endpoint IS NOT NULL AND outcome = 'answered'
+ ORDER BY called_at DESC LIMIT 5;
+
+SELECT 'proposals (postgres-assigned role)' AS witness,
+       submitted_by_role, source, status, disposition_reason, count(*) AS rows
+  FROM public.ottoq_external_proposals
+ WHERE source = 'forward_lex' AND submitted_by_role = 'system:service_role'
+ GROUP BY 1,2,3,4,5 ORDER BY rows DESC;
+
+SELECT 'fire log (submit_path)' AS witness,
+       to_char(fired_at,'HH24:MI:SS') AS at_utc,
+       fire->>'submit_path' AS submit_path, fire->>'endpoint_source' AS endpoint_source,
+       fire->>'agent_objective' AS objective, fire->>'assign_latency_ms' AS assign_ms,
+       status, n_rows, n_planned, n_abstained, n_submitted
+  FROM public.ottoq_proposer_fire_log
+ WHERE effective_source = 'forward_lex' AND fire->>'submit_path' = 'edge:ottoq-cpsat-propose'
+ ORDER BY fired_at DESC LIMIT 5;
+
+-- ══ 2. WHAT UNBLOCKED IT WAS THE DEPOT, NOT A CHANGE ════════════════════════
+--
+-- `0303` measured 26 consecutive hops returning `solved_but_zero_proposals` against **0 of 40**
+-- charge stalls offerable. At 07:53 **one DCFC stall came free** — measured in the same minute as
+-- `dcfc 10 total / 1 offerable, l2 30 total / 0 offerable` — and the solver proposed on that tick.
+-- No code changed between the 26 empty answers and this one. That is the strongest available
+-- evidence that the empty answers were the depot's truth and not the service's fault, and it is
+-- why `0303` recorded them as a capacity finding rather than a defect.
+--
+-- ══ 3. AND THE SHIELD DISPOSED, WHICH IS THE POINT OF THE ARCHITECTURE ══════
+--
+--   status refused · reason **proposer_abstained** · 23
+--   status superseded · reason **entity_decided_by_other_proposal** · 3
+--   status pending · 2
+--
+-- Read those reasons carefully, because "23 refused" is not the shield rejecting 23 CP-SAT plans.
+-- `proposer_abstained` is the disposition of rows where **CP-SAT itself abstained** — bookkeeping
+-- for an abstention, not a rejection of a proposal. `entity_decided_by_other_proposal` is
+-- precedence: another proposer reached that vehicle first. The two real `assign_stall` proposals
+-- were `pending` at capture, awaiting the decide path.
+--
+-- **So propose/dispose is working as designed on the agent path for the first time:** an advisory
+-- solver proposed, the deterministic path kept the right to dispose, and no proposer wrote a final
+-- assignment. CLAUDE.md rule 6's "agents propose, solver disposes" is now exercised through the
+-- agent chain and not only through cuOpt.
+--
+-- ══ 4. A NEW FINDING, AND IT IS A MODEL CLAIM THAT OVERSTATES ITSELF ════════
+--
+-- **Both real proposals in that batch name the SAME stall.** Measured:
+--
+--   proposal cc86db35 · vehicle 54aeb4ca · assign_stall · stall **609910b1** · pending
+--   proposal 40486606 · vehicle fd6ec8c7 · assign_stall · stall **609910b1** · pending
+--   both created 2026-09-21 07:53:12.979223+00 — the same batch, the same transaction
+--
+-- And `609910b1` was **the only offerable charge stall in the depot** at that moment. So CP-SAT
+-- returned two vehicles for one stall in a single plan.
+--
+-- `supabase/functions/_shared/agent_solver_chain.ts` states, in its own doc comment on
+-- `assignmentPairCost`: *"Compatibility and one-vehicle/one-stall constraints remain structural in
+-- the LP."* **That sentence is not true of the batch this produced**, or the two rows are
+-- deliberate ranked alternatives for the disposer to choose between and the comment should say so.
+-- It is one or the other, and right now the code asserts the first while emitting the second.
+--
+-- **Nothing unsafe happened, and that is the propose/dispose design earning its keep twice over:**
+-- `ottoq_stall_bookings`' EXCLUDE constraint makes double-booking physically impossible, and the
+-- decide path disposes one proposal per entity. A proposer that emits a conflicting pair is
+-- contained. But a proposer whose comment claims a constraint it does not enforce will mislead the
+-- next person who trusts the comment instead of the batch — and if CP-SAT is ever promoted from
+-- proposer to decide-path successor (CLAUDE.md C4 step 4 option (a)), that containment disappears.
+-- **Tracked as G109.**
+
+SELECT left(proposal_id::text,8) AS pid, left(entity_id::text,8) AS vehicle,
+       proposal->>'verb' AS verb, left(proposal->>'stall_id',8) AS stall,
+       (proposal->>'abstain')::bool AS abstain, status, disposition_reason, created_at
+  FROM public.ottoq_external_proposals
+ WHERE source = 'forward_lex' AND submitted_by_role = 'system:service_role'
+   AND coalesce((proposal->>'abstain')::bool, false) = false
+ ORDER BY created_at DESC LIMIT 10;
+
+-- ══ 5. THE SENTENCE THAT MAY NOW BE QUOTED ══════════════════════════════════
+--
+-- *"The agent chain runs end to end. Nemotron reads the board and emits one of three bounded
+-- objectives; the CP-SAT service resolves its address from the database, answers in 17–63 ms, and
+-- its proposals reach the deterministic shield through the same door every proposer uses. Measured
+-- on run f13fc580 at 2026-09-21 07:53:12 UTC: 2 proposals from 10 solver rows, confirmed by three
+-- independent records — the call ledger, the proposals table's Postgres-assigned
+-- `submitted_by_role='system:service_role'`, and the fire log's
+-- `submit_path='edge:ottoq-cpsat-propose'`. The shield disposed them; the proposer wrote no
+-- assignment."*
+--
+-- **What still may NOT be said:** that a CP-SAT proposal from the agent path has been ENACTED. Both
+-- real proposals were `pending` at capture. Enactment is the decide path's call and is not required
+-- for G108 — the finding was that the path produced nothing, and it now produces proposals — but it
+-- is a separate claim and needs its own row.
+
+-- OPEN-ITEM: G109 -- CP-SAT returned two assign_stall proposals for the SAME stall (609910b1, the depot's only offerable charge stall) in one batch at 07:53:12, while _shared/agent_solver_chain.ts asserts "one-vehicle/one-stall constraints remain structural in the LP". Either the LP does not enforce it or the rows are deliberate ranked alternatives and the comment must say so. Contained today by ottoq_stall_bookings' EXCLUDE constraint and by the decide path disposing one proposal per entity, but that containment disappears if CP-SAT is ever promoted from proposer to decide-path successor. Also still unclaimed: no agent-path CP-SAT proposal has yet been ENACTED (both were pending at capture).
