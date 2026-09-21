@@ -501,7 +501,10 @@ repo_manifest(version, name, file) AS (
     ('20260921174317'::text, 'the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116'::text, '0404_the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116.sql'::text),
     ('20260921190250'::text, 'the_cockpit_gets_its_reads_back_after_0198_revoked_them_on_a_grep_over_the_wrong_repo'::text, '0405_the_cockpit_gets_its_reads_back_after_0198_revoked_them_on_a_grep_over_the_wrong_repo.sql'::text),
     ('20260921190457'::text, 'thirteen_writers_were_reachable_with_the_browser_key_including_three_i_shipped_this_afternoon'::text, '0406_thirteen_writers_were_reachable_with_the_browser_key_including_three_i_shipped_this_afternoon.sql'::text),
-    ('20260921193848'::text, 'a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough'::text, '0407_a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough.sql'::text)
+    ('20260921193848'::text, 'a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough'::text, '0407_a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough.sql'::text),
+    ('20260921203327'::text, 'the_registry_gate_that_catches_unclassified_run_tables_cannot_see_the_twin_schema_and_one_evidence_check_has_been_dead_since_this_afternoon'::text, '0408_the_registry_gate_that_catches_unclassified_run_tables_cannot_see_the_twin_schema_and_one_evidence_check_has_been_dead_since_this_afternoon.sql'::text),
+    ('20260921203917'::text, 'the_evidence_ledgers_look_98_percent_unattributable_and_95_percent_of_that_is_recoverable_from_the_archive'::text, '0409_the_evidence_ledgers_look_98_percent_unattributable_and_95_percent_of_that_is_recoverable_from_the_archive.sql'::text),
+    ('20260921204952'::text, 'the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads'::text, '0410_the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
