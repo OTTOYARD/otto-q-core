@@ -491,7 +491,14 @@ repo_manifest(version, name, file) AS (
     ('20260921005249'::text, 'shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where'::text, '0394_shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where.sql'::text),
     ('20260921012521'::text, 'my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart'::text, '0395_my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart.sql'::text),
     ('20260921025959'::text, 'choose_the_clock_before_you_build_the_world_g107'::text, '0396_choose_the_clock_before_you_build_the_world_g107.sql'::text),
-    ('20260921031935'::text, 'one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96'::text, '0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql'::text)
+    ('20260921031935'::text, 'one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96'::text, '0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql'::text),
+    ('20260921073824'::text, 'the_address_of_a_service_that_moves_belongs_in_data_g108'::text, '0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql'::text),
+    ('20260921122812'::text, 'the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96'::text, '0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql'::text),
+    ('PENDING'::text, 'the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114'::text, '0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql'::text),
+    ('PENDING'::text, 'the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114'::text, '0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql'::text),
+    ('20260921165330'::text, 'a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112'::text, '0402_a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112.sql'::text),
+    ('20260921172038'::text, 'the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116'::text, '0403_the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116.sql'::text),
+    ('20260921174317'::text, 'the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116'::text, '0404_the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

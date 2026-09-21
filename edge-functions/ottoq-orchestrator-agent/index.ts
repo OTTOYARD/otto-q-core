@@ -10,6 +10,21 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v18 (0301/0304): 🔴 THE SOLVER HANDOFF NAMED AN ENGINE THAT HAD NOT RUN.
+//      `engine: receipt.engine ?? "cp_sat_forward_lex"` named the primary engine whenever the
+//      reply named none, and `??` falls through on null as well as undefined. So when
+//      ottoq-cpsat-propose correctly DECLINED a run that was no longer live --
+//      `{ok:true, skipped:"run is not active"}` -- this code recorded
+//      `status:"completed", engine:"cp_sat_forward_lex", receipt:null`, and that row was read
+//      for an hour as proof the agent chain had reached CP-SAT end to end. It had not: the
+//      service's own uvicorn access log held ZERO `POST /assign` lines over the window
+//      containing it, and the surviving evidence row at that timestamp was nvidia_nemotron
+//      with no cpsat_service row carrying an endpoint anywhere near it. A decline is not a
+//      success, and a default that invents an engine is how one became the other.
+//      NOW: a reply carrying `skipped` records status "skipped" with engine null; the engine
+//      is NEVER defaulted (absent means nothing ran); `solver_ran` is carried through from the
+//      bridge; and `solverAccepted` -- which drives both the verb and outcome_status -- counts
+//      only "completed" and "fallback", so a skip can no longer produce `analyze_and_solve`.
 // v17: audit honesty (check 0045 R5). enacted_action gains a `verb` derived from what was
 //      ACTUALLY applied, and outcome_status is 'enacted' only when something was — a tick
 //      where everything the model asked for was rejected or queued now records
@@ -321,12 +336,34 @@ serve(async (req) => {
             engine: "cp_sat_forward_lex",
             error: String(receipt?.error ?? receipt?.primary_error ?? responseText ?? `HTTP ${response.status}`).slice(0, 600),
           };
+        } else if (receipt.skipped) {
+          // v18. A DECLINE IS NOT A SUCCESS. ottoq-cpsat-propose returns
+          // {ok:true, skipped:"run is not active", engine:null, solver_ran:false} when the run
+          // has finished -- which is correct of it, and used to be recorded here as
+          // status "completed" with engine "cp_sat_forward_lex" and receipt null. That row was
+          // then read as proof the chain had reached CP-SAT. It records what happened now.
+          solverHandoff = {
+            ...solverHandoff,
+            status: "skipped",
+            engine: null,
+            solver_ran: false,
+            skipped: String(receipt.skipped).slice(0, 200),
+          };
         } else {
           solverHandoff = {
             ...solverHandoff,
             status: receipt.fallback === true ? "fallback" : "completed",
-            engine: receipt.engine ?? "cp_sat_forward_lex",
+            // v18: NO DEFAULT. An absent engine means NOTHING RAN, and naming the primary
+            // engine here is how a decline became a completed solve for an hour. `??` falls
+            // through on null as well as undefined, so `engine: null` from the bridge was
+            // being replaced too -- which is exactly why the bridge setting it was not enough
+            // on its own and this line had to change.
+            engine: receipt.engine ?? null,
+            solver_ran: receipt.solver_ran === true,
             receipt: receipt.receipt ?? null,
+            // The real numbers, so a bare "completed" never again stands in for whether
+            // anything was actually proposed.
+            assign: receipt.assign ?? null,
             fallback_reason: receipt.fallback_reason ?? null,
           };
         }
@@ -349,6 +386,9 @@ serve(async (req) => {
     // The verb is derived from what actually happened, never from what was proposed: one
     // applied ops_action names itself; one set_policy names the dial; several name the batch.
     const a0 = applied[0] as any;
+    // v18: "skipped" is deliberately NOT in this list. It used to be reachable only as
+    // "completed", which made a declined handoff produce the verb `analyze_and_solve` and an
+    // outcome_status of `enacted` on a tick where no solver ran at all.
     const solverAccepted = ["completed", "fallback"].includes(String(solverHandoff.status));
     const verb =
       solverAccepted ? "analyze_and_solve"
