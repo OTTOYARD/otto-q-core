@@ -218,3 +218,68 @@ SELECT 'ottoq-orchestrator-agent' AS function_slug,
 -- (https://supabase.com/docs/reference/api/introduction, fetched 2026-09-21).
 --
 -- OPEN-ITEM: G110's drift half is WIRED BUT INERT. verify.yml now carries an edge-drift step that warns on PRs and fails on push-to-main, respects the script's exit 2 as "could not compare" rather than a pass, and soft-skips without the secret -- the ref/exit matrix was exercised directly and is in §7b. It compares NOTHING until SUPABASE_ACCESS_TOKEN exists as a repository secret, so repo-vs-deployed drift is still ungated in practice and G110 stays OPEN. Do not record it as closed on the strength of the step existing; that is the same defect as a success line nothing reads. Tracked as G110.
+
+-- ══ 8. THE SECRET WAS DECLINED, SO §7c's "WHAT REMAINS" IS NOT A PENDING ═════
+--       ITEM — IT IS A CEILING. AND THE SUBSTITUTE IS WEAKER IN A NAMED WAY.
+--
+-- **Decided 2026-09-21 by Chase: no `SUPABASE_ACCESS_TOKEN` repository secret.** §7c asked for
+-- it and quoted Supabase's own line that a PAT *"carries your full account privileges"*; that
+-- sentence is the argument against handing one to CI, not merely a caveat attached to handing it
+-- over, and the decision follows it. **Recorded as a decision rather than an omission**, because
+-- an unexplained soft-skip reads as configuration someone forgot and invites a future session to
+-- re-ask. `verify.yml`'s notice and comment now say so in the log, where the skip is seen.
+--
+-- **THE CONSEQUENCE, STATED WITHOUT SOFTENING.** There is no unauthenticated route to a deployed
+-- function's source, so **no CI configuration can compare repo against deployed.** The drift step
+-- will print and exit 0 on every run from now on. **A green `verify` does not mean
+-- `edge-functions/` matches what is deployed, and never will.** That is the one direction this
+-- repo has no automated guard for — every other gate here (pytest, node, compile-check, KPI)
+-- reads committed files and needs nothing.
+--
+-- ══ 8a. THE SUBSTITUTE: THE MCP CONNECTOR, WHICH NEEDS NO REPO SECRET ═══════
+--
+-- The Supabase MCP connector reads deployed source in-session with no token in the repo.
+-- `mcp__Supabase__list_edge_functions` + `get_edge_function` is the whole check. Run today:
+--
+--   * **28 ACTIVE deployed, 28 directories in `edge-functions/` (excluding `_shared` and
+--     `_MANIFEST.md`), and the two SETS MATCH EXACTLY** — no deployed function missing from the
+--     repo, no repo directory that is not deployed. That half is a complete verdict.
+--   * `ottoq-orchestrator-agent` is **v30**, the copy `0306` §3 deployed, and its deployed source
+--     carries every marker this repo's tests assert: the `else if (receipt.skipped)` branch,
+--     `engine: receipt.engine ?? null` (no default), `solver_ran`, `assign`, the **awaited**
+--     `const response = await fetch(solverUrl` rather than `EdgeRuntime.waitUntil`, the v18
+--     header block, and — in the deployed `_shared/agent_solver_chain.ts` — the G109 TEMPORAL
+--     doc comment. So the four-hour production-only window `0306` §3 records is **closed**.
+--
+-- **AND WHAT THAT IS NOT.** It is **marker-level agreement, not byte-level.** `_MANIFEST.md`
+-- established by measurement that `version` is a 77%-false-positive signal and `updated_at`
+-- gives two false positives and one false negative out of 28 — and that the one false negative
+-- was the function whose drift contained a live credential. It also refuses hand-transcription
+-- as a method, correctly, and a tool result read into a model's context and retyped is
+-- transcription. **So this check can say "the deployed copy contains the fixes" and cannot say
+-- "the two files are identical."** `ezbr_sha256` does not close the gap either: it digests the
+-- bundled eszip, not the source, so it cannot be compared to a hash of a repo file. Only
+-- `supabase functions download --use-api` — i.e. the declined token — gives bytes.
+--
+-- ══ 8b. THE RESIDUAL RISK, WHICH IS ABOUT HUMANS RATHER THAN TOOLING ════════
+--
+-- An in-session check runs **when someone remembers**; a CI gate runs on every push. The failure
+-- `0306` §3 exists to record — orchestrator v29 live in production for four hours with the repo
+-- disagreeing and no signal able to say so — **is exactly a "when someone remembers" failure**,
+-- and the substitute for the gate is the thing that already failed once. Naming that plainly is
+-- the point of this section: the guard did not get weaker quietly, it got weaker by a decision
+-- that was made with the trade-off visible.
+--
+-- **So the standing instruction, for any session that deploys an edge function:** deploy and then
+-- immediately re-read the deployed source through the connector in the SAME session, because
+-- nothing downstream will. And **G69's exception still stands** — `ottoq-energy-mpc`'s deployed
+-- body carries hardcoded credential fallbacks the repo removed on 2026-09-07, it must never be
+-- synced INTO the repo, and it is the one function where deployed-differs-from-repo is correct.
+
+SELECT 'edge drift gate' AS subject,
+       'WIRED, PERMANENTLY INERT -- secret declined 2026-09-21 by decision' AS ci_status,
+       'in-session via Supabase MCP connector; marker-level, not byte-level' AS substitute,
+       '28 deployed = 28 repo dirs, sets match exactly' AS set_verdict,
+       'orchestrator-agent v30 carries every v18 marker; §3 four-hour window CLOSED' AS content_verdict;
+
+-- OPEN-ITEM: G110's drift half is WIRED AND NOW PERMANENTLY INERT BY DECISION, not by oversight -- Chase declined the SUPABASE_ACCESS_TOKEN repository secret on 2026-09-21, following the same Supabase documentation §7c quoted about a PAT carrying full account privileges. No CI configuration can compare repo against deployed without it, so a green verify never means edge-functions/ matches deployment, and this is a CEILING rather than a TODO: do not re-ask for the secret. The substitute is an in-session check through the Supabase MCP connector (§8a), which today confirmed 28 deployed = 28 repo directories with the sets matching exactly, and orchestrator-agent v30 carrying every marker the tests assert -- closing §3's four-hour production-only window. It is MARKER-LEVEL, NOT BYTE-LEVEL: _MANIFEST.md disqualified version and updated_at by measurement and refuses hand-transcription, and ezbr_sha256 digests the bundled eszip rather than the source, so only the declined token yields bytes. The residual risk is human -- an in-session check runs when someone remembers, and v29's four production-only hours were themselves a "when someone remembers" failure. Standing instruction: any session that deploys an edge function re-reads the deployed source through the connector in that same session. Tracked as G110.

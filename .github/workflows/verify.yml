@@ -136,6 +136,21 @@ jobs:
       # WARNING and on push-to-main it is a FAILURE. main is where repo and deployed are supposed
       # to agree, and a disagreement there is real drift.
       #
+      # 🔴 DECIDED 2026-09-21: THE SECRET IS NOT COMING, SO THIS STEP IS PERMANENTLY A SKIP.
+      # Chase declined to add SUPABASE_ACCESS_TOKEN as a repository secret. That is a
+      # legitimate call -- a Supabase PAT carries full account privileges, and handing one to CI
+      # to win a comparison is a poor trade. The consequence must be stated rather than left
+      # looking pending: **this step will print its notice and exit 0 on every run, forever, and
+      # a green `verify` NEVER means edge-functions/ matches what is deployed.** Nothing in CI
+      # can check that -- the Management API needs auth and there is no unauthenticated route to
+      # a deployed function's source, so this is a ceiling, not a TODO.
+      # THE SUBSTITUTE, and its exact weakness. Drift is checked in-session through the Supabase
+      # MCP connector, which reads deployed source with no repo secret (db/checks/0306 §8). That
+      # is strictly weaker in one way worth naming: it happens when a person remembers, not on
+      # every push -- and orchestrator v29 living only in production for four hours is precisely
+      # what "when a person remembers" failed to catch. Treat edge-function deploys as the one
+      # place this repo has no automated guard.
+      #
       # SOFT-SKIPS WITHOUT THE SECRET, exactly like the ledger gate above, so secretless PRs and
       # forks still pass. The script's own exit codes are respected rather than reinterpreted:
       #   0 = compared, no unexpected drift
@@ -152,7 +167,7 @@ jobs:
         run: |
           set -uo pipefail
           if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
-            echo "::notice::no SUPABASE_ACCESS_TOKEN -- edge drift NOT checked. This is a skip, not a pass."
+            echo "::notice::no SUPABASE_ACCESS_TOKEN -- edge drift NOT checked. This is a skip, not a pass, and it is PERMANENT: the secret was declined 2026-09-21 by decision, not oversight. Verify drift in-session via the Supabase MCP connector (db/checks/0306 §8). A green verify does not mean edge-functions/ matches deployed."
             exit 0
           fi
           npm i -g supabase >/dev/null 2>&1 || true
