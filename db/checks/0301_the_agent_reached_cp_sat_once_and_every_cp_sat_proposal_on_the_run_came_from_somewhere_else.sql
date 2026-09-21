@@ -55,6 +55,58 @@ SELECT source, declared_source, submitted_by_role, count(*) AS rows,
 -- comfortably inside 5 s and says the bound was not absurd, only too tight once a cold start and
 -- three solves are stacked behind an edge-to-EC2 hop.
 --
+-- ┌─────────────────────────────────────────────────────────────────────────┐
+-- │ RETRACTED 2026-09-21 07:16 UTC, WITHIN THE HOUR, AND THE FILE'S OWN     │
+-- │ TITLE IS NOW WRONG: THE AGENT NEVER REACHED CP-SAT. NOT ONCE.          │
+-- └─────────────────────────────────────────────────────────────────────────┘
+--
+-- The paragraph below said the 05:12:10 handoff was "the first time the whole chain ran end to
+-- end" and that "CP-SAT answered". **Both are false, and I had no evidence for either** — I read
+-- `status: completed` plus `engine: cp_sat_forward_lex` off an audit row and treated the label as
+-- the event. Two independent measurements refute it:
+--
+--   (1) **`POST /assign` lines in the service's own uvicorn access log: ZERO.** Measured over SSM
+--       at 07:15 UTC on the container created 2026-09-21 04:30:55 — which covers 05:12:10. For
+--       contrast the same log holds 4 `GET /health` lines, all of them my probes. The box has
+--       never been asked to solve anything. It answered `/health` on loopback in **14 ms** listing
+--       `["energy_mpc","cp_sat_forward_lex"]`, at **0.14% CPU** with **loadavg 0.00** on 2 vCPU, so
+--       "healthy but slow" is refuted too.
+--   (2) **The surviving evidence row at that exact timestamp is `nvidia_nemotron`, not
+--       `cpsat_service`.** `ottoq_model_call_ledger` is `class='evidence'` and outlived the purge
+--       that deleted run 71942fbf; at `05:12:10.158057+00`, chain `c37a27a3`, there is one
+--       Nemotron row and **no `cpsat_service` row carrying an endpoint anywhere near it**.
+--
+-- **AND THE CODE EXPLAINS IT EXACTLY, which is the strongest form of this proof because it needs
+-- no surviving data.** `ottoq-cpsat-propose` v8 opened with an early return for a run that is no
+-- longer live:
+--
+--     if (run.status !== "running")
+--       return json({ ok: true, skipped: "run is not active", chain_id: chainId });
+--
+-- No `fallback`, no `engine`, no `receipt`. And `ottoq-orchestrator-agent` reads that reply as:
+--
+--     status:  receipt.fallback === true ? "fallback" : "completed"   ->  "completed"
+--     engine:  receipt.engine ?? "cp_sat_forward_lex"                 ->  "cp_sat_forward_lex"
+--     receipt: receipt.receipt ?? null                                ->  null
+--     fallback_reason: receipt.fallback_reason ?? null                ->  null
+--
+-- That reproduces the observed row **field for field**, including the `receipt: null` I flagged as
+-- undiagnosable — and it requires no HTTP call at all. Run 71942fbf ended around its 540-minute
+-- horizon; the agent chain fired once more afterwards, `ottoq-cpsat-propose` correctly declined a
+-- finished run, and the caller recorded the decline as a completed CP-SAT solve.
+--
+-- **THE DEFECT IS THE `??` DEFAULT.** `receipt.engine ?? "cp_sat_forward_lex"` names an engine
+-- when the reply named none. An absent engine means nothing ran, and defaulting it to the primary
+-- engine manufactures a success — the same class of defect as the deploy workflow's success line
+-- that printed "/health lists cp_sat_forward_lex" after a rollback, and as `cpsat_service`'s 3,124
+-- ledger rows that were never calls. Third instance in two days of a label being read as an event.
+--
+-- **What is true, and all that is true:** the agent layer works — Nemotron reads the board,
+-- reasons in the depot's own vocabulary, and emits a bounded objective, and that part is quoted
+-- below unchanged because it is real and it is logged. **The solver hop has never happened.**
+--
+-- The original paragraph follows, wrong, for the record:
+--
 -- **THE ONE THAT COMPLETED IS WORTH READING IN FULL**, because it is the first time the whole
 -- chain ran end to end. At 2026-09-21 05:12:10 UTC, tick 1137:
 --
@@ -74,6 +126,10 @@ SELECT source, declared_source, submitted_by_role, count(*) AS rows,
 -- objective, handed off, and CP-SAT answered. **And `receipt` is null, so nothing was proposed** —
 -- and nothing in the record says whether CP-SAT abstained on every row, whether the batch was
 -- empty, or whether the RPC simply returned nothing. That ambiguity is a defect in its own right.
+--
+-- ^^ END OF THE RETRACTED PARAGRAPH. The first two clauses are true and logged. "and CP-SAT
+-- answered" is false — see the retraction above. The `receipt: null` I called "a defect in its own
+-- right" was in fact the ONLY honest field in the row: nothing was proposed because nothing ran.
 
 SELECT enacted_action->'solver_handoff'->>'status'          AS handoff_status,
        enacted_action->'solver_handoff'->>'engine'          AS engine,
@@ -139,20 +195,42 @@ SELECT provider,
   FROM public.ottoq_model_call_ledger
  GROUP BY 1 ORDER BY 1;
 
--- ══ 4. WHAT MAY BE SAID TODAY, AND WHAT MAY NOT ════════════════════════════
+-- ══ 4. WHAT MAY BE SAID TODAY, AND WHAT MAY NOT (REWRITTEN AFTER THE RETRACTION) ══
 --
--- SAY: *"the agent chain runs end to end — Nemotron reads the board, chooses one of three bounded
--- objectives, and the CP-SAT service answers — and it has done so once, on run 71942fbf at
--- 05:12:10 UTC. The 175 handoffs before it timed out at a five-second abort, now raised to twenty
--- and instrumented. The CP-SAT proposals that reached the shield on that run — 255, of which 4
--- were enacted — came from the CI-runner path, not from the agent."*
+-- SAY: *"the agent layer works and is logged — Nemotron reads the board, reasons in the depot's own
+-- vocabulary, and emits one of three bounded objectives. The CP-SAT service is deployed and healthy,
+-- answering /health in 14 ms with `cp_sat_forward_lex` in its optimizer list, and the solver itself
+-- produces real proposals on this depot's live frame in 24–511 ms. **The hop between them has never
+-- once completed:** the service's own access log holds zero `POST /assign` lines. The CP-SAT
+-- proposals that reached the shield — 255 on run 71942fbf, 4 enacted — all came from the CI-runner
+-- path."*
 --
--- DO NOT SAY that CP-SAT is in the agent loop in production. One completed handoff that produced
--- no proposals is a wiring proof, not a working loop. The claim to earn next, and the query that
--- earns it, is a run on which `ottoq_model_call_ledger` holds `cpsat_service` rows with
--- `endpoint IS NOT NULL`, `outcome = 'answered'`, `proposals_out > 0`, AND matching
--- `ottoq_external_proposals` rows with `submitted_by_role = 'system:service_role'` and
--- `fire->>'submit_path' = 'edge:ottoq-cpsat-propose'`.
+-- DO NOT SAY the chain has run end to end. It has not, and I said it had for about an hour on the
+-- strength of an audit label. There is no completed solver hop to point at.
+--
+-- The claim to earn, and the query that earns it, unchanged: a run on which
+-- `ottoq_model_call_ledger` holds `cpsat_service` rows with `endpoint IS NOT NULL`,
+-- `outcome = 'answered'`, `proposals_out > 0`, AND matching `ottoq_external_proposals` rows with
+-- `submitted_by_role = 'system:service_role'` and
+-- `fire->>'submit_path' = 'edge:ottoq-cpsat-propose'`. **Note what the retraction adds: the ledger
+-- predicate alone is no longer enough, because `endpoint IS NOT NULL` is written by the caller.
+-- The independent witness is the box's own uvicorn access log, over SSM — `POST /assign` lines,
+-- counted on the box, by something that is not the thing making the claim.**
+--
+-- ══ 5. AND THE MEASUREMENT THAT SAYS WHY IT NEVER ARRIVES ═══════════════════
+--
+-- Run f13fc580 (seed 100021), with v9's instrumentation live, twelve attempts:
+--
+--   outcome=errored   n=12   latency 20005–20011 ms   http_status: 0 of 12   proposals: 0
+--
+-- **Twelve attempts clustered inside 6 ms of the 20-second ceiling, none carrying a status.** A
+-- solve of variable difficulty does not do that; a connection that never completes does. Combined
+-- with §4's zero-`POST /assign` and the box being idle at 0.14% CPU, the request is not reaching
+-- the box — so the cause is the address, the security group, or egress, and NOT the service.
+-- `OTTOQ_INTEL_URL` is a Supabase secret, not readable from here; the instance was stopped
+-- 2026-09-21 02:52 and started again, and it carries **no Elastic IP**, so a public address that
+-- changed on restart is the leading candidate and is checked in the next file rather than asserted
+-- here.
 --
 -- DO NOT quote "cpsat_service: N calls" from `ottoq_intelligence_ledger` without the
 -- `endpoint IS NOT NULL` predicate. Before v9 that count was 3,124 and the true number of calls
@@ -160,4 +238,4 @@ SELECT provider,
 -- the capture trigger still maps the label to the provider. Both numbers are in the table; only
 -- one of them is a call count.
 
--- OPEN-ITEM: PATH B has never produced a proposal. The v9 fix (20 s bound + per-attempt evidence rows) is deployed but unexercised -- it needs a live run where the agent chain fires and cpsat_service rows appear with endpoint IS NOT NULL and proposals_out > 0. Until that run exists, "CP-SAT is in the agent loop" is a wiring claim only. Tracked as G108.
+-- OPEN-ITEM: PATH B has never once reached the CP-SAT service -- zero POST /assign lines in the box's own access log -- and the "completed" handoff this file originally cited is retracted above as the skip branch mislabelled by orchestrator-agent's `receipt.engine ?? "cp_sat_forward_lex"` default. Two things are owed: (a) make /assign actually arrive, the leading candidate being a stale OTTOQ_INTEL_URL after the instance restarted without an Elastic IP; (b) delete the lying default so an absent engine can never be reported as the primary engine. Tracked as G108.
