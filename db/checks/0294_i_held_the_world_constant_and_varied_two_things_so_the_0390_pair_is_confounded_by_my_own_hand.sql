@@ -178,3 +178,56 @@ SELECT COALESCE(enacted_action->>'source', l2_engine, '(null)') AS src,
 -- **MAY NOT:** that the absolute proposal counts compare. 973 against 610 is three configuration
 -- changes as much as one code change; the abstention SHARE and per-vehicle ratio are the
 -- comparable figures, and even they inherit §2's caveat.
+
+-- ══ 6. THE FIVE KPIs FOR THE COMPLETED RUN, RECORDED BEFORE THEY ARE PURGED ══
+--
+-- Run `e8b8eb3e` completed at tick **1,189**, sim 09:47 CT, `failure_reason =
+-- 'run_governor: reached the 540 sim-minute ceiling'` — the designed end, not a fault — and one
+-- row in `ottoq_run_archives`. **`ottoq_kpi_five` reads `class='engine'` tables, so the next demo
+-- run deletes every figure below.** The archive keys the run; it does not keep the KPIs. Recording
+-- them here IS the "cite the run, not the table" discipline, applied to my own numbers.
+--
+--   run_key: pack robotaxi · scenario busy_day · seed 100020 · policy otto_q
+--            config_hash 0053a045e66e029a238004b70746cc56
+--            engine_hash 797d8dcef7db38efc22264308070737a
+--
+--                                        e8b8eb3e      c8f678fb (0288 §3)
+--   1  asset_hours_available_per_day       **48.04**        57.89
+--   2  service_point_turns_per_point_day    **3.40**         3.56
+--   3  peak_site_kw                      **1,113.8**            —
+--      peak_site_kw_demand               **1,105.3**            —
+--   4  touch_events_per_turn               **0.140**        1.091  ← see below
+--   5  p95_time_to_service_min              **58.1**         39.6
+--      p50_time_to_service_min               **0.6**            —
+--      returns_unserved                        **6**           11
+--
+--   `not_reproducible: []` — all eight published fields reproducible from this run id.
+--
+-- **KPI 4 IS `0391` WORKING, AND THE AUDIT BLOCK PROVES IT RATHER THAN ASSERTING IT.**
+-- `touch_events 75`, `touch_events_operator 75`, `touch_events_override 0`, and
+-- **`touch_events_override_flag_only 626`**. So the pre-`0391` headline would have been
+-- (75 + 626) / 537 = **1.305**, and the published figure is **0.140** — a 9.3x correction on this
+-- run, with the 626 excluded rows travelling beside it exactly as `0185`'s reversibility doctrine
+-- requires. **The comparison against `c8f678fb`'s 1.091 is therefore across two definitions and
+-- must not be read as an improvement in operations** — it is the same depot measured honestly.
+--
+-- **KPI 5 got WORSE and that is the expected direction.** p95 39.6 → 58.1 min on a run whose wave
+-- presented 46 vehicles wanting service against 24 at the same point. `returns_unserved` fell 11 →
+-- 6, so more vehicles were eventually served and the ones that waited waited longer — a queue
+-- deepening, not a failure. Both belong to `0288` §3's capacity wall, now seen at higher load.
+--
+-- **AND ONE DIAGNOSTIC I CANNOT EXPLAIN, FLAGGED RATHER THAN QUIETLY PASSED OVER.** KPI 1's audit
+-- block reads `hours_clipped_to_window = **-237.29**` with `dispatches_open_at_horizon = 1`.
+-- `0185`'s own reversibility note says *"KPI 1 asset_hours + audit.hours_clipped_to_window is the
+-- pre-0182 number"*, which here gives **-189.25 asset-hours** — a negative quantity of
+-- availability, which is not a quantity. A single dispatch open at the horizon cannot account for
+-- 237 hours (about ten days) on a nine-hour run in either direction, so **either the clip is
+-- measuring something other than what its name says, or KPI 1's numerator and this diagnostic
+-- disagree about their window.** `horizon_source` correctly reads `run_horizon`, so the bound is
+-- not `now()` and the headline is reproducible; it is the diagnostic that does not add up.
+-- **NOT INVESTIGATED HERE** — it is KPI 1's own machinery (`0182`), it does not affect the
+-- published figure or any claim in this file, and chasing it now would mean starting a fourth
+-- thread on a night that has already produced three self-retractions. Recorded so it cannot be
+-- lost, and it is the next thing to measure.
+
+SELECT jsonb_pretty(public.ottoq_kpi_five('e8b8eb3e-da9d-41ff-ab67-84b6998ba441')) AS kpis;
