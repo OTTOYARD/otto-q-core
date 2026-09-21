@@ -487,7 +487,8 @@ repo_manifest(version, name, file) AS (
     ('20260921000517'::text, 'an_abstention_is_not_a_claim_and_two_predicates_counted_it_as_one'::text, '0390_an_abstention_is_not_a_claim_and_two_predicates_counted_it_as_one.sql'::text),
     ('20260921001618'::text, 'kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour'::text, '0391_kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour.sql'::text),
     ('20260921002608'::text, 'the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible'::text, '0392_the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible.sql'::text),
-    ('20260921004457'::text, 'the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for'::text, '0393_the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for.sql'::text)
+    ('20260921004457'::text, 'the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for'::text, '0393_the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for.sql'::text),
+    ('20260921005249'::text, 'shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where'::text, '0394_shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
