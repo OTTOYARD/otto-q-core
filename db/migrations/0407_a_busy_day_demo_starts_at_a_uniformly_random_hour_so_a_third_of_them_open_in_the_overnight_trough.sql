@@ -93,6 +93,15 @@
 
 BEGIN;
 
+-- ALTER TABLE ... ADD COLUMN needs an AccessExclusiveLock on ottoq_scenarios, and
+-- ottoq-recert-runner (pg_cron, job 746) holds RowShare + AccessShare on that table for the whole
+-- length of every determinism pair -- measured at 281 seconds and counting. Without this, the
+-- request QUEUES, and an AccessExclusive request queued in front of new readers stalls the recert
+-- runner itself. Failing fast and retrying in a gap is strictly better than blocking the thing
+-- that certifies the engine. This is also why 0401 committed and this file did not: 0401 only does
+-- CREATE OR REPLACE FUNCTION, which never takes a table lock.
+SET LOCAL lock_timeout = '15s';
+
 DO $preflight$
 DECLARE v_n int;
 BEGIN
