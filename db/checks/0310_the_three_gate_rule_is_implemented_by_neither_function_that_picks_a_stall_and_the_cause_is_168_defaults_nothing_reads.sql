@@ -161,11 +161,17 @@
 -- reservation TTL the function already passes to `ottoq_reserve_stall`. Staging branch passes
 -- `p_staging_role => 'temp'` first, then NULL, preserving today's `(staging_role='temp') DESC`
 -- preference.
---   **AND A TRAP TO ENCODE RATHER THAN DISCOVER:** the helper's calendar predicate is
---   `b.sim_run_id = p_sim_run_id`. Called with `p_sim_run_id IS NULL` — which this function
---   permits, it null-guards the downlink — that comparison is never true, so the calendar gate
---   passes everything while LOOKING present. A null run must take a different path, not the
---   helper, or the fix becomes a decoration.
+--   **A TRAP I THOUGHT I HAD FOUND, AND THE CONSTRAINT SETTLES IT THE OTHER WAY —
+--   CORRECTED HERE RATHER THAN CARRIED FORWARD.** I wrote that the helper's calendar predicate is
+--   `b.sim_run_id = p_sim_run_id`, so a NULL run — which this function permits, it null-guards the
+--   downlink — makes the comparison never true and "the calendar gate passes everything while
+--   LOOKING present... or the fix becomes a decoration." **The mechanics are right; the conclusion
+--   is wrong.** Measured: `ottoq_stall_bookings.sim_run_id` is **NOT NULL**, **0 of 15,890** rows
+--   carry a null, and the EXCLUDE constraint is itself keyed `sim_run_id WITH =`. The calendar is
+--   **inherently run-scoped**, so for a NULL run there are provably no bookings to conflict with
+--   and admitting everything is CORRECT, not decorative. No special-casing is needed, and `0400`
+--   has none. Worth keeping as a worked example: the constraint definition answered a design
+--   question I was about to answer with a defensive branch.
 --
 -- **(b) `ottoq_replan_after_charger_fault` never reads its own gate's verdict.** It calls
 -- `ottoq_indepot_reassignment_guard` and uses **only** `v_gate->>'mode'`, for the return payload.
@@ -215,3 +221,44 @@ SELECT '-- effective defaults --',
        0;
 
 -- OPEN-ITEM: CLAUDE.md Part 3's three-gate rule (pointer AND calendar AND charger-not-Faulted) is implemented by NEITHER function that picks a charge stall, and they fail on different gates. ottoq.ottoq_stall_free_between -- the shared candidate source with SEVEN callers -- checks the calendar (state set deliberately aligned to the EXCLUDE constraint) and the charger (0372), but its pointer check sits behind calendar_occupancy_guard, whose catalog default is 1, whose call-site fallback is 0, and whose only row in the database belongs to a PURGED run: 0 of 22 surviving twin-depot runs ever had the pointer gate on. ottoq.ottoq_replan_after_charger_fault checks pointer and charger and reads NO calendar, and it writes no booking at all, so ottoq_stall_bookings_no_overlap_v3 never sees it -- which RETRACTS 0308 §2's claim that "the EXCLUDE constraint contains it downstream". The general cause is that ottoq_policy_get resolves run -> depot -> global -> the CALLER'S HARDCODED LITERAL and never reads ottoq_policy_param_catalog, so 168 declared defaults are consulted by nothing and the effective default of every knob is a literal at its call site. Five keys disagree with no global/depot row to settle it; the consequential one is deploy_peak_fraction, which reads 0.90 in ottoq_agent_board and ottoq_cil_propose and 0.55 in twin.ottoq_sim_advance_service_flow (the site that computes the deploy target), on 20 of 22 surviving twin-depot runs -- so the agent's +/-30% drift window is [0.63,1.0] around a board value of 0.90 while the engine runs 0.55, putting the value in force BELOW the floor of what the agent may request. Fix order in section 6: (a) migrate the replanner onto the helper as an INTERSECTION never a replacement, since the helper is looser on the pointer, and handle p_sim_run_id IS NULL explicitly or the calendar gate passes everything while looking present; (b) the replanner also ignores its own gate's `allowed` and its `rebook_required`; (c) deploy_peak_fraction 0.55-vs-0.90 is a product decision measurement cannot make; (d) calendar_occupancy_guard must not be switched on blind -- it changes the candidate set for all seven callers and forces a recert, so it batches with G111/G112, and ottoq_policy_get should read the catalog default or the next 168 knobs inherit this. Tracked as G114.
+
+-- ══ 7. `0400` IS WRITTEN AND PROVEN ON A ROLLED-BACK PROBE (items a + b) ═══
+--
+-- `db/migrations/0400` implements §6(a) and §6(b), as **PENDING** — `forces_recert` TRUE (a reroute
+-- landing on a different stall moves bookings, commands and the fingerprint), so per `0397` §1b it
+-- batches with G111's actor attribution and the G112 granularity decision rather than buying one
+-- fix for nine re-certifications. It joins `ottoq_stall_free_between` as an INTERSECTION, keeps
+-- every existing pointer predicate, and keeps each query's own ORDER BY, so the only behavioural
+-- change is that calendar-promised stalls stop being offered. Five preflight assertions, including
+-- the EXCLUDE state set still matching what the helper reads (the 2026-08-02 condition) and the
+-- top-N margin of the `p_limit` this file passes.
+--
+-- **PROBE 1, at the run's final clock (`b4d5f76d`, 2026-09-02 02:00 UTC) — the gate cost NOTHING,
+-- and that is reported because it is not the result I wanted.** dcfc 10 → 10, staging 113 → 113.
+-- The run's bookings end at **2026-09-02 01:48**, twelve minutes before its final clock, so at that
+-- instant nothing overlaps and a correct gate removes nothing. **A probe at a moment where the
+-- answer cannot differ proves the gate is wired and proves nothing about whether it binds** — the
+-- G28 trap, in a probe rather than in a rule. It also confirmed the helper's top-N hazard directly:
+-- `p_limit => 1` returns exactly 1 candidate, which is what preflight (5) guards.
+--
+-- **PROBE 2, at a MID-run clock (2026-09-01 12:00 UTC), is the one that binds:**
+--
+--   dcfc candidates, pointer+charger     **10**
+--   the same, with the calendar joined    **6**   → **4 removed**
+--
+-- Four of the ten stalls the pre-`0400` predicates would have offered were already promised by the
+-- calendar for `[12:00, 13:00)`. **State the limit of that number honestly:** `stalls.status` and
+-- `current_vehicle_id` are read as they stand NOW, against that run's HISTORICAL bookings, and the
+-- count omits the `reserved_by` clause for brevity — so 10 → 6 demonstrates that the added
+-- predicate binds and roughly how hard, and is **not** a reconstruction of the candidate set as it
+-- actually stood at 12:00 on that run.
+--
+-- **AND PROBE 1 CAUGHT §6(b) AS A LIVE DEFECT RATHER THAN AS A READING OF THE SOURCE**, which is
+-- the more valuable half. Calling the **pre-fix** function with a vehicle uuid that does not exist:
+--
+--   PRE-FIX   disposition=`requeued_same_class`  new_stall=`765adddb-3dc3-4cd4-be62-28c76ed8e737`
+--   POST-FIX  disposition=`gate_refused`         new_stall=`(null)`  reason=`vehicle_not_found`
+--
+-- So the old code really did reserve a real DCFC stall for a nonexistent vehicle — the guard had
+-- answered `allowed:false` and the function never asked. Not inferred from `prosrc`; executed.
+-- Both probes abort by `RAISE`, so the function replacement and every write are discarded.

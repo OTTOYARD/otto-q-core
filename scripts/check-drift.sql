@@ -493,7 +493,8 @@ repo_manifest(version, name, file) AS (
     ('20260921025959'::text, 'choose_the_clock_before_you_build_the_world_g107'::text, '0396_choose_the_clock_before_you_build_the_world_g107.sql'::text),
     ('20260921031935'::text, 'one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96'::text, '0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql'::text),
     ('20260921073824'::text, 'the_address_of_a_service_that_moves_belongs_in_data_g108'::text, '0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql'::text),
-    ('20260921122812'::text, 'the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96'::text, '0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql'::text)
+    ('20260921122812'::text, 'the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96'::text, '0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql'::text),
+    ('PENDING'::text, 'the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114'::text, '0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
