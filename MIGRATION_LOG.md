@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0398 — GENERATED, not a log
+## Index, 0134–0399 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -381,7 +381,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0396](db/migrations/0396_choose_the_clock_before_you_build_the_world_g107.sql) | `20260921025959` | yes — ledger | G107 — CHOOSE THE CLOCK BEFORE YOU BUILD THE WORLD |
 | [0397](db/migrations/0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql) | `20260921031935` | yes — ledger | G96, STEPS 0 AND 1. **THE BESS GETS ONE WORD FOR REST.** Three places in this schema declare |
 | [0398](db/migrations/0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql) | `20260921073824` | yes — ledger | G108, THE LAST LINK. **The CP-SAT service's address lives in a deploy-time secret, and the |
+| [0399](db/migrations/0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql) | `20260921122812` | yes — ledger | G96, STEP 2 — THE LAST ONE. **SM.006 has had a callable evaluator and no caller since it |
 
-261 migrations indexed.
+262 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

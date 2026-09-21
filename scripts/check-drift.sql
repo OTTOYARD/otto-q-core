@@ -492,7 +492,8 @@ repo_manifest(version, name, file) AS (
     ('20260921012521'::text, 'my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart'::text, '0395_my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart.sql'::text),
     ('20260921025959'::text, 'choose_the_clock_before_you_build_the_world_g107'::text, '0396_choose_the_clock_before_you_build_the_world_g107.sql'::text),
     ('20260921031935'::text, 'one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96'::text, '0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql'::text),
-    ('20260921073824'::text, 'the_address_of_a_service_that_moves_belongs_in_data_g108'::text, '0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql'::text)
+    ('20260921073824'::text, 'the_address_of_a_service_that_moves_belongs_in_data_g108'::text, '0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql'::text),
+    ('20260921122812'::text, 'the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96'::text, '0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
