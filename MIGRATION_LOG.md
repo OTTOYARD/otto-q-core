@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0395 — GENERATED, not a log
+## Index, 0134–0396 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -378,7 +378,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0393](db/migrations/0393_the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for.sql) | `20260921004457` | yes — ledger | `0392` SEEDED `orchestrator_agent` AS `shield_expected = true` AND CALLED IT "THE ONE PATH |
 | [0394](db/migrations/0394_shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where.sql) | `20260921005249` | yes — ledger | `0392`'s `shield_expected` ASKS *"SHOULD THIS BRANCH PASS THE PROBE ON THIS ROW?"* — AND |
 | [0395](db/migrations/0395_my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart.sql) | `20260921012521` | yes — ledger | I GUARDED A ONE-SHOT CRON JOB WITH `IF EXISTS (SELECT ...)` AND IT **STARTED TWO DEMO RUNS |
+| [0396](db/migrations/0396_choose_the_clock_before_you_build_the_world_g107.sql) | `20260921025959` | yes — ledger | G107 — CHOOSE THE CLOCK BEFORE YOU BUILD THE WORLD |
 
-258 migrations indexed.
+259 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

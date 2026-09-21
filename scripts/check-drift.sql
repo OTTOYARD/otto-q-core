@@ -489,7 +489,8 @@ repo_manifest(version, name, file) AS (
     ('20260921002608'::text, 'the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible'::text, '0392_the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible.sql'::text),
     ('20260921004457'::text, 'the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for'::text, '0393_the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for.sql'::text),
     ('20260921005249'::text, 'shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where'::text, '0394_shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where.sql'::text),
-    ('20260921012521'::text, 'my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart'::text, '0395_my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart.sql'::text)
+    ('20260921012521'::text, 'my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart'::text, '0395_my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart.sql'::text),
+    ('20260921025959'::text, 'choose_the_clock_before_you_build_the_world_g107'::text, '0396_choose_the_clock_before_you_build_the_world_g107.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
