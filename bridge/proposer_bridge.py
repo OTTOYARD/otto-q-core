@@ -366,7 +366,7 @@ def suppress_not_due(frame: dict, not_due_until: dict[str, datetime],
                      clock: datetime | None) -> tuple[dict, int]:
     """Drop the vehicles whose own earlier abstention said they are not due yet.
 
-    ══ 0295 / G102. AN ABSTENTION CARRIES ITS OWN DUE TIME AND NOTHING READ IT ══
+    ══ 0294 / G102. AN ABSTENTION CARRIES ITS OWN DUE TIME AND NOTHING READ IT ══
 
     `only_due_now`'s docstring says a not-due row *"is re-offered by the next fire,
     whose plan will have moved it forward."* Measured on run `e8b8eb3e`'s return
@@ -805,7 +805,7 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
     #: 'first' until something has woken it; see _wait_for_next_tick.
     trigger: str = "first"
     last_fired_tick: int | None = None
-    #: 0295 / G102. vehicle_id -> the sim clock at which its own not-due abstention
+    #: 0294 / G102. vehicle_id -> the sim clock at which its own not-due abstention
     #: becomes due. This loop's memory of what it has already said, and the only state
     #: that survives between fires. One invocation, never persisted; see the suppression
     #: site for why forgetting between CI runs is the correct behaviour rather than a
@@ -852,7 +852,7 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                 #: Read what came back, never what was asked for.
                 if not allow_blind_frame:
                     _require_seeing_frame(frame, sim_run_id)
-                #: 0295 / G102. Withhold the vehicles whose own earlier abstention said they
+                #: 0294 / G102. Withhold the vehicles whose own earlier abstention said they
                 #: are not due yet. See suppress_not_due for the measurement and the reasoning.
                 fire_clock = run.get("sim_clock_current")
                 frame, n_suppressed_not_due = suppress_not_due(
@@ -874,7 +874,7 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                               serviceable_states=serviceable_states,
                               allow_rejection=allow_rejection)
                 rows, record = result["rows"], result["fire"]
-                #: 0295 / G102. Both halves on the record: how many vehicles this fire withheld
+                #: 0294 / G102. Both halves on the record: how many vehicles this fire withheld
                 #: because their own earlier abstention is not due yet, and how many it is now
                 #: carrying. Published rather than silent, because a suppressed vehicle is a
                 #: vehicle the ledger would otherwise show no row for -- and "absent because
