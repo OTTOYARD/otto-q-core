@@ -207,3 +207,117 @@ SELECT state, COALESCE(release_reason,'(null)') AS release_reason, count(*) AS n
   FROM public.ottoq_stall_bookings GROUP BY 1,2 ORDER BY n DESC;
 
 -- OPEN-ITEM: under the otto_q policy the ONLY live path that starts a charging session is twin.ottoq_sim_reconcile_charge_sessions, whose gate admits a vehicle only if current_state IS ALREADY 'charging_dcfc'/'charging_l2' -- it is a reconciler, not an initiator. twin.ottoq_sim_auto_charge_assign_tick, which would assign, is reachable only from public.ottoq_greedy_tick. So a vehicle can occupy a charge stall for its full booked window, have the booking counted as a completed turn (correctly -- occupancy is real and KPI #2 is NOT inflated), and never be charged, because no session means no energy: the only in-run charging path iterates active ocpp_sessions. Magnitude is UNKNOWN, not "about half" -- the counts drifted 362 to 484 mid-measurement while the 0399 recert sweep added runs, and my attempt to confirm the cause from vehicle_state_change evaluations failed as a witness (false for 198 of 200 bookings that DID have a session, because that probe is one day old and the table is class='engine'). Owed: re-derive on one named run; find what should move a vehicle to charging_* on arrival and whether it runs; make a charge turn with no session an asserted condition per 2.6. Do NOT widen the reconciler's gate. Separately ottoq_replan_after_charger_fault, the fault recovery path, checks the pointer and the charger but NOT the calendar, against CLAUDE.md's three-gate rule. Tracked as G112.
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ══ 7. RETRACTION, SAME DAY, 13:30 UTC. §3's HEADLINE IS WRONG AS A GENERAL
+--       CLAIM, AND §5's REFUSAL TO STATE A MAGNITUDE IS THE ONLY THING THAT
+--       SAVED IT FROM BEING QUOTED. The wrong text above is kept.
+-- ══════════════════════════════════════════════════════════════════════════════
+--
+-- **WHAT I GOT WRONG.** §3 says the only live session-starter under `otto_q` is the reconciler,
+-- and infers that a vehicle can hold a charge stall and never be charged. The premise is true and
+-- the inference does not follow, because **I never asked which function sets `current_state` in
+-- the first place.** It is `twin.ottoq_sim_confirm_commands`, on command confirmation — and it is
+-- in the list of `current_state` writers I had already pulled. I read the list for the reconciler
+-- and did not read it for the initiator.
+--
+-- **AND THE DEFECT I "FOUND" IS DOCUMENTED IN THAT FUNCTION AS ALREADY FOUND AND FIXED**, in a
+-- comment that states my finding more exactly than I did:
+--
+--     0039 COMPLETION: A CONFIRMED COMMAND CHANGES THE VEHICLE.
+--     Migration 0039 moved the state write out of ottoq_decide_tick and into "the twin on
+--     command confirmation" -- and this function never implemented that half. It had no
+--     UPDATE vehicles at all. So a confirmed begin_charge seated the car in the stall but
+--     never made it charging_dcfc, and twin.ottoq_sim_reconcile_charge_sessions only opens a
+--     session for a vehicle ALREADY in charging_dcfc/charging_l2. The chain was cut in the
+--     middle: measured 135 begin_charge executed, 0 ocpp_sessions.
+--
+-- So the chain is **decide_tick → `begin_charge` carrying `new_state` in its payload →
+-- confirm_commands writes `current_state` → the reconciler opens the session**, the initiator
+-- exists, and the reconciler is correctly a reconciler. §3's "structurally unable" is true of the
+-- reconciler in isolation and false of the engine.
+--
+-- ══ 7a. THE MEASUREMENT THAT SETTLES IT, PER RUN RATHER THAN OVER THE TABLE ══
+--
+-- The same query as §5, grouped by run and ordered by start — which is what `0305` and rule 8 both
+-- say to do and what §5 conspicuously did not:
+--
+--   run        ticks  run_by          occupied charge turns  with session  none
+--   f13fc580   1136   operator_demo            84                 84        **0**
+--   91e511dd     12   cert_harness             85                 40         45
+--   e164f488     12   cert_harness             85                 40         45
+--   186be0d1     12   cert_harness             89                 47         42
+--   7d2ea57b     12   cert_harness             89                 47         42
+--   06988541     12   cert_harness             94                 46         48
+--   8e36e0b7     12   cert_harness             94                 46         48
+--   445537be     12   cert_harness             82                 38         44
+--   851a0ace     12   cert_harness             82                 38         44
+--   0e7b51ee     24   cert_harness            104                 49         55
+--   676c3840     24   cert_harness            104                 49         55
+--   dcc249c8     24   cert_harness            112                 54         58
+--   ea3ee9ed     24   cert_harness            112                 54         58
+--   b4d5f76d     48   cert_harness            183                109         74
+--   bf895408     48   cert_harness            183                109         74
+--
+-- **ZERO of 84 on the only full-length run under the real policy, and roughly half on every
+-- certification pair.** The population is entirely in the cert fixture. So the sentence *"a
+-- vehicle can occupy a charge stall for its whole booked window and never be charged"* is
+-- **retracted as a statement about OTTO-Q in operation**: on the run that actually orchestrated a
+-- nine-hour sim day, every occupied charge turn had a charging session.
+--
+-- Note also that the pairs agree with each other EXACTLY — 85/40/45 twice, 183/109/74 twice —
+-- which is determinism doing its job and is the tell that this is fixture behaviour rather than
+-- noise.
+--
+-- ══ 7b. WHAT SURVIVES, AND IT IS A DIFFERENT AND SMALLER FINDING ════════════
+--
+-- **The determinism canon certifies a world in which about half the charge turns never charge.**
+-- All nine canon columns are 12/24/48-tick `cert_harness` pairs, and in every one of them ~50% of
+-- occupied charge turns have no session. That does not invalidate a single verdict — the arms are
+-- byte-identical, which is the whole claim — but it is the **G25/G28 shape**: the comparison is
+-- narrower than the thing it is trusted to cover. A pair can be perfectly reproducible on a world
+-- where the charging chain is half inert, and no atom would notice, because both arms are equally
+-- inert.
+--
+-- Two candidate causes, neither established here and both cheap to separate: **(i) truncation** —
+-- a 12-tick run is ~6 sim-minutes against a 31–44 minute charge window, so the confirm → state →
+-- session chain may simply not have enough ticks; **(ii) the arm fixtures seat vehicles
+-- directly** — `ottoq_cert_arm*` and `ottoq_tick_invariance_reset_fleet` both write
+-- `vehicles.current_state` and `ottoq_tick_invariance_reset_fleet` even calls
+-- `ottoq_sim_start_charge_session` itself, so a cert world may begin mid-service in a state the
+-- normal chain never produces. (ii) is the more interesting because it would mean the fixture, not
+-- the engine, is what the canon measures at the charging layer.
+--
+-- **And one thing in this file is untouched by the retraction:** §2's finding that
+-- `ottoq.ottoq_replan_after_charger_fault` gates on the pointer and the charger but never reads
+-- the calendar, against CLAUDE.md's three-gate rule. That is a source fact about the fault
+-- recovery path and does not depend on any of the above.
+--
+-- **THE LESSON, stated so it generalises past this file.** §5 refused to publish a magnitude
+-- because the counts drifted, and that refusal is the only reason a wrong claim never got a
+-- number attached to it. But the drift was the SYMPTOM; the disease was aggregating across runs at
+-- all. One run ordered by time would have shown this in the first query. *"Cite the run, never the
+-- table"* is not advice about freshness — it is advice about **populations**, and a table is a
+-- population made of incomparable parts.
+
+-- The per-run split, so the retraction is reproducible rather than asserted.
+WITH cb AS (
+  SELECT b.sim_run_id, b.vehicle_id, b.during
+    FROM public.ottoq_stall_bookings b
+    JOIN public.stalls st ON st.id = b.stall_id
+   WHERE b.purpose IN ('charge_dcfc','charge_l2')
+     AND b.state = 'done' AND b.release_reason = 'window_elapsed_occupied'
+     AND st.depot_id = '11111111-1111-1111-1111-111111111111'
+)
+SELECT r.started_at, left(r.sim_run_id::text,8) AS run, r.tick_count, r.run_by,
+       count(*) AS occupied_charge_turns,
+       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.ocpp_sessions s
+         WHERE s.sim_run_id = cb.sim_run_id AND s.vehicle_id = cb.vehicle_id
+           AND tstzrange(s.started_at, COALESCE(s.ended_at, upper(cb.during)),'[]') && cb.during)) AS with_session,
+       count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM public.ocpp_sessions s
+         WHERE s.sim_run_id = cb.sim_run_id AND s.vehicle_id = cb.vehicle_id
+           AND tstzrange(s.started_at, COALESCE(s.ended_at, upper(cb.during)),'[]') && cb.during)) AS no_session
+  FROM cb JOIN public.ottoq_sim_runs r ON r.sim_run_id = cb.sim_run_id
+ GROUP BY 1,2,3,4 ORDER BY r.started_at;
+
+-- OPEN-ITEM: G112 RESTATED. The claim that a vehicle can occupy a charge stall and never be charged is RETRACTED as a statement about operation -- measured per run, the full-length operator demo f13fc580 shows 84 of 84 occupied charge turns WITH a charging session, and the entire no-session population sits in the 12/24/48-tick cert_harness pairs at ~50%. The initiator I failed to look for is twin.ottoq_sim_confirm_commands, whose own comment documents this exact defect as already found and fixed (0039: "135 begin_charge executed, 0 ocpp_sessions"). WHAT SURVIVES is smaller and still real: all nine determinism canon columns are cert pairs, so the canon certifies a world where about half the charge turns never charge -- the G25/G28 shape, where the comparison is narrower than what it is trusted to cover, and no atom notices because both arms are equally inert. Separate the two candidate causes: truncation (6 sim-minutes against a 31-44 minute charge window) versus the arm fixtures seating vehicles directly (ottoq_tick_invariance_reset_fleet calls ottoq_sim_start_charge_session itself). Also untouched by the retraction: ottoq_replan_after_charger_fault reads the pointer and the charger but not the calendar, against the three-gate rule. Tracked as G112.
