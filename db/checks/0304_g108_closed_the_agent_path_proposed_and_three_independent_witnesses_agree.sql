@@ -203,4 +203,52 @@ SELECT left(b.booking_id::text,8) AS booking, s.stall_code, left(b.vehicle_id::t
  WHERE b.source = 'forward_lex'
  ORDER BY b.booked_at DESC LIMIT 6;
 
+-- ══ 8. AND THE LAST LIVE PIECE OF 0301's DEFECT IS NOW FIXED (orchestrator v29) ══
+--
+-- §5 and 0302 §4 both flagged that the retraction was only half repaired: `ottoq-cpsat-propose`
+-- v10 made its decline unmistakable in its own reply (`{ok:true, skipped, engine:null,
+-- solver_ran:false}`), but the LIE WAS IN THE CALLER. `ottoq-orchestrator-agent` read
+--
+--     engine: receipt.engine ?? "cp_sat_forward_lex"
+--
+-- and `??` falls through on **null as well as undefined** — so the bridge setting `engine: null`
+-- was not enough on its own, and that is precisely why this line had to change rather than only
+-- the bridge. Deployed as v29:
+--
+--   * a reply carrying `skipped` records `status:"skipped", engine:null, solver_ran:false`;
+--   * the engine is **never defaulted** — `receipt.engine ?? null`, because an absent engine
+--     means nothing ran;
+--   * `solver_ran` and the bridge's `assign` block are carried onto the audit row;
+--   * `solverAccepted` — which drives both the `verb` and `outcome_status` — counts only
+--     "completed" and "fallback", so a skip can no longer produce `analyze_and_solve`/`enacted`.
+--
+-- **Verified live at 08:02:50 UTC**, one tick after deploy:
+--
+--   status completed · engine cp_sat_forward_lex · **solver_ran true**
+--   **assign { rows 6, real_rows 0, latency_ms 24, endpoint_source db:ottoq_service_endpoints }**
+--   verb analyze_and_solve · outcome_status enacted
+--
+-- Note what that row now says that the old one could not: the solver ran, answered in 24 ms, and
+-- proposed **nothing** (6 rows, 0 real). A bare "completed" can no longer stand in for "something
+-- was proposed" — the numbers are on the row. The 08:02:13 row immediately before it still reads
+-- `solver_ran: null`, which dates the deploy precisely.
+--
+-- **STILL UNVERIFIED, and deliberately not claimed:** the skip branch itself. It fires only when
+-- the agent chain ticks against a run that is no longer `running`, which is what happened at
+-- 05:12:10 and produced the false "completed". Run f13fc580 has not ended yet. The check is one
+-- query once it does — the last `orchestrator_agent` decision of the run must read
+-- `status:"skipped"`, `engine:null`, `solver_ran:false`, and a verb that is not
+-- `analyze_and_solve`.
+
+SELECT to_char(created_at,'HH24:MI:SS') AS at_utc,
+       enacted_action->'solver_handoff'->>'status'      AS handoff_status,
+       enacted_action->'solver_handoff'->>'engine'      AS engine,
+       enacted_action->'solver_handoff'->>'solver_ran'  AS solver_ran,
+       enacted_action->'solver_handoff'->'assign'       AS assign,
+       enacted_action->>'verb'                          AS verb,
+       outcome_status
+  FROM public.ottoq_decisions
+ WHERE resolved_action_context = 'orchestrator_agent'
+ ORDER BY created_at DESC LIMIT 8;
+
 -- OPEN-ITEM: G109 -- CP-SAT returned two assign_stall proposals for the SAME stall (609910b1, the depot's only offerable charge stall) in one batch at 07:53:12, while _shared/agent_solver_chain.ts asserts "one-vehicle/one-stall constraints remain structural in the LP". Either the LP does not enforce it or the rows are deliberate ranked alternatives and the comment must say so. Contained today by ottoq_stall_bookings' EXCLUDE constraint and by the decide path disposing one proposal per entity, but that containment disappears if CP-SAT is ever promoted from proposer to decide-path successor. Also still unclaimed: no agent-path CP-SAT proposal has yet been ENACTED (both were pending at capture).
