@@ -809,3 +809,206 @@ def test_the_loop_actually_waits_on_the_tick():
     assert src.index("if follow_ticks:") < src.index("trigger = \"interval\"")
     # and the reason travels on the fire record
     assert '"fire_trigger"' in src and '"ticks_since_last_fire"' in src
+
+
+# ---------------------------------------------------------------------------
+# 0389 / 0282: --site auto and --max-wall-s. Both exist because of measured
+# failures of the scheduled loop, so both are tested at the boundary that
+# failed rather than only where they are convenient to assert.
+# ---------------------------------------------------------------------------
+
+def test_site_auto_refuses_offline_because_there_is_nothing_to_ask(tmp_path, capsys):
+    """`--site auto` reads the descriptor from the database, so it needs --dsn.
+
+    The failure mode this forecloses is silent: offline, `auto` is not a path, so
+    _load_json would raise a FileNotFoundError naming a file called "auto" and the
+    reader would go looking for a missing site file that never existed.
+    """
+    with pytest.raises(SystemExit) as e:
+        pb.main(["--run", RUN, "--depot", DEPOT, "--site", "auto"])
+    assert e.value.code == 2
+    assert "needs --dsn" in capsys.readouterr().err
+
+
+def test_site_auto_reaches_run_live_and_does_not_read_a_file(monkeypatch):
+    seen = {}
+
+    def spy(dsn, **kw):
+        seen.update(kw)
+        return []
+
+    monkeypatch.setattr(pb, "run_live", spy)
+    #: if anything tried to load "auto" as a path this would raise instead.
+    monkeypatch.setattr(pb, "_load_json",
+                        lambda p: (_ for _ in ()).throw(AssertionError(f"read {p!r}")))
+    assert pb.main(["--run", "auto", "--depot", DEPOT, "--site", "auto",
+                    "--dsn", "postgresql://x"]) == 0
+    assert seen["site_auto"] is True
+    assert seen["site"] == {}
+
+
+def test_max_wall_s_reaches_run_live(monkeypatch, tmp_path):
+    site = tmp_path / "site.json"
+    site.write_text(json.dumps(SITE))
+    seen = {}
+    monkeypatch.setattr(pb, "run_live", lambda dsn, **kw: seen.update(kw) or [])
+    assert pb.main(["--run", "auto", "--depot", DEPOT, "--site", str(site),
+                    "--dsn", "postgresql://x", "--max-wall-s", "780"]) == 0
+    assert seen["max_wall_s"] == 780.0
+    #: absent means unbounded, which is the pre-0282 behaviour and must stay the default.
+    seen.clear()
+    assert pb.main(["--run", "auto", "--depot", DEPOT, "--site", str(site),
+                    "--dsn", "postgresql://x"]) == 0
+    assert seen["max_wall_s"] is None
+
+
+def test_fetch_site_refuses_a_descriptor_the_solver_cannot_use():
+    """0389's floor asserted on THIS side too.
+
+    solvers/cpsat/model.py spends power_cap_kw_hard as a NewIntVar bound, and
+    OR-Tools 9.15.6755 raises TypeError on a non-integral one -- reported as a
+    solver fault rather than the data fault it is. Both halves assert it.
+    """
+    ok = pb._fetch_site(FakeCur(one=({"power_cap_kw_hard": 595,
+                                      "power_soft_target_kw": 595},)),
+                        DEPOT, RUN, None)
+    assert ok["power_cap_kw_hard"] == 595 and isinstance(ok["power_cap_kw_hard"], int)
+
+    with pytest.raises(pb.BridgeError, match="power_soft_target_kw"):
+        pb._fetch_site(FakeCur(one=({"power_cap_kw_hard": 595},)), DEPOT, RUN, None)
+
+    with pytest.raises(pb.BridgeError, match="non-integral"):
+        pb._fetch_site(FakeCur(one=({"power_cap_kw_hard": 659.5,
+                                     "power_soft_target_kw": 595},)),
+                       DEPOT, RUN, None)
+
+
+def test_fetch_site_accepts_a_zero_cap_rather_than_flooring_it_up():
+    """A zero cap is a legitimate MPC decision: no charging right now.
+
+    Returning it truthfully makes the model INFEASIBLE, which run_live already
+    records as status='empty' with "solver declined the frame" (L-62). Flooring it
+    to 1 would let a charge through against a cap of nothing.
+    """
+    site = pb._fetch_site(FakeCur(one=({"power_cap_kw_hard": 0,
+                                        "power_soft_target_kw": 0},)),
+                          DEPOT, RUN, None)
+    assert site["power_cap_kw_hard"] == 0
+
+
+# ── 0295 / G102: an abstention carries its own due time ────────────────────────
+def _not_due_row(vid, start):
+    """A row shaped exactly as only_due_now emits a not-due abstention."""
+    return {"action_context": "stall_assignment", "entity_type": "vehicle", "entity_id": vid,
+            "source": "forward_lex",
+            "proposal": {"verb": "assign_stall", "abstain": True, "vehicle_id": vid,
+                         "rationale": {"optimizer": "forward_lex", "planned_start_min": start,
+                                       "abstained_by": "bridge:not_due"},
+                         "resolved_action_context": "stall_assignment"}}
+
+
+def test_remember_not_due_stores_the_moment_the_plan_comes_into_the_window():
+    from datetime import datetime, timedelta, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    seen: dict = {}
+    pb.remember_not_due([_not_due_row(V1, 131)], seen, clock, start_within_min=30)
+    #: 131 minutes out, a 30-minute window: due in 101 minutes, not in 131.
+    assert seen[V1] == clock + timedelta(minutes=101)
+
+
+def test_remember_not_due_ignores_rows_it_cannot_justify():
+    from datetime import datetime, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    seen: dict = {}
+    #: a live assignment, a proposer-side abstention, and an unreadable start.
+    bad = _not_due_row(V2, 60)
+    bad["proposal"]["rationale"]["planned_start_min"] = "soon"
+    other = _not_due_row(V3, 90)
+    other["proposal"]["rationale"]["abstained_by"] = "proposer:no_capable_point"
+    pb.remember_not_due([_row(V1, S1, 0), bad, other], seen, clock, start_within_min=30)
+    assert seen == {}
+    #: and no clock is fail-open too: nothing is remembered, so nothing is withheld.
+    pb.remember_not_due([_not_due_row(V1, 131)], seen, None, start_within_min=30)
+    assert seen == {}
+
+
+def test_suppress_not_due_withholds_only_while_the_vehicle_is_not_yet_due():
+    from datetime import datetime, timedelta, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    frame = {"vehicles": [{"id": V1}, {"id": V2}, {"id": V3}]}
+    seen = {V1: clock + timedelta(minutes=101),   # not due
+            V2: clock - timedelta(minutes=1)}     # became due a minute ago
+    out, n = pb.suppress_not_due(frame, seen, clock)
+    assert n == 1
+    assert [v["id"] for v in out["vehicles"]] == [V2, V3]
+    #: the ORIGINAL frame is untouched -- it is hashed into the fire record.
+    assert len(frame["vehicles"]) == 3
+
+
+def test_suppress_not_due_is_a_no_op_without_a_clock_or_a_memory():
+    from datetime import datetime, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    frame = {"vehicles": [{"id": V1}]}
+    assert pb.suppress_not_due(frame, {}, clock) == (frame, 0)
+    assert pb.suppress_not_due(frame, {V1: clock}, None) == (frame, 0)
+
+
+def test_a_replan_that_moves_earlier_shortens_the_suppression():
+    from datetime import datetime, timedelta, timezone
+    clock = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+    seen: dict = {}
+    pb.remember_not_due([_not_due_row(V1, 200)], seen, clock, start_within_min=30)
+    assert seen[V1] == clock + timedelta(minutes=170)
+    later = clock + timedelta(minutes=10)
+    pb.remember_not_due([_not_due_row(V1, 45)], seen, later, start_within_min=30)
+    #: overwritten, not trapped by the first answer.
+    assert seen[V1] == later + timedelta(minutes=15)
+
+
+# ── 0396 / G105: the arming gate conflated two independent CP-SAT paths ────────
+# Reuses FakeCur and _arming from above. My first draft of this block defined its own
+# _FakeCur AND its own _arming, and the second SHADOWED the existing helper at line 658 --
+# breaking two passing tests that call it with no arguments. Rule 5 applies to tests too.
+
+
+def _receipt(verdict, missing=None):
+    return ({"ok": True, "receipts": [], "arming": dict(
+        _arming(verdict, missing), primary_proposer={"reachable": False, "fires": 0})},)
+
+
+def test_armed_proceeds_and_is_not_annotated():
+    out = pb._arm_run(FakeCur(one=_receipt("armed")), RUN, pb.ARMED_BY)
+    assert out["verdict"] == "armed"
+    assert "accepted_despite_verdict" not in out
+
+
+def test_armed_primary_unreachable_proceeds_because_it_describes_the_other_path():
+    """The EC2 path being dead must not stop the loop that solves in the runner.
+
+    Measured on run c9b0a87e at 01:26 UTC: the job died on this verdict with `missing []` --
+    every dial set. PATH A (this loop, OR-Tools inside the CI runner) is also the only thing
+    that can make fires > 0, so refusing on it is refusing to do the very thing whose absence
+    is the complaint.
+    """
+    out = pb._arm_run(FakeCur(one=_receipt("armed_primary_unreachable")), RUN, pb.ARMED_BY)
+    assert out["verdict"] == "armed_primary_unreachable"
+    #: accepted, and NEVER silently: the annotation rides the dict the caller already logs.
+    assert "does not use" in out["accepted_despite_verdict"]["why"]
+    assert out["accepted_despite_verdict"]["verdict"] == "armed_primary_unreachable"
+
+
+def test_a_genuinely_unarmed_run_is_still_refused():
+    """The permit is narrow: anything meaning "the dials are NOT set" must still raise."""
+    for verdict in ("not_armed", "partial", "unknown_future_value", None):
+        with pytest.raises(pb.BridgeError) as exc:
+            pb._arm_run(FakeCur(one=_receipt(verdict, ["cuopt_propose_enabled"])),
+                        RUN, pb.ARMED_BY)
+        assert "arming verdict" in str(exc.value)
+        assert "cuopt_propose_enabled" in str(exc.value)
+
+
+def test_widening_the_verdicts_did_not_widen_ok_false():
+    with pytest.raises(pb.BridgeError) as exc:
+        pb._arm_run(FakeCur(one=({"ok": False, "arming": _arming("armed")},)),
+                    RUN, pb.ARMED_BY)
+    assert "did not confirm the arming" in str(exc.value)

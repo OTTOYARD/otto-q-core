@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0338 — GENERATED, not a log
+## Index, 0134–0404 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -324,7 +324,74 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0336](db/migrations/0336_the_proposal_finalizer_accepts_the_kernel_tick_type.sql) | `20260917122803` | yes — ledger | Live proof on Peak Turnover run 1ac6b6a4 showed 397 deterministic beats |
 | [0337](db/migrations/0337_the_agent_chain_gets_first_refusal_before_greedy_dispatch.sql) | `20260917123453` | yes — ledger | Run a7a364e7 proved Nemotron, policy enactment and the deterministic kernel, |
 | [0338](db/migrations/0338_one_inflight_agent_gets_a_bounded_solver_window.sql) | `20260917124150` | yes — ledger | Live run 911a5d0d measured Nemotron at about 29 seconds. A one-beat refusal |
+| [0339](db/migrations/0339_the_charge_stall_was_reserved_before_any_solver_could_see_it.sql) | `20260919042514` | yes — ledger | CP-SAT WAS MADE THE PRIMARY PROPOSER AND HAS PROPOSED NOTHING SINCE, |
+| [0340](db/migrations/0340_every_external_model_call_gets_a_ledger_that_outlives_its_run.sql) | `20260919045051` | yes — ledger | THE THREE INTELLIGENCE PATHS KEEP NO DURABLE PER-CALL RECORD, AND THE |
+| [0341](db/migrations/0341_the_intelligence_view_dropped_two_thirds_of_its_own_rows.sql) | `20260919045936` | yes — ledger | THE VIEW 0340 SHIPPED COUNTED 515 OF 1,676 ROWS AND REPORTED THE OTHER |
+| [0342](db/migrations/0342_the_agent_never_learns_what_the_kernel_did_with_its_objective.sql) | `20260919052746` | yes — ledger | THE LOOP RUNS AGENT -> SOLVER -> KERNEL AND STOPS. NOTHING COMES BACK |
+| [0343](db/migrations/0343_the_review_joined_on_the_tick_and_the_chain_crosses_ticks.sql) | `20260919053350` | yes — ledger | 0342's REVIEW REPORTED "kernel: enacted 0, solver: null" FOR A CHAIN |
+| [0344](db/migrations/0344_the_purge_cannot_complete_and_the_twin_start_door_has_no_handler.sql) | `20260919154650` | yes — ledger | ottoq_purge_prior_runs RAISES, ottoq_start_demo_run DOES NOT CATCH IT, |
+| [0345](db/migrations/0345_the_purge_deletes_engine_tables_alphabetically_not_by_dependency.sql) | `20260919155936` | yes — ledger | "CHILDREN FIRST" WAS ORDER BY table_name. THAT IS ALPHABETICAL, NOT |
+| [0346](db/migrations/0346_the_cockpits_solver_join_has_never_matched_a_row.sql) | `20260919161259` | yes — ledger | THE OTTO-TWIN COCKPIT HAS DISPLAYED "CP-SAT" AND ZERO THROUGHPUT FOR |
+| [0347](db/migrations/0347_one_missing_index_made_the_twin_start_door_cost_six_thousand_gigabytes.sql) | `20260919163943` | yes — ledger | THE PURGE IS NOT BLOCKED ANY MORE. IT IS QUADRATIC. ONE UNINDEXED |
+| [0348](db/migrations/0348_a_six_row_table_held_the_twin_start_door_shut_because_its_guard_never_learned_the_purge_protocol.sql) | `20260919170057` | yes — ledger | FOUR ENGINE TABLES ARE APPEND-ONLY. THREE LET THE PURGE THROUGH. THE |
+| [0349](db/migrations/0349_a_run_reads_armed_while_its_rank_zero_proposer_is_unreachable.sql) | `20260919173442` | yes — ledger | THE ATTESTATION SAYS "ARMED, 7 OF 7". THE RANK-0 PROPOSER HAS NOT RUN |
+| [0350](db/migrations/0350_the_agent_orchestrates_a_depot_from_eleven_hundred_characters_of_counters.sql) | `20260919191701` | yes — ledger | THE WORLD MODEL CARRIES ~120 PER-ASSET VARIABLES. THE AGENT SEES ZERO |
+| [0351](db/migrations/0351_the_intelligence_layers_are_real_and_nothing_assembles_them_into_a_stack.sql) | `20260919195941` | yes — ledger | EVERY LAYER OF THE INTELLIGENCE STACK IS MEASURABLE. NOTHING RETURNS |
+| [0352](db/migrations/0352_the_agents_dial_limits_live_in_edge_typescript_and_not_in_this_database.sql) | `20260919205659` | yes — ledger | THE LIMITS THE AI OBEYS ARE NOT IN THIS DATABASE, AND THE CATALOG IS |
+| [0353](db/migrations/0353_the_shield_gains_a_fifth_probe_point_and_the_ai_write_path_finally_lands_in_its_ledger.sql) | `20260919210336` | yes — ledger | NO AI-ORIGINATED STATE CHANGE HAS EVER APPEARED IN THE SHIELD'S LEDGER |
+| [0354](db/migrations/0354_the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt.sql) | `20260919224417` | yes — ledger | THE RETURN LEG WORKS AND ITS VERDICT SAID "solver_returned_nothing" ON A |
+| [0355](db/migrations/0355_the_energy_shield_declared_five_block_rules_at_the_moment_power_flows_and_none_had_ever_run.sql) | `20260919235525` | yes — ledger | FIVE BLOCK-ENFORCEMENT RULES DECLARE `charge_session_start`. THAT PROBE |
+| [0356](db/migrations/0356_the_shield_finally_sees_the_moment_power_begins.sql) | `20260919235738` | yes — ledger | THE SIXTH CALLED PROBE POINT, AND THE FIRST ONE THAT WATCHES ELECTRONS |
+| [0357](db/migrations/0357_the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere.sql) | `20260920004021` | yes — ledger | `released_at - booked_at` IS NEGATIVE ON 100% OF ROWS, AND THE FIX IS NOT |
+| [0358](db/migrations/0358_a_single_stall_proposal_gives_the_disposer_nothing_to_dispose_over.sql) | `20260920005644` | yes — ledger | THE RANKED PROPOSAL CONTRACT. A PROPOSER MAY NOW NAME AN ORDERED SET OF |
+| [0359](db/migrations/0359_a_promoted_candidate_must_carry_its_own_kilowatts_or_the_shield_judges_the_wrong_load.sql) | `20260920010111` | yes — ledger | 0358 REWROTE THE STALL AND LEFT THE KILOWATTS BEHIND. FOUR ENERGY RULES |
+| [0360](db/migrations/0360_a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it.sql) | `20260920022145` | yes — ledger | THE DEPOT IS 98% RESERVED AND 13% OCCUPIED. NOTHING RELEASES A |
+| [0361](db/migrations/0361_a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall.sql) | `20260920023610` | yes — ledger | THE DISPOSER HAS NO CONCEPT OF AN ABSTENTION, SO A PROPOSER THAT |
+| [0362](db/migrations/0362_a_worse_ranked_proposer_removes_a_better_one_from_the_pool_before_rank_is_read.sql) | `20260920024530` | yes — ledger | RANK DECIDES WHICH PENDING PROPOSAL WINS. SUPERSESSION DECIDES WHICH |
+| [0363](db/migrations/0363_the_gate_0362_installed_could_never_be_opened.sql) | `20260920025230` | yes — ledger | 0362 SHIPPED A POLICY GATE THAT CANNOT BE SET. REGISTER THE KEY |
+| [0364](db/migrations/0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql) | `20260920035200` | yes — ledger | WHETHER A PROPOSAL WAS ENACTED IS RECORDED ONLY IN A TABLE THE NEXT |
+| [0365](db/migrations/0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql) | `20260920033500` | yes — ledger | `window_elapsed_occupied` HAS ONE WRITER AND ZERO READERS. MAKE THE |
+| [0366](db/migrations/0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql) | `20260920034500` | yes — ledger | PUBLISH THE OVERSTAY TO THE DECISION FRAME, SO THE SIGNAL REACHES A |
+| [0367](db/migrations/0367_the_reclaimer_0360_installed_has_never_run_on_the_live_metronome_path.sql) | `20260920041500` | yes — ledger | THE RECLAIMER 0360 INSTALLED HAS NEVER RUN: THE LIVE METRONOME DOES NOT |
+| [0368](db/migrations/0368_the_reroute_hunted_the_scarcest_stall_type_for_vehicles_that_wanted_the_most_plentiful.sql) | `20260920041236` | yes — ledger | THE REROUTE HUNTED THE SCARCEST STALL TYPE ON THE SITE FOR VEHICLES |
+| [0369](db/migrations/0369_a_vehicle_parked_in_one_stall_was_still_holding_another.sql) | `20260920041750` | yes — ledger | A VEHICLE PARKED IN ONE STALL WAS STILL HOLDING ANOTHER, AND THE |
+| [0370](db/migrations/0370_fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them.sql) | `20260920042835` | yes — ledger | FIFTY-NINE CALENDAR CLAIMS WERE ALREADY OVERRULED BY A VEHICLE SITTING |
+| [0371](db/migrations/0371_i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out.sql) | `20260920043723` | yes — ledger | I PUT A NONDETERMINISM SOURCE INSIDE THE TICK PATH FOUR MIGRATIONS AGO |
+| [0372](db/migrations/0372_the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted.sql) | `20260920045844` | yes — ledger | THE SHARED CANDIDATE SOURCE OFFERED CHARGE STALLS WHOSE CHARGER WAS |
+| [0373](db/migrations/0373_three_comments_that_stop_the_next_person_repeating_tonight.sql) | `20260920050351` | yes — ledger | THREE COMMENTS THAT STOP THE NEXT PERSON REPEATING TONIGHT |
+| [0374](db/migrations/0374_two_legal_decisions_summed_past_the_service_contract_and_the_meter_that_would_have_seen_it_is_not_read.sql) | `20260920123000` | yes — ledger | THE SITE ALREADY METERS 2,738.8 kW AGAINST A 2,500 kW SERVICE CONTRACT, |
+| [0375](db/migrations/0375_my_own_new_column_says_throttle_the_vehicles_when_the_answer_is_defer_the_battery.sql) | `20260920124500` | yes — ledger | 0374's READER ANSWERS "WHAT IS THE BIGGEST LOAD" UNDER A COLUMN NAME THAT |
+| [0376](db/migrations/0376_i_built_a_detector_whose_silence_cannot_be_told_from_absence_which_is_the_defect_i_spent_tonight_fixing.sql) | `20260920131500` | yes — ledger | 0374's DETECTOR WRITES NOTHING WHEN THE SITE IS QUIET, AND WRITES NOTHING |
+| [0377](db/migrations/0377_removing_the_one_row_my_own_path_test_left_in_an_evidence_table.sql) | `20260920132500` | yes — ledger | I TESTED 0376's `ON CONFLICT` PATH BY LOWERING THE THRESHOLD BY HAND, AND |
+| [0378](db/migrations/0378_the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run.sql) | `20260920134500` | yes — ledger | EVERY NUMBER IN `db/checks/0271` LIVES IN A `class='engine'` TABLE. CAPTURE |
+| [0379](db/migrations/0379_the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time.sql) | `20260920132449` | yes — ledger | "EV LOAD EXCEEDED THE CAP IN FORCE" CANNOT BE ANSWERED BY ANY QUERY AFTER THE |
+| [0380](db/migrations/0380_joining_an_evidence_table_to_sim_runs_silently_undoes_the_reason_it_is_evidence.sql) | `20260920135731` | yes — ledger | EVERY EVIDENCE LEDGER WE BUILT EXISTS TO SURVIVE THE PURGE, AND THE OBVIOUS |
+| [0381](db/migrations/0381_the_published_reliability_field_names_an_action_that_never_happened_and_undercounts_the_one_that_did.sql) | `20260920141533` | yes — ledger | `reliability.stranded_recharges` IS WRONG TWICE, IN OPPOSITE DIRECTIONS, IN A |
+| [0382](db/migrations/0382_a_column_named_for_a_fifteen_minute_quantity_that_is_a_running_peak_in_sim_and_not_even_that_in_production.sql) | `20260920155947` | yes — ledger | G90: `site_energy_snapshots.peak_demand_kw_15min` IS NOT A 15-MINUTE QUANTITY |
+| [0383](db/migrations/0383_the_whole_of_g86_is_one_concurrency_class_that_no_executor_admits_and_the_walkaround_is_its_only_member.sql) | `20260920161631` | yes — ledger | G86: `perimeter_walkaround` IS NOT MISSING AN EXECUTOR. IT IS DERIVED INTO A |
+| [0384](db/migrations/0384_my_own_new_detector_raises_on_the_malformed_data_it_exists_to_find.sql) | `20260920162559` | yes — ledger | HARDENING `public.ottoq_atom_class_coverage` (0383) AGAINST THE ONE INPUT IT IS |
+| [0385](db/migrations/0385_the_catch_up_that_stopped_one_state_short_strands_a_vehicle_for_the_whole_run.sql) | `20260920172340` | yes — ledger | G91: A VEHICLE THAT REACHES `staged_for_departure` STILL HOLDING A MANDATORY |
+| [0386](db/migrations/0386_the_fourteen_atom_verdict_is_the_one_thing_the_permanent_run_record_does_not_keep.sql) | `20260920173700` | yes — ledger | G93: EVERY DETERMINISM VERDICT THIS ENGINE HAS EVER PRODUCED IS GONE. 1,166 |
+| [0387](db/migrations/0387_two_critical_state_machine_rules_had_a_caller_shaped_hole_and_the_input_they_need_did_not_exist.sql) | `20260920185425` | yes — ledger | G44: SM.001 AND SM.003 NOW HAVE A CALLER. AND THE REASON THEY COULD NOT SIMPLY |
+| [0388](db/migrations/0388_my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do.sql) | `20260920185739` | yes — ledger | 0387's PROBE IS MEASURE-ONLY AND ITS LOG ROWS SAY `enforcement_taken='blocked'` |
+| [0389](db/migrations/0389_cp_sat_was_told_the_site_could_draw_2500_kw_while_the_engine_was_enforcing_795.sql) | `20260920194102` | yes — ledger | THE SITE POWER CAP CP-SAT PLANS AGAINST IS A CONSTANT IN TWO PLACES, AND THE |
+| [0390](db/migrations/0390_an_abstention_is_not_a_claim_and_two_predicates_counted_it_as_one.sql) | `20260921000517` | yes — ledger | AN ABSTENTION IS NOT A CLAIM — AND THE PROPOSER'S OWN "I CANNOT SERVE THIS VEHICLE |
+| [0391](db/migrations/0391_kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour.sql) | `20260921001618` | yes — ledger | KPI 4 STOPS COUNTING THE DETERMINISTIC SHIELD'S OWN SAFE-DEFAULT FALLBACKS AS HUMAN |
+| [0392](db/migrations/0392_the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible.sql) | `20260921002608` | yes — ledger | EVERY COVERAGE NUMBER THIS REPO HAS EVER PUBLISHED ABOUT THE L1 SHIELD WAS COUNTED FROM |
+| [0393](db/migrations/0393_the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for.sql) | `20260921004457` | yes — ledger | `0392` SEEDED `orchestrator_agent` AS `shield_expected = true` AND CALLED IT "THE ONE PATH |
+| [0394](db/migrations/0394_shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where.sql) | `20260921005249` | yes — ledger | `0392`'s `shield_expected` ASKS *"SHOULD THIS BRANCH PASS THE PROBE ON THIS ROW?"* — AND |
+| [0395](db/migrations/0395_my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart.sql) | `20260921012521` | yes — ledger | I GUARDED A ONE-SHOT CRON JOB WITH `IF EXISTS (SELECT ...)` AND IT **STARTED TWO DEMO RUNS |
+| [0396](db/migrations/0396_choose_the_clock_before_you_build_the_world_g107.sql) | `20260921025959` | yes — ledger | G107 — CHOOSE THE CLOCK BEFORE YOU BUILD THE WORLD |
+| [0397](db/migrations/0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql) | `20260921031935` | yes — ledger | G96, STEPS 0 AND 1. **THE BESS GETS ONE WORD FOR REST.** Three places in this schema declare |
+| [0398](db/migrations/0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql) | `20260921073824` | yes — ledger | G108, THE LAST LINK. **The CP-SAT service's address lives in a deploy-time secret, and the |
+| [0399](db/migrations/0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql) | `20260921122812` | yes — ledger | G96, STEP 2 — THE LAST ONE. **SM.006 has had a callable evaluator and no caller since it |
+| [0400](db/migrations/0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql) | `PENDING` | no — pending | G114, item (a) and item (b) — **the fault reroute reads the calendar, and stops ignoring |
+| [0401](db/migrations/0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql) | `PENDING` | no — pending | **G114 items (c) and (d), decided under delegated authority** — Chase, 2026-09-21: *"You make |
+| [0402](db/migrations/0402_a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112.sql) | `20260921165330` | yes — ledger | **G112, decision (3a): a determinism verdict can state its own clock.** `db/checks/0312` §3 |
+| [0403](db/migrations/0403_the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116.sql) | `20260921172038` | yes — ledger | **THE PREREQUISITE FOR ANY LEARNING: THE DIALS OUTLIVE THEIR RUN.** `db/checks/0313` §3 |
+| [0404](db/migrations/0404_the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116.sql) | `20260921174317` | yes — ledger | **G116, PART TWO: THE REWARD FUNCTION, AND DIAL PROMOTION ENABLED.** Chase instructed both on |
 
 204 migrations indexed.
+267 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

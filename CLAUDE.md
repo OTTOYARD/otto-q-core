@@ -42,6 +42,28 @@ protected still holds: *every external fact in this repo carries a source and a 
      A fact without a URL is not a fact, no matter who fetched it.
    - **Never guess silently.** Unchanged, and the whole point.
 
+   **RE-AFFIRMED AND SHARPENED 2026-09-19, in Chase's words, because the agent side of
+   this rule kept getting re-litigated from scratch every session.** Two different
+   permissions live here and they are NOT the same permission:
+
+   - **WEB SEARCH IS STANDING AND OPEN. Do not ask.** *"You can always do web search
+     if needed. Make sure you save that and that doesn't get lost. I don't want you to
+     feel like you're on an island with our own information. If you ever need to go
+     search for external sources, you can do that on the web."* So: no permission
+     request, no "should I look this up", no reasoning from memory about a versioned
+     external fact when the answer is one fetch away. The provenance rule above is the
+     only condition — claim, version/date, URL.
+   - **RESEARCH *AGENTS* STILL STOP FIRST.** *"Maintain the same posture with research
+     agents. If needed, you have to let me know first, stop building, and we can
+     discuss what it will be needed for and if it's necessary, or if it's more
+     important just to test and build line by line."* Fanning out subagents for
+     research is what burns token budget, so it is an explicit ask-first action every
+     time. Note the asymmetry: **fanning out to BUILD is allowed** (*"If you need to
+     fan out and build, do that"*) — it is deep *research* with agents that stops.
+
+   The distinction to hold: one search is free, twelve agents reading the internet is a
+   budget decision that belongs to Chase.
+
 When information is missing:
    - Write `docs/research/requests/R-<n>-<slug>.md` with precise, answerable questions (field names, units, versions — never "tell me about X") and commit it. Hermes polls that folder at the start of its sessions.
    - Then proceed with labeled assumptions (`ASSUMPTION — pending R-<n>`) or park the step and continue the run.
@@ -60,6 +82,11 @@ When information is missing:
      **The table's own COMMENT asserts the opposite** — *"Deliberately NOT named ottoq\* so `ottoq_purge_prior_runs` cannot delete prior-run evidence"* — a naming convention relied upon to defeat a mechanism that does not read names. It has never worked. (Note the nightly job is NOT the deleter: cron 625 runs `ottoq_retention_purge_runs`, whose allowlist holds 7 tables and not this one.)
      The damage, measured: `n_tup_ins` **48,897** against `n_tup_del` **63,755**; `max(invocation_id)` 48,897 with **28,262 allocated ids absent**; and the decisive independent witness — the earliest surviving `called_at` is **2026-08-02**, while sibling table `ottoq_cuopt_fire_log` still holds firings from **2026-07-18**, fifteen days earlier. (28,262 is ids absent, not rows deleted: `nextval` is non-transactional and `cuopt_log_gate`'s INSERT sits in an exception handler, so an aborted insert burns an id too. `n_tup_del` is what proves the deletion.)
      **SAY INSTEAD:** *"Sixteen calls to the NVIDIA endpoint survive in the invocation ledger, the last on 2026-08-30. The true lifetime count is at least sixteen and is not recoverable from this table — it is registered as run-scoped engine data and the demo-run purge has deleted from it, leaving 28,262 allocated ids absent and no surviving row older than 2026-08-02, while `ottoq_cuopt_fire_log` still holds firings from 2026-07-18."*
+     **CORRECTION 2026-09-19 (`db/checks/0247`, fixed by `0340`/`0341`) — THE SENTENCE ABOVE IS NOW WRONG BY 499 CALLS, IN THE DIRECTION THAT UNDERSTATES US, AND cuOpt IS NOT DARK.** Measured today: `cuopt_invocation_log` holds **27,340 rows of which 515 carry an `http_status`**, and that column is set only from `nvidiaStatuses` in `ottoq-cuopt-propose`, so each one is a real call to `optimize.api.nvidia.com`. All 515 returned 200. **507 answered with `source='cuopt'` for 2,738 proposals**; 8 returned `solved_but_zero_proposals`. The most recent call is **2026-09-17 12:42:07 UTC**, not 2026-08-30 — the endpoint came back to life on 2026-09-16 under `edge:v26-agent-chain` (485 of the 515 calls). "Sixteen calls, the last on 2026-08-30" was true when written and has been quoted past its evidence.
+     **AND THE UNDERLYING FRAGILITY IS NOW FIXED RATHER THAN DESCRIBED.** The reason that sentence had to hedge — the ledger is `class='engine'` and the demo-run purge deletes it — is closed by `0340`: `public.ottoq_model_call_ledger` is an append-only, `class='evidence'` ledger with **deliberately no FK to `ottoq_sim_runs`** (the registry's own check (b) requires an FK of `engine`/`stamp` only, and an enforcing FK on evidence can only block the purge or, as CASCADE, erase what check (c) forbids erasing). It carries one row per external model or solver call — cuOpt, Nemotron, CP-SAT, the Anthropic advisor — filled by two error-swallowing capture triggers plus a backfill of the 515 surviving NVIDIA calls and 1,161 intelligence decisions. No chain-of-thought is stored.
+     **SO STOP QUOTING A SENTENCE AND READ THE VIEW.** `SELECT * FROM public.ottoq_intelligence_ledger` computes the rule-6 answer per provider, and its five outcome classes are asserted to sum to its call count — the check `0340`'s first view lacked, which is why that view silently reported 515 of 1,676 rows and bucketed the other 1,161 nowhere (`0341`). As of 2026-09-19 it reads: **nvidia_cuopt 515 calls / 515 reaching NVIDIA / 507 answered / 2,738 proposals, last 2026-09-17 12:42 UTC · nvidia_nemotron 1,120 calls, last 2026-09-17 12:44 UTC · cpsat_service 41 calls, last 2026-09-14 09:23 UTC.** Re-derive; never quote this paragraph's numbers without re-running it.
+     **AND TWO THINGS THAT VIEW MAKES VISIBLE FOR THE FIRST TIME, both of which are product findings rather than hygiene.** (a) **G62 — the agent is on average exactly one tick late.** Nemotron's mean latency over 1,120 calls is **30,394 ms** with a maximum of **180,743 ms**, against a 30-second beat, and **433 of 1,120 calls (39%) took longer than one tick**. That is the mechanism behind the 721 `deterministic_fallback` decisions sitting beside 729 `nemotron` ones: an advisory agent cannot be a synchronous dependency of a 30-second tick. (b) **`agent_calls_with_no_l1_rules` = 1,120 of 1,120.** Every Nemotron call in the ledger carries an empty `rule_results`, so the one path where an AI changes engine state is still the one path the L1 shield does not gate — now countable from evidence that survives its run.
+
      **AND NOTE WHICH DIRECTION THIS CUTS.** Rule 6 forbids unquantified cuOpt claims *in both directions*. A purged ledger makes the LOW direction unquantifiable too: "cuOpt has barely been used" is now exactly as unsupported as "cuOpt is heavily used." The fix — reclassifying the ledger to `evidence`, and deleting the false comment — belongs in the cuOpt cut window, because prior-run rows surviving would expose any unscoped cuOpt reader (the 0145/0146 class), and that audit happens there anyway.
      **And a warning attached to cutting it.** Of the eight database functions named `cuopt*`, **five are not cuOpt**: they are the propose/dispose deferral machinery, which carries a cuOpt name for historical reasons and is **load-bearing for the CP-SAT proposer** (`ottoq_proposer_precedence` declares `holds_tick` for `cuopt`, `cuopt_fallback`, `forward_lex` and `llm_advisor`; `ottoq_agentic_arm` writes `cuopt_first_refusal_max_defers=1` on every armed run). Cutting "everything cuopt" by name would remove the CP-SAT proposer's right of first refusal. `db/checks/0220` has the safe order.
    - **Assignment plus verification, always.** Already embodied: `ottoq_stall_bookings` makes double-booking physically impossible via EXCLUDE constraint; `space_conflict_ledger` records every calendar claim overruled by physical reality. Never remove either side.
@@ -76,6 +103,48 @@ When information is missing:
    - `pg_cron` evaluates cron expressions in **UTC**. Convert CT to UTC before writing a schedule, and if the conversion crosses midnight shift the day fields too.
    - `now()`, `started_at`, and every timestamptz in the database are UTC. Read them as UTC; convert only when reporting.
    - Never restate a stored UTC timestamp as though it were CT, and never rewrite a working cron schedule just to make it read nicely.
+
+**8. ONE SITE. THE TWIN DEPOT, AND NOTHING ELSE — added 2026-09-19 in Chase's words, and it overrides Part 4 where they conflict.**
+
+   *"The only depot, installs and chargers and staging spaces I ever want you to test
+   against is Otto-twin depot. I don't wanna do multiple depot with 200 stalls. I wanna
+   start with that depot and see effectively if OTTO-Q functions first. If it does, then
+   we will see potentially how many vehicles at one time we can comfortably stage and
+   sort an orchestrate through there. That's the ultimate goal. We are nowhere near that
+   yet. We still need to test and validate everything. Just letting you know, do not test
+   or validate across multiple sites. Only use the simulation twin Depot as the test site."*
+
+   **The site is `11111111-1111-1111-1111-111111111111`, "OTTOYARD Nashville Flagship"** —
+   158 stalls (113 staging, 30 L2, 10 DCFC, 3 wash bay, 2 service bay), 8 sim runs, the
+   only depot that has ever hosted one but the retired P2 fixture. Four other depots exist
+   in `depots` and **none of them is a test target**: `22222222-…` "OTTOYARD Benchmark
+   (CRN A/B)" carries 160 stalls and has hosted **zero** runs, and three fixtures carry
+   1–10 stalls between them.
+
+   - **Every measurement predicated on a depot carries `depot_id = '11111111-…'`.** A
+     stall, vehicle, booking, session or occupancy count without that predicate is not a
+     weaker number, it is a number about a different question. `db/checks/0250` is the
+     retraction that produced this rule: an unscoped stall census reported 36 L2 stalls
+     available when the site under test had **4**, and the "no capacity wall" conclusion
+     drawn from it was wrong — every refused proposal on the live run was asking for one
+     of the two stall types at 87% and 80% occupancy. Same defect class as 0145 / 0146 /
+     0229.
+   - **This supersedes Phase C8's "Site Alpha"** (§C8.1's three-tenant, 28-point config)
+     as a *build target*. Its power cap, capability pairs and anti-correlation sweep stay
+     in the brief as the design of the eventual multi-tenant config; they are not what
+     gets run. The anti-correlation curve needs tenants, not sites — so it can still be
+     expressed on the twin depot by phase-shifting tenant demand within it, and that is
+     the only form of it to build.
+   - **And it collides with 2.5's forced decomposition, which is the more interesting
+     conflict.** 2.5 gives CP-SAT the inside of a site and cuOpt the routing of recalls
+     *between* sites "at 18-depot scale." On one depot there is no inter-site layer, so
+     cuOpt has no routing problem to solve and its present contribution is whatever it
+     does as a stall-assignment proposer — currently, on the live run, 1 enacted against
+     7 refused and 11 superseded (`0250` §2–3). Do not quote 2.5's inter-site sentence as
+     a live architecture. It is a plan gated on a second site existing.
+   - **The goal, in Chase's framing, is depth not breadth:** prove OTTO-Q functions on this
+     one depot, then find how many vehicles it can stage, sort and orchestrate at once. A
+     result from a second site does not advance that and is not evidence about it.
 
 ---
 
@@ -108,7 +177,7 @@ The site is a **resource-constrained flexible flow shop**, not a queue: N assets
 | Job / visit | `ottoq_visit_needs`, `ottoq_vehicle_dispatches`, itineraries/legs | naming + lifecycle doc |
 | Booking | `ottoq_stall_bookings` (EXCLUDE constraint) | keep; this is the calendar |
 | Operations catalog | `service_definitions` (9), `service_cadence_policy` | per-pack catalogs as data |
-| ^ **CORRECTION 2026-09-12 (`db/checks/0178`)** | The order above reads as though the first were the catalog. Measured: **`service_cadence_policy` is the live one** — 15 services, each with a `lane`, all active, read by 8 routines, and it covers **15 of the 16 `svc` values the engine's own work atoms actually use**. `service_definitions` is a **fallback** consulted by one bridge (`ottoq_svc_to_stall_type`, whose own comment calls it "the catalogue table named in the brief"), it holds **27 rows / 9 distinct codes** (the "(9)" above is the distinct count, not the row count), and it overlaps the atom vocabulary on **exactly one** code, `exterior_wash`. | The extension point C11 aims at is `service_cadence_policy`. One service, `perimeter_walkaround`, is declared in **neither** — derived 108 times per run, required of none, performed never. |
+| ^ **CORRECTION 2026-09-12 (`db/checks/0178`)** | The order above reads as though the first were the catalog. Measured: **`service_cadence_policy` is the live one** — 15 services, each with a `lane`, all active, read by 8 routines, and it covers **15 of the 16 `svc` values the engine's own work atoms actually use**. `service_definitions` is a **fallback** consulted by one bridge (`ottoq_svc_to_stall_type`, whose own comment calls it "the catalogue table named in the brief"), it holds **27 rows / 9 distinct codes** (the "(9)" above is the distinct count, not the row count), and it overlaps the atom vocabulary on **exactly one** code, `exterior_wash`. | The extension point C11 aims at is `service_cadence_policy`. One service, `perimeter_walkaround`, was declared in **neither** — derived 108 times per run, required of none, performed never. **All three clauses are now stale (`db/checks/0277`, fixed by `0383`): it IS required (25 `must_do` atoms), it IS now performable, and it IS now declared — `service_cadence_policy` holds 16 services and `ottoq_assert_service_vocabulary()` returns an empty `undeclared` for the first time.** |
 | Rules layer | `ottoq_rules` (52, versioned, tenant-parameterizable) + 792k logged evaluations | keep as Layer 1 |
 | Multi-tenant terms | `ottoq_fleet_operator_slas` (4 OEM rows, versioned) | the L2 foothold |
 | Signed telemetry | `ottoq_events` (20.8k, HMAC-signed), `ottoq_telemetry_packets` (25k) | the L1 foothold |
@@ -126,6 +195,7 @@ DC fast charge 20–45 min (dominant kW) · L2 charge 2–8 hr · sensor clean 3
 Three cooperating layers exist today:
 1. **Layer 1, deterministic rules** — 52 versioned rules, tenant-parameterizable, every evaluation logged. Inviolable constraints including per-OEM SLAs.
    **CORRECTION 2026-09-13 (`db/checks/0192`), because this number is quoted outward:** 52 is the ROW count (29 active codes plus 23 archived versions), and of the 29 active codes the shield actually evaluates **20**, at **four** probe points — `task_start` (2,701,143 evaluations), `stall_assignment` (544,413), `redeployment` (90,244), `bess_dispatch` (2,222). The other nine have evaluator functions that exist and are callable, and no caller: they are invariants over transitions and outcomes (vehicle/stall/BESS state-machine legality, role gating including `emergency_stop`, audit note on override, physical presence at completion, queue depth at arrival), and a gate placed where something STARTS cannot check one. Six of the nine are `critical`. The honest sentence is "twenty of twenty-nine declared rules, at four decision points, every evaluation logged"; tracked as G44.
+   **RE-DERIVED 2026-09-20 (`db/checks/0273`), AS Part 3's refresh instructed, and the sentence above is now WRONG IN OUR FAVOUR — which is the direction to be most careful about.** Measured on the twin depot: **53 rule rows / 30 distinct codes, all 30 active, and every archived row a superseded version of a still-active code (0 archive-only codes)**. Of those 30, **21 are evaluated, at SIX probe points, not four**: `task_start` (13 codes), `stall_assignment` (5), **`charge_session_start` (5)**, `redeployment` (6), **`policy_write` (1)**, `bess_dispatch` (1). **`0192` missed `charge_session_start` and `policy_write`, and the first is not marginal** — 5 codes and 4,475 evaluations, more traffic than `redeployment` and `bess_dispatch` combined. **And the omission was already contradicted inside this repo**: `FINDINGS.md` G89 states EN.001 caps aggregate charging *"at `stall_assignment` and `charge_session_start`"*, so one file documented the fifth probe while another counted four. A cross-file consistency failure, not a measurement error. **THE SENTENCE TO QUOTE:** *"twenty-one of thirty declared rules, at six decision points, every evaluation logged."* **The nine unevaluated codes are the same nine, and six are still `critical`** — HW.006 physical presence, SM.001/003/006 state-machine legality, SM.004 role gating, SM.005 audit note on override, SLA.002 queue depth, TW.002, TW.004 — so `0192`'s diagnosis stands unchanged: these are invariants over *transitions and outcomes*, and a gate placed where something STARTS cannot check one. G44 is unchanged and still open; only the arithmetic around it moved, because the one code added since 09-08 IS evaluated. **AND 21 OF 30 IS A WIRING COUNT, NOT A PROTECTION COUNT.** "Evaluated" means "has at least one logged evaluation", which is weaker than "binds": per `db/checks/0263` §1, four of the five codes at `stall_assignment` are charge-specific and cannot judge a parking hold, and the fifth, `HW.004.stall_single_vehicle`, says in its own description that it is enforced by a partial unique index rather than by the probe. So 21 of 30 is the **optimistic bound**, and any phrasing implying 21 rules actively prevent something overstates it. **Never quote the per-probe evaluation counts without their moment** — `ottoq_rule_evaluations` is `class='engine'`, and 2.5's 2,701,143 for `task_start` against today's 137,787 is the purge, not a loss of coverage.
 2. **The local decide path** — the tick-driven scheduler embodied in database functions (the `ottoq_fn_backup_*` set names its policies: dcfc_first, night_waves, plug_target_policy, cold_start, stall_watchdog, frozen_target, supersede_churn). This is what disposes.
 3. **Proposers** — cuOpt via the `ottoq-cuopt-propose` edge function to the NVIDIA endpoint (255 logged invocations; the deferral table gives an in-flight proposal one-tick right-of-first-refusal before the local path pre-empts), external proposals, and the energy MPC bridge (`ottoq-energy-mpc`, AWS optimizer) whose BESS setpoints the twin follows when `energy_mpc_follow=1`.
 
@@ -282,6 +352,51 @@ has not been called since 2026-08-30 — is the part that matters and is unaffec
 **Two clarifications, not corrections.** "52 deterministic rules" is a ROW count: 29 active plus 23 archived, across **29 distinct rule codes** — the archived rows are superseded versions of the same codes, not 52 separate rules. And rule 6's cuOpt sentence must be re-derived before it is spoken: the ledger now holds 12,478 invocations, not 255, so any claim built on the August figure is off by 49x in the direction that flatters us.
 
 **Why this refresh exists.** `db/checks/0098` records a 22-second KPI view that survived because it scanned a table CLAUDE.md said held 20,799 rows and which actually held 2.49M. Reasoning from a stale ground-truth line is how that happened. Re-measure before quoting; the queries are one `SELECT count(*)` each.
+
+**REFRESH 2026-09-20 05:01 UTC — AND THIS ONE IS A LESSON RATHER THAN A TABLE, BECAUSE EVERY FIGURE ABOVE JUST FELL BY ONE TO TWO ORDERS OF MAGNITUDE.** A single demo run started at 04:08 UTC purged **352,673 rows** and deleted one prior run. Measured immediately afterwards:
+
+| | 2026-09-08 | 2026-09-20 05:01 | |
+|---|---|---|---|
+| rule evaluations | 5,464,682 | **74,719** | 0.014x |
+| HMAC-signed events | 2,231,792 | **34,761** | 0.016x |
+| telemetry packets | 272,919 | **17,724** | 0.065x |
+| `cuopt_invocation_log` rows | 15,346 | **957** | 0.062x |
+| decisions | 1,650,636 | **9,125** | 0.006x |
+| sim runs | 787 | **9** | 0.011x |
+| service detail records | 179,423 | **491** | 0.003x |
+| stall bookings | 783,276 | **1,245** | 0.002x |
+| archived reproducible runs | 946 | **1,396** | **1.48x — up** |
+
+**Nothing broke. This is `ottoq_purge_prior_runs` doing exactly what it is for.** Every table that fell is registered `class='engine'` in `ottoq_run_scope_registry` — run-scoped working data that must not outlive its run — and `ottoq_run_archives` is the one that ROSE, because it is the durable reproducibility key. **So the standing instruction is stronger than "re-measure before quoting": these are not slow-moving totals that drift, they are per-run working sets that a colleague starting a demo can take to near zero between your measurement and your sentence.** Cite the run, never the table.
+
+**AND THE SHARPEST DEMONSTRATION THIS FILE HAS OF WHY `0340` EXISTS, measured in the same minute.** Rule 6's cuOpt sentence is derived from calls carrying an `http_status`:
+
+| | rows | calls to NVIDIA |
+|---|---|---|
+| `cuopt_invocation_log` (`class='engine'`) | 957 | **14** |
+| `public.ottoq_model_call_ledger` (`class='evidence'`) | 3,502 | **865** |
+
+**The invocation log lost 851 of its 865 NVIDIA calls in tonight's purge. The evidence ledger kept every one.** `SOLVER_STATE.md` §13 quotes 865 because it reads the ledger; anyone reading `cuopt_invocation_log` today gets **14** and would conclude cuOpt is nearly dark. That is the 0231 fragility, closed by 0340, observed rather than argued. **Read `public.ottoq_intelligence_ledger`. Never `cuopt_invocation_log`.** The same now holds for proposal outcomes: `ottoq_proposal_disposition_ledger` (0364, `class='evidence'`) held **128** rows through the purge while `ottoq_external_proposals` lost its 24.
+
+**Two counts that are structural rather than run-scoped, and one correction:**
+
+| | value | note |
+|---|---|---|
+| stalls, ALL depots | **330** | unchanged since 09-08; 2.3's "427" remains stale |
+| **stalls, the twin depot** | **158** | **the only number rule 8 makes relevant** — 113 staging, 30 L2, 10 DCFC, 3 wash bay, 2 service bay |
+| vehicles | **226** | unchanged |
+| vehicle classes | **9** | unchanged |
+| OCPP chargers | **94** all depots / **45** the twin depot | of the twin's 45, **6 were `Faulted`** at this reading and ~**13.8% of charger-time** is lost to faults on a busy_day run (`db/checks/0264` §3) — so **effective charge capacity is about 86% of nameplate, continuously, by design** |
+| deterministic rules | **53** rows / **30** codes | was 52/29; one code added since 09-08. The "twenty of twenty-nine at four probe points" sentence in 2.5 needs re-deriving before it is spoken again |
+| run-scope registry | **229** classified columns | 223 at the 09-08 pull |
+
+**CORRECTION to 2.3's `perimeter_walkaround` note, and it is the one that matters operationally.** That note says the service is *"derived 108 times per run, required of none, performed never."* **The middle clause is false.** Measured 2026-09-20: **75 atoms, 0 done, and 25 of them `must_do`** — mandatory, never completed, and declared in neither `service_cadence_policy` nor `service_definitions`. Its `perimeter_hold` bookings held **98 of the twin depot's 113 staging stalls** at an average **248-minute** window on a run whose whole life is 540 sim-minutes, while **258 `twin.staging_overflow`** events fired. The cause is traced end to end in `db/checks/0261`: a producer, two observers that say yes for 90% of arrivals, and **no executor anywhere in the engine** — so the hold cannot clear on completion and clears on expiry instead. **This is G86 and it is an open product decision, not a bug to route around.**
+
+**G86 IS NOW CLOSED (`db/checks/0277`, fixed by `db/migrations/0383`), AND THE SENTENCE ABOVE IS HALF RETRACTED — the staging-stall clause was a prefix match and must not be quoted again.** `perimeter_hold` is named for the depot's perimeter **RING**; `perimeter_walkaround` is a walk around a **VEHICLE's** perimeter. `ottoq.ottoq_book_hold_stall` picks the purpose on dwell duration alone — `v_purpose := CASE WHEN v_is_long THEN 'perimeter_hold' ELSE 'temp_hold' END` — and every one of those 82–98 bookings carries **`need_atom IS NULL`**, because a parking hold serves no service atom. **No function in the database mentions both strings**, which is the one-query check that settles it: the two sets of functions are disjoint. The walkaround's own bookings are **fourteen `purpose='service'` rows on two service-bay stalls**. So the long staging holds are long-dwell parking, which is what staging stalls are for, and **closing G86 frees no staging stalls** — the 258 overflow events remain an open question about staging capacity under dwell.
+
+**What was actually wrong is one word, and the executor was never missing.** `twin.ottoq_sim_advance_visit_atoms` completes **any** atom whose `status='in_progress'` and `ends_at` has passed, names no service and needs no bay. The gate is the START side, `ottoq_start_concurrent_atoms`, which admits `concurrency IN ('cabin','exterior','digital')` — and derive wrote the walkaround as **`concurrency='hold'`, a seventh class with exactly one member.** Measured: cabin 75 of 127 done, gate 33 of 98, anchor 28 of 67, bay 23 of 64, digital 2 of 5, exterior 1 of 2, and **`hold` 0 of 63, not one ever reaching `in_progress`.** Every class completes except the orphan. The engine had already said so twice in machine-readable form — `ottoq_atom_retirable_set()` excluded it, so `ottoq_atoms_guard` demoted 39 of 63 to `must_do:false` with `guard_reason='svc_not_retirable'`, and `ottoq_assert_service_vocabulary()` named it as the only undeclared service. **`0383` derives it as `exterior` beside `sensor_clean`** (event-raised, performed at the vehicle, `lane_stalls=NULL`), adds it to the retirable set and declares it. Proven end to end on a rolled-back probe: derived `exterior`/`must_do:true` with no demotion, started in place, `ends_at` exactly the declared 12 minutes, `done`. **And it costs a real technician:** `exterior` sits inside the starter's `general_tech` subtraction (**10** at the twin depot, one vehicle each), so 63 atoms cannot all start at once — `digital` is the branch exempt from that pool and would have completed 63 walkarounds with nobody walking, which is why it was not used. **Take from this the general lesson, not the specific fix: a service name and a booking purpose that share a prefix are not the same mechanism, and the check is one query — does any function mention both?**
+
+**AND A RULE FOR EVERY AVAILABILITY NUMBER, earned three times in one night.** A stall is offerable only as the **intersection of three gates**: the pointer (`stalls.reserved_by` / `current_vehicle_id` / `status`), the CALENDAR (`ottoq_stall_bookings` in `held`/`active`/`done`/`interrupted` overlapping the window), and, for `dcfc`/`l2`, the **OCPP charger not being `Faulted`** (0372). **Neither of the first two dominates:** measured on the twin depot in one moment, DCFC read 0 pointer-free against 10 calendar-free, L2 read 3 against 1, and staging read 59 against 12. Whichever single gate you quote, some stall type makes it look generous — the same defect shape `db/checks/0250` established for depot scope. CP-SAT is what caught it: it declined a frame our own pointer census called four-free, and all four were faulted.
 
 **Agent access map (topology facts C1 documents):** Hermes (cloud agent, Telegram-fronted) holds a GitHub token authenticating as the OTTOYARD user — push + PR proven, **no `issues` scope** (Issues API 403) — and a Supabase Management API token executing SQL as the postgres role across all three projects. By standing policy in HERMES.md, Hermes's database use is **read-only** (its pre-existing `intelligence_events` ingestion excepted); all Hermes deliverables arrive as PRs into `docs/research/**`. Claude Code is the only agent that changes schema or engine state.
 

@@ -8,7 +8,8 @@
 //
 // Deploy: supabase functions deploy otto-twin-control
 // Invoke: https://<project-ref>.supabase.co/functions/v1/otto-twin-control/<path>
-// Auth:   service_role bearer required (not anon key)
+// Auth:   demo controls are open on the private link; database writes use the
+//         function's server-side service role and are never exposed to clients
 // ============================================================================
 //
 // ENDPOINTS

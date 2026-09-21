@@ -1,0 +1,285 @@
+-- 0306  THE ONLY TESTS THAT COVER THE EDGE FUNCTIONS WERE NEVER RUN BY CI, HAD BEEN RED FOR TWO
+--       DAYS, AND THE RED ASSERTION WAS ITSELF STALE. Found while completing G109's retraction:
+--       the code side of that retraction needed a test, and reaching for `node --test` showed
+--       that nothing had ever run it. Three separate things were wrong and they compound.
+--
+-- No database reads. This file is about committed files, a workflow and a deployed function, so
+-- every claim in it is checkable from the repo plus one `get_edge_function` call. Measured
+-- 2026-09-21 12:0x UTC (07:0x CT).
+--
+-- ══ 1. THE GATE THAT DID NOT EXIST ══════════════════════════════════════════
+--
+-- `tests/*.test.mjs` is the ONLY coverage of `edge-functions/**` — the agent→CP-SAT→kernel
+-- chain (`agent_solver_chain.test.mjs`) and the proposal/disposition contract
+-- (`proposal_disposition.test.mjs`). `.github/workflows/verify.yml` ran, in order: the CP-SAT
+-- prototype battery, the policy battery, the KPI gate, `python3 -m pytest -q`, the migration
+-- compile-check and the ledger check. **`node` was never invoked.** So:
+--
+--   `node --test tests/*.test.mjs` at commit f0b13fc   22 tests · 21 pass · **1 FAIL**
+--
+-- and that failure dated to **591305d (2026-09-19)**, two days earlier. Two days of a red
+-- suite that no human and no pipeline could see. Same defect class as `0098`'s 22-second KPI
+-- view and `0220`'s row-count-as-invocation-count: a signal that exists, is never read, and is
+-- therefore trusted more than a signal that does not exist at all.
+--
+-- ══ 2. AND THE RED ASSERTION WAS WRONG, WHICH IS THE SECOND HALF OF THE SAME THING ══
+--
+-- The failing assertion demanded `/EdgeRuntime\.waitUntil/` of
+-- `edge-functions/ottoq-orchestrator-agent/index.ts`. Measured across the file's history:
+--
+--   e143ce6   waitUntil present?  no
+--   480427d   waitUntil present?  YES   <- the lineage the test was written against
+--   591305d   waitUntil present?  no    <- `check-edge-drift`-style pull of the LIVE function
+--
+-- `591305d` (G67) pulled the deployed function into the repo, and the deployed lineage does not
+-- fire the handoff and forget it — it **awaits** the reply, on purpose, and says so in its own
+-- comment: *"The bridge response is awaited so the audit trail records completion, fallback, or
+-- failure instead of claiming that an unobserved request queued."* That is not a regression, it
+-- is the behaviour `0301`'s audit-honesty work depends on. The test was asserting an obsolete
+-- contract. **A test nothing runs is a test nothing maintains**, so the two halves are one
+-- finding: the missing gate is why the stale assertion survived, and the stale assertion is
+-- what a newly-added gate would have tripped over.
+--
+-- FIXED, both halves:
+--   * `verify.yml` gains an `Edge-function suite` step running `node --test tests/*.test.mjs`,
+--     with Node PINNED via `actions/setup-node@v4` to 22 and an inline assertion that the
+--     runtime is >= 22.18. The floor is load-bearing rather than cosmetic: these tests import
+--     `../edge-functions/**/*.ts` directly and need unflagged TypeScript type-stripping, which
+--     landed in Node 22.18. ubuntu-latest has defaulted to Node 20.x, where every one of these
+--     files fails with ERR_UNKNOWN_FILE_EXTENSION — an error that reads like a broken test
+--     rather than a wrong runtime, so the version check fails loudly instead.
+--   * the `waitUntil` assertion is INVERTED (`assert.doesNotMatch`) and paired with
+--     `assert.match(source, /const response = await fetch\(solverUrl/)`, so the test now names
+--     the behaviour the function actually has and would fail if anyone reverted to
+--     fire-and-forget.
+--
+-- **Proof the gate fires, which is this repo's standing requirement for adding one:** the step
+-- as written, run against f0b13fc — the commit immediately before this one — exits 1 with
+-- `not ok 8 - agent binds an explicit run before handing off to the solver`. Against HEAD it
+-- exits 0 with **24 tests / 24 pass**. It is not a step that can only be green.
+--
+-- ══ 3. AND A THIRD THING, WHICH IS WHY §1 MATTERED TODAY: THE REPO WAS NOT THE TRUTH ══
+--
+-- `ottoq-orchestrator-agent` **v29** (deployed 2026-09-21 08:04 UTC, the fix for `0301`'s
+-- `engine: receipt.engine ?? "cp_sat_forward_lex"` default) was deployed by editing the
+-- function through the API. Its commit — 6e52dae, "fix(edge): orchestrator v29" — touched
+-- **`FINDINGS.md` and `db/checks/0304` and NOTHING ELSE**. The repo copy of the function
+-- carried none of v29: no `skipped` branch, no `solver_ran`, and `engine: receipt.engine ??
+-- "cp_sat_forward_lex"` still on line 328. A commit whose subject line is the fix, that does
+-- not contain the fix. For four hours the only copy of the corrected function was the one
+-- running in production, which is the inverse of where the truth is supposed to live —
+-- exactly the drift `scripts/check-edge-drift.sh` was written for and which nothing ran here
+-- either (it needs `SUPABASE_ACCESS_TOKEN`, absent in this session).
+--
+-- Now: the repo copy carries v18/v29 verbatim, and a new test asserts the three parts of it
+-- that `0301` bought — `engine: receipt.engine ?? null`, `status: "skipped"`,
+-- `solver_ran: receipt.solver_ran === true`, and `solverAccepted` excluding a skip — with the
+-- negative check run over comment-stripped source, because the v18 header QUOTES the defective
+-- line so a reader knows what changed and a naive regex would fail on the explanation.
+--
+-- ══ 4. G109's CODE SIDE, COMPLETED — v30 ════════════════════════════════════
+--
+-- `0304` §4b retracted G109: two proposals sharing a `stall_id` were **0→5 and 23→41**, a
+-- valid two-slot schedule, and `m.AddNoOverlap(ivs)` per point held. The doc comment I had
+-- deleted for being false was true. That restoration was only in the repo; the DEPLOYED bundle
+-- still carried the paragraph asserting the false finding, i.e. the deployed code asserted a
+-- retracted claim.
+--
+--   deployed v30  2026-09-21 (ezbr_sha256 a8da8e50…), verify_jwt true
+--   `_shared/agent_solver_chain.ts`  the original claim restored AND sharpened: it now states
+--   that one-vehicle/one-stall is enforced TEMPORALLY, quotes the AddNoOverlap loop, says that
+--   two proposals on one stall in DISJOINT windows are correct output, and ends
+--   "Before calling a shared stall_id a conflict, READ THE WINDOWS."
+--
+-- **Boot-verified rather than assumed**, because 25 KB of source went over the API by hand:
+-- invoked through `net.http_post` with the vault's `ottoq_anon_key` (the same call
+-- `ottoq_sim_tick_advance` makes), request 96685 →
+-- **`status_code 200`, body `{"ok":true,"skipped":"no running run"}`, `error_msg NULL`.** That
+-- exercises module load, the `_shared` import, client construction and the run query. It does
+-- NOT exercise the solver handoff — there is no live run — so the `skipped`/`engine:null`
+-- branch's proof remains `0305` §3's 08:18:33 row, which was produced by v29 whose handoff code
+-- v30 carries byte-identically.
+--
+-- A third test asserts the restored comment cannot be deleted again without a red build:
+-- `/one-vehicle\/one-stall/`, `/AddNoOverlap/`, `/READ THE WINDOWS/`.
+--
+-- ══ 5. WHAT IS STILL OPEN ═══════════════════════════════════════════════════
+--
+-- G109 as RESTATED: `assign_stall` carries no time dimension, so a two-slot plan is half
+-- discarded — the disposer enacts 23→41 and refuses 0→5 with `stall_reserved`. Nothing in
+-- this file touches that; it is a proposal-vocabulary design question and the disposer's
+-- refusal must not be "fixed".
+--
+-- And one this file deliberately does not close: **`check-edge-drift.sh` still cannot run in
+-- CI or in this session** for want of `SUPABASE_ACCESS_TOKEN`, so §3's class of defect — repo
+-- and deployment disagreeing — is now *testable* but still not *gated*. The new node step
+-- gates the repo's copy against its own contract, which would have caught v29's absence only
+-- because the new assertions name v29's fields. That is a narrower guarantee than drift
+-- detection and should not be mistaken for it.
+--
+-- OPEN-ITEM: scripts/check-edge-drift.sh is the only thing that can prove edge-functions/ matches what is deployed, and it runs nowhere -- not in verify.yml, not in this session -- because it needs SUPABASE_ACCESS_TOKEN. v29 lived only in production for four hours and no signal existed that could have said so. The new `node --test` step gates the repo copy against named v29 fields, which is narrower than drift detection and must not be read as replacing it. Tracked as G110.
+
+-- Nothing to measure in SQL. The one database interaction this file makes is the boot check of
+-- the deployed function, reproduced here so a reader can repeat it (the response row is
+-- transient -- net._http_response is trimmed).
+--
+--   SELECT net.http_post(
+--     url := 'https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-orchestrator-agent',
+--     headers := jsonb_build_object('Content-Type','application/json',
+--       'Authorization','Bearer '||(SELECT decrypted_secret FROM vault.decrypted_secrets
+--                                    WHERE name='ottoq_anon_key' LIMIT 1),
+--       'apikey',(SELECT decrypted_secret FROM vault.decrypted_secrets
+--                  WHERE name='ottoq_anon_key' LIMIT 1)),
+--     body := jsonb_build_object('depot_id','11111111-1111-1111-1111-111111111111'),
+--     timeout_milliseconds := 20000);
+--   -- then: SELECT status_code, content, error_msg FROM net._http_response WHERE id = <returned>;
+--
+-- The deployed version and hash, which is the part worth re-reading later:
+SELECT 'ottoq-orchestrator-agent' AS function_slug,
+       30                         AS version_at_this_check,
+       'a8da8e509e03104e02cdf22917403b39648015055d1e6fcd9d837c860aab49ff' AS ezbr_sha256,
+       'repo edge-functions/ottoq-orchestrator-agent/index.ts + _shared/agent_solver_chain.ts'
+                                  AS deployed_from;
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- ══ 7. G110's SECOND HALF IS NOW WIRED BUT DELIBERATELY INERT (2026-09-21 15:1x
+--       UTC / 10:1x CT). The CI step exists; it cannot compare anything until a
+--       secret lands, and it says so rather than going green.
+-- ══════════════════════════════════════════════════════════════════════════════
+--
+-- §5 left this open: `scripts/check-edge-drift.sh` is the only thing that can prove
+-- `edge-functions/` matches what is deployed, and it ran NOWHERE. `verify.yml` now carries
+-- **Edge-function drift, repo vs deployed**. **This does NOT close G110** — the step is a no-op
+-- until `SUPABASE_ACCESS_TOKEN` exists as a repository secret, and pretending otherwise would be
+-- the same defect as the success line nothing reads.
+--
+-- ══ 7a. THE DESIGN DECISION, WHICH IS THE ONLY INTERESTING PART ══════════════
+--
+-- The naive wiring — run it on every event, fail on drift — would have produced **the
+-- permanently-red gate this very workflow warns about twice**. The script compares the REPO
+-- against the DEPLOYED function, and **on a pull request the repo copy is the PROPOSED state**.
+-- So every PR that edits an edge function legitimately differs from deployed until the change is
+-- deployed, and such a PR would go red for being exactly what it is. `0206`'s lesson, arriving
+-- from a new direction.
+--
+-- So the step is **asymmetric by ref**: a WARNING on a pull request, a FAILURE on push to `main`.
+-- `main` is where the repo and the deployment are supposed to agree; a disagreement there is real
+-- drift and is worth stopping for. On a branch it is a work-in-progress signal.
+--
+-- **And the script's own exit codes are respected rather than reinterpreted**, which matters
+-- because it was written to refuse a false pass:
+--
+--   0  compared, no unexpected drift                      → step passes
+--   1  unexpected drift, files named                      → FAIL on main, WARN on a PR
+--   2  COULD NOT COMPARE (no CLI, no token, download fail) → WARN, never a green tick
+--   *  anything undocumented                              → FAIL, because an exit code the
+--                                                            script does not document is not a
+--                                                            result to interpret charitably
+--
+-- `ottoq-energy-mpc` needs no handling here: it is an acknowledged exception INSIDE the script
+-- (G69 — the deployed copy still carries hardcoded credential fallbacks, and syncing it into the
+-- repo would re-commit a live secret, so the fix is to deploy the repo's version and rotate).
+--
+-- ══ 7b. TESTED BEFORE COMMITTING, BOTH BRANCHES AND THE WHOLE TRUTH TABLE ════
+--
+-- The skip path, which is what CI executes today:
+--
+--   SUPABASE_ACCESS_TOKEN=""   → `::notice::no SUPABASE_ACCESS_TOKEN -- edge drift NOT checked.
+--                                 This is a skip, not a pass.`  exit 0
+--
+-- The script's own refusal, with a token present but unusable:
+--
+--   SUPABASE_ACCESS_TOKEN=fake → `check-edge-drift: download failed: ... REFUSING to report a
+--                                 pass without comparing. exit 2`  → step warns, exit 0
+--
+-- (That second test incidentally proved the CLI guard works and that the Supabase CLI IS present
+-- in this environment — the script got past its `command -v supabase` check and failed at the
+-- download, which is the correct place to fail with a fake token.)
+--
+-- And the ref/exit matrix, exercised directly rather than reasoned about:
+--
+--   ref                  rc=0    rc=1              rc=2     rc=7
+--   refs/heads/main      exit 0  **exit 1** ERROR  exit 0    exit 1
+--   refs/pull/201/merge  exit 0  exit 0   WARN     exit 0    exit 1
+--
+-- So the gate can fail — on drift on main, and on an exit code the script does not document —
+-- and cannot fail for being a PR. That is the property `0206` asks for, stated as a table.
+--
+-- ══ 7c. WHAT REMAINS, PRECISELY ═════════════════════════════════════════════
+--
+-- One repository secret: `SUPABASE_ACCESS_TOKEN`, at
+-- github.com/OTTOYARD/otto-q-core → Settings → Secrets and variables → Actions. The same token
+-- also removes the Supabase MCP server's own per-statement confirmations for in-session SQL, by
+-- letting the Management API be called over HTTPS instead — which is what
+-- `.claude/settings.json`'s `//2` note already prescribed and what blocked two queries at
+-- 13:45 UTC today. Supabase's own documentation is explicit that a personal access token
+-- "carries your full account privileges", so it wants a finite expiry and a rotation habit
+-- rather than a permanent grant
+-- (https://supabase.com/docs/reference/api/introduction, fetched 2026-09-21).
+--
+-- OPEN-ITEM: G110's drift half is WIRED BUT INERT. verify.yml now carries an edge-drift step that warns on PRs and fails on push-to-main, respects the script's exit 2 as "could not compare" rather than a pass, and soft-skips without the secret -- the ref/exit matrix was exercised directly and is in §7b. It compares NOTHING until SUPABASE_ACCESS_TOKEN exists as a repository secret, so repo-vs-deployed drift is still ungated in practice and G110 stays OPEN. Do not record it as closed on the strength of the step existing; that is the same defect as a success line nothing reads. Tracked as G110.
+
+-- ══ 8. THE SECRET WAS DECLINED, SO §7c's "WHAT REMAINS" IS NOT A PENDING ═════
+--       ITEM — IT IS A CEILING. AND THE SUBSTITUTE IS WEAKER IN A NAMED WAY.
+--
+-- **Decided 2026-09-21 by Chase: no `SUPABASE_ACCESS_TOKEN` repository secret.** §7c asked for
+-- it and quoted Supabase's own line that a PAT *"carries your full account privileges"*; that
+-- sentence is the argument against handing one to CI, not merely a caveat attached to handing it
+-- over, and the decision follows it. **Recorded as a decision rather than an omission**, because
+-- an unexplained soft-skip reads as configuration someone forgot and invites a future session to
+-- re-ask. `verify.yml`'s notice and comment now say so in the log, where the skip is seen.
+--
+-- **THE CONSEQUENCE, STATED WITHOUT SOFTENING.** There is no unauthenticated route to a deployed
+-- function's source, so **no CI configuration can compare repo against deployed.** The drift step
+-- will print and exit 0 on every run from now on. **A green `verify` does not mean
+-- `edge-functions/` matches what is deployed, and never will.** That is the one direction this
+-- repo has no automated guard for — every other gate here (pytest, node, compile-check, KPI)
+-- reads committed files and needs nothing.
+--
+-- ══ 8a. THE SUBSTITUTE: THE MCP CONNECTOR, WHICH NEEDS NO REPO SECRET ═══════
+--
+-- The Supabase MCP connector reads deployed source in-session with no token in the repo.
+-- `mcp__Supabase__list_edge_functions` + `get_edge_function` is the whole check. Run today:
+--
+--   * **28 ACTIVE deployed, 28 directories in `edge-functions/` (excluding `_shared` and
+--     `_MANIFEST.md`), and the two SETS MATCH EXACTLY** — no deployed function missing from the
+--     repo, no repo directory that is not deployed. That half is a complete verdict.
+--   * `ottoq-orchestrator-agent` is **v30**, the copy `0306` §3 deployed, and its deployed source
+--     carries every marker this repo's tests assert: the `else if (receipt.skipped)` branch,
+--     `engine: receipt.engine ?? null` (no default), `solver_ran`, `assign`, the **awaited**
+--     `const response = await fetch(solverUrl` rather than `EdgeRuntime.waitUntil`, the v18
+--     header block, and — in the deployed `_shared/agent_solver_chain.ts` — the G109 TEMPORAL
+--     doc comment. So the four-hour production-only window `0306` §3 records is **closed**.
+--
+-- **AND WHAT THAT IS NOT.** It is **marker-level agreement, not byte-level.** `_MANIFEST.md`
+-- established by measurement that `version` is a 77%-false-positive signal and `updated_at`
+-- gives two false positives and one false negative out of 28 — and that the one false negative
+-- was the function whose drift contained a live credential. It also refuses hand-transcription
+-- as a method, correctly, and a tool result read into a model's context and retyped is
+-- transcription. **So this check can say "the deployed copy contains the fixes" and cannot say
+-- "the two files are identical."** `ezbr_sha256` does not close the gap either: it digests the
+-- bundled eszip, not the source, so it cannot be compared to a hash of a repo file. Only
+-- `supabase functions download --use-api` — i.e. the declined token — gives bytes.
+--
+-- ══ 8b. THE RESIDUAL RISK, WHICH IS ABOUT HUMANS RATHER THAN TOOLING ════════
+--
+-- An in-session check runs **when someone remembers**; a CI gate runs on every push. The failure
+-- `0306` §3 exists to record — orchestrator v29 live in production for four hours with the repo
+-- disagreeing and no signal able to say so — **is exactly a "when someone remembers" failure**,
+-- and the substitute for the gate is the thing that already failed once. Naming that plainly is
+-- the point of this section: the guard did not get weaker quietly, it got weaker by a decision
+-- that was made with the trade-off visible.
+--
+-- **So the standing instruction, for any session that deploys an edge function:** deploy and then
+-- immediately re-read the deployed source through the connector in the SAME session, because
+-- nothing downstream will. And **G69's exception still stands** — `ottoq-energy-mpc`'s deployed
+-- body carries hardcoded credential fallbacks the repo removed on 2026-09-07, it must never be
+-- synced INTO the repo, and it is the one function where deployed-differs-from-repo is correct.
+
+SELECT 'edge drift gate' AS subject,
+       'WIRED, PERMANENTLY INERT -- secret declined 2026-09-21 by decision' AS ci_status,
+       'in-session via Supabase MCP connector; marker-level, not byte-level' AS substitute,
+       '28 deployed = 28 repo dirs, sets match exactly' AS set_verdict,
+       'orchestrator-agent v30 carries every v18 marker; §3 four-hour window CLOSED' AS content_verdict;
+
+-- OPEN-ITEM: G110's drift half is WIRED AND NOW PERMANENTLY INERT BY DECISION, not by oversight -- Chase declined the SUPABASE_ACCESS_TOKEN repository secret on 2026-09-21, following the same Supabase documentation §7c quoted about a PAT carrying full account privileges. No CI configuration can compare repo against deployed without it, so a green verify never means edge-functions/ matches deployment, and this is a CEILING rather than a TODO: do not re-ask for the secret. The substitute is an in-session check through the Supabase MCP connector (§8a), which today confirmed 28 deployed = 28 repo directories with the sets matching exactly, and orchestrator-agent v30 carrying every marker the tests assert -- closing §3's four-hour production-only window. It is MARKER-LEVEL, NOT BYTE-LEVEL: _MANIFEST.md disqualified version and updated_at by measurement and refuses hand-transcription, and ezbr_sha256 digests the bundled eszip rather than the source, so only the declined token yields bytes. The residual risk is human -- an in-session check runs when someone remembers, and v29's four production-only hours were themselves a "when someone remembers" failure. Standing instruction: any session that deploys an edge function re-reads the deployed source through the connector in that same session. Tracked as G110.

@@ -1,5 +1,26 @@
 // ============================================================================
 // ottoq-cuopt-propose — NVIDIA cuOpt → OTTO-Q external-proposal seam adapter.
+// v27: ⭐ RANKED CANDIDATE SET — THE PROPOSAL NOW NAMES ITS FALLBACKS.
+//      Every proposal this function has ever written named exactly ONE stall. If
+//      that stall was claimed between propose and dispose, refusal was the only
+//      outcome available — the disposer had nothing to dispose over. 0255
+//      measured the cost on a live run: 29 of 39 refusals (74%) were STALENESS,
+//      not capacity. A free, compatible, same-type stall existed and the
+//      proposal could not name it.
+//      Each proposal now carries up to 3 ranked alternatives as
+//      proposal.candidates = [{stall_id, requested_kw}, ...], which
+//      ottoq_promote_proposal_candidates (migration 0358, corrected by 0359)
+//      walks at the top of ottoq_dispose_external_proposals, rewriting BOTH the
+//      stall and the load onto the first feasible one. That machinery shipped
+//      inert because nothing produced the array; this is its producer.
+//      SAME SERVICE ONLY — a candidate always matches the primary's stall_type.
+//      Choosing a different service is a scheduling decision and does not belong
+//      in a proposer.
+//      DETERMINISTIC BY CONSTRUCTION — sorted (effective kW desc, stall id asc),
+//      a total order, because ottoq_hash_proposals digests proposal::text and
+//      freeStalls arrives from a LIMIT query with no ORDER BY.
+//      A proposal with no alternative is byte-identical to its v25 form: the key
+//      is omitted rather than emitted empty.
 // v25: ⭐ AVAILABILITY RE-FIX — THE CHARGER IS A HEALTH SIGNAL, NOT AN OCCUPANCY SIGNAL.
 //      Phase-11 showed 11 gate-passed calls abstaining `no_free_stalls_demand_present`
 //      with free_stalls_in = 0 on ALL 11 — a category phase 10 did not have.
@@ -460,10 +481,69 @@ serve(async (req) => {
     const overCapKw = capKw === null ? null
       : Math.round((committedKw + proposedKw - capKw) * 10) / 10;
 
+    // ── v27 RANKED CANDIDATE SET ────────────────────────────────────────────
+    // A single stall_id gives the disposer nothing to dispose over: if the
+    // primary is taken by the time the tick reads the proposal, the only
+    // available outcome is a refusal. 0255 measured that 29 of 39 refusals
+    // (74%) were STALENESS, not capacity — the depot had a free stall of the
+    // right type and the proposal could not name it.
+    //
+    // 0358/0359 built the SQL side: ottoq_promote_proposal_candidates walks
+    // proposal->'candidates' at the top of ottoq_dispose_external_proposals and
+    // rewrites BOTH stall_id and requested_kw onto the first feasible element.
+    // This function is the only producer that fills it, so until now that
+    // machinery was inert.
+    //
+    // ELEMENT SHAPE is the object form {stall_id, requested_kw}, never a bare
+    // uuid. Four L1 energy evaluators (EN.001–EN.004) read requested_kw, so a
+    // promotion that moved the stall without moving the load would have the
+    // shield judging a draw the vehicle will not take — that was the defect
+    // 0358 shipped and 0359 fixed. The SQL side re-derives kW itself for bare
+    // uuids and will only promote those onto an identical connector_max_kw;
+    // emitting the object form keeps it off that narrow path.
+    //
+    // DETERMINISM. freeStalls comes from a `.limit(120)` query with no ORDER BY,
+    // so its row order is NOT guaranteed by Postgres. The sort below is total —
+    // (effective kW desc, stall id asc) — so the emitted array is identical for
+    // an identical world whatever order the rows arrived in. That is load-
+    // bearing, not tidiness: ottoq_hash_proposals digests p.proposal::text, so
+    // a candidate array that reordered on replay would break the proposals atom
+    // of the fourteen-atom verdict.
+    const vehById = new Map<string, any>();
+    for (const v of [...allCands, ...zoneACands, ...enrouteAll]) {
+      if (v && v.id && !vehById.has(String(v.id))) vehById.set(String(v.id), v);
+    }
+    const MAX_CANDIDATES = 3;   // matches ottoq_promote_proposal_candidates' p_max_promotions default
+    const primaryStalls = new Set(assignments.map((a) => a.stallId));
+    const rankedCandidates = (a: Assign): { stall_id: string; requested_kw: number }[] => {
+      const v = vehById.get(String(a.vehicleId));
+      if (!v) return [];
+      const pool = a.enroute ? freeDcfc : freeStalls;
+      return pool
+        // SAME SERVICE ONLY. Promoting a dcfc vehicle onto an l2 stall would
+        // change what the vehicle came for, and choosing a different service is
+        // a scheduling decision — adapters translate, proposers propose, the
+        // decide path disposes. A proposer must not make it.
+        .filter((s: any) => String(s.stall_type) === String(a.stallType))
+        // Exclude this proposal's own primary, and every OTHER proposal's
+        // primary: those are being claimed on this same tick, so offering them
+        // as alternatives only spends promotion attempts that cannot succeed.
+        .filter((s: any) => s.id !== a.stallId && !primaryStalls.has(s.id))
+        .filter((s: any) => compatible(v.inlet_type, s))
+        .map((s: any): { stall_id: string; requested_kw: number } =>
+          ({ stall_id: String(s.id), requested_kw: effKw(v, s) }))
+        .sort((x: { stall_id: string; requested_kw: number },
+               y: { stall_id: string; requested_kw: number }) =>
+          y.requested_kw - x.requested_kw || x.stall_id.localeCompare(y.stall_id))
+        .slice(0, MAX_CANDIDATES);
+    };
+
     let proposed = 0;
     let enrouteProposed = 0;
     let zoneAProposed = 0;
     let submitErrors = 0;
+    let withCandidates = 0;
+    let candidatesEmitted = 0;
     for (const a of assignments) {
       const proposal: any = {
         abstain: false,
@@ -473,6 +553,14 @@ serve(async (req) => {
         source: a.src,
         solver_directive: solverDirective,
       };
+      // Set only when non-empty, so a proposal with no alternative keeps the
+      // EXACT payload shape it had before v27 and its hash does not move.
+      const candidates = rankedCandidates(a);
+      if (candidates.length > 0) {
+        proposal.candidates = candidates;
+        withCandidates++;
+        candidatesEmitted += candidates.length;
+      }
       if (agentHandoff) {
         proposal.agent_handoff = {
           chain_id: agentHandoff.chain_id ?? null,
@@ -517,6 +605,11 @@ serve(async (req) => {
         zone_a_proposed: zoneAProposed, zone_a_cap: zoneACap, zone_a_error: zoneAError,
         enroute_proposed: enrouteProposed, dcfc_free: freeDcfc.length,
         submit_errors: submitErrors,
+        // v27. NOT the same thing as the `candidates` key on the HTTP response,
+        // which counts VEHICLES posed to the LP. These count the ranked
+        // alternative STALLS carried inside the proposals.
+        ranked_candidates: { proposals_with: withCandidates, emitted: candidatesEmitted,
+                            max_per_proposal: MAX_CANDIDATES },
         stalls_scanned: (stalls ?? []).length,
         cohort_mode: cohortMode, gate_tick: gateTick, pinned_requested: pinnedRequested,
         pinned_dropped: { by_state_or_soc: pinnedDroppedByState,
@@ -540,6 +633,7 @@ serve(async (req) => {
                         already_reserved: pinnedDroppedReserved },
       enroute_candidates: enrouteAll.length, enroute_in_instance: enrouteCands.length,
       enroute_proposed: enrouteProposed, enroute_source: enrouteSource, dcfc_free: freeDcfc.length,
+      ranked_candidates: { proposals_with: withCandidates, emitted: candidatesEmitted },
       zone_a_candidates: zoneAAll.length, zone_a_in_instance: zoneACands.length,
       zone_a_proposed: zoneAProposed, zone_a_cap: zoneACap,
       zone_a_reserve_fraction: reserveFrac, zone_a_error: zoneAError,

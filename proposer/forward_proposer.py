@@ -653,6 +653,29 @@ CHARGE_PLACE_KEY = "holds_charge_place"
 #: Planning it again is work with nowhere to land.
 PENDING_PROPOSAL_KEY = "has_live_holds_tick_proposal"
 
+#: 0366 / G81. THE OVERSTAY. True when the frame says this vehicle physically
+#: occupies a CHARGE stall for which no booking covers the clock -- i.e.
+#: ottoq_release_expired_bookings has already stamped
+#: release_reason = 'window_elapsed_occupied' and the asset never left.
+#:
+#: WHY THIS IS NOT ALREADY COVERED BY CHARGE_PLACE_KEY, which is the whole point:
+#: holds_charge_place asks "do I hold a BOOKED charge place?" and answers FALSE
+#: here, CORRECTLY -- the booking was released. So an overstaying vehicle looked
+#: plannable, and G80 measured the result: b97789b5 was offered NASH-L2-STALL-19
+#: while physically charging in NASH-L2-STALL-31 at soc 70 against target 100.
+#: The proposer was not wrong; it was not told.
+#:
+#: Measured on run 3fb415d8: 162 window_elapsed_occupied releases against 143
+#: clean window_elapsed, so more bookings expire with the asset still plugged in
+#: than expire cleanly, and 8 stalls were overstayed concurrently -- one DCFC of
+#: only ten by 188 minutes, one L2 by 241.
+#:
+#: KEY PRESENCE IS THE VERSION TEST, the same discipline as CHARGE_PLACE_KEY and
+#: PENDING_PROPOSAL_KEY. A frame that does not carry it -- a pre-0366 fixture, a
+#: certification arm, the gate off -- keeps exactly the behaviour it had. Never a
+#: guess, in either direction.
+OVERSTAY_CHARGE_KEY = "occupies_charge_stall_unbooked"
+
 
 def vehicle_has_live_proposal(vehicle: dict) -> bool:
     """True iff the frame says a holds_tick source already has a pending plan here.
@@ -677,7 +700,7 @@ def vehicle_has_live_proposal(vehicle: dict) -> bool:
 def vehicle_is_held(vehicle: dict) -> bool:
     """True iff the frame says this vehicle is not worth planning right now.
 
-    TWO INDEPENDENT REASONS, and they are different in kind:
+    THREE INDEPENDENT REASONS, and they are different in kind:
 
       1. IT ALREADY HAS A PLACE. facts_version >= 2 frames answer this in
          `holds_charge_place`, and that answer wins outright -- including when
@@ -691,10 +714,28 @@ def vehicle_is_held(vehicle: dict) -> bool:
          them, while the kernel had already declined to open a seat for exactly
          those vehicles.
 
+      3. IT IS ALREADY IN ONE. 0366 frames answer this in
+         `occupies_charge_stall_unbooked` (G81): the vehicle physically occupies a
+         charge stall whose booking has been released, so it holds a charge place
+         in fact while `holds_charge_place` -- which asks about a BOOKED place --
+         correctly says False. Checked BEFORE reason 1's key, because that key wins
+         outright and would otherwise make this unreachable. Measured on run
+         3fb415d8: 162 window_elapsed_occupied releases against 143 clean ones, and
+         one DCFC of only ten overstayed by 188 minutes.
+
     A frame carrying none of the keys (pre-0265, or the gate off) answers False
     for every vehicle -- the pre-0265 behaviour, unchanged, and never a guess.
     """
     if vehicle_has_live_proposal(vehicle):
+        return True
+    #: 0366 / G81. IT IS ALREADY IN ONE. Occupying a charge stall whose booking has
+    #: been released is holding a charge place in FACT, if not on the calendar.
+    #:
+    #: THIS MUST SIT ABOVE THE CHARGE_PLACE_KEY BRANCH BELOW, and the ordering is
+    #: the entire fix: that branch "wins outright" and answers False for precisely
+    #: this vehicle, so the same check placed after it would be unreachable while
+    #: looking perfectly correct in a diff.
+    if vehicle.get(OVERSTAY_CHARGE_KEY):
         return True
     if CHARGE_PLACE_KEY in vehicle:
         return bool(vehicle[CHARGE_PLACE_KEY])

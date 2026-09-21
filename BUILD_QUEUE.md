@@ -28,6 +28,508 @@ correct, no caller at link 1).
 
 ---
 
+## OVERNIGHT 2026-09-19 → 20 — WHAT LANDED, AND THE THREE DECISIONS THAT ARE YOURS
+
+Chase, 2026-09-19 ~11:30 PM CT: *"Just keep building and testing in the background
+and save any architecture or major issues for me in the morning… build and test
+logic that doesn't require me."* This section is that report. Every number in it
+is on the twin depot (`11111111-…`, rule 8), and the two runs are `3fb415d8`
+(pre-fix baseline, 1,245 ticks, governor-stopped) and `5b37ee46` (busy_day, seed
+777777, speed 8.0, the same seed so the pair is CRN-comparable).
+
+**THE HEADLINE, AND IT IS A GOOD ONE.** The rejection → re-solve loop you asked
+for **already existed and already ran** — `ottoq.ottoq_react_to_refusals`, called
+every tick from `decide_and_dispatch`, walks up to 25 calendar-free stalls,
+reserves, books and re-emits the command with `reroute_after`. Nothing needed
+building. It was being handed a world that lied to it. With that fixed, its
+success rate on the refusals it can actually act on went **2 of 7 (29%) → 61 of
+83 (73.5%)**.
+
+### What landed (all applied, all committed, all on the twin depot)
+
+| # | migration | what it fixes | recert |
+|---|---|---|---|
+| 0364 | proposal outcomes survive their run | G72 — an append-only `class='evidence'` disposition ledger. **Now witnessed, not asserted:** starting `5b37ee46` purged 352,673 rows and deleted the prior run outright; all 12 ledger rows describing that deleted run survived. | false |
+| 0367 | the reclaimer on the path that actually runs | **G82 — 0360's reservation reclaimer had never executed once.** `ottoq_demo_metronome` calls `ottoq_sim_advance_tick_world` + `decide_and_dispatch` directly and never `ottoq_sim_advance_tick`, which is where 0360 put it. | **true** |
+| 0368 | the reroute stops guessing `dcfc` | G83 — a `proceed_to_stall` with no `stall_type` fell through to the scarcest type on site (10 stalls) when its real target was staging (113). 4 of 8 reroutable refusals. | **true** |
+| 0369 | the unbacked orphan | G84 — a vehicle parked in stall A still holding stall B, with nothing in the calendar behind it. 21 releasable against **15 calendar-backed plans that must survive** — the booking test is the whole safety of it. | **true** |
+| 0370 | count the contradicted claims | G85 — 59 live calendar claims already overruled by a vehicle in the stall, **0 of them in `space_conflict_ledger`**. Measured only; changes no assignment. | **true** |
+| 0371 | take my own nondeterminism back out | 0367 used `FOR UPDATE … SKIP LOCKED`, which makes the candidate set depend on who else held a row at that instant — inside a path the determinism pair certifies. Replaced with an unlocked, ascending-id selection. | **true** |
+
+Checks: `0257`–`0261`. Findings: **G82–G86** in `FINDINGS.md`, with G72 closed and
+the 0360 attribution retracted (see below).
+
+### The three decisions that are yours
+
+1. **`perimeter_walkaround` — RESOLVED AND BUILT 2026-09-20 (`0383`/`0384`, check
+   `0277`), so this is no longer a decision you owe me; what follows is the record,
+   and the "holding 98 of 113 staging stalls" half is RETRACTED.** The service is now
+   performable, mandatory and declared: derived as `concurrency='exterior'` beside
+   `sensor_clean`, admitted by the starter that was already there, metered against the
+   `general_tech` pool (10 at the twin depot), completed in place by the general atom
+   advancer at exactly its declared 12 minutes. Proven end to end on a rolled-back
+   probe. **No completer needed writing** — `twin.ottoq_sim_advance_visit_atoms`
+   completes any atom whose `ends_at` has passed and names no service; the walkaround
+   was simply derived into `concurrency='hold'`, a seventh class with one member that
+   no starter admits. Measured: every other class completes (cabin 75/127, gate 33/98,
+   anchor 28/67, bay 23/64), `hold` 0 of 63 with not one atom ever reaching
+   `in_progress`. **The retraction: `perimeter_hold` is the depot's perimeter RING —
+   long-dwell parking chosen on duration alone, `need_atom IS NULL`, and no function in
+   the database mentions both strings.** Those 82–98 staging holds were never this
+   service's, so closing it frees not one stall and the 258 `twin.staging_overflow`
+   events remain open as a staging-capacity-under-dwell question. **What IS still
+   yours:** the fix makes a critical gate real. SLA.004 blocks redeploy on any
+   non-deferrable `must_do` atom, and before `0383` it passed on 39 of 63 walkarounds
+   because `ottoq_atoms_guard` had *withdrawn the requirement*, not because it was met.
+   At night every arriving vehicle now needs 12 metered technician-minutes before it
+   may deploy (~76 min of pool time for 63 walkarounds across 10 techs, competing with
+   cabin work), and the advancer ranks a vehicle already in `staged_for_departure`
+   BELOW charging vehicles for that same pool — a plausible starvation path I have
+   deliberately not pre-empted, because both mitigations (rank a dispatch-blocked
+   vehicle up, or make the walkaround `deferrable`) change what "ready for work"
+   means. **That is the measurement for the next fresh run.** Original framing below,
+   left as the record:
+
+   **`perimeter_walkaround` — a mandatory service no code in this engine can
+   perform, holding 98 of 113 staging stalls.** This was the big one. `db/checks/0261`
+   has the full trace: a producer (`ottoq_derive_visit_needs`, night-gated and the
+   gating is *correct*), two observers that say yes for 90% of arrivals, `must_do:
+   true`, and **no executor anywhere** — every completion path takes a fixed service
+   list and this service is in none of them. So the hold clears on expiry, which is
+   what the measured **248-minute average window** is. Meanwhile **258
+   `twin.staging_overflow`** events fired on the same run. Three answers, all of
+   which change what "ready for work" means: **(a) make it performable** — add it to
+   the twin's atom advancer as a `concurrency='hold'` service completed in place
+   after its 12-minute `est_min`, turning a 248-minute hold into a 12-minute one
+   (**my recommendation**, and it makes the twin *more* faithful); (b) stop it
+   holding a stall; (c) stop deriving it until something can perform it. **I
+   implemented none — writing a completer for a service nothing performs would be
+   fabricating work completion.**
+
+2. **Act on G85, or leave it measured?** 0370 now counts the standing
+   contradictions (59, average age **114.6 minutes**, average **140.5 minutes**
+   still to run). Acting on them — rebooking a holder whose stall is already taken,
+   *before* it travels — would convert the 25 late `assignment_refused_occupied`
+   refusals into early rebookings. That is an assignment-policy change, so it waits
+   for you.
+
+3. **CP-SAT's host.** Unchanged and still yours: `ottoq-intelligence` as an
+   always-on container plus `OTTOQ_INTEL_URL` / `OTTOQ_INTEL_TOKEN`. Re-derived from
+   `ottoq_intelligence_ledger` at 04:19 UTC, and this is the argument in one row:
+   **`cpsat_service` averages 23 ms against cuOpt's 2,783 ms and Nemotron's 23,130
+   ms** — fastest thing in the table by three orders of magnitude, 41 of 49 calls
+   enacted, and it has not been called since 02:45. **CORRECTED ~09:20 AM CT: not
+   because the host is down.** The box answers a CONNECT probe on 8080 and always
+   did; what was missing is `OTTOQ_INTEL_URL` / `OTTOQ_INTEL_TOKEN` /
+   `OTTOQ_BRIDGE_TOKEN`, absent from the project entirely. I could not have known
+   the host's state either way — plain HTTP cannot egress from this container.
+
+### Two retractions, mine
+
+* **The improvement I credited to 0360 was not 0360's.** "Free stalls 2 → 30,
+  charge 0 → 11, occupancy 21 → 43" was real but came from the one-off *manual*
+  invocation I made while verifying that migration — the tick wiring never ran. A
+  single manual call is not a fix; it looked like one because the numbers moved.
+  G76/G77 are annotated.
+* **"6.5% reroute success" was the wrong denominator.** It divided by all 31
+  refusals when 24 of them are `superseded` or `vehicle_state_incompatible`, which
+  the reactor is *right* to escalate and cannot reroute. The honest figure was 2 of
+  7. G78's defect — an honest refusal scored as a miss — committed by me on the
+  instrument measuring the fix.
+
+### Two rules this night earned
+
+* **A free-stall count is only meaningful as the INTERSECTION of the pointer gate
+  (`stalls.reserved_by`) and the calendar gate (`ottoq_stall_bookings`).** Measured
+  on staging: **59 pointer-free, 12 calendar-free, 11 free on both.** Anyone
+  quoting `reserved_by` overstates availability five-fold. Third direction this
+  two-authorities theme appeared in tonight (G84, the wash bays in `0260`, this).
+* **A caller check must match the call syntax, not the bare name.**
+  `position('ottoq_sim_advance_tick' in prosrc)` returned 4179 for the metronome and
+  was read as "it calls advance_tick". 4179 is the offset of
+  `ottoq_sim_advance_tick_***world***`. Third instance of one mistake class tonight,
+  after the `_`-is-a-LIKE-wildcard trap and testing raw source instead of
+  comment-stripped executable SQL — which bit again in `0371`'s own P9.
+
+**And the standing heuristic at the top of this file earned two more instances, both
+tonight, which is now six:** G82 — `ottoq_release_unusable_reservations`, correct,
+wired into a function the live engine never calls. G86 — `perimeter_walkaround`,
+produced for 90% of arrivals, mandatory, and with no executor. **Do not look for
+what is missing; look for what exists and is never called.**
+
+### ADDENDUM, 05:15 CT-minus-5 (05:15 UTC) — four more findings, and the one number that answers the CP-SAT question
+
+Written after the section above, so it is the later half of the same night.
+
+| # | what | state |
+|---|---|---|
+| G87 | `reliability.stranded_recharges` counts **neither recharges nor vehicles** — 239 events carrying 1,333 vehicle-requeues, published as `count(*)` of events under a name that says "recharge", when the writer grants no charge at all (it re-queues and temp-stages, per the never-bounce-to-the-gate doctrine). Wrong twice in opposite directions. | named; **do not quote that field** |
+| G88 | **`ottoq_stall_free_between` offered charge stalls whose OCPP charger was `Faulted`** — the shared candidate source every proposer and the reroute walk go through. **CP-SAT caught it:** it declined four frames as having no offerable charge stall while our own pointer census said 4 were free, and the four were the faulted ones. **FIXED by 0372.** | fixed |
+| G89 | **Two independently legal decisions summed to 239 kW over the depot's declared service maximum.** EV charging 1,691.8 kW (under its 1,800 nameplate) + BESS **charging at 968 kW** + 79 kW base load = **2,738.8 kW against `service_max_kw` 2,500**, reconstructing to 0.1 kW. `bess_dispatch` evaluates exactly **one** rule (`EN.003.bess_limits`, 234 evals, 0 failures) and it checks the battery's own envelope. **Nothing asserts the sum.** | **open — yours** |
+| G90 | `site_energy_snapshots.peak_demand_kw_15min` is a **running peak of instantaneous import**, not a 15-minute quantity: ≥ `grid_import_kw` in 1,139 of 1,139 snapshots, never less. Reading it for demand billing overstates by 79%. **KPI 3 is correct** and derives its own rolling mean — the investigation started as "the KPI understates the peak by 44%" and that accusation was wrong. | named, low severity |
+
+**G89 IS THE ANSWER TO YOUR CP-SAT QUESTION, AND IT IS BETTER THAN AN OPINION.** The
+shared site power cap is one of the four load-bearing constructs CLAUDE.md 2.3 names,
+and 2.5 — on R-12's evidence — records that **cuOpt cannot express a cumulative
+resource at all.** G89 is the first time that constraint has actually been breached on
+the twin depot, and the breach shape is exactly the one a per-consumer rule cannot
+catch: each consumer legal, the sum not checked. A rule can be added (and should be,
+measured-only first), but **what structurally holds a cumulative site cap while
+scheduling inside it is CP-SAT.** That is what the always-on container buys, stated as
+a measured breach rather than a preference.
+
+**AND THE LOOP RESULT, NOW THAT THE RUN HAS FINISHED — `db/checks/0267` is the
+definitive pair.** Both runs stopped on the same 540 sim-minute ceiling, 1,245 against
+1,260 ticks, same seed, scenario, depot and speed:
+
+| per tick | before | after | |
+|---|---|---|---|
+| **tasks completed** | 0.38956 | 0.42857 | **+10.0%** |
+| commands issued | 8.120 | 6.258 | **−23.0%** |
+| commands per dispatch | 60.2 | 45.3 | **−24.8%** |
+| escalations | 0.3157 | 0.2325 | **−26.4%** |
+| refusals | 0.3494 | 0.4032 | **+15.4%** |
+| dispatches | 0.13494 | 0.13810 | +2.3% |
+
+**Ten percent more work finished per tick, a quarter less command churn per dispatch, a
+quarter fewer escalations — on identical inputs, and on three fewer vehicles.** The
+extra refusals are the point rather than a regression: **210 of the 283 reroutable
+refusals (74.2%) now find a stall**, against 2 of 7 measured just before 0368/0369.
+`reservation_reclaim_blocked` was **zero across all 1,260 ticks**, which is the evidence
+that 0371's removal of `SKIP LOCKED` did not reintroduce 0360's deadlock.
+
+**AND I HAVE TO FLAG MY OWN OVERSTATEMENT, because it was in this file an hour ago.** At
+halfway I read commands per tick as down **3.3x** and dispatches as up **29%**. Both were
+artefacts of comparing a 51%-complete run against a finished one — command volume
+accelerates in the second half of a busy_day. `0263` §2 named that confound explicitly
+and then printed the numbers anyway, which is how a caveat fails to do its job. The real
+delta is +10%, and +10% on identical inputs is a good night's work that does not need
+help. `db/checks/0262` attributes **54 of the
+first 78 reroutes to 0368 specifically**: they are the cases where the refused command
+carried no `stall_type`, its real target was staging, and before 0368 the walk would
+have hunted ten DCFC stalls instead of 113 staging ones.
+
+**AND THE RE-LEARNING SUBSTRATE IS POPULATED AND ALREADY SAYING SOMETHING** (`db/checks/0266`):
+
+| source | rank | disp | enacted | refused | superseded | rescued | enacted % | runs |
+|---|---|---|---|---|---|---|---|---|
+| `cuopt` | 10 | 24 | 16 | 7 | 1 | **4** | **66.67** | 1 |
+| `greedy_constrained` | — | 111 | 25 | 33 | 53 | 0 | **22.52** | **2** |
+| `ottoq_service_priority` | — | 2 | 0 | 0 | 2 | 0 | 0.00 | 2 |
+
+`rescued_by_promotion = 4` is the ranked-candidate rescue path (0358/0359 + cuOpt v27)
+firing for the first time — `0256` had recorded it as inert for two migrations.
+`greedy_constrained` spans **two** runs and one of them was deleted outright by
+tonight's purge, so the evidence-class property is now visible in a column. **And the
+honest reading of 66.67% against 22.52% is "of the proposals each source commits,
+cuOpt's are enacted three times as often" — a statement about selectivity as much as
+quality**, because cuOpt proposes behind a gate that declines when there is nothing to
+propose while greedy proposes on everything, and greedy's 53 `superseded` are a better
+proposal displacing it rather than a failure. Settling which it is needs C5's
+`p_policy`.
+
+**AND THE VALIDATION THAT MATTERED MOST: THE DETERMINISM PAIR PASSES.** Run the moment
+the twin depot was free (`db/checks/0268`) — `ottoq_determinism_pair(171717, 12,
+'busy_day', …)`, 110.5 s, **both arms `validation_status = 'passed'`**, and
+`ottoq_twin_determinism_verdict` reads **12 ticks compared, 12 identical, 0 divergent,
+`deterministic = true`**. Six migrations touched the decide path tonight and five are
+`forces_recert TRUE`; if the fourteen-atom property had not survived them, everything
+above this line would be worthless. **It survived** — including 0371's replacement of
+0367's `SKIP LOCKED` with a deterministic ascending-id selection, which is the change
+this pair existed to test. The other half of that evidence is the 1,260-tick demo run
+logging **zero** `ottoq.reservation_reclaim_blocked` events: the alarm never fired, so
+the reclaimer neither deadlocked nor fell silent.
+
+**A NEW STANDING INSTRUMENT: `scripts/coverage-guard.sql`.** It mechanises this file's
+own heuristic and found G88 on its first run. Two bugs in it are worth knowing because
+both made it lie toward manufacturing findings: matching a bare function name instead
+of `name(` (the G82 prefix trap), and excluding PROCEDURES, which hid the fact that
+`ottoq_demo_metronome` is one. Fixed, and the validation is that its known false
+positive disappeared while its known true positive stayed.
+
+**Five corrections of mine are recorded in the files rather than quietly fixed:** the
+0360 attribution (above), the 6.5% reroute denominator (above), `cpsat_service`'s last
+call (I quoted the FIRST call's date, turning a few hours of silence into six days), a
+first cut of `coverage-guard` that reported 883 of 1,335 routines as uncalled, and the
+partial-run figures in `0263` §2 that `0267` retracts.
+
+**And a sixth that is the most instructive, because the trap was written down and I read
+it an hour before I fell into it.** `scripts/schedule-round.sql` says, in its own header:
+*"an IN-FLIGHT job of this shape reports `status='succeeded'`, `return_message='SET'`,
+duration ~1 s, because the command is two statements and the row reflects the first until
+the job ends. Rows under 60 s are therefore discarded as in-flight artefacts rather than
+trusted as fast pairs."* I then wrote a watcher for the determinism pair that polled
+`cron.job_run_details`, saw `succeeded / SET / 0.7 s`, called the pair complete and
+**unscheduled the job while it was still executing.** Nothing was lost — `cron.unschedule`
+removes the definition, not the running backend, and the pair was still live at 78 s when
+I checked `pg_stat_activity` — but the watcher would have reported a determinism pass
+that had not happened. **Reading a warning is not the same as encoding it**, and the fixed
+watcher now discards any row under 60 s exactly as that header says to.
+
+---
+
+### Negative result, recorded so the hour is not spent twice
+
+The wash bays looked wrong — 3 stalls reading 0 reserved / 0 occupied while
+`exterior_wash` completed 11 times — and **both hypotheses were wrong.** They *are*
+booked (31 bookings), through the calendar without `stalls.reserved_by`, which is
+why a reservation census reads zero; and the 8 `interrupted` bookings whose planned
+equals actual are not mislabelled — `ottoq_release_vacated_spaces` clips `during` to
+the actual occupancy in the same UPDATE that sets the state, and the pre-clip
+planned/actual survive in the `ottoq.booking_interrupted` event. The
+`interruption_emission_ratio` invariant reads **16/16 = 1.000** on this run, so
+interruption numbers here are trustworthy. `db/checks/0260` §2.
+
+### SECOND ADDENDUM, 07:45 AM CT (12:45 UTC) — G89 is now instrumented, and it turned out to be the CP-SAT argument in a stronger form than I filed it
+
+CI on PR #200 went green at **07:22 AM CT** after the migration-file fix; that was the
+one thing outstanding and it is closed. Then, with the queue's own top item being
+G89, I built its measurable half. Two migrations, `0374` and `0375`, plus
+`db/checks/0269`. **Neither enforces anything** — no assignment changes, EN.001 is
+untouched, and the enforcement decision is still yours for the reason below.
+
+**WHAT RE-MEASURING G89 CHANGED, AND ONE THING IT DID NOT.** The finding holds
+exactly. Three refinements:
+
+1. **Nothing needed reconstructing — the site total is already a stored column.**
+   `site_energy_snapshots.grid_import_kw` equals the component sum in **8,050 of
+   8,050** snapshots on the twin depot, worst residual **0.10 kW**. So `0374` reads
+   the twin's own meter rather than computing a second opinion, which is `0264`'s
+   lesson applied on purpose.
+
+2. **The mechanism is an incomplete meter, not just an unchecked sum** — and this is
+   the sharper version of the finding. EN.001 *does* compare against
+   `service_max_kw`. But its load term is
+   `ottoq_depot_current_demand_kw` → `twin.ottoq_sim_compute_charger_load_kw` =
+   `SUM(ocpp_sessions power)` **and nothing else**. So it asks a true question,
+   correctly answered, **about a quantity that is not the site's load.** That is a
+   better sentence than "nothing asserts the sum", because it says where to look.
+
+3. **The rate is 1 in 8,050 snapshots across 9 runs — and the distribution is why
+   that is not reassurance.** I nearly filed the rate as a downgrade. The histogram
+   stopped me: buckets covering **1,800–2,700 kW are empty.** The site has never once
+   operated between **1,714** and **2,739** kW. It does not climb toward the cap and
+   occasionally tip over — it sits comfortably below and takes a single ~1,000 kW step
+   clean over, and ~1,000 kW is the BESS charge magnitude. **A megawatt discontinuity
+   in a metered load is the signature of a second decision adding, not of demand
+   building.** So the rarity is the rarity of the coincidence. Nothing prevents it.
+   That is the difference between a system that rides a limit and one that is blind to
+   it, and only the second kind produces an empty middle.
+
+**AND THE LIMITATION, because the queue's own G89 row asked for something else.** G89
+recommended a projected-sum check **at `bess_dispatch`** — i.e. *before* the decision.
+What I built is a **meter, not a projection**: it witnesses an excursion after the
+fact and can neither prevent nor predict one. Deliberate, because it catches an
+excursion however it arises rather than only via a BESS decision, and because it is
+what makes the historical rate answerable across purges — which is the precondition
+for deciding whether the pre-decision check is worth building. **But it does not
+discharge that check, and I am not claiming it does.**
+
+**THE DECISION THIS PUTS IN FRONT OF YOU, AND IT IS NARROWER THAN BEFORE.** Read
+`SELECT * FROM public.ottoq_site_power_ledger`. It says **1 excursion, 1 clearable by
+deferring the BESS charge, 0 needing EV action.** That last column is the point:
+*every excursion on record would have been cleared by deferring the battery, and none
+required refusing a vehicle.* At the excursion, deferring the 968 kW BESS charge
+leaves **1,770.8 kW — 729 kW under the cap.** So the question is not "should the
+shield refuse charging sessions" (which is what a naive site-cap rule would do) but
+"should the BESS charge window yield to site headroom", which is an arbitrage
+decision against demand charges. **That is a much cheaper change than a shield rule,
+and it is still yours.**
+
+**AND IT IS THE FIRST MEASURED INSTANCE OF THE CONSTRUCT cuOpt CANNOT EXPRESS.** A
+shared site power cap across concurrent activities is a cumulative resource — one of
+the four load-bearing constructs of CLAUDE.md 2.3 that R-12 established are absent
+from cuOpt 26.08. Until tonight that was a vendor-documentation argument. It is now an
+observed excursion on our own run: two legal decisions, no shared constraint between
+them, 238.8 kW over a utility service contract. **Stronger than the doc citation,
+because it is ours.**
+
+**ONE SELF-CORRECTION, TWENTY MINUTES AFTER SHIPPING.** `0374` exposed a column
+`usual_dominant_component` and its own comment claimed it answered *"what pushed us
+over … whether enforcement should refuse a vehicle or defer a battery."* **It does
+not.** It computes the largest single load, and here the two disagree: it reads
+`ev_charging` (1,691.8, the biggest) while deferring the battery is what clears the
+cap. A reader following that column **throttles vehicles for nothing.** `0375`
+renames it `largest_component` and adds the pair that actually decides, asserted to
+partition the excursions. Found by reading the instrument's own output once,
+immediately after applying it — nothing else would have caught it, because the column
+was correctly computed and internally consistent. **It was the name and the comment
+that were wrong, which is the class of defect no assertion catches.** Same shape as
+`0371` correcting `0367` earlier the same night: the instrument wrong, not the
+finding, and both mine.
+
+**AND A SECOND CORRECTION, WHICH IS THE ONE I MIND.** After applying `0374` I ran the
+determinism pair — **12 of 12 identical, `deterministic = true`**, so the per-tick call
+did not break the byte-identical property. The ledger then read **`live_rows = 0`**,
+which is *correct* (the pair peaked at 1,050 kW against a 1,500 kW threshold, and
+calling the detector by hand returned `{"tier": null, "total_kw": 498.2, "headroom_kw":
+2001.8}` and wrote nothing). **But `live_rows = 0` is also exactly what a detector that
+never executed would produce, and nothing in the ledger told the two apart — which is
+G82, the finding I spent the night on, reproduced by me in the code that fixed it.** I
+had proved the function works and *inferred* the tick runs it from `prosrc`. Better
+evidence than 0360 ever had; still inference.
+
+`0376` closes it: a third tier `armed`, one row per run on first execution, so a run
+absent from it was never covered. It needed the `snapshot_id` unique index made
+**partial** — an `armed` row shares its snapshot with whatever that instant later turns
+out to be, and an unconditional index would have let the beacon **silently suppress a
+real excursion**. A second pair then ran and the ledger holds **2 `armed` rows,
+`source_kind='live'`, one per arm**, with determinism still **12 of 12**. *That* is
+observation rather than inference, and it also proved the beacon is symmetric across
+arms and that the partial index suppressed nothing. `db/checks/0270`.
+
+**Seventh instance of this file's own standing heuristic, and the first where the thing
+that exists and might never be called is something I wrote hours after writing the
+heuristic down.** Which is the argument for `scripts/coverage-guard.sql` over
+remembering it.
+
+### THIRD ADDENDUM, 08:45 AM CT (13:45 UTC) — I HAD G89 WRONG, AND THE TRUE CAUSE IS A ONE-LINE FIX THAT IS YOURS
+
+**Read this one before the two above it.** CI is green on every head (`0b47fe1` at
+08:05 AM CT). Then I went to build the projected-sum check G89 asked for — and rule 5
+stopped me, because **it already exists**, and what it turned up is better than the
+finding it was checking.
+
+**`ottoq_energy_orchestrate` computes the site sum every tick.** Literally:
+`v_charge_cap := GREATEST(50, v_demand_target − v_base_load + v_solar + v_bess_dispatch)`.
+The battery's own draw is subtracted kW for kW — that *is* the cumulative reasoning
+G89 said was absent — and the result is published as a `charge_cap_kw` command.
+**So "nothing asserts the sum" is false, and I had repeated it in `0374`'s header, its
+table comment, its registry note and its lineage note.** `db/checks/0271` is the
+retraction; `FINDINGS.md` G89 carries it.
+
+**What survives of G89 is narrower and still real: no RULE asserts it.** The
+orchestrator publishes, it does not refuse. **All 1,260** caps on the run carry
+`"advisory": true` in their own payload. Measured against what actually flowed, the
+advisory cap is mostly respected anyway — **26 of 1,260 snapshots (2.1%) drew more EV
+load than the cap in force, worst overshoot 205 kW** — which is what makes this a
+finding rather than an emergency.
+
+**AND THE EXCURSION'S REAL CAUSE IS A PLANNING DEFECT WITH A ONE-LINE FIX.**
+`v_demand_target` starts as `service_max_kw × factor` (2,500 × **0.9** = 2,250), then
+is **replaced outright** by `ottoq_bess_reserve_target(...)` — with **no
+`LEAST(v_service_max, …)`**. That function binary-searches for the lowest grid-import
+ceiling the battery can hold, and **returns the forecast peak when it can hold
+nothing.** It answers *"what can I do"*; the orchestrator uses it as *"what am I
+allowed to do."* At **13.81% SoC** it returned **2,802** against a **2,500** contract,
+producing a **1,762 kW** EV cap where the contract-derived arithmetic gives **1,210**.
+
+| | |
+|---|---|
+| caps published on the run | 1,260 |
+| demand targets above the 2,500 contract | **16** |
+| worst demand target | **2,959** (459 kW over) |
+| worst published EV cap | **2,804.4** — itself above the contract |
+| **median demand target** | **1,048** |
+
+**The median is why this is not a case for ripping the mechanism out.** At 1,048 against
+a contract-derived 2,250, the reserve-shave override normally tightens the target by
+more than half — it is doing its job. It loosens past the contract only when the
+battery is empty and demand is high, which is exactly when it must not.
+
+**THE DECISION, AND IT IS NARROWER AND CHEAPER THAN THE ONE I HANDED YOU AT 07:45:**
+
+```sql
+v_demand_target := LEAST(v_service_max,
+                         COALESCE(ottoq_bess_reserve_target(...), v_demand_target));
+```
+
+I have not applied it. It lowers the EV charge cap in exactly those 16 ticks — trading
+charging throughput at the worst moment for staying inside the utility contract. **On
+the evidence that is the right trade** (a demand-charge excursion is expensive, a
+breaker trip worse), but it is a throughput call on the one depot whose capacity is the
+open question, so rule 8 says it is yours. Separately, making `charge_cap_kw` *binding*
+inside the decide path is the larger question; per 2.9a it lands measured first, and
+§2 of `0271` is that measurement: it would have bitten 26 times in 1,260 ticks at a
+mean 67.7 kW.
+
+**`0378` captures the 16 rows into `class='evidence'` first**, because
+`ottoq_energy_commands` is `class='engine'` and the next demo run deletes every number
+in this section. Fourth instance of the 0231 fragility in one night, after `0340`,
+`0364` and `0374`. Read it with `SELECT * FROM public.ottoq_site_power_plan_audit`,
+whose `all_advisory` and `all_reserve_shave` columns are assertions rather than
+statistics — both read **true** over all 16, so the single-cause diagnosis covers every
+row.
+
+**AND A cuOpt CLAIM OF MINE THAT NEEDS WALKING BACK.** `0374` and `db/checks/0269` both
+call this "the first measured instance of the cumulative-resource construct cuOpt cannot
+express." **Overreach** — a cumulative site-power resource *is* reasoned about here, in
+SQL, every tick. The honest version: **the site power cap is currently held by an
+advisory publication plus an unclamped heuristic, where a scheduler carrying it as a
+first-class hard constraint would not need either.** Still a point for CP-SAT. A weaker
+and truer one, and I would rather you quote that version to anyone hostile.
+
+**AND ONE MORE THING BUILT, 09:00 AM CT — `0379`, plus a bug it caught in my own key.**
+`0378` deferred the "did we draw more than our own published budget" question to a
+view. **That was wrong, and the reason is a real observability gap:**
+`ottoq_active_charge_cap_kw` filters `status='executed'`, and
+`twin.ottoq_sim_energy_controller` rewrites each prior cap to `superseded` — so on the
+run, **1,259 of 1,260 caps read superseded and the single `executed` row is the run's
+final command.** No query afterwards can reconstruct which cap was in force at tick N.
+It has to be captured at tick time, which `0379` now does as a fourth ledger tier.
+
+I nearly recorded the opposite: probing the accessor across all 1,260 clocks returned
+non-NULL every time, which reads as "the cap was always available" and is the reverse —
+it returned that one surviving row for every tick, because its 15-minute horizon is
+later than every earlier clock. A historical question asked with a present-tense
+predicate, caught because the answer was suspiciously clean.
+
+**The bug `0379` caught before shipping:** `0376` keyed the ledger on `snapshot_id`
+alone, on the invariant "one row per metered instant" — correct while `excursion` and
+`high_water` came from one `if/elsif` and couldn't both fire. The new tier is
+**independent** of both, so a tick over the site cap *and* over the published cap would
+have had its second finding **silently dropped** by `ON CONFLICT DO NOTHING`. The exact
+suppression `0376` existed to prevent. Key widened to `(snapshot_id, severity_tier)`.
+
+**Validated:** determinism **12/12 for the third consecutive pair**; beacon at 4 `armed`
+rows across 4 runs; the new tier exercised by a path test that this time ran inside
+`BEGIN … ROLLBACK` and left **nothing** behind — which is the method `0377` should have
+used, and confirms there was never a reason to write to evidence to test a write path.
+`db/checks/0272`.
+
+**One number to watch on your next busy_day run:** `ev_over_published_cap` should start
+appearing — `0271` §2's reconstruction says it happened 26 times in 1,260 ticks, worst
+205 kW. **If it stays at zero, that reconstruction is the thing to doubt first**, not the
+detector.
+
+### G78's STATUS HALF — DELIBERATELY NOT BUILT, and the reason is the whole point
+
+The queue carried *"the G78 status half (`status='abstained'`) must land in one file with
+`ottoq_agent_review`, `ottoq_intelligence_stack` and `ottoq_activity_feed` or it recreates
+0341's non-summing buckets; forces_recert TRUE."* I picked it up, measured first, and
+**stopped.**
+
+`ottoq_proposer_scorecard` shows `abstained = 0` across **890** ledger rows, which looks
+like the abstention machinery `0361` and `0364` built sitting inert. **It is not inert. It
+is correct.** Measured:
+
+| | |
+|---|---|
+| `forward_lex` (CP-SAT) rows in the disposition ledger | **0** |
+| `forward_lex` declared in `ottoq_proposer_precedence` | 1 |
+| rows with `abstained = true` | 0 of 890 |
+| **distinct `disposition_reason` values containing "abstain"** | **0** |
+
+Every reason in the ledger is concrete — `enacted_by_kernel`, `stall_reserved`,
+`stall_occupied`, `entity_decided_by_other_proposal`. **cuOpt and `greedy_constrained`
+genuinely never abstain**; CP-SAT is the one that abstains by design (`0364` records 9–11
+of ~13–16 rows per fire), and it has never proposed in-engine because the host is
+unreachable.
+
+**So building it now would mean adding a status transition and three reader buckets,
+forcing a recert, with zero rows to validate against and no way to produce one until the
+instance exists.** That is a speculative abstraction, which rule 4 forbids — and worse, it
+is precisely how you get an eighth instance of this file's own standing heuristic. Seven
+things found today that existed and were never called; I am not adding the eighth on
+purpose.
+
+**It is blocked on the instance, not on effort.** The moment `ottoq-cpsat-propose` can
+reach `/assign`, CP-SAT abstains on its first fire, and then the bucket has data the day
+it is written. Building it in that order also means the three readers can be tested rather
+than reasoned about.
+
+---
+
 ## THE DISCIPLINE FIX — why the misses happened, and what changes
 
 Three misses, one cause: **I audited behaviour, never coverage.** The certification

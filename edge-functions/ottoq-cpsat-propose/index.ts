@@ -9,6 +9,7 @@ import {
   FALLBACK_ASSIGNMENT_ENGINE,
   PRIMARY_ASSIGNMENT_ENGINE,
   rejectionFeedback,
+  resolveSite,
 } from "../_shared/cpsat_agent_chain.ts";
 
 const cors = {
@@ -42,8 +43,8 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const intelligenceUrl = Deno.env.get("OTTOQ_INTEL_URL");
   const intelligenceToken = Deno.env.get("OTTOQ_INTEL_TOKEN");
-  if (!supabaseUrl || !serviceKey || !intelligenceUrl || !intelligenceToken) {
-    return json({ ok: false, error: "CP-SAT bridge is not configured" }, 500);
+  if (!supabaseUrl || !serviceKey) {
+    return json({ ok: false, error: "Supabase service configuration is unavailable" }, 500);
   }
   if (req.headers.get("authorization") !== `Bearer ${serviceKey}`) {
     return json({ ok: false, error: "internal service role required" }, 401);
@@ -59,6 +60,9 @@ Deno.serve(async (req) => {
 
   const sb = createClient(supabaseUrl, serviceKey);
   try {
+    if (!intelligenceUrl || !intelligenceToken) {
+      throw new Error("CP-SAT service is not configured");
+    }
     const { data: run, error: runError } = await sb.from("ottoq_sim_runs")
       .select("sim_run_id,depot_id,status,sim_clock_current,tick_count")
       .eq("sim_run_id", simRunId).maybeSingle();
@@ -81,6 +85,14 @@ Deno.serve(async (req) => {
 
     const directive = normalizeSolverDirective(handoff.solver);
     const simClock = new Date(run.sim_clock_current ?? Date.now());
+    // 0389: the site power cap CP-SAT plans against is derived from the engine, not a
+    // constant in this file. resolveSite never throws -- it degrades to the structural
+    // limits and says so, because losing one RPC must not take the agent chain down.
+    const resolvedSite = await resolveSite(sb, {
+      depotId: run.depot_id,
+      simRunId,
+      simClock: run.sim_clock_current ?? null,
+    });
     const requestBody = assignmentRequest({
       simRunId,
       depotId: run.depot_id,
@@ -89,17 +101,44 @@ Deno.serve(async (req) => {
       directive,
       feedback: rejectionFeedback((feedbackResult.data ?? []) as Array<Record<string, unknown>>),
       hourOfDay: Number.isNaN(simClock.getUTCHours()) ? 12 : simClock.getUTCHours(),
+      site: resolvedSite.site,
     });
 
     const response = await fetch(`${intelligenceUrl.replace(/\/$/, "")}/assign`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${intelligenceToken}` },
       body: JSON.stringify(requestBody),
+      // The solver host may be intentionally stopped between development sessions.
+      // Fail over promptly instead of leaving the agent chain waiting on TCP timeout.
+      signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) throw new Error(`intelligence /assign returned ${response.status}: ${(await response.text()).slice(0, 400)}`);
     const result = await response.json();
     if (!result || !Array.isArray(result.rows) || !result.fire || typeof result.fire !== "object") {
-      throw new Error("intelligence /assign returned an invalid proposer envelope");
+      // NAME THE CAUSE, DO NOT JUST REPORT THE SYMPTOM. "invalid proposer envelope" is
+      // true and nearly useless: it is what a 2xx from a STALE IMAGE looks like, and on
+      // 2026-09-20 that ambiguity cost a full day of CP-SAT being unreachable while the
+      // box was up and answering. The optimizer list in /health is the tell -- a build
+      // predating app/optimizers/assignment_cpsat.py answers ["energy_mpc"] while one
+      // carrying it answers ["energy_mpc","cp_sat_forward_lex"]. Ask, and put the answer
+      // in the reason the fallback records.
+      let deployed = "unknown (/health unreachable)";
+      try {
+        const health = await fetch(`${intelligenceUrl.replace(/\/$/, "")}/health`, {
+          headers: { Authorization: `Bearer ${intelligenceToken}` },
+          signal: AbortSignal.timeout(3_000),
+        });
+        deployed = (await health.text()).slice(0, 300);
+      } catch (_) { /* the reason below is still better than the old one without it */ }
+      const stale = !deployed.includes(PRIMARY_ASSIGNMENT_ENGINE);
+      throw new Error(
+        `intelligence /assign returned an invalid proposer envelope; ` +
+        (stale
+          ? `/health does not list ${PRIMARY_ASSIGNMENT_ENGINE} -- THE RUNNING IMAGE ` +
+            `PREDATES CP-SAT. Redeploy the service (ottoq-intelligence deploy workflow). `
+          : `/health DOES list ${PRIMARY_ASSIGNMENT_ENGINE}, so the image is current and ` +
+            `the envelope shape is the fault, not the build. `) +
+        `/health said: ${deployed}`);
     }
 
     const fire = {
@@ -109,6 +148,11 @@ Deno.serve(async (req) => {
       agent_objective: directive.objective,
       agent_objective_why: directive.why,
       pipeline: result.pipeline ?? null,
+      // 0389: which cap this plan was solved against, on the fire record itself, so a
+      // reader never has to assume it was the live one.
+      site_source: resolvedSite.source,
+      site_fallback_reason: resolvedSite.detail,
+      site_power_cap_kw_hard: resolvedSite.site.power_cap_kw_hard ?? null,
     };
     const { data: receipt, error: submitError } = await sb.rpc("ottoq_proposer_submit_batch", {
       p_sim_run_id: simRunId,

@@ -10,6 +10,21 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v18 (0301/0304): 🔴 THE SOLVER HANDOFF NAMED AN ENGINE THAT HAD NOT RUN.
+//      `engine: receipt.engine ?? "cp_sat_forward_lex"` named the primary engine whenever the
+//      reply named none, and `??` falls through on null as well as undefined. So when
+//      ottoq-cpsat-propose correctly DECLINED a run that was no longer live --
+//      `{ok:true, skipped:"run is not active"}` -- this code recorded
+//      `status:"completed", engine:"cp_sat_forward_lex", receipt:null`, and that row was read
+//      for an hour as proof the agent chain had reached CP-SAT end to end. It had not: the
+//      service's own uvicorn access log held ZERO `POST /assign` lines over the window
+//      containing it, and the surviving evidence row at that timestamp was nvidia_nemotron
+//      with no cpsat_service row carrying an endpoint anywhere near it. A decline is not a
+//      success, and a default that invents an engine is how one became the other.
+//      NOW: a reply carrying `skipped` records status "skipped" with engine null; the engine
+//      is NEVER defaulted (absent means nothing ran); `solver_ran` is carried through from the
+//      bridge; and `solverAccepted` -- which drives both the verb and outcome_status -- counts
+//      only "completed" and "fallback", so a skip can no longer produce `analyze_and_solve`.
 // v17: audit honesty (check 0045 R5). enacted_action gains a `verb` derived from what was
 //      ACTUALLY applied, and outcome_status is 'enacted' only when something was — a tick
 //      where everything the model asked for was rejected or queued now records
@@ -167,30 +182,43 @@ serve(async (req) => {
     // ---- the ONE model call (three lenses). Reasoning disabled for reliable, fast JSON. ----
     let parsed: any = null; let modelUsed = "none"; let raw = "";
     let proposeMs = 0;
-    const key = NV_KEYS.map((k) => Deno.env.get(k)).find(Boolean);
-    if (key) {
+    const keys = NV_KEYS
+      .map((name) => ({ name, value: Deno.env.get(name) }))
+      .filter((candidate): candidate is { name: string; value: string } => Boolean(candidate.value));
+    if (keys.length > 0) {
       const tModel = Date.now();
-      try {
-        const r = await fetch(NV_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify({
-            model: MODEL, temperature: 0.1, max_tokens: 1400,
-            chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
-            response_format: { type: "json_object" },
-            messages: [
-              { role: "system", content: SYSTEM },
-              { role: "user", content: `BOARD DIGEST:\n${JSON.stringify(board, null, 1)}\n\nReturn ONLY the JSON object.` },
-            ],
-          }),
-        });
-        if (r.ok) {
-          const j = await r.json();
+      const requestBody = JSON.stringify({
+        model: MODEL, temperature: 0.1, max_tokens: 1400,
+        chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: `BOARD DIGEST:\n${JSON.stringify(board, null, 1)}\n\nReturn ONLY the JSON object.` },
+        ],
+      });
+      for (const candidate of keys) {
+        try {
+          const r = await fetch(NV_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${candidate.value}` },
+            body: requestBody,
+          });
+          const responseText = await r.text();
+          if (!r.ok) {
+            // A legacy NVCF key can be valid yet point at a retired function and return
+            // 404. Keep trying the remaining configured NVIDIA keys before falling safe.
+            raw = `HTTP ${r.status}: ${responseText.slice(0, 240)}`;
+            continue;
+          }
+          const j = JSON.parse(responseText);
           raw = j?.choices?.[0]?.message?.content ?? "";
           parsed = extractJson(raw);
-          modelUsed = MODEL;
-        } else { raw = `HTTP ${r.status}`; }
-      } catch (_e) { /* deterministic fallback below */ }
+          if (parsed && Array.isArray(parsed.actions)) modelUsed = MODEL;
+          break;
+        } catch (error) {
+          raw = `request error: ${error instanceof Error ? error.message : "unknown"}`;
+        }
+      }
       proposeMs = Date.now() - tModel;
     }
     if (!parsed || !Array.isArray(parsed.actions)) parsed = { actions: [], solver: { objective: "readiness_first", why: "model unavailable" }, rationale: `fallback: model unavailable or unparseable (${raw ? raw.slice(0,40) : "no key"}) — no action taken` };
@@ -259,10 +287,9 @@ serve(async (req) => {
     }
 
     // ---- ONE PROCESS: agent analysis -> CP-SAT proposal -> deterministic core ----
-    // This edge call is detached because the parent request comes from pg_net's
-    // short timeout. The CP-SAT bridge records its result under this chain id and
-    // submits through the same kernel door as every proposer. cuOpt runs only if
-    // the primary service or submission door fails.
+    // The bridge response is awaited so the audit trail records completion,
+    // fallback, or failure instead of claiming that an unobserved request queued.
+    // The bridge bounds the external solver call and falls back to cuOpt.
     const chainId = crypto.randomUUID();
     let solverHandoff: Record<string, unknown> = {
       chain_id: chainId,
@@ -289,14 +316,65 @@ serve(async (req) => {
       };
       const solverUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ottoq-cpsat-propose`;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      EdgeRuntime.waitUntil(fetch(solverUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-        body: JSON.stringify({ sim_run_id: run.sim_run_id, agent_handoff: handoff }),
-      }).then(async (response) => {
-        if (!response.ok) console.error("CP-SAT handoff failed", response.status, (await response.text()).slice(0, 500));
-      }).catch((error) => console.error("CP-SAT handoff threw", error)));
-      solverHandoff = { ...solverHandoff, status: "queued", engine: "cp_sat_forward_lex" };
+      try {
+        const response = await fetch(solverUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
+          },
+          body: JSON.stringify({ sim_run_id: run.sim_run_id, agent_handoff: handoff }),
+        });
+        const responseText = await response.text();
+        let receipt: any = null;
+        try { receipt = JSON.parse(responseText); } catch { /* bounded raw detail below */ }
+        if (!response.ok || receipt?.ok !== true) {
+          solverHandoff = {
+            ...solverHandoff,
+            status: "failed",
+            engine: "cp_sat_forward_lex",
+            error: String(receipt?.error ?? receipt?.primary_error ?? responseText ?? `HTTP ${response.status}`).slice(0, 600),
+          };
+        } else if (receipt.skipped) {
+          // v18. A DECLINE IS NOT A SUCCESS. ottoq-cpsat-propose returns
+          // {ok:true, skipped:"run is not active", engine:null, solver_ran:false} when the run
+          // has finished -- which is correct of it, and used to be recorded here as
+          // status "completed" with engine "cp_sat_forward_lex" and receipt null. That row was
+          // then read as proof the chain had reached CP-SAT. It records what happened now.
+          solverHandoff = {
+            ...solverHandoff,
+            status: "skipped",
+            engine: null,
+            solver_ran: false,
+            skipped: String(receipt.skipped).slice(0, 200),
+          };
+        } else {
+          solverHandoff = {
+            ...solverHandoff,
+            status: receipt.fallback === true ? "fallback" : "completed",
+            // v18: NO DEFAULT. An absent engine means NOTHING RAN, and naming the primary
+            // engine here is how a decline became a completed solve for an hour. `??` falls
+            // through on null as well as undefined, so `engine: null` from the bridge was
+            // being replaced too -- which is exactly why the bridge setting it was not enough
+            // on its own and this line had to change.
+            engine: receipt.engine ?? null,
+            solver_ran: receipt.solver_ran === true,
+            receipt: receipt.receipt ?? null,
+            // The real numbers, so a bare "completed" never again stands in for whether
+            // anything was actually proposed.
+            assign: receipt.assign ?? null,
+            fallback_reason: receipt.fallback_reason ?? null,
+          };
+        }
+      } catch (error) {
+        solverHandoff = {
+          ...solverHandoff,
+          status: "failed",
+          engine: "cp_sat_forward_lex",
+          error: error instanceof Error ? error.message.slice(0, 600) : "solver handoff failed",
+        };
+      }
     }
 
     const totalMs = Date.now() - tStart;
@@ -308,9 +386,12 @@ serve(async (req) => {
     // The verb is derived from what actually happened, never from what was proposed: one
     // applied ops_action names itself; one set_policy names the dial; several name the batch.
     const a0 = applied[0] as any;
-    const solverQueued = solverHandoff.status === "queued";
+    // v18: "skipped" is deliberately NOT in this list. It used to be reachable only as
+    // "completed", which made a declined handoff produce the verb `analyze_and_solve` and an
+    // outcome_status of `enacted` on a tick where no solver ran at all.
+    const solverAccepted = ["completed", "fallback"].includes(String(solverHandoff.status));
     const verb =
-      solverQueued ? "analyze_and_solve"
+      solverAccepted ? "analyze_and_solve"
       : applied.length === 0 ? "no_op"
       : applied.length === 1
         ? (a0.type === "ops_action" ? String(a0.action ?? "ops_action")
@@ -328,7 +409,7 @@ serve(async (req) => {
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
                         solver_handoff: solverHandoff,
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
-      outcome_status: applied.length > 0 || solverQueued ? "enacted" : "noop_no_candidate",
+      outcome_status: applied.length > 0 || solverAccepted ? "enacted" : "noop_no_candidate",
       propose_latency_ms: proposeMs, total_latency_ms: totalMs,
     });
 

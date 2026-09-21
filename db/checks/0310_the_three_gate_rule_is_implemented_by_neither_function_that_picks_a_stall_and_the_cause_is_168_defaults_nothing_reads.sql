@@ -1,0 +1,264 @@
+-- 0310  **CLAUDE.md's THREE-GATE RULE IS IMPLEMENTED BY NEITHER OF THE TWO FUNCTIONS THAT PICK
+--       A CHARGE STALL, AND THEY FAIL IT ON DIFFERENT GATES.** Part 3's rule, added 2026-09-20
+--       and *"earned three times in one night"*, says a stall is offerable only as the
+--       intersection of the POINTER, the CALENDAR, and the OCPP charger not being `Faulted`.
+--       Measured today: the shared candidate source checks gates 1(partial)/2/3 with the pointer
+--       switched **off**, and the fault reroute checks 1 and 3 with **no calendar at all**.
+--       Neither is the intersection. **And the underlying cause is general: the policy catalog
+--       declares 168 defaults and `ottoq_policy_get` reads none of them**, so the effective
+--       default of every knob in this engine is a literal typed at its call site.
+--
+-- Read-only. Measured 2026-09-21 ~17:0x UTC (12:0x CT), via the Supabase MCP connector.
+-- Found while writing the migration for `0308` §2's parked note that
+-- `ottoq.ottoq_replan_after_charger_fault` never reads the calendar.
+--
+-- ══ 1. FIRST, A RETRACTION OF MY OWN SENTENCE IN `0308` §2 / G112 ═══════════
+--
+-- That note ended: *"the EXCLUDE constraint contains it downstream, which is the architecture
+-- being right rather than the function."* **That is WRONG and must not be quoted.** Measured:
+--
+--   ottoq.ottoq_replan_after_charger_fault  -- creates a booking?  **NO**
+--     (prosrc matches none of ottoq_stall_bookings | book_hold_stall | ottoq_book_)
+--
+-- The reroute moves a vehicle by **POINTER ONLY** — `ottoq_reserve_stall`, a 550-character
+-- atomic CAS on `stalls` — and writes no row to `ottoq_stall_bookings`. `ottoq_stall_bookings_no_overlap_v3`
+-- is an EXCLUDE constraint **on that table**; a path that inserts nothing there is a path the
+-- constraint never sees. So the containment I credited does not exist. What `ottoq_reserve_stall`
+-- *does* contain is pointer-versus-pointer racing (two vehicles cannot both reserve one stall).
+-- What nothing contains is pointer-versus-CALENDAR: a stall booked for vehicle B at T+10 can be
+-- pointer-reserved for vehicle A now, and the collision surfaces as physical reality overruling
+-- a calendar claim — which is precisely what `space_conflict_ledger` exists to record.
+--
+-- ══ 1a. AND A SECOND CORRECTION, THIS ONE ABOUT MY INSTRUMENT ══════════════
+--
+-- I first tested "does the fault gate read the calendar?" with
+-- `prosrc ~* 'ottoq_stall_bookings'` against `public.ottoq_indepot_reassignment_guard`, and it
+-- returned **true**. It is **false**. The guard's single occurrence of that string is inside a
+-- COMMENT:
+--
+--   -- (The cleaner long-term shape is real *_sim columns, as ottoq_stall_bookings already
+--   -- has with booked_at_sim. That is a schema change and belongs in its own migration.)
+--
+-- **A regex over `prosrc` matches prose, and `prosrc` in this database is roughly half prose.**
+-- Same defect class as `0277`'s prefix match (`perimeter_hold` vs `perimeter_walkaround`) and as
+-- every clock-domain error here: a predicate answering a narrower question than it is read as
+-- answering. The cheap correction is to check whether the matched line is a comment line, which
+-- §2's query now does for every hit it reports.
+--
+-- ══ 2. GATE BY GATE, FOR BOTH FUNCTIONS ════════════════════════════════════
+--
+--   function                                  pointer      calendar   charger-not-Faulted
+--   ottoq.ottoq_stall_free_between            **POLICY**   yes        yes (dcfc/l2 only)
+--   ottoq.ottoq_replan_after_charger_fault    yes          **NO**     yes
+--
+-- `ottoq_stall_free_between` is **the shared candidate source**, with SEVEN callers:
+-- `ottoq_activate_due_bay_reservations`, `ottoq_arrival_disposition`, `ottoq_enact_space_assignment`,
+-- `ottoq_find_and_book_stall`, `ottoq_react_to_refusals`, `ottoq_validate_assignment`,
+-- `public.ottoq_l2_optimize_assignments`. Its calendar read is careful and its comment says why —
+-- the state set `held/active/done/interrupted` is aligned to the EXCLUDE constraint deliberately,
+-- because a picker and a constraint that disagree produce silent oversubscription (the 2026-08-02
+-- finding: 22 vehicles booked into one bay). Its charger gate is `0372`. **But its POINTER check —
+-- `s.current_vehicle_id IS NULL` — sits inside `AND (NOT g.guard_on OR ...)`,** behind
+-- `calendar_occupancy_guard`, and §3 shows that switch is off.
+--
+-- **Note the irony, because it reverses the framing `0308` §2 used.** `ottoq_stall_free_between`'s
+-- own comment says: *"The only two routines that DID check [the charger] are
+-- `ottoq_l2_optimize_assignments` and `ottoq_replan_after_charger_fault`."* The fault reroute was
+-- **ahead of the field on gate 3** while being blind to gate 2. It is not a careless function; it
+-- is a function written before the shared helper existed and never migrated onto it.
+--
+-- ══ 3. THE SWITCH IS OFF, AND THE ROW THAT TURNED IT ON IS AN ORPHAN ═══════
+--
+--   catalog default for `calendar_occupancy_guard`   **1**
+--   the call site's hardcoded fallback               **0**   (ottoq_stall_free_between)
+--   rows setting it, ALL scopes                      **1** — run:900a8a44…=1
+--   does run 900a8a44 still exist?                   **NO — purged**
+--   twin-depot runs with the pointer gate ON         **0 of 22**
+--
+-- So the declared default says the pointer gate is on; the effective default says off; and the one
+-- row that ever said on belongs to a run `ottoq_purge_prior_runs` has since deleted, leaving the
+-- policy row behind as an orphan. **Not one surviving twin-depot run ever offered stalls through
+-- the pointer gate.**
+--
+-- ══ 4. THE GENERAL CAUSE: 168 DECLARED DEFAULTS THAT NOTHING READS ════════
+--
+-- `public.ottoq_policy_get(p_sim_run_id, p_param_key, p_default)` resolves in four steps:
+-- run-scope row → depot-scope row → global-scope row → **`COALESCE(v, p_default)`**. It does
+-- **not** touch `ottoq_policy_param_catalog` at any point.
+--
+--   catalog rows                                        **168**
+--   catalog rows carrying a non-null `default_value`     **168**
+--   functions reading the catalog at all                  4  (ottoq_agent_dial_envelope,
+--                                                            ottoq_intelligence_status,
+--                                                            ottoq_policy_set,
+--                                                            ottoq_rule_eval_agent_dial_envelope)
+--   …of those, reading `default_value`                     2  (neither is ottoq_policy_get)
+--   keys with any row set, any scope                      93
+--   keys set at global scope                              46
+--
+-- **So for any key with no run/depot/global row, the value in force is a literal typed at the call
+-- site, and the catalog's declared default has never been consulted by the reader.** That is the
+-- `0231` defect in configuration form — a declaration arranged so the mechanism it describes
+-- cannot disagree with it, because nothing ever compares them. Five keys where they in fact
+-- disagree, with no global or depot row to settle it (comment-line check applied; none matched a
+-- comment):
+--
+--   param_key                  sites  call-site fallback   catalog   rows set
+--   deploy_peak_fraction         3      **0.55 / 0.90**     0.90       307
+--   calendar_occupancy_guard     1        0                 1           1 (orphan)
+--   cuopt_debounce_s             1        2                 4           1
+--   cuopt_solve_window_ms        1        4000              2500        1
+--   robotic_demate_seconds       1        **-1**            11.5        **0**
+--
+-- `robotic_demate_seconds` is the purest case: **nothing anywhere sets it**, so the catalog's
+-- 11.5 seconds has never once been in force and the value is always the `-1` sentinel in
+-- `ottoq_arm_timings`.
+--
+-- ══ 5. THE ONE THAT MOVES VEHICLES: `deploy_peak_fraction` READS TWO ═══════
+--       VALUES IN ONE TICK, AND THE AGENT IS SHOWN THE ONE THAT IS NOT IN FORCE.
+--
+-- Three call sites, verbatim, neither on a comment line:
+--
+--   public.ottoq_agent_board             ottoq_policy_get(p_sim_run_id,'deploy_peak_fraction',**0.90**)
+--   public.ottoq_cil_propose             ottoq_policy_get(p_sim_run_id,'deploy_peak_fraction',**0.90**)
+--   twin.ottoq_sim_advance_service_flow  v_target := FLOOR(v_fleet *
+--       ottoq_deploy_target_fraction(v_hour,
+--         ottoq_policy_get(p_sim_run_id,'deploy_peak_fraction',**0.55**)))
+--
+-- The third is the one that computes the deploy target and therefore moves vehicles. So on a run
+-- with no row for this key, **the agent's board reports 0.90 while the twin deploys against 0.55.**
+--
+--   twin-depot runs surviving                              **22**
+--   …with a `deploy_peak_fraction` row at run scope           **2**
+--   …with NO row → board 0.90, twin 0.55                    **20**
+--
+-- **AND IT POISONS THE DRIFT LIMITER, WHICH IS THE v16 DEFECT FED FROM THE OTHER END.**
+-- `ottoq-orchestrator-agent` calls `clampDial(key, requested, board.policy?.[key])`, so `current`
+-- is the BOARD's 0.90. The ±30% window is [0.63, 1.17], clamped to the dial range [0.5, 1.0],
+-- giving an admissible request set of **[0.63, 1.0]** — while the engine is running **0.55**.
+-- **The value actually in force is below the floor of what the agent is permitted to ask for**, so
+-- the agent cannot request the status quo, and its first successful write necessarily raises the
+-- fraction by at least 0.08 against what was really in effect. v16 fixed the clamp's *arithmetic*;
+-- this is the clamp being handed the wrong `current`, and no amount of correct arithmetic recovers
+-- from that.
+--
+-- **The divergence self-heals the moment the agent writes the dial** — `ottoq_policy_set` writes a
+-- RUN-scope row and `ottoq_policy_get` checks run scope first, so both sites then read one value.
+-- That is exactly why only 2 of 22 runs have a row: those are the runs where the agent set it. The
+-- window is "from run start until the agent's first successful write of this dial", and on 20 of 22
+-- runs it never closed.
+--
+-- ══ 6. WHAT IS FIXED, WHAT IS ASKED, AND WHAT MUST NOT BE DONE BLIND ══════
+--
+-- **(a) The replanner's calendar gate — mine, narrow, and the fix already exists.** Migrate
+-- `ottoq_replan_after_charger_fault` onto `ottoq_stall_free_between` **as an INTERSECTION, never a
+-- replacement.** The helper is LOOSER on the pointer than the replanner is today
+-- (`status NOT IN ('maintenance','closed')` versus `status='available'`, and `current_vehicle_id`
+-- behind the off switch), so swapping the hand-rolled SELECTs *for* the helper would trade gate 2
+-- for gate 1 and leave the total no better — the very shape Part 3 warns about, where whichever
+-- single gate you quote makes some stall type look generous. **Keep the existing pointer
+-- predicates AND add the helper's window.** Window `[p_clock, p_clock + 1 hour)` to match the
+-- reservation TTL the function already passes to `ottoq_reserve_stall`. Staging branch passes
+-- `p_staging_role => 'temp'` first, then NULL, preserving today's `(staging_role='temp') DESC`
+-- preference.
+--   **A TRAP I THOUGHT I HAD FOUND, AND THE CONSTRAINT SETTLES IT THE OTHER WAY —
+--   CORRECTED HERE RATHER THAN CARRIED FORWARD.** I wrote that the helper's calendar predicate is
+--   `b.sim_run_id = p_sim_run_id`, so a NULL run — which this function permits, it null-guards the
+--   downlink — makes the comparison never true and "the calendar gate passes everything while
+--   LOOKING present... or the fix becomes a decoration." **The mechanics are right; the conclusion
+--   is wrong.** Measured: `ottoq_stall_bookings.sim_run_id` is **NOT NULL**, **0 of 15,890** rows
+--   carry a null, and the EXCLUDE constraint is itself keyed `sim_run_id WITH =`. The calendar is
+--   **inherently run-scoped**, so for a NULL run there are provably no bookings to conflict with
+--   and admitting everything is CORRECT, not decorative. No special-casing is needed, and `0400`
+--   has none. Worth keeping as a worked example: the constraint definition answered a design
+--   question I was about to answer with a defensive branch.
+--
+-- **(b) `ottoq_replan_after_charger_fault` never reads its own gate's verdict.** It calls
+-- `ottoq_indepot_reassignment_guard` and uses **only** `v_gate->>'mode'`, for the return payload.
+-- It never reads `allowed`, and it never reads the `rebook_required: true` / `preserve_work: true`
+-- the guard returns for `resource_fault`. Today the first is nearly harmless — for
+-- `p_reason='resource_fault'` the guard returns `allowed:true` on every branch **except**
+-- `vehicle_not_found`, which returns `allowed:false` with no `mode` key at all; on that path the
+-- replanner reserves a stall for a vehicle that does not exist and reports `gate_mode` NULL. The
+-- second is (a): `rebook_required` is the guard *telling the caller to touch the calendar*, and the
+-- caller does not.
+--
+-- **(c) NOT MINE TO CHOOSE — `deploy_peak_fraction` is 0.55 or 0.90 and measurement cannot say
+-- which.** Is peak deployment 55% or 90% of the fleet? One is the twin's physical pacing, the
+-- other is what the agent and `ottoq_cil_propose` reason about. Making them agree requires knowing
+-- the intended number, so this is Chase's call. **Do not "fix" it by copying either literal into
+-- the other site** — that silently ratifies whichever was typed second. The G94/G96 shape: two
+-- readings, opposite remedies, measurement cannot choose.
+--
+-- **(d) NOT TO BE SWITCHED ON BLIND — `calendar_occupancy_guard`.** Turning the pointer gate on
+-- changes the candidate set for all seven callers of the shared source, which changes stall
+-- offers, which changes the world fingerprint. It is very likely correct per Part 3's rule and it
+-- is still a `forces_recert` behavioural change that reduces availability, so it belongs in a
+-- window where a recert is being paid anyway — alongside G111's actor fix and the G112 granularity
+-- decision, per `0397` §1b. **And whatever is decided, `ottoq_policy_get` should read the catalog
+-- default before falling back to a call-site literal**, or the next 168 knobs inherit the same gap.
+--
+-- **NOT CLAIMED:** that any stall was actually double-committed, or that any run's numbers are
+-- wrong. `space_conflict_ledger` is the place that would show it and is not measured here. This is
+-- a gate-coverage finding, not an outcome finding.
+
+SELECT 'ottoq_stall_free_between'                       AS picker,
+       'pointer BEHIND calendar_occupancy_guard (off)'  AS gate1_pointer,
+       'yes, state set aligned to the EXCLUDE'          AS gate2_calendar,
+       'yes (0372, dcfc/l2)'                            AS gate3_charger,
+       7                                                AS callers
+UNION ALL
+SELECT 'ottoq_replan_after_charger_fault',
+       'yes (status/current_vehicle_id/reserved_by)',
+       '** NO -- and it writes no booking, so the EXCLUDE never sees it **',
+       'yes',
+       2
+UNION ALL
+SELECT '-- effective defaults --',
+       'ottoq_policy_get reads run/depot/global then the CALL SITE literal',
+       '168 catalog defaults, 0 read by ottoq_policy_get',
+       'deploy_peak_fraction: board 0.90 vs twin 0.55 on 20 of 22 runs',
+       0;
+
+-- OPEN-ITEM: CLAUDE.md Part 3's three-gate rule (pointer AND calendar AND charger-not-Faulted) is implemented by NEITHER function that picks a charge stall, and they fail on different gates. ottoq.ottoq_stall_free_between -- the shared candidate source with SEVEN callers -- checks the calendar (state set deliberately aligned to the EXCLUDE constraint) and the charger (0372), but its pointer check sits behind calendar_occupancy_guard, whose catalog default is 1, whose call-site fallback is 0, and whose only row in the database belongs to a PURGED run: 0 of 22 surviving twin-depot runs ever had the pointer gate on. ottoq.ottoq_replan_after_charger_fault checks pointer and charger and reads NO calendar, and it writes no booking at all, so ottoq_stall_bookings_no_overlap_v3 never sees it -- which RETRACTS 0308 §2's claim that "the EXCLUDE constraint contains it downstream". The general cause is that ottoq_policy_get resolves run -> depot -> global -> the CALLER'S HARDCODED LITERAL and never reads ottoq_policy_param_catalog, so 168 declared defaults are consulted by nothing and the effective default of every knob is a literal at its call site. Five keys disagree with no global/depot row to settle it; the consequential one is deploy_peak_fraction, which reads 0.90 in ottoq_agent_board and ottoq_cil_propose and 0.55 in twin.ottoq_sim_advance_service_flow (the site that computes the deploy target), on 20 of 22 surviving twin-depot runs -- so the agent's +/-30% drift window is [0.63,1.0] around a board value of 0.90 while the engine runs 0.55, putting the value in force BELOW the floor of what the agent may request. Fix order in section 6: (a) migrate the replanner onto the helper as an INTERSECTION never a replacement, since the helper is looser on the pointer, and handle p_sim_run_id IS NULL explicitly or the calendar gate passes everything while looking present; (b) the replanner also ignores its own gate's `allowed` and its `rebook_required`; (c) deploy_peak_fraction 0.55-vs-0.90 is a product decision measurement cannot make; (d) calendar_occupancy_guard must not be switched on blind -- it changes the candidate set for all seven callers and forces a recert, so it batches with G111/G112, and ottoq_policy_get should read the catalog default or the next 168 knobs inherit this. Tracked as G114.
+
+-- ══ 7. `0400` IS WRITTEN AND PROVEN ON A ROLLED-BACK PROBE (items a + b) ═══
+--
+-- `db/migrations/0400` implements §6(a) and §6(b), as **PENDING** — `forces_recert` TRUE (a reroute
+-- landing on a different stall moves bookings, commands and the fingerprint), so per `0397` §1b it
+-- batches with G111's actor attribution and the G112 granularity decision rather than buying one
+-- fix for nine re-certifications. It joins `ottoq_stall_free_between` as an INTERSECTION, keeps
+-- every existing pointer predicate, and keeps each query's own ORDER BY, so the only behavioural
+-- change is that calendar-promised stalls stop being offered. Five preflight assertions, including
+-- the EXCLUDE state set still matching what the helper reads (the 2026-08-02 condition) and the
+-- top-N margin of the `p_limit` this file passes.
+--
+-- **PROBE 1, at the run's final clock (`b4d5f76d`, 2026-09-02 02:00 UTC) — the gate cost NOTHING,
+-- and that is reported because it is not the result I wanted.** dcfc 10 → 10, staging 113 → 113.
+-- The run's bookings end at **2026-09-02 01:48**, twelve minutes before its final clock, so at that
+-- instant nothing overlaps and a correct gate removes nothing. **A probe at a moment where the
+-- answer cannot differ proves the gate is wired and proves nothing about whether it binds** — the
+-- G28 trap, in a probe rather than in a rule. It also confirmed the helper's top-N hazard directly:
+-- `p_limit => 1` returns exactly 1 candidate, which is what preflight (5) guards.
+--
+-- **PROBE 2, at a MID-run clock (2026-09-01 12:00 UTC), is the one that binds:**
+--
+--   dcfc candidates, pointer+charger     **10**
+--   the same, with the calendar joined    **6**   → **4 removed**
+--
+-- Four of the ten stalls the pre-`0400` predicates would have offered were already promised by the
+-- calendar for `[12:00, 13:00)`. **State the limit of that number honestly:** `stalls.status` and
+-- `current_vehicle_id` are read as they stand NOW, against that run's HISTORICAL bookings, and the
+-- count omits the `reserved_by` clause for brevity — so 10 → 6 demonstrates that the added
+-- predicate binds and roughly how hard, and is **not** a reconstruction of the candidate set as it
+-- actually stood at 12:00 on that run.
+--
+-- **AND PROBE 1 CAUGHT §6(b) AS A LIVE DEFECT RATHER THAN AS A READING OF THE SOURCE**, which is
+-- the more valuable half. Calling the **pre-fix** function with a vehicle uuid that does not exist:
+--
+--   PRE-FIX   disposition=`requeued_same_class`  new_stall=`765adddb-3dc3-4cd4-be62-28c76ed8e737`
+--   POST-FIX  disposition=`gate_refused`         new_stall=`(null)`  reason=`vehicle_not_found`
+--
+-- So the old code really did reserve a real DCFC stall for a nonexistent vehicle — the guard had
+-- answered `allowed:false` and the function never asked. Not inferred from `prosrc`; executed.
+-- Both probes abort by `RAISE`, so the function replacement and every write are discarded.
