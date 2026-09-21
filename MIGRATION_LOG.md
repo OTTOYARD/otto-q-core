@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0403 — GENERATED, not a log
+## Index, 0134–0404 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -386,7 +386,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0401](db/migrations/0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql) | `PENDING` | no — pending | **G114 items (c) and (d), decided under delegated authority** — Chase, 2026-09-21: *"You make |
 | [0402](db/migrations/0402_a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112.sql) | `20260921165330` | yes — ledger | **G112, decision (3a): a determinism verdict can state its own clock.** `db/checks/0312` §3 |
 | [0403](db/migrations/0403_the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116.sql) | `20260921172038` | yes — ledger | **THE PREREQUISITE FOR ANY LEARNING: THE DIALS OUTLIVE THEIR RUN.** `db/checks/0313` §3 |
+| [0404](db/migrations/0404_the_reward_function_and_dial_promotion_behind_hard_evidence_gates_g116.sql) | `20260921174317` | yes — ledger | **G116, PART TWO: THE REWARD FUNCTION, AND DIAL PROMOTION ENABLED.** Chase instructed both on |
 
-266 migrations indexed.
+267 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
