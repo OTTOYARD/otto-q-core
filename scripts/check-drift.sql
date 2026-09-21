@@ -504,7 +504,8 @@ repo_manifest(version, name, file) AS (
     ('20260921193848'::text, 'a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough'::text, '0407_a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough.sql'::text),
     ('20260921203327'::text, 'the_registry_gate_that_catches_unclassified_run_tables_cannot_see_the_twin_schema_and_one_evidence_check_has_been_dead_since_this_afternoon'::text, '0408_the_registry_gate_that_catches_unclassified_run_tables_cannot_see_the_twin_schema_and_one_evidence_check_has_been_dead_since_this_afternoon.sql'::text),
     ('20260921203917'::text, 'the_evidence_ledgers_look_98_percent_unattributable_and_95_percent_of_that_is_recoverable_from_the_archive'::text, '0409_the_evidence_ledgers_look_98_percent_unattributable_and_95_percent_of_that_is_recoverable_from_the_archive.sql'::text),
-    ('20260921204952'::text, 'the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads'::text, '0410_the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads.sql'::text)
+    ('20260921204952'::text, 'the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads'::text, '0410_the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads.sql'::text),
+    ('20260921210548'::text, 'the_purge_hardcodes_public_so_the_two_twin_tables_it_was_meant_to_clear_would_have_shut_the_start_door'::text, '0411_the_purge_hardcodes_public_so_the_two_twin_tables_it_was_meant_to_clear_would_have_shut_the_start_door.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0410 — GENERATED, not a log
+## Index, 0134–0411 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -393,7 +393,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0408](db/migrations/0408_the_registry_gate_that_catches_unclassified_run_tables_cannot_see_the_twin_schema_and_one_evidence_check_has_been_dead_since_this_afternoon.sql) | `20260921203327` | yes — ledger | **Three fixes, all found while retracting `db/checks/0316`. None changes engine behaviour, |
 | [0409](db/migrations/0409_the_evidence_ledgers_look_98_percent_unattributable_and_95_percent_of_that_is_recoverable_from_the_archive.sql) | `20260921203917` | yes — ledger | **`ottoq_evidence_join_loss_now` reads 83–98% join loss across the evidence ledgers, and |
 | [0410](db/migrations/0410_the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads.sql) | `20260921204952` | yes — ledger | **Bookkeeping. `0408` and `0409` each argue `forces_recert=false` in their headers, each |
+| [0411](db/migrations/0411_the_purge_hardcodes_public_so_the_two_twin_tables_it_was_meant_to_clear_would_have_shut_the_start_door.sql) | `20260921210548` | yes — ledger | **Chase's call: classify `twin.arm_cycles` and `twin.arm_registrations` as `engine` and let |
 
-273 migrations indexed.
+274 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
