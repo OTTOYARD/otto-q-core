@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260921193848
 -- migration-name:    a_busy_day_demo_starts_at_a_uniformly_random_hour_so_a_third_of_them_open_in_the_overnight_trough
 --
 -- 0407  **A demo run picks its hour of day uniformly at random. Nothing ties a scenario to the time

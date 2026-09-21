@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260921192817
 -- migration-name:    the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114
 --
 -- 0401  **G114 items (c) and (d), decided under delegated authority** — Chase, 2026-09-21: *"You make
