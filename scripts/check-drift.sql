@@ -496,7 +496,8 @@ repo_manifest(version, name, file) AS (
     ('20260921122812'::text, 'the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96'::text, '0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql'::text),
     ('PENDING'::text, 'the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114'::text, '0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql'::text),
     ('PENDING'::text, 'the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114'::text, '0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql'::text),
-    ('20260921165330'::text, 'a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112'::text, '0402_a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112.sql'::text)
+    ('20260921165330'::text, 'a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112'::text, '0402_a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112.sql'::text),
+    ('20260921172038'::text, 'the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116'::text, '0403_the_dials_outlive_their_run_so_reanalysis_becomes_possible_g116.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
