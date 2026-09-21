@@ -45,6 +45,34 @@ jobs:
       # ever looked at db/migrations at all. Both are properties of committed files.
       - name: Pytest suite (conformance, site profiles, tariffs, recall, adapters, migration hygiene)
         run: python3 -m pytest -q
+      # tests/*.test.mjs -- the ONLY tests covering the edge functions, i.e. the agent ->
+      # CP-SAT -> kernel chain and the proposal/disposition contract. They were never run
+      # here: this workflow ran three scripts and pytest, and node was never invoked at all.
+      # MEASURED 2026-09-21: `node --test tests/*.test.mjs` at commit f0b13fc returned
+      # 22 tests / 1 FAILING, and it had been failing since 591305d on 2026-09-19 -- two
+      # days red with nobody able to see it. The assertion in question was itself stale
+      # (it demanded EdgeRuntime.waitUntil from a function that deliberately awaits the
+      # handoff), which is the second half of the same defect: a test nothing runs is a
+      # test nothing maintains. Both are fixed in db/checks/0306.
+      # Node is PINNED rather than taken from the runner image, and the floor is not
+      # cosmetic: these tests `import ... from "../edge-functions/_shared/*.ts"` directly,
+      # which needs the unflagged TypeScript type-stripping that landed in Node 22.18.
+      # ubuntu-latest's default node has been 20.x, where every one of these files fails to
+      # import with ERR_UNKNOWN_FILE_EXTENSION -- an error that looks like a broken test
+      # rather than a wrong runtime. The assertion below makes the runtime the thing that
+      # fails when it is wrong.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Edge-function suite (agent/solver chain, proposal disposition)
+        run: |
+          set -euo pipefail
+          node -e 'const [maj,min]=process.versions.node.split(".").map(Number);
+            if (maj<22 || (maj===22 && min<18)) {
+              console.error(`node ${process.versions.node} cannot import .ts without a flag; need >=22.18`);
+              process.exit(1);
+            }'
+          node --test tests/*.test.mjs
       # G12, second rung: compile every PENDING migration against a throwaway
       # PostgreSQL. It runs each file (execution stops at the first precondition
       # that fails, which against an empty database is early and by design) and

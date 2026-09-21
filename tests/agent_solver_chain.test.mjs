@@ -67,8 +67,50 @@ test("agent binds an explicit run before handing off to the solver", () => {
   assert.match(source, /requestedRun/);
   assert.match(source, /eq\("sim_run_id", requestedRun\)/);
   assert.match(source, /ottoq-cpsat-propose/);
-  assert.match(source, /EdgeRuntime\.waitUntil/);
   assert.match(source, /ottoq_agent_chain_claim/);
+  // This used to assert /EdgeRuntime\.waitUntil/ and had been RED since 591305d pulled the
+  // live function into the repo -- the deployed lineage never fired the handoff and forgot
+  // it, it awaits the reply so the audit row can record completion/fallback/failure instead
+  // of claiming an unobserved request queued. Nothing noticed, because verify.yml runs
+  // pytest and three scripts and has never run `node --test` (db/checks/0306). The
+  // assertion now names the behaviour the code actually has.
+  assert.doesNotMatch(source, /EdgeRuntime\.waitUntil/);
+  assert.match(source, /const response = await fetch\(solverUrl/);
+});
+
+test("the solver handoff never names an engine that did not run (0301/v18)", () => {
+  const source = readFileSync(
+    new URL("../edge-functions/ottoq-orchestrator-agent/index.ts", import.meta.url),
+    "utf8",
+  );
+  // 0301: `engine: receipt.engine ?? "cp_sat_forward_lex"` turned ottoq-cpsat-propose's
+  // decline -- {ok:true, skipped:"run is not active", engine:null} -- into a row reading
+  // status "completed", engine cp_sat_forward_lex, and it was read for an hour as proof the
+  // chain had reached CP-SAT. `??` falls through on null as well as undefined, which is why
+  // the bridge setting engine:null was not enough on its own.
+  assert.match(source, /engine: receipt\.engine \?\? null/);
+  // Comments are stripped first: the v18 header QUOTES the defective line so a reader knows
+  // what changed, and a naive negative match would fail on the explanation rather than on
+  // the code. Only executable lines are searched for the resurrected default.
+  const code = source.split("\n").filter((line) => !line.trim().startsWith("//")).join("\n");
+  assert.doesNotMatch(code, /receipt\.engine \?\? "cp_sat_forward_lex"/);
+  assert.match(source, /status: "skipped"/);
+  assert.match(source, /solver_ran: receipt\.solver_ran === true/);
+  // The verb and outcome_status both hang off this list; a skip must not be in it.
+  assert.match(source, /solverAccepted = \["completed", "fallback"\]/);
+});
+
+test("one-vehicle/one-stall is documented as TEMPORAL, not instantaneous (G109)", () => {
+  const source = readFileSync(
+    new URL("../edge-functions/_shared/agent_solver_chain.ts", import.meta.url),
+    "utf8",
+  );
+  // G109 was mis-filed by reading two proposals that shared a stall_id as a violated
+  // constraint, without opening their windows (0 -> 5 and 23 -> 41: disjoint). The comment
+  // that was briefly deleted for being false was true. Keep the disambiguation in the file.
+  assert.match(source, /one-vehicle\/one-stall/);
+  assert.match(source, /AddNoOverlap/);
+  assert.match(source, /READ THE WINDOWS/);
 });
 
 test("CP-SAT request bounds agent influence and retries", () => {

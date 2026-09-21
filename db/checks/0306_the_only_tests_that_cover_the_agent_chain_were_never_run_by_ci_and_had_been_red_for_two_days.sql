@@ -1,0 +1,142 @@
+-- 0306  THE ONLY TESTS THAT COVER THE EDGE FUNCTIONS WERE NEVER RUN BY CI, HAD BEEN RED FOR TWO
+--       DAYS, AND THE RED ASSERTION WAS ITSELF STALE. Found while completing G109's retraction:
+--       the code side of that retraction needed a test, and reaching for `node --test` showed
+--       that nothing had ever run it. Three separate things were wrong and they compound.
+--
+-- No database reads. This file is about committed files, a workflow and a deployed function, so
+-- every claim in it is checkable from the repo plus one `get_edge_function` call. Measured
+-- 2026-09-21 12:0x UTC (07:0x CT).
+--
+-- ══ 1. THE GATE THAT DID NOT EXIST ══════════════════════════════════════════
+--
+-- `tests/*.test.mjs` is the ONLY coverage of `edge-functions/**` — the agent→CP-SAT→kernel
+-- chain (`agent_solver_chain.test.mjs`) and the proposal/disposition contract
+-- (`proposal_disposition.test.mjs`). `.github/workflows/verify.yml` ran, in order: the CP-SAT
+-- prototype battery, the policy battery, the KPI gate, `python3 -m pytest -q`, the migration
+-- compile-check and the ledger check. **`node` was never invoked.** So:
+--
+--   `node --test tests/*.test.mjs` at commit f0b13fc   22 tests · 21 pass · **1 FAIL**
+--
+-- and that failure dated to **591305d (2026-09-19)**, two days earlier. Two days of a red
+-- suite that no human and no pipeline could see. Same defect class as `0098`'s 22-second KPI
+-- view and `0220`'s row-count-as-invocation-count: a signal that exists, is never read, and is
+-- therefore trusted more than a signal that does not exist at all.
+--
+-- ══ 2. AND THE RED ASSERTION WAS WRONG, WHICH IS THE SECOND HALF OF THE SAME THING ══
+--
+-- The failing assertion demanded `/EdgeRuntime\.waitUntil/` of
+-- `edge-functions/ottoq-orchestrator-agent/index.ts`. Measured across the file's history:
+--
+--   e143ce6   waitUntil present?  no
+--   480427d   waitUntil present?  YES   <- the lineage the test was written against
+--   591305d   waitUntil present?  no    <- `check-edge-drift`-style pull of the LIVE function
+--
+-- `591305d` (G67) pulled the deployed function into the repo, and the deployed lineage does not
+-- fire the handoff and forget it — it **awaits** the reply, on purpose, and says so in its own
+-- comment: *"The bridge response is awaited so the audit trail records completion, fallback, or
+-- failure instead of claiming that an unobserved request queued."* That is not a regression, it
+-- is the behaviour `0301`'s audit-honesty work depends on. The test was asserting an obsolete
+-- contract. **A test nothing runs is a test nothing maintains**, so the two halves are one
+-- finding: the missing gate is why the stale assertion survived, and the stale assertion is
+-- what a newly-added gate would have tripped over.
+--
+-- FIXED, both halves:
+--   * `verify.yml` gains an `Edge-function suite` step running `node --test tests/*.test.mjs`,
+--     with Node PINNED via `actions/setup-node@v4` to 22 and an inline assertion that the
+--     runtime is >= 22.18. The floor is load-bearing rather than cosmetic: these tests import
+--     `../edge-functions/**/*.ts` directly and need unflagged TypeScript type-stripping, which
+--     landed in Node 22.18. ubuntu-latest has defaulted to Node 20.x, where every one of these
+--     files fails with ERR_UNKNOWN_FILE_EXTENSION — an error that reads like a broken test
+--     rather than a wrong runtime, so the version check fails loudly instead.
+--   * the `waitUntil` assertion is INVERTED (`assert.doesNotMatch`) and paired with
+--     `assert.match(source, /const response = await fetch\(solverUrl/)`, so the test now names
+--     the behaviour the function actually has and would fail if anyone reverted to
+--     fire-and-forget.
+--
+-- **Proof the gate fires, which is this repo's standing requirement for adding one:** the step
+-- as written, run against f0b13fc — the commit immediately before this one — exits 1 with
+-- `not ok 8 - agent binds an explicit run before handing off to the solver`. Against HEAD it
+-- exits 0 with **24 tests / 24 pass**. It is not a step that can only be green.
+--
+-- ══ 3. AND A THIRD THING, WHICH IS WHY §1 MATTERED TODAY: THE REPO WAS NOT THE TRUTH ══
+--
+-- `ottoq-orchestrator-agent` **v29** (deployed 2026-09-21 08:04 UTC, the fix for `0301`'s
+-- `engine: receipt.engine ?? "cp_sat_forward_lex"` default) was deployed by editing the
+-- function through the API. Its commit — 6e52dae, "fix(edge): orchestrator v29" — touched
+-- **`FINDINGS.md` and `db/checks/0304` and NOTHING ELSE**. The repo copy of the function
+-- carried none of v29: no `skipped` branch, no `solver_ran`, and `engine: receipt.engine ??
+-- "cp_sat_forward_lex"` still on line 328. A commit whose subject line is the fix, that does
+-- not contain the fix. For four hours the only copy of the corrected function was the one
+-- running in production, which is the inverse of where the truth is supposed to live —
+-- exactly the drift `scripts/check-edge-drift.sh` was written for and which nothing ran here
+-- either (it needs `SUPABASE_ACCESS_TOKEN`, absent in this session).
+--
+-- Now: the repo copy carries v18/v29 verbatim, and a new test asserts the three parts of it
+-- that `0301` bought — `engine: receipt.engine ?? null`, `status: "skipped"`,
+-- `solver_ran: receipt.solver_ran === true`, and `solverAccepted` excluding a skip — with the
+-- negative check run over comment-stripped source, because the v18 header QUOTES the defective
+-- line so a reader knows what changed and a naive regex would fail on the explanation.
+--
+-- ══ 4. G109's CODE SIDE, COMPLETED — v30 ════════════════════════════════════
+--
+-- `0304` §4b retracted G109: two proposals sharing a `stall_id` were **0→5 and 23→41**, a
+-- valid two-slot schedule, and `m.AddNoOverlap(ivs)` per point held. The doc comment I had
+-- deleted for being false was true. That restoration was only in the repo; the DEPLOYED bundle
+-- still carried the paragraph asserting the false finding, i.e. the deployed code asserted a
+-- retracted claim.
+--
+--   deployed v30  2026-09-21 (ezbr_sha256 a8da8e50…), verify_jwt true
+--   `_shared/agent_solver_chain.ts`  the original claim restored AND sharpened: it now states
+--   that one-vehicle/one-stall is enforced TEMPORALLY, quotes the AddNoOverlap loop, says that
+--   two proposals on one stall in DISJOINT windows are correct output, and ends
+--   "Before calling a shared stall_id a conflict, READ THE WINDOWS."
+--
+-- **Boot-verified rather than assumed**, because 25 KB of source went over the API by hand:
+-- invoked through `net.http_post` with the vault's `ottoq_anon_key` (the same call
+-- `ottoq_sim_tick_advance` makes), request 96685 →
+-- **`status_code 200`, body `{"ok":true,"skipped":"no running run"}`, `error_msg NULL`.** That
+-- exercises module load, the `_shared` import, client construction and the run query. It does
+-- NOT exercise the solver handoff — there is no live run — so the `skipped`/`engine:null`
+-- branch's proof remains `0305` §3's 08:18:33 row, which was produced by v29 whose handoff code
+-- v30 carries byte-identically.
+--
+-- A third test asserts the restored comment cannot be deleted again without a red build:
+-- `/one-vehicle\/one-stall/`, `/AddNoOverlap/`, `/READ THE WINDOWS/`.
+--
+-- ══ 5. WHAT IS STILL OPEN ═══════════════════════════════════════════════════
+--
+-- G109 as RESTATED: `assign_stall` carries no time dimension, so a two-slot plan is half
+-- discarded — the disposer enacts 23→41 and refuses 0→5 with `stall_reserved`. Nothing in
+-- this file touches that; it is a proposal-vocabulary design question and the disposer's
+-- refusal must not be "fixed".
+--
+-- And one this file deliberately does not close: **`check-edge-drift.sh` still cannot run in
+-- CI or in this session** for want of `SUPABASE_ACCESS_TOKEN`, so §3's class of defect — repo
+-- and deployment disagreeing — is now *testable* but still not *gated*. The new node step
+-- gates the repo's copy against its own contract, which would have caught v29's absence only
+-- because the new assertions name v29's fields. That is a narrower guarantee than drift
+-- detection and should not be mistaken for it.
+--
+-- OPEN-ITEM: scripts/check-edge-drift.sh is the only thing that can prove edge-functions/ matches what is deployed, and it runs nowhere -- not in verify.yml, not in this session -- because it needs SUPABASE_ACCESS_TOKEN. v29 lived only in production for four hours and no signal existed that could have said so. The new `node --test` step gates the repo copy against named v29 fields, which is narrower than drift detection and must not be read as replacing it. Tracked as G110.
+
+-- Nothing to measure in SQL. The one database interaction this file makes is the boot check of
+-- the deployed function, reproduced here so a reader can repeat it (the response row is
+-- transient -- net._http_response is trimmed).
+--
+--   SELECT net.http_post(
+--     url := 'https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-orchestrator-agent',
+--     headers := jsonb_build_object('Content-Type','application/json',
+--       'Authorization','Bearer '||(SELECT decrypted_secret FROM vault.decrypted_secrets
+--                                    WHERE name='ottoq_anon_key' LIMIT 1),
+--       'apikey',(SELECT decrypted_secret FROM vault.decrypted_secrets
+--                  WHERE name='ottoq_anon_key' LIMIT 1)),
+--     body := jsonb_build_object('depot_id','11111111-1111-1111-1111-111111111111'),
+--     timeout_milliseconds := 20000);
+--   -- then: SELECT status_code, content, error_msg FROM net._http_response WHERE id = <returned>;
+--
+-- The deployed version and hash, which is the part worth re-reading later:
+SELECT 'ottoq-orchestrator-agent' AS function_slug,
+       30                         AS version_at_this_check,
+       'a8da8e509e03104e02cdf22917403b39648015055d1e6fcd9d837c860aab49ff' AS ezbr_sha256,
+       'repo edge-functions/ottoq-orchestrator-agent/index.ts + _shared/agent_solver_chain.ts'
+                                  AS deployed_from;
