@@ -52,7 +52,7 @@ import json
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -87,6 +87,38 @@ BATCH = "public.ottoq_proposer_submit_batch"
 ARM = "public.ottoq_agentic_arm"
 #: Who the arming is attributed to in ottoq_policy_params.updated_by.
 ARMED_BY = "proposer_bridge"
+
+#: ══ 0396 / G105. TWO INDEPENDENT CP-SAT PATHS, AND THE ARMING GATE CONFLATED THEM ══
+#:
+#: `_arm_run` refused on any verdict that was not exactly `'armed'`. Migration `0349` then added
+#: a FOURTH value, `armed_primary_unreachable`, and this consumer silently turned it into a hard
+#: refusal. Measured on run `c9b0a87e` at 01:26 UTC: the job died with
+#: "reports arming verdict 'armed_primary_unreachable' ... missing []" -- **nothing missing**,
+#: every dial set, and the loop refused anyway.
+#:
+#: WHY THAT IS WRONG, and it is the distinction that matters. CP-SAT reaches this engine by TWO
+#: routes that share nothing but a name:
+#:
+#:   PATH A  this loop. `bridge/proposer_bridge.py` imports `proposer.forward_proposer` and
+#:           solves with OR-Tools **inside the CI runner**, then submits through
+#:           `ottoq_submit_external_proposal`. It never touches EC2. On run `e8b8eb3e` it
+#:           produced 973 proposals.
+#:   PATH B  the agent chain. `ottoq-cpsat-propose` (edge) calls the `ottoq-intelligence`
+#:           service on its EC2 box, which solves there.
+#:
+#: `0349`'s `reachable` is judged from PATH B's evidence — `ottoq_proposer_fire_log` rows and
+#: `ottoq_decisions.enacted_action->solver_handoff` over `orchestrator_agent` chains. So a dead
+#: EC2 image made PATH A refuse to run, **and PATH A is the only thing that can make `fires > 0`.**
+#: A startup race on top: `reachable` is three-valued and needs >= 3 agent chains to judge, so at
+#: `demo_speed_x = 8.0` the chains cross that threshold before a dispatch can land.
+#:
+#: WHAT THIS DOES NOT DO: hide the finding. The verdict is logged at accept time with its whole
+#: `primary_proposer` block, and on `c9b0a87e` it carried the real diagnosis in its own words --
+#: *"/health does not list cp_sat_forward_lex -- THE RUNNING IMAGE PREDATES CP-SAT"*, with
+#: `/health` answering `{"optimizers":["energy_mpc"]}` against main's
+#: `["energy_mpc","cp_sat_forward_lex"]`. That is a live PATH B outage and it is tracked as G105;
+#: it is not a reason to stop PATH A, which is the half that works.
+ARMING_VERDICTS_THIS_LOOP_MAY_PROCEED_ON: tuple[str, ...] = ("armed_primary_unreachable",)
 FRAME_FN = "public.ottoq_build_decision_frame"
 DEFAULT_TTL_S = 60
 
@@ -362,6 +394,78 @@ def only_due_now(rows: list[dict], *, start_within_min: int) -> tuple[list[dict]
     return kept, deferred
 
 
+def suppress_not_due(frame: dict, not_due_until: dict[str, datetime],
+                     clock: datetime | None) -> tuple[dict, int]:
+    """Drop the vehicles whose own earlier abstention said they are not due yet.
+
+    ══ 0294 / G102. AN ABSTENTION CARRIES ITS OWN DUE TIME AND NOTHING READ IT ══
+
+    `only_due_now`'s docstring says a not-due row *"is re-offered by the next fire,
+    whose plan will have moved it forward."* Measured on run `e8b8eb3e`'s return
+    wave, where the loop fires every 8 seconds: **a plan 131 minutes out has not
+    moved forward in 8 seconds**, so the SAME abstention is re-submitted on every
+    fire. **259 of 350 `forward_lex` rows (74%) were abstentions**, against 35% on
+    `c8f678fb` -- and every one of them carries `planned_start_min` in its own
+    rationale, which no code path consulted.
+
+    So a vehicle is withheld until the sim clock reaches the moment its own
+    abstention declared: when its planned start comes WITHIN `start_within_min` of
+    now. This is the proposer-side half of `0290` §4's ordering -- cut the churn
+    first, then read the standing -- and it needs no migration, no tick-path change
+    and no recert, because the suppression is this loop's memory of what it has
+    already said, not a new fact about the world.
+
+    FAIL-OPEN AND DELIBERATELY FORGETFUL, both load-bearing. No clock, no entry for
+    a vehicle, or an unreadable due time all mean "plan it", i.e. exactly today's
+    behaviour, so the change can only ever REMOVE redundant rows and never withhold
+    a vehicle nobody has answered for. And the memory lives in one process, so a
+    fresh CI invocation starts blind rather than inheriting a suppression it cannot
+    verify: withholding a vehicle on the strength of a plan from a previous loop
+    would be the G54 defect, asking a narrower question than the kernel asks.
+
+    Returns `(frame, n_suppressed)`. The frame is a COPY when anything was dropped,
+    because the frame is hashed into the fire record and mutating the fetched object
+    would make that hash describe a frame the engine never emitted.
+    """
+    if clock is None or not not_due_until:
+        return frame, 0
+    keep, n = [], 0
+    for vehicle in (frame.get("vehicles") or []):
+        due = not_due_until.get(str(vehicle.get("id")))
+        if due is not None and clock < due:
+            n += 1
+            continue
+        keep.append(vehicle)
+    return ({**frame, "vehicles": keep}, n) if n else (frame, 0)
+
+
+def remember_not_due(rows: list[dict], not_due_until: dict[str, datetime],
+                     clock: datetime | None, *, start_within_min: int) -> None:
+    """Record, per vehicle, when its not-due abstention becomes due. Mutates the map.
+
+    Reads only what `only_due_now` already wrote: `abstained_by == 'bridge:not_due'`
+    and `planned_start_min`. A row that is not one of those, an absent clock, or an
+    unreadable start is skipped, so the map only ever gains entries this loop can
+    justify from its own output -- see suppress_not_due for why that matters.
+
+    A vehicle that is planned again later OVERWRITES its entry, so a plan that moves
+    earlier shortens the suppression rather than being trapped by the first answer.
+    """
+    if clock is None:
+        return
+    for row in rows:
+        rationale = ((row.get("proposal") or {}).get("rationale") or {})
+        if rationale.get("abstained_by") != "bridge:not_due":
+            continue
+        try:
+            start = int(rationale.get("planned_start_min"))
+        except (TypeError, ValueError):
+            continue  #: fail open: an unreadable due time means plan it again
+        if start > int(start_within_min):
+            not_due_until[str(row.get("entity_id"))] = clock + timedelta(
+                minutes=start - int(start_within_min))
+
+
 def _jsonb_literal(obj: Any) -> str:
     text = _canonical(obj)
     if DOLLAR_TAG in text:
@@ -484,6 +588,48 @@ def _fetch_class_rows(cur) -> list[dict]:
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
+#: 0389. The site descriptor, DERIVED rather than read from a file.
+SITE_FN = "public.ottoq_build_site_descriptor"
+
+
+def _fetch_site(cur, depot_id: str, sim_run_id: str | None, clock) -> dict:
+    """The site descriptor as the ENGINE currently defines it (0389).
+
+    WHY THIS EXISTS AND WHY IT IS RE-READ EVERY FIRE. `power_cap_kw_hard` is spent
+    by solvers/cpsat/model.py as a CP-SAT cumulative capacity, so it is the site
+    power cap the plan is actually constrained by -- and until 0389 it came from a
+    constant, 2500, in bridge/sites/nashville-flagship.json. The cap the decide
+    path enforces is `ottoq_active_charge_cap_kw`, an MPC setpoint with a horizon,
+    and on run 1efeb1cd it read 795 / 659.5 / 595.3 kW across three consecutive
+    measurements. A descriptor loaded once at startup is therefore wrong twice
+    over: wrong in level, and stale by construction.
+
+    The function tightens only -- with no live cap in force it returns exactly the
+    constants it replaces -- so a fire that reads it can never plan against MORE
+    headroom than the file gave.
+    """
+    cur.execute(f"SELECT {SITE_FN}(%s::uuid, %s::uuid, %s::timestamptz)",
+                (depot_id, sim_run_id, clock))
+    site = cur.fetchone()[0]
+    if isinstance(site, str):
+        site = json.loads(site)
+    #: Read what came back, never what was asked for. A descriptor missing either
+    #: power key would reach OR-Tools as a KeyError inside the model build, which
+    #: reports as a solver fault rather than as the data fault it is.
+    for key in ("power_cap_kw_hard", "power_soft_target_kw"):
+        if key not in site:
+            raise BridgeError(f"{SITE_FN} returned no {key!r}; refusing to plan "
+                              f"against an undeclared site power cap")
+        if isinstance(site[key], float) and not site[key].is_integer():
+            #: OR-Tools 9.15.6755: Domain(arg0: int, arg1: int) -- a fractional
+            #: bound is a TypeError inside NewIntVar, not a worse plan. 0389 floors
+            #: in SQL; this is the assertion that the flooring happened.
+            raise BridgeError(f"{SITE_FN} returned non-integral {key}={site[key]!r}; "
+                              f"model.py spends it as a NewIntVar bound")
+        site[key] = int(site[key])
+    return site
+
+
 CERT_RUN_BY = "cert_harness"
 # The two rigs that must never share a depot with a live proposer loop. A pair
 # runs both of its arms inside ONE transaction, so its ottoq_sim_runs rows are
@@ -562,12 +708,24 @@ def _arm_run(cur, sim_run_id: str, by: str) -> dict:
     receipt = row[0] if row else None
     if not isinstance(receipt, dict) or not receipt.get("ok"):
         raise BridgeError(f"{ARM} did not confirm the arming of run {sim_run_id}: {receipt}")
-    verdict = (receipt.get("arming") or {}).get("verdict")
-    if verdict != "armed":
+    arming = receipt.get("arming") or {}
+    verdict = arming.get("verdict")
+    if verdict not in ("armed",) + ARMING_VERDICTS_THIS_LOOP_MAY_PROCEED_ON:
         raise BridgeError(f"run {sim_run_id} reports arming verdict {verdict!r} after "
-                          f"{ARM} returned ok; missing "
-                          f"{(receipt.get('arming') or {}).get('missing')}")
-    return receipt["arming"]
+                          f"{ARM} returned ok; missing {arming.get('missing')}")
+    if verdict != "armed":
+        #: 0396 / G105. LOUD, NEVER SILENT -- and logged by the CALLER, not here. `log` is a
+        #: parameter of run_live (`log=print`), not a module-level name, so calling it from this
+        #: module-level function would raise NameError and break the loop worse than the bug it
+        #: is fixing. The caller already emits `{"armed": arming}` for every arming, and this
+        #: annotation travels inside that same dict, so the acceptance and its reason reach the
+        #: job log through the path that already works.
+        arming = dict(arming, accepted_despite_verdict={
+            "verdict": verdict,
+            "why": "the dials this loop needs are all set (missing is empty); this verdict "
+                   "describes the edge->EC2 proposer path, which this loop does not use",
+        })
+    return arming
 
 
 def _require_seeing_frame(frame: dict, sim_run_id: str) -> int:
@@ -668,7 +826,9 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
              allow_blind_frame: bool = False,
              follow_ticks: bool = True,
              tick_wait_s: float = DEFAULT_TICK_WAIT_S,
-             max_consecutive_skips: int = 30) -> list[dict]:
+             max_consecutive_skips: int = 30,
+             site_auto: bool = False,
+             max_wall_s: float | None = None) -> list[dict]:
     """Fetch → propose → submit, once or in a loop while the run is running.
 
     Every fire is committed in its own transaction so the door's tick_seq stamp
@@ -689,6 +849,13 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
     #: 'first' until something has woken it; see _wait_for_next_tick.
     trigger: str = "first"
     last_fired_tick: int | None = None
+    #: 0294 / G102. vehicle_id -> the sim clock at which its own not-due abstention
+    #: becomes due. This loop's memory of what it has already said, and the only state
+    #: that survives between fires. One invocation, never persisted; see the suppression
+    #: site for why forgetting between CI runs is the correct behaviour rather than a
+    #: limitation.
+    not_due_until: dict[str, datetime] = {}
+    started_at = time.monotonic()
     with psycopg.connect(dsn) as conn:
         n = 0
         skips = 0
@@ -729,8 +896,20 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                 #: Read what came back, never what was asked for.
                 if not allow_blind_frame:
                     _require_seeing_frame(frame, sim_run_id)
+                #: 0294 / G102. Withhold the vehicles whose own earlier abstention said they
+                #: are not due yet. See suppress_not_due for the measurement and the reasoning.
+                fire_clock = run.get("sim_clock_current")
+                frame, n_suppressed_not_due = suppress_not_due(
+                    frame, not_due_until, fire_clock)
                 class_rows = _fetch_class_rows(cur)
-                result = fire(frame, class_rows, site=site, sim_run_id=sim_run_id,
+                #: 0389. `--site auto` re-derives the descriptor from the engine on
+                #: EVERY fire, because the live charge cap moves within a run. The
+                #: file route is unchanged and still the default, so nothing that
+                #: passes a path behaves differently than it did.
+                fire_site = (_fetch_site(cur, depot_id, sim_run_id,
+                                         run["sim_clock_current"])
+                             if site_auto else site)
+                result = fire(frame, class_rows, site=fire_site, sim_run_id=sim_run_id,
                               depot_id=depot_id,
                               hour_of_day=(run["sim_hour"] if regime else None),
                               max_assets=max_assets, det_budget_s=det_budget_s,
@@ -739,6 +918,16 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
                               serviceable_states=serviceable_states,
                               allow_rejection=allow_rejection)
                 rows, record = result["rows"], result["fire"]
+                #: 0294 / G102. Both halves on the record: how many vehicles this fire withheld
+                #: because their own earlier abstention is not due yet, and how many it is now
+                #: carrying. Published rather than silent, because a suppressed vehicle is a
+                #: vehicle the ledger would otherwise show no row for -- and "absent because
+                #: already answered" must be distinguishable from "absent because unseen",
+                #: which is the whole lesson of `n_vehicles_held` and `frame_facts_version`.
+                record["n_suppressed_not_due"] = n_suppressed_not_due
+                remember_not_due(rows, not_due_until, fire_clock,
+                                 start_within_min=start_within_min)
+                record["n_not_due_remembered"] = len(not_due_until)
                 record["tick_count_at_fetch"] = run["tick_count"]
                 record["run_resolved_by"] = "auto" if auto_run else "argument"
                 #: G58: what woke this fire, and how many ticks passed since the
@@ -778,6 +967,24 @@ def run_live(dsn: str, *, sim_run_id: str, depot_id: str, site: dict,
             log(_canonical(receipt))
             last_fired_tick = run["tick_count"]
             if not loop or (max_fires is not None and n >= max_fires):
+                break
+            #: A CLEAN STOP BEFORE THE HOST KILLS US, and it is why --max-fires can now be
+            #: set generously. `db/checks/0282`: the scheduled loop fired fifty times and
+            #: proposed nothing, because GitHub throttles a */5 cron to roughly three-hourly
+            #: and the depot was idle at each of those moments. The answer is to make each
+            #: catch cover a long window -- but --max-fires alone cannot, because the loop
+            #: FOLLOWS THE TICK and a tick's real duration depends on the run's
+            #: demo_speed_x. 400 fires is twelve minutes at 8x and two hours at 1x, and the
+            #: second one hits the job's timeout-minutes and turns a working loop red.
+            #: A wall bound is the only thing that makes a generous fire count safe, and it
+            #: stops by CHOICE -- with its reason on the record -- rather than by SIGKILL,
+            #: which would lose the receipts the run is judged from.
+            if max_wall_s is not None and (time.monotonic() - started_at) >= max_wall_s:
+                log(_canonical({"stopping": "max_wall_s",
+                                "wall_s": round(time.monotonic() - started_at, 1),
+                                "max_wall_s": max_wall_s, "fires": n,
+                                "why": "bounded stop so the host does not kill the loop "
+                                       "mid-fire and lose its receipts"}))
                 break
             if follow_ticks:
                 trigger = _wait_for_next_tick(conn, sim_run_id,
@@ -822,7 +1029,12 @@ def main(argv: list[str] | None = None) -> int:
                          "depot's one running non-certification run each fire")
     ap.add_argument("--depot", required=True, help="depot_id (uuid)")
     ap.add_argument("--site", required=True,
-                    help="site JSON (bridge/sites/*.json)")
+                    help="site JSON (bridge/sites/*.json), or the literal 'auto' to "
+                         "derive it from the engine each fire via 0389's "
+                         "ottoq_build_site_descriptor -- which is the only route that "
+                         "sees the LIVE charge cap. The committed files carry the "
+                         "site's STRUCTURAL limits (2500 kW here); the engine was "
+                         "enforcing 595-795 kW on run 1efeb1cd. 'auto' needs --dsn.")
     ap.add_argument("--frame", help="decision frame JSON (offline)")
     ap.add_argument("--classes", help="ottoq_vehicle_classes rows JSON (offline)")
     ap.add_argument("--emit-sql", help="write the door calls here (offline)")
@@ -851,6 +1063,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--loop", action="store_true")
     ap.add_argument("--interval-s", type=float, default=10.0)
     ap.add_argument("--max-fires", type=int, default=None)
+    ap.add_argument("--max-wall-s", type=float, default=None,
+                    help="live loop only: stop cleanly after this many wall seconds. Set "
+                         "it BELOW the host's own kill (a GitHub job's timeout-minutes) so "
+                         "the loop stops by choice with its reason on the record instead "
+                         "of by SIGKILL, which loses the receipts. This is what makes a "
+                         "generous --max-fires safe: the loop follows the TICK, so 400 "
+                         "fires is twelve minutes at demo_speed_x 8 and two hours at 1.")
     ap.add_argument("--json-out", help="write the fire result (rows + record) here")
     ap.add_argument("--no-arm", action="store_true",
                     help="do NOT call ottoq_agentic_arm on the resolved run. The default "
@@ -882,11 +1101,18 @@ def main(argv: list[str] | None = None) -> int:
                          "exits non-zero -- those are decisions, not idleness.")
     args = ap.parse_args(argv)
 
-    site = _load_json(args.site)
+    #: 0389. `--site auto` means "ask the engine", and it is live-only: offline mode
+    #: has no database to ask, so it must say so rather than fall back to a file it
+    #: was not given.
+    site_auto = str(args.site).strip().lower() == "auto"
+    if site_auto and not args.dsn:
+        ap.error("--site auto derives the descriptor from the database; it needs --dsn. "
+                 "Offline, pass a site file (bridge/sites/*.json).")
+    site = {} if site_auto else _load_json(args.site)
     try:
         if args.dsn:
             receipts = run_live(args.dsn, sim_run_id=args.run, depot_id=args.depot,
-                                site=site, ttl_seconds=args.ttl,
+                                site=site, site_auto=site_auto, ttl_seconds=args.ttl,
                                 max_assets=args.max_assets,
                                 det_budget_s=args.det_budget, via=args.via,
                                 regime=args.regime, loop=args.loop,
@@ -898,7 +1124,8 @@ def main(argv: list[str] | None = None) -> int:
                                 arm=not args.no_arm,
                                 allow_blind_frame=args.allow_blind_frame,
                                 follow_ticks=not args.no_follow_ticks,
-                                tick_wait_s=args.tick_wait_s)
+                                tick_wait_s=args.tick_wait_s,
+                                max_wall_s=args.max_wall_s)
             if args.json_out:
                 Path(args.json_out).write_text(json.dumps(receipts, indent=1, default=str))
             return 0

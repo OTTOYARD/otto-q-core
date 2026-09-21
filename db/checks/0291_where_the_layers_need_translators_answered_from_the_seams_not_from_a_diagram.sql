@@ -1,0 +1,236 @@
+-- 0291  WHERE OTTO-Q'S LAYERS NEED CONNECTORS — ANSWERED BY MEASURING THE SIX SEAMS, NOT BY
+--       DRAWING A DIAGRAM. THREE OF THE SIX ALREADY HAVE THE RIGHT COMPONENT AND SOMETHING WALKS
+--       PAST IT; THREE NEED SOMETHING NEW, AND ONLY ONE OF THOSE IS NEAR-TERM.
+--
+-- Read-only. Scope: twin depot 11111111-1111-1111-1111-111111111111 (rule 8), live run
+-- `e8b8eb3e-da9d-41ff-ab67-84b6998ba441` (busy_day, seed 100020), measured 2026-09-20 19:20 CT
+-- (2026-09-21 00:20 UTC) while the run was in flight. Every count here is `class='engine'` and
+-- moves with the run — re-derive, never quote this file.
+--
+-- Chase's question, verbatim: *"if connectors or translators or middle ground sections are needed
+-- to be built or integrated to help layers better communicate and understand one another's
+-- purpose and potential, then think about where those sections might be needed and most
+-- valuable."* His layer enumeration, also verbatim: *"Agent layer, solver, deterministic,
+-- dispatch, learning loop, and then top of the funnel again."*
+--
+-- **The single most useful result of asking it: in three of six seams the translator is already
+-- built and correctly shaped, and the gap is a CALLER** (seam 1 — `llm_advisor` holds rank 20 and
+-- has never submitted; seam 2 — `ottoq_shield_and_log` probes an arbitrary action array and five
+-- enacting branches route around it; seam 4 — `ottoq_stall_free_between` is the shared candidate
+-- source and seven of eight proposers do not call it). That reframes the work from design to
+-- wiring, and wiring is cheap, testable and reversible.
+--
+-- **The other three need something that does not exist**, and only one is near-term: the reverse
+-- channel out of the solver (seam 3), outcome attribution (seam 5, gated on it), and the site
+-- forecast the Recall Decision's third argument has never had a producer for (seam 6).
+--
+-- Rule 5 — verify, consolidate, extend — is doing real work here. **I opened two of these
+-- sections intending to design a component and closed both having found it already built.** Seam
+-- 4's draft is preserved inside it as a retraction rather than deleted, because the way it went
+-- wrong is the reusable part.
+--
+-- ══ SEAM 1 — AGENT LAYER -> DETERMINISTIC SHIELD. THE WORST, AND THE DOOR EXISTS ═══
+--
+-- Two defects, one cause, and **one fix closes both**:
+--
+--   (a) **Ungated.** `nemotron` is the only one of eight `l2_engine` values on this run whose
+--       decisions carry no L1 evaluation. Measured: nemotron **0 of 42** with rule results,
+--       against deterministic_v1 646/862, needs_card 49/49, reservation_honoured 31/31,
+--       inspect_seam 26/26, forward_lex 6/6, cuopt 1/1, greedy_constrained 1/1. G62's
+--       `agent_calls_with_no_l1_rules = 1,120 of 1,120`, reproduced on a different seed.
+--   (b) **Synchronously coupled to a beat it cannot meet.** G62's other half: mean Nemotron
+--       latency 30,394 ms against a 30-second tick, 39% of calls longer than one tick, and 721
+--       `deterministic_fallback` decisions beside 729 `nemotron` ones.
+--
+-- **The door: `public.ottoq_external_proposals` + `ottoq_proposer_precedence`.** Measured today,
+-- `llm_advisor` is **declared in the precedence table at rank 20 with `holds_tick = true` and
+-- `greedy_yields = true`** — a registered, ranked, hold-eligible proposer — and it has submitted
+-- **zero proposals, ever**: 0 rows live, and 0 of the 6,681 rows in the `class='evidence'`
+-- `ottoq_proposal_disposition_ledger`, which does carry cuopt, forward_lex, greedy_constrained
+-- and ottoq_service_priority. The agent has a seat at the table it has never sat in.
+--
+-- **Routing the agent through it fixes (a) and (b) at once**, because the disposer already
+-- evaluates L1 and already runs on its own beat: a proposal is inherently asynchronous, so a
+-- 30-second latency stops being a missed deadline and becomes a proposal that lands on the next
+-- tick — which `ottoq_agent_review` already expects and already joins on
+-- `proposal->'agent_handoff'->>'chain_id'` (its own comment: *"net.http_post only QUEUES, so the
+-- solver answers on a LATER beat"*). **This is CLAUDE.md rule 6's "agents propose, solver
+-- disposes" applied to the one agent that currently does neither.**
+--
+-- **Highest value of the six.** It is the only seam that is simultaneously a safety hole and a
+-- latency defect, and the only one where the fix is to stop bypassing existing machinery.
+
+SELECT p.source, p.rank, p.holds_tick, p.greedy_yields,
+       (SELECT count(*) FROM public.ottoq_external_proposals x WHERE x.source = p.source)
+         AS proposals_live,
+       (SELECT count(*) FROM public.ottoq_proposal_disposition_ledger l WHERE l.source = p.source)
+         AS proposals_evidence
+  FROM public.ottoq_proposer_precedence p ORDER BY p.rank;
+
+-- ══ SEAM 2 — ENACTMENT -> AUDIT. THE GAP I DID NOT EXPECT TO FIND ══════════
+--
+-- Fixed as an instrument by `db/migrations/0392` and stated fully there. In one line: every
+-- shield-coverage figure this repo has published was counted from the RULES' side, which cannot
+-- see an enactment that consulted no rule. Counted from the ACTIONS' side, **119 of 859 enacted
+-- decisions on this run carry no rule evaluation** — of which 60, on two branches, are a real
+-- gap: `orchestrator_agent` (seam 1) and **`gate_intake_no_charge`, which books a staging stall
+-- and emits `proceed_to_stall` with no `ottoq_shield_probe` anywhere in its loop.**
+--
+-- The translator built: `public.ottoq_enactment_branches` — a declared vocabulary for
+-- `resolved_action_context` naming each branch's writer, its side of the sim boundary, and
+-- whether a shield is expected — plus `ottoq_shield_coverage(run)` and
+-- `ottoq_assert_shield_coverage(run)`. **`ottoq_decisions` does not record which function wrote
+-- it**, and that is the underlying deficiency: twelve insert sites in `ottoq_decide_tick` alone,
+-- across eight database functions plus one edge function, with free text as the only proxy.
+
+SELECT * FROM public.ottoq_shield_coverage('e8b8eb3e-da9d-41ff-ab67-84b6998ba441');
+SELECT public.ottoq_assert_shield_coverage('e8b8eb3e-da9d-41ff-ab67-84b6998ba441') AS rollup;
+
+-- ══ SEAM 3 — SOLVER -> FRAME, AND FRAME -> SOLVER ══════════════════════════
+--
+-- **Forward direction: built, `0389`.** `ottoq_build_site_descriptor` is exactly a translator —
+-- engine truth (service cap, live `ottoq_active_charge_cap_kw`, derived margin) rendered as a
+-- site descriptor with **integral** bounds, because OR-Tools 9.15.6755 refuses non-integral ones
+-- (`TypeError: Domain(arg0: int, arg1: int)`, verified empirically). It tightens only, and FLOOR
+-- is load-bearing. Before it, CP-SAT was told the site could draw 2,500 kW while the engine
+-- enforced 795.
+--
+-- **Reverse direction: MISSING, and it is the one thing on this list that does not exist.** When
+-- CP-SAT declines, nothing carries the reason back into the next fire's inputs. Measured on the
+-- prior wave run `c8f678fb`: 610 proposals over 56 vehicles (10.89 each) winning 12 enactments —
+-- **51 proposals per enactment** — and 213 of the 610 (35%) abstentions whose own rationale reads
+-- *"planned to start at +111 min ... beyond this tick's 30-min window; re-offered when due"*.
+-- `0390` fixed the half of this that was a misread — an abstention was setting
+-- `has_live_holds_tick_proposal` and consuming a first-refusal seat, so the proposer's own
+-- "not yet" suppressed its next attempt — but the churn itself remains: `vehicle_is_held`
+-- withholds a vehicle only while a proposal is *pending*, and the disposer clears them every
+-- tick, so the next fire re-plans an unchanged vehicle against a frame that has barely moved.
+--
+-- **What to build: a frame delta the proposer can read.** Not a new solver and not a new ledger —
+-- a per-vehicle "nothing relevant changed since tick N" fact, so a rolling re-solve re-solves
+-- what moved. `0290` §4 ranks this first and states why the order is not negotiable: measuring
+-- CP-SAT's standing while it floods its own denominator produced two wrong numbers in one check
+-- file. **Fix the instrument, then read it.**
+--
+-- ══ SEAM 4 — DISPATCH -> TWIN. THE ORACLE EXISTS. IT HAS ONE CALLER OF EIGHT ═══
+--
+-- **RETRACTED AND REPLACED BEFORE IT WAS EVER QUOTED, and the retraction is the useful part of
+-- this section.** I first wrote here that CLAUDE.md's three-gate rule is stated and *"nothing
+-- enforces it, so each reader reimplements a subset"*, and recommended building
+-- `ottoq_stall_availability(stall, window)`. **Both halves were wrong, and the second would have
+-- been a rule-5 violation — duplicating a capability that exists.**
+--
+-- **`ottoq.ottoq_stall_free_between(run, depot, from, to, stall_type, staging_role, limit, zones)`
+-- IS the shared availability oracle**, and it is careful. It applies the calendar with the exact
+-- state set that matches the EXCLUDE constraint (`held`/`active`/`done`/`interrupted`, carrying
+-- its own 2026-08-02 incident note about a picker that read a narrower set and booked 22 vehicles
+-- into one bay), the `0372`/G88 charger-health gate scoped to `dcfc`/`l2` on purpose, `status NOT
+-- IN ('maintenance','closed')`, and a policy-gated occupancy guard on `current_vehicle_id` with an
+-- itinerary-derived horizon. Its own comment calls it *"the SHARED candidate source for every
+-- proposer and for `ottoq.ottoq_react_to_refusals`' reroute walk."*
+--
+-- **WHAT MY FIRST DRAFT DID, AND WHY IT IS THE SAME DEFECT AS G99.** I censused which routines
+-- mention `reserved_by` / `ottoq_stall_bookings` / `station_state` in their own `prosrc` and was
+-- about to report *"63 routines read stalls with a gate, only 3 apply all three."* **A routine
+-- that calls `ottoq_stall_free_between` gets all three gates without naming any of them**, so that
+-- census scores every correct caller as a failure. It is exactly G99's error — a predicate read
+-- outside the domain it is defined on — committed by me, one file later, while writing the file
+-- about it.
+--
+-- **THE CORRECT MEASUREMENT IS "WHO CALLS THE ORACLE", AND IT FOUND SOMETHING SHARPER.** Seven
+-- callers exist: `ottoq_activate_due_bay_reservations`, `ottoq_arrival_disposition`,
+-- `ottoq_enact_space_assignment`, `ottoq_find_and_book_stall`, `ottoq_react_to_refusals`,
+-- `ottoq_validate_assignment`, and `public.ottoq_l2_optimize_assignments`. **Of the eight stall
+-- proposers, exactly one — `ottoq_l2_optimize_assignments`, the greedy path — is among them. The
+-- other seven read the pointer and the charger directly and NOT ONE of them reads the calendar at
+-- all**, neither through the oracle nor itself:
+--
+--   ottoq_l2_optimize_assignments      oracle YES   calendar via oracle
+--   ottoq_l2_propose_stall_assignment  oracle no    calendar **NO**
+--   ottoq_l2_propose_seat              oracle no    calendar **NO**
+--   ottoq_l2_propose_stall_seat        oracle no    calendar **NO**
+--   ottoq_l2_external_proposal         oracle no    calendar **NO**
+--   ottoq_honour_reservation_proposal  oracle no    calendar **NO**
+--   ottoq_promote_proposal_candidates  oracle no    calendar **NO**
+--   ottoq_service_priority_propose     oracle no    calendar NO, charger NO, pointer NO
+--
+-- **So the oracle's comment asserts a universality it does not have** — the `0231` defect shape, a
+-- comment relied upon for a property nothing enforces. Nothing is silently oversubscribed, because
+-- the EXCLUDE constraint refuses the collision at write time (rule 6's assignment-plus-verification
+-- working exactly as designed) — but **a proposer that never reads the calendar necessarily
+-- proposes into claimed windows and learns only at booking**, and `stall_reserved` refusals are the
+-- observable residue (`0288` measured 16 on `c8f678fb`). That is a candidate contributor to seam
+-- 3's churn, and it is a hypothesis here, not a claim.
+--
+-- **AND THE ORACLE'S POINTER GATE HAS BEEN DARK SINCE 2026-08-01.** `calendar_occupancy_guard`
+-- exists in `ottoq_policy_params` for **exactly one run** — `900a8a44`, written by `band_cert` on
+-- 2026-08-01 21:01 UTC — at run scope, with no global or default row anywhere. The oracle reads it
+-- as `ottoq_policy_get(run, 'calendar_occupancy_guard', 0)`, so `guard_on` is **false on every run
+-- since**, including `e8b8eb3e` and `c8f678fb`. On those runs `ottoq_stall_free_between` is a
+-- TWO-gate oracle (calendar + charger) with a carefully written horizon model that never executes.
+--
+-- **So what to build here is not an oracle — it is three much smaller things:** (1) route the
+-- seven proposers through the existing candidate source, or state in each why it must not; (2)
+-- decide whether `calendar_occupancy_guard` should default on, which is a behaviour change and
+-- therefore `forces_recert TRUE`; (3) note that the oracle never reads `reserved_by` at all, so
+-- CLAUDE.md's pointer gate is only ever two-thirds present even with the guard armed. The
+-- 792-overflow question stays open and is not touched by any of this.
+--
+-- ══ SEAM 5 — LEARNING LOOP. EVIDENCE WITHOUT FEEDBACK ══════════════════════
+--
+-- The emptiest seam, and worth saying plainly because it is the one most likely to be assumed
+-- present. What exists is **four durable evidence ledgers**, all `class='evidence'` and all
+-- surviving the purge that takes engine tables to near zero: `ottoq_model_call_ledger` (0340,
+-- one row per external model or solver call), `ottoq_proposal_disposition_ledger` (0364),
+-- `ottoq_determinism_verdict_ledger` (0386), `ottoq_run_archives`.
+--
+-- **What does not exist is any routine that reads them back into a decision.** Today you can ask
+-- *"was this proposal enacted"*; you cannot ask *"was enacting it better than the alternative"*,
+-- because nothing joins a proposal to the realised outcome of the vehicle it was about — served
+-- on time or not, at what kW, against which tariff window. So the honest description of the
+-- learning loop is: **it has a memory and no feedback path.** The connector is an
+-- outcome-attribution join (proposal -> disposition -> that vehicle's realised service), and it
+-- is gated on seam 3, because attributing outcomes to a proposer that submits 51 proposals per
+-- enactment attributes them to noise.
+--
+-- ══ SEAM 6 — TOP OF THE FUNNEL: RECALL -> SITE FORECAST ════════════════════
+--
+-- CLAUDE.md 2.7's interface takes three inputs — `AssetState`, `WorkSideSignals`, `SiteForecast`
+-- — and the third is the one with no producer. `recall/` implements the naive threshold
+-- documented as naive, which is correct for C9; the connector it will need is a forecast
+-- publisher (predicted congestion, price windows, availability) shaped like the
+-- `ServiceProfile` of 2.6 rather than like a query. **Deliberately last**: a forecast consumed by
+-- a decide path whose availability oracle is three inconsistent readers (seam 4) would be a
+-- forecast of the wrong quantity.
+--
+-- ══ THE RANKING, BY VALUE PER HOUR, AND WHAT IS NOW IN FLIGHT ══════════════
+--
+--   1. **Seam 1** — route the agent through `ottoq_external_proposals` as `llm_advisor`. Closes a
+--      safety hole and a latency defect with one change, using a seat already declared. Tick
+--      path, `forces_recert TRUE`, so it waits for run `e8b8eb3e` to finish.
+--   2. **Seam 2** — instrument LANDED (`0392`). Remedy for `gate_intake_no_charge` is tick path,
+--      `forces_recert TRUE`, waits with (1).
+--   3. **Seam 4** — NOT an oracle; the oracle exists. Route the seven proposers that never read
+--      the calendar through `ottoq.ottoq_stall_free_between`, and decide whether
+--      `calendar_occupancy_guard` should default on (dark since 2026-08-01).
+--   4. **Seam 3 reverse** — the frame delta that stops the churn. Must precede any standing
+--      claim about CP-SAT's influence.
+--   5. **Seam 5** — outcome attribution. Gated on 4.
+--   6. **Seam 6** — forecast publisher. Gated on 3.
+--
+-- **And the pattern worth keeping from all six:** the valuable connector is almost never a new
+-- abstraction. Five of six are either an existing component with a missing caller, or one
+-- declared fact replacing several readers' private reimplementations of it. The one genuinely
+-- absent thing is the reverse channel out of the solver — the engine has never been able to hear
+-- a proposer say *"not this, and here is why."*
+--
+-- **THE SECOND PATTERN, WHICH THIS FILE EARNED THE HARD WAY.** Seam 1 and seam 4 both began as
+-- *"this does not exist, build it"* and both ended as *"it exists, at rank 20 with zero proposals
+-- / with one caller of eight."* In seam 4 I got as far as a censused table of 63 routines before
+-- noticing the census could not see a caller of the oracle at all. **Before proposing any
+-- connector, the query to run first is not "does a reader apply the gates" but "does a shared
+-- component already apply them, and who calls it."** Rule 5 is not a politeness; on this codebase
+-- it is the difference between a fix and a duplicate.
+
+-- OPEN-ITEM: seven of the eight stall proposers never read the booking calendar -- not via ottoq_stall_free_between and not themselves -- so they necessarily propose into claimed windows and learn only at booking time. Tracked as G104.
+-- OPEN-ITEM: calendar_occupancy_guard exists in ottoq_policy_params for exactly one run (900a8a44, band_cert, 2026-08-01) with no global or default row, so the shared availability oracle's only pointer gate has been dark on every run since. Tracked as G104.

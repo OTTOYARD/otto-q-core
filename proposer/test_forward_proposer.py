@@ -31,6 +31,7 @@ from forward_proposer import (  # noqa: E402
     stall_block_reason,
     stall_is_free,
     vehicle_is_held,
+    OVERSTAY_CHARGE_KEY,
     vehicle_has_live_proposal,
 )
 
@@ -1538,3 +1539,48 @@ def test_a_version_3_frame_reports_its_version_and_the_sources_that_hold_a_tick(
         "cuopt", "cuopt_fallback", "forward_lex", "llm_advisor"]
     r = propose(frame, CLASSES, site=SITE)
     assert r["facts_version"] == 3
+
+
+def test_a_vehicle_overstaying_a_charge_stall_is_held():
+    """0366 / G81. It occupies a charge stall whose booking was released, so it
+    holds a charge place IN FACT. holds_charge_place asks about a BOOKED place and
+    answers False -- correctly -- which is exactly why this needs its own key."""
+    over = _vehicle("v-over", soc=70, state="charging_l2",
+                    **{OVERSTAY_CHARGE_KEY: True, "holds_charge_place": False,
+                       "has_live_booking": True})
+    assert vehicle_is_held(over)
+
+
+def test_the_overstay_check_is_not_shadowed_by_holds_charge_place():
+    """THE ORDERING IS THE FIX, so it is asserted rather than trusted.
+
+    holds_charge_place 'wins outright' -- its branch returns bool(value) and stops.
+    An overstaying vehicle carries holds_charge_place=False, so the same check
+    placed AFTER that branch would be unreachable while looking correct in a diff.
+    This test fails if the two are ever reordered."""
+    over = _vehicle("v-shadow", soc=70, state="charging_l2",
+                    **{OVERSTAY_CHARGE_KEY: True, "holds_charge_place": False})
+    assert vehicle_is_held(over), (
+        "holds_charge_place=False shadowed the overstay check -- the branches have "
+        "been reordered and the G81 fix is dead code")
+
+
+def test_a_frame_without_the_overstay_key_keeps_its_old_behaviour():
+    """Key presence is the version test, the discipline CHARGE_PLACE_KEY set. A
+    pre-0366 fixture, a certification arm and a frame with the gate off must all
+    answer exactly as they did -- never a guess, in either direction."""
+    old = _vehicle("v-old", soc=70, state="charging_l2",
+                   **{"holds_charge_place": False})
+    assert OVERSTAY_CHARGE_KEY not in old
+    assert not vehicle_is_held(old)
+
+
+def test_the_overstay_key_being_false_does_not_hold_a_vehicle():
+    """False must not be read as 'present therefore held'. A vehicle the frame
+    positively says is NOT overstaying falls through to the existing reasons."""
+    not_over = _vehicle("v-clean", soc=70, state="charging_l2",
+                        **{OVERSTAY_CHARGE_KEY: False, "holds_charge_place": False})
+    assert not vehicle_is_held(not_over)
+    still_placed = _vehicle("v-placed", soc=70, state="charging_l2",
+                            **{OVERSTAY_CHARGE_KEY: False, "holds_charge_place": True})
+    assert vehicle_is_held(still_placed)

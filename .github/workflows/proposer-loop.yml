@@ -37,17 +37,17 @@ on:
         required: false
         default: "auto"
       fires:
-        description: how many fires before stopping
+        description: how many fires before stopping (the wall bound stops it first)
         required: false
-        default: "12"
+        default: "400"
       interval_s:
-        description: seconds between fires
+        description: seconds between fires (a bound; the loop follows the tick)
         required: false
-        default: "20"
+        default: "8"
       states:
         description: vehicle states to propose for (narrowing only)
         required: false
-        default: "arrived_at_gate"
+        default: "arrived_at_gate,staged_awaiting_service"
       advisor:
         description: "also run the LLM advisor fire (costs money; needs ANTHROPIC_API_KEY)"
         required: false
@@ -73,6 +73,38 @@ on:
   # Safe to leave on: --idle-ok makes an idle depot a green no-op, and the
   # certification guard makes a round-in-flight a logged skip, so a 5-minute
   # beat against a quiet depot costs a runner minute and writes nothing.
+  #
+  # AND */5 IS NOT WHAT ACTUALLY HAPPENS, measured 2026-09-20 (db/checks/0282).
+  # GitHub de-prioritises scheduled workflows on a busy repo: the real firing
+  # times on 09-20 were 01:02, 06:08, 11:25, 14:47 and 17:44 -- roughly
+  # three-hourly, not five-minutely. Across FIFTY scheduled runs this loop
+  # proposed NOTHING, every one green in ~23 seconds on the --idle-ok path,
+  # because the depot happened to be idle at each of those five moments. The
+  # conclusion column cannot distinguish "the proposer works" from "the proposer
+  # has never seen a frame", which is why 0282 records it as a defect of
+  # instrumentation rather than of the loop.
+  #
+  # The mitigation is below and it is deliberately not a schedule change (*/5 is
+  # already the documented floor): make each CATCH cover a long window, with
+  # --max-fires 400 and --max-wall-s 780. A catch now runs ~13 minutes instead of
+  # ~4, and the wall bound is what makes the generous fire count safe -- the loop
+  # follows the TICK, so 400 fires is twelve minutes at demo_speed_x 8 and two
+  # hours at 1x, and the second one would hit timeout-minutes and turn a working
+  # loop red. An idle depot still exits in seconds, so none of this costs
+  # anything when there is nothing to do.
+  #
+  # AND THE SCHEDULED STATE SET IS WIDENED BY ONE, on evidence rather than taste.
+  # It was `arrived_at_gate` alone, from proposer_bridge's D3 note that this is
+  # "the population the one-tick hold is holding". That note is about the HOLD
+  # mechanism; it is not an instruction to exclude the other states, and on the
+  # busy_day night run measured in 0282 `arrived_at_gate` was **zero for the whole
+  # window** while 33 vehicles sat in a serviceable state. A proposer pointed at an
+  # empty population is indistinguishable from a broken one. `staged_awaiting_
+  # service` is the other population genuinely waiting for a place -- not already
+  # plugged in, so not answering holds_charge_place -- and one of the two CP-SAT
+  # plans the kernel enacted on that run came from a fire that included it. The two
+  # states still EXCLUDE charging_dcfc and charging_l2, which is the part that
+  # matters: a vehicle already on a charger is not asking for a stall.
   #
   # The better design is event-driven -- fire from the tick, gated on whether the
   # frame changed -- because a proposer solving a stale frame is worse than no
@@ -135,6 +167,21 @@ jobs:
       # --allow-blind-frame exist for measurement and both are explicit. Arming
       # also refuses a certification arm outright (ERRCODE 42501), which closes
       # that hole on the explicit --run path as well as the resolved one.
+      #
+      # `--site auto` INSTEAD OF THE COMMITTED FILE, added 2026-09-20 (0389).
+      # bridge/sites/nashville-flagship.json declares power_cap_kw_hard 2500 --
+      # correctly, as depots.service_max_kw, the utility service limit. But
+      # solvers/cpsat/model.py spends that number as a CP-SAT *cumulative
+      # capacity*, so it is the cap the plan is constrained by, and the cap the
+      # decide path actually enforces is ottoq_active_charge_cap_kw: an MPC
+      # setpoint with a horizon that read 795, then 659.5, then 595.3 kW across
+      # three consecutive measurements on run 1efeb1cd. A file loaded once is
+      # therefore wrong in level AND stale by construction. 0389's
+      # ottoq_build_site_descriptor is re-read every fire and tightens only --
+      # with no live cap in force it returns exactly 2500/1620, the file's own
+      # values -- so this switch cannot loosen any constraint. The files stay as
+      # the offline route's input and as the provenance record for the five
+      # modelling parameters that exist nowhere in the database.
       - name: CP-SAT proposer loop (one batch per fire; ledgered; the kernel disposes)
         env:
           OTTOQ_DATABASE_URL: ${{ secrets.OTTOQ_DATABASE_URL }}
@@ -143,13 +190,14 @@ jobs:
             --dsn "$OTTOQ_DATABASE_URL" \
             --run "${{ github.event.inputs.run || 'auto' }}" \
             --depot "${{ github.event.inputs.depot || '11111111-1111-1111-1111-111111111111' }}" \
-            --site bridge/sites/nashville-flagship.json \
-            --states "${{ github.event.inputs.states || 'arrived_at_gate' }}" \
+            --site auto \
+            --states "${{ github.event.inputs.states || 'arrived_at_gate,staged_awaiting_service' }}" \
             --default-ready-delta 30 \
             --allow-rejection \
             --loop \
-            --interval-s "${{ github.event.inputs.interval_s || '20' }}" \
-            --max-fires "${{ github.event.inputs.fires || '12' }}" \
+            --interval-s "${{ github.event.inputs.interval_s || '8' }}" \
+            --max-fires "${{ github.event.inputs.fires || '400' }}" \
+            --max-wall-s 780 \
             --idle-ok \
             --via batch \
             --json-out receipts.json

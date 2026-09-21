@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0356 — GENERATED, not a log
+## Index, 0134–0397 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -339,7 +339,48 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0354](db/migrations/0354_the_review_judged_the_whole_run_from_three_chains_and_a_ledger_that_never_held_cuopt.sql) | `20260919224417` | yes — ledger | THE RETURN LEG WORKS AND ITS VERDICT SAID "solver_returned_nothing" ON A |
 | [0355](db/migrations/0355_the_energy_shield_declared_five_block_rules_at_the_moment_power_flows_and_none_had_ever_run.sql) | `20260919235525` | yes — ledger | FIVE BLOCK-ENFORCEMENT RULES DECLARE `charge_session_start`. THAT PROBE |
 | [0356](db/migrations/0356_the_shield_finally_sees_the_moment_power_begins.sql) | `20260919235738` | yes — ledger | THE SIXTH CALLED PROBE POINT, AND THE FIRST ONE THAT WATCHES ELECTRONS |
+| [0357](db/migrations/0357_the_booking_calendar_keeps_three_timestamps_on_two_clocks_and_says_so_nowhere.sql) | `20260920004021` | yes — ledger | `released_at - booked_at` IS NEGATIVE ON 100% OF ROWS, AND THE FIX IS NOT |
+| [0358](db/migrations/0358_a_single_stall_proposal_gives_the_disposer_nothing_to_dispose_over.sql) | `20260920005644` | yes — ledger | THE RANKED PROPOSAL CONTRACT. A PROPOSER MAY NOW NAME AN ORDERED SET OF |
+| [0359](db/migrations/0359_a_promoted_candidate_must_carry_its_own_kilowatts_or_the_shield_judges_the_wrong_load.sql) | `20260920010111` | yes — ledger | 0358 REWROTE THE STALL AND LEFT THE KILOWATTS BEHIND. FOUR ENERGY RULES |
+| [0360](db/migrations/0360_a_stall_reservation_outlives_the_vehicle_that_can_no_longer_use_it.sql) | `20260920022145` | yes — ledger | THE DEPOT IS 98% RESERVED AND 13% OCCUPIED. NOTHING RELEASES A |
+| [0361](db/migrations/0361_a_proposer_that_declines_is_not_a_proposer_that_named_a_bad_stall.sql) | `20260920023610` | yes — ledger | THE DISPOSER HAS NO CONCEPT OF AN ABSTENTION, SO A PROPOSER THAT |
+| [0362](db/migrations/0362_a_worse_ranked_proposer_removes_a_better_one_from_the_pool_before_rank_is_read.sql) | `20260920024530` | yes — ledger | RANK DECIDES WHICH PENDING PROPOSAL WINS. SUPERSESSION DECIDES WHICH |
+| [0363](db/migrations/0363_the_gate_0362_installed_could_never_be_opened.sql) | `20260920025230` | yes — ledger | 0362 SHIPPED A POLICY GATE THAT CANNOT BE SET. REGISTER THE KEY |
+| [0364](db/migrations/0364_a_proposers_hit_rate_is_deleted_by_the_next_run_that_starts.sql) | `20260920035200` | yes — ledger | WHETHER A PROPOSAL WAS ENACTED IS RECORDED ONLY IN A TABLE THE NEXT |
+| [0365](db/migrations/0365_the_overstay_has_a_name_and_no_reader_so_give_it_one.sql) | `20260920033500` | yes — ledger | `window_elapsed_occupied` HAS ONE WRITER AND ZERO READERS. MAKE THE |
+| [0366](db/migrations/0366_the_frame_now_says_which_vehicles_are_overstaying_a_charge_stall.sql) | `20260920034500` | yes — ledger | PUBLISH THE OVERSTAY TO THE DECISION FRAME, SO THE SIGNAL REACHES A |
+| [0367](db/migrations/0367_the_reclaimer_0360_installed_has_never_run_on_the_live_metronome_path.sql) | `20260920041500` | yes — ledger | THE RECLAIMER 0360 INSTALLED HAS NEVER RUN: THE LIVE METRONOME DOES NOT |
+| [0368](db/migrations/0368_the_reroute_hunted_the_scarcest_stall_type_for_vehicles_that_wanted_the_most_plentiful.sql) | `20260920041236` | yes — ledger | THE REROUTE HUNTED THE SCARCEST STALL TYPE ON THE SITE FOR VEHICLES |
+| [0369](db/migrations/0369_a_vehicle_parked_in_one_stall_was_still_holding_another.sql) | `20260920041750` | yes — ledger | A VEHICLE PARKED IN ONE STALL WAS STILL HOLDING ANOTHER, AND THE |
+| [0370](db/migrations/0370_fifty_nine_calendar_claims_were_already_overruled_and_the_ledger_held_none_of_them.sql) | `20260920042835` | yes — ledger | FIFTY-NINE CALENDAR CLAIMS WERE ALREADY OVERRULED BY A VEHICLE SITTING |
+| [0371](db/migrations/0371_i_put_a_nondeterminism_source_inside_the_tick_path_taking_it_back_out.sql) | `20260920043723` | yes — ledger | I PUT A NONDETERMINISM SOURCE INSIDE THE TICK PATH FOUR MIGRATIONS AGO |
+| [0372](db/migrations/0372_the_shared_candidate_source_offered_charge_stalls_whose_charger_was_faulted.sql) | `20260920045844` | yes — ledger | THE SHARED CANDIDATE SOURCE OFFERED CHARGE STALLS WHOSE CHARGER WAS |
+| [0373](db/migrations/0373_three_comments_that_stop_the_next_person_repeating_tonight.sql) | `20260920050351` | yes — ledger | THREE COMMENTS THAT STOP THE NEXT PERSON REPEATING TONIGHT |
+| [0374](db/migrations/0374_two_legal_decisions_summed_past_the_service_contract_and_the_meter_that_would_have_seen_it_is_not_read.sql) | `20260920123000` | yes — ledger | THE SITE ALREADY METERS 2,738.8 kW AGAINST A 2,500 kW SERVICE CONTRACT, |
+| [0375](db/migrations/0375_my_own_new_column_says_throttle_the_vehicles_when_the_answer_is_defer_the_battery.sql) | `20260920124500` | yes — ledger | 0374's READER ANSWERS "WHAT IS THE BIGGEST LOAD" UNDER A COLUMN NAME THAT |
+| [0376](db/migrations/0376_i_built_a_detector_whose_silence_cannot_be_told_from_absence_which_is_the_defect_i_spent_tonight_fixing.sql) | `20260920131500` | yes — ledger | 0374's DETECTOR WRITES NOTHING WHEN THE SITE IS QUIET, AND WRITES NOTHING |
+| [0377](db/migrations/0377_removing_the_one_row_my_own_path_test_left_in_an_evidence_table.sql) | `20260920132500` | yes — ledger | I TESTED 0376's `ON CONFLICT` PATH BY LOWERING THE THRESHOLD BY HAND, AND |
+| [0378](db/migrations/0378_the_entire_causal_record_of_the_excursion_is_class_engine_and_dies_with_the_next_demo_run.sql) | `20260920134500` | yes — ledger | EVERY NUMBER IN `db/checks/0271` LIVES IN A `class='engine'` TABLE. CAPTURE |
+| [0379](db/migrations/0379_the_engine_exceeding_its_own_published_budget_is_only_observable_at_tick_time.sql) | `20260920132449` | yes — ledger | "EV LOAD EXCEEDED THE CAP IN FORCE" CANNOT BE ANSWERED BY ANY QUERY AFTER THE |
+| [0380](db/migrations/0380_joining_an_evidence_table_to_sim_runs_silently_undoes_the_reason_it_is_evidence.sql) | `20260920135731` | yes — ledger | EVERY EVIDENCE LEDGER WE BUILT EXISTS TO SURVIVE THE PURGE, AND THE OBVIOUS |
+| [0381](db/migrations/0381_the_published_reliability_field_names_an_action_that_never_happened_and_undercounts_the_one_that_did.sql) | `20260920141533` | yes — ledger | `reliability.stranded_recharges` IS WRONG TWICE, IN OPPOSITE DIRECTIONS, IN A |
+| [0382](db/migrations/0382_a_column_named_for_a_fifteen_minute_quantity_that_is_a_running_peak_in_sim_and_not_even_that_in_production.sql) | `20260920155947` | yes — ledger | G90: `site_energy_snapshots.peak_demand_kw_15min` IS NOT A 15-MINUTE QUANTITY |
+| [0383](db/migrations/0383_the_whole_of_g86_is_one_concurrency_class_that_no_executor_admits_and_the_walkaround_is_its_only_member.sql) | `20260920161631` | yes — ledger | G86: `perimeter_walkaround` IS NOT MISSING AN EXECUTOR. IT IS DERIVED INTO A |
+| [0384](db/migrations/0384_my_own_new_detector_raises_on_the_malformed_data_it_exists_to_find.sql) | `20260920162559` | yes — ledger | HARDENING `public.ottoq_atom_class_coverage` (0383) AGAINST THE ONE INPUT IT IS |
+| [0385](db/migrations/0385_the_catch_up_that_stopped_one_state_short_strands_a_vehicle_for_the_whole_run.sql) | `20260920172340` | yes — ledger | G91: A VEHICLE THAT REACHES `staged_for_departure` STILL HOLDING A MANDATORY |
+| [0386](db/migrations/0386_the_fourteen_atom_verdict_is_the_one_thing_the_permanent_run_record_does_not_keep.sql) | `20260920173700` | yes — ledger | G93: EVERY DETERMINISM VERDICT THIS ENGINE HAS EVER PRODUCED IS GONE. 1,166 |
+| [0387](db/migrations/0387_two_critical_state_machine_rules_had_a_caller_shaped_hole_and_the_input_they_need_did_not_exist.sql) | `20260920185425` | yes — ledger | G44: SM.001 AND SM.003 NOW HAVE A CALLER. AND THE REASON THEY COULD NOT SIMPLY |
+| [0388](db/migrations/0388_my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do.sql) | `20260920185739` | yes — ledger | 0387's PROBE IS MEASURE-ONLY AND ITS LOG ROWS SAY `enforcement_taken='blocked'` |
+| [0389](db/migrations/0389_cp_sat_was_told_the_site_could_draw_2500_kw_while_the_engine_was_enforcing_795.sql) | `20260920194102` | yes — ledger | THE SITE POWER CAP CP-SAT PLANS AGAINST IS A CONSTANT IN TWO PLACES, AND THE |
+| [0390](db/migrations/0390_an_abstention_is_not_a_claim_and_two_predicates_counted_it_as_one.sql) | `20260921000517` | yes — ledger | AN ABSTENTION IS NOT A CLAIM — AND THE PROPOSER'S OWN "I CANNOT SERVE THIS VEHICLE |
+| [0391](db/migrations/0391_kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour.sql) | `20260921001618` | yes — ledger | KPI 4 STOPS COUNTING THE DETERMINISTIC SHIELD'S OWN SAFE-DEFAULT FALLBACKS AS HUMAN |
+| [0392](db/migrations/0392_the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible.sql) | `20260921002608` | yes — ledger | EVERY COVERAGE NUMBER THIS REPO HAS EVER PUBLISHED ABOUT THE L1 SHIELD WAS COUNTED FROM |
+| [0393](db/migrations/0393_the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for.sql) | `20260921004457` | yes — ledger | `0392` SEEDED `orchestrator_agent` AS `shield_expected = true` AND CALLED IT "THE ONE PATH |
+| [0394](db/migrations/0394_shield_expected_was_the_wrong_question_an_hour_after_i_shipped_it_ask_which_effects_are_gated_where.sql) | `20260921005249` | yes — ledger | `0392`'s `shield_expected` ASKS *"SHOULD THIS BRANCH PASS THE PROBE ON THIS ROW?"* — AND |
+| [0395](db/migrations/0395_my_one_shot_cron_guard_read_before_it_wrote_and_started_two_runs_fourteen_seconds_apart.sql) | `20260921012521` | yes — ledger | I GUARDED A ONE-SHOT CRON JOB WITH `IF EXISTS (SELECT ...)` AND IT **STARTED TWO DEMO RUNS |
+| [0396](db/migrations/0396_choose_the_clock_before_you_build_the_world_g107.sql) | `20260921025959` | yes — ledger | G107 — CHOOSE THE CLOCK BEFORE YOU BUILD THE WORLD |
+| [0397](db/migrations/0397_one_word_for_rest_and_the_dwell_that_lived_in_two_missing_rows_g96.sql) | `20260921031935` | yes — ledger | G96, STEPS 0 AND 1. **THE BESS GETS ONE WORD FOR REST.** Three places in this schema declare |
 
-219 migrations indexed.
+260 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
