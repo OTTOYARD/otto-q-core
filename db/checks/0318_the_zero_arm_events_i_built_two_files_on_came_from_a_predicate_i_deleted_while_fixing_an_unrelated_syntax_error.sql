@@ -246,6 +246,65 @@
 -- instrument of Phase C5 (`db/checks/0145`: 68 rows, one policy, one seed, no writer), so its
 -- provenance loss costs nothing today — but C5 must not build on those 91 rows believing they
 -- carry run IDs. Seventy-one of them do not.
+--
+-- ══ §10 I WROTE "forces_recert FALSE" IN A COMMENT AND INVALIDATED ALL NINE CANON COLUMNS ══
+--
+-- Both `0408` and `0409` carry `forces_recert` FALSE in their file headers, and both claims are
+-- correct on the merits. **Neither had any effect, because the header is prose and the mechanism
+-- reads a table.** `public.ottoq_cert_recert_floor()` computes the floor as:
+--
+--     LEFT JOIN public.ottoq_cert_lineage l ON <name, prefix-stripped both sides>
+--      WHERE COALESCE(l.forces_recert, true)
+--
+-- **An unclassified migration forces recert by default**, which is the right fail-safe. I
+-- classified `0405` and `0406` as false and `0400`/`0401`/`0407` as true earlier today, then
+-- forgot these two. At 20:39:17 UTC the floor jumped to `0409`'s own timestamp and all nine canon
+-- columns read *"stale: predates the recert floor"* — nineteen passing verdicts of sweep work
+-- discarded by an omission, ninety seconds after I told Chase the change was safe for the sweep.
+--
+-- **This is the `0231` pattern with my name on it.** CLAUDE.md records `cuopt_invocation_log`'s
+-- own COMMENT asserting a protection (*"Deliberately NOT named ottoq\* so the purge cannot delete
+-- it"*) that the purge mechanism cannot read, because the purge reads the registry and not names.
+-- A `forces_recert` classification in a `--` comment is the same error in the same repo: **the
+-- claim was put where a human reads and not where the code reads.**
+--
+-- **Repaired, not re-run.** Two `ottoq_cert_lineage` rows, applied by `execute_sql` (a
+-- classification is metadata about an applied migration, and applying it AS a migration would
+-- register a row needing its own classification):
+--
+--     INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note) VALUES
+--      ('0408_arm_event_vocabulary_and_two_registry_readers',     false, '<why>'),
+--      ('0409_evidence_join_loss_reports_archive_recoverability', false, '<why>')
+--     ON CONFLICT (name) DO UPDATE SET ...;
+--
+-- The floor fell from `20:39:17` back to `19:38:48` (`0407`, genuinely invalidating), and the
+-- matrix went to **9 of 9 columns `current`** — the first time all nine have been current. No pair
+-- was re-run: the verdicts were always valid, only the floor was wrong.
+--
+-- **AND A NAMING TRAP WORTH MORE THAN THE SLIP.** The lineage join strips `^[0-9]{4}[a-z]?_` from
+-- both sides and compares to `supabase_migrations.schema_migrations.name`. For `0405`–`0407` the
+-- file name and the applied name are identical, so `0405_<file name>` joins. **For `0408` and
+-- `0409` they are not:** I passed short names (`arm_event_vocabulary_and_two_registry_readers`,
+-- `evidence_join_loss_reports_archive_recoverability`) to `apply_migration` while the files carry
+-- long descriptive names. So the lineage rows are keyed on the APPLIED name with a file-number
+-- prefix, and anyone grepping `ottoq_cert_lineage` for this file's name will find nothing and
+-- conclude it is unclassified. **Pass the file's own name to `apply_migration`** — `db/checks/0135`
+-- already records that a name-convention mismatch made 33 of 92 classifications unreachable, and
+-- this is the same hazard created deliberately by a careless argument.
+
+\echo '=== 0318 §10 — the floor, its classification source, and the canon matrix ==='
+SELECT public.ottoq_cert_recert_floor()                               AS recert_floor,
+       (SELECT count(*) FROM public.ottoq_determinism_canon)          AS canon_columns,
+       (SELECT count(*) FROM public.ottoq_determinism_canon
+         WHERE status = 'current')                                    AS current_columns,
+       (SELECT count(*) FROM supabase_migrations.schema_migrations m
+         LEFT JOIN public.ottoq_cert_lineage l
+                ON regexp_replace(l.name, '^[0-9]{4}[a-z]?_', '')
+                 = regexp_replace(m.name, '^[0-9]{4}[a-z]?_', '')
+        WHERE l.name IS NULL AND m.version ~ '^[0-9]{14}$')           AS unclassified_migrations;
+-- Every unclassified migration is COALESCE'd to forces_recert=true, so that last count is the
+-- number of rows that can each hold the floor at their own timestamp. It is not zero for
+-- historical reasons; what matters is that a migration applied TODAY is classified today.
 
 \echo '=== 0318 §1 — the arm events that two files said did not exist ==='
 SELECT event_type, count(*) AS n,
