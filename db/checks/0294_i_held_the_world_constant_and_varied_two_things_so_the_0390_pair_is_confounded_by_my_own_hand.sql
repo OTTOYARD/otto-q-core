@@ -231,3 +231,6 @@ SELECT COALESCE(enacted_action->>'source', l2_engine, '(null)') AS src,
 -- lost, and it is the next thing to measure.
 
 SELECT jsonb_pretty(public.ottoq_kpi_five('e8b8eb3e-da9d-41ff-ab67-84b6998ba441')) AS kpis;
+
+-- OPEN-ITEM: KPI 1's audit diagnostic hours_clipped_to_window reads -237.29 with one dispatch open at the horizon, which by 0185's reversibility note makes the pre-0182 figure a negative quantity of availability. Tracked as G103.
+-- OPEN-ITEM: the clean single-variable 0390 measurement is still owed -- one run at seed 100020 with the loop configured exactly as c8f678fb's was (states arrived_at_gate only, fires 12, interval 20s). Tracked as G103.

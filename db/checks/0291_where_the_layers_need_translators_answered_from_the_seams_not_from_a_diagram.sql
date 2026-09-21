@@ -231,3 +231,6 @@ SELECT public.ottoq_assert_shield_coverage('e8b8eb3e-da9d-41ff-ab67-84b6998ba441
 -- connector, the query to run first is not "does a reader apply the gates" but "does a shared
 -- component already apply them, and who calls it."** Rule 5 is not a politeness; on this codebase
 -- it is the difference between a fix and a duplicate.
+
+-- OPEN-ITEM: seven of the eight stall proposers never read the booking calendar -- not via ottoq_stall_free_between and not themselves -- so they necessarily propose into claimed windows and learn only at booking time. Tracked as G104.
+-- OPEN-ITEM: calendar_occupancy_guard exists in ottoq_policy_params for exactly one run (900a8a44, band_cert, 2026-08-01) with no global or default row, so the shared availability oracle's only pointer gate has been dark on every run since. Tracked as G104.
