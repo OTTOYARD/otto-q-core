@@ -485,7 +485,8 @@ repo_manifest(version, name, file) AS (
     ('20260920185739'::text, 'my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do'::text, '0388_my_own_new_probe_writes_blocked_into_a_log_where_that_word_means_something_it_did_not_do.sql'::text),
     ('20260920194102'::text, 'cp_sat_was_told_the_site_could_draw_2500_kw_while_the_engine_was_enforcing_795'::text, '0389_cp_sat_was_told_the_site_could_draw_2500_kw_while_the_engine_was_enforcing_795.sql'::text),
     ('20260921000517'::text, 'an_abstention_is_not_a_claim_and_two_predicates_counted_it_as_one'::text, '0390_an_abstention_is_not_a_claim_and_two_predicates_counted_it_as_one.sql'::text),
-    ('20260921001618'::text, 'kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour'::text, '0391_kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour.sql'::text)
+    ('20260921001618'::text, 'kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour'::text, '0391_kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour.sql'::text),
+    ('20260921002608'::text, 'the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible'::text, '0392_the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

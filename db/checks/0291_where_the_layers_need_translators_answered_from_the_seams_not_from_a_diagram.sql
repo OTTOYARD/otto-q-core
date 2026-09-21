@@ -1,0 +1,168 @@
+-- 0291  WHERE OTTO-Q'S LAYERS NEED CONNECTORS — ANSWERED BY MEASURING THE SIX SEAMS, NOT BY
+--       DRAWING A DIAGRAM. FOUR OF THE SIX ALREADY HAVE THE RIGHT COMPONENT AND SOMETHING
+--       WALKS PAST IT; ONLY ONE NEEDS A THING THAT DOES NOT EXIST.
+--
+-- Read-only. Scope: twin depot 11111111-1111-1111-1111-111111111111 (rule 8), live run
+-- `e8b8eb3e-da9d-41ff-ab67-84b6998ba441` (busy_day, seed 100020), measured 2026-09-20 19:20 CT
+-- (2026-09-21 00:20 UTC) while the run was in flight. Every count here is `class='engine'` and
+-- moves with the run — re-derive, never quote this file.
+--
+-- Chase's question, verbatim: *"if connectors or translators or middle ground sections are needed
+-- to be built or integrated to help layers better communicate and understand one another's
+-- purpose and potential, then think about where those sections might be needed and most
+-- valuable."* His layer enumeration, also verbatim: *"Agent layer, solver, deterministic,
+-- dispatch, learning loop, and then top of the funnel again."*
+--
+-- **The single most useful result of asking it: in four of six seams the translator is already
+-- built and correctly shaped, and the gap is a CALLER.** That reframes the work from design to
+-- wiring, and wiring is cheap, testable and reversible. Rule 5 — verify, consolidate, extend —
+-- is doing real work here: I started this intending to design an asynchronous advisory intake
+-- and found `public.ottoq_shield_and_log` already is one.
+--
+-- ══ SEAM 1 — AGENT LAYER -> DETERMINISTIC SHIELD. THE WORST, AND THE DOOR EXISTS ═══
+--
+-- Two defects, one cause, and **one fix closes both**:
+--
+--   (a) **Ungated.** `nemotron` is the only one of eight `l2_engine` values on this run whose
+--       decisions carry no L1 evaluation. Measured: nemotron **0 of 42** with rule results,
+--       against deterministic_v1 646/862, needs_card 49/49, reservation_honoured 31/31,
+--       inspect_seam 26/26, forward_lex 6/6, cuopt 1/1, greedy_constrained 1/1. G62's
+--       `agent_calls_with_no_l1_rules = 1,120 of 1,120`, reproduced on a different seed.
+--   (b) **Synchronously coupled to a beat it cannot meet.** G62's other half: mean Nemotron
+--       latency 30,394 ms against a 30-second tick, 39% of calls longer than one tick, and 721
+--       `deterministic_fallback` decisions beside 729 `nemotron` ones.
+--
+-- **The door: `public.ottoq_external_proposals` + `ottoq_proposer_precedence`.** Measured today,
+-- `llm_advisor` is **declared in the precedence table at rank 20 with `holds_tick = true` and
+-- `greedy_yields = true`** — a registered, ranked, hold-eligible proposer — and it has submitted
+-- **zero proposals, ever**: 0 rows live, and 0 of the 6,681 rows in the `class='evidence'`
+-- `ottoq_proposal_disposition_ledger`, which does carry cuopt, forward_lex, greedy_constrained
+-- and ottoq_service_priority. The agent has a seat at the table it has never sat in.
+--
+-- **Routing the agent through it fixes (a) and (b) at once**, because the disposer already
+-- evaluates L1 and already runs on its own beat: a proposal is inherently asynchronous, so a
+-- 30-second latency stops being a missed deadline and becomes a proposal that lands on the next
+-- tick — which `ottoq_agent_review` already expects and already joins on
+-- `proposal->'agent_handoff'->>'chain_id'` (its own comment: *"net.http_post only QUEUES, so the
+-- solver answers on a LATER beat"*). **This is CLAUDE.md rule 6's "agents propose, solver
+-- disposes" applied to the one agent that currently does neither.**
+--
+-- **Highest value of the six.** It is the only seam that is simultaneously a safety hole and a
+-- latency defect, and the only one where the fix is to stop bypassing existing machinery.
+
+SELECT p.source, p.rank, p.holds_tick, p.greedy_yields,
+       (SELECT count(*) FROM public.ottoq_external_proposals x WHERE x.source = p.source)
+         AS proposals_live,
+       (SELECT count(*) FROM public.ottoq_proposal_disposition_ledger l WHERE l.source = p.source)
+         AS proposals_evidence
+  FROM public.ottoq_proposer_precedence p ORDER BY p.rank;
+
+-- ══ SEAM 2 — ENACTMENT -> AUDIT. THE GAP I DID NOT EXPECT TO FIND ══════════
+--
+-- Fixed as an instrument by `db/migrations/0392` and stated fully there. In one line: every
+-- shield-coverage figure this repo has published was counted from the RULES' side, which cannot
+-- see an enactment that consulted no rule. Counted from the ACTIONS' side, **119 of 859 enacted
+-- decisions on this run carry no rule evaluation** — of which 60, on two branches, are a real
+-- gap: `orchestrator_agent` (seam 1) and **`gate_intake_no_charge`, which books a staging stall
+-- and emits `proceed_to_stall` with no `ottoq_shield_probe` anywhere in its loop.**
+--
+-- The translator built: `public.ottoq_enactment_branches` — a declared vocabulary for
+-- `resolved_action_context` naming each branch's writer, its side of the sim boundary, and
+-- whether a shield is expected — plus `ottoq_shield_coverage(run)` and
+-- `ottoq_assert_shield_coverage(run)`. **`ottoq_decisions` does not record which function wrote
+-- it**, and that is the underlying deficiency: twelve insert sites in `ottoq_decide_tick` alone,
+-- across eight database functions plus one edge function, with free text as the only proxy.
+
+SELECT * FROM public.ottoq_shield_coverage('e8b8eb3e-da9d-41ff-ab67-84b6998ba441');
+SELECT public.ottoq_assert_shield_coverage('e8b8eb3e-da9d-41ff-ab67-84b6998ba441') AS rollup;
+
+-- ══ SEAM 3 — SOLVER -> FRAME, AND FRAME -> SOLVER ══════════════════════════
+--
+-- **Forward direction: built, `0389`.** `ottoq_build_site_descriptor` is exactly a translator —
+-- engine truth (service cap, live `ottoq_active_charge_cap_kw`, derived margin) rendered as a
+-- site descriptor with **integral** bounds, because OR-Tools 9.15.6755 refuses non-integral ones
+-- (`TypeError: Domain(arg0: int, arg1: int)`, verified empirically). It tightens only, and FLOOR
+-- is load-bearing. Before it, CP-SAT was told the site could draw 2,500 kW while the engine
+-- enforced 795.
+--
+-- **Reverse direction: MISSING, and it is the one thing on this list that does not exist.** When
+-- CP-SAT declines, nothing carries the reason back into the next fire's inputs. Measured on the
+-- prior wave run `c8f678fb`: 610 proposals over 56 vehicles (10.89 each) winning 12 enactments —
+-- **51 proposals per enactment** — and 213 of the 610 (35%) abstentions whose own rationale reads
+-- *"planned to start at +111 min ... beyond this tick's 30-min window; re-offered when due"*.
+-- `0390` fixed the half of this that was a misread — an abstention was setting
+-- `has_live_holds_tick_proposal` and consuming a first-refusal seat, so the proposer's own
+-- "not yet" suppressed its next attempt — but the churn itself remains: `vehicle_is_held`
+-- withholds a vehicle only while a proposal is *pending*, and the disposer clears them every
+-- tick, so the next fire re-plans an unchanged vehicle against a frame that has barely moved.
+--
+-- **What to build: a frame delta the proposer can read.** Not a new solver and not a new ledger —
+-- a per-vehicle "nothing relevant changed since tick N" fact, so a rolling re-solve re-solves
+-- what moved. `0290` §4 ranks this first and states why the order is not negotiable: measuring
+-- CP-SAT's standing while it floods its own denominator produced two wrong numbers in one check
+-- file. **Fix the instrument, then read it.**
+--
+-- ══ SEAM 4 — DISPATCH -> TWIN. ONE AVAILABILITY ORACLE, THREE READERS ══════
+--
+-- CLAUDE.md Part 3 already states the rule — a stall is offerable only as the intersection of
+-- pointer, CALENDAR, and (for dcfc/l2) the OCPP charger not being `Faulted` — and **nothing
+-- enforces it**, so each reader reimplements a subset. Two measured consequences:
+--
+--   - `0289`/G99: the frame's `offerable` requires `ocpp_charger_id IS NOT NULL`, so it is false
+--     by construction for 118 of the twin depot's 158 stalls. I nearly published "staging is
+--     100% occupied for the whole run" from it; 76 were pointer-free and 77 calendar-free out of
+--     113, which by pigeonhole is at least 40 free on both.
+--   - **792 `twin.staging_overflow` events on `c8f678fb` coexisting with those ~40 free stalls.**
+--     Still an open question — I am not claiming the link, because the overflow producer has not
+--     been read end to end.
+--
+-- **What to build: `ottoq_stall_availability(stall, window)` returning the three gates and their
+-- intersection, called by the frame, the overflow producer, and every census.** This is the
+-- cheapest of the five and the one most likely to retire an open question rather than document
+-- one. G99's option (b) is a special case of it.
+--
+-- ══ SEAM 5 — LEARNING LOOP. EVIDENCE WITHOUT FEEDBACK ══════════════════════
+--
+-- The emptiest seam, and worth saying plainly because it is the one most likely to be assumed
+-- present. What exists is **four durable evidence ledgers**, all `class='evidence'` and all
+-- surviving the purge that takes engine tables to near zero: `ottoq_model_call_ledger` (0340,
+-- one row per external model or solver call), `ottoq_proposal_disposition_ledger` (0364),
+-- `ottoq_determinism_verdict_ledger` (0386), `ottoq_run_archives`.
+--
+-- **What does not exist is any routine that reads them back into a decision.** Today you can ask
+-- *"was this proposal enacted"*; you cannot ask *"was enacting it better than the alternative"*,
+-- because nothing joins a proposal to the realised outcome of the vehicle it was about — served
+-- on time or not, at what kW, against which tariff window. So the honest description of the
+-- learning loop is: **it has a memory and no feedback path.** The connector is an
+-- outcome-attribution join (proposal -> disposition -> that vehicle's realised service), and it
+-- is gated on seam 3, because attributing outcomes to a proposer that submits 51 proposals per
+-- enactment attributes them to noise.
+--
+-- ══ SEAM 6 — TOP OF THE FUNNEL: RECALL -> SITE FORECAST ════════════════════
+--
+-- CLAUDE.md 2.7's interface takes three inputs — `AssetState`, `WorkSideSignals`, `SiteForecast`
+-- — and the third is the one with no producer. `recall/` implements the naive threshold
+-- documented as naive, which is correct for C9; the connector it will need is a forecast
+-- publisher (predicted congestion, price windows, availability) shaped like the
+-- `ServiceProfile` of 2.6 rather than like a query. **Deliberately last**: a forecast consumed by
+-- a decide path whose availability oracle is three inconsistent readers (seam 4) would be a
+-- forecast of the wrong quantity.
+--
+-- ══ THE RANKING, BY VALUE PER HOUR, AND WHAT IS NOW IN FLIGHT ══════════════
+--
+--   1. **Seam 1** — route the agent through `ottoq_external_proposals` as `llm_advisor`. Closes a
+--      safety hole and a latency defect with one change, using a seat already declared. Tick
+--      path, `forces_recert TRUE`, so it waits for run `e8b8eb3e` to finish.
+--   2. **Seam 2** — instrument LANDED (`0392`). Remedy for `gate_intake_no_charge` is tick path,
+--      `forces_recert TRUE`, waits with (1).
+--   3. **Seam 4** — one availability oracle. Cheapest; may retire the 792-overflow question.
+--   4. **Seam 3 reverse** — the frame delta that stops the churn. Must precede any standing
+--      claim about CP-SAT's influence.
+--   5. **Seam 5** — outcome attribution. Gated on 4.
+--   6. **Seam 6** — forecast publisher. Gated on 3.
+--
+-- **And the pattern worth keeping from all six:** the valuable connector is almost never a new
+-- abstraction. Five of six are either an existing component with a missing caller, or one
+-- declared fact replacing several readers' private reimplementations of it. The one genuinely
+-- absent thing is the reverse channel out of the solver — the engine has never been able to hear
+-- a proposer say *"not this, and here is why."*
