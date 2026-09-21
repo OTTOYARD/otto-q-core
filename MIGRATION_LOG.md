@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0392 — GENERATED, not a log
+## Index, 0134–0393 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -375,7 +375,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0390](db/migrations/0390_an_abstention_is_not_a_claim_and_two_predicates_counted_it_as_one.sql) | `20260921000517` | yes — ledger | AN ABSTENTION IS NOT A CLAIM — AND THE PROPOSER'S OWN "I CANNOT SERVE THIS VEHICLE |
 | [0391](db/migrations/0391_kpi_four_stops_counting_the_shields_own_safe_defaults_as_human_labour.sql) | `20260921001618` | yes — ledger | KPI 4 STOPS COUNTING THE DETERMINISTIC SHIELD'S OWN SAFE-DEFAULT FALLBACKS AS HUMAN |
 | [0392](db/migrations/0392_the_shields_coverage_was_only_ever_counted_from_the_rules_side_so_two_enacting_branches_were_invisible.sql) | `20260921002608` | yes — ledger | EVERY COVERAGE NUMBER THIS REPO HAS EVER PUBLISHED ABOUT THE L1 SHIELD WAS COUNTED FROM |
+| [0393](db/migrations/0393_the_branch_i_led_0392_with_is_gated_at_a_probe_point_i_did_not_look_for.sql) | `20260921004457` | yes — ledger | `0392` SEEDED `orchestrator_agent` AS `shield_expected = true` AND CALLED IT "THE ONE PATH |
 
-255 migrations indexed.
+256 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
