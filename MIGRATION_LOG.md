@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0400 — GENERATED, not a log
+## Index, 0134–0402 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -383,7 +383,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0398](db/migrations/0398_the_address_of_a_service_that_moves_belongs_in_data_g108.sql) | `20260921073824` | yes — ledger | G108, THE LAST LINK. **The CP-SAT service's address lives in a deploy-time secret, and the |
 | [0399](db/migrations/0399_the_bess_state_machine_gets_its_caller_and_the_table_gets_its_first_trigger_g96.sql) | `20260921122812` | yes — ledger | G96, STEP 2 — THE LAST ONE. **SM.006 has had a callable evaluator and no caller since it |
 | [0400](db/migrations/0400_the_fault_reroute_gets_the_gate_it_was_missing_and_hears_its_own_gate_say_no_g114.sql) | `PENDING` | no — pending | G114, item (a) and item (b) — **the fault reroute reads the calendar, and stops ignoring |
+| [0401](db/migrations/0401_the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114.sql) | `PENDING` | no — pending | **G114 items (c) and (d), decided under delegated authority** — Chase, 2026-09-21: *"You make |
+| [0402](db/migrations/0402_a_determinism_verdict_can_finally_state_the_clock_it_was_earned_at_g112.sql) | `20260921165330` | yes — ledger | **G112, decision (3a): a determinism verdict can state its own clock.** `db/checks/0312` §3 |
 
-263 migrations indexed.
+265 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

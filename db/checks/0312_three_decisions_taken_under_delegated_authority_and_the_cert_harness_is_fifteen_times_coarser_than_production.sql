@@ -1,0 +1,224 @@
+-- 0312  **THE THREE OPEN DECISIONS, TAKEN.** Chase delegated them in session on 2026-09-21:
+--       *"You make the call in the open decisions. You're the autonomous fleet engineer and coding
+--       expert."* They were G114 item (c) (`deploy_peak_fraction` 0.55 vs 0.90), G114 item (d)
+--       (`calendar_occupancy_guard` on or off), and G112's tick-granularity call. Each is recorded
+--       here with the evidence that decided it, **and two of the three turned out to be decidable by
+--       measurement after all** — `0310` §6 said measurement could not choose, and for (c) that was
+--       wrong: I had not looked at the consumer function or at what the engine actually wrote.
+--
+--       **This file also RETRACTS one of my own recommendations** — `0310` §6(d)'s *"`ottoq_policy_get`
+--       should read the catalog default"* — because the catalog's `default_value` is not uniformly
+--       authoritative and following that advice would have switched on a legacy override that has
+--       never run in this engine's life. §1c.
+--
+-- Read-only. Measured 2026-09-21 ~17:3x UTC (12:3x CT).
+--
+-- ══ 1. DECISION (c): `deploy_peak_fraction` IS **0.90**. FOUR SITES, ═══════
+--       THREE ALREADY AGREE, AND THE OUTLIER IS THE TWIN.
+--
+-- `0310` §5 found 0.90 on `ottoq_agent_board` and `ottoq_cil_propose` against 0.55 in
+-- `twin.ottoq_sim_advance_service_flow`, and called it a product decision. **Two pieces of evidence
+-- I had not gathered settle it:**
+--
+-- **(a) THE CONSUMER FUNCTION DECLARES ITS OWN DEFAULT, AND IT IS 0.90.** The dial is not used
+-- directly; it is passed to `ottoq_deploy_target_fraction(v_hour, p_peak)`, whose body opens
+-- `GREATEST(0.005, LEAST(COALESCE(p_peak,0.90), COALESCE(p_peak,0.90) * (CASE hour …)))` — **0.90
+-- twice, as the value to use when handed nothing.** So the function that consumes this dial is a
+-- fourth site, and it agrees with the catalog and the board. The 0.55 is 1 of 4.
+--
+-- **(b) REVEALED PREFERENCE OVER 307 WRITES, ALL BY `ottoq_prime`:** min **0.50**, mean **0.892**,
+-- max **1.00**, modal value **1.00 (106 of 307)**, and **251 of 307 (82%) at 0.85 or above**. Only
+-- **3 rows in the engine's life ever wrote 0.55.** The agent, free to choose within [0.5, 1.0], lives
+-- at 0.9–1.0.
+--
+-- **AND THE SEMANTICS CONFIRM IT.** The hourly curve in `ottoq_deploy_target_fraction` peaks at
+-- **1.00 at hours 16–18** and bottoms at 0.005 at 03:00, so `deploy_peak_fraction` means literally
+-- *the fraction of fleet deployed at the evening peak* — the catalog's own description, *"Daytime-peak
+-- deployed fraction of fleet."* For a robotaxi operator, 0.90 at peak is the economics of the
+-- business: the fleet earns deployed and costs money parked. **0.55 would hold 45% of the fleet at
+-- base during peak demand, which is not a conservative setting, it is the wrong answer.**
+--
+-- **DECISION: 0.90 is canonical. `twin.ottoq_sim_advance_service_flow`'s literal `0.55` is the
+-- defect and is corrected to 0.90 in `db/migrations/0401`.**
+--
+-- **AND NOTE WHAT IS *NOT* BEING DECIDED.** If anyone ever wants the twin to under-deploy
+-- deliberately, that belongs in a **policy ROW at depot or global scope**, where all four sites read
+-- it coherently and the agent's board shows the truth — not in a call-site literal that contradicts
+-- three other sites and that the agent's ±30% drift window cannot even reach. The lesson is the
+-- placement, not the number.
+--
+-- ══ 1b. AND THE BLAST RADIUS OF THE CLASS IS NOW BOUNDED: 7 OF 160 ════════
+--
+-- `0310` §4 reported "168 declared defaults, 0 read". Widened to every key reached through
+-- `ottoq_policy_get` (not only those with a numeric literal):
+--
+--   keys read via ottoq_policy_get                          **160**
+--   …absent from the catalog                                   **0**   (no orphans — good)
+--   …settled by a global/depot row, so the catalog is moot     **66**
+--   …UNSETTLED and catalog disagrees with a single literal      **4**
+--   …UNSETTLED with TWO OR MORE different literals              **1**   (deploy_peak_fraction)
+--   …UNSETTLED with no literal at all (variable default)        **2**
+--
+-- So **at most 7 keys are affected**, not 168. The seven, with the catalog's own descriptions:
+--
+--   key                        literals      catalog   rows   decision
+--   deploy_peak_fraction       0.55 / 0.90     0.90     307   **0.90** (§1)
+--   calendar_occupancy_guard        0            1        1   **ON**   (§2)
+--   cuopt_debounce_s                2            4        1   catalog → **2**  (reality wins)
+--   cuopt_solve_window_ms        4000         2500        1   catalog → **4000** (reality wins)
+--   robotic_demate_seconds         -1         11.5        0   catalog → **-1**  (see §1c)
+--   contention_wait_cap_min      (none)        120        0   **leave alone** (§1c)
+--   timer_backstop_min           (none)       1440        0   **leave alone** (§1c)
+--
+-- For the two cuOpt timing knobs the call-site literal is the value that has actually been running,
+-- so it is the empirically proven one and the catalog is what gets corrected. Lowering
+-- `cuopt_solve_window_ms` from the live 4000 to the declared 2500 would shorten the wait before
+-- `decide` consumes a cuOpt answer — a regression risk taken for nothing.
+--
+-- ══ 1c. RETRACTION OF MY OWN ADVICE IN `0310` §6(d) ═══════════════════════
+--
+-- `0310` §6(d) says: *"`ottoq_policy_get` should read the catalog default, or the next 168 knobs
+-- inherit this."* **Do not do that, and the reason is in the last three rows of the table above.**
+--
+--   * **`robotic_demate_seconds`** is described as a *"LEGACY WHOLE-WINDOW OVERRIDE for the demate
+--     hold, in seconds"*, its live value is the sentinel **-1** (override off), **no row has ever set
+--     it**, and the catalog declares **11.5**. A catalog-aware `ottoq_policy_get` would switch on a
+--     legacy override that has **never been active in this engine's life** — silently, as a side
+--     effect of a hygiene change.
+--   * **`contention_wait_cap_min`** and **`timer_backstop_min`** carry catalog rows whose own
+--     descriptions begin *"0304: UNBOUNDED BY DESIGN (min NULL, max NULL) — admits the key, clamps
+--     nothing"*. **Those rows exist to ALLOW-LIST the key, not to supply a value.** Their
+--     `default_value` is filler. Reading it as authoritative would substitute 120 and 1440 where a
+--     variable supplies the number today.
+--
+-- **So `default_value` is not uniformly a default** — for some rows it is a bound, for some it is
+-- filler admitting a key to `ottoq_policy_set`'s allow-list. Repurposing one column as authoritative
+-- across 160 keys because 1 key diverged is the wrong trade, and my earlier line recommending it was
+-- written without reading those three rows.
+--
+-- **WHAT TO DO INSTEAD — the repo's own pattern.** `ottoq_assert_service_vocabulary()`,
+-- `ottoq_assert_bess_state_vocabulary()` and `ottoq_assert_snapshot_integrity()` all exist to make a
+-- declaration that lies impossible to keep. `0401` adds
+-- **`public.ottoq_assert_policy_default_coherence()`**, which returns a row for every key that is
+-- unsettled by a policy row AND (carries two different call-site literals OR disagrees with its
+-- catalog default). It must return empty. That makes divergence *detectable* without changing the
+-- resolution semantics of the most-called configuration function in the engine.
+--
+-- ══ 2. DECISION (d): `calendar_occupancy_guard` GOES **ON**, AS A GLOBAL ══
+--       POLICY ROW — AND ITS COST IS HONESTLY UNMEASURED.
+--
+-- **The rule decides it.** Part 3's three-gate rule — Chase's own, added 2026-09-19 and *"earned
+-- three times in one night"* — is that a stall is offerable only as the **intersection** of pointer,
+-- calendar and charger-not-`Faulted`. `ottoq_stall_free_between` is the shared candidate source for
+-- **seven** callers and its pointer gate is the one behind this switch. Off, it offers pointer-held
+-- stalls; `0311` §4 showed those get refused downstream by `ottoq_validate_assignment`. **So the
+-- switch does not decide whether a conflict is caught — it decides whether it is caught BEFORE or
+-- AFTER the engine commits to the offer.** Earlier is strictly better: a proposal that will be
+-- refused is wasted solver time, a wasted tick of right-of-first-refusal, and a phantom entry in
+-- every capacity count.
+--
+-- **And the guard is not a naive pointer test**, which is what makes ON safe to choose: it admits a
+-- pointer-held stall whose current occupant's `ottoq_itinerary_legs` forecast ends before the
+-- requested window, bounded by `occupied_stall_horizon_min` (45) and `_max_min` (240). It is a
+-- forecast, not a veto.
+--
+-- **IMPLEMENTED AS A GLOBAL POLICY ROW, NOT A CODE CHANGE, and that is deliberate:** it is
+-- reversible by one `UPDATE` with no migration and no deploy, it makes the value explicit and
+-- greppable instead of implicit in a literal, and — per §1b — settling the key at global scope
+-- removes it from the divergence list by construction.
+--
+-- **THE COST IS UNMEASURED, AND I COULD NOT MEASURE IT. Reported rather than glossed.** Two probes:
+--
+--   probe A, window [12:00,13:00) on run b4d5f76d   dcfc 6→6, l2 26→26, staging 64→64   (−0)
+--   probe B, window anchored at the run's own clock  dcfc 10→10, l2 28→28, staging 113→113 (−0)
+--
+-- **Neither is evidence that the guard is free.** Probe B reports why: on the twin depot
+-- **`stalls` pointer-occupied = 0** and **live `ottoq_itinerary_legs` = 0**. Every surviving run is
+-- completed and torn down, so the guard's first escape (`current_vehicle_id IS NULL`) admits every
+-- stall and the switch cannot bite. **The guard's effect is measurable only on a LIVE run**, and I
+-- did not start one — `ottoq_start_demo_run` purges every `class='engine'` table, which is a
+-- consequential change to shared state and not mine to make for a measurement. Probe A is
+-- additionally the `0400` mistake repeated: a window 14 sim-hours from the run's clock cannot
+-- overlap the forecast, so the answer could not have differed.
+--
+-- **THE FALSIFIABLE PREDICTION, to check on the next live run:** offers fall, `target_occupied`
+-- refusals naming a POINTER conflict fall by more, and `solved_but_zero_proposals` rises only where
+-- the stalls withdrawn were ones that would have been refused anyway. **If offers fall and refusals
+-- do not, the guard is over-restricting** — most likely via the 45-minute fallback horizon applied
+-- when an occupant has no live leg — and the row should be set back to 0. That is one `UPDATE`.
+--
+-- ══ 3. DECISION (G112): DO **NOT** RE-GRANULARISE THE NINE CANON COLUMNS. ══
+--       RECORD THE GRANULARITY, AND ADD ONE COLUMN AT PRODUCTION'S.
+--
+-- **First, two measurement corrections, because I nearly decided this on both.**
+--
+--   * **`tick_interval_seconds` is 30 for EVERY run in the database** — cert, demo and production
+--     alike. It is **wall-clock pacing**, not sim advance. The 30-minute figure in `0308` §8 is
+--     `(sim span ÷ tick_count)`. Two different quantities, one of them named "seconds"; reading the
+--     column as the answer would have been the clock-domain error this repo has now recorded nine
+--     times. The independent confirmation that sim-advance is right: the measured confirm lag is
+--     exactly **00:30:00**, which only makes sense against a 30-**minute** tick.
+--   * **I assumed the canon's 6-tick columns ran at 4 sim-hours per tick.** They do not. Measured:
+--     **all 18 surviving `cert_harness` runs are 30.00 sim-min/tick**, and the tick COUNT varies the
+--     SPAN (48→1 day, 24→12 h, 12→6 h, 6→3 h). Tick size is constant across the whole canon.
+--
+-- **AND THAT PRODUCES THE ACTUAL FINDING, which is sharper than the one I was chasing:**
+--
+--   run_by            sim-min/tick        one-tick confirm lag costs
+--   cert_harness         **30.00**        30 sim-minutes
+--   production_live      **2.00**         2 sim-minutes
+--   operator_demo        **0.48**         29 sim-seconds
+--
+-- **The certification harness runs 15× coarser than the configuration that ships.** A determinism
+-- certificate earned at 30 sim-min/tick is a certificate about a clock production never uses, and at
+-- that granularity the `begin_charge` chain cannot complete inside a charge window shorter than
+-- roughly 36 minutes (`0311` §2: budget left must exceed one tick) — which is why ~40% of cert charge
+-- turns never charge while `operator_demo` charged 84 of 84.
+--
+-- **THE DECISION, three parts:**
+--
+-- **(3a) RECORD THE GRANULARITY IN THE VERDICT. `ottoq_determinism_canon` has no tick-size column
+-- at all** — its columns are `depot_id, scenario, seed, ticks, …`, where `ticks` is a COUNT. So today
+-- a canon row physically cannot state the clock it certified at, and "certified" reads as unqualified.
+-- `db/migrations/0402` adds `sim_min_per_tick`, backfilled from `ottoq_sim_runs`. **`forces_recert`
+-- FALSE and it is measurable rather than argued: it is metadata about a verdict, not one of the
+-- fourteen hashed atoms, and nothing hashed can read a column that did not exist.** This is the part
+-- that makes the disclosure structural instead of a comment, so it is the part that ships first.
+--
+-- **(3b) ADD ONE NEW CANON COLUMN AT PRODUCTION GRANULARITY (2.00 sim-min/tick), MEASURED FIRST.**
+-- Per 2.9a's blind-spot doctrine an atom or column is added MEASURED and promoted to ENFORCED only
+-- after a flagship round agrees. Specified here, **not executed** — it requires running certification
+-- pairs, and starting runs is the same shared-state action I declined in §2.
+--
+-- **(3c) DO NOT CHANGE THE EXISTING NINE COLUMNS.** Three reasons, in order of weight: the property
+-- they prove — same inputs, byte-identical outputs across fourteen atoms — **is true at any tick
+-- size**, and both arms of every pair are equally coarse, so no verdict is wrong; re-granularising
+-- costs **nine re-certifications** and destroys nine per-column streaks, buying no new truth about
+-- determinism; and coarseness is a **coverage** gap, which 2.9a says to disclose and add to, not to
+-- fix by mutating a working canon. **What was wrong was never the fixture — it was that the fixture's
+-- clock was invisible in the verdict.** (3a) fixes that.
+--
+-- **AND THIS UNBLOCKS WORK THAT WAS QUEUED BEHIND IT.** `0307` §6 deferred G111's one-line actor fix
+-- and `0400` deferred its own apply, both on the argument that *"a G112 granularity decision would
+-- force a recert anyway, so this rides along for nothing."* **The granularity decision is "do not
+-- change it", so that free ride does not exist.** G111 and `0400` must now be scheduled on their own
+-- merits — they still batch with each other and with `0401`, which is three `forces_recert` changes
+-- for one sweep, but the batch no longer waits on anything.
+--
+-- **NOT CLAIMED:** that any published determinism verdict is invalid. None is. What is claimed is
+-- that until `0402` lands, no verdict can state its own clock, and the nine current ones were all
+-- earned at 30 sim-min/tick against a production clock of 2.00.
+
+SELECT 'c: deploy_peak_fraction' AS decision, '0.90'                              AS taken,
+       '4 sites, 3 already agree incl. the consumer fn''s own COALESCE(p_peak,0.90); 307 writes mean 0.892, 82% >= 0.85' AS basis
+UNION ALL
+SELECT 'd: calendar_occupancy_guard', 'ON, as a global policy row',
+       'Part 3''s three-gate rule; moves a refusal earlier, not into existence; cost UNMEASURED -- 0 pointer-occupied stalls survive any run'
+UNION ALL
+SELECT 'G112: cert granularity', 'do NOT re-granularise; record it, add one column at 2.00',
+       'all 18 cert runs are 30.00 sim-min/tick vs production 2.00 -- 15x coarser; determinism holds at any tick size, so this is coverage not correctness'
+UNION ALL
+SELECT 'retracted here', '0310 section 6(d), my own advice',
+       'ottoq_policy_get must NOT read the catalog: default_value is a bound or filler for 3 of the 7 affected keys, and robotic_demate_seconds would switch on a legacy override that has never run';
+
+-- OPEN-ITEM: The three delegated decisions are TAKEN (0312), and one of my own recommendations is retracted. (c) deploy_peak_fraction is 0.90 -- decidable after all, which 0310 section 6 wrongly called a product call: the consumer ottoq_deploy_target_fraction declares COALESCE(p_peak,0.90) twice, making three of four sites agree, and 307 writes by ottoq_prime mean 0.892 with 82% at or above 0.85 and only 3 ever at 0.55; twin.ottoq_sim_advance_service_flow's 0.55 is the defect, fixed in 0401. (d) calendar_occupancy_guard goes ON as a GLOBAL POLICY ROW rather than a code change, because Part 3's three-gate rule requires the intersection and the switch only decides whether a conflict is caught before or after the engine commits to the offer; its throughput cost is UNMEASURED and unmeasurable on any surviving run, since the twin depot has 0 pointer-occupied stalls and 0 live itinerary legs, so a falsifiable prediction is recorded instead and the row is revertible by one UPDATE. (G112) do NOT re-granularise the nine canon columns: all 18 cert_harness runs are 30.00 sim-min/tick against production's 2.00, so the harness is 15x coarser than what ships, but determinism is true at any tick size and both arms are equally coarse, so this is a COVERAGE gap -- 0402 adds sim_min_per_tick to ottoq_determinism_canon (forces_recert FALSE) so a verdict can state its own clock, and a production-granularity column is specified but not executed since starting runs purges engine-class tables. Two measurement corrections are recorded: tick_interval_seconds is wall-clock pacing not sim advance and is 30 for every run in the database, and the canon's 6-tick columns run at 30 sim-min/tick not 4 hours. RETRACTED: 0310 section 6(d)'s advice that ottoq_policy_get should read the catalog default -- default_value is a bound or allow-list filler for contention_wait_cap_min and timer_backstop_min, and for robotic_demate_seconds it would switch on a legacy override that has never been active; 0401 adds ottoq_assert_policy_default_coherence() instead. AND THIS UNBLOCKS: G111 and 0400 were both deferred on the argument that a G112 granularity change would force a recert anyway; that free ride does not exist, so they batch on their own merits. Tracked as G114 and G112.
