@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922224038
 -- migration-name:    a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged
 --
 -- 0431  **The dispatcher holds a staged vehicle until its readiness check is done.** `db/checks/0351`
