@@ -34,6 +34,16 @@
 -- between the two hypotheses and lands on the fixed one. The old dial would have condemned about a
 -- tenth of the fleet in the first eighteen sim-minutes.
 --
+-- **AND THE EXPOSURE DENOMINATOR IS CENSORED EARLY IN A RUN, which nearly produced a fifth wrong
+-- conclusion.** At tick 157 the timeline reconstruction reports 43.0 total vehicle-hours, but 116
+-- vehicles over 157 thirty-second ticks is **112 vehicle-hours** — the measurement sees 38% of it,
+-- because a vehicle that has not yet changed state contributes no segment at all. I had begun writing
+-- up an inferred 3x drop in eligible exposure (and with it a claim that lambda was calibrated 3x too
+-- low against a contaminated baseline) before checking: **the eligible FRACTION is 70.73% here against
+-- the baseline's 61.31%, pointing the other way**, and the apparent drop was censoring, not physics.
+-- Same family as the `occurred_at` error in `0413` §2 — a denominator that looks measured and is not —
+-- and the reason the value check has to wait for a run that has exercised every vehicle.
+--
 -- **What is NOT yet shown**, and needs the run to finish: that the realised rate MATCHES 0.00088
 -- rather than merely being below the old one. At 0.021 expected faults you cannot measure a rate at
 -- all — you can only exclude a much larger one. Confirming the value needs roughly 1,700 eligible
