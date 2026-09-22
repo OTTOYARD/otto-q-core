@@ -1,11 +1,17 @@
--- migration-version: PENDING
+-- migration-version: 20260922172845
 -- migration-name:    the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both
 --
--- 0430  **`ottoq_rule_evaluations.enforcement_taken='blocked'` is the shield's RECOMMENDATION, and at six of
---       ten probe points the caller discards it — so 5,721 of 7,626 `blocked` rows record a refusal that
---       never happened (G149, `db/checks/0337` §3, quantified in `0345`).** This does not change enforcement
+-- 0430  **`ottoq_rule_evaluations.enforcement_taken='blocked'` is the shield's RECOMMENDATION, and at FIVE
+--       of ten probe points the caller discards it, so a `blocked` row may record a refusal that never
+--       happened (G149, `db/checks/0337` §3, quantified in `0345`).** This does not change enforcement
 --       anywhere. It makes the column readable, by deriving each probe point's posture from the callers'
 --       own source and exposing it beside every evaluation.
+--
+--       **"Five of ten", not `0337`'s six:** `0428` promoted `charge_session_start` earlier today, and
+--       `0337`'s "5,721 of 7,626" is likewise a figure from this morning. Both are left as the
+--       point-in-time records they are; the current split is in §6 and is the one to quote. **That this
+--       file's own headline needed correcting between writing and applying is the argument for deriving
+--       the posture rather than storing it.**
 --
 --       **The rule this file follows is the one `0345` arrived at: fix the ledger, not the enforcement.**
 --       `0428` promoted exactly one checkpoint, on its own evidence; the other five stay advisory and are
@@ -351,3 +357,39 @@ COMMIT;
 -- **And the sentence this migration finally makes sayable, which is the point:** instead of *"5,721 of 7,626
 -- blocked rows record a refusal that never happened, and to know which you must read PL/pgSQL"*, the honest
 -- count is now `WHERE effect = 'recorded_only'`.
+--
+-- ══ APPLIED 20260922172845 (2026-09-22 17:28:45 UTC / 12:28 PM CT) ═══════════
+--
+-- Preconditions passed, including P2's two named facts: `ottoq_decide_tick` reads **six probe sites and six
+-- honouring branches** (the literal form finds five), and `twin.ottoq_sim_advance_visit_atoms` reads **zero**
+-- probe references once comments are stripped.
+--
+-- **V1: 5 enforced, 5 advisory, 1 unresolvable.** `charge_session_start` reads `enforced`, which it did not
+-- this morning — the derivation tracks `0428`'s promotion without being told about it, which is the whole
+-- argument for deriving rather than storing.
+-- **V2: blocked rows split `refused=7,371` / `recorded_only=2,187` / `unknown_posture=0`.**
+-- **V3: base 9,558, view 9,558** — it reclassifies and never filters.
+--
+-- **AND THE READ-TIME CAVEAT IS NOT SMALL, SO HERE IT IS AS A NUMBER RATHER THAN A WARNING.** Of the 7,371
+-- rows the view calls `refused`, **4,664 are `charge_session_start` rows written BEFORE `0428` promoted that
+-- checkpoint — 63% of the population.** Every one of them was `recorded_only` at the moment it was written,
+-- and every one is an `HW.002` false alarm from the defect `0424` fixed. The view is not wrong; it answers
+-- *"would this be refused by today's engine"*, and that is a different question from *"was this refused."*
+--
+--     lifetime          refused 7,371   recorded_only 2,187
+--     since 0428        refused   106   recorded_only    32     <-- the honest current split
+--
+-- **So quote the windowed figure, and treat the lifetime one as describing history** — `0334`'s standing
+-- rule, arriving here through a different door: it is normally the *data* that ages, and this time it is the
+-- *interpretation*.
+--
+-- **DEVIATION, DECLARED:** applied through `execute_sql` in five ordered calls (preconditions; the posture
+-- function; the view and the assertion; then V1–V3), with the `supabase_migrations` and lineage rows written
+-- explicitly afterwards — the same channel and the same reason as `0429` §8, where `apply_migration` timed
+-- out at 60 s three times on sub-second SQL. Nothing here is transactional across the four calls, which is
+-- acceptable only because every object is `CREATE OR REPLACE` and read-only: a failure part-way leaves a
+-- missing view, not a half-changed engine. **The `COMMENT ON` statements in §5 were missed on the first
+-- pass** — the objects landed without them — and were applied in a fifth call immediately afterwards, with
+-- the view's comment extended to carry the 63% caveat above. Catalog and file now agree. **Noted rather
+-- than silently corrected, because "the object exists" and "the object is documented" are separate facts
+-- and only the first was verified by V1–V3.**

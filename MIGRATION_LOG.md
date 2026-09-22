@@ -412,7 +412,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0427](db/migrations/0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql) | `20260922163008` | yes — ledger | **`HW.006.physical_presence_verification` asks whether the vehicle is physically in the stall, and |
 | [0428](db/migrations/0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence.sql) | `PENDING` | no — pending | **`charge_session_start` is the first of the six advisory checkpoints to become ENFORCING.** Four |
 | [0429](db/migrations/0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql) | `20260922171450` | yes — ledger | **Ten event types emit `p_entity_type := 'depot', p_entity_id := p_depot_id` and never pass |
-| [0430](db/migrations/0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql) | `PENDING` | no — pending | **`ottoq_rule_evaluations.enforcement_taken='blocked'` is the shield's RECOMMENDATION, and at six of |
+| [0430](db/migrations/0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql) | `20260922172845` | yes — ledger | **`ottoq_rule_evaluations.enforcement_taken='blocked'` is the shield's RECOMMENDATION, and at FIVE |
 
 293 migrations indexed.
 
