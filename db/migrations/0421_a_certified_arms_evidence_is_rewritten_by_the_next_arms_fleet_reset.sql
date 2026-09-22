@@ -1,13 +1,13 @@
--- migration-version: PENDING
+-- migration-version: 20260922125637
 -- migration-name:    a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset
 --
 -- 0421  **The one-line fix for `db/checks/0329` (G137): every certified pair fails when atom 4 is
 --       recomputed from the evidence it was certified on, because the NEXT arm's fleet reset is filed
 --       against the PREVIOUS arm. Proven on demand, both the cause and the fix, before writing this.**
 --
---       **PREPARED, NOT APPLIED.** `forces_recert` **TRUE**: this changes `ottoq_events` content for
---       certification runs, so every canon re-runs. The recert sweep went green at 10:10 UTC and taking
---       the apparatus down twice in one morning is a scheduling decision, not a technical one — §5.
+--       **APPLIED `20260922125637`.** `forces_recert` **TRUE**: this changes `ottoq_events` content for
+--       certification runs, so every canon re-runs — and that re-run is the regression test, because it
+--       is the first sweep whose verdicts should reproduce from their own evidence. §5.
 --
 -- ══ §1 THE DEFECT IN ONE PARAGRAPH ════════════════════════════════════════════
 --
@@ -59,8 +59,8 @@
 --
 -- ══ §3 WHY SURGICAL SUBSTITUTION RATHER THAN A REWRITE ════════════════════════
 --
--- `ottoq_determinism_pair` is 10,256 characters of certification logic carrying guards from `0152`,
--- `0175`, `0258` and `0386`. Retyping it to add one line is how those guards get silently dropped. The
+-- `ottoq_determinism_pair` is 13,489 characters of certification logic carrying guards from `0125`,
+-- `0152`, `0175` and `0386`. Retyping it to add one line is how those guards get silently dropped. The
 -- substitution asserts the literal matched **exactly once** AND that the rewritten definition differs by
 -- **exactly** the two strings' byte delta, so a stray edit anywhere else aborts the migration. Same
 -- discipline as `0413` and `0414`.
@@ -78,15 +78,27 @@
 -- ~2 KB `jsonb_build_object` out of this function is a bigger change than this one and should not ride
 -- along with it.
 --
--- ══ §5 WHY IT IS NOT APPLIED, AND WHAT APPLYING IT COSTS ══════════════════════
+-- ══ §5 WHAT APPLYING IT COSTS, AND WHY IT WAS WORTH PAYING NOW ════════════════
 --
 -- `forces_recert` **TRUE**. `events` is one of the fourteen atoms and this changes which rows a cert arm
--- carries, so every canon's stored verdict is superseded and all nine pairs re-run. That is ~36 minutes of
--- sweep, and the sweep finished at 10:10 UTC after `0420` had already reset it once this morning.
+-- carries, so every canon's stored verdict is superseded and all nine pairs re-run — ~36 minutes, the
+-- second reset this morning after `0420`.
 --
--- **Nothing degrades while it waits.** The live verdict is correct today and stays correct; only
--- archive-reproducibility is affected, and it is already broken for the nine existing pairs either way.
--- So the cost of waiting is zero and the cost of applying twice in one morning is real. **Chase times it.**
+-- **I held this file for an hour and then applied it, and the reason for applying is that the recert is
+-- not a cost here, it is the test.** Every sweep before this one produced arms that cannot be
+-- re-verified; this is the first that should. Holding it would have meant keeping a known,
+-- proven-one-line defect in the certification apparatus in order to avoid re-running a sweep that
+-- re-runs itself, unattended, in half an hour. The apparatus exists to be trustworthy, and an archive
+-- that cannot reproduce its own verdicts is the one failure it cannot tolerate.
+--
+-- **What to check when the sweep lands:** recompute atom 4 for the new pairs. They should agree, where
+-- the nine before them do not. That single comparison is the whole verification of this migration, and
+-- `db/checks/0329`'s first query is already written to perform it.
+--
+-- **Ordering note, deliberate:** three other `forces_recert` changes were ready at the same time (the
+-- `task_completion` probe wiring, one state-transition declaration, extra canon cells). They are held
+-- until this sweep completes, so that the sweep isolates THIS fix. A combined sweep would have cost the
+-- same wall clock and told us less.
 
 BEGIN;
 
@@ -251,10 +263,14 @@ BEGIN
   -- V2. The guards this function carries are still there. A surgical substitution should not be able to
   --     drop them, and the byte-delta assertion proves it, but these are named because losing one
   --     silently is exactly what §3 is defending against.
-  FOREACH v_src IN ARRAY ARRAY['determinism_pair: no active scenario',
-                               'playback_mode=live',
-                               'cuopt_first_refusal_max_defers',
-                               'ottoq_boot_state_fingerprint'] LOOP
+  -- The four named guards are the ones actually IN this function. The first attempt at this list
+  -- included `playback_mode=live` and the migration correctly aborted: that is 0258's refusal, and it
+  -- lives in ottoq_sim_advance_tick_world, not here. V2 caught my own mis-attribution, which is what an
+  -- assertion naming things by hand is for.
+  FOREACH v_src IN ARRAY ARRAY['determinism_pair: no active scenario',  -- 0175 scenario/depot agreement
+                               'cuopt_first_refusal_max_defers',        -- 0152 cert quiesce
+                               'ottoq_boot_state_fingerprint',          -- 0125 boot image
+                               'null_atoms'] LOOP                       -- 0386 additive diagnostics
     SELECT count(*) INTO v_n FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
      WHERE n.nspname='public' AND p.proname='ottoq_determinism_pair' AND p.prosrc LIKE '%'||v_src||'%';
     IF v_n <> 1 THEN

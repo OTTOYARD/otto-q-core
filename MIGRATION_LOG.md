@@ -403,7 +403,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0418](db/migrations/0418_the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired.sql) | `20260922073820` | yes — ledger | **`task_completion` is declared by five rules and probed by nothing, and it is the ONLY one of |
 | [0419](db/migrations/0419_my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts.sql) | `20260922074145` | yes — ledger | **`0418` shipped `ottoq_assert_task_completion_coverage()` two hours ago to stop abstentions |
 | [0420](db/migrations/0420_i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances.sql) | `20260922080856` | yes — ledger | **`0413` fixed the fault hazard's units and then converted them with the wrong number |
-| [0421](db/migrations/0421_a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset.sql) | `PENDING` | no — pending | **The one-line fix for `db/checks/0329` (G137): every certified pair fails when atom 4 is |
+| [0421](db/migrations/0421_a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset.sql) | `20260922125637` | yes — ledger | **The one-line fix for `db/checks/0329` (G137): every certified pair fails when atom 4 is |
 
 284 migrations indexed.
 
