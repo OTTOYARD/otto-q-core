@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0416 — GENERATED, not a log
+## Index, 0134–0417 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -399,7 +399,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0414](db/migrations/0414_the_agent_envelope_was_advertised_and_judged_and_enforced_by_nobody.sql) | `20260922050100` | yes — ledger | **The agent dial envelope had three of the four parts it needs. It is ADVERTISED to the agent |
 | [0415](db/migrations/0415_the_ledger_called_an_empty_frame_an_abstention_and_a_decision_a_call.sql) | `20260922053000` | yes — ledger | **`ottoq_intelligence_ledger` is the view CLAUDE.md instructs every reader to use for the |
 | [0416](db/migrations/0416_the_drift_cap_was_a_fraction_in_a_percent_column_so_it_froze_the_dial_it_was_meant_to_bound.sql) | `20260922065233` | yes — ledger | **`agent_max_drift_pct = 0.30` is a FRACTION stored in a column whose every sibling is a |
+| [0417](db/migrations/0417_the_agents_advice_carries_the_tick_it_was_computed_from_and_the_tick_it_was_applied_at_and_nobody_had_ever_subtracted_them.sql) | `PENDING` | no — pending | **G62, step 2 of the build `0323` §5 specified: MEASURE advice staleness, enforce nothing.** |
 
-279 migrations indexed.
+280 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
