@@ -523,7 +523,7 @@ repo_manifest(version, name, file) AS (
     ('20260922155423'::text, 'a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service'::text, '0426_a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service.sql'::text),
     ('20260922163008'::text, 'the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends'::text, '0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql'::text),
     ('PENDING'::text, 'the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence'::text, '0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence.sql'::text),
-    ('PENDING'::text, 'the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero'::text, '0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql'::text)
+    ('20260922171450'::text, 'the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero'::text, '0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

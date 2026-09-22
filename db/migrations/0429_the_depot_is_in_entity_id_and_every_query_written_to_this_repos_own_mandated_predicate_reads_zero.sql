@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922171450
 -- migration-name:    the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero
 --
 -- 0429  **Ten event types emit `p_entity_type := 'depot', p_entity_id := p_depot_id` and never pass
@@ -93,6 +93,32 @@
 --
 -- Nor is it needed. These rows are `class='engine'` — run-scoped working data — so the gap self-heals within
 -- a run or two, and `0344` documents reading the historical rows through `entity_id`.
+--
+-- ══ §7 THE FIRST ATTEMPT TIMED OUT, AND THE CAUSE WAS IN MY OWN VERIFICATION ══
+--
+-- Recorded rather than quietly fixed, because the construction is dangerous and reads as ordinary SQL.
+--
+-- **V2 originally wrote `SELECT depot_id INTO … FROM ottoq_events WHERE event_id =
+-- public.ottoq_record_event(…)`** — calling the writer inside the predicate. `ottoq_record_event` is
+-- **VOLATILE**, so the planner is not permitted to fold it to a constant and may re-evaluate it **once per
+-- row scanned**. On a table of this size that is one INSERT per existing row, from a three-line test.
+--
+-- **It rolled back cleanly and nothing landed** — verified afterwards: no `supabase_migrations` row, no
+-- `ottoq_record_event` change, no instrument, no `0429_pre` snapshot, no lineage row. The whole-file
+-- transaction is what made a runaway test harmless, which is the argument for the APPLYING.md shape.
+--
+-- Fixed by capturing the returned id into a variable first. V3 also called the instrument **twice** —
+-- doubling a full-table aggregate for no extra information — now one call with a FILTER.
+--
+-- **And the attribution is measured, not assumed, because the double call was the more obvious suspect.**
+-- `EXPLAIN ANALYZE` on the instrument's aggregate reads **2,938 ms over 775,287 events** (parallel seq scan,
+-- one worker). So two calls is ~6 s against a 60 s budget and was never the timeout; 775,287 volatile
+-- re-evaluations, each an INSERT plus two triggers, is. **The cheap suspect was the wrong one, and one
+-- EXPLAIN separated them** — the same discipline this branch keeps arriving at from the other direction.
+--
+-- **THE STANDING TEST: never put a VOLATILE function in a WHERE clause.** Assign it, then predicate on the
+-- assignment. And note the shape it shares with this branch's other findings: the statement was *correct* —
+-- it does exactly what it says — and its cost was invisible in the reading.
 --
 -- ══ §5 PRE-FLIGHT, CHANGE, VERIFICATION ═══════════════════════════════════════
 
@@ -232,7 +258,7 @@ END $$;
 -- including the two it deliberately does not fix.
 CREATE OR REPLACE FUNCTION public.ottoq_assert_event_depot_attribution(p_sim_run_id uuid DEFAULT NULL)
 RETURNS TABLE (entity_type text, attribution_class text, events bigint, unattributed bigint, verdict text)
-LANGUAGE sql STABLE AS $fn$
+LANGUAGE sql STABLE AS $body$
   SELECT e.entity_type,
          CASE
            WHEN e.entity_type = 'depot'   THEN 'identity'
@@ -262,7 +288,7 @@ LANGUAGE sql STABLE AS $fn$
    WHERE p_sim_run_id IS NULL OR e.sim_run_id = p_sim_run_id
    GROUP BY 1, 2
    ORDER BY count(*) FILTER (WHERE e.depot_id IS NULL) DESC, count(*) DESC;
-$fn$;
+$body$;
 
 COMMENT ON FUNCTION public.ottoq_assert_event_depot_attribution(uuid) IS
   'G155/0429. Per entity_type: how many events carry no depot_id, and whether that is a defect. '
@@ -297,32 +323,38 @@ DO $$
 DECLARE
   v_twin  uuid := '11111111-1111-1111-1111-111111111111';
   v_other uuid;
+  v_id    uuid;
   v_got_default uuid; v_got_explicit uuid; v_got_refused uuid;
   v_ran boolean := false;
 BEGIN
   SELECT id INTO v_other FROM public.depots WHERE id <> v_twin ORDER BY slug LIMIT 1;
 
   BEGIN
+    -- The returned id is captured into a variable BEFORE it is used as a predicate. Writing
+    -- `WHERE event_id = public.ottoq_record_event(...)` instead is what timed this migration out on its
+    -- first attempt: ottoq_record_event is VOLATILE, so the planner may not fold it to a constant and
+    -- re-evaluates it PER ROW SCANNED -- i.e. one INSERT into ottoq_events per existing row. See section 7.
+
     -- (a) depot event, no p_depot_id  -> filled from entity_id
-    SELECT e.depot_id INTO v_got_default FROM public.ottoq_events e
-     WHERE e.event_id = public.ottoq_record_event(
+    v_id := public.ottoq_record_event(
        p_actor_type := 'ottoq_engine', p_event_type := 'twin.staging_overflow',
        p_entity_type := 'depot', p_entity_id := v_twin,
        p_payload := jsonb_build_object('probe','0429_v2a'));
+    SELECT e.depot_id INTO v_got_default FROM public.ottoq_events e WHERE e.event_id = v_id;
 
     -- (b) depot event WITH an explicit p_depot_id -> the argument wins, the default must not override it
-    SELECT e.depot_id INTO v_got_explicit FROM public.ottoq_events e
-     WHERE e.event_id = public.ottoq_record_event(
+    v_id := public.ottoq_record_event(
        p_actor_type := 'ottoq_engine', p_event_type := 'twin.staging_overflow',
        p_entity_type := 'depot', p_entity_id := v_twin, p_depot_id := v_other,
        p_payload := jsonb_build_object('probe','0429_v2b'));
+    SELECT e.depot_id INTO v_got_explicit FROM public.ottoq_events e WHERE e.event_id = v_id;
 
     -- (c) entity_type='depot' but entity_id is NOT a depot -> must stay NULL, never fabricate
-    SELECT e.depot_id INTO v_got_refused FROM public.ottoq_events e
-     WHERE e.event_id = public.ottoq_record_event(
+    v_id := public.ottoq_record_event(
        p_actor_type := 'ottoq_engine', p_event_type := 'twin.staging_overflow',
        p_entity_type := 'depot', p_entity_id := '00000000-0000-0000-0000-000000000000'::uuid,
        p_payload := jsonb_build_object('probe','0429_v2c'));
+    SELECT e.depot_id INTO v_got_refused FROM public.ottoq_events e WHERE e.event_id = v_id;
 
     v_ran := true;
     RAISE EXCEPTION 'OTTOQ_0429_V2_ROLLBACK';
@@ -356,10 +388,12 @@ END $$;
 DO $$
 DECLARE v_rows int; v_vehicle text;
 BEGIN
-  SELECT count(*) INTO v_rows FROM public.ottoq_assert_event_depot_attribution();
+  -- ONE call, not two: the instrument aggregates the whole event table, so calling it twice doubles a
+  -- full scan for no information. (Also part of what timed out the first attempt.)
+  SELECT count(*), max(a.verdict) FILTER (WHERE a.entity_type = 'vehicle')
+    INTO v_rows, v_vehicle
+    FROM public.ottoq_assert_event_depot_attribution() a;
   IF v_rows = 0 THEN RAISE EXCEPTION '0429 V3: the attribution instrument returned no rows'; END IF;
-  SELECT verdict INTO v_vehicle FROM public.ottoq_assert_event_depot_attribution()
-   WHERE entity_type='vehicle';
   IF v_vehicle IS NOT NULL AND v_vehicle NOT LIKE 'NOT_INFERRED%' AND v_vehicle <> 'OK' THEN
     RAISE EXCEPTION '0429 V3: the vehicle class reads "%" -- expected NOT_INFERRED or OK', v_vehicle;
   END IF;
@@ -421,3 +455,46 @@ COMMIT;
 -- capacity restated per event rather than remaining headroom. A reader concludes nothing was ever exhausted
 -- while the same payload reports 30 vehicles in overflow. Rename them or make them mean remaining; they
 -- appear in six functions, so it is not a one-line edit.
+--
+-- ══ APPLIED 20260922171450 (2026-09-22 17:14:50 UTC / 12:14 PM CT) ═══════════
+--
+-- All preconditions passed. **V2 passed all three cases, which is what this file is really about:**
+-- (a) a depot event with no `p_depot_id` came back attributed to the twin depot; (b) an event carrying an
+-- EXPLICIT `p_depot_id` of the benchmark depot **was not overridden** — the COALESCE order holds; (c) an
+-- `entity_type='depot'` event naming a non-depot came back **NULL**, so the default restates an identity and
+-- does not guess. V3 returns 10 classes with `vehicle` reading `NOT_INFERRED BY DESIGN (G158)`.
+--
+-- ══ §8 APPLY-CHANNEL DEVIATION, DECLARED, AND IT IS LARGER THAN THE USUAL ONE ══
+--
+-- **`apply_migration` timed out at 60 s on this file THREE times, and the cause is the channel, not the
+-- SQL.** That is stated as a measurement, not an excuse:
+--
+--   * every block was timed individually — **P1 82 ms, P2 47 ms, P3b 27 ms, the V3 aggregate 1,167 ms**
+--     (2,938 ms in the worst case over 775,287 events), `CREATE OR REPLACE ottoq_record_event` **12 ms**,
+--     one `ottoq_record_event` + lookup **9 ms**;
+--   * measured again **while a recert sweep was active** (`sweep_active=1`): the full aggregate ran in
+--     **197 ms** and the function replacement in **12 ms**, so neither saturation nor the sweep explains it;
+--   * the recert runner holds only `AccessShareLock` on `ottoq_cert_lineage`, which does not conflict with
+--     this file's `INSERT … ON CONFLICT`, so it is not lock contention either;
+--   * the third attempt stripped every comment and removed the `CREATE FUNCTION` entirely and **still**
+--     timed out, which rules out payload size and the custom dollar-quote tag;
+--   * **the identical statements then ran through `execute_sql` in under a second.**
+--
+-- **So it was applied through `execute_sql` in two ordered calls** — preconditions + snapshot + change + V1,
+-- then V2 + V3 — and the `supabase_migrations` row and lineage row were written explicitly afterwards.
+-- **What is lost by that route is the single enclosing transaction**, which is why the order matters and why
+-- the snapshot is taken before the change: a failure in the second call would have left the change applied
+-- and unverified, recoverable from `ottoq_schema_snapshots` label `0429_pre`. It did not fail.
+--
+-- **Three of my own attempts also rolled back cleanly and left nothing behind** — verified each time against
+-- `supabase_migrations`, `pg_proc`, `ottoq_cert_lineage` and `ottoq_schema_snapshots` rather than assumed.
+-- The first of those was a real defect in my own verification and is recorded in §7; the other two were not.
+--
+-- **The instrument in (B) was created by an earlier isolation test and therefore exists independently of the
+-- ordered calls above.** It is `CREATE OR REPLACE`, so the file remains reproducible; noted because a reader
+-- reconstructing history from `ottoq_schema_snapshots` would otherwise find no pre-image for it.
+--
+-- **THE STANDING NOTE: the apply channel is not neutral, and "it did not apply" is not the same as "it
+-- failed."** Check `supabase_migrations`, the catalog and the lineage table before re-running anything —
+-- all three times the answer was a clean rollback, and assuming otherwise would have produced a duplicate
+-- snapshot row and a second lineage write.

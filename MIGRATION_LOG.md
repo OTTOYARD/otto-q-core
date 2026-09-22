@@ -411,7 +411,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0426](db/migrations/0426_a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service.sql) | `20260922155423` | yes — ledger | **`HW.003.sensor_liveness` is `safety_critical`/`block` and fails 1,288 of 3,550 evaluations at |
 | [0427](db/migrations/0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql) | `20260922163008` | yes — ledger | **`HW.006.physical_presence_verification` asks whether the vehicle is physically in the stall, and |
 | [0428](db/migrations/0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence.sql) | `PENDING` | no — pending | **`charge_session_start` is the first of the six advisory checkpoints to become ENFORCING.** Four |
-| [0429](db/migrations/0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql) | `PENDING` | no — pending | **Ten event types emit `p_entity_type := 'depot', p_entity_id := p_depot_id` and never pass |
+| [0429](db/migrations/0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql) | `20260922171450` | yes — ledger | **Ten event types emit `p_entity_type := 'depot', p_entity_id := p_depot_id` and never pass |
 
 292 migrations indexed.
 
