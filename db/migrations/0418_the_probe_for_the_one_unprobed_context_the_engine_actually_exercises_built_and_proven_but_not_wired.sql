@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922073820
 -- migration-name:    the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired
 --
 -- 0418  **`task_completion` is declared by five rules and probed by nothing, and it is the ONLY one of

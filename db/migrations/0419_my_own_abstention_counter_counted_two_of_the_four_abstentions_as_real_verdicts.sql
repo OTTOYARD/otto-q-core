@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922074145
 -- migration-name:    my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts
 --
 -- 0419  **`0418` shipped `ottoq_assert_task_completion_coverage()` two hours ago to stop abstentions
@@ -37,7 +37,7 @@
 -- evaluator could abstain in words containing no "context" at all. The durable fix is a structured
 -- abstention signal on `ottoq_rule_result` rather than a phrase match, and that is a change to the rule
 -- result type used by every evaluator in the engine; it is named here as the right fix and deliberately
--- not made at 03:00 CT. `v_abstention_is_heuristic` is returned as a column so no reader can mistake the
+-- not made at 03:00 CT. `abstention_is_heuristic` is returned as a column so no reader can mistake the
 -- one for the other.
 --
 -- ══ §2 WHAT THE EXERCISE PROVED, WHICH IS WHY `0418` WAS WORTH BUILDING ═══════
