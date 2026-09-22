@@ -526,7 +526,7 @@ repo_manifest(version, name, file) AS (
     ('20260922171450'::text, 'the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero'::text, '0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql'::text),
     ('20260922172845'::text, 'the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both'::text, '0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql'::text),
     ('20260922224038'::text, 'a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged'::text, '0431_a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged.sql'::text),
-    ('PENDING'::text, 'the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps'::text, '0432_the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps.sql'::text)
+    ('20260922231738'::text, 'the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps'::text, '0432_the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

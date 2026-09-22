@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922231738
 -- migration-name:    the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps
 --
 -- 0432  **The orchestrator agent stops setting the work side's demand, the catalog's `agent_writable` flag
