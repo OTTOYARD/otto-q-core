@@ -134,6 +134,17 @@
 --   5. a clean full-day run showing residual failures are only group (c)
 --   6. **only then** `SM.001` from `shadow` to `block`
 --
+-- **STEP 5 IS WRONG AS WRITTEN, corrected by `db/checks/0324` §3 on live traffic.** It asks for a run
+-- whose residual SM.001 FAILURES are only group (c). Measured on run `61cedc05`: SM.001 logged **524
+-- evaluations, zero failures**, while `ottoq_events` recorded **fifteen** undeclared
+-- `offline -> charge_complete_holding` transitions — and **not one SM.001 evaluation carries
+-- `from_state='offline'`.** The boot-state transitions are written by the seeding path, which never
+-- reaches the row-level trigger SM.001 probes from, so group (c) produces NO failures at all and step 5
+-- is satisfied trivially by a run that has answered nothing. **Rewrite it against the EVENTS census —
+-- which V3 above already uses — not against SM.001's log.** The lesson is worth more than the fix: a
+-- rule reads green over a population its probe cannot see, so cleanliness is evidence only across the
+-- paths that actually reach the gate.
+--
 -- That is CLAUDE.md 2.9a's blind-spot promotion doctrine — MEASURED first, ENFORCED after a clean
 -- round — applied to a rule instead of a determinism atom.
 
