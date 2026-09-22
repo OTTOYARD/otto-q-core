@@ -4,8 +4,15 @@
 --       every rate that can be measured it currently BEATS the CP-SAT service that was supposed to
 --       replace it.**
 --
---       No migration here. This is the diagnosis the decision needs, and one number in it
---       (`0250`'s "1 enacted / 7 refused / 11 superseded") is retracted as a single-run figure.
+--       No migration here. This is the diagnosis the decision needs. Two numbers are retracted:
+--       `0250`'s "1 enacted / 7 refused / 11 superseded" as a single-run figure, and this file's own
+--       §6b hypothesis, which §8 falsifies with the query §6b asked for.
+--
+--       **THE ACTIONABLE DEFECT, and it is neither solver's competence:** BOTH external proposers
+--       re-propose for the same entity without de-duplicating against their own in-flight proposal —
+--       CP-SAT **10.49** times per entity, cuOpt **3.62**, against the local path's 1.71. That churn
+--       is what produces the 83.6% supersession rate AND deflates every per-proposal rate quoted
+--       about them. Fixing de-duplication is a bigger win than any dial in this file. See §8.
 --
 --       **Measured 2026-09-22 04:40:02 UTC (2026-09-21 11:40 PM CT), AND A RUN WAS LIVE WHILE
 --       MEASURING** — `greedy_constrained` went from 16,034 to 16,246 proposals between two queries
@@ -66,6 +73,11 @@
 --     ottoq_service_priority   NULL         353         0         0          118     0.0%       0.0%
 --
 -- Total enactments 4,810. **The two external solvers together account for 110 of them — 2.3%.**
+--
+-- **READ §8 BEFORE QUOTING ANY RATE IN THIS TABLE.** The `enact%` column divides by proposals, and
+-- both external solvers inflate their own denominators by re-proposing for the same entity — CP-SAT
+-- 10.5x per entity, cuOpt 3.6x. Per entity the rates are 39.1% / 19.8% / 9.1%, and the 2.3% share
+-- mostly reflects the external solvers being asked about 3.5% as many entities, not losing contests.
 --
 -- **`0250`'s "1 enacted against 7 refused and 11 superseded" is RETRACTED as a live-architecture
 -- statement.** It was true of one run. Across the surviving evidence cuOpt has 74 enactments, and the
@@ -154,6 +166,45 @@
 -- got there first, not of who was right.** C5's four-policy CRN comparison is the only thing that
 -- converts any of this into an edge claim in either direction.
 --
+-- ══ §8 §6b IS FALSIFIED, THE REAL CAUSE IS SELF-CHURN, AND §3's FRAMING WAS
+--       UNFAIR TO BOTH EXTERNAL SOLVERS ══════════════════════════════════════
+--
+-- I ran §6b's partition rather than leaving it. **It falsifies the hypothesis outright.** Every one
+-- of cuOpt's 1,190 proposals came from a run carrying a run-scoped
+-- `cuopt_first_refusal_max_defers` of **6** — not 0, and not the 1 CLAUDE.md describes, but the
+-- "agentic full mode" value. **cuOpt has had a six-beat protected window on every proposal it has
+-- ever made, and is still 83.6% superseded.** A missing right of first refusal is not the cause.
+--
+-- **The cause is that cuOpt supersedes itself.** Its 1,190 proposals cover only **329 distinct
+-- (run, entity) pairs** — 3.62 proposals per entity, **38 for one entity**, and **861 of the 1,190
+-- (72.4%) are re-proposals for an entity cuOpt had already proposed for.** 570 of the 995
+-- supersessions carry `newer_proposal_same_entity`, which is cuOpt displacing its own earlier
+-- proposal. The refresh has no de-duplication against an in-flight proposal for the same entity, so
+-- it re-solves and re-submits on every beat and each submission invalidates the last.
+--
+-- **AND THE SAME DEFECT IS WORSE IN CP-SAT.** Per entity:
+--
+--     source                   proposals   entities   per entity   entities won   % won   % props enacted
+--     ----------------------   ---------   --------   ----------   ------------   -----   ---------------
+--     greedy_constrained          16,406      9,579         1.71          3,741   39.1%             29.0%
+--     forward_lex (CP-SAT)         4,166        397        10.49             36    9.1%              0.9%
+--     cuopt                        1,190        329         3.62             65   19.8%              6.2%
+--     ottoq_service_priority         357        349         1.02              0    0.0%              0.0%
+--
+-- **CP-SAT re-proposes 10.49 times per entity — six times greedy's churn and nearly three times
+-- cuOpt's.** Its 0.9% per-proposal enactment rate is mostly that churn dividing a fixed numerator.
+--
+-- **So §3's rates were the wrong denominator, and the honest comparison narrows the gap a long way.**
+-- Per ENTITY, the win rates are greedy **39.1%**, cuOpt **19.8%**, CP-SAT **9.1%** — cuOpt is half
+-- the local path, not a fifth of it. Same defect shape as `0290` (G98's wrong denominator) and
+-- `0250`: a ratio whose denominator is inflated by the measured system's own churn.
+--
+-- **And a scope fact that reframes the 2.3% share entirely.** greedy proposes for **9,579**
+-- (run, entity) pairs; cuOpt for 329 and CP-SAT for 397 — about **3.5%** as many. The external
+-- solvers are not losing 97.7% of contests, **they are being asked about 3.5% of the work.** Whether
+-- that narrow slice is the right slice is a design question nobody has written down, and it is a far
+-- better question than "is cuOpt worth keeping."
+--
 -- ══ §7 WHAT MAY AND MAY NOT BE SAID ══════════════════════════════════════════
 --
 -- SAY: *"cuOpt reached the NVIDIA endpoint 1,159 times, answered 1,141 of them for 5,063 proposals
@@ -164,6 +215,38 @@
 -- (98.4% answer rate); "CP-SAT replaced cuOpt" (it answers 4.1% of its calls and enacts 0.9% of its
 -- proposals); "cpsat_service made 3,638 calls" (487); "4,248 Nemotron calls" (zero carry an
 -- endpoint); or any enactment rate stated as a performance comparison (§6c).
+--
+-- **AND PREFER THE PER-ENTITY RATE TO THE PER-PROPOSAL RATE EVERY TIME (§8).** Per proposal, cuOpt
+-- reads 6.2% and CP-SAT 0.9%; per entity they read 19.8% and 9.1%. The per-proposal figures are
+-- deflated by each solver's own re-proposal churn, so quoting them understates both — and the
+-- direction that understates us is still a wrong number.
+
+\echo '=== 0322 §8 — the defer hypothesis, falsified: every cuOpt proposal already had 6 defers ==='
+WITH armed AS (
+  SELECT scope_id AS sim_run_id, param_value AS defers
+    FROM public.ottoq_policy_params
+   WHERE scope_type='run' AND param_key='cuopt_first_refusal_max_defers'
+)
+SELECT COALESCE(a.defers::text, 'no run-scoped row (global 0)') AS defer_setting,
+       count(DISTINCT d.sim_run_id) AS runs, count(*) AS cuopt_proposals,
+       round(100.0*count(*) FILTER (WHERE d.status='superseded')/count(*),1) AS pct_superseded
+  FROM public.ottoq_proposal_disposition_ledger d
+  LEFT JOIN armed a ON a.sim_run_id = d.sim_run_id
+ WHERE d.source='cuopt' GROUP BY 1 ORDER BY 1;
+-- One row, defers=6. A six-beat protected window and 83.6% supersession: not a window problem.
+
+\echo '=== 0322 §8 — the real cause, and the fair denominator ==='
+SELECT source, count(*) AS proposals,
+       count(DISTINCT (sim_run_id, entity_id)) AS entities,
+       round(count(*)::numeric / count(DISTINCT (sim_run_id, entity_id)), 2) AS proposals_per_entity,
+       count(DISTINCT (sim_run_id, entity_id)) FILTER (WHERE status='enacted') AS entities_won,
+       round(100.0*count(DISTINCT (sim_run_id, entity_id)) FILTER (WHERE status='enacted')
+             / count(DISTINCT (sim_run_id, entity_id)), 1) AS pct_entities_won,
+       round(100.0*count(*) FILTER (WHERE status='enacted')/count(*), 1) AS pct_proposals_enacted
+  FROM public.ottoq_proposal_disposition_ledger
+ GROUP BY 1 ORDER BY proposals DESC;
+-- CP-SAT re-proposes 10.49x per entity, cuOpt 3.62x, greedy 1.71x. Per ENTITY the win rates are
+-- 39.1% / 19.8% / 9.1% -- and the external solvers see 3.5% as many entities as greedy does.
 
 \echo '=== 0322 §1 — the predicate: which ledger rows are actually calls ==='
 SELECT provider, count(*) AS ledger_rows,
