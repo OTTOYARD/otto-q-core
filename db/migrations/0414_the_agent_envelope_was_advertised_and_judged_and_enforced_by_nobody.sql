@@ -103,8 +103,18 @@
 --
 -- **`apply_migration` timed out at 60 s TWICE, each time with a verified clean rollback** (no
 -- function created, no lineage row, no `schema_migrations` entry). Re-run statement-wise through
--- `execute_sql` the whole thing completed in under a second, so the timeout was the transport and
--- not the work. Every preflight, every patch assertion and every verify below was executed and
+-- `execute_sql` the whole thing completed in under a second. **I first wrote that the timeout was
+-- "the transport and not the work". That was a guess and it is now contradicted by direct
+-- evidence:** minutes later a `SET statement_timeout = 0; DO $runner$ ... pg_try_advisory_xact_lock`
+-- transaction — the recert harness — was observed running for 275 s while a
+-- `SELECT ottoq_start_demo_run(...)` sat behind it in `wait_event_type='Lock'`,
+-- `wait_event='transactionid'`, for 113 s. **A `CREATE OR REPLACE FUNCTION` on `ottoq_policy_set`
+-- needs a lock that same harness transaction can hold, so LOCK CONTENTION WITH THE RECERT HARNESS is
+-- the likely cause of all three of this branch's `apply_migration` timeouts, and the statement-wise
+-- retry succeeded because it happened to land in a gap.** Not proven for those specific attempts —
+-- I did not look at `pg_stat_activity` at the time, which is the lesson — but it is a mechanism with
+-- observed evidence, where "transport" had none. Every preflight, every patch assertion and every
+-- verify below was executed and
 -- passed; the `schema_migrations` row was then written by hand as version `20260922050100` with a
 -- statement recording that provenance. **The lesson is the one this repo already has for MCP
 -- timeouts: a timeout is not a rollback, so go and look — here it happened to be a rollback both
