@@ -242,3 +242,59 @@ SELECT column_name, data_type, is_nullable
 --      carries `lane_stalls=0` and legitimately books `wash` stalls, so the column is a capacity, not a
 --      boolean. **Open, and to be measured on its own evidence.**
 --   3. **Whether `source` is correct where present** — still not measured, as `0336` §5 said.
+
+-- ══ §8 ROOT CAUSE, TRACED TO A SINGLE MAPPING — ONE FUNCTION, ONE RETURN VALUE ═
+--
+-- §6 left the fix as "a predicate on `lane_stalls`". **It is smaller than that, and it needs no new
+-- mechanism at all: the engine's correct pattern already exists and the walkaround is the only service
+-- not in it.**
+--
+-- The chain, each hop measured rather than assumed:
+--
+--   1. `public.ottoq_plan_visit_itinerary` handles non-bay atoms in two loops, both gated
+--      `IF v_a->>'concurrency' IN ('cabin','exterior','digital') AND v_a->>'svc' NOT IN ('readiness_check')`.
+--      **The walkaround is `concurrency='exterior'` since `0383`, so it is handled by the RIGHT loop** —
+--      confirmed on live atoms: every walkaround atom derived since `0383` reads `exterior` (the only
+--      `hold` rows are one pre-`0383` batch from 08-30). The separate `concurrency='bay'` loop, which is
+--      what maps to `'service'`, **never sees it.**
+--   2. That loop takes its leg type from **`public.ottoq_svc_to_leg_type(svc)`**.
+--   3. **And that is where it breaks:**
+--
+--          svc                    ottoq_svc_to_leg_type()   -> stall kind booked
+--          --------------------   -----------------------   -------------------
+--          perimeter_walkaround   **'service'**             **service_bay**
+--          sensor_clean           'sensor_clean'            (none)
+--          interior_tidy          'interior_tidy'           (none)
+--          item_retrieval         'item_retrieval'          (none)
+--          remote_diagnostics     'remote_diagnostics'      (none)
+--          triage_check           'triage_check'            (none)
+--          software_update        'software_update'         (none)
+--          interior_inspection    'inspect'                 (none)
+--
+--      **Every sibling returns its own name and books nothing. The walkaround alone falls through to
+--      `'service'`**, which `ottoq.ottoq_book_workflow_legs` maps with a hardcoded
+--      `CASE ... WHEN 'service' THEN 'service_bay'`.
+--
+-- The leg population confirms the pattern from the other side: `sensor_clean` 398 legs / **0** with a
+-- stall, `interior_tidy` 1,446 / 0, `item_retrieval` 336 / 0, `remote_diagnostics` 323 / 0,
+-- `triage_check` 10 / 0 — against `service` 5,677 legs / **3,225** with a stall.
+--
+-- **THE FIX: make `public.ottoq_svc_to_leg_type('perimeter_walkaround')` return `'perimeter_walkaround'`.**
+-- One mapping. `ottoq_book_workflow_legs`'s CASE already has `ELSE NULL`, so an unrecognised leg type
+-- books no stall — no change needed there, and no `lane_stalls` predicate needed either. §6's proposed
+-- predicate is the *general* guard and remains a reasonable defence in depth, but it is not required to
+-- close this.
+--
+-- **And this is `0383`'s residue, which is worth stating plainly because `0383` is mine.** `0383`
+-- re-derived the walkaround from the orphan `concurrency='hold'` to `'exterior'`, explicitly modelling it
+-- on `sensor_clean`, and proved the atom now starts and completes. **It fixed the CONCURRENCY class and
+-- left the LEG TYPE falling through** — so the atom became performable while its itinerary leg went on
+-- claiming a bay. A service's identity is declared in two places and `0383` changed one.
+--
+-- **The check that generalises it**, and the one to run after the fix: `ottoq_svc_to_leg_type` should
+-- return the fall-through `'service'` only for services whose `service_cadence_policy.lane='service_bay'`.
+-- Today that is `cosmetic_repair`, `fault_repair`, `mechanical_pm`, `sensor_calibration` — and the
+-- walkaround, which is `lane='exterior'`.
+--
+-- `forces_recert` will be TRUE: it changes which stalls a run books, and `bookings` is one of the
+-- fourteen atoms.
