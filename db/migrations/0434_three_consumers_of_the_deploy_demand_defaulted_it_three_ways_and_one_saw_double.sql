@@ -38,7 +38,12 @@
 --   (C) service_flow's pressure test reads (B). decide_tick's demand line reads (A) for its fraction (its own
 --       formula otherwise unchanged -- it counts deployed by vehicle state, not dispatch, and carries no
 --       multiplier; aligning those is a separate change). The dispatcher is not touched: it is the reference.
---   P3 proves (A) and (B) reproduce the dispatcher's own arithmetic for every scenario before anything moves.
+--   (D) G164. The agent's grounding block reads (A) and (B) instead of its own copy of the arithmetic, and
+--       publishes `deploy_gap = target − deployed`. On run 7a42982a's first v19 pass the agent raised
+--       `deploy_surge_catchup` "to clear the 67-vehicle service backlog" with deployed 4 above target 3, where
+--       the dial -- the fraction of a POSITIVE deploy gap released per tick -- does nothing; edge function v20
+--       tells it so. Not read by any certification path.
+--   P3 proves (A) and (B) reproduce the dispatcher's own arithmetic, hour by hour, before anything moves.
 --
 -- ══ §4 forces_recert TRUE -- service_flow and decide_tick move in every cert arm whose scenario sets a demand. ══
 
@@ -63,17 +68,18 @@ DECLARE r record; v_n int := 0;
 BEGIN
   FOR r IN SELECT n.nspname, p.proname, md5(p.prosrc) AS m FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
             WHERE (n.nspname, p.proname) IN (('public','ottoq_decide_tick'), ('twin','ottoq_sim_advance_service_flow'),
-                                             ('twin','ottoq_sim_auto_dispatch_tick'))
+                                             ('twin','ottoq_sim_auto_dispatch_tick'), ('public','ottoq_agent_board_grounding'))
   LOOP
     v_n := v_n + 1;
     IF (r.proname = 'ottoq_decide_tick'              AND r.m <> 'c6bff9868c8982744491e597cd7c3f49')
     OR (r.proname = 'ottoq_sim_advance_service_flow' AND r.m <> '7d6dddd76e5d8fe7aa9cb4d6cd6fdbd9')
-    OR (r.proname = 'ottoq_sim_auto_dispatch_tick'   AND r.m <> 'e6cccbe3b00d69dd0e07cb3c24378778') THEN
+    OR (r.proname = 'ottoq_sim_auto_dispatch_tick'   AND r.m <> 'e6cccbe3b00d69dd0e07cb3c24378778')
+    OR (r.proname = 'ottoq_agent_board_grounding'    AND r.m <> '41d78cddb8d9dba0e91e9e46aa156ebf') THEN
       RAISE EXCEPTION '0434 P1: %.% prosrc md5 is % -- apply 0433 first, or it changed since this file read it',
         r.nspname, r.proname, r.m;
     END IF;
   END LOOP;
-  IF v_n <> 3 THEN RAISE EXCEPTION '0434 P1: expected 3 functions, found %', v_n; END IF;
+  IF v_n <> 4 THEN RAISE EXCEPTION '0434 P1: expected 4 functions, found %', v_n; END IF;
 END $$;
 
 -- ── P2: anchors ──
@@ -196,6 +202,31 @@ BEGIN
   EXECUTE v_new;
 END $$;
 
+-- ── (D): THE AGENT'S GROUNDING READS THE RESOLVERS AND PUBLISHES THE GAP (G164) ──
+DO $$
+DECLARE v_oid oid; v_def text; v_new text; v_a1 text; v_r1 text; v_a2 text; v_r2 text;
+BEGIN
+  SELECT p.oid INTO v_oid FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'ottoq_agent_board_grounding';
+  v_def := pg_get_functiondef(v_oid);
+  v_a1 := $a$v_peak := ottoq_policy_get(p_sim_run_id, 'deploy_peak_fraction', COALESCE(v_target_pct, 0.90));$a$;
+  v_r1 := $r$v_peak := public.ottoq_deploy_peak_fraction(p_sim_run_id);  -- 0434$r$;
+  v_a2 := $a$'deploy_target_now', FLOOR(v_fleet * ottoq_deploy_target_fraction(v_hour, v_peak) * v_mult),$a$;
+  v_r2 := $r$'deploy_target_now', public.ottoq_deploy_target_now(p_sim_run_id, p_depot_id, p_clock),
+      'deploy_gap', public.ottoq_deploy_target_now(p_sim_run_id, p_depot_id, p_clock) - v_deployed,  -- 0434 / G164
+      'deploy_gap_note', 'target minus deployed. deploy_surge_catchup releases a share of a POSITIVE gap per tick; '
+                         'at a gap of 0 or less it does nothing.',$r$;
+  IF (length(v_def) - length(replace(v_def, v_a1, ''))) / length(v_a1) <> 1
+  OR (length(v_def) - length(replace(v_def, v_a2, ''))) / length(v_a2) <> 1 THEN
+    RAISE EXCEPTION '0434 (D): a grounding anchor is not unique';
+  END IF;
+  v_new := replace(replace(v_def, v_a1, v_r1), v_a2, v_r2);
+  IF length(v_new) - length(v_def) <> (length(v_r1) - length(v_a1)) + (length(v_r2) - length(v_a2)) THEN
+    RAISE EXCEPTION '0434 (D): grounding byte delta';
+  END IF;
+  EXECUTE v_new;
+END $$;
+
 -- ── V1: no consumer resolves the demand on its own any more ──
 DO $$
 DECLARE v_n int;
@@ -206,6 +237,22 @@ BEGIN
   IF v_n <> 0 THEN RAISE EXCEPTION '0434 V1: % consumer(s) still resolve deploy_peak_fraction themselves', v_n; END IF;
 END $$;
 
+-- ── V2: the grounding's target equals the dispatcher's and carries the gap ──
+DO $$
+DECLARE v_run uuid; v_clock timestamptz; g jsonb;
+BEGIN
+  SELECT sim_run_id, sim_clock_current INTO v_run, v_clock FROM public.ottoq_sim_runs
+   WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND run_by NOT IN ('cert_harness','benchmark') AND tick_count > 50
+   ORDER BY started_at DESC LIMIT 1;
+  IF v_run IS NULL THEN RAISE WARNING '0434 V2: no twin demo run to probe; skipped'; RETURN; END IF;
+  g := public.ottoq_agent_board_grounding(v_run, '11111111-1111-1111-1111-111111111111', v_clock) -> 'work_side_demand';
+  IF (g->>'deploy_target_now')::int IS DISTINCT FROM public.ottoq_deploy_target_now(v_run, '11111111-1111-1111-1111-111111111111', v_clock)
+     OR NOT g ? 'deploy_gap'
+     OR (g->>'deploy_gap')::int IS DISTINCT FROM (g->>'deploy_target_now')::int - (g->>'deployed_now')::int THEN
+    RAISE EXCEPTION '0434 V2: grounding work_side_demand is inconsistent: %', g;
+  END IF;
+END $$;
+
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note) VALUES
  ('0434_three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double',
   true,
@@ -214,7 +261,8 @@ INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note) VALUES
   'busy_day (0.45) service_flow''s target was exactly twice the dispatcher''s at every hour, so its deploy-pressure '
   'fast-track fired all day: run 7a42982a, 04:12-07:02 CT, 44 events moving 85 vehicles past their optional '
   'services. ottoq_deploy_peak_fraction and ottoq_deploy_target_now reproduce the dispatcher verbatim (P3 proves it '
-  'per scenario and hour); service_flow reads the target, decide_tick the fraction. TRUE: both consumers move.')
+  'hour by hour); service_flow reads the target, decide_tick the fraction, and the agent''s grounding reads both and '
+  'publishes deploy_gap (G164). TRUE: service_flow and decide_tick move in cert arms; the grounding is not read by one.')
 ON CONFLICT (name) DO UPDATE SET forces_recert = EXCLUDED.forces_recert, note = EXCLUDED.note;
 
 COMMIT;

@@ -10,6 +10,10 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v20 (0434, G164): the agent raised deploy_surge_catchup "to clear the 67-vehicle service backlog" on run
+//      7a42982a's first v19 pass, with deployed (4) already above the work side's target (3) -- where the dial,
+//      the share of a POSITIVE deploy gap released per tick, does nothing. The grounding block now publishes
+//      work_side_demand.deploy_gap (0434) and the prompt says the dial acts only on a positive gap.
 // v19 (0432, db/checks/0352): 🔴 THE AGENT WAS SETTING THE DEMAND IT IS MEASURED AGAINST, FROM A
 //      BOARD THAT MISREPORTED IT. On run 0682752c the board said deploy_peak_fraction = 0.90 while
 //      the dispatcher used busy_day's 0.45; the agent's first move was 0.95 -- doubling the peak
@@ -128,7 +132,7 @@ READ THE BOARD THIS WAY:
 DIALS (the only keys set_policy accepts; value in [min, max]):
   energy_demand_factor_peak [0.3, 0.9] — grid-draw target as a fraction of service_max outside expensive windows. HIGHER = draw more from the grid, shave less; LOWER = the battery covers more.
   energy_demand_factor_expensive [0.2, 0.8] — the same target during expensive-tariff windows.
-  deploy_surge_catchup [0.1, 1.0] — fraction of the deploy gap released per tick: how fast the depot meets the work side's target, never the target itself.
+  deploy_surge_catchup [0.1, 1.0] — fraction of a POSITIVE deploy gap (grounding.work_side_demand.deploy_gap = target − deployed) released per tick: how fast the depot catches up to the work side's target, never the target itself. At a gap of 0 or less it does nothing — leave it alone; it is not a service-backlog lever.
   forecast_horizon_min [10, 90] integer — arrival-forecast horizon (minutes) for energy and staging pre-positioning.
   energy_reserve_shave 0|1 — 1 = causal water-fill reserve target instead of the fixed demand factor.
 STABILITY: each grounding.actuators[dial] shows last_change {direction, min_ago} and how often your requests were clamped. A dial whose last_change is younger than grounding.stability.reversal_dwell_min may move again ONLY in the same direction — a reversal is rejected. Re-sending the value already in force is rejected as no_change. Values outside [min, max] are clamped, so ask inside the range.
@@ -438,7 +442,7 @@ serve(async (req) => {
                        // separate a grounded decision from one made on counters alone.
                        board_blocks: { grounding: board.grounding != null, assets: board.assets != null,
                                        review: board.review != null },
-                       agent_version: "v19" },
+                       agent_version: "v20" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId },
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
