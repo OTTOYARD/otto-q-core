@@ -407,8 +407,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0422](db/migrations/0422_wiring_the_task_completion_probe_so_the_rule_that_names_g121_can_finally_fire.sql) | `20260922134041` | yes — ledger | **`0418` built the `task_completion` probe, proved its verdicts on live atoms, and deliberately |
 | [0423](db/migrations/0423_a_vehicle_can_power_down_from_any_state_and_the_catalog_never_knew_it.sql) | `20260922134203` | yes — ledger | **`SM.001` fails on 23.2% of everything it judges — 6,298 of 27,144 evaluations, every one |
 | [0424](db/migrations/0424_a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass.sql) | `20260922150552` | yes — ledger | **`HW.002.charger_state_precondition` is `critical`/`block` and CANNOT PASS on the twin. Across |
-| [0425](db/migrations/0425_the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner.sql) | `PENDING` | no — pending | **`perimeter_walkaround` is performed AT THE VEHICLE and holds 3,257 bookings on the twin depot's |
-| [0426](db/migrations/0426_a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service.sql) | `PENDING` | no — pending | **`HW.003.sensor_liveness` is `safety_critical`/`block` and fails 1,288 of 3,550 evaluations at |
+| [0425](db/migrations/0425_the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner.sql) | `20260922155332` | yes — ledger | **`perimeter_walkaround` is performed AT THE VEHICLE and holds 3,257 bookings on the twin depot's |
+| [0426](db/migrations/0426_a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service.sql) | `20260922155423` | yes — ledger | **`HW.003.sensor_liveness` is `safety_critical`/`block` and fails 1,288 of 3,550 evaluations at |
 
 289 migrations indexed.
 

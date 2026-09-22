@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922155332
 -- migration-name:    the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner
 --
 -- 0425  **`perimeter_walkaround` is performed AT THE VEHICLE and holds 3,257 bookings on the twin depot's
@@ -217,7 +217,7 @@ BEGIN
   LOOP
     IF public.ottoq_svc_to_leg_type(r.svc) IS DISTINCT FROM r.expect THEN
       v_bad := v_bad + 1;
-      RAISE WARNING '0425 V1: %s -> %s, expected %s', r.svc,
+      RAISE WARNING '0425 V1: % -> %, expected %', r.svc,
                     public.ottoq_svc_to_leg_type(r.svc), r.expect;
     END IF;
   END LOOP;
@@ -242,7 +242,7 @@ BEGIN
   LOOP
     IF position('''' || r.emitted || '''' in v_def) = 0 THEN
       v_bad := v_bad + 1;
-      RAISE WARNING '0425 V2: bridge emits %s which the leg_type CHECK forbids', r.emitted;
+      RAISE WARNING '0425 V2: bridge emits % which the leg_type CHECK forbids', r.emitted;
     END IF;
   END LOOP;
   IF v_bad <> 0 THEN
@@ -267,7 +267,7 @@ BEGIN
       'mechanical_pm','fault_repair','cosmetic_repair']) AS v
   LOOP
     IF position('''' || r.v || '''' in v_def) = 0 THEN
-      v_bad := v_bad + 1; RAISE WARNING '0425 V3: previously-legal leg type %s was DROPPED', r.v;
+      v_bad := v_bad + 1; RAISE WARNING '0425 V3: previously-legal leg type % was DROPPED', r.v;
     END IF;
   END LOOP;
   IF v_bad <> 0 THEN
@@ -351,3 +351,38 @@ COMMIT;
 -- `perimeter_walkaround` legs must appear with **`with_stall = 0`**, and the `service` leg count must
 -- fall. If `perimeter_walkaround` legs are zero, the planner is not reaching the non-bay loop for this
 -- atom and the diagnosis in `0338` §8 needs re-deriving.
+
+-- ══ APPLIED ═══════════════════════════════════════════════════════════════════
+--
+-- **Applied 2026-09-22 15:53:32 UTC (10:53 AM CT) as `20260922155332`**, in a window verified clear:
+-- canon 9/9 `satisfies_floor` and `passed`, `ottoq_sim_runs` 0 active, and `pg_stat_activity` 0 pairs in
+-- flight (the only honest signal, per G141). All blocks ran: P1 confirmed the defect live (3,785 walkaround
+-- bookings against sensor_clean's 0), P2 confirmed the constraint forbade the value, (A) extended it, (B)
+-- spliced the bridge, V1/V2/V3 passed, V4 recorded the baseline.
+--
+-- **VERIFIED independently of the migration's own asserts**, re-reading the catalog afterwards:
+--
+--     ottoq_svc_to_leg_type('perimeter_walkaround')  = 'perimeter_walkaround'   (was 'service')
+--     ottoq_svc_to_leg_type('sensor_clean')          = 'sensor_clean'           (unchanged)
+--     ottoq_svc_to_leg_type('a_code_nobody_declares')= 'service'                (ELSE intact)
+--     constraint permits 'perimeter_walkaround'      = true
+--
+-- **TWO DEVIATIONS FROM THE FILE, both declared rather than dropped (APPLYING.md step 4).**
+--
+--   1. As with `0424`, the apply channel takes SQL inline, so whole-line `--` comments and the one psql
+--      directive were stripped. Comment-stripped and whitespace-collapsed, file and submission differed by
+--      exactly 22 characters — `\set ON_ERROR_STOP on`, a psql directive that is not SQL.
+--   2. **A REAL CORRECTION, made at submit time and back-ported into this file so the two now match:**
+--      three `RAISE WARNING` strings used `%s` where PL/pgSQL takes `%`. It is cosmetic — `%s` consumes the
+--      argument and prints a literal `s` after it, and only on the failure paths — but a malformed message
+--      is worst exactly when it is being read, so it was fixed in the SQL that ran and the file was then
+--      amended to agree. **The file above is what executed.** The `EXCEPTION` strings were already correct.
+--
+-- **`forces_recert` row written by this file**, moving the floor to 2026-09-22 15:54:23 and putting 9 of 9
+-- canons into `NOT satisfies_floor`. `0426` was applied 51 seconds later deliberately, so ONE resweep
+-- covers both.
+--
+-- **NOT YET VERIFIED, and this is what actually settles it:** that a NEW run books no service bay for the
+-- walkaround. §5's query must be scoped to the new `sim_run_id` — the 3,785 historical rows are not deleted,
+-- so an unscoped count still shows them and reads as a failed fix.
+

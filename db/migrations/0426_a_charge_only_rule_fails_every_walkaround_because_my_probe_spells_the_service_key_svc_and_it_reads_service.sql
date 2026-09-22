@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922155423
 -- migration-name:    a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service
 --
 -- 0426  **`HW.003.sensor_liveness` is `safety_critical`/`block` and fails 1,288 of 3,550 evaluations at
@@ -276,3 +276,27 @@ COMMIT;
 -- And re-run `ottoq_assert_task_completion_coverage()`: it should report **four** VACUOUS codes, with
 -- HW.006 the only one producing real verdicts. Report that as the honest coverage reading, not as a
 -- regression and not as an improvement.
+
+-- ══ APPLIED ═══════════════════════════════════════════════════════════════════
+--
+-- **Applied 2026-09-22 15:54:23 UTC (10:54 AM CT) as `20260922155423`**, 51 seconds after `0425`, in the
+-- same verified-clear window so ONE resweep covers both. All blocks ran: P1 confirmed 1,288 failures with
+-- 3,550 carrying `svc` and 0 carrying `service`, P2 confirmed the scope guard is present and reads
+-- `service`, the splice landed on an anchor matching exactly once, V1 confirmed added-not-renamed, and V2
+-- passed BOTH halves — abstains on `perimeter_walkaround` via the guard (reason contains N/A), still
+-- refuses a `charge` with 20-minute-stale SOC.
+--
+-- **VERIFIED independently of the migration's own asserts:** `ottoq_probe_task_completion` now carries
+-- `'svc'` once AND `'service'` once — the key was added, not renamed, so the stall resolution and every
+-- analysis query on this probe point still work.
+--
+-- **DEVIATION, declared:** as with `0424`/`0425`, whole-line comments and the psql directive were stripped
+-- for the inline channel; file and submission differ by exactly those 22 characters of
+-- `\set ON_ERROR_STOP on`. No other difference.
+--
+-- **NOT YET VERIFIED:** §5's windowed query. Expect `failed = 0` and
+-- `abstained_on_scope_guard = evals` on evaluations after the apply, and
+-- `ottoq_assert_task_completion_coverage()` to report **four** VACUOUS codes with HW.006 the only one
+-- producing real verdicts. **Report that as the honest coverage reading — neither a regression nor an
+-- improvement.** The lifetime column keeps the 1,288 (append-only), so the window is not optional.
+
