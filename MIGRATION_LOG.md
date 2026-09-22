@@ -2,6 +2,7 @@
 
 | Date | File | What changed | Why | Applied by | Verified |
 |---|---|---|---|---|---|
+| 2026-09-22 | `db/migrations/0432_the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps.sql` | `deploy_peak_fraction` becomes `agent_writable=false` (work-side demand; the promoter's gate 2 then refuses it); `public.ottoq_policy_set` refuses an agent actor on any non-writable dial after the `policy_write` probe; `public.ottoq_apply_ops_action` returns `refused`/`no_change` instead of `applied`; new `public.ottoq_agent_board_grounding(run, depot, clock)` concatenated into `ottoq_agent_board` as `grounding` behind dial `agent_board_grounding_enabled`; the board's `policy.deploy_peak_fraction` uses the dispatcher's scenario default; `ottoq_agentic_arm` arms grounding and 0350's asset depth; dial `agent_dial_reversal_dwell_min` (30). Ships with edge function `ottoq-orchestrator-agent` v19. | `db/checks/0352`: on `0682752c` the board said 0.90 while the dispatcher used busy_day's 0.45, the agent set 0.95 at tick 1 and was clamped to the 0.50 floor on 96 of 106 writes; 71%/68% of energy-dial changes reversed the last one; all 312 stored rows of the demand dial were agent-written; `ottoq_dial_clamp` reads `agent_writable` and ignores it; the ops path reported refusals as applied; 0350's asset block had one run-scoped row in its life. | Claude Code, MCP `apply_migration`, version `PENDING` | Dry run (rolled back) passed P1–P4 and V1, V2, V4, V5: agent refused on the demand with AI.001 logging the attempt, operator unaffected, ops `applied`/`no_change`/`refused` each as named, grounding 3,705 bytes in 48 ms, armed board 12,297 bytes. `forces_recert` FALSE. |
 | 2026-09-22 | `db/migrations/0431_a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged.sql` | `ottoq.ottoq_plan_dispatch_tick('deploy_plan')` holds a `staged_for_departure` vehicle whose open visit still has a pending `readiness_check`; dial `dispatch_holds_for_readiness_check` (default 1, not agent-writable); new instrument `public.ottoq_assert_departure_readiness(run)`. | `db/checks/0351`: 24.5% and 25.8% of post-visit departures left with the check never done — the check runs at call 1 of the world advance, staging at call 15, dispatch at call 27, so same-tick stage→deploy skipped it (23/23 had 0 ticks staged). | Claude Code, MCP `apply_migration`, version `20260922224038` | In-file P0–P4 + V1–V3 passed on apply: body md5 moved (`80ce2258…` → `2a676899…`), dial reads 1, `deploy_plan` executed against the newest twin run, instrument reads 24 on `0682752c` and 26 on `6a8a7029` (= 0351). `forces_recert` TRUE. Behavioural proof pending the first fresh run: instrument expected 0. |
 | 2026-09-16 | `db/migrations/0335_cp_sat_becomes_the_primary_agent_solver.sql` | Makes deterministic CP-SAT (`forward_lex`) the rank-0 assignment proposer, moves cuOpt to specialist/fallback ranks, and joins the agent chain to its async solver receipt in the live activity feed. | The product loop must be one traceable process: agent objective → deterministic solve → kernel disposition → dispatch, with bounded rejection feedback visible in OTTO-Twin. | Codex (registered via Supabase apply_migration) | Self-verifying preflight/assert blocks passed; production apply returned success. |
 | 2026-08-29 | `db/migrations/0073_provenance_says_what_it_is.sql` | SDR `data_source` now derived from `depots.feed_mode` instead of from whether a run id was passed; the twin labels its burn-model SoC `estimated`, not `oem_telemetry`. | Both fields reported something other than the truth; every live-path SDR was stamped `twin` regardless of feed. | Claude Code (founder-merged PR #98 authorized; first apply attempt 2026-08-27 was blocked by the harness permission layer, applied 2026-08-29 after founder granted full DB access; registered via MCP apply_migration) | Self-verifying DO block: anchors found exactly once, post-conditions RAISE on survival; success returned. |
@@ -102,10 +103,10 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0431 — GENERATED, not a log
+## Index, 0134–0432 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
-resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431 — which are indexed below as well as logged above; the log row is
+resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432 — which are indexed below as well as logged above; the log row is
 the one that says what was VERIFIED.
 Everything else from 0134 on went unlogged at the time. Rather than invent prose after the
 fact about work whose reasoning already lives in the migration files, this block is
@@ -415,7 +416,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0429](db/migrations/0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql) | `20260922171450` | yes — ledger | **Ten event types emit `p_entity_type := 'depot', p_entity_id := p_depot_id` and never pass |
 | [0430](db/migrations/0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql) | `20260922172845` | yes — ledger | **`ottoq_rule_evaluations.enforcement_taken='blocked'` is the shield's RECOMMENDATION, and at FIVE |
 | [0431](db/migrations/0431_a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged.sql) | `20260922224038` | yes — ledger | **The dispatcher holds a staged vehicle until its readiness check is done.** `db/checks/0351` |
+| [0432](db/migrations/0432_the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps.sql) | `PENDING` | no — pending | **The orchestrator agent stops setting the work side's demand, the catalog's `agent_writable` flag |
 
-294 migrations indexed.
+295 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
