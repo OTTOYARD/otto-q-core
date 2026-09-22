@@ -156,3 +156,48 @@ SELECT atom->>'concurrency' AS concurrency,
 -- interior_deep_clean 28) all COMPLETE and are NEVER probed -- 0422 spliced the probe into
 -- twin.ottoq_sim_advance_visit_atoms, which only completes the concurrent classes. HW.006 asks whether the
 -- vehicle is in the stall; the only completions it sees are the ones with no stall.
+
+-- ══ §6 THE REMEDY, DESIGNED FROM SOURCE — AND ITS ONE LOAD-BEARING CONSTRAINT ═
+--
+-- §5 said the remedy is "a probe at the stall-occupying completion paths". Having read them, the design is
+-- specific, and it has a constraint that would have produced a fresh false-alarm class if discovered after
+-- applying rather than before.
+--
+-- **SITE: `twin.ottoq_sim_stop_charge_session`.** It holds `v_session.stall_id` and `v_session.vehicle_id`
+-- from `ocpp_sessions` by construction, which is exactly the pair HW.006 needs. (`advance_visit_atoms`,
+-- where `0422` put the probe, mentions `stall_id` **nowhere** — measured — which is the mechanical reason
+-- the existing probe can never resolve one.)
+--
+-- **THE CONSTRAINT: the probe MUST sit BEFORE this statement**, which the function performs on the close
+-- path:
+--
+--     UPDATE stalls SET current_vehicle_id = NULL WHERE id = v_session.stall_id;
+--
+-- `ottoq_eval_hw_006_presence_verification` compares `stalls.current_vehicle_id` against the context's
+-- `vehicle_id` and fails on `IS DISTINCT FROM`. **Probe after the clear and it fails 100% of charge closes**
+-- — a brand-new `critical` false-alarm stream, the exact class `0426` and `0425` just removed 1,522 of.
+-- Placing it before the clear asks the meaningful question: *was the vehicle still recorded at the stall at
+-- the moment its charge completed?*
+--
+-- **AND THE SAME PROBE GIVES HW.003 ITS FIRST LEGITIMATE CASE.** HW.003 is charge-only by its scope guard
+-- (`0340`), so passing `'service' := 'charge'` here makes it evaluate **for real** rather than abstain —
+-- the one population it has jurisdiction over and has never been shown. So one probe moves two of the five
+-- codes from vacuous to meaningful, which is why this site is worth more than a generic bay-exit probe.
+--
+-- Context to pass, by the conventions each consumer actually reads:
+--     'stall_id'   := v_session.stall_id     -- HW.006's comparand
+--     'vehicle_id' := v_session.vehicle_id   -- HW.006's comparand
+--     'svc'        := 'charge'               -- the stall resolution and every analysis query (0418)
+--     'service'    := 'charge'               -- HW.003's scope guard (0340/0426)
+--     'now_ts'     := v_clock                -- the SIM clock the function already computed (0326 §1)
+--
+-- **NOT designed yet, and deliberately separate:** the `bay` exit (`exterior_wash`,
+-- `interior_deep_clean`) in `twin.ottoq_sim_advance_service_flow` — 30,510 characters with several exit
+-- paths, so it needs its own read rather than an assumption that one anchor covers them. And
+-- `readiness_check` (`gate`, 182 completions) is a third path again. **One site per migration**, per
+-- APPLYING.md's one-concern rule.
+--
+-- **Predicted effect, so it is falsifiable before it is built:** HW.006 produces its first real verdicts at
+-- `task_completion` — expected to PASS, because a vehicle should still be at its stall when charging ends —
+-- and HW.003 produces its first real charge verdicts. **A failure from either would be a genuine finding,
+-- not a wiring artefact**, which is the difference between this probe and the one `0422` installed.
