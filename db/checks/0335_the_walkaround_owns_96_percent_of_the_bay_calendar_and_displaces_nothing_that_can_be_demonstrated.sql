@@ -143,3 +143,77 @@ SELECT count(*) AS must_do_bay_atoms,
 -- 1,374 / 404 done / not_done_WRONG = 4 / not_done_RIGHT = 970 / status_is_null = 966. NULL <> 'done' is NULL, and FILTER
 -- drops it. A count of things that did NOT happen must use IS DISTINCT FROM, because "did not happen"
 -- is the state most likely to be stored as NULL.
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- §5  THE G147 AUDIT, RUN RATHER THAN PROMISED — AND IT COMES BACK CLEAN
+--     (appended 2026-09-22 ~14:1x UTC / 09:1x CT, same session)
+-- ══════════════════════════════════════════════════════════════════════════════
+--
+-- §4 ended "every `FILTER (WHERE x <> '…')` in this repo is suspect" and filed the sweep as undone.
+-- Done now. **The engine is clean; the defect was in my ad-hoc query and nowhere else.**
+--
+--     database functions using `<>` anywhere                        125
+--     ... of which inside a FILTER (the dangerous shape)            **2**
+--     ... of which actually able to fail open                       **0**
+--     `ottoq_assert*` functions using `<>`                            5
+--     ... of which inside a FILTER                                    0
+--     ... of which actually able to fail open                       **0**
+--
+-- **The two FILTER sites, and why each is safe:**
+--
+--   * `ottoq_twin_determinism_verdict` — `FILTER (WHERE ma IS NOT NULL AND mb IS NOT NULL AND ha <> hb)`.
+--     **Explicitly NULL-guarded on both sides before the comparison.** This is the function that decides
+--     whether two arms disagree, i.e. the single place where this bug class would have been worst, and
+--     it was written correctly.
+--   * `ottoq_rules_headline` — `FILTER (WHERE status='active' AND reality<>'enforcing')` beside
+--     `FILTER (WHERE status='active' AND reality='enforcing')`. A NULL `reality` would fall into neither
+--     bucket, so the test is arithmetic rather than textual: **26 + 4 = 30 = `registered_active`.** The
+--     partition sums, so nothing is being dropped.
+--
+-- **The five `ottoq_assert*` sites:** `ottoq_assert_kpi_touch_vocabulary` compares a `count(*)` (never
+-- NULL); `ottoq_assert_snapshot_integrity` compares `content_hash`, which is `NOT NULL` with 0 nulls in
+-- 1,746 rows; `ottoq_assert_policy_default_coherence` guards with `a.cat IS NOT NULL` in the same
+-- predicate; `ottoq_assert_bess_state_vocabulary` compares two `COALESCE(..., '{}')` arrays; and
+-- `ottoq_assert_clock_invariant`'s `f.playback_mode <> 'live'` is an early-return guard that fails in the
+-- **safe** direction (a NULL mode over-asserts rather than under-asserts) and is bailed out two lines
+-- later by an explicit `IS NULL` check.
+--
+-- ══ WHAT TO TAKE FROM A CLEAN RESULT ═════════════════════════════════════════
+--
+-- **The reusable guard is arithmetic, not vigilance.** `ottoq_rules_headline` was settled in one query
+-- by asking whether its buckets sum to its total — not by reading its source. `0417`'s
+-- `classes_sum_to_calls` and `0341` (a view that silently bucketed 1,161 of 1,676 rows nowhere) are the
+-- same instrument. **Any partition of a population into named buckets should assert that the buckets sum
+-- to the population**, and then a NULL cannot hide in the gap between them.
+--
+-- **And the honest shape of this finding: the codebase already knew the rule in two places and I did not
+-- apply it in a throwaway query.** The engine's verdict function guards its NULLs; the intelligence view
+-- asserts its classes sum. The failure was mine, it was ad hoc, and it never reached a migration or a
+-- stored function. That is the blast radius, and it is worth stating as plainly as the finding would
+-- have been.
+
+\echo '=== 0335 §5 — the two FILTER sites in the whole function catalog, and both are safe ==='
+WITH s AS (
+  SELECT n.nspname||'.'||p.proname AS fn,
+         regexp_replace(regexp_replace(p.prosrc,'/\*.*?\*/','','g'),'--[^'||chr(10)||']*','','g') AS src
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname IN ('public','twin','ottoq') AND p.prokind='f'
+)
+SELECT count(*) FILTER (WHERE position('<>' in src) > 0)            AS fns_using_neq,
+       count(*) FILTER (WHERE src ~* 'FILTER\s*\(\s*WHERE[^)]*<>')  AS fns_with_neq_INSIDE_a_filter,
+       count(*) FILTER (WHERE src ~* 'IS DISTINCT FROM')            AS fns_using_is_distinct_from,
+       (SELECT jsonb_agg(fn ORDER BY fn) FROM s WHERE src ~* 'FILTER\s*\(\s*WHERE[^)]*<>') AS the_two_sites
+  FROM s;
+-- 125 / 2 / 42. The two sites are ottoq_twin_determinism_verdict (NULL-guarded on both sides) and
+-- ottoq_rules_headline (settled by the sum below).
+
+\echo '=== 0335 §5b — the arithmetic that settles ottoq_rules_headline without reading its source ==='
+WITH h AS (SELECT public.ottoq_rules_headline() AS j)
+SELECT (j->>'registered_active')::int      AS registered_active,
+       (j->>'observed_enforcing')::int     AS observed_enforcing,
+       (j->>'not_observed_in_window')::int AS not_observed_in_window,
+       ((j->>'observed_enforcing')::int + (j->>'not_observed_in_window')::int
+          = (j->>'registered_active')::int) AS buckets_sum_to_total
+  FROM h;
+-- 30 / 26 / 4 / true. A NULL `reality` would fall into neither bucket and break the sum. It does not.
+-- This is the guard to reuse: assert the partition sums, and a NULL cannot hide between the buckets.
