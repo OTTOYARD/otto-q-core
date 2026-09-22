@@ -217,3 +217,89 @@ SELECT (j->>'registered_active')::int      AS registered_active,
   FROM h;
 -- 30 / 26 / 4 / true. A NULL `reality` would fall into neither bucket and break the sum. It does not.
 -- This is the guard to reuse: assert the partition sums, and a NULL cannot hide between the buckets.
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- §6  WHERE THE BOOKING COMES FROM — NARROWED, NOT YET CLOSED
+--     (appended same session; §3 step 1 named the fix and aimed it at the wrong target)
+-- ══════════════════════════════════════════════════════════════════════════════
+--
+-- **First, the time check, because `0334` was written an hour ago and this is exactly its case.** All
+-- **2,754** of these bookings were created on **2026-09-22**, across **39 runs** — nine on 08-30 and
+-- nothing between. **This is current behaviour, not a residue of the pre-`0383` era.** Had it been
+-- historical the whole of §1–§3 would describe a closed defect, and the partition is one query.
+--
+-- **Second, §3 step 1 aimed at the wrong place.** It said "stop booking a bay for a vehicle-side
+-- service", implying the service→stall bridge was mapping it. It is not: **`ottoq.ottoq_svc_to_stall_type
+-- ('perimeter_walkaround', <twin>)` returns NULL**, correctly, exactly as it does for `sensor_clean` and
+-- every other `lane='exterior'` service. The declared bridge already knows the walkaround needs no stall.
+--
+--     svc                    svc_to_stall_type   lane       lane_stalls
+--     --------------------  ------------------  ---------  -----------
+--     perimeter_walkaround        **NULL**       exterior      NULL
+--     sensor_clean                **NULL**       exterior      NULL
+--     interior_inspection         **NULL**       cabin         NULL
+--     exterior_wash               wash_bay       wash_bay         3
+--
+-- **So the booking is made by a path that does not consult the bridge.** `ottoq_record_enacted_booking`
+-- only *records* a stall someone else chose — it takes `p_stall_id` and derives `purpose` from the
+-- stall's own type (`service_bay` → `'service'`, which is why these read `purpose='service'`). Its five
+-- callers are `ottoq_decide_tick`, `ottoq_enact_space_assignment`, `ottoq_bind_unbooked_bay_occupants`,
+-- `ottoq_reconcile_displace_stale_claim` and `ottoq_fn_backup_enact_cuopt_batch`.
+--
+-- **And the one thing true of all five is the finding:** exactly one reads `service_cadence_policy` at
+-- all (`ottoq_decide_tick`), and **not one of the five reads `lane_stalls`** — the column `0383` set to
+-- NULL precisely to mark a service as performed at the vehicle. **The marker exists, the bridge honours
+-- it, and the path that actually picks the stall never looks at it.**
+--
+-- ══ WHAT IS ESTABLISHED AND WHAT IS NOT ══════════════════════════════════════
+--
+-- **Established:** the bookings are current; the declared bridge returns NULL for this service; no
+-- booking-path function reads `lane_stalls`; the `purpose='service'` label is derived from the stall
+-- type after the fact rather than asserted before it.
+--
+-- **Not established:** which of the five callers writes these specific rows, and whether the vehicle is
+-- genuinely being sent to a bay (a real routing error) or merely having a bay reserved against it (a
+-- bookkeeping error). **Those are different defects with different fixes** and this check does not
+-- separate them — `0333` §3 found the stalls hold no vehicle, which points at bookkeeping, but that was
+-- measured at one instant and is not a test of what happens during the atom.
+--
+-- **The next query, which is one join:** attribute the bookings by `source` on
+-- `ottoq_stall_bookings`, then read that caller. Deliberately not run here, because a fix is
+-- `forces_recert` (`bookings` is one of the fourteen atoms) and cannot land until the current sweep
+-- completes anyway — so the honest state to leave this in is narrowed and labelled, not half-fixed.
+
+\echo '=== 0335 §6 — the bookings are TODAY, not a pre-0383 residue ==='
+SELECT date_trunc('day', b.booked_at) AS booked_day,
+       count(*) AS bookings, count(DISTINCT b.sim_run_id) AS runs,
+       round(sum(EXTRACT(epoch FROM (upper(b.during)-lower(b.during)))/60.0)) AS bay_minutes
+  FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id=b.stall_id
+ WHERE s.depot_id='11111111-1111-1111-1111-111111111111' AND s.stall_type='service_bay'
+   AND b.need_atom='perimeter_walkaround'
+ GROUP BY 1 ORDER BY 1 DESC;
+-- 2,754 on 2026-09-22 across 39 runs; 9 on 08-30. Current behaviour.
+
+\echo '=== 0335 §6b — the declared bridge already returns NULL for it ==='
+SELECT p.svc,
+       ottoq.ottoq_svc_to_stall_type(p.svc, '11111111-1111-1111-1111-111111111111') AS maps_to_stall_type,
+       c.lane, c.lane_stalls
+  FROM (VALUES ('perimeter_walkaround'),('sensor_clean'),('interior_inspection'),('exterior_wash')) AS p(svc)
+  LEFT JOIN public.service_cadence_policy c ON c.svc = p.svc;
+-- NULL for every lane='exterior'/'cabin' service, wash_bay for the one that needs a bay. The bridge is
+-- correct; the booking path does not use it.
+
+\echo '=== 0335 §6c — no booking-path function reads lane_stalls, the marker 0383 set ==='
+WITH s AS (
+  SELECT n.nspname||'.'||p.proname AS fn,
+         regexp_replace(regexp_replace(p.prosrc,'/\*.*?\*/','','g'),'--[^'||chr(10)||']*','','g') AS src
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname IN ('public','twin','ottoq') AND p.prokind='f'
+)
+SELECT fn,
+       (src ILIKE '%service_cadence_policy%') AS reads_cadence_policy,
+       (src ILIKE '%lane_stalls%')            AS reads_lane_stalls,
+       (src ILIKE '%svc_to_stall_type%')      AS uses_the_declared_bridge
+  FROM s
+ WHERE src ILIKE '%ottoq_record_enacted_booking%' AND fn <> 'ottoq.ottoq_record_enacted_booking'
+ ORDER BY fn;
+-- One of the five reads the cadence policy; NONE reads lane_stalls; none uses the bridge. The marker
+-- exists, the bridge honours it, and the path that picks the stall never looks at it.
