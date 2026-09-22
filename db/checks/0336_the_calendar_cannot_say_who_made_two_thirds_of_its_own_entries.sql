@@ -135,3 +135,78 @@ SELECT 'ottoq_model_call_ledger (0340)',
                      /NULLIF(count(*),0),1) FROM public.ottoq_model_call_ledger);
 -- The ledger knows its provider and its source kind on every row, which is why 0334 could partition a
 -- three-day outage out of a lifetime average in one query. The calendar cannot.
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- §6  THE SAME SHAPE ON A SECOND TABLE: G121 IS UNOBSERVABLE AFTER THE FACT
+--     (appended same session, while the recert sweep finished its last column)
+-- ══════════════════════════════════════════════════════════════════════════════
+--
+-- **G121 is defined by a DISAGREEMENT between three fields** (`0326` §2): a stall carrying
+-- `status='available'` **together with** a live `current_vehicle_id` and `reserved_by`. Three DCFC
+-- stalls — the depot's scarcest resource — held by nobody.
+--
+-- **Two observations, and the second is the point.**
+--
+-- **(a) It is not present right now, and that fact is worth nothing.** All 158 twin-depot stalls read
+-- `available` with both pointers NULL. That is the clean between-runs state: a determinism pair had just
+-- reset the fleet. **Checking a live-run defect on an idle depot is not a test**, it is the inverse of
+-- the error `0334` caught this morning — there I quoted a fixed outage as current, here I could quote an
+-- idle depot as fixed. Same failure, opposite sign: not checking what state the measurement was taken in.
+--
+-- **(b) And it cannot be checked historically either, because the event stream does not carry the
+-- fields that define it.** `stall.state_changed` has **83,456 rows**, and every one has exactly one
+-- payload key:
+--
+--     payload_keys        ["diff"]
+--     diff contents       {"status": {"from": "occupied", "to": "available"}}
+--     new_has_vehicle_ptr  (no `new` block at all)
+--     new_has_reserved_by  (no `new` block at all)
+--
+-- **The stall trigger records the status transition and neither pointer.** So the one combination that
+-- defines G121 is structurally invisible in the archive. Contrast `vehicle.state_changed`, whose diff
+-- carries SoC, `target_soc`, `config` and `last_state_change` — `0329` reconstructed a whole
+-- contamination from it. The vehicle trigger diffs broadly; the stall trigger diffs one column.
+--
+-- **That is why G121 has stayed open.** Every look either lands on a live run and catches it (as `0326`
+-- did) or lands between runs and sees nothing — and there is no ledger to consult in between. It is not
+-- a hard defect to fix; it is a defect nobody can *watch*.
+--
+-- ══ WHAT THIS ADDS TO §4's FIX ORDER ═════════════════════════════════════════
+--
+-- Same family as this check's headline, one table over: **`ottoq_stall_bookings` cannot say WHO, and
+-- `stall.state_changed` cannot say WHAT ELSE WAS TRUE.** Both are questions the table was never asked to
+-- answer and both block a live defect.
+--
+--   * **Add `current_vehicle_id` and `reserved_by` to the stall trigger's diff.** Cheap, and it turns
+--     G121 from "catch it live or not at all" into a countable rate — the same move `0340` made for
+--     model calls, which is what let `0334` partition an outage this morning.
+--   * **Then G121's fix can be verified**, which today it cannot: there is no before to compare an after
+--     against.
+--
+-- **`forces_recert` TRUE** — `events` is one of the fourteen atoms and this changes what a cert arm
+-- writes. Sequence it with the `p_source` change in §4; they are one theme and one sweep.
+
+\echo '=== 0336 §6a — G121 absent right now, on an IDLE depot. This is not a test ==='
+SELECT s.stall_type, s.status,
+       (s.current_vehicle_id IS NOT NULL) AS has_vehicle_ptr,
+       (s.reserved_by IS NOT NULL)        AS has_reserved_by,
+       count(*) AS stalls
+  FROM public.stalls s
+ WHERE s.depot_id='11111111-1111-1111-1111-111111111111'
+ GROUP BY 1,2,3,4
+ ORDER BY (s.status='available' AND s.current_vehicle_id IS NOT NULL) DESC, stalls DESC;
+-- All 158 available, both pointers NULL: the between-runs state after a pair's fleet reset. An idle
+-- depot cannot falsify a live-run defect, and reading it as "fixed" is 0334's error with the sign
+-- reversed.
+
+\echo '=== 0336 §6b — and the archive cannot answer either: the diff carries only status ==='
+SELECT (SELECT jsonb_agg(DISTINCT k) FROM jsonb_object_keys(e.payload) k) AS payload_keys,
+       (e.payload->'diff' ? 'status')             AS diff_has_status,
+       (e.payload->'diff' ? 'current_vehicle_id') AS diff_has_vehicle_ptr,
+       (e.payload->'diff' ? 'reserved_by')        AS diff_has_reserved_by,
+       count(*) AS n
+  FROM public.ottoq_events e
+ WHERE e.event_type='stall.state_changed'
+ GROUP BY 1,2,3,4 ORDER BY n DESC;
+-- 83,456 rows, one payload key, status only. The combination that DEFINES G121 is structurally absent
+-- from the archive, so the defect can be caught live or not at all -- which is why it has stayed open.
