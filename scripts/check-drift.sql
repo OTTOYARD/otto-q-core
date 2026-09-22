@@ -521,7 +521,7 @@ repo_manifest(version, name, file) AS (
     ('20260922150552'::text, 'a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass'::text, '0424_a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass.sql'::text),
     ('20260922155332'::text, 'the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner'::text, '0425_the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner.sql'::text),
     ('20260922155423'::text, 'a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service'::text, '0426_a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service.sql'::text),
-    ('PENDING'::text, 'the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends'::text, '0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql'::text)
+    ('20260922163008'::text, 'the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends'::text, '0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

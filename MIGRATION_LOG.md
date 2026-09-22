@@ -409,7 +409,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0424](db/migrations/0424_a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass.sql) | `20260922150552` | yes — ledger | **`HW.002.charger_state_precondition` is `critical`/`block` and CANNOT PASS on the twin. Across |
 | [0425](db/migrations/0425_the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner.sql) | `20260922155332` | yes — ledger | **`perimeter_walkaround` is performed AT THE VEHICLE and holds 3,257 bookings on the twin depot's |
 | [0426](db/migrations/0426_a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service.sql) | `20260922155423` | yes — ledger | **`HW.003.sensor_liveness` is `safety_critical`/`block` and fails 1,288 of 3,550 evaluations at |
-| [0427](db/migrations/0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql) | `PENDING` | no — pending | **`HW.006.physical_presence_verification` asks whether the vehicle is physically in the stall, and |
+| [0427](db/migrations/0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql) | `20260922163008` | yes — ledger | **`HW.006.physical_presence_verification` asks whether the vehicle is physically in the stall, and |
 
 290 migrations indexed.
 

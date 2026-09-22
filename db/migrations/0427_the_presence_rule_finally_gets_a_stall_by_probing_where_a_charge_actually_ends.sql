@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922163008
 -- migration-name:    the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends
 --
 -- 0427  **`HW.006.physical_presence_verification` asks whether the vehicle is physically in the stall, and
@@ -329,3 +329,31 @@ COMMIT;
 -- And re-run `ottoq_assert_task_completion_coverage()`: HW.006 and HW.003 should move off VACUOUS. If they
 -- do not, the probe is not reaching this path — check whether `p_sim_run_id` is NULL on the close, which is
 -- the one input this site does not own.
+--
+-- ══ APPLIED 20260922163008 (2026-09-22 16:30:08 UTC / 11:30 AM CT) ═══════════
+--
+-- All three preconditions passed on a clear window — **0 runs running/paused and 0 other active backends**
+-- (`pg_stat_activity`, which G141 establishes is the only honest witness). P1 read **2,288** HW.006
+-- evaluations at `task_completion` since `0426`, **zero** carrying a `stall_id`; P2 found the probe still
+-- resolving by `need_atom = p_svc`, still emitting `'service'`, and **6,059** charge bookings on the twin
+-- depot for it to find. The anchor matched **exactly once**; the byte delta equalled the insert exactly.
+--
+-- **V1 passed on the number that matters: the probe sits at 7,938 and the pointer clear at 8,419.** The
+-- ordering this whole file is about is now asserted in the function permanently, not just at apply time.
+-- V2 passed — the rewritten function returns early on an unknown session without raising.
+--
+-- **DEVIATION, declared, identical to `0424`/`0425`/`0426`:** whole-line comments and `\set ON_ERROR_STOP on`
+-- were stripped for the inline channel. File and submission differ by exactly those characters.
+--
+-- **AND ONE PRECONDITION THIS FILE DID NOT CARRY, checked by hand before applying and worth recording as
+-- the gap it is.** `V2` calls the function with an unknown session, which returns early — so V2 can prove
+-- the body *parses* and cannot prove any name inside it *resolves*. PL/pgSQL does not resolve variable
+-- names at `CREATE FUNCTION`, so a typo'd `v_clock` or `v_session.started_at` would have compiled, passed
+-- V1 and V2, and raised on the first real charge close inside the world advance — caught only by the
+-- `EXCEPTION WHEN OTHERS` this file adds, i.e. silently, as a WARNING nobody reads. I asserted the four
+-- referenced names against `prosrc` separately (`v_clock`, `p_sim_run_id`, `v_session.vehicle_id`,
+-- `v_session.started_at`, `v_session.stall_id` — all present) and the probe's signature against
+-- `pg_get_function_arguments`. **THE GENERAL RULE: a smoke call that returns early proves syntax, not
+-- resolution. If the splice references names, assert the names.**
+--
+-- **NOT YET VERIFIED:** §6's windowed query, which needs a fresh run. `with_stall` must be non-zero.
