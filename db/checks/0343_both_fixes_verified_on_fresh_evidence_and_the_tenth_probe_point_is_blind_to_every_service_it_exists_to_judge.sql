@@ -100,8 +100,16 @@
 --
 -- **The remedy is a probe at the stall-occupying completion paths** — the charge-session close and the
 -- service-flow bay exit — where `stall_id` is in hand by construction and HW.006's question is meaningful.
--- That is a `forces_recert` tick-path change and is NOT attempted here; `0418`'s probe function already
--- takes `p_stall_id`, so it is a wiring job rather than a new instrument.
+-- That is a `forces_recert` tick-path change and is NOT attempted here.
+--
+-- **CORRECTION 2026-09-22, caught by `db/migrations/0427`'s own P2 before anything ran:** this section and
+-- §6 below both said *"`0418`'s probe already takes `p_stall_id`, so it is a wiring job rather than a new
+-- instrument."* **It has no such parameter** — the signature ends at `p_ends_at` and the probe RESOLVES its
+-- stall internally from `ottoq_stall_bookings` on `b.need_atom = p_svc`. **The conclusion survives and is
+-- simpler than claimed:** a charge HAS such a booking (5,575 on the twin depot), so calling the probe with
+-- `p_svc := 'charge'` resolves a stall through the existing mechanism. What `0422`'s site lacks is not the
+-- ability to be TOLD a stall — it is that **non-stall atoms have no booking for the resolution to find.**
+-- Same finding, correctly stated. And note it was a precondition, not a review, that caught it.
 --
 -- **And note the shape, because it is the counterpart of `0340`'s.** `0340` was a rule that fired where it
 -- had no jurisdiction. This is a rule with jurisdiction that never sees a case. Both look identical in a
@@ -190,6 +198,10 @@ SELECT atom->>'concurrency' AS concurrency,
 --     'svc'        := 'charge'               -- the stall resolution and every analysis query (0418)
 --     'service'    := 'charge'               -- HW.003's scope guard (0340/0426)
 --     'now_ts'     := v_clock                -- the SIM clock the function already computed (0326 §1)
+--
+-- **(The `p_stall_id` line in the context list above is superseded by the correction in §5: one argument,
+-- `p_svc := 'charge'`, does all of it — it resolves the stall AND, since `0426` made the probe emit both
+-- `svc` and `service`, satisfies HW.003's scope guard.)**
 --
 -- **NOT designed yet, and deliberately separate:** the `bay` exit (`exterior_wash`,
 -- `interior_deep_clean`) in `twin.ottoq_sim_advance_service_flow` — 30,510 characters with several exit
