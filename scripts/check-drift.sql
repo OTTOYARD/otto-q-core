@@ -507,7 +507,8 @@ repo_manifest(version, name, file) AS (
     ('20260921204952'::text, 'the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads'::text, '0410_the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads.sql'::text),
     ('20260921210548'::text, 'the_purge_hardcodes_public_so_the_two_twin_tables_it_was_meant_to_clear_would_have_shut_the_start_door'::text, '0411_the_purge_hardcodes_public_so_the_two_twin_tables_it_was_meant_to_clear_would_have_shut_the_start_door.sql'::text),
     ('20260922042212'::text, 'the_state_machine_never_learned_that_a_vehicle_can_break_while_parked'::text, '0412_the_state_machine_never_learned_that_a_vehicle_can_break_while_parked.sql'::text),
-    ('20260922043506'::text, 'a_fault_hazard_denominated_in_scheduler_ticks_is_not_a_fault_rate'::text, '0413_a_fault_hazard_denominated_in_scheduler_ticks_is_not_a_fault_rate.sql'::text)
+    ('20260922043506'::text, 'a_fault_hazard_denominated_in_scheduler_ticks_is_not_a_fault_rate'::text, '0413_a_fault_hazard_denominated_in_scheduler_ticks_is_not_a_fault_rate.sql'::text),
+    ('20260922050100'::text, 'the_agent_envelope_was_advertised_and_judged_and_enforced_by_nobody'::text, '0414_the_agent_envelope_was_advertised_and_judged_and_enforced_by_nobody.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
