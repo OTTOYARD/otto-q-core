@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0418 — GENERATED, not a log
+## Index, 0134–0419 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -401,7 +401,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0416](db/migrations/0416_the_drift_cap_was_a_fraction_in_a_percent_column_so_it_froze_the_dial_it_was_meant_to_bound.sql) | `20260922065233` | yes — ledger | **`agent_max_drift_pct = 0.30` is a FRACTION stored in a column whose every sibling is a |
 | [0417](db/migrations/0417_the_agents_advice_carries_the_tick_it_was_computed_from_and_the_tick_it_was_applied_at_and_nobody_had_ever_subtracted_them.sql) | `20260922070445` | yes — ledger | **G62, step 2 of the build `0323` §5 specified: MEASURE advice staleness, enforce nothing.** |
 | [0418](db/migrations/0418_the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired.sql) | `PENDING` | no — pending | **`task_completion` is declared by five rules and probed by nothing, and it is the ONLY one of |
+| [0419](db/migrations/0419_my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts.sql) | `PENDING` | no — pending | **`0418` shipped `ottoq_assert_task_completion_coverage()` two hours ago to stop abstentions |
 
-281 migrations indexed.
+282 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
