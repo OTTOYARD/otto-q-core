@@ -103,7 +103,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0432 — GENERATED, not a log
+## Index, 0134–0434 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432 — which are indexed below as well as logged above; the log row is
@@ -417,7 +417,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0430](db/migrations/0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql) | `20260922172845` | yes — ledger | **`ottoq_rule_evaluations.enforcement_taken='blocked'` is the shield's RECOMMENDATION, and at FIVE |
 | [0431](db/migrations/0431_a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged.sql) | `20260922224038` | yes — ledger | **The dispatcher holds a staged vehicle until its readiness check is done.** `db/checks/0351` |
 | [0432](db/migrations/0432_the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps.sql) | `20260922231738` | yes — ledger | **The orchestrator agent stops setting the work side's demand, the catalog's `agent_writable` flag |
+| [0433](db/migrations/0433_a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery.sql) | `PENDING` | no — pending | **A demand-response call asks the depot to shed 50–400 kW. The engine read that number as the depot's |
+| [0434](db/migrations/0434_three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double.sql) | `PENDING` | no — pending | **The work side's deploy demand is read by three engine functions, which resolved its default three |
 
-295 migrations indexed.
+297 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
