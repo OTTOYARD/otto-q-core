@@ -1,8 +1,12 @@
--- 0322  **Chase asked what cuOpt's true role and edge actually are. Measured, and the answer is not
---       the one either the brief or `D001` predicts: cuOpt was formally RETIRED from the decide path
---       on 2026-09-03 and is live today as the CP-SAT chain's declared fallback engine — and on
---       every rate that can be measured it currently BEATS the CP-SAT service that was supposed to
---       replace it.**
+-- 0322  **Chase asked what cuOpt's true role and edge actually are. ANSWER, from §10, which is the
+--       section to read first: cuOpt was formally RETIRED from the decide path on 2026-09-03 and is
+--       live today as the CP-SAT chain's declared fallback engine — and its entire recent life WAS
+--       CP-SAT's outage. It absorbed 2,735 failed handoffs across four days of infrastructure
+--       failure, answered 98.4% of them, and has not been called ONCE since CP-SAT became reachable
+--       at 07:41 on 2026-09-21. Its edge is availability, not optimization.**
+--
+--       **This file was originally titled "…and it outperforms the solver that replaced it". §10
+--       retracts that**: the comparison aggregated over the period in which CP-SAT was broken.
 --
 --       No migration here. This is the diagnosis the decision needs. Two numbers are retracted:
 --       `0250`'s "1 enacted / 7 refused / 11 superseded" as a single-run figure, and this file's own
@@ -242,6 +246,51 @@
 -- and §8 itself: **check what the denominator and the status word actually mean before recommending
 -- a build against them.**
 --
+
+-- ══ §10 THE ANSWER TO CHASE'S QUESTION, AND IT RETRACTS THIS FILE'S OWN TITLE ══
+--
+-- **"cuOpt outperforms the solver that replaced it" is an artifact of aggregating over CP-SAT's
+-- outages, and the title of this file (before it was renamed) asserted it as a present-tense fact.**
+-- `0415` §3 establishes the regime split from the fallback reasons' own first/last timestamps: CP-SAT
+-- was unreachable or misdeployed for most of its recorded life, in four episodes that each stopped
+-- when they were fixed —
+--
+--     "CP-SAT service is not configured"                1,502   09-19 17:12 -> 09-20 05:16
+--     "THE RUNNING IMAGE PREDATES CP-SAT"                 835   09-20 19:46 -> 09-21 02:31
+--     "Signal timed out."                                 206   09-20 19:32 -> 09-21 07:41
+--     "invalid proposer envelope"                         191   09-20 15:46 -> 09-20 19:45
+--
+-- **86% of the 2,735 fallbacks were configuration or deployment failures, not solver failures**, the
+-- last ending as `0398` gave the box an Elastic IP at 07:38 on 09-21 and verified `/health` lists
+-- `cp_sat_forward_lex`.
+--
+-- **Measured on the CURRENT regime only — everything from 2026-09-21 07:41 onward:**
+--
+--     cpsat_service    444 real calls, avg 88 ms, last 09-22 02:03
+--     nvidia_cuopt       0 calls
+--
+-- **cuOpt has not been called once since CP-SAT became reachable.** Its last call is 2026-09-21
+-- 07:32 — NINE MINUTES before the fix. So the whole picture resolves, and it is a better story than
+-- either the brief or `D001` tells:
+--
+--   **cuOpt's entire recent life WAS CP-SAT's outage.** It is wired as the fallback, it absorbed 2,735
+--   failed handoffs across four days of infrastructure failure, it answered 98.4% of them, and the
+--   moment the primary came back it went quiet. **Its edge is availability, not optimization** — and on
+--   that measure it performed exactly as a fallback should.
+--
+-- So the live question is not cuOpt's role at all. It is **why CP-SAT declines**, and `0415` §1(c)
+-- answers most of that too: **328 of its 444 current-regime calls (74%) were handed an EMPTY candidate
+-- set** and correctly returned nothing in ~21 ms. On the 112 calls that carried candidates it produced
+-- a usable proposal 20 times — **17.9%, not 4.1%**, and in the same band as cuOpt's 19.8% per entity.
+--
+-- **What this file got right and wrong, so the next reader can weight it.** RIGHT: cuOpt is not
+-- retired and D001 is stale (§5); the per-entity denominator (§8); the self-refresh retraction (§9);
+-- the endpoint predicate (§1). WRONG, and retracted here: the present-tense performance comparison in
+-- the old title and §2, which compared a working solver against a broken one without noticing the
+-- period contained the breakage. **The general lesson, which is the fourth instance tonight: an
+-- aggregate over a window containing a fixed outage describes a system that no longer exists.** Take a
+-- cutover, always.
+--
 -- ══ §7 WHAT MAY AND MAY NOT BE SAID ══════════════════════════════════════════
 --
 -- SAY: *"cuOpt reached the NVIDIA endpoint 1,159 times, answered 1,141 of them for 5,063 proposals
@@ -252,6 +301,10 @@
 -- (98.4% answer rate); "CP-SAT replaced cuOpt" (it answers 4.1% of its calls and enacts 0.9% of its
 -- proposals); "cpsat_service made 3,638 calls" (487); "4,248 Nemotron calls" (zero carry an
 -- endpoint); or any enactment rate stated as a performance comparison (§6c).
+--
+-- **AND DO NOT SAY cuOpt outperforms CP-SAT** (§10) — that compared a working solver with a broken
+-- one. In the current regime CP-SAT is the only external solver being called at all, and its usable-
+-- answer rate on frames that carry candidates is 17.9%, not the 4.1% this file's §2 implies.
 --
 -- **AND DO NOT SAY the re-proposal churn is a defect** — §9 retracts that: 97.2% of supersessions
 -- are a proposer superseding its own stale plan, which is correct behaviour. The only live question
