@@ -509,7 +509,8 @@ repo_manifest(version, name, file) AS (
     ('20260922042212'::text, 'the_state_machine_never_learned_that_a_vehicle_can_break_while_parked'::text, '0412_the_state_machine_never_learned_that_a_vehicle_can_break_while_parked.sql'::text),
     ('20260922043506'::text, 'a_fault_hazard_denominated_in_scheduler_ticks_is_not_a_fault_rate'::text, '0413_a_fault_hazard_denominated_in_scheduler_ticks_is_not_a_fault_rate.sql'::text),
     ('20260922050100'::text, 'the_agent_envelope_was_advertised_and_judged_and_enforced_by_nobody'::text, '0414_the_agent_envelope_was_advertised_and_judged_and_enforced_by_nobody.sql'::text),
-    ('20260922053000'::text, 'the_ledger_called_an_empty_frame_an_abstention_and_a_decision_a_call'::text, '0415_the_ledger_called_an_empty_frame_an_abstention_and_a_decision_a_call.sql'::text)
+    ('20260922053000'::text, 'the_ledger_called_an_empty_frame_an_abstention_and_a_decision_a_call'::text, '0415_the_ledger_called_an_empty_frame_an_abstention_and_a_decision_a_call.sql'::text),
+    ('20260922065233'::text, 'the_drift_cap_was_a_fraction_in_a_percent_column_so_it_froze_the_dial_it_was_meant_to_bound'::text, '0416_the_drift_cap_was_a_fraction_in_a_percent_column_so_it_froze_the_dial_it_was_meant_to_bound.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
