@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922070445
 -- migration-name:    the_agents_advice_carries_the_tick_it_was_computed_from_and_the_tick_it_was_applied_at_and_nobody_had_ever_subtracted_them
 --
 -- 0417  **G62, step 2 of the build `0323` §5 specified: MEASURE advice staleness, enforce nothing.**
@@ -110,6 +110,29 @@
 -- The summary is grouped by `source_kind`, deliberately: the 1,120 `backfill` rows predate the handoff
 -- detail and would silently dilute every rate. Pooling them would be `0322` §10's aggregate-spanning-an-
 -- outage mistake.
+--
+-- ══ §5 APPLIED 20260922070445, AND THE GROUPING PAID FOR ITSELF IMMEDIATELY ═════
+--
+-- First read of the summary view:
+--
+--     source_kind  calls  applied  fell_back  no_handoff  mean_stale  p95  max  changed  modal-wrong  mean_lat
+--     -----------  -----  -------  ---------  ----------  ----------  ---  ---  -------  -----------  --------
+--     live         3,383      640      2,735           0        4.70   17   59    1/638        33.07%  19,723ms
+--     backfill     1,120        0          0       1,120           -    -    -        -             -  30,394ms
+--
+-- `classes_sum_to_calls` is true in both groups.
+--
+-- **Every one of the 1,120 backfill rows is `no_handoff`** — they predate the handoff detail entirely, so
+-- they can contribute no staleness at all — **and their mean latency is 30,394 ms against live's 19,723.**
+-- That 30,394 is the exact figure CLAUDE.md Part 3 quotes for G62. So pooling the two source kinds would
+-- have raised the live mean by 2.6 seconds and attributed a dead era's latency to the running engine,
+-- which is precisely the dilution §4 grouped to avoid. **The guard was written on principle and turned
+-- out to be load-bearing on first read.**
+--
+-- **And the numbers in §1-§3 have already moved, which is the point of the view.** They were measured
+-- minutes before this migration applied; the live run kept ticking, so 629 applied became 640 and
+-- 33.65% became 33.07%. Neither the shape nor any conclusion changes. **Re-derive from the view; the
+-- header numbers are a moment, per CLAUDE.md's "cite the run, never the table."**
 
 BEGIN;
 
