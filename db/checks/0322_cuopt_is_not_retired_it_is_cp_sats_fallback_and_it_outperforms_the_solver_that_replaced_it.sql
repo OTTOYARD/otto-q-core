@@ -8,11 +8,13 @@
 --       `0250`'s "1 enacted / 7 refused / 11 superseded" as a single-run figure, and this file's own
 --       §6b hypothesis, which §8 falsifies with the query §6b asked for.
 --
---       **THE ACTIONABLE DEFECT, and it is neither solver's competence:** BOTH external proposers
---       re-propose for the same entity without de-duplicating against their own in-flight proposal —
---       CP-SAT **10.49** times per entity, cuOpt **3.62**, against the local path's 1.71. That churn
---       is what produces the 83.6% supersession rate AND deflates every per-proposal rate quoted
---       about them. Fixing de-duplication is a bigger win than any dial in this file. See §8.
+--       **THE MEASUREMENT CORRECTION THAT MATTERS:** both external proposers re-propose for the same
+--       entity — CP-SAT **10.49** times, cuOpt **3.62**, against the local path's 1.71 — which
+--       deflates every per-proposal rate quoted about them. Per ENTITY the win rates are greedy
+--       39.1%, cuOpt 19.8%, CP-SAT 9.1%. **§8 called that churn an actionable defect and §9 RETRACTS
+--       it:** 97.2% of the supersessions are the proposer superseding its OWN stale proposal, which
+--       is the refresh cadence working as designed, not waste. Read §8 for the denominator and §9
+--       for why there is no de-duplication bug to fix.
 --
 --       **Measured 2026-09-22 04:40:02 UTC (2026-09-21 11:40 PM CT), AND A RUN WAS LIVE WHILE
 --       MEASURING** — `greedy_constrained` went from 16,034 to 16,246 proposals between two queries
@@ -85,7 +87,8 @@
 -- (83.6%), not refused (9.7%)**. A refusal means the shield judged the proposal infeasible. A
 -- supersession means the proposal was fine and arrived too late to matter — 570
 -- `newer_proposal_same_entity` plus 425 `entity_decided_by_other_proposal`. **cuOpt is not being
--- rejected on quality. It is being outrun.**
+-- rejected on quality** — and §9 establishes that it is not being outrun either: 97.2% of that 570 is
+-- cuOpt superseding its OWN earlier proposal, i.e. its refresh cadence, not a rival arriving first.
 --
 -- ══ §4 THE PRECEDENCE TABLE DOES NOT GOVERN THE PROPOSER THAT WINS ════════════
 --
@@ -205,6 +208,40 @@
 -- that narrow slice is the right slice is a design question nobody has written down, and it is a far
 -- better question than "is cuOpt worth keeping."
 --
+-- ══ §9 §8's "ACTIONABLE DEFECT" IS RETRACTED. THE CHURN IS REFRESH, NOT WASTE,
+--       AND THERE IS NO DE-DUPLICATION BUG TO FIX ══════════════════════════════
+--
+-- §8 called the re-proposal churn "the actionable defect" and recommended de-duplicating against an
+-- in-flight proposal. **I checked before building it, and the check kills the recommendation.**
+--
+-- Of the 570 cuOpt proposals superseded as `newer_proposal_same_entity`, **554 — 97.2% — have a
+-- LATER cuOpt proposal for the same (run, entity).** They were superseded by cuOpt itself.
+--
+-- And that is `ottoq_submit_external_proposal` working exactly as designed: on a new proposal for the
+-- same `(run, action_context, entity)` it marks the prior `pending` row
+-- `superseded/newer_proposal_same_entity`. **A proposer that re-solves each beat and submits an
+-- updated assignment SHOULD supersede its own stale one — the newest plan is the best plan it has.**
+-- Superseding yourself is not losing a contest; it is the refresh cadence showing up in a status
+-- column.
+--
+-- So: **no de-duplication is warranted, and building it would have made the system worse** by pinning
+-- a stale plan in place while a better one was discarded. §8's per-entity denominator STANDS — that is
+-- the measurement correction and it is right. What does not stand is reading the churn as a defect.
+--
+-- **What remains, and it is an efficiency question rather than a correctness one:** cuOpt placed
+-- 1,159 network calls to cover 329 entity-runs, and CP-SAT 10.49 proposals per entity. If a refresh
+-- adds nothing when the frame has not changed, the saving is in CALL VOLUME (latency, spend, and
+-- NVIDIA quota), not in decision quality. That is a cadence-tuning question for whoever owns the
+-- refresh beat, and it needs a "did the frame actually change" test that does not exist yet. It is
+-- NOT the shape §8 described.
+--
+-- **The general lesson, which is the reason this section exists rather than a silent edit:** a status
+-- column that reads like failure (`superseded`, 83.6%) can be the mechanism functioning. Three
+-- sections of this file were needed to get from "cuOpt is being rejected" to "cuOpt is being outrun"
+-- to "cuOpt is refreshing itself," and only the last one is true. Same discipline as `0250`, `0290`
+-- and §8 itself: **check what the denominator and the status word actually mean before recommending
+-- a build against them.**
+--
 -- ══ §7 WHAT MAY AND MAY NOT BE SAID ══════════════════════════════════════════
 --
 -- SAY: *"cuOpt reached the NVIDIA endpoint 1,159 times, answered 1,141 of them for 5,063 proposals
@@ -215,6 +252,10 @@
 -- (98.4% answer rate); "CP-SAT replaced cuOpt" (it answers 4.1% of its calls and enacts 0.9% of its
 -- proposals); "cpsat_service made 3,638 calls" (487); "4,248 Nemotron calls" (zero carry an
 -- endpoint); or any enactment rate stated as a performance comparison (§6c).
+--
+-- **AND DO NOT SAY the re-proposal churn is a defect** — §9 retracts that: 97.2% of supersessions
+-- are a proposer superseding its own stale plan, which is correct behaviour. The only live question
+-- there is call-volume efficiency, not decision quality.
 --
 -- **AND PREFER THE PER-ENTITY RATE TO THE PER-PROPOSAL RATE EVERY TIME (§8).** Per proposal, cuOpt
 -- reads 6.2% and CP-SAT 0.9%; per entity they read 19.8% and 9.1%. The per-proposal figures are
@@ -295,3 +336,24 @@ SELECT 'D001 decided 2026-09-03: retire cuOpt from the decide path' AS decision,
        (SELECT max(called_at) FROM public.ottoq_model_call_ledger
          WHERE provider='nvidia_cuopt' AND endpoint IS NOT NULL) AS last_cuopt_call;
 -- Nothing in docs/decisions/ supersedes D001. Reconciling it is a product decision, not a cleanup.
+
+\echo '=== 0322 §9 — the churn is SELF-refresh, so there is no de-duplication bug ==='
+WITH s AS (
+  SELECT d.sim_run_id, d.entity_id, d.proposal_created_at
+    FROM public.ottoq_proposal_disposition_ledger d
+   WHERE d.source='cuopt' AND d.status='superseded'
+     AND d.disposition_reason='newer_proposal_same_entity'
+)
+SELECT count(*) AS superseded_as_newer,
+       count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_proposal_disposition_ledger l
+          WHERE l.sim_run_id=s.sim_run_id AND l.entity_id=s.entity_id
+            AND l.source='cuopt' AND l.proposal_created_at > s.proposal_created_at)) AS later_cuopt_exists,
+       round(100.0*count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_proposal_disposition_ledger l
+          WHERE l.sim_run_id=s.sim_run_id AND l.entity_id=s.entity_id
+            AND l.source='cuopt' AND l.proposal_created_at > s.proposal_created_at))/count(*), 1)
+         AS pct_self_superseded
+  FROM s;
+-- 554 of 570 = 97.2%. A proposer superseding its own stale plan is the mechanism working. Building
+-- de-duplication here would pin a stale plan while discarding a better one.
