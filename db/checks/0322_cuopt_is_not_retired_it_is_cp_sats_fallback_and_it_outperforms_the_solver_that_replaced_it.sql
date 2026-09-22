@@ -129,12 +129,23 @@
 -- (`0250`), so the hypothesis to test is that it is being handed frames with no feasible assignment
 -- rather than failing to find one. That is a measurement, not an opinion, and it is not taken here.
 --
--- **(b) Whether supersession is fixable by the deferral it already has.** `cuopt_first_refusal_max_defers`
--- is **0** at global scope while `ottoq_agentic_arm` writes 1 on every armed run. cuOpt's 995
--- supersessions are the signature of a proposal with no protected window. Raising the global defer to
--- 1 is a one-row change whose effect is directly measurable as a shift from `superseded` to
--- `enacted`/`refused` — and `refused` would be the honest outcome, because it would mean the shield
--- actually judged it.
+-- **(b) Whether supersession is fixable by the deferral it already has — AND THE OBVIOUS VERSION OF
+-- THIS EXPERIMENT IS FORBIDDEN, WHICH I NEARLY MISSED.** cuOpt's 995 supersessions are the signature
+-- of a proposal with no protected window: `cuopt_first_refusal_max_defers` is **0** at global scope.
+-- The tempting one-row fix is to raise the global to 1. **Do not.** The catalog says why in its own
+-- description — *"0152: global tier is 0 — the deterministic core runs alone. Re-enable per run with
+-- a run-scoped 1"* — and the same is true of `cuopt_propose_enabled`. A global defer would give a
+-- nondeterministic network proposer a hold inside the certified deterministic path, which is exactly
+-- what CLAUDE.md 2.5 forbids in terms: *"cuOpt can never sit inside the certified deterministic
+-- path."* The global 0 is a certification invariant, not an oversight.
+--
+-- So the experiment is **run-scoped and already half-run**: `ottoq_agentic_arm` writes 1 on every
+-- armed run, so armed runs already carry the protected window and unarmed ones do not. The
+-- measurement is therefore available from existing evidence without changing any dial — partition
+-- cuOpt's dispositions by whether their run was armed, and see whether `superseded` falls and
+-- `enacted`/`refused` rise. `refused` would be the honest good outcome there, because it means the
+-- shield actually judged the proposal instead of the clock discarding it. That partition is the next
+-- query to write, and it is NOT taken here because it needs the per-run arm state joined in.
 --
 -- **(c) The comparison that does not exist.** `D001` §"the finding that matters more" still stands
 -- word for word: we cannot show OTTO-Q beats anything, because the arms have not been run. None of
@@ -183,12 +194,15 @@ SELECT source, proposer_rank, count(*) AS proposals,
 -- The unranked in-process proposer takes 97.7% of enactments. That is propose/dispose working, NOT a
 -- defect -- and it is also why no enactment rate here is an outcome measure.
 
-\echo '=== 0322 §4 — cuOpt has no protected window, which is what 83.6% supersession looks like ==='
-SELECT scope_type, param_key, param_value
-  FROM public.ottoq_policy_params
- WHERE param_key IN ('cuopt_first_refusal_max_defers','cuopt_propose_enabled')
- ORDER BY param_key, scope_type;
--- Global defers 0; ottoq_agentic_arm writes 1 per armed run. §6b is the one-row experiment.
+\echo '=== 0322 §4 — cuOpt has no protected window globally, AND THAT IS ON PURPOSE ==='
+SELECT c.param_key, c.default_value, c.min_value, c.max_value, c.description
+  FROM public.ottoq_policy_param_catalog c
+ WHERE c.param_key IN ('cuopt_first_refusal_max_defers','cuopt_propose_enabled')
+ ORDER BY c.param_key;
+-- Read the descriptions before touching either: "0152: global tier is 0 -- the deterministic core
+-- runs alone. Re-enable per run with a run-scoped 1." Raising the GLOBAL defer would put a
+-- nondeterministic network proposer inside the certified path (CLAUDE.md 2.5 forbids exactly this).
+-- ottoq_agentic_arm writes 1 per armed run, so the experiment is run-scoped and needs no dial change.
 
 \echo '=== 0322 §5 — the documented decision and the running system disagree ==='
 SELECT 'D001 decided 2026-09-03: retire cuOpt from the decide path' AS decision,
