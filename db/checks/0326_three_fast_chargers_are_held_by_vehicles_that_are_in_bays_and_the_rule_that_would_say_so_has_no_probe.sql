@@ -187,6 +187,40 @@
 -- So adding a probe is inherently a MEASURED change in CLAUDE.md 2.9a's sense — a new probe cannot wedge
 -- the engine unless its caller chooses to act on `would_block`.
 --
+-- ══ §6(c) AND 49% MUST NEVER BE QUOTED ALONE, BECAUSE THE TRAFFIC SIDE READS 97% ═
+--
+-- **`public.ottoq_assert_shield_coverage(run)` already exists and measures a THIRD unit** — not codes,
+-- not declared pairs, but **decision rows actually enacted.** On the live run `61cedc05`:
+--
+--     enacted decisions                      12,871
+--     shielded on the row                    12,478   (96.9%)
+--     unshielded                                393
+--       of which gated downstream               305
+--       of which merely record a fact            61
+--       of which a REAL GAP                      27   (0.2%) -- one branch, `gate_intake_no_charge`,
+--                                                     -- space/movement ungated, written by
+--                                                     -- `ottoq_decide_tick`
+--
+-- **So the shield is 49% wired on the declaration surface and 96.9% effective on the traffic.** Both
+-- numbers are correct and they answer different questions: 34-of-69 asks *how many of the checks the rules
+-- asked for are wired*, and 12,478-of-12,871 asks *how many decisions the engine actually made passed a
+-- gate*. **Quoting 49% alone would be the exact error `0417` §2 warned about** — a figure that argues for a
+-- conclusion its pair does not support.
+--
+-- **And the reconciliation is the real finding of this section, sharper than either number.** The 22
+-- unprobed contexts are mostly actions **this engine never takes**: `tech_override`, `oem_accept`,
+-- `brain_pause`, `emergency_stop` and the rest of SM.004's seven are human/UI actions with no DB path;
+-- `oem_acceptance`, `release` and `power_increase` are alternative names for transitions the engine
+-- reaches through `redeployment` and `charge_session_start`, where those same codes already fire. **An
+-- unprobed context for an action nobody performs costs nothing.**
+--
+-- **`task_completion` is the exception, and that is precisely why HW.006's absence is a live defect while
+-- SM.004's is not.** The engine completes atoms constantly — `twin.ottoq_sim_advance_visit_atoms` closed
+-- them throughout this run — so this is a decision the engine makes thousands of times with five codes
+-- declared against it and no probe. **The test that separates a harmless declaration gap from a real one
+-- is not the count; it is whether the engine performs the action.** Applied: of the 22, `task_completion`
+-- is the one to build, and G121 is the bill for not having built it.
+--
 -- ══ §7 WHAT I DID NOT BUILD, AND WHY EACH ONE WAS DECLINED ════════════════════
 --
 -- **(a) I did not extend the sweeper to dcfc.** The exclusion is not an oversight to correct — it is
@@ -214,8 +248,10 @@
 --
 -- The honest status: *the pointer gate is holding three fast chargers for vehicles that are in bays; no
 -- reconciler covers non-bay stalls by design; the rule that names this defect exactly has never been
--- probed because nothing probes `task_completion`, which five codes declare; and the shield's coverage
--- is 34 of 69 declared (code, context) pairs — 49% — against the 24-of-30 code count's 80%.*
+-- probed because nothing probes `task_completion`, which five codes declare; and the shield is 34 of 69
+-- declared (code, context) pairs wired — 49% — while shielding 12,478 of 12,871 enacted decisions,
+-- 96.9%, with 27 rows in a real gap. Quote both, and build `task_completion`, because it is the one
+-- unprobed context the engine actually exercises.*
 
 \echo '=== 0326 §1 — the clock domain: during is SIM, now() is REAL, and the wrong one says the depot is empty ==='
 WITH simnow AS (SELECT max(sim_clock_at) AS t FROM public.ottoq_events)
@@ -325,6 +361,16 @@ SELECT (SELECT count(*) FROM declared) AS declared_contexts,
          AS pairs_probed;
 -- 31 / 9 / 22 / 0 / 69 / 34. Zero orphan probes, so every probe is one a rule asked for. 34 of 69 is
 -- 49%; the code-level "24 of 30" reads 80% for the same shield.
+
+\echo '=== 0326 §6(c) — and the traffic side reads 96.9%: never quote 49% alone ==='
+SELECT jsonb_pretty(public.ottoq_assert_shield_coverage(
+         (SELECT sim_run_id FROM public.ottoq_sim_runs WHERE status='running'
+           ORDER BY started_at DESC LIMIT 1))) AS enacted_decision_coverage;
+-- 12,871 enacted / 12,478 shielded on the row / 393 unshielded, of which 305 gated downstream, 61 record
+-- a fact, and 27 a real GAP (one branch: gate_intake_no_charge, space/movement ungated). The declaration
+-- surface is 49% wired; the traffic is 96.9% shielded. Different questions, both true. The 22 unprobed
+-- contexts are mostly actions this engine never performs -- which is why task_completion, the one it
+-- performs constantly, is the only one worth building, and G121 is the bill for not having built it.
 
 \echo '=== 0326 §6(b) — every declared context nobody probes, and what waits on it ==='
 WITH declared AS (
