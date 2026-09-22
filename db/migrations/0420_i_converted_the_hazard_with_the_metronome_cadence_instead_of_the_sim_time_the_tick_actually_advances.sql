@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922080856
 -- migration-name:    i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances
 --
 -- 0420  **`0413` fixed the fault hazard's units and then converted them with the wrong number.

@@ -402,7 +402,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0417](db/migrations/0417_the_agents_advice_carries_the_tick_it_was_computed_from_and_the_tick_it_was_applied_at_and_nobody_had_ever_subtracted_them.sql) | `20260922070445` | yes — ledger | **G62, step 2 of the build `0323` §5 specified: MEASURE advice staleness, enforce nothing.** |
 | [0418](db/migrations/0418_the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired.sql) | `20260922073820` | yes — ledger | **`task_completion` is declared by five rules and probed by nothing, and it is the ONLY one of |
 | [0419](db/migrations/0419_my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts.sql) | `20260922074145` | yes — ledger | **`0418` shipped `ottoq_assert_task_completion_coverage()` two hours ago to stop abstentions |
-| [0420](db/migrations/0420_i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances.sql) | `PENDING` | no — pending | **`0413` fixed the fault hazard's units and then converted them with the wrong number |
+| [0420](db/migrations/0420_i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances.sql) | `20260922080856` | yes — ledger | **`0413` fixed the fault hazard's units and then converted them with the wrong number |
 
 283 migrations indexed.
 
