@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922134203
 -- migration-name:    a_vehicle_can_power_down_from_any_state_and_the_catalog_never_knew_it
 --
 -- 0423  **`SM.001` fails on 23.2% of everything it judges — 6,298 of 27,144 evaluations, every one
@@ -114,10 +114,24 @@ BEGIN
                     'longer writes BESS standby -- re-read it before editing';
   END IF;
 
-  -- P4. No run in flight. This changes what the shield permits mid-tick.
+  -- P4. No run in flight. This changes what the shield permits mid-tick, and it rewrites
+  --     ottoq_tick_invariance_reset_fleet -- the function a determinism pair calls at every arm boot.
   SELECT count(*) INTO v_n FROM public.ottoq_sim_runs WHERE status IN ('running','paused');
   IF v_n <> 0 THEN
     RAISE EXCEPTION '0423 P4: % run(s) running/paused', v_n;
+  END IF;
+
+  -- P4b. AND THE RUNS TABLE CANNOT SEE A DETERMINISM PAIR, which is G141 (db/checks/0330 §5): both arms
+  --      execute in ONE uncommitted transaction, so its ottoq_sim_runs rows are invisible to this
+  --      session until it commits. P4 alone would report "0 runs" while the recert runner is 8 minutes
+  --      into a 48-tick pair, and this migration would then swap the reset function out from under an
+  --      arm that is already being fingerprinted. pg_stat_activity is the only honest signal.
+  SELECT count(*) INTO v_n FROM pg_stat_activity
+   WHERE state='active' AND pid <> pg_backend_pid()
+     AND query LIKE '%ottoq\_recert\_runner%';
+  IF v_n <> 0 THEN
+    RAISE EXCEPTION '0423 P4b: a determinism pair is in flight (invisible to ottoq_sim_runs -- G141). '
+                    'Wait for it: this migration rewrites the function that pair calls at every arm boot';
   END IF;
 END $pre$;
 

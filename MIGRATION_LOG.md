@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0421 — GENERATED, not a log
+## Index, 0134–0423 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -404,7 +404,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0419](db/migrations/0419_my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts.sql) | `20260922074145` | yes — ledger | **`0418` shipped `ottoq_assert_task_completion_coverage()` two hours ago to stop abstentions |
 | [0420](db/migrations/0420_i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances.sql) | `20260922080856` | yes — ledger | **`0413` fixed the fault hazard's units and then converted them with the wrong number |
 | [0421](db/migrations/0421_a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset.sql) | `20260922125637` | yes — ledger | **The one-line fix for `db/checks/0329` (G137): every certified pair fails when atom 4 is |
+| [0422](db/migrations/0422_wiring_the_task_completion_probe_so_the_rule_that_names_g121_can_finally_fire.sql) | `20260922134041` | yes — ledger | **`0418` built the `task_completion` probe, proved its verdicts on live atoms, and deliberately |
+| [0423](db/migrations/0423_a_vehicle_can_power_down_from_any_state_and_the_catalog_never_knew_it.sql) | `20260922134203` | yes — ledger | **`SM.001` fails on 23.2% of everything it judges — 6,298 of 27,144 evaluations, every one |
 
-284 migrations indexed.
+286 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

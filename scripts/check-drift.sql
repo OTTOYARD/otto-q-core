@@ -515,7 +515,9 @@ repo_manifest(version, name, file) AS (
     ('20260922073820'::text, 'the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired'::text, '0418_the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired.sql'::text),
     ('20260922074145'::text, 'my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts'::text, '0419_my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts.sql'::text),
     ('20260922080856'::text, 'i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances'::text, '0420_i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances.sql'::text),
-    ('20260922125637'::text, 'a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset'::text, '0421_a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset.sql'::text)
+    ('20260922125637'::text, 'a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset'::text, '0421_a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset.sql'::text),
+    ('20260922134041'::text, 'wiring_the_task_completion_probe_so_the_rule_that_names_g121_can_finally_fire'::text, '0422_wiring_the_task_completion_probe_so_the_rule_that_names_g121_can_finally_fire.sql'::text),
+    ('20260922134203'::text, 'a_vehicle_can_power_down_from_any_state_and_the_catalog_never_knew_it'::text, '0423_a_vehicle_can_power_down_from_any_state_and_the_catalog_never_knew_it.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

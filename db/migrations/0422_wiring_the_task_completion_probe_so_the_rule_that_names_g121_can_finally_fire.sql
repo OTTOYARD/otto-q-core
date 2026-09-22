@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922134041
 -- migration-name:    wiring_the_task_completion_probe_so_the_rule_that_names_g121_can_finally_fire
 --
 -- 0422  **`0418` built the `task_completion` probe, proved its verdicts on live atoms, and deliberately
