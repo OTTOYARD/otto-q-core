@@ -518,7 +518,8 @@ repo_manifest(version, name, file) AS (
     ('20260922125637'::text, 'a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset'::text, '0421_a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset.sql'::text),
     ('20260922134041'::text, 'wiring_the_task_completion_probe_so_the_rule_that_names_g121_can_finally_fire'::text, '0422_wiring_the_task_completion_probe_so_the_rule_that_names_g121_can_finally_fire.sql'::text),
     ('20260922134203'::text, 'a_vehicle_can_power_down_from_any_state_and_the_catalog_never_knew_it'::text, '0423_a_vehicle_can_power_down_from_any_state_and_the_catalog_never_knew_it.sql'::text),
-    ('20260922150552'::text, 'a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass'::text, '0424_a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass.sql'::text)
+    ('20260922150552'::text, 'a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass'::text, '0424_a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass.sql'::text),
+    ('PENDING'::text, 'the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner'::text, '0425_the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
