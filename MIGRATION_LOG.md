@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0412 — GENERATED, not a log
+## Index, 0134–0413 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -395,7 +395,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0410](db/migrations/0410_the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads.sql) | `20260921204952` | yes — ledger | **Bookkeeping. `0408` and `0409` each argue `forces_recert=false` in their headers, each |
 | [0411](db/migrations/0411_the_purge_hardcodes_public_so_the_two_twin_tables_it_was_meant_to_clear_would_have_shut_the_start_door.sql) | `20260921210548` | yes — ledger | **Chase's call: classify `twin.arm_cycles` and `twin.arm_registrations` as `engine` and let |
 | [0412](db/migrations/0412_the_state_machine_never_learned_that_a_vehicle_can_break_while_parked.sql) | `20260922042212` | yes — ledger | **Thirteen transitions the engine performs as normal business and `ottoq_state_transitions` |
+| [0413](db/migrations/0413_a_fault_hazard_denominated_in_scheduler_ticks_is_not_a_fault_rate.sql) | `20260922043506` | yes — ledger | **`vehicle_fault_rate_per_tick = 0.004` is replaced by a hazard denominated per ELIGIBLE |
 
-275 migrations indexed.
+276 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
