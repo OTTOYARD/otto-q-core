@@ -1,3 +1,23 @@
+-- ██ RETRACTED IN FULL BY `db/checks/0318`. DO NOT IMPLEMENT ANYTHING BELOW. ██
+-- ██
+-- ██  Every number and the whole conclusion of this file are wrong.
+-- ██
+-- ██  1. "`ottoq_events` holds ZERO arm rows" is false. It holds 2,678 across 41 runs and always
+-- ██     has. The zero came from a predicate I deleted from my own query while fixing an
+-- ██     unrelated syntax error; the surviving predicate searched for '%tether%' and '%robotic%',
+-- ██     neither of which any event type contains. `0318` §1 has both queries verbatim.
+-- ██  2. "8.6 KB per event" is `pg_total_relation_size / count(*)` on a table with 13.1M inserts
+-- ██     against 16.5M deletes — that is bloat plus 486 MB of indexes, not row width. A row is
+-- ██     ~937 bytes; an arm row is ~743.
+-- ██  3. "53,330 cycles per run" is a 1,414-RUN accumulation in an unclassified table the purge
+-- ██     never touches. A run runs 74–165 cycles.
+-- ██
+-- ██  Real cost of what this file was sizing: **~110–180 KB per run**, not 459 MB — and it is
+-- ██  already being paid, because the events already exist. Implementing the summary design
+-- ██  below would ADD per-tick events to substitute for events that are already there.
+-- ██
+-- ██  Kept unedited beneath this banner as the record of the mistake. `0318` is the retraction.
+-- ██
 -- 0316  **The obvious implementation of "put the charge arms in the audit trail" would add ~459 MB
 --       to `ottoq_events` PER RUN.** `db/checks/0315` §3 established the gap: `twin.arm_cycles`
 --       holds 53,330 rows while `ottoq_events` holds **zero** arm or tether rows, so the arms — the

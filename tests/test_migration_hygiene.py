@@ -355,6 +355,24 @@ CLASSIFY_EXEMPT = {
         "repaired by 0310",
     "0309_benchmark_had_everything_except_a_scenario":
         "repaired by 0310",
+    # FOURTH occurrence, and this guard is what caught it -- in CI, after both
+    # were already applied to the live engine. All nine canon columns read
+    # "stale: predates the recert floor" because the floor had moved to 0409's
+    # own apply stamp, discarding the nineteen-verdict sweep of 0400/0401/0407
+    # that had just reached 8 of 9. Both headers argue forces_recert=false
+    # correctly and at length; neither writes the row the floor reads. Exactly
+    # what this test's docstring predicted about arguments in headers.
+    #
+    # The repair was applied out of band the moment the stale matrix was noticed,
+    # so 0410 is the repo record of it plus its own classification -- and it also
+    # documents the naming trap these two created: their lineage rows are keyed
+    # on the APPLIED migration name, not the file stem, because for the first
+    # time in this repo the two differ. A row named after the file would never
+    # join and the floor would stay broken while looking repaired.
+    "0408_the_registry_gate_that_catches_unclassified_run_tables_cannot_see_the_twin_schema_and_one_evidence_check_has_been_dead_since_this_afternoon":
+        "repaired by 0410",
+    "0409_the_evidence_ledgers_look_98_percent_unattributable_and_95_percent_of_that_is_recoverable_from_the_archive":
+        "repaired by 0410",
 }
 
 
