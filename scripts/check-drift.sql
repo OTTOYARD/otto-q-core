@@ -513,7 +513,8 @@ repo_manifest(version, name, file) AS (
     ('20260922065233'::text, 'the_drift_cap_was_a_fraction_in_a_percent_column_so_it_froze_the_dial_it_was_meant_to_bound'::text, '0416_the_drift_cap_was_a_fraction_in_a_percent_column_so_it_froze_the_dial_it_was_meant_to_bound.sql'::text),
     ('20260922070445'::text, 'the_agents_advice_carries_the_tick_it_was_computed_from_and_the_tick_it_was_applied_at_and_nobody_had_ever_subtracted_them'::text, '0417_the_agents_advice_carries_the_tick_it_was_computed_from_and_the_tick_it_was_applied_at_and_nobody_had_ever_subtracted_them.sql'::text),
     ('20260922073820'::text, 'the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired'::text, '0418_the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired.sql'::text),
-    ('20260922074145'::text, 'my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts'::text, '0419_my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts.sql'::text)
+    ('20260922074145'::text, 'my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts'::text, '0419_my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts.sql'::text),
+    ('PENDING'::text, 'i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances'::text, '0420_i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
