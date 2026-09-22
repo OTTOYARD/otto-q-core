@@ -80,6 +80,16 @@
 -- column). What this buys is that the defect becomes COUNTABLE from the shield's own ledger instead of
 -- from an ad-hoc census.
 --
+-- **RETRACTED FOUR HOURS AFTER APPLY (`db/checks/0333`): THE LAST SENTENCE IS WRONG. IT DOES NOT MAKE
+-- G121 COUNTABLE.** Measured on the first 1,230 evaluations: three of the five codes abstain on 100% of
+-- calls; `HW.003`'s 102 failures are a tautology (staleness equals the atom's own duration to within
+-- 20 s across all seven services, so any atom over the 300 s threshold fails by construction); and every
+-- one of `HW.006`'s resolvable cases lands on a `service_bay` stall that is `available` and holds no
+-- vehicle — including the four that PASSED. G121 is three `dcfc` stalls each holding a live
+-- `current_vehicle_id`. **The tenth probe point is live and produces no meaningful verdict yet, and
+-- G121 still has only `0326` §2's census.** `0333` §5 has the fix order; nothing here is reverted,
+-- because the instrument is what made this visible in four hours.
+--
 -- **It does not make HW.006 protective.** `0418` §2: HW.006's evaluator returns TRUE with reason
 -- *"insufficient context for presence verification"* and `severity='warning'` when no stall resolves, and
 -- `cabin`/`exterior` atoms are performed at the vehicle with no stall at all (`0383`). Those are honest
