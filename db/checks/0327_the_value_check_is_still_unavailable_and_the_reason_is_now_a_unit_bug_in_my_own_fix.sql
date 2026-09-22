@@ -18,9 +18,19 @@
 --     real minutes elapsed                      152.7
 --
 -- **The run is bounded by `sim_clock_end`, not by a tick count** — 24 sim-hours — and in `live` playback
--- at `speed_x` 1.0 the sim clock advances one second per real second, so it needs roughly **24 real
--- hours**, not the ~2 the check-in assumed. Tick count was the wrong unit to predict completion in: at
--- 7.9 sim-seconds per tick it takes ~10,900 ticks to cover a sim-day, not 1,104.
+-- at `speed_x` 1.0 the sim clock advances one second per real second. Tick count was the wrong unit to
+-- predict completion in: at 7.9 sim-seconds per tick it takes ~10,900 ticks to cover a sim-day, not 1,104.
+--
+-- **CORRECTION, ten minutes after writing the paragraph above: it will NOT reach 24 sim-hours, because
+-- the run governor stops it at nine.** `ottoq_run_governor_auto_stop` (cron 17, every 2 minutes) stops any
+-- `running` run whose sim clock has travelled `run_governor_max_sim_minutes`, and this run is
+-- `run_by='operator_demo'` — not one of the two exempt values (`production_live`, `cert_harness`). The
+-- dial resolves to **540** sim-minutes from the **global** row (`00000000-…`, set 2026-08-13); the catalog
+-- default is 139 and the only depot override, 1,440, belongs to the benchmark depot `22222222-…`, not the
+-- twin. So `sim_clock_end` is not the binding limit — **the governor is, at 9 sim-hours.** At 168.7
+-- sim-minutes when measured, the run has ~371 sim-minutes left, which in live 1× is ~6.2 real hours, so
+-- it self-terminates around **14:25 UTC (09:25 CT)** rather than tomorrow morning. §7 is the consequence,
+-- and it is the one that changes what to do next.
 --
 -- ══ §2 STEP 2 — THE CENSORING `0324` HIT IS GONE. THIS IS THE GOOD NEWS ════════
 --
@@ -131,9 +141,67 @@
 -- is one. **It is in `shadow`, so nothing is blocked either way, and the evidence is durable in
 -- `ottoq_rule_evaluations` and above.** It needs Chase's intent, not my inference.
 --
--- The honest status, in one line: *the denominator is finally sound, the value check needs a fresh run of
--- ~1,700 eligible vehicle-hours under the corrected hazard, and the shadow shield caught an
--- undeclared transition on its first occurrence.*
+-- ══ §7 NO DEMO RUN CAN EVER ANSWER THE λ QUESTION, AND THE RECERT SWEEP CAN ════
+--
+-- Putting §1's correction together with §3's requirement settles the plan, and the answer is structural
+-- rather than a matter of waiting longer:
+--
+--     the governor caps a demo run at                     540 sim-minutes = 9.0 sim-hours
+--     twin depot vehicles                                 116
+--     eligible share measured on this run                  76%
+--     => eligible vehicle-hours a FULL demo run yields   ~793
+--     eligible vehicle-hours the value check needs      ~1,700   (0324 §1)
+--
+-- **A governor-capped demo run tops out at less than half of what the measurement needs. Waiting for this
+-- run to finish, or starting another one, cannot answer the question — not slowly, but never.**
+--
+-- **What can: a certification pair.** `run_by='cert_harness'` is one of the two values the governor
+-- exempts, and a cert pair runs `fixed` playback where a tick advances `tick_interval_seconds *
+-- time_scale` = **30 sim-minutes**. So a 48-tick canon covers **24 sim-hours** — about **2,100 eligible
+-- vehicle-hours in one arm**, above the requirement, in roughly 24 real minutes rather than 24 real
+-- hours. `ottoq_determinism_canon` holds 48-tick columns.
+--
+-- **And it is already scheduled.** Cron job 746 runs every minute, takes an advisory lock, **returns
+-- immediately if any run is `running` or `paused`**, and otherwise picks the first canon where
+-- `enabled AND NOT satisfies_floor`. Measured now: **9 of 9 canons are enabled and failing their floor**,
+-- which is what `0420`'s `forces_recert=TRUE` is for. So the recert sweep `0420` owes (G131) and the λ
+-- value measurement are **the same runs**, and the only thing standing between them and starting is the
+-- demo run holding the engine until ~14:25 UTC.
+--
+-- **So the correct action is to do nothing to the live run and let the governor have it.** Not stopping it
+-- by hand is deliberate: it is `run_by='operator_demo'`, its remaining 6 hours cost nothing that the
+-- recert sweep needs, and stopping a run a person may be watching is not a call to make unattended when
+-- the governor will make it anyway within the hour.
+--
+-- The honest status, in one line: *the denominator is finally sound, no demo run can ever reach the
+-- ~1,700 eligible vehicle-hours the value check needs, the governor-exempt 48-tick cert pairs can and are
+-- already queued behind the live run, and the shadow shield caught an undeclared transition on its first
+-- occurrence.*
+
+\echo '=== 0327 §1 correction + §7 — the governor caps this run at 9 sim-hours, not 24 ==='
+SELECT r.run_by,
+       (COALESCE(r.run_by,'') IN ('production_live','cert_harness')) AS governor_exempt,
+       round(EXTRACT(epoch FROM (r.sim_clock_current - r.sim_clock_start))/60.0, 1) AS sim_minutes_done,
+       public.ottoq_policy_get(r.sim_run_id,'run_governor_max_sim_minutes',139) AS governor_ceiling_min,
+       round(EXTRACT(epoch FROM (r.sim_clock_end - r.sim_clock_start))/60.0, 0) AS sim_clock_end_min,
+       round((116 * public.ottoq_policy_get(r.sim_run_id,'run_governor_max_sim_minutes',139)/60.0
+              * 0.76)::numeric, 0) AS eligible_vh_a_full_demo_run_yields,
+       1700 AS eligible_vh_needed
+  FROM public.ottoq_sim_runs r WHERE r.sim_run_id='61cedc05-fa8a-44f0-8a31-5cd6404404ff';
+-- 540 from the GLOBAL row; the catalog default is 139 and the only depot override (1,440) belongs to the
+-- benchmark depot, not the twin. ~793 eligible vehicle-hours against ~1,700 needed: a demo run cannot
+-- answer the lambda question at all, however long it runs.
+
+\echo '=== 0327 §7 — the recert sweep IS the measurement vehicle, and it is already queued ==='
+SELECT count(*) AS canons_enabled,
+       count(*) FILTER (WHERE NOT satisfies_floor) AS awaiting_recert,
+       count(*) FILTER (WHERE NOT satisfies_floor AND ticks >= 48) AS awaiting_at_48_ticks,
+       48 * 30 AS a_48_tick_fixed_run_covers_sim_minutes,
+       round((116 * (48*30)/60.0 * 0.76)::numeric, 0) AS eligible_vh_one_48_tick_arm_yields
+  FROM public.ottoq_determinism_canon WHERE enabled;
+-- Cert pairs are governor-EXEMPT and run fixed playback (30 sim-minutes per tick), so 48 ticks is a full
+-- sim-day: ~2,100 eligible vehicle-hours per arm, above the requirement. Cron 746 starts them the moment
+-- no run is 'running' -- which is why the right action is to leave the live run alone.
 
 \echo '=== 0327 §1 — step 1: the run is 10.8% complete, and tick count was the wrong unit ==='
 SELECT status, tick_count,
