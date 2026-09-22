@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260922150552
 -- migration-name:    a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass
 --
 -- 0424  **`HW.002.charger_state_precondition` is `critical`/`block` and CANNOT PASS on the twin. Across
@@ -372,3 +372,38 @@ COMMIT;
 -- a healthy charger's gap is 0 and a faulted one's is whatever its fault duration is, so the count must
 -- be > 1. A rate can fall for many reasons; the gap losing its zero variance can only mean the ordering
 -- changed.
+
+-- ══ APPLIED ═══════════════════════════════════════════════════════════════════
+--
+-- **Applied 2026-09-22 15:05:52 UTC (10:05 AM CT) as `20260922150552`.** All eight blocks ran:
+-- P1 confirmed the defect live (4,632 failures, gap constant 1800 s, threshold 90 s), P2 confirmed
+-- `feed_mode='sim'`, P3/P3b confirmed no run and no pair in flight, P4 snapshotted both orchestrators
+-- as `0424_pre`, (A) and (B) installed, V1/V2/V3 passed.
+--
+-- **DEVIATION, declared per APPLYING.md step 4.** The apply channel takes SQL inline, so the submitted
+-- text is this file with whole-line `--` comments and the one psql meta-command removed. The executable
+-- halves were **proven identical by digest before applying**, not assumed: comment-stripped and
+-- whitespace-collapsed, both sides give **`89b6c002b9e2e9119eb2db46d6e4123c` at 9,479 characters**, and
+-- the only opcode difference between the normalised file and the normalised submission is the deletion
+-- of `\set ON_ERROR_STOP on` — which is a psql directive, not SQL, and cannot be submitted.
+--
+-- **VERIFIED independently of the migration's own asserts**, re-reading the catalog afterwards:
+--
+--     fn                                 first_heartbeat_write  charge_work  heartbeat_first  writes  faulted_excl
+--     ---------------------------------  ---------------------  -----------  ---------------  ------  ------------
+--     public.ottoq_sim_advance_tick_world                 2,982        3,103            true       2             2
+--     twin.ottoq_world_advance                            2,190        2,434            true       2             2
+--
+-- Before the migration those positions were 5,375 / 2,963 and 4,483 / 2,171 — heartbeat AFTER the charge
+-- work in both. `writes = 2` is V2's claim confirmed from outside: the original late write is still
+-- there, so this added a statement rather than moving one.
+--
+-- **`ottoq_cert_lineage` row inserted with `forces_recert = true`**, which moved the recert floor to
+-- 2026-09-22 15:06:22.746274+00 and put **9 of 9 canon columns into `NOT satisfies_floor`**. Job 746
+-- resweeps them; no determinism claim may be quoted until it lands.
+--
+-- **NOT YET VERIFIED, and this is the number that actually settles it:** the post-apply HW.002 failure
+-- rate and — more importantly — `distinct_gaps > 1`. §5's query is the one to run once the resweep has
+-- generated fresh `charge_session_start` evaluations. Until then this migration is "applied and
+-- structurally verified", not "shown to have fixed the rule". Those are different claims and the
+-- difference is the whole of `db/checks/0337`.
