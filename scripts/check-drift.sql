@@ -524,7 +524,8 @@ repo_manifest(version, name, file) AS (
     ('20260922163008'::text, 'the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends'::text, '0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql'::text),
     ('PENDING'::text, 'the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence'::text, '0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence.sql'::text),
     ('20260922171450'::text, 'the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero'::text, '0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql'::text),
-    ('20260922172845'::text, 'the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both'::text, '0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql'::text)
+    ('20260922172845'::text, 'the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both'::text, '0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql'::text),
+    ('20260923023300'::text, 'the_physical_pointer_defect_is_safety_evidence_and_it_evaporates_on_the_next_demo_run'::text, '0441_the_physical_pointer_defect_is_safety_evidence_and_it_evaporates_on_the_next_demo_run.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
