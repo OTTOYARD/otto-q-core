@@ -120,6 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
+## Index, 0134–0441 — GENERATED, not a log
 ## Index, 0134–0450 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
@@ -432,6 +433,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0428](db/migrations/0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence.sql) | `PENDING` | no — pending | **`charge_session_start` is the first of the six advisory checkpoints to become ENFORCING.** Four |
 | [0429](db/migrations/0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql) | `20260922171450` | yes — ledger | **Ten event types emit `p_entity_type := 'depot', p_entity_id := p_depot_id` and never pass |
 | [0430](db/migrations/0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql) | `20260922172845` | yes — ledger | **`ottoq_rule_evaluations.enforcement_taken='blocked'` is the shield's RECOMMENDATION, and at FIVE |
+| [0441](db/migrations/0441_the_physical_pointer_defect_is_safety_evidence_and_it_evaporates_on_the_next_demo_run.sql) | `20260923023300` | yes — ledger | **G157's 49 physical-pointer divergences — a charging stall that records a DIFFERENT vehicle, or |
+
+294 migrations indexed.
 | [0431](db/migrations/0431_a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged.sql) | `20260922224038` | yes — ledger | **The dispatcher holds a staged vehicle until its readiness check is done.** `db/checks/0351` |
 | [0432](db/migrations/0432_the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps.sql) | `20260922231738` | yes — ledger | **The orchestrator agent stops setting the work side's demand, the catalog's `agent_writable` flag |
 | [0433](db/migrations/0433_a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery.sql) | `20260923012038` | yes — ledger | **A demand-response call asks the depot to shed 50–400 kW. The engine read that number as the depot's |
