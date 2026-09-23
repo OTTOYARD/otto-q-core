@@ -111,7 +111,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0446 — GENERATED, not a log
+## Index, 0134–0447 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440 — which are indexed below as well as logged above; the log row is
@@ -439,7 +439,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0444](db/migrations/0444_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql) | `PENDING` | no — pending | **The battery was dispatched before the tick's new charging sessions started, so it always answered one tick |
 | [0445](db/migrations/0445_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql) | `PENDING` | no — pending | **Two of the depot's ten fast chargers looped for over an hour on two vehicles already at the fast chargers' |
 | [0446](db/migrations/0446_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql) | `PENDING` | no — pending | **The readiness gate's hold clock lived on the vehicle, not the run, so a stamp an earlier run left behind |
+| [0447](db/migrations/0447_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql) | `PENDING` | no — pending | **The recall policy and the visit planner disagreed about whether interval maintenance is required, so |
 
-309 migrations indexed.
+310 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
