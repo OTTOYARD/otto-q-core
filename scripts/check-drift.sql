@@ -538,7 +538,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere'::text, '0441_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql'::text),
     ('PENDING'::text, 'the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence'::text, '0442_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql'::text),
     ('PENDING'::text, 'the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak'::text, '0443_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql'::text),
-    ('PENDING'::text, 'the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late'::text, '0444_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql'::text)
+    ('PENDING'::text, 'the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late'::text, '0444_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql'::text),
+    ('PENDING'::text, 'two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing'::text, '0445_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

@@ -111,7 +111,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0444 — GENERATED, not a log
+## Index, 0134–0445 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440 — which are indexed below as well as logged above; the log row is
@@ -437,7 +437,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0442](db/migrations/0442_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql) | `PENDING` | no — pending | **`ottoq_ab_pair` never received 0421's reset.** 0421 fixed the 0329 defect in `ottoq_determinism_pair` |
 | [0443](db/migrations/0443_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql) | `PENDING` | no — pending | **The battery's day plan could not see the fleet waiting to charge, so the boot surge set the day's billed |
 | [0444](db/migrations/0444_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql) | `PENDING` | no — pending | **The battery was dispatched before the tick's new charging sessions started, so it always answered one tick |
+| [0445](db/migrations/0445_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql) | `PENDING` | no — pending | **Two of the depot's ten fast chargers looped for over an hour on two vehicles already at the fast chargers' |
 
-307 migrations indexed.
+308 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
