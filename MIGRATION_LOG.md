@@ -101,7 +101,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0411 — GENERATED, not a log
+## Index, 0134–0430 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335 — which are indexed below as well as logged above; the log row is
@@ -394,7 +394,26 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0409](db/migrations/0409_the_evidence_ledgers_look_98_percent_unattributable_and_95_percent_of_that_is_recoverable_from_the_archive.sql) | `20260921203917` | yes — ledger | **`ottoq_evidence_join_loss_now` reads 83–98% join loss across the evidence ledgers, and |
 | [0410](db/migrations/0410_the_fourth_time_a_header_argued_forces_recert_false_at_length_and_did_not_write_the_row_the_floor_reads.sql) | `20260921204952` | yes — ledger | **Bookkeeping. `0408` and `0409` each argue `forces_recert=false` in their headers, each |
 | [0411](db/migrations/0411_the_purge_hardcodes_public_so_the_two_twin_tables_it_was_meant_to_clear_would_have_shut_the_start_door.sql) | `20260921210548` | yes — ledger | **Chase's call: classify `twin.arm_cycles` and `twin.arm_registrations` as `engine` and let |
+| [0412](db/migrations/0412_the_state_machine_never_learned_that_a_vehicle_can_break_while_parked.sql) | `20260922042212` | yes — ledger | **Thirteen transitions the engine performs as normal business and `ottoq_state_transitions` |
+| [0413](db/migrations/0413_a_fault_hazard_denominated_in_scheduler_ticks_is_not_a_fault_rate.sql) | `20260922043506` | yes — ledger | **`vehicle_fault_rate_per_tick = 0.004` is replaced by a hazard denominated per ELIGIBLE |
+| [0414](db/migrations/0414_the_agent_envelope_was_advertised_and_judged_and_enforced_by_nobody.sql) | `20260922050100` | yes — ledger | **The agent dial envelope had three of the four parts it needs. It is ADVERTISED to the agent |
+| [0415](db/migrations/0415_the_ledger_called_an_empty_frame_an_abstention_and_a_decision_a_call.sql) | `20260922053000` | yes — ledger | **`ottoq_intelligence_ledger` is the view CLAUDE.md instructs every reader to use for the |
+| [0416](db/migrations/0416_the_drift_cap_was_a_fraction_in_a_percent_column_so_it_froze_the_dial_it_was_meant_to_bound.sql) | `20260922065233` | yes — ledger | **`agent_max_drift_pct = 0.30` is a FRACTION stored in a column whose every sibling is a |
+| [0417](db/migrations/0417_the_agents_advice_carries_the_tick_it_was_computed_from_and_the_tick_it_was_applied_at_and_nobody_had_ever_subtracted_them.sql) | `20260922070445` | yes — ledger | **G62, step 2 of the build `0323` §5 specified: MEASURE advice staleness, enforce nothing.** |
+| [0418](db/migrations/0418_the_probe_for_the_one_unprobed_context_the_engine_actually_exercises_built_and_proven_but_not_wired.sql) | `20260922073820` | yes — ledger | **`task_completion` is declared by five rules and probed by nothing, and it is the ONLY one of |
+| [0419](db/migrations/0419_my_own_abstention_counter_counted_two_of_the_four_abstentions_as_real_verdicts.sql) | `20260922074145` | yes — ledger | **`0418` shipped `ottoq_assert_task_completion_coverage()` two hours ago to stop abstentions |
+| [0420](db/migrations/0420_i_converted_the_hazard_with_the_metronome_cadence_instead_of_the_sim_time_the_tick_actually_advances.sql) | `20260922080856` | yes — ledger | **`0413` fixed the fault hazard's units and then converted them with the wrong number |
+| [0421](db/migrations/0421_a_certified_arms_evidence_is_rewritten_by_the_next_arms_fleet_reset.sql) | `20260922125637` | yes — ledger | **The one-line fix for `db/checks/0329` (G137): every certified pair fails when atom 4 is |
+| [0422](db/migrations/0422_wiring_the_task_completion_probe_so_the_rule_that_names_g121_can_finally_fire.sql) | `20260922134041` | yes — ledger | **`0418` built the `task_completion` probe, proved its verdicts on live atoms, and deliberately |
+| [0423](db/migrations/0423_a_vehicle_can_power_down_from_any_state_and_the_catalog_never_knew_it.sql) | `20260922134203` | yes — ledger | **`SM.001` fails on 23.2% of everything it judges — 6,298 of 27,144 evaluations, every one |
+| [0424](db/migrations/0424_a_charger_heartbeat_written_after_the_charge_starts_is_a_liveness_check_that_cannot_pass.sql) | `20260922150552` | yes — ledger | **`HW.002.charger_state_precondition` is `critical`/`block` and CANNOT PASS on the twin. Across |
+| [0425](db/migrations/0425_the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner.sql) | `20260922155332` | yes — ledger | **`perimeter_walkaround` is performed AT THE VEHICLE and holds 3,257 bookings on the twin depot's |
+| [0426](db/migrations/0426_a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service.sql) | `20260922155423` | yes — ledger | **`HW.003.sensor_liveness` is `safety_critical`/`block` and fails 1,288 of 3,550 evaluations at |
+| [0427](db/migrations/0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql) | `20260922163008` | yes — ledger | **`HW.006.physical_presence_verification` asks whether the vehicle is physically in the stall, and |
+| [0428](db/migrations/0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence.sql) | `PENDING` | no — pending | **`charge_session_start` is the first of the six advisory checkpoints to become ENFORCING.** Four |
+| [0429](db/migrations/0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql) | `20260922171450` | yes — ledger | **Ten event types emit `p_entity_type := 'depot', p_entity_id := p_depot_id` and never pass |
+| [0430](db/migrations/0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql) | `20260922172845` | yes — ledger | **`ottoq_rule_evaluations.enforcement_taken='blocked'` is the shield's RECOMMENDATION, and at FIVE |
 
-274 migrations indexed.
+293 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
