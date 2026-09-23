@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   DEFAULT_REVERSAL_DWELL_MIN,
+  INERT_KEYS,
+  INERT_OPS,
   KNOBS,
   OPS_ACTION_DIAL,
   WORK_SIDE_KEYS,
@@ -43,7 +45,8 @@ test("the drift limiter bounds a move to 30% of the value in force", () => {
 test("the range clamp is reported, and integer dials round", () => {
   assert.deepEqual(clampDial("energy_demand_factor_expensive", 0.1, null),
     { value: 0.2, limiter: "range", requested: 0.1 });
-  assert.equal(clampDial("forecast_horizon_min", 44.6, 40).value, 45);
+  // an integer-valued dial rounds (v20 has no integer dial beyond the binary switch, so a local table)
+  assert.equal(clampDial("h", 44.6, 40, { h: { lo: 10, hi: 90, int: true } }).value, 45);
 });
 
 test("a binary switch is not drift-pinned at 0", () => {
@@ -69,11 +72,31 @@ test("the current value comes from grounding, then policy, else null", () => {
   assert.equal(currentDialValue(null, "deploy_surge_catchup"), null);
 });
 
-test("with a grounded current value the drift limiter now runs on the surge dial", () => {
-  const board = { grounding: { actuators: { deploy_surge_catchup: { value: 0.35 } } } };
-  const c = clampDial("deploy_surge_catchup", 1.0, currentDialValue(board, "deploy_surge_catchup"));
-  assert.equal(c.value, 0.35 * 1.3);
+test("with a grounded current value the drift limiter runs", () => {
+  const board = { grounding: { actuators: { energy_demand_factor_peak: { value: 0.4 } } } };
+  const c = clampDial("energy_demand_factor_peak", 0.9, currentDialValue(board, "energy_demand_factor_peak"));
+  assert.equal(c.value, 0.4 * 1.3);
   assert.equal(c.limiter, "drift");
+});
+
+// v20 (G175): two dials the agent used to be offered have no reader anywhere in the engine.
+test("the dials nothing reads are not knobs, and say why", () => {
+  assert.deepEqual(Object.keys(KNOBS).sort(),
+    ["energy_demand_factor_expensive", "energy_demand_factor_peak", "energy_reserve_shave"]);
+  for (const k of ["deploy_surge_catchup", "forecast_horizon_min"]) {
+    assert.equal(KNOBS[k], undefined);
+    assert.match(INERT_KEYS[k], /^inert_dial: no engine function reads /);
+    assert.throws(() => clampDial(k, 0.5, 0.35), /not an agent actuator/);
+  }
+  for (const k of Object.keys(INERT_KEYS)) assert.equal(KNOBS[k], undefined);
+});
+
+test("the ops actions that only moved an inert dial are not whitelisted", () => {
+  assert.deepEqual(Object.keys(OPS_ACTION_DIAL), ["enable_energy_reserve"]);
+  for (const a of ["raise_deploy_surge", "extend_forecast_horizon"]) {
+    assert.equal(OPS_ACTION_DIAL[a], undefined);
+    assert.match(INERT_OPS[a], /^inert_ops_action: /);
+  }
 });
 
 test("the dwell is read from the board, defaults, and ignores nonsense", () => {
@@ -124,18 +147,19 @@ test("no last change, or an unreadable one, never holds", () => {
   assert.equal(reversalHold("energy_demand_factor_peak", "unknown", { last_change: { direction: "down", min_ago: 1 } }, 30), null);
 });
 
-test("ops actions carry their direction, and an explicit lower value reverses it", () => {
-  assert.equal(opsActionDirection("raise_deploy_surge", {}, 0.35), "up");
-  assert.equal(opsActionDirection("extend_forecast_horizon", { value: 20 }, 45), "down");
-  assert.equal(opsActionDirection("extend_forecast_horizon", { value: 60 }, 45), "up");
+test("ops actions carry their direction; the reserve switch only turns on", () => {
   assert.equal(opsActionDirection("enable_energy_reserve", { value: 0 }, 1), "up");
+  assert.equal(opsActionDirection("enable_energy_reserve", {}, 0), "up");
+  // v20: no longer whitelisted, so no direction to hold on
+  assert.equal(opsActionDirection("raise_deploy_surge", {}, 0.35), "unknown");
+  assert.equal(opsActionDirection("extend_forecast_horizon", { value: 20 }, 45), "unknown");
   assert.equal(opsActionDirection("drain_the_bess", {}, 1), "unknown");
   assert.equal(moveDirection(0.5, null), "unknown");
 });
 
 test("an ops action that would undo a recent set_policy change is held", () => {
-  const actuator = { value: 45, last_change: { direction: "down", min_ago: 10, from: 60, to: 45 } };
-  const hold = reversalHold("forecast_horizon_min", opsActionDirection("extend_forecast_horizon", {}, 45), actuator, 30);
+  const actuator = { value: 0, last_change: { direction: "down", min_ago: 10, from: 1, to: 0 } };
+  const hold = reversalHold("energy_reserve_shave", opsActionDirection("enable_energy_reserve", {}, 0), actuator, 30);
   assert.equal(hold?.reason, "reversal_within_dwell");
 });
 

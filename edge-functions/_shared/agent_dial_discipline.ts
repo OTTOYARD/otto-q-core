@@ -25,9 +25,21 @@ export type Knob = { lo: number; hi: number; int?: boolean };
 export const KNOBS: Readonly<Record<string, Knob>> = {
   energy_demand_factor_peak:      { lo: 0.3, hi: 0.9 },
   energy_demand_factor_expensive: { lo: 0.2, hi: 0.8 },
-  deploy_surge_catchup:           { lo: 0.1, hi: 1.0 },
-  forecast_horizon_min:           { lo: 10,  hi: 90, int: true },
   energy_reserve_shave:           { lo: 0,   hi: 1,  int: true },   // binary switch
+};
+
+/**
+ * v20 (G175, db/migrations/0438): dials the agent used to be offered that NOTHING READS. A comment-stripped
+ * search of every function in the database, and of every code repo, finds deploy_surge_catchup and
+ * forecast_horizon_min only in the setter that writes them (ottoq_apply_ops_action) and in this agent. On run
+ * 7a42982a the agent drove the first from 0.455 to 1.0 and the second from 39 to 75, and neither changed
+ * anything. They are REJECTED here with a reason the agent can read, never queued for a human: a human
+ * approving a placebo is worse than the agent tuning one. 0438 also makes them agent_writable = false, so
+ * the setter refuses them too.
+ */
+export const INERT_KEYS: Readonly<Record<string, string>> = {
+  deploy_surge_catchup: "inert_dial: no engine function reads deploy_surge_catchup (G175, 0438)",
+  forecast_horizon_min: "inert_dial: no engine function reads forecast_horizon_min (G175, 0438)",
 };
 
 /**
@@ -183,15 +195,20 @@ export function admitDialChange(
 
 /** Which dial each whitelisted ops action moves, and in which direction by default. */
 export const OPS_ACTION_DIAL: Readonly<Record<string, { key: string; direction: Direction }>> = {
-  raise_deploy_surge:      { key: "deploy_surge_catchup", direction: "up" },
-  extend_forecast_horizon: { key: "forecast_horizon_min", direction: "up" },
   enable_energy_reserve:   { key: "energy_reserve_shave", direction: "up" },
 };
 
+/** v20 (G175): the ops actions whose only effect was to move an inert dial. Rejected, never queued. */
+export const INERT_OPS: Readonly<Record<string, string>> = {
+  raise_deploy_surge:      "inert_ops_action: raise_deploy_surge moves deploy_surge_catchup, which nothing reads (G175)",
+  extend_forecast_horizon: "inert_ops_action: extend_forecast_horizon moves forecast_horizon_min, which nothing reads (G175)",
+};
+
 /**
- * The direction an ops action would move its dial. An explicit `args.value` below the value in force
- * makes raise_deploy_surge / extend_forecast_horizon a DOWN move (the SQL honours the value); the
- * reserve switch only ever turns on.
+ * The direction an ops action would move its dial. An explicit `args.value` below the value in force makes
+ * a raise a DOWN move (the SQL honours the value); the reserve switch only ever turns on. Since v20 the only
+ * whitelisted ops action is that switch, so the general branch is kept for the next dial that earns an ops
+ * action rather than for any action in force today.
  */
 export function opsActionDirection(action: string, args: unknown, current: number | null | undefined): Direction {
   const spec = OPS_ACTION_DIAL[action];

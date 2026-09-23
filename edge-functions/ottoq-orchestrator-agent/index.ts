@@ -2,7 +2,7 @@
 // (Nemotron 3 Ultra) wearing THREE analyst lenses in a single audited call:
 //   (1) depot orchestration/flow  (2) return-wave analysis  (3) energy strategy.
 // Doctrine: model proposes, SQL disposes. AUTO-ACTIONS an expanded set:
-//   • DIALS: 6 whitelisted policy knobs, hard-clamped + drift-limited.
+//   • DIALS: 3 whitelisted policy knobs since v20 (G175), hard-clamped + drift-limited.
 //   • OPS ACTIONS: whitelisted operational moves via ottoq_apply_ops_action (clamped);
 //     anything out-of-whitelist ROUTES TO THE HUMAN APPROVAL QUEUE (ottoq_ops_approvals).
 //   • DIRECTIVES: operator-facing advisory text (logged + surfaced in Pulse).
@@ -10,10 +10,19 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
-// v20 (0434, G164): the agent raised deploy_surge_catchup "to clear the 67-vehicle service backlog" on run
-//      7a42982a's first v19 pass, with deployed (4) already above the work side's target (3) -- where the dial,
-//      the share of a POSITIVE deploy gap released per tick, does nothing. The grounding block now publishes
-//      work_side_demand.deploy_gap (0434) and the prompt says the dial acts only on a positive gap.
+// v20 (0433-0438; G164, G174, G175): three of the agent's five dials did nothing.
+//      * deploy_surge_catchup and forecast_horizon_min have NO READER: a comment-stripped search of every
+//        database function and every code repo finds them only in the setter (ottoq_apply_ops_action) and in
+//        this file. On run 7a42982a the agent drove them from 0.455 to 1.0 and from 39 to 75, and one v19 pass
+//        raised the first "to clear the 67-vehicle service backlog". They leave KNOBS, their ops actions leave
+//        the whitelist, and both are REJECTED with a reason (INERT_KEYS / INERT_OPS), never queued for a
+//        human. 0438 makes them agent_writable = false, so the setter refuses them as well. (A draft of this
+//        v20 explained the surge dial's "semantics" to the agent; there were none to explain.)
+//      * energy_demand_factor_peak / _expensive do nothing while energy_reserve_shave is on, and the agent
+//        turned it on itself. grounding.actuators[dial].live says so (0438), and the prompt says so.
+//      * energy_reserve_shave = 1 now selects the battery's day plan (0435), and the plan's scalars are on
+//        grounding.energy_limits.battery_plan (0438). A DR call's allowance counts building load, solar and
+//        sustainable battery discharge (0433); the prompt no longer says battery discharge cannot help.
 // v19 (0432, db/checks/0352): 🔴 THE AGENT WAS SETTING THE DEMAND IT IS MEASURED AGAINST, FROM A
 //      BOARD THAT MISREPORTED IT. On run 0682752c the board said deploy_peak_fraction = 0.90 while
 //      the dispatcher used busy_day's 0.45; the agent's first move was 0.95 -- doubling the peak
@@ -82,7 +91,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeSolverDirective } from "../_shared/agent_solver_chain.ts";
 import {
-  KNOBS, WORK_SIDE_KEYS, OPS_ACTION_DIAL,
+  KNOBS, WORK_SIDE_KEYS, OPS_ACTION_DIAL, INERT_KEYS, INERT_OPS,
   clampDial, currentDialValue, reversalDwellMin, admitDialChange, opsActionDirection, reversalHold,
 } from "../_shared/agent_dial_discipline.ts";
 
@@ -126,22 +135,22 @@ READ THE BOARD THIS WAY:
 - grounding.work_side_demand is READ-ONLY: it is the demand you are measured against (deploy_target_now vs deployed_now). You cannot change it and must not try; deploy_peak_fraction is not a dial.
 - grounding.queue.waiting_for_service is the service backlog. readiness_checks_not_yet_due are the final gate check of visits still in service — NOT backlog. exit_checks_due are staged vehicles waiting for that check.
 - grounding.resources are pointer counts per stall type (free_by_pointer excludes faulted chargers); general_tech is the technician pool.
-- grounding.energy_limits.dr_call, when present, caps NEW charging at cap_kw for minutes_left; battery discharge does not raise that cap.
+- grounding.energy_limits.dr_call, when present, is a demand-response call: the site must cut its grid draw by the call's reduction for minutes_left. New charging is admitted up to grounding.energy_limits.ev_charge_allowance_kw, which counts building load, solar and what the battery can sustain for the rest of the call — so a battery that still holds energy at the call is what keeps vehicles charging.
+- grounding.energy_limits.battery_plan (when energy_reserve_shave = 1) is the battery's plan for the rest of the day: mode, the grid level it defends (level_kw), the billed peak (ratchet_kw), the DR reserve it holds (reserve_now_kwh), and whether it is charging and why.
 - "assets" (when present): SoC distribution, hard constraints with their causes (dcfc blocked by pack_temp_high clears by waiting; cell_balance_overdue needs service; soh_derate is permanent), deadline pressure, and a named attention list. Use it to choose the solver objective and to write directives about named vehicles.
 
-DIALS (the only keys set_policy accepts; value in [min, max]):
-  energy_demand_factor_peak [0.3, 0.9] — grid-draw target as a fraction of service_max outside expensive windows. HIGHER = draw more from the grid, shave less; LOWER = the battery covers more.
-  energy_demand_factor_expensive [0.2, 0.8] — the same target during expensive-tariff windows.
-  deploy_surge_catchup [0.1, 1.0] — fraction of a POSITIVE deploy gap (grounding.work_side_demand.deploy_gap = target − deployed) released per tick: how fast the depot catches up to the work side's target, never the target itself. At a gap of 0 or less it does nothing — leave it alone; it is not a service-backlog lever.
-  forecast_horizon_min [10, 90] integer — arrival-forecast horizon (minutes) for energy and staging pre-positioning.
-  energy_reserve_shave 0|1 — 1 = causal water-fill reserve target instead of the fixed demand factor.
+DIALS (the only keys set_policy accepts; value in [min, max]). Each grounding.actuators[dial].live says whether the dial does anything right now, and why not:
+  energy_reserve_shave 0|1 — 1 = the battery follows its day plan (price- and demand-charge-aware to midnight, holding a demand-response reserve through the afternoon); 0 = a fixed grid-draw target set by the two factors below.
+  energy_demand_factor_peak [0.3, 0.9] — ONLY when energy_reserve_shave = 0: grid-draw target as a fraction of service_max outside expensive windows. HIGHER = draw more from the grid, shave less; LOWER = the battery covers more.
+  energy_demand_factor_expensive [0.2, 0.8] — ONLY when energy_reserve_shave = 0: the same target during expensive-tariff windows.
+  A dial whose live is false has no effect: leave it alone. deploy_surge_catchup and forecast_horizon_min are not dials — nothing in the engine reads them, and a write to either is rejected.
 STABILITY: each grounding.actuators[dial] shows last_change {direction, min_ago} and how often your requests were clamped. A dial whose last_change is younger than grounding.stability.reversal_dwell_min may move again ONLY in the same direction — a reversal is rejected. Re-sending the value already in force is rejected as no_change. Values outside [min, max] are clamped, so ask inside the range.
 
 INVIOLABLE: vehicles/chargers are never held back; a vehicle needing charge with a free charger charges immediately; you communicate — you never move vehicles.
 
 Return EXACTLY: {"actions":[...],"solver":{"objective":"readiness_first|throughput_first|energy_balanced","why":"<short>"},"rationale":"<3-6 sentences citing board numbers>"} where each action is one of:
-  {"type":"set_policy","key":"<dial>","value":<number>,"why":"<short>"}  dials: energy_demand_factor_peak | energy_demand_factor_expensive | deploy_surge_catchup | forecast_horizon_min | energy_reserve_shave(0|1)
-  {"type":"ops_action","action":"<name>","args":{},"why":"<short>"}  ops: raise_deploy_surge | extend_forecast_horizon | enable_energy_reserve (any OTHER name → human approval queue)
+  {"type":"set_policy","key":"<dial>","value":<number>,"why":"<short>"}  dials: energy_reserve_shave(0|1) | energy_demand_factor_peak | energy_demand_factor_expensive
+  {"type":"ops_action","action":"<name>","args":{},"why":"<short>"}  ops: enable_energy_reserve (any OTHER name → human approval queue)
   {"type":"directive","text":"<advisory>","severity":"info|warning"}
 The solver objective ranks feasible assignments only: readiness_first protects low-SoC readiness, throughput_first prefers faster service, and energy_balanced conserves DCFC for vehicles that need it. It never changes eligibility and never holds a vehicle back.
 At most 3 policy/ops actions; dial values near current (max ±30%); prefer the smallest effective change; empty actions is a good answer when healthy — a dial that is working should be left alone. Fractional dials accept fractional values — send the precise number you intend, not a rounded one. Output ONLY the JSON object.`;
@@ -251,6 +260,8 @@ serve(async (req) => {
           rejected.push({ ...a, reason: "work_side_demand: read-only, not an agent actuator (0432)" });
           continue;
         }
+        // v20 (G175): a dial nothing reads is rejected with its reason -- never queued for a human to approve.
+        if (INERT_KEYS[a.key]) { rejected.push({ ...a, reason: INERT_KEYS[a.key] }); continue; }
         if (!KNOBS[a.key]) { await queueApproval("nemotron_policy_out_of_whitelist", { key: a.key, value: Number(a.value), why: a.why }); continue; }
         if (moves >= 3) { rejected.push({ ...a, reason: "move cap (3) reached" }); continue; }
         // v19: the current value comes from the grounding block (the engine's own resolution). v18 read
@@ -293,6 +304,8 @@ serve(async (req) => {
           moves++;
         }
       } else if (a?.type === "ops_action" && typeof a.action === "string") {
+        // v20 (G175): an ops action whose only effect is an inert dial is rejected, never queued.
+        if (INERT_OPS[a.action]) { rejected.push({ ...a, reason: INERT_OPS[a.action] }); continue; }
         if (moves >= 3 && OPS_WHITELIST.has(a.action)) { rejected.push({ ...a, reason: "move cap (3) reached" }); continue; }
         // v19: an ops action moves a dial too, so the reversal dwell applies to it.
         const opsDial = OPS_ACTION_DIAL[a.action];
