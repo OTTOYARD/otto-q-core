@@ -103,7 +103,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0436 — GENERATED, not a log
+## Index, 0134–0437 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432 — which are indexed below as well as logged above; the log row is
@@ -421,7 +421,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0434](db/migrations/0434_three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double.sql) | `PENDING` | no — pending | **The work side's deploy demand is read by three engine functions, which resolved its default three |
 | [0435](db/migrations/0435_the_battery_planned_eight_hours_ahead_on_a_forecast_where_charging_stops_and_was_empty_before_the_expensive_afternoon.sql) | `PENDING` | no — pending | **The battery's planner looked eight hours ahead, on a forecast in which EV charging stops as soon as |
 | [0436](db/migrations/0436_the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine.sql) | `PENDING` | no — pending | **The twin's temperature is coldest at 08:00 and hottest at 20:00, because the diurnal swing is written as |
+| [0437](db/migrations/0437_the_readiness_check_had_a_second_door_out_of_the_depot_and_0431_only_guarded_one.sql) | `PENDING` | no — pending | **A vehicle could still leave without its readiness check through a second door: 0431 held vehicles |
 
-299 migrations indexed.
+300 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
