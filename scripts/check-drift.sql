@@ -537,7 +537,8 @@ repo_manifest(version, name, file) AS (
     ('20260923021253'::text, 'the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share'::text, '0440_the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share.sql'::text),
     ('PENDING'::text, 'the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere'::text, '0441_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql'::text),
     ('PENDING'::text, 'the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence'::text, '0442_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql'::text),
-    ('PENDING'::text, 'the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak'::text, '0443_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql'::text)
+    ('PENDING'::text, 'the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak'::text, '0443_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql'::text),
+    ('PENDING'::text, 'the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late'::text, '0444_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
