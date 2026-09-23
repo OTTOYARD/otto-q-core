@@ -1,7 +1,7 @@
 -- migration-version: PENDING
 -- migration-name:    two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing
 --
--- 0445  **Two of the depot's ten fast chargers looped for over an hour on two vehicles already at the fast chargers'
+-- 0446  **Two of the depot's ten fast chargers looped for over an hour on two vehicles already at the fast chargers'
 --       daytime cap, delivering nothing.** A DCFC session stops at LEAST(vehicle target, `ottoq_target_soc_cap`)
 --       - 0.5, and that cap is 90% by day (06:00-20:00 CT, `dcfc_target_soc_day`) against a 100% vehicle target
 --       (`ottoq_default_target_soc`). The stall picker never asks the cap. A vehicle at 90% by day therefore still
@@ -50,14 +50,14 @@ DO $inflight$
 DECLARE v_jobs text; v_pairs int; v_runs int;
 BEGIN
   SELECT string_agg(jobname, ', ' ORDER BY jobname) INTO v_jobs FROM cron.job WHERE jobname ~ '^r[0-9]+_';
-  IF v_jobs IS NOT NULL THEN RAISE EXCEPTION '0445 P0: certification jobs are still scheduled (%)', v_jobs; END IF;
+  IF v_jobs IS NOT NULL THEN RAISE EXCEPTION '0446 P0: certification jobs are still scheduled (%)', v_jobs; END IF;
   SELECT count(*) INTO v_pairs FROM pg_stat_activity
    WHERE (query ILIKE '%ottoq_determinism_pair%' OR query ILIKE '%ottoq_dial_pair%' OR query ILIKE '%ottoq_dial_experiment_runner%'
           OR query ILIKE '%ottoq_ab_pair%')
      AND state = 'active' AND pid <> pg_backend_pid();
-  IF v_pairs > 0 THEN RAISE EXCEPTION '0445 P0: a pair is running right now'; END IF;
+  IF v_pairs > 0 THEN RAISE EXCEPTION '0446 P0: a pair is running right now'; END IF;
   SELECT count(*) INTO v_runs FROM public.ottoq_sim_runs WHERE status IN ('running','paused');
-  IF v_runs > 0 THEN RAISE EXCEPTION '0445 P0: % sim run(s) running/paused -- apply between runs', v_runs; END IF;
+  IF v_runs > 0 THEN RAISE EXCEPTION '0446 P0: % sim run(s) running/paused -- apply between runs', v_runs; END IF;
 END $inflight$;
 
 -- ── P1: the picker as read on 2026-09-23, and its anchors unique ──
@@ -66,7 +66,7 @@ DECLARE v_src text; v_n int; v_a text;
 BEGIN
   SELECT prosrc INTO v_src FROM pg_proc WHERE oid = 'public.ottoq_l2_propose_stall_assignment(uuid,uuid,jsonb)'::regprocedure;
   IF md5(v_src) <> '335d111fefed5df5d7b5fe15cfa54ed1' THEN
-    RAISE EXCEPTION '0445 P1: ottoq_l2_propose_stall_assignment md5 is %', md5(v_src);
+    RAISE EXCEPTION '0446 P1: ottoq_l2_propose_stall_assignment md5 is %', md5(v_src);
   END IF;
   FOREACH v_a IN ARRAY ARRAY[
       E'  v_want_kw numeric; v_ceiling numeric; v_wait_reason text := NULL; v_seat int; /* 0261 */\n',
@@ -74,20 +74,20 @@ BEGIN
       E'       AND c.station_state = ''Available'' AND c.last_heartbeat_at >= v_now - INTERVAL ''90 seconds''\n']
   LOOP
     v_n := (length(v_src) - length(replace(v_src, v_a, ''))) / length(v_a);
-    IF v_n <> 1 THEN RAISE EXCEPTION '0445 P1: anchor matched % times: %', v_n, left(v_a, 70); END IF;
+    IF v_n <> 1 THEN RAISE EXCEPTION '0446 P1: anchor matched % times: %', v_n, left(v_a, 70); END IF;
   END LOOP;
   -- the session's stop rule this mirrors, as read today
   SELECT prosrc INTO v_src FROM pg_proc WHERE oid = 'twin.ottoq_sim_advance_charge_sessions'::regproc;
   IF position('IF v_new_soc >= v_target_soc - 0.5 THEN' IN v_src) = 0
      OR position('LEAST(COALESCE(v_vehicle.target_soc, public.ottoq_default_target_soc()), public.ottoq_target_soc_cap(v_session.stall_type::TEXT, v_session.started_at))' IN v_src) = 0 THEN
-    RAISE EXCEPTION '0445 P1: the session''s stop rule is no longer LEAST(target, cap) - 0.5';
+    RAISE EXCEPTION '0446 P1: the session''s stop rule is no longer LEAST(target, cap) - 0.5';
   END IF;
 END $$;
 
 -- ── SNAPSHOT ──
 INSERT INTO public.ottoq_schema_snapshots
        (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0445_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+SELECT '0446_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE p.oid = 'public.ottoq_l2_propose_stall_assignment(uuid,uuid,jsonb)'::regprocedure;
 
@@ -99,7 +99,7 @@ BEGIN
   v_new := replace(v_def,
     E'  v_want_kw numeric; v_ceiling numeric; v_wait_reason text := NULL; v_seat int; /* 0261 */\n',
     E'  v_want_kw numeric; v_ceiling numeric; v_wait_reason text := NULL; v_seat int; /* 0261 */\n'
-    || E'  v_veh_target numeric;   /* 0445 */\n');
+    || E'  v_veh_target numeric;   /* 0446 */\n');
   v_new := replace(v_new,
     E'  SELECT inlet_type, inlet_max_kw, battery_capacity_kwh INTO v_inlet, v_inlet_kw, v_batt_kwh\n    FROM vehicles WHERE id = p_vehicle_id;\n',
     E'  SELECT inlet_type, inlet_max_kw, battery_capacity_kwh, target_soc INTO v_inlet, v_inlet_kw, v_batt_kwh, v_veh_target\n'
@@ -107,14 +107,14 @@ BEGIN
   v_new := replace(v_new,
     E'       AND c.station_state = ''Available'' AND c.last_heartbeat_at >= v_now - INTERVAL ''90 seconds''\n',
     E'       AND c.station_state = ''Available'' AND c.last_heartbeat_at >= v_now - INTERVAL ''90 seconds''\n'
-    || E'       /* 0445 (G179): the session stops at LEAST(target, this stall type''s cap now) - 0.5, so a stall that\n'
+    || E'       /* 0446 (G179): the session stops at LEAST(target, this stall type''s cap now) - 0.5, so a stall that\n'
     || E'          would stop the session before it starts is not a candidate. Without this, a vehicle at the DCFC\n'
     || E'          daytime cap kept its DCFC reservation and looped on it, delivering nothing. */\n'
     || E'       AND v_soc < LEAST(COALESCE(v_veh_target, public.ottoq_default_target_soc()),\n'
     || E'                         public.ottoq_target_soc_cap(s.stall_type::text, v_now)) - 0.5\n');
   IF v_new = v_def OR position('public.ottoq_target_soc_cap(s.stall_type::text, v_now)) - 0.5' IN v_new) = 0
      OR position('target_soc INTO v_inlet, v_inlet_kw, v_batt_kwh, v_veh_target' IN v_new) = 0 THEN
-    RAISE EXCEPTION '0445: the picker splices did not all apply';
+    RAISE EXCEPTION '0446: the picker splices did not all apply';
   END IF;
   EXECUTE v_new;
 END $splice$;
@@ -142,7 +142,7 @@ BEGIN
     r := public.ottoq_l2_propose_stall_assignment(v_vid, '11111111-1111-1111-1111-111111111111',
            jsonb_build_object('current_soc', 90, 'now_ts', v_day, 'headroom_kw', 5000));
     IF COALESCE((r->>'abstain')::boolean, true) OR r->>'stall_type' <> 'l2' THEN
-      RAISE EXCEPTION '0445 V1(a): by day at 90%% the picker returned %', r;
+      RAISE EXCEPTION '0446 V1(a): by day at 90%% the picker returned %', r;
     END IF;
 
     -- (b) by day, no L2 available: abstain rather than the DCFC
@@ -151,14 +151,14 @@ BEGIN
     r := public.ottoq_l2_propose_stall_assignment(v_vid, '11111111-1111-1111-1111-111111111111',
            jsonb_build_object('current_soc', 90, 'now_ts', v_day, 'headroom_kw', 5000));
     IF NOT COALESCE((r->>'abstain')::boolean, false) THEN
-      RAISE EXCEPTION '0445 V1(b): by day at 90%% with no L2 the picker returned %', r;
+      RAISE EXCEPTION '0446 V1(b): by day at 90%% with no L2 the picker returned %', r;
     END IF;
 
     -- (c) the same vehicle below the cap is still offered the DCFC by day
     r := public.ottoq_l2_propose_stall_assignment(v_vid, '11111111-1111-1111-1111-111111111111',
            jsonb_build_object('current_soc', 40, 'now_ts', v_day, 'headroom_kw', 5000));
     IF COALESCE((r->>'abstain')::boolean, true) OR r->>'stall_type' <> 'dcfc' THEN
-      RAISE EXCEPTION '0445 V1(c): by day at 40%% the picker returned %', r;
+      RAISE EXCEPTION '0446 V1(c): by day at 40%% the picker returned %', r;
     END IF;
 
     -- (d) by night the DCFC cap is 100, so at 90% the DCFC is a candidate again
@@ -167,13 +167,13 @@ BEGIN
     r := public.ottoq_l2_propose_stall_assignment(v_vid, '11111111-1111-1111-1111-111111111111',
            jsonb_build_object('current_soc', 90, 'now_ts', v_night, 'headroom_kw', 5000));
     IF COALESCE((r->>'abstain')::boolean, true) OR r->>'stall_type' <> 'dcfc' THEN
-      RAISE EXCEPTION '0445 V1(d): by night at 90%% the picker returned %', r;
+      RAISE EXCEPTION '0446 V1(d): by night at 90%% the picker returned %', r;
     END IF;
 
-    RAISE EXCEPTION USING MESSAGE = '0445_probe_rollback';
+    RAISE EXCEPTION USING MESSAGE = '0446_probe_rollback';
   EXCEPTION WHEN raise_exception THEN
     GET STACKED DIAGNOSTICS v_msg = MESSAGE_TEXT;
-    IF v_msg <> '0445_probe_rollback' THEN RAISE; END IF;
+    IF v_msg <> '0446_probe_rollback' THEN RAISE; END IF;
   END;
 END $$;
 
@@ -186,13 +186,13 @@ BEGIN
   IF position('v_soc < LEAST(COALESCE(v_veh_target, public.ottoq_default_target_soc()),' IN v_src) = 0
      OR position('public.ottoq_target_soc_cap(s.stall_type::text, v_now)) - 0.5' IN v_src) = 0
      OR position('v_soc < LEAST(COALESCE(v_veh_target' IN v_src) > position('SELECT id, stall_type, connector_max_kw, eff_kw' IN v_src) THEN
-    RAISE EXCEPTION '0445 V2: the cap predicate is not in the candidate set';
+    RAISE EXCEPTION '0446 V2: the cap predicate is not in the candidate set';
   END IF;
 END $$;
 
 -- ── LINEAGE ──
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note) VALUES
-  ('0445_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing',
+  ('0446_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing',
    true,
    'G179: ottoq_l2_propose_stall_assignment admits a charge stall only if the vehicle is below LEAST(its target, '
    'ottoq_target_soc_cap(stall type, now)) - 0.5, the session''s own stop rule. By day a vehicle at the DCFC cap is '
@@ -203,4 +203,4 @@ ON CONFLICT (name) DO UPDATE SET forces_recert = EXCLUDED.forces_recert, note = 
 COMMIT;
 
 -- forces_recert TRUE. Live proof: the next busy_day run has no DCFC session that starts at or above the DCFC cap
--- by day (324eb0f1: 156 by sim 11:43 CT). Rollback: restore the picker from ottoq_schema_snapshots label '0445_pre'.
+-- by day (324eb0f1: 156 by sim 11:43 CT). Rollback: restore the picker from ottoq_schema_snapshots label '0446_pre'.

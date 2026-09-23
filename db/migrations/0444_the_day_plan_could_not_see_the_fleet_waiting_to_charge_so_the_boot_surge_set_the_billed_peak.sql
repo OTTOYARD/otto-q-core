@@ -1,7 +1,7 @@
 -- migration-version: PENDING
 -- migration-name:    the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak
 --
--- 0443  **The battery's day plan could not see the fleet waiting to charge, so the boot surge set the day's billed
+-- 0444  **The battery's day plan could not see the fleet waiting to charge, so the boot surge set the day's billed
 --       peak while the battery sat at 95%.** `public.ottoq_bess_day_plan` (0435) forecasts EV load as
 --       GREATEST(known, persistence). `known` (`ottoq_forecast_ev_known_kw`) counts two things: sessions already
 --       running, held at their rate until they finish, and returning dispatches, charged from their ETA.
@@ -70,7 +70,7 @@
 -- ══ §4 forces_recert FALSE ═══════════════════════════════════════════════════════════════════════════════════
 --
 --   The day plan is reached only from `ottoq_energy_orchestrate` with `energy_reserve_shave` >= 0.5, and no
---   certification run has that on (P2; 0435 P3; 0441 P2). The two new functions have no other caller.
+--   certification run has that on (P2; 0435 P3; 0442 P2). The two new functions have no other caller.
 
 BEGIN;
 
@@ -79,13 +79,13 @@ DO $inflight$
 DECLARE v_jobs text; v_pairs int; v_runs int;
 BEGIN
   SELECT string_agg(jobname, ', ' ORDER BY jobname) INTO v_jobs FROM cron.job WHERE jobname ~ '^r[0-9]+_';
-  IF v_jobs IS NOT NULL THEN RAISE EXCEPTION '0443 P0: certification jobs are still scheduled (%)', v_jobs; END IF;
+  IF v_jobs IS NOT NULL THEN RAISE EXCEPTION '0444 P0: certification jobs are still scheduled (%)', v_jobs; END IF;
   SELECT count(*) INTO v_pairs FROM pg_stat_activity
    WHERE (query ILIKE '%ottoq_determinism_pair%' OR query ILIKE '%ottoq_dial_pair%' OR query ILIKE '%ottoq_dial_experiment_runner%')
      AND state = 'active' AND pid <> pg_backend_pid();
-  IF v_pairs > 0 THEN RAISE EXCEPTION '0443 P0: a determinism or dial pair is running right now'; END IF;
+  IF v_pairs > 0 THEN RAISE EXCEPTION '0444 P0: a determinism or dial pair is running right now'; END IF;
   SELECT count(*) INTO v_runs FROM public.ottoq_sim_runs WHERE status IN ('running','paused');
-  IF v_runs > 0 THEN RAISE EXCEPTION '0443 P0: % sim run(s) running/paused -- apply between runs', v_runs; END IF;
+  IF v_runs > 0 THEN RAISE EXCEPTION '0444 P0: % sim run(s) running/paused -- apply between runs', v_runs; END IF;
 END $inflight$;
 
 -- ── P1: the day plan as read on 2026-09-23, every anchor unique, and nothing this creates exists yet ──
@@ -95,7 +95,7 @@ BEGIN
   SELECT prosrc INTO v_src FROM pg_proc
    WHERE oid = 'public.ottoq_bess_day_plan(uuid,uuid,timestamp with time zone,numeric)'::regprocedure;
   IF md5(v_src) <> '7f2a404edbee50b9bcb091516576231b' THEN
-    RAISE EXCEPTION '0443 P1: ottoq_bess_day_plan md5 is %', md5(v_src);
+    RAISE EXCEPTION '0444 P1: ottoq_bess_day_plan md5 is %', md5(v_src);
   END IF;
   FOREACH v_a IN ARRAY ARRAY[
       E'  v_prof numeric[]; v_prof_now numeric; v_anom numeric;\n',
@@ -105,11 +105,11 @@ BEGIN
       E'       ''ev_kw'',    (SELECT jsonb_agg(round(x, 0) ORDER BY o) FROM unnest(v_ev)    WITH ORDINALITY AS u(x, o)),\n']
   LOOP
     v_n := (length(v_src) - length(replace(v_src, v_a, ''))) / length(v_a);
-    IF v_n <> 1 THEN RAISE EXCEPTION '0443 P1: anchor matched % times: %', v_n, left(v_a, 60); END IF;
+    IF v_n <> 1 THEN RAISE EXCEPTION '0444 P1: anchor matched % times: %', v_n, left(v_a, 60); END IF;
   END LOOP;
   IF to_regprocedure('public.ottoq_ev_queue_schedule(numeric[],numeric[],numeric[],numeric[],numeric[],numeric,integer)') IS NOT NULL
      OR to_regprocedure('public.ottoq_forecast_ev_queue_kw(uuid,uuid,timestamp with time zone,integer,numeric)') IS NOT NULL THEN
-    RAISE EXCEPTION '0443 P1: the queue forecast already exists';
+    RAISE EXCEPTION '0444 P1: the queue forecast already exists';
   END IF;
 END $$;
 
@@ -119,21 +119,21 @@ DECLARE v_callers text;
 BEGIN
   IF EXISTS (SELECT 1 FROM public.ottoq_policy_params
               WHERE param_key = 'energy_reserve_shave' AND scope_type IN ('depot','global') AND param_value >= 0.5) THEN
-    RAISE EXCEPTION '0443 P2: energy_reserve_shave is on at depot/global scope, so certification runs reach plan mode';
+    RAISE EXCEPTION '0444 P2: energy_reserve_shave is on at depot/global scope, so certification runs reach plan mode';
   END IF;
   SELECT string_agg(DISTINCT n.nspname || '.' || p.proname, ', ') INTO v_callers
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname IN ('public','twin','ottoq') AND p.proname <> 'ottoq_bess_day_plan'
      AND regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') ~ 'ottoq_bess_day_plan';
   IF v_callers IS DISTINCT FROM 'public.ottoq_energy_orchestrate' THEN
-    RAISE EXCEPTION '0443 P2: ottoq_bess_day_plan has callers other than the orchestrator: %', v_callers;
+    RAISE EXCEPTION '0444 P2: ottoq_bess_day_plan has callers other than the orchestrator: %', v_callers;
   END IF;
 END $$;
 
 -- ── SNAPSHOT ──
 INSERT INTO public.ottoq_schema_snapshots
        (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0443_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+SELECT '0444_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE p.oid = 'public.ottoq_bess_day_plan(uuid,uuid,timestamp with time zone,numeric)'::regprocedure;
 
@@ -147,7 +147,7 @@ CREATE FUNCTION public.ottoq_ev_queue_schedule(
  IMMUTABLE
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0443: list scheduling of charge jobs onto chargers, for a load FORECAST. Jobs arrive in queue order; each takes
+/* 0444: list scheduling of charge jobs onto chargers, for a load FORECAST. Jobs arrive in queue order; each takes
    the charger that can start it earliest (ties: more kW, then lower index). Load is each step's AVERAGE kW, so
    sum(load) x step/60 is the energy delivered inside the horizon. Pure: no table is read. */
 DECLARE
@@ -206,7 +206,7 @@ CREATE FUNCTION public.ottoq_forecast_ev_queue_kw(
  STABLE SECURITY DEFINER
  SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
 AS $fn$
-/* 0443 (G177): the EV load the depot will draw, as a queue. Running sessions hold their charger until their
+/* 0444 (G177): the EV load the depot will draw, as a queue. Running sessions hold their charger until their
    forecast end (ottoq_forecast_ev_known_kw loop (1)'s arithmetic, verbatim); vehicles waiting on site and returning
    dispatches (loop (2)'s predicate) are scheduled onto the chargers as they free, by ottoq_ev_queue_schedule.
    Every input is this run's rows or the depot's static data, so the two arms of a pair see the same forecast. */
@@ -316,33 +316,33 @@ BEGIN
   v_new := replace(v_def,
     E'  v_prof numeric[]; v_prof_now numeric; v_anom numeric;\n',
     E'  v_prof numeric[]; v_prof_now numeric; v_anom numeric;\n'
-    || E'  v_q record; v_queue numeric[];   /* 0443 */\n');
+    || E'  v_q record; v_queue numeric[];   /* 0444 */\n');
   v_new := replace(v_new,
     E'  v_known := public.ottoq_forecast_ev_known_kw(p_sim_run_id, p_depot_id, p_sim_clock, v_n, 30, 30);\n',
     E'  v_known := public.ottoq_forecast_ev_known_kw(p_sim_run_id, p_depot_id, p_sim_clock, v_n, 30, 30);\n'
-    || E'  -- 0443 (G177): and the fleet already on site waiting for a charger, queued onto the chargers as they free\n'
+    || E'  -- 0444 (G177): and the fleet already on site waiting for a charger, queued onto the chargers as they free\n'
     || E'  SELECT * INTO v_q FROM public.ottoq_forecast_ev_queue_kw(p_sim_run_id, p_depot_id, p_sim_clock, v_n, 30);\n'
     || E'  v_queue := v_q.load_kw;\n');
   v_new := replace(v_new,
     E'    v_ev[k] := GREATEST(COALESCE(v_known[k], 0), v_ev_persist);\n',
-    E'    v_ev[k] := GREATEST(COALESCE(v_known[k], 0), COALESCE(v_queue[k], 0), v_ev_persist);   /* 0443 */\n');
+    E'    v_ev[k] := GREATEST(COALESCE(v_known[k], 0), COALESCE(v_queue[k], 0), v_ev_persist);   /* 0444 */\n');
   v_new := replace(v_new,
     E'''ev_persist_kw'', round(v_ev_persist, 1),\n',
     E'''ev_persist_kw'', round(v_ev_persist, 1),\n'
     || E'    ''ev_queue'', jsonb_build_object(''pending_n'', v_q.pending_n, ''pending_kwh'', round(v_q.pending_kwh, 1),\n'
     || E'                 ''returning_n'', v_q.returning_n, ''chargers'', v_q.chargers_n, ''unplaced_n'', v_q.unplaced_n,\n'
-    || E'                 ''peak_kw'', round((SELECT max(x) FROM unnest(v_queue) AS x), 1)),   /* 0443 */\n');
+    || E'                 ''peak_kw'', round((SELECT max(x) FROM unnest(v_queue) AS x), 1)),   /* 0444 */\n');
   v_new := replace(v_new,
     E'       ''ev_kw'',    (SELECT jsonb_agg(round(x, 0) ORDER BY o) FROM unnest(v_ev)    WITH ORDINALITY AS u(x, o)),\n',
     E'       ''ev_kw'',    (SELECT jsonb_agg(round(x, 0) ORDER BY o) FROM unnest(v_ev)    WITH ORDINALITY AS u(x, o)),\n'
-    || E'       ''ev_queue_kw'', (SELECT jsonb_agg(round(x, 0) ORDER BY o) FROM unnest(v_queue) WITH ORDINALITY AS u(x, o)),   /* 0443 */\n'
+    || E'       ''ev_queue_kw'', (SELECT jsonb_agg(round(x, 0) ORDER BY o) FROM unnest(v_queue) WITH ORDINALITY AS u(x, o)),   /* 0444 */\n'
     || E'       ''ev_known_kw'', (SELECT jsonb_agg(round(x, 0) ORDER BY o) FROM unnest(v_known) WITH ORDINALITY AS u(x, o)),\n');
   IF v_new = v_def
      OR position('ottoq_forecast_ev_queue_kw' IN v_new) = 0
      OR position('COALESCE(v_queue[k], 0), v_ev_persist' IN v_new) = 0
      OR position('''ev_queue'', jsonb_build_object' IN v_new) = 0
      OR position('''ev_queue_kw''' IN v_new) = 0 THEN
-    RAISE EXCEPTION '0443: the day-plan splices did not all apply';
+    RAISE EXCEPTION '0444: the day-plan splices did not all apply';
   END IF;
   EXECUTE v_new;
 END $splice$;
@@ -359,11 +359,11 @@ BEGIN
   IF (SELECT array_agg(round(x, 3) ORDER BY o) FROM unnest(r.load_kw) WITH ORDINALITY AS u(x, o))
        <> ARRAY[109.2, 56.533, 30.2, 13.4]::numeric[]
      OR r.placed <> 3 OR r.unplaced <> 0 OR r.placed_kwh <> 105 THEN
-    RAISE EXCEPTION '0443 V1: the core scheduled % (placed %, unplaced %, kWh %)', r.load_kw, r.placed, r.unplaced, r.placed_kwh;
+    RAISE EXCEPTION '0444 V1: the core scheduled % (placed %, unplaced %, kWh %)', r.load_kw, r.placed, r.unplaced, r.placed_kwh;
   END IF;
   -- energy conserved inside the horizon: 105 kWh placed, and C's last 1.818 min x 11 kW (1/3 kWh) falls outside it
   IF abs((SELECT sum(x) FROM unnest(r.load_kw) AS x) * 30 / 60.0 - (105 - 11 * (15 / 11.0 * 60 + 40 - 120) / 60.0)) > 1e-6 THEN
-    RAISE EXCEPTION '0443 V1: energy is not conserved inside the horizon';
+    RAISE EXCEPTION '0444 V1: energy is not conserved inside the horizon';
   END IF;
 END $$;
 
@@ -376,7 +376,7 @@ BEGIN
          ARRAY[45, 45]::numeric[], ARRAY[0, 50]::numeric[], ARRAY[250, 250]::numeric[], 30, 4);
   IF (SELECT array_agg(round(x, 3) ORDER BY o) FROM unnest(r.load_kw) WITH ORDINALITY AS u(x, o))
        <> ARRAY[50, 90, 40, 0]::numeric[] OR r.placed <> 2 OR r.unplaced <> 0 THEN
-    RAISE EXCEPTION '0443 V2: the core queued % (placed %, unplaced %)', r.load_kw, r.placed, r.unplaced;
+    RAISE EXCEPTION '0444 V2: the core queued % (placed %, unplaced %)', r.load_kw, r.placed, r.unplaced;
   END IF;
 END $$;
 
@@ -388,13 +388,13 @@ BEGIN
   SELECT * INTO r FROM public.ottoq_ev_queue_schedule(ARRAY[19.2]::numeric[], ARRAY[0]::numeric[],
          ARRAY[100, 10]::numeric[], ARRAY[0, 0]::numeric[], ARRAY[11, 11]::numeric[], 30, 4);
   IF r.load_kw <> ARRAY[11, 11, 11, 11]::numeric[] OR r.placed <> 1 OR r.unplaced <> 1 THEN
-    RAISE EXCEPTION '0443 V3: % placed % unplaced %', r.load_kw, r.placed, r.unplaced;
+    RAISE EXCEPTION '0444 V3: % placed % unplaced %', r.load_kw, r.placed, r.unplaced;
   END IF;
   -- and no chargers at all: every job unplaced, zero load
   SELECT * INTO r FROM public.ottoq_ev_queue_schedule('{}'::numeric[], '{}'::numeric[],
          ARRAY[10]::numeric[], ARRAY[0]::numeric[], ARRAY[11]::numeric[], 30, 2);
   IF r.load_kw <> ARRAY[0, 0]::numeric[] OR r.placed <> 0 OR r.unplaced <> 1 THEN
-    RAISE EXCEPTION '0443 V3: with no chargers the core returned % placed % unplaced %', r.load_kw, r.placed, r.unplaced;
+    RAISE EXCEPTION '0444 V3: with no chargers the core returned % placed % unplaced %', r.load_kw, r.placed, r.unplaced;
   END IF;
 END $$;
 
@@ -406,7 +406,7 @@ BEGIN
   SELECT sim_run_id, sim_clock_current INTO v_run, v_clock FROM public.ottoq_sim_runs
    WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND sim_clock_current IS NOT NULL
    ORDER BY started_at DESC LIMIT 1;
-  IF v_run IS NULL THEN RAISE NOTICE '0443 V4: no twin run to read; skipped'; RETURN; END IF;
+  IF v_run IS NULL THEN RAISE NOTICE '0444 V4: no twin run to read; skipped'; RETURN; END IF;
 
   SELECT * INTO r FROM public.ottoq_forecast_ev_queue_kw(v_run, '11111111-1111-1111-1111-111111111111', v_clock, 16, 30);
   SELECT COALESCE(sum(COALESCE(ch.max_kw, st.connector_max_kw, 0)), 0) INTO v_cap_sum
@@ -415,23 +415,23 @@ BEGIN
   IF array_length(r.load_kw, 1) <> 16 OR r.chargers_n < 1
      OR EXISTS (SELECT 1 FROM unnest(r.load_kw) AS x WHERE x < 0 OR x > v_cap_sum + 1e-6)
      OR r.pending_n < 0 OR r.pending_kwh < 0 OR r.unplaced_n < 0 THEN
-    RAISE EXCEPTION '0443 V4: the wrapper returned % (chargers %, pending %/% kWh, unplaced %) against % kW of chargers',
+    RAISE EXCEPTION '0444 V4: the wrapper returned % (chargers %, pending %/% kWh, unplaced %) against % kW of chargers',
       r.load_kw, r.chargers_n, r.pending_n, r.pending_kwh, r.unplaced_n, v_cap_sum;
   END IF;
 
   v_plan := public.ottoq_bess_day_plan(v_run, '11111111-1111-1111-1111-111111111111', v_clock, NULL);
   IF NOT COALESCE((v_plan->>'ok')::boolean, false) THEN
-    RAISE EXCEPTION '0443 V4: the day plan no longer solves: %', v_plan;
+    RAISE EXCEPTION '0444 V4: the day plan no longer solves: %', v_plan;
   END IF;
   IF v_plan->'ev_queue' IS NULL OR v_plan->'forecast'->'ev_queue_kw' IS NULL OR v_plan->'forecast'->'ev_known_kw' IS NULL THEN
-    RAISE EXCEPTION '0443 V4: the plan does not report its queue term';
+    RAISE EXCEPTION '0444 V4: the plan does not report its queue term';
   END IF;
   SELECT array_agg(x::numeric ORDER BY o) INTO v_ev FROM jsonb_array_elements_text(v_plan->'forecast'->'ev_kw') WITH ORDINALITY AS t(x, o);
   SELECT array_agg(x::numeric ORDER BY o) INTO v_q  FROM jsonb_array_elements_text(v_plan->'forecast'->'ev_queue_kw') WITH ORDINALITY AS t(x, o);
   SELECT array_agg(x::numeric ORDER BY o) INTO v_kn FROM jsonb_array_elements_text(v_plan->'forecast'->'ev_known_kw') WITH ORDINALITY AS t(x, o);
   FOR k IN 1 .. array_length(v_ev, 1) LOOP
     IF v_ev[k] < v_q[k] OR v_ev[k] < v_kn[k] THEN
-      RAISE EXCEPTION '0443 V4: step % forecasts % kW of EV under its queue % or known % term', k, v_ev[k], v_q[k], v_kn[k];
+      RAISE EXCEPTION '0444 V4: step % forecasts % kW of EV under its queue % or known % term', k, v_ev[k], v_q[k], v_kn[k];
     END IF;
   END LOOP;
 END $$;
@@ -444,17 +444,17 @@ BEGIN
    WHERE oid = 'public.ottoq_bess_day_plan(uuid,uuid,timestamp with time zone,numeric)'::regprocedure;
   IF position('ottoq_forecast_ev_queue_kw(p_sim_run_id, p_depot_id, p_sim_clock, v_n, 30)' IN v_src) = 0
      OR position('GREATEST(COALESCE(v_known[k], 0), COALESCE(v_queue[k], 0), v_ev_persist)' IN v_src) = 0 THEN
-    RAISE EXCEPTION '0443 V5: the day plan does not read the queue the way the header says';
+    RAISE EXCEPTION '0444 V5: the day plan does not read the queue the way the header says';
   END IF;
   IF (SELECT provolatile FROM pg_proc WHERE oid = 'public.ottoq_ev_queue_schedule(numeric[],numeric[],numeric[],numeric[],numeric[],numeric,integer)'::regprocedure) <> 'i'
      OR (SELECT provolatile FROM pg_proc WHERE oid = 'public.ottoq_forecast_ev_queue_kw(uuid,uuid,timestamp with time zone,integer,numeric)'::regprocedure) <> 's' THEN
-    RAISE EXCEPTION '0443 V5: the core must be IMMUTABLE and the wrapper STABLE';
+    RAISE EXCEPTION '0444 V5: the core must be IMMUTABLE and the wrapper STABLE';
   END IF;
 END $$;
 
 -- ── LINEAGE ──
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note) VALUES
-  ('0443_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak',
+  ('0444_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak',
    false,
    'G177: ottoq_bess_day_plan''s EV forecast is GREATEST(known, queue, persistence). The queue term '
    '(ottoq_forecast_ev_queue_kw over the pure list scheduler ottoq_ev_queue_schedule) adds the vehicles waiting on '
@@ -467,4 +467,4 @@ COMMIT;
 
 -- forces_recert FALSE. After applying: every armed run's plan reports `ev_queue` and the forecast's `ev_queue_kw`;
 -- the next busy_day demo run is the live proof (the boot hour's billed peak against 324eb0f1's 1,624 kW).
--- Rollback: restore ottoq_bess_day_plan from ottoq_schema_snapshots label '0443_pre'; the two functions can stay.
+-- Rollback: restore ottoq_bess_day_plan from ottoq_schema_snapshots label '0444_pre'; the two functions can stay.

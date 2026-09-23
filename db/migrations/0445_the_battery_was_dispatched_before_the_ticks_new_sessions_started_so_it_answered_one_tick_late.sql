@@ -1,7 +1,7 @@
 -- migration-version: PENDING
 -- migration-name:    the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late
 --
--- 0444  **The battery was dispatched before the tick's new charging sessions started, so it always answered one tick
+-- 0445  **The battery was dispatched before the tick's new charging sessions started, so it always answered one tick
 --       late.** Both world orchestrators, `public.ottoq_sim_advance_tick_world` (demo runs, every pair) and
 --       `twin.ottoq_world_advance` (production-live runs), call `ottoq_energy_orchestrate` and
 --       `ottoq_sim_energy_controller` BEFORE `ottoq_sim_reconcile_charge_sessions`. The sessions that reconciliation
@@ -61,14 +61,14 @@ DO $inflight$
 DECLARE v_jobs text; v_pairs int; v_runs int;
 BEGIN
   SELECT string_agg(jobname, ', ' ORDER BY jobname) INTO v_jobs FROM cron.job WHERE jobname ~ '^r[0-9]+_';
-  IF v_jobs IS NOT NULL THEN RAISE EXCEPTION '0444 P0: certification jobs are still scheduled (%)', v_jobs; END IF;
+  IF v_jobs IS NOT NULL THEN RAISE EXCEPTION '0445 P0: certification jobs are still scheduled (%)', v_jobs; END IF;
   SELECT count(*) INTO v_pairs FROM pg_stat_activity
    WHERE (query ILIKE '%ottoq_determinism_pair%' OR query ILIKE '%ottoq_dial_pair%' OR query ILIKE '%ottoq_dial_experiment_runner%'
           OR query ILIKE '%ottoq_ab_pair%')
      AND state = 'active' AND pid <> pg_backend_pid();
-  IF v_pairs > 0 THEN RAISE EXCEPTION '0444 P0: a pair is running right now'; END IF;
+  IF v_pairs > 0 THEN RAISE EXCEPTION '0445 P0: a pair is running right now'; END IF;
   SELECT count(*) INTO v_runs FROM public.ottoq_sim_runs WHERE status IN ('running','paused');
-  IF v_runs > 0 THEN RAISE EXCEPTION '0444 P0: % sim run(s) running/paused -- apply between runs', v_runs; END IF;
+  IF v_runs > 0 THEN RAISE EXCEPTION '0445 P0: % sim run(s) running/paused -- apply between runs', v_runs; END IF;
 END $inflight$;
 
 -- ── P1: both orchestrators as read on 2026-09-23, every anchor unique ──
@@ -77,7 +77,7 @@ DECLARE v_src text; v_n int; v_a text;
 BEGIN
   SELECT prosrc INTO v_src FROM pg_proc WHERE oid = 'public.ottoq_sim_advance_tick_world'::regproc;
   IF md5(v_src) <> 'be38b51c780490c9a983e84aae3c6cc0' THEN
-    RAISE EXCEPTION '0444 P1: ottoq_sim_advance_tick_world md5 is %', md5(v_src);
+    RAISE EXCEPTION '0445 P1: ottoq_sim_advance_tick_world md5 is %', md5(v_src);
   END IF;
   FOREACH v_a IN ARRAY ARRAY[
       E'  IF (v_run.policy IS NULL OR v_run.policy = ''otto_q'') AND ottoq_policy_get(p_sim_run_id,''energy_orchestration_enabled'',1) > 0 THEN\n'
@@ -88,12 +88,12 @@ BEGIN
       || E'    SELECT COUNT(*) INTO v_charge_adv FROM ottoq_sim_advance_charge_sessions(p_sim_run_id, v_new_sim_clock);\n']
   LOOP
     v_n := (length(v_src) - length(replace(v_src, v_a, ''))) / length(v_a);
-    IF v_n <> 1 THEN RAISE EXCEPTION '0444 P1: tick_world anchor matched % times: %', v_n, left(v_a, 70); END IF;
+    IF v_n <> 1 THEN RAISE EXCEPTION '0445 P1: tick_world anchor matched % times: %', v_n, left(v_a, 70); END IF;
   END LOOP;
 
   SELECT prosrc INTO v_src FROM pg_proc WHERE oid = 'twin.ottoq_world_advance'::regproc;
   IF md5(v_src) <> '2c37ad199f942326437483b8ee952bd8' THEN
-    RAISE EXCEPTION '0444 P1: twin.ottoq_world_advance md5 is %', md5(v_src);
+    RAISE EXCEPTION '0445 P1: twin.ottoq_world_advance md5 is %', md5(v_src);
   END IF;
   FOREACH v_a IN ARRAY ARRAY[
       E'  -- OTTO-Q ENERGY ORCHESTRATION (the #1 demand-shave edge) — gated + defensive\n'
@@ -108,14 +108,14 @@ BEGIN
       || E'  EXCEPTION WHEN OTHERS THEN RAISE WARNING ''world_advance reconcile_charge: %'', SQLERRM; END;\n']
   LOOP
     v_n := (length(v_src) - length(replace(v_src, v_a, ''))) / length(v_a);
-    IF v_n <> 1 THEN RAISE EXCEPTION '0444 P1: world_advance anchor matched % times: %', v_n, left(v_a, 70); END IF;
+    IF v_n <> 1 THEN RAISE EXCEPTION '0445 P1: world_advance anchor matched % times: %', v_n, left(v_a, 70); END IF;
   END LOOP;
 END $$;
 
 -- ── SNAPSHOT ──
 INSERT INTO public.ottoq_schema_snapshots
        (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0444_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+SELECT '0445_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE p.oid IN ('public.ottoq_sim_advance_tick_world'::regproc, 'twin.ottoq_world_advance'::regproc);
 
@@ -133,11 +133,11 @@ DECLARE v_def text; v_new text;
 BEGIN
   v_def := pg_get_functiondef('public.ottoq_sim_advance_tick_world'::regproc);
   v_new := replace(v_def, c_block,
-         E'  -- 0444 (G178): the battery is dispatched below, after reconciliation starts this tick''s sessions\n');
+         E'  -- 0445 (G178): the battery is dispatched below, after reconciliation starts this tick''s sessions\n');
   v_new := replace(v_new, c_split,
          E'    PERFORM ottoq_sim_reconcile_charge_sessions(p_sim_run_id, v_new_sim_clock);\n'
       || E'  END IF;\n'
-      || E'  /* 0444 (G178): THE BATTERY ANSWERS THE LOAD IT WILL SEE. The orchestrator sums the ACTIVE sessions'' rates,\n'
+      || E'  /* 0445 (G178): THE BATTERY ANSWERS THE LOAD IT WILL SEE. The orchestrator sums the ACTIVE sessions'' rates,\n'
       || E'     so it must run after reconciliation has started this tick''s sessions and before energy is delivered;\n'
       || E'     above the charge block it answered one tick late (a whole billing interval at 30 sim-min per tick). */\n'
       || c_block
@@ -146,7 +146,7 @@ BEGIN
   IF v_new = v_def
      OR (length(v_new) - length(replace(v_new, 'PERFORM ottoq_energy_orchestrate(', ''))) / length('PERFORM ottoq_energy_orchestrate(') <> 1
      OR (length(v_new) - length(replace(v_new, 'PERFORM ottoq_sim_energy_controller(', ''))) / length('PERFORM ottoq_sim_energy_controller(') <> 1 THEN
-    RAISE EXCEPTION '0444: the tick_world move did not apply cleanly';
+    RAISE EXCEPTION '0445: the tick_world move did not apply cleanly';
   END IF;
   EXECUTE v_new;
 END $splice$;
@@ -169,17 +169,17 @@ DECLARE v_def text; v_new text;
 BEGIN
   v_def := pg_get_functiondef('twin.ottoq_world_advance'::regproc);
   v_new := replace(v_def, c_block,
-         E'  -- 0444 (G178): the battery is dispatched below, after reconciliation starts this tick''s sessions\n');
+         E'  -- 0445 (G178): the battery is dispatched below, after reconciliation starts this tick''s sessions\n');
   v_new := replace(v_new, c_split,
          c_split
       || E'  END IF;\n'
-      || E'  /* 0444 (G178): the battery answers the load it will see -- after reconciliation, before delivery. */\n'
+      || E'  /* 0445 (G178): the battery answers the load it will see -- after reconciliation, before delivery. */\n'
       || c_block
       || E'  IF v_feed_sim THEN\n');
   IF v_new = v_def
      OR (length(v_new) - length(replace(v_new, 'PERFORM ottoq_energy_orchestrate(', ''))) / length('PERFORM ottoq_energy_orchestrate(') <> 1
      OR (length(v_new) - length(replace(v_new, 'PERFORM ottoq_sim_energy_controller(', ''))) / length('PERFORM ottoq_sim_energy_controller(') <> 1 THEN
-    RAISE EXCEPTION '0444: the world_advance move did not apply cleanly';
+    RAISE EXCEPTION '0445: the world_advance move did not apply cleanly';
   END IF;
   EXECUTE v_new;
 END $splice$;
@@ -199,23 +199,23 @@ BEGIN
     p_chg  := position('ottoq_sim_advance_charge_sessions(' IN v_src);
     p_nrg  := position('ottoq_sim_advance_all_energy(' IN v_src);
     IF NOT (p_hb > 0 AND p_hb < p_rec AND p_rec < p_orch AND p_orch < p_ctl AND p_ctl < p_chg AND p_chg < p_nrg) THEN
-      RAISE EXCEPTION '0444 V1: % order is heartbeat % reconcile % orchestrate % controller % charge % energy %',
+      RAISE EXCEPTION '0445 V1: % order is heartbeat % reconcile % orchestrate % controller % charge % energy %',
         v_fn, p_hb, p_rec, p_orch, p_ctl, p_chg, p_nrg;
     END IF;
     IF v_fn = 'public.ottoq_sim_advance_tick_world'::regproc THEN
       p_arm := position('ottoq_arm_advance_cycles(' IN v_src);
-      IF NOT (p_arm > 0 AND p_arm < p_rec) THEN RAISE EXCEPTION '0444 V1: the arm no longer walks before the charge block'; END IF;
+      IF NOT (p_arm > 0 AND p_arm < p_rec) THEN RAISE EXCEPTION '0445 V1: the arm no longer walks before the charge block'; END IF;
     END IF;
     -- the orchestration is gated on policy, never on the feed, exactly as before
     IF position('energy_orchestration_enabled' IN v_src) = 0 OR position('energy_orchestration_enabled' IN v_src) > p_orch THEN
-      RAISE EXCEPTION '0444 V1: % lost the orchestration''s policy gate', v_fn;
+      RAISE EXCEPTION '0445 V1: % lost the orchestration''s policy gate', v_fn;
     END IF;
   END LOOP;
 END $$;
 
 -- ── LINEAGE ──
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note) VALUES
-  ('0444_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late',
+  ('0445_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late',
    true,
    'G178: in ottoq_sim_advance_tick_world and twin.ottoq_world_advance the energy orchestration and the energy '
    'controller move from before the charge block to between ottoq_sim_reconcile_charge_sessions and '
@@ -227,4 +227,4 @@ COMMIT;
 
 -- forces_recert TRUE. After applying: the recert runner (cron 746) re-earns the canon; then, on the first certified
 -- pair and the first dial pair, the battery command at a tick where sessions start carries their rate in
--- `desired_ev_kw`. Rollback: restore both functions from ottoq_schema_snapshots label '0444_pre'.
+-- `desired_ev_kw`. Rollback: restore both functions from ottoq_schema_snapshots label '0445_pre'.

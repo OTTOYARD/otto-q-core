@@ -1,7 +1,7 @@
 -- migration-version: PENDING
 -- migration-name:    the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere
 --
--- 0441  **The site's forward schedule was computed every tick and published nowhere.** Since 0435 the battery
+-- 0442  **The site's forward schedule was computed every tick and published nowhere.** Since 0435 the battery
 --       follows `public.ottoq_bess_day_plan`, which returns a 30-minute schedule to local midnight: forecast net
 --       load, planned discharge per step, the DR reserve and prices. `ottoq_energy_orchestrate` keeps the plan's
 --       scalars and drops the arrays (`v_day_plan - 'forecast' - 'discharge_plan_kw'`). The object the brief names
@@ -68,13 +68,13 @@ DO $inflight$
 DECLARE v_jobs text; v_pairs int; v_runs int;
 BEGIN
   SELECT string_agg(jobname, ', ' ORDER BY jobname) INTO v_jobs FROM cron.job WHERE jobname ~ '^r[0-9]+_';
-  IF v_jobs IS NOT NULL THEN RAISE EXCEPTION '0441 P0: certification jobs are still scheduled (%)', v_jobs; END IF;
+  IF v_jobs IS NOT NULL THEN RAISE EXCEPTION '0442 P0: certification jobs are still scheduled (%)', v_jobs; END IF;
   SELECT count(*) INTO v_pairs FROM pg_stat_activity
    WHERE (query ILIKE '%ottoq_determinism_pair%' OR query ILIKE '%ottoq_dial_pair%' OR query ILIKE '%ottoq_dial_experiment_runner%')
      AND state = 'active' AND pid <> pg_backend_pid();
-  IF v_pairs > 0 THEN RAISE EXCEPTION '0441 P0: a determinism or dial pair is running right now'; END IF;
+  IF v_pairs > 0 THEN RAISE EXCEPTION '0442 P0: a determinism or dial pair is running right now'; END IF;
   SELECT count(*) INTO v_runs FROM public.ottoq_sim_runs WHERE status IN ('running','paused');
-  IF v_runs > 0 THEN RAISE EXCEPTION '0441 P0: % sim run(s) running/paused -- apply between runs', v_runs; END IF;
+  IF v_runs > 0 THEN RAISE EXCEPTION '0442 P0: % sim run(s) running/paused -- apply between runs', v_runs; END IF;
 END $inflight$;
 
 -- ── P1: the orchestrator, the view and the table as read on 2026-09-23; what this creates does not exist ──
@@ -84,28 +84,28 @@ DECLARE v_src text; v_n int;
 BEGIN
   SELECT prosrc INTO v_src FROM pg_proc
    WHERE oid = 'public.ottoq_energy_orchestrate(uuid,uuid,timestamp with time zone,bigint)'::regprocedure;
-  IF md5(v_src) <> '7b5f7d9a0bb7432cfe733c473a36437f' THEN RAISE EXCEPTION '0441 P1: ottoq_energy_orchestrate md5 is %', md5(v_src); END IF;
+  IF md5(v_src) <> '7b5f7d9a0bb7432cfe733c473a36437f' THEN RAISE EXCEPTION '0442 P1: ottoq_energy_orchestrate md5 is %', md5(v_src); END IF;
   v_n := (length(v_src) - length(replace(v_src, c_anchor, ''))) / length(c_anchor);
-  IF v_n <> 1 THEN RAISE EXCEPTION '0441 P1: the orchestrator anchor matched % times', v_n; END IF;
+  IF v_n <> 1 THEN RAISE EXCEPTION '0442 P1: the orchestrator anchor matched % times', v_n; END IF;
   IF md5(pg_get_viewdef('public.service_profiles'::regclass, true)) <> '32824b909ace4396c5b9eea926418c95' THEN
-    RAISE EXCEPTION '0441 P1: service_profiles md5 is %', md5(pg_get_viewdef('public.service_profiles'::regclass, true));
+    RAISE EXCEPTION '0442 P1: service_profiles md5 is %', md5(pg_get_viewdef('public.service_profiles'::regclass, true));
   END IF;
   -- the plan carries the arrays the publisher reads
   SELECT prosrc INTO v_src FROM pg_proc
    WHERE oid = 'public.ottoq_bess_day_plan(uuid,uuid,timestamp with time zone,numeric)'::regprocedure;
   IF position('''net_kw''' IN v_src) = 0 OR position('''base_kw''' IN v_src) = 0 OR position('''solar_kw''' IN v_src) = 0
      OR position('''discharge_plan_kw''' IN v_src) = 0 OR position('''horizon_steps''' IN v_src) = 0 THEN
-    RAISE EXCEPTION '0441 P1: ottoq_bess_day_plan no longer returns the forecast and discharge arrays';
+    RAISE EXCEPTION '0442 P1: ottoq_bess_day_plan no longer returns the forecast and discharge arrays';
   END IF;
   -- the table's arrays are numeric[], which the publisher writes
   IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ottoq_energy_plan'
          AND column_name IN ('bess_setpoint_kw','grid_import_kw','forecast_load_kw') AND udt_name = '_numeric') <> 3 THEN
-    RAISE EXCEPTION '0441 P1: ottoq_energy_plan''s schedule arrays are not numeric[]';
+    RAISE EXCEPTION '0442 P1: ottoq_energy_plan''s schedule arrays are not numeric[]';
   END IF;
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ottoq_energy_plan'
                 AND column_name IN ('ev_allowance_kw','detail'))
      OR to_regprocedure('public.ottoq_publish_day_plan(uuid,uuid,timestamp with time zone,bigint,jsonb,numeric,numeric)') IS NOT NULL THEN
-    RAISE EXCEPTION '0441 P1: the publication objects already exist';
+    RAISE EXCEPTION '0442 P1: the publication objects already exist';
   END IF;
 END $$;
 
@@ -117,7 +117,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.ottoq_policy_params
               WHERE param_key IN ('energy_reserve_shave', 'energy_mpc_follow') AND scope_type IN ('depot','global')
                 AND param_value >= 0.5) THEN
-    RAISE EXCEPTION '0441 P2: energy_reserve_shave or energy_mpc_follow is on at depot/global scope';
+    RAISE EXCEPTION '0442 P2: energy_reserve_shave or energy_mpc_follow is on at depot/global scope';
   END IF;
   -- no atom or fingerprint reads the plan table, and nothing reads the view
   SELECT string_agg(DISTINCT n.nspname || '.' || p.proname, ', ') INTO v_readers
@@ -125,23 +125,23 @@ BEGIN
    WHERE n.nspname IN ('public','twin','ottoq')
      AND (p.proname ILIKE '%atom%' OR p.proname ILIKE '%fingerprint%' OR p.proname IN ('ottoq_determinism_pair','ottoq_ab_pair'))
      AND regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') ~ 'ottoq_energy_plan\M';
-  IF v_readers IS NOT NULL THEN RAISE EXCEPTION '0441 P2: % read(s) ottoq_energy_plan -- a published plan would move an atom', v_readers; END IF;
+  IF v_readers IS NOT NULL THEN RAISE EXCEPTION '0442 P2: % read(s) ottoq_energy_plan -- a published plan would move an atom', v_readers; END IF;
   SELECT string_agg(DISTINCT n.nspname || '.' || p.proname, ', ') INTO v_readers
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname IN ('public','twin','ottoq')
      AND regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') ~ 'service_profiles';
-  IF v_readers IS NOT NULL THEN RAISE EXCEPTION '0441 P2: % read(s) service_profiles', v_readers; END IF;
+  IF v_readers IS NOT NULL THEN RAISE EXCEPTION '0442 P2: % read(s) service_profiles', v_readers; END IF;
 END $$;
 
 -- ── SNAPSHOT ──
 INSERT INTO public.ottoq_schema_snapshots
        (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0441_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+SELECT '0442_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE p.oid = 'public.ottoq_energy_orchestrate(uuid,uuid,timestamp with time zone,bigint)'::regprocedure;
 INSERT INTO public.ottoq_schema_snapshots
        (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0441_pre', 'view', 'public', 'service_profiles',
+SELECT '0442_pre', 'view', 'public', 'service_profiles',
        pg_get_viewdef('public.service_profiles'::regclass, true),
        md5(pg_get_viewdef('public.service_profiles'::regclass, true));
 
@@ -150,11 +150,11 @@ ALTER TABLE public.ottoq_energy_plan
   ADD COLUMN ev_allowance_kw numeric[],
   ADD COLUMN detail jsonb;
 COMMENT ON COLUMN public.ottoq_energy_plan.ev_allowance_kw IS
-  '0441: per step, the EV charging the plan leaves room for (kW). Step 1 is the charge cap the orchestrator issued; '
+  '0442: per step, the EV charging the plan leaves room for (kW). Step 1 is the charge cap the orchestrator issued; '
   'later steps apply its plan-mode formula max(50, level - base + solar + max(bess, 0)), level clamped to an active '
   'DR call''s cap for steps that begin before the call expires.';
 COMMENT ON COLUMN public.ottoq_energy_plan.detail IS
-  '0441: the publisher''s context -- publication clock (sim time on sim runs), tick, level, DR clamp, prices, the '
+  '0442: the publisher''s context -- publication clock (sim time on sim runs), tick, level, DR clamp, prices, the '
   'DR reserve per step and the plan''s scalars.';
 CREATE INDEX ottoq_energy_plan_applied ON public.ottoq_energy_plan (sim_run_id, depot_id) WHERE plan_state = 'applied';
 
@@ -167,7 +167,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_publish_day_plan(p_sim_run_id uuid, p_de
  SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-/* 0441 (G9, G168): persist the day plan the battery just acted on as the site's forward schedule, the site_power
+/* 0442 (G9, G168): persist the day plan the battery just acted on as the site's forward schedule, the site_power
    ServiceProfile, superseding the run's previous one. Step k covers [clock + 30(k-1) min, clock + 30k min), the plan's
    own steps. Arithmetic over the plan's arrays; the one read is the active DR call, by the orchestrator's own query. */
 DECLARE
@@ -191,7 +191,7 @@ BEGIN
   IF v_n IS NULL OR v_n < 1 OR v_level IS NULL
      OR COALESCE(array_length(v_net, 1), 0) < v_n OR COALESCE(array_length(v_dis, 1), 0) < v_n
      OR COALESCE(array_length(v_base, 1), 0) < v_n OR COALESCE(array_length(v_solar, 1), 0) < v_n THEN
-    RAISE EXCEPTION '0441: the plan does not carry % steps of forecast and discharge', v_n;
+    RAISE EXCEPTION '0442: the plan does not carry % steps of forecast and discharge', v_n;
   END IF;
 
   -- the DR call the orchestrator clamped its level to (its query, its order), and when that call ends
@@ -241,7 +241,7 @@ BEGIN
   v_def := pg_get_functiondef('public.ottoq_energy_orchestrate(uuid,uuid,timestamp with time zone,bigint)'::regprocedure);
   v_new := replace(v_def, c_anchor,
        E'             ELSE ''{}''::jsonb END);   /* 0435 */\n'
-    || E'  /* 0441 (G9, G168): the plan the battery just acted on is the site''s forward schedule. Publish it as the\n'
+    || E'  /* 0442 (G9, G168): the plan the battery just acted on is the site''s forward schedule. Publish it as the\n'
     || E'     site_power ServiceProfile, superseding the last one. Plan mode only, so no certification arm publishes;\n'
     || E'     a failed publication is a warning, never a stopped tick. */\n'
     || E'  IF COALESCE((v_day_plan->>''ok'')::boolean, false) AND NOT v_mpc_follow THEN\n'
@@ -249,12 +249,12 @@ BEGIN
     || E'      PERFORM public.ottoq_publish_day_plan(p_sim_run_id, p_depot_id, p_sim_clock, p_tick_seq, v_day_plan,\n'
     || E'                                            round(v_bess_dispatch, 1), round(v_charge_cap, 1));\n'
     || E'    EXCEPTION WHEN OTHERS THEN\n'
-    || E'      RAISE WARNING ''0441: day plan publication failed at tick %: %'', p_tick_seq, SQLERRM;\n'
+    || E'      RAISE WARNING ''0442: day plan publication failed at tick %: %'', p_tick_seq, SQLERRM;\n'
     || E'    END;\n'
     || E'  END IF;\n'
     || E'  RETURN round(v_charge_cap,1);');
   IF v_new = v_def OR position('ottoq_publish_day_plan' IN v_new) = 0 THEN
-    RAISE EXCEPTION '0441 (3): the orchestrator splice did not apply';
+    RAISE EXCEPTION '0442 (3): the orchestrator splice did not apply';
   END IF;
   EXECUTE v_new;
 END $splice$;
@@ -301,11 +301,11 @@ SELECT 'service_point', s.depot_id, b.stall_id, b.sim_run_id,
   LEFT JOIN public.ottoq_operation_catalog oc
          ON oc.booking_purpose = b.purpose AND oc.pack_id = 'robotaxi'
  WHERE b.state IN ('held','active')
-   AND upper(b.during) > COALESCE(r.sim_clock_current, now()) - interval '1 hour';   -- 0441: the run's own clock
+   AND upper(b.during) > COALESCE(r.sim_clock_current, now()) - interval '1 hour';   -- 0442: the run's own clock
 COMMENT ON VIEW public.service_profiles IS
   'ServiceProfile (CLAUDE.md 2.6): the published forward schedule. site_power: the profile in force per run '
   '(ottoq_energy_plan, plan_state ready/applied/pending; the day plan publishes applied and supersedes its '
-  'predecessor, 0441), with explicit per-step offsets and a declared unit. service_point: held/active bookings whose '
+  'predecessor, 0442), with explicit per-step offsets and a declared unit. service_point: held/active bookings whose '
   'window ends after the run''s own sim clock minus an hour (now() only for production rows).';
 
 -- ── V1: the publisher, on a synthetic plan against a real run, rolled back ──
@@ -317,7 +317,7 @@ BEGIN
   -- the latest run that is not live, so the probe never touches a running run's world
   SELECT sim_run_id, sim_clock_current INTO v_run, v_clock FROM public.ottoq_sim_runs
    WHERE depot_id = v_depot AND status NOT IN ('running','paused') ORDER BY started_at DESC LIMIT 1;
-  IF v_run IS NULL THEN RAISE EXCEPTION '0441 V1: no finished run on the twin depot to publish against'; END IF;
+  IF v_run IS NULL THEN RAISE EXCEPTION '0442 V1: no finished run on the twin depot to publish against'; END IF;
   v_clock := v_clock + interval '3 days';   -- after any DR call of the run, so the first check is unclamped
   v_plan := jsonb_build_object('ok', true, 'plan', '0435', 'mode', 'shave', 'level_kw', 500, 'horizon_steps', 4,
                                'step_min', 30, 'solve_ms', 12,
@@ -334,32 +334,32 @@ BEGIN
     IF r.bess_setpoint_kw <> ARRAY[90,200,0,0]::numeric[] OR r.grid_import_kw <> ARRAY[510,500,400,300]::numeric[]
        OR r.ev_allowance_kw <> ARRAY[480,700,400,400]::numeric[] OR r.predicted_peak_kw <> 510
        OR r.forecast_load_kw <> ARRAY[600,700,400,300]::numeric[] OR r.plan_state <> 'applied' OR r.source <> 'day_plan' THEN
-      RAISE EXCEPTION '0441 V1: the published arrays are wrong: bess % grid % allow % peak %',
+      RAISE EXCEPTION '0442 V1: the published arrays are wrong: bess % grid % allow % peak %',
         r.bess_setpoint_kw, r.grid_import_kw, r.ev_allowance_kw, r.predicted_peak_kw;
     END IF;
     -- a DR call covering the first two steps clamps the second step's allowance and not the third's
     INSERT INTO public.ottoq_dr_calls (depot_id, sim_run_id, issued_at, expires_at, duration_minutes, required_load_cap_kw, reason)
-    VALUES (v_depot, v_run, v_clock - interval '5 minutes', v_clock + interval '45 minutes', 50, 300, '0441_probe');
+    VALUES (v_depot, v_run, v_clock - interval '5 minutes', v_clock + interval '45 minutes', 50, 300, '0442_probe');
     v_b := public.ottoq_publish_day_plan(v_run, v_depot, v_clock, 2, v_plan, 90, 480);
     SELECT * INTO r FROM public.ottoq_energy_plan WHERE id = v_b;
     IF r.ev_allowance_kw <> ARRAY[480,500,400,400]::numeric[] OR (r.detail->>'dr_cap_kw')::numeric <> 300 THEN
-      RAISE EXCEPTION '0441 V1: the DR clamp is wrong: allow % detail %', r.ev_allowance_kw, r.detail->'dr_cap_kw';
+      RAISE EXCEPTION '0442 V1: the DR clamp is wrong: allow % detail %', r.ev_allowance_kw, r.detail->'dr_cap_kw';
     END IF;
     -- the second publication superseded the first; the view shows one site-power profile for the run, the second
     IF (SELECT plan_state FROM public.ottoq_energy_plan WHERE id = v_a) <> 'superseded'
        OR (SELECT count(*) FROM public.ottoq_energy_plan WHERE sim_run_id = v_run AND source = 'day_plan' AND plan_state = 'applied') <> 1 THEN
-      RAISE EXCEPTION '0441 V1: the first profile was not superseded';
+      RAISE EXCEPTION '0442 V1: the first profile was not superseded';
     END IF;
     SELECT * INTO v_sp FROM public.service_profiles WHERE resource_kind = 'site_power' AND sim_run_id = v_run;
     IF NOT FOUND OR (v_sp.periods->>'profile_id')::uuid <> v_b OR v_sp.published_at <> v_clock
        OR v_sp.periods->'start_period_s' <> '[0,1800,3600,5400]'::jsonb OR v_sp.periods->>'rate_unit' <> 'kW'
        OR v_sp.window_end <> v_clock + interval '2 hours' OR v_sp.periods->'ev_allowance_kw' <> '[480,500,400,400]'::jsonb THEN
-      RAISE EXCEPTION '0441 V1: the view does not show the profile in force: %', to_jsonb(v_sp);
+      RAISE EXCEPTION '0442 V1: the view does not show the profile in force: %', to_jsonb(v_sp);
     END IF;
-    RAISE EXCEPTION USING MESSAGE = '0441_probe_rollback';
+    RAISE EXCEPTION USING MESSAGE = '0442_probe_rollback';
   EXCEPTION WHEN raise_exception THEN
     GET STACKED DIAGNOSTICS v_msg = MESSAGE_TEXT;
-    IF v_msg <> '0441_probe_rollback' THEN RAISE EXCEPTION '%', v_msg; END IF;
+    IF v_msg <> '0442_probe_rollback' THEN RAISE EXCEPTION '%', v_msg; END IF;
   END;
 END $v1$;
 
@@ -371,10 +371,10 @@ BEGIN
    WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND status NOT IN ('running','paused')
    ORDER BY started_at DESC LIMIT 1;
   SELECT v.id INTO v_veh FROM public.vehicles v WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111' ORDER BY v.id LIMIT 1;
-  IF v_run IS NULL OR v_veh IS NULL THEN RAISE EXCEPTION '0441 V2: no finished run or no vehicle on the twin depot'; END IF;
+  IF v_run IS NULL OR v_veh IS NULL THEN RAISE EXCEPTION '0442 V2: no finished run or no vehicle on the twin depot'; END IF;
   -- the test only discriminates if the run's clock is more than an hour behind the wall clock
   IF v_clock > now() - interval '3 hours' THEN
-    RAISE EXCEPTION '0441 V2: the latest run''s clock % is too close to now() to tell the two clocks apart', v_clock;
+    RAISE EXCEPTION '0442 V2: the latest run''s clock % is too close to now() to tell the two clocks apart', v_clock;
   END IF;
   SELECT s.id INTO v_stall FROM public.stalls s
    WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'staging'
@@ -384,16 +384,16 @@ BEGIN
   BEGIN
     INSERT INTO public.ottoq_stall_bookings (sim_run_id, stall_id, vehicle_id, purpose, during, state, booked_by, source, booked_at_sim)
     VALUES (v_run, v_stall, v_veh, 'temp_hold', tstzrange(v_clock + interval '10 minutes', v_clock + interval '40 minutes'),
-            'held', '0441_probe', '0441_probe', v_clock)
+            'held', '0442_probe', '0442_probe', v_clock)
     RETURNING booking_id INTO v_bk;
     IF NOT EXISTS (SELECT 1 FROM public.service_profiles WHERE resource_kind = 'service_point' AND sim_run_id = v_run
                       AND service_point_id = v_stall AND published_at = v_clock) THEN
-      RAISE EXCEPTION '0441 V2: a held booking ahead of its run''s clock is not in the view';
+      RAISE EXCEPTION '0442 V2: a held booking ahead of its run''s clock is not in the view';
     END IF;
-    RAISE EXCEPTION USING MESSAGE = '0441_probe_rollback';
+    RAISE EXCEPTION USING MESSAGE = '0442_probe_rollback';
   EXCEPTION WHEN raise_exception THEN
     GET STACKED DIAGNOSTICS v_msg = MESSAGE_TEXT;
-    IF v_msg <> '0441_probe_rollback' THEN RAISE EXCEPTION '%', v_msg; END IF;
+    IF v_msg <> '0442_probe_rollback' THEN RAISE EXCEPTION '%', v_msg; END IF;
   END;
 END $v2$;
 
@@ -406,24 +406,24 @@ BEGIN
   -- the publication is conditional on the plan and on MPC-follow being off, and sits after the command insert
   IF position('IF COALESCE((v_day_plan->>''ok'')::boolean, false) AND NOT v_mpc_follow THEN' IN v_src) = 0
      OR position('ottoq_publish_day_plan' IN v_src) < position('INSERT INTO ottoq_energy_commands' IN v_src) THEN
-    RAISE EXCEPTION '0441 V3: the orchestrator does not publish where and when the header says';
+    RAISE EXCEPTION '0442 V3: the orchestrator does not publish where and when the header says';
   END IF;
   -- the MPC follow branch still reads only ready plans, and the publisher never writes one
   IF position('plan_state = ''ready''' IN v_src) = 0 THEN
-    RAISE EXCEPTION '0441 V3: the MPC follow branch no longer filters on ready';
+    RAISE EXCEPTION '0442 V3: the MPC follow branch no longer filters on ready';
   END IF;
   SELECT regexp_replace(regexp_replace(prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') INTO v_src FROM pg_proc
    WHERE oid = 'public.ottoq_publish_day_plan(uuid,uuid,timestamp with time zone,bigint,jsonb,numeric,numeric)'::regprocedure;
-  IF position('''ready''' IN v_src) > 0 THEN RAISE EXCEPTION '0441 V3: the publisher writes a ready plan'; END IF;
+  IF position('''ready''' IN v_src) > 0 THEN RAISE EXCEPTION '0442 V3: the publisher writes a ready plan'; END IF;
   -- the view kept its grants' target and its security mode
   IF (SELECT reloptions FROM pg_class WHERE oid = 'public.service_profiles'::regclass) IS DISTINCT FROM ARRAY['security_invoker=true'] THEN
-    RAISE EXCEPTION '0441 V3: service_profiles lost security_invoker';
+    RAISE EXCEPTION '0442 V3: service_profiles lost security_invoker';
   END IF;
 END $$;
 
 -- ── LINEAGE ──
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note) VALUES
-  ('0441_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere',
+  ('0442_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere',
    false,
    'G9/G168: ottoq_publish_day_plan persists the day plan the battery acted on into ottoq_energy_plan (source '
    'day_plan, plan_state applied, predecessor superseded; bess, grid, net forecast, EV allowance with the DR clamp). '
@@ -438,4 +438,4 @@ COMMIT;
 -- forces_recert FALSE. After applying: the next armed run (or a dial-experiment treatment arm) writes one applied
 -- profile per run into ottoq_energy_plan, and `SELECT * FROM service_profiles WHERE resource_kind = 'site_power'`
 -- shows it. Rollback: restore ottoq_energy_orchestrate and service_profiles from ottoq_schema_snapshots label
--- '0441_pre'; the two columns, the index and the publisher can stay.
+-- '0442_pre'; the two columns, the index and the publisher can stay.

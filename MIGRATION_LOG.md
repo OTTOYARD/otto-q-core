@@ -111,7 +111,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0447 — GENERATED, not a log
+## Index, 0134–0448 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440 — which are indexed below as well as logged above; the log row is
@@ -433,13 +433,13 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0438](db/migrations/0438_three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so.sql) | `20260923012821` | yes — ledger | **Three of the orchestrator agent's five dials did nothing, and its board never said so.** Two have no reader |
 | [0439](db/migrations/0439_the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments.sql) | `20260923020808` | yes — ledger | **The learning loop had nothing to compare, so it now runs its own experiments.** The dial promoter |
 | [0440](db/migrations/0440_the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share.sql) | `20260923021253` | yes — ledger | **The dial-experiment runner takes one shot at a lock that the recertification heartbeat holds for a |
-| [0441](db/migrations/0441_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql) | `PENDING` | no — pending | **The site's forward schedule was computed every tick and published nowhere.** Since 0435 the battery |
-| [0442](db/migrations/0442_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql) | `PENDING` | no — pending | **`ottoq_ab_pair` never received 0421's reset.** 0421 fixed the 0329 defect in `ottoq_determinism_pair` |
-| [0443](db/migrations/0443_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql) | `PENDING` | no — pending | **The battery's day plan could not see the fleet waiting to charge, so the boot surge set the day's billed |
-| [0444](db/migrations/0444_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql) | `PENDING` | no — pending | **The battery was dispatched before the tick's new charging sessions started, so it always answered one tick |
-| [0445](db/migrations/0445_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql) | `PENDING` | no — pending | **Two of the depot's ten fast chargers looped for over an hour on two vehicles already at the fast chargers' |
-| [0446](db/migrations/0446_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql) | `PENDING` | no — pending | **The readiness gate's hold clock lived on the vehicle, not the run, so a stamp an earlier run left behind |
-| [0447](db/migrations/0447_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql) | `PENDING` | no — pending | **The recall policy and the visit planner disagreed about whether interval maintenance is required, so |
+| [0442](db/migrations/0442_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql) | `PENDING` | no — pending | **The site's forward schedule was computed every tick and published nowhere.** Since 0435 the battery |
+| [0443](db/migrations/0443_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql) | `PENDING` | no — pending | **`ottoq_ab_pair` never received 0421's reset.** 0421 fixed the 0329 defect in `ottoq_determinism_pair` |
+| [0444](db/migrations/0444_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql) | `PENDING` | no — pending | **The battery's day plan could not see the fleet waiting to charge, so the boot surge set the day's billed |
+| [0445](db/migrations/0445_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql) | `PENDING` | no — pending | **The battery was dispatched before the tick's new charging sessions started, so it always answered one tick |
+| [0446](db/migrations/0446_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql) | `PENDING` | no — pending | **Two of the depot's ten fast chargers looped for over an hour on two vehicles already at the fast chargers' |
+| [0447](db/migrations/0447_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql) | `PENDING` | no — pending | **The readiness gate's hold clock lived on the vehicle, not the run, so a stamp an earlier run left behind |
+| [0448](db/migrations/0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql) | `PENDING` | no — pending | **The recall policy and the visit planner disagreed about whether interval maintenance is required, so |
 
 310 migrations indexed.
 
