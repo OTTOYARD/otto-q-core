@@ -111,7 +111,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0440 — GENERATED, not a log
+## Index, 0134–0441 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440 — which are indexed below as well as logged above; the log row is
@@ -433,7 +433,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0438](db/migrations/0438_three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so.sql) | `20260923012821` | yes — ledger | **Three of the orchestrator agent's five dials did nothing, and its board never said so.** Two have no reader |
 | [0439](db/migrations/0439_the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments.sql) | `20260923020808` | yes — ledger | **The learning loop had nothing to compare, so it now runs its own experiments.** The dial promoter |
 | [0440](db/migrations/0440_the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share.sql) | `20260923021253` | yes — ledger | **The dial-experiment runner takes one shot at a lock that the recertification heartbeat holds for a |
+| [0441](db/migrations/0441_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql) | `PENDING` | no — pending | **The site's forward schedule was computed every tick and published nowhere.** Since 0435 the battery |
 
-303 migrations indexed.
+304 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
