@@ -541,7 +541,9 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late'::text, '0445_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql'::text),
     ('PENDING'::text, 'two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing'::text, '0446_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql'::text),
     ('PENDING'::text, 'the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds'::text, '0447_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql'::text),
-    ('PENDING'::text, 'the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped'::text, '0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql'::text)
+    ('PENDING'::text, 'the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped'::text, '0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql'::text),
+    ('PENDING'::text, 'the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean'::text, '0449_the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean.sql'::text),
+    ('PENDING'::text, 'the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call'::text, '0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

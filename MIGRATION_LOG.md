@@ -111,7 +111,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0448 — GENERATED, not a log
+## Index, 0134–0450 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440 — which are indexed below as well as logged above; the log row is
@@ -440,7 +440,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0446](db/migrations/0446_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql) | `PENDING` | no — pending | **Two of the depot's ten fast chargers looped for over an hour on two vehicles already at the fast chargers' |
 | [0447](db/migrations/0447_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql) | `PENDING` | no — pending | **The readiness gate's hold clock lived on the vehicle, not the run, so a stamp an earlier run left behind |
 | [0448](db/migrations/0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql) | `PENDING` | no — pending | **The recall policy and the visit planner disagreed about whether interval maintenance is required, so |
+| [0449](db/migrations/0449_the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean.sql) | `PENDING` | no — pending | **The twin's September afternoon reached 45.3 °C, 4.7 °C past Nashville's record for the month, because the |
+| [0450](db/migrations/0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql) | `PENDING` | no — pending | **The twin's battery paid for a cooling system it never got, so in hot weather it could not discharge and sat |
 
-310 migrations indexed.
+312 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
