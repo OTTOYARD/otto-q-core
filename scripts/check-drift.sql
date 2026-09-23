@@ -533,7 +533,7 @@ repo_manifest(version, name, file) AS (
     ('20260923012457'::text, 'the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine'::text, '0436_the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine.sql'::text),
     ('20260923012530'::text, 'the_readiness_check_had_a_second_door_out_of_the_depot_and_0431_only_guarded_one'::text, '0437_the_readiness_check_had_a_second_door_out_of_the_depot_and_0431_only_guarded_one.sql'::text),
     ('20260923012821'::text, 'three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so'::text, '0438_three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so.sql'::text),
-    ('PENDING'::text, 'the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments'::text, '0439_the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments.sql'::text)
+    ('20260923020808'::text, 'the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments'::text, '0439_the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

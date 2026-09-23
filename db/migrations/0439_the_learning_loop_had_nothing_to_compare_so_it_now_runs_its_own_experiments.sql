@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923020808
 -- migration-name:    the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments
 --
 -- 0439  **The learning loop had nothing to compare, so it now runs its own experiments.** The dial promoter
@@ -45,7 +45,8 @@
 --      dial pair and a determinism pair can never share the world.
 --   3. `public.ottoq_dial_arm_metrics(run, depot, soc_start)` computes each arm's vector:
 --      - the five 2.9 KPIs as the reward reads them, and unserved returns;
---      - shield evaluations, failures and safety-critical failures;
+--      - shield evaluations, failures and safety-critical failures, the last split by what the engine did with
+--        them (0430's `effect`): `refused` (the unsafe action did not happen) and unprevented (everything else);
 --      - the A/B score's operational figures;
 --      - REALISED ENERGY COST: TOU energy, the NCP_30min peak priced on the depot's own tariff and amortised over
 --        the plan's 30 days, battery wear, and the battery's terminal state valued at the cost of refilling it
@@ -98,9 +99,20 @@
 --     `guardrail_margin_pct` (default 2%) on average. The direction of each KPI is the sign of its weight in the
 --     active `ottoq_reward_weights`, which is where the repo already writes down "better".
 --   - SAFETY, checked on every counted pair at every look, and able to stop the experiment early:
---     - no pair may leave more returns unserved under the treatment;
---     - the treatment may not total more safety-critical rule failures than the control.
+--     - no pair may leave more returns unserved under the treatment. Measured 2026-09-23: every 24- and 48-tick
+--       busy_day certification arm on the twin serves every return, so one more is a signal, not noise;
+--     - the treatment may not total more UNPREVENTED safety-critical failures than the control: failures whose
+--       0430 `effect` is anything but `refused`, i.e. unsafe actions that went ahead.
 --     Vehicle-first stays inviolable, exactly as the existing promoter's gate 6.
+--   - SHIELD RELIANCE is a guardrail, not a stop. A safety-critical failure at an enforcing checkpoint is a
+--     REFUSAL: the unsafe action did not happen. Measured 2026-09-23, every safety-critical failure on the last
+--     certification arms (EN.003.bess_limits at bess_dispatch, 1-2 per arm) and all 204 on run 7a42982a
+--     (EN.001.grid_capacity_ceiling during its two DR calls) read `refused`. Counting refusals as a safety stop
+--     would halt an energy experiment on the very dispatch pattern it exists to change, about half the time,
+--     on noise. So refusals block a WIN instead (`guardrail_breach`) when the treatment has more of them in
+--     significantly many pairs: a one-sided sign test at `guardrail_alpha` (default 0.20). That is deliberately
+--     more sensitive than the primary's per-look alpha: a missed degradation costs more than a missed win. The
+--     existing promoter's gate 7 ("never trade safety for score") is the same principle on observational data.
 --   - OUTCOMES. Terminal: treatment_wins, control_holds, guardrail_breach, safety_regression, no_effect (every
 --     arm byte-identical, so the dial is inert in this world), negligible_effect, inconclusive (final look,
 --     undecided). Otherwise: collecting.
@@ -258,6 +270,7 @@ CREATE TABLE public.ottoq_dial_experiments (
   alpha                numeric NOT NULL DEFAULT 0.05,
   guardrail_margin_pct numeric NOT NULL DEFAULT 2,
   min_effect_pct       numeric NOT NULL DEFAULT 0.5,
+  guardrail_alpha      numeric NOT NULL DEFAULT 0.20,
   hypothesis           text NOT NULL,
   status               text NOT NULL DEFAULT 'active',
   concluded_at         timestamptz,
@@ -269,7 +282,8 @@ CREATE TABLE public.ottoq_dial_experiments (
   CONSTRAINT ottoq_dial_experiments_looks         CHECK (first_look_pairs >= 6 AND final_look_pairs >= first_look_pairs
                                                           AND final_look_pairs <= 40),
   CONSTRAINT ottoq_dial_experiments_alpha         CHECK (alpha > 0 AND alpha <= 0.10),
-  CONSTRAINT ottoq_dial_experiments_margins       CHECK (guardrail_margin_pct >= 0 AND min_effect_pct >= 0),
+  CONSTRAINT ottoq_dial_experiments_margins       CHECK (guardrail_margin_pct >= 0 AND min_effect_pct >= 0
+                                                          AND guardrail_alpha > 0 AND guardrail_alpha <= 0.5),
   CONSTRAINT ottoq_dial_experiments_ticks         CHECK (ticks BETWEEN 12 AND 96),
   CONSTRAINT ottoq_dial_experiments_fixed         CHECK (jsonb_typeof(fixed_params) = 'object' AND NOT fixed_params ? param_key),
   -- the harness's own keys define the arm; an experiment on one of them would edit the instrument
@@ -372,7 +386,7 @@ DECLARE
   v_grid_kwh numeric; v_cost numeric; v_peak30 numeric; v_dis numeric; v_chg numeric; v_min_rate numeric; v_samples int;
   v_block numeric; v_r1 numeric; v_r2 numeric; v_demand numeric;
   v_amort numeric; v_deg numeric; v_rt_raw numeric; v_rt numeric; v_soc_end numeric; v_terminal numeric;
-  v_evals bigint; v_fail bigint; v_crit bigint; v_dr int; v_defer bigint;
+  v_evals bigint; v_fail bigint; v_crit bigint; v_crit_ref bigint; v_crit_unp bigint; v_dr int; v_defer bigint;
 BEGIN
   SELECT * INTO r FROM ottoq_sim_runs WHERE sim_run_id = p_run;
   IF NOT FOUND THEN RAISE EXCEPTION 'ottoq_dial_arm_metrics: run % not found', p_run; END IF;
@@ -418,6 +432,12 @@ BEGIN
   SELECT count(*), count(*) FILTER (WHERE NOT passed), count(*) FILTER (WHERE NOT passed AND severity = 'safety_critical')
     INTO v_evals, v_fail, v_crit
     FROM ottoq_rule_evaluations WHERE sim_run_id = p_run;
+  -- 0430: what the shield recommended beside what the engine did. A safety-critical failure the engine REFUSED
+  -- did not happen; any other effect (recorded_only, an advisory posture, an unresolvable one) may have.
+  SELECT count(*) FILTER (WHERE e.effect = 'refused'), count(*) FILTER (WHERE e.effect IS DISTINCT FROM 'refused')
+    INTO v_crit_ref, v_crit_unp
+    FROM public.ottoq_rule_evaluation_effect e
+   WHERE e.sim_run_id = p_run AND NOT e.passed AND e.severity = 'safety_critical';
   SELECT count(*) INTO v_dr FROM ottoq_dr_calls WHERE sim_run_id = p_run;
   SELECT count(*) INTO v_defer FROM ottoq_decisions
    WHERE sim_run_id = p_run AND action_context = 'stall_assignment' AND outcome_status = 'deferred_site_power_cap';
@@ -434,6 +454,7 @@ BEGIN
     'kpi_purged',                            (v_kpi->'purged') IS NOT NULL AND jsonb_typeof(v_kpi->'purged') <> 'null',
     -- the shield
     'rule_evaluations', v_evals, 'rule_failures', v_fail, 'safety_critical_failures', v_crit,
+    'safety_critical_refused', v_crit_ref, 'safety_critical_unprevented', v_crit_unp,
     -- operations, from the arm's ottoq_ab_runs row
     'deploys', v_ab.deploys_total, 'trips_completed', v_ab.trips_completed,
     'vehicles_turned_around', v_ab.vehicles_turned_around, 'median_turnaround_min', v_ab.median_turnaround_min,
@@ -665,6 +686,7 @@ DECLARE
   v_unserved_worse int := 0; v_crit_a numeric := 0; v_crit_b numeric := 0;
   v_look int; v_w int := 0; v_l int := 0; v_t int := 0; v_n int := 0;
   v_rel numeric; v_identical boolean := false; v_p_treat numeric; v_p_ctrl numeric;
+  v_ref_more int := 0; v_ref_fewer int := 0; v_p_ref numeric;
   v_guard jsonb := '{}'::jsonb; v_breach jsonb := '[]'::jsonb; v_pairs jsonb := '[]'::jsonb;
   v_outcome text; v_terminal boolean := true; v_why text;
 BEGIN
@@ -681,11 +703,12 @@ BEGIN
     INTO v_all, v_stale, v_invalid
     FROM public.ottoq_dial_pair_ledger l WHERE l.experiment_id = p_experiment_id;
 
-  -- SAFETY, over EVERY counted pair and not only the look's, so it can stop the experiment early
+  -- SAFETY, over EVERY counted pair and not only the look's, so it can stop the experiment early. Only an
+  -- UNPREVENTED safety-critical failure is an unsafe outcome; a refused one is shield reliance (a guardrail below).
   SELECT count(*),
          count(*) FILTER (WHERE COALESCE((c.b->>'returns_unserved')::numeric, 0) > COALESCE((c.a->>'returns_unserved')::numeric, 0)),
-         COALESCE(sum(COALESCE((c.a->>'safety_critical_failures')::numeric, 0)), 0),
-         COALESCE(sum(COALESCE((c.b->>'safety_critical_failures')::numeric, 0)), 0)
+         COALESCE(sum(COALESCE((c.a->>'safety_critical_unprevented')::numeric, 0)), 0),
+         COALESCE(sum(COALESCE((c.b->>'safety_critical_unprevented')::numeric, 0)), 0)
     INTO v_counted, v_unserved_worse, v_crit_a, v_crit_b
     FROM public.ottoq_dial_counted_pairs(p_experiment_id, v_engine) c;
 
@@ -725,6 +748,21 @@ BEGIN
            COALESCE(jsonb_agg(s.key ORDER BY s.key) FILTER (WHERE s.m < -x.guardrail_margin_pct / 100.0), '[]'::jsonb)
       INTO v_guard, v_breach
       FROM s;
+
+    -- SHIELD RELIANCE: refusals are small counts (1-2 per arm), where a relative change means nothing, so they
+    -- get the sign test, one-sided, at the more sensitive guardrail_alpha
+    SELECT count(*) FILTER (WHERE rb > ra), count(*) FILTER (WHERE rb < ra)
+      INTO v_ref_more, v_ref_fewer
+      FROM (SELECT COALESCE((q.a->>'safety_critical_refused')::numeric, 0) AS ra,
+                   COALESCE((q.b->>'safety_critical_refused')::numeric, 0) AS rb
+              FROM public.ottoq_dial_counted_pairs(p_experiment_id, v_engine) q WHERE q.k <= v_look) z;
+    v_p_ref := public.ottoq_binom_upper_tail(v_ref_more + v_ref_fewer, v_ref_more);
+    v_guard := v_guard || jsonb_build_object('safety_critical_refused', jsonb_build_object(
+                 'pairs_more', v_ref_more, 'pairs_fewer', v_ref_fewer, 'p', round(v_p_ref, 6),
+                 'alpha', x.guardrail_alpha, 'breach', v_ref_more > 0 AND v_p_ref <= x.guardrail_alpha));
+    IF v_ref_more > 0 AND v_p_ref <= x.guardrail_alpha THEN
+      v_breach := v_breach || to_jsonb('safety_critical_refused'::text);
+    END IF;
   END IF;
 
   IF v_unserved_worse > 0 THEN
@@ -732,7 +770,7 @@ BEGIN
     v_why := format('%s counted pair(s) leave more returns unserved under the treatment; vehicle-first is inviolable', v_unserved_worse);
   ELSIF v_crit_b > v_crit_a THEN
     v_outcome := 'safety_regression';
-    v_why := format('the treatment totals %s safety-critical rule failures against the control''s %s', v_crit_b, v_crit_a);
+    v_why := format('the treatment totals %s unprevented safety-critical failures against the control''s %s', v_crit_b, v_crit_a);
   ELSIF v_look IS NULL THEN
     v_outcome := 'collecting'; v_terminal := false;
     v_why := format('%s of %s counted pairs needed for the first look', v_counted, x.first_look_pairs);
@@ -742,8 +780,8 @@ BEGIN
   ELSIF v_p_treat <= v_alpha_look AND COALESCE(v_rel, 0) >= x.min_effect_pct / 100.0 THEN
     IF jsonb_array_length(v_breach) > 0 THEN
       v_outcome := 'guardrail_breach';
-      v_why := format('the treatment wins %s (%s of %s, p = %s) and worsens %s by more than %s%%',
-                      x.primary_metric, v_w, v_n, round(v_p_treat, 5), v_breach::text, x.guardrail_margin_pct);
+      v_why := format('the treatment wins %s (%s of %s, p = %s) and breaches %s (a KPI worse by more than %s%%, or refusals up at p <= %s)',
+                      x.primary_metric, v_w, v_n, round(v_p_treat, 5), v_breach::text, x.guardrail_margin_pct, x.guardrail_alpha);
     ELSE
       v_outcome := 'treatment_wins';
       v_why := format('%s of %s non-tied pairs favour the treatment (%s tied), p = %s <= %s, mean gain %s%% on %s',
@@ -776,9 +814,10 @@ BEGIN
                                   'wins', v_w, 'losses', v_l, 'ties', v_t,
                                   'p_treatment', round(v_p_treat, 6), 'p_control', round(v_p_ctrl, 6),
                                   'mean_gain_pct', round(100 * v_rel, 3), 'min_effect_pct', x.min_effect_pct),
-    'guardrails', jsonb_build_object('margin_pct', x.guardrail_margin_pct, 'kpis', v_guard, 'breached', v_breach),
+    'guardrails', jsonb_build_object('margin_pct', x.guardrail_margin_pct, 'alpha', x.guardrail_alpha,
+                                     'kpis', v_guard, 'breached', v_breach),
     'safety', jsonb_build_object('pairs_more_unserved', v_unserved_worse,
-                                 'safety_critical_control', v_crit_a, 'safety_critical_treatment', v_crit_b),
+                                 'unprevented_control', v_crit_a, 'unprevented_treatment', v_crit_b),
     'look_pairs', v_pairs);
 END
 $function$;
@@ -1005,7 +1044,7 @@ INSERT INTO public.ottoq_policy_param_catalog
        (param_key, description, default_value, min_value, max_value, affects, agent_writable)
 VALUES ('dial_experiment_runner_enabled',
         '0439 (G161): master switch for public.ottoq_dial_experiment_runner (pg_cron every 10 min). When 1, each '
-        'firing runs at most ONE common-random-numbers dial pair (a 48-tick pair takes about 4-5 minutes), and only '
+        'firing runs at most ONE common-random-numbers dial pair (a 48-tick determinism pair took 9 minutes on 2026-09-23), and only '
         'when no run is live, every canon column is current and the recertification lock is free. A pair blocks '
         'every other pg_cron job while it runs (G141), so this stays 0 unless an operator chooses a quiet window.',
         0, 0, 1, 'public.ottoq_dial_experiment_runner', false)
@@ -1021,7 +1060,8 @@ VALUES ('0439', '11111111-1111-1111-1111-111111111111', 'energy_reserve_shave', 
         'realised daily site cost -- TOU energy, plus the NCP_30min demand charge amortised over 30 days, plus '
         'battery wear, plus the cost of refilling whatever charge the battery ends the day short -- against the '
         'fixed-factor demand target that certification arms run, by at least 0.5%, without moving asset hours, '
-        'turns, peak, touches or time to service more than 2% the wrong way, and without one more unserved return.');
+        'turns, peak, touches or time to service more than 2% the wrong way, without one more unserved return or '
+        'unprevented safety-critical failure, and without leaning on the shield''s refusals significantly more.');
 
 SELECT cron.schedule('ottoq-dial-experiment-runner', '*/10 * * * *',
                      $cmd$SET statement_timeout = 0; SELECT public.ottoq_dial_experiment_runner();$cmd$);
@@ -1059,11 +1099,15 @@ BEGIN
       SELECT p_x, (r->>'seed')::bigint, COALESCE(r->>'engine', p_engine), gen_random_uuid(), gen_random_uuid(), gen_random_uuid(),
              true, true, true, COALESCE((r->>'differs')::boolean, true), '["h_nrg"]'::jsonb,
              jsonb_build_object('site_cost_usd_per_day', (r->>'ca')::numeric,
-                                'returns_unserved', COALESCE((r->>'ua')::numeric, 0), 'safety_critical_failures', 0,
+                                'returns_unserved', COALESCE((r->>'ua')::numeric, 0),
+                                'safety_critical_unprevented', COALESCE((r->>'xa')::numeric, 0),
+                                'safety_critical_refused', COALESCE((r->>'fa')::numeric, 0),
                                 'asset_hours_available_per_day', 100, 'service_point_turns_per_point_per_day', 10,
                                 'peak_site_kw', 1500, 'touch_events_per_turn', 1, 'p95_time_to_service_min', 30),
              jsonb_build_object('site_cost_usd_per_day', (r->>'cb')::numeric,
-                                'returns_unserved', COALESCE((r->>'ub')::numeric, 0), 'safety_critical_failures', 0,
+                                'returns_unserved', COALESCE((r->>'ub')::numeric, 0),
+                                'safety_critical_unprevented', COALESCE((r->>'xb')::numeric, 0),
+                                'safety_critical_refused', COALESCE((r->>'fb')::numeric, 0),
                                 'asset_hours_available_per_day', COALESCE((r->>'ahb')::numeric, 100),
                                 'service_point_turns_per_point_per_day', 10, 'peak_site_kw', 1400,
                                 'touch_events_per_turn', 1, 'p95_time_to_service_min', 30),
@@ -1143,6 +1187,27 @@ BEGIN
     PERFORM pg_temp.v0439_pairs(v_x, v_e, (SELECT jsonb_agg(jsonb_build_object('seed', g, 'ca', 1000, 'cb', 999)) FROM generate_series(1, 12) g));
     v := public.ottoq_dial_experiment_verdict(v_x);
     IF v->>'outcome' <> 'negligible_effect' THEN RAISE EXCEPTION '0439 V2(j): read %', v->>'outcome'; END IF;
+    -- (k) six wins, each with one more REFUSAL under the treatment: shield reliance, p = 1/64 <= 0.20, blocks the
+    --     win; the same refusals split three more / three fewer (p = 0.656) do not, and the win stands
+    DELETE FROM public.ottoq_dial_pair_ledger WHERE experiment_id = v_x;
+    PERFORM pg_temp.v0439_pairs(v_x, v_e, (SELECT jsonb_agg(jsonb_build_object('seed', g, 'ca', 1000, 'cb', 950, 'fa', 2, 'fb', 3))
+                                             FROM generate_series(1, 6) g));
+    v := public.ottoq_dial_experiment_verdict(v_x);
+    IF v->>'outcome' <> 'guardrail_breach' OR NOT (v->'guardrails'->'breached') ? 'safety_critical_refused' THEN
+      RAISE EXCEPTION '0439 V2(k): six more-refusal pairs read % %', v->>'outcome', v->'guardrails'->'breached';
+    END IF;
+    UPDATE public.ottoq_dial_pair_ledger SET metrics_b = jsonb_set(metrics_b, '{safety_critical_refused}', '1')
+     WHERE experiment_id = v_x AND seed IN (4, 5, 6);
+    v := public.ottoq_dial_experiment_verdict(v_x);
+    IF v->>'outcome' <> 'treatment_wins' THEN RAISE EXCEPTION '0439 V2(k): split refusals read %', v->>'outcome'; END IF;
+    -- (l) one UNPREVENTED safety-critical failure more under the treatment stops it, whatever the cost says, while
+    --     refusals alone (case k) never do
+    UPDATE public.ottoq_dial_pair_ledger SET metrics_b = jsonb_set(metrics_b, '{safety_critical_unprevented}', '1')
+     WHERE experiment_id = v_x AND seed = 1;
+    v := public.ottoq_dial_experiment_verdict(v_x);
+    IF v->>'outcome' <> 'safety_regression' OR (v->'safety'->>'unprevented_treatment')::numeric <> 1 THEN
+      RAISE EXCEPTION '0439 V2(l): read % %', v->>'outcome', v->'safety';
+    END IF;
 
     -- V3: the promoter, on a win. A dry run writes nothing; the real call concludes and, if gate 1 is on,
     -- writes the depot row through the setter and its own forces_recert lineage row.
@@ -1210,7 +1275,7 @@ BEGIN
     RAISE EXCEPTION '0439 V4: the first experiment reads %', r;
   END IF;
   -- a pair refuses a seed already paired on this engine without running anything: prove the refusal path
-  -- exists in source rather than by running a 5-minute pair inside a migration
+  -- exists in source rather than by running a 9-minute pair inside a migration
   IF position('already paired on engine' IN v_src) = 0 THEN
     RAISE EXCEPTION '0439 V4: the repeated-seed refusal is missing';
   END IF;
@@ -1224,7 +1289,8 @@ INSERT INTO public.ottoq_cert_lineage (name, forces_recert, note) VALUES
    'G161. Designed dial experiments: ottoq_dial_experiments, ottoq_dial_pair (CRN pair, one run-scoped dial apart, '
    '0421 reset, ab_pair quiesce, recert lock), ottoq_dial_pair_ledger (evidence), ottoq_dial_arm_metrics (five KPIs, '
    'safety, realised energy cost with terminal SoC), ottoq_dial_experiment_verdict (exact sign test, two looks at '
-   'alpha/2, guardrails, safety floor), ottoq_promote_dial_experiment (setter at depot scope + its own forces_recert '
+   'alpha/2, KPI guardrails, a shield-reliance sign test on refusals, a safety floor on unserved returns and '
+   'unprevented safety-critical failures), ottoq_promote_dial_experiment (setter at depot scope + its own forces_recert '
    'lineage row), ottoq_dial_experiment_runner (cron every 10 min, dial default 0). ottoq_run_reward_ledger excludes '
    'designed arms. First experiment: energy_reserve_shave 0 -> 1 with the day plan, busy_day 48 ticks. FALSE: no '
    'engine function changes; the reward view has no caller in any tick; nothing runs at apply.')
