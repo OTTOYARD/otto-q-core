@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923012821
 -- migration-name:    three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so
 --
 -- 0438  **Three of the orchestrator agent's five dials did nothing, and its board never said so.** Two have no reader
@@ -34,6 +34,10 @@
 --      reads `live: true`, with a `why` saying no liveness rule is declared: an unknown is not a claim.
 --   3. The energy block carries `battery_plan`: the day plan's scalar summary (0435) from the latest BESS
 --      command of this run, i.e. exactly what the orchestrator acted on.
+--   4. 0434's `deploy_gap_note` told the agent that `deploy_surge_catchup` "releases a share of a POSITIVE gap
+--      per tick". That is G164's reading, and G175 retracts it: nothing reads the dial. The note now names what
+--      does close the gap, `deploy_release_per_tick_cap`, which is not an agent dial. Found by this file's own
+--      P2 at dry run, applied after 0434: the grounding had become the one other function naming the dial.
 --
 -- ══ §3 forces_recert FALSE ═════════════════════════════════════════════════
 --
@@ -72,7 +76,7 @@ DECLARE v_src text; v_n int; v_a text; v_i int := 0;
 BEGIN
   SELECT p.prosrc INTO v_src FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname = 'public' AND p.proname = 'ottoq_agent_board_grounding';
-  IF md5(v_src) <> 'POST_0434_GROUNDING_MD5' THEN
+  IF md5(v_src) <> 'e09f7049c6d225bf60c53e5f32cc6b44' THEN
     RAISE EXCEPTION '0438 P1: ottoq_agent_board_grounding md5 is % -- apply 0433 and 0434 first, or it changed since', md5(v_src);
   END IF;
   FOREACH v_a IN ARRAY ARRAY[
@@ -86,16 +90,27 @@ BEGIN
 END $$;
 
 -- ── P2: the premise, re-proved at apply time: nothing but the setter reads the two dials ──
+--   The grounding is excluded from the search and checked on its own, because 0434 gave it a NOTE that names
+--   deploy_surge_catchup -- in a string, not a read -- and that note asserts exactly the semantics G175 retracts
+--   ("releases a share of a POSITIVE gap per tick"). (3) replaces it; V3 then re-runs the full search.
 DO $$
-DECLARE v_readers text;
+DECLARE v_readers text; v_src text; v_note text :=
+  E'      ''deploy_gap_note'', ''target minus deployed. deploy_surge_catchup releases a share of a POSITIVE gap per tick; ''\n'
+  || E'                         ''at a gap of 0 or less it does nothing.'',\n';
 BEGIN
   SELECT string_agg(DISTINCT n.nspname || '.' || p.proname, ', ') INTO v_readers
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname IN ('public','twin','ottoq')
-     AND p.proname <> 'ottoq_apply_ops_action'
+     AND p.proname NOT IN ('ottoq_apply_ops_action', 'ottoq_agent_board_grounding')
      AND regexp_replace(p.prosrc, '--[^\n]*', '', 'g') ~ '(deploy_surge_catchup|forecast_horizon_min)';
   IF v_readers IS NOT NULL THEN
     RAISE EXCEPTION '0438 P2: % now mention(s) the dials -- they may no longer be inert; re-read before applying', v_readers;
+  END IF;
+  SELECT p.prosrc INTO v_src FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'ottoq_agent_board_grounding';
+  IF (length(v_src) - length(replace(v_src, v_note, ''))) / length(v_note) <> 1
+     OR regexp_replace(replace(v_src, v_note, ''), '--[^\n]*', '', 'g') ~ '(deploy_surge_catchup|forecast_horizon_min)' THEN
+    RAISE EXCEPTION '0438 P2: the grounding names an inert dial somewhere other than 0434''s deploy_gap_note';
   END IF;
   -- and the reserve switch still overrides the factor target (the rule ottoq_dial_liveness declares)
   IF NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -161,7 +176,14 @@ BEGIN
     || E'                        WHERE ec.sim_run_id = p_sim_run_id AND ec.depot_id = p_depot_id\n'
     || E'                          AND ec.command_type = ''bess_setpoint_kw'' AND ec.issued_at <= p_clock\n'
     || E'                        ORDER BY ec.issued_at DESC, ec.tick_seq DESC NULLS LAST LIMIT 1),\n');
-  IF v_new = v_def OR position('battery_plan' IN v_new) = 0 OR position('ottoq_dial_liveness' IN v_new) = 0 THEN
+  -- 0434's note told the agent the surge dial acts on a positive gap; nothing reads that dial (G175)
+  v_new := replace(v_new,
+    E'      ''deploy_gap_note'', ''target minus deployed. deploy_surge_catchup releases a share of a POSITIVE gap per tick; ''\n'
+    || E'                         ''at a gap of 0 or less it does nothing.'',\n',
+    E'      ''deploy_gap_note'', ''target minus deployed: read-only work-side demand. The dispatcher closes a positive gap at ''\n'
+    || E'                         ''deploy_release_per_tick_cap per tick, which is not an agent dial; no agent dial moves this number (0438).'',\n');
+  IF v_new = v_def OR position('battery_plan' IN v_new) = 0 OR position('ottoq_dial_liveness' IN v_new) = 0
+     OR position('deploy_surge_catchup releases' IN v_new) > 0 THEN
     RAISE EXCEPTION '0438 (3): a splice did not apply';
   END IF;
   EXECUTE v_new;
@@ -221,6 +243,20 @@ BEGIN
     IF SQLERRM <> '0438_probe_rollback' THEN RAISE; END IF;
   END;
   IF NOT v_ok THEN RAISE EXCEPTION '0438 V2:%', v_msg; END IF;
+END $$;
+
+-- ── V3: P2's premise, now with no exclusion but the setter: nothing in the engine names either dial ──
+DO $$
+DECLARE v_readers text;
+BEGIN
+  SELECT string_agg(DISTINCT n.nspname || '.' || p.proname, ', ') INTO v_readers
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname IN ('public','twin','ottoq')
+     AND p.proname <> 'ottoq_apply_ops_action'
+     AND regexp_replace(p.prosrc, '--[^\n]*', '', 'g') ~ '(deploy_surge_catchup|forecast_horizon_min)';
+  IF v_readers IS NOT NULL THEN
+    RAISE EXCEPTION '0438 V3: % still name(s) an inert dial after the splice', v_readers;
+  END IF;
 END $$;
 
 -- ── LINEAGE ──

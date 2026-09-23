@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923012457
 -- migration-name:    the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine
 --
 -- 0436  **The twin's temperature is coldest at 08:00 and hottest at 20:00, because the diurnal swing is written as

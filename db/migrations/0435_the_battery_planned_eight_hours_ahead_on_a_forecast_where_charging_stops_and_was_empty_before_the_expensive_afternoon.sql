@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923012432
 -- migration-name:    the_battery_planned_eight_hours_ahead_on_a_forecast_where_charging_stops_and_was_empty_before_the_expensive_afternoon
 --
 -- 0435  **The battery's planner looked eight hours ahead, on a forecast in which EV charging stops as soon as

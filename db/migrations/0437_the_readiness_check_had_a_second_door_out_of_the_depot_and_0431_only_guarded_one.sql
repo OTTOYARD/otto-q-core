@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923012530
 -- migration-name:    the_readiness_check_had_a_second_door_out_of_the_depot_and_0431_only_guarded_one
 --
 -- 0437  **A vehicle could still leave without its readiness check through a second door: 0431 held vehicles

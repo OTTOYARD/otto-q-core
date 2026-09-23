@@ -527,12 +527,12 @@ repo_manifest(version, name, file) AS (
     ('20260922172845'::text, 'the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both'::text, '0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql'::text),
     ('20260922224038'::text, 'a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged'::text, '0431_a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged.sql'::text),
     ('20260922231738'::text, 'the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps'::text, '0432_the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps.sql'::text),
-    ('PENDING'::text, 'a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery'::text, '0433_a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery.sql'::text),
-    ('PENDING'::text, 'three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double'::text, '0434_three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double.sql'::text),
-    ('PENDING'::text, 'the_battery_planned_eight_hours_ahead_on_a_forecast_where_charging_stops_and_was_empty_before_the_expensive_afternoon'::text, '0435_the_battery_planned_eight_hours_ahead_on_a_forecast_where_charging_stops_and_was_empty_before_the_expensive_afternoon.sql'::text),
-    ('PENDING'::text, 'the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine'::text, '0436_the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine.sql'::text),
-    ('PENDING'::text, 'the_readiness_check_had_a_second_door_out_of_the_depot_and_0431_only_guarded_one'::text, '0437_the_readiness_check_had_a_second_door_out_of_the_depot_and_0431_only_guarded_one.sql'::text),
-    ('PENDING'::text, 'three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so'::text, '0438_three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so.sql'::text)
+    ('20260923012038'::text, 'a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery'::text, '0433_a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery.sql'::text),
+    ('20260923012128'::text, 'three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double'::text, '0434_three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double.sql'::text),
+    ('20260923012432'::text, 'the_battery_planned_eight_hours_ahead_on_a_forecast_where_charging_stops_and_was_empty_before_the_expensive_afternoon'::text, '0435_the_battery_planned_eight_hours_ahead_on_a_forecast_where_charging_stops_and_was_empty_before_the_expensive_afternoon.sql'::text),
+    ('20260923012457'::text, 'the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine'::text, '0436_the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine.sql'::text),
+    ('20260923012530'::text, 'the_readiness_check_had_a_second_door_out_of_the_depot_and_0431_only_guarded_one'::text, '0437_the_readiness_check_had_a_second_door_out_of_the_depot_and_0431_only_guarded_one.sql'::text),
+    ('20260923012821'::text, 'three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so'::text, '0438_three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923012038
 -- migration-name:    a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery
 --
 -- 0433  **A demand-response call asks the depot to shed 50–400 kW. The engine read that number as the depot's

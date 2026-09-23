@@ -2,27 +2,31 @@
 --       layer that the ranked review could only argue from source now have their costs measured.**
 --       (a) The battery reached the expensive afternoon empty. 98.5% of its discharge went at $0.052–$0.092/kWh,
 --           after the month's peak was already billed, so it bought no demand charge.
---       (b) A demand-response call then froze every new charge for three and a half hours, while solar held the
---           site's grid import well under the call's cap.
+--       (b) A demand-response call then froze every new charge for three and a half hours (16,542 deferrals
+--           against 25 enactments) while solar held the site's grid import at 137 kW against a 241 kW cap, and
+--           for an hour and a half after it the empty battery pinned the charge cap at its 50 kW floor.
 --
 --       Run `7a42982a-a905-4464-83f9-b602b076c5dc` (busy_day, twin depot `11111111-…`, operator_demo, armed; agent
 --       v19; governor raised to 900 sim-minutes so the run crosses the 14:00–19:00 CT DR window). Started 23:22 UTC
---       on 2026-09-22 (6:22 PM CT). Measured 00:00–01:20 UTC on 2026-09-23 (7:00–8:20 PM CT), while and after it ran.
+--       on 2026-09-22 (6:22 PM CT). Measured 00:00–01:30 UTC on 2026-09-23 (7:00–8:30 PM CT), while and after it ran; it ended at sim 19:18 CT
+--       (01:16 UTC), 1,831 ticks.
 --
 --       What each section answers:
 --         §1  0431 — departures without the readiness check: 2 of 124, both through the door 0437 now closes.
---         §2  0432 + v19 — the agent: 0 writes to the demand dial, 247 of 247 passes grounded, reversals 87 → 2.
+--         §2  0432 + v19 — the agent: 0 writes to the demand dial, 365 of 365 passes grounded; the share of its
+--             energy-dial changes that reversed the previous one fell from 71% / 68% (v18) to 32% / 38%.
 --         §3  G160 — the DR call: its cost under today's gate, and the counterfactual allowance under 0433 and
 --             0433 + 0435.
 --         §4  G169 — the battery: where its 2,274 kWh went, by price band.
---         §5  G173 — the solver's power headroom while the battery shaved (16 kW average over 811 ticks).
---         §6  G162 — fast-tracks: 250 events moving 426 vehicles.
+--         §5  G173 — the solver's power headroom while the battery shaved (15 kW average over 888 ticks), and the
+--             charge cap at its 50 kW floor for the 1.5 hours after the call.
+--         §6  G162 — fast-tracks: 349 events moving 690 vehicles.
 --         §7  the twin, 2D and 3D, during the DR call.
 
 \echo '=== 0353 §1 — departures that left with the readiness check still pending (0431) ==='
 SELECT (SELECT count(*) FROM public.ottoq_vehicle_dispatches WHERE sim_run_id = '7a42982a-a905-4464-83f9-b602b076c5dc') AS dispatches,
        (SELECT count(*) FROM public.ottoq_assert_departure_readiness('7a42982a-a905-4464-83f9-b602b076c5dc')) AS violations;
--- MEASURED_S1_TOTALS
+-- 168 dispatches, 2 violations (1.2%).
 -- Before 0431: 24 of 93 (0682752c) and 26 of 106 (6a8a7029), i.e. 24.5–25.8%.
 --
 -- The path each violation took (vehicle.state_changed, diff->current_state):
@@ -46,7 +50,7 @@ SELECT count(*) AS agent_passes,
                                        WHERE a->>'key' = 'deploy_peak_fraction')) AS passes_writing_demand
   FROM public.ottoq_decisions d
  WHERE d.sim_run_id = '7a42982a-a905-4464-83f9-b602b076c5dc' AND d.resolved_action_context = 'orchestrator_agent';
--- MEASURED_S2_PASSES
+-- 365 agent passes, 365 grounded, 0 writing deploy_peak_fraction.
 -- 0682752c (v18): 106 writes to deploy_peak_fraction, the first at tick 1 (0.95 from a board value of 0.90).
 
 -- dither, 0352 §3's definition (consecutive set_policy writes on one dial that reverse direction):
@@ -63,14 +67,22 @@ SELECT dial, count(*) AS writes, count(*) FILTER (WHERE v = prev) AS unchanged_r
        count(*) FILTER (WHERE prev IS NOT NULL AND v <> prev) AS changes,
        count(*) FILTER (WHERE prev IS NOT NULL AND prev2 IS NOT NULL AND sign(v - prev) * sign(prev - prev2) < 0) AS reversals
   FROM s GROUP BY 1 ORDER BY 2 DESC;
--- MEASURED_S2_DITHER
+--   dial                             writes  resends  changes  reversals
+--   energy_demand_factor_peak            20        0       19          6   (32% of changes)
+--   energy_demand_factor_expensive       17        0       16          6   (38%)
+--   deploy_surge_catchup                  9        0        8          4
+--   forecast_horizon_min                  4        0        3          0
+-- 0352 measured 71% and 68% on the two energy dials under v18. Zero resends: v19's no_change hold works.
 
 -- what v19's holds stopped (enacted_action->'rejected'):
 SELECT coalesce(r->>'reason', r->>'error') AS reason, coalesce(r->>'key', r->>'action') AS dial, count(*) AS n
   FROM public.ottoq_decisions d, jsonb_array_elements(coalesce(d.enacted_action->'rejected','[]')) r
  WHERE d.sim_run_id = '7a42982a-a905-4464-83f9-b602b076c5dc' AND d.resolved_action_context = 'orchestrator_agent'
  GROUP BY 1, 2 ORDER BY 3 DESC;
--- MEASURED_S2_HOLDS
+--   reversal_within_dwell   deploy_surge_catchup 11 · energy_demand_factor_peak 5 · energy_demand_factor_expensive 4
+--   no_change               deploy_surge_catchup 7 · energy_demand_factor_peak 2 · energy_demand_factor_expensive 1
+--                           · raise_deploy_surge 1
+-- 31 holds. Every one on deploy_surge_catchup (18 of 31) held a dial nothing reads (G175, 0438).
 -- NEW (G174): the agent's energy writes land on dials that do nothing in the mode it chose. With
 -- energy_reserve_shave on (the agent turned it on at 23:32 UTC), ottoq_energy_orchestrate replaces the
 -- factor-based target with the water-fill's, so energy_demand_factor_peak and energy_demand_factor_expensive
@@ -81,7 +93,8 @@ SELECT to_char(c.issued_at AT TIME ZONE 'America/Chicago','HH24:MI:SS') AS issue
        to_char(c.expires_at AT TIME ZONE 'America/Chicago','HH24:MI') AS expires_ct, round(c.duration_minutes) AS dur_min,
        round(c.required_load_cap_kw) AS cap_kw, c.reason, c.program
   FROM public.ottoq_dr_calls c WHERE c.sim_run_id = '7a42982a-a905-4464-83f9-b602b076c5dc' ORDER BY c.issued_at;
--- MEASURED_S3_CALLS
+-- One call: issued 14:15:04 CT (sim), expired 17:43:51, 208.8 min, cap 241 kW, heat_demand_response, TVA_VOLUNTARY.
+-- compliance_score was never written (NULL).
 -- At ignition: ambient 36.5 °C · battery SoC 13.8% (the discharge gate is floor 10 + uncertainty + 3) · grid 357 kW,
 -- EV 629 kW, building 108 kW, solar 380 kW · baseline (mean grid over the prior 60 sim-min) 329 kW.
 
@@ -105,7 +118,18 @@ da AS (SELECT b, count(*) FILTER (WHERE outcome_status = 'deferred_site_power_ca
               count(*) FILTER (WHERE outcome_status = 'enacted') AS enacted FROM d GROUP BY b)
 SELECT ea.*, COALESCE(da.deferred, 0) AS deferred, COALESCE(da.enacted, 0) AS enacted
   FROM ea LEFT JOIN da USING (b) ORDER BY b;
--- MEASURED_S3_TIMELINE
+-- By phase (site_energy_snapshots, time-weighted; stall_assignment decisions):
+--   phase            hours  EV kW (max)  grid kW (max)  solar  bess  building  over cap  grid $   deferred  enacted
+--   60 min before    1.00    605 (775)    328 (540)       400    21     145       100/118   52.32          0      251
+--   the call         3.48    220 (629)    137 (358)       231     0     149        25/417   87.15     16,542       25
+--   after, to 19:18  1.57    434 (950)    541 (1,029)      14     0     121       188/189  190.87      6,792       33
+-- The 15-minute query above gives the same picture at finer grain. Two things in it are not the call's:
+--   * after the call ended the deferrals continued at almost the same rate, because the charge cap sat at its
+--     50 kW floor from 17:45 to 19:18 CT (hold_reserve, SoC 12.6-12.9%): the water-fill's low target became the
+--     admission cap (G173), with the battery too empty to discharge. Grid import still reached 1,029 kW at the
+--     super-peak $0.235 from sessions already running: $190.87 in 1.57 hours.
+--   * the deferral count is per tick per waiting vehicle (about 40 vehicles a tick during the call), not per
+--     vehicle.
 
 -- The counterfactual, from the same rows. Today's gate compares committed EV kW with the call's 241 kW. 0433 reads
 -- the 241 as a REDUCTION: cap = baseline 329 − 241 = 88 kW of grid, and EV may draw cap − building + solar +
@@ -115,7 +139,12 @@ SELECT ea.*, COALESCE(da.deferred, 0) AS deferred, COALESCE(da.enacted, 0) AS en
 --   today's gate:                          241 kW of committed EV, against 629 kW at ignition
 -- So 0433 alone recovers about 70 kW. Most of the recovery needs a battery that still holds energy at 14:15,
 -- which is 0435's job. That is why the two ship together.
--- MEASURED_S3_COMPLIANCE
+-- Grid import exceeded the 241 kW cap on 25 of 417 call samples, at the two ends only: 14 in the first
+-- 16 minutes (sessions already running at ignition winding down; the gate stops new sessions, it does not
+-- curtail running ones) and 11 in the last 23 minutes, by 3-38 kW, when solar fell below 100 kW at dusk and a
+-- battery at 12.9% sat under its own discharge floor. A 600 kWh reserve (0435) covers that dusk shortfall many
+-- times over; under 0433's reading the cap tightens to about 88 kW of grid, which only a battery that still holds
+-- energy can meet.
 
 \echo '=== 0353 §4 — where the battery''s energy went (G169) ==='
 WITH s AS (
@@ -127,7 +156,12 @@ SELECT CASE WHEN rate <= 0.052 THEN 'off_peak 0.052' WHEN rate < 0.1 THEN 'mid_p
        round(sum(GREATEST(0, -bess_output_kw) * dt_h)::numeric) AS charged_kwh,
        round(sum(GREATEST(0, bess_output_kw) * dt_h * rate)::numeric, 2) AS grid_cost_displaced_usd
   FROM s WHERE dt_h IS NOT NULL AND dt_h < 0.5 GROUP BY 1 ORDER BY 1;
--- MEASURED_S4_BANDS
+--   band                  discharged kWh  charged kWh  grid cost displaced   grid kWh   grid cost
+--   off_peak 0.052                    379            7              $19.69      1,143      $59.42
+--   mid_peak 0.085-0.092            1,860            0             $171.13      2,712     $249.50
+--   on_peak 0.158-0.235                35            3               $5.47      1,726     $340.90
+-- 2,274 kWh discharged, 35 of it (1.5%) on-peak. The on-peak band bought 27% of the grid energy for 52% of the
+-- energy bill ($340.90 of $649.82 over the 15 sim-hours).
 -- The billing-period peak (the demand ratchet) was 1,657 kW, set in the 04:00 boot burst, so no discharge after
 -- 04:30 bought any demand charge. The water-fill's target by hour, 05–10: 973 → 192 → 262 → 544 → 478 → 679 kW,
 -- against net load 764 → 699 → 848 → 790 → 715 → 668 kW. SoC 94.7% at 04:12 → 13.7% by 14:00.
@@ -146,11 +180,15 @@ j AS (SELECT cc.*, b.mode, e.total_ev_charging_kw AS ev, cc.cap_kw - e.total_ev_
 SELECT mode, count(*) AS ticks, round(avg(headroom)) AS avg_headroom_kw,
        count(*) FILTER (WHERE headroom < 100) AS under_100kw
   FROM j GROUP BY 1 ORDER BY 2 DESC;
--- measured at 00:27 UTC (tick ~1,060):
---   discharge_reserve_shave   811 ticks   16 kW avg headroom   808 under 100 kW
---   hold_reserve              117         117                   64
---   idle                      112         920                   12
---   discharge_shave            20          11                   20
+-- final (1,831 ticks):
+--   discharge_reserve_shave   888 ticks   15 kW avg headroom   885 under 100 kW   avg cap   712 kW
+--   hold_reserve              753         -25                  560                          370
+--   idle                      112         920                   12                        1,808
+--   thermal_hold               41        -196                   39                           92
+--   discharge_shave            20          11                   20                        1,527
+--   charge_offpeak_reserve     13         148                    9                          464
+--   discharge_dr                4          34                    4                          550
+-- (at 00:27 UTC, tick ~1,060: discharge_reserve_shave 811 ticks, 16 kW; hold_reserve 117 ticks, 117 kW.)
 -- ottoq_build_site_descriptor gives CP-SAT power_cap_kw_hard = floor(LEAST(service_max, this cap)), and
 -- solvers/cpsat/model.py spends it in AddCumulative. With 16 kW of headroom a new charge can start only after
 -- another ends, which is G167's "planned to start at +N min, beyond this tick's 30-min window".
@@ -158,7 +196,7 @@ SELECT mode, count(*) AS ticks, round(avg(headroom)) AS avg_headroom_kw,
 \echo '=== 0353 §6 — deploy-pressure fast-tracks (G162) ==='
 SELECT count(*) AS events, sum((payload->>'fasttracked')::int) AS vehicles
   FROM public.ottoq_events WHERE sim_run_id = '7a42982a-a905-4464-83f9-b602b076c5dc' AND event_type = 'twin.deploy_pressure_fasttrack';
--- MEASURED_S6
+-- 349 events moving 690 vehicles (at 00:27 UTC: 250 events, 426 vehicles).
 
 -- §7 the twin, 2D and 3D (scratchpad live_probe.mjs against the cockpit dev server, 120 s at sim 14:42 CT, during
 -- the call): 58 samples, 109 cars rendered, 25 samples with a moving vehicle, 0 stopped, 0 stuck. Header: deployed 7

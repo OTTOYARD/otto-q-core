@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923012128
 -- migration-name:    three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double
 --
 -- 0434  **The work side's deploy demand is read by three engine functions, which resolved its default three
