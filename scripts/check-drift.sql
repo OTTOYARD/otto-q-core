@@ -535,7 +535,8 @@ repo_manifest(version, name, file) AS (
     ('20260923012821'::text, 'three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so'::text, '0438_three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so.sql'::text),
     ('20260923020808'::text, 'the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments'::text, '0439_the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments.sql'::text),
     ('20260923021253'::text, 'the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share'::text, '0440_the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share.sql'::text),
-    ('PENDING'::text, 'the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere'::text, '0441_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql'::text)
+    ('PENDING'::text, 'the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere'::text, '0441_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql'::text),
+    ('PENDING'::text, 'the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence'::text, '0442_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
