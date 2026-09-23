@@ -3,8 +3,9 @@
 --       (a) The battery reached the expensive afternoon empty. 98.5% of its discharge went at $0.052–$0.092/kWh,
 --           after the month's peak was already billed, so it bought no demand charge.
 --       (b) A demand-response call then froze every new charge for three and a half hours (16,542 deferrals
---           against 25 enactments) while solar held the site's grid import at 137 kW against a 241 kW cap, and
---           for an hour and a half after it the empty battery pinned the charge cap at its 50 kW floor.
+--           against 25 enactments) while solar held the site's grid import at 137 kW against a 241 kW cap. A second
+--           call ignited 42 seconds after the first expired -- the per-tick roll 0433 (C) replaces -- and held the
+--           cap at 106 kW to the end of the run, with the empty battery pinning the charge cap at its 50 kW floor.
 --
 --       Run `7a42982a-a905-4464-83f9-b602b076c5dc` (busy_day, twin depot `11111111-…`, operator_demo, armed; agent
 --       v19; governor raised to 900 sim-minutes so the run crosses the 14:00–19:00 CT DR window). Started 23:22 UTC
@@ -93,8 +94,12 @@ SELECT to_char(c.issued_at AT TIME ZONE 'America/Chicago','HH24:MI:SS') AS issue
        to_char(c.expires_at AT TIME ZONE 'America/Chicago','HH24:MI') AS expires_ct, round(c.duration_minutes) AS dur_min,
        round(c.required_load_cap_kw) AS cap_kw, c.reason, c.program
   FROM public.ottoq_dr_calls c WHERE c.sim_run_id = '7a42982a-a905-4464-83f9-b602b076c5dc' ORDER BY c.issued_at;
--- One call: issued 14:15:04 CT (sim), expired 17:43:51, 208.8 min, cap 241 kW, heat_demand_response, TVA_VOLUNTARY.
--- compliance_score was never written (NULL).
+-- Two calls, both heat_demand_response / TVA_VOLUNTARY, compliance_score never written (NULL):
+--   #1  issued 14:15:04 CT (sim), expired 17:43:51, 208.8 min, cap 241 kW
+--   #2  issued 17:44:33 -- 42 seconds after #1 expired -- to 20:52:26, 188 min, cap 106 kW; still active when the
+--       run ended at 19:18. At this run's cadence (~1 sim-minute ticks) the per-tick ignition roll fired again almost
+--       at once: G160 (c), the hazard 0433 (C) replaces with a per-30-sim-minute rate. §3's 'after' phase below is
+--       call #2, not a quiet hour.
 -- At ignition: ambient 36.5 °C · battery SoC 13.8% (the discharge gate is floor 10 + uncertainty + 3) · grid 357 kW,
 -- EV 629 kW, building 108 kW, solar 380 kW · baseline (mean grid over the prior 60 sim-min) 329 kW.
 
@@ -122,12 +127,13 @@ SELECT ea.*, COALESCE(da.deferred, 0) AS deferred, COALESCE(da.enacted, 0) AS en
 --   phase            hours  EV kW (max)  grid kW (max)  solar  bess  building  over cap  grid $   deferred  enacted
 --   60 min before    1.00    605 (775)    328 (540)       400    21     145       100/118   52.32          0      251
 --   the call         3.48    220 (629)    137 (358)       231     0     149        25/417   87.15     16,542       25
---   after, to 19:18  1.57    434 (950)    541 (1,029)      14     0     121       188/189  190.87      6,792       33
+--   call #2, to 19:18 1.57    434 (950)    541 (1,029)      14     0     121       188/189  190.87      6,792       33
 -- The 15-minute query above gives the same picture at finer grain. Two things in it are not the call's:
---   * after the call ended the deferrals continued at almost the same rate, because the charge cap sat at its
---     50 kW floor from 17:45 to 19:18 CT (hold_reserve, SoC 12.6-12.9%): the water-fill's low target became the
---     admission cap (G173), with the battery too empty to discharge. Grid import still reached 1,029 kW at the
---     super-peak $0.235 from sessions already running: $190.87 in 1.57 hours.
+--   * during call #2 the deferrals continued at almost the same rate. Two caps bound at once: the call's 106 kW,
+--     and the orchestrator's charge cap at its 50 kW floor from 17:45 to 19:18 CT (hold_reserve, SoC 12.6-12.9%),
+--     where the water-fill's low target became the admission cap (G173) with the battery too empty to discharge.
+--     Grid import still reached 1,029 kW at the super-peak $0.235 (188 of 189 samples over the call's cap):
+--     $190.87 in 1.57 hours.
 --   * the deferral count is per tick per waiting vehicle (about 40 vehicles a tick during the call), not per
 --     vehicle.
 
