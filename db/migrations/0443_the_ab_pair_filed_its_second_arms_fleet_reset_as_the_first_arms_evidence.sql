@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923042056
 -- migration-name:    the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence
 --
 -- 0443  **`ottoq_ab_pair` never received 0421's reset.** 0421 fixed the 0329 defect in `ottoq_determinism_pair`

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923042353
 -- migration-name:    two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing
 --
 -- 0446  **Two of the depot's ten fast chargers looped for over an hour on two vehicles already at the fast chargers'

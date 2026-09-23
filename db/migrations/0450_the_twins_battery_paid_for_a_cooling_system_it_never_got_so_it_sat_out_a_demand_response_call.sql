@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923042708
 -- migration-name:    the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call
 --
 -- 0450  **The twin's battery paid for a cooling system it never got, so in hot weather it could not discharge and sat

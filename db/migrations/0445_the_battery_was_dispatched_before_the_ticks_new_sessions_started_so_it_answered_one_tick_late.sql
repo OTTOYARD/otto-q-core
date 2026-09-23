@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923042310
 -- migration-name:    the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late
 --
 -- 0445  **The battery was dispatched before the tick's new charging sessions started, so it always answered one tick

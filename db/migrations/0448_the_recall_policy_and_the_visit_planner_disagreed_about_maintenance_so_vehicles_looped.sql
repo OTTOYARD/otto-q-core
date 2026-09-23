@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923042526
 -- migration-name:    the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped
 --
 -- 0448  **The recall policy and the visit planner disagreed about whether interval maintenance is required, so

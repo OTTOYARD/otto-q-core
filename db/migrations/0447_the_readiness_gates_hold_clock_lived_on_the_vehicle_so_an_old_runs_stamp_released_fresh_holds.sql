@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923042423
 -- migration-name:    the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds
 --
 -- 0447  **The readiness gate's hold clock lived on the vehicle, not the run, so a stamp an earlier run left behind

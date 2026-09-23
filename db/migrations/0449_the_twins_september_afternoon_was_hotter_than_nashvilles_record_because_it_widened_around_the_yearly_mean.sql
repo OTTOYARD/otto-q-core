@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923042610
 -- migration-name:    the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean
 --
 -- 0449  **The twin's September afternoon reached 45.3 °C, 4.7 °C past Nashville's record for the month, because the
@@ -187,7 +187,8 @@ BEGIN
         RAISE NOTICE '0449 V2: % CT falls on another card day; skipped', v_h;
         CONTINUE;
       END IF;
-      PERFORM twin.ottoq_sim_advance_weather_and_solar(r.sim_run_id, r.depot_id, v_clock);
+      PERFORM twin.ottoq_sim_advance_weather_and_solar(p_depot_id => r.depot_id, p_sim_run_id => r.sim_run_id,
+                                                       p_sim_clock_now => v_clock);
       SELECT w.ambient_temp_c INTO v_got FROM public.ottoq_weather_snapshots w
        WHERE w.sim_run_id = r.sim_run_id AND w.depot_id = r.depot_id AND w.sim_clock_at = v_clock
        ORDER BY w.snapshot_id DESC LIMIT 1;

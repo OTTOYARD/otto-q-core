@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923042223
 -- migration-name:    the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak
 --
 -- 0444  **The battery's day plan could not see the fleet waiting to charge, so the boot surge set the day's billed
@@ -124,7 +124,8 @@ BEGIN
   SELECT string_agg(DISTINCT n.nspname || '.' || p.proname, ', ') INTO v_callers
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname IN ('public','twin','ottoq') AND p.proname <> 'ottoq_bess_day_plan'
-     AND regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') ~ 'ottoq_bess_day_plan';
+     -- a CALL, not the name: 0442's publisher names the plan as a string for provenance ('ottoq_bess_day_plan', 'ok', ...)
+     AND regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') ~ 'ottoq_bess_day_plan\s*\(';
   IF v_callers IS DISTINCT FROM 'public.ottoq_energy_orchestrate' THEN
     RAISE EXCEPTION '0444 P2: ottoq_bess_day_plan has callers other than the orchestrator: %', v_callers;
   END IF;

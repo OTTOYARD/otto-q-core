@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260923042027
 -- migration-name:    the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere
 --
 -- 0442  **The site's forward schedule was computed every tick and published nowhere.** Since 0435 the battery

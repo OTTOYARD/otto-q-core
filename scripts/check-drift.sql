@@ -535,15 +535,15 @@ repo_manifest(version, name, file) AS (
     ('20260923012821'::text, 'three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so'::text, '0438_three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so.sql'::text),
     ('20260923020808'::text, 'the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments'::text, '0439_the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments.sql'::text),
     ('20260923021253'::text, 'the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share'::text, '0440_the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share.sql'::text),
-    ('PENDING'::text, 'the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere'::text, '0442_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql'::text),
-    ('PENDING'::text, 'the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence'::text, '0443_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql'::text),
-    ('PENDING'::text, 'the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak'::text, '0444_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql'::text),
-    ('PENDING'::text, 'the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late'::text, '0445_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql'::text),
-    ('PENDING'::text, 'two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing'::text, '0446_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql'::text),
-    ('PENDING'::text, 'the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds'::text, '0447_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql'::text),
-    ('PENDING'::text, 'the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped'::text, '0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql'::text),
-    ('PENDING'::text, 'the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean'::text, '0449_the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean.sql'::text),
-    ('PENDING'::text, 'the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call'::text, '0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql'::text)
+    ('20260923042027'::text, 'the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere'::text, '0442_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql'::text),
+    ('20260923042056'::text, 'the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence'::text, '0443_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql'::text),
+    ('20260923042223'::text, 'the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak'::text, '0444_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql'::text),
+    ('20260923042310'::text, 'the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late'::text, '0445_the_battery_was_dispatched_before_the_ticks_new_sessions_started_so_it_answered_one_tick_late.sql'::text),
+    ('20260923042353'::text, 'two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing'::text, '0446_two_fast_chargers_looped_on_vehicles_already_at_their_daytime_cap_delivering_nothing.sql'::text),
+    ('20260923042423'::text, 'the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds'::text, '0447_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql'::text),
+    ('20260923042526'::text, 'the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped'::text, '0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql'::text),
+    ('20260923042610'::text, 'the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean'::text, '0449_the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean.sql'::text),
+    ('20260923042708'::text, 'the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call'::text, '0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
