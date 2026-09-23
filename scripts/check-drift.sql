@@ -528,7 +528,9 @@ repo_manifest(version, name, file) AS (
     ('20260922224038'::text, 'a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged'::text, '0431_a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged.sql'::text),
     ('20260922231738'::text, 'the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps'::text, '0432_the_agent_could_rewrite_the_simulated_demand_it_is_measured_against_and_could_not_see_its_own_clamps.sql'::text),
     ('PENDING'::text, 'a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery'::text, '0433_a_demand_response_reduction_was_read_as_the_depots_whole_charging_ceiling_and_the_gate_forgot_the_battery.sql'::text),
-    ('PENDING'::text, 'three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double'::text, '0434_three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double.sql'::text)
+    ('PENDING'::text, 'three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double'::text, '0434_three_consumers_of_the_deploy_demand_defaulted_it_three_ways_and_one_saw_double.sql'::text),
+    ('PENDING'::text, 'the_battery_planned_eight_hours_ahead_on_a_forecast_where_charging_stops_and_was_empty_before_the_expensive_afternoon'::text, '0435_the_battery_planned_eight_hours_ahead_on_a_forecast_where_charging_stops_and_was_empty_before_the_expensive_afternoon.sql'::text),
+    ('PENDING'::text, 'the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine'::text, '0436_the_twins_afternoon_peaked_at_eight_pm_because_a_sine_was_written_where_its_comment_meant_a_cosine.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
