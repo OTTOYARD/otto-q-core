@@ -35,9 +35,8 @@
 --                         {at, action, verb, outcome, engine, rationale}. verb and rationale read enacted first,
 --                         then proposed, the same precedence ottoq_activity_feed uses.
 --       All three are NULL / [] when no run is live, exactly like `card`.
---   (3) Top level, new keys:
---         `reservations`       every held/active booking of the run (operator-filtered like the vehicles), so the
---                              Depot tab draws the reservation board from the same call.
+--   (3) Top level, new key (the depot-wide reservation board is the union of the per-vehicle lists; it is not
+--       published twice, which would double a ~150 KB payload the cockpits poll every 5 s):
 --         `reservation_ledger` count of this run's bookings by state (done / released / superseded /
 --                              interrupted / held / active), operator-filtered. Reported side by side on purpose:
 --                              AGENTS.md "report done / interrupted / legacy side by side".
@@ -206,17 +205,6 @@ SELECT jsonb_build_object(
      LEFT JOIN bk_json bj ON bj.vehicle_id = vh.id
      LEFT JOIN dec  dc    ON dc.vehicle_id = vh.id
   ), '[]'::jsonb),
-  'reservations', COALESCE((
-     SELECT jsonb_agg(jsonb_build_object(
-       'booking_id', bk.booking_id, 'vehicle_id', bk.vehicle_id, 'display_name', vh.display_name,
-       'operator', vh.operator_name,
-       'purpose', bk.purpose, 'state', bk.state,
-       'stall_code', bk.stall_code, 'stall_kind', bk.stall_kind,
-       'starts_at', bk.starts_at, 'ends_at', bk.ends_at,
-       'why', bk.why, 'need_atom', bk.need_atom, 'booked_by', bk.booked_by)
-       ORDER BY bk.starts_at NULLS LAST, vh.display_name)
-       FROM bk JOIN veh vh ON vh.id = bk.vehicle_id
-  ), '[]'::jsonb),
   'reservation_ledger', COALESCE((
      SELECT jsonb_object_agg(x.state, x.n) FROM (
        SELECT b.state, count(*) AS n
@@ -237,6 +225,6 @@ COMMIT;
 --   select prosrc ilike '%0460%' from pg_proc where proname = 'ottoq_depot_cards';                 -- this body
 --   select has_function_privilege('anon','public.ottoq_depot_cards(uuid,uuid)','execute');        -- true
 --   select ottoq_depot_cards('11111111-1111-1111-1111-111111111111')->>'contract_version';        -- '1.1'
---   During a live run: jsonb_array_length(->'reservations') equals
+--   During a live run: the sum over vehicles of jsonb_array_length(->'reservations') equals
 --   (select count(*) from ottoq_stall_bookings where sim_run_id = <run> and state in ('held','active')
 --      and vehicle_id in (select id from vehicles where current_depot_id = <depot>)).
