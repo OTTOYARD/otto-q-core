@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0493 — GENERATED, not a log
+## Index, 0134–0494 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -492,7 +492,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0491](db/migrations/0491_an_ops_action_outside_the_whitelist_is_refused_and_says_so.sql) | `20260926170743` | yes — ledger | **An ops action outside the whitelist is refused, and says so (G222).** The setter promised a human approval |
 | [0492](db/migrations/0492_the_orphan_sweep_ends_a_twin_session_on_its_runs_clock.sql) | `20260926170804` | yes — ledger | **The orphan sweep ends a twin charge session on its run's clock (G220).** |
 | [0493](db/migrations/0493_a_refused_charge_books_nothing_and_a_charging_car_holds_no_other_charger.sql) | `20260926183701` | yes — ledger | **The charge step never read the emission gate's answer, the gate intake could take a car the charge step had |
+| [0494](db/migrations/0494_the_charge_proposer_offers_only_a_charger_the_gate_accepts.sql) | `20260926190651` | yes — ledger | **The charge proposer offered a charger promised to another car to every car in the tick (G226, the second |
 
-353 migrations indexed.
+354 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
