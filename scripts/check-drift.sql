@@ -557,7 +557,8 @@ repo_manifest(version, name, file) AS (
     ('20260926045517'::text, 'a_charge_that_completed_below_its_visit_target_stayed_open_and_the_deploy_gate_looped_the_car_through_the_service_bay'::text, '0463_a_charge_that_completed_below_its_visit_target_stayed_open_and_the_deploy_gate_looped_the_car_through_the_service_bay.sql'::text),
     ('20260926045544'::text, 'the_deploy_gate_sent_every_kind_of_open_work_to_the_service_bay_and_named_the_wrong_work_as_missing'::text, '0464_the_deploy_gate_sent_every_kind_of_open_work_to_the_service_bay_and_named_the_wrong_work_as_missing.sql'::text),
     ('20260926045604'::text, 'the_command_door_dropped_the_step_a_gate_intake_carried_so_the_car_was_never_moved_again'::text, '0465_the_command_door_dropped_the_step_a_gate_intake_carried_so_the_car_was_never_moved_again.sql'::text),
-    ('20260926045441'::text, 'the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count'::text, '0466_the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count.sql'::text)
+    ('20260926045441'::text, 'the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count'::text, '0466_the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count.sql'::text),
+    ('20260926052522'::text, 'the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold'::text, '0467_the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
