@@ -68,3 +68,13 @@ SELECT count(*) AS swept,
 --     RAISE EXCEPTION 'PROBE run clock=% | swept session: ended_at=% status=% reason=% | on the run clock=% | now()=%',
 --       v_clock, v_end, v_status, v_reason, (v_end = v_clock), now();
 --   END $probe$;
+
+-- ══ §3 THE CANON UNDER 0492 ════════════════════════════════════════════════════════════════════════════════════
+
+\echo '=== 0366 §3 — the canon ==='
+SELECT c.scenario, c.seed, c.ticks, c.verdict_id, c.certified_at, c.outcome, c.equal, c.disagreeing_atoms, c.status
+  FROM public.ottoq_determinism_canon c
+ WHERE c.enabled
+ ORDER BY c.certified_at;
+-- READ (2026-09-26, 18:06 UTC): all nine columns current under 0492, every one `passed` with no disagreeing atom,
+--   first attempt each: verdicts 375-383, pairs started 17:09-17:27 UTC (12:09-12:27 PM CT).
