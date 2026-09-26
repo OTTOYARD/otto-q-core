@@ -115,8 +115,9 @@ SELECT
     WHERE e.sim_run_id = :'run' AND e.event_type = 'twin.service_completed' AND e.payload->>'from' = 'in_service_bay'
       AND COALESCE((v.config->>'flagged_issue')::boolean, false)) AS g208_bay_exits_still_flagged_now;
 -- G205 10 stage {no_wash_need} commands, 2 boot-cohort cars in the first 8 sim-minutes.
--- G206 3 of 46 intakes with no booking: the intake's gate checks the stall at this moment and its booking covers the
---      whole staging window, which a later booking on the stall overlapped (Tesla-AV-067, Tesla-AV-044 by 10:13 AM).
+-- G206 3 of 46 intakes with no booking. First read here as a later booking on the stall overlapping the intake's
+--      window; that was wrong. All three picked stalls carried the SAME car's own live hold, which the validator
+--      exempts and the booking's EXCLUDE does not (0360 §4, fixed by 0476).
 -- G208 5 of the 8 service-bay exits were flagged cars, and all 5 are still flagged (4 of them credited nothing).
 
 -- ══ §5 TWO MORE, READ AT 11:41 AM BEFORE THE STOP ═══════════════════════════════════════════════════════════════

@@ -565,7 +565,9 @@ repo_manifest(version, name, file) AS (
     ('20260926063850'::text, 'the_staging_hold_booked_stalls_promised_to_another_car_and_left_each_refused_booking_held'::text, '0471_the_staging_hold_booked_stalls_promised_to_another_car_and_left_each_refused_booking_held.sql'::text),
     ('20260926070905'::text, 'the_inspection_seam_sent_cars_the_gate_intake_had_already_sent_and_the_door_kept_one_by_stall_id'::text, '0472_the_inspection_seam_sent_cars_the_gate_intake_had_already_sent_and_the_door_kept_one_by_stall_id.sql'::text),
     ('20260926070924'::text, 'the_inspection_seam_served_the_readiness_leg_as_a_second_interior_inspection'::text, '0473_the_inspection_seam_served_the_readiness_leg_as_a_second_interior_inspection.sql'::text),
-    ('PENDING'::text, 'a_car_moved_off_a_faulted_charger_was_staged_with_no_step_so_no_gate_read_it'::text, '0474_a_car_moved_off_a_faulted_charger_was_staged_with_no_step_so_no_gate_read_it.sql'::text)
+    ('PENDING'::text, 'a_car_moved_off_a_faulted_charger_was_staged_with_no_step_so_no_gate_read_it'::text, '0474_a_car_moved_off_a_faulted_charger_was_staged_with_no_step_so_no_gate_read_it.sql'::text),
+    ('PENDING'::text, 'the_deploy_gates_technician_flag_was_never_cleared_and_took_service_bay_seats_in_later_runs'::text, '0475_the_deploy_gates_technician_flag_was_never_cleared_and_took_service_bay_seats_in_later_runs.sql'::text),
+    ('PENDING'::text, 'the_gate_intake_booked_over_the_cars_own_hold_and_ran_with_no_booking'::text, '0476_the_gate_intake_booked_over_the_cars_own_hold_and_ran_with_no_booking.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
