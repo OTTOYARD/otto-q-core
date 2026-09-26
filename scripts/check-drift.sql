@@ -552,7 +552,8 @@ repo_manifest(version, name, file) AS (
     ('20260923062252'::text, 'the_kernel_card_counted_abstentions_as_refused_proposals'::text, '0456_the_kernel_card_counted_abstentions_as_refused_proposals.sql'::text),
     ('20260923063827'::text, 'a_held_deploy_is_a_state_not_an_event'::text, '0457_a_held_deploy_is_a_state_not_an_event.sql'::text),
     ('20260926033237'::text, 'a_bay_door_seated_cars_for_no_time_and_the_bay_could_not_credit_the_need_it_was_seated_for'::text, '0458_a_bay_door_seated_cars_for_no_time_and_the_bay_could_not_credit_the_need_it_was_seated_for.sql'::text),
-    ('20260926033252'::text, 'stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished'::text, '0459_stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished.sql'::text)
+    ('20260926033252'::text, 'stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished'::text, '0459_stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished.sql'::text),
+    ('20260926040843'::text, 'the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick'::text, '0462_the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
