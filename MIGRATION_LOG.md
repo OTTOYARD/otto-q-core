@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0450 — GENERATED, not a log
+## Index, 0134–0457 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -451,7 +451,14 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0448](db/migrations/0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql) | `20260923042526` | yes — ledger | **The recall policy and the visit planner disagreed about whether interval maintenance is required, so |
 | [0449](db/migrations/0449_the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean.sql) | `20260923042610` | yes — ledger | **The twin's September afternoon reached 45.3 °C, 4.7 °C past Nashville's record for the month, because the |
 | [0450](db/migrations/0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql) | `20260923042708` | yes — ledger | **The twin's battery paid for a cooling system it never got, so in hot weather it could not discharge and sat |
+| [0451](db/migrations/0451_the_intelligence_panel_counted_failures_as_refusals_and_showed_every_runs_solver_calls_as_this_ones.sql) | `20260923053740` | yes — ledger | **The cockpit's Intelligence and Decisions streams read the right tables and said the wrong things.** |
+| [0452](db/migrations/0452_the_decisions_stream_restated_every_waiting_vehicle_every_tick_and_the_ledger_never_saw_a_failed_agent_call.sql) | `20260923060345` | yes — ledger | **Two reporting defects behind the cockpit's Decisions stream, both measured on run 736406cf (busy_day, twin |
+| [0453](db/migrations/0453_a_repeat_is_the_next_decide_tick_and_standing_is_per_action.sql) | `20260923060733` | yes — ledger | **Two corrections to 0452's changes-only stream, both found by reading its first live output rather than |
+| [0454](db/migrations/0454_events_are_their_own_rows_and_a_waiting_vehicle_is_one_row.sql) | `20260923061135` | yes — ledger | **0453 over-corrected, and the live stream showed it within a minute.** `db/checks/0356` §3. FINDINGS G189 |
+| [0455](db/migrations/0455_every_decision_in_the_stream_says_what_it_decided_and_why.sql) | `20260923061500` | yes — ledger | **The Decisions stream printed the engine's name where the decision's reason belonged.** `db/checks/0356` §4 |
+| [0456](db/migrations/0456_the_kernel_card_counted_abstentions_as_refused_proposals.sql) | `20260923062252` | yes — ledger | **The Intelligence panel's L4 card counted the proposer's abstentions as proposals the kernel refused.** |
+| [0457](db/migrations/0457_a_held_deploy_is_a_state_not_an_event.sql) | `20260923063827` | yes — ledger | **0454 classified whole actions as events; one of them also carries a state.** `db/checks/0356` §3 |
 
-312 migrations indexed.
+319 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

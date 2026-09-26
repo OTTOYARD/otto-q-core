@@ -543,7 +543,14 @@ repo_manifest(version, name, file) AS (
     ('20260923042423'::text, 'the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds'::text, '0447_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql'::text),
     ('20260923042526'::text, 'the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped'::text, '0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql'::text),
     ('20260923042610'::text, 'the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean'::text, '0449_the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean.sql'::text),
-    ('20260923042708'::text, 'the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call'::text, '0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql'::text)
+    ('20260923042708'::text, 'the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call'::text, '0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql'::text),
+    ('20260923053740'::text, 'the_intelligence_panel_counted_failures_as_refusals_and_showed_every_runs_solver_calls_as_this_ones'::text, '0451_the_intelligence_panel_counted_failures_as_refusals_and_showed_every_runs_solver_calls_as_this_ones.sql'::text),
+    ('20260923060345'::text, 'the_decisions_stream_restated_every_waiting_vehicle_every_tick_and_the_ledger_never_saw_a_failed_agent_call'::text, '0452_the_decisions_stream_restated_every_waiting_vehicle_every_tick_and_the_ledger_never_saw_a_failed_agent_call.sql'::text),
+    ('20260923060733'::text, 'a_repeat_is_the_next_decide_tick_and_standing_is_per_action'::text, '0453_a_repeat_is_the_next_decide_tick_and_standing_is_per_action.sql'::text),
+    ('20260923061135'::text, 'events_are_their_own_rows_and_a_waiting_vehicle_is_one_row'::text, '0454_events_are_their_own_rows_and_a_waiting_vehicle_is_one_row.sql'::text),
+    ('20260923061500'::text, 'every_decision_in_the_stream_says_what_it_decided_and_why'::text, '0455_every_decision_in_the_stream_says_what_it_decided_and_why.sql'::text),
+    ('20260923062252'::text, 'the_kernel_card_counted_abstentions_as_refused_proposals'::text, '0456_the_kernel_card_counted_abstentions_as_refused_proposals.sql'::text),
+    ('20260923063827'::text, 'a_held_deploy_is_a_state_not_an_event'::text, '0457_a_held_deploy_is_a_state_not_an_event.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
