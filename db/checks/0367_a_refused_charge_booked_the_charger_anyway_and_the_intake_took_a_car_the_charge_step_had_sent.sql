@@ -424,8 +424,10 @@ SELECT c.scenario || '/' || c.seed || '/' || c.ticks AS col, c.body, c.verdict_i
 --     busy_day/424242/24     185/80  -> 115/8     cars  96 ->  96
 --     busy_day/171717/48     248/76  -> 174/3     cars 110 -> 109
 --   Refusals fell from 27-131 an arm to 3-8, below 0492's 19-57 (§5(b)), and the commands issued fell with them (160 to
---   90 on busy_day/171717/12) while the cars charged stayed within one. What refuses now is a charger that changed
---   between the proposal and the gate inside one tick.
+--   90 on busy_day/171717/12) while the cars charged stayed within one. CORRECTED the same afternoon (0368 §10): this
+--   READ first said the 3-8 left are "a charger that changed between the proposal and the gate inside one tick". That
+--   was assumed, not measured, and it is wrong: every one of them, on every arm, is a proposal from the kernel's greedy
+--   optimizer (`ottoq_l2_optimize_assignments`), which still picked by pointer. 0495 gives it the gate's check.
 
 \echo '=== 0367 §7(b) — against 0492: cars charged only there, and whether any of them needed a charge ==='
 WITH pairs(v92, v94) AS (VALUES (377,395),(378,396),(379,397),(380,398),(381,399),(382,400),(383,401)),

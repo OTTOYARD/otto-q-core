@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0494 — GENERATED, not a log
+## Index, 0134–0497 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -493,7 +493,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0492](db/migrations/0492_the_orphan_sweep_ends_a_twin_session_on_its_runs_clock.sql) | `20260926170804` | yes — ledger | **The orphan sweep ends a twin charge session on its run's clock (G220).** |
 | [0493](db/migrations/0493_a_refused_charge_books_nothing_and_a_charging_car_holds_no_other_charger.sql) | `20260926183701` | yes — ledger | **The charge step never read the emission gate's answer, the gate intake could take a car the charge step had |
 | [0494](db/migrations/0494_the_charge_proposer_offers_only_a_charger_the_gate_accepts.sql) | `20260926190651` | yes — ledger | **The charge proposer offered a charger promised to another car to every car in the tick (G226, the second |
+| [0495](db/migrations/0495_the_greedy_optimizer_offers_only_a_charger_the_gate_accepts.sql) | `20260926201658` | yes — ledger | **The in-kernel greedy optimizer still offered a charger promised to another car (G226, the third part).** |
+| [0496](db/migrations/0496_the_intelligence_card_reads_the_playback_speed_the_run_is_paced_by.sql) | `20260926200223` | yes — ledger | **The Intelligence tab's run card said "1x" on a run playing at 8x.** `db/checks/0368` §12 |
+| [0497](db/migrations/0497_a_run_seed_goes_to_the_cockpit_as_text.sql) | `20260926204519` | yes — ledger | **The cockpits printed every run seed rounded (G230).** `db/checks/0368` §12 |
 
-354 migrations indexed.
+357 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

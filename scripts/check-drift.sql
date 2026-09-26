@@ -585,7 +585,10 @@ repo_manifest(version, name, file) AS (
     ('20260926170743'::text, 'an_ops_action_outside_the_whitelist_is_refused_and_says_so'::text, '0491_an_ops_action_outside_the_whitelist_is_refused_and_says_so.sql'::text),
     ('20260926170804'::text, 'the_orphan_sweep_ends_a_twin_session_on_its_runs_clock'::text, '0492_the_orphan_sweep_ends_a_twin_session_on_its_runs_clock.sql'::text),
     ('20260926183701'::text, 'a_refused_charge_books_nothing_and_a_charging_car_holds_no_other_charger'::text, '0493_a_refused_charge_books_nothing_and_a_charging_car_holds_no_other_charger.sql'::text),
-    ('20260926190651'::text, 'the_charge_proposer_offers_only_a_charger_the_gate_accepts'::text, '0494_the_charge_proposer_offers_only_a_charger_the_gate_accepts.sql'::text)
+    ('20260926190651'::text, 'the_charge_proposer_offers_only_a_charger_the_gate_accepts'::text, '0494_the_charge_proposer_offers_only_a_charger_the_gate_accepts.sql'::text),
+    ('20260926201658'::text, 'the_greedy_optimizer_offers_only_a_charger_the_gate_accepts'::text, '0495_the_greedy_optimizer_offers_only_a_charger_the_gate_accepts.sql'::text),
+    ('20260926200223'::text, 'the_intelligence_card_reads_the_playback_speed_the_run_is_paced_by'::text, '0496_the_intelligence_card_reads_the_playback_speed_the_run_is_paced_by.sql'::text),
+    ('20260926204519'::text, 'a_run_seed_goes_to_the_cockpit_as_text'::text, '0497_a_run_seed_goes_to_the_cockpit_as_text.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
