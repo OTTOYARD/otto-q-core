@@ -1242,6 +1242,7 @@ def test_an_unofferable_stall_is_never_planned_on_even_when_status_is_available(
     ({"offerable": False, "charger_state": "Unavailable"}, "charger_unavailable"),
     ({"offerable": False, "charger_fresh": False}, "charger_stale"),
     ({"offerable": False, "reservation_live": True, "reserved_by": "v-x"}, "reserved"),
+    ({"offerable": False, "calendar_held_by": "v-x"}, "calendar_held"),
     ({"offerable": False, "vehicle_id": "v-x"}, "occupied"),
     ({"status": "maintenance"}, "status_maintenance"),
 ])
