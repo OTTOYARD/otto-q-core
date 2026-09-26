@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0501 — GENERATED, not a log
+## Index, 0134–0503 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -500,7 +500,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0499](db/migrations/0499_the_proposal_selector_asks_the_calendar_the_gate_refuses_on.sql) | `20260926210943` | yes — ledger | **The selector still handed the charge step an external proposal the gate refuses (G229, the disposal side).** |
 | [0500](db/migrations/0500_a_parking_hold_lasts_as_long_as_its_car_is_parked.sql) | `20260926214200` | yes — ledger | **A car parked in staging to wait for a charger sat on a hold that lapsed, so the calendar called its stall |
 | [0501](db/migrations/0501_the_wait_for_a_charger_is_measured_beside_kpi_5.sql) | `20260926221345` | yes — ledger | **KPI 5 could not see a queue for chargers (G233).** `db/checks/0371` |
+| [0502](db/migrations/0502_the_recall_appointment_picks_a_staging_stall_the_gate_accepts.sql) | `20260926232454` | yes — ledger | **The recall appointment picked its staging stall on the pointer alone, so the gate refused it, and the |
+| [0503](db/migrations/0503_the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival.sql) | `20260926232527` | yes — ledger | **A refused staging appointment was rerouted into an hour's hold that nothing ever used (G235, second |
 
-361 migrations indexed.
+363 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

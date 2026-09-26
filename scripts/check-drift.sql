@@ -592,7 +592,9 @@ repo_manifest(version, name, file) AS (
     ('20260926210609'::text, 'the_cp_sat_frame_reads_the_calendar_the_gate_refuses_on'::text, '0498_the_cp_sat_frame_reads_the_calendar_the_gate_refuses_on.sql'::text),
     ('20260926210943'::text, 'the_proposal_selector_asks_the_calendar_the_gate_refuses_on'::text, '0499_the_proposal_selector_asks_the_calendar_the_gate_refuses_on.sql'::text),
     ('20260926214200'::text, 'a_parking_hold_lasts_as_long_as_its_car_is_parked'::text, '0500_a_parking_hold_lasts_as_long_as_its_car_is_parked.sql'::text),
-    ('20260926221345'::text, 'the_wait_for_a_charger_is_measured_beside_kpi_5'::text, '0501_the_wait_for_a_charger_is_measured_beside_kpi_5.sql'::text)
+    ('20260926221345'::text, 'the_wait_for_a_charger_is_measured_beside_kpi_5'::text, '0501_the_wait_for_a_charger_is_measured_beside_kpi_5.sql'::text),
+    ('20260926232454'::text, 'the_recall_appointment_picks_a_staging_stall_the_gate_accepts'::text, '0502_the_recall_appointment_picks_a_staging_stall_the_gate_accepts.sql'::text),
+    ('20260926232527'::text, 'the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival'::text, '0503_the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
