@@ -583,7 +583,8 @@ repo_manifest(version, name, file) AS (
     ('20260926161825'::text, 'the_completion_probe_reads_the_stall_the_work_was_done_in'::text, '0489_the_completion_probe_reads_the_stall_the_work_was_done_in.sql'::text),
     ('20260926161853'::text, 'the_refusal_reactor_leaves_a_car_the_decide_path_has_already_replanned'::text, '0490_the_refusal_reactor_leaves_a_car_the_decide_path_has_already_replanned.sql'::text),
     ('20260926170743'::text, 'an_ops_action_outside_the_whitelist_is_refused_and_says_so'::text, '0491_an_ops_action_outside_the_whitelist_is_refused_and_says_so.sql'::text),
-    ('20260926170804'::text, 'the_orphan_sweep_ends_a_twin_session_on_its_runs_clock'::text, '0492_the_orphan_sweep_ends_a_twin_session_on_its_runs_clock.sql'::text)
+    ('20260926170804'::text, 'the_orphan_sweep_ends_a_twin_session_on_its_runs_clock'::text, '0492_the_orphan_sweep_ends_a_twin_session_on_its_runs_clock.sql'::text),
+    ('20260926183701'::text, 'a_refused_charge_books_nothing_and_a_charging_car_holds_no_other_charger'::text, '0493_a_refused_charge_books_nothing_and_a_charging_car_holds_no_other_charger.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
