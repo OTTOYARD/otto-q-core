@@ -572,7 +572,8 @@ repo_manifest(version, name, file) AS (
     ('20260926115337'::text, 'the_dial_setter_kept_a_rows_first_writer_so_a_dial_named_who_created_it_not_who_set_it'::text, '0478_the_dial_setter_kept_a_rows_first_writer_so_a_dial_named_who_created_it_not_who_set_it.sql'::text),
     ('20260926115429'::text, 'the_solar_canopies_soiling_was_shared_by_every_run_so_an_arm_inherited_the_panels_the_last_run_left'::text, '0479_the_solar_canopies_soiling_was_shared_by_every_run_so_an_arm_inherited_the_panels_the_last_run_left.sql'::text),
     ('20260926115449'::text, 'the_reserve_shave_promotion_is_measured_again_on_arms_that_start_on_the_same_panels'::text, '0480_the_reserve_shave_promotion_is_measured_again_on_arms_that_start_on_the_same_panels.sql'::text),
-    ('PENDING'::text, 'a_dial_promotion_the_canon_keeps_failing_under_now_rolls_itself_back'::text, '0481_a_dial_promotion_the_canon_keeps_failing_under_now_rolls_itself_back.sql'::text)
+    ('20260926122216'::text, 'a_dial_promotion_the_canon_keeps_failing_under_now_rolls_itself_back'::text, '0481_a_dial_promotion_the_canon_keeps_failing_under_now_rolls_itself_back.sql'::text),
+    ('20260926122233'::text, 'the_dial_runner_opens_and_closes_its_own_overnight_window'::text, '0482_the_dial_runner_opens_and_closes_its_own_overnight_window.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

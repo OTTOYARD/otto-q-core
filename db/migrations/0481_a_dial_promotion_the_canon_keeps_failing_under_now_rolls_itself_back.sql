@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260926122216
 -- migration-name:    a_dial_promotion_the_canon_keeps_failing_under_now_rolls_itself_back
 --
 -- 0481  **A dial promotion the canon keeps failing under now rolls itself back.** `db/checks/0361` §3. FINDINGS

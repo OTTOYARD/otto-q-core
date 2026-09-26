@@ -23,7 +23,7 @@ SELECT pair, count(*) AS ticks FROM multi GROUP BY 1 ORDER BY 2 DESC;
 -- ══ §2 G207 (0473): THE SEAM SERVES ONLY INTERIOR INSPECTIONS ═════════════════════════════════════════════════════
 
 \echo '=== 0362 §2 — inspection-lane bookings by the atom of the leg they served ==='
-SELECT COALESCE(l.payload->>'atom', l.leg_type, '(none)') AS leg_atom, count(*) AS bookings
+SELECT COALESCE(l.duration_basis->>'atom', l.leg_type, '(none)') AS leg_atom, count(*) AS bookings
   FROM public.ottoq_stall_bookings b
   LEFT JOIN public.ottoq_itinerary_legs l ON l.leg_id = b.leg_id
  WHERE b.sim_run_id = :'run' AND b.purpose = 'inspect'
@@ -84,3 +84,19 @@ SELECT o.canopy_code,
   FROM public.ottoq_solar_output o WHERE o.sim_run_id = :'run' GROUP BY 1 ORDER BY 1;
 -- PREDICTED: every canopy's first recorded soiling derives from 0.85 (0.85 itself on a dry first tick, or 0.88 after
 -- one rainy tick), whatever the depot row held when the run started.
+
+-- ══ §8 G195: BOOKINGS STILL ACTIVE FOR A CAR THAT IS NOT ON THE STALL (READ WHILE THE RUN IS LIVE) ═══════════════════
+
+\echo '=== 0362 §8 — active bookings whose car is elsewhere, by stall type and purpose, with stall-minutes left ==='
+WITH clk AS (SELECT sim_clock_current AS t FROM public.ottoq_sim_runs WHERE sim_run_id = :'run')
+SELECT s.stall_type, b.purpose, count(*) AS leaked,
+       round(sum(GREATEST(0, EXTRACT(EPOCH FROM (upper(b.during) - clk.t)) / 60.0))) AS stall_minutes_left
+  FROM public.ottoq_stall_bookings b
+  JOIN public.stalls s ON s.id = b.stall_id
+  JOIN public.vehicles v ON v.id = b.vehicle_id
+  CROSS JOIN clk
+ WHERE b.sim_run_id = :'run' AND b.state = 'active' AND v.current_stall_id IS DISTINCT FROM b.stall_id
+ GROUP BY 1, 2 ORDER BY 3 DESC;
+-- 317d4331 at ~9:10 AM sim: 1 DCFC (103 stall-minutes left), 1 L2, 1 inspection, 1 perimeter hold, 10 staging holds
+-- (213 stall-minutes). 0467 and 0471 removed two of its sources since; the sweep that releases the rest
+-- (space_departure_release_enabled) is off. If this reads zero, there is nothing left for a dial experiment to test.

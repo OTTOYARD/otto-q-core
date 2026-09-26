@@ -277,3 +277,42 @@ SELECT p.exp, to_char(p.ran_at, 'HH24:MI') AS ran, sa.soil0 AS soil_a0, sb.soil0
 --   body. 0479 moved the recertification floor to 11:54:29, and the runner began the sweep at 11:55. 0480 registered
 --   experiment 82c5568b, b66fa99c's design under a new id and so new seeds, which the dial runner takes up in its next
 --   window (3:00-6:00 AM CT).
+--
+--   The sweep under 0479 (floor 11:54:29 UTC) certified 9 of 9: grid_smoke 239001/6 and 424242/6 (verdicts 326,
+--   327), busy_day 171717/12, 314159/12 and 424242/12 (328, 329, 333), normal_day 171717/12 (334), busy_day 171717/24
+--   and 424242/24 (335, 336), and busy_day 171717/48 (337, the last, done at 12:21 UTC). On every column, each of the
+--   eleven digests is identical to the same column's last verdict before 0479 (317-325): 0479 moved no certified
+--   digest. That fits what it changes. At 12:19 UTC every shared canopy row, at both depots, read 0.85, the floor, and
+--   0479 starts every run at 0.85, so a pair whose arms both found the row at the floor behaves the same under either
+--   body. The pairs §8 caught diverging were the ones whose arms found the row at different values.
+
+-- ══ §11 THE RUNNER THAT RETRIED FOREVER, AND THE WINDOW NOBODY OPENED ══════════════════════════════════════════════
+--
+--   0481 (G211's open half), dry-run at 12:02 UTC on a rolled-back transaction with a simulated G211: a fake enacted
+--   promotion of energy_reserve_shave whose lineage row is the newest floor-mover, then failed verdicts for
+--   busy_day / 171717 / 12 at the twin depot.
+--     two failures              -> guard: none ("the column has not failed enough times since the promotion")
+--     a third                   -> guard: rolled_back; the rollback's ledger row reads "the canon could not certify it:
+--                                  busy_day / 171717 / 12 ticks failed 3 times since the promotion ...", carries the
+--                                  3 verdict ids, and a forces_recert lineage row moved the floor
+--     called again              -> guard: none ("the promotion is not enacted, or is already rolled back")
+--   Under 0481, G211's night would have ended after three failed pairs, about six minutes, instead of forty in 78.
+--
+--   0482: the dial runner's window. Last night's was opened and closed by hand (the close was a one-shot reminder at
+--   11:00:49 UTC), and nothing would open it again for 0480's replication. Two pg_cron jobs now set the runner's gate
+--   through the setter, 1 at 08:00 UTC and 0 at 11:00 UTC (3:00-6:00 AM CDT). Its first apply, at 12:06 UTC, queued
+--   behind a running certification pair: the apply path takes a lock on supabase_migrations.schema_migrations, which
+--   the pair holds a share lock on for its whole transaction because the recert floor reads it. The client timed out
+--   at 60 s and the server cancelled the apply cleanly (no row, no jobs). G194's shape: the file had no P0 because it
+--   schedules only, and that turned out not to matter to the lock. It has a P0 now.
+--
+--   Applied at 12:22 UTC (7:22 AM CT), a minute after the last column of the 0479 sweep certified (verdict 337):
+--   0481 = 20260926122216 and 0482 = 20260926122233, each stored statement's md5 equal to its file's body
+--   (49101ffd..., 5bea4df2...). Read back at once:
+--     cron 746            active, calls the guard once (character 1,407), between the pick and the pair, with the
+--                         record the pair is called with; six firings to 12:28 UTC succeeded (no column below the
+--                         floor, so none reached the guard)
+--     the guard today     action none, "the floor was not moved by a dial promotion" (0479 moved it)
+--     jobs 761 / 762      ottoq_dial_window_open 0 8 * * *, ottoq_dial_window_close 0 11 * * *, both active
+--     the gate            dial_experiment_runner_enabled reads 0: V2's write was undone, so the window first opens at
+--                         08:00 UTC tomorrow (3:00 AM CT), for 0480's replication
