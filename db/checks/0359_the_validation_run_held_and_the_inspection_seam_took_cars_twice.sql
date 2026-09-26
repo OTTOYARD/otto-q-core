@@ -127,8 +127,12 @@ SELECT
 --       `ottoq_l2_propose_service` admits on open service-bay atoms whatever their must-do. Why the bay then credited
 --       neither atom is not yet read. One of 8 exits.
 --   (b) Waymo-AV-015 and Tesla-AV-065 went from `charging_l2` straight to `staged_awaiting_service` with no `svc_step`
---       (10:36 and 10:46) and were still stepless at 11:41: G197's shape on the L2 completion path, which 0465 did
---       not cover. No gate reads a car with no step.
+--       (10:36 and 10:46) and were still stepless at 11:41: G197's shape, on the charger-fault requeue path (both
+--       sessions ended `faulted`, at 91% and 86%), which 0465 did not cover. No gate reads a car with no step; the
+--       charge cursor (3) does, and both visits still owed a must-do charge (target 100%), so the two waited for a
+--       charger as a `need_charge` car would, but uncounted and with nothing recording why. G209, drafted as 0474;
+--       §8 is its probe. (An earlier draft of this line said "L2 completion path" and, in 0474, "waited for chargers
+--       they did not need". Both were wrong: the sessions faulted, and the charge was owed.)
 --
 -- ══ §6 THE COCKPITS ON THIS RUN ══════════════════════════════════════════════════════════════════════════════════
 --
@@ -141,3 +145,52 @@ SELECT
 --
 --   Tick compute on this run averaged 849-1,030 ms per tick from 9 AM against 328-583 ms on 317d4331 at the same sim
 --   times (`ottoq_tick_clock_log`), inside the 3.75 s budget at 8x. Different seeds and fleet mix; not attributed.
+
+-- ══ §7 0472 AND 0473, BEFORE AND AFTER, ON ONE ROLLED-BACK TRANSACTION ═════════════════════════════════════════════
+--
+--   Run on 2026-09-26 at 07:38-07:40 UTC (2:38-2:40 AM CT), after the recert sweep for 0471-0473 had passed 9 of 9 and
+--   with no pair or run live, as one transaction that raised at its end. On the stopped run 49c45bd4 (sim clock 11:47
+--   AM CT), the depot's three lowest-id untethered cars are put at the gate, each with a fresh itinerary of two
+--   `inspect` legs, the planner's pair: `interior_inspection` now and `readiness_check` four hours out. The seam then
+--   runs once under each body, swapped in from `ottoq_schema_snapshots` inside a subtransaction and swapped back out.
+--
+--                                                              original      0472 only     applied
+--                                                              (0472_pre)    (0473_pre)    (0472+0473)
+--     car 1  interior leg planned; the gate intake has already   served        not served    not served
+--            sent it to a staging stall this tick (G204)
+--     car 2  interior leg done; readiness leg still planned      served, as    served, as    not served
+--            (G207)                                              readiness     readiness
+--     car 3  interior leg planned, nothing else (control)        served        served        served
+--     enacted                                                    3             2             1
+--
+--   The applied body's md5 read 5b65d6842860c1b641bcbbbbf3a816a2 inside the transaction and after it. No probe row
+--   survived (0 itineraries created by the probe, 0 decisions at its tick).
+--
+--   The first attempt enacted 0 under all three bodies, the control included: on a stopped run the needs card measures
+--   `vehicle_need_profile.next_deploy_at` against the depot's latest run clock, so every car read overdue (-759 to
+--   -1,116 minutes) and failed the seam's two window tests. The probe clears the three cars' `next_deploy_at` (NULL
+--   passes both). A probe whose control is not served has shown nothing about the fix.
+
+-- ══ §8 0474, BEFORE AND AFTER, ON ONE ROLLED-BACK TRANSACTION ════════════════════════════════════════════════════
+--
+--   Run on 2026-09-26 at 07:41-07:58 UTC (2:41-2:58 AM CT), with no pair or run live: 0474's P0, P2, patch and V-blocks
+--   bracketed by the same scenario, on the stopped run 49c45bd4. Waymo-AV-015's faulted L2 session is reopened with the
+--   car back on its charger at 86% against a 100% target, no step, and its visit reopened as it was live (charge owed,
+--   must-do). `twin.ottoq_sim_stop_charge_session` is called with `fault.session_aborted_other`, then the service flow
+--   runs once 30 s later on the tick's search_path. Each scenario runs twice: as the stop is, and with
+--   `ottoq.ottoq_book_hold_stall` stubbed to book nothing (the staging-full branch). Each is undone in its own
+--   subtransaction, the stub with it.
+--
+--                          after the stop                              after one service-flow pass
+--     old body
+--       temp stall booked  staged_awaiting_service, staging, no step   no step; no deploy_gate record
+--       staging full       staged_awaiting_service, no stall, no step  no step; no deploy_gate record
+--     new body (0474)
+--       temp stall booked  staged_awaiting_service, staging,           need_charge; deploy_gate reason
+--                          need_deploy                                 must_do_work_open, missing ['charge']
+--       staging full       staged_awaiting_service, no stall,          need_charge; same
+--                          need_deploy
+--
+--   The session reads `faulted` in all four. The stub did not outlive its subtransaction. The first attempt at the
+--   service-flow pass failed on `ottoq_sim_lane_capacity(uuid, unknown, integer) does not exist`: the service flow
+--   sets no search_path and resolves its callees on its callers' (`twin, ottoq, public, extensions`, both of them).

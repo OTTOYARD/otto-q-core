@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0473 — GENERATED, not a log
+## Index, 0134–0474 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -472,7 +472,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0471](db/migrations/0471_the_staging_hold_booked_stalls_promised_to_another_car_and_left_each_refused_booking_held.sql) | `20260926063850` | yes — ledger | **The staging hold booked stalls promised to another car, and left each booking it could not use held until |
 | [0472](db/migrations/0472_the_inspection_seam_sent_cars_the_gate_intake_had_already_sent_and_the_door_kept_one_by_stall_id.sql) | `20260926070905` | yes — ledger | **The inspection seam sent cars the gate intake had already sent to a stall in the same tick, and the command |
 | [0473](db/migrations/0473_the_inspection_seam_served_the_readiness_leg_as_a_second_interior_inspection.sql) | `20260926070924` | yes — ledger | **The inspection seam served every itinerary's final readiness leg as a second interior inspection, as soon |
+| [0474](db/migrations/0474_a_car_moved_off_a_faulted_charger_was_staged_with_no_step_so_no_gate_read_it.sql) | `PENDING` | no — pending | **A car moved off a charger that faulted under it was staged with no step, so no gate read it.** |
 
-333 migrations indexed.
+334 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
