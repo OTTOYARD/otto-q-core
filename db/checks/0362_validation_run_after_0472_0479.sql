@@ -188,7 +188,10 @@ SELECT closer, COALESCE(state_at_close, '(no state event yet)') AS state_at_clos
              ORDER BY event_seq LIMIT 1)) AS max_soc_at_arrival
   FROM x GROUP BY 1, 2, 3 ORDER BY 4 DESC;
 -- READ on 3dbe16db (sim 8:00 AM-12:57 PM): 56 charge atoms closed. The flow contract closed 17: 10 while the car was
--- en_route_to_depot (all must_do, at 87-96%, arriving at 44-54%), 1 while it was deployed, 6 at the depot.
+-- en_route_to_depot (all must_do, at 87-96%, arriving at 44-54%), 7 at the depot. (This line first read "1 while it was
+-- deployed, 6 at the depot". That row is an opportunistic top-up closed in the tick 1225f10e left staging: the closure
+-- and the deploy share one sim instant (11:53:40 AM), and the query takes the latest state at or before it. The state
+-- strictly before was staged_for_departure. 0363 §1 found the same on the next run.)
 -- ottoq_satisfied closed 35 and session_completed 3, all at the depot. (A first read of this query took the SoC from the
 -- first event at or after the arrival instant, and a telemetry event at that instant sorted ahead of the arrival: it
 -- read Zoox-AV-073 as arriving at 87% when it arrived at 47%. The query now reads the arrival event's own SoC.)

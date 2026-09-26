@@ -7,11 +7,13 @@
 -- ══ §1 MEASURED ════════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   Validation run `3dbe16db` (busy_day, twin depot, sim 8:00 AM-12:57 PM): 56 charge atoms were closed, 17 of them by
---   this flow contract, and 11 of those 17 while the car was not at the depot: 10 while it was `en_route_to_depot`, all
---   `must_do`, all to a 90% target, and 1 while it was still `deployed`. The en-route cars read 87-96% when their charge
---   was closed and arrived at the gate at 44-54%, because the twin applies the trip's drain when the car reaches the
---   gate (`7ec698b8`: recalled at 8:08:45 reading 95%, charge closed at 8:09:27, arrived at 8:10:20 at 54%). The other
---   closers (`ottoq_satisfied` 35, `session_completed` 3) closed only cars at the depot.
+--   this flow contract, and 10 of those 17 while the car was not at the depot: all while it was `en_route_to_depot`, all
+--   `must_do`, all to a 90% target. (An 11th, first read as closed while `deployed`, is an opportunistic top-up closed in
+--   the tick its car left staging, at the same sim instant as the deploy: `db/checks/0363` §1.) The en-route cars read
+--   87-96% when their charge was closed and arrived at the gate at 44-54%, because the twin applies the drain when the car
+--   reaches the gate (`7ec698b8`: recalled at 8:08:45 reading 95%, charge closed at 8:09:27, arrived at 8:10:20 at 54%).
+--   That drain is busy_day's arrival shift, -30 points plus about 3 of climate, applied in one step at the gate: G219,
+--   `db/checks/0363` §4. The other closers (`ottoq_satisfied` 35, `session_completed` 3) closed only cars at the depot.
 --
 --   Each of those cars then met the gate with its charge already done:
 --     - the gate intake (`ottoq_decide_tick` (3b), no-charge arrivals) staged it `need_deploy` and recorded "no charge
