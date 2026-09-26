@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0467 — GENERATED, not a log
+## Index, 0134–0469 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -466,7 +466,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0465](db/migrations/0465_the_command_door_dropped_the_step_a_gate_intake_carried_so_the_car_was_never_moved_again.sql) | `20260926045604` | yes — ledger | **The command door dropped the step a gate-intake command carried, so the car was staged with no step and |
 | [0466](db/migrations/0466_the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count.sql) | `20260926045441` | yes — ledger | **The run list counted no charge sessions for any run, and printed its own row cap as a count.** |
 | [0467](db/migrations/0467_the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold.sql) | `20260926052522` | yes — ledger | **The gate intake picked a staging stall its own command gate refuses, and every refusal left a phantom |
+| [0468](db/migrations/0468_the_service_bay_admitted_cars_on_their_step_alone_and_seated_the_boot_cohort_for_work_that_did_not_exist.sql) | `20260926055955` | yes — ledger | **The service bay admitted any car whose step said `need_service`, whether or not it had service-bay work, |
+| [0469](db/migrations/0469_the_service_sequencer_sent_every_ready_car_a_stage_command_every_tick_that_the_door_executed_as_nothing.sql) | `20260926060017` | yes — ledger | **The service sequencer sent every ready car a `stage` command every tick, and the command door executed each |
 
-327 migrations indexed.
+329 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

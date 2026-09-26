@@ -558,7 +558,9 @@ repo_manifest(version, name, file) AS (
     ('20260926045544'::text, 'the_deploy_gate_sent_every_kind_of_open_work_to_the_service_bay_and_named_the_wrong_work_as_missing'::text, '0464_the_deploy_gate_sent_every_kind_of_open_work_to_the_service_bay_and_named_the_wrong_work_as_missing.sql'::text),
     ('20260926045604'::text, 'the_command_door_dropped_the_step_a_gate_intake_carried_so_the_car_was_never_moved_again'::text, '0465_the_command_door_dropped_the_step_a_gate_intake_carried_so_the_car_was_never_moved_again.sql'::text),
     ('20260926045441'::text, 'the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count'::text, '0466_the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count.sql'::text),
-    ('20260926052522'::text, 'the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold'::text, '0467_the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold.sql'::text)
+    ('20260926052522'::text, 'the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold'::text, '0467_the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold.sql'::text),
+    ('20260926055955'::text, 'the_service_bay_admitted_cars_on_their_step_alone_and_seated_the_boot_cohort_for_work_that_did_not_exist'::text, '0468_the_service_bay_admitted_cars_on_their_step_alone_and_seated_the_boot_cohort_for_work_that_did_not_exist.sql'::text),
+    ('20260926060017'::text, 'the_service_sequencer_sent_every_ready_car_a_stage_command_every_tick_that_the_door_executed_as_nothing'::text, '0469_the_service_sequencer_sent_every_ready_car_a_stage_command_every_tick_that_the_door_executed_as_nothing.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

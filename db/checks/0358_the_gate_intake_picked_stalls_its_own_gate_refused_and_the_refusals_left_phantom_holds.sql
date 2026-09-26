@@ -103,6 +103,18 @@ SELECT t.tr AS first_move_off_the_gate, count(*) AS cars
 -- `arrived_at_gate` on a staging stall: the (3b) cursor requires `current_stall_id IS NULL`, so it never saw the car
 -- again, and the car moved only when another path (the inspection seam, a charge) took it.
 
+\echo '=== 0358 §1f — every hold that expired unused, by who made it (what G195 is left with after 0467) ==='
+SELECT s.stall_type::text AS stype, COALESCE(b.booked_by,'-') AS booked_by, b.purpose, count(*) AS n,
+       round(sum(extract(epoch FROM (COALESCE(b.released_at, upper(b.during)) - lower(b.during)))/60)) AS stall_min
+  FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id
+ WHERE b.sim_run_id = :'run' AND b.state = 'released' AND b.release_reason ILIKE '%window_elapsed%'
+ GROUP BY 1,2,3 ORDER BY stall_min DESC;
+-- staging / otto_q_reaction / temp_hold   69 / 4,182 stall-min   (of which the gate intake's superseded reroutes: 49 / 2,775)
+-- staging / otto_q          / temp_hold   98 / 1,827
+-- l2      / otto_q          / charge_l2   15 /   795
+-- then perimeter_hold 1 / 120, inspect 8 / 32, wash 2 / 21. After 0467 the reactor line should lose the intake's
+-- share; the rest is G195's residual and the next thing to measure on a live run.
+
 -- ══ §2 THE FIX, BEFORE AND AFTER, ON ONE ROLLED-BACK TRANSACTION (0467) ══════════════════════════════════════════
 --
 --   Run on 2026-09-26 at 05:24 UTC (12:24 AM CT), after the 0463-0465 recert (9/9 passed) and before 0467 applied,
@@ -122,3 +134,71 @@ SELECT t.tr AS first_move_off_the_gate, count(*) AS cars
 --
 --   The probe script is the migration's blocks between two copies of the setup; it is not committed because it
 --   writes to a stopped run's rows (it cannot run on a live one without racing the metronome).
+
+-- ══ §3 G201: THE SERVICE BAY ADMITTED ON THE STEP ALONE, AND THE BOOT COHORT SAT 40 MINUTES FOR NOTHING ══════════
+
+\echo '=== 0358 §3a — the boot cohort: seeded need_service, no visit, and what the service bay credited ==='
+WITH boot AS (
+  SELECT e.entity_id AS vehicle_id, e.payload->'diff'->'current_state'->>'to' AS boot_state
+    FROM public.ottoq_events e
+   WHERE e.sim_run_id = :'run' AND e.event_type = 'vehicle.state_changed'
+     AND e.payload->'diff'->'current_state'->>'from' = 'offline'
+     AND e.sim_clock_at = (SELECT sim_clock_start FROM public.ottoq_sim_runs WHERE sim_run_id = :'run')
+     AND e.payload->'diff'->'config'->'to'->>'svc_step' = 'need_service'),
+seat AS (
+  SELECT b.vehicle_id, b.boot_state,
+         (SELECT e.payload->'credited' FROM public.ottoq_events e
+           WHERE e.sim_run_id = :'run' AND e.entity_id = b.vehicle_id AND e.event_type = 'twin.service_completed'
+           ORDER BY e.sim_clock_at LIMIT 1) AS first_exit_credited,
+         EXISTS (SELECT 1 FROM public.ottoq_visit_needs vn
+                  WHERE vn.sim_run_id = :'run' AND vn.vehicle_id = b.vehicle_id
+                    AND vn.arrived_at <= (SELECT sim_clock_start FROM public.ottoq_sim_runs WHERE sim_run_id = :'run') + interval '1 minute') AS had_boot_visit
+    FROM boot b)
+SELECT boot_state, count(*) AS cars, count(*) FILTER (WHERE had_boot_visit) AS with_boot_visit,
+       count(first_exit_credited) AS bay_exits,
+       count(*) FILTER (WHERE jsonb_array_length(COALESCE(first_exit_credited, '[1]'::jsonb)) = 0) AS exits_crediting_nothing
+  FROM seat GROUP BY 1;
+-- staged_awaiting_service 9 cars / 0 with a visit / 5 bay exits / 4 crediting nothing; charge_complete_holding 1 / 0 / 0.
+-- Tesla-AV-070 and Zoox-AV-078 (0357's examples): offline -> staged_awaiting_service at 8:00:00 with need_service,
+-- in_service_bay 8:06:27 to 8:46:28, `credited: []`, then ready and deployed. No command for either before 8:50: the
+-- seat is the service flow's own STEP 2, whose service cursor reads only `staged_awaiting_service` + `need_service`.
+-- The wash cursor above it is need-gated ("M1_need_gated_wash"); the service cursor never was.
+-- These 4 are half of G196b's 8 empty service-bay exits. Fixed by 0468.
+
+-- ══ §4 G200: A STAGE COMMAND EVERY TICK THAT THE DOOR EXECUTED AS NOTHING ════════════════════════════════════════
+
+\echo '=== 0358 §4 — stage commands by shape ==='
+SELECT c.status::text AS status, c.payload ? 'stall_id' AS has_stall,
+       left((c.payload - 'refused_at_clock' - 'reaction' - 'stall_id' - 'reroute_after' - 'booking_id')::text, 60) AS shape,
+       count(*) AS n, count(DISTINCT c.vehicle_id) AS cars
+  FROM public.ottoq_vehicle_commands c
+ WHERE c.sim_run_id = :'run' AND c.command_type = 'stage'
+ GROUP BY 1,2,3 ORDER BY n DESC LIMIT 5;
+-- executed / no stall / {"ready": true} / 7,686 / 74 cars (up to 262 for one car over 574 ticks). Emitted by
+-- ottoq_decide_tick (5) for every promote_ready verdict; twin.ottoq_sim_confirm_commands maps `stage` to no
+-- transition, so each is a command row and a door pass that changes nothing. Removed by 0469.
+
+-- ══ §5 0468 AND 0469, BEFORE AND AFTER, IN TICK ORDER, ON ONE ROLLED-BACK TRANSACTION ═══════════════════════════
+--
+--   Run on 2026-09-26 at 05:58 UTC (12:58 AM CT), after 0467's recert (9/9 passed), as one transaction that raised
+--   at its end: both files' P2, patch and V-blocks, bracketed by the same setup on the stopped run 317d4331, and
+--   called in the order `ottoq_sim_advance_tick` calls them: the service flow (world step) first, then the decide
+--   tick. Four cars, each `staged_awaiting_service`:
+--     A  `need_service`, SoC 90, no visit, no flag            (the boot cohort's shape)
+--     B  `need_service`, open must-do `mechanical_pm`          (real service-bay work: the control)
+--     C  `need_charge`, SoC 40, no visit                        (reaches the sequencer's promote_ready)
+--     D  `need_service`, no visit, `flagged_issue` tech_flag    (the technician path, which must keep its seat)
+--
+--                       old bodies                                       new bodies (0468 + 0469)
+--     A                 stays need_service; decide emits enter_wash      need_deploy -> released by the gate in the
+--                       and stage {ready: true}                          same pass: staged_for_departure / ready
+--     B                 in_service_bay / servicing                       in_service_bay / servicing
+--     C                 stage {ready: true}; decision promote_ready      no command; decision promote_ready kept
+--     D                 in_service_bay / servicing                       in_service_bay / servicing
+--     stage {ready}     2                                                0
+--
+--   A first run in the reverse order (decide tick first) had the sequencer admit A on its step alone: the decide
+--   path's `ottoq_l2_propose_service` admits on `svc_step = 'need_service' OR` open service-bay work. It is not
+--   patched: in a real tick the world step, and 0468 inside it, runs first. The first draft of 0468 had no flag
+--   exemption; the service flow's own STEP 1 sends flagged cars from the wash and detail bays to the service bay on
+--   the flag alone, so the exemption was added before apply and D is its proof.
