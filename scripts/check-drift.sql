@@ -543,7 +543,9 @@ repo_manifest(version, name, file) AS (
     ('20260923042423'::text, 'the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds'::text, '0447_the_readiness_gates_hold_clock_lived_on_the_vehicle_so_an_old_runs_stamp_released_fresh_holds.sql'::text),
     ('20260923042526'::text, 'the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped'::text, '0448_the_recall_policy_and_the_visit_planner_disagreed_about_maintenance_so_vehicles_looped.sql'::text),
     ('20260923042610'::text, 'the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean'::text, '0449_the_twins_september_afternoon_was_hotter_than_nashvilles_record_because_it_widened_around_the_yearly_mean.sql'::text),
-    ('20260923042708'::text, 'the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call'::text, '0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql'::text)
+    ('20260923042708'::text, 'the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call'::text, '0450_the_twins_battery_paid_for_a_cooling_system_it_never_got_so_it_sat_out_a_demand_response_call.sql'::text),
+    ('20260925200000'::text, 'the_cockpits_could_not_read_the_card_they_were_built_on_and_it_never_said_where_a_vehicle_was_booked'::text, '0460_the_cockpits_could_not_read_the_card_they_were_built_on_and_it_never_said_where_a_vehicle_was_booked.sql'::text),
+    ('20260926032129'::text, 'the_depot_card_migration_never_classified_itself_so_the_recert_floor_restarted_every_column'::text, '0461_the_depot_card_migration_never_classified_itself_so_the_recert_floor_restarted_every_column.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
