@@ -29,7 +29,8 @@ SELECT COALESCE(src.engine, '(no matching decision)') AS engine, count(*) AS ref
    AND c.confirmed_by = 'otto_q_preflight' AND NOT (c.payload ? 'reroute_reason')
  GROUP BY 1 ORDER BY 2 DESC;
 -- BEFORE 394e1e83: greedy_constrained 21, forward_lex 3, per-car 0 (24 of 119).
--- READ: pending.
+-- READ (22:53 UTC, 5:53 PM CT, after the stop at sim 11:44 AM): no rows. The charge step issued 105 `begin_charge`: 103
+--   executed, 2 expired at the stop (issued on the last tick, `run_ended`), 0 refused at the gate. Held.
 
 \echo '=== 0372 §1(b) — the frame''s calendar fact, over the run''s snapshots ==='
 SELECT count(*) AS snapshots,
@@ -40,7 +41,8 @@ SELECT count(*) AS snapshots,
   FROM public.ottoq_decision_snapshots s WHERE s.sim_run_id = :'run';
 -- PREDICTED: every snapshot at facts_version 4, and at busy times chargers the calendar holds while their pointer is
 --   empty (the case 0498 stops CP-SAT offering).
--- READ: pending.
+-- READ: 206 snapshots, all 206 at facts_version 4. At most 117 stalls held by the calendar in one frame, and at most 2
+--   chargers the calendar held with no car on them, the case 0498 takes out of CP-SAT's offer. Held.
 
 \echo '=== 0372 §1(c) — CP-SAT''s proposals on the run, by how they were disposed ==='
 SELECT p.status, COALESCE(p.disposition_reason, '-') AS reason, count(*)
@@ -52,7 +54,42 @@ SELECT p.status, COALESCE(p.disposition_reason, '-') AS reason, count(*)
 -- PREDICTED: none of CP-SAT's proposals is for a charger another car's live booking covers, since 0498 marks those
 --   not offerable in the frame it plans on, so none reaches the gate to be refused there (that is §1(a)). How the rest
 --   are disposed is read here, not predicted.
--- READ: pending.
+-- READ: 199 proposals: refused / proposer_abstained 150, superseded / entity_decided_by_other_proposal 31, refused /
+--   stall_reserved 10, refused / stall_occupied 5, enacted / enacted_by_kernel 2, superseded / newer_proposal_same_entity
+--   1. The prediction is tested by the next query, each proposal against a frame.
+
+\echo '=== 0372 §1(c), second query (added after the stop): each stall proposal against the decide frame at its tick ==='
+WITH p AS (
+  SELECT p.status, p.disposition_reason, p.tick_seq, p.entity_id AS car, p.proposal->>'stall_id' AS stall_id,
+         (p.proposal->'rationale'->>'planned_start_min')::numeric AS start_min
+    FROM public.ottoq_external_proposals p
+   WHERE p.sim_run_id = :'run' AND p.source = 'forward_lex' AND p.action_context = 'stall_assignment'
+     AND p.proposal ? 'stall_id'),
+f AS (
+  SELECT p.*, y.st AS entry
+    FROM p
+    LEFT JOIN public.ottoq_decision_snapshots s ON s.sim_run_id = :'run' AND s.tick_seq = p.tick_seq
+    LEFT JOIN LATERAL (SELECT x FROM jsonb_array_elements(s.frame->'stalls') x WHERE x->>'id' = p.stall_id LIMIT 1) y(st)
+      ON true)
+SELECT CASE WHEN entry IS NULL THEN 'no snapshot at its tick'
+            WHEN entry->>'calendar_held_by' IS NOT NULL AND entry->>'calendar_held_by' <> car::text
+              THEN 'held by another car''s booking'
+            WHEN entry->>'offerable' = 'false' AND entry->>'reservation_live' = 'true' AND entry->>'vehicle_id' IS NULL
+              THEN 'empty, another car''s live reservation'
+            WHEN entry->>'offerable' = 'false' THEN 'not offerable, other'
+            ELSE 'offerable' END AS frame_said,
+       (start_min > 0) AS later_slot, status || ' / ' || COALESCE(disposition_reason, '-') AS outcome, count(*)
+  FROM f GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
+-- READ: 18 of the 199 name a stall, and 11 of those have a decide snapshot at their tick. That snapshot is the frame of
+--   the tick that disposes the proposal: CP-SAT solves a tick earlier (the ledger's call at tick 207 is the proposals
+--   tagged 208) on a frame the edge function builds. Held by another car's booking: 0. The prediction held.
+--   5 read offerable=false for an empty DCFC under another car's live reservation with no booking, and each of the 3
+--   chargers' `reservation_expires_at` carries the disposing tick's clock to the microsecond (.726544 at tick 208,
+--   .294464 at 270): the per-car path reserved the charger between CP-SAT's solve and the disposal, and the kernel
+--   refused the proposal `stall_reserved`. The forward proposer does read `offerable` (`stall_is_free`), so this is the
+--   race and not a blind spot. The other 6 were offerable: 5 refused `stall_occupied` in the same race, 1 enacted. The 7
+--   without a snapshot: stall_reserved 5, enacted 1, superseded 1. 394e1e83 had the race too (occupied 8, reserved 8);
+--   what 0498 removed, a charger the calendar had promised, did not recur.
 
 -- ══ §2 G228 (0500): A PARKED CAR KEEPS ITS HOLD ═══════════════════════════════════════════════════════════════════
 --
@@ -75,7 +112,18 @@ SELECT p.st, count(*) AS parked,
             AND b.state IN ('held','active') AND b.during @> r.t)) AS on_the_calendar
   FROM p GROUP BY 1 ORDER BY 2 DESC;
 -- BEFORE 394e1e83: at sim 10:37 AM 42 cars at the gate parked in staging, 4 on the calendar; at 11:50 AM 35, 2.
--- READ: pending.
+-- READ, live (parked / on the calendar):
+--     sim  8:28 AM, tick  50   at the gate  1/1    staged for departure 31/31
+--          9:31 AM,      170   at the gate 18/18   awaiting service  6/6    for departure 2/2
+--          9:48 AM,      201   at the gate 29/27   awaiting service  9/9    for departure 1/1
+--         10:52 AM,      318   at the gate 44/44   awaiting service 21/21   for departure 1/1
+--         11:21 AM,      370   at the gate 45/45   awaiting service 20/20   for departure 1/1
+--         11:40 AM,      406   at the gate 43/43   awaiting service 23/23   for departure 1/1
+--   Held at five readings of six. The two at 9:48 were not on a parking hold: 72ccc3d4 on NASH-STG-I007 and 7a138260 on
+--   NASH-STG-I009 sat in the inspection lane 26 sim-seconds after their 4-minute `inspect` booking (readiness_check)
+--   ended, and moved on at 9:50 to E022 and E021. Over the run 54 of 66 inspect bookings in staging ended with the car
+--   still on the stall, for a p50 of 0.63 minutes (max 1.99, 38.9 stall-minutes in all): the car waits for the next
+--   decide tick to move it. That is a service booking's tail, which 0500 does not renew and this check did not predict.
 
 \echo '=== 0372 §2(b) — the other side of the renewal: parking holds still live on a staging stall their car has left ==='
 WITH r AS (SELECT sim_run_id AS run, sim_clock_current AS t FROM public.ottoq_sim_runs WHERE sim_run_id = :'run')
@@ -98,7 +146,52 @@ SELECT b.purpose, count(*) AS holds_after_departure,
 --   a time, against 30-40 parked cars on the calendar in §2; perimeter holds are G195's older half, with hours left.
 -- BEFORE: no live reading (the stop relabels live bookings); on `317d4331` 0357 §5 counted 10 staging holds (213
 --   stall-minutes) held for cars elsewhere at 9:10 AM sim.
--- READ: pending.
+-- READ, live, as written: sim 8:28 AM 15 temp holds after departure (188 stall-minutes, max 28.5 minutes left); 9:31
+--   AM 11 (max 13) and 1 perimeter hold (57). The 8:28 reading broke the prediction's 15 minutes, and not through the
+--   renewal: this run books temp holds for 30 minutes, not 12-17, so a car leaving inside its first window leaves up
+--   to 30 behind. §2(c) separates the two.
+
+-- §2(c), ADDED AFTER THE START (22:31 UTC, run at sim 8:35 AM): §2(b)'s prediction assumed a parking hold is booked for
+--   12-17 minutes, as on 394e1e83. On this run temp holds are booked for 30 (one perimeter hold for 120), so a car that
+--   leaves inside its ORIGINAL window leaves up to 30 minutes behind, which is G195 as it stood before 0500. The part
+--   0500 owns is the renewed holds. `why` records each hold's booked window ("temp_hold 13:33-14:03", to the minute),
+--   so a renewed hold is one whose window now ends more than a minute after that.
+\echo '=== 0372 §2(c) — §2(b) split by renewed and as booked, and every parking hold of the run so far ==='
+WITH r AS (SELECT sim_run_id AS run, sim_clock_current AS t FROM public.ottoq_sim_runs WHERE sim_run_id = :'run'),
+h AS (
+  SELECT b.*, r.t,
+         (date_trunc('day', lower(b.during)) + (substring(b.why from '\d\d:\d\d-(\d\d:\d\d)'))::time) AS booked_end
+    FROM public.ottoq_stall_bookings b JOIN r ON b.sim_run_id = r.run
+   WHERE b.purpose IN ('temp_hold','perimeter_hold'))
+SELECT 'after departure' AS what, h.purpose, (upper(h.during) > h.booked_end + interval '1 minute') AS renewed,
+       count(*) AS holds, round(sum(EXTRACT(epoch FROM upper(h.during) - h.t) / 60)::numeric) AS stall_min_left,
+       round(max(EXTRACT(epoch FROM upper(h.during) - h.t) / 60)::numeric, 1) AS max_min_left
+  FROM h JOIN public.stalls s ON s.id = h.stall_id AND s.stall_type::text = 'staging'
+  JOIN public.vehicles v ON v.id = h.vehicle_id
+ WHERE h.state = 'active' AND h.during @> h.t
+   AND s.current_vehicle_id IS DISTINCT FROM h.vehicle_id AND v.current_stall_id IS DISTINCT FROM h.stall_id
+ GROUP BY 1, 2, 3
+UNION ALL
+SELECT 'all holds so far', h.purpose, (upper(h.during) > h.booked_end + interval '1 minute'), count(*), NULL, NULL
+  FROM h GROUP BY 1, 2, 3
+ ORDER BY 1, 2, 3;
+-- A first cut compared the window's end, which carries seconds, with the `why` end, which does not: all 92 holds
+--   read renewed. The one-minute tolerance is what separates them.
+-- READ, live (holds still live after their car left; as booked / renewed by 0500):
+--     sim  8:35 AM   temp as booked 14 (64 stall-min, max 20.6 left)   renewed 5 (28, max 5.6)    perimeter 1 (112)
+--          9:31 AM   temp as booked 10 (95, max 13.0)                  renewed 1 (max 11.1)       perimeter 1 (57)
+--          9:48 AM   temp as booked  2 (13, max 11.5)                  renewed 0                  perimeter 1 (39.9)
+--         10:52 AM   temp as booked  2 (8, max 5.4)                    renewed 1 (8, max 8.5)
+--         11:21 AM   temp as booked  2 (14, max 13.2)                  renewed 1 (13, max 13.2)   perimeter 1 (81.2)
+--         11:40 AM   temp as booked  2 (43, max 26.0)                  renewed 2 (18, max 9.5)    perimeter 1 (62.5)
+--   Every renewed hold had at most 13.2 minutes left after its car left, inside the 15 predicted. Parking holds by 11:40
+--   AM: temp 145 as booked + 118 renewed, perimeter 10.
+--   Over the whole run (read after the stop, from each hold's car's departure event): renewed temp holds outlived their
+--   car 53 times, 409 stall-minutes, p50 7.8, max 14.4; temp holds as booked 118 times, 1,836 stall-minutes, p50 14.1,
+--   max 33.1; perimeter holds 6 times, 631 stall-minutes, p50 118.5. So 0500's share is 409 of 2,876 stall-minutes, and
+--   G195's staging half (as-booked windows and perimeter holds) is the rest: about 11% of the 25,425 staging
+--   stall-minutes the run had (113 stalls x 225 sim-minutes). Staging never filled on this run (64 of 113 in use at
+--   10:31 AM), so this cost calendar truth rather than a car's place.
 
 -- ══ §3 G233 (0501): THE WAIT FOR A CHARGER, BESIDE KPI 5 ═════════════════════════════════════════════════════════
 
@@ -107,7 +200,17 @@ SELECT public.ottoq_kpi_charge_wait(:'run') AS charge_wait,
        public.ottoq_kpi_five(:'run')->>'p95_time_to_service_min' AS kpi5_p95_min;
 -- BEFORE 394e1e83: 135 visits owing a charge, 92 charged (p50 16.2, p95 154.4 minutes), 42 waiting at the stop, p95
 --   floor 198.2; KPI 5 p95 0.7.
--- READ: pending. The cockpit's KPI tab shows it under the five (ottoyarddepot-sim#110).
+-- READ at the stop (sim 11:44 AM, tick 412): 139 visits owing a charge, 92 charged (p50 8.4, p95 98.5, max 175.1
+--   minutes), 47 still waiting (p50 117.2, max 224.8 so far), none closed without a session; p95 floor 156.2. KPI 5 p95
+--   27.6 (p50 0.4; 113 returns measured, 16 unserved).
+--   Live (visits / waiting / floor / KPI 5): 9:31 AM 80/23/49.6/6.4; 9:48 AM 101/38/58.9/7.0; 10:52 AM 130/48/119.0/9.0;
+--   11:21 AM 135/48/146.9/20.1; 11:40 AM 139/48/155.8/27.6.
+--   KPI 5 read 27.6 against 0.7 on 394e1e83, and it is the need mix, not a change in the queue: 8 returns on this run had
+--   the charge itself as their first operation and so waited for it (6 over 30 minutes, the L2 ones 75.8 on average),
+--   while a car with a cabin, inspect or digital task starts that at once. The same queue moves KPI 5 or not; the
+--   companion counts every car owing a charge. Every charger that could charge was charging: at 10:43 AM the 4 with no
+--   session were all OCPP `Faulted` (DCFC-03 since 8:14 AM, L2-09 8:49, L2-31 9:38, L2-14 9:56).
+--   The cockpits show it under the five (§7).
 
 -- ══ §4 WHAT 0486-0495 ALREADY HELD, STILL HOLDING ═════════════════════════════════════════════════════════════════
 
@@ -115,7 +218,7 @@ SELECT public.ottoq_kpi_charge_wait(:'run') AS charge_wait,
 SELECT count(*) AS failed_ticks FROM public.ottoq_events e
  WHERE e.sim_run_id = :'run' AND e.event_type = 'sim_tick_failed';
 -- BEFORE 394e1e83: 0.
--- READ: pending.
+-- READ: 0, at every live reading and at the stop.
 
 -- ══ §5 G232 (OPEN): WHERE AN INTERIOR INSPECTION IS ACTUALLY DONE ═══════════════════════════════════════════════════
 --
@@ -154,4 +257,81 @@ SELECT b.charging, b.state_at_start, COALESCE(s.stall_type::text, '(none)') AS s
 --   detail bay 2, and at the gate with no stall 1.
 --   So execution inspects a waiting car while it waits (a technician walks to it), and the plan draws the inspection
 --   inside a charge that starts an hour or more later. The plan's time is what is wrong, and the cockpits show it.
--- READ: pending. No fix is in force for G232; this is its second reading.
+-- READ (no fix is in force for G232; this is its second reading): 98 done. 10 started at a charger (charging_l2 5,
+--   charging_dcfc 5). 81 started while the car was `arrived_at_gate` in a staging stall: 14 in the arrival_inspection
+--   zone and 67 in the zones a car waiting for a charger is parked in (staging_south 29, staging_east 14, staging_buffer
+--   14, staging_north 5, staging_west 5). The other 7: staged for departure 4, awaiting service 2, in a service bay 1.
+--   The same shape as 394e1e83 (12 of 127 at a charger).
+--   Against the plan, every itinerary `inspect` leg that started (103): 34 were planned inside their car's charge
+--   window and started a p50 of 21.4 minutes late (16 of them 30+); the 69 planned outside it started a p50 of 3.0
+--   minutes early (7 of them 30+ late). Over all 103, 23 started 30+ minutes late, p95 106.7. (0368 §12's "30 of 109,
+--   p95 33" on 394e1e83 came from a query not kept in that file, so the two are not the same count.) G232 stands:
+--   inspections run where the car waits, and the plan dates them inside a charge that starts late.
+
+-- ══ §6 SEEN ON THE RUN, NOT PREDICTED: THE REACTOR'S PARKING HOLDS (G235) ══════════════════════════════════════════
+--
+--   Found tracing staging stalls reserved for cars sitting elsewhere (sim 10:09 AM: 9 of them). Most were the charge
+--   step's short hold "until a charger frees", released within a decide tick once the car went to charge. The ones that
+--   stayed were holds the refusal reactor booked.
+
+\echo '=== 0372 §6(a) — the refusal reactor''s parking holds, and whether their car ever came ==='
+SELECT b.booked_by, b.state || ' / ' || COALESCE(b.release_reason, '-') AS closed,
+       (SELECT e.payload->'diff'->'current_state'->>'to' FROM public.ottoq_events e
+         WHERE e.sim_run_id = b.sim_run_id AND e.entity_id = b.vehicle_id AND e.event_type = 'vehicle.state_changed'
+           AND e.payload->'diff' ? 'current_state' AND e.sim_clock_at <= b.booked_at_sim
+         ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS car_state_at_booking,
+       EXISTS (SELECT 1 FROM public.ottoq_events e
+                WHERE e.sim_run_id = b.sim_run_id AND e.entity_id = b.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                  AND e.payload->'diff'->'current_stall_id'->>'to' = b.stall_id::text
+                  AND e.sim_clock_at >= lower(b.during) - interval '1 minute' AND e.sim_clock_at < upper(b.during)) AS car_came,
+       count(*) AS holds,
+       round(sum(EXTRACT(epoch FROM LEAST(COALESCE(b.released_at, upper(b.during)), upper(b.during)) - lower(b.during)) / 60))
+         AS stall_minutes
+  FROM public.ottoq_stall_bookings b
+ WHERE b.sim_run_id = :'run' AND b.booked_by LIKE 'otto_q_reaction%' AND b.purpose IN ('temp_hold','perimeter_hold')
+ GROUP BY 1, 2, 3, 4 ORDER BY 5 DESC;
+-- READ: 7 holds, all `otto_q_reaction`, all booked while the car was `en_route_to_depot`, and the car came to none:
+--   4 closed `window_elapsed` after their full 60 minutes, 3 at the stop; 322 stall-minutes. Each follows the same
+--   refusal: the recall's appointment (`stage`, `appointment: true`) was refused `target_occupied`, and
+--   `ottoq.ottoq_react_to_refusals` rerouted it with an hour's reservation and a 60-minute `temp_hold` on a free stall.
+--   The car arrived 1-2 minutes later and was placed by the inspection seam (3, on I008/I009/I012) or by the charge
+--   step's parking hold (4, on S017, S027, B010, N004), and neither looks at the hold the car already has:
+--   `ottoq_record_enacted_booking` releases sibling holds of the SAME purpose only (an `inspect` booking leaves a
+--   `temp_hold`), and `ottoq.ottoq_book_hold_stall` releases none. Across every run started in the 8 hours before the
+--   read (canon arms included), the reactor booked 192 parking holds (152 for cars en route, 40 for cars at the gate)
+--   and not one was ever activated. G235.
+
+\echo '=== 0372 §6(b) — recall appointments: did the car go to the stall it was given? ==='
+SELECT c.status, c.payload ? 'reroute_reason' AS rerouted, count(*) AS appointments,
+       count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_events e
+          WHERE e.sim_run_id = c.sim_run_id AND e.entity_id = c.vehicle_id AND e.event_type = 'vehicle.state_changed'
+            AND e.payload->'diff'->'current_stall_id'->>'to' = c.payload->>'stall_id'
+            AND e.sim_clock_at >= c.issued_at AND e.sim_clock_at < c.issued_at + interval '90 minutes')) AS car_went_there
+  FROM public.ottoq_vehicle_commands c
+ WHERE c.sim_run_id = :'run' AND c.command_type = 'stage' AND (c.payload->>'appointment')::boolean
+ GROUP BY 1, 2 ORDER BY 3 DESC;
+-- READ: executed and not rerouted 81, the car at the appointed stall within 90 minutes in 30; rerouted 7, in 0; refused
+--   7, in 1. So an appointment the gate accepts is kept about a third of the time, and the arrival flow places the car on
+--   its own; an appointment the gate refuses is rerouted onto a hold that is never kept. Recorded with G235; why the
+--   arrival flow does not start from the appointment is not established here.
+
+-- ══ §7 THE COCKPITS ═════════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   The twin cockpit (ottoyarddepot-sim#110's head on :8080), PULSE and OrchestrAV (their PR heads on :8081 and :8082,
+--   each through its local live-harness page), all on this run.
+--   - Started from Control at 5:24 PM CT (busy_day, 8x); stopped from Control at 5:52 PM CT (sim 11:44 AM, 412 ticks,
+--     `operator_stop`). The cockpit landed on Runs with the run first: 3h 45m sim, 412 ticks, 143 dispatches, 103
+--     charges, 7 faults, and seed 2489361993912108160 printed exactly (0497's text seed, live).
+--   - 2D and 3D render at sim 9:13-9:22 AM and 10:31-10:39 AM. At 10:31 (t277) the 2D map read DCFC 9/10 and L2 27/30 in
+--     use, staging 64/113, 63 waiting.
+--   - The row 0501 added, "Wait for a charger, p95", under the five:
+--       twin KPIs tab, sim 9:13 AM      45.8 min · at least: 19 still waiting, the longest 72 · p50 8.2 over 46 charged
+--       PULSE Performance, ~9:00 AM     43.4 min · 19 waiting, longest 59 · p50 8.2 over 40 charged; KPI 5 1.9
+--       OrchestrAV Performance, ~9:05   42.3 min · 20 waiting, longest 64 · p50 8.2 over 42 charged; KPI 5 1.8
+--       twin KPIs tab, 10:31 AM         96.4 min · at least: 51 still waiting, the longest 149 · p50 8.2 over 74 charged;
+--                                       KPI 5 8.1
+--       PULSE and OrchestrAV, ~10:30    94.1 min · 49 waiting, longest 146 · p50 8.2 over 74 charged; KPI 5 8.3
+--     Each read the same function a few sim-minutes apart, so the figures move between reads; none showed "undefined" or
+--     an empty row.
+--   - The Control tab's "Arrival / dispatch rate" slider still carries "engine support coming": a disabled placeholder.
