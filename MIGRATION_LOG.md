@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0462 — GENERATED, not a log
+## Index, 0134–0466 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -461,7 +461,11 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0458](db/migrations/0458_a_bay_door_seated_cars_for_no_time_and_the_bay_could_not_credit_the_need_it_was_seated_for.sql) | `20260926033237` | yes — ledger | **A bay door seated cars for no time at all, and the bay could not credit the need a car was seated for, so |
 | [0459](db/migrations/0459_stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished.sql) | `20260926033252` | yes — ledger | **Stopping a run relabelled every interrupted bay booking `released / run_stopped`, so the record of the |
 | [0462](db/migrations/0462_the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick.sql) | `20260926040843` | yes — ledger | **The cockpit's Events feed printed real insert time beside a sim-time cockpit, painted passing rule checks |
+| [0463](db/migrations/0463_a_charge_that_completed_below_its_visit_target_stayed_open_and_the_deploy_gate_looped_the_car_through_the_service_bay.sql) | `20260926045517` | yes — ledger | **A charge that completed below its visit's target was never closed, so the deploy gate held a charged car |
+| [0464](db/migrations/0464_the_deploy_gate_sent_every_kind_of_open_work_to_the_service_bay_and_named_the_wrong_work_as_missing.sql) | `20260926045544` | yes — ledger | **The deploy gate sent every kind of open must-do work to the service bay, and named the wrong work as |
+| [0465](db/migrations/0465_the_command_door_dropped_the_step_a_gate_intake_carried_so_the_car_was_never_moved_again.sql) | `20260926045604` | yes — ledger | **The command door dropped the step a gate-intake command carried, so the car was staged with no step and |
+| [0466](db/migrations/0466_the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count.sql) | `20260926045441` | yes — ledger | **The run list counted no charge sessions for any run, and printed its own row cap as a count.** |
 
-322 migrations indexed.
+326 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

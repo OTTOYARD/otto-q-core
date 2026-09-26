@@ -553,7 +553,11 @@ repo_manifest(version, name, file) AS (
     ('20260923063827'::text, 'a_held_deploy_is_a_state_not_an_event'::text, '0457_a_held_deploy_is_a_state_not_an_event.sql'::text),
     ('20260926033237'::text, 'a_bay_door_seated_cars_for_no_time_and_the_bay_could_not_credit_the_need_it_was_seated_for'::text, '0458_a_bay_door_seated_cars_for_no_time_and_the_bay_could_not_credit_the_need_it_was_seated_for.sql'::text),
     ('20260926033252'::text, 'stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished'::text, '0459_stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished.sql'::text),
-    ('20260926040843'::text, 'the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick'::text, '0462_the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick.sql'::text)
+    ('20260926040843'::text, 'the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick'::text, '0462_the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick.sql'::text),
+    ('20260926045517'::text, 'a_charge_that_completed_below_its_visit_target_stayed_open_and_the_deploy_gate_looped_the_car_through_the_service_bay'::text, '0463_a_charge_that_completed_below_its_visit_target_stayed_open_and_the_deploy_gate_looped_the_car_through_the_service_bay.sql'::text),
+    ('20260926045544'::text, 'the_deploy_gate_sent_every_kind_of_open_work_to_the_service_bay_and_named_the_wrong_work_as_missing'::text, '0464_the_deploy_gate_sent_every_kind_of_open_work_to_the_service_bay_and_named_the_wrong_work_as_missing.sql'::text),
+    ('20260926045604'::text, 'the_command_door_dropped_the_step_a_gate_intake_carried_so_the_car_was_never_moved_again'::text, '0465_the_command_door_dropped_the_step_a_gate_intake_carried_so_the_car_was_never_moved_again.sql'::text),
+    ('20260926045441'::text, 'the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count'::text, '0466_the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
