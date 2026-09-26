@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260926112337
 -- migration-name:    the_gate_intake_booked_over_the_cars_own_hold_and_ran_with_no_booking
 --
 -- 0476  **The gate intake picked the stall the car already held its own booking on, collided with that booking, and

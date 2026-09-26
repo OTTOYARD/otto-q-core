@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260926112238
 -- migration-name:    a_car_moved_off_a_faulted_charger_was_staged_with_no_step_so_no_gate_read_it
 --
 -- 0474  **A car moved off a charger that faulted under it was staged with no step, so no gate read it.**

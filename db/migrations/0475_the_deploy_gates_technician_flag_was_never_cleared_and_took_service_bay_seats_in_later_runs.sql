@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260926112312
 -- migration-name:    the_deploy_gates_technician_flag_was_never_cleared_and_took_service_bay_seats_in_later_runs
 --
 -- 0475  **The deploy gate's technician flag was never cleared, so it outlived the run that raised it and took

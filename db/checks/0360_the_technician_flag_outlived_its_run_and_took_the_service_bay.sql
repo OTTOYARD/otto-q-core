@@ -142,3 +142,43 @@ SELECT pair, count(*) AS ticks FROM multi GROUP BY 1 ORDER BY 2 DESC;
 -- The reason-less commands are the appointment planner's `stage` and `proceed_to_stall` (they carry a `plan` and an
 -- `appointment`) and the charge path's `begin_charge`; most were refused `target_occupied`. 10 ticks on the run. Not
 -- traced further here.
+
+-- ══ §6 0475, BEFORE AND AFTER, ON A ROLLED-BACK PROBE ═════════════════════════════════════════════════════════════
+--
+--   On the stopped run 49c45bd4, 2026-09-26 at 11:20 UTC (6:20 AM CT), in one transaction undone by a final RAISE:
+--   the lowest-id untethered car of the twin depot put in the first service bay, its seat over (service_ends_at a
+--   minute past), carrying flagged_issue true and flagged_issue_type deploy_gate_stuck, as an earlier run leaves it.
+--   (A) one pass of twin.ottoq_sim_advance_service_flow on the tick's search_path; (B) twin.ottoq_sim_seed_fleet
+--   (depot, 42, 8), the scenario runner's seed. Each under the old bodies, then under 0475's.
+--
+--                            before 0475                          after 0475
+--   (A) the car              staged_for_departure, step ready     staged_for_departure, step ready
+--       flagged_issue        true                                 (absent)
+--       flagged_issue_type   deploy_gate_stuck                    (absent)
+--       twin.service_completed  credited [], suppressed_n 4       the same, and flag_cleared: deploy_gate_stuck
+--   (B) after the seed       116 cars, 33 flagged, 0 typed        116 cars, 0 flagged, 0 typed
+--
+--   Both predictions hold. The exit clears the flag the seat answered and names it on the event; the seed no longer
+--   hands a run the previous runs' flags (the 33 are §1b's 32 plus the probe's car, each stripped of its type).
+--   The first attempt timed out at 60 s: its "latest event" read scanned ottoq_events by run and car (23 s cold).
+--   The second took the global max(event_seq) instead, which the primary key answers at once.
+
+-- ══ §7 0476, BEFORE AND AFTER, ON A ROLLED-BACK PROBE ═════════════════════════════════════════════════════════════
+--
+--   The same run, 11:21 UTC: the same car put at the gate (arrived_at_gate, no step) with an open visit owing only
+--   an interior inspection, so the intake's (3b) cursor serves it; the stall the intake picks first computed by the
+--   intake's own query; and the car's own temp_hold booked on that stall from five sim-minutes before the clock to
+--   fifteen after, as a hold path leaves it. One public.ottoq_decide_tick under each body:
+--
+--                            before 0476                          after 0476
+--   intake decision          on the picked stall, booking (none)  on the picked stall, booking 87e2fd5d…
+--   staging booking on it    0                                    1
+--   the car's own hold       held                                 superseded (superseded_by_enacted_decision)
+--   gate_intake commands     1                                    1
+--
+--   Before: the car is sent and nothing is booked, which is §4's three incidents exactly. After: the intake is
+--   booked on the stall it picked, and the car's own hold gives way to it through the seam.
+--
+--   A first attempt that also set the stall's reserved_by to the car found nothing to fix: the intake's cursor
+--   skips a stall whose pointer is held, by anyone, so it picked another stall and booked it, before and after. The
+--   collision needs the calendar hold without the pointer, which is how all three incidents' stalls stood.
