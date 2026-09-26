@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0478 — GENERATED, not a log
+## Index, 0134–0481 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -476,8 +476,11 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0475](db/migrations/0475_the_deploy_gates_technician_flag_was_never_cleared_and_took_service_bay_seats_in_later_runs.sql) | `20260926112312` | yes — ledger | **The deploy gate's technician flag was never cleared, so it outlived the run that raised it and took |
 | [0476](db/migrations/0476_the_gate_intake_booked_over_the_cars_own_hold_and_ran_with_no_booking.sql) | `20260926112337` | yes — ledger | **The gate intake picked the stall the car already held its own booking on, collided with that booking, and |
 | [0477](db/migrations/0477_the_energy_command_hashed_the_day_plans_solve_time_so_a_reserve_shaving_depot_could_not_certify.sql) | `20260926112403` | yes — ledger | **The energy command's reason carried the day plan's wall-clock solve time, so the energy atom differed |
-| [0478](db/migrations/0478_the_dial_setter_kept_a_rows_first_writer_so_a_dial_named_who_created_it_not_who_set_it.sql) | `PENDING` | no — pending | **The dial setter kept a row's first writer, so a dial named who created it, not who last set it.** |
+| [0478](db/migrations/0478_the_dial_setter_kept_a_rows_first_writer_so_a_dial_named_who_created_it_not_who_set_it.sql) | `20260926115337` | yes — ledger | **The dial setter kept a row's first writer, so a dial named who created it, not who last set it.** |
+| [0479](db/migrations/0479_the_solar_canopies_soiling_was_shared_by_every_run_so_an_arm_inherited_the_panels_the_last_run_left.sql) | `20260926115429` | yes — ledger | **The solar canopies' soiling was depot state every run shared, so each arm inherited the panels the run |
+| [0480](db/migrations/0480_the_reserve_shave_promotion_is_measured_again_on_arms_that_start_on_the_same_panels.sql) | `20260926115449` | yes — ledger | **The reserve-shave promotion is measured again, on arms that start on the same panels.** `db/checks/0361` |
+| [0481](db/migrations/0481_a_dial_promotion_the_canon_keeps_failing_under_now_rolls_itself_back.sql) | `PENDING` | no — pending | **A dial promotion the canon keeps failing under now rolls itself back.** `db/checks/0361` §3. FINDINGS |
 
-338 migrations indexed.
+341 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

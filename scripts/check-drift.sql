@@ -569,7 +569,10 @@ repo_manifest(version, name, file) AS (
     ('20260926112312'::text, 'the_deploy_gates_technician_flag_was_never_cleared_and_took_service_bay_seats_in_later_runs'::text, '0475_the_deploy_gates_technician_flag_was_never_cleared_and_took_service_bay_seats_in_later_runs.sql'::text),
     ('20260926112337'::text, 'the_gate_intake_booked_over_the_cars_own_hold_and_ran_with_no_booking'::text, '0476_the_gate_intake_booked_over_the_cars_own_hold_and_ran_with_no_booking.sql'::text),
     ('20260926112403'::text, 'the_energy_command_hashed_the_day_plans_solve_time_so_a_reserve_shaving_depot_could_not_certify'::text, '0477_the_energy_command_hashed_the_day_plans_solve_time_so_a_reserve_shaving_depot_could_not_certify.sql'::text),
-    ('PENDING'::text, 'the_dial_setter_kept_a_rows_first_writer_so_a_dial_named_who_created_it_not_who_set_it'::text, '0478_the_dial_setter_kept_a_rows_first_writer_so_a_dial_named_who_created_it_not_who_set_it.sql'::text)
+    ('20260926115337'::text, 'the_dial_setter_kept_a_rows_first_writer_so_a_dial_named_who_created_it_not_who_set_it'::text, '0478_the_dial_setter_kept_a_rows_first_writer_so_a_dial_named_who_created_it_not_who_set_it.sql'::text),
+    ('20260926115429'::text, 'the_solar_canopies_soiling_was_shared_by_every_run_so_an_arm_inherited_the_panels_the_last_run_left'::text, '0479_the_solar_canopies_soiling_was_shared_by_every_run_so_an_arm_inherited_the_panels_the_last_run_left.sql'::text),
+    ('20260926115449'::text, 'the_reserve_shave_promotion_is_measured_again_on_arms_that_start_on_the_same_panels'::text, '0480_the_reserve_shave_promotion_is_measured_again_on_arms_that_start_on_the_same_panels.sql'::text),
+    ('PENDING'::text, 'a_dial_promotion_the_canon_keeps_failing_under_now_rolls_itself_back'::text, '0481_a_dial_promotion_the_canon_keeps_failing_under_now_rolls_itself_back.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

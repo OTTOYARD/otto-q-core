@@ -87,12 +87,38 @@ db AS (SELECT vehicle_id, dispatched_at, actual_return_at, scheduled_return_at, 
 SELECT (SELECT moved FROM p) AS moved_digests, (SELECT count(*) FROM da) AS dispatches_a, (SELECT count(*) FROM db) AS dispatches_b,
        (SELECT count(*) FROM (SELECT * FROM da EXCEPT SELECT * FROM db) x) AS in_a_not_b,
        (SELECT count(*) FROM (SELECT * FROM db EXCEPT SELECT * FROM da) x) AS in_b_not_a;
--- The arms' recall decisions differ (h_rcl moves, with decisions, events, energy, rules and end state), and their
--- 196 dispatches are identical row for row. asset_hours_available_per_day (view
--- ottoq_kpi_asset_hours_available_per_day) is the sum of dispatch durations clipped to the run, so it cannot differ
--- between the arms, and did not on 5 of 5 pairs. The verdict counts identical primaries as ties, so the experiment
--- reads `collecting` at its first look and `inconclusive` at its final one: no false "no effect" is recorded, but no
--- answer is possible either. What recall decides never reaches when a car leaves or returns in these arms. Open.
+-- The arms' 196 dispatches are identical row for row, so asset_hours_available_per_day (view
+-- ottoq_kpi_asset_hours_available_per_day, the sum of dispatch durations clipped to the run) cannot differ between
+-- them, and did not on 5 of 5 pairs. The verdict counts identical primaries as ties: no false "no effect" is
+-- recorded, and no answer is possible either.
+--
+-- CORRECTED the same morning, and the first reading was wrong. It said "what recall decides never reaches when a
+-- car leaves or returns". It does: twin.ottoq_sim_advance_deployed_telemetry acts on a triggered return (status
+-- returning, scheduled_return_at moved). What happened is that the arms decided nothing differently:
+
+\echo '=== 0361 §4b — the recall decisions of each pair, arm against arm, field for field ==='
+WITH p AS (SELECT l.seed, l.run_a, l.run_b FROM public.ottoq_dial_pair_ledger l
+            WHERE l.experiment_id = '3a2c5fa1-aa46-4471-bc10-2413c63a7312' AND l.ran_at > '2026-09-26 07:55+00')
+SELECT p.seed,
+       (SELECT count(*) FROM public.ottoq_recall_decisions d WHERE d.sim_run_id = p.run_a) AS decisions_a,
+       (SELECT count(*) FROM (
+          SELECT vehicle_id, decided_at_sim, should_return, return_trigger, urgency, rung, is_deferrable, lead_ticks, projected_eta_min
+            FROM public.ottoq_recall_decisions WHERE sim_run_id = p.run_a
+          EXCEPT ALL
+          SELECT vehicle_id, decided_at_sim, should_return, return_trigger, urgency, rung, is_deferrable, lead_ticks, projected_eta_min
+            FROM public.ottoq_recall_decisions WHERE sim_run_id = p.run_b) x) AS differing
+  FROM p ORDER BY p.seed;
+-- 5 pairs, 1,014-1,202 decisions an arm, 0 differing in any decision field. Both arms fired the same 563 returns with
+-- the same trigger mix (low_soc_reserve 239, overnight_prestage 167, sensor_soil 89, wash_cadence 51, comms_stale 12,
+-- rider_flag_cleaning 5), and neither fired an interval-maintenance trigger. interval_scheduled_v1 differs from
+-- naive_threshold_v1 only when a car's interval maintenance comes due, and no car of the reset certification fleet
+-- reaches its interval within 48 ticks. The hypothesis came from live run 324eb0f1, where naive recall pulled 58 cars
+-- for maintenance; the dial arms start from the canonical reset, which never gets there.
+--
+-- Two things still moved between the arms, and neither is the dial. h_rcl hashes each decision with the
+-- implementation's name (public.ottoq_evaluate_return_need), so it differs whenever the names do. And the energy,
+-- decision, event, rule and end-state atoms moved because of G214 (§8): the arms started with different canopy
+-- soiling. The experiment was abandoned at 11:44 UTC (6:44 AM CT, §9).
 
 -- ══ §5 THE FIRST TWIN-DEPOT PAIR AFTER THE ROLLBACK ═════════════════════════════════════════════════════════════════
 
@@ -158,3 +184,96 @@ SELECT (SELECT count(*) FROM public.ottoq_energy_commands c, ids WHERE c.sim_run
 -- and not vacuously: each arm has 24 energy commands, 12 of which carry the reserve-shaving day plan in the hashed
 -- reason, none carries solve_ms, and the arm reads energy_reserve_shave 1. G211's prediction holds on the column
 -- that exposed it. The other six twin-depot columns follow below.
+
+-- ══ §8 G214: THE ARMS DID NOT START WITH THE SAME SOLAR PANELS ═══════════════════════════════════════════════════════
+
+\echo '=== 0361 §8 — the first energy difference of the latest recall pair, and where it comes from ==='
+WITH p AS (SELECT l.run_a, l.run_b FROM public.ottoq_dial_pair_ledger l
+            WHERE l.experiment_id = '3a2c5fa1-aa46-4471-bc10-2413c63a7312' AND l.ran_at > '2026-09-26 07:55+00'
+            ORDER BY l.ran_at DESC LIMIT 1),
+a AS (SELECT s.timestamp AS t, s.building_load_kw AS bld, s.solar_generation_kw AS sol, s.total_ev_charging_kw AS ev
+        FROM public.site_energy_snapshots s, p WHERE s.sim_run_id = p.run_a),
+b AS (SELECT s.timestamp AS t, s.building_load_kw AS bld, s.solar_generation_kw AS sol, s.total_ev_charging_kw AS ev
+        FROM public.site_energy_snapshots s, p WHERE s.sim_run_id = p.run_b)
+SELECT a.t, a.bld, b.bld AS bld_b, a.ev, b.ev AS ev_b, a.sol, b.sol AS sol_b, round(b.sol / NULLIF(a.sol, 0), 4) AS ratio
+  FROM a JOIN b USING (t) WHERE (a.bld, a.sol, a.ev) IS DISTINCT FROM (b.bld, b.sol, b.ev) ORDER BY a.t LIMIT 4;
+-- 12:00 UTC  building 103.1 = 103.1  EV 351.9 = 351.9  solar  48.7 / 46.7  0.9589
+-- 12:30      building  93.7 =  93.7  EV 450.1 = 450.1  solar 103.5 / 99.4  0.9604
+-- 13:00                                               solar 199.9 / 192.0  0.9605
+-- The energy commands first differ at tick 7 in net load, 543 against 545 kW. Dispatches (196), charge sessions
+-- (180, every physical field) and recall decisions are identical; solar alone differs, by a constant 4%. On canopy_1
+-- at 12:00, same irradiance (76.8 W/m2), temperature and weather: soiling_factor 0.9082 in arm A, 0.8724 in arm B.
+
+\echo '=== 0361 §8b — the soiling every overnight arm started with (canopy_1), and the pair''s primary ==='
+WITH pairs AS (SELECT left(l.experiment_id::text, 8) AS exp, l.ran_at, l.run_a, l.run_b,
+                      (l.metrics_a->>'site_cost_usd_per_day')::numeric AS cost_a, (l.metrics_b->>'site_cost_usd_per_day')::numeric AS cost_b
+                 FROM public.ottoq_dial_pair_ledger l WHERE l.ran_at >= '2026-09-26 07:55+00'),
+s AS (SELECT o.sim_run_id, (array_agg(o.soiling_factor ORDER BY o.sim_clock_at))[1] AS soil0, round(sum(o.ac_power_kw) * 0.5, 1) AS kwh
+        FROM public.ottoq_solar_output o
+       WHERE o.canopy_code = 'canopy_1' AND o.sim_run_id IN (SELECT run_a FROM pairs UNION ALL SELECT run_b FROM pairs)
+       GROUP BY o.sim_run_id)
+SELECT p.exp, to_char(p.ran_at, 'HH24:MI') AS ran, sa.soil0 AS soil_a0, sb.soil0 AS soil_b0, sa.kwh AS c1_kwh_a, sb.kwh AS c1_kwh_b,
+       p.cost_a, p.cost_b
+  FROM pairs p JOIN s sa ON sa.sim_run_id = p.run_a JOIN s sb ON sb.sim_run_id = p.run_b ORDER BY p.ran_at;
+-- exp       ran    soil A0  soil B0   canopy_1 kWh A / B   site cost A / B ($/day)
+-- b66fa99c  08:00  0.8500   0.8500     612.0 /  612.0      1,821.31 / 1,634.77
+-- 3a2c5fa1  08:10  0.8500   0.9854     981.0 / 1117.2
+-- b66fa99c  08:20  0.9854   0.9496    1011.2 /  974.0      1,537.28 / 1,411.66   treatment dirtier
+-- 3a2c5fa1  08:30  0.9139   0.8781     662.4 /  636.1
+-- b66fa99c  08:40  0.8500   0.8500     838.7 /  838.7      1,698.47 / 1,528.33
+-- 3a2c5fa1  08:50  0.8500   0.8500     870.3 /  870.3
+-- b66fa99c  09:00  0.8500   0.8500     516.9 /  516.9      2,317.65 / 2,286.11
+-- 3a2c5fa1  09:10  0.8500   0.9840     909.2 / 1013.5
+-- b66fa99c  09:20  0.9840   0.9482    1023.1 /  985.4      1,545.78 / 1,495.98   treatment dirtier
+-- 3a2c5fa1  09:30  0.9125   0.8767    1010.3 /  970.2
+-- b66fa99c  09:40  0.8500   0.9854     827.7 /  922.0      1,657.30 / 1,500.39   treatment CLEANER
+--
+-- The mechanism: twin.ottoq_sim_advance_weather_and_solar keeps each canopy's soiling in ottoq_canopy_state, one row
+-- per canopy per depot, drifting it down about 0.075% a dry tick (floor 0.85) and up 0.03 a rainy one (cap 1.0), and
+-- nothing scopes the row to a run or resets it. The two arms of a pair run back to back, so arm B starts where arm A
+-- ended. They agree only while the soiling is pinned at its floor; a seed that rains lifts it, and the next arm
+-- inherits the lift. public.ottoq_bess_day_plan forecasts solar from the same row. (The precipitation chain beside
+-- it was scoped to its run by 0134; the soiling was not.)
+--
+-- What it did to the night's two verdicts:
+--   energy_reserve_shave (b66fa99c): three pairs started clean and all three favour the treatment; two started with
+--   the treatment's panels dirtier and it still won both; one, the sixth, started with them cleaner. The verdict's
+--   p = 0.0156 needed all six: five of five is p = 0.031, above the 0.025 per-look alpha. The effect looks real (the
+--   clean pairs save 10.2%, 10.0% and 1.4%, the two handicapped ones 8.2% and 3.2%), but the gate passed on a pair the
+--   confound favoured. So the promotion stands on the evidence and not on its own arithmetic, and it is re-measured
+--   once 0479 lands.
+--   recall_implementation_id (3a2c5fa1): every moved atom but h_rcl is this (§4b).
+--
+--   And the canon: verdicts 273 and 280 of G211's window differ in 12 energy commands with solve_ms removed, and their
+--   arms started at different soiling (273: 0.9771-0.9854 against 0.9679-0.9762). G211 had two causes. solve_ms was the
+--   persistent one; this one washed out on its own once the retries had drifted the panels back down to the floor,
+--   and it comes back after any run that rains. Every canon column certified today started at the floor.
+--
+-- Fixed by db/migrations/0479: the solar step and the day plan read the run's own recorded soiling, 0.85 before
+-- the run's first row.
+
+-- ══ §9 THE RECALL EXPERIMENT, ABANDONED ═════════════════════════════════════════════════════════════════════════════
+--
+--   11:44 UTC (6:44 AM CT): 3a2c5fa1 set to status abandoned, verdict outcome abandoned_uninformative, with §4b's
+--   evidence and the condition to recreate it (a canonical fleet reset that seeds maintenance-interval progress, so
+--   some cars cross their interval in the run). It had held half the dial runner's nightly budget for an experiment
+--   whose arms could not differ.
+
+-- ══ §10 0479, BEFORE AND AFTER, AND THE REPLICATION ═════════════════════════════════════════════════════════════════
+--
+--   11:52 UTC (6:52 AM CT), after the sweep of 0474-0477 had certified 9 of 9 (busy_day/171717/48 last, verdict 325),
+--   on a rolled-back transaction: the stopped run 49c45bd4 (its last recorded soiling 0.79 on every canopy), the shared
+--   canopy rows set first to 0.97 and then to 0.90, as a rainy run would leave them, and one solar step at the run's
+--   clock + 30 min each time, under the old body and under 0479's:
+--
+--                          shared row 0.97              shared row 0.90
+--   before 0479            soiling 0.9571, 111.89 kW    soiling 0.8591, 100.43 kW     (canopy_1)
+--   after 0479             soiling 0.7900,  92.35 kW    soiling 0.7900,  92.35 kW
+--
+--   Before, the run's panels are whatever the shared row says. After, they are the run's own, whatever the row says.
+--   (0.79 is below the 0.85 floor because 49c45bd4 ran a solar_soiling variability profile, applied after the floor.)
+--
+--   Applied: 0478 at 11:53:37, 0479 at 11:54:29, 0480 at 11:54:49 UTC, each stored statement's md5 equal to its file's
+--   body. 0479 moved the recertification floor to 11:54:29, and the runner began the sweep at 11:55. 0480 registered
+--   experiment 82c5568b, b66fa99c's design under a new id and so new seeds, which the dial runner takes up in its next
+--   window (3:00-6:00 AM CT).
