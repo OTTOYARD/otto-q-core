@@ -578,7 +578,10 @@ repo_manifest(version, name, file) AS (
     ('20260926132059'::text, 'a_finished_charge_kept_its_charger_booked_and_reserved_so_the_car_held_it_from_staging'::text, '0484_a_finished_charge_kept_its_charger_booked_and_reserved_so_the_car_held_it_from_staging.sql'::text),
     ('20260926143555'::text, 'the_dial_window_stays_closed_while_the_build_is_still_moving'::text, '0485_the_dial_window_stays_closed_while_the_build_is_still_moving.sql'::text),
     ('20260926145308'::text, 'the_battery_drains_while_the_car_is_out_and_otto_q_rereads_its_charge_need_every_tick'::text, '0486_the_battery_drains_while_the_car_is_out_and_otto_q_rereads_its_charge_need_every_tick.sql'::text),
-    ('20260926152610'::text, 'the_crew_decides_first_and_the_engine_applies_it'::text, '0487_the_crew_decides_first_and_the_engine_applies_it.sql'::text)
+    ('20260926152610'::text, 'the_crew_decides_first_and_the_engine_applies_it'::text, '0487_the_crew_decides_first_and_the_engine_applies_it.sql'::text),
+    ('20260926160930'::text, 'the_wave_admission_edge_function_stops_moving_cars_under_the_live_tick'::text, '0488_the_wave_admission_edge_function_stops_moving_cars_under_the_live_tick.sql'::text),
+    ('20260926161825'::text, 'the_completion_probe_reads_the_stall_the_work_was_done_in'::text, '0489_the_completion_probe_reads_the_stall_the_work_was_done_in.sql'::text),
+    ('20260926161853'::text, 'the_refusal_reactor_leaves_a_car_the_decide_path_has_already_replanned'::text, '0490_the_refusal_reactor_leaves_a_car_the_decide_path_has_already_replanned.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0487 — GENERATED, not a log
+## Index, 0134–0490 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -486,7 +486,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0485](db/migrations/0485_the_dial_window_stays_closed_while_the_build_is_still_moving.sql) | `20260926143555` | yes — ledger | **The dial window stays closed while the build is still moving.** Chase, 2026-09-26: hold off on major testing |
 | [0486](db/migrations/0486_the_battery_drains_while_the_car_is_out_and_otto_q_rereads_its_charge_need_every_tick.sql) | `20260926145308` | yes — ledger | **The battery drains while the car is out, and OTTO-Q re-reads a car's charge need every tick.** |
 | [0487](db/migrations/0487_the_crew_decides_first_and_the_engine_applies_it.sql) | `20260926152610` | yes — ledger | **The crew decides first, and the engine applies it.** PULSE's approvals queue had an Approve and a |
+| [0488](db/migrations/0488_the_wave_admission_edge_function_stops_moving_cars_under_the_live_tick.sql) | `20260926160930` | yes — ledger | **The wave-admission edge function stops moving cars under the live tick (G223).** Every operator run |
+| [0489](db/migrations/0489_the_completion_probe_reads_the_stall_the_work_was_done_in.sql) | `20260926161825` | yes — ledger | **The completion probe reads the stall the work was done in (G224).** The canon's 48-tick busy_day |
+| [0490](db/migrations/0490_the_refusal_reactor_leaves_a_car_the_decide_path_has_already_replanned.sql) | `20260926161853` | yes — ledger | **The refusal reactor leaves a car the decide path has already re-planned (G225).** A refused command from |
 
-347 migrations indexed.
+350 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
