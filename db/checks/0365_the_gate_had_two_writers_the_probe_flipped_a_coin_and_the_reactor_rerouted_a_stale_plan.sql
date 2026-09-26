@@ -248,4 +248,22 @@ SELECT c.scenario, c.seed, c.ticks, c.verdict_id, c.certified_at, c.outcome, c.e
   FROM public.ottoq_determinism_canon c
  WHERE c.enabled
  ORDER BY c.certified_at;
--- READ: pending the sweep.
+-- READ (2026-09-26, 16:48 UTC): all nine columns current under 0489 and 0490, every one `passed` with no disagreeing
+--   atom, first attempt each: verdicts 366-374, pairs started 16:19:00-16:37:32 UTC (11:19-11:37 AM CT). grid_smoke
+--   239001/6 and 424242/6 (366, 367), busy_day 171717/12, 314159/12, 424242/12 (368-370), normal_day 171717/12 (371),
+--   busy_day 171717/24 and 424242/24 (372, 373), busy_day 171717/48 (374).
+
+\echo '=== 0365 §4(b) — the 48-tick column under 0487 (364) and under 0489/0490 (374): the fixes are not vacuous ==='
+WITH v AS (SELECT verdict_id, arm_a_run, arm_b_run FROM public.ottoq_determinism_verdict_ledger WHERE verdict_id IN (364, 374))
+SELECT v.verdict_id, CASE WHEN e.sim_run_id = v.arm_a_run THEN 'A' ELSE 'B' END AS arm,
+       count(*) FILTER (WHERE NOT e.passed) AS hw006_failed, count(*) FILTER (WHERE e.passed) AS hw006_passed
+  FROM v JOIN public.ottoq_rule_evaluations e ON e.sim_run_id IN (v.arm_a_run, v.arm_b_run)
+ WHERE e.rule_code = 'HW.006.physical_presence_verification' AND e.action_context = 'task_completion'
+ GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ: 364 A 11 failed / 497 passed, B 12 / 496. 374 A 0 / 502, B 0 / 502. Every HW.006 failure this column carried
+--   was a wrong stall. The same arms: the reactor marked 6 refusals `superseded` and rerouted 42 (48 before), exactly
+--   the six §3(b) counted, and no car holds two charge bookings starting at one instant (1 under 364).
+--
+--   What this does not say: HW.006 is still advisory, and the mechanism G157 names (an L2 session that outlives its
+--   vehicle's stall pointer, 0350) is independent of both fixes. On an operator run a failure at the charge close now
+--   means that mechanism and nothing else.
