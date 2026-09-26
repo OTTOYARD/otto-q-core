@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0490 — GENERATED, not a log
+## Index, 0134–0492 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -489,7 +489,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0488](db/migrations/0488_the_wave_admission_edge_function_stops_moving_cars_under_the_live_tick.sql) | `20260926160930` | yes — ledger | **The wave-admission edge function stops moving cars under the live tick (G223).** Every operator run |
 | [0489](db/migrations/0489_the_completion_probe_reads_the_stall_the_work_was_done_in.sql) | `20260926161825` | yes — ledger | **The completion probe reads the stall the work was done in (G224).** The canon's 48-tick busy_day |
 | [0490](db/migrations/0490_the_refusal_reactor_leaves_a_car_the_decide_path_has_already_replanned.sql) | `20260926161853` | yes — ledger | **The refusal reactor leaves a car the decide path has already re-planned (G225).** A refused command from |
+| [0491](db/migrations/0491_an_ops_action_outside_the_whitelist_is_refused_and_says_so.sql) | `20260926170743` | yes — ledger | **An ops action outside the whitelist is refused, and says so (G222).** The setter promised a human approval |
+| [0492](db/migrations/0492_the_orphan_sweep_ends_a_twin_session_on_its_runs_clock.sql) | `20260926170804` | yes — ledger | **The orphan sweep ends a twin charge session on its run's clock (G220).** |
 
-350 migrations indexed.
+352 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
