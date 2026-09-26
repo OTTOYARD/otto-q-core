@@ -411,5 +411,73 @@ SELECT c.scenario || '/' || c.seed || '/' || c.ticks AS col, c.body, c.verdict_i
        count(DISTINCT x.vehicle_id) FILTER (WHERE x.command_type = 'begin_charge' AND x.status = 'executed') AS cars_charged
   FROM cols c JOIN public.ottoq_vehicle_commands x ON x.sim_run_id = c.run
  GROUP BY 1, 2, 3 ORDER BY 1, 2;
--- READ: pending the sweep that started at 2:07 PM CT.
+-- READ (19:36 UTC, 2:36 PM CT): the canon re-certified 9 of 9 under 0494, each column on its first attempt: verdicts
+--   393-401, pairs started 19:07-19:25 UTC (2:07-2:25 PM CT), every one `passed` with no disagreeing atom. Arm A of each,
+--   (3)'s begin_charge issued / refused at the gate, under 0493 -> under 0494, and cars charged:
+--     grid_smoke/239001/6      3/0   ->   3/0     cars   2 ->   2
+--     grid_smoke/424242/6      2/0   ->   2/0     cars   2 ->   2
+--     busy_day/171717/12     160/70  ->  90/3     cars  87 ->  87
+--     busy_day/314159/12     223/131 -> 100/6     cars  90 ->  91
+--     busy_day/424242/12     172/78  -> 104/7     cars  93 ->  93
+--     normal_day/171717/12   117/27  ->  90/3     cars  87 ->  87
+--     busy_day/171717/24     171/70  -> 104/3     cars  89 ->  89
+--     busy_day/424242/24     185/80  -> 115/8     cars  96 ->  96
+--     busy_day/171717/48     248/76  -> 174/3     cars 110 -> 109
+--   Refusals fell from 27-131 an arm to 3-8, below 0492's 19-57 (§5(b)), and the commands issued fell with them (160 to
+--   90 on busy_day/171717/12) while the cars charged stayed within one. What refuses now is a charger that changed
+--   between the proposal and the gate inside one tick.
+
+\echo '=== 0367 §7(b) — against 0492: cars charged only there, and whether any of them needed a charge ==='
+WITH pairs(v92, v94) AS (VALUES (377,395),(378,396),(379,397),(380,398),(381,399),(382,400),(383,401)),
+runs AS (
+  SELECT l92.scenario || '/' || l92.seed || '/' || l92.ticks AS col, l92.arm_a_run AS r92, l94.arm_a_run AS r94
+    FROM pairs p JOIN public.ottoq_determinism_verdict_ledger l92 ON l92.verdict_id = p.v92
+                 JOIN public.ottoq_determinism_verdict_ledger l94 ON l94.verdict_id = p.v94),
+charged AS (
+  SELECT r.col, r.r92, r.r94, x.sim_run_id, x.vehicle_id
+    FROM runs r JOIN public.ottoq_vehicle_commands x ON x.sim_run_id IN (r.r92, r.r94)
+   WHERE x.command_type = 'begin_charge' AND x.status = 'executed'
+   GROUP BY 1, 2, 3, 4, 5),
+only92 AS (
+  SELECT c.col, c.r94, c.vehicle_id FROM charged c
+   WHERE c.sim_run_id = c.r92
+     AND NOT EXISTS (SELECT 1 FROM charged d WHERE d.col = c.col AND d.sim_run_id = c.r94 AND d.vehicle_id = c.vehicle_id))
+SELECT o.col, count(*) AS charged_only_under_0492,
+       count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) a
+          WHERE vn.sim_run_id = o.r94 AND vn.vehicle_id = o.vehicle_id AND a->>'svc' = 'charge'
+            AND COALESCE(a->>'status','open') NOT IN ('done','closed','skipped','cancelled'))) AS open_charge_need_under_0494,
+       count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_visit_needs vn
+          WHERE vn.sim_run_id = o.r94 AND vn.vehicle_id = o.vehicle_id
+            AND (vn.meta->>'soc_at_arrival')::numeric < vn.target_soc - 1)) AS arrived_below_target_minus_1
+  FROM only92 o GROUP BY 1 ORDER BY 1;
+-- READ (19:40 UTC): cars charged is 1-3 below 0492 on all seven columns (0493 already carried that, §5(b)). 15 cars
+--   across the seven busy_day and normal_day columns charged only under 0492 (1, 3, 4, 1, 1, 4, 1), and none of them
+--   had an open charge need under 0494 or arrived below its visit target minus 1. On busy_day/424242/12 the four were
+--   fixture cars arriving at 93, 97, 93 and 89 against targets of 90, 90, 90 and 85, with no open charge atom: under
+--   0492 the charge step topped them up because it charged anything below the visit target; since 0493 it charges below
+--   the target minus 1, the deriver's rule. So the lost "cars charged" are top-ups nobody asked for.
+
+\echo '=== 0367 §7(c) — against 0492: cars ending the arm with a charge still to do, and energy delivered ==='
+WITH pairs(v92, v94) AS (VALUES (377,395),(378,396),(379,397),(380,398),(381,399),(382,400),(383,401)),
+arms AS (
+  SELECT l.scenario || '/' || l.seed || '/' || l.ticks AS col, CASE WHEN l.verdict_id = p.v92 THEN '0492' ELSE '0494' END AS body,
+         l.arm_a_run AS run
+    FROM pairs p JOIN public.ottoq_determinism_verdict_ledger l ON l.verdict_id IN (p.v92, p.v94))
+SELECT a.col, a.body,
+       count(DISTINCT vn.vehicle_id) FILTER (WHERE EXISTS (
+          SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x->>'svc' = 'charge'
+             AND COALESCE(x->>'status','open') NOT IN ('done','closed','skipped','cancelled'))) AS cars_with_open_charge_atom,
+       (SELECT round(sum(COALESCE(o.energy_delivered_kwh, 0))::numeric, 0) FROM public.ocpp_sessions o WHERE o.sim_run_id = a.run) AS kwh_delivered
+  FROM arms a JOIN public.ottoq_visit_needs vn ON vn.sim_run_id = a.run
+ GROUP BY a.col, a.body, a.run ORDER BY 1, 2;
+-- READ (19:41 UTC), arm A of each pair, cars ending the arm with an open charge atom and kWh delivered, 0492 -> 0494:
+--     busy_day/171717/12    7 ->  5   1,522 -> 1,556      busy_day/171717/24    5 ->  4   1,816 -> 1,783
+--     busy_day/314159/12   21 -> 16   1,619 -> 1,739      busy_day/424242/24    2 ->  4   1,817 -> 1,777
+--     busy_day/424242/12    7 ->  6   1,496 -> 1,513      busy_day/171717/48   21 -> 23   4,398 -> 4,398
+--     normal_day/171717/12 12 ->  9   1,545 -> 1,591
+--   67 cars left with a charge to do against 75, and 14,357 kWh against 14,213 (+1.0%). It moves both ways column by
+--   column (the 48-tick column ends with two more cars waiting on the same energy), so the claim is no loss, not a gain.
+--   Read before the validation run started, which purges these arms.
 
