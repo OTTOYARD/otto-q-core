@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0484 — GENERATED, not a log
+## Index, 0134–0487 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -483,7 +483,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0482](db/migrations/0482_the_dial_runner_opens_and_closes_its_own_overnight_window.sql) | `20260926122233` | yes — ledger | **The dial runner opens and closes its own overnight window.** `db/checks/0361` §1, §10 |
 | [0483](db/migrations/0483_a_recalled_cars_charge_was_closed_on_the_soc_it_left_with_before_the_arrival_drain.sql) | `20260926132036` | yes — ledger | **A recalled car's must-do charge was closed on the SoC it left with, before the arrival drain.** |
 | [0484](db/migrations/0484_a_finished_charge_kept_its_charger_booked_and_reserved_so_the_car_held_it_from_staging.sql) | `20260926132059` | yes — ledger | **A finished charge kept its charger booked and reserved, so the car held it from staging.** |
+| [0485](db/migrations/0485_the_dial_window_stays_closed_while_the_build_is_still_moving.sql) | `20260926143555` | yes — ledger | **The dial window stays closed while the build is still moving.** Chase, 2026-09-26: hold off on major testing |
+| [0486](db/migrations/0486_the_battery_drains_while_the_car_is_out_and_otto_q_rereads_its_charge_need_every_tick.sql) | `20260926145308` | yes — ledger | **The battery drains while the car is out, and OTTO-Q re-reads a car's charge need every tick.** |
+| [0487](db/migrations/0487_the_crew_decides_first_and_the_engine_applies_it.sql) | `20260926152610` | yes — ledger | **The crew decides first, and the engine applies it.** PULSE's approvals queue had an Approve and a |
 
-344 migrations indexed.
+347 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
