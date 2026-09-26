@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0457 — GENERATED, not a log
+## Index, 0134–0459 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -458,7 +458,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0455](db/migrations/0455_every_decision_in_the_stream_says_what_it_decided_and_why.sql) | `20260923061500` | yes — ledger | **The Decisions stream printed the engine's name where the decision's reason belonged.** `db/checks/0356` §4 |
 | [0456](db/migrations/0456_the_kernel_card_counted_abstentions_as_refused_proposals.sql) | `20260923062252` | yes — ledger | **The Intelligence panel's L4 card counted the proposer's abstentions as proposals the kernel refused.** |
 | [0457](db/migrations/0457_a_held_deploy_is_a_state_not_an_event.sql) | `20260923063827` | yes — ledger | **0454 classified whole actions as events; one of them also carries a state.** `db/checks/0356` §3 |
+| [0458](db/migrations/0458_a_bay_door_seated_cars_for_no_time_and_the_bay_could_not_credit_the_need_it_was_seated_for.sql) | `20260926033237` | yes — ledger | **A bay door seated cars for no time at all, and the bay could not credit the need a car was seated for, so |
+| [0459](db/migrations/0459_stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished.sql) | `20260926033252` | yes — ledger | **Stopping a run relabelled every interrupted bay booking `released / run_stopped`, so the record of the |
 
-319 migrations indexed.
+321 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
