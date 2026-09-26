@@ -4,7 +4,9 @@
 --       §1 is measured on validation run `317d4331-747a-4fd4-ab69-41ec78c5be98` (busy_day, twin depot `11111111-…`,
 --       sim 8:00 AM-12:34 PM CT, 275 sim-min; stopped 04:48 UTC on 2026-09-26), read after the stop and before any purge. The run is
 --       engine-class data and the next demo start deletes it; the numbers below are the record.
---       §2 is the rolled-back before/after probe of migration 0467 on the same run.
+--       §2 is the rolled-back before/after probe of migration 0467 on the same run. §3-§5 are G201 and G200 and the
+--       probe of 0468/0469; §6-§7 are G203 (staging holds booked on stalls promised to another car) and the probe of
+--       0471, all on the same run.
 --
 --       Every query takes the run as a psql variable:
 --
@@ -202,3 +204,90 @@ SELECT c.status::text AS status, c.payload ? 'stall_id' AS has_stall,
 --   patched: in a real tick the world step, and 0468 inside it, runs first. The first draft of 0468 had no flag
 --   exemption; the service flow's own STEP 1 sends flagged cars from the wash and detail bays to the service bay on
 --   the flag alone, so the exemption was added before apply and D is its proof.
+
+-- ══ §6 G203: THE STAGING HOLD BOOKED STALLS PROMISED TO ANOTHER CAR, AND KEPT EVERY BOOKING IT COULD NOT USE ══════
+--
+--   §1f counted 98 `otto_q` `temp_hold` bookings that expired unused. This splits them by what the stall's pointer
+--   said just before each booking, rebuilt from the stall's own `stall.state_changed` diffs (they carry
+--   `reserved_by`, `reservation_expires_at` and `current_vehicle_id`). Measured 2026-09-26 06:25 UTC, run still intact.
+
+\echo '=== 0358 §6a — otto_q temp_hold bookings by outcome ==='
+WITH b AS (
+  SELECT b.* FROM public.ottoq_stall_bookings b
+   WHERE b.sim_run_id = :'run' AND b.purpose = 'temp_hold' AND b.booked_by = 'otto_q')
+SELECT b.state, b.release_reason,
+       EXISTS (SELECT 1 FROM public.ottoq_events e
+                WHERE e.sim_run_id = b.sim_run_id AND e.entity_id = b.vehicle_id
+                  AND e.event_type = 'vehicle.state_changed'
+                  AND e.payload->'diff'->'current_stall_id'->>'to' = b.stall_id::text) AS car_ever_on,
+       count(*) AS n
+  FROM b GROUP BY 1,2,3 ORDER BY n DESC;
+-- 290 bookings. done/window_elapsed_occupied/on 176 · released/window_elapsed/NEVER ON 58 · released/window_elapsed/
+-- on 40 · done/vehicle_moved_to_next_leg 9 · released/run_stopped 7. The 58 are the orphans; 50 were windows that
+-- started the tick they were booked, the other 8 a mean 36 s later.
+
+\echo '=== 0358 §6b — the 58 orphans by the stall pointer just before booking ==='
+WITH o AS (
+  SELECT b.booking_id, b.stall_id, b.vehicle_id, lower(b.during) AS t0, upper(b.during) AS t1, s.staging_role
+    FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id
+   WHERE b.sim_run_id = :'run' AND b.purpose = 'temp_hold' AND b.booked_by = 'otto_q'
+     AND b.state = 'released' AND b.release_reason = 'window_elapsed'
+     AND NOT EXISTS (SELECT 1 FROM public.ottoq_events e
+                      WHERE e.sim_run_id = b.sim_run_id AND e.entity_id = b.vehicle_id
+                        AND e.event_type = 'vehicle.state_changed'
+                        AND e.payload->'diff'->'current_stall_id'->>'to' = b.stall_id::text)),
+st AS (
+  SELECT o.*,
+    (SELECT e.payload->'diff'->'reserved_by'->>'to' FROM public.ottoq_events e
+      WHERE e.sim_run_id = :'run' AND e.entity_id = o.stall_id AND e.event_type = 'stall.state_changed'
+        AND e.payload->'diff' ? 'reserved_by' AND e.sim_clock_at < o.t0
+      ORDER BY e.sim_clock_at DESC, e.occurred_at DESC LIMIT 1) AS rsv_before,
+    (SELECT (e.payload->'diff'->'reservation_expires_at'->>'to')::timestamptz FROM public.ottoq_events e
+      WHERE e.sim_run_id = :'run' AND e.entity_id = o.stall_id AND e.event_type = 'stall.state_changed'
+        AND e.payload->'diff' ? 'reservation_expires_at' AND e.sim_clock_at < o.t0
+      ORDER BY e.sim_clock_at DESC, e.occurred_at DESC LIMIT 1) AS rsv_exp_before,
+    (SELECT e.payload->'diff'->'current_vehicle_id'->>'to' FROM public.ottoq_events e
+      WHERE e.sim_run_id = :'run' AND e.entity_id = o.stall_id AND e.event_type = 'stall.state_changed'
+        AND e.payload->'diff' ? 'current_vehicle_id' AND e.sim_clock_at < o.t0
+      ORDER BY e.sim_clock_at DESC, e.occurred_at DESC LIMIT 1) AS cur_before
+  FROM o)
+SELECT CASE WHEN cur_before IS NOT NULL THEN 'car on the stall'
+            WHEN rsv_before IS NOT NULL AND rsv_before <> vehicle_id::text
+                 AND (rsv_exp_before IS NULL OR rsv_exp_before > t0) THEN 'live reservation by another car'
+            WHEN rsv_before = vehicle_id::text THEN 'reserved by the same car'
+            ELSE 'free' END AS pointer_at_booking,
+       staging_role, count(*) AS n, round(avg(extract(epoch FROM t1 - t0) / 60)) AS avg_window_min
+  FROM st GROUP BY 1, 2 ORDER BY n DESC;
+-- live reservation by another car  temp 23 (20 min) + long 11 (23 min) = 34
+-- car on the stall                 temp 15 (16 min) + long  3 (9 min)  = 18
+-- free                             temp  3 + long 3                    =  6
+--
+-- The booking's candidate source, ottoq.ottoq_stall_free_between, reads the calendar, stall status, charger health
+-- and (behind calendar_occupancy_guard, on) the car on the stall. It never reads `reserved_by`, so a reservation
+-- that outlived its booking (the refusal reactor reserves 3,600 s beside a 60-minute booking; a superseded command
+-- releases the booking and not the pointer) left a stall that looked free and could not be reserved. The two
+-- callers, ottoq_decide_tick (3) when the charge proposer abstains and ottoq.ottoq_place_unplaced_vehicles, then
+-- called ottoq_reserve_stall, were refused, and did nothing with the booking they had just made. The car-on-stall
+-- cases pass the occupancy guard because it trusts the car's planned leg end. `arm.move_refused` fired 0 times on
+-- this run, so the third failure branch (the arm) is not a source here. Fixed by 0471.
+
+-- ══ §7 0471, BEFORE AND AFTER, ON TWO ROLLED-BACK TRANSACTIONS ═════════════════════════════════════════════════════
+--
+--   Run on 2026-09-26 at 06:33-06:37 UTC (1:33-1:37 AM CT), after 0470 and with no pair or run live, as transactions
+--   that raised at their end: 0471's P0, P2, patches and V-blocks, bracketed by the same scenarios on the stopped run
+--   317d4331 (sim clock 12:34 PM CT). The car is the depot's lowest id (so `p_max => 1` places it and only it); its
+--   disposition is `redeploy`, a 20-minute temp hold, and the stall its hold books today is called S.
+--
+--   ottoq_place_unplaced_vehicles(run, depot, clock, 1)       old bodies                   new bodies (0471)
+--     S free (control)                                          placed on S                  placed on S
+--     S reserved by another car to clock+15 min                 not placed; S held, orphan   placed on the next stall
+--     another car on S, occupancy guard off for the run *       not placed; S held, orphan   not placed; S released
+--                                                                                            reserve_refused_place_unplaced
+--   ottoq_decide_tick(run), the car low at the gate with an open charge visit, every charge stall in maintenance,
+--   ottoq_reserve_stall stubbed to refuse **
+--     disposition temp_stage_await_resource                     hold held, orphan            hold released
+--                                                                                            reserve_refused_decide_tick
+--
+--   *  The guard trusts the car's plan; turning it off for the run stands in for its plan-ended blind spot.
+--   ** A first attempt with the same car and no open visit read `redeploy`, which books no hold, so the branch was
+--      not reached; the open charge visit is what puts a car on it (ottoq.ottoq_arrival_disposition).

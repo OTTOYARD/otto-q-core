@@ -560,7 +560,11 @@ repo_manifest(version, name, file) AS (
     ('20260926045441'::text, 'the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count'::text, '0466_the_run_list_counted_no_charge_sessions_for_any_run_and_printed_its_row_cap_as_a_count.sql'::text),
     ('20260926052522'::text, 'the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold'::text, '0467_the_gate_intake_picked_a_stall_its_own_gate_refused_and_each_refusal_left_a_phantom_hold.sql'::text),
     ('20260926055955'::text, 'the_service_bay_admitted_cars_on_their_step_alone_and_seated_the_boot_cohort_for_work_that_did_not_exist'::text, '0468_the_service_bay_admitted_cars_on_their_step_alone_and_seated_the_boot_cohort_for_work_that_did_not_exist.sql'::text),
-    ('20260926060017'::text, 'the_service_sequencer_sent_every_ready_car_a_stage_command_every_tick_that_the_door_executed_as_nothing'::text, '0469_the_service_sequencer_sent_every_ready_car_a_stage_command_every_tick_that_the_door_executed_as_nothing.sql'::text)
+    ('20260926060017'::text, 'the_service_sequencer_sent_every_ready_car_a_stage_command_every_tick_that_the_door_executed_as_nothing'::text, '0469_the_service_sequencer_sent_every_ready_car_a_stage_command_every_tick_that_the_door_executed_as_nothing.sql'::text),
+    ('20260926062937'::text, 'the_run_list_showed_certification_arms_and_pushed_the_operators_own_runs_off_it'::text, '0470_the_run_list_showed_certification_arms_and_pushed_the_operators_own_runs_off_it.sql'::text),
+    ('20260926063850'::text, 'the_staging_hold_booked_stalls_promised_to_another_car_and_left_each_refused_booking_held'::text, '0471_the_staging_hold_booked_stalls_promised_to_another_car_and_left_each_refused_booking_held.sql'::text),
+    ('20260926070905'::text, 'the_inspection_seam_sent_cars_the_gate_intake_had_already_sent_and_the_door_kept_one_by_stall_id'::text, '0472_the_inspection_seam_sent_cars_the_gate_intake_had_already_sent_and_the_door_kept_one_by_stall_id.sql'::text),
+    ('20260926070924'::text, 'the_inspection_seam_served_the_readiness_leg_as_a_second_interior_inspection'::text, '0473_the_inspection_seam_served_the_readiness_leg_as_a_second_interior_inspection.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
