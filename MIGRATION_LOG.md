@@ -332,6 +332,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0325](db/migrations/0325_energy_commands_get_the_dock_that_vehicle_commands_already_have.sql) | `20260914214010` | yes — ledger | ENERGY COMMANDS GET THE DOCK THAT VEHICLE COMMANDS ALREADY HAVE, |
 | [0326](db/migrations/0326_the_stamp_must_be_present_and_not_older_not_different.sql) | `20260914193928` | yes — ledger | 0322's TRIGGER REFUSES A CORRECT WRITE, BECAUSE "THE STAMP MUST MOVE" |
 | [0327](db/migrations/0327_the_ledger_comment_claims_a_protection_that_has_never_existed.sql) | `20260914214102` | yes — ledger | THE cuOpt LEDGER'S OWN COMMENT ASSERTS A PROTECTION THAT HAS NEVER |
+| [0328](db/migrations/0328_the_conflict_ledger_records_who_was_there_and_not_what_they_were_doing.sql) | `20260914235653` | yes — ledger | THE CONFLICT LEDGER RECORDS *WHO* WAS IN THE STALL AND NOT *WHAT THEY |
+| [0329](db/migrations/0329_the_departure_release_covers_five_of_the_flagships_one_hundred_and_fifty_eight_stalls.sql) | `20260915001355` | yes — ledger | A BOOKING ENDS WHEN ITS WINDOW RUNS OUT, NOT WHEN THE VEHICLE LEAVES, |
+| [0330](db/migrations/0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming.sql) | `20260919161129` | yes — ledger | SWEEP 2 TOOK SPACES AWAY FROM VEHICLES THAT WERE STANDING IN THE YARD |
 | [0331](db/migrations/0331_the_agent_hands_one_solver_request_to_the_kernel.sql) | `20260916000638` | yes — ledger | THE AGENT AND THE SOLVER WERE BOTH LIVE, BUT THEY WERE TWO PARALLEL |
 | [0332](db/migrations/0332_one_agent_claim_per_run_tick.sql) | `20260916002025` | yes — ledger | The first 0331 live run proved the chain itself, then exposed two entrances: |
 | [0333](db/migrations/0333_every_solver_proposal_gets_a_deterministic_disposition.sql) | `20260916144203` | yes — ledger | The first live 0331/0332 Sim Start proved one product process: |
@@ -442,6 +445,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0438](db/migrations/0438_three_of_the_agents_five_dials_did_nothing_and_its_board_never_said_so.sql) | `20260923012821` | yes — ledger | **Three of the orchestrator agent's five dials did nothing, and its board never said so.** Two have no reader |
 | [0439](db/migrations/0439_the_learning_loop_had_nothing_to_compare_so_it_now_runs_its_own_experiments.sql) | `20260923020808` | yes — ledger | **The learning loop had nothing to compare, so it now runs its own experiments.** The dial promoter |
 | [0440](db/migrations/0440_the_dial_runner_lost_its_lock_to_the_recert_heartbeat_on_every_minute_they_share.sql) | `20260923021253` | yes — ledger | **The dial-experiment runner takes one shot at a lock that the recertification heartbeat holds for a |
+| [0441](db/migrations/0441_the_physical_pointer_defect_is_safety_evidence_and_it_evaporates_on_the_next_demo_run.sql) | `20260923023300` | yes — ledger | **G157's 49 physical-pointer divergences — a charging stall that records a DIFFERENT vehicle, or |
 | [0442](db/migrations/0442_the_sites_forward_schedule_was_computed_every_tick_and_published_nowhere.sql) | `20260923042027` | yes — ledger | **The site's forward schedule was computed every tick and published nowhere.** Since 0435 the battery |
 | [0443](db/migrations/0443_the_ab_pair_filed_its_second_arms_fleet_reset_as_the_first_arms_evidence.sql) | `20260923042056` | yes — ledger | **`ottoq_ab_pair` never received 0421's reset.** 0421 fixed the 0329 defect in `ottoq_determinism_pair` |
 | [0444](db/migrations/0444_the_day_plan_could_not_see_the_fleet_waiting_to_charge_so_the_boot_surge_set_the_billed_peak.sql) | `20260923042223` | yes — ledger | **The battery's day plan could not see the fleet waiting to charge, so the boot surge set the day's billed |
@@ -460,6 +464,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0457](db/migrations/0457_a_held_deploy_is_a_state_not_an_event.sql) | `20260923063827` | yes — ledger | **0454 classified whole actions as events; one of them also carries a state.** `db/checks/0356` §3 |
 | [0458](db/migrations/0458_a_bay_door_seated_cars_for_no_time_and_the_bay_could_not_credit_the_need_it_was_seated_for.sql) | `20260926033237` | yes — ledger | **A bay door seated cars for no time at all, and the bay could not credit the need a car was seated for, so |
 | [0459](db/migrations/0459_stopping_a_run_relabelled_every_interrupted_bay_booking_so_the_interruption_record_vanished.sql) | `20260926033252` | yes — ledger | **Stopping a run relabelled every interrupted bay booking `released / run_stopped`, so the record of the |
+| [0460](db/migrations/0460_the_cockpits_could_not_read_the_card_they_were_built_on_and_it_never_said_where_a_vehicle_was_booked.sql) | `20260925200000` | yes — ledger | **The two cockpits could not read the card they were built on, and the card never said where a vehicle |
+| [0461](db/migrations/0461_the_depot_card_migration_never_classified_itself_so_the_recert_floor_restarted_every_column.sql) | `20260926032129` | yes — ledger | **0460 never wrote its `ottoq_cert_lineage` row, so the recert floor read it as forcing and restarted every |
 | [0462](db/migrations/0462_the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick.sql) | `20260926040843` | yes — ledger | **The cockpit's Events feed printed real insert time beside a sim-time cockpit, painted passing rule checks |
 | [0463](db/migrations/0463_a_charge_that_completed_below_its_visit_target_stayed_open_and_the_deploy_gate_looped_the_car_through_the_service_bay.sql) | `20260926045517` | yes — ledger | **A charge that completed below its visit's target was never closed, so the deploy gate held a charged car |
 | [0464](db/migrations/0464_the_deploy_gate_sent_every_kind_of_open_work_to_the_service_bay_and_named_the_wrong_work_as_missing.sql) | `20260926045544` | yes — ledger | **The deploy gate sent every kind of open must-do work to the service bay, and named the wrong work as |
@@ -511,6 +517,6 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0510](db/migrations/0510_one_air_temperature_for_the_whole_depot.sql) | `20260927030227` | yes — ledger | **A charge, a car on the road and a telemetry packet each drew their own air temperature from the whole year, |
 | [0511](db/migrations/0511_the_interior_inspection_happens_during_the_charge.sql) | `20260927034307` | yes — ledger | **A car that charges has its interior inspection at the charger, during the charge, done by the charger's |
 
-371 migrations indexed.
+377 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
