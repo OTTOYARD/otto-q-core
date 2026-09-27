@@ -1,0 +1,121 @@
+-- 0377  **G236, decided: a car that charges has its interior inspection at the charger, during the charge, by the
+--       charger's sensors. Before this, most such inspections started before the car was plugged in, and most of the
+--       cars were also sent to the arrival inspection lane.**
+--
+--       The decision (Chase, 2026-09-27, 10:00 PM CT): "Let's continue to have the interior inspection occur while the
+--       vehicle is charging. Ideally, all charging will be robotic and they will just be sensors that potentially view
+--       and approve or deny or confirm and clean, etc., while they are charging. This will suffice the idea of while
+--       they're just sitting charging they could be easily interior cleaned, or at least inspected."
+--
+--       Baseline read on validation run 964cf17b (busy_day, twin depot, stopped at sim 11:17 AM). Takes the run as a
+--       psql variable:
+--
+--           \set run '<sim_run_id>'
+
+-- ══ §1 WHERE AND WHEN THE INTERIOR INSPECTIONS HAPPENED ═════════════════════════════════════════════════════════
+
+\echo '=== 0377 §1 — interior inspections by whether the visit charges: started during a charge, before it, sent to the lane ==='
+WITH a AS (
+  SELECT vn.visit_id, vn.vehicle_id, x->>'status' AS status, (x->>'started_at')::timestamptz AS started_at,
+         x->>'performed_by' AS performed_by,
+         EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) y WHERE y->>'svc' = 'charge') AS visit_charges
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id = :'run' AND x->>'svc' = 'interior_inspection'),
+j AS (
+  SELECT a.*,
+         EXISTS (SELECT 1 FROM public.ocpp_sessions os
+                  WHERE os.sim_run_id = :'run' AND os.vehicle_id = a.vehicle_id
+                    AND os.started_at <= a.started_at AND COALESCE(os.ended_at, 'infinity') > a.started_at) AS during_charge,
+         (SELECT min(os.started_at) FROM public.ocpp_sessions os
+           WHERE os.sim_run_id = :'run' AND os.vehicle_id = a.vehicle_id
+             AND os.started_at >= a.started_at - interval '6 hours') AS next_session_start,
+         (SELECT count(*) FROM public.ottoq_stall_bookings b
+           WHERE b.sim_run_id = :'run' AND b.vehicle_id = a.vehicle_id AND b.purpose = 'inspect') AS lane_bookings
+    FROM a)
+SELECT visit_charges, count(*) AS atoms, count(*) FILTER (WHERE status = 'done') AS done,
+       count(*) FILTER (WHERE started_at IS NOT NULL) AS started,
+       count(*) FILTER (WHERE during_charge) AS started_during_a_charge,
+       count(*) FILTER (WHERE started_at IS NOT NULL AND NOT during_charge AND next_session_start > started_at) AS started_before_its_charge,
+       count(*) FILTER (WHERE performed_by = 'charger_sensors') AS by_the_chargers_sensors,
+       count(*) FILTER (WHERE lane_bookings > 0) AS car_also_sent_to_the_lane
+  FROM j GROUP BY 1 ORDER BY 1;
+-- READ on 964cf17b: of 128 interior inspections on visits that charge, 101 started, and only 12 of them during a charge;
+--   71 started before the car's charge began, and 77 of the cars were also sent to the arrival inspection lane. Of 9 on
+--   visits with no charge, 7 started, 6 of those cars sent to the lane. (0374 §3 read the same shape on 66 lane visits:
+--   the inspection overlapped 17, came after 19, and was already done before 12.)
+
+-- ══ §2 THE MECHANISM ════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   The service catalogue already means it to happen at the charger: `service_cadence_policy` gives
+--   `interior_inspection` the lane `cabin`, "Cheap tech-pool lane at the charge stall", and the planner writes a
+--   charging visit's cabin legs "concurrent with the charge" (`duration_basis.concurrent_with = 'charge'`). Two things
+--   ignore that:
+--   (1) `ottoq_decide_tick` calls `ottoq_start_concurrent_atoms` when it enacts a charge, before the car has driven to
+--       the charger, and that starter starts every pending cabin atom wherever the car is. The twin's own starter
+--       (`twin.ottoq_sim_advance_visit_atoms`) already holds a cabin atom until the car is charging, with two catch-ups
+--       (still on the charger after the charge; staged for departure).
+--   (2) `ottoq.ottoq_enact_inspection_seam` sends any car with a planned, unbound `inspect` leg for the interior
+--       inspection to an `arrival_inspection` stall, including the legs the planner marked concurrent with the charge.
+--   And the starter meters every cabin atom against the 10 general technicians (founder spec, July: "plug in, 3-5 min
+--   interior clean, inspect"). Under the decision the charger's sensors inspect, so an inspection at the charger takes
+--   no technician; the interior tidy stays a technician's job.
+
+\echo '=== 0377 §2 — the catalogue, and the planner''s tag on a charging visit''s inspection legs ==='
+SELECT (SELECT lane || ' / ' || notes FROM public.service_cadence_policy WHERE svc = 'interior_inspection') AS catalogue,
+       count(*) FILTER (WHERE l.duration_basis->>'concurrent_with' = 'charge') AS inspect_legs_planned_with_the_charge,
+       count(*) FILTER (WHERE COALESCE(l.duration_basis->>'concurrent_with', '') <> 'charge') AS inspect_legs_standalone,
+       count(*) FILTER (WHERE l.duration_basis->>'concurrent_with' = 'charge'
+                          AND EXISTS (SELECT 1 FROM public.ottoq_stall_bookings b
+                                       WHERE b.leg_id = l.leg_id AND b.purpose = 'inspect')) AS planned_with_the_charge_but_lane_booked
+  FROM public.ottoq_itinerary_legs l
+ WHERE l.sim_run_id = :'run' AND l.leg_type = 'inspect'
+   AND COALESCE(l.duration_basis->>'atom', 'interior_inspection') = 'interior_inspection';
+-- READ on 964cf17b: the catalogue reads `cabin / Cheap tech-pool lane at the charge stall.`; 115 interior inspection
+--   legs were planned with the charge and 17 standalone, and the seam booked the lane for 54 of the 115.
+
+-- ══ §3 THE APPLY (0511), AND THE CANON UNDER IT ═════════════════════════════════════════════════════════════════
+--
+--   0511 (`the_interior_inspection_happens_during_the_charge`): while a visit still has its charge to do, its cabin
+--   atoms start only on the charger (or in the twin's two catch-ups); an interior inspection on the charger is done by
+--   its sensors (`performed_by = 'charger_sensors'`) and takes no technician; the seam passes over an inspection leg
+--   planned with the charge; and a leg nothing bound to a stall records where the car was when the work finished.
+
+\echo '=== 0377 §3 — 0511 as applied ==='
+SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
+  FROM supabase_migrations.schema_migrations m
+ WHERE m.name = 'the_interior_inspection_happens_during_the_charge';
+-- READ: pending.
+
+-- ══ §4 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
+--
+--   PREDICTED on the next busy_day operator run, read with §1 and §2 above on it: (a) on visits that charge, every
+--   interior inspection that starts, starts during a charge or in a catch-up on the charger, and none before the car's
+--   charge (71 of 101 on 964cf17b); (b) those started on the charger carry `performed_by = 'charger_sensors'`;
+--   (c) no car whose inspection leg was planned with its charge is booked into the arrival lane (54 of 115 legs on
+--   964cf17b); (d) a done interior inspection leg names a stall, the charger's when it was done there. Not predicted:
+--   what freeing the technicians of inspections does to the other cabin and exterior work, which (e) reads.
+
+\echo '=== 0377 §4(d) — done interior inspection legs by the kind of stall they name ==='
+SELECT COALESCE(st.stall_type::text, '(none)') AS stall_type, count(*) AS done_legs
+  FROM public.ottoq_itinerary_legs l
+  LEFT JOIN public.stalls st ON st.id = l.to_stall_id
+ WHERE l.sim_run_id = :'run' AND l.leg_type = 'inspect' AND l.status = 'done'
+   AND COALESCE(l.duration_basis->>'atom', 'interior_inspection') = 'interior_inspection'
+ GROUP BY 1 ORDER BY 2 DESC;
+-- READ: pending.
+
+\echo '=== 0377 §4(e) — cabin and exterior atoms: started, and sim-minutes from the car''s arrival to the start ==='
+SELECT x->>'svc' AS svc, count(*) AS atoms, count(*) FILTER (WHERE x->>'started_at' IS NOT NULL) AS started,
+       count(*) FILTER (WHERE x->>'performed_by' = 'charger_sensors') AS by_sensors,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(epoch FROM (x->>'started_at')::timestamptz - vn.arrived_at) / 60)
+              FILTER (WHERE x->>'started_at' IS NOT NULL AND vn.arrived_at IS NOT NULL))::numeric, 1) AS p50_min_arrival_to_start
+  FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+ WHERE vn.sim_run_id = :'run' AND x->>'concurrency' IN ('cabin', 'exterior')
+ GROUP BY 1 ORDER BY 1;
+-- READ before 0511, on 964cf17b: interior_inspection 137 atoms, 108 started, a median 4.9 sim-minutes from arrival
+--   to start; interior_tidy 43 / 24 / 11.7; item_retrieval 12 / 10 / 3.9; sensor_clean 7 / 4 / 2.0; triage_check 26 /
+--   25 / 6.5; none by sensors. Expected after: the inspection's arrival-to-start grows to about the wait for a charger
+--   (it now starts at the plug), and costs no depot time, because a 4-minute inspection runs inside a charge of 40-75.
+--   (Both clocks are sim: `arrived_at` is the visit's sim arrival and `started_at` the atom's sim start; the row's
+--   `created_at` is real time and never enters this.)
+-- READ after: pending.
