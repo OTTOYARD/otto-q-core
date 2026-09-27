@@ -73,10 +73,12 @@ from load import targets as T  # noqa: E402
 #: slowest, so it still summarises rather than names a single sample.
 MIN_SAMPLES_FOR_TAIL = 200
 
+#: The recert runner (cron 746) names the pair only past pg_stat_activity's 1 kB of query text, so it is matched
+#: by its own lock key as well (G194).
 PAIR_PROBE = (
     "SELECT count(*) FROM pg_stat_activity "
-    "WHERE query ILIKE '%ottoq_determinism_pair%' AND state='active' "
-    "AND pid <> pg_backend_pid();")
+    "WHERE (query ILIKE '%ottoq_determinism_pair%' OR query ILIKE '%ottoq_recert_runner%') "
+    "AND state='active' AND pid <> pg_backend_pid();")
 
 
 def _redact(text: str, url: str | None) -> str:
