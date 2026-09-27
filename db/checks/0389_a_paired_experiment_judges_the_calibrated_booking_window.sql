@@ -89,6 +89,17 @@ SELECT l.pair_id, l.seed, l.ran_at, l.complete, l.world_identical, l.both_paid_s
 --   predicted: time to service improved by 27%, and turns per point fell 5.7% -- a longer window holds a charger longer
 --   on the calendar, which is the price §2 named, and past the 2% margin on this one pair. Whether that holds across
 --   seeds is what the guardrail test at alpha 0.20 is for.
+-- RE-READ (2026-09-27 11:05 UTC, 6:05 AM CT, the window closed), three pairs, all complete, world-identical and paid:
+--     pair  seed                 outlast 0 -> 6     DCFC           L2             overrun (min)  p95 TTS       turns/pt
+--     76    20516641458992974    72.55 -> 29.41    65.71 -> 31.43  87.50 -> 25.00  44.0 -> 4.0   54.0 -> 39.6  1.74 -> 1.64
+--     78    648583339835406296   68.18 -> 47.73    64.52 -> 45.16  76.92 -> 53.85  23.6 -> 11.0  48.0 -> 48.0  1.72 -> 1.71
+--     80    674720992483056488   75.00 -> 23.21    71.05 -> 26.32  83.33 -> 16.67  24.5 -> 3.0   18.0 -> 18.0  1.57 -> 1.45
+--   The treatment wins the primary on all three seeds, by 20.5 to 51.8 points (mean 38.5), and cuts the median overrun
+--   on all three. p95 time to service is better on one and equal on two. Turns per point fall on all three, by 5.7%,
+--   0.6% and 7.6% -- the guardrail the verdict will weigh, and the one question this experiment cannot yet answer is
+--   whether that is the window itself or a booking held past its charge's stop (G195's calendar leak, which a longer
+--   window would make costlier). Pair 78's smaller win is its L2 treatment still outlasting 53.85%: the seed that
+--   leaves the most L2 charges past even the calibrated bound.
 
 \echo '=== 0389 §3(b) — the verdict ==='
 SELECT public.ottoq_dial_experiment_verdict(e.experiment_id) AS verdict
@@ -98,3 +109,21 @@ SELECT public.ottoq_dial_experiment_verdict(e.experiment_id) AS verdict
 --   two active experiments by pair count on this engine, and this one's pair takes 18 minutes of wall time to the energy
 --   experiment's 10, so the night can give it three pairs at most; the first look waits for the next dial window, and
 --   holds only if no forces_recert migration lands before it (a new engine counts from zero).
+-- RE-READ (2026-09-27 11:05 UTC): `collecting`, 3 of 6 counted, 0 invalid, 0 stale, no safety flag. As predicted,
+--   three pairs was the night's most.
+
+-- ══ §4 THE WINDOW'S CLOSE RACED ITS RUNNER (G247) ════════════════════════════════════════════════════════════════
+
+\echo '=== 0389 §4 — the window close and the runner at 11:00 UTC, and the pair that started as the window closed ==='
+SELECT j.jobid, j.jobname, j.schedule, d.start_time, d.end_time, d.status
+  FROM cron.job_run_details d JOIN cron.job j ON j.jobid = d.jobid
+ WHERE j.jobid IN (755, 762) AND d.start_time BETWEEN '2026-09-27 10:59:00+00' AND '2026-09-27 11:01:00+00'
+ ORDER BY d.start_time;
+-- READ (2026-09-27 11:05 UTC): the close job (762, `0 11 * * *`) started at 11:00:00.244 and committed by .496; the
+--   runner (755, `*/10 * * * *`) started at .252 and called `ottoq_dial_experiment_runner()` at .262 (`pg_stat_activity`).
+--   It read the gate before the close committed, saw 1, and started a pair at 11:00 that was still running at 11:06
+--   with the gate at 0. pg_cron files the runner's row as succeeded when its
+--   first statement returns (CLAUDE.md 2.9a's note), so only `pg_stat_activity` showed it. Harmless tonight -- one
+--   extra pair of the energy experiment -- but a pair starves every other cron job while it runs (G141), so a morning
+--   run started at 6 AM CT would have sat frozen behind it. 0522 moves the close to 10:41 UTC, off the runner's
+--   minutes and after its last start of the night, so the last pair ends inside the window.
