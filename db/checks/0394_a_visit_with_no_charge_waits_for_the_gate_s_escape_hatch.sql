@@ -96,3 +96,15 @@ SELECT run, no_charge, svc, count(*) AS atoms, count(started_at) AS started,
 --   visits' cabin work is unchanged -- the sensors still do it at the charger, and no sensor start is off a charger
 --   (0390 §4(a)(b) re-run); (c) overrides for bay work waiting for a bay are not this fix's, and are read, not predicted.
 --   Read with §1 and §2 above, the run id put in place of 6ddd827e.
+-- READ (2026-09-27 15:48 UTC, 10:48 AM CT; the run is 6e0352a0, the first live, seeded busy_day operator run after 0526,
+--   stopped by the governor at 540 sim-minutes, sim 5:11 PM CT):
+--   (a) HOLDS. Four deploy-gate overrides, none naming an interior inspection: Waymo-AV-024 at 3:11 PM (exterior wash),
+--   Waymo-AV-037 at 3:19 (its charge, held 248.1 minutes -- a car the charger queue never reached, 0397 §5),
+--   Zoox-AV-091 at 4:19 and Waymo-AV-021 at 5:00 (interior deep clean, each waiting for a detail bay). Every no-charge
+--   interior inspection started within 30 minutes: 6 of 6, the longest 15.6 minutes (6ddd827e: 3 of 12 after two hours,
+--   the three the escape hatch released); the one no-charge interior tidy in 2.4.
+--   (b) HOLDS. 210 sensor starts, every one stamped with a DCFC or L2 stall the car had a charge session on: DCFC 87
+--   done, 2 in progress, 1 returned to pending by 0519; L2 120 done. None on staging, in a bay or on no stall. The
+--   charging visits' interior inspections were done by the sensors, 176 of 180 started.
+--   (c) READ: the two deep-clean overrides are bay work waiting for a bay, the class 4bc19d29's six were.
+--   G251 is validated on live traffic.

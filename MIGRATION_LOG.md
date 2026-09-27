@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0529 — GENERATED, not a log
+## Index, 0134–0530 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -534,7 +534,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0527](db/migrations/0527_kpi_two_counts_a_turn_when_a_car_leaves_a_service_point.sql) | `20260927140742` | yes — ledger | **G252: KPI 2 counted a booking the car outlived as a turn, and a charge still running at the day's end as no |
 | [0528](db/migrations/0528_kpi_four_counts_the_technicians_and_divides_by_the_cars_that_came_in.sql) | `20260927150822` | yes — ledger | **G253: KPI 4, "human interventions per asset-turn", never counted a technician, and divided by bookings |
 | [0529](db/migrations/0529_a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured.sql) | `20260927151819` | yes — ledger | **G254: the dial verdict skipped any guardrail whose control arm read 0 -- it divided each change by the |
+| [0530](db/migrations/0530_unmet_demand_is_measured_from_the_cars_actually_out.sql) | `20260927153902` | yes — ledger | **G255: nothing on the scorecard measured whether the depot met the work side's demand. On the day's full busy |
 
-395 migrations indexed.
+396 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
