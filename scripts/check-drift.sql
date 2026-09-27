@@ -624,7 +624,9 @@ repo_manifest(version, name, file) AS (
     ('20260927131711'::text, 'a_start_stops_the_live_run_and_a_failed_seed_starts_nothing'::text, '0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql'::text),
     ('20260927131932'::text, 'the_charge_evidence_records_the_cadence_it_was_observed_at'::text, '0525_the_charge_evidence_records_the_cadence_it_was_observed_at.sql'::text),
     ('20260927140637'::text, 'a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked'::text, '0526_a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked.sql'::text),
-    ('20260927140742'::text, 'kpi_two_counts_a_turn_when_a_car_leaves_a_service_point'::text, '0527_kpi_two_counts_a_turn_when_a_car_leaves_a_service_point.sql'::text)
+    ('20260927140742'::text, 'kpi_two_counts_a_turn_when_a_car_leaves_a_service_point'::text, '0527_kpi_two_counts_a_turn_when_a_car_leaves_a_service_point.sql'::text),
+    ('20260927150822'::text, 'kpi_four_counts_the_technicians_and_divides_by_the_cars_that_came_in'::text, '0528_kpi_four_counts_the_technicians_and_divides_by_the_cars_that_came_in.sql'::text),
+    ('20260927151819'::text, 'a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured'::text, '0529_a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
