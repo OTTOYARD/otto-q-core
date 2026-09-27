@@ -131,6 +131,26 @@ SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
 --   the lane for the replanted leg; V3 now detaches those bookings. Bodies after: starter 27afba5d125225f796058c1a894d0b93,
 --   seam 7188902a73038886a3f7077b5bdc975f, closer f4605207eaf4860749deb4406b521239; `0511_pre` snapshots 3.
 
+\echo '=== 0377 §3(b) — the canon under 0511: each column''s verdict, and the digests that moved from its 0510 verdict ==='
+WITH v AS (
+  SELECT verdict_id, depot_id, scenario, seed, ticks, outcome, verdict->'arm_a' AS a
+    FROM public.ottoq_determinism_verdict_ledger WHERE verdict_id BETWEEN 457 AND 475),
+k AS (SELECT key FROM jsonb_object_keys((SELECT a FROM v WHERE verdict_id = 475)) key WHERE key LIKE 'h\_%' OR key = 'fp')
+SELECT n.verdict_id, n.outcome, n.scenario || '/' || n.seed || '/' || n.ticks AS col, o.verdict_id AS under_0510,
+       (SELECT string_agg(k.key, ',' ORDER BY k.key) FROM k WHERE (n.a->>k.key) IS DISTINCT FROM (o.a->>k.key)) AS moved
+  FROM v n LEFT JOIN v o ON o.depot_id = n.depot_id AND o.scenario = n.scenario AND o.seed = n.seed
+                        AND o.ticks = n.ticks AND o.verdict_id BETWEEN 457 AND 465
+ WHERE n.verdict_id >= 466 ORDER BY n.verdict_id;
+-- READ (2026-09-27 04:50 UTC, 11:50 PM CT on the 26th): all nine columns passed, verdicts 466-473 and 475, started
+--   between 03:44 and 04:14 UTC. The seven twin-depot columns each moved nine digests from their 0510 verdict (bookings, commands, decisions,
+--   events, energy, proposals, recalls, rules, service records); the two grid_smoke columns moved three (events,
+--   rules, service records); `fp` and the deferrals moved nowhere. One column needed a second attempt: verdict 474
+--   (busy_day/171717/48) failed on `calibration` alone and the runner's automatic retry, 475, passed. That failure was
+--   not 0511's. The weekly calibration refit (cron 2, Sundays 04:00 UTC) landed while 474's first arm was running,
+--   so its two arms booted on different priors. The refit's guard cannot see a pair the recert runner holds
+--   (db/checks/0384, G243). So 475 certified that column on this week's priors (bb7fb6fa) and the other eight on last
+--   week's (c5fbb56e), each internally consistent. That is why `h_cal` also moved on the 48-tick column.
+
 -- ══ §4 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --
 --   PREDICTED on the next busy_day operator run, read with §1 and §2 above on it: (a) on visits that charge, every
