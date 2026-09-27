@@ -194,7 +194,20 @@ SELECT n.scenario || '/' || n.seed || '/' || n.ticks AS col, b.verdict_id AS was
            AND n.a->>k IS DISTINCT FROM b.a->>k) AS moved
   FROM now_v n LEFT JOIN before_v b USING (scenario, seed, ticks)
  ORDER BY 1;
--- READ: pending.
+-- READ (2026-09-27 02:00 UTC): all nine columns passed under 0508, verdicts 448-456, the last certified 8:49 PM CT,
+--   every one `equal = true`. Against 439-447: every busy_day and normal_day column moved all ten digests (endst h_bkg
+--   h_cmd h_dec h_evt h_nrg h_prop h_rcl h_rule h_sdr); both grid_smoke columns moved endst h_evt h_sdr; `fp` moved in
+--   none. So 0508 reaches the decisions as well as the records, which a leg that stays active can: the flow contract
+--   re-times a plan only when no leg is active. Measured on arm A of two columns, 0504 against 0508:
+--     busy_day/171717/12   commands 306 / 306, refused 31 / 31, sessions 87 / 88, kWh 1,554.1 / 1,549.4, decisions
+--                          1,410 / 1,401 (amend_plan 782 / 768), done charge legs 86 / 80, their records with energy
+--                          0 of 86 / 80 of 80
+--     busy_day/171717/48   commands 947 / 907, refused 125 / 120, sessions 176 / 169, kWh 4,392.2 / 4,402.1,
+--                          decisions 5,339 / 5,334 (amend_plan 3,454 / 3,485), done charge legs 169 / 167, with energy
+--                          0 of 169 / 166 of 167
+--   The done charge legs fall because a charge still running when an arm ends now ends `amended` with its session,
+--   not `done` at its window; the one record of 167 without energy is a charge leg that overlapped no session. Which
+--   decisions moved, one by one, is not traced here.
 
 -- ══ §5 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --
