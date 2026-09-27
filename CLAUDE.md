@@ -155,6 +155,64 @@ When information is missing:
      one depot, then find how many vehicles it can stage, sort and orchestrate at once. A
      result from a second site does not advance that and is not evidence about it.
 
+**9. VEHICLE FIRST. A VEHICLE'S NEEDS ARE NEVER SACRIFICED FOR SITE OPTIMIZATION — added 2026-09-27 in Chase's words. It overrides every objective, KPI, dial and experiment in this file.**
+
+   *"Vehicle needs should never be sacrificed for overall orchestration or site optimization.
+   The way to think about this is that if a car or vehicle or asset needs a specific service
+   like cleaning or servicing or washing those should never be superseded just because more
+   cars are coming in or something like that. The vehicle owner or manager, whether it is a
+   private individual or OEM will have strict requirements for vehicle needs and up time
+   agreements per our contract. So we can never say a vehicle doesn't need to reach its
+   maximum charge just so we can move around some vehicles or something like that. So we
+   should never stop a vehicle short of charging unless there's an obvious reason like that
+   charger actually faulted or there's an emergency with the vehicle that requires it to be
+   either taken off-line or immediately routed to a service stall or overnight/longer term
+   staging area. ... This is just common sense from a fleet management perspective. So I
+   shouldn't really have to explain that a vehicle shouldn't be stopped short of its full
+   charge. You should be able to catch these things."*
+
+   - **A vehicle's charge target and its services belong to its owner, by contract.** The
+     depot never lowers a target, ends a charge early, skips, defers or supersedes a required
+     service, or releases a vehicle with open needs to move other vehicles, raise throughput,
+     meet a deploy target or improve a KPI. Queueing is allowed; sacrificing is not.
+   - **The only reasons a charge ends short:** its charger faulted (the car is re-queued to
+     finish), or a vehicle emergency takes it offline or routes it immediately to a service
+     stall or to overnight/long-term staging. A request from the owner (e.g. an OEM asking for
+     an immediate turnaround) is the owner's requirement, not ours, and is honored as asked.
+   - **Site pressure is a capacity finding, never a lever on a vehicle.** When cars wait for
+     chargers, the answers are more capacity, fewer charger faults, freeing a charger the moment
+     its car is done, and better ordering of who is served next. Never shorter charges.
+   - **Every question, finding, experiment and objective is checked against this rule before it
+     is built.** It was missed on 2026-09-27: G257 called charging to target a "taper tax", the
+     challenger's Q1 proposed ending charges early, and two paired experiments tested stopping
+     fast charges at 85% (`08262943`) and 90% at night (`11b546b1`). Both experiments were
+     abandoned the same evening (`outcome = abandoned_vehicle_first`, G265). Do not re-create
+     them in any form.
+
+**10. OTTO-Q DOES NOT EXPERIMENT IN PRODUCTION. HYPOTHESES AND TESTS BELONG TO THE RESEARCH WING, IN THE TWIN — added 2026-09-27 in Chase's words.**
+
+   *"I don't really want large scale testing proposed from OTTO – Q in this manner. It should
+   search for immediate and optimal results for vehicles and depot variables, and then ...
+   overnight it will analyze everything from that day and learn from it. But I don't want it
+   hypothesizing large scale, testing, or anything like that. All of that should be done on our
+   internal side through kind of our research wing and through the twin simulator. So basically
+   I don't want it to do that analysis or testing in actual production once actual vehicle
+   telemetry and real world data is being piped in."*
+
+   - **Production OTTO-Q** decides in real time, and overnight learns from the day's real data:
+     it updates its estimates (how long charges take, when cars return, which chargers fault) and
+     grades its own decisions read-only (the challenger). It never proposes hypotheses, never
+     runs tests, and never changes its own rules or settings.
+   - **The research wing** (us, with the twin) owns hypotheses and paired tests. A result is a
+     recommendation that is reviewed and shipped as a certified change. OTTO-Q never originates an
+     experiment: every one to date (`b66fa99c`, `3a2c5fa1`, `82c5568b`, `143a11c7`, `08262943`,
+     `11b546b1`) was created by engineering, and the "self-directed experiment analyst" is dropped
+     from OTTO-Q's roadmap.
+   - **Before real telemetry flows** (open decisions put to Chase on 2026-09-27): move the test lab
+     out of the production database (a paired test blocks every `pg_cron` job for its duration,
+     G141, which would stall a live engine), and turn automatic dial promotion off so every result
+     is a recommendation (it self-applied once, `energy_reserve_shave`, on 2026-09-26).
+
 ---
 
 # PART 2 — THE KERNEL BRIEF
