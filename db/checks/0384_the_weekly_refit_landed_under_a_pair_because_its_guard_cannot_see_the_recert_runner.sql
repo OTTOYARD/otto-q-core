@@ -103,14 +103,25 @@ SELECT n.nspname || '.' || p.proname AS fn,
 --   on that path asks whether a pair is running. So the guard has to move, or be repeated, where the rows are
 --   written: a pair that starts after a correct kickoff check still gets tonight's failure.
 --
--- THE FIX, filed as G243 and not built here: one helper, `ottoq_certification_in_flight()`, that every in-database
---   guard calls, so the next copy of the probe cannot drift (the probe now lives in six places); the two functions
---   and the bridge call or copy it; and the calibration tables refuse writes while it reads non-zero, so the
---   async writer is guarded at the write. The refit then needs a retry, which it can safely have: skip when every
---   dataset was ingested within the last six days, and run the job hourly on Sundays. What remains is a window the
---   width of one write transaction, milliseconds rather than tonight's eight seconds, and a lock that the runner
---   holds for the pair's whole transaction would close even that. That part touches the certified harness and
---   waits for a recert window.
+-- AND THE PURGE'S PROBE IS DEAD CODE, WHICH IS WHY IT IS LEFT ALONE. Above its pair probe, `ottoq_retention_purge_runs`
+--   skips when "a certification round is scheduled": any ACTIVE cron job whose command contains
+--   ottoq_determinism_pair. cron.job.command is the full text, not pg_stat_activity's 1 kB, and cron 746 is active and
+--   always contains it, so that check matches every night and the purge has returned early every night since the
+--   runner was created (its oldest kept run is 2026-09-20 20:16 UTC). Measured 2026-09-27 05:00 UTC: 0 of the 585
+--   non-production runs are older than the purge's 48 hours, because the demo start's `ottoq_purge_prior_runs`
+--   clears them. So nothing is lost today. Unblocking the purge would delete the nine operator runs G240's
+--   calibration is measured on, the oldest from 2026-09-25 19:12 UTC, so it waits for G240's evidence ledger, and
+--   both checks are fixed together then.
+
+\echo '=== 0384 §4(b) — the purge''s round check, and what the purge would have had to delete ==='
+SELECT j.jobid, j.jobname,
+       (j.active AND (j.command ILIKE '%ottoq_determinism_pair%' OR j.command ILIKE '%ottoq_cert_battery_step%')) AS matches_round_check
+  FROM cron.job j WHERE j.jobid = 746;
+SELECT count(*) FILTER (WHERE COALESCE(run_by, '') <> 'production_live') AS non_production_runs,
+       count(*) FILTER (WHERE COALESCE(run_by, '') <> 'production_live' AND status <> 'running'
+                          AND started_at < now() - interval '48 hours') AS purgeable_after_48h
+  FROM public.ottoq_sim_runs;
+-- READ (2026-09-27 05:00 UTC): 746 matches_round_check TRUE; 585 non-production runs, 0 purgeable after 48 hours.
 
 -- ══ §5 WHAT THIS DOES AND DOES NOT TOUCH ═════════════════════════════════════════════════════════
 --
@@ -120,3 +131,32 @@ SELECT n.nspname || '.' || p.proname AS fn,
 -- retry. Every run from 04:03:47 UTC on draws its weather and grid demand from the new fit. The next sweep will
 -- certify the other eight columns on bb7fb6fa, and it may move their digests, for a reason that is not a
 -- migration.
+
+-- ══ §6 THE FIX: 0513, APPLIED 20260927050506 (12:05 AM CT), forces_recert FALSE ══════════════════════════════════════
+--
+--   `public.ottoq_certification_rig_matches(text, boolean)` holds the G194-fixed pattern list once;
+--   `public.ottoq_certification_in_flight(boolean)` counts the other backends it matches (SECURITY DEFINER, since the
+--   edge function writes as service_role, which cannot read other roles' query text). `ottoq_twin_ingest_refresh()`
+--   asks it, and skips a source refit in the last six days. A statement-level guard on the four calibration tables
+--   refuses writes while it reads non-zero, so the asynchronous write is guarded where it lands. cron 2 runs
+--   '0 4-23 * * 0', the same first attempt with hourly retries through Sunday UTC. bridge/proposer_bridge.py's
+--   CERT_CALLS carries the same list. The purge is untouched (above). The last window, a pair starting between the
+--   guard's check and a refit write's commit, is milliseconds now; closing it needs a lock the runner holds for the
+--   pair's whole transaction, and that waits for a recert window.
+
+\echo '=== 0384 §6 — 0513 as applied ==='
+SELECT m.version, md5(m.statements[1]) AS stored_md5,
+       (SELECT schedule FROM cron.job WHERE jobid = 2) AS refit_schedule,
+       (SELECT count(*) FROM pg_trigger WHERE tgname = 'ottoq_calibration_write_guard' AND NOT tgisinternal) AS guards,
+       public.ottoq_certification_in_flight(true) AS rigs_now
+  FROM supabase_migrations.schema_migrations m
+ WHERE m.name = 'the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair';
+-- READ (2026-09-27 05:06 UTC): version 20260927050506, stored md5 9c77fb14ce37cd524959263e9910be4e (the file's body
+--   byte for byte), refit_schedule '0 4-23 * * 0', guards 4, rigs_now 0. The same blocks passed a rolled-back dry run
+--   first. V3, rolled back: (a) the runner's visible text (1,023 characters) is a rig to the predicate and invisible
+--   to the old probe; (b) with a rig in flight (the fail-closed flag), an UPDATE on a calibration table is refused
+--   with 55P03 and the refresh asks for nothing; (c) with none, the write goes through and the two sources refit at
+--   04:03 UTC are skipped; (d) with NOAA's dataset aged seven days, exactly one request is queued, for NOAA.
+--   The refresh's body moved 66a94e5141493b0b2dd8ab7febf9db63 -> 6739008c0c963938e53e278977db6cb7 (`0513_pre`
+--   holds the old one). What is not seen yet: a live deferral or refusal. The first chance is a refit that finds a
+--   pair running, and the next scheduled refit is 2026-10-04 04:00 UTC.

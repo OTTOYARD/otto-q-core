@@ -636,7 +636,14 @@ CERT_RUN_BY = "cert_harness"
 # invisible to this session until it commits -- which is exactly why the house
 # rule says pg_stat_activity is the only authority for "in flight" and why this
 # guard asks the process list, not the run table.
-CERT_CALLS = ("%ottoq_determinism_pair%", "%ottoq_ab_pair%")
+#
+# G243 (db/migrations/0513): pg_stat_activity keeps only the first 1 kB of a query,
+# and the recert runner (cron 746) names ottoq_determinism_pair at byte 1,542, so the
+# first two patterns never see a pair the runner holds (G194). The runner is matched
+# by its advisory-lock key, which sits in its first 100 characters. The same list as
+# public.ottoq_certification_rig_matches, which the database's own guards now share.
+CERT_CALLS = ("%ottoq_determinism_pair%", "%ottoq_ab_pair%", "%ottoq_recert_runner%",
+              "%ottoq_dial_pair%", "%ottoq_dial_experiment_runner%")
 
 
 def _cert_in_flight(cur) -> str | None:
@@ -644,11 +651,12 @@ def _cert_in_flight(cur) -> str | None:
     cur.execute(
         "SELECT count(*) FROM pg_stat_activity "
         " WHERE pid <> pg_backend_pid() AND state <> 'idle' "
-        "   AND (query ILIKE %s OR query ILIKE %s)", CERT_CALLS)
+        "   AND query ILIKE ANY (%s)", (list(CERT_CALLS),))
     n = cur.fetchone()[0]
     if n:
-        return (f"{n} certification call(s) in flight (ottoq_determinism_pair / "
-                f"ottoq_ab_pair); a proposer must not submit into a certification arm")
+        return (f"{n} certification call(s) in flight (a determinism, A/B or dial pair, "
+                f"or the recert runner running ottoq_determinism_pair); "
+                f"a proposer must not submit into a certification arm")
     return None
 
 

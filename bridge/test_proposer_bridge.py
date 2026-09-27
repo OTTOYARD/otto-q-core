@@ -507,6 +507,33 @@ def test_the_guard_query_watches_the_ab_rig_too():
     assert any("determinism_pair" in c for c in pb.CERT_CALLS)
 
 
+def _ilike(text, pattern):
+    """Postgres ILIKE for the patterns CERT_CALLS uses: % is any run, _ is any one character."""
+    rx = "".join(".*" if ch == "%" else "." if ch == "_" else re.escape(ch) for ch in pattern)
+    return re.fullmatch(rx, text, flags=re.IGNORECASE | re.DOTALL) is not None
+
+
+# The first 1 kB is all pg_stat_activity keeps of a query. The recert runner's command
+# (cron 746) opens like this and names ottoq_determinism_pair only at byte 1,542 (G243).
+RUNNER_VISIBLE = (" SET statement_timeout = 0; DO $runner$ DECLARE c record; BEGIN IF NOT "
+                  "pg_try_advisory_xact_lock(hashtext('ottoq_recert_runner')::bigint) THEN RETURN; "
+                  "END IF; IF EXISTS (SELECT 1 FROM public.ottoq_sim_runs WHERE status IN "
+                  "('running','paused')) THEN RETURN; END IF; -- NO DEPOT PREDICATE")
+
+
+def test_the_guard_sees_a_pair_the_recert_runner_holds():
+    old = ("%ottoq_determinism_pair%", "%ottoq_ab_pair%")
+    assert not any(_ilike(RUNNER_VISIBLE, p) for p in old), "the fixture should show the old blindness"
+    assert any(_ilike(RUNNER_VISIBLE, p) for p in pb.CERT_CALLS)
+
+
+def test_the_guard_passes_every_pattern_to_one_ilike_any():
+    cur = FakeCur(one=(0,))
+    pb._cert_in_flight(cur)
+    assert "ILIKE ANY" in cur.sql[0]
+    assert cur.params == (list(pb.CERT_CALLS),)
+
+
 def test_an_idle_depot_is_a_distinct_exception_so_a_scheduler_can_pass_it():
     with pytest.raises(pb.BridgeIdle):
         pb._resolve_run(FakeCur(many=[]), DEPOT)
