@@ -144,8 +144,32 @@ SELECT m.version, md5(m.statements[1]) AS body_md5,
 
 -- ══ §3 THE SWEEP ════════════════════════════════════════════════════════════════════════════════════════════════
 --
---   0518 and 0519 move the recert floor together (both forces_recert TRUE). READ: pending (the runner started at
---   02:42 AM CT, verdict 476).
+--   0518 and 0519 move the recert floor together (both forces_recert TRUE).
+
+\echo '=== 0387 §3 — the verdicts since 0518, and which digests each column moved against its last verdict before ==='
+WITH v AS (
+  SELECT l.verdict_id, l.scenario, l.seed, l.ticks, l.outcome, l.engine_hash, l.verdict->'arm_a' AS a,
+         row_number() OVER (PARTITION BY l.scenario, l.seed, l.ticks ORDER BY l.verdict_id DESC) AS rn
+    FROM public.ottoq_determinism_verdict_ledger l
+   WHERE l.outcome = 'passed' AND l.verdict_id BETWEEN 457 AND 485 AND jsonb_typeof(l.verdict->'arm_a') = 'object')
+SELECT c.scenario, c.seed, c.ticks, c.verdict_id AS now_v, left(c.engine_hash, 8) AS engine, p.verdict_id AS before_v,
+       (SELECT string_agg(k, ',' ORDER BY k) FROM jsonb_object_keys(c.a) k
+         WHERE k LIKE 'h\_%' AND c.a->>k IS DISTINCT FROM p.a->>k) AS moved_digests
+  FROM v c LEFT JOIN v p ON (p.scenario, p.seed, p.ticks) = (c.scenario, c.seed, c.ticks) AND p.rn = 2
+ WHERE c.rn = 1 ORDER BY c.ticks, c.scenario, c.seed;
+-- READ (2026-09-27 08:15 UTC, 3:15 AM CT): all nine columns passed on the first attempt, verdicts 476-485 between 2:42
+--   and 3:02:44 AM CT, every one equal and complete with no disagreeing atom. 476 (grid_smoke/239001/6) ran between the
+--   two applies, on engine 45cebd01, and its column was certified again as 477 on engine 1f067bbf, which carries both;
+--   477-485 are all on 1f067bbf. Nothing certified is wrong. What the digests say:
+--     grid_smoke 239001/6 and 424242/6   moved nothing but h_cal
+--     busy_day 171717/48 (against 475)   h_bkg h_cmd h_dec h_evt h_nrg h_prop h_rcl h_rule h_sdr -- 9 of 11
+--     the other busy and normal columns  7-10 digests, h_cal among them
+--   h_cal moved because the weekly refit's new priors landed between 474 and 475 (G243): every column last certified
+--   before 475 moved it for that reason, not for these migrations. So the 48-tick column is the clean reading -- its
+--   last verdict was already on the new priors -- and there the two rules moved 9 of 11 digests, which is what
+--   forces_recert TRUE is for: a full day's bookings, commands, decisions and records are not what they were. The
+--   6-tick smoke columns moved nothing of their own: in three sim-hours no car sat in the gap and no charger faulted
+--   under the sensors. The other columns' movement mixes the new priors with the change and is not attributed.
 
 -- ══ §4 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --

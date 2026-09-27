@@ -524,7 +524,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0517](db/migrations/0517_a_calibrated_charge_window_behind_a_dial.sql) | `20260927062217` | yes — ledger | **G240, step 3: the booking writer sizes a charge's window from a named calibration version when the dial |
 | [0518](db/migrations/0518_one_rule_for_whether_a_car_needs_its_charge.sql) | `20260927074142` | yes — ledger | **G244: three parts of the engine answer "does this car still need a charge", and the flow contract used a |
 | [0519](db/migrations/0519_the_charger_s_sensors_cannot_finish_an_inspection_on_a_car_that_has_left.sql) | `20260927074236` | yes — ledger | **G245: an interior inspection the charger's sensors started was marked done when its minutes ran out, even |
-| [0520](db/migrations/0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql) | `PENDING` | no — pending | **G240, step 4's instrument: a designed pair can now judge the calibrated booking window, which it could not |
+| [0520](db/migrations/0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql) | `20260927081719` | yes — ledger | **G240, step 4's instrument: a designed pair can now judge the calibrated booking window, which it could not |
 
 386 migrations indexed.
 

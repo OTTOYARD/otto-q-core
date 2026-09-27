@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260927081719
 -- migration-name:    a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence
 --
 -- 0520  **G240, step 4's instrument: a designed pair can now judge the calibrated booking window, which it could not.
