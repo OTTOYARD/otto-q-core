@@ -141,8 +141,10 @@ SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
 --   (f) on visits that charge, every triage check that judges only the cabin and starts, starts on the charger by its
 --   sensors (3 of 17 during a charge on 964cf17b, none by sensors), and (g) one that also judges an exterior or bay need
 --   is still a technician's; (h) the verdict mix stays the twin's draw (10 confirm / 6 clear / 3 escalate of 19 on
---   964cf17b is one sample of it, not a target). Not predicted: what freeing the technicians of inspections and cabin
---   triage does to the other cabin and exterior work, which (e) reads.
+--   964cf17b is one sample of it, not a target); (i) with 0512 applied, the twin snapshot and the cards (contract 1.4)
+--   carry `performed_by`, `awaiting_triage` and `triage_verdict`, and PULSE and OrchestrAV show "charger sensors" on an
+--   inspection running on a charger and "awaiting triage" on a tidy held for the verdict. Not predicted: what freeing
+--   the technicians of inspections and cabin triage does to the other cabin and exterior work, which (e) reads.
 
 \echo '=== 0377 §4(d) — done interior inspection legs by the kind of stall they name ==='
 SELECT COALESCE(st.stall_type::text, '(none)') AS stall_type, count(*) AS done_legs
