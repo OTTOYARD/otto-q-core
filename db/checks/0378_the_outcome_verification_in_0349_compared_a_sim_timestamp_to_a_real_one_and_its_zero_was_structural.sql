@@ -1,4 +1,6 @@
--- 0350  **`0349` §1b is RETRACTED IN ITS METHOD. `sessions_that_started_anyway = 0` was not a
+-- RENUMBERED 0350 -> 0378 at merge (2026-09-27): filed as 0350 on branch claude/otto-q-workflow-audit-m28xlp, but main
+-- had already taken 0350 for a different check; references to 0350 in this branch's files mean this one.
+-- 0378  **`0349` §1b is RETRACTED IN ITS METHOD. `sessions_that_started_anyway = 0` was not a
 --       measurement — it joined `ocpp_sessions.started_at`, which is a **SIM** timestamp, against
 --       `ottoq_events.occurred_at`, which is **REAL**, inside a `BETWEEN … ± 5 s` window. Those two
 --       domains are three weeks apart. The window could never match anything, so the zero was
@@ -177,7 +179,7 @@
 -- append-only `class='evidence'` ledger carrying no FK to `ottoq_sim_runs`. That is the next build,
 -- and it is a prerequisite for closing G157 rather than re-measuring it every morning.
 
-\echo '=== 0350 §1 — the clock domains: compare min() of each against the run BEFORE joining ==='
+\echo '=== 0378 §1 — the clock domains: compare min() of each against the run BEFORE joining ==='
 SELECT r.sim_run_id,
        r.started_at::text       AS run_REAL_start,
        r.sim_clock_start::text  AS run_SIM_start,
@@ -190,7 +192,7 @@ SELECT r.sim_run_id,
  GROUP BY 1,2,3 ORDER BY r.started_at DESC LIMIT 3;
 -- started_at tracks the SIM clock; occurred_at tracks the REAL clock. 0349 joined one to the other.
 
-\echo '=== 0350 §1b — occurred_at COLLAPSES: one distinct value for a whole pair arm ==='
+\echo '=== 0378 §1b — occurred_at COLLAPSES: one distinct value for a whole pair arm ==='
 SELECT sim_run_id,
        count(*) AS events,
        count(DISTINCT occurred_at)  AS distinct_occurred_at,
@@ -201,7 +203,7 @@ SELECT sim_run_id,
 -- 14,833 events, ONE occurred_at, 49 sim_clock_at. now() is transaction-stable and an arm is one
 -- transaction, so occurred_at is the transaction's birthday. It cannot order events within a pair.
 
-\echo '=== 0350 §2 — refusals verified in the SIM domain: nothing started at the refused instant ==='
+\echo '=== 0378 §2 — refusals verified in the SIM domain: nothing started at the refused instant ==='
 WITH ref AS (
   SELECT e.sim_clock_at, e.sim_run_id,
          (e.payload->>'charger_id')::uuid AS charger_id,
@@ -223,7 +225,7 @@ SELECT count(*) AS refusals,
 -- 28 refusals, 0 and 0. The signed-delta view (§2 prose) shows the one admitted session arrives
 -- 18.7 SIM-SECONDS AFTER the last refusal, which is the cap freeing, not a bypass.
 
-\echo '=== 0350 §3 — one refusal event per blocked evaluation, per run ==='
+\echo '=== 0378 §3 — one refusal event per blocked evaluation, per run ==='
 SELECT COALESCE(b.sim_run_id, ev.sim_run_id) AS run,
        COALESCE(b.blocked_evals,0) AS en001_blocked_at_charge_start,
        COALESCE(ev.refusal_events,0) AS refusal_events
@@ -235,7 +237,7 @@ SELECT COALESCE(b.sim_run_id, ev.sim_run_id) AS run,
  ORDER BY 2 DESC;
 -- 28 / 28 on the one run that had any. Neither column ever appears without the other.
 
-\echo '=== 0350 §4 — the shield effect split (refused vs recorded_only), no pre-0424 era ==='
+\echo '=== 0378 §4 — the shield effect split (refused vs recorded_only), no pre-0424 era ==='
 SELECT rule_code, action_context, enforcement, effect, probe_posture,
        count(*) AS n, count(DISTINCT sim_run_id) AS runs
   FROM public.ottoq_rule_evaluation_effect
@@ -244,14 +246,14 @@ SELECT rule_code, action_context, enforcement, effect, probe_posture,
 -- refused 693 across FIVE (rule,context) pairs; recorded_only 92 across two; unknown 0.
 -- EN.001 at stall_assignment (176) is the largest single refuser and was previously unrecorded.
 
-\echo '=== 0350 §4b — the two repaired rules at scale: 0 failures ==='
+\echo '=== 0378 §4b — the two repaired rules at scale: 0 failures ==='
 SELECT rule_code, count(*) AS evaluations, count(*) FILTER (WHERE NOT passed) AS failures
   FROM public.ottoq_rule_evaluations
  WHERE rule_code LIKE 'HW.002%' OR rule_code LIKE 'HW.003%'
  GROUP BY 1 ORDER BY 2 DESC;
 -- HW.002 76,126/0 (was failing 100% and could not pass); HW.003 52,593/0 (was 808/808).
 
-\echo '=== 0350 §5 — G157 is NOT l2-only: dcfc fails at 0.96%, l2 at 9.29% ==='
+\echo '=== 0378 §5 — G157 is NOT l2-only: dcfc fails at 0.96%, l2 at 9.29% ==='
 WITH e AS (
   SELECT (result_payload->>'stall_id')::uuid AS pstall, entity_id, evaluated_at, passed, sim_run_id,
          result_payload
@@ -267,7 +269,7 @@ SELECT COALESCE(st.stall_type::text,'(no stall resolved)') AS stall_kind,
 -- The tether is a ~10x reduction, NOT an exemption. 0347's "the tether exemption IS the l2/dcfc
 -- split" is half retracted: dcfc fails 7 times across 5 stalls and 2 runs.
 
-\echo '=== 0350 §5b — the two defect forms, de-duplicated on a key that includes `passed` ==='
+\echo '=== 0378 §5b — the two defect forms, de-duplicated on a key that includes `passed` ==='
 WITH e AS (
   SELECT DISTINCT (result_payload->>'stall_id')::uuid AS pstall, entity_id, evaluated_at, passed,
          sim_run_id, (result_payload->>'stall_current_vehicle_id') AS held
@@ -283,7 +285,7 @@ SELECT st.stall_type::text AS stall_kind,
 -- 49 incidents; 26 are the serious `holds_DIFFERENT_vehicle` form. NOTE the DISTINCT includes
 -- `passed` -- see §6: three triples carry BOTH verdicts, and a DISTINCT ON without it reports 46.
 
-\echo '=== 0350 §6 — the duplicate rows are not always copies: 3 triples DISAGREE ==='
+\echo '=== 0378 §6 — the duplicate rows are not always copies: 3 triples DISAGREE ==='
 WITH e AS (
   SELECT (result_payload->>'stall_id')::uuid AS pstall, entity_id, evaluated_at, passed
     FROM public.ottoq_rule_evaluations
@@ -296,7 +298,7 @@ SELECT count(*) AS triples, round(avg(n),2) AS rows_per_triple,
 -- 1,147 triples, 1.45 rows each, 3 disagreeing. A de-dup key that omits the measured value can
 -- silently drop a failure -- which is how 46 became the wrong answer for 49.
 
-\echo '=== 0350 §7 — why none of the above can be re-run: both homes are class=engine ==='
+\echo '=== 0378 §7 — why none of the above can be re-run: both homes are class=engine ==='
 SELECT reg.table_name,
        string_agg(DISTINCT reg.class::text, ', ') AS registry_class,
        (SELECT count(*) FROM public.ottoq_rule_evaluations) AS rule_evals_now,

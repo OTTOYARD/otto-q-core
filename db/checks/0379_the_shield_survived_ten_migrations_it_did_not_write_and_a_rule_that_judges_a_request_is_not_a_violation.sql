@@ -1,4 +1,6 @@
--- 0351  **An independent re-census of the L1 shield after TEN migrations that this branch did not write
+-- RENUMBERED 0351 -> 0379 at merge (2026-09-27): filed as 0351 on branch claude/otto-q-workflow-audit-m28xlp, but main
+-- had already taken 0351 for a different check; references to 0351 in this branch's files mean this one.
+-- 0379  **An independent re-census of the L1 shield after TEN migrations that this branch did not write
 --       and that are not in the repository (`0431`–`0440`, applied by a concurrent session — see
 --       `db/migrations/0441`'s footer). The shield is structurally UNCHANGED, and none of the ten
 --       touched `ottoq_rules` at all.**
@@ -85,7 +87,7 @@
 -- for it.** CLAUDE.md 2.5's claim that the agent's dial writes are *"clamped to the declared envelope
 -- since `0414`"* is correct.
 --
--- **VERIFIED BY OUTCOME, not by reading the code** — which is the discipline `0350` had to learn:
+-- **VERIFIED BY OUTCOME, not by reading the code** — which is the discipline `0378` had to learn:
 --
 --     deploy_peak_fraction: 312 stored rows · all updated_by='ottoq_prime' · min 0.5 · max 1.00
 --                           rows stored BELOW the agent floor of 0.5 .......... 0
@@ -93,7 +95,7 @@
 --                            than the parameter's own range, and it is the binding one)
 --
 -- **This is the fourth member of a family that keeps appearing on this branch** — `0332` a duration is
--- not a wait, `0337` a value is not an outcome, `0350` a sim timestamp is not a real one — and the
+-- not a wait, `0337` a value is not an outcome, `0378` a sim timestamp is not a real one — and the
 -- general form is now clear enough to state as a rule: **before calling a rule failure a violation,
 -- find out WHICH VALUE the rule was handed.** A rule that judges a request and a rule that judges a
 -- write produce identical-looking failure rows.
@@ -141,7 +143,7 @@
 -- built in this file — the catalog is shared with a concurrently-migrating session, and `0441`'s footer
 -- is explicit that no reconciliation with those ten migrations has been attempted.
 
-\echo '=== 0351 §1 — the shield after ten unseen migrations: structurally unchanged ==='
+\echo '=== 0379 §1 — the shield after ten unseen migrations: structurally unchanged ==='
 SELECT 'rule rows / codes / active' AS metric,
        count(*)||' / '||count(DISTINCT rule_code)||' / '||
        count(DISTINCT rule_code) FILTER (WHERE status='active') AS value
@@ -165,7 +167,7 @@ SELECT 'probe points / enforced / advisory / other',
 -- 54/30/30, ZERO rows updated in 24h, 69 pairs, 31 contexts, 11/5/5/1. The ten migrations 0431-0440
 -- did not touch ottoq_rules. 53->54 is 0423 from 09-21, not their work.
 
-\echo '=== 0351 §1b — NULL-run evaluations are IMMORTAL: the purge deletes by run ==='
+\echo '=== 0379 §1b — NULL-run evaluations are IMMORTAL: the purge deletes by run ==='
 SELECT COALESCE(sim_run_id::text,'(NULL run -- survives every purge)') AS run,
        count(*) AS evals, count(*) FILTER (WHERE NOT passed) AS failures,
        count(DISTINCT rule_code) AS codes, min(evaluated_at)::text AS earliest,
@@ -176,7 +178,7 @@ SELECT COALESCE(sim_run_id::text,'(NULL run -- survives every purge)') AS run,
 -- write with sim_run_id NULL, so SM.006's "15 failures" is the SAME historical 15 on every run.
 -- A per-run rule figure MUST carry WHERE sim_run_id = '<run>'.
 
-\echo '=== 0351 §2 — AI.001 judges the REQUEST; the clamp fixes the value before it is stored ==='
+\echo '=== 0379 §2 — AI.001 judges the REQUEST; the clamp fixes the value before it is stored ==='
 SELECT (src ~ 'v_final\s*:=\s*public\.ottoq_dial_clamp') AS clamps_into_v_final,
        position('ottoq_dial_clamp' in src)               AS clamp_at,
        position('ottoq_shield_probe' in src)             AS probe_at,
@@ -188,7 +190,7 @@ SELECT (src ~ 'v_final\s*:=\s*public\.ottoq_dial_clamp') AS clamps_into_v_final,
 -- clamp BEFORE probe BEFORE insert, and the probe is handed p_param_value (pre-clamp) while the insert
 -- stores v_final (post-clamp). So an AI.001 failure is the agent's INTENT, not the engine's state.
 
-\echo '=== 0351 §2b — VERIFIED BY OUTCOME: nothing below the agent floor was ever stored ==='
+\echo '=== 0379 §2b — VERIFIED BY OUTCOME: nothing below the agent floor was ever stored ==='
 SELECT count(*) AS stored_rows,
        min(param_value) AS min_stored, max(param_value) AS max_stored,
        count(*) FILTER (WHERE param_value < 0.5) AS stored_BELOW_agent_floor,
@@ -199,7 +201,7 @@ SELECT count(*) AS stored_rows,
 -- 312 rows, all by the agent, min 0.5, ZERO below the 0.5 floor -- while the catalog range allows 0.30.
 -- The agent envelope is TIGHTER than the parameter range and is the binding constraint.
 
-\echo '=== 0351 §3 — only ONE of nine direct writers of ottoq_policy_params checks agent_writable ==='
+\echo '=== 0379 §3 — only ONE of nine direct writers of ottoq_policy_params checks agent_writable ==='
 WITH f AS (
   SELECT n.nspname||'.'||p.proname AS fn,
          regexp_replace(regexp_replace(p.prosrc,'/\*.*?\*/','','g'),'--[^'||chr(10)||']*','','g') AS src
@@ -215,7 +217,7 @@ SELECT fn,
 -- Nine writers, one gate. But NOT ONE of the eight bypassers mentions ottoq_prime or that dial, so the
 -- gate is not decorative -- the 312 rows were written while the dial WAS agent-writable.
 
-\echo '=== 0351 §3b — the agent actuator surface, and a boundary with no audit trail ==='
+\echo '=== 0379 §3b — the agent actuator surface, and a boundary with no audit trail ==='
 SELECT count(*) AS dials_total,
        count(*) FILTER (WHERE agent_writable) AS agent_writable_now,
        string_agg(param_key, ', ' ORDER BY param_key) FILTER (WHERE agent_writable) AS which,

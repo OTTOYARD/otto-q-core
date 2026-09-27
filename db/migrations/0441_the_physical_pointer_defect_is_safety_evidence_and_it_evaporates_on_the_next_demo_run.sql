@@ -1,10 +1,15 @@
 -- migration-version: 20260923023300
 -- migration-name:    the_physical_pointer_defect_is_safety_evidence_and_it_evaporates_on_the_next_demo_run
+-- RENUMBERED CHECKS (2026-09-27, at merge): the check this migration cites as `db/checks/0350` was filed
+-- on branch claude/otto-q-workflow-audit-m28xlp as 0350 and renumbered to 0378, because main had already
+-- taken 0350 for a different check. The comments below say 0378. The COMMENT ON TABLE text further down
+-- still says `(0350 s6)`, because that is the text the database stored when this was applied
+-- (20260923023300). It means db/checks/0378 §6.
 --
 -- 0441  **G157's 49 physical-pointer divergences — a charging stall that records a DIFFERENT vehicle, or
 --       no vehicle, while a charge session is open on it — are recorded in exactly one place,
 --       `ottoq_rule_evaluations`, and that table is `class='engine'`. A demo run started at 02:15 UTC
---       today took it from ~150,000 rows to 208 BETWEEN TWO OF MY OWN QUERIES (`db/checks/0350`).**
+--       today took it from ~150,000 rows to 208 BETWEEN TWO OF MY OWN QUERIES (`db/checks/0378`).**
 --
 --       So the count of a `critical` safety rule's failures is not a slow-moving total that drifts; it
 --       is a per-run working set that a colleague starting a demo can take to zero while a sentence
@@ -31,7 +36,7 @@
 --
 --   (a) **The split is real but not a boundary.** On 30x `0346`'s evidence: `dcfc` fails **7 of 727
 --       (0.96%)**, `l2` **39 of 420 (9.29%)**. The tether is a **~10x reduction, not an exemption**
---       (`0350` §5). Any sentence confining G157 to L2 is wrong.
+--       (`0378` §5). Any sentence confining G157 to L2 is wrong.
 --
 --   (b) **The tether is not a charging guard at all — it is the ROBOTIC ARM's lease.** It is written
 --       only by `twin.ottoq_arm_begin_cycle` and `twin.ottoq_arm_advance_cycles` (and extended by
@@ -114,7 +119,7 @@
 -- ══ §5 THE DEDUPLICATION IS PART OF THE SCHEMA, BECAUSE COUNTING THIS WRONG IS THE DEFAULT ══
 --
 -- `0346` established that this ledger carries ~2 rows per `(stall, vehicle, evaluated_at)` triple, so
--- quoting the row count doubles the defect; `0350` §6 found the sharper form — **3 triples carry both
+-- quoting the row count doubles the defect; `0378` §6 found the sharper form — **3 triples carry both
 -- a passed and a failed row**, so a `DISTINCT ON` whose key omits `passed` keeps whichever sorts first
 -- and **reports 46 incidents where there are 49**. My own first pass did that.
 --
@@ -437,7 +442,7 @@ COMMIT;
 -- 49 incidents before this table existed, so `NONE RECORDED` on day one is an empty instrument, not a
 -- clean depot — exactly the `ottoq_ab_runs` mistake `db/checks/0145` caught, where a well-shaped table
 -- with no writer was read as a working one. It becomes evidence only after a run produces an incident,
--- and `0350` §5 says to expect roughly 9% of L2 charge completions and 1% of DCFC.
+-- and `0378` §5 says to expect roughly 9% of L2 charge completions and 1% of DCFC.
 
 -- ══ APPLIED 20260923023300 (2026-09-23 02:33 UTC / 2026-09-22 09:33 PM CT) ═══
 --
@@ -457,7 +462,7 @@ COMMIT;
 -- **AND V4's ZERO IS AN EMPTY INSTRUMENT, NOT A CLEAN DEPOT.** The 02:15 purge took the 49 incidents
 -- before this table existed, so the backfill inserted **0 rows** — it is the `ottoq_ab_runs` shape
 -- `db/checks/0145` caught, where a well-formed table with no data was read as a working one. It
--- becomes evidence only once a run produces an incident; `0350` §5 says to expect ~9% of L2 charge
+-- becomes evidence only once a run produces an incident; `0378` §5 says to expect ~9% of L2 charge
 -- completions and ~1% of DCFC.
 --
 -- ══ RENUMBERED FROM 0431, AND THE REASON IS A HAZARD WORTH MORE THAN THE RENAME ══
@@ -483,7 +488,7 @@ COMMIT;
 -- been removed and this file's row re-inserted as `0441`. **A migration number must be checked against
 -- `ottoq_cert_lineage`, never against `ls db/migrations`.**
 --
--- **AND IT EXPLAINS THE PURGE THAT ATE THIS FILE'S MOTIVATING MEASUREMENT.** `db/checks/0350` records
+-- **AND IT EXPLAINS THE PURGE THAT ATE THIS FILE'S MOTIVATING MEASUREMENT.** `db/checks/0378` records
 -- that `ottoq_rule_evaluations` fell from ~150,000 rows to 208 *between two of my own queries*, which I
 -- attributed to "a demo run started at 02:15." It was the other session's run. **Two agents on one
 -- `class='engine'` database will silently delete each other's evidence** — not through any fault in the
