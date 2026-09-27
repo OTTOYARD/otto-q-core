@@ -48,6 +48,48 @@ SELECT leg_type, count(*) AS done_legs,
 --   ended on a fault (12). So 1,038 is a floor: the five would have gone on. On b0fdc92b: 36 of 76, all 36
 --   `window_elapsed_occupied`, 1,280 charger-minutes (not split by session end).
 
+\echo '=== 0375 §1(b) — G240: the charge booking windows against the plan and the session ==='
+WITH legs AS (
+  SELECT l.leg_id, l.vehicle_id, l.leg_type, l.actual_start_sim, l.actual_end_sim, l.planned_duration_s
+    FROM public.ottoq_itinerary_legs l
+   WHERE l.sim_run_id = :'run' AND l.leg_type IN ('charge_l2','charge_dcfc') AND l.status = 'done'),
+j AS (
+  SELECT l.*, s.started_at AS s_start, s.ended_at AS s_end, lower(b.during) AS b_start, upper(b.during) AS b_end
+    FROM legs l
+    JOIN LATERAL (SELECT os.* FROM public.ocpp_sessions os
+                   WHERE os.sim_run_id = :'run' AND os.vehicle_id = l.vehicle_id
+                     AND os.started_at <= l.actual_end_sim AND COALESCE(os.ended_at, 'infinity') >= l.actual_start_sim
+                   ORDER BY abs(EXTRACT(epoch FROM os.started_at - l.actual_start_sim)) LIMIT 1) s ON true
+    JOIN LATERAL (SELECT bb.* FROM public.ottoq_stall_bookings bb WHERE bb.leg_id = l.leg_id
+                   ORDER BY (bb.state IN ('superseded','released','cancelled')), lower(bb.during) LIMIT 1) b ON true
+   WHERE s.stopped_reason = 'completed')
+SELECT leg_type, count(*) AS completed,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(epoch FROM b_end - b_start)/60))::numeric,1) AS p50_window_min,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY planned_duration_s/60.0))::numeric,1) AS p50_planned_min,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(epoch FROM s_end - s_start)/60))::numeric,1) AS p50_session_min,
+       count(*) FILTER (WHERE s_end > b_end) AS session_outlasts_window,
+       count(*) FILTER (WHERE (b_end - b_start) < make_interval(secs => planned_duration_s) - interval '5 minutes') AS window_shorter_than_plan
+  FROM j GROUP BY 1 ORDER BY 1;
+-- READ on 5344fc12: charge_dcfc 21 completed, window 51.7 / plan 68.5 / session 50.9 minutes, 9 outlasting their
+--   window, 9 windows short of the plan; charge_l2 31 completed, 49.0 / 67.3 / 62.7, 21 outlasting, 18 short.
+--   Where the short windows come from is not established. Two guesses were measured and ruled out: of 43 enacted
+--   charge bookings shorter than their leg's plan, 1 ends exactly where another car's booking on the stall begins (5
+--   within a minute), so they are not clipped to the next promise; and 65 of 74 enacted windows start at the
+--   enactment clock, a median 0.6 minutes before the leg's planned start, so they are not a stale plan window either.
+--   `ottoq_decide_tick` passes the leg's planned window to `ottoq_record_enacted_booking`, so the sizing happens
+--   inside the booking writer, which is the next place to read (G240).
+--   Read next, the same evening: the writer sizes a charge it is not handed a window for with
+--   `ottoq_charge_minutes_between(SoC now, the visit's target_soc (else 85), the stall's connector_max_kw, the car's
+--   inlet limit, pack)` at 22 °C and 95% state of health, clamped to 15-480 minutes. The rated powers match the
+--   chargers (L2 19.2 kW, DCFC 350 kW) and busy_day's charge_time multiplier is 1, so neither is the gap. Given each
+--   completed session's own start SoC and target, that estimator against the real duration: DCFC a median ratio
+--   1.00 (p90 1.22), L2 1.13 (p90 1.45). The target is not the main cause either: matched on sim time, 41 of 54
+--   completed sessions charge to exactly their visit's target, 5 past it (about 107 charger-minutes) and 3 below it
+--   (a DCFC cap). (A first match compared the visit's real-clock `created_at` with the session's sim start and found
+--   no visits at all; the match above uses `arrived_at`.) So the windows run short because a nominal model, with no
+--   knowledge of the car, the battery's temperature or its history, sizes every charge, and the calibration that
+--   fixed the card's ETA in §6 (1.9 minutes median error against 12.6 for the plan) is the direction for the booking.
+
 -- ══ §2 THE MECHANISM ════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   `ottoq.ottoq_release_expired_bookings` (md5 a6ef4307af4493ec005b082feb5587f5 at this read) ends every held or
@@ -191,3 +233,84 @@ SELECT l.status, count(*) AS legs,
  WHERE l.sim_run_id = :'run' AND l.leg_type IN ('charge_dcfc','charge_l2') AND l.status IN ('active','amended')
  GROUP BY 1;
 -- READ: pending.
+
+-- ══ §6 THE CARD'S CHARGE ETA (0509), BACKTESTED BEFORE IT WAS APPLIED ═══════════════════════════════════════════
+--
+--   Under 0508 a charge step stays current until its session ends, so 0507's `expected_end` (actual start plus
+--   planned duration) would read in the past for every charge that outruns its plan. 0509 gives a running charge an
+--   ETA from the planner's own charge model (`ottoq_estimate_charge_minutes`) from the car's SoC now to its target,
+--   calibrated on the session as it runs: scaled by the minutes the session has actually taken over the minutes the
+--   model gives for the SoC it has gained (1 until 2 points gained; held in [0.5, 5]). Its inputs are what a real depot
+--   knows (charger rating, inlet limit, pack, state of health, start SoC and time, ambient, SoC now, target cap); it
+--   reads no variability profile and no per-car curve card, so the twin's hidden perturbations are exactly what the
+--   calibration has to learn, and it would run unchanged on real OCPP meter values.
+--
+--   The backtest: every completed session of 10+ minutes on the run, read at the meter value nearest its midpoint,
+--   three ways against the minutes it actually had left: the calibrated model, the model alone (ratio 1), and the plan
+--   (0507: actual start plus planned duration).
+
+\echo '=== 0375 §6 — the ETA three ways at each completed session''s midpoint, against the real end ==='
+WITH s AS (
+  SELECT os.id, os.vehicle_id, os.stall_id, os.started_at, os.ended_at, os.soc_start, os.ambient_temp_c,
+         ch.max_kw, v.inlet_max_kw, v.battery_capacity_kwh AS pack, COALESCE((v.config->>'battery_soh_pct')::numeric, 95) AS soh,
+         st.stall_type::text AS stype,
+         (SELECT (m.payload->>'target_soc_pct')::numeric FROM public.ottoq_ocpp_messages m
+           WHERE m.ocpp_session_id = os.id AND m.message_type = 'StartTransaction' LIMIT 1) AS target
+    FROM public.ocpp_sessions os
+    JOIN public.stalls st ON st.id = os.stall_id
+    JOIN public.ottoq_ocpp_chargers ch ON ch.charger_id = st.ocpp_charger_id
+    JOIN public.vehicles v ON v.id = os.vehicle_id
+   WHERE os.sim_run_id = :'run' AND os.stopped_reason = 'completed'
+     AND os.ended_at - os.started_at >= interval '10 minutes'),
+mid AS (
+  SELECT s.*, mv.sim_clock_at AS t_mid,
+         (SELECT (e->>'value')::numeric FROM jsonb_array_elements(mv.payload->'sampledValue') e WHERE e->>'measurand' = 'SoC') AS soc_mid
+    FROM s
+    JOIN LATERAL (SELECT m.* FROM public.ottoq_ocpp_messages m
+                   WHERE m.ocpp_session_id = s.id AND m.message_type = 'MeterValues'
+                   ORDER BY abs(EXTRACT(epoch FROM m.sim_clock_at - (s.started_at + (s.ended_at - s.started_at) / 2))) LIMIT 1) mv ON true),
+leg AS (
+  SELECT mid.*, (SELECT l.actual_start_sim + make_interval(secs => l.planned_duration_s)
+                   FROM public.ottoq_itinerary_legs l
+                  WHERE l.sim_run_id = :'run' AND l.vehicle_id = mid.vehicle_id
+                    AND l.leg_type IN ('charge_dcfc','charge_l2') AND l.actual_start_sim IS NOT NULL
+                  ORDER BY abs(EXTRACT(epoch FROM l.actual_start_sim - mid.started_at)) LIMIT 1) AS plan_end
+    FROM mid),
+calc AS (
+  SELECT leg.*,
+         LEAST(leg.target, public.ottoq_target_soc_cap(leg.stype, leg.started_at)) AS tgt,
+         EXTRACT(epoch FROM leg.t_mid - leg.started_at)/60 AS elapsed,
+         public.ottoq_estimate_charge_minutes(leg.soc_start, leg.soc_mid, leg.max_kw, leg.inlet_max_kw, leg.pack,
+                                              COALESCE(leg.ambient_temp_c,22)+5, leg.soh, 1.0) AS model_done
+    FROM leg WHERE leg.soc_mid IS NOT NULL),
+pred AS (
+  SELECT calc.*,
+         CASE WHEN soc_mid - soc_start >= 2 AND model_done > 0 THEN LEAST(5, GREATEST(0.5, elapsed / model_done)) ELSE 1 END AS ratio
+    FROM calc),
+fin AS (
+  SELECT pred.stype, pred.ratio,
+         EXTRACT(epoch FROM pred.ended_at - pred.t_mid)/60 AS actual_left,
+         public.ottoq_estimate_charge_minutes(pred.soc_mid, pred.tgt, pred.max_kw, pred.inlet_max_kw, pred.pack,
+                                              COALESCE(pred.ambient_temp_c,22)+5, pred.soh, pred.ratio) AS cal_left,
+         public.ottoq_estimate_charge_minutes(pred.soc_mid, pred.tgt, pred.max_kw, pred.inlet_max_kw, pred.pack,
+                                              COALESCE(pred.ambient_temp_c,22)+5, pred.soh, 1.0) AS raw_left,
+         EXTRACT(epoch FROM pred.plan_end - pred.t_mid)/60 AS plan_left
+    FROM pred)
+SELECT stype, count(*) AS sessions, round(avg(ratio)::numeric, 2) AS avg_ratio,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY abs(cal_left - actual_left)))::numeric, 1) AS p50_err_calibrated,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(cal_left - actual_left)))::numeric, 1) AS p90_err_calibrated,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY abs(raw_left - actual_left)))::numeric, 1) AS p50_err_model_only,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(raw_left - actual_left)))::numeric, 1) AS p90_err_model_only,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY abs(plan_left - actual_left)))::numeric, 1) AS p50_err_plan,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(plan_left - actual_left)))::numeric, 1) AS p90_err_plan,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY actual_left))::numeric, 1) AS p50_actual_left
+  FROM fin GROUP BY ROLLUP (stype) ORDER BY 1;
+-- READ on 5344fc12 (52 completed sessions of 10+ minutes; a median 31.4 minutes left at the midpoint), absolute
+--   error in minutes, median / p90:
+--                       calibrated     model alone    plan (0507)
+--     charge_dcfc (22)   1.2 /  4.4     4.7 / 17.7     4.7 / 82.2
+--     charge_l2   (30)   3.4 /  7.7     8.6 / 26.6    19.4 / 87.8
+--     all         (52)   1.9 /  7.0     7.5 / 23.5    12.6 / 87.1
+--   The calibration ratio averaged 0.93 on DCFC and 1.02 on L2, so the model's shape was close and the per-session
+--   correction did most of the work at the tail. One run, the midpoint only; the live reading (0509's V3 and the
+--   cockpits) is on the next validation run.
