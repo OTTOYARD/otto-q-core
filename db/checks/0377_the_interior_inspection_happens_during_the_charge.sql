@@ -1,6 +1,7 @@
 -- 0377  **G236, decided: a car that charges has its interior inspection at the charger, during the charge, by the
---       charger's sensors. Before this, most such inspections started before the car was plugged in, and most of the
---       cars were also sent to the arrival inspection lane.**
+--       charger's sensors, and the same sensors give the verdict on an uncertain interior tidy (confirm, clear or
+--       escalate). Before this, most such inspections started before the car was plugged in, most of the cars were also
+--       sent to the arrival inspection lane, and every verdict waited for a technician's triage check.**
 --
 --       The decision (Chase, 2026-09-27, 10:00 PM CT): "Let's continue to have the interior inspection occur while the
 --       vehicle is charging. Ideally, all charging will be robotic and they will just be sensors that potentially view
@@ -44,6 +45,32 @@ SELECT visit_charges, count(*) AS atoms, count(*) FILTER (WHERE status = 'done')
 --   visits with no charge, 7 started, 6 of those cars sent to the lane. (0374 §3 read the same shape on 66 lane visits:
 --   the inspection overlapped 17, came after 19, and was already done before 12.)
 
+\echo '=== 0377 §1(b) — triage checks by whether the visit charges and whether every need they judge is in the cabin ==='
+WITH a AS (
+  SELECT vn.visit_id, vn.vehicle_id, x->>'status' AS status, (x->>'started_at')::timestamptz AS started_at,
+         x->>'performed_by' AS performed_by,
+         EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) y WHERE y->>'svc' = 'charge') AS visit_charges,
+         NOT EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) y
+                      WHERE (y ? 'triage_verdict' OR COALESCE((y->>'confirm_required')::boolean, false))
+                        AND y->>'concurrency' IS DISTINCT FROM 'cabin') AS judges_only_the_cabin
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id = :'run' AND x->>'svc' = 'triage_check'),
+j AS (
+  SELECT a.*,
+         EXISTS (SELECT 1 FROM public.ocpp_sessions os
+                  WHERE os.sim_run_id = :'run' AND os.vehicle_id = a.vehicle_id
+                    AND os.started_at <= a.started_at AND COALESCE(os.ended_at, 'infinity') > a.started_at) AS during_charge
+    FROM a)
+SELECT visit_charges, judges_only_the_cabin, count(*) AS triage_checks,
+       count(*) FILTER (WHERE started_at IS NOT NULL) AS started,
+       count(*) FILTER (WHERE during_charge) AS started_during_a_charge,
+       count(*) FILTER (WHERE performed_by = 'charger_sensors') AS by_the_chargers_sensors
+  FROM j GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ on 964cf17b: on visits that charge, 18 triage checks judged only the cabin (every one an uncertain interior
+--   tidy); 17 started, 3 of them during a charge, none by the charger's sensors. 6 more also judged an exterior or bay
+--   need (a sensor clean, a cosmetic repair), none during a charge. 2 on visits with no charge. The verdicts on the
+--   run's 19 judged tidies: 10 confirmed, 6 cleared, 3 escalated to a deep clean.
+
 -- ══ §2 THE MECHANISM ════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   The service catalogue already means it to happen at the charger: `service_cadence_policy` gives
@@ -59,6 +86,12 @@ SELECT visit_charges, count(*) AS atoms, count(*) FILTER (WHERE status = 'done')
 --   And the starter meters every cabin atom against the 10 general technicians (founder spec, July: "plug in, 3-5 min
 --   interior clean, inspect"). Under the decision the charger's sensors inspect, so an inspection at the charger takes
 --   no technician; the interior tidy stays a technician's job.
+--   The triage: a need whose confidence falls in the confirm band (`confirm_band_lo`..`hi`, 0.40-0.75 by default)
+--   carries `confirm_required` and cannot start; the starter adds one `triage_check` (cabin, 3 min, a technician), and
+--   when it completes the twin draws each such need's verdict from its confidence: confirm, clear (cancelled, never
+--   credited), or escalate (a tidy becomes a deep clean in the detail bay). The charger's sensors see the cabin, so a
+--   triage that judges only cabin needs is theirs to perform; the verdict is drawn exactly as before, whoever
+--   performed the check, so only the actor and the moment move.
 
 \echo '=== 0377 §2 — the catalogue, and the planner''s tag on a charging visit''s inspection legs ==='
 SELECT (SELECT lane || ' / ' || notes FROM public.service_cadence_policy WHERE svc = 'interior_inspection') AS catalogue,
@@ -76,9 +109,10 @@ SELECT (SELECT lane || ' / ' || notes FROM public.service_cadence_policy WHERE s
 -- ══ §3 THE APPLY (0511), AND THE CANON UNDER IT ═════════════════════════════════════════════════════════════════
 --
 --   0511 (`the_interior_inspection_happens_during_the_charge`): while a visit still has its charge to do, its cabin
---   atoms start only on the charger (or in the twin's two catch-ups); an interior inspection on the charger is done by
---   its sensors (`performed_by = 'charger_sensors'`) and takes no technician; the seam passes over an inspection leg
---   planned with the charge; and a leg nothing bound to a stall records where the car was when the work finished.
+--   atoms start only on the charger (or in the twin's two catch-ups); an interior inspection on the charger, and a
+--   triage check that judges only the cabin, are done by its sensors (`performed_by = 'charger_sensors'`) and take no
+--   technician; the seam passes over an inspection leg planned with the charge; and a leg nothing bound to a stall
+--   records where the car was when the work finished.
 
 \echo '=== 0377 §3 — 0511 as applied ==='
 SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
@@ -92,8 +126,12 @@ SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
 --   interior inspection that starts, starts during a charge or in a catch-up on the charger, and none before the car's
 --   charge (71 of 101 on 964cf17b); (b) those started on the charger carry `performed_by = 'charger_sensors'`;
 --   (c) no car whose inspection leg was planned with its charge is booked into the arrival lane (54 of 115 legs on
---   964cf17b); (d) a done interior inspection leg names a stall, the charger's when it was done there. Not predicted:
---   what freeing the technicians of inspections does to the other cabin and exterior work, which (e) reads.
+--   964cf17b); (d) a done interior inspection leg names a stall, the charger's when it was done there; read with §1(b):
+--   (f) on visits that charge, every triage check that judges only the cabin and starts, starts on the charger by its
+--   sensors (3 of 17 during a charge on 964cf17b, none by sensors), and (g) one that also judges an exterior or bay need
+--   is still a technician's; (h) the verdict mix stays the twin's draw (10 confirm / 6 clear / 3 escalate of 19 on
+--   964cf17b is one sample of it, not a target). Not predicted: what freeing the technicians of inspections and cabin
+--   triage does to the other cabin and exterior work, which (e) reads.
 
 \echo '=== 0377 §4(d) — done interior inspection legs by the kind of stall they name ==='
 SELECT COALESCE(st.stall_type::text, '(none)') AS stall_type, count(*) AS done_legs
