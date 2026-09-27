@@ -151,6 +151,20 @@ SELECT n.verdict_id, n.outcome, n.scenario || '/' || n.seed || '/' || n.ticks AS
 --   (db/checks/0384, G243). So 475 certified that column on this week's priors (bb7fb6fa) and the other eight on last
 --   week's (c5fbb56e), each internally consistent. That is why `h_cal` also moved on the 48-tick column.
 
+\echo '=== 0377 §3(c) — 0512, the cockpit reads, as applied ==='
+SELECT m.version, md5(m.statements[1]) AS stored_md5,
+       md5(pg_get_functiondef('public.ottoq_twin_snapshot(uuid)'::regprocedure)) AS snapshot_body,
+       md5(pg_get_functiondef('public.ottoq_depot_cards(uuid,uuid)'::regprocedure)) AS cards_body
+  FROM supabase_migrations.schema_migrations m WHERE m.name = 'the_cards_say_who_did_the_work';
+-- READ (2026-09-27 05:10 UTC, 12:10 AM CT): version 20260927050956, stored md5 c0b3aa5b0bcc38d4372ec31a8d7989f4 (the
+--   file's body byte for byte), forces_recert FALSE, applied with no pair in flight and no run live. Its first dry run,
+--   during the 0511 sweep (verdict 473's pair), was cancelled after waiting 60 s on a lock that pair held; the
+--   second, with nothing running, passed, and so did the apply. V3, rolled back on the newest stopped operator run: the snapshot
+--   carries the three keys on every atom, the sensors' inspection reads `performed_by = 'charger_sensors'` and the
+--   tidy `awaiting_triage = true`; the cards read contract 1.4 with the same two needs, nulls stripped. Bodies after:
+--   snapshot 95ddec4114825a3883e52d988147e826, cards 845156cf68af864f2de243e30af0f5b5; `0512_pre` snapshots 2. The
+--   cockpit halves that print these keys are not merged yet (§4(i) reads them).
+
 -- ══ §4 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --
 --   PREDICTED on the next busy_day operator run, read with §1 and §2 above on it: (a) on visits that charge, every

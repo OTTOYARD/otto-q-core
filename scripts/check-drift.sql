@@ -609,6 +609,7 @@ repo_manifest(version, name, file) AS (
     ('20260927020531'::text, 'a_charging_card_ends_when_the_charge_physics_says_it_will'::text, '0509_a_charging_card_ends_when_the_charge_physics_says_it_will.sql'::text),
     ('20260927030227'::text, 'one_air_temperature_for_the_whole_depot'::text, '0510_one_air_temperature_for_the_whole_depot.sql'::text),
     ('20260927034307'::text, 'the_interior_inspection_happens_during_the_charge'::text, '0511_the_interior_inspection_happens_during_the_charge.sql'::text),
+    ('20260927050956'::text, 'the_cards_say_who_did_the_work'::text, '0512_the_cards_say_who_did_the_work.sql'::text),
     ('20260927050506'::text, 'the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair'::text, '0513_the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),

@@ -516,8 +516,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0509](db/migrations/0509_a_charging_card_ends_when_the_charge_physics_says_it_will.sql) | `20260927020531` | yes — ledger | **Under 0508 a charge step stays current until its session ends, and its card said "until" a time the |
 | [0510](db/migrations/0510_one_air_temperature_for_the_whole_depot.sql) | `20260927030227` | yes — ledger | **A charge, a car on the road and a telemetry packet each drew their own air temperature from the whole year, |
 | [0511](db/migrations/0511_the_interior_inspection_happens_during_the_charge.sql) | `20260927034307` | yes — ledger | **A car that charges has its interior inspection at the charger, during the charge, done by the charger's |
+| [0512](db/migrations/0512_the_cards_say_who_did_the_work.sql) | `20260927050956` | yes — ledger | **The cockpits can say that the charger's sensors did an inspection, and that a cleaning need is waiting on |
 | [0513](db/migrations/0513_the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair.sql) | `20260927050506` | yes — ledger | **G243: the weekly calibration refit cannot write the priors while a certification rig is running, the job |
 
-378 migrations indexed.
+379 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
