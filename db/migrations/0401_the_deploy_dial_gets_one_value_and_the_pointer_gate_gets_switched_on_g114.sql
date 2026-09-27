@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260921192817
 -- migration-name:    the_deploy_dial_gets_one_value_and_the_pointer_gate_gets_switched_on_g114
 --
 -- 0401  **G114 items (c) and (d), decided under delegated authority** — Chase, 2026-09-21: *"You make
@@ -140,10 +140,16 @@ $preflight$;
 -- Surgical: the ONLY change is the fallback literal. Everything else in this function is
 -- reproduced from the live source unchanged, so the diff is one number.
 DO $fix$
-DECLARE v_src text; v_new text; v_args text;
+DECLARE v_src text; v_new text; v_args text; v_ndef int; v_ndef_after int;
 BEGIN
-  SELECT p.prosrc, pg_get_function_identity_arguments(p.oid)
-    INTO v_src, v_args
+  -- pg_get_function_ARGUMENTS, never pg_get_function_IDENTITY_arguments. The identity form STRIPS
+  -- parameter defaults, and CREATE OR REPLACE with them missing does not silently drop them -- it
+  -- fails with 42P13 "cannot remove parameter defaults from existing function". This function
+  -- carries one (p_depot_id DEFAULT the twin depot), and the first attempt at this migration died
+  -- on exactly that, which is the good outcome: the alternative was a signature change nobody
+  -- asked for. Asserted after the rewrite rather than assumed.
+  SELECT p.prosrc, pg_get_function_arguments(p.oid), p.pronargdefaults
+    INTO v_src, v_args, v_ndef
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='twin' AND p.proname='ottoq_sim_advance_service_flow';
 
@@ -164,6 +170,13 @@ BEGIN
                  (SELECT pg_get_function_result(p.oid) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
                    WHERE n.nspname='twin' AND p.proname='ottoq_sim_advance_service_flow'),
                  v_new);
+
+  SELECT p.pronargdefaults INTO v_ndef_after
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='twin' AND p.proname='ottoq_sim_advance_service_flow';
+  IF v_ndef_after <> v_ndef THEN
+    RAISE EXCEPTION '0401 P7: parameter defaults changed from % to % -- the signature moved, which this file must never do', v_ndef, v_ndef_after;
+  END IF;
 END
 $fix$;
 
@@ -184,6 +197,12 @@ LANGUAGE sql STABLE AS $$
       CROSS JOIN LATERAL regexp_matches(p.prosrc,
         'ottoq_policy_get\s*\([^,]+,\s*''([a-z0-9_]+)''\s*,\s*(-?[0-9]+(?:\.[0-9]+)?)\s*\)', 'g') AS m
      WHERE n.nspname IN ('public','ottoq','twin')
+       -- Cheap prefilter before the global regex. Semantically free: the pattern cannot match a
+       -- body that lacks this literal. Measured 2026-09-21: 1,392 functions / 2 MB of source in
+       -- these three schemas, of which only 76 mention ottoq_policy_get -- an 18x reduction in
+       -- regex work. This function is meant to be run routinely, so it has to be cheap enough
+       -- that nobody is tempted to skip it.
+       AND p.prosrc LIKE '%ottoq_policy_get%'
   ), agg AS (
     SELECT s.k,
            count(DISTINCT s.hard)                                        AS n_lit,

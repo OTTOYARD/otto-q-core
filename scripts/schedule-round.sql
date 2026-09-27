@@ -96,9 +96,10 @@ BEGIN
   IF EXISTS (SELECT 1 FROM cron.job WHERE jobname ~ ('^r'||v_round||'_')) THEN
     RAISE EXCEPTION 'schedule-round: round % already has jobs; unschedule them first', v_round;
   END IF;
+  -- G194: the recert runner names the pair past pg_stat_activity's 1 kB of query text; match its lock key too.
   IF EXISTS (SELECT 1 FROM pg_stat_activity
-              WHERE query ILIKE '%ottoq_determinism_pair%' AND state='active'
-                AND pid <> pg_backend_pid()) THEN
+              WHERE (query ILIKE '%ottoq_determinism_pair%' OR query ILIKE '%ottoq_recert_runner%')
+                AND state='active' AND pid <> pg_backend_pid()) THEN
     RAISE EXCEPTION 'schedule-round: a pair is running right now — pg_stat_activity, not the '
                     'cron log, is the authority on that';
   END IF;

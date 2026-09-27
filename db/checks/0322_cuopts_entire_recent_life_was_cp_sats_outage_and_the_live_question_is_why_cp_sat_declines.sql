@@ -1,0 +1,412 @@
+-- 0322  **Chase asked what cuOpt's true role and edge actually are. ANSWER, from §10, which is the
+--       section to read first: cuOpt was formally RETIRED from the decide path on 2026-09-03 and is
+--       live today as the CP-SAT chain's declared fallback engine — and its entire recent life WAS
+--       CP-SAT's outage. It absorbed 2,735 failed handoffs across four days of infrastructure
+--       failure, answered 98.4% of them, and has not been called ONCE since CP-SAT became reachable
+--       at 07:41 on 2026-09-21. Its edge is availability, not optimization.**
+--
+--       **This file was originally titled "…and it outperforms the solver that replaced it". §10
+--       retracts that**: the comparison aggregated over the period in which CP-SAT was broken.
+--
+--       No migration here. This is the diagnosis the decision needs. Two numbers are retracted:
+--       `0250`'s "1 enacted / 7 refused / 11 superseded" as a single-run figure, and this file's own
+--       §6b hypothesis, which §8 falsifies with the query §6b asked for.
+--
+--       **THE MEASUREMENT CORRECTION THAT MATTERS:** both external proposers re-propose for the same
+--       entity — CP-SAT **10.49** times, cuOpt **3.62**, against the local path's 1.71 — which
+--       deflates every per-proposal rate quoted about them. Per ENTITY the win rates are greedy
+--       39.1%, cuOpt 19.8%, CP-SAT 9.1%. **§8 called that churn an actionable defect and §9 RETRACTS
+--       it:** 97.2% of the supersessions are the proposer superseding its OWN stale proposal, which
+--       is the refresh cadence working as designed, not waste. Read §8 for the denominator and §9
+--       for why there is no de-duplication bug to fix.
+--
+--       **Measured 2026-09-22 04:40:02 UTC (2026-09-21 11:40 PM CT), AND A RUN WAS LIVE WHILE
+--       MEASURING** — `greedy_constrained` went from 16,034 to 16,246 proposals between two queries
+--       four minutes apart. Every figure below is from ONE atomic snapshot at that moment. Cite the
+--       moment, never the table.
+--
+-- ══ §1 THE PREDICATE THAT DECIDES EVERYTHING BELOW: `endpoint IS NOT NULL` ═════
+--
+-- `0301` established that `ottoq_model_call_ledger` holds two different kinds of row under one
+-- provider name, because `ottoq_capture_decision_model_call` maps a decision by its engine —
+--
+--     WHEN 'forward_lex' THEN 'cpsat_service'
+--
+-- — so every local decision labelled `forward_lex` becomes a `cpsat_service` row whether or not
+-- anything was called. `0301` fixed the WRITE side (the edge function now stamps `endpoint`), and
+-- **the READ side was never fixed: `ottoq_intelligence_ledger.calls` still counts both.** Measured:
+--
+--     provider           ledger rows   endpoint NOT NULL   % that are NOT calls
+--     ----------------   -----------   -----------------   --------------------
+--     nvidia_nemotron          4,248                   0                 100.0%
+--     cpsat_service            3,638                 487                  86.6%
+--     nvidia_cuopt             1,159               1,159                   0.0%
+--
+-- **cuOpt is the only provider in the ledger whose call count is a call count.** And the
+-- contamination is not cosmetic — it moves latency in the flattering direction:
+-- `cpsat_service` reports **251 ms** average across all rows and **1,847 ms** across its real calls,
+-- a 7.4x understatement, because 3,151 sub-25 ms decision rows are averaged in with the network hops.
+--
+-- **WHAT IS NOT CLAIMED, and the distinction matters for G62.** Zero Nemotron rows carrying an
+-- endpoint does NOT mean Nemotron never called NVIDIA. It means no Nemotron row records one, so the
+-- predicate that separates calls from captured decisions classifies none of them as calls, and its
+-- 22,596 ms average is DECISION latency, not an instrumented round trip. For G62's purpose that is
+-- still the right measurement — a decision that took 22.6 s against a 30 s tick is the finding
+-- whether or not the fetch was timed — but "4,248 Nemotron CALLS" is not a sentence this ledger
+-- supports.
+--
+-- ══ §2 THE HONEST PER-PROVIDER NUMBERS ════════════════════════════════════════
+--
+--     provider         real calls   answered   avg ms   last real call
+--     --------------   ----------   --------   ------   --------------------
+--     nvidia_cuopt          1,159      1,141    2,719   2026-09-21 07:32 UTC
+--     cpsat_service           487         20    1,847   2026-09-22 02:03 UTC
+--     nvidia_nemotron           0          -        -   none recorded
+--
+-- **cuOpt answers 1,141 of 1,159 calls — 98.4%. The CP-SAT service answers 20 of 487 — 4.1%.**
+-- CP-SAT's 487 real calls decompose as: **420 `solved_but_zero_proposals`** (it solved and every row
+-- came back `abstain`), **44 `errored`** (all `"Signal timed out."` at the 20,000 ms bound, avg
+-- 20,007 ms), **20 `answered`** (fast when it answers — 415 ms), **3 `refused`** (HTTP 500).
+--
+-- ══ §3 DISPOSITIONS — WHO ACTUALLY DECIDES THE DEPOT ══════════════════════════
+--
+--     source                   rank   proposals   enacted   refused   superseded   enact%   share of
+--                                                                                           all enacts
+--     ----------------------   ----   ---------   -------   -------   ----------   ------   ----------
+--     greedy_constrained       NULL      16,246     4,700     2,580        8,965    28.9%      97.7%
+--     cuopt                      10       1,190        74       116          995     6.2%       1.5%
+--     forward_lex (CP-SAT)        0       4,166        36       611        3,493     0.9%       0.7%
+--     ottoq_service_priority   NULL         353         0         0          118     0.0%       0.0%
+--
+-- Total enactments 4,810. **The two external solvers together account for 110 of them — 2.3%.**
+--
+-- **READ §8 BEFORE QUOTING ANY RATE IN THIS TABLE.** The `enact%` column divides by proposals, and
+-- both external solvers inflate their own denominators by re-proposing for the same entity — CP-SAT
+-- 10.5x per entity, cuOpt 3.6x. Per entity the rates are 39.1% / 19.8% / 9.1%, and the 2.3% share
+-- mostly reflects the external solvers being asked about 3.5% as many entities, not losing contests.
+--
+-- **`0250`'s "1 enacted against 7 refused and 11 superseded" is RETRACTED as a live-architecture
+-- statement.** It was true of one run. Across the surviving evidence cuOpt has 74 enactments, and the
+-- shape is different in a way that changes the diagnosis: cuOpt's dominant fate is **superseded
+-- (83.6%), not refused (9.7%)**. A refusal means the shield judged the proposal infeasible. A
+-- supersession means the proposal was fine and arrived too late to matter — 570
+-- `newer_proposal_same_entity` plus 425 `entity_decided_by_other_proposal`. **cuOpt is not being
+-- rejected on quality** — and §9 establishes that it is not being outrun either: 97.2% of that 570 is
+-- cuOpt superseding its OWN earlier proposal, i.e. its refresh cadence, not a rival arriving first.
+--
+-- ══ §4 THE PRECEDENCE TABLE DOES NOT GOVERN THE PROPOSER THAT WINS ════════════
+--
+-- `ottoq_proposer_precedence` declares four seats: `forward_lex` 0, `cuopt` 10, `cuopt_fallback` 11,
+-- `llm_advisor` 20, all `holds_tick`. **`greedy_constrained` has no row and carries
+-- `proposer_rank IS NULL` on all 16,246 of its dispositions** — and it takes 97.7% of enactments,
+-- while the seat ranked 0 takes 0.7%.
+--
+-- **This is NOT presented as a defect, and the difference matters.** `greedy_constrained` is the
+-- in-process local proposer (`D001` records it as "in-process"); the precedence table exists to order
+-- the EXTERNAL proposer seats against each other and against the local path's right to dispose. An
+-- unranked in-process proposer beating ranked external ones is the propose/dispose design working:
+-- the kernel disposes, and it is not obliged to wait.
+--
+-- **What IS worth a decision is that the declared architecture describes 2.3% of the behaviour.**
+-- CLAUDE.md 2.5 reads as though CP-SAT schedules inside the site and cuOpt routes between sites.
+-- On one depot there is no inter-site layer (rule 8), and inside the site the ranked solvers enact
+-- 110 decisions against the local path's 4,700.
+--
+-- ══ §5 SO WHAT IS cuOPT'S TRUE ROLE, ANSWERED FROM THE WIRING ═════════════════
+--
+-- It has one, it is explicit in code, and it is not the one `D001` left it with.
+-- `supabase/functions/_shared/cpsat_agent_chain.ts` declares:
+--
+--     export const PRIMARY_ASSIGNMENT_ENGINE  = "cp_sat_forward_lex";
+--     export const FALLBACK_ASSIGNMENT_ENGINE = "cuopt";
+--
+-- and `ottoq-cpsat-propose`'s catch block calls `queueCuOptFallback(...)` on every failure path. So
+-- **cuOpt is today the CP-SAT chain's failure handler**, and `ottoq_proposer_precedence` says the
+-- same in data: *"NVIDIA cuOpt specialist and service-failure fallback. Lower priority than CP-SAT."*
+--
+-- **That role is load-bearing precisely because CP-SAT fails often.** 467 of CP-SAT's 487 real calls
+-- ended in all-abstain, timeout or 500 — and each of those hands off to cuOpt. A fallback behind a
+-- primary that answers 4.1% of the time is not a vestige.
+--
+-- **AND `D001` HAS NOT BEEN REVISITED, WITH AN ARITHMETIC COINCIDENCE THAT MAKES THE POINT EXACTLY.**
+-- It decided on 2026-09-03 to "retire cuOpt from the decide path," it is the only file in
+-- `docs/decisions/`, and nothing supersedes it. Of cuOpt's 1,159 endpoint-carrying calls, **1,143
+-- happened AFTER 2026-09-03 — leaving exactly 16 before it.** Sixteen is the number `D001` and
+-- `0220` both reasoned from. So the entire evidence base for retiring cuOpt is the 1.4% of its
+-- calls that predate the decision, and **98.6% of everything cuOpt has ever done, it did after being
+-- retired.** The documented decision and the running system disagree, and the running system is the
+-- one serving traffic. Reconciling that is Chase's call, not a cleanup — which is why this file
+-- stops here.
+--
+-- ══ §6 THE THREE THINGS THAT WOULD SETTLE THE EDGE QUESTION ═══════════════════
+--
+-- **(a) Why CP-SAT abstains 420 times out of 487.** This is the highest-value unknown in the whole
+-- solver layer, and abstention is not failure — it is CP-SAT declining a frame. `0372` already
+-- showed it declining a frame our own pointer census called four-free when all four stalls were
+-- `Faulted`, i.e. it was RIGHT and the census was wrong. The request carries `max_assets: 8` and
+-- `det_budget_s: 0.25` against a depot at 87%/80% occupancy on the two stall types that matter
+-- (`0250`), so the hypothesis to test is that it is being handed frames with no feasible assignment
+-- rather than failing to find one. That is a measurement, not an opinion, and it is not taken here.
+--
+-- **(b) Whether supersession is fixable by the deferral it already has — AND THE OBVIOUS VERSION OF
+-- THIS EXPERIMENT IS FORBIDDEN, WHICH I NEARLY MISSED.** cuOpt's 995 supersessions are the signature
+-- of a proposal with no protected window: `cuopt_first_refusal_max_defers` is **0** at global scope.
+-- The tempting one-row fix is to raise the global to 1. **Do not.** The catalog says why in its own
+-- description — *"0152: global tier is 0 — the deterministic core runs alone. Re-enable per run with
+-- a run-scoped 1"* — and the same is true of `cuopt_propose_enabled`. A global defer would give a
+-- nondeterministic network proposer a hold inside the certified deterministic path, which is exactly
+-- what CLAUDE.md 2.5 forbids in terms: *"cuOpt can never sit inside the certified deterministic
+-- path."* The global 0 is a certification invariant, not an oversight.
+--
+-- So the experiment is **run-scoped and already half-run**: `ottoq_agentic_arm` writes 1 on every
+-- armed run, so armed runs already carry the protected window and unarmed ones do not. The
+-- measurement is therefore available from existing evidence without changing any dial — partition
+-- cuOpt's dispositions by whether their run was armed, and see whether `superseded` falls and
+-- `enacted`/`refused` rise. `refused` would be the honest good outcome there, because it means the
+-- shield actually judged the proposal instead of the clock discarding it. That partition is the next
+-- query to write, and it is NOT taken here because it needs the per-run arm state joined in.
+--
+-- **(c) The comparison that does not exist.** `D001` §"the finding that matters more" still stands
+-- word for word: we cannot show OTTO-Q beats anything, because the arms have not been run. None of
+-- §3's enactment rates is an outcome measure — a proposer that enacts 28.9% is not thereby better
+-- than one that enacts 6.2%, it is only louder and earlier. **Enactment share is a measure of who
+-- got there first, not of who was right.** C5's four-policy CRN comparison is the only thing that
+-- converts any of this into an edge claim in either direction.
+--
+-- ══ §8 §6b IS FALSIFIED, THE REAL CAUSE IS SELF-CHURN, AND §3's FRAMING WAS
+--       UNFAIR TO BOTH EXTERNAL SOLVERS ══════════════════════════════════════
+--
+-- I ran §6b's partition rather than leaving it. **It falsifies the hypothesis outright.** Every one
+-- of cuOpt's 1,190 proposals came from a run carrying a run-scoped
+-- `cuopt_first_refusal_max_defers` of **6** — not 0, and not the 1 CLAUDE.md describes, but the
+-- "agentic full mode" value. **cuOpt has had a six-beat protected window on every proposal it has
+-- ever made, and is still 83.6% superseded.** A missing right of first refusal is not the cause.
+--
+-- **The cause is that cuOpt supersedes itself.** Its 1,190 proposals cover only **329 distinct
+-- (run, entity) pairs** — 3.62 proposals per entity, **38 for one entity**, and **861 of the 1,190
+-- (72.4%) are re-proposals for an entity cuOpt had already proposed for.** 570 of the 995
+-- supersessions carry `newer_proposal_same_entity`, which is cuOpt displacing its own earlier
+-- proposal. The refresh has no de-duplication against an in-flight proposal for the same entity, so
+-- it re-solves and re-submits on every beat and each submission invalidates the last.
+--
+-- **AND THE SAME DEFECT IS WORSE IN CP-SAT.** Per entity:
+--
+--     source                   proposals   entities   per entity   entities won   % won   % props enacted
+--     ----------------------   ---------   --------   ----------   ------------   -----   ---------------
+--     greedy_constrained          16,406      9,579         1.71          3,741   39.1%             29.0%
+--     forward_lex (CP-SAT)         4,166        397        10.49             36    9.1%              0.9%
+--     cuopt                        1,190        329         3.62             65   19.8%              6.2%
+--     ottoq_service_priority         357        349         1.02              0    0.0%              0.0%
+--
+-- **CP-SAT re-proposes 10.49 times per entity — six times greedy's churn and nearly three times
+-- cuOpt's.** Its 0.9% per-proposal enactment rate is mostly that churn dividing a fixed numerator.
+--
+-- **So §3's rates were the wrong denominator, and the honest comparison narrows the gap a long way.**
+-- Per ENTITY, the win rates are greedy **39.1%**, cuOpt **19.8%**, CP-SAT **9.1%** — cuOpt is half
+-- the local path, not a fifth of it. Same defect shape as `0290` (G98's wrong denominator) and
+-- `0250`: a ratio whose denominator is inflated by the measured system's own churn.
+--
+-- **And a scope fact that reframes the 2.3% share entirely.** greedy proposes for **9,579**
+-- (run, entity) pairs; cuOpt for 329 and CP-SAT for 397 — about **3.5%** as many. The external
+-- solvers are not losing 97.7% of contests, **they are being asked about 3.5% of the work.** Whether
+-- that narrow slice is the right slice is a design question nobody has written down, and it is a far
+-- better question than "is cuOpt worth keeping."
+--
+-- ══ §9 §8's "ACTIONABLE DEFECT" IS RETRACTED. THE CHURN IS REFRESH, NOT WASTE,
+--       AND THERE IS NO DE-DUPLICATION BUG TO FIX ══════════════════════════════
+--
+-- §8 called the re-proposal churn "the actionable defect" and recommended de-duplicating against an
+-- in-flight proposal. **I checked before building it, and the check kills the recommendation.**
+--
+-- Of the 570 cuOpt proposals superseded as `newer_proposal_same_entity`, **554 — 97.2% — have a
+-- LATER cuOpt proposal for the same (run, entity).** They were superseded by cuOpt itself.
+--
+-- And that is `ottoq_submit_external_proposal` working exactly as designed: on a new proposal for the
+-- same `(run, action_context, entity)` it marks the prior `pending` row
+-- `superseded/newer_proposal_same_entity`. **A proposer that re-solves each beat and submits an
+-- updated assignment SHOULD supersede its own stale one — the newest plan is the best plan it has.**
+-- Superseding yourself is not losing a contest; it is the refresh cadence showing up in a status
+-- column.
+--
+-- So: **no de-duplication is warranted, and building it would have made the system worse** by pinning
+-- a stale plan in place while a better one was discarded. §8's per-entity denominator STANDS — that is
+-- the measurement correction and it is right. What does not stand is reading the churn as a defect.
+--
+-- **What remains, and it is an efficiency question rather than a correctness one:** cuOpt placed
+-- 1,159 network calls to cover 329 entity-runs, and CP-SAT 10.49 proposals per entity. If a refresh
+-- adds nothing when the frame has not changed, the saving is in CALL VOLUME (latency, spend, and
+-- NVIDIA quota), not in decision quality. That is a cadence-tuning question for whoever owns the
+-- refresh beat, and it needs a "did the frame actually change" test that does not exist yet. It is
+-- NOT the shape §8 described.
+--
+-- **The general lesson, which is the reason this section exists rather than a silent edit:** a status
+-- column that reads like failure (`superseded`, 83.6%) can be the mechanism functioning. Three
+-- sections of this file were needed to get from "cuOpt is being rejected" to "cuOpt is being outrun"
+-- to "cuOpt is refreshing itself," and only the last one is true. Same discipline as `0250`, `0290`
+-- and §8 itself: **check what the denominator and the status word actually mean before recommending
+-- a build against them.**
+--
+
+-- ══ §10 THE ANSWER TO CHASE'S QUESTION, AND IT RETRACTS THIS FILE'S OWN TITLE ══
+--
+-- **"cuOpt outperforms the solver that replaced it" is an artifact of aggregating over CP-SAT's
+-- outages, and the title of this file (before it was renamed) asserted it as a present-tense fact.**
+-- `0415` §3 establishes the regime split from the fallback reasons' own first/last timestamps: CP-SAT
+-- was unreachable or misdeployed for most of its recorded life, in four episodes that each stopped
+-- when they were fixed —
+--
+--     "CP-SAT service is not configured"                1,502   09-19 17:12 -> 09-20 05:16
+--     "THE RUNNING IMAGE PREDATES CP-SAT"                 835   09-20 19:46 -> 09-21 02:31
+--     "Signal timed out."                                 206   09-20 19:32 -> 09-21 07:41
+--     "invalid proposer envelope"                         191   09-20 15:46 -> 09-20 19:45
+--
+-- **86% of the 2,735 fallbacks were configuration or deployment failures, not solver failures**, the
+-- last ending as `0398` gave the box an Elastic IP at 07:38 on 09-21 and verified `/health` lists
+-- `cp_sat_forward_lex`.
+--
+-- **Measured on the CURRENT regime only — everything from 2026-09-21 07:41 onward:**
+--
+--     cpsat_service    444 real calls, avg 88 ms, last 09-22 02:03
+--     nvidia_cuopt       0 calls
+--
+-- **cuOpt has not been called once since CP-SAT became reachable.** Its last call is 2026-09-21
+-- 07:32 — NINE MINUTES before the fix. So the whole picture resolves, and it is a better story than
+-- either the brief or `D001` tells:
+--
+--   **cuOpt's entire recent life WAS CP-SAT's outage.** It is wired as the fallback, it absorbed 2,735
+--   failed handoffs across four days of infrastructure failure, it answered 98.4% of them, and the
+--   moment the primary came back it went quiet. **Its edge is availability, not optimization** — and on
+--   that measure it performed exactly as a fallback should.
+--
+-- So the live question is not cuOpt's role at all. It is **why CP-SAT declines**, and `0415` §1(c)
+-- answers most of that too: **328 of its 444 current-regime calls (74%) were handed an EMPTY candidate
+-- set** and correctly returned nothing in ~21 ms. On the 112 calls that carried candidates it produced
+-- a usable proposal 20 times — **17.9%, not 4.1%**, and in the same band as cuOpt's 19.8% per entity.
+--
+-- **What this file got right and wrong, so the next reader can weight it.** RIGHT: cuOpt is not
+-- retired and D001 is stale (§5); the per-entity denominator (§8); the self-refresh retraction (§9);
+-- the endpoint predicate (§1). WRONG, and retracted here: the present-tense performance comparison in
+-- the old title and §2, which compared a working solver against a broken one without noticing the
+-- period contained the breakage. **The general lesson, which is the fourth instance tonight: an
+-- aggregate over a window containing a fixed outage describes a system that no longer exists.** Take a
+-- cutover, always.
+--
+-- ══ §7 WHAT MAY AND MAY NOT BE SAID ══════════════════════════════════════════
+--
+-- SAY: *"cuOpt reached the NVIDIA endpoint 1,159 times, answered 1,141 of them for 5,063 proposals
+-- at 2.7 s average, and 74 of its proposals were enacted; it is wired as the CP-SAT chain's fallback
+-- engine, and 84% of its proposals are superseded rather than refused — outrun, not rejected."*
+--
+-- DO NOT SAY: "cuOpt is retired" (it is live, and it is a declared fallback); "cuOpt never worked"
+-- (98.4% answer rate); "CP-SAT replaced cuOpt" (it answers 4.1% of its calls and enacts 0.9% of its
+-- proposals); "cpsat_service made 3,638 calls" (487); "4,248 Nemotron calls" (zero carry an
+-- endpoint); or any enactment rate stated as a performance comparison (§6c).
+--
+-- **AND DO NOT SAY cuOpt outperforms CP-SAT** (§10) — that compared a working solver with a broken
+-- one. In the current regime CP-SAT is the only external solver being called at all, and its usable-
+-- answer rate on frames that carry candidates is 17.9%, not the 4.1% this file's §2 implies.
+--
+-- **AND DO NOT SAY the re-proposal churn is a defect** — §9 retracts that: 97.2% of supersessions
+-- are a proposer superseding its own stale plan, which is correct behaviour. The only live question
+-- there is call-volume efficiency, not decision quality.
+--
+-- **AND PREFER THE PER-ENTITY RATE TO THE PER-PROPOSAL RATE EVERY TIME (§8).** Per proposal, cuOpt
+-- reads 6.2% and CP-SAT 0.9%; per entity they read 19.8% and 9.1%. The per-proposal figures are
+-- deflated by each solver's own re-proposal churn, so quoting them understates both — and the
+-- direction that understates us is still a wrong number.
+
+\echo '=== 0322 §8 — the defer hypothesis, falsified: every cuOpt proposal already had 6 defers ==='
+WITH armed AS (
+  SELECT scope_id AS sim_run_id, param_value AS defers
+    FROM public.ottoq_policy_params
+   WHERE scope_type='run' AND param_key='cuopt_first_refusal_max_defers'
+)
+SELECT COALESCE(a.defers::text, 'no run-scoped row (global 0)') AS defer_setting,
+       count(DISTINCT d.sim_run_id) AS runs, count(*) AS cuopt_proposals,
+       round(100.0*count(*) FILTER (WHERE d.status='superseded')/count(*),1) AS pct_superseded
+  FROM public.ottoq_proposal_disposition_ledger d
+  LEFT JOIN armed a ON a.sim_run_id = d.sim_run_id
+ WHERE d.source='cuopt' GROUP BY 1 ORDER BY 1;
+-- One row, defers=6. A six-beat protected window and 83.6% supersession: not a window problem.
+
+\echo '=== 0322 §8 — the real cause, and the fair denominator ==='
+SELECT source, count(*) AS proposals,
+       count(DISTINCT (sim_run_id, entity_id)) AS entities,
+       round(count(*)::numeric / count(DISTINCT (sim_run_id, entity_id)), 2) AS proposals_per_entity,
+       count(DISTINCT (sim_run_id, entity_id)) FILTER (WHERE status='enacted') AS entities_won,
+       round(100.0*count(DISTINCT (sim_run_id, entity_id)) FILTER (WHERE status='enacted')
+             / count(DISTINCT (sim_run_id, entity_id)), 1) AS pct_entities_won,
+       round(100.0*count(*) FILTER (WHERE status='enacted')/count(*), 1) AS pct_proposals_enacted
+  FROM public.ottoq_proposal_disposition_ledger
+ GROUP BY 1 ORDER BY proposals DESC;
+-- CP-SAT re-proposes 10.49x per entity, cuOpt 3.62x, greedy 1.71x. Per ENTITY the win rates are
+-- 39.1% / 19.8% / 9.1% -- and the external solvers see 3.5% as many entities as greedy does.
+
+\echo '=== 0322 §1 — the predicate: which ledger rows are actually calls ==='
+SELECT provider, count(*) AS ledger_rows,
+       count(*) FILTER (WHERE endpoint IS NOT NULL) AS real_calls,
+       round(100.0*count(*) FILTER (WHERE endpoint IS NULL)/count(*), 1) AS pct_not_a_call,
+       round(avg(latency_ms))                                  AS avg_ms_all_rows,
+       round(avg(latency_ms) FILTER (WHERE endpoint IS NOT NULL)) AS avg_ms_real_calls
+  FROM public.ottoq_model_call_ledger
+ GROUP BY 1 ORDER BY 2 DESC;
+-- cuOpt is the only provider whose "calls" are calls. cpsat_service's average latency is understated
+-- 7.4x by 3,151 decision rows that never left the database.
+
+\echo '=== 0322 §2 — what the CP-SAT service actually does when it IS called ==='
+SELECT outcome, count(*) AS real_calls, round(avg(latency_ms)) AS avg_ms
+  FROM public.ottoq_model_call_ledger
+ WHERE provider='cpsat_service' AND endpoint IS NOT NULL
+ GROUP BY 1 ORDER BY 2 DESC;
+-- 420 all-abstain, 44 timeouts at the 20 s bound, 20 answers, 3 server errors.
+
+\echo '=== 0322 §3 — dispositions: superseded is not refused, and that is the diagnosis ==='
+SELECT source, proposer_rank, count(*) AS proposals,
+       count(*) FILTER (WHERE status='enacted')    AS enacted,
+       count(*) FILTER (WHERE status='refused')    AS refused,
+       count(*) FILTER (WHERE status='superseded') AS superseded,
+       round(100.0*count(*) FILTER (WHERE status='enacted')/count(*), 1) AS pct_enacted
+  FROM public.ottoq_proposal_disposition_ledger
+ GROUP BY 1,2 ORDER BY enacted DESC;
+-- The unranked in-process proposer takes 97.7% of enactments. That is propose/dispose working, NOT a
+-- defect -- and it is also why no enactment rate here is an outcome measure.
+
+\echo '=== 0322 §4 — cuOpt has no protected window globally, AND THAT IS ON PURPOSE ==='
+SELECT c.param_key, c.default_value, c.min_value, c.max_value, c.description
+  FROM public.ottoq_policy_param_catalog c
+ WHERE c.param_key IN ('cuopt_first_refusal_max_defers','cuopt_propose_enabled')
+ ORDER BY c.param_key;
+-- Read the descriptions before touching either: "0152: global tier is 0 -- the deterministic core
+-- runs alone. Re-enable per run with a run-scoped 1." Raising the GLOBAL defer would put a
+-- nondeterministic network proposer inside the certified path (CLAUDE.md 2.5 forbids exactly this).
+-- ottoq_agentic_arm writes 1 per armed run, so the experiment is run-scoped and needs no dial change.
+
+\echo '=== 0322 §5 — the documented decision and the running system disagree ==='
+SELECT 'D001 decided 2026-09-03: retire cuOpt from the decide path' AS decision,
+       (SELECT count(*) FROM public.ottoq_model_call_ledger
+         WHERE provider='nvidia_cuopt' AND endpoint IS NOT NULL
+           AND called_at > '2026-09-03') AS cuopt_calls_since,
+       (SELECT max(called_at) FROM public.ottoq_model_call_ledger
+         WHERE provider='nvidia_cuopt' AND endpoint IS NOT NULL) AS last_cuopt_call;
+-- Nothing in docs/decisions/ supersedes D001. Reconciling it is a product decision, not a cleanup.
+
+\echo '=== 0322 §9 — the churn is SELF-refresh, so there is no de-duplication bug ==='
+WITH s AS (
+  SELECT d.sim_run_id, d.entity_id, d.proposal_created_at
+    FROM public.ottoq_proposal_disposition_ledger d
+   WHERE d.source='cuopt' AND d.status='superseded'
+     AND d.disposition_reason='newer_proposal_same_entity'
+)
+SELECT count(*) AS superseded_as_newer,
+       count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_proposal_disposition_ledger l
+          WHERE l.sim_run_id=s.sim_run_id AND l.entity_id=s.entity_id
+            AND l.source='cuopt' AND l.proposal_created_at > s.proposal_created_at)) AS later_cuopt_exists,
+       round(100.0*count(*) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_proposal_disposition_ledger l
+          WHERE l.sim_run_id=s.sim_run_id AND l.entity_id=s.entity_id
+            AND l.source='cuopt' AND l.proposal_created_at > s.proposal_created_at))/count(*), 1)
+         AS pct_self_superseded
+  FROM s;
+-- 554 of 570 = 97.2%. A proposer superseding its own stale plan is the mechanism working. Building
+-- de-duplication here would pin a stale plan while discarding a better one.
