@@ -57,14 +57,17 @@ SELECT visit_charges, count(*) AS atoms, count(*) FILTER (WHERE status = 'done')
 --     its visit charges, and a car on a charger is in front of the charger's sensors. Correct as built.
 --   * The 2 started before their charge are Zoox-AV-072 and Zoox-AV-076, and both come from one rule outside 0511:
 --     `twin.ottoq_sim_advance_flow_contract` marks a visit's charge step done once the car, not charging and not en
---     route, is within 2 points of its target. 076 reached the gate at 8:44 with 83% against 85%; its charge step was
---     closed at 8:45:09 -- no `closed_by`, the flow contract's mark -- while the decide path had already sent it to an
---     L2, where it plugged in at 8:46:01 and charged 83 -> 90% for 36 minutes. With the charge step closed, 0511's hold
---     let go, and a technician started the inspection at the gate at 8:45:33, 28 seconds before the charger's sensors
---     would have. 072 (88% against 90%, an opportunistic charge) had its cabin work started at 8:02 by the starter's
---     staged-for-departure catch-up, which is what that catch-up is for; its charge step was then closed at 8:05:22 and
---     it charged 88 -> 90% on an L2 from 8:06 anyway. Filed as G244: two parts of the engine disagree about whether the
---     car still needs its charge, and the car charges while its visit says it did not need to.
+--     route, is within 2 points of its target, while the need deriver and the decide path's charge cursor both call a
+--     charge needed below 1 point under it (0493, G210). 076 reached the gate at 8:44 with 83% against 85%, inside that
+--     gap: its charge step was closed at 8:45:09 -- no `closed_by`, the flow contract's mark -- and 24 seconds later, at
+--     8:45:34, the charge cursor booked it an L2 (83 < 84), started its cabin work in the same act, and it plugged in at
+--     8:46:01 and charged 83 -> 90% for 36 minutes. With the charge step closed, 0511's hold did not apply, so a
+--     technician started the inspection at the gate at 8:45:34, 28 seconds before the plug-in. (A first draft of this
+--     READ said the decide path had sent the car before the close; the bookings say after, by 24 seconds.) 072 (88%
+--     against 90%, an opportunistic charge) had its cabin work started at 8:02 by the starter's staged-for-departure
+--     catch-up, which is what that catch-up is for; its charge step was closed at 8:05:22, the cursor booked it at
+--     8:05:44, and it charged 88 -> 90% from 8:06. Filed as G244: the engine's three answers to "does this car need a
+--     charge" use two rules, and a car between them charges after its visit says it did not need to.
 
 \echo '=== 0377 §1(b) — triage checks by whether the visit charges and whether every need they judge is in the cabin ==='
 WITH a AS (
@@ -265,8 +268,8 @@ SELECT v.display_name AS car, a.visit_charges, a.performed_by, a.started_at,
 -- READ on caf85837 (sim clock, CT):
 --     Tesla-AV-060   no charge  charger_sensors  8:02:05  -- booted on a charger, charge done
 --     Waymo-AV-013   no charge  charger_sensors  8:02:05  -- the same
---     Zoox-AV-072    charges    technician       8:02:05  charge step done 8:05:22, no closed_by; plugged in 8:06:12
---     Zoox-AV-076    charges    technician       8:45:33  charge step done 8:45:09, no closed_by; plugged in 8:46:01
+--     Zoox-AV-072    charges    technician       8:02:05  charge step done 8:05:22, no closed_by; booked 8:05:44, plugged in 8:06:12
+--     Zoox-AV-076    charges    technician       8:45:34  charge step done 8:45:09, no closed_by; booked 8:45:34, plugged in 8:46:01
 --   (a) HELD but for 2 of 87, both G244. (b) HELD: 85 of 85 started on a charge were the sensors', and the 2 more the
 --   sensors did were on cars parked on a charger.
 
@@ -286,8 +289,8 @@ SELECT COALESCE(closed_by, '(flow contract)') AS closed_by, count(*) AS closed,
                                          AND os.started_at >= ca.done_at AND os.started_at < ca.done_at + interval '15 minutes')) AS a_charge_began_after
   FROM ca GROUP BY 1 ORDER BY 2 DESC;
 -- READ on caf85837: `ottoq_satisfied` 34 (none followed by a charge), the flow contract 16 (14 at the end of the car's
---   session, as meant; 2 before a charge the decide path had already committed, 072 and 076, 7.4 and 36 minutes of
---   charging after the visit said the charge was done), `session_completed` 6.
+--   session, as meant; 2 before a charge the cursor booked 22 and 24 seconds later, 072 and 076, then 7.4 and 36 minutes
+--   of charging after the visit said the charge was done), `session_completed` 6.
 
 \echo '=== 0377 §4(i) — the cockpits on a live run ==='
 -- Read in the browser, not SQL: the cards read the running run only (`ottoq_depot_cards` returns no vehicles once a
