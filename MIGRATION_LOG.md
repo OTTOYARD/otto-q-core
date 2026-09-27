@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0511 — GENERATED, not a log
+## Index, 0134–0536 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -516,7 +516,32 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0509](db/migrations/0509_a_charging_card_ends_when_the_charge_physics_says_it_will.sql) | `20260927020531` | yes — ledger | **Under 0508 a charge step stays current until its session ends, and its card said "until" a time the |
 | [0510](db/migrations/0510_one_air_temperature_for_the_whole_depot.sql) | `20260927030227` | yes — ledger | **A charge, a car on the road and a telemetry packet each drew their own air temperature from the whole year, |
 | [0511](db/migrations/0511_the_interior_inspection_happens_during_the_charge.sql) | `20260927034307` | yes — ledger | **A car that charges has its interior inspection at the charger, during the charge, done by the charger's |
+| [0512](db/migrations/0512_the_cards_say_who_did_the_work.sql) | `20260927050956` | yes — ledger | **The cockpits can say that the charger's sensors did an inspection, and that a cleaning need is waiting on |
+| [0513](db/migrations/0513_the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair.sql) | `20260927050506` | yes — ledger | **G243: the weekly calibration refit cannot write the priors while a certification rig is running, the job |
+| [0514](db/migrations/0514_the_charges_that_teach_the_booking_window_are_purged_with_their_run.sql) | `20260927052757` | yes — ledger | **G240, step 1: every charge that stops on an operator or production run is recorded in an append-only |
+| [0515](db/migrations/0515_the_ledger_records_what_the_charge_was_booked_for_and_aimed_at.sql) | `20260927060333` | yes — ledger | **G240, step 1b: the charge-duration ledger records, for every charge it captures from here on, the SoC the |
+| [0516](db/migrations/0516_the_booking_window_is_fitted_from_the_charges_with_the_run_s_stop_counted.sql) | `20260927061451` | yes — ledger | **G240, step 2: a versioned, append-only calibration of the charge booking window, fitted from 0514's |
+| [0517](db/migrations/0517_a_calibrated_charge_window_behind_a_dial.sql) | `20260927062217` | yes — ledger | **G240, step 3: the booking writer sizes a charge's window from a named calibration version when the dial |
+| [0518](db/migrations/0518_one_rule_for_whether_a_car_needs_its_charge.sql) | `20260927074142` | yes — ledger | **G244: three parts of the engine answer "does this car still need a charge", and the flow contract used a |
+| [0519](db/migrations/0519_the_charger_s_sensors_cannot_finish_an_inspection_on_a_car_that_has_left.sql) | `20260927074236` | yes — ledger | **G245: an interior inspection the charger's sensors started was marked done when its minutes ran out, even |
+| [0520](db/migrations/0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql) | `20260927081719` | yes — ledger | **G240, step 4's instrument: a designed pair can now judge the calibrated booking window, which it could not |
+| [0521](db/migrations/0521_the_charger_s_sensors_see_only_a_car_on_a_charger.sql) | `20260927085218` | yes — ledger | **G246: the charger's sensors were credited with interior inspections and cabin triage checks on cars that |
+| [0522](db/migrations/0522_the_dial_window_closes_before_its_last_pair_could_outlast_it.sql) | `20260927111501` | yes — ledger | **G247: the dial window's close and the dial runner fired in the same minute, so the runner could start a |
+| [0523](db/migrations/0523_a_dial_experiment_restarts_only_for_a_change_that_can_move_an_arm.sql) | `20260927122408` | yes — ledger | **G250: a dial experiment counted only the pairs run on the current engine, and the engine was the md5 of every |
+| [0524](db/migrations/0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql) | `20260927131711` | yes — ledger | **G249: a run whose fleet seed failed ran anyway, on the previous run's world. The seed tripped on an arm |
+| [0525](db/migrations/0525_the_charge_evidence_records_the_cadence_it_was_observed_at.sql) | `20260927131932` | yes — ledger | **G248: the charge-duration evidence did not record the cadence a charge was observed at, and its reader did |
+| [0526](db/migrations/0526_a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked.sql) | `20260927140637` | yes — ledger | **G251: a visit with nothing to charge could not have its cabin work started while its car waited for a bay |
+| [0527](db/migrations/0527_kpi_two_counts_a_turn_when_a_car_leaves_a_service_point.sql) | `20260927140742` | yes — ledger | **G252: KPI 2 counted a booking the car outlived as a turn, and a charge still running at the day's end as no |
+| [0528](db/migrations/0528_kpi_four_counts_the_technicians_and_divides_by_the_cars_that_came_in.sql) | `20260927150822` | yes — ledger | **G253: KPI 4, "human interventions per asset-turn", never counted a technician, and divided by bookings |
+| [0529](db/migrations/0529_a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured.sql) | `20260927151819` | yes — ledger | **G254: the dial verdict skipped any guardrail whose control arm read 0 -- it divided each change by the |
+| [0530](db/migrations/0530_unmet_demand_is_measured_from_the_cars_actually_out.sql) | `20260927153902` | yes — ledger | **G255: nothing on the scorecard measured whether the depot met the work side's demand. On the day's full busy |
+| [0531](db/migrations/0531_the_learners_arms_start_through_the_operators_door.sql) | `20260927161230` | yes — ledger | **G256: the dial experiments' arms start the way the operator's day starts. They started in a busy day that met |
+| [0532](db/migrations/0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait.sql) | `20260927164827` | yes — ledger | **The challenger, first form: a loop beside the funnel that asks, every minute of a live day, whether the |
+| [0533](db/migrations/0533_the_charge_target_an_arm_is_given_is_the_one_it_charges_to.sql) | `20260927171208` | yes — ledger | **G258: an experiment on the three charge-target dials could not move its arms, and its verdict would have read |
+| [0534](db/migrations/0534_an_experiment_can_wait_its_turn.sql) | `20260927173711` | yes — ledger | **The dial runner can be told that an experiment waits, and tonight the energy replication waits so the two |
+| [0535](db/migrations/0535_a_top_off_is_offered_to_a_car_still_waiting_for_one.sql) | `20260927175201` | yes — ledger | **G259: an approved top-off moved a car out of the wash bay it was being washed in, and the tick failed. The |
+| [0536](db/migrations/0536_the_cockpits_see_what_the_brain_questions_and_what_it_learns.sql) | `20260927180246` | yes — ledger | **The second loop, made visible. The challenger's questions and grades, and the learner's experiments and |
 
-377 migrations indexed.
+402 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

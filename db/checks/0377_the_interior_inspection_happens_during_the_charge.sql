@@ -44,6 +44,30 @@ SELECT visit_charges, count(*) AS atoms, count(*) FILTER (WHERE status = 'done')
 --   71 started before the car's charge began, and 77 of the cars were also sent to the arrival inspection lane. Of 9 on
 --   visits with no charge, 7 started, 6 of those cars sent to the lane. (0374 §3 read the same shape on 66 lane visits:
 --   the inspection overlapped 17, came after 19, and was already done before 12.)
+-- READ on caf85837 (2026-09-27 05:39 UTC; the validation run after 0510-0513, busy_day on the twin depot, started
+--   05:12:48 UTC and stopped by the operator 05:37:07 UTC -- 12:12 to 12:37 AM CT -- at sim 11:13 AM, tick 354):
+--     visits that charge   130 inspections, 87 started (all done), 85 during a charge, all 85 by the charger's
+--                          sensors; 2 started before the car's charge; 16 of the cars also had a lane booking
+--     visits with no charge  11 inspections, 7 started, 2 of them by the charger's sensors, 4 cars with a lane booking
+--   The lane column counts a car's inspect bookings anywhere in the run, not the leg planned with its charge (§2 reads
+--   that one exactly: 0 of 121). The four exceptions, each traced (§4(a)):
+--   * The 2 by the sensors on visits with no charge are Tesla-AV-060 and Waymo-AV-013. Both booted at 8:00 AM in
+--     `charge_complete_holding` -- parked on a charger with their charge done -- and were inspected at 8:02 while
+--     still on it (they left at 8:06 and 8:07). The starter credits the sensors by where the car is, not by whether
+--     its visit charges, and a car on a charger is in front of the charger's sensors. Correct as built.
+--   * The 2 started before their charge are Zoox-AV-072 and Zoox-AV-076, and both come from one rule outside 0511:
+--     `twin.ottoq_sim_advance_flow_contract` marks a visit's charge step done once the car, not charging and not en
+--     route, is within 2 points of its target, while the need deriver and the decide path's charge cursor both call a
+--     charge needed below 1 point under it (0493, G210). 076 reached the gate at 8:44 with 83% against 85%, inside that
+--     gap: its charge step was closed at 8:45:09 -- no `closed_by`, the flow contract's mark -- and 24 seconds later, at
+--     8:45:34, the charge cursor booked it an L2 (83 < 84), started its cabin work in the same act, and it plugged in at
+--     8:46:01 and charged 83 -> 90% for 36 minutes. With the charge step closed, 0511's hold did not apply, so a
+--     technician started the inspection at the gate at 8:45:34, 28 seconds before the plug-in. (A first draft of this
+--     READ said the decide path had sent the car before the close; the bookings say after, by 24 seconds.) 072 (88%
+--     against 90%, an opportunistic charge) had its cabin work started at 8:02 by the starter's staged-for-departure
+--     catch-up, which is what that catch-up is for; its charge step was closed at 8:05:22, the cursor booked it at
+--     8:05:44, and it charged 88 -> 90% from 8:06. Filed as G244: the engine's three answers to "does this car need a
+--     charge" use two rules, and a car between them charges after its visit says it did not need to.
 
 \echo '=== 0377 §1(b) — triage checks by whether the visit charges and whether every need they judge is in the cabin ==='
 WITH a AS (
@@ -70,6 +94,10 @@ SELECT visit_charges, judges_only_the_cabin, count(*) AS triage_checks,
 --   tidy); 17 started, 3 of them during a charge, none by the charger's sensors. 6 more also judged an exterior or bay
 --   need (a sensor clean, a cosmetic repair), none during a charge. 2 on visits with no charge. The verdicts on the
 --   run's 19 judged tidies: 10 confirmed, 6 cleared, 3 escalated to a deep clean.
+-- READ on caf85837: on visits that charge, 11 triage checks judged only the cabin; all 11 started during a charge,
+--   all 11 by the charger's sensors. 4 more also judged an exterior or bay need; 3 of them started during a charge and
+--   none by the sensors -- still a technician's. 1 on a visit with no charge, by a technician. Verdicts on the run's
+--   16 judged needs: 11 confirmed, 3 cleared, 2 escalated.
 
 -- ══ §2 THE MECHANISM ════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -105,6 +133,8 @@ SELECT (SELECT lane || ' / ' || notes FROM public.service_cadence_policy WHERE s
    AND COALESCE(l.duration_basis->>'atom', 'interior_inspection') = 'interior_inspection';
 -- READ on 964cf17b: the catalogue reads `cabin / Cheap tech-pool lane at the charge stall.`; 115 interior inspection
 --   legs were planned with the charge and 17 standalone, and the seam booked the lane for 54 of the 115.
+-- READ on caf85837: the same catalogue line; 121 legs planned with the charge and 14 standalone. The lane was booked
+--   for 0 of the 121 and for 13 of the 14 standalone legs, which are the ones the lane is for.
 
 -- ══ §3 THE APPLY (0511), AND THE CANON UNDER IT ═════════════════════════════════════════════════════════════════
 --
@@ -131,6 +161,40 @@ SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
 --   the lane for the replanted leg; V3 now detaches those bookings. Bodies after: starter 27afba5d125225f796058c1a894d0b93,
 --   seam 7188902a73038886a3f7077b5bdc975f, closer f4605207eaf4860749deb4406b521239; `0511_pre` snapshots 3.
 
+\echo '=== 0377 §3(b) — the canon under 0511: each column''s verdict, and the digests that moved from its 0510 verdict ==='
+WITH v AS (
+  SELECT verdict_id, depot_id, scenario, seed, ticks, outcome, verdict->'arm_a' AS a
+    FROM public.ottoq_determinism_verdict_ledger WHERE verdict_id BETWEEN 457 AND 475),
+k AS (SELECT key FROM jsonb_object_keys((SELECT a FROM v WHERE verdict_id = 475)) key WHERE key LIKE 'h\_%' OR key = 'fp')
+SELECT n.verdict_id, n.outcome, n.scenario || '/' || n.seed || '/' || n.ticks AS col, o.verdict_id AS under_0510,
+       (SELECT string_agg(k.key, ',' ORDER BY k.key) FROM k WHERE (n.a->>k.key) IS DISTINCT FROM (o.a->>k.key)) AS moved
+  FROM v n LEFT JOIN v o ON o.depot_id = n.depot_id AND o.scenario = n.scenario AND o.seed = n.seed
+                        AND o.ticks = n.ticks AND o.verdict_id BETWEEN 457 AND 465
+ WHERE n.verdict_id >= 466 ORDER BY n.verdict_id;
+-- READ (2026-09-27 04:50 UTC, 11:50 PM CT on the 26th): all nine columns passed, verdicts 466-473 and 475, started
+--   between 03:44 and 04:14 UTC. The seven twin-depot columns each moved nine digests from their 0510 verdict (bookings, commands, decisions,
+--   events, energy, proposals, recalls, rules, service records); the two grid_smoke columns moved three (events,
+--   rules, service records); `fp` and the deferrals moved nowhere. One column needed a second attempt: verdict 474
+--   (busy_day/171717/48) failed on `calibration` alone and the runner's automatic retry, 475, passed. That failure was
+--   not 0511's. The weekly calibration refit (cron 2, Sundays 04:00 UTC) landed while 474's first arm was running,
+--   so its two arms booted on different priors. The refit's guard cannot see a pair the recert runner holds
+--   (db/checks/0384, G243). So 475 certified that column on this week's priors (bb7fb6fa) and the other eight on last
+--   week's (c5fbb56e), each internally consistent. That is why `h_cal` also moved on the 48-tick column.
+
+\echo '=== 0377 §3(c) — 0512, the cockpit reads, as applied ==='
+SELECT m.version, md5(m.statements[1]) AS stored_md5,
+       md5(pg_get_functiondef('public.ottoq_twin_snapshot(uuid)'::regprocedure)) AS snapshot_body,
+       md5(pg_get_functiondef('public.ottoq_depot_cards(uuid,uuid)'::regprocedure)) AS cards_body
+  FROM supabase_migrations.schema_migrations m WHERE m.name = 'the_cards_say_who_did_the_work';
+-- READ (2026-09-27 05:10 UTC, 12:10 AM CT): version 20260927050956, stored md5 c0b3aa5b0bcc38d4372ec31a8d7989f4 (the
+--   file's body byte for byte), forces_recert FALSE, applied with no pair in flight and no run live. Its first dry run,
+--   during the 0511 sweep (verdict 473's pair), was cancelled after waiting 60 s on a lock that pair held; the
+--   second, with nothing running, passed, and so did the apply. V3, rolled back on the newest stopped operator run: the snapshot
+--   carries the three keys on every atom, the sensors' inspection reads `performed_by = 'charger_sensors'` and the
+--   tidy `awaiting_triage = true`; the cards read contract 1.4 with the same two needs, nulls stripped. Bodies after:
+--   snapshot 95ddec4114825a3883e52d988147e826, cards 845156cf68af864f2de243e30af0f5b5; `0512_pre` snapshots 2. The
+--   cockpit halves that print these keys are not merged yet (§4(i) reads them).
+
 -- ══ §4 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --
 --   PREDICTED on the next busy_day operator run, read with §1 and §2 above on it: (a) on visits that charge, every
@@ -141,8 +205,10 @@ SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
 --   (f) on visits that charge, every triage check that judges only the cabin and starts, starts on the charger by its
 --   sensors (3 of 17 during a charge on 964cf17b, none by sensors), and (g) one that also judges an exterior or bay need
 --   is still a technician's; (h) the verdict mix stays the twin's draw (10 confirm / 6 clear / 3 escalate of 19 on
---   964cf17b is one sample of it, not a target). Not predicted: what freeing the technicians of inspections and cabin
---   triage does to the other cabin and exterior work, which (e) reads.
+--   964cf17b is one sample of it, not a target); (i) with 0512 applied, the twin snapshot and the cards (contract 1.4)
+--   carry `performed_by`, `awaiting_triage` and `triage_verdict`, and PULSE and OrchestrAV show "charger sensors" on an
+--   inspection running on a charger and "awaiting triage" on a tidy held for the verdict. Not predicted: what freeing
+--   the technicians of inspections and cabin triage does to the other cabin and exterior work, which (e) reads.
 
 \echo '=== 0377 §4(d) — done interior inspection legs by the kind of stall they name ==='
 SELECT COALESCE(st.stall_type::text, '(none)') AS stall_type, count(*) AS done_legs
@@ -151,7 +217,15 @@ SELECT COALESCE(st.stall_type::text, '(none)') AS stall_type, count(*) AS done_l
  WHERE l.sim_run_id = :'run' AND l.leg_type = 'inspect' AND l.status = 'done'
    AND COALESCE(l.duration_basis->>'atom', 'interior_inspection') = 'interior_inspection'
  GROUP BY 1 ORDER BY 2 DESC;
--- READ: pending.
+-- READ on caf85837: 93 done legs, every one naming a stall -- l2 46, dcfc 31, staging 15, wash_bay 1. (d) HELD. The
+--   77 on a charger are the sensors' at the charge; the 15 in staging are the standalone legs and the catch-ups, and 2
+--   sensor inspections that outlasted their charge: 3 of the 85 ran past the unplug (by 1.3 to 2.6 minutes of their 4-5),
+--   and the closer records where the car was when the work finished -- staging for Tesla-AV-050 and Tesla-AV-057, and
+--   for Waymo-AV-016 an L2: not the one it had been on (a first draft said it "stayed parked on it"), but a second one
+--   it reached through a staging stall after the first faulted (0388 §1). A sensor cannot look into a car that has
+--   driven away. All three were charges cut by a fault within 5 minutes, so the work started as meant and its
+--   completion never asked where the car was: G245, fixed by 0519 (the work is done only on the stall whose sensors
+--   started it, else it is pending again).
 
 \echo '=== 0377 §4(e) — cabin and exterior atoms: started, and sim-minutes from the car''s arrival to the start ==='
 SELECT x->>'svc' AS svc, count(*) AS atoms, count(*) FILTER (WHERE x->>'started_at' IS NOT NULL) AS started,
@@ -167,4 +241,68 @@ SELECT x->>'svc' AS svc, count(*) AS atoms, count(*) FILTER (WHERE x->>'started_
 --   (it now starts at the plug), and costs no depot time, because a 4-minute inspection runs inside a charge of 40-75.
 --   (Both clocks are sim: `arrived_at` is the visit's sim arrival and `started_at` the atom's sim start; the row's
 --   `created_at` is real time and never enters this.)
--- READ after: pending.
+-- READ after, on caf85837: interior_inspection 141 atoms, 94 started, 87 by the sensors, a median 4.9 sim-minutes from
+--   arrival to start; interior_tidy 33 / 17 / 8.0; item_retrieval 6 / 6 / 6.6; sensor_clean 8 / 8 / 4.5; triage_check
+--   16 / 16 / 4.3, 11 by the sensors. The inspection's median did not grow, and the reason is measured rather than
+--   guessed: on this run a car reached its charger a median 5.8 sim-minutes after arriving, and the sensors began the
+--   inspection a median 0.41 sim-minutes after the plug-in (max 1.69, inside a tick or two), so waiting for the plug
+--   cost about what waiting for a technician used to. What the technicians were freed for: the tidy started sooner
+--   (8.0 against 11.7) and every sensor clean started (8 of 8 against 4 of 7), while item retrieval started later
+--   (6.6 against 3.9). One run, small counts; a direction, not a size.
+
+\echo '=== 0377 §4(a) — interior inspections on charging visits that did not start during a charge, and sensors off a charging visit ==='
+WITH a AS (
+  SELECT vn.visit_id, vn.vehicle_id, x->>'performed_by' AS performed_by, (x->>'started_at')::timestamptz AS started_at,
+         EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) y WHERE y->>'svc' = 'charge') AS visit_charges,
+         (SELECT y FROM jsonb_array_elements(vn.atoms) y WHERE y->>'svc' = 'charge' LIMIT 1) AS charge_atom
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id = :'run' AND x->>'svc' = 'interior_inspection' AND x->>'started_at' IS NOT NULL)
+SELECT v.display_name AS car, a.visit_charges, a.performed_by, a.started_at,
+       a.charge_atom->>'done_at' AS charge_step_done_at, a.charge_atom->>'closed_by' AS charge_closed_by,
+       (SELECT min(os.started_at) FROM public.ocpp_sessions os
+         WHERE os.sim_run_id = :'run' AND os.vehicle_id = a.vehicle_id AND os.started_at >= a.started_at) AS next_plug_in
+  FROM a JOIN public.vehicles v ON v.id = a.vehicle_id
+ WHERE (a.visit_charges AND NOT EXISTS (SELECT 1 FROM public.ocpp_sessions os
+                                          WHERE os.sim_run_id = :'run' AND os.vehicle_id = a.vehicle_id
+                                            AND os.started_at <= a.started_at AND COALESCE(os.ended_at, 'infinity') > a.started_at))
+    OR (NOT a.visit_charges AND a.performed_by = 'charger_sensors')
+ ORDER BY a.started_at;
+-- READ on caf85837 (sim clock, CT):
+--     Tesla-AV-060   no charge  charger_sensors  8:02:05  -- booted on a charger, charge done
+--     Waymo-AV-013   no charge  charger_sensors  8:02:05  -- the same
+--     Zoox-AV-072    charges    technician       8:02:05  charge step done 8:05:22, no closed_by; booked 8:05:44, plugged in 8:06:12
+--     Zoox-AV-076    charges    technician       8:45:34  charge step done 8:45:09, no closed_by; booked 8:45:34, plugged in 8:46:01
+--   (a) HELD but for 2 of 87, both G244. (b) HELD: 85 of 85 started on a charge were the sensors', and the 2 more the
+--   sensors did were on cars parked on a charger.
+
+\echo '=== 0377 §4(a2) — G244: charge steps the flow contract closed, and whether a charge started after the close ==='
+WITH ca AS (
+  SELECT vn.vehicle_id, (x->>'done_at')::timestamptz AS done_at, x->>'closed_by' AS closed_by,
+         COALESCE((x->>'must_do')::boolean, false) AS must_do
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id = :'run' AND x->>'svc' = 'charge' AND x->>'status' = 'done')
+SELECT COALESCE(closed_by, '(flow contract)') AS closed_by, count(*) AS closed,
+       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.ocpp_sessions os
+                                       WHERE os.sim_run_id = :'run' AND os.vehicle_id = ca.vehicle_id
+                                         AND os.started_at < ca.done_at
+                                         AND COALESCE(os.ended_at, 'infinity') >= ca.done_at - interval '1 minute')) AS at_a_sessions_end,
+       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.ocpp_sessions os
+                                       WHERE os.sim_run_id = :'run' AND os.vehicle_id = ca.vehicle_id
+                                         AND os.started_at >= ca.done_at AND os.started_at < ca.done_at + interval '15 minutes')) AS a_charge_began_after
+  FROM ca GROUP BY 1 ORDER BY 2 DESC;
+-- READ on caf85837: `ottoq_satisfied` 34 (none followed by a charge), the flow contract 16 (14 at the end of the car's
+--   session, as meant; 2 before a charge the cursor booked 22 and 24 seconds later, 072 and 076, then 7.4 and 36 minutes
+--   of charging after the visit said the charge was done), `session_completed` 6.
+
+\echo '=== 0377 §4(i) — the cockpits on a live run ==='
+-- Read in the browser, not SQL: the cards read the running run only (`ottoq_depot_cards` returns no vehicles once a
+-- run stops), and the snapshot of a stopped run carries no open needs. So §4(i) was read on a short second run,
+-- 2b20b226 (busy_day, started through the twin cockpit 05:44:39 UTC and stopped 05:46:55 UTC, sim 8:03-8:17 AM), with
+-- PULSE and OrchestrAV served from their local branches that carry 0512's cockpit half.
+-- READ (2026-09-27 05:46 UTC): PULSE's Vehicles tab at sim 8:07 AM showed "charger sensors" on 15 needs and "awaiting
+--   triage" on 3, and OrchestrAV's fleet tab at 8:09 AM showed 12 and 3, each with its hover title ("done by the
+--   charger's sensors during the charge, no technician"; "waiting on the triage check's verdict (confirm, clear or
+--   escalate)"), no page errors, no failed calls. The card read "Interior inspection 4m · charger sensors" on a car
+--   charging on an L2. (i) HELD. That run started without purging a prior run (the cockpit's start door is
+--   `ottoq_sim_run_scenario`, which does not call `ottoq_purge_prior_runs`), and its 24 stopped charges are in 0514's
+--   ledger.
