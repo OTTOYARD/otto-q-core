@@ -10,6 +10,16 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v21 (G188, db/checks/0356): 🔴 THE AGENT WENT DARK AND SAID NOTHING. Neither outbound call had a
+//      deadline -- not the Nemotron request, not the CP-SAT handoff -- and the decision insert's error
+//      was never read. On run 736406cf the agent claimed ticks 9, 26, 51, 75 and 109 and wrote NOTHING:
+//      zero ottoq_decisions rows, zero ottoq_model_call_ledger rows, zero posts to ottoq-cpsat-propose
+//      (11-16 per 5 minutes before 04:12 UTC), every pg_net request timing out at 20 s. A hung model call
+//      holds the worker until the runtime kills it, so the fallback below -- written for exactly this --
+//      never ran, and the Intelligence stream showed an empty agent layer instead of saying why.
+//      NOW: the model call is bounded by MODEL_TIMEOUT_MS and a timeout stops the key loop (the other keys
+//      hit the same host); the handoff is bounded by SOLVER_TIMEOUT_MS; a timeout on either is recorded
+//      by name in the decision; and a failed decision insert returns 500 with the database's message.
 // v20 (0433-0438; G164, G174, G175): three of the agent's five dials did nothing.
 //      * deploy_surge_catchup and forecast_horizon_min have NO READER: a comment-stripped search of every
 //        database function and every code repo finds them only in the setter (ottoq_apply_ops_action) and in
@@ -103,6 +113,13 @@ const OPS_WHITELIST = new Set(Object.keys(OPS_ACTION_DIAL));
 const NV_KEYS = ["NVIDIA_API_KEY_NEMOTRON", "NVIDIA_API_KEY_CUOPT", "NVIDIA_API_KEY"];
 const NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
+// v21 (G188). Live-era p95 agent latency is 66.6 s (CLAUDE.md 2.5, 0417), so 75 s keeps the calls
+// that answer and ends the ones that never will. Both bounds together stay under the runtime's
+// 150 s wall clock, so the decision below is always written.
+const MODEL_TIMEOUT_MS = 75_000;
+const SOLVER_TIMEOUT_MS = 30_000;
+const isTimeout = (error: unknown) =>
+  error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
 
 function extractJson(text: string): unknown {
   const cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/g, "");
@@ -217,6 +234,7 @@ serve(async (req) => {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${candidate.value}` },
             body: requestBody,
+            signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
           });
           const responseText = await r.text();
           if (!r.ok) {
@@ -231,6 +249,12 @@ serve(async (req) => {
           if (parsed && Array.isArray(parsed.actions)) modelUsed = MODEL;
           break;
         } catch (error) {
+          if (isTimeout(error)) {
+            // Every key points at the same host; a second attempt would only spend the
+            // budget the decision insert needs.
+            raw = `model timeout after ${MODEL_TIMEOUT_MS} ms`;
+            break;
+          }
           raw = `request error: ${error instanceof Error ? error.message : "unknown"}`;
         }
       }
@@ -372,6 +396,7 @@ serve(async (req) => {
             apikey: serviceKey,
           },
           body: JSON.stringify({ sim_run_id: run.sim_run_id, agent_handoff: handoff }),
+          signal: AbortSignal.timeout(SOLVER_TIMEOUT_MS),
         });
         const responseText = await response.text();
         let receipt: any = null;
@@ -419,7 +444,9 @@ serve(async (req) => {
           ...solverHandoff,
           status: "failed",
           engine: "cp_sat_forward_lex",
-          error: error instanceof Error ? error.message.slice(0, 600) : "solver handoff failed",
+          error: isTimeout(error)
+            ? `solver handoff timeout after ${SOLVER_TIMEOUT_MS} ms`
+            : error instanceof Error ? error.message.slice(0, 600) : "solver handoff failed",
         };
       }
     }
@@ -445,7 +472,7 @@ serve(async (req) => {
            : a0.type === "set_policy" ? `set_policy:${a0.key}`
            : String(a0.type))
       : `agent_batch:${applied.length}`;
-    await sb.from("ottoq_decisions").insert({
+    const { error: decisionError } = await sb.from("ottoq_decisions").insert({
       sim_run_id: run.sim_run_id, tick_seq: run.tick_count, sim_clock: run.sim_clock_current,
       depot_id: depot, action_context: "task_start", resolved_action_context: "orchestrator_agent",
       entity_type: "depot", entity_id: depot,
@@ -455,7 +482,7 @@ serve(async (req) => {
                        // separate a grounded decision from one made on counters alone.
                        board_blocks: { grounding: board.grounding != null, assets: board.assets != null,
                                        review: board.review != null },
-                       agent_version: "v20" },
+                       agent_version: "v21" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId },
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
@@ -464,6 +491,13 @@ serve(async (req) => {
       outcome_status: applied.length > 0 || solverAccepted ? "enacted" : "noop_no_candidate",
       propose_latency_ms: proposeMs, total_latency_ms: totalMs,
     });
+    if (decisionError) {
+      // v21 (G188): the audit row IS the agent's output. Losing it silently is how a live agent
+      // and a dead one looked the same on the Intelligence stream.
+      console.error(`ottoq-orchestrator-agent: decision insert failed: ${decisionError.message}`);
+      return json({ ok: false, error: `decision insert: ${decisionError.message}`, model: modelUsed,
+        solver_handoff: solverHandoff }, 500);
+    }
 
     return json({ ok: true, run: run.sim_run_id, model: modelUsed, applied, queued, rejected,
       solver_handoff: solverHandoff,

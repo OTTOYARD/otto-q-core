@@ -1,0 +1,232 @@
+-- 0364  **0485-0486: the dial window stays closed, the battery drains while the car is out, and OTTO-Q re-reads a car's
+--       charge need every tick.**
+--
+--       Chase, 2026-09-26: drain the battery gradually because that is how vehicle batteries behave, keep OTTO-Q
+--       assessing so a change is caught as it happens, and hold off on large test runs while the build is still moving.
+--       So this check is a rolled-back probe of each change and the automatic re-certification, not a validation run.
+
+-- ══ §1 0486, ROLLED BACK: THE LIVE BODY AGAINST 0486's ON ONE TICK, AND THE RE-ASSESSMENT ON FOUR CARS ═════════════
+--
+--   On the stopped run 461c79fa at its last clock (sim 10:54:57 AM), in one transaction that ends in RAISE:
+--     V   deployed 30 minutes into a stint at 90% (a synthetic dispatch, no energy used yet)
+--     W   on its way home at 80%, due at the gate this tick
+--     X   en route at 60% on an open pass-through visit (immediate_dispatch, target 85, derived from 95%), no charge
+--     Y   the same, but its visit carries a charge closed short of target (session_completed)
+--     Z   at the gate at 90%        Q   deployed at 60%
+--   The live telemetry body runs one 10-minute tick in a subtransaction that rolls back. Then 0486's body replaces it
+--   and runs the same tick. Then the re-assessment function is created and called twice.
+--
+--   READ (2026-09-26, about 14:50 UTC):
+--     out-drain on this run            33.334 SoC points per hour (busy_day's -30 plus 3.334 of climate)
+--     V energy used this tick          live 2.8790 kWh, 0486 7.0458 kWh: 4.1668 kWh more, which is exactly
+--                                      33.334% of 75 kWh over 10 minutes
+--     V SoC after the tick             live 86, 0486 81
+--     W at the gate                    live: ledger soc_at_return 76.13, gate SoC 43 (the 33-point step)
+--                                      0486: ledger 70.57, gate 71 (no step, the ledger and the car agree)
+--                                      W had no stint before the probe's tick, so its gate SoC is high. On a run,
+--                                      the drain it would have accrued while out lands before the gate.
+--     re-assessment                    first call 1, second call 0
+--       X                              visit relabelled D_charge_and_go. First atom: charge, must_do, not deferrable,
+--                                      target 85, est_min 52, reassessed_soc 60, derived_from_soc 95. One
+--                                      ottoq.need_reassessed event.
+--       Y, Z, Q                        untouched (2, 1 and 1 atoms), no event
+--
+--   The probe as run:
+--   -- 0486 probe: one transaction, ends in RAISE, so everything rolls back. On the stopped run 461c79fa at its last clock.
+--   DO $probe$
+--   DECLARE
+--     R  uuid := '461c79fa-6f85-467f-b90a-92b33d40728d';
+--     T0 timestamptz;
+--     six uuid[];
+--     V uuid; W uuid; X uuid; Y uuid; Z uuid; Q uuid;
+--     dV uuid := gen_random_uuid(); dW uuid := gen_random_uuid();
+--     cap_v numeric; cap_w numeric;
+--     e_old_v numeric; e_new_v numeric; s_old_v int; s_new_v int;
+--     g_old_w int; g_new_w int; ret_old_w numeric; ret_new_w numeric;
+--     drain_h numeric;
+--     v_def text; n int; n2 int;
+--     res jsonb := '{}'::jsonb;
+--   BEGIN
+--     SELECT sim_clock_current INTO T0 FROM ottoq_sim_runs WHERE sim_run_id = R;
+--     SELECT array_agg(id ORDER BY id) INTO six FROM (SELECT id FROM vehicles WHERE home_depot_id = '11111111-1111-1111-1111-111111111111' AND category = 'autonomous' ORDER BY id LIMIT 6) s;
+--     V := six[1]; W := six[2]; X := six[3]; Y := six[4]; Z := six[5]; Q := six[6];
+--     SELECT battery_capacity_kwh INTO cap_v FROM vehicles WHERE id = V;
+--     SELECT battery_capacity_kwh INTO cap_w FROM vehicles WHERE id = W;
+--
+--     -- ── world: V is 30 minutes into a stint at 90%, W is on its way home at 80% and due at the gate now ──
+--     UPDATE vehicles SET current_state = 'deployed', current_soc = 90, current_stall_id = NULL WHERE id = V;
+--     UPDATE vehicles SET current_state = 'en_route_to_depot', current_soc = 80, current_stall_id = NULL WHERE id = W;
+--     INSERT INTO ottoq_vehicle_dispatches (dispatch_id, vehicle_id, sim_run_id, dispatched_at, scheduled_return_at,
+--            planned_duration_min, soc_at_dispatch_pct, energy_consumed_kwh, status)
+--     VALUES (dV, V, R, T0 - interval '30 minutes', T0 + interval '60 minutes', 90, 90, 0, 'active');
+--     INSERT INTO ottoq_vehicle_dispatches (dispatch_id, vehicle_id, sim_run_id, dispatched_at, scheduled_return_at,
+--            planned_duration_min, soc_at_dispatch_pct, energy_consumed_kwh, status, returning_started_at, return_eta_minutes,
+--            eta_refreshed_at, eta_source, return_trigger)
+--     VALUES (dW, W, R, T0 - interval '60 minutes', T0 - interval '1 minute', 50, 80, 0, 'returning', T0 - interval '20 minutes', 10,
+--             T0 - interval '20 minutes', 'fixture:probe0486', 'service_interval_due');
+--
+--     -- ── the live body, one 10-minute tick ──
+--     BEGIN
+--       PERFORM * FROM twin.ottoq_sim_advance_deployed_telemetry(R, T0, 10.0);
+--       SELECT energy_consumed_kwh INTO e_old_v FROM ottoq_vehicle_dispatches WHERE dispatch_id = dV;
+--       SELECT current_soc INTO s_old_v FROM vehicles WHERE id = V;
+--       SELECT current_soc INTO g_old_w FROM vehicles WHERE id = W;
+--       SELECT soc_at_return_pct INTO ret_old_w FROM ottoq_vehicle_dispatches WHERE dispatch_id = dW;
+--       RAISE EXCEPTION 'undo_old';
+--     EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'undo_old' THEN RAISE; END IF;
+--     END;
+--
+--     -- ── 0486's body, the same tick ──
+--     v_def := pg_get_functiondef('twin.ottoq_sim_advance_deployed_telemetry(uuid,timestamp with time zone,numeric)'::regprocedure);
+--     v_def := regexp_replace(v_def, $p$(  v_recall_id      UUID;      -- 0212: the decision a refusal names
+--   )$p$, $r$  v_recall_id      UUID;      -- 0212: the decision a refusal names
+--     v_out_drain_pct_h NUMERIC;  -- 0486: SoC points per hour a car is out, beyond what it drives
+--   $r$);
+--     v_def := regexp_replace(v_def, $p$(  v_seed := abs\(hashtextextended\(COALESCE\(\(SELECT random_seed::text FROM ottoq_sim_runs WHERE sim_run_id = p_sim_run_id\), '42'\) \|\| twin\.ottoq_sim_clock_salt\(p_sim_run_id, p_sim_clock_now\), 42\)\);
+--   )$p$, $r$  v_seed := abs(hashtextextended(COALESCE((SELECT random_seed::text FROM ottoq_sim_runs WHERE sim_run_id = p_sim_run_id), '42') || twin.ottoq_sim_clock_salt(p_sim_run_id, p_sim_clock_now), 42));
+--     v_out_drain_pct_h := GREATEST(0, -COALESCE((SELECT (vp.knobs #>> '{soc_on_arrival,shift}')::numeric
+--                                                   FROM ottoq_variability_profiles vp
+--                                                  WHERE vp.sim_run_id = p_sim_run_id), 0))
+--                          + GREATEST(0, COALESCE(ottoq_twin_arrival_soc_drain(p_sim_run_id, p_sim_clock_now), 0));
+--   $r$);
+--     v_def := regexp_replace(v_def, $p$(    v_discharge_kw := v_discharge_kw \* COALESCE\(v_dispatch\.v_cons_scalar, 1\.0\);
+--   )$p$, $r$    v_discharge_kw := v_discharge_kw * COALESCE(v_dispatch.v_cons_scalar, 1.0);
+--       v_discharge_kw := v_discharge_kw + (v_out_drain_pct_h / 100.0) * COALESCE(v_dispatch.battery_capacity_kwh, 0);
+--   $r$);
+--     v_def := regexp_replace(v_def, $p$current_soc = GREATEST\(2, LEAST\(100,
+--   \s+ottoq_apply_profile\(p_sim_run_id, 'soc_on_arrival', v_new_soc, v_new_soc\) - ottoq_twin_arrival_soc_drain\(p_sim_run_id, p_sim_clock_now\)\)\),$p$,
+--                               $r$current_soc = GREATEST(2, LEAST(100, v_new_soc)),$r$);
+--     EXECUTE v_def;
+--     drain_h := GREATEST(0, -COALESCE((SELECT (vp.knobs #>> '{soc_on_arrival,shift}')::numeric FROM ottoq_variability_profiles vp WHERE vp.sim_run_id = R), 0))
+--                + GREATEST(0, COALESCE(ottoq_twin_arrival_soc_drain(R, T0), 0));
+--     BEGIN
+--       PERFORM * FROM twin.ottoq_sim_advance_deployed_telemetry(R, T0, 10.0);
+--       SELECT energy_consumed_kwh INTO e_new_v FROM ottoq_vehicle_dispatches WHERE dispatch_id = dV;
+--       SELECT current_soc INTO s_new_v FROM vehicles WHERE id = V;
+--       SELECT current_soc INTO g_new_w FROM vehicles WHERE id = W;
+--       SELECT soc_at_return_pct INTO ret_new_w FROM ottoq_vehicle_dispatches WHERE dispatch_id = dW;
+--       RAISE EXCEPTION 'undo_new';
+--     EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'undo_new' THEN RAISE; END IF;
+--     END;
+--     res := res || jsonb_build_object('drain',
+--       jsonb_build_object('out_drain_pct_per_h', round(drain_h, 3), 'cap_kwh', cap_v,
+--         'V_energy_live', round(e_old_v, 4), 'V_energy_0486', round(e_new_v, 4),
+--         'V_extra_kwh', round(e_new_v - e_old_v, 4), 'V_extra_expected', round(drain_h / 100.0 * cap_v * 10 / 60.0, 4),
+--         'V_soc_live', s_old_v, 'V_soc_0486', s_new_v,
+--         'W_gate_soc_live', g_old_w, 'W_gate_soc_0486', g_new_w,
+--         'W_ledger_soc_at_return_live', round(ret_old_w, 2), 'W_ledger_soc_at_return_0486', round(ret_new_w, 2)));
+--
+--     -- ── the re-assessment: X qualifies, Y has a closed charge, Z is at its target, Q is deployed ──
+--     EXECUTE $f$
+--   CREATE FUNCTION ottoq.ottoq_reassess_charge_needs(p_sim_run_id uuid, p_clock timestamp with time zone)
+--    RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'ottoq', 'twin', 'public', 'extensions'
+--   AS $function$
+--   DECLARE v_n int := 0; r record; v_min int;
+--   BEGIN
+--     IF p_sim_run_id IS NULL THEN RETURN 0; END IF;
+--     FOR r IN
+--       SELECT n.visit_id, n.vehicle_id, n.depot_id, n.atoms, n.archetype, n.urgency,
+--              COALESCE(n.target_soc, v.target_soc, public.ottoq_default_target_soc()) AS tgt,
+--              v.current_soc, v.current_state::text AS state, v.fleet_operator_id,
+--              v.battery_capacity_kwh, v.inlet_max_kw,
+--              (v.config->>'battery_soh_pct')::numeric AS soh,
+--              (v.config->>'charge_curve_scalar')::numeric AS curve,
+--              n.meta->'soc_at_arrival' AS derived_from
+--         FROM public.ottoq_visit_needs n
+--         JOIN public.vehicles v ON v.id = n.vehicle_id
+--        WHERE n.sim_run_id = p_sim_run_id
+--          AND n.status IN ('open','in_progress')
+--          AND jsonb_typeof(n.atoms) = 'array'
+--          AND v.current_soc IS NOT NULL
+--          AND v.current_state::text IN ('en_route_to_depot','arrived_at_gate','staged_awaiting_service')
+--          AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(n.atoms) a WHERE a->>'svc' = 'charge')
+--          AND v.current_soc < COALESCE(n.target_soc, v.target_soc, public.ottoq_default_target_soc()) - 1
+--        ORDER BY n.vehicle_id, n.visit_id
+--     LOOP
+--       v_min := GREATEST(8, round(COALESCE(
+--                  public.ottoq_estimate_charge_minutes(r.current_soc, r.tgt, 150, COALESCE(r.inlet_max_kw, 150),
+--                                                       COALESCE(r.battery_capacity_kwh, 75), 25, COALESCE(r.soh, 95),
+--                                                       GREATEST(0.2, 1.0 / GREATEST(0.2, COALESCE(r.curve, 1.0)))), 25)))::int;
+--       UPDATE public.ottoq_visit_needs n
+--          SET atoms = jsonb_build_array(jsonb_build_object(
+--                        'svc', 'charge', 'must_do', true, 'deferrable', false, 'target_soc', r.tgt,
+--                        'est_min', v_min, 'concurrency', 'anchor',
+--                        'reassessed_at', p_clock, 'reassessed_soc', r.current_soc,
+--                        'derived_from_soc', r.derived_from)) || n.atoms,
+--              archetype = CASE WHEN n.archetype = 'M_pass_through_or_P_triage' THEN
+--                            CASE WHEN n.urgency = 'immediate_dispatch'
+--                                      AND EXISTS (SELECT 1 FROM jsonb_array_elements(n.atoms) e WHERE e->>'svc' = 'interior_tidy')
+--                                   THEN 'A_charge_clean_go'
+--                                 WHEN n.urgency = 'immediate_dispatch' THEN 'D_charge_and_go'
+--                                 WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(n.atoms) e WHERE e->>'svc' = 'mechanical_pm')
+--                                   THEN 'B_full_service'
+--                                 ELSE 'std_mixed' END
+--                            ELSE n.archetype END,
+--              meta = COALESCE(n.meta, '{}'::jsonb) || jsonb_build_object('charge_reassessed',
+--                       jsonb_build_object('at', p_clock, 'soc', r.current_soc, 'state', r.state,
+--                                          'archetype_before', n.archetype))
+--        WHERE n.visit_id = r.visit_id;
+--       v_n := v_n + 1;
+--       BEGIN
+--         PERFORM ottoq_record_event(
+--           p_actor_type := 'ottoq_engine', p_actor_id := 'need_reassessment',
+--           p_event_type := 'ottoq.need_reassessed', p_entity_type := 'vehicle', p_entity_id := r.vehicle_id,
+--           p_fleet_operator_id := r.fleet_operator_id, p_depot_id := r.depot_id,
+--           p_payload := jsonb_build_object('visit_id', r.visit_id, 'svc', 'charge', 'soc', r.current_soc,
+--                                           'target_soc', r.tgt, 'derived_from_soc', r.derived_from,
+--                                           'state', r.state, 'est_min', v_min),
+--           p_severity := 'info', p_ingest_source := 'twin', p_data_source := 'twin', p_sim_run_id := p_sim_run_id);
+--       EXCEPTION WHEN OTHERS THEN NULL;
+--       END;
+--     END LOOP;
+--     RETURN v_n;
+--   END;
+--   $function$
+--   $f$;
+--
+--     UPDATE vehicles SET current_state = 'en_route_to_depot', current_soc = 60, current_stall_id = NULL WHERE id IN (X, Y);
+--     UPDATE vehicles SET current_state = 'arrived_at_gate', current_soc = 90, current_stall_id = NULL WHERE id = Z;
+--     UPDATE vehicles SET current_state = 'deployed', current_soc = 60, current_stall_id = NULL WHERE id = Q;
+--     INSERT INTO ottoq_visit_needs (vehicle_id, sim_run_id, depot_id, arrived_at, visit_key, archetype, urgency, target_soc, atoms, status, meta)
+--     SELECT vid, R, '11111111-1111-1111-1111-111111111111', T0 - interval '5 minutes', 'probe0486:' || vid::text,
+--            'M_pass_through_or_P_triage', 'immediate_dispatch', 85,
+--            CASE WHEN vid = Y
+--                 THEN jsonb_build_array(jsonb_build_object('svc','charge','status','done','must_do',true,'target_soc',85,'est_min',20,'concurrency','anchor','closed_by','session_completed'),
+--                                        jsonb_build_object('svc','readiness_check','must_do',true,'deferrable',false,'est_min',3,'concurrency','gate','predecessors',jsonb_build_array('*')))
+--                 ELSE jsonb_build_array(jsonb_build_object('svc','readiness_check','must_do',true,'deferrable',false,'est_min',3,'concurrency','gate','predecessors',jsonb_build_array('*'))) END,
+--            'open', jsonb_build_object('soc_at_arrival', 95, 'sla_floor', 80)
+--       FROM unnest(ARRAY[X, Y, Z, Q]) vid;
+--
+--     n  := ottoq.ottoq_reassess_charge_needs(R, T0);
+--     n2 := ottoq.ottoq_reassess_charge_needs(R, T0);
+--     res := res || jsonb_build_object('reassess', jsonb_build_object(
+--       'first_call', n, 'second_call', n2,
+--       'X', (SELECT jsonb_build_object('archetype', archetype, 'first_atom', atoms->0, 'n_atoms', jsonb_array_length(atoms), 'meta', meta->'charge_reassessed')
+--               FROM ottoq_visit_needs WHERE vehicle_id = X AND visit_key = 'probe0486:' || X::text),
+--       'Y_atoms', (SELECT jsonb_array_length(atoms) FROM ottoq_visit_needs WHERE vehicle_id = Y AND visit_key = 'probe0486:' || Y::text),
+--       'Z_atoms', (SELECT jsonb_array_length(atoms) FROM ottoq_visit_needs WHERE vehicle_id = Z AND visit_key = 'probe0486:' || Z::text),
+--       'Q_atoms', (SELECT jsonb_array_length(atoms) FROM ottoq_visit_needs WHERE vehicle_id = Q AND visit_key = 'probe0486:' || Q::text),
+--       'events_X', (SELECT count(*) FROM ottoq_events WHERE sim_run_id = R AND entity_id = X AND event_type = 'ottoq.need_reassessed'),
+--       'events_other', (SELECT count(*) FROM ottoq_events WHERE sim_run_id = R AND entity_id IN (Y, Z, Q) AND event_type = 'ottoq.need_reassessed')));
+--
+--     RAISE EXCEPTION 'PROBE %', res;
+--   END $probe$;
+
+-- ══ §2 THE APPLIES ════════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   0485 = 20260926143555 (9:35 AM CT): cron 761, the nightly dial window opener, inactive. The close job, the runner
+--          and the registered replication are untouched, so the loop resumes by reactivating one job.
+--   0486 = 20260926145308 (9:53 AM CT), stored statement md5 ebb41adb..., equal to the file's body. forces_recert,
+--          so the recert floor moved to 14:53:08 UTC and the recert runner re-certifies the canon on its own.
+
+\echo '=== 0364 §2 — the canon under 0486 ==='
+SELECT c.scenario, c.seed, c.ticks, c.verdict_id, c.certified_at, c.outcome, c.equal, c.disagreeing_atoms,
+       c.satisfies_floor, c.status
+  FROM public.ottoq_determinism_canon c
+ WHERE c.enabled
+ ORDER BY c.certified_at;
+-- READ (2026-09-26, 15:24 UTC): all nine columns re-certified under 0486, every one `passed`, `equal`, no disagreeing
+--   atom, `current`. Verdicts 347-355, certified 14:54:00-15:11:55 UTC (9:54-10:11 AM CT): grid_smoke 239001/6 and
+--   424242/6 (347, 348), busy_day 171717/12, 314159/12, 424242/12 (349-351), normal_day 171717/12 (352), busy_day
+--   171717/24 and 424242/24 (353, 354), busy_day 171717/48 (355). The drain and the per-tick re-read are deterministic
+--   on every certified cell, including the 48-tick busy_day that crosses the most drain time.
