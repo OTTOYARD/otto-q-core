@@ -1,5 +1,7 @@
+-- RENUMBERED 0249 -> 0382 at merge (2026-09-27): filed as 0249 on branch claude/context-packs-relay-status-cxj3of, but main
+-- had already taken 0249 for a different check; references to 0249 in this branch's files mean this one.
 -- ============================================================================
--- 0249 — 0329's MECHANISM IS RIGHT AND ITS POLICY IS WRONG: THE RELEASE FREES
+-- 0382 — 0329's MECHANISM IS RIGHT AND ITS POLICY IS WRONG: THE RELEASE FREES
 --        THE SPACE, AND THE VEHICLE THAT LOST IT STARVES.
 -- ============================================================================
 -- Paired runs, identical configuration (tick_interval 30 s, time_scale 60,

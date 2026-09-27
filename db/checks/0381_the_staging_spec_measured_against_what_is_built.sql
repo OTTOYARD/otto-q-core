@@ -1,5 +1,7 @@
+-- RENUMBERED 0248 -> 0381 at merge (2026-09-27): filed as 0248 on branch claude/context-packs-relay-status-cxj3of, but main
+-- had already taken 0248 for a different check; references to 0248 in this branch's files mean this one.
 -- ============================================================================
--- 0248 — CHASE'S STAGING / ORCHESTRATION SPEC, MEASURED LINE BY LINE AGAINST
+-- 0381 — CHASE'S STAGING / ORCHESTRATION SPEC, MEASURED LINE BY LINE AGAINST
 --        WHAT IS ACTUALLY BUILT.
 -- ============================================================================
 -- Measured 2026-09-14 ~23:10 UTC, read-only, against twin run
@@ -81,7 +83,7 @@
 -- plus a routing gap, not a missing concept -- the vocabulary is already there.
 --
 -- GAP 2 — THE ENGINE DOES NOT KNOW WHICH STALLS ARE BOOKED. Measured on the run
--- (db/checks/0247): of 347 stall-bearing commands, 116 were dispatched at an
+-- (db/checks/0380): of 347 stall-bearing commands, 116 were dispatched at an
 -- ALREADY OCCUPIED target and refused by preflight -- 33%. 107 of the 119 space
 -- conflicts are l2, 9 are dcfc, ZERO are staging. Nothing double-occupied; the
 -- net held every time. But the spec says do not send them there, and the engine
@@ -91,7 +93,7 @@
 -- GAP 3 — THE `stage` COMMAND CARRIES NO STALL, SO IT CANNOT BE CHECKED. 115 of
 -- 118 stage commands in the run carry no stall_id, and the executor's occupancy
 -- gate keys on the payload carrying one. The command that implements the spec's
--- most-used path is the one command that is never validated (0247).
+-- most-used path is the one command that is never validated (0380).
 --
 -- ── WHAT IS NOT YET MEASURED, AND MUST BE BEFORE ANY CLAIM ─────────────────
 --   * the release -> notify -> proceed loop: ottoq_release_vacated_spaces and

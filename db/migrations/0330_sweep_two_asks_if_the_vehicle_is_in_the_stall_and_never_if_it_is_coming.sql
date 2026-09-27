@@ -1,12 +1,18 @@
 -- migration-version: 20260919161129
 -- migration-name:    0330_sweep_two_asks_if_the_vehicle_is_in_the_stall_and_never_if_it_is_coming
+-- RENUMBERED CHECKS (2026-09-27, at merge): the paired-run check this migration cites was filed on
+-- branch claude/context-packs-relay-status-cxj3of as db/checks/0249 and renumbered to 0382, because
+-- main had already taken 0249 for a different check. The comments below say 0382. Two string literals
+-- still say 0249 (the space_noshow_release_enabled catalog description and the ottoq_cert_lineage
+-- note), because that is the text the database stored when this was applied (20260919161129).
+-- Both mean db/checks/0382.
 -- ============================================================================
 -- 0330 — SWEEP 2 TOOK SPACES AWAY FROM VEHICLES THAT WERE STANDING IN THE YARD
 --        WAITING FOR THEM, BECAUSE IT ASKS WHERE THE VEHICLE *IS* AND NEVER
 --        WHETHER IT IS *COMING*.
 -- ============================================================================
 -- This corrects 0329, which I wrote, on evidence 0328 had already collected and
--- I read wrongly. The paired runs are in db/checks/0249. Clipped to a matched
+-- I read wrongly. The paired runs are in db/checks/0382. Clipped to a matched
 -- 870 sim-minute horizon, seed 771771 / busy_day / flagship, the only
 -- difference being one run-scoped dial:
 --
@@ -63,7 +69,7 @@
 --    on it, so a new state defaults to KEEPING the claim. The failure mode of
 --    a stale allow-list is a space held too long; the failure mode of a stale
 --    deny-list is a space taken from a vehicle that was coming for it. Those
---    are not equally bad, and 0249 is what it cost to learn that.
+--    are not equally bad, and 0382 is what it cost to learn that.
 --
 -- ── WHAT THIS FILE DOES NOT DO ─────────────────────────────────────────────
 -- It does not add priority, ageing, or any queue ordering. Starvation is
@@ -80,7 +86,7 @@
 --     legitimate part of sweep 2 still retire genuinely abandoned claims.
 -- P3. p95 returns to at or below the control's 243, and returns_unserved to 0.
 -- NOT PREDICTED, and deliberately: that the combined change is net-positive.
--- 0249 is what happens when that gets assumed instead of measured.
+-- 0382 is what happens when that gets assumed instead of measured.
 -- ============================================================================
 
 DO $pre$
@@ -149,7 +155,7 @@ RETURNS boolean LANGUAGE sql IMMUTABLE AS $fn$
   -- after this migration is NOT on the list, so it defaults to KEEPING the
   -- claim. The cost of a stale allow-list is a space held too long; the cost of
   -- a stale deny-list is a space taken from a vehicle that was coming for it.
-  -- db/checks/0249 measured the second: one vehicle lost its space 12 times.
+  -- db/checks/0382 measured the second: one vehicle lost its space 12 times.
   --
   -- Deliberately ABSENT from this list, with reasons:
   --   en_route_to_depot        -- it is coming; this is 17.5% of 0328's blockers
@@ -213,7 +219,7 @@ DECLARE v_dep_on int; v_nos_on int; v_grace int; v_dep int := 0; v_nos int := 0;
 BEGIN
   IF p_sim_run_id IS NULL OR p_depot_id IS NULL OR p_clock IS NULL THEN RETURN 0; END IF;
 
-  -- 0330: TWO dials now. 0249 measured sweep 2 causing all of 0329's harm while
+  -- 0330: TWO dials now. 0382 measured sweep 2 causing all of 0329's harm while
   -- sweep 1 fired 4 times harmlessly, so they are no longer switched together.
   v_dep_on := COALESCE(public.ottoq_policy_get(p_sim_run_id,'space_departure_release_enabled',0),0)::int;
   v_nos_on := COALESCE(public.ottoq_policy_get(p_sim_run_id,'space_noshow_release_enabled',0),0)::int;
@@ -224,7 +230,7 @@ BEGIN
   -- ── SWEEP 1: DEPARTURE. Unchanged from 0329. An `active` claim whose vehicle
   -- has left, on two independent witnesses (the VEHICLE says it is positively
   -- in a different stall; the STALL disowns it) plus no open OCPP session on a
-  -- charge place. This is the half 0249 found harmless.
+  -- charge place. This is the half 0382 found harmless.
   IF v_dep_on = 1 THEN
     WITH cand AS (
       SELECT b.booking_id, lower(b.during) AS lo, upper(b.during) AS hi,
@@ -267,7 +273,7 @@ BEGIN
   -- ── SWEEP 2: NO-SHOW, NOW WITH AN INTENT WITNESS.
   -- 0329 asked only whether the vehicle was IN the stall, so it scavenged from
   -- vehicles standing at the gate and in staging waiting for that very space --
-  -- 158 releases, 22 vehicles starved, one of them 12 times (db/checks/0249).
+  -- 158 releases, 22 vehicles starved, one of them 12 times (db/checks/0382).
   -- A held claim is now retired only on POSITIVE evidence the vehicle is not
   -- coming for it:
   --   (a) its state is on the absent-from-site allow-list, or
@@ -336,7 +342,7 @@ BEGIN
   END IF;
 
   -- A2. THE INTENT WITNESS IS IN SWEEP 2. This is the assertion this file
-  --     exists for; without it the starvation of 0249 returns.
+  --     exists for; without it the starvation of 0382 returns.
   IF position('ottoq_vehicle_absent_from_site' in v_src) = 0 THEN
     RAISE EXCEPTION '0330 A2: sweep 2 still has no intent witness';
   END IF;
@@ -422,7 +428,7 @@ ON CONFLICT (name) DO NOTHING;
 -- WHAT IS NOT PROVEN. P1, P2 and P3 in the header are predictions, not results.
 -- The file changes no behaviour until a run sets a dial. Judging them needs a
 -- fresh pair on seed 771771 against the control already captured in
--- db/checks/0249 (p95 243, p50 60, conflicts 134, turns 332, unserved 0,
+-- db/checks/0382 (p95 243, p50 60, conflicts 134, turns 332, unserved 0,
 -- 30 vehicles losing a claim, worst 3).
 --
 -- AND THE HONEST LIMIT OF W1. W1 proves the witness CLASSIFIES the twelve

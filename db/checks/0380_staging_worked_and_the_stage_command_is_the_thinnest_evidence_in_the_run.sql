@@ -1,5 +1,7 @@
+-- RENUMBERED 0247 -> 0380 at merge (2026-09-27): filed as 0247 on branch claude/context-packs-relay-status-cxj3of, but main
+-- had already taken 0247 for a different check; references to 0247 in this branch's files mean this one.
 -- ============================================================================
--- 0247 — STAGING WORKED. THE `stage` COMMAND IS THE THINNEST EVIDENCE IN THE
+-- 0380 — STAGING WORKED. THE `stage` COMMAND IS THE THINNEST EVIDENCE IN THE
 --        RUN, AND I ALMOST QUOTED IT AS THE STRONGEST.
 -- ============================================================================
 -- Measured 2026-09-14 23:0x UTC, read-only, against the completed UI-door twin

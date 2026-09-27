@@ -1,5 +1,7 @@
+-- RENUMBERED 0250 -> 0383 at merge (2026-09-27): filed as 0250 on branch claude/context-packs-relay-status-cxj3of, but main
+-- had already taken 0250 for a different check; references to 0250 in this branch's files mean this one.
 -- ============================================================================
--- 0250 — **THIS FILE'S ORIGINAL FINDING WAS WRONG IN ITS PREMISE.** THE START
+-- 0383 — **THIS FILE'S ORIGINAL FINDING WAS WRONG IN ITS PREMISE.** THE START
 --        WAS NEVER SLOW. IT WAS BLOCKED, BY ANOTHER SESSION'S JOB, ON A
 --        DATABASE I WAS TREATING AS IF I WERE ITS ONLY WRITER.
 -- ============================================================================
