@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260927173711
 -- migration-name:    an_experiment_can_wait_its_turn
 --
 -- 0534  **The dial runner can be told that an experiment waits, and tonight the energy replication waits so the two

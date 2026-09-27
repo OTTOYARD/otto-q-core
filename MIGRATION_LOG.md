@@ -538,7 +538,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0531](db/migrations/0531_the_learners_arms_start_through_the_operators_door.sql) | `20260927161230` | yes — ledger | **G256: the dial experiments' arms start the way the operator's day starts. They started in a busy day that met |
 | [0532](db/migrations/0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait.sql) | `20260927164827` | yes — ledger | **The challenger, first form: a loop beside the funnel that asks, every minute of a live day, whether the |
 | [0533](db/migrations/0533_the_charge_target_an_arm_is_given_is_the_one_it_charges_to.sql) | `20260927171208` | yes — ledger | **G258: an experiment on the three charge-target dials could not move its arms, and its verdict would have read |
-| [0534](db/migrations/0534_an_experiment_can_wait_its_turn.sql) | `PENDING` | no — pending | **The dial runner can be told that an experiment waits, and tonight the energy replication waits so the two |
+| [0534](db/migrations/0534_an_experiment_can_wait_its_turn.sql) | `20260927173711` | yes — ledger | **The dial runner can be told that an experiment waits, and tonight the energy replication waits so the two |
 
 400 migrations indexed.
 
