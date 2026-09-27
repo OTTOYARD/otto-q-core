@@ -437,8 +437,151 @@ SELECT stype, frac, count(*) AS sessions,
 --   9:26, 9:32, 9:50 and 9:57, each within 2 minutes of the screen but one (5), which, paired in order, ties each
 --   estimate to its charger (the two rebuilt at 9:22 tie); the charges ended at 8:37, 9:11, 9:24, 9:25, 9:16, 9:44,
 --   10:03 and 10:17. So the screen ran from 16 minutes early to 10 late, and the three with the most left (68-102
---   minutes) read 12-16 minutes early. A charge that has just begun carries little of its own evidence; what can fill
---   that is the car's history (G240).
+--   minutes) read 12-16 minutes early. A charge that has just begun carries little of its own evidence. (This READ
+--   first ended "what can fill that is the car's history"; §6(c) measured that and it does not.)
+
+-- ══ §6(c) WHAT COULD FILL THE EARLY GAP: A CAR'S HISTORY, OR THE TEMPERATURE ═════════════════════════════════════
+--
+--   Operator runs only. The certification and A/B harnesses step the sim clock 30 minutes a tick (the operator run
+--   steps 30 seconds), so their sessions are timed to the half hour and cannot train or test a duration model.
+
+\echo '=== 0375 §6(c) — does a car''s history predict its next charge? (leave one run out) ==='
+WITH base AS (
+  SELECT os.sim_run_id, os.vehicle_id, st.stall_type::text AS stype,
+         ln((EXTRACT(epoch FROM os.ended_at - os.started_at)/60)
+            / public.ottoq_charge_minutes_between(os.soc_start, os.soc_end, ch.max_kw, v.inlet_max_kw, v.battery_capacity_kwh, 95, 22, 0.5)) AS lr
+    FROM public.ocpp_sessions os
+    JOIN public.stalls st ON st.id = os.stall_id AND st.depot_id = '11111111-1111-1111-1111-111111111111'
+    JOIN public.ottoq_ocpp_chargers ch ON ch.charger_id = st.ocpp_charger_id
+    JOIN public.vehicles v ON v.id = os.vehicle_id
+    JOIN public.ottoq_sim_runs r ON r.sim_run_id = os.sim_run_id AND r.run_by = 'operator_demo'
+   WHERE os.stopped_reason = 'completed' AND os.ended_at - os.started_at >= interval '10 minutes'
+     AND os.soc_end >= os.soc_start + 2),
+pred AS (
+  SELECT b.*,
+         (SELECT avg(o.lr) FROM base o WHERE o.stype = b.stype AND o.sim_run_id <> b.sim_run_id) AS fleet_mu,
+         (SELECT avg(o.lr) FROM base o WHERE o.stype = b.stype AND o.vehicle_id = b.vehicle_id AND o.sim_run_id <> b.sim_run_id) AS car_mu,
+         (SELECT count(*) FROM base o WHERE o.stype = b.stype AND o.vehicle_id = b.vehicle_id AND o.sim_run_id <> b.sim_run_id) AS car_n
+    FROM base b)
+SELECT stype, count(*) AS sessions, count(DISTINCT sim_run_id) AS runs, round(avg(car_n)::numeric, 1) AS car_sessions_elsewhere,
+       round(sqrt(avg(lr^2))::numeric, 3) AS rms_nominal,
+       round(sqrt(avg((lr - fleet_mu)^2))::numeric, 3) AS rms_fleet_mean,
+       round(sqrt(avg((lr - (fleet_mu + car_n::numeric / (car_n + 2) * (COALESCE(car_mu, fleet_mu) - fleet_mu)))^2))::numeric, 3) AS rms_car_shrunk
+  FROM pred GROUP BY 1 ORDER BY 1;
+-- READ (2026-09-27 02:45 UTC; 9 operator runs on 9 seeds, 2026-09-25 to tonight): the log of the actual duration over
+--   the booking writer's nominal model has an RMS of 0.215 on DCFC (230 sessions) and 0.222 on L2 (233). The fleet mean
+--   from the other runs brings it to 0.175 and 0.174. Adding each car's own mean from its other runs (about 2 sessions
+--   of the type each, shrunk toward the fleet with k = 2) makes it worse: 0.184 and 0.179. So a car's history does not
+--   predict its next charge here, and a per-car ratio is not the calibration to build.
+
+\echo '=== 0375 §6(c)(2) — the model against each half of a charge, by the day''s temperature ==='
+WITH s AS (
+  SELECT os.id, st.stall_type::text AS stype, os.started_at, os.ended_at, os.soc_start, os.soc_end, os.ambient_temp_c,
+         ch.max_kw, v.inlet_max_kw, v.battery_capacity_kwh AS pack, COALESCE((v.config->>'battery_soh_pct')::numeric, 95) AS soh
+    FROM public.ocpp_sessions os
+    JOIN public.stalls st ON st.id = os.stall_id AND st.depot_id = '11111111-1111-1111-1111-111111111111'
+    JOIN public.ottoq_ocpp_chargers ch ON ch.charger_id = st.ocpp_charger_id
+    JOIN public.vehicles v ON v.id = os.vehicle_id
+    JOIN public.ottoq_sim_runs r ON r.sim_run_id = os.sim_run_id AND r.run_by = 'operator_demo'
+   WHERE os.stopped_reason = 'completed' AND os.ended_at - os.started_at >= interval '20 minutes'
+     AND os.soc_end >= os.soc_start + 10),
+half AS (
+  SELECT s.*, (s.soc_start + s.soc_end) / 2.0 AS soc_half,
+         (SELECT m.sim_clock_at FROM public.ottoq_ocpp_messages m, jsonb_array_elements(m.payload->'sampledValue') e
+           WHERE m.ocpp_session_id = s.id AND m.message_type = 'MeterValues' AND e->>'measurand' = 'SoC'
+             AND (e->>'value')::numeric >= (s.soc_start + s.soc_end) / 2.0
+           ORDER BY m.sim_clock_at LIMIT 1) AS t_half
+    FROM s),
+r AS (
+  SELECT stype, ambient_temp_c,
+         (EXTRACT(epoch FROM t_half - started_at)/60)
+           / NULLIF(public.ottoq_charge_minutes_between(soc_start, soc_half, max_kw, inlet_max_kw, pack, 95, 22, 0.5), 0) AS head_nominal,
+         (EXTRACT(epoch FROM ended_at - t_half)/60)
+           / NULLIF(public.ottoq_charge_minutes_between(soc_half, soc_end, max_kw, inlet_max_kw, pack, 95, 22, 0.5), 0) AS tail_nominal,
+         (EXTRACT(epoch FROM t_half - started_at)/60)
+           / NULLIF(public.ottoq_estimate_charge_minutes(soc_start, soc_half, max_kw, inlet_max_kw, pack, COALESCE(ambient_temp_c,22)+5, soh, 1.0), 0) AS head_model,
+         (EXTRACT(epoch FROM ended_at - t_half)/60)
+           / NULLIF(public.ottoq_estimate_charge_minutes(soc_half, soc_end, max_kw, inlet_max_kw, pack, COALESCE(ambient_temp_c,22)+5, soh, 1.0), 0) AS tail_model
+    FROM half WHERE t_half IS NOT NULL)
+SELECT stype, CASE WHEN ambient_temp_c < 10 THEN 'below 10 C' WHEN ambient_temp_c < 25 THEN '10-25 C' ELSE '25 C up' END AS ambient,
+       count(*) AS sessions,
+       round(exp(avg(ln(head_nominal)))::numeric, 2) AS head_nominal, round(exp(avg(ln(tail_nominal)))::numeric, 2) AS tail_nominal,
+       round(exp(avg(ln(head_model)))::numeric, 2) AS head_model, round(exp(avg(ln(tail_model)))::numeric, 2) AS tail_model,
+       round(corr(ln(head_model), ln(tail_model))::numeric, 2) AS head_tail_corr
+  FROM r WHERE head_nominal > 0 AND tail_nominal > 0 AND head_model > 0 AND tail_model > 0
+ GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ (the same runs; sessions of 20+ minutes gaining 10+ points, split where the SoC passes halfway; geometric mean
+--   of the time taken over the time predicted):
+--                              nominal (22 C, 95%)     charge model (ambient + 5 C, SoH)
+--                              1st half   2nd half     1st half   2nd half
+--     dcfc  below 10 C  (62)     1.13       0.98         0.75       0.66
+--           10-25 C    (100)     1.06       1.11         1.05       1.10
+--           25 C up     (54)     1.24       1.47         1.20       1.42
+--     l2    below 10 C  (44)     1.08       0.99         0.68       0.63
+--           10-25 C    (108)     1.09       1.15         1.08       1.13
+--           25 C up     (33)     1.40       1.61         1.33       1.53
+--   The charge model's temperature response is wrong both ways. It expects a cold charge to take 33-59% longer than it
+--   does (the twin warms the battery as it charges), and a hot charge runs 20-53% longer than it expects, most of that
+--   gap in the second half. Within a band the two halves move together (correlation 0.68-0.97), which is why the
+--   per-session calibration is good by the midpoint; and the first half's ratio misstates the second's in a direction
+--   the temperature sets, which (3) reads on the card's own ETA.
+
+\echo '=== 0375 §6(c)(3) — the card''s ETA a quarter of the way in, by the day''s temperature (all operator runs) ==='
+WITH s AS (
+  SELECT os.id, os.vehicle_id, os.started_at, os.ended_at, os.soc_start, os.ambient_temp_c,
+         ch.max_kw, v.inlet_max_kw, v.battery_capacity_kwh AS pack, COALESCE((v.config->>'battery_soh_pct')::numeric, 95) AS soh,
+         st.stall_type::text AS stype,
+         (SELECT (m.payload->>'target_soc_pct')::numeric FROM public.ottoq_ocpp_messages m
+           WHERE m.ocpp_session_id = os.id AND m.message_type = 'StartTransaction' LIMIT 1) AS target
+    FROM public.ocpp_sessions os
+    JOIN public.stalls st ON st.id = os.stall_id AND st.depot_id = '11111111-1111-1111-1111-111111111111'
+    JOIN public.ottoq_ocpp_chargers ch ON ch.charger_id = st.ocpp_charger_id
+    JOIN public.vehicles v ON v.id = os.vehicle_id
+    JOIN public.ottoq_sim_runs r ON r.sim_run_id = os.sim_run_id AND r.run_by = 'operator_demo'
+   WHERE os.stopped_reason = 'completed' AND os.ended_at - os.started_at >= interval '10 minutes'),
+q AS (SELECT s.*, s.started_at + (s.ended_at - s.started_at) * 0.25 AS t_q FROM s),
+mv AS (
+  SELECT q.*, m.sim_clock_at AS t_read,
+         (SELECT (e->>'value')::numeric FROM jsonb_array_elements(m.payload->'sampledValue') e WHERE e->>'measurand' = 'SoC') AS soc_read
+    FROM q
+    JOIN LATERAL (SELECT mm.* FROM public.ottoq_ocpp_messages mm
+                   WHERE mm.ocpp_session_id = q.id AND mm.message_type = 'MeterValues'
+                   ORDER BY abs(EXTRACT(epoch FROM mm.sim_clock_at - q.t_q)) LIMIT 1) m ON true),
+calc AS (
+  SELECT mv.*, LEAST(mv.target, public.ottoq_target_soc_cap(mv.stype, mv.started_at)) AS tgt,
+         EXTRACT(epoch FROM mv.t_read - mv.started_at)/60 AS elapsed,
+         public.ottoq_estimate_charge_minutes(mv.soc_start, mv.soc_read, mv.max_kw, mv.inlet_max_kw, mv.pack,
+                                              COALESCE(mv.ambient_temp_c,22)+5, mv.soh, 1.0) AS model_done
+    FROM mv WHERE mv.soc_read IS NOT NULL AND mv.target IS NOT NULL),
+pred AS (
+  SELECT calc.*, CASE WHEN soc_read - soc_start >= 2 AND model_done > 0 THEN LEAST(5, GREATEST(0.5, elapsed / model_done)) ELSE 1 END AS ratio
+    FROM calc),
+fin AS (
+  SELECT pred.stype, pred.ambient_temp_c,
+         EXTRACT(epoch FROM pred.ended_at - pred.t_read)/60 AS actual_left,
+         public.ottoq_estimate_charge_minutes(pred.soc_read, pred.tgt, pred.max_kw, pred.inlet_max_kw, pred.pack,
+                                              COALESCE(pred.ambient_temp_c,22)+5, pred.soh, pred.ratio) AS cal_left
+    FROM pred)
+SELECT stype, CASE WHEN ambient_temp_c < 10 THEN 'below 10 C' WHEN ambient_temp_c < 25 THEN '10-25 C' ELSE '25 C up' END AS ambient,
+       count(*) AS sessions,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY abs(cal_left - actual_left)))::numeric, 1) AS p50_err,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(cal_left - actual_left)))::numeric, 1) AS p90_err,
+       round(avg(cal_left - actual_left)::numeric, 1) AS mean_signed_min,
+       round(avg((cal_left - actual_left) / NULLIF(actual_left, 0))::numeric, 3) AS mean_signed_share
+  FROM fin GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ (the same 9 runs, 463 completed sessions of 10+ minutes; minutes, and the mean signed error as a share of the
+--   time that was left; negative: the ETA was early):
+--                          sessions   median / p90    mean signed
+--     dcfc  below 10 C        67       2.5 / 20.1     +6.5  (+14.5%)
+--           10-25 C          106       2.4 / 12.8     -4.0   (-8.2%)
+--           25 C up           57       7.5 / 19.3     -9.7  (-18.6%)
+--     l2    below 10 C        58       6.8 / 26.6     +9.7  (+23.4%)
+--           10-25 C          129       9.1 / 17.4     -8.8  (-11.3%)
+--           25 C up           46      16.5 / 23.0    -14.8  (-19.2%)
+--   So the early error has a sign, and the temperature sets it: early on a mild or hot day, late on a cold one, as
+--   the halves in (2) predict. What can fill the early gap is a fleet-level correction by temperature and state of
+--   charge, learned from the meter values a depot already has, not a per-car one (G240), and it removes a bias rather
+--   than noise.
 
 -- ══ §7 0509 AS APPLIED, AND READ LIVE ═══════════════════════════════════════════════════════════════════════════
 
