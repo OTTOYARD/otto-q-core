@@ -636,7 +636,9 @@ repo_manifest(version, name, file) AS (
     ('20260927180246'::text, 'the_cockpits_see_what_the_brain_questions_and_what_it_learns'::text, '0536_the_cockpits_see_what_the_brain_questions_and_what_it_learns.sql'::text),
     ('20260927194349'::text, 'a_question_is_one_the_next_scan_still_sees'::text, '0537_a_question_is_one_the_next_scan_still_sees.sql'::text),
     ('20260927210230'::text, 'a_challenger_grade_says_what_it_measures_and_what_tests_its_lever'::text, '0538_a_challenger_grade_says_what_it_measures_and_what_tests_its_lever.sql'::text),
-    ('20260927223621'::text, 'a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it'::text, '0539_a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it.sql'::text)
+    ('20260927223621'::text, 'a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it'::text, '0539_a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it.sql'::text),
+    ('20260927230739'::text, 'every_result_the_learner_reaches_is_a_recommendation_a_person_ships'::text, '0540_every_result_the_learner_reaches_is_a_recommendation_a_person_ships.sql'::text),
+    ('20260927230859'::text, 'a_car_charging_to_its_target_is_never_a_question'::text, '0541_a_car_charging_to_its_target_is_never_a_question.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

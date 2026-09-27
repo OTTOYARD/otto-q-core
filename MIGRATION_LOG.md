@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0539 — GENERATED, not a log
+## Index, 0134–0541 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -544,7 +544,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0537](db/migrations/0537_a_question_is_one_the_next_scan_still_sees.sql) | `20260927194349` | yes — ledger | **The cockpits show a challenger question once a second scan still sees it. A sighting the next scan no longer |
 | [0538](db/migrations/0538_a_challenger_grade_says_what_it_measures_and_what_tests_its_lever.sql) | `20260927210230` | yes — ledger | **Each challenger question says what its grade measures, and carries the paired tests of its lever with their |
 | [0539](db/migrations/0539_a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it.sql) | `20260927223621` | yes — ledger | **A car charges to full. How full is its owner's answer, and nothing the depot decides lowers it.** |
+| [0540](db/migrations/0540_every_result_the_learner_reaches_is_a_recommendation_a_person_ships.sql) | `20260927230739` | yes — ledger | **A dial experiment's win is a recommendation a person reviews and ships. The engine never applies it itself.** |
+| [0541](db/migrations/0541_a_car_charging_to_its_target_is_never_a_question.sql) | `20260927230859` | yes — ledger | **The challenger's first question is retired: a car charging to its own target is never a question.** |
 
-405 migrations indexed.
+407 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

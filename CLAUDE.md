@@ -226,6 +226,15 @@ When information is missing:
      out of the production database (a paired test blocks every `pg_cron` job for its duration,
      G141, which would stall a live engine), and turn automatic dial promotion off so every result
      is a recommendation (it self-applied once, `energy_reserve_shave`, on 2026-09-26).
+   - **Chase's answer on those three (2026-09-27, 5:00 PM CT):** *"No input on your other three
+     questions. I'm not really concerned with testing through OTTO – Q and the twin. They both serve
+     a purpose. One will be actual production and one is our research fortification and data set or
+     world benchmark for testing against. They should both be leveraged accordingly."* So they were
+     judgment calls, made that evening: (1) the test lab moves to a separate research copy of the
+     database **before real telemetry flows**, not now; the twin stays the research wing's benchmark.
+     (2) Automatic dial promotion is **off** (`0540`): a win is `recommended`, and a person ships it
+     as a certified change. (3) The cockpits' "Learner" card is renamed so that it reads as the
+     research wing's tests in the twin, not as OTTO-Q testing itself.
 
 ---
 
