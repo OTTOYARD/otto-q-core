@@ -118,7 +118,18 @@ SELECT (SELECT lane || ' / ' || notes FROM public.service_cadence_policy WHERE s
 SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
   FROM supabase_migrations.schema_migrations m
  WHERE m.name = 'the_interior_inspection_happens_during_the_charge';
--- READ: pending.
+-- READ (2026-09-27 03:43 UTC, 10:43 PM CT): version 20260927034307, stored md5 f9591188831781de1e386d7a0aee58ed, the
+--   file's body byte for byte. Applied once the canon had passed all nine columns under 0510 (verdicts 457-465), with
+--   no pair in flight and no run live. V3 passed on the stopped run 964cf17b, rolled back: (a) a charging visit's cabin
+--   work held in staging, the triage check added but not started; (b) on the charger with no general technician free,
+--   the inspection and the cabin-only triage started, performed by the charger's sensors, while the item retrieval
+--   waited for a technician and the tidy for the triage's verdict; (b2) with an uncertain sensor clean added the triage
+--   waited for a technician; (c) a technician's inspection once the charge was done; (d) the seam passed over the car
+--   whose leg was planned with its charge and considered the other; (e) the inspection leg closed on the charger's
+--   stall and its one service record names it. The first dry run failed (d) on the rig, not the change: the seam's
+--   first step closes a planned inspection leg that already has a done lane booking, and the stopped run had booked
+--   the lane for the replanted leg; V3 now detaches those bookings. Bodies after: starter 27afba5d125225f796058c1a894d0b93,
+--   seam 7188902a73038886a3f7077b5bdc975f, closer f4605207eaf4860749deb4406b521239; `0511_pre` snapshots 3.
 
 -- ══ §4 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --
