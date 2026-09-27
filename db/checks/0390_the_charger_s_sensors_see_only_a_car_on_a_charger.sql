@@ -84,12 +84,19 @@ SELECT p.oid::regprocedure::text AS writer, m[1] AS statement
  WHERE n.nspname IN ('public','ottoq','twin')
    AND regexp_replace(p.prosrc, '--[^\n]*', '', 'g') ~ 'SET[^;]*current_state\s*=\s*''charge_complete_holding'''
  ORDER BY 1;
--- READ (2026-09-27 08:58 UTC): three writers. `twin.ottoq_sim_stop_charge_session` after a charge, which is the meaning
---   0511 assumed; and two at the gate, `twin.ottoq_world_advance`'s "gate disposition (target-aware): an arrival already
---   at/above its OWN charge target needs no charge -> hold for onward disposition (wash/deploy)" and the older
---   `ottoq_sim_advance_tick_world`'s (SoC >= 85). So the overload is by design, not a slip: "charge complete" is written
---   for "no charge needed" too. 33 functions read the state (comment-stripped); which of them also take it to mean
---   "on a charger" is not yet audited, and is the open half of G246.
+-- READ (2026-09-27 08:58 UTC): the query finds three writers, the three that write the state with a literal `SET`:
+--   `twin.ottoq_sim_stop_charge_session` after a charge, which is the meaning 0511 assumed; and two at the gate,
+--   `twin.ottoq_world_advance`'s "gate disposition (target-aware): an arrival already at/above its OWN charge target needs
+--   no charge -> hold for onward disposition (wash/deploy)" and the older `ottoq_sim_advance_tick_world`'s (SoC >= 85).
+--   Reading every line that names the state (33 functions, comment-stripped) found two more the regex cannot see:
+--   `twin.ottoq_sim_bay_fault_handler` assigns it through a variable when a wash bay faults, and
+--   `twin.ottoq_sim_seed_fleet` seeds most of the fleet into it. So the overload is by design, not a slip: "charge
+--   complete" is written for "no charge needed", "out of a faulted bay" and "the fleet as seeded" too.
+--   Of the 33 readers, read line by line and the two nearest a charger in context (`ottoq_decide_tick`'s charge
+--   disposition, `twin.ottoq_sim_emit_depot_heartbeats`), only the starter took the state to mean "on a charger" in order
+--   to credit work there; the rest group it as "holding, ready for the next step" -- a disposition, a count, a list of
+--   in-depot states -- which holds wherever the car stands. The decide tick's cursor calls itself "the charge-stall ->
+--   wash-bay door", but what it does, send a holding car to a bay or to staging, is as right from a staging stall.
 --   Noted, not changed: the gate disposition judges "no charge needed" as SoC >= the VEHICLE's `target_soc`, while
 --   0518's one rule is SoC >= the visit's (or step's) target - 1. A car at target - 1 is "needs no charge" to the deriver,
 --   the cursor and the flow contract, and not held by the gate. A fourth place that asks the question, on a fourth rule.
