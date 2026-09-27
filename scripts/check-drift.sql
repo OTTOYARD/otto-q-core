@@ -623,7 +623,8 @@ repo_manifest(version, name, file) AS (
     ('20260927122408'::text, 'a_dial_experiment_restarts_only_for_a_change_that_can_move_an_arm'::text, '0523_a_dial_experiment_restarts_only_for_a_change_that_can_move_an_arm.sql'::text),
     ('20260927131711'::text, 'a_start_stops_the_live_run_and_a_failed_seed_starts_nothing'::text, '0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql'::text),
     ('20260927131932'::text, 'the_charge_evidence_records_the_cadence_it_was_observed_at'::text, '0525_the_charge_evidence_records_the_cadence_it_was_observed_at.sql'::text),
-    ('PENDING'::text, 'a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked'::text, '0526_a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked.sql'::text)
+    ('20260927140637'::text, 'a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked'::text, '0526_a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked.sql'::text),
+    ('20260927140742'::text, 'kpi_two_counts_a_turn_when_a_car_leaves_a_service_point'::text, '0527_kpi_two_counts_a_turn_when_a_car_leaves_a_service_point.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

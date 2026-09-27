@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260927140637
 -- migration-name:    a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked
 --
 -- 0526  **G251: a visit with nothing to charge could not have its cabin work started while its car waited for a bay.
@@ -34,8 +34,11 @@
 -- ══ §3 forces_recert TRUE; forces_dial_restart left NULL (restarts) ═════════════════════════════════════════════
 --
 --   The filter runs every tick in every certified arm, and who starts what moves the technician pool. It also moves a
---   dial arm, so the dial experiments restart from this file (0523). Applied after a dial window, so the pairs a window
---   gathers are not cut in half by it.
+--   dial arm, so the dial experiments restart from this file (0523). It was to wait for the next dial window, so G240's
+--   first look was not thrown away for it; 0395 (G252) then showed that first look would have been judged on a KPI that
+--   counts booking states, so it was applied at 9:06 AM CT on 2026-09-27 together with 0527, which fixes that KPI and
+--   restarts the experiments too -- one restart, and the night's pairs gather on the engine and the metric they will be
+--   judged by.
 
 BEGIN;
 
