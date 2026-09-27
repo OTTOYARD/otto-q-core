@@ -596,7 +596,9 @@ repo_manifest(version, name, file) AS (
     ('20260926232454'::text, 'the_recall_appointment_picks_a_staging_stall_the_gate_accepts'::text, '0502_the_recall_appointment_picks_a_staging_stall_the_gate_accepts.sql'::text),
     ('20260926232527'::text, 'the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival'::text, '0503_the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival.sql'::text),
     ('20260926235621'::text, 'an_inspection_closes_its_own_leg_not_the_readiness_check'::text, '0504_an_inspection_closes_its_own_leg_not_the_readiness_check.sql'::text),
-    ('20260927002850'::text, 'a_twin_command_records_when_it_executed'::text, '0505_a_twin_command_records_when_it_executed.sql'::text)
+    ('20260927002850'::text, 'a_twin_command_records_when_it_executed'::text, '0505_a_twin_command_records_when_it_executed.sql'::text),
+    ('20260927004648'::text, 'a_vehicle_card_names_its_steps_and_says_when_one_is_overdue'::text, '0506_a_vehicle_card_names_its_steps_and_says_when_one_is_overdue.sql'::text),
+    ('20260927005114'::text, 'a_vehicle_card_ends_the_current_step_when_it_will_end'::text, '0507_a_vehicle_card_ends_the_current_step_when_it_will_end.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
