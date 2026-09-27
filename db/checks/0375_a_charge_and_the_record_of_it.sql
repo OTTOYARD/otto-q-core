@@ -114,3 +114,80 @@ SELECT count(*) AS sessions, round(sum(energy_delivered_kwh)::numeric, 1) AS kwh
 -- READ on 5344fc12: 95 sessions delivered 2,317.8 kWh; the run's 67 charge records carry none of it. Matched from the
 --   session side, 66 sessions belong to done charge legs and 29 were still charging when the run stopped (their legs
 --   ended `amended`, which issues no record).
+
+-- ══ §4 THE APPLY (0508), AND THE CANON UNDER IT ═════════════════════════════════════════════════════════════════
+--
+--   0508 (`a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered`): the closer leaves an ACTIVE
+--   charge leg open while an OCPP session for that car on the booking's stall is active (the booking still ends
+--   `window_elapsed_occupied`, G81); the orphan sweep closes a swept session's charge leg at the session's end; and a
+--   charge's record carries the energy and peak of the car's sessions that overlap the leg, and the session's id when
+--   exactly one does.
+
+\echo '=== 0375 §4 — 0508 as applied ==='
+SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
+  FROM supabase_migrations.schema_migrations m
+ WHERE m.name = 'a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered';
+-- READ: 20260927012721 (8:27 PM CT), md5 3e2b9c0d0c16db1d741aea872f34ce74, equal to the file's body; forces_recert
+--   TRUE. Dry-run first with V3 passing on 5344fc12's own charges, rolled back: (a) the closer, a minute past a
+--   window, ended the booking `window_elapsed_occupied` and left the leg open with no record, and the session's stop
+--   12 min 58 s past the window closed it with one record of 5.893 kWh, the session's peak and its id; (b) the
+--   control, a charge its session had closed, closed at its window as before with 0.723 kWh; (c) the orphan sweep
+--   ended a planted running session at its own end and closed its leg there with 37.384 kWh. Applied with the same
+--   V3 passing. The sweep began at once (verdict 448, grid_smoke/239001/6, passed 8:28 PM CT).
+
+\echo '=== 0375 §4(b) — the canon since 0508, and what moved against its verdicts under 0504 ==='
+WITH now_v AS (
+  SELECT DISTINCT ON (scenario, seed, ticks) verdict_id, scenario, seed, ticks, equal, verdict->'arm_a' AS a
+    FROM public.ottoq_determinism_verdict_ledger
+   WHERE certified_at > '2026-09-27 01:27:21+00'
+   ORDER BY scenario, seed, ticks, verdict_id DESC),
+before_v AS (
+  SELECT DISTINCT ON (scenario, seed, ticks) verdict_id, scenario, seed, ticks, verdict->'arm_a' AS a
+    FROM public.ottoq_determinism_verdict_ledger
+   WHERE verdict_id BETWEEN 439 AND 447
+   ORDER BY scenario, seed, ticks, verdict_id DESC)
+SELECT n.scenario || '/' || n.seed || '/' || n.ticks AS col, b.verdict_id AS was, n.verdict_id AS now, n.equal,
+       (SELECT string_agg(k, ',' ORDER BY k) FROM jsonb_object_keys(n.a) k
+         WHERE (k LIKE 'h\_%' OR k IN ('fp','endst'))
+           AND n.a->>k IS DISTINCT FROM b.a->>k) AS moved
+  FROM now_v n LEFT JOIN before_v b USING (scenario, seed, ticks)
+ ORDER BY 1;
+-- READ: pending.
+
+-- ══ §5 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
+--
+--   PREDICTED on the next busy_day operator run: (a) no done charge leg closes 5+ minutes before its session ends
+--   (31 of 67 on 5344fc12), except a leg that was still `planned` when its window ran out; (b) every done charge leg's
+--   record carries energy, and the records' kWh equals the kWh of the sessions they match; (c) bookings are unchanged:
+--   charge bookings still end `window_elapsed_occupied` when the charge outlasts them (G81), so G240's window gap reads
+--   as before; (d) no charge leg is left `active` at the stop without a running session.
+
+\echo '=== 0375 §5(a) — §1 on the new run: done charge legs closed before their session ended ==='
+--   Run §1: `closed_early` should read 0 (or only legs that were never opened).
+
+\echo '=== 0375 §5(b) — done charge legs, their records, and the energy on both sides ==='
+WITH legs AS (
+  SELECT l.leg_id, l.vehicle_id, l.actual_start_sim, l.actual_end_sim
+    FROM public.ottoq_itinerary_legs l
+   WHERE l.sim_run_id = :'run' AND l.leg_type IN ('charge_dcfc','charge_l2') AND l.status = 'done')
+SELECT count(*) AS done_charge_legs,
+       count(sd.sdr_id) AS with_record,
+       count(sd.energy_kwh) AS record_with_energy,
+       count(sd.ocpp_session_id) AS record_with_session,
+       round(sum(sd.energy_kwh)::numeric, 1) AS kwh_in_records,
+       round(sum((SELECT sum(os.energy_delivered_kwh) FROM public.ocpp_sessions os
+                   WHERE os.vehicle_id = l.vehicle_id AND os.sim_run_id = :'run'
+                     AND os.started_at < l.actual_end_sim AND os.ended_at > l.actual_start_sim))::numeric, 1) AS kwh_in_sessions
+  FROM legs l
+  LEFT JOIN public.ottoq_service_detail_records sd ON sd.leg_id = l.leg_id;
+-- READ: pending.
+
+\echo '=== 0375 §5(d) — charge legs still active at the stop, and whether a session was running ==='
+SELECT l.status, count(*) AS legs,
+       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.ocpp_sessions os
+                                        WHERE os.vehicle_id = l.vehicle_id AND os.sim_run_id = :'run'
+                                          AND os.stopped_reason = 'sim_reset')) AS car_charging_at_the_stop
+  FROM public.ottoq_itinerary_legs l
+ WHERE l.sim_run_id = :'run' AND l.leg_type IN ('charge_dcfc','charge_l2') AND l.status IN ('active','amended')
+ GROUP BY 1;
+-- READ: pending.

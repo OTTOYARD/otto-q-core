@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0507 — GENERATED, not a log
+## Index, 0134–0508 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -506,7 +506,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0505](db/migrations/0505_a_twin_command_records_when_it_executed.sql) | `20260927002850` | yes — ledger | **A twin-executed command recorded that it executed 30 minutes after it was issued, whenever it actually |
 | [0506](db/migrations/0506_a_vehicle_card_names_its_steps_and_says_when_one_is_overdue.sql) | `20260927004648` | yes — ledger | **The vehicle cards showed "Next: Inspect at 8:20 AM" at 9:23 AM, and could not say which inspection |
 | [0507](db/migrations/0507_a_vehicle_card_ends_the_current_step_when_it_will_end.sql) | `20260927005114` | yes — ledger | **A vehicle card said a charge ran "until 4:51 PM" for a charge that started at 9:51 AM and would end near |
+| [0508](db/migrations/0508_a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered.sql) | `20260927012721` | yes — ledger | **A charge's itinerary leg and its signed service record ended when the booking window ran out, while the |
 
-367 migrations indexed.
+368 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
