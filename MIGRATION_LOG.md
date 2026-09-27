@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0525 — GENERATED, not a log
+## Index, 0134–0526 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -530,7 +530,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0523](db/migrations/0523_a_dial_experiment_restarts_only_for_a_change_that_can_move_an_arm.sql) | `20260927122408` | yes — ledger | **G250: a dial experiment counted only the pairs run on the current engine, and the engine was the md5 of every |
 | [0524](db/migrations/0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql) | `PENDING` | no — pending | **G249: a run whose fleet seed failed ran anyway, on the previous run's world. The seed tripped on an arm |
 | [0525](db/migrations/0525_the_charge_evidence_records_the_cadence_it_was_observed_at.sql) | `PENDING` | no — pending | **G248: the charge-duration evidence did not record the cadence a charge was observed at, and its reader did |
+| [0526](db/migrations/0526_a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked.sql) | `PENDING` | no — pending | **G251: a visit with nothing to charge could not have its cabin work started while its car waited for a bay |
 
-391 migrations indexed.
+392 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

@@ -1,0 +1,80 @@
+-- 0394  **G251: a visit with nothing to charge could not have its cabin work started while its car waited for a bay.
+--       The car sat on a staging stall until the deploy gate's 240-minute escape hatch released it with the work
+--       undone. On validation run 6ddd827e three cars' interior inspections waited that way.**
+--
+--       Written on 2026-09-27 (12:40-13:15 UTC, 7:40-8:15 AM CT), from validation run 6ddd827e while it ran and after.
+--       Read-only.
+
+-- ══ §1 THE THREE, AND HOW THE GATE LET THEM GO ═══════════════════════════════════════════════════════════════════
+
+\echo '=== 0394 §1 — deploy-gate overrides on the day''s two full-day runs, and what each left undone ==='
+SELECT left(e.sim_run_id::text, 8) AS run, v.display_name AS car,
+       to_char(e.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH24:MI') AS released_ct,
+       (e.payload->>'held_min')::numeric AS held_min, e.payload->>'reason' AS reason, e.payload->'missing' AS missing,
+       left(e.payload->>'note', 60) AS note
+  FROM public.ottoq_events e JOIN public.vehicles v ON v.id = e.entity_id
+ WHERE e.sim_run_id IN ('6ddd827e-b549-43cf-8154-4d1bfb20cabf', '4bc19d29-790c-4cb0-9e2e-ae090a7da57b')
+   AND e.event_type = 'twin.deploy_gate_override'
+ ORDER BY e.sim_run_id, e.sim_clock_at;
+-- READ (2026-09-27 12:47 UTC, 6ddd827e at sim 2:13 PM CT): 6ddd827e 3 overrides, 4bc19d29 (the full day before 0521)
+--   6. Every one is "escape hatch 3: released past the readiness gate so the twin cannot wedge; this is a DEFECT to
+--   investigate, not a normal path", reason `must_do_work_open`, held 240.1-240.2 minutes. 4bc19d29's left bay and
+--   cabin cleaning undone (interior_deep_clean 4, interior_tidy 1, exterior_wash 1). 6ddd827e's all left the interior
+--   inspection undone -- Waymo-AV-016 (with its exterior wash), Waymo-AV-020 (with its wash) and Tesla-AV-041.
+
+\echo '=== 0394 §1(b) — Waymo-AV-016 on 6ddd827e: its state and stall changes from the gate to the release ==='
+SELECT to_char(e.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH24:MI:SS') AS sim_ct, e.event_type,
+       e.payload->'diff'->'current_state'->>'to' AS to_state,
+       (SELECT stall_code FROM public.stalls WHERE id = (e.payload->'diff'->'current_stall_id'->>'to')::uuid) AS to_stall
+  FROM public.ottoq_events e JOIN public.vehicles v ON v.id = e.entity_id
+ WHERE e.sim_run_id = '6ddd827e-b549-43cf-8154-4d1bfb20cabf' AND v.display_name = 'Waymo-AV-016'
+   AND (e.event_type = 'twin.deploy_gate_override'
+        OR (e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ?| ARRAY['current_state', 'current_stall_id']))
+   AND e.sim_clock_at BETWEEN '2026-09-27 13:09:00+00' AND '2026-09-27 17:13:00+00'
+ ORDER BY e.sim_clock_at, e.event_seq;
+-- READ (2026-09-27 12:44 UTC): arrived 8:09:46 AM CT sim; at 8:11:23 the gate intake took it through
+--   `arrived_at_gate` -> `charge_complete_holding` -> `staged_awaiting_service` in one statement (its visit has no
+--   charge: an inspection, a readiness check and an exterior wash); parked on NASH-STG-I011 at 8:11:44, moved to
+--   NASH-STG-B009 at 8:15:56; and there it stayed until 12:11:51, when `twin.deploy_gate_override` fired at 240.1
+--   minutes with `missing` = exterior_wash and interior_inspection and moved it to `staged_for_departure`. The inspection
+--   started at 12:12:25 -- in the exit catch-up, 35 seconds after the release -- and the wash was still pending when
+--   read at about 1 PM sim.
+
+-- ══ §2 WHY: THE CANDIDATE FILTER PRESUMES EVERY VISIT CHARGES ═══════════════════════════════════════════════════════
+--
+--   `twin.ottoq_sim_advance_visit_atoms` chooses the cars whose atoms `ottoq_start_concurrent_atoms` may start. Cabin
+--   work is admitted only for `charging_dcfc`, `charging_l2`, `charge_complete_holding` and `staged_for_departure`
+--   (M3_cabin_at_charger: cabin work is a technician's at the charger, during the session; the last two are catch-ups
+--   so nothing waits forever). The starter itself has no state test and holds cabin work only for a charging visit,
+--   so it would give this inspection to a technician -- it is never asked. A no-charge visit's car spends no time
+--   charging; it passes through `charge_complete_holding` in the same statement as the intake, and waits for its bay in
+--   `staged_awaiting_service`, which admits exterior and digital work but not cabin work; and the readiness gate will
+--   not move it to `staged_for_departure` with must-do work open. Only the escape hatch breaks the circle.
+--   Why it shows now: until 0521 the charger's sensors credited such inspections at the intake moment, on cars that
+--   were on no charger (G246's false credits) -- which is also why 4bc19d29's six releases name no inspection. The
+--   trap was already there for other cabin work: on 4bc19d29 the one no-charge interior tidy started after 262 minutes.
+
+\echo '=== 0394 §2 — cabin atoms by run and whether the visit charges: started, started after 2 hours, never started ==='
+WITH runs AS (SELECT sim_run_id, left(sim_run_id::text, 8) AS run FROM public.ottoq_sim_runs
+               WHERE left(sim_run_id::text, 8) IN ('4bc19d29', '6ddd827e')),
+cab AS (
+  SELECT r.run, x->>'svc' AS svc, (x->>'started_at')::timestamptz AS started_at, vn.arrived_at,
+         NOT EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) c WHERE c->>'svc' = 'charge') AS no_charge
+    FROM runs r JOIN public.ottoq_visit_needs vn ON vn.sim_run_id = r.sim_run_id, jsonb_array_elements(vn.atoms) x
+   WHERE x->>'concurrency' = 'cabin')
+SELECT run, no_charge, svc, count(*) AS atoms, count(started_at) AS started,
+       count(*) FILTER (WHERE extract(epoch FROM started_at - arrived_at) / 60 > 120) AS started_after_2h,
+       count(*) FILTER (WHERE started_at IS NULL) AS never_started
+  FROM cab GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
+-- READ (2026-09-27 12:45 UTC, 6ddd827e at sim about 2 PM CT): on 6ddd827e, 11 interior inspections on no-charge visits,
+--   all started, 3 of them after two hours (the three above); on 4bc19d29 3, none after two hours, and one no-charge
+--   interior tidy after 262 minutes. The charging visits' cabin work waits for its charger by design and is not this.
+
+-- ══ §3 THE FIX: 0526 ══════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   The candidate filter also admits cabin work for a car in `staged_awaiting_service`, on a stall, whose visit has no
+--   charge left to do -- the starter's own definition of a charging visit, negated. The starter then gives it to a
+--   technician from the general pool. A charging visit still does its cabin work at the charger; the catch-ups stay.
+--   forces_recert TRUE (the filter runs in every certified arm, and the technician pool moves), and it moves dial arms,
+--   so it restarts the dial experiments: it waits for the end of the next dial window, so the G240 experiment's first
+--   look is not thrown away for it.
