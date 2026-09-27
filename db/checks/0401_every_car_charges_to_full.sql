@@ -12,6 +12,11 @@
 --       tariff windows, the night boundary, solar, the hour-of-day demand) starts 22 minutes apart, so the two days are
 --       close, not identical. A difference that is small against that shift is not evidence of anything. Only a pair
 --       started through the pair machinery is CRN.
+--
+--       **ad106e55's side cannot be re-queried.** Starting this run purged the prior runs' working rows, as designed
+--       (`ottoq_purge_prior_runs`; the run-scoped tables are `class='engine'`). Only ad106e55's archive row survives
+--       (1,057 ticks, 10:03-19:20 UTC sim). So §0 below is the READ taken at 22:50 UTC, before the purge, and ad106e55's
+--       scorecard is 0400 §1's READ. Re-running either query for ad106e55 now returns nothing.
 
 -- ══ §0 BEFORE: WHAT ad106e55's CHARGES WERE TOLD TO STOP AT ═════════════════════════════════════════════════════════
 --
@@ -34,10 +39,10 @@ SELECT st.stall_type::text AS plug, (m.payload->>'target_soc_pct')::numeric AS s
 
 -- ══ §1 THE RUN ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 
-\echo '=== 0401 §1 — the run and its scorecard, beside ad106e55 ==='
+\echo '=== 0401 §1 — the run and its scorecard, beside ad106e55 (0400 §1''s READ) ==='
 SELECT r.sim_run_id, r.run_by, r.status, r.random_seed, r.sim_clock_start, r.sim_clock_current, r.tick_count,
        r.started_at, r.ended_at
-  FROM public.ottoq_sim_runs r WHERE r.sim_run_id IN ('c9d14225-a7e6-4cf8-b4b7-7b652db9b283', 'ad106e55-e775-4780-b853-418f504d4bcf');
+  FROM public.ottoq_sim_runs r WHERE r.sim_run_id = 'c9d14225-a7e6-4cf8-b4b7-7b652db9b283';
 SELECT public.ottoq_kpi_five('c9d14225-a7e6-4cf8-b4b7-7b652db9b283');
 SELECT public.ottoq_kpi_charge_wait('c9d14225-a7e6-4cf8-b4b7-7b652db9b283');
 SELECT public.ottoq_kpi_supply_gap('c9d14225-a7e6-4cf8-b4b7-7b652db9b283') - 'by_hour_ct';
@@ -63,6 +68,26 @@ SELECT st.stall_type::text AS plug, os.stopped_reason, count(*) AS sessions,
    AND os.soc_end < (m.payload->>'target_soc_pct')::numeric - 0.5
  GROUP BY 1, 2 ORDER BY 1, 3 DESC;
 -- READ: pending
+
+\echo '=== 0401 §2(c) — cars parked ready while they still owe a must-do charge (G267) ==='
+--   A car in staged_for_departure is past every charging path, and neither dispatcher takes a car with open must-do
+--   work. So a car that arrives there still owing its charge waits, uncharged and unsent, until the run ends.
+SELECT COALESCE(v.display_name, v.id::text) AS car, v.current_soc, v.last_state_change, vn.urgency,
+       (SELECT a->>'target_soc' FROM jsonb_array_elements(vn.atoms) a WHERE a->>'svc' = 'charge') AS charge_target,
+       round(EXTRACT(EPOCH FROM (r.sim_clock_current - v.last_state_change)) / 60.0) AS parked_min
+  FROM public.ottoq_visit_needs vn
+  JOIN public.vehicles v ON v.id = vn.vehicle_id
+  JOIN public.ottoq_sim_runs r ON r.sim_run_id = vn.sim_run_id
+ WHERE vn.sim_run_id = 'c9d14225-a7e6-4cf8-b4b7-7b652db9b283' AND vn.status IN ('open', 'in_progress')
+   AND v.current_state = 'staged_for_departure'
+   AND EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) a
+                WHERE a->>'svc' = 'charge' AND COALESCE((a->>'must_do')::boolean, false)
+                  AND COALESCE(a->>'status', 'pending') NOT IN ('done', 'cancelled'))
+ ORDER BY v.last_state_change;
+-- READ (2026-09-27 23:23 UTC, mid-run at 6:22 AM CT sim): 10 cars at 88-97%, each with a charge to 100 pending, 9 of
+--   them parked since 09:49-09:52 UTC sim (the run's first ten minutes) and one since 10:40. All 10 were boot-placed
+--   `charge_complete_holding` and released by the wash triage (Waymo-AV-032: offline to charge_complete_holding at
+--   09:41:00, then staged_for_departure/ready at 09:49:00). End-of-run READ: pending.
 
 -- ══ §3 G266: THE BOOT RESET WORKED ═══════════════════════════════════════════════════════════════════════════════════
 -- READ: pending
