@@ -7,9 +7,9 @@
 --       Why a designed pair and not two live runs: a live run's cadence is the wall clock's (0.3-1.5 sim-minutes a tick,
 --       G161), so two live runs of one seed differ in cadence as well as in the dial and cannot be paired. The dial pair
 --       holds cadence, seed, scenario and sim start fixed and resets the world before each arm (0421), so the arms differ
---       only in `charge_window_calibration_id`. Its one cost, measured: a 2-minute tick reads a charge's end up to 2 minutes
---       late in both arms, against the ~0.5-minute ticks version 6 was fitted on, so the treatment's windows are a minute
---       short on average and the experiment is, if anything, biased against it.
+--       only in `charge_window_calibration_id`. Its one cost: a coarse tick reads a charge's end late in both arms -- up to
+--       6 minutes at the registered 6-minute tick (§2), against the ~0.5-minute ticks version 6 was fitted on -- so the
+--       treatment's windows are about 3 minutes short on average and the experiment is, if anything, biased against it.
 
 -- ══ §1 0520 AS APPLIED ══════════════════════════════════════════════════════════════════════════════════════════
 
@@ -30,10 +30,14 @@ SELECT m.version, md5(m.statements[1]) AS body_md5,
 -- ══ §2 THE EXPERIMENT ═══════════════════════════════════════════════════════════════════════════════════════════
 --
 --   PRE-REGISTERED before its first pair: `charge_window_calibration_id` 0 (control, the window as booked today) against
---   6 (treatment, the first kept fit), busy_day from 8:00 AM CT (2026-09-01 13:00 UTC) at 2 sim-minutes a tick for 270
---   ticks (to 5:00 PM, the governor's ceiling on an operator run), primary `charge_outlast_pct`, lower is better, looks
---   at 6 and 12 pairs, alpha 0.05, minimum effect 0.5%, guardrails the five KPIs at a 2% margin and alpha 0.20 -- the
---   conventions of the three experiments before it.
+--   6 (treatment, the first kept fit), busy_day from 8:00 AM CT (2026-09-01 13:00 UTC) to 5:00 PM (the governor's ceiling
+--   on an operator run), primary `charge_outlast_pct`, lower is better, looks at 6 and 12 pairs, alpha 0.05, minimum
+--   effect 0.5%, guardrails the five KPIs at a 2% margin and alpha 0.20 -- the conventions of the three experiments
+--   before it.
+--   AMENDED BEFORE ITS FIRST PAIR, and the amendment is the design that runs: drafted at 2 sim-minutes a tick for 270
+--   ticks, and refused at registration by `ottoq_dial_experiments_ticks` (12 to 96 ticks, a bound on a pair's wall time
+--   that 0520 left as it was), so registered at 6 sim-minutes a tick for 90 ticks -- the same nine hours. The cost is
+--   the one in the header, tripled: a charge's end is read up to 6 minutes late in both arms. Nothing else moved.
 --   PREDICTED: (a) the treatment lowers `charge_outlast_pct` on every pair, from about 70% (61.3% DCFC and 81.5% L2 on
 --   `4bc19d29`, 0386 §6) toward the 5-40% version 6 promises for days like the ones it saw (0386 §4); (b) the median
 --   overrun of the charges that still outlast falls; (c) not predicted, read: the guardrails -- a longer window holds a
@@ -45,7 +49,13 @@ SELECT experiment_id, created_at, param_key, control_value, treatment_value, sce
        primary_metric, primary_better, first_look_pairs, final_look_pairs, alpha, guardrail_margin_pct, min_effect_pct,
        guardrail_alpha, status
   FROM public.ottoq_dial_experiments WHERE param_key = 'charge_window_calibration_id' ORDER BY created_at;
--- READ: pending.
+-- READ (2026-09-27 08:55 UTC): experiment 143a11c7-6740-4624-b747-e145f3533e60, registered 08:33:33 UTC (3:33 AM CT),
+--   `charge_window_calibration_id` 0 against 6, busy_day, 90 ticks from 2026-09-01 13:00 UTC at 6 sim-minutes a tick,
+--   primary `charge_outlast_pct` lower, looks 6 and 12, alpha 0.05, guardrail margin 2% at alpha 0.20, minimum effect
+--   0.5%, active, 0 pairs. The dial runner was opened for the night at the same minute. Its first pair on this engine
+--   will be on 0521's (`db/checks/0390`): the runner's 3:40 AM fire went to the older energy experiment 82c5568b, the
+--   tie on pair count going to the older, and 0521 was applied between that pair and the next, so every pair this
+--   experiment counts was run on one engine.
 
 -- ══ §3 THE PAIRS ════════════════════════════════════════════════════════════════════════════════════════════════
 

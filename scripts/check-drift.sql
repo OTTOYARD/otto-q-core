@@ -617,7 +617,8 @@ repo_manifest(version, name, file) AS (
     ('20260927062217'::text, 'a_calibrated_charge_window_behind_a_dial'::text, '0517_a_calibrated_charge_window_behind_a_dial.sql'::text),
     ('20260927074142'::text, 'one_rule_for_whether_a_car_needs_its_charge'::text, '0518_one_rule_for_whether_a_car_needs_its_charge.sql'::text),
     ('20260927074236'::text, 'the_charger_s_sensors_cannot_finish_an_inspection_on_a_car_that_has_left'::text, '0519_the_charger_s_sensors_cannot_finish_an_inspection_on_a_car_that_has_left.sql'::text),
-    ('20260927081719'::text, 'a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence'::text, '0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql'::text)
+    ('20260927081719'::text, 'a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence'::text, '0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql'::text),
+    ('20260927085218'::text, 'the_charger_s_sensors_see_only_a_car_on_a_charger'::text, '0521_the_charger_s_sensors_see_only_a_car_on_a_charger.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

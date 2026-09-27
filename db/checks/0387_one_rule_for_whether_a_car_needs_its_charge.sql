@@ -181,3 +181,92 @@ SELECT c.scenario, c.seed, c.ticks, c.verdict_id AS now_v, left(c.engine_hash, 8
 --   inspection starts at the gate on a visit whose charge step is open (G244's 076 and 072); (e) not predicted, read:
 --   deploy-gate overrides (`twin.deploy_gate_override`) against the night's runs, since two cars a run now wait for a
 --   top-up they used to skip.
+
+\echo '=== 0387 §4 — the validation run: charge steps done, by who closed them, the SoC at the close against the step''s target, and whether a charge followed ==='
+WITH ca AS (
+  SELECT vn.vehicle_id, (x->>'target_soc')::numeric AS atom_tgt, x->>'closed_by' AS closed_by,
+         (x->>'closed_soc')::numeric AS closed_soc, (x->>'closed_vs_target')::numeric AS closed_vs_target,
+         COALESCE((x->>'done_at')::timestamptz, (x->>'closed_at')::timestamptz) AS closed_at
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id = 'c4afb873-ce23-4ae7-b167-9fda79961fc7' AND x->>'svc' = 'charge' AND x->>'status' = 'done')
+SELECT COALESCE(closed_by, '(none)') AS closed_by, count(*) AS closed,
+       min(closed_soc - COALESCE(closed_vs_target, atom_tgt)) AS min_soc_minus_target,
+       max(closed_soc - COALESCE(closed_vs_target, atom_tgt)) AS max_soc_minus_target,
+       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.ocpp_sessions os
+                                       WHERE os.sim_run_id = 'c4afb873-ce23-4ae7-b167-9fda79961fc7' AND os.vehicle_id = ca.vehicle_id
+                                         AND os.started_at >= ca.closed_at AND os.started_at < ca.closed_at + interval '15 minutes')) AS charge_within_15_min
+  FROM ca GROUP BY 1 ORDER BY 1;
+-- READ (2026-09-27 08:35-08:45 UTC; c4afb873, busy_day from sim 8:00 AM, stopped by the operator at 3:32 AM CT at sim
+--   9:55 AM, 218 ticks):
+--     flow_contract_near_target    8 closed   SoC - target -1 to 0    0 charged within 15 minutes
+--     ottoq_satisfied             28          0 to +1                 0
+--     session_completed            2          -10                     0
+--   (a) HOLDS: every step the flow contract closed says so, with its SoC, target and clock, and none was closed under
+--   `target - 1`. No done charge step carries no closer. (b) HOLDS: 0 of 8 flow-contract closes were followed by a
+--   charge, against 4 of 54 on the night's two earlier runs. (`ottoq_satisfied` stamps `closed_at`, not `done_at`, so
+--   its rows are read on the close; both of `session_completed`'s are the stop of a charge cut short, 10 under target.)
+
+\echo '=== 0387 §4(c) — cars that came to their charge from the old gap [target-2, target-1): who closed the step, and when ==='
+WITH ca AS (
+  SELECT vn.vehicle_id, vn.status AS visit_status, (x->>'target_soc')::numeric AS atom_tgt, COALESCE(x->>'status','pending') AS st,
+         x->>'closed_by' AS closed_by, (x->>'closed_soc')::numeric AS closed_soc,
+         COALESCE((x->>'done_at')::timestamptz, (x->>'closed_at')::timestamptz) AS closed_at
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id = 'c4afb873-ce23-4ae7-b167-9fda79961fc7' AND x->>'svc' = 'charge')
+SELECT v.display_name AS car, ca.visit_status, ca.st, ca.closed_by, ca.atom_tgt, s.soc_start, s.soc_end, s.stopped_reason,
+       to_char(s.ended_at AT TIME ZONE 'America/Chicago', 'HH24:MI:SS') AS charge_ended_ct,
+       to_char(ca.closed_at AT TIME ZONE 'America/Chicago', 'HH24:MI:SS') AS step_closed_ct, ca.closed_soc
+  FROM ca JOIN public.vehicles v ON v.id = ca.vehicle_id
+  JOIN LATERAL (SELECT * FROM public.ocpp_sessions os WHERE os.sim_run_id = 'c4afb873-ce23-4ae7-b167-9fda79961fc7'
+                   AND os.vehicle_id = ca.vehicle_id AND (ca.closed_at IS NULL OR os.started_at <= ca.closed_at)
+                 ORDER BY os.started_at DESC LIMIT 1) s ON true
+ WHERE s.soc_start >= ca.atom_tgt - 2 AND s.soc_start < ca.atom_tgt - 1
+ ORDER BY s.started_at, ca.st;
+-- READ (2026-09-27 08:40 UTC):
+--     Zoox-AV-075   superseded  done     flow_contract_near_target  90  88 -> 90  completed  08:08:55  closed 08:09:20 at 90
+--     Tesla-AV-058  superseded  done     flow_contract_near_target  90  88 -> 90  completed  08:14:45  closed 08:16:14 at 90
+--     Tesla-AV-058  superseded  pending  (none)                     90  88 -> 90  completed  08:14:45  (a second superseded
+--                                                                                                     visit's step, never closed)
+--     Tesla-AV-050  superseded  done     ottoq_satisfied            90  88 -> 90  completed  08:44:41  closed 08:44:41 at 90
+--   (c) HOLDS in substance, not in the closer's name: three cars came to their charge from the old gap, each kept its
+--   step open through the charge, and each step closed at 90 against 90, after the charge -- never in the gap. Two were
+--   closed by the flow contract 25 and 89 seconds after the session's stop rather than by the stop's own closer, the
+--   third by the stop in the same second:
+--   whichever runs first in the tick after the stop takes it, and at the target both rules agree.
+
+\echo '=== 0387 §4(d) — every interior inspection started on the run: who did it, whether the visit''s charge step was open, and the car''s state ==='
+WITH insp AS (
+  SELECT vn.vehicle_id, (x->>'started_at')::timestamptz AS started_at, x->>'performed_by' AS performed_by,
+         EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) c WHERE c->>'svc' = 'charge'
+                   AND (COALESCE(c->>'status','pending') NOT IN ('done','cancelled')
+                        OR COALESCE((c->>'done_at')::timestamptz, (c->>'closed_at')::timestamptz) > (x->>'started_at')::timestamptz)) AS charge_open_at_start
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id = 'c4afb873-ce23-4ae7-b167-9fda79961fc7' AND x->>'svc' = 'interior_inspection' AND x ? 'started_at')
+SELECT COALESCE(i.performed_by, '(technician)') AS performed_by, i.charge_open_at_start,
+       (SELECT e.payload->'diff'->'current_state'->>'to' FROM public.ottoq_events e
+         WHERE e.sim_run_id = 'c4afb873-ce23-4ae7-b167-9fda79961fc7' AND e.entity_id = i.vehicle_id
+           AND e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state' AND e.sim_clock_at <= i.started_at
+         ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS state_at_start,
+       count(*) AS n
+  FROM insp i GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
+-- READ (2026-09-27 08:40 UTC; the state is the stream's last at or before the start, so a change in the same tick can
+--   show on either side):
+--     charger_sensors  63   charging_l2 38, charging_dcfc 20, charge_complete_holding 2, offline 2, in_detail_bay 1
+--     technician        9   staged_for_departure 8 (3 with the charge step still open), in_service_bay 1
+--   (d) HOLDS: 0 of 72 inspections started at the gate. The 9 a technician did are the exit catch-up (0385) and a car in
+--   the service bay; the 3 catch-ups with a charge step open were in the run's first 7 sim-minutes, cars the reset had
+--   staged for departure, on visits since superseded. But the sensors' 63 are not all on a charger: 0519's stamp puts
+--   6 of the run's 72 sensor starts on staging or on no stall -- G246, `db/checks/0390`.
+
+\echo '=== 0387 §4(e) — deploy-gate overrides on the night''s operator runs ==='
+SELECT left(e.sim_run_id::text, 8) AS run, count(*) AS overrides,
+       min(to_char(e.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH24:MI')) AS first_ct,
+       jsonb_agg(e.payload->'missing' ORDER BY e.sim_clock_at) AS missing
+  FROM public.ottoq_events e
+ WHERE e.sim_run_id IN ('c4afb873-ce23-4ae7-b167-9fda79961fc7','4bc19d29-790c-4cb0-9e2e-ae090a7da57b','caf85837-8681-4afe-9744-03eecd796737')
+   AND e.event_type = 'twin.deploy_gate_override'
+ GROUP BY 1 ORDER BY 1;
+-- READ (2026-09-27 08:42 UTC): only 4bc19d29, 6 overrides from sim 12:22 PM on, every one must-do bay or cabin work
+--   (interior_deep_clean 4, interior_tidy 1, exterior_wash 1) and none a charge. (e) UNREADABLE on c4afb873: the gate
+--   overrides only at its 240-minute hard cap (the run's last summary: 4 held, 2 escalated, 0 overridden), and the run
+--   lasted 116 sim-minutes. The question -- do cars that now wait for a top-up reach the cap -- needs a full day.

@@ -85,3 +85,43 @@ SELECT m.version, md5(m.statements[1]) AS body_md5,
 --   leaves the work pending with one `interrupted` entry, and the work is done later on another charger or by a
 --   technician; (d) not predicted, read: how long an interrupted inspection waits to be done again, since the car's
 --   next charger may be minutes or an hour away.
+
+\echo '=== 0388 §4 — the validation run: sensor work by outcome, whether it carries its stall, and where the car was when it was done ==='
+WITH a AS (
+  SELECT vn.vehicle_id, x->>'svc' AS svc, COALESCE(x->>'status','pending') AS st, (x ? 'sensor_stall_id') AS stamped,
+         (x->>'sensor_stall_id')::uuid AS sstall, (x->>'done_at')::timestamptz AS done_at,
+         jsonb_array_length(COALESCE(x->'interrupted', '[]'::jsonb)) AS interruptions
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id = 'c4afb873-ce23-4ae7-b167-9fda79961fc7'
+     AND (x->>'performed_by' = 'charger_sensors' OR x ? 'interrupted'))
+SELECT a.svc, a.st, count(*) AS n, count(*) FILTER (WHERE a.stamped) AS stamp_key, count(*) FILTER (WHERE a.sstall IS NOT NULL) AS stamp_value,
+       sum(a.interruptions) AS interruptions,
+       count(*) FILTER (WHERE a.st = 'done' AND a.sstall IS NOT NULL
+                          AND a.sstall = (SELECT (e.payload->'diff'->'current_stall_id'->>'to')::uuid FROM public.ottoq_events e
+                                           WHERE e.sim_run_id = 'c4afb873-ce23-4ae7-b167-9fda79961fc7' AND e.entity_id = a.vehicle_id
+                                             AND e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_stall_id'
+                                             AND e.sim_clock_at <= a.done_at
+                                           ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1)) AS done_with_car_on_that_stall
+  FROM a GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ (2026-09-27 08:40 UTC; c4afb873, sim 8:00-9:55 AM):
+--     interior_inspection  done         59  stamped 59 (57 with a stall)  1 interruption   57 done with the car on it
+--     interior_inspection  in_progress   4          4 (4)                                  --
+--     interior_inspection  pending       1          -- (0519 took the stamp)  1 interruption
+--     triage_check         done          7          7 (6)                                  6
+--   (a) HOLDS IN FORM, NOT IN SUBSTANCE: every one of the 70 pieces of sensor work started carries `sensor_stall_id`, but
+--   3 carry it empty, because the car was on no stall when the sensors "started" -- and 3 more carry a staging stall.
+--   That is G246, `db/checks/0390`: 6 of the run's 72 sensor starts were on no charger at all.
+--   (b) HOLDS: no sensor work was done after its car's unplug (5 of 275 on the night's two earlier runs), and every one
+--   of the 63 done with a stall stamped was done with the car on that stall -- 62 chargers and, G246 again, one staging
+--   stall (Zoox-AV-091's second start). The 3 done with an empty stamp passed 0519's
+--   check by having nothing to compare: Tesla-AV-043's inspection finished in a wash bay, Waymo-AV-027's inspection and
+--   triage on a staging stall.
+--   (c) NOT EXERCISED AS PREDICTED: no charge was cut by a fault during sensor work on this 116-minute run, so the case
+--   0519 exists for did not occur. 0519's branch fired twice, both times on a car moved between two STAGING stalls
+--   (Zoox-AV-091 from NASH-STG-I010 at 8:11:48, Waymo-AV-002 from I010 at 8:29:22), each returned to pending with one
+--   `left_the_charger` interruption naming the staging stall -- the mechanism working, on a premise (G246) that was
+--   false. 091's was started again 22 seconds later on the next staging stall, W021, and "done" there; 002's was still
+--   pending when its visit was superseded.
+--   (d) UNREAD: the one re-start (22 seconds) was on a staging stall, not a charger, and says nothing about how long an
+--   inspection cut by a fault waits for the car's next charger. That needs a run long enough for faults to land in the
+--   sensors' 3-5 minutes -- 5 in 12 sim-hours on the night's two earlier runs.

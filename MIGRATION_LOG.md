@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0520 — GENERATED, not a log
+## Index, 0134–0521 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -525,7 +525,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0518](db/migrations/0518_one_rule_for_whether_a_car_needs_its_charge.sql) | `20260927074142` | yes — ledger | **G244: three parts of the engine answer "does this car still need a charge", and the flow contract used a |
 | [0519](db/migrations/0519_the_charger_s_sensors_cannot_finish_an_inspection_on_a_car_that_has_left.sql) | `20260927074236` | yes — ledger | **G245: an interior inspection the charger's sensors started was marked done when its minutes ran out, even |
 | [0520](db/migrations/0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql) | `20260927081719` | yes — ledger | **G240, step 4's instrument: a designed pair can now judge the calibrated booking window, which it could not |
+| [0521](db/migrations/0521_the_charger_s_sensors_see_only_a_car_on_a_charger.sql) | `20260927085218` | yes — ledger | **G246: the charger's sensors were credited with interior inspections and cabin triage checks on cars that |
 
-386 migrations indexed.
+387 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
