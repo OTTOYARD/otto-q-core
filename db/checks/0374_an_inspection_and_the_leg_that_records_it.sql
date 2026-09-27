@@ -206,3 +206,28 @@ SELECT (SELECT count(*) FROM public.ottoq_visit_needs vn, jsonb_array_elements(v
 
 \echo '=== 0374 §5(c) — lane visits for a car whose inspection was already done (the §3 query) ==='
 --   Run §3 on the new run: `inspection_done_before_the_lane` should read 0.
+
+-- ══ §6 THE COMMAND'S EXECUTION TIME (G237, 0505) ════════════════════════════════════════════════════════════════
+--
+--   Found while reading §3's appointments: measured from `executed_at`, 1 of 77 recall appointments reached its lane
+--   stall; measured from `issued_at`, 28 of 77. The column was the difference. `twin.ottoq_sim_confirm_commands`
+--   executes a command in the tick it runs and stamped `confirmed_at` and `executed_at` with issue + 30 minutes.
+
+\echo '=== 0374 §6 — executed commands at the twin depot, by the gap between issue and recorded execution ==='
+SELECT CASE WHEN r.validation_status IS NULL THEN 'operator' ELSE 'certification arm' END AS run_class,
+       count(DISTINCT r.sim_run_id) AS runs, count(*) AS executed_commands,
+       count(DISTINCT EXTRACT(epoch FROM c.executed_at - c.issued_at)) AS distinct_gaps,
+       min(EXTRACT(epoch FROM c.executed_at - c.issued_at)) AS min_s, max(EXTRACT(epoch FROM c.executed_at - c.issued_at)) AS max_s
+  FROM public.ottoq_vehicle_commands c
+  JOIN public.ottoq_sim_runs r ON r.sim_run_id = c.sim_run_id
+ WHERE r.depot_id = '11111111-1111-1111-1111-111111111111' AND c.status = 'executed'
+ GROUP BY 1 ORDER BY 1;
+-- READ (2026-09-27 00:20 UTC, before 0505): certification arms 386 runs, 171,470 executed commands, ONE distinct gap,
+--   1,800 seconds. Operator runs 9, 19,763 commands, 31 distinct gaps: every command of the eight runs since
+--   2026-08-30 at exactly 1,800 seconds (b0fdc92b: 281 of 281), and the 30 commands of one run from 2026-07-21
+--   (b54929ce) at 61-100 seconds, the only rows that record a real gap. An operator run ticks about every 33
+--   sim-seconds and a canon arm every 30 sim-minutes, so on the canon the constant equals one tick, which is how 0308
+--   §8 could read it as a measured one-tick lag (G112). Whether the confirm step really runs one tick after the
+--   command is issued is not shown by this column, before or after 0505 on the canon; it is shown on an operator run.
+--   PREDICTED after 0505: executed_at = the confirm step's clock, so on an operator run the gap is one or a few ticks
+--   (tens of seconds to a few minutes) and varies; certified digests do not move (neither column is in one).
