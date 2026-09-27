@@ -610,7 +610,8 @@ repo_manifest(version, name, file) AS (
     ('20260927030227'::text, 'one_air_temperature_for_the_whole_depot'::text, '0510_one_air_temperature_for_the_whole_depot.sql'::text),
     ('20260927034307'::text, 'the_interior_inspection_happens_during_the_charge'::text, '0511_the_interior_inspection_happens_during_the_charge.sql'::text),
     ('20260927050956'::text, 'the_cards_say_who_did_the_work'::text, '0512_the_cards_say_who_did_the_work.sql'::text),
-    ('20260927050506'::text, 'the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair'::text, '0513_the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair.sql'::text)
+    ('20260927050506'::text, 'the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair'::text, '0513_the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair.sql'::text),
+    ('20260927052757'::text, 'the_charges_that_teach_the_booking_window_are_purged_with_their_run'::text, '0514_the_charges_that_teach_the_booking_window_are_purged_with_their_run.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

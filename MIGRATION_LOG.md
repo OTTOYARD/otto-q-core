@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0513 — GENERATED, not a log
+## Index, 0134–0514 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -518,7 +518,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0511](db/migrations/0511_the_interior_inspection_happens_during_the_charge.sql) | `20260927034307` | yes — ledger | **A car that charges has its interior inspection at the charger, during the charge, done by the charger's |
 | [0512](db/migrations/0512_the_cards_say_who_did_the_work.sql) | `20260927050956` | yes — ledger | **The cockpits can say that the charger's sensors did an inspection, and that a cleaning need is waiting on |
 | [0513](db/migrations/0513_the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair.sql) | `20260927050506` | yes — ledger | **G243: the weekly calibration refit cannot write the priors while a certification rig is running, the job |
+| [0514](db/migrations/0514_the_charges_that_teach_the_booking_window_are_purged_with_their_run.sql) | `20260927052757` | yes — ledger | **G240, step 1: every charge that stops on an operator or production run is recorded in an append-only |
 
-379 migrations indexed.
+380 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
