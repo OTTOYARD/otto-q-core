@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0532 — GENERATED, not a log
+## Index, 0134–0533 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -537,7 +537,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0530](db/migrations/0530_unmet_demand_is_measured_from_the_cars_actually_out.sql) | `20260927153902` | yes — ledger | **G255: nothing on the scorecard measured whether the depot met the work side's demand. On the day's full busy |
 | [0531](db/migrations/0531_the_learners_arms_start_through_the_operators_door.sql) | `20260927161230` | yes — ledger | **G256: the dial experiments' arms start the way the operator's day starts. They started in a busy day that met |
 | [0532](db/migrations/0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait.sql) | `20260927164827` | yes — ledger | **The challenger, first form: a loop beside the funnel that asks, every minute of a live day, whether the |
+| [0533](db/migrations/0533_the_charge_target_an_arm_is_given_is_the_one_it_charges_to.sql) | `20260927171208` | yes — ledger | **G258: an experiment on the three charge-target dials could not move its arms, and its verdict would have read |
 
-398 migrations indexed.
+399 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
