@@ -131,7 +131,9 @@ SELECT l.verdict_id, l.scenario, l.seed, l.ticks, l.outcome, l.equal, l.complete
  WHERE l.certified_at > (SELECT classified_at FROM public.ottoq_cert_lineage
                           WHERE name = '0521_the_charger_s_sensors_see_only_a_car_on_a_charger')
  ORDER BY l.verdict_id;
--- READ: pending.
+-- READ (2026-09-27 10:09 UTC, 5:09 AM CT): all nine columns passed on the first attempt, verdicts 486-494 between
+--   3:53:00 and 4:13:54 AM CT, every one equal and complete with no disagreeing atom, all on engine f03cf4ee. The dial
+--   runner waited behind the sweep, as certification has priority, and took its first pair at 4:30.
 
 \echo '=== 0390 §3(b) — per column, the digests 0521 moved against the column''s last verdict before it ==='
 WITH cut AS (SELECT classified_at FROM public.ottoq_cert_lineage
@@ -149,7 +151,19 @@ SELECT c.scenario, c.seed, c.ticks, c.verdict_id AS now_v, p.verdict_id AS befor
   FROM v c JOIN v p ON (p.scenario, p.seed, p.ticks) = (c.scenario, c.seed, c.ticks) AND p.rn = 1 AND NOT p.after_0521
  WHERE c.rn = 1 AND c.after_0521
  ORDER BY c.ticks, c.scenario, c.seed;
--- READ: pending.
+-- READ (2026-09-27 10:09 UTC):
+--     grid_smoke 239001/6, 424242/6       (none)                                  against 477, 478
+--     busy_day 171717/12, normal_day 171717/12   h_bkg h_cmd h_dec h_evt h_rule h_sdr   against 479, 482
+--     busy_day 314159/12                  the same and h_nrg                      against 480
+--     busy_day 424242/12, 171717/24       the same, h_nrg and h_rcl               against 481, 483
+--     busy_day 424242/24, 171717/48       the same, h_nrg, h_prop and h_rcl       against 484, 485
+--   A clean attribution, unlike 0387 §3's: every "before" verdict was on engine 1f067bbf with the week's new priors,
+--   and h_cal moved in no column. So 0521 alone moved 6-9 of 11 digests on every busy and normal day, from the
+--   12-tick columns up. That fits §1(c): the fleet seeder puts most of the fleet into charge_complete_holding, so from
+--   the first tick of a certified arm the starter was crediting sensors on cars that were not on a charger, and now
+--   gives those inspections to technicians -- who are counted against the pool, which moves what else starts. The two
+--   grid_smoke columns (a separate fixture depot, three sim-hours) moved nothing; why was not looked into, since a
+--   column that did not move is not one 0521 could have broken.
 
 -- ══ §4 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --

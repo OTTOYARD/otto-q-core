@@ -72,9 +72,29 @@ SELECT l.pair_id, l.seed, l.ran_at, l.complete, l.world_identical, l.both_paid_s
   JOIN public.ottoq_dial_experiments e ON e.experiment_id = l.experiment_id
  WHERE e.param_key = 'charge_window_calibration_id'
  ORDER BY l.pair_id;
--- READ: pending.
+-- READ (2026-09-27 10:09 UTC, 5:09 AM CT), the first pair, on 0521's engine f03cf4ee:
+--     pair 76, seed 20516641458992974, 4:40 AM CT, 1,081 s wall; complete, world identical, both arms paid the shield
+--                             control (0)   treatment (6)
+--     charge_outlast_pct         72.55         29.41
+--       DCFC                     65.71         31.43
+--       L2                       87.50         25.00
+--     charges judged                51            51
+--     median overrun, minutes     44.0           4.0
+--     p95 time to service, min    54.0          39.6
+--     turns per point per day     1.74          1.64
+--   One pair is one pair, and the verdict is the sign test's at 6 (§3(b)). What it shows so far: (a) as predicted, the
+--   calibrated window cuts the share of charges that outlast their booking, from 73% to 29% on this seed -- inside the
+--   5-40% version 6 promised -- and hardest on L2 (88% to 25%), where the booked window was furthest off; (b) as
+--   predicted, the charges that still outlast do so by a median of 4 minutes, not 44; (c) the guardrails, read and not
+--   predicted: time to service improved by 27%, and turns per point fell 5.7% -- a longer window holds a charger longer
+--   on the calendar, which is the price §2 named, and past the 2% margin on this one pair. Whether that holds across
+--   seeds is what the guardrail test at alpha 0.20 is for.
 
 \echo '=== 0389 §3(b) — the verdict ==='
 SELECT public.ottoq_dial_experiment_verdict(e.experiment_id) AS verdict
   FROM public.ottoq_dial_experiments e WHERE e.param_key = 'charge_window_calibration_id' ORDER BY e.created_at DESC LIMIT 1;
--- READ: pending.
+-- READ (2026-09-27 10:09 UTC): `collecting` -- 1 of the 6 counted pairs the first look needs, 0 invalid, 0 on a stale
+--   engine, no safety flag (0 pairs with more unserved returns). The window closes at 6 AM CT. The runner alternates the
+--   two active experiments by pair count on this engine, and this one's pair takes 18 minutes of wall time to the energy
+--   experiment's 10, so the night can give it three pairs at most; the first look waits for the next dial window, and
+--   holds only if no forces_recert migration lands before it (a new engine counts from zero).
