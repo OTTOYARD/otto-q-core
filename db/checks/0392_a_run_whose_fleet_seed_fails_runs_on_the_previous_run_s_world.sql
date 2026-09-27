@@ -99,12 +99,12 @@ SELECT r.run, floor(extract(epoch FROM s.started_at - r.sim_clock_start) / 3600)
 --       the run had it.
 --   (b) `ottoq_sim_run_scenario`'s own supersede. A start at a depot with a running run marks that run `completed` with
 --       a bare UPDATE -- no release, no archive. The control edge function's start calls this door directly (to stay
---       inside PostgREST's statement timeout), as do `ottoq_start_demo_run` and `ottoq_start_busy_run`. The cockpit shows
+--       inside PostgREST's statement timeout), as does `ottoq_start_demo_run` (`ottoq_start_busy_run` through it). The cockpit shows
 --       Start only while it knows of no run, but a second client, the edge API or a runbook start does not ask. On a busy
 --       run a tether is almost always live (every car on a DCFC charges tethered: 3 of 3 at 929e323c's stop), so a start
 --       that supersedes a busy run would almost always be refused its seed -- and would run anyway.
 --   Certification and A/B-harness arms do not pass through either door (`ottoq_determinism_pair` resets the fleet itself;
---   no function but the two start wrappers calls `ottoq_sim_run_scenario`, and nothing but it calls the seed), so no
+--   no function but `ottoq_start_demo_run` calls `ottoq_sim_run_scenario`, and nothing but it calls the seed), so no
 --   certified or dial-pair number is touched.
 --
 --   (c) AND ONE MORE COPY OF A FIXED BUG, in the seed, not reached today because the seed failed: it closes the depot's

@@ -125,3 +125,29 @@ SELECT a.svc, a.st, count(*) AS n, count(*) FILTER (WHERE a.stamped) AS stamp_ke
 --   (d) UNREAD: the one re-start (22 seconds) was on a staging stall, not a charger, and says nothing about how long an
 --   inspection cut by a fault waits for the car's next charger. That needs a run long enough for faults to land in the
 --   sensors' 3-5 minutes -- 5 in 12 sim-hours on the night's two earlier runs.
+
+\echo '=== 0388 §4(b) — the full-day validation run 6ddd827e: every piece of sensor work a charge's end interrupted, and the charge that ended ==='
+-- (929e323c, the first full-day run after 0519, is not read: its seed failed and it ran the previous run's world --
+--  G249, `db/checks/0392`.)
+SELECT v.display_name, x->>'svc' AS svc, COALESCE(x->>'status', 'pending') AS now_status,
+       i->>'reason' AS reason, (SELECT stall_code FROM public.stalls WHERE id = (i->>'stall_id')::uuid) AS cut_on,
+       (i->>'started_at')::timestamptz AS first_start, (i->>'at')::timestamptz AS returned_at,
+       (SELECT s.stopped_reason FROM public.ocpp_sessions s
+         WHERE s.sim_run_id = vn.sim_run_id AND s.vehicle_id = vn.vehicle_id AND s.stall_id = (i->>'stall_id')::uuid
+           AND s.started_at <= (i->>'started_at')::timestamptz ORDER BY s.started_at DESC LIMIT 1) AS charge_ended_by,
+       (SELECT stall_code FROM public.stalls WHERE id = (x->>'sensor_stall_id')::uuid) AS done_on, x->>'performed_by' AS done_by,
+       round(extract(epoch FROM (x->>'started_at')::timestamptz - (i->>'at')::timestamptz) / 60, 1) AS waited_min
+  FROM public.ottoq_visit_needs vn JOIN public.vehicles v ON v.id = vn.vehicle_id,
+       jsonb_array_elements(vn.atoms) x, jsonb_array_elements(x->'interrupted') i
+ WHERE vn.sim_run_id = '6ddd827e-b549-43cf-8154-4d1bfb20cabf'
+ ORDER BY returned_at;
+-- INTERIM READ (2026-09-27 12:30 UTC, 7:30 AM CT; the run at sim 11:54 AM, 235 of 540 sim-minutes): one, and it is the case 0519
+--   exists for. Waymo-001 plugged in on NASH-DCFC-STALL-05 at 9:46:54 AM sim; the sensors started its inspection 26
+--   seconds later; the charge faulted at 9:49:22 (`fault.session_aborted_other`, the calibrated fault mix) and the car
+--   left the charger; at 9:51:28 the completer found it gone and returned the work to pending with one
+--   `left_the_charger` interruption naming DCFC-05 -- where before 0519 it would have been marked done on a car that
+--   was not there. The car's next charger was NASH-L2-STALL-26 from 11:20:26; the sensors started the inspection there
+--   83 seconds later and finished it at 11:25:49. (c) HOLDS, once. (d) the wait: 90.3 minutes from the return to the
+--   re-start, which is the wait for the car's next charger and not for anything the inspection itself needed. Of the 98
+--   inspections the sensors have started so far, 97 are done -- this one among them, after its interruption -- and one
+--   is in progress.

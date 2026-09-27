@@ -20,9 +20,9 @@
 --   (0392 §2).
 --   Two paths reach a seed with a live tether. A stop through `ottoq_sim_mark_stopped` alone (a stop by hand, as here),
 --   and this function's own supersede, which marked a live run `completed` with a bare UPDATE -- no release, no archive
---   -- and is what the control edge function's start, `ottoq_start_demo_run` and `ottoq_start_busy_run` all call. And the
---   seed closed any leftover open charge with `ended_at = COALESCE(ended_at, NOW())`, the wall-clock fallback 0357
---   removed from the release door and not from here.
+--   -- and is what the control edge function's start and `ottoq_start_demo_run` call (`ottoq_start_busy_run` through the
+--   latter). And the seed closed any leftover open charge with `ended_at = COALESCE(ended_at, NOW())`, the wall-clock
+--   fallback 0357 removed from the release door and not from here.
 --
 -- ══ §2 WHAT THIS DOES ══════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -46,8 +46,9 @@
 -- ══ §3 forces_recert FALSE ═════════════════════════════════════════════════════════════════════════════════════
 --
 --   Neither function is on a certified or dial-pair path: certification arms and A/B-harness arms reset their own fleet
---   and carry no `seed_fleet` key (0392 §1), nothing but `ottoq_start_demo_run` and `ottoq_start_busy_run` calls
---   `ottoq_sim_run_scenario`, and nothing but it calls the seed (P2 asserts both). An operator run's day changes only
+--   and carry no `seed_fleet` key (0392 §1), nothing but `ottoq_start_demo_run` calls `ottoq_sim_run_scenario`
+--   (`ottoq_start_busy_run` names it only in a comment and starts through `ottoq_start_demo_run`), and nothing but it
+--   calls the seed (P2 asserts both, on text that includes comments, so it can only overcount). An operator run's day changes only
 --   where it used to start on the wrong one. forces_dial_restart FALSE (0523) for the same reason: a dial pair's arms
 --   start through `ottoq_dial_pair`, not this door, so no arm can come out differently.
 --
@@ -72,7 +73,8 @@ BEGIN
   IF position('0524 (G249)' IN v_seed) > 0 OR position('0524 (G249)' IN v_start) > 0 THEN
     RAISE EXCEPTION '0524 P2: already applied';
   END IF;
-  -- the start calls this seed, and only the two start wrappers call the start; nothing else calls the seed
+  -- the start calls this seed; a text search for its callers finds only the two start wrappers (ottoq_start_busy_run's
+  -- one mention is a comment -- it starts through ottoq_start_demo_run); nothing else calls the seed
   IF position('PERFORM ottoq_sim_seed_fleet(v_scenario.default_depot_id, v_seed, v_start_hour);' IN v_start) = 0 THEN
     RAISE EXCEPTION '0524 P2: the start does not call the three-argument seed as this file expects';
   END IF;

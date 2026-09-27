@@ -621,7 +621,8 @@ repo_manifest(version, name, file) AS (
     ('20260927085218'::text, 'the_charger_s_sensors_see_only_a_car_on_a_charger'::text, '0521_the_charger_s_sensors_see_only_a_car_on_a_charger.sql'::text),
     ('20260927111501'::text, 'the_dial_window_closes_before_its_last_pair_could_outlast_it'::text, '0522_the_dial_window_closes_before_its_last_pair_could_outlast_it.sql'::text),
     ('20260927122408'::text, 'a_dial_experiment_restarts_only_for_a_change_that_can_move_an_arm'::text, '0523_a_dial_experiment_restarts_only_for_a_change_that_can_move_an_arm.sql'::text),
-    ('PENDING'::text, 'a_start_stops_the_live_run_and_a_failed_seed_starts_nothing'::text, '0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql'::text)
+    ('PENDING'::text, 'a_start_stops_the_live_run_and_a_failed_seed_starts_nothing'::text, '0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql'::text),
+    ('PENDING'::text, 'the_charge_evidence_records_the_cadence_it_was_observed_at'::text, '0525_the_charge_evidence_records_the_cadence_it_was_observed_at.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
