@@ -327,3 +327,31 @@ SELECT stype, count(*) AS sessions, round(avg(ratio)::numeric, 2) AS avg_ratio,
 --   The calibration ratio averaged 0.93 on DCFC and 1.02 on L2, so the model's shape was close and the per-session
 --   correction did most of the work at the tail. One run, the midpoint only; the live reading (0509's V3 and the
 --   cockpits) is on the next validation run.
+
+-- ══ §7 0509 AS APPLIED, AND READ LIVE ═══════════════════════════════════════════════════════════════════════════
+
+\echo '=== 0375 §7 — 0509 as applied ==='
+SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
+  FROM supabase_migrations.schema_migrations m
+ WHERE m.name = 'a_charging_card_ends_when_the_charge_physics_says_it_will';
+-- READ: 20260927020531 (9:05 PM CT), md5 9348c6d9c5cea2096b26216936ada869, equal to the file's body; forces_recert
+--   FALSE (a cockpit read function). Dry-run first between runs (patch, V1, V2; V3 needs a live run), then applied four
+--   minutes into validation run 964cf17b (sim 8:25 AM, 24 charging sessions) with V3 passing on the live cards.
+
+\echo '=== 0375 §7(b) — on a live run: current steps by ETA source, and the minutes left on the physics ones ==='
+WITH c AS (SELECT public.ottoq_depot_cards('11111111-1111-1111-1111-111111111111', NULL) AS j),
+st AS (SELECT (c.j->>'sim_clock')::timestamptz AS clk, s
+         FROM c, jsonb_array_elements(c.j->'vehicles') v, jsonb_array_elements(COALESCE(v->'card'->'steps','[]'::jsonb)) s
+        WHERE s->>'status' = 'current')
+SELECT count(*) FILTER (WHERE s->>'eta_source' = 'charge_physics') AS physics_steps,
+       count(*) FILTER (WHERE s->>'eta_source' = 'plan') AS plan_steps,
+       round(avg(EXTRACT(epoch FROM (s->>'expected_end')::timestamptz - clk)/60)
+               FILTER (WHERE s->>'eta_source' = 'charge_physics')::numeric, 1) AS avg_min_left,
+       count(*) FILTER (WHERE (s->>'over_plan_min') IS NOT NULL) AS past_plan
+  FROM st;
+-- READ on 964cf17b at sim 8:31:56 AM, just after the apply: contract 1.3; 31 current steps by the calibrated physics
+--   (a mean 57.4 minutes left), 2 by the plan, none past plan yet; the whole read took about 0.13 s. In the cockpits:
+--   PULSE at sim 8:36 AM showed 8 charging cards "DC fast charge until ~9:20 AM" and the like (the ~ marks an
+--   estimate) beside bay steps on their plan times ("Wash bay until 8:44 AM"); OrchestrAV at 8:41 showed 10, the same
+--   cars' estimates moved by a minute or two as each calibration took in five more minutes of its session (~10:02 ->
+--   ~10:01 AM, ~9:48 -> ~9:50 AM, ~9:20 -> ~9:21 AM).

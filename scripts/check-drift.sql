@@ -599,7 +599,8 @@ repo_manifest(version, name, file) AS (
     ('20260927002850'::text, 'a_twin_command_records_when_it_executed'::text, '0505_a_twin_command_records_when_it_executed.sql'::text),
     ('20260927004648'::text, 'a_vehicle_card_names_its_steps_and_says_when_one_is_overdue'::text, '0506_a_vehicle_card_names_its_steps_and_says_when_one_is_overdue.sql'::text),
     ('20260927005114'::text, 'a_vehicle_card_ends_the_current_step_when_it_will_end'::text, '0507_a_vehicle_card_ends_the_current_step_when_it_will_end.sql'::text),
-    ('20260927012721'::text, 'a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered'::text, '0508_a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered.sql'::text)
+    ('20260927012721'::text, 'a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered'::text, '0508_a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered.sql'::text),
+    ('20260927020531'::text, 'a_charging_card_ends_when_the_charge_physics_says_it_will'::text, '0509_a_charging_card_ends_when_the_charge_physics_says_it_will.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
