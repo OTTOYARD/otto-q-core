@@ -126,7 +126,7 @@ SELECT m.version, m.name, md5(m.statements[1]) AS stored_md5
 WITH now_v AS (
   SELECT DISTINCT ON (scenario, seed, ticks) verdict_id, scenario, seed, ticks, equal, verdict->'arm_a' AS a
     FROM public.ottoq_determinism_verdict_ledger
-   WHERE certified_at > '2026-09-27 03:02:27+00'
+   WHERE verdict_id BETWEEN 457 AND 465   -- 0510's own sweep; 0511's began at 03:44 UTC
    ORDER BY scenario, seed, ticks, verdict_id DESC),
 before_v AS (
   SELECT DISTINCT ON (scenario, seed, ticks) verdict_id, scenario, seed, ticks, verdict->'arm_a' AS a
@@ -139,7 +139,12 @@ SELECT n.scenario || '/' || n.seed || '/' || n.ticks AS col, b.verdict_id AS was
            AND n.a->>k IS DISTINCT FROM b.a->>k) AS moved
   FROM now_v n LEFT JOIN before_v b USING (scenario, seed, ticks)
  ORDER BY 1;
--- READ: pending (the sweep began at the apply).
+-- READ (2026-09-27 03:46 UTC): all nine columns passed under 0510 on their first attempt, verdicts 457-465, pairs
+--   started 03:03-03:23 UTC (10:03-10:23 PM CT), arms equal. Every busy_day and normal_day column moved ten digests
+--   (endst, bookings, commands, decisions, events, energy, proposals, recalls, rules, service records) and both
+--   grid_smoke columns eight (no decisions or proposals to move); the world fingerprint `fp` moved in none. That is the
+--   shape a change to every charge's pace should leave: the air temperature sets each session's battery temperature,
+--   so the charges' ends, and everything the engine does after them, move.
 
 -- ══ §5 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --
