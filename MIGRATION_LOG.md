@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0536 — GENERATED, not a log
+## Index, 0134–0538 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -541,7 +541,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0534](db/migrations/0534_an_experiment_can_wait_its_turn.sql) | `20260927173711` | yes — ledger | **The dial runner can be told that an experiment waits, and tonight the energy replication waits so the two |
 | [0535](db/migrations/0535_a_top_off_is_offered_to_a_car_still_waiting_for_one.sql) | `20260927175201` | yes — ledger | **G259: an approved top-off moved a car out of the wash bay it was being washed in, and the tick failed. The |
 | [0536](db/migrations/0536_the_cockpits_see_what_the_brain_questions_and_what_it_learns.sql) | `20260927180246` | yes — ledger | **The second loop, made visible. The challenger's questions and grades, and the learner's experiments and |
+| [0537](db/migrations/0537_a_question_is_one_the_next_scan_still_sees.sql) | `20260927194349` | yes — ledger | **The cockpits show a challenger question once a second scan still sees it. A sighting the next scan no longer |
+| [0538](db/migrations/0538_a_challenger_grade_says_what_it_measures_and_what_tests_its_lever.sql) | `20260927210230` | yes — ledger | **Each challenger question says what its grade measures, and carries the paired tests of its lever with their |
 
-402 migrations indexed.
+404 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
