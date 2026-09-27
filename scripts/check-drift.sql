@@ -631,7 +631,8 @@ repo_manifest(version, name, file) AS (
     ('20260927161230'::text, 'the_learners_arms_start_through_the_operators_door'::text, '0531_the_learners_arms_start_through_the_operators_door.sql'::text),
     ('20260927164827'::text, 'the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait'::text, '0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait.sql'::text),
     ('20260927171208'::text, 'the_charge_target_an_arm_is_given_is_the_one_it_charges_to'::text, '0533_the_charge_target_an_arm_is_given_is_the_one_it_charges_to.sql'::text),
-    ('20260927173711'::text, 'an_experiment_can_wait_its_turn'::text, '0534_an_experiment_can_wait_its_turn.sql'::text)
+    ('20260927173711'::text, 'an_experiment_can_wait_its_turn'::text, '0534_an_experiment_can_wait_its_turn.sql'::text),
+    ('20260927175201'::text, 'a_top_off_is_offered_to_a_car_still_waiting_for_one'::text, '0535_a_top_off_is_offered_to_a_car_still_waiting_for_one.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
