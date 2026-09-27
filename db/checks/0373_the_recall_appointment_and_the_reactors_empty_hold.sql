@@ -313,4 +313,15 @@ SELECT c.reason_code, left(c.reason_detail, 40) AS detail, c.payload->'reaction'
  WHERE c.sim_run_id = :'run' AND c.command_type = 'stage' AND c.status = 'refused'
    AND (c.payload->>'appointment')::boolean
  GROUP BY 1, 2, 3 ORDER BY 4 DESC;
--- READ: pending.
+-- READ on validation run 5344fc12 (busy_day, twin depot, started from the twin cockpit at 7:29 PM CT, stopped at 7:53,
+--   356 ticks, sim 8:00-11:15 AM; 0502-0505 in force, 0506-0507 applied during it): no rows. Not one staging
+--   appointment was refused, so (c) was not exercised.
+--   (a) held: 80 staging appointments executed, 0 refused (7 of 7 staging refusals on b0fdc92b were the calendar).
+--   (b) held: 0 `otto_q_reaction` parking holds (7 on b0fdc92b, 194 across the 9 hours before 0503).
+--   (d) held: the reactor's other reactions are the kinds b0fdc92b had: 34 `vehicle_state_incompatible` escalations
+--   (a recall appointment for a car still on the road; 28 on b0fdc92b), 3 `no_capacity` escalations for L2 and 3
+--   charge reroutes on `target_occupied`.
+--   The appointment's stall: 71 of 80 in the arrival_inspection lane (22 reached within 90 minutes), 9 in
+--   staging_buffer (1). On b0fdc92b it was 77 of 88 in the lane, 28 reached, and in all 28 the inspection seam then
+--   booked the car's inspection on that same stall, so the lane pick feeds the arrival inspection. (A first count
+--   read "1 of 77 reached": it measured from `executed_at`, which the twin stamped issue + 30 minutes. G237, 0505.)
