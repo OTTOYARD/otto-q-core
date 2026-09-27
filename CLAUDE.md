@@ -188,6 +188,20 @@ When information is missing:
      fast charges at 85% (`08262943`) and 90% at night (`11b546b1`). Both experiments were
      abandoned the same evening (`outcome = abandoned_vehicle_first`, G265). Do not re-create
      them in any form.
+   - **100% ACROSS THE BOARD, FOR NOW — Chase, 2026-09-27, 5:00 PM CT:** *"Let's just do 100%
+     across-the-board for now. I'm thinking of the vehicles there. It should just go ahead and be
+     fully charged. We can always change that later on. And ultimately, eventually that can be a
+     per vehicle or per asset setting or pre-established threshold that can be toggled or adjusted
+     from a UI. Meaning: eventually a fleet manager might decide to just cap charging at 90% to get
+     vehicles back out in earning revenue or performing tasks in the field sooner. They could
+     theoretically do that from one of our apps with correct verification and confirmation and then
+     that would permanently save to their vehicle settings, and OTTO – Q would acknowledge that."*
+     Built by `0539`: there is ONE answer to how full a car charges,
+     `public.ottoq_effective_target_soc_at`, the fleet default (100) under the owner's contract
+     ceiling (`max_charge_target_pct`, 100 in all four contracts). No depot ceiling, chemistry
+     default, urgency or top-off lowers it. An immediate dispatch keeps its due time and charges to
+     100 too, unless its owner asks for less. A lower limit is only ever the owner's, set verified
+     and confirmed and read at that one function. The engine never writes one.
 
 **10. OTTO-Q DOES NOT EXPERIMENT IN PRODUCTION. HYPOTHESES AND TESTS BELONG TO THE RESEARCH WING, IN THE TWIN — added 2026-09-27 in Chase's words.**
 
