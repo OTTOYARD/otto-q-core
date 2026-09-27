@@ -125,6 +125,27 @@ SELECT p.st, count(*) AS parked,
 --   still on the stall, for a p50 of 0.63 minutes (max 1.99, 38.9 stall-minutes in all): the car waits for the next
 --   decide tick to move it. That is a service booking's tail, which 0500 does not renew and this check did not predict.
 
+\echo '=== 0372 §2, second query (added after the stop) — how long a car stays on after its inspect booking in staging ends ==='
+WITH r AS (SELECT sim_run_id AS run, sim_clock_current AS t FROM public.ottoq_sim_runs WHERE sim_run_id = :'run'),
+b AS (
+  SELECT b.vehicle_id, b.stall_id, lower(b.during) AS lo, upper(b.during) AS hi
+    FROM public.ottoq_stall_bookings b JOIN r ON b.sim_run_id = r.run
+    JOIN public.stalls s ON s.id = b.stall_id AND s.stall_type::text = 'staging'
+   WHERE b.purpose = 'inspect' AND upper(b.during) <= r.t),
+x AS (
+  SELECT b.*, (SELECT min(e.sim_clock_at) FROM public.ottoq_events e, r
+                WHERE e.sim_run_id = r.run AND e.entity_id = b.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                  AND e.payload->'diff'->'current_stall_id'->>'from' = b.stall_id::text AND e.sim_clock_at >= b.lo) AS left_at
+    FROM b)
+SELECT count(*) AS ended, count(*) FILTER (WHERE left_at > hi) AS car_still_on_at_the_end,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(epoch FROM left_at - hi) / 60)
+              FILTER (WHERE left_at > hi))::numeric, 2) AS p50_min_past_end,
+       round((max(EXTRACT(epoch FROM left_at - hi) / 60) FILTER (WHERE left_at > hi))::numeric, 2) AS max_min_past_end,
+       round((sum(EXTRACT(epoch FROM left_at - hi) / 60) FILTER (WHERE left_at > hi))::numeric, 1) AS stall_minutes
+  FROM x;
+-- READ (after the stop): 66 ended, 54 with the car still on the stall, p50 0.63 minutes past the end, max 1.99, 38.9
+--   stall-minutes.
+
 \echo '=== 0372 §2(b) — the other side of the renewal: parking holds still live on a staging stall their car has left ==='
 WITH r AS (SELECT sim_run_id AS run, sim_clock_current AS t FROM public.ottoq_sim_runs WHERE sim_run_id = :'run')
 SELECT b.purpose, count(*) AS holds_after_departure,
@@ -193,6 +214,34 @@ SELECT 'all holds so far', h.purpose, (upper(h.during) > h.booked_end + interval
 --   stall-minutes the run had (113 stalls x 225 sim-minutes). Staging never filled on this run (64 of 113 in use at
 --   10:31 AM), so this cost calendar truth rather than a car's place.
 
+\echo '=== 0372 §2(c), second query (added after the stop) — parking holds that outlived their car, over the whole run ==='
+WITH r AS (SELECT sim_run_id AS run, sim_clock_current AS t FROM public.ottoq_sim_runs WHERE sim_run_id = :'run'),
+h AS (
+  SELECT b.*, (date_trunc('day', lower(b.during)) + (substring(b.why from '\d\d:\d\d-(\d\d:\d\d)'))::time) AS booked_end
+    FROM public.ottoq_stall_bookings b JOIN r ON b.sim_run_id = r.run
+   WHERE b.purpose IN ('temp_hold','perimeter_hold')),
+x AS (
+  SELECT h.*, (upper(h.during) > h.booked_end + interval '1 minute') AS renewed,
+         (SELECT min(e.sim_clock_at) FROM public.ottoq_events e, r
+           WHERE e.sim_run_id = r.run AND e.entity_id = h.vehicle_id AND e.event_type = 'vehicle.state_changed'
+             AND e.payload->'diff'->'current_stall_id'->>'from' = h.stall_id::text
+             AND e.sim_clock_at > lower(h.during)) AS left_at
+    FROM h),
+y AS (
+  SELECT x.*, EXTRACT(epoch FROM LEAST(upper(during), COALESCE(released_at, 'infinity'::timestamptz), (SELECT t FROM r))
+                                 - left_at) / 60 AS m
+    FROM x WHERE left_at < upper(during) AND left_at < COALESCE(released_at, 'infinity'::timestamptz))
+SELECT x.purpose, x.renewed, count(*) AS holds,
+       (SELECT count(*) FROM y WHERE y.purpose = x.purpose AND y.renewed = x.renewed) AS outlived_their_car,
+       (SELECT round(sum(m)::numeric) FROM y WHERE y.purpose = x.purpose AND y.renewed = x.renewed) AS stall_min_after_car_left,
+       (SELECT round((percentile_cont(0.5) WITHIN GROUP (ORDER BY m))::numeric, 1) FROM y
+         WHERE y.purpose = x.purpose AND y.renewed = x.renewed) AS p50_min,
+       (SELECT round(max(m)::numeric, 1) FROM y WHERE y.purpose = x.purpose AND y.renewed = x.renewed) AS max_min
+  FROM x GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ (after the stop): perimeter_hold as booked 10 holds, 6 outlived their car, 631 stall-minutes, p50 118.5, max
+--   119.6; temp_hold as booked 148, 118, 1,836, p50 14.1, max 33.1; temp_hold renewed 118, 53, 409, p50 7.8, max 14.4.
+--   The figures quoted in the READ above.
+
 -- ══ §3 G233 (0501): THE WAIT FOR A CHARGER, BESIDE KPI 5 ═════════════════════════════════════════════════════════
 
 \echo '=== 0372 §3 — the companion, and KPI 5 beside it ==='
@@ -211,6 +260,27 @@ SELECT public.ottoq_kpi_charge_wait(:'run') AS charge_wait,
 --   companion counts every car owing a charge. Every charger that could charge was charging: at 10:43 AM the 4 with no
 --   session were all OCPP `Faulted` (DCFC-03 since 8:14 AM, L2-09 8:49, L2-31 9:38, L2-14 9:56).
 --   The cockpits show it under the five (§7).
+
+\echo '=== 0372 §3, second query (added after the stop) — KPI 5 by the first operation after each return ==='
+WITH pairs AS (
+  SELECT d.actual_return_at,
+         (SELECT l.leg_type FROM public.ottoq_itinerary_legs l
+           WHERE l.sim_run_id = d.sim_run_id AND l.vehicle_id = d.vehicle_id AND l.leg_type <> ALL (ARRAY['taxi','stage'])
+             AND l.actual_start_sim >= d.actual_return_at ORDER BY l.actual_start_sim LIMIT 1) AS first_leg,
+         (SELECT min(l.actual_start_sim) FROM public.ottoq_itinerary_legs l
+           WHERE l.sim_run_id = d.sim_run_id AND l.vehicle_id = d.vehicle_id AND l.leg_type <> ALL (ARRAY['taxi','stage'])
+             AND l.actual_start_sim >= d.actual_return_at) AS first_op
+    FROM public.ottoq_vehicle_dispatches d JOIN public.ottoq_sim_runs r ON r.sim_run_id = d.sim_run_id
+   WHERE d.sim_run_id = :'run' AND d.actual_return_at IS NOT NULL AND d.actual_return_at <= r.sim_clock_current)
+SELECT CASE WHEN first_op IS NULL THEN 'none' WHEN EXTRACT(epoch FROM first_op - actual_return_at) / 60 < 2 THEN 'a <2 min'
+            WHEN EXTRACT(epoch FROM first_op - actual_return_at) / 60 < 10 THEN 'b 2-10'
+            WHEN EXTRACT(epoch FROM first_op - actual_return_at) / 60 < 30 THEN 'c 10-30' ELSE 'd 30+' END AS band,
+       first_leg, count(*) AS returns,
+       round(avg(EXTRACT(epoch FROM first_op - actual_return_at) / 60)::numeric, 1) AS avg_min
+  FROM pairs GROUP BY 1, 2 ORDER BY 1, 3 DESC;
+-- READ (after the stop): under 2 minutes 97 (inspect 51, charge_l2 23, charge_dcfc 6, interior_tidy 6, the rest 11);
+--   2-10 minutes 8; 10-30 minutes 2 (charge_l2 25.6, charge_dcfc 11.9); 30+ minutes 6, all charges (charge_l2 5 at
+--   75.8 on average, charge_dcfc 1 at 33.5); none 19.
 
 -- ══ §4 WHAT 0486-0495 ALREADY HELD, STILL HOLDING ═════════════════════════════════════════════════════════════════
 
@@ -262,11 +332,42 @@ SELECT b.charging, b.state_at_start, COALESCE(s.stall_type::text, '(none)') AS s
 --   zone and 67 in the zones a car waiting for a charger is parked in (staging_south 29, staging_east 14, staging_buffer
 --   14, staging_north 5, staging_west 5). The other 7: staged for departure 4, awaiting service 2, in a service bay 1.
 --   The same shape as 394e1e83 (12 of 127 at a charger).
---   Against the plan, every itinerary `inspect` leg that started (103): 34 were planned inside their car's charge
---   window and started a p50 of 21.4 minutes late (16 of them 30+); the 69 planned outside it started a p50 of 3.0
---   minutes early (7 of them 30+ late). Over all 103, 23 started 30+ minutes late, p95 106.7. (0368 §12's "30 of 109,
---   p95 33" on 394e1e83 came from a query not kept in that file, so the two are not the same count.) G232 stands:
---   inspections run where the car waits, and the plan dates them inside a charge that starts late.
+--   Against the plan, by the query below (itinerary `inspect` legs split by the atom each serves; a first cut here
+--   counted every `inspect` leg, the end-of-visit readiness check included, and read "34 of 103, p50 21.4 late"):
+--   interior inspections that started, 89: the 24 planned inside their car's charge window started a p50 of 37.8
+--   minutes late (13 of them 30+, p95 106.0), the 65 planned outside it a p50 of 3.0 minutes early (7 of them 30+
+--   late). Readiness checks that started: 14, 3 of them 30+ late. (0368 §12's "30 of 109, p95 33" on 394e1e83 came from
+--   a query not kept in that file, so the two are not the same count.) G232 stands: inspections run where the car
+--   waits, and the plan dates them inside a charge that starts late.
+-- CORRECTION (0374, read on b0fdc92b before it was purged): the last sentence is wrong. The lateness above is the
+--   leg's record, not the inspection. Matched to their atoms, the inspections started on plan (a median 0.0 minutes
+--   late). `ottoq_close_atom_leg` looked for a leg of type `interior_inspection`, which does not exist (the leg is
+--   `inspect`, tagged with its atom), so no inspection ever closed its own leg. 26 of the 91 done interior legs were
+--   closed by the car's readiness check hours later, and those are the late ones: the 25 the lane never booked read a
+--   median 67.1 minutes late, while their inspections started a median 0.0. The other 65 were closed by the
+--   inspection lane's booking. Fixed by 0504.
+
+\echo '=== 0372 §5, second query (added after the stop) — inspect legs by the atom they serve, planned inside a charge or not ==='
+WITH i AS (
+  SELECT l.*, l.duration_basis->>'atom' AS atom,
+         EXTRACT(epoch FROM l.actual_start_sim - l.planned_start_sim) / 60 AS late_min,
+         EXISTS (SELECT 1 FROM public.ottoq_itinerary_legs c
+                  WHERE c.sim_run_id = l.sim_run_id AND c.itinerary_id = l.itinerary_id
+                    AND c.leg_type IN ('charge_dcfc','charge_l2')
+                    AND l.planned_start_sim >= c.planned_start_sim AND l.planned_start_sim < c.planned_end_sim) AS inside_charge
+    FROM public.ottoq_itinerary_legs l
+   WHERE l.sim_run_id = :'run' AND l.leg_type = 'inspect')
+SELECT atom, inside_charge, count(*) AS legs, count(*) FILTER (WHERE actual_start_sim IS NOT NULL) AS started,
+       count(*) FILTER (WHERE late_min >= 30) AS late_30_plus,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY late_min))::numeric, 1) AS p50_late_min,
+       round((percentile_cont(0.95) WITHIN GROUP (ORDER BY late_min))::numeric, 1) AS p95_late_min
+  FROM i GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ: interior_inspection outside a charge 92 legs, 65 started, 7 late 30+, p50 -3.0, p95 111.8; inside a charge 43
+--   legs, 24 started, 13 late 30+, p50 37.8, p95 106.0; readiness_check outside 83 legs, 4 started, 0 late, inside 59
+--   legs, 10 started, 3 late 30+. Most readiness checks had not started when the run stopped.
+-- CORRECTION (0374): false. 43 readiness checks were done. Their legs record 14, because 26 of the 43 closed an
+--   interior inspection's leg instead and 3 found no open inspect leg. A leg counts what was recorded, not what was
+--   performed.
 
 -- ══ §6 SEEN ON THE RUN, NOT PREDICTED: THE REACTOR'S PARKING HOLDS (G235) ══════════════════════════════════════════
 --

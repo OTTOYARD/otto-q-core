@@ -287,7 +287,17 @@ SELECT n.scenario || '/' || n.seed || '/' || n.ticks AS col, b.verdict_id AS was
            AND n.a->>k IS DISTINCT FROM b.a->>k) AS moved
   FROM now_v n LEFT JOIN before_v b USING (scenario, seed, ticks)
  ORDER BY 1;
--- READ: pending (the sweep runs about 28 minutes from 6:25 PM CT).
+-- READ (2026-09-26 23:55 UTC, 6:55 PM CT): all nine columns passed under 0502 and 0503, verdicts 430-438, the last
+--   (busy_day/171717/48) certified at 6:45 PM CT. Against verdicts 420-428 (the canon under 0500/0501):
+--     grid_smoke/239001/6 and grid_smoke/424242/6       nothing moved (no recall appointments on a 6-tick smoke run)
+--     busy_day/171717/12, /24, /48, normal_day/171717/12  endst, h_bkg, h_cmd, h_evt, h_rule
+--     busy_day/314159/12                                 endst, h_cmd, h_evt, h_rule
+--     busy_day/424242/12 and /24                         endst, h_bkg, h_cmd, h_dec, h_evt, h_nrg, h_prop, h_rcl,
+--                                                        h_rule, h_sdr
+--   The shape the two changes predict: bookings, commands and events move where a staging appointment was refused
+--   and rerouted, and on seed 424242 the changed placements carry through to decisions, energy, proposals, recalls
+--   and service records. 0504 was applied at 6:56 PM CT, after this reading, and re-certifies the canon under it
+--   (0374 §4).
 
 -- ══ §5 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --
