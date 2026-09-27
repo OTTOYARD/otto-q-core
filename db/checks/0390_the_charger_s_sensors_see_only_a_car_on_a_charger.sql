@@ -175,7 +175,7 @@ SELECT c.scenario, c.seed, c.ticks, c.verdict_id AS now_v, p.verdict_id AS befor
 
 \echo '=== 0390 §4(a)(b) — the first operator run after 0521: every sensor start, by the kind of stall stamped ==='
 WITH r AS (SELECT sr.sim_run_id FROM public.ottoq_sim_runs sr
-            WHERE sr.run_by = 'operator_demo'
+            WHERE sr.run_by = 'operator_demo' AND sr.payload->>'playback_mode' = 'live'   -- G248: not a fixed-cadence run
               AND sr.started_at > (SELECT classified_at FROM public.ottoq_cert_lineage
                                     WHERE name = '0521_the_charger_s_sensors_see_only_a_car_on_a_charger')
             ORDER BY sr.started_at LIMIT 1),
@@ -198,7 +198,7 @@ SELECT left(st.sim_run_id::text, 8) AS run, COALESCE(s.stall_type::text, '(no st
 
 \echo '=== 0390 §4(c) — interior inspections by who did them and whether the visit charges, with the wait from arrival ==='
 WITH r AS (SELECT sr.sim_run_id FROM public.ottoq_sim_runs sr
-            WHERE sr.run_by = 'operator_demo'
+            WHERE sr.run_by = 'operator_demo' AND sr.payload->>'playback_mode' = 'live'   -- G248: not a fixed-cadence run
               AND sr.started_at > (SELECT classified_at FROM public.ottoq_cert_lineage
                                     WHERE name = '0521_the_charger_s_sensors_see_only_a_car_on_a_charger')
             ORDER BY sr.started_at LIMIT 1),

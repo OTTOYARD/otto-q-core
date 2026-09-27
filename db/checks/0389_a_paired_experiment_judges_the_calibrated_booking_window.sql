@@ -127,3 +127,19 @@ SELECT j.jobid, j.jobname, j.schedule, d.start_time, d.end_time, d.status
 --   extra pair of the energy experiment -- but a pair starves every other cron job while it runs (G141), so a morning
 --   run started at 6 AM CT would have sat frozen behind it. 0522 moves the close to 10:41 UTC, off the runner's
 --   minutes and after its last start of the night, so the last pair ends inside the window.
+--   The pair (read 11:14 UTC): pair 81, the energy experiment 82c5568b, as the tie-break on pair count predicted, 590 s,
+--   complete and world-identical; it ended at 11:09:50 UTC (6:09:50 AM CT). A valid pair, so it counts: the window's
+--   close governs when pairs may start, not which are good evidence.
+
+\echo '=== 0389 §4(b) — 0522 in the migration ledger, and the close job it left ==='
+SELECT m.version, md5(m.statements[1]) AS body_md5,
+       (SELECT schedule FROM cron.job WHERE jobname = 'ottoq_dial_window_close') AS close_schedule,
+       (SELECT schedule FROM cron.job WHERE jobid = 755) AS runner_schedule,
+       (SELECT forces_recert FROM public.ottoq_cert_lineage
+         WHERE name = '0522_the_dial_window_closes_before_its_last_pair_could_outlast_it') AS forces_recert
+  FROM supabase_migrations.schema_migrations m
+ WHERE m.name = 'the_dial_window_closes_before_its_last_pair_could_outlast_it';
+-- READ (2026-09-27 11:15 UTC): version 20260927111501 (6:15 AM CT), body md5 a4d8c5c98dc2b02426bd3af4ab294277, the
+--   file's body byte for byte; the close at `41 10 * * *`, the runner still `*/10 * * * *`; forces_recert FALSE and the
+--   canon at its floor. Dry run and apply passed first time, applied with no pair in flight and before the validation
+--   run started. Tonight's window, if one is opened, ends at 5:41 AM CT.

@@ -526,7 +526,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0519](db/migrations/0519_the_charger_s_sensors_cannot_finish_an_inspection_on_a_car_that_has_left.sql) | `20260927074236` | yes — ledger | **G245: an interior inspection the charger's sensors started was marked done when its minutes ran out, even |
 | [0520](db/migrations/0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql) | `20260927081719` | yes — ledger | **G240, step 4's instrument: a designed pair can now judge the calibrated booking window, which it could not |
 | [0521](db/migrations/0521_the_charger_s_sensors_see_only_a_car_on_a_charger.sql) | `20260927085218` | yes — ledger | **G246: the charger's sensors were credited with interior inspections and cabin triage checks on cars that |
-| [0522](db/migrations/0522_the_dial_window_closes_before_its_last_pair_could_outlast_it.sql) | `PENDING` | no — pending | **G247: the dial window's close and the dial runner fired in the same minute, so the runner could start a |
+| [0522](db/migrations/0522_the_dial_window_closes_before_its_last_pair_could_outlast_it.sql) | `20260927111501` | yes — ledger | **G247: the dial window's close and the dial runner fired in the same minute, so the runner could start a |
 
 388 migrations indexed.
 

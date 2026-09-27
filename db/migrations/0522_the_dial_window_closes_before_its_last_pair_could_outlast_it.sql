@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260927111501
 -- migration-name:    the_dial_window_closes_before_its_last_pair_could_outlast_it
 --
 -- 0522  **G247: the dial window's close and the dial runner fired in the same minute, so the runner could start a
