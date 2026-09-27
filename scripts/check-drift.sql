@@ -600,7 +600,8 @@ repo_manifest(version, name, file) AS (
     ('20260927004648'::text, 'a_vehicle_card_names_its_steps_and_says_when_one_is_overdue'::text, '0506_a_vehicle_card_names_its_steps_and_says_when_one_is_overdue.sql'::text),
     ('20260927005114'::text, 'a_vehicle_card_ends_the_current_step_when_it_will_end'::text, '0507_a_vehicle_card_ends_the_current_step_when_it_will_end.sql'::text),
     ('20260927012721'::text, 'a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered'::text, '0508_a_charge_is_recorded_when_its_session_ends_with_the_energy_it_delivered.sql'::text),
-    ('20260927020531'::text, 'a_charging_card_ends_when_the_charge_physics_says_it_will'::text, '0509_a_charging_card_ends_when_the_charge_physics_says_it_will.sql'::text)
+    ('20260927020531'::text, 'a_charging_card_ends_when_the_charge_physics_says_it_will'::text, '0509_a_charging_card_ends_when_the_charge_physics_says_it_will.sql'::text),
+    ('20260927030227'::text, 'one_air_temperature_for_the_whole_depot'::text, '0510_one_air_temperature_for_the_whole_depot.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
