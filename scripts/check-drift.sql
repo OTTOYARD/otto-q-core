@@ -629,7 +629,7 @@ repo_manifest(version, name, file) AS (
     ('20260927151819'::text, 'a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured'::text, '0529_a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured.sql'::text),
     ('20260927153902'::text, 'unmet_demand_is_measured_from_the_cars_actually_out'::text, '0530_unmet_demand_is_measured_from_the_cars_actually_out.sql'::text),
     ('20260927161230'::text, 'the_learners_arms_start_through_the_operators_door'::text, '0531_the_learners_arms_start_through_the_operators_door.sql'::text),
-    ('PENDING'::text, 'the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait'::text, '0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait.sql'::text)
+    ('20260927164827'::text, 'the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait'::text, '0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

@@ -16,7 +16,13 @@ SELECT p.pair_id, p.seed, p.complete, p.world_identical, p.both_paid_shield, p.m
        p.metrics_a->'unmet_demand_pct' AS unmet_pct_a, p.metrics_b->'unmet_demand_pct' AS unmet_pct_b
   FROM public.ottoq_dial_pair_ledger p
  WHERE p.experiment_id = '08262943-e487-4a24-9ddb-0686737bcf98' ORDER BY p.pair_id;
--- READ: pending the pair.
+-- READ (2026-09-27 16:40 UTC; job 764 ran 16:15:00-16:35:05 UTC and removed itself): pair 95, seed 812326339305302355,
+--   complete, the same world, both arms paid the shield -- and `moved` is EMPTY. Every atom of the treatment arm (85%)
+--   equals the control's (90%): 336.3 unmet car-hours of 440.0 in both, 76.4%, in 1,182 seconds of wall time.
+--   A cap that moves nothing on a day when cars spent 863-1,107 DCFC-minutes above 85% (§3) is a cap nobody reads.
+--   `ottoq_target_soc_cap` reads `ottoq_policy_get(NULL, 'dcfc_target_soc_day', 90)`: the GLOBAL scope. The pair writes
+--   the arm's value at run scope, which no reader of this dial consults. Every pair of this experiment would have been
+--   identical, and a verdict over identical pairs would have concluded that the dial does nothing. G258.
 
 \echo '=== 0398 §1(b) — each arm hour by hour against the operator''s two full days ==='
 SELECT r.label, h.key AS hour_ct, (h.value->>'target')::int AS target, (h.value->>'deployed')::int AS deployed
@@ -24,7 +30,15 @@ SELECT r.label, h.key AS hour_ct, (h.value->>'target')::int AS target, (h.value-
          WHERE experiment_id = '08262943-e487-4a24-9ddb-0686737bcf98' ORDER BY pair_id LIMIT 1) r,
        jsonb_each(public.ottoq_kpi_supply_gap(r.id)->'by_hour_ct') h
  ORDER BY 2;
--- READ: pending the pair.
+-- READ (2026-09-27 16:42 UTC): the arm lives in the operator's world now. Dealt through the door (13 at the gate, 91
+--   staged, 46 primed, a profile row), its cars went out 47.4 minutes a trip and used 30.8 points (the operator's 55 and
+--   37; the old arm's 281 and 31), 199 dispatches and 193 returns in nine hours (the operator's 204-218 and 199-208; the
+--   old arm's 168 and 116). Hour by hour, cars out against the target: 37/45 at 8, 37/49 at 9, then 9, 4, 3, 4, 5, 2
+--   and 4 against 48-52 -- the operator's shape, collapsing at 10 AM. It collapses harder: 76.4% unmet against the
+--   operator's 62.6% and 64.6% (and the old arm's 1.2%). The one difference left by construction is the cadence: the
+--   arm decides every 6 sim-minutes, the operator's live run about every 36 sim-seconds, so a charger freed mid-tick
+--   waits for the next tick to be refilled. Both arms share it, so the comparison is fair; the level is not the
+--   operator's. Read the arms' differences, never their level, as the operator's.
 
 -- ══ §2 THE OPERATOR'S DEAL STAMPED THE WALL CLOCK, MEASURED ═══════════════════════════════════════════════════════════
 --

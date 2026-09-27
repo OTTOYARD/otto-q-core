@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260927164827
 -- migration-name:    the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait
 --
 -- 0532  **The challenger, first form: a loop beside the funnel that asks, every minute of a live day, whether the
@@ -493,17 +493,19 @@ VALUES ('0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_
   'and hindsight grading. It reads the world and writes only its ledger; nothing on the certified path changes.', now())
 ON CONFLICT (name) DO NOTHING;
 
--- V3, rolled back: (a) the taper tax of 6e0352a0 is the prototype's (0398 §1): 551 minutes, cars waiting in all of
+-- V3, rolled back: (a) the taper tax of 6e0352a0 is the prototype's (0398 §3): 551 minutes, cars waiting in all of
 --     them, a mean 34.2 and at most 58, 80 DCFC sessions, 3,980 DCFC-minutes busy, 1,576 of them above the floor and
---     863 above 85% while cars waited -- in under 3 seconds. (b) A day started through the operator's door and ticked
---     6 sim-minutes at a time, scanned from the fourth tick, until a scan sees cars waiting and a DCFC charging a car
---     above the floor (at most 15 ticks; 6e0352a0 had one from 8:30 AM sim): the scan writes
---     it as an open episode with its evidence and claim, and a second scan a tick later extends that episode rather than
---     opening another; the run is stopped and the close grades every episode left open.
+--     863 above 85% while cars waited -- in under 3 seconds. (b) The scan's mechanics, on a day started through the
+--     operator's door and ticked 2 sim-minutes at a time until the first DCFC session runs (at most 10 ticks) while the
+--     dealt gate queue waits. That car is planted at 85%, above the floor, so Q1 must see it: the first scan writes it as
+--     an open episode naming that car, with its evidence and claim; after one more tick a second scan extends the
+--     episode rather than opening another, or closes and grades it if the queue or the session ended; the run is
+--     stopped and the next tick of the challenger closes and grades every episode left open. A tick of this world costs
+--     about 6.6 s (0398 §1), so V3 plants rather than waits.
 DO $v3$
 DECLARE
-  v_msg text; v_t0 timestamptz; v_ms numeric; v_tax jsonb; v_run uuid; v_scan1 jsonb; v_scan2 jsonb; i int;
-  v_open int; v_rows int; v_graded int; v_ep int;
+  v_msg text; v_t0 timestamptz; v_ms numeric; v_tax jsonb; v_run uuid; v_scan1 jsonb; v_scan2 jsonb; v_car uuid;
+  v_open int; v_rows int; v_graded int; f record; v_ticks int := 0;
 BEGIN
   BEGIN
     v_t0 := clock_timestamp();
@@ -520,42 +522,54 @@ BEGIN
     PERFORM set_config('ottoq.sim_run_id', '', true);
     v_run := public.ottoq_sim_run_scenario('busy_day', 532532, 'ab_harness', '2026-09-01 13:00:00+00');
     PERFORM set_config('ottoq.sim_run_id', v_run::text, true);
-    UPDATE public.ottoq_sim_runs SET time_scale = 12, tick_interval_seconds = 30 WHERE sim_run_id = v_run;
-    -- tick until a scan sees a DCFC above the floor while cars wait (6e0352a0 had one from 8:30 AM sim), at most 90 minutes
-    FOR i IN 1..15 LOOP
+    -- 2 sim-minutes a tick, until the first DCFC session runs (the dealt gate queue takes a few ticks to plug)
+    UPDATE public.ottoq_sim_runs SET time_scale = 4, tick_interval_seconds = 30 WHERE sim_run_id = v_run;
+    FOR i IN 1..10 LOOP
       PERFORM public.ottoq_sim_advance_tick(v_run);
-      CONTINUE WHEN i < 4;
-      v_scan1 := public.ottoq_challenger_scan(v_run);
-      EXIT WHEN COALESCE((v_scan1->>'charging_above_floor')::int, 0) > 0;
+      v_ticks := i;                                   -- a FOR loop's variable is the loop's own, gone after it
+      SELECT os.vehicle_id INTO v_car
+        FROM public.ocpp_sessions os JOIN public.stalls st ON st.id = os.stall_id
+       WHERE os.sim_run_id = v_run AND os.status = 'active' AND st.stall_type = 'dcfc'
+       ORDER BY os.vehicle_id LIMIT 1;
+      EXIT WHEN v_car IS NOT NULL;
     END LOOP;
-    IF COALESCE((v_scan1->>'cars_waiting')::int, 0) = 0 OR COALESCE((v_scan1->>'charging_above_floor')::int, 0) = 0 THEN
-      RAISE EXCEPTION '0532 V3 FAILED (b): after % ticks the scan saw %', i, v_scan1;
+    IF v_car IS NULL THEN
+      RAISE EXCEPTION '0532 V3 FAILED (b): no DCFC session was running after % ticks of 2 sim-minutes', v_ticks;
     END IF;
-    SELECT count(*) INTO v_ep FROM public.ottoq_challenger_findings
-     WHERE sim_run_id = v_run AND question = 'charging_above_floor_while_cars_wait';
+    UPDATE public.vehicles SET current_soc = 85 WHERE id = v_car;     -- the plant
+    v_scan1 := public.ottoq_challenger_scan(v_run);
+    IF COALESCE((v_scan1->>'cars_waiting')::int, 0) = 0 OR COALESCE((v_scan1->>'charging_above_floor')::int, 0) = 0
+       OR NOT EXISTS (SELECT 1 FROM public.ottoq_challenger_findings
+                       WHERE sim_run_id = v_run AND question = 'charging_above_floor_while_cars_wait' AND status = 'open'
+                         AND (evidence->>'car_id')::uuid = v_car AND (evidence->>'car_soc')::numeric = 85
+                         AND counterfactual ? 'beneficiary_id' AND (evidence->>'cars_waiting')::int > 0) THEN
+      RAISE EXCEPTION '0532 V3 FAILED (b): the first scan saw % and wrote no open Q1 episode for the planted car', v_scan1;
+    END IF;
     PERFORM public.ottoq_sim_advance_tick(v_run);
     v_scan2 := public.ottoq_challenger_scan(v_run);
-    SELECT count(*) FILTER (WHERE status = 'open'), count(*) INTO v_open, v_rows
-      FROM public.ottoq_challenger_findings WHERE sim_run_id = v_run;
-    IF NOT EXISTS (SELECT 1 FROM public.ottoq_challenger_findings
-                    WHERE sim_run_id = v_run AND question = 'charging_above_floor_while_cars_wait'
-                      AND scans_seen = 2 AND evidence ? 'car_soc' AND counterfactual ? 'beneficiary_id')
-       AND NOT EXISTS (SELECT 1 FROM public.ottoq_challenger_findings
-                        WHERE sim_run_id = v_run AND question = 'charging_above_floor_while_cars_wait' AND status = 'closed'
-                          AND grade IS NOT NULL) THEN
-      RAISE EXCEPTION '0532 V3 FAILED (b): after two scans no Q1 episode was extended or closed and graded (% rows)', v_rows;
+    SELECT * INTO f FROM public.ottoq_challenger_findings
+     WHERE sim_run_id = v_run AND question = 'charging_above_floor_while_cars_wait' AND (evidence->>'car_id')::uuid = v_car;
+    IF NOT ((f.status = 'open' AND f.scans_seen = 2)
+            OR (f.status = 'closed' AND f.grade IS NOT NULL AND f.realized ? 'saving_min')) THEN
+      RAISE EXCEPTION '0532 V3 FAILED (b): after the second scan the planted episode reads status %, scans %, grade %',
+        f.status, f.scans_seen, f.grade;
+    END IF;
+    IF (SELECT count(*) FROM public.ottoq_challenger_findings
+         WHERE sim_run_id = v_run AND question = 'charging_above_floor_while_cars_wait'
+           AND (evidence->>'car_id')::uuid = v_car) <> 1 THEN
+      RAISE EXCEPTION '0532 V3 FAILED (b): the planted session was written as more than one episode';
     END IF;
     PERFORM public.ottoq_sim_stop_and_reset(v_run, '0532_v3');
     PERFORM public.ottoq_challenger_tick();
-    SELECT count(*) FILTER (WHERE grade IS NOT NULL), count(*) FILTER (WHERE status = 'open')
-      INTO v_graded, v_open FROM public.ottoq_challenger_findings WHERE sim_run_id = v_run;
+    SELECT count(*), count(*) FILTER (WHERE grade IS NOT NULL), count(*) FILTER (WHERE status = 'open')
+      INTO v_rows, v_graded, v_open FROM public.ottoq_challenger_findings WHERE sim_run_id = v_run;
     IF v_open <> 0 OR v_graded <> v_rows THEN
       RAISE EXCEPTION '0532 V3 FAILED (b): after the stop % of % episodes graded, % still open', v_graded, v_rows, v_open;
     END IF;
-    RAISE EXCEPTION '0532 V3 PASSED: 6e0352a0 taper tax % DCFC-minutes above the floor while cars waited (% above 85), in % ms; a live day at % sim (tick %): % cars waiting, % DCFC above the floor, % Q1 episodes; after the stop % of % episodes graded (%)',
+    RAISE EXCEPTION '0532 V3 PASSED: 6e0352a0 taper tax % DCFC-minutes above the floor while cars waited (% above 85), in % ms; at % sim (tick %) % cars waiting and % DCFC above the floor (one planted); the planted episode % after the second scan (scans %); after the stop % of % episodes graded (%)',
       v_tax->'dcfc_above_floor_while_waiting_min', v_tax->'dcfc_above_85_while_waiting_min', round(v_ms),
-      to_char((v_scan1->>'sim_clock')::timestamptz AT TIME ZONE 'America/Chicago', 'HH24:MI'), i,
-      v_scan1->'cars_waiting', v_scan1->'charging_above_floor', v_ep, v_graded, v_rows,
+      to_char((v_scan1->>'sim_clock')::timestamptz AT TIME ZONE 'America/Chicago', 'HH24:MI'), v_ticks,
+      v_scan1->'cars_waiting', v_scan1->'charging_above_floor', f.status, f.scans_seen, v_graded, v_rows,
       (SELECT jsonb_object_agg(question || ':' || grade, n) FROM (SELECT question, grade, count(*) AS n
          FROM public.ottoq_challenger_findings WHERE sim_run_id = v_run GROUP BY 1, 2) z);
   EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM;

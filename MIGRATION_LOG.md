@@ -536,7 +536,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0529](db/migrations/0529_a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured.sql) | `20260927151819` | yes — ledger | **G254: the dial verdict skipped any guardrail whose control arm read 0 -- it divided each change by the |
 | [0530](db/migrations/0530_unmet_demand_is_measured_from_the_cars_actually_out.sql) | `20260927153902` | yes — ledger | **G255: nothing on the scorecard measured whether the depot met the work side's demand. On the day's full busy |
 | [0531](db/migrations/0531_the_learners_arms_start_through_the_operators_door.sql) | `20260927161230` | yes — ledger | **G256: the dial experiments' arms start the way the operator's day starts. They started in a busy day that met |
-| [0532](db/migrations/0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait.sql) | `PENDING` | no — pending | **The challenger, first form: a loop beside the funnel that asks, every minute of a live day, whether the |
+| [0532](db/migrations/0532_the_challenger_asks_whether_the_chargers_could_do_more_while_cars_wait.sql) | `20260927164827` | yes — ledger | **The challenger, first form: a loop beside the funnel that asks, every minute of a live day, whether the |
 
 398 migrations indexed.
 
