@@ -111,6 +111,12 @@ SELECT public.ottoq_dial_experiment_verdict(e.experiment_id) AS verdict
 --   holds only if no forces_recert migration lands before it (a new engine counts from zero).
 -- RE-READ (2026-09-27 11:05 UTC): `collecting`, 3 of 6 counted, 0 invalid, 0 stale, no safety flag. As predicted,
 --   three pairs was the night's most.
+-- RE-READ (2026-09-27 12:18 UTC, 7:18 AM CT): `collecting`, 0 of 6 counted, 3 stale. 0522 -- a cron schedule -- did
+--   that: the verdict counted a pair only on the engine hash, which is the md5 of every migration version, so ANY
+--   migration restarted the experiment. The 10:09 READ above ("holds only if no forces_recert migration lands") was
+--   wrong in the direction that flatters. G250, `db/checks/0393`.
+-- RE-READ (2026-09-27 12:25 UTC, after 0523 at 7:24 AM CT): `collecting`, 3 of 6 counted, 0 invalid, 0 stale; the
+--   verdict now names its `pair_floor`, 08:52:18 UTC -- 0521's apply, the last change that could move an arm.
 
 -- ══ §4 THE WINDOW'S CLOSE RACED ITS RUNNER (G247) ════════════════════════════════════════════════════════════════
 
@@ -143,3 +149,6 @@ SELECT m.version, md5(m.statements[1]) AS body_md5,
 --   file's body byte for byte; the close at `41 10 * * *`, the runner still `*/10 * * * *`; forces_recert FALSE and the
 --   canon at its floor. Dry run and apply passed first time, applied with no pair in flight and before the validation
 --   run started. Tonight's window, if one is opened, ends at 5:41 AM CT.
+--   AND IT RESTARTED BOTH DIAL EXPERIMENTS, which nobody saw for an hour: a forces_recert FALSE change still moved the
+--   engine hash the verdict counted by (§3(b) RE-READ 12:18 UTC; G250, `db/checks/0393`). 0523 classifies it
+--   `forces_dial_restart = false`, and the pairs count again.

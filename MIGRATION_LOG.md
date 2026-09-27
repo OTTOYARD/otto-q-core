@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0522 — GENERATED, not a log
+## Index, 0134–0524 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -527,7 +527,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0520](db/migrations/0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql) | `20260927081719` | yes — ledger | **G240, step 4's instrument: a designed pair can now judge the calibrated booking window, which it could not |
 | [0521](db/migrations/0521_the_charger_s_sensors_see_only_a_car_on_a_charger.sql) | `20260927085218` | yes — ledger | **G246: the charger's sensors were credited with interior inspections and cabin triage checks on cars that |
 | [0522](db/migrations/0522_the_dial_window_closes_before_its_last_pair_could_outlast_it.sql) | `20260927111501` | yes — ledger | **G247: the dial window's close and the dial runner fired in the same minute, so the runner could start a |
+| [0523](db/migrations/0523_a_dial_experiment_restarts_only_for_a_change_that_can_move_an_arm.sql) | `20260927122408` | yes — ledger | **G250: a dial experiment counted only the pairs run on the current engine, and the engine was the md5 of every |
+| [0524](db/migrations/0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql) | `PENDING` | no — pending | **G249: a run whose fleet seed failed ran anyway, on the previous run's world. The seed tripped on an arm |
 
-388 migrations indexed.
+390 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
