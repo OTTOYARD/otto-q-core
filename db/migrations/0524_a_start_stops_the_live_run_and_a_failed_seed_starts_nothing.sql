@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260927131711
 -- migration-name:    a_start_stops_the_live_run_and_a_failed_seed_starts_nothing
 --
 -- 0524  **G249: a run whose fleet seed failed ran anyway, on the previous run's world. The seed tripped on an arm

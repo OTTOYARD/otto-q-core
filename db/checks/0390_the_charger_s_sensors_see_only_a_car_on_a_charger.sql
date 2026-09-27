@@ -195,7 +195,10 @@ SELECT left(st.sim_run_id::text, 8) AS run, COALESCE(s.stall_type::text, '(no st
                                          AND os.stall_id = st.stall)) AS with_a_session_there
   FROM starts st LEFT JOIN public.stalls s ON s.id = st.stall
  GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
--- READ: pending.
+-- READ (2026-09-27 13:25 UTC, 8:25 AM CT; the run is 6ddd827e, the first live, seeded operator run after 0521, ended by
+--   the governor at 540 sim-minutes): (a) HOLDS -- 209 sensor starts, every one stamped with a DCFC or L2 stall the car
+--   had a charge session on: DCFC 88 done and 1 returned to pending by 0519 (a charge fault, 0388 §4(b)), L2 120 done.
+--   (b) HOLDS -- none on staging, in a bay or on no stall (6 of 72 on c4afb873 before 0521).
 
 \echo '=== 0390 §4(c) — interior inspections by who did them and whether the visit charges, with the wait from arrival ==='
 WITH r AS (SELECT sr.sim_run_id FROM public.ottoq_sim_runs sr
@@ -220,4 +223,9 @@ SELECT left(sim_run_id::text, 8) AS run, COALESCE(performed_by, '(technician)') 
 --   false credits, cars on staging or on no stall); charger_sensors, charging visit 60 (p50 4.6, p90 40.6, max 67.0 --
 --   the wait for the charge itself). After 0521 the third row can hold only a car really on a charger under a visit with
 --   no charge left (one still parked on its charger after the charge); §4(a)(b) says whether any is.
--- READ: pending.
+-- READ (2026-09-27 13:25 UTC, 6ddd827e complete): technician, no charge 12 (p50 3.6 min, p90 243.1, max 267.5);
+--   technician, charging visit 2 (p50 10.4); charger_sensors, charging visit 188 (p50 15.4, p90 207.4, max 474.1 -- the
+--   wait for a charger on a busy day, which the inspection rides); charger_sensors, no charge: none -- the third row is
+--   gone, as 0521 intended. (c) HOLDS for 9 of the 12: technicians took the no-charge inspections within minutes. The
+--   other 3 are the p90: they waited 240 minutes for the deploy gate's escape hatch, because the twin never offered them
+--   to a technician while their cars waited for a bay (G251, `db/checks/0394`, fixed by 0526).

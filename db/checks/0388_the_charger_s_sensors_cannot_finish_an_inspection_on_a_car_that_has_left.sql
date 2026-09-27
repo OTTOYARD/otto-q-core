@@ -151,3 +151,6 @@ SELECT v.display_name, x->>'svc' AS svc, COALESCE(x->>'status', 'pending') AS no
 --   re-start, which is the wait for the car's next charger and not for anything the inspection itself needed. Of the 98
 --   inspections the sensors have started so far, 97 are done -- this one among them, after its interruption -- and one
 --   is in progress.
+-- FINAL READ (2026-09-27 13:25 UTC, the run ended by the governor at 540 sim-minutes): still one, the same. Waymo-001's
+--   inspection is done on NASH-L2-STALL-26 by the sensors after its one `left_the_charger` interruption on DCFC-05; no
+--   other sensor work was cut by a charge's end across the run's 209 sensor starts (0390 §4(a)). (c) and (d) HOLD.

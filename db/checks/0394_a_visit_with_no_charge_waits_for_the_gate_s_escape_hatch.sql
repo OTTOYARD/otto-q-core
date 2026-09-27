@@ -2,7 +2,7 @@
 --       The car sat on a staging stall until the deploy gate's 240-minute escape hatch released it with the work
 --       undone. On validation run 6ddd827e three cars' interior inspections waited that way.**
 --
---       Written on 2026-09-27 (12:40-13:15 UTC, 7:40-8:15 AM CT), from validation run 6ddd827e while it ran and after.
+--       Written on 2026-09-27 (12:40-13:30 UTC, 7:40-8:30 AM CT), from validation run 6ddd827e while it ran and after.
 --       Read-only.
 
 -- ══ §1 THE THREE, AND HOW THE GATE LET THEM GO ═══════════════════════════════════════════════════════════════════
@@ -21,6 +21,9 @@ SELECT left(e.sim_run_id::text, 8) AS run, v.display_name AS car,
 --   investigate, not a normal path", reason `must_do_work_open`, held 240.1-240.2 minutes. 4bc19d29's left bay and
 --   cabin cleaning undone (interior_deep_clean 4, interior_tidy 1, exterior_wash 1). 6ddd827e's all left the interior
 --   inspection undone -- Waymo-AV-016 (with its exterior wash), Waymo-AV-020 (with its wash) and Tesla-AV-041.
+-- FINAL READ (2026-09-27 13:25 UTC, the run ended by the governor at 540 sim-minutes): 4 overrides, the three above
+--   (released at sim 12:11, 12:26 and 1:01 PM CT) and Tesla-RT-002 at 4:14 PM, held 240.6 minutes for an interior deep
+--   clean -- bay work waiting for a detail bay, the kind all six of 4bc19d29's were, and not this finding.
 
 \echo '=== 0394 §1(b) — Waymo-AV-016 on 6ddd827e: its state and stall changes from the gate to the release ==='
 SELECT to_char(e.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH24:MI:SS') AS sim_ct, e.event_type,
@@ -69,6 +72,9 @@ SELECT run, no_charge, svc, count(*) AS atoms, count(started_at) AS started,
 -- READ (2026-09-27 12:45 UTC, 6ddd827e at sim about 2 PM CT): on 6ddd827e, 11 interior inspections on no-charge visits,
 --   all started, 3 of them after two hours (the three above); on 4bc19d29 3, none after two hours, and one no-charge
 --   interior tidy after 262 minutes. The charging visits' cabin work waits for its charger by design and is not this.
+-- FINAL READ (2026-09-27 13:25 UTC, 6ddd827e complete): 12 no-charge interior inspections, all started, 3 after two
+--   hours -- the three the escape hatch released. The other no-charge cabin work on the run (1 interior tidy, 2 item
+--   retrievals, 1 triage check) started within two hours: those visits' cars were not left waiting for a bay.
 
 -- ══ §3 THE FIX: 0526 ══════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -78,3 +84,15 @@ SELECT run, no_charge, svc, count(*) AS atoms, count(started_at) AS started,
 --   forces_recert TRUE (the filter runs in every certified arm, and the technician pool moves), and it moves dial arms,
 --   so it restarts the dial experiments: it waits for the end of the next dial window, so the G240 experiment's first
 --   look is not thrown away for it.
+--   Dry run (2026-09-27 13:22 UTC, 8:22 AM CT, no run live): P2, the patch, V1 and V3 all passed. V3's (a) run against
+--   the UNPATCHED filter -- the same planted car, stall and visit, on 6ddd827e marked running inside the test -- leaves the
+--   inspection `pending`, so the test tells the two filters apart; with the patch it goes `in_progress` with no
+--   `performed_by`, a technician's.
+
+-- ══ §4 THE FIRST FULL DAY AFTER 0526, PREDICTED BEFORE IT RUNS ══════════════════════════════════════════════════════
+--
+--   PREDICTED on the first live, seeded busy_day operator run after 0526: (a) no deploy-gate override names an interior
+--   inspection, and every no-charge interior inspection starts within 30 minutes of its car's arrival (§2 with 30 for 120); (b) the charging
+--   visits' cabin work is unchanged -- the sensors still do it at the charger, and no sensor start is off a charger
+--   (0390 §4(a)(b) re-run); (c) overrides for bay work waiting for a bay are not this fix's, and are read, not predicted.
+--   Read with §1 and §2 above, the run id put in place of 6ddd827e.

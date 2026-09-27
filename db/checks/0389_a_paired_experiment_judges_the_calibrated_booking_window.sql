@@ -152,3 +152,25 @@ SELECT m.version, md5(m.statements[1]) AS body_md5,
 --   AND IT RESTARTED BOTH DIAL EXPERIMENTS, which nobody saw for an hour: a forces_recert FALSE change still moved the
 --   engine hash the verdict counted by (§3(b) RE-READ 12:18 UTC; G250, `db/checks/0393`). 0523 classifies it
 --   `forces_dial_restart = false`, and the pairs count again.
+
+-- ══ §5 TONIGHT'S WINDOW, OPENED FOR ONE NIGHT ═════════════════════════════════════════════════════════════════════
+--
+--   At 13:35 UTC (8:35 AM CT) both experiments read `collecting` on the 0521 floor, 08:52:18 UTC: this one 3 of the 6
+--   counted pairs its first look needs, 0480's energy replication `82c5568b` 4 of 6. 0524 and 0525 moved no floor (both
+--   `forces_dial_restart` FALSE). Chase handed the call to the build on 2026-09-27 ("you can make all other judgment
+--   calls yourself"), so the window is opened for the night of 9/27-28 ONLY: one-shot cron job 763,
+--   `ottoq_dial_window_open_once_20260928` (`0 8 28 9 *`, 3:00 AM CT), with the same command as the paused opener 761;
+--   762 closes it at 5:41 AM CT. 761 stays paused -- the 9/26 hold (0485) was about changes invalidating runs, and the
+--   next change that can move an arm (0526, G251) is applied after this close, not before, so tonight's pairs are not
+--   cut in half. 763 is unscheduled after it fires. At 18 and 10 minutes of wall time a pair and the runner alternating
+--   by pair count, 161 minutes holds the 3 + 2 pairs the two first looks need with room to spare.
+
+\echo '=== 0389 §5 — the one-night opener, the paused nightly one, the close, and both verdicts ==='
+SELECT (SELECT jsonb_agg(jsonb_build_object('job', jobid, 'name', jobname, 'schedule', schedule, 'active', active) ORDER BY jobid)
+          FROM cron.job WHERE jobname LIKE 'ottoq_dial_window%') AS window_jobs,
+       (SELECT jsonb_agg(jsonb_build_object('exp', left(e.experiment_id::text, 8), 'key', e.param_key,
+                                            'outcome', public.ottoq_dial_experiment_verdict(e.experiment_id)->>'outcome',
+                                            'why', public.ottoq_dial_experiment_verdict(e.experiment_id)->>'why') ORDER BY e.created_at)
+          FROM public.ottoq_dial_experiments e WHERE e.status = 'active') AS experiments;
+-- READ (2026-09-27 13:35 UTC): 761 `0 8 * * *` inactive, 762 `41 10 * * *` active, 763 `0 8 28 9 *` active; 82c5568b
+--   `collecting`, "4 of 6 counted pairs needed for the first look"; 143a11c7 `collecting`, "3 of 6 ...".

@@ -528,8 +528,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0521](db/migrations/0521_the_charger_s_sensors_see_only_a_car_on_a_charger.sql) | `20260927085218` | yes — ledger | **G246: the charger's sensors were credited with interior inspections and cabin triage checks on cars that |
 | [0522](db/migrations/0522_the_dial_window_closes_before_its_last_pair_could_outlast_it.sql) | `20260927111501` | yes — ledger | **G247: the dial window's close and the dial runner fired in the same minute, so the runner could start a |
 | [0523](db/migrations/0523_a_dial_experiment_restarts_only_for_a_change_that_can_move_an_arm.sql) | `20260927122408` | yes — ledger | **G250: a dial experiment counted only the pairs run on the current engine, and the engine was the md5 of every |
-| [0524](db/migrations/0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql) | `PENDING` | no — pending | **G249: a run whose fleet seed failed ran anyway, on the previous run's world. The seed tripped on an arm |
-| [0525](db/migrations/0525_the_charge_evidence_records_the_cadence_it_was_observed_at.sql) | `PENDING` | no — pending | **G248: the charge-duration evidence did not record the cadence a charge was observed at, and its reader did |
+| [0524](db/migrations/0524_a_start_stops_the_live_run_and_a_failed_seed_starts_nothing.sql) | `20260927131711` | yes — ledger | **G249: a run whose fleet seed failed ran anyway, on the previous run's world. The seed tripped on an arm |
+| [0525](db/migrations/0525_the_charge_evidence_records_the_cadence_it_was_observed_at.sql) | `20260927131932` | yes — ledger | **G248: the charge-duration evidence did not record the cadence a charge was observed at, and its reader did |
 | [0526](db/migrations/0526_a_visit_with_no_charge_does_its_cabin_work_where_the_car_is_parked.sql) | `PENDING` | no — pending | **G251: a visit with nothing to charge could not have its cabin work started while its car waited for a bay |
 
 392 migrations indexed.

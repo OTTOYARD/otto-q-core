@@ -263,10 +263,15 @@ SELECT left(e.sim_run_id::text, 8) AS run, count(*) AS overrides,
        min(to_char(e.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH24:MI')) AS first_ct,
        jsonb_agg(e.payload->'missing' ORDER BY e.sim_clock_at) AS missing
   FROM public.ottoq_events e
- WHERE e.sim_run_id IN ('c4afb873-ce23-4ae7-b167-9fda79961fc7','4bc19d29-790c-4cb0-9e2e-ae090a7da57b','caf85837-8681-4afe-9744-03eecd796737')
+ WHERE e.sim_run_id IN ('c4afb873-ce23-4ae7-b167-9fda79961fc7','4bc19d29-790c-4cb0-9e2e-ae090a7da57b','caf85837-8681-4afe-9744-03eecd796737',
+                        '6ddd827e-b549-43cf-8154-4d1bfb20cabf')
    AND e.event_type = 'twin.deploy_gate_override'
  GROUP BY 1 ORDER BY 1;
 -- READ (2026-09-27 08:42 UTC): only 4bc19d29, 6 overrides from sim 12:22 PM on, every one must-do bay or cabin work
 --   (interior_deep_clean 4, interior_tidy 1, exterior_wash 1) and none a charge. (e) UNREADABLE on c4afb873: the gate
 --   overrides only at its 240-minute hard cap (the run's last summary: 4 held, 2 escalated, 0 overridden), and the run
 --   lasted 116 sim-minutes. The question -- do cars that now wait for a top-up reach the cap -- needs a full day.
+-- READ (2026-09-27 13:25 UTC, 6ddd827e added -- the first full day after 0518/0519/0521, 540 sim-minutes): 4 overrides
+--   against 4bc19d29's 6, from sim 12:11 PM on, and again NONE a charge: cars that wait for a top-up do not reach the
+--   cap. Three left an interior inspection undone (two with their exterior wash), all on visits with no charge -- G251,
+--   `db/checks/0394` -- and one a deep clean waiting for a detail bay, as on 4bc19d29.

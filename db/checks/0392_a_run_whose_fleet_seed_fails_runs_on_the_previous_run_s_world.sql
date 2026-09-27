@@ -137,3 +137,10 @@ SELECT r.run, floor(extract(epoch FROM s.started_at - r.sim_clock_start) / 3600)
 --       a start, never a relabel.
 --   (4) A seed that still fails stops the start: `ottoq_sim_run_scenario` raises, the transaction rolls back, and the
 --       caller sees why. No run exists that says it is a scenario's day and is not.
+--   APPLIED `20260927131711` (2026-09-27 13:17 UTC, 8:17 AM CT), once 6ddd827e had ended, after a full dry run with no run
+--   live: P2, both patches, V1 and all three V3 cases passed -- (a) a start over a car planted on a DCFC stall with a 2099
+--   tether and an open charge of the last operator run: the seed succeeded, the tether was gone, the charge was
+--   `cancelled`/`sim_reset` at that run's own last clock; (b) a second start stopped the first through the stop door
+--   (archived, noted, `failure_reason` the supersede) and ran seeded, with the transaction no longer pinned to the first;
+--   (c) a planted refusal of the seed's move made the start raise "fleet seed failed at depot ..., so no run was
+--   started", with no new run and the live one still running. The ledger's statement md5 matches the file.

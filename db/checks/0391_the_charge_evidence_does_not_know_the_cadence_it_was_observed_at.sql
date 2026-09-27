@@ -73,3 +73,12 @@ SELECT left(l.sim_run_id::text, 8) AS run, l.charger_type, count(*) AS n, count(
 --   (2) the reaper closes an orphan on its own run's last clock (`sim_clock_current`), never the reaper's, and the
 --   capture does not file a reap as a charge. Nothing refits the charge window on a schedule (no cron job, no function
 --   calls the fit), so nothing is at risk before then.
+--
+--   APPLIED AS 0525, `20260927131932` (2026-09-27 13:19 UTC, 8:19 AM CT), after 0524, its dry run re-run clean on the
+--   morning's data first. (1) as written: the ledger's new `tick_minutes` holds the run's sim-minutes per tick, capture
+--   version 3 files it, and the reader keeps a charge only at 2 minutes a tick or finer (NULL, the rows filed before, kept;
+--   V1 proved the filter drops none of the rows the reader returned before it). (2) NOT as written: the reaper is left
+--   alone -- it is on the certified tick path -- and the capture simply files no `orphaned_run` session. And 11f15672's
+--   path to the reaper is closed by 0524: a start now stops a live run through the stop door, and its seed closes any
+--   leftover charge as `sim_reset` on the charge's own run's last clock, so a run started through the start door finds
+--   no other run's open charge for its reaper to close on the wrong clock.

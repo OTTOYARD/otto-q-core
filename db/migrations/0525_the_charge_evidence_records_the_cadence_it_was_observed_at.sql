@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260927131932
 -- migration-name:    the_charge_evidence_records_the_cadence_it_was_observed_at
 --
 -- 0525  **G248: the charge-duration evidence did not record the cadence a charge was observed at, and its reader did
