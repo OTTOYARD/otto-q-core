@@ -219,6 +219,10 @@ SELECT n.scenario || '/' || n.seed || '/' || n.ticks AS col, b.verdict_id AS was
 
 \echo '=== 0375 §5(a) — §1 on the new run: done charge legs closed before their session ended ==='
 --   Run §1: `closed_early` should read 0 (or only legs that were never opened).
+-- READ on 964cf17b (busy_day, twin depot, 9:01-9:26 PM CT, 362 ticks, stopped from the Control tab at sim 11:17:46 AM,
+--   0508 live throughout): 69 done charge legs (DCFC 28, L2 41), every one matched to a session, and 0 closed 5+
+--   minutes before it ended; none closed before its session did at all (the largest gap reads 0.0 minutes). On
+--   5344fc12, 31 of 67.
 
 \echo '=== 0375 §5(b) — done charge legs, their records, and the energy on both sides ==='
 WITH legs AS (
@@ -235,7 +239,22 @@ SELECT count(*) AS done_charge_legs,
                      AND os.started_at < l.actual_end_sim AND os.ended_at > l.actual_start_sim))::numeric, 1) AS kwh_in_sessions
   FROM legs l
   LEFT JOIN public.ottoq_service_detail_records sd ON sd.leg_id = l.leg_id;
--- READ: pending.
+-- READ on 964cf17b: 69 done charge legs, 69 records, and all 69 carry energy, a peak and their session's id: 1,984.0
+--   kWh in the records against 1,984.0 in the sessions they match. From the session side, the 63 sessions that
+--   completed (1,887.3 kWh) and the 6 that ended on a fault (96.7 kWh) each closed their leg `done` with one record; the
+--   37 still charging when the run stopped (`sim_reset`, 707.7 kWh) ended their legs `amended`, which issues no record.
+--   The run's 106 sessions delivered 2,691.7 kWh in all. On 5344fc12, 0 of 67 records carried energy.
+
+\echo '=== 0375 §5(c) — charge bookings by how they ended ==='
+SELECT b.purpose, b.state, b.release_reason, count(*) AS bookings
+  FROM public.ottoq_stall_bookings b
+ WHERE b.sim_run_id = :'run' AND b.purpose IN ('charge_dcfc','charge_l2')
+ GROUP BY 1, 2, 3 ORDER BY 1, 4 DESC;
+-- READ on 964cf17b: as predicted, the calendar still ends a charge's booking at its window (G81): 31 charge bookings
+--   ended `done / window_elapsed_occupied` (DCFC 10, L2 21) beside 39 `charge_session_completed` (19, 20). §1(b) on this
+--   run: DCFC window 41.9 / plan 81.7 / session 41.0 minutes, 7 of 22 completed sessions outlasting their window; L2
+--   60.0 / 94.8 / 75.3, 20 of 38 outlasting. So G240 reads as before, and now it is the calendar alone that ends
+--   early: the leg and the record wait for the session.
 
 \echo '=== 0375 §5(d) — charge legs still active at the stop, and whether a session was running ==='
 SELECT l.status, count(*) AS legs,
@@ -245,7 +264,25 @@ SELECT l.status, count(*) AS legs,
   FROM public.ottoq_itinerary_legs l
  WHERE l.sim_run_id = :'run' AND l.leg_type IN ('charge_dcfc','charge_l2') AND l.status IN ('active','amended')
  GROUP BY 1;
--- READ: pending.
+-- READ on 964cf17b: no charge leg was left `active`. 37 ended `amended`, all 37 had started, and each belongs to a car
+--   whose session the stop ended (`sim_reset`, 37 sessions).
+
+\echo '=== 0375 §5(e) — tick compute against 5344fc12, in each run''s first sim hour and after ==='
+SELECT left(t.sim_run_id::text, 8) AS run,
+       CASE WHEN t.sim_clock_before < r.sim_clock_start + interval '1 hour' THEN 'first sim hour' ELSE 'after' END AS sim_window,
+       count(*) AS ticks, round(avg(t.tick_compute_ms)) AS avg_ms,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY t.tick_compute_ms))::numeric) AS p50_ms,
+       round((percentile_cont(0.95) WITHIN GROUP (ORDER BY t.tick_compute_ms))::numeric) AS p95_ms
+  FROM public.ottoq_tick_clock_log t
+  JOIN public.ottoq_sim_runs r USING (sim_run_id)
+ WHERE t.sim_run_id IN (:'run', '5344fc12-ea68-452d-8a1e-54af79d63a5c')
+ GROUP BY 1, 2 ORDER BY 1, 2 DESC;
+-- READ: after the first sim hour the two runs are level: 964cf17b 942 ms on average (p50 870, p95 1,395) over 253
+--   ticks against 932 (919, 1,330) over 241. The first sim hour is not: 966 ms (p95 1,469) against 734 (1,175).
+--   Binned by ten sim-minutes (the same rows), the excess is there from the first bin (972 against 798 at 8:00-8:10
+--   AM), when 0508's added work (per expired charge booking, per closed charge leg, per orphaned session) had almost
+--   nothing to act on, and before 0509 was applied (8:25). The two runs have different seeds (106 sessions against
+--   95), so the first hour's difference is not attributed further.
 
 -- ══ §6 THE CARD'S CHARGE ETA (0509), BACKTESTED BEFORE IT WAS APPLIED ═══════════════════════════════════════════
 --
@@ -327,6 +364,81 @@ SELECT stype, count(*) AS sessions, round(avg(ratio)::numeric, 2) AS avg_ratio,
 --   The calibration ratio averaged 0.93 on DCFC and 1.02 on L2, so the model's shape was close and the per-session
 --   correction did most of the work at the tail. One run, the midpoint only; the live reading (0509's V3 and the
 --   cockpits) is on the next validation run.
+-- READ on 964cf17b, out of sample (0509 was fixed on 5344fc12 before this run began): 61 completed sessions of 10+
+--   minutes, a median 31.3 minutes left at the midpoint; median / p90:
+--                       calibrated     model alone    plan (0507)
+--     charge_dcfc (25)   2.0 /  5.8     3.8 / 17.1    18.3 /  80.5
+--     charge_l2   (36)   3.0 /  7.1     9.1 / 29.0    28.7 / 120.3
+--     all         (61)   2.9 /  6.8     7.3 / 24.0    24.2 / 119.8
+--   The calibrated error's signed mean is +0.2 minutes, so at the midpoint it leans neither way.
+
+\echo '=== 0375 §6(b) — the same ETA read a quarter, a half and three quarters of the way into each session ==='
+WITH s AS (
+  SELECT os.id, os.vehicle_id, os.started_at, os.ended_at, os.soc_start, os.ambient_temp_c,
+         ch.max_kw, v.inlet_max_kw, v.battery_capacity_kwh AS pack, COALESCE((v.config->>'battery_soh_pct')::numeric, 95) AS soh,
+         st.stall_type::text AS stype,
+         (SELECT (m.payload->>'target_soc_pct')::numeric FROM public.ottoq_ocpp_messages m
+           WHERE m.ocpp_session_id = os.id AND m.message_type = 'StartTransaction' LIMIT 1) AS target
+    FROM public.ocpp_sessions os
+    JOIN public.stalls st ON st.id = os.stall_id
+    JOIN public.ottoq_ocpp_chargers ch ON ch.charger_id = st.ocpp_charger_id
+    JOIN public.vehicles v ON v.id = os.vehicle_id
+   WHERE os.sim_run_id = :'run' AND os.stopped_reason = 'completed'
+     AND os.ended_at - os.started_at >= interval '10 minutes'),
+q AS (SELECT s.*, f.frac, s.started_at + (s.ended_at - s.started_at) * f.frac AS t_q
+        FROM s CROSS JOIN (VALUES (0.25), (0.5), (0.75)) f(frac)),
+mv AS (
+  SELECT q.*, m.sim_clock_at AS t_read,
+         (SELECT (e->>'value')::numeric FROM jsonb_array_elements(m.payload->'sampledValue') e WHERE e->>'measurand' = 'SoC') AS soc_read
+    FROM q
+    JOIN LATERAL (SELECT mm.* FROM public.ottoq_ocpp_messages mm
+                   WHERE mm.ocpp_session_id = q.id AND mm.message_type = 'MeterValues'
+                   ORDER BY abs(EXTRACT(epoch FROM mm.sim_clock_at - q.t_q)) LIMIT 1) m ON true),
+leg AS (
+  SELECT mv.*, (SELECT l.actual_start_sim + make_interval(secs => l.planned_duration_s)
+                  FROM public.ottoq_itinerary_legs l
+                 WHERE l.sim_run_id = :'run' AND l.vehicle_id = mv.vehicle_id
+                   AND l.leg_type IN ('charge_dcfc','charge_l2') AND l.actual_start_sim IS NOT NULL
+                 ORDER BY abs(EXTRACT(epoch FROM l.actual_start_sim - mv.started_at)) LIMIT 1) AS plan_end
+    FROM mv),
+calc AS (
+  SELECT leg.*, LEAST(leg.target, public.ottoq_target_soc_cap(leg.stype, leg.started_at)) AS tgt,
+         EXTRACT(epoch FROM leg.t_read - leg.started_at)/60 AS elapsed,
+         public.ottoq_estimate_charge_minutes(leg.soc_start, leg.soc_read, leg.max_kw, leg.inlet_max_kw, leg.pack,
+                                              COALESCE(leg.ambient_temp_c,22)+5, leg.soh, 1.0) AS model_done
+    FROM leg WHERE leg.soc_read IS NOT NULL),
+pred AS (
+  SELECT calc.*,
+         CASE WHEN soc_read - soc_start >= 2 AND model_done > 0 THEN LEAST(5, GREATEST(0.5, elapsed / model_done)) ELSE 1 END AS ratio
+    FROM calc),
+fin AS (
+  SELECT pred.stype, pred.frac,
+         EXTRACT(epoch FROM pred.ended_at - pred.t_read)/60 AS actual_left,
+         public.ottoq_estimate_charge_minutes(pred.soc_read, pred.tgt, pred.max_kw, pred.inlet_max_kw, pred.pack,
+                                              COALESCE(pred.ambient_temp_c,22)+5, pred.soh, pred.ratio) AS cal_left,
+         EXTRACT(epoch FROM pred.plan_end - pred.t_read)/60 AS plan_left
+    FROM pred)
+SELECT stype, frac, count(*) AS sessions,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY abs(cal_left - actual_left)))::numeric, 1) AS p50_err_calibrated,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(cal_left - actual_left)))::numeric, 1) AS p90_err_calibrated,
+       round(avg(cal_left - actual_left)::numeric, 1) AS mean_signed_calibrated,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY abs(plan_left - actual_left)))::numeric, 1) AS p50_err_plan,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(plan_left - actual_left)))::numeric, 1) AS p90_err_plan,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY actual_left))::numeric, 1) AS p50_actual_left
+  FROM fin GROUP BY stype, frac ORDER BY 1, 2;
+-- READ on 964cf17b, absolute error in minutes, median / p90, with the signed mean (negative: the ETA was early):
+--                    at 25%                at 50%               at 75%               plan (at any point)
+--     charge_dcfc   4.3 / 16.8 (-3.7)      2.0 / 5.8 (-1.3)     0.6 / 1.9 (+0.3)     18.3 /  80.5
+--     charge_l2    10.3 / 19.5 (-1.8)      3.0 / 7.1 (+1.2)     2.0 / 5.0 (+2.7)     28.7 / 120.3
+--   It beats the plan at every point, and it is weakest where it has seen least of the session: a quarter of the way
+--   in, one charge in ten is still 17-20 minutes off. The cards said the same, live. At sim 8:36 AM PULSE showed eight
+--   DC fast charges "until ~8:37, ~9:05, ~9:20, ~9:22, ~9:26, ~9:32, ~9:48, ~10:02 AM", most of them about half an hour
+--   into their charge. Rebuilt from each session's own meter values at 8:36, the eight read 8:38, 9:06, 9:22, 9:22,
+--   9:26, 9:32, 9:50 and 9:57, each within 2 minutes of the screen but one (5), which, paired in order, ties each
+--   estimate to its charger (the two rebuilt at 9:22 tie); the charges ended at 8:37, 9:11, 9:24, 9:25, 9:16, 9:44,
+--   10:03 and 10:17. So the screen ran from 16 minutes early to 10 late, and the three with the most left (68-102
+--   minutes) read 12-16 minutes early. A charge that has just begun carries little of its own evidence; what can fill
+--   that is the car's history (G240).
 
 -- ══ §7 0509 AS APPLIED, AND READ LIVE ═══════════════════════════════════════════════════════════════════════════
 
