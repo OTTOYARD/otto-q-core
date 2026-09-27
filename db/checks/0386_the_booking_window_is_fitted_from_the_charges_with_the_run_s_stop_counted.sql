@@ -140,7 +140,32 @@ SELECT calibration_id, fitted_at, evidence_through, n_judged, array_length(sourc
                                                       'med_nom_all', v -> 'median_nominal_all'))
           FROM jsonb_each(cells) c(k, v)) AS cells
   FROM public.ottoq_charge_window_calibration ORDER BY calibration_id;
--- READ: pending (the fit is taken after 4bc19d29 stops).
+-- READ (2026-09-27 07:33 UTC, 2:33 AM CT). The full-day run did not reach 8 PM: the run governor stopped it at 07:12 UTC
+--   at its 540 sim-minute ceiling ("run_governor: reached the 540 sim-minute ceiling"), sim 8:00 AM - 5:02 PM, 1,035
+--   ticks, its stop captured as 39 cut charges (9 DCFC, 30 L2) beside 128 completed and 22 faulted. The fit, version 6,
+--   `ottoq_fit_charge_window_calibration(twin, 0.10, 2.0, 30, 120, '{5,15,25}', NULL, note)`, evidence through 07:12:00
+--   UTC, 11 runs, 311 judged charges (192 before):
+--     l2    a 1.2208 (13)   b 1.1834 (14)   c 1.3611 (73)   d 1.7469 (51)   all 1.5748 (151)
+--     dcfc  a 1.0832 (15)   b 1.1395 (25)   c 1.4010 (48)   d 1.6036 (72)   all 1.5066 (160)
+--   no judged charge cut (n_cut 0 everywhere); judged median nominal 73.2 minutes on L2 (population 153.0), 48.8 on DCFC
+--   (84.6). Leave-one-run-out: 253 of 311 = 81.35% (DCFC 83.1%, L2 79.5%). Code md5s: fit 875440a0, evidence 54674fcf,
+--   band e8cf9910, charge model 14a1e1ab.
+--   (a) HELD, modestly: judged L2 charges 93 -> 151, and two L2 band cells now stand on their own (c 42 -> 73, d 24 ->
+--   51); the judged median nominal moved only 66.5 -> 73.2 against a population of 153, because a charge is judged when
+--   the run gave it twice its nominal and a 3-hour charge needs 6 hours of runway: at 9 hours, only the morning's long
+--   charges qualify. (b) PARTLY: l2:* rose 1.4998 -> 1.5748 and l2:c 1.2169 -> 1.3611, but l2:d fell 1.9718 -> 1.7469 --
+--   its first 24 charges were the hottest of the mornings, the full day added 27 more ordinary band-d charges; dcfc:*
+--   rose 1.4132 -> 1.5066. (c) FAILED: coverage fell to 81.35%, not toward 90%, and it splits cleanly by the held-out run
+--   (replicated outside the fit, 253 of 311 exactly): the full day held out is covered 70 of 119 = 58.8% (L2 31 of 58),
+--   the ten morning runs 183 of 192 = 95.3%. The mornings never saw a hot afternoon. Every full-day L2 charge from 9 AM
+--   on started in air of 25.8 C or more and paced 1.36 to 1.61 on average by start hour (9 AM 1.355, noon 1.609), where
+--   the mornings' L2 charges, 80 of 93 started at 8 AM in 16 C air, paced 1.11. Held out, the full day is fitted by
+--   factors learned from mild mornings, and its hot band-d L2 cell had fewer than 30 charges without it, so it fell back
+--   to the pooled l2:* factor of the mornings. That is covariate shift, which a conformal bound does not promise
+--   against: the guarantee is for a charge exchangeable with the ones it was fitted on, and a full day is not
+--   exchangeable with a morning. What the kept fit has that the held-out read did not: the hot cells now stand on their
+--   own (l2:d 51, dcfc:d 72), so a full day like this one is inside what version 6 has seen. The honest statement is two
+--   numbers: 95.3% for a day like the ones it learned from, 58.8% for a kind of day it had never seen.
 
 -- ══ §5 0517: THE BOOKING WRITER BEHIND A DIAL ══════════════════════════════════════════════════════════════════
 
@@ -163,3 +188,42 @@ SELECT m.version, md5(m.statements[1]) AS body_md5,
 --   What is not done: the dial is off. Turning it on is a paired experiment at the operator's tick -- two live runs of
 --   one seed, dial 0 against a named version -- read on the share of charges that outlast their booking (0515 records
 --   it durably), the wait for a charger, and the refusals.
+
+-- ══ §6 THE WINDOW AS BOOKED TODAY: HOW MANY CHARGES OUTLAST THEIR BOOKING ════════════════════════════════════════
+--
+--   The measure a paired experiment on the dial is judged by (0520 makes it an arm metric). Read from the ledger's
+--   version-2 captures, which record each charge's booking as it stood at the stop: the calendar itself cannot answer
+--   this afterwards, because a booking's end is moved after its charge stops (§6(b)).
+
+\echo '=== 0386 §6 — completed charges with a booking, and how many outlasted it, by run and charger type (dial 0) ==='
+SELECT left(l.sim_run_id::text, 8) AS run, l.charger_type,
+       count(*) AS completed_booked,
+       count(*) FILTER (WHERE l.ended_at > l.booked_to) AS outlasted,
+       round(100.0 * count(*) FILTER (WHERE l.ended_at > l.booked_to) / NULLIF(count(*), 0), 1) AS pct_outlasted,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(epoch FROM l.ended_at - l.booked_to) / 60)
+              FILTER (WHERE l.ended_at > l.booked_to))::numeric, 1) AS p50_overrun_min
+  FROM public.ottoq_charge_duration_ledger l
+ WHERE l.depot_id = '11111111-1111-1111-1111-111111111111' AND l.capture_version = 2 AND l.run_by = 'operator_demo'
+   AND l.stopped_reason = 'completed' AND l.booked_to IS NOT NULL
+ GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ (2026-09-27 07:45 UTC; 4bc19d29 is the one operator run captured at version 2, 0515 having applied at 06:03):
+--     dcfc  62 completed with a booking  38 outlasted it  61.3%  median overrun 21.4 minutes
+--     l2    65                           53              81.5%                49.8
+--   With the window as booked today, most charges outlast the booking the calendar holds for them: a charger the
+--   calendar says is free is, more often than not, still charging. This is the number a paired experiment on the dial
+--   is judged by (0520): the version-6 factors, read leave-one-run-out, say 58.8-95.3% of charges would fit.
+
+\echo '=== 0386 §6(b) — a charge''s booking, at its stop and now ==='
+SELECT l.stopped_reason, count(*) AS charges,
+       count(*) FILTER (WHERE upper(b.during) = l.booked_to) AS booking_end_unchanged,
+       count(*) FILTER (WHERE upper(b.during) = l.ended_at AND l.ended_at <> l.booked_to) AS moved_to_the_stop,
+       count(*) FILTER (WHERE upper(b.during) <> l.booked_to AND upper(b.during) <> l.ended_at) AS moved_elsewhere
+  FROM public.ottoq_charge_duration_ledger l
+  JOIN public.ottoq_stall_bookings b ON b.booking_id = l.booking_id
+ WHERE l.sim_run_id = '4bc19d29-790c-4cb0-9e2e-ae090a7da57b'
+ GROUP BY 1 ORDER BY 2 DESC;
+-- READ (2026-09-27 07:45 UTC): of 127 completed charges, 91 bookings still end where they did at the stop, 12 now end at
+--   the stop and 24 somewhere else; every charge the run's stop cut (38 with a booking) and every faulted one kept or took the stop's
+--   end. So 36 of 127 completed charges' bookings moved after the fact: read at the end of a run, the calendar would
+--   report some of those charges as fitting their windows. The outlast measure has to come from the stop-time capture,
+--   which is why 0520 reads the ledger and not the calendar.

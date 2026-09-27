@@ -219,11 +219,13 @@ SELECT COALESCE(st.stall_type::text, '(none)') AS stall_type, count(*) AS done_l
  GROUP BY 1 ORDER BY 2 DESC;
 -- READ on caf85837: 93 done legs, every one naming a stall -- l2 46, dcfc 31, staging 15, wash_bay 1. (d) HELD. The
 --   77 on a charger are the sensors' at the charge; the 15 in staging are the standalone legs and the catch-ups, and 2
---   sensor inspections that outlasted their charge: 3 of the 85 ran past the unplug (by 1.4 to 2.6 minutes of their 4-5),
---   and the closer records where the car was when the work finished -- staging for Tesla-AV-050 and Tesla-AV-057, the
---   L2 for Waymo-AV-016, which stayed parked on it. A sensor cannot look into a car that has driven away, so an
---   inspection the charge will not outlast should either not start on the sensors or finish at the unplug; noted, not
---   yet built (3 of 85).
+--   sensor inspections that outlasted their charge: 3 of the 85 ran past the unplug (by 1.3 to 2.6 minutes of their 4-5),
+--   and the closer records where the car was when the work finished -- staging for Tesla-AV-050 and Tesla-AV-057, and
+--   for Waymo-AV-016 an L2: not the one it had been on (a first draft said it "stayed parked on it"), but a second one
+--   it reached through a staging stall after the first faulted (0388 §1). A sensor cannot look into a car that has
+--   driven away. All three were charges cut by a fault within 5 minutes, so the work started as meant and its
+--   completion never asked where the car was: G245, fixed by 0519 (the work is done only on the stall whose sensors
+--   started it, else it is pending again).
 
 \echo '=== 0377 §4(e) — cabin and exterior atoms: started, and sim-minutes from the car''s arrival to the start ==='
 SELECT x->>'svc' AS svc, count(*) AS atoms, count(*) FILTER (WHERE x->>'started_at' IS NOT NULL) AS started,

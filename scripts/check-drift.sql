@@ -614,7 +614,10 @@ repo_manifest(version, name, file) AS (
     ('20260927052757'::text, 'the_charges_that_teach_the_booking_window_are_purged_with_their_run'::text, '0514_the_charges_that_teach_the_booking_window_are_purged_with_their_run.sql'::text),
     ('20260927060333'::text, 'the_ledger_records_what_the_charge_was_booked_for_and_aimed_at'::text, '0515_the_ledger_records_what_the_charge_was_booked_for_and_aimed_at.sql'::text),
     ('20260927061451'::text, 'the_booking_window_is_fitted_from_the_charges_with_the_run_s_stop_counted'::text, '0516_the_booking_window_is_fitted_from_the_charges_with_the_run_s_stop_counted.sql'::text),
-    ('20260927062217'::text, 'a_calibrated_charge_window_behind_a_dial'::text, '0517_a_calibrated_charge_window_behind_a_dial.sql'::text)
+    ('20260927062217'::text, 'a_calibrated_charge_window_behind_a_dial'::text, '0517_a_calibrated_charge_window_behind_a_dial.sql'::text),
+    ('20260927074142'::text, 'one_rule_for_whether_a_car_needs_its_charge'::text, '0518_one_rule_for_whether_a_car_needs_its_charge.sql'::text),
+    ('20260927074236'::text, 'the_charger_s_sensors_cannot_finish_an_inspection_on_a_car_that_has_left'::text, '0519_the_charger_s_sensors_cannot_finish_an_inspection_on_a_car_that_has_left.sql'::text),
+    ('PENDING'::text, 'a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence'::text, '0520_a_paired_experiment_can_judge_the_booking_window_at_a_charge_s_own_cadence.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
