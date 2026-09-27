@@ -133,6 +133,24 @@ SELECT l.verdict_id, l.scenario, l.seed, l.ticks, l.outcome, l.equal, l.complete
  ORDER BY l.verdict_id;
 -- READ: pending.
 
+\echo '=== 0390 §3(b) — per column, the digests 0521 moved against the column''s last verdict before it ==='
+WITH cut AS (SELECT classified_at FROM public.ottoq_cert_lineage
+              WHERE name = '0521_the_charger_s_sensors_see_only_a_car_on_a_charger'),
+v AS (
+  SELECT l.verdict_id, l.scenario, l.seed, l.ticks, l.certified_at > (SELECT classified_at FROM cut) AS after_0521,
+         l.verdict->'arm_a' AS a,
+         row_number() OVER (PARTITION BY l.scenario, l.seed, l.ticks, l.certified_at > (SELECT classified_at FROM cut)
+                            ORDER BY l.verdict_id DESC) AS rn
+    FROM public.ottoq_determinism_verdict_ledger l
+   WHERE l.outcome = 'passed' AND jsonb_typeof(l.verdict->'arm_a') = 'object')
+SELECT c.scenario, c.seed, c.ticks, c.verdict_id AS now_v, p.verdict_id AS before_v,
+       COALESCE((SELECT string_agg(k, ',' ORDER BY k) FROM jsonb_object_keys(c.a) k
+                  WHERE k LIKE 'h\_%' AND c.a->>k IS DISTINCT FROM p.a->>k), '(none)') AS moved_digests
+  FROM v c JOIN v p ON (p.scenario, p.seed, p.ticks) = (c.scenario, c.seed, c.ticks) AND p.rn = 1 AND NOT p.after_0521
+ WHERE c.rn = 1 AND c.after_0521
+ ORDER BY c.ticks, c.scenario, c.seed;
+-- READ: pending.
+
 -- ══ §4 THE NEXT VALIDATION RUN, PREDICTED BEFORE IT STARTS ══════════════════════════════════════════════════════
 --
 --   PREDICTED on the next busy_day operator run: (a) every sensor start is stamped with a dcfc or l2 stall the car has
@@ -140,3 +158,50 @@ SELECT l.verdict_id, l.scenario, l.seed, l.ticks, l.outcome, l.equal, l.complete
 --   (c) the inspections of cars held on the intake row with nothing to charge are started by technicians, so the
 --   technician pool is busier in the first half hour than on c4afb873 -- read, not predicted in size: how long those
 --   cars wait for one, since the opening burst is when the pool is shortest.
+
+\echo '=== 0390 §4(a)(b) — the first operator run after 0521: every sensor start, by the kind of stall stamped ==='
+WITH r AS (SELECT sr.sim_run_id FROM public.ottoq_sim_runs sr
+            WHERE sr.run_by = 'operator_demo'
+              AND sr.started_at > (SELECT classified_at FROM public.ottoq_cert_lineage
+                                    WHERE name = '0521_the_charger_s_sensors_see_only_a_car_on_a_charger')
+            ORDER BY sr.started_at LIMIT 1),
+starts AS (
+  SELECT vn.sim_run_id, vn.vehicle_id, COALESCE(x->>'status','pending') AS st, (x->>'sensor_stall_id')::uuid AS stall
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id = (SELECT sim_run_id FROM r) AND x->>'performed_by' = 'charger_sensors'
+  UNION ALL
+  SELECT vn.sim_run_id, vn.vehicle_id, 'returned to pending (0519)', (i->>'stall_id')::uuid
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x, jsonb_array_elements(x->'interrupted') i
+   WHERE vn.sim_run_id = (SELECT sim_run_id FROM r))
+SELECT left(st.sim_run_id::text, 8) AS run, COALESCE(s.stall_type::text, '(no stall)') AS sensor_stall, st.st AS outcome,
+       count(*) AS starts,
+       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.ocpp_sessions os
+                                       WHERE os.sim_run_id = st.sim_run_id AND os.vehicle_id = st.vehicle_id
+                                         AND os.stall_id = st.stall)) AS with_a_session_there
+  FROM starts st LEFT JOIN public.stalls s ON s.id = st.stall
+ GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
+-- READ: pending.
+
+\echo '=== 0390 §4(c) — interior inspections by who did them and whether the visit charges, with the wait from arrival ==='
+WITH r AS (SELECT sr.sim_run_id FROM public.ottoq_sim_runs sr
+            WHERE sr.run_by = 'operator_demo'
+              AND sr.started_at > (SELECT classified_at FROM public.ottoq_cert_lineage
+                                    WHERE name = '0521_the_charger_s_sensors_see_only_a_car_on_a_charger')
+            ORDER BY sr.started_at LIMIT 1),
+insp AS (
+  SELECT vn.sim_run_id, vn.arrived_at, (x->>'started_at')::timestamptz AS started_at, x->>'performed_by' AS performed_by,
+         EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) c WHERE c->>'svc' = 'charge') AS visit_charges
+    FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+   WHERE vn.sim_run_id IN ((SELECT sim_run_id FROM r), 'c4afb873-ce23-4ae7-b167-9fda79961fc7')
+     AND x->>'svc' = 'interior_inspection' AND x ? 'started_at')
+SELECT left(sim_run_id::text, 8) AS run, COALESCE(performed_by, '(technician)') AS by, visit_charges, count(*) AS n,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM started_at - arrived_at) / 60)::numeric, 1) AS p50_wait_min,
+       round(percentile_cont(0.9) WITHIN GROUP (ORDER BY extract(epoch FROM started_at - arrived_at) / 60)::numeric, 1) AS p90_wait_min,
+       round(max(extract(epoch FROM started_at - arrived_at) / 60)::numeric, 1) AS max_wait_min
+  FROM insp GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
+-- BASELINE (2026-09-27 09:10 UTC, c4afb873 before 0521): technician, no charge 6 (p50 2.9 min, p90 4.9, max 5.5);
+--   technician, charging visit 3 (the exit catch-up, p50 2.0); charger_sensors, no charge 3 (p50 7.0 -- all three G246's
+--   false credits, cars on staging or on no stall); charger_sensors, charging visit 60 (p50 4.6, p90 40.6, max 67.0 --
+--   the wait for the charge itself). After 0521 the third row can hold only a car really on a charger under a visit with
+--   no charge left (one still parked on its charger after the charge); §4(a)(b) says whether any is.
+-- READ: pending.
