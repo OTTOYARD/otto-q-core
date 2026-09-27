@@ -84,20 +84,22 @@ SELECT left(d.sim_run_id::text, 8) AS run, r.run_by,
 --   undone) fired on 882 of 6ddd827e's 991 ticks and on 22 of the arm's 90.
 --
 --   The cause is G219's part 3, deferred on 2026-09-26 and costed here. The operator starts through
---   `ottoq_sim_run_scenario`: `twin.ottoq_sim_seed_fleet(depot, seed, start hour)` deals the start hour's deployed
---   share (`ottoq_deploy_target_fraction`, 0.39 at 8 AM) as staged for departure and puts 55% of the rest AT THE GATE
---   AT 12-47% SoC; `ottoq_variability_instantiate` gives the run busy_day's template (the arrival drain as SoC points
---   per hour out, trip duration x0.3, DTC x7, idle fraction x1.9, incidents x0.4); fleet overrides; a prime at the
---   hour-shaped fraction. `ottoq_dial_pair` resets the fleet OFFLINE AT 85-99% (`ottoq_tick_invariance_reset_fleet`),
---   starts through `twin.ottoq_sim_start_run` (a 0.55 cold-start prime) and primes again at 0.70 -- 80 cars on the road
---   at 8 AM, no car at the gate, no template: `ottoq_profile_rate_mult` returns 1 for a run with no profile row, so
---   every rate reads its default. Two worlds by construction, not by chance.
+--   `ottoq_sim_run_scenario`: `twin.ottoq_sim_seed_fleet(depot, seed, start hour)` stages the start hour's share of a
+--   0.90 peak for departure (0.792 at 8 AM: 91 of 116, at 86-99%) and puts 55% of the rest AT THE GATE AT 12-47% SoC
+--   (6e0352a0: 17), the others held or awaiting service; `ottoq_variability_instantiate` gives the run busy_day's
+--   template (the arrival drain as SoC points per hour out, trip duration x0.3, DTC x7, idle fraction x1.9, incidents
+--   x0.4); the fleet overrides (maintenance intervals x0.01/x0.02); a prime at the scenario's 0.45 peak shape (0.396 at
+--   8 AM: 46 out, 13 of them inbound). `ottoq_dial_pair` resets the fleet OFFLINE AT 85-99%
+--   (`ottoq_tick_invariance_reset_fleet`), starts through `twin.ottoq_sim_start_run` (a 0.55 cold-start prime) and
+--   primes again at 0.70 -- all 116 primed, 81 on the road at 8 AM, no car at the gate, no template:
+--   `ottoq_profile_rate_mult` returns 1 for a run with no profile row, so every rate reads its default. Two worlds by
+--   construction, not by chance.
 --
 --   What it means: every dial verdict to date (G240's charge windows, the energy pair, the recall dials) was measured
 --   in a depot that meets its demand, on the question "which setting is better when nothing is short". The operator's
 --   day is decided by the charger queue. A dial that helps the queue cannot show it in a world without one, and a dial
---   that is neutral with idle chargers can be costly with none. Fixed by G256 (the next migration): the arms deal the
---   operator's world, deterministically.
+--   that is neutral with idle chargers can be costly with none. Fixed by G256 in 0531 (applied 20260927161230): the
+--   arms start through the operator's door, deterministically; 0398 reads the first pair run in that world.
 
 -- ══ §4 KPI 1 DISAGREES WITH THE DEPLOYED TIME (OPEN) ═══════════════════════════════════════════════════════════════════
 --
@@ -136,5 +138,6 @@ SELECT left(r.id::text, 8) AS run,
 --   already between 80% and 90% -- above the deploy floor, able to go -- while the deploy target read 49 against 8 out.
 --   A charger is a car-hour machine and the day's binding resource: every minute a charger spends taking a deployable
 --   car from 80 to 90 is a minute a car below the floor waits for it. That is the first question the challenger asks
---   (0531+), and the dial experiment to answer it is `dcfc_target_soc_day` 90 against 85, primary
---   `unmet_demand_car_hours` -- registered only after G256, so that it runs in this world and not the learner's.
+--   (0532+), and the dial experiment to answer it is `dcfc_target_soc_day` 90 against 85, primary
+--   `unmet_demand_car_hours` -- registered after 0531 (experiment 08262943, 2026-09-27 16:13 UTC), so that it runs in
+--   this world and not the learner's old one.

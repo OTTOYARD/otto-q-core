@@ -627,7 +627,8 @@ repo_manifest(version, name, file) AS (
     ('20260927140742'::text, 'kpi_two_counts_a_turn_when_a_car_leaves_a_service_point'::text, '0527_kpi_two_counts_a_turn_when_a_car_leaves_a_service_point.sql'::text),
     ('20260927150822'::text, 'kpi_four_counts_the_technicians_and_divides_by_the_cars_that_came_in'::text, '0528_kpi_four_counts_the_technicians_and_divides_by_the_cars_that_came_in.sql'::text),
     ('20260927151819'::text, 'a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured'::text, '0529_a_guardrail_that_moves_off_zero_is_judged_and_the_verdict_names_the_unmeasured.sql'::text),
-    ('20260927153902'::text, 'unmet_demand_is_measured_from_the_cars_actually_out'::text, '0530_unmet_demand_is_measured_from_the_cars_actually_out.sql'::text)
+    ('20260927153902'::text, 'unmet_demand_is_measured_from_the_cars_actually_out'::text, '0530_unmet_demand_is_measured_from_the_cars_actually_out.sql'::text),
+    ('20260927161230'::text, 'the_learners_arms_start_through_the_operators_door'::text, '0531_the_learners_arms_start_through_the_operators_door.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
