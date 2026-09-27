@@ -594,7 +594,8 @@ repo_manifest(version, name, file) AS (
     ('20260926214200'::text, 'a_parking_hold_lasts_as_long_as_its_car_is_parked'::text, '0500_a_parking_hold_lasts_as_long_as_its_car_is_parked.sql'::text),
     ('20260926221345'::text, 'the_wait_for_a_charger_is_measured_beside_kpi_5'::text, '0501_the_wait_for_a_charger_is_measured_beside_kpi_5.sql'::text),
     ('20260926232454'::text, 'the_recall_appointment_picks_a_staging_stall_the_gate_accepts'::text, '0502_the_recall_appointment_picks_a_staging_stall_the_gate_accepts.sql'::text),
-    ('20260926232527'::text, 'the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival'::text, '0503_the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival.sql'::text)
+    ('20260926232527'::text, 'the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival'::text, '0503_the_refusal_reactor_leaves_a_refused_staging_appointment_to_the_cars_arrival.sql'::text),
+    ('20260926235621'::text, 'an_inspection_closes_its_own_leg_not_the_readiness_check'::text, '0504_an_inspection_closes_its_own_leg_not_the_readiness_check.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
