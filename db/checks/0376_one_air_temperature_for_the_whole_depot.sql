@@ -161,7 +161,9 @@ SELECT count(*) AS sessions,
        count(*) FILTER (WHERE os.ambient_temp_c IS DISTINCT FROM twin.ottoq_sim_site_ambient_c(os.sim_run_id, os.started_at)) AS not_the_depots_air
   FROM public.ocpp_sessions os
  WHERE os.sim_run_id = :'run';
--- READ: pending.
+-- READ (2026-09-27 05:38 UTC, validation run caf85837-8681-4afe-9744-03eecd796737, busy_day on the twin depot, started
+--   05:12:48 UTC and stopped by the operator at 05:37:07 UTC -- 12:12 to 12:37 AM CT -- at sim 11:13 AM, tick 354):
+--   98 sessions, 0 not at the depot's air. (a) HELD.
 
 \echo '=== 0376 §5(b)-(c) — the run''s temperature card, and the charges'' ambient against the weather ==='
 SELECT (SELECT round(c.value, 2) FROM public.ottoq_variability_cards c
@@ -174,7 +176,10 @@ SELECT (SELECT round(c.value, 2) FROM public.ottoq_variability_cards c
           FROM public.ottoq_weather_snapshots w WHERE w.sim_run_id = :'run') AS weather_range,
        (SELECT round(min(os.ambient_temp_c), 1) || ' .. ' || round(max(os.ambient_temp_c), 1) || ' (sd ' || round(stddev(os.ambient_temp_c), 1) || ')'
           FROM public.ocpp_sessions os WHERE os.sim_run_id = :'run') AS charges_ambient;
--- READ: pending.
+-- READ (2026-09-27 05:38 UTC, caf85837): day card 23.21 C = the seed's September draw 23.21 C (the boot draw's
+--   world_day0 reads 23.212196); the weather's 354 readings span 23.4 .. 27.8 C; the 98 charges' ambient spans
+--   23.4 .. 27.8 C, SD 1.3 C. (b) HELD: the card is the month's, inside NOAA's September 22.8 +/- 3.3 C. (c) HELD: the
+--   charges' spread is the weather's own morning range, exactly, where every run before read an SD of 10.7-12.0 C.
 
 \echo '=== 0376 §5(d) — the charges'' duration against the nominal model ==='
 SELECT st.stall_type::text AS stype, count(*) AS sessions,
@@ -187,4 +192,8 @@ SELECT st.stall_type::text AS stype, count(*) AS sessions,
  WHERE os.sim_run_id = :'run' AND os.stopped_reason = 'completed'
    AND os.ended_at - os.started_at >= interval '10 minutes' AND os.soc_end >= os.soc_start + 2
  GROUP BY 1 ORDER BY 1;
--- READ: pending.
+-- READ (2026-09-27 05:38 UTC, caf85837): dcfc 24 sessions, RMS log error 0.190 (0.215 before); l2 27 sessions, 0.158
+--   (0.222 before). (d) HELD in direction on both charger types, L2 by more than DCFC -- L2 charges are long, so a
+--   whole-year air draw had the longest time to move them. One run is one draw of the weather (a warm morning, all of
+--   it in the 15-25 and 25+ bands), so this is a direction and not yet a size; G240's calibration reads the size, from
+--   0514's ledger, across runs.
