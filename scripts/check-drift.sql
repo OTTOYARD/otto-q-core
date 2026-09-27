@@ -611,7 +611,10 @@ repo_manifest(version, name, file) AS (
     ('20260927034307'::text, 'the_interior_inspection_happens_during_the_charge'::text, '0511_the_interior_inspection_happens_during_the_charge.sql'::text),
     ('20260927050956'::text, 'the_cards_say_who_did_the_work'::text, '0512_the_cards_say_who_did_the_work.sql'::text),
     ('20260927050506'::text, 'the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair'::text, '0513_the_weekly_refit_could_not_see_the_recert_runner_and_wrote_the_priors_under_a_pair.sql'::text),
-    ('20260927052757'::text, 'the_charges_that_teach_the_booking_window_are_purged_with_their_run'::text, '0514_the_charges_that_teach_the_booking_window_are_purged_with_their_run.sql'::text)
+    ('20260927052757'::text, 'the_charges_that_teach_the_booking_window_are_purged_with_their_run'::text, '0514_the_charges_that_teach_the_booking_window_are_purged_with_their_run.sql'::text),
+    ('20260927060333'::text, 'the_ledger_records_what_the_charge_was_booked_for_and_aimed_at'::text, '0515_the_ledger_records_what_the_charge_was_booked_for_and_aimed_at.sql'::text),
+    ('20260927061451'::text, 'the_booking_window_is_fitted_from_the_charges_with_the_run_s_stop_counted'::text, '0516_the_booking_window_is_fitted_from_the_charges_with_the_run_s_stop_counted.sql'::text),
+    ('20260927062217'::text, 'a_calibrated_charge_window_behind_a_dial'::text, '0517_a_calibrated_charge_window_behind_a_dial.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
