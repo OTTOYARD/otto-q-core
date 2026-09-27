@@ -43,6 +43,14 @@ is in the template's comments; the checklist is:
   pair at all** (both arms run in one transaction, so the rows are uncommitted
   and invisible), and `cron.job_run_details` reports an in-flight pair as
   `succeeded` in about a second. `pg_stat_activity` is the only authority.
+  **And match the recert runner by its own name, not only the pair's (G194).**
+  `pg_stat_activity.query` keeps `track_activity_query_size` (1 kB) of text, and
+  cron 746's command names `ottoq_determinism_pair` at character 1,303, so a
+  pair-name match reads zero while the runner is certifying. Add
+  `OR query ILIKE '%ottoq_recert_runner%'` (its advisory-lock key sits in its
+  first 100 characters); `db/migrations/0462_*.sql`'s P0 is the current form.
+  Without it an apply does not refuse, it queues behind the runner's locks until
+  the client times out.
 - **Snapshot before you replace.** `INSERT INTO ottoq_schema_snapshots ... SELECT
   pg_get_functiondef(p.oid), md5(...)` for every function the file touches,
   before it touches them.

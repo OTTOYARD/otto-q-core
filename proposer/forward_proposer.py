@@ -209,6 +209,14 @@ FREE_STALL_STATUS = "available"
 #: migration's assertion A4 recomputes it independently and refuses to apply if
 #: the two disagree. So it is the door's verdict, not a restatement of it.
 #:
+#: 0498/0499 (G229): the door had a fourth test neither the selector nor this
+#: verdict asked -- ANOTHER vehicle's booking covering the clock, the gate's
+#: calendar lookup. Measured on run 394e1e83: all 3 CP-SAT refusals were on an
+#: L2 whose calendar held a car still on its way. The frame now carries
+#: `calendar_held_by` and folds it into `offerable` (facts_version 4), and the
+#: selector passes such a proposal over, so all three layers ask the same four
+#: questions.
+#:
 #: THE TWO TESTS ARE CONJOINED, NOT SUBSTITUTED, and that is the whole subtlety.
 #: `offerable` does NOT read `stalls.status` -- neither does the selector -- so a
 #: stall in `maintenance` with a free, healthy, unreserved charger is offerable
@@ -301,6 +309,12 @@ def stall_block_reason(stall: dict) -> str | None:
         return "charger_stale"
     if stall.get("reservation_live"):
         return "reserved"
+    #: 0498 (G229), facts_version 4: another vehicle's booking covers the clock,
+    #: which is the gate's last test. Before 0498 the frame's `offerable` did not
+    #: ask it, so CP-SAT planned onto a charger promised to a car still on its way
+    #: and the gate refused the begin_charge.
+    if stall.get("calendar_held_by"):
+        return "calendar_held"
     return "not_offerable"
 
 #: THE PRODUCTION JOIN KEY (finding L-41). `ottoq_vehicle_classes` is keyed by
