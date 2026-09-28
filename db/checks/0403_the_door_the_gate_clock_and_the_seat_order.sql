@@ -2,10 +2,12 @@
 --
 --       Written on 2026-09-27 (CT) for the validation run after 0544 (a car that is not finished cannot be dispatched:
 --       the door refuses, the dispatch ledger rejects) and 0545 (G269: the readiness gate times a hold from the car's
---       return, not from its first hold; G270: a bay seat goes to the most overdue car first). Read-only.
---       The run is __RUN__, busy_day at 8x on 9eab647f's seed, so it opens at the same sim minute (4:41 AM CT) and draws
---       the same world. What differs is the engine: 0544 and 0545 together. 0544 changes nothing a run writes when the
---       deploy plan filters first, so a difference below is 0545's.
+--       return, not from its first hold; G270: a bay seat goes to the most overdue car first; G271: a charger goes to the
+--       car with the highest response ratio, not the lowest charge). Read-only.
+--       The run is 4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c. Cron 773 started it at 04:13 UTC (11:13 PM CT), once all nine
+--       canon columns had passed under 0545 (verdicts 540-548). It is busy_day at 8x on 9eab647f's seed, so it opens at
+--       the same sim minute (4:41 AM CT) and draws the same world. What differs is the engine: 0544 and 0545 together.
+--       0544 changes nothing a run writes when the deploy plan filters first, so a difference below is 0545's.
 --
 --       **9eab647f's side is §0, read before this run purged it** (`ottoq_purge_prior_runs`, class 'engine').
 
@@ -45,10 +47,10 @@
 \echo '=== 0403 §1 — the run and its scorecard ==='
 SELECT r.sim_run_id, r.run_by, r.status, r.random_seed, r.sim_clock_start, r.sim_clock_current, r.tick_count,
        r.started_at, r.ended_at
-  FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '__RUN__';
-SELECT public.ottoq_kpi_five('__RUN__');
-SELECT public.ottoq_kpi_charge_wait('__RUN__');
-SELECT public.ottoq_kpi_supply_gap('__RUN__') - 'by_hour_ct';
+  FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c';
+SELECT public.ottoq_kpi_five('4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c');
+SELECT public.ottoq_kpi_charge_wait('4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c');
+SELECT public.ottoq_kpi_supply_gap('4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c') - 'by_hour_ct';
 -- READ: pending.
 
 -- ══ §2 RULE 9 STILL HOLDS: NO DEPARTURE WITH A SERVICE OPEN OR A CHARGE SHORT ═════════════════════════════════════════
@@ -57,7 +59,7 @@ SELECT public.ottoq_kpi_supply_gap('__RUN__') - 'by_hour_ct';
 
 \echo '=== 0403 §2 — departures, and any that left unfinished ==='
 WITH run AS (
-  SELECT r.sim_run_id AS id, r.sim_clock_start AS t0 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '__RUN__'),
+  SELECT r.sim_run_id AS id, r.sim_clock_start AS t0 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c'),
 dep AS (
   SELECT e.entity_id AS vehicle_id, e.sim_clock_at AS left_at
     FROM public.ottoq_events e, run
@@ -97,7 +99,7 @@ SELECT (SELECT count(*) FROM dv) AS departures,
 SELECT count(*) FILTER (WHERE e.event_type = 'twin.dispatch_refused_unfinished') AS door_refusals,
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed') AS tick_failures,
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed' AND e.payload::text LIKE '%0544 (CLAUDE.md rule 9)%') AS floor_rejections
-  FROM public.ottoq_events e WHERE e.sim_run_id = '__RUN__';
+  FROM public.ottoq_events e WHERE e.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c';
 -- READ: pending. All three must be 0.
 
 -- ══ §4 G269: AN ESCALATION IS A CAR THAT WAITED, NOT ONE THAT WAS SERVED ═══════════════════════════════════════════════
@@ -114,7 +116,7 @@ SELECT v.display_name, e.sim_clock_at AT TIME ZONE 'America/Chicago' AS escalate
            AND s.sim_clock_at > e.sim_clock_at - make_interval(secs => (e.payload->>'held_min')::numeric * 60)
            AND s.sim_clock_at < e.sim_clock_at) AS state_changes_inside_the_hold
   FROM public.ottoq_events e LEFT JOIN public.vehicles v ON v.id = e.entity_id
- WHERE e.sim_run_id = '__RUN__' AND e.event_type = 'twin.deploy_gate_escalated'
+ WHERE e.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c' AND e.event_type = 'twin.deploy_gate_escalated'
  ORDER BY e.sim_clock_at;
 -- READ: pending. state_changes_inside_the_hold must be 0 on every row.
 
@@ -131,13 +133,13 @@ SELECT d.enacted_action->>'purpose' AS purpose,
        count(*) AS seats,
        min((d.context_frame->>'minutes_to_deploy')::int) AS min_mtd, max((d.context_frame->>'minutes_to_deploy')::int) AS max_mtd
   FROM public.ottoq_decisions d
- WHERE d.sim_run_id = '__RUN__' AND d.enacted_action->>'source' = 'needs_card' AND d.outcome_status = 'enacted'
+ WHERE d.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c' AND d.enacted_action->>'source' = 'needs_card' AND d.outcome_status = 'enacted'
  GROUP BY 1, 2 ORDER BY 1, 2;
 -- the longest a car waited at the gate before it was seated or released, by whether it was late when it left the gate
 WITH holds AS (
   SELECT e.entity_id, max((e.payload->'diff'->'config'->'to'->'deploy_gate'->>'held_min')::numeric) AS held
     FROM public.ottoq_events e
-   WHERE e.sim_run_id = '__RUN__' AND e.event_type = 'vehicle.state_changed'
+   WHERE e.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c' AND e.event_type = 'vehicle.state_changed'
      AND e.payload->'diff'->'config'->'to'->'deploy_gate' ? 'held_min'
      AND e.payload->'diff'->'config'->'to'->'deploy_gate'->>'run' = e.sim_run_id::text   -- not a prior run's stamp
    GROUP BY 1)
@@ -153,10 +155,10 @@ SELECT count(*) FILTER (WHERE e.event_type = 'twin.departure_recheck') AS rechec
        count(*) FILTER (WHERE e.event_type = 'twin.deploy_gate_escalated') AS escalated_to_a_person,
        max((e.payload->>'held')::int) FILTER (WHERE e.event_type = 'twin.deploy_gate_summary') AS gate_held_max,
        max((e.payload->>'overflow')::int) FILTER (WHERE e.event_type = 'twin.staging_overflow') AS staging_overflow_max
-  FROM public.ottoq_events e WHERE e.sim_run_id = '__RUN__';
+  FROM public.ottoq_events e WHERE e.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c';
 SELECT (SELECT jsonb_object_agg(to_state, k) FROM (
           SELECT e.payload->'diff'->'current_state'->>'to' AS to_state, count(*) AS k
-            FROM public.ottoq_events e WHERE e.sim_run_id = '__RUN__' AND e.event_type = 'vehicle.state_changed'
+            FROM public.ottoq_events e WHERE e.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c' AND e.event_type = 'vehicle.state_changed'
              AND e.payload->'diff'->'current_state'->>'to' IN ('in_wash_bay', 'in_detail_bay', 'in_service_bay')
            GROUP BY 1) q) AS bay_entries;
 -- READ: pending.
@@ -171,7 +173,7 @@ SELECT (SELECT jsonb_object_agg(to_state, k) FROM (
 
 \echo '=== 0403 §7 — waits on need_charge, by SoC at the start and by how each ended ==='
 WITH run AS (
-  SELECT r.sim_run_id AS id, r.sim_clock_current AS t1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '__RUN__'),
+  SELECT r.sim_run_id AS id, r.sim_clock_current AS t1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c'),
 st AS (
   SELECT e.entity_id AS vehicle_id, e.sim_clock_at AS at, e.event_seq AS seq,
          e.payload->'diff'->'current_state'->>'to' AS to_state,
@@ -207,4 +209,32 @@ SELECT band, how, count(*) AS waits,
        round(percentile_cont(0.95) WITHIN GROUP (ORDER BY wait_min)::numeric, 1) AS p95_min,
        round(max(wait_min)::numeric, 1) AS max_min, min(soc_at_start) AS min_soc, max(soc_at_start) AS max_soc
   FROM w GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ: pending.
+
+-- ══ §8 THE GATE'S FLAG OUTLIVES THE HOLD (0545 §4; G208, G218) ════════════════════════════════════════════════════════
+--
+--   The gate flags a car it has held past its patience (`deploy_gate_stuck`, 45 min) or its hard cap
+--   (`deploy_gate_hard_cap`, 240 min) with `flagged_issue`. Its release drops the `deploy_gate` stamp and keeps the flag,
+--   and only a service-bay seat clears it (0475). Counted here: releases that kept the flag, and whether the car was
+--   later in a service bay. Measured, not fixed: 0545 §4 left it out.
+--   9eab647f (measured 04:12 UTC, before the purge): 8 releases kept the flag, on 7 cars. 7 releases on 6 cars kept
+--   `deploy_gate_stuck`, and 1 of those 6 cars was later in a service bay. 1 release kept `deploy_gate_hard_cap`. Only
+--   4 cars were escalated, and three were held to the teardown (0402 §4), so that release is Tesla-AV-061: G269's
+--   false alarm left carrying the flag.
+
+\echo '=== 0403 §8 — gate releases that kept the flag ==='
+WITH rel AS (
+  SELECT e.entity_id, e.event_seq, e.payload->'diff'->'config'->'to'->>'flagged_issue_type' AS flag_type
+    FROM public.ottoq_events e
+   WHERE e.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c' AND e.event_type = 'vehicle.state_changed'
+     AND e.payload->'diff'->'config'->'from' ? 'deploy_gate'
+     AND NOT (e.payload->'diff'->'config'->'to' ? 'deploy_gate')
+     AND (e.payload->'diff'->'config'->'to'->>'flagged_issue')::boolean)
+SELECT flag_type, count(*) AS releases_keeping_the_flag, count(DISTINCT entity_id) AS cars,
+       count(DISTINCT entity_id) FILTER (WHERE EXISTS (
+         SELECT 1 FROM public.ottoq_events e3
+          WHERE e3.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c' AND e3.entity_id = rel.entity_id
+            AND e3.event_type = 'vehicle.state_changed' AND e3.event_seq > rel.event_seq
+            AND e3.payload->'diff'->'current_state'->>'to' = 'in_service_bay')) AS later_in_service_bay
+  FROM rel GROUP BY flag_type ORDER BY flag_type;
 -- READ: pending.
