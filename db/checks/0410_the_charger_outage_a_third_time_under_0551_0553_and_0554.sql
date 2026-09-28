@@ -104,7 +104,7 @@ SELECT (SELECT count(*) FROM dv) AS departures,
        (SELECT count(*) FROM dv WHERE soc < 99) AS below_99,
        (SELECT min(soc) FROM dv) AS min_soc,
        (SELECT count(DISTINCT (vehicle_id, left_at)) FROM open_at) AS left_with_open_work;
--- READ: pending.
+-- READ (live, 20:06 UTC; sim 11:04 AM): 89 departures, 0 below 99% (min 99), 0 left with open work.
 
 -- ══ §3 THE DOOR AND THE FLOOR (0544): NEITHER SHOULD EVER FIRE ════════════════════════════════════════════════════════
 
@@ -921,7 +921,10 @@ SELECT i.stall_code, to_char(e.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH1
    AND e.payload->'diff' ? 'status' AND e.sim_clock_at >= i.fault_at
  ORDER BY i.stall_code, e.event_seq
  LIMIT 30;
--- READ: pending.
+-- READ (20:06 UTC, 3:06 PM CT; sim 10:59 AM): each injected stall went, at 7:45:05 AM, `occupied` → `available` as its
+--   car was moved to staging, then `available` → `maintenance` in the same instant. All three went `maintenance` →
+--   `available` at 9:46:31 AM, 121.4 minutes after the fault and the first tick past the 120-minute repair, and each
+--   took its next car at 9:47:29. Nothing returned a stall early.
 
 -- ══ §18 G282 RE-MEASURED: GATE STAYS BELOW TARGET THAT REACHED 240 MINUTES, AND AN ESCALATION INSIDE THE STAY ═════════
 --
@@ -1130,6 +1133,7 @@ SELECT s_to AS bay_state, s_from AS came_from, count(*) AS visits,
   FROM cls GROUP BY ROLLUP (1, 2) ORDER BY 1 NULLS LAST, 2 NULLS LAST;
 -- READ (live, 19:19 and 19:26 UTC; sim 4:47 and 5:43 AM): 5 cars in a bay state each time, all 5 standing in a bay that
 --   names them; 0 in a bay state in no bay.
+-- READ (live, 20:06 UTC; sim 11:04 AM): 3 cars in a bay state, all 3 in the bay that names them.
 
 -- ══ §22 G279 UNDER 0551: WHO WENT AHEAD OF A CAR RE-QUEUED BY A FAULT ══════════════════════════════════════════════════
 --
@@ -1166,7 +1170,11 @@ SELECT v.display_name AS car, x.kind, x.soc_at_fault, x.stopped_reason,
        ) AS overtaken_by_later_arrivals
   FROM x JOIN public.vehicles v ON v.id = x.vehicle_id
  ORDER BY x.faulted_at;
--- READ: pending.
+-- READ (live, 20:06 UTC; sim 10:59 AM): 9 faults on cars below 99% (6 the twin's own, 3 injected), and all 9 cars
+--   plugged in again. Later arrivals charged first 12 times in all: 5 ahead of Waymo-AV-004 (injected, 73%, waited
+--   98.5 minutes), 4 ahead of Tesla-AV-042 (L2 station fault at 9:07 AM, 54%, 98.3), 2 ahead of Waymo-AV-033, 1 ahead
+--   of Zoox-AV-080, and none ahead of the other five. Waits after the fault: 1.0 to 98.5 minutes. eff13379, over its
+--   whole day: 179 overtakings over 16 faults, and 6 cars at 40-96% never recharged (§0).
 
 --   §22b, live only (the teardown ends every episode): the banks the cursor reads, `config.charge_wait`, on this run's cars.
 \echo '=== 0410 §22b — live: cars carrying a charge-wait bank for this run ==='
@@ -1196,7 +1204,11 @@ SELECT e.payload->>'reason' AS reason, e.payload->>'at' AS waited_at, count(*) A
   FROM public.ottoq_events e
  WHERE e.sim_run_id = 'ab8075a3-4001-45b5-b9e2-747033ad2273' AND e.event_type = 'twin.deploy_gate_escalated'
  GROUP BY 1, 2 ORDER BY 1, 2;
--- READ: pending.
+-- READ (live, 20:06 UTC; sim 11:03 AM): 21 escalations, every one `waiting_for_a_charger`, held 240.1-240.5 minutes (none
+--   early). 16 were cars at the GATE, all told at 8:35 AM, each waiting since 4:35 at 12-31% (the boot cohort). 5 were
+--   staged: Zoox-004 and Waymo-AV-007 at 8:26, Tesla-AV-057 and Tesla-AV-051 at 8:36, and Tesla-AV-042 at 10:36 (54%,
+--   waiting since its 6:17 arrival and through its 9:07 fault). eff13379 told a person about 7 cars all day, none of
+--   them at the gate.
 
 \echo '=== 0410 §23b — gate stays below target that reached 240 minutes: told in their episode, or not ==='
 WITH run AS MATERIALIZED (SELECT r.sim_run_id AS id, r.sim_clock_start AS t0, r.sim_clock_current AS t1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = 'ab8075a3-4001-45b5-b9e2-747033ad2273'),
@@ -1232,7 +1244,9 @@ cov AS (
 SELECT count(*) AS stays_240_plus_below_target, count(*) FILTER (WHERE told) AS told_in_their_episode,
        count(*) FILTER (WHERE NOT told) AS never_told, round(max(wait_min)::numeric, 1) AS longest_min
   FROM cov;
--- READ: pending.
+-- READ (live, 20:06 UTC; sim 11:03 AM): 81 gate stays began below target and none has yet reached 240 minutes as a
+--   single stay. The 16 gate escalations (§23a) came on the episode clock, a car's whole wait across its moves between
+--   the gate and staging (0551 (b)). A per-stay count cannot see them, which is why §18 reads lower.
 
 -- ══ §24 G283 UNDER 0553: A HOLD FOR A CAR THAT CANNOT COME GIVES WAY ═══════════════════════════════════════════════════
 --
@@ -1254,6 +1268,8 @@ SELECT d.proposed_action->>'stall_type' AS bay, d.proposed_action->>'purpose' AS
 -- READ (live, 19:48 UTC, sim 8:35 AM): 5 seats came straight after a yield, 4 washes and 1 service, all seated
 --   (`enacted_action.yielded_holds`; this query first read `proposed_action`, where the seat does not write it).
 --   Refused so far: 125 wash-bay seats and 45 service-bay seats.
+-- READ (live, 20:06 UTC; sim 11:04 AM): 10 seats straight after a yield, all seated. Needs-card bay seats so far: 52
+--   seated, 170 refused.
 
 \echo '=== 0410 §24b — the yields, from the bay reconciler''s log ==='
 SELECT s.stall_type::text AS bay, r.action, r.reason, r.blocked_by, count(*) AS holds, count(DISTINCT r.vehicle_id) AS cars,
