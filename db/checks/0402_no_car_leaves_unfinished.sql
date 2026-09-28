@@ -179,5 +179,19 @@ SELECT v.display_name, v.current_state, v.config->>'svc_step' AS step, v.current
                AND COALESCE(a->>'status', 'pending') NOT IN ('done', 'cancelled')))
       OR (v.config->>'svc_step' = 'need_deploy'))
  ORDER BY min_in_state DESC;
--- READ: pending. need_deploy cars are the gate's, and it releases, routes or holds them each tick, so they are left
---   out; §4's escalations are the ones it could not finish.
+-- READ: need_deploy cars are the gate's, and it releases, routes or holds them each tick, so they are left out; §4's
+--   escalations are the ones it could not finish.
+--   Early probe 02:23 UTC (9:23 PM CT; sim 5:47 AM CT, tick 111): **empty.** 14 departures, all at 100% with nothing
+--   open; 33 cars on need_charge, every one below its target - 1.
+--   Mid-run probe 02:45 UTC (9:45 PM CT; sim 8:43 AM CT, tick 461): **empty again.** §2 so far: 49 departures, 0 below
+--   99% (lowest 99), 0 with work open. §4 so far: 13 recheck events; 2 cars rerouted, both at the boot tick (91% and
+--   96%, no work open, to need_charge); 13 cars sent back to the gate, 13 distinct, once each, so nothing bounced; 0
+--   escalated to a person. The gate's peak of 32 held was the boot tick. Held at the probe: 4 cars at 100% waiting for
+--   the wash lane (an exterior wash 85 min; deep cleans 97, 36 and 25 min) while it was full: 2 of 2 seats, since its
+--   capacity is LEAST(3 cleaning staff, 2 wash supervisors). The bay admission had seated 17 so far (13 washes, 2 deep
+--   cleans, 1 fault repair, 1 calibration). 24 cars on need_charge (33-98%, the longest 237 min); staging overflow
+--   peaked at 54, against 35 for the whole of c9d14225.
+--   Watch for the end read: (4b) orders across cars by urgency, fits-window, deadline and then SHORTEST job, with no
+--   term for how long a car has waited, so under steady wash demand a 25-minute deep clean can be passed over by
+--   9-minute washes again and again. A car held that way reaches the gate's hard cap at 240 minutes and is escalated
+--   to a person.
