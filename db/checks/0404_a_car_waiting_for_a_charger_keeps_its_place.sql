@@ -360,6 +360,11 @@ s AS (
 SELECT CASE WHEN started_at < timestamptz '2026-09-28 10:00:00+00' THEN 'before 5:00 AM CT' ELSE 'from 5:00 AM CT' END AS started,
        COALESCE(urgency, 'no visit') AS car, count(*) AS sessions, min(soc_start) AS min_soc, max(soc_start) AS max_soc
   FROM s GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ (2026-09-28 06:06 UTC, 1:06 AM CT; tick 46, sim 5:12 AM CT): before 5:00 AM, **32 sessions went to boot cars with
+--   no visit** (at 78-98%) and 8 to immediate dispatches (82-97%); from 5:00 AM, 7 more immediate dispatches (29-97%). On
+--   4acf0b1d, 20 no-visit cars had charged before 5:00 AM and none after. The top-offs now go first on their ratio, which
+--   is what the ratio is for (a short job's ratio climbs fastest); the standard visits at 12-46% had not yet had a
+--   charger. Whether they wait too long is what §7 and the mid-run read answer.
 
 -- ══ §11 THE CHARGERS: HOW BUSY, HOW MANY FAULTED, AND WHAT WAS FREE WHILE CARS WAITED ═══════════════════════════════════
 --
