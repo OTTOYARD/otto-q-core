@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0543 — GENERATED, not a log
+## Index, 0134–0544 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -548,7 +548,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0541](db/migrations/0541_a_car_charging_to_its_target_is_never_a_question.sql) | `20260927230859` | yes — ledger | **The challenger's first question is retired: a car charging to its own target is never a question.** |
 | [0542](db/migrations/0542_a_car_that_owes_its_charge_goes_to_the_charger_and_no_gate_sends_a_car_out_unfinished.sql) | `20260928003702` | yes — ledger | **A car that still owes its charge goes to a charger, not to departure. The readiness gate never sends a car out |
 | [0543](db/migrations/0543_no_car_leaves_the_depot_with_a_service_still_needed.sql) | `20260928013804` | yes — ledger | **No car leaves the depot with a service still needed, ever. A car that is not finished is re-orchestrated, |
+| [0544](db/migrations/0544_a_car_that_is_not_finished_cannot_be_dispatched.sql) | `20260928033602` | yes — ledger | **A car that is not finished cannot be dispatched. The dispatch door refuses it, and the dispatch ledger cannot |
 
-409 migrations indexed.
+410 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
