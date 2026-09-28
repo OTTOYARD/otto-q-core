@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0549 — GENERATED, not a log
+## Index, 0134–0554 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -554,7 +554,12 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0547](db/migrations/0547_a_charger_its_car_has_left_for_a_bay_is_free.sql) | `20260928074913` | yes — ledger | **A charger is free the moment its car has left it for a bay.** (G276, and the writer G121 could not find.) |
 | [0548](db/migrations/0548_a_paired_test_can_keep_a_fast_charger_for_a_car_that_wants_one.sql) | `20260928093601` | yes — ledger | **A paired test can keep a free fast charger for a car that wants one.** (G277; research wing, rule 10.) |
 | [0549](db/migrations/0549_a_car_seated_in_a_bay_early_is_served_now.sql) | `20260928111517` | yes — ledger | **A car seated in a bay before its booking's window is served now, and the bay is free when the work is done.** |
+| [0550](db/migrations/0550_a_charger_fault_from_the_cockpit_stops_the_charge.sql) | `20260928163347` | yes — ledger | **A charger fault injected from the cockpit stops the charge, and only a repair clears a fault.** (G281.) |
+| [0551](db/migrations/0551_a_car_keeps_its_place_in_the_charge_line_through_a_fault.sql) | `20260928180804` | yes — ledger | **A car keeps its place in the charge line through a charger fault and through every move it makes while it |
+| [0552](db/migrations/0552_the_fault_door_waits_for_the_tick_instead_of_deadlocking_with_it.sql) | `20260928170009` | yes — ledger | **The cockpit's charger-fault door waits for the tick instead of deadlocking with it.** (G285) |
+| [0553](db/migrations/0553_a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now.sql) | `PENDING` | no — pending | **A bay held for a car that cannot come in time gives way to a car waiting for it now.** (G283; CLAUDE.md rule 9) |
+| [0554](db/migrations/0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql) | `PENDING` | no — pending | **A car is in a wash, detail or service bay only when it stands in one.** (G286) |
 
-415 migrations indexed.
+420 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
