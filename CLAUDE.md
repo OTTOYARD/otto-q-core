@@ -155,6 +155,106 @@ When information is missing:
      one depot, then find how many vehicles it can stage, sort and orchestrate at once. A
      result from a second site does not advance that and is not evidence about it.
 
+**9. VEHICLE FIRST. A VEHICLE'S NEEDS ARE NEVER SACRIFICED FOR SITE OPTIMIZATION — added 2026-09-27 in Chase's words. It overrides every objective, KPI, dial and experiment in this file.**
+
+   *"Vehicle needs should never be sacrificed for overall orchestration or site optimization.
+   The way to think about this is that if a car or vehicle or asset needs a specific service
+   like cleaning or servicing or washing those should never be superseded just because more
+   cars are coming in or something like that. The vehicle owner or manager, whether it is a
+   private individual or OEM will have strict requirements for vehicle needs and up time
+   agreements per our contract. So we can never say a vehicle doesn't need to reach its
+   maximum charge just so we can move around some vehicles or something like that. So we
+   should never stop a vehicle short of charging unless there's an obvious reason like that
+   charger actually faulted or there's an emergency with the vehicle that requires it to be
+   either taken off-line or immediately routed to a service stall or overnight/longer term
+   staging area. ... This is just common sense from a fleet management perspective. So I
+   shouldn't really have to explain that a vehicle shouldn't be stopped short of its full
+   charge. You should be able to catch these things."*
+
+   - **A vehicle's charge target and its services belong to its owner, by contract.** The
+     depot never lowers a target, ends a charge early, skips, defers or supersedes a required
+     service, or releases a vehicle with open needs to move other vehicles, raise throughput,
+     meet a deploy target or improve a KPI. Queueing is allowed; sacrificing is not.
+   - **The only reasons a charge ends short:** its charger faulted (the car is re-queued to
+     finish), or a vehicle emergency takes it offline or routes it immediately to a service
+     stall or to overnight/long-term staging. A request from the owner (e.g. an OEM asking for
+     an immediate turnaround) is the owner's requirement, not ours, and is honored as asked.
+   - **Site pressure is a capacity finding, never a lever on a vehicle.** When cars wait for
+     chargers, the answers are more capacity, fewer charger faults, freeing a charger the moment
+     its car is done, and better ordering of who is served next. Never shorter charges.
+   - **Every question, finding, experiment and objective is checked against this rule before it
+     is built.** It was missed on 2026-09-27: G257 called charging to target a "taper tax", the
+     challenger's Q1 proposed ending charges early, and two paired experiments tested stopping
+     fast charges at 85% (`08262943`) and 90% at night (`11b546b1`). Both experiments were
+     abandoned the same evening (`outcome = abandoned_vehicle_first`, G265). Do not re-create
+     them in any form.
+   - **100% ACROSS THE BOARD, FOR NOW — Chase, 2026-09-27, 5:00 PM CT:** *"Let's just do 100%
+     across-the-board for now. I'm thinking of the vehicles there. It should just go ahead and be
+     fully charged. We can always change that later on. And ultimately, eventually that can be a
+     per vehicle or per asset setting or pre-established threshold that can be toggled or adjusted
+     from a UI. Meaning: eventually a fleet manager might decide to just cap charging at 90% to get
+     vehicles back out in earning revenue or performing tasks in the field sooner. They could
+     theoretically do that from one of our apps with correct verification and confirmation and then
+     that would permanently save to their vehicle settings, and OTTO – Q would acknowledge that."*
+     Built by `0539`: there is ONE answer to how full a car charges,
+     `public.ottoq_effective_target_soc_at`, the fleet default (100) under the owner's contract
+     ceiling (`max_charge_target_pct`, 100 in all four contracts). No depot ceiling, chemistry
+     default, urgency or top-off lowers it. An immediate dispatch keeps its due time and charges to
+     100 too, unless its owner asks for less. A lower limit is only ever the owner's, set verified
+     and confirmed and read at that one function. The engine never writes one.
+   - **NO CAR LEAVES WITH A SERVICE STILL NEEDED, EVER — Chase, 2026-09-27, 8:00 PM CT:**
+     *"vehicles cannot leave the depot with any remaining service still needed, EVER. Re-optimizations
+     can occur, especially if there is a delay, or flagging, or hardware fault, etc. This is what OTTO-Q
+     should optimize for, and can always use temporary or perimeter parking if needed, while temporary
+     re-orchestration occurs. If there is an immediate option that otto-q identifies for a
+     re-submission, the vehicle can go straight to that next reservation or stall without the temporary
+     staging recommendation. Again, OTTO-Q has to be all seeing and all knowing."*
+     So a service OTTO-Q has found a car to need is required, whatever its urgency. There is no
+     "optional" or "deferrable past departure": a wash on the night rotation, a scheduled deep clean,
+     preventive maintenance, a sensor calibration after a failed clean, a cosmetic repair, remote
+     diagnostics, a pending software update and a started top-off are all finished before the car
+     leaves. A car below its charge target does not leave either, visit or no visit. When a car is
+     not ready it is re-orchestrated, not released: it goes straight to its next charger or bay if
+     one is free, and otherwise to temporary or perimeter parking until one is. This answered the
+     sensor-calibration question put to Chase at 7:45 PM CT. Measured on `c9d14225` before the
+     change: 10 of 90 departures left with optional work open, and 10 boot cars with no visit left
+     below 99%, as low as 80% (FINDINGS G268). Built by `0543`: one departure test at both
+     dispatchers (`public.ottoq_departure_clear`), and a recheck each tick that sends a car staged to
+     leave but unfinished back to its charger or bay.
+
+**10. OTTO-Q DOES NOT EXPERIMENT IN PRODUCTION. HYPOTHESES AND TESTS BELONG TO THE RESEARCH WING, IN THE TWIN — added 2026-09-27 in Chase's words.**
+
+   *"I don't really want large scale testing proposed from OTTO – Q in this manner. It should
+   search for immediate and optimal results for vehicles and depot variables, and then ...
+   overnight it will analyze everything from that day and learn from it. But I don't want it
+   hypothesizing large scale, testing, or anything like that. All of that should be done on our
+   internal side through kind of our research wing and through the twin simulator. So basically
+   I don't want it to do that analysis or testing in actual production once actual vehicle
+   telemetry and real world data is being piped in."*
+
+   - **Production OTTO-Q** decides in real time, and overnight learns from the day's real data:
+     it updates its estimates (how long charges take, when cars return, which chargers fault) and
+     grades its own decisions read-only (the challenger). It never proposes hypotheses, never
+     runs tests, and never changes its own rules or settings.
+   - **The research wing** (us, with the twin) owns hypotheses and paired tests. A result is a
+     recommendation that is reviewed and shipped as a certified change. OTTO-Q never originates an
+     experiment: every one to date (`b66fa99c`, `3a2c5fa1`, `82c5568b`, `143a11c7`, `08262943`,
+     `11b546b1`) was created by engineering, and the "self-directed experiment analyst" is dropped
+     from OTTO-Q's roadmap.
+   - **Before real telemetry flows** (open decisions put to Chase on 2026-09-27): move the test lab
+     out of the production database (a paired test blocks every `pg_cron` job for its duration,
+     G141, which would stall a live engine), and turn automatic dial promotion off so every result
+     is a recommendation (it self-applied once, `energy_reserve_shave`, on 2026-09-26).
+   - **Chase's answer on those three (2026-09-27, 5:00 PM CT):** *"No input on your other three
+     questions. I'm not really concerned with testing through OTTO – Q and the twin. They both serve
+     a purpose. One will be actual production and one is our research fortification and data set or
+     world benchmark for testing against. They should both be leveraged accordingly."* So they were
+     judgment calls, made that evening: (1) the test lab moves to a separate research copy of the
+     database **before real telemetry flows**, not now; the twin stays the research wing's benchmark.
+     (2) Automatic dial promotion is **off** (`0540`): a win is `recommended`, and a person ships it
+     as a certified change. (3) The cockpits' "Learner" card is renamed so that it reads as the
+     research wing's tests in the twin, not as OTTO-Q testing itself.
+
 ---
 
 # PART 2 — THE KERNEL BRIEF
