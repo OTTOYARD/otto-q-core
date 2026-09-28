@@ -3,8 +3,13 @@
 --       Written on 2026-09-27 (CT) around the validation run started after 0543 (applied 20260928013804): no car leaves
 --       the depot with a service still needed, ever (Chase, 8:00 PM CT; CLAUDE.md rule 9; FINDINGS G268). Also the first
 --       operator run under 0542 (G267: a car that owes its charge goes to the charger; the gate never releases an
---       unfinished car). Read-only. Started by one-shot cron 772 once the recert sweep under 0543 had passed:
---       `ottoq_start_busy_run(8, 1, 9055713631887914180)`, busy_day at 8x on c9d14225's seed.
+--       unfinished car). Read-only. Started by one-shot cron 772 once the recert sweep under 0543 had passed (all nine
+--       columns by 01:58 UTC): `ottoq_start_busy_run(8, 1, 9055713631887914180)`, busy_day at 8x on c9d14225's seed.
+--       Run 9eab647f began at 02:15:00 UTC (9:15 PM CT) and was booted by 02:16:11; its sim clock opens at 09:41 UTC
+--       (4:41 AM CT), as c9d14225's did. Cron 772's first four firings returned without starting it: pg_cron fires the
+--       recert runner (cron 746) at second :00 of every minute too, and `ottoq_certification_in_flight` counts that
+--       runner's sub-second idle pass as a rig in flight. A five-second `pg_sleep` before the guard fixed it. A guard of
+--       this kind in any future one-shot must wait out the runner's second.
 --
 --       **Closer to c9d14225 than c9d14225 was to ad106e55, and still not a pair.** Both runs were started with the seed
 --       passed, so both open at the same sim minute (4:41 AM CT) and draw the same world. What differs is the engine:
@@ -13,7 +18,7 @@
 --       **c9d14225's side is §0, read before this run purged it** (`ottoq_purge_prior_runs`, class 'engine'). Re-running
 --       §0 now returns nothing.
 --
---       The run's id is RUN_ID below.
+--       The run's id is 9eab647f-01ae-4c32-92eb-a9803f1397af below.
 
 -- ══ §0 BEFORE: c9d14225 (read 2026-09-28 01:47-01:52 UTC, 8:47-8:52 PM CT, before the purge) ══════════════════════════
 --
@@ -34,11 +39,11 @@
 \echo '=== 0402 §1 — the run and its scorecard, beside c9d14225 (0401 §1''s READ) ==='
 SELECT r.sim_run_id, r.run_by, r.status, r.random_seed, r.sim_clock_start, r.sim_clock_current, r.tick_count,
        r.started_at, r.ended_at
-  FROM public.ottoq_sim_runs r WHERE r.sim_run_id = 'RUN_ID';
-SELECT public.ottoq_kpi_five('RUN_ID');
-SELECT public.ottoq_kpi_charge_wait('RUN_ID');
-SELECT public.ottoq_kpi_supply_gap('RUN_ID') - 'by_hour_ct';
-SELECT sim_run_id, metrics FROM public.ottoq_run_archives WHERE sim_run_id = 'RUN_ID';
+  FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af';
+SELECT public.ottoq_kpi_five('9eab647f-01ae-4c32-92eb-a9803f1397af');
+SELECT public.ottoq_kpi_charge_wait('9eab647f-01ae-4c32-92eb-a9803f1397af');
+SELECT public.ottoq_kpi_supply_gap('9eab647f-01ae-4c32-92eb-a9803f1397af') - 'by_hour_ct';
+SELECT sim_run_id, metrics FROM public.ottoq_run_archives WHERE sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af';
 -- READ: pending.
 
 -- ══ §2 THE RULE: NO DEPARTURE WITH A SERVICE OPEN OR A CHARGE SHORT ═════════════════════════════════════════════════
@@ -48,7 +53,7 @@ SELECT sim_run_id, metrics FROM public.ottoq_run_archives WHERE sim_run_id = 'RU
 
 \echo '=== 0402 §2 — departures, and any that left unfinished ==='
 WITH run AS (
-  SELECT r.sim_run_id AS id, r.sim_clock_start AS t0 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = 'RUN_ID'),
+  SELECT r.sim_run_id AS id, r.sim_clock_start AS t0 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af'),
 dep AS (
   SELECT e.entity_id AS vehicle_id, e.sim_clock_at AS left_at, e.payload->'diff'->'current_state'->>'from' AS from_state
     FROM public.ottoq_events e, run
@@ -91,7 +96,7 @@ SELECT a->>'svc' AS svc, COALESCE((a->>'must_do')::boolean, false) AS must_do, c
        count(*) FILTER (WHERE COALESCE(a->>'status', 'pending') NOT IN ('done', 'cancelled')) AS open,
        count(*) FILTER (WHERE (a->>'no_executor')::boolean) AS no_executor
   FROM public.ottoq_visit_needs vn CROSS JOIN LATERAL jsonb_array_elements(vn.atoms) a
- WHERE vn.sim_run_id = 'RUN_ID'
+ WHERE vn.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af'
  GROUP BY 1, 2 ORDER BY 1, 2;
 -- READ: pending. Every row must read must_do = true, and no_executor must be 0.
 
@@ -105,20 +110,20 @@ SELECT count(*) FILTER (WHERE e.event_type = 'twin.departure_recheck') AS rechec
        max((e.payload->>'held')::int) FILTER (WHERE e.event_type = 'twin.deploy_gate_summary') AS gate_held_max,
        max((e.payload->>'overflow')::int) FILTER (WHERE e.event_type = 'twin.staging_overflow') AS staging_overflow_max,
        count(*) FILTER (WHERE e.event_type = 'twin.deferred_service_started') AS overnight_deferred_started
-  FROM public.ottoq_events e WHERE e.sim_run_id = 'RUN_ID';
+  FROM public.ottoq_events e WHERE e.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af';
 SELECT c->>'remedy' AS remedy, count(*) AS cars, min((c->>'soc')::numeric) AS min_soc,
        (SELECT jsonb_object_agg(s, k) FROM (SELECT s, count(*) AS k
           FROM public.ottoq_events e2 CROSS JOIN LATERAL jsonb_array_elements(e2.payload->'cars') c2
           CROSS JOIN LATERAL jsonb_array_elements_text(c2->'open') s
-         WHERE e2.sim_run_id = 'RUN_ID' AND e2.event_type = 'twin.departure_recheck' AND c2->>'remedy' = c->>'remedy'
+         WHERE e2.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af' AND e2.event_type = 'twin.departure_recheck' AND c2->>'remedy' = c->>'remedy'
          GROUP BY s) q) AS open_services
   FROM public.ottoq_events e CROSS JOIN LATERAL jsonb_array_elements(e.payload->'cars') c
- WHERE e.sim_run_id = 'RUN_ID' AND e.event_type = 'twin.departure_recheck'
+ WHERE e.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af' AND e.event_type = 'twin.departure_recheck'
  GROUP BY 1 ORDER BY 1;
 SELECT e.entity_id AS vehicle_id, e.sim_clock_at AT TIME ZONE 'America/Chicago' AS escalated_ct,
        e.payload->>'held_min' AS held_min, e.payload->>'remedy' AS remedy, e.payload->'missing' AS missing
   FROM public.ottoq_events e
- WHERE e.sim_run_id = 'RUN_ID' AND e.event_type = 'twin.deploy_gate_escalated' ORDER BY e.sim_clock_at;
+ WHERE e.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af' AND e.event_type = 'twin.deploy_gate_escalated' ORDER BY e.sim_clock_at;
 -- READ: pending.
 
 -- ══ §5 WHAT HOLDING COSTS, AND THE BAYS IT LOADS ══════════════════════════════════════════════════════════════════════
@@ -126,24 +131,24 @@ SELECT e.entity_id AS vehicle_id, e.sim_clock_at AT TIME ZONE 'America/Chicago' 
 \echo '=== 0402 §5 — bay entries, needs-card admissions, and cars still in the depot at the end with work open ==='
 SELECT (SELECT jsonb_object_agg(to_state, k) FROM (
           SELECT e.payload->'diff'->'current_state'->>'to' AS to_state, count(*) AS k
-            FROM public.ottoq_events e WHERE e.sim_run_id = 'RUN_ID' AND e.event_type = 'vehicle.state_changed'
+            FROM public.ottoq_events e WHERE e.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af' AND e.event_type = 'vehicle.state_changed'
              AND e.payload->'diff'->'current_state'->>'to' IN ('in_wash_bay', 'in_detail_bay', 'in_service_bay')
            GROUP BY 1) q) AS bay_entries,
        (SELECT count(*) FROM public.ottoq_decisions d
-         WHERE d.sim_run_id = 'RUN_ID' AND d.enacted_action->>'source' = 'needs_card' AND d.outcome_status = 'enacted')
+         WHERE d.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af' AND d.enacted_action->>'source' = 'needs_card' AND d.outcome_status = 'enacted')
          AS needs_card_bay_admissions;
 -- the cars' last state in the signed stream (the teardown resets vehicles, so read the stream, not the table)
 WITH last AS (
   SELECT DISTINCT ON (e.entity_id) e.entity_id AS vehicle_id, e.payload->'diff'->'current_state'->>'to' AS last_state,
          e.sim_clock_at AS since
     FROM public.ottoq_events e
-   WHERE e.sim_run_id = 'RUN_ID' AND e.event_type = 'vehicle.state_changed'
+   WHERE e.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af' AND e.event_type = 'vehicle.state_changed'
      AND e.payload->'diff' ? 'current_state'
      AND e.payload->'diff'->'current_state'->>'to' <> 'offline'
    ORDER BY e.entity_id, e.sim_clock_at DESC)
 SELECT l.last_state, count(*) AS cars,
        round(avg(extract(epoch FROM (r.sim_clock_current - l.since)) / 60.0)) AS mean_min_in_state
-  FROM last l, public.ottoq_sim_runs r WHERE r.sim_run_id = 'RUN_ID'
+  FROM last l, public.ottoq_sim_runs r WHERE r.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af'
  GROUP BY 1 ORDER BY 2 DESC;
 -- READ: pending.
 
@@ -161,7 +166,7 @@ SELECT v.display_name, v.current_state, v.config->>'svc_step' AS step, v.current
            AND COALESCE(a->>'status', 'pending') NOT IN ('done', 'cancelled')) AS open_svcs,
        round(extract(epoch FROM (r.sim_clock_current - v.last_state_change)) / 60.0) AS min_in_state
   FROM public.vehicles v, public.ottoq_sim_runs r
- WHERE r.sim_run_id = 'RUN_ID' AND r.status = 'running'
+ WHERE r.sim_run_id = '9eab647f-01ae-4c32-92eb-a9803f1397af' AND r.status = 'running'
    AND v.home_depot_id = '11111111-1111-1111-1111-111111111111' AND v.category = 'autonomous'
    AND v.current_state = 'staged_awaiting_service'
    AND NOT (
