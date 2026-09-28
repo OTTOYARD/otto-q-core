@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0538 — GENERATED, not a log
+## Index, 0134–0549 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -543,7 +543,18 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0536](db/migrations/0536_the_cockpits_see_what_the_brain_questions_and_what_it_learns.sql) | `20260927180246` | yes — ledger | **The second loop, made visible. The challenger's questions and grades, and the learner's experiments and |
 | [0537](db/migrations/0537_a_question_is_one_the_next_scan_still_sees.sql) | `20260927194349` | yes — ledger | **The cockpits show a challenger question once a second scan still sees it. A sighting the next scan no longer |
 | [0538](db/migrations/0538_a_challenger_grade_says_what_it_measures_and_what_tests_its_lever.sql) | `20260927210230` | yes — ledger | **Each challenger question says what its grade measures, and carries the paired tests of its lever with their |
+| [0539](db/migrations/0539_a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it.sql) | `20260927223621` | yes — ledger | **A car charges to full. How full is its owner's answer, and nothing the depot decides lowers it.** |
+| [0540](db/migrations/0540_every_result_the_learner_reaches_is_a_recommendation_a_person_ships.sql) | `20260927230739` | yes — ledger | **A dial experiment's win is a recommendation a person reviews and ships. The engine never applies it itself.** |
+| [0541](db/migrations/0541_a_car_charging_to_its_target_is_never_a_question.sql) | `20260927230859` | yes — ledger | **The challenger's first question is retired: a car charging to its own target is never a question.** |
+| [0542](db/migrations/0542_a_car_that_owes_its_charge_goes_to_the_charger_and_no_gate_sends_a_car_out_unfinished.sql) | `20260928003702` | yes — ledger | **A car that still owes its charge goes to a charger, not to departure. The readiness gate never sends a car out |
+| [0543](db/migrations/0543_no_car_leaves_the_depot_with_a_service_still_needed.sql) | `20260928013804` | yes — ledger | **No car leaves the depot with a service still needed, ever. A car that is not finished is re-orchestrated, |
+| [0544](db/migrations/0544_a_car_that_is_not_finished_cannot_be_dispatched.sql) | `20260928033602` | yes — ledger | **A car that is not finished cannot be dispatched. The dispatch door refuses it, and the dispatch ledger cannot |
+| [0545](db/migrations/0545_no_queue_starves_a_car_that_cannot_leave_until_it_is_finished.sql) | `20260928034458` | yes — ledger | **No queue starves a car that cannot leave until it is finished. The readiness gate times a car only while it |
+| [0546](db/migrations/0546_a_car_waiting_for_a_charger_keeps_its_place_in_line.sql) | `20260928053318` | yes — ledger | **A car waiting for a charger keeps its place in line, a car with no visit is not sent to the back of it, and a |
+| [0547](db/migrations/0547_a_charger_its_car_has_left_for_a_bay_is_free.sql) | `20260928074913` | yes — ledger | **A charger is free the moment its car has left it for a bay.** (G276, and the writer G121 could not find.) |
+| [0548](db/migrations/0548_a_paired_test_can_keep_a_fast_charger_for_a_car_that_wants_one.sql) | `20260928093601` | yes — ledger | **A paired test can keep a free fast charger for a car that wants one.** (G277; research wing, rule 10.) |
+| [0549](db/migrations/0549_a_car_seated_in_a_bay_early_is_served_now.sql) | `20260928111517` | yes — ledger | **A car seated in a bay before its booking's window is served now, and the bay is free when the work is done.** |
 
-404 migrations indexed.
+415 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
