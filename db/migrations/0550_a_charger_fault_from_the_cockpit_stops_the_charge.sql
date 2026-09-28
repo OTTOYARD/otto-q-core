@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260928163347
 -- migration-name:    a_charger_fault_from_the_cockpit_stops_the_charge
 --
 -- 0550  **A charger fault injected from the cockpit stops the charge, and only a repair clears a fault.** (G281.)

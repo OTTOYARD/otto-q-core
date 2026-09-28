@@ -554,7 +554,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0547](db/migrations/0547_a_charger_its_car_has_left_for_a_bay_is_free.sql) | `20260928074913` | yes — ledger | **A charger is free the moment its car has left it for a bay.** (G276, and the writer G121 could not find.) |
 | [0548](db/migrations/0548_a_paired_test_can_keep_a_fast_charger_for_a_car_that_wants_one.sql) | `20260928093601` | yes — ledger | **A paired test can keep a free fast charger for a car that wants one.** (G277; research wing, rule 10.) |
 | [0549](db/migrations/0549_a_car_seated_in_a_bay_early_is_served_now.sql) | `20260928111517` | yes — ledger | **A car seated in a bay before its booking's window is served now, and the bay is free when the work is done.** |
-| [0550](db/migrations/0550_a_charger_fault_from_the_cockpit_stops_the_charge.sql) | `PENDING` | no — pending | **A charger fault injected from the cockpit stops the charge, and only a repair clears a fault.** (G281.) |
+| [0550](db/migrations/0550_a_charger_fault_from_the_cockpit_stops_the_charge.sql) | `20260928163347` | yes — ledger | **A charger fault injected from the cockpit stops the charge, and only a repair clears a fault.** (G281.) |
 
 416 migrations indexed.
 

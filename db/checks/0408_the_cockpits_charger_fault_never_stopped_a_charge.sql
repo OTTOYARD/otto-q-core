@@ -1071,3 +1071,27 @@ SELECT w.car, round((extract(epoch FROM (w.w1 - w.w0))/60)::numeric) AS wait_min
 --   to measure. The cause is not established here. 0405bf42, the same seed, held no car at the cap for a deep clean, so this
 --   is sensitive to the day's timing rather than built into the seed. Rule 9 held: neither car left before its deep clean,
 --   and each was escalated to a person at 240 minutes.
+
+\echo '=== 0408 §19b — the wash bays'' calendar in the same windows: bookings used, released unused and superseded ==='
+WITH bays AS (SELECT id FROM public.stalls WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND stall_type::text = 'wash_bay'),
+w AS (SELECT * FROM (VALUES ('Tesla-RT-002', timestamptz '2026-09-28 09:54:00+00', timestamptz '2026-09-28 15:24:00+00'),
+                            ('Waymo-AV-014', timestamptz '2026-09-28 12:14:00+00', timestamptz '2026-09-28 16:24:00+00')) x(car, w0, w1)),
+b AS (
+  SELECT b.booking_id, b.purpose, b.state, b.during
+    FROM public.ottoq_stall_bookings b
+   WHERE b.sim_run_id = 'ca448d95-6526-40b6-b36e-a5e02273fff3' AND b.stall_id IN (SELECT id FROM bays))
+SELECT w.car, b.state, b.purpose, count(*) AS bookings,
+       round((sum(extract(epoch FROM (LEAST(upper(b.during), w.w1) - GREATEST(lower(b.during), w.w0)))) / 60)::numeric, 1) AS booked_min_in_window
+  FROM w JOIN b ON b.during && tstzrange(w.w0, w.w1)
+ GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
+-- READ (16:36 UTC, after the run): in Tesla-RT-002's window (990 bay-minutes) the wash bays' calendar carried 35 bookings
+--   that were used (detail 12 and wash 23, 448.3 minutes), 15 released unused (detail 6 and wash 9, 224.0) and 9 superseded
+--   (89.0). In Waymo-AV-014's window (750): 22 used (320.6), 16 released unused (211.9), 5 superseded (67.0). So about a third
+--   of the bays' time was held on the calendar by reservations that never became a service. A car seated for a deep clean
+--   needs 25 free minutes on the calendar, not only an empty bay, which is the likely mechanism: the hypothesis for G283,
+--   not yet proven. The seat's own decisions would prove it, and they are purged with this run when the next one starts.
+-- READ (16:38 UTC, the decision ledger, before the next run purges it): the needs-card seat asked for Tesla-RT-002's deep
+--   clean 77 times from 5:24 AM to 10:10 AM CT, and for Waymo-AV-014's 69 times from 7:42 AM to 11:22 AM CT. Every one was
+--   `noop_no_candidate`: no wash bay passed the seat's gates. The first that found one was enacted at 10:23 AM and 11:23 AM.
+--   The frame at 7:06 AM for Tesla-RT-002: `fits_window` false, `minutes_to_deploy` −108 (already late), urgency `due`, and
+--   6 cars waiting fresh in the detail lane. The frame does not say which gate refused each bay, so the cause stays open.
