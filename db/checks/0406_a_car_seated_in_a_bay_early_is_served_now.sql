@@ -676,3 +676,67 @@ SELECT purpose, count(*) AS entries,
 --   detail 8, booked 25, in the bay p50 25.3 and max 26.2; service 4, booked p50 42.5 and max 45, in the bay max 45.3.
 --   **No booking longer than its service and nobody stayed past a booking.** G278 is fixed (921e349c: wash max 232.0 in
 --   the bay, detail max 182.2, a stretched detail booking of 52.3).
+
+-- ══ §14 G195 RE-MEASURED: PARKING HOLDS THAT OUTLIVE THEIR CAR, AND WHETHER STAGING EVER BINDS ═══════════════════════
+--
+--   G195's open half is the parking holds (`temp_hold`, `perimeter_hold`) that stay on the calendar after their car has
+--   left the stall; its remedy, the departure sweep (`space_departure_release_enabled`), is off. It costs nothing while
+--   staging has room, so §14a counts the leak (0372 §2(c)'s query) and §14b whether staging ever came near full, every
+--   ten sim-minutes, from the calendar: stalls with a live booking, and among them stalls whose booked car had left.
+
+\echo '=== 0406 §14a — parking holds that outlived their car, over the whole run (0372 §2(c)) ==='
+WITH r AS (SELECT sim_run_id AS run, sim_clock_current AS t FROM public.ottoq_sim_runs WHERE sim_run_id = 'ae0597b7-439c-46db-9e8e-8b5fa241629c'),
+h AS (
+  SELECT b.*, (date_trunc('day', lower(b.during)) + (substring(b.why from '\d\d:\d\d-(\d\d:\d\d)'))::time) AS booked_end
+    FROM public.ottoq_stall_bookings b JOIN r ON b.sim_run_id = r.run
+   WHERE b.purpose IN ('temp_hold','perimeter_hold')),
+x AS (
+  SELECT h.*, (upper(h.during) > h.booked_end + interval '1 minute') AS renewed,
+         (SELECT min(e.sim_clock_at) FROM public.ottoq_events e, r
+           WHERE e.sim_run_id = r.run AND e.entity_id = h.vehicle_id AND e.event_type = 'vehicle.state_changed'
+             AND e.payload->'diff'->'current_stall_id'->>'from' = h.stall_id::text
+             AND e.sim_clock_at > lower(h.during)) AS left_at
+    FROM h),
+y AS (
+  SELECT x.*, EXTRACT(epoch FROM LEAST(upper(during), COALESCE(released_at, 'infinity'::timestamptz), (SELECT t FROM r))
+                                 - left_at) / 60 AS m
+    FROM x WHERE left_at < upper(during) AND left_at < COALESCE(released_at, 'infinity'::timestamptz))
+SELECT x.purpose, x.renewed, count(*) AS holds,
+       (SELECT count(*) FROM y WHERE y.purpose = x.purpose AND y.renewed IS NOT DISTINCT FROM x.renewed) AS outlived_their_car,
+       (SELECT round(sum(m)::numeric) FROM y WHERE y.purpose = x.purpose AND y.renewed IS NOT DISTINCT FROM x.renewed) AS stall_min_after_car_left,
+       (SELECT round((percentile_cont(0.5) WITHIN GROUP (ORDER BY m))::numeric, 1) FROM y
+         WHERE y.purpose = x.purpose AND y.renewed IS NOT DISTINCT FROM x.renewed) AS p50_min,
+       (SELECT round(max(m)::numeric, 1) FROM y WHERE y.purpose = x.purpose AND y.renewed IS NOT DISTINCT FROM x.renewed) AS max_min
+  FROM x GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ (end, 13:26 UTC, 8:26 AM CT): perimeter_hold as booked 11 holds, 10 outlived their car, 843 stall-minutes, p50
+--   96.8, max 119.5; perimeter_hold renewed 6, 3, 23; temp_hold as booked 125, 112, 1,759, p50 14.1, max 69.4; temp_hold
+--   renewed 187, 114, 887, p50 7.2, max 14.5. About 3,512 stall-minutes in all (b0fdc92b under 0500: 2,876).
+
+\echo '=== 0406 §14b — staging stalls on the calendar every ten sim-minutes, and how many of them held a car that had left ==='
+WITH r AS (SELECT sim_run_id AS run, sim_clock_start AS t0, sim_clock_current AS t1 FROM public.ottoq_sim_runs WHERE sim_run_id = 'ae0597b7-439c-46db-9e8e-8b5fa241629c'),
+stg AS (SELECT id FROM public.stalls WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND stall_type::text = 'staging'),
+b AS (
+  SELECT b.booking_id, b.stall_id, b.vehicle_id, b.purpose, b.state, lower(b.during) AS lo,
+         LEAST(upper(b.during), COALESCE(b.released_at, 'infinity'::timestamptz)) AS hi
+    FROM public.ottoq_stall_bookings b JOIN r ON b.sim_run_id = r.run
+   WHERE b.stall_id IN (SELECT id FROM stg) AND b.state IN ('held', 'active', 'done', 'interrupted')),
+bl AS (
+  SELECT b.*,
+         (SELECT min(e.sim_clock_at) FROM public.ottoq_events e, r
+           WHERE e.sim_run_id = r.run AND e.entity_id = b.vehicle_id AND e.event_type = 'vehicle.state_changed'
+             AND e.payload->'diff'->'current_stall_id'->>'from' = b.stall_id::text
+             AND e.sim_clock_at > b.lo) AS left_at
+    FROM b),
+t AS (SELECT generate_series((SELECT t0 FROM r), (SELECT t1 FROM r), interval '10 minutes') AS at),
+c AS (
+  SELECT t.at,
+         count(DISTINCT bl.stall_id) FILTER (WHERE bl.lo <= t.at AND bl.hi > t.at) AS stalls_on_calendar,
+         count(DISTINCT bl.stall_id) FILTER (WHERE bl.lo <= t.at AND bl.hi > t.at AND bl.left_at IS NOT NULL AND bl.left_at <= t.at) AS leaked
+    FROM t CROSS JOIN bl GROUP BY t.at)
+SELECT (SELECT count(*) FROM stg) AS staging_stalls, max(stalls_on_calendar) AS peak_on_calendar,
+       round(avg(stalls_on_calendar), 1) AS mean_on_calendar, max(leaked) AS peak_leaked, round(avg(leaked), 1) AS mean_leaked
+  FROM c;
+-- READ (end, 13:27 UTC): of 113 staging stalls, the calendar held at most 62 at once (5:21 AM sim), 33.6 on average;
+--   stalls held by a car that had left, at most 12 at once (6:01 AM), 3.8 on average. **Staging never came near full,
+--   so G195's open half stays latent: calendar hygiene, not a capacity cost.** The binding constraint on this run is the
+--   charger bank (§1, §7). The departure sweep stays off until a paired test shows it frees a stall someone was waiting for.
