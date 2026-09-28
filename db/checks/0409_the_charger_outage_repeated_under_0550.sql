@@ -1108,3 +1108,57 @@ SELECT d.jobid, d.start_time, d.status, round(extract(epoch FROM (d.end_time - d
 --   its first attempt, at 17:01:00 UTC (1.68 s, the longer time being the wait for the tick in flight). One success is
 --   not proof of the absence of a race. The proof is the lock order, which 0552's V1 asserts on both doors against the
 --   tick's own first statement (P2).
+
+-- ══ §21 G286: BAY WORK DONE IN NO BAY ══════════════════════════════════════════════════════════════════════════════════
+--
+--   Found reading 0553's probe: three cars that had left the depot still held wash-bay bookings, each for a bay leg the
+--   itinerary had already closed as done. Two of them had done their deep clean with no bay. The twin's service flow
+--   (`twin.ottoq_sim_advance_service_flow`) admits cars to its wash lane (STEP 2, from `charge_complete_holding`) and
+--   its service lane (from `staged_awaiting_service` / need_service) by staff count alone: LEAST(cleaning_staff,
+--   wash_supervisor) and service_staff, less the cars already in a bay STATE. It seats a car in a bay only when the car
+--   holds a booking whose window contains the clock and the bay is free. Otherwise it still sets the car to
+--   `in_wash_bay`, `in_detail_bay` or `in_service_bay`, with `service_ends_at`, and STEP 1 credits the bay's work when
+--   the timer ends. The car stands on its staging stall, or on no stall once the charge arm has let go of it.
+--   Each bay visit (a vehicle state segment in a bay state) is classed by both pointers: the car's own
+--   `current_stall_id` while in that state, and any bay's `current_vehicle_id` naming it in that interval.
+
+\echo '=== 0409 §21 — each bay visit: in a bay, or in no bay, by where the car came from ==='
+WITH run AS MATERIALIZED (SELECT sim_run_id AS id, sim_clock_current AS t1 FROM public.ottoq_sim_runs WHERE sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727'),
+bays AS MATERIALIZED (SELECT id, stall_type::text AS stype FROM public.stalls
+                       WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND stall_type::text IN ('wash_bay','service_bay','detail_bay')),
+st AS MATERIALIZED (
+  SELECT e.entity_id AS vid, e.sim_clock_at AS at, e.event_seq AS seq,
+         e.payload->'diff'->'current_state'->>'from' AS s_from, e.payload->'diff'->'current_state'->>'to' AS s_to
+    FROM public.ottoq_events e, run
+   WHERE e.sim_run_id = run.id AND e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state'),
+seg AS MATERIALIZED (
+  SELECT vid, s_from, s_to, at AS began, seq AS seq0,
+         COALESCE(lead(at) OVER w, (SELECT t1 FROM run)) AS ended, lead(seq) OVER w AS seq1
+    FROM st WINDOW w AS (PARTITION BY vid ORDER BY seq)),
+-- the car's own pointer: its value when the segment began, and every value it took inside it
+vptr AS MATERIALIZED (
+  SELECT e.entity_id AS vid, e.event_seq AS seq, NULLIF(e.payload->'diff'->'current_stall_id'->>'to', '')::uuid AS stall_to
+    FROM public.ottoq_events e, run
+   WHERE e.sim_run_id = run.id AND e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_stall_id'),
+-- each bay's pointer, as intervals
+sptr AS MATERIALIZED (
+  SELECT e.entity_id AS stall_id, e.sim_clock_at AS at, NULLIF(e.payload->'diff'->'current_vehicle_id'->>'to', '')::uuid AS vid,
+         lead(e.sim_clock_at) OVER (PARTITION BY e.entity_id ORDER BY e.event_seq) AS until
+    FROM public.ottoq_events e, run
+   WHERE e.sim_run_id = run.id AND e.event_type = 'stall.state_changed' AND e.payload->'diff' ? 'current_vehicle_id'
+     AND e.entity_id IN (SELECT id FROM bays)),
+cls AS (
+  SELECT g.*,
+         EXISTS (SELECT 1 FROM (
+                   SELECT p.stall_to FROM vptr p WHERE p.vid = g.vid AND p.seq > g.seq0 AND p.seq < COALESCE(g.seq1, 9e18)
+                   UNION ALL
+                   SELECT (SELECT p2.stall_to FROM vptr p2 WHERE p2.vid = g.vid AND p2.seq <= g.seq0 ORDER BY p2.seq DESC LIMIT 1)) x
+                  WHERE x.stall_to IN (SELECT id FROM bays))
+         OR EXISTS (SELECT 1 FROM sptr s WHERE s.vid = g.vid AND s.at < g.ended AND COALESCE(s.until, (SELECT t1 FROM run)) > g.began) AS in_a_bay
+    FROM seg g WHERE g.s_to IN ('in_wash_bay', 'in_detail_bay', 'in_service_bay'))
+SELECT s_to AS bay_state, s_from AS came_from, count(*) AS visits,
+       count(*) FILTER (WHERE in_a_bay) AS in_a_bay, count(*) FILTER (WHERE NOT in_a_bay) AS in_no_bay,
+       round((sum(extract(epoch FROM (ended - began))) FILTER (WHERE in_a_bay) / 60)::numeric) AS bay_minutes,
+       round((sum(extract(epoch FROM (ended - began))) FILTER (WHERE NOT in_a_bay) / 60)::numeric) AS no_bay_minutes
+  FROM cls GROUP BY ROLLUP (1, 2) ORDER BY 1 NULLS LAST, 2 NULLS LAST;
+-- READ: pending.

@@ -19,6 +19,12 @@
 --       Zoox-AV-094's wash hold, 8:55-9:05, sat in the window until 8:53:01, when it was deferred to 10:58; Waymo-004's
 --       deep-clean hold, 8:58-9:23, until 8:58:21, when it was deferred to 10:28.
 --   Waymo-AV-014, at 100%, was refused every minute from 8:50 to 8:57 AM and seated at 8:58:21, the tick after a release.
+--   A third kind was found reading this file's probe at sim 10:58 AM: holds whose bay leg the itinerary had already closed
+--   as done. Waymo-AV-003 (wash, 11:16), Tesla-AV-060 (deep clean, 11:33) and Tesla-RT-001 (deep clean, 1:02 PM) each
+--   held a wash bay for work already done, and each had left or was about to leave. Two of the three had done their deep
+--   clean in no bay at all (G286, 0409 §21), so nothing ever took up or released their hold. A car that has left is
+--   released by the no-show grace only after its window begins; a car still on site whose work is done is not released at
+--   all until then.
 --   Rule 9: every service OTTO-Q finds a car to need is done before it leaves, so a car held for a deep clean is held at
 --   the gate until a bay takes it, and each refusal is time it could have been working.
 --
@@ -34,7 +40,8 @@
 --       that is physically free (no car, no live reservation by another car, no real occupancy in the window) and blocked
 --       only by held bookings of other cars that cannot be there before `until`. It moves each of those holds to its car's
 --       ETA, and never earlier than `until`; a hold for a car that has left the site is released, as the reconciler
---       releases it. A move that collides walks forward in 10-minute steps, up to 240 minutes, on the same bay; a hold with
+--       releases it, and so is a hold whose itinerary leg is already closed (`done` or `skipped`), wherever its car is,
+--       because the work it was booked for is finished (`replanned_leg_closed`). A move that collides walks forward in 10-minute steps, up to 240 minutes, on the same bay; a hold with
 --       no room is released (`replanned_no_window`, the reconciler's own reason). Each move is logged in the reconciler's
 --       table (`deferred`, reason `yielded_to_a_car_waiting_now`), and its itinerary leg is re-timed. It returns the
 --       number of holds moved or released, 0 when no bay can be freed, and never raises. The dial
@@ -53,7 +60,8 @@
 --
 --   - The reconciler's own look-ahead stays the taxi time. A wider one would move holds that no waiting car needs moved,
 --     and each move counts toward its defer cap.
---   - The service flow's wash lane (cars coming off a charger) takes its own path, unchanged.
+--   - The service flow's wash and service lanes take their own path, unchanged. They seat a car in a bay only when it
+--     holds a booking due now, and otherwise set it to a bay state in no bay (G286). That is its own file.
 --   - Holds booked hours ahead are still booked hours ahead. This file stops them blocking a car that is here.
 
 BEGIN;
@@ -188,18 +196,24 @@ BEGIN
     -- The bay can be freed only if every hold in the window is another car's that cannot be here before p_until.
     v_ok := true;
     FOR v_h IN
-      SELECT b.vehicle_id FROM public.ottoq_stall_bookings b
+      SELECT b.vehicle_id,
+             EXISTS (SELECT 1 FROM public.ottoq_itinerary_legs l
+                      WHERE l.leg_id = b.leg_id AND l.status IN ('done', 'skipped')) AS leg_closed
+        FROM public.ottoq_stall_bookings b
        WHERE b.stall_id = v_bay.id AND b.sim_run_id = p_sim_run_id AND b.state = 'held'
          AND b.during && tstzrange(p_from, p_until, '[)')
     LOOP
       IF v_h.vehicle_id IS NOT DISTINCT FROM p_for_vehicle THEN v_ok := false; EXIT; END IF;
+      CONTINUE WHEN v_h.leg_closed;   -- the work this hold was booked for is done
       v_eta := ottoq.ottoq_bay_hold_car_eta(p_sim_run_id, v_h.vehicle_id, p_from, v_taxi);
       IF v_eta IS NULL OR v_eta < p_until THEN v_ok := false; EXIT; END IF;
     END LOOP;
     CONTINUE WHEN NOT v_ok;
 
     FOR v_h IN
-      SELECT b.booking_id, b.vehicle_id, b.leg_id, b.purpose, lower(b.during) AS lo, upper(b.during) AS hi
+      SELECT b.booking_id, b.vehicle_id, b.leg_id, b.purpose, lower(b.during) AS lo, upper(b.during) AS hi,
+             (SELECT l.status FROM public.ottoq_itinerary_legs l
+               WHERE l.leg_id = b.leg_id AND l.status IN ('done', 'skipped')) AS leg_closed_as
         FROM public.ottoq_stall_bookings b
        WHERE b.stall_id = v_bay.id AND b.sim_run_id = p_sim_run_id AND b.state = 'held'
          AND b.during && tstzrange(p_from, p_until, '[)')
@@ -209,6 +223,19 @@ BEGIN
       SELECT current_state::text INTO v_state FROM public.vehicles WHERE id = v_h.vehicle_id;
       SELECT count(*) INTO v_seq FROM public.bay_reservation_reconcile_2026_08_02 r
        WHERE r.booking_id = v_h.booking_id AND r.action = 'deferred';
+      IF v_h.leg_closed_as IS NOT NULL THEN
+        -- the work it was booked for is finished; nothing will ever take this hold up
+        UPDATE public.ottoq_stall_bookings
+           SET state = 'released', released_at = p_from, release_reason = 'replanned_leg_closed'
+         WHERE booking_id = v_h.booking_id AND state = 'held';
+        INSERT INTO public.bay_reservation_reconcile_2026_08_02
+          (sim_run_id, booking_id, vehicle_id, stall_id, purpose, sim_clock, action, reason, blocked_by,
+           old_from, old_to, defer_seq)
+        VALUES (p_sim_run_id, v_h.booking_id, v_h.vehicle_id, v_bay.id, v_h.purpose, p_from, 'released',
+                'replanned_leg_closed', 'yield:leg_' || v_h.leg_closed_as, v_h.lo, v_h.hi, v_seq);
+        v_n := v_n + 1;
+        CONTINUE;
+      END IF;
       IF v_state IN ('offline', 'deployed', 'en_route_to_deployment', 'out_of_service', 'tow_requested') THEN
         UPDATE public.ottoq_stall_bookings
            SET state = 'released', released_at = p_from, release_reason = 'replanned_vehicle_absent'
@@ -281,7 +308,8 @@ EXCEPTION WHEN OTHERS THEN
 END $fn$;
 COMMENT ON FUNCTION ottoq.ottoq_yield_bay_holds(uuid, uuid, text, timestamptz, timestamptz, uuid) IS
   '0553 (G283): frees one bay for a car waiting now by moving the held bookings of cars that cannot be there before it '
-  'would finish to their ETA (logged as yielded_to_a_car_waiting_now). Returns holds moved or released; never raises.';
+  'would finish to their ETA (logged as yielded_to_a_car_waiting_now), and releasing a hold whose leg is already closed '
+  '(replanned_leg_closed) or whose car has left. Returns holds moved or released; never raises.';
 
 -- ── (c) the needs-card seat asks for a bay to be freed, and tries once more ──
 DO $seat$
@@ -328,7 +356,7 @@ VALUES ('0553_a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now',
   'the first bay that is physically free and blocked only by held bookings of other cars that cannot be there before the '
   'waiting car would finish (ottoq.ottoq_bay_hold_car_eta: charging past the window, in another bay, owing a charge not '
   'started, or gone). It moves each hold to its car''s ETA, never before the waiting car''s window ends, releases a gone '
-  'car''s hold, logs each move in bay_reservation_reconcile_2026_08_02, and the seat tries the assignment once more. '
+  'car''s hold and a hold whose leg is already closed, logs each move in bay_reservation_reconcile_2026_08_02, and the seat tries the assignment once more. '
   'Dial bay_hold_yield_enabled (default 1).', now())
 ON CONFLICT (name) DO NOTHING;
 
@@ -341,13 +369,14 @@ ON CONFLICT (name) DO NOTHING;
 --   (i) the assignment is refused (`no_free_space`); (ii) the yield frees bay 1 (the first in order whose holds cannot
 --   come), moving C's hold to C's ETA (58.5 minutes plus the 3-minute taxi), and leaves R's hold alone; (iii) the retry seats W on
 --   bay 1. (iv) With bay 1 taken, a second waiting car W2 is refused, and the yield frees bay 3, moving G's hold to the end
---   of W2's window. R's hold is never moved.
+--   of W2's window. R's hold is never moved. (v) R's hold is then pointed at a leg already closed as done: a third
+--   waiting car W3 is refused, the yield releases R's hold (`replanned_leg_closed`), and W3 takes bay 2.
 DO $v3$
 DECLARE
   v_msg text; v_run uuid; v_depot uuid := '11111111-1111-1111-1111-111111111111';
-  t timestamptz; bay uuid[]; car uuid[]; c uuid; r uuid; g uuid; w uuid; w2 uuid;
-  bc uuid; br uuid; bg uuid; v_l2 uuid; s1 jsonb; s2 jsonb; s3 jsonb; s4 jsonb; y1 int; y2 int;
-  v_c_from timestamptz; v_r_from timestamptz; v_g_from timestamptz;
+  t timestamptz; bay uuid[]; car uuid[]; c uuid; r uuid; g uuid; w uuid; w2 uuid; w3 uuid;
+  bc uuid; br uuid; bg uuid; v_l2 uuid; s1 jsonb; s2 jsonb; s3 jsonb; s4 jsonb; s5 jsonb; s6 jsonb; y1 int; y2 int; y3 int;
+  v_c_from timestamptz; v_r_from timestamptz; v_g_from timestamptz; v_leg_done uuid; v_r_state text; v_r_reason text;
 BEGIN
   BEGIN
     SELECT r0.sim_run_id INTO v_run FROM public.ottoq_sim_runs r0
@@ -366,9 +395,9 @@ BEGIN
        WHERE v.home_depot_id = v_depot AND v.category = 'autonomous' AND v.current_stall_id IS NULL
          AND v.robotic_tether_until IS NULL
          AND NOT EXISTS (SELECT 1 FROM public.stalls s WHERE s.current_vehicle_id = v.id OR s.reserved_by = v.id)
-       ORDER BY v.id LIMIT 5) q;
-    IF coalesce(array_length(car, 1), 0) < 5 THEN RAISE EXCEPTION '0553 V3: fewer than five free twin cars'; END IF;
-    c := car[1]; r := car[2]; g := car[3]; w := car[4]; w2 := car[5];
+       ORDER BY v.id LIMIT 6) q;
+    IF coalesce(array_length(car, 1), 0) < 6 THEN RAISE EXCEPTION '0553 V3: fewer than six free twin cars'; END IF;
+    c := car[1]; r := car[2]; g := car[3]; w := car[4]; w2 := car[5]; w3 := car[6];
 
     -- clear the bays and their calendar from t on, as an empty depot
     UPDATE public.stalls SET current_vehicle_id = NULL, reserved_by = NULL, reserved_at = NULL, reservation_expires_at = NULL,
@@ -426,8 +455,22 @@ BEGIN
        OR NOT COALESCE((s4->>'assigned')::boolean, false) OR (s4->>'stall_id')::uuid IS DISTINCT FROM bay[3] THEN
       RAISE EXCEPTION '0553 V3 FAILED (iv): first try %, yield %, G''s hold at %, R''s at %, retry %', s3, y2, v_g_from, v_r_from, s4;
     END IF;
+    -- (v) R's hold, for a car ready now, becomes a hold for work already done: W3 is refused, the yield releases it
+    SELECT l.leg_id INTO v_leg_done FROM public.ottoq_itinerary_legs l
+     WHERE l.sim_run_id = v_run AND l.status = 'done' ORDER BY l.leg_id LIMIT 1;
+    IF v_leg_done IS NULL THEN RAISE EXCEPTION '0553 V3: no closed leg on run %', v_run; END IF;
+    UPDATE public.ottoq_stall_bookings SET leg_id = v_leg_done WHERE booking_id = br;
+    s5 := ottoq.ottoq_enact_space_assignment(v_run, v_depot, w3, 'wash_bay', 'detail', t, t + interval '25 minutes', NULL, 'needs_card');
+    y3 := ottoq.ottoq_yield_bay_holds(v_run, v_depot, 'wash_bay', t, t + interval '25 minutes', w3);
+    SELECT state, release_reason INTO v_r_state, v_r_reason FROM public.ottoq_stall_bookings WHERE booking_id = br;
+    s6 := ottoq.ottoq_enact_space_assignment(v_run, v_depot, w3, 'wash_bay', 'detail', t, t + interval '25 minutes', NULL, 'needs_card');
+    IF COALESCE((s5->>'assigned')::boolean, false) OR y3 <> 1 OR v_r_state IS DISTINCT FROM 'released'
+       OR v_r_reason IS DISTINCT FROM 'replanned_leg_closed'
+       OR NOT COALESCE((s6->>'assigned')::boolean, false) OR (s6->>'stall_id')::uuid IS DISTINCT FROM bay[2] THEN
+      RAISE EXCEPTION '0553 V3 FAILED (v): first try %, yield %, R''s hold % (%), retry %', s5, y3, v_r_state, v_r_reason, s6;
+    END IF;
 
-    RAISE EXCEPTION '0553 V3 PASSED on run %: W was refused, the yield moved C''s hold (58.5 minutes of charge left at its session''s pace) to its ETA and W took bay 1; W2 was refused, the yield moved G''s hold (owes a charge) past W2''s window and W2 took bay 3; R''s hold (a car ready now) was never moved',
+    RAISE EXCEPTION '0553 V3 PASSED on run %: W was refused, the yield moved C''s hold (58.5 minutes of charge left at its session''s pace) to its ETA and W took bay 1; W2 was refused, the yield moved G''s hold (owes a charge) past W2''s window and W2 took bay 3; R''s hold (a car ready now) was never moved, and once its leg was closed the yield released it and W3 took bay 2',
       v_run;
   EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM;
   END;
