@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260928170009
 -- migration-name:    the_fault_door_waits_for_the_tick_instead_of_deadlocking_with_it
 --
 -- 0552  **The cockpit's charger-fault door waits for the tick instead of deadlocking with it.** (G285)
