@@ -562,7 +562,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0555](db/migrations/0555_a_faulted_car_is_repaired_before_it_goes_back_to_work.sql) | `20260928212503` | yes — ledger | **A car with a vehicle fault is repaired in the service bay before it goes back to work.** (G290) |
 | [0556](db/migrations/0556_the_gates_patience_flag_is_a_note_for_a_person_not_service_work.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | **The readiness gate's patience flag is a note for a person, not service work.** (G289) |
 | [0557](db/migrations/0557_a_faulted_car_is_repaired_before_it_charges.sql) | `20260928220015` | yes — ledger | **A car with an open vehicle fault is repaired before it charges.** (G291; CLAUDE.md rule 9) |
-| [0558](db/migrations/0558_a_faulted_cars_repair_goes_first_in_its_plan.sql) | `PENDING` | no — pending | **A faulted car's repair goes first in its plan, and no charger is held for it before the repair.** (G292; |
+| [0558](db/migrations/0558_a_faulted_cars_repair_goes_first_in_its_plan.sql) | `20260928235524` | yes — ledger | **A faulted car's repair goes first in its plan, and no charger is held for it before the repair.** (G292; |
 
 424 migrations indexed.
 

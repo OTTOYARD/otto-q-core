@@ -1,5 +1,6 @@
--- migration-version: PENDING
+-- migration-version: 20260928235524
 -- migration-name:    a_faulted_cars_repair_goes_first_in_its_plan
+-- (applied 2026-09-28, 6:55 PM CT, after check 0411's run ended; the dry run passed first and left nothing behind.)
 --
 -- 0558  **A faulted car's repair goes first in its plan, and no charger is held for it before the repair.** (G292;
 --       CLAUDE.md rule 9)
@@ -602,3 +603,12 @@ END $v3$;
 -- booker as they were, and step (6) as 0557 left it).
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-28 to gxdrcyphqjzjsuhxuqtg, 6:55 PM CT (ledger 20260928235524).
+--   public.ottoq_plan_visit_itinerary               5e51d7ce498454993ac040379e772307 -> 990e9481a4917ae0d23dc78e205896aa
+--   ottoq.ottoq_book_workflow_legs                  5e627c00a761823854fd84701a19e93d -> 6fd66cb3893bcc250d13a9e71758cf3b
+--   ottoq.ottoq_route_faulted_cars_to_repair        e04e790f6e4f843c6de1b08078f7b52e -> c35dd18bb69226bfdcacb800e2a86305
+--   V1 and V3 passed: the transaction commits only if both do. A dry run (ROLLBACK in place of COMMIT) passed first and
+--   left nothing behind (the three md5s unchanged, no 0558_pre snapshot, no lineage row). ottoq_cert_recert_floor()
+--   moved to 2026-09-28 23:55:24.089925+00; the sweep restarted.

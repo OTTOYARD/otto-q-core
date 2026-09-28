@@ -655,7 +655,7 @@ repo_manifest(version, name, file) AS (
     ('20260928212503'::text, 'a_faulted_car_is_repaired_and_the_gate_flag_is_a_note'::text, '0555_a_faulted_car_is_repaired_before_it_goes_back_to_work.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'the_gates_patience_flag_is_a_note_for_a_person_not_service_work'::text, '0556_the_gates_patience_flag_is_a_note_for_a_person_not_service_work.sql'::text),
     ('20260928220015'::text, 'a_faulted_car_is_repaired_before_it_charges'::text, '0557_a_faulted_car_is_repaired_before_it_charges.sql'::text),
-    ('PENDING'::text, 'a_faulted_cars_repair_goes_first_in_its_plan'::text, '0558_a_faulted_cars_repair_goes_first_in_its_plan.sql'::text)
+    ('20260928235524'::text, 'a_faulted_cars_repair_goes_first_in_its_plan'::text, '0558_a_faulted_cars_repair_goes_first_in_its_plan.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
