@@ -358,8 +358,8 @@ BEGIN
     IF t IS NULL THEN RAISE EXCEPTION '0550 V3: the stress run is gone'; END IF;
     UPDATE public.ottoq_sim_runs SET status = 'running', sim_clock_current = t WHERE sim_run_id = v_run;
 
-    SELECT array_agg(id ORDER BY stall_code), array_agg(ch ORDER BY stall_code) INTO st, ch FROM (
-      SELECT s.id, s.stall_code, s.ocpp_charger_id AS ch FROM public.stalls s
+    SELECT array_agg(id ORDER BY stall_code), array_agg(charger_id ORDER BY stall_code) INTO st, ch FROM (
+      SELECT s.id, s.stall_code, s.ocpp_charger_id AS charger_id FROM public.stalls s
         JOIN public.ottoq_ocpp_chargers c ON c.charger_id = s.ocpp_charger_id
        WHERE s.depot_id = v_depot AND s.stall_type::text = 'dcfc' AND c.station_state <> 'Faulted'
          AND s.current_vehicle_id IS NULL AND s.reserved_by IS NULL
@@ -398,7 +398,7 @@ BEGIN
     RETURNING id INTO sz;
     INSERT INTO twin.arm_cycles(sim_run_id, depot_id, stall_id, vehicle_id, session_id, direction, phase,
                                 phase_started_at, phase_deadline, started_at, ended_at, outcome)
-    VALUES (v_run, v_depot, st[3], car[3], sz, 'mate', 'done', t - interval '41 minutes', t - interval '40 minutes',
+    VALUES (v_run, v_depot, st[3], car[3], sz, 'mate', 'charging', t - interval '41 minutes', t - interval '40 minutes',
             t - interval '41 minutes', t - interval '40 minutes', 'latched');
     -- Q reserved to S4, en route.
     UPDATE public.stalls SET reserved_by = car[4], reserved_at = t - interval '5 minutes',
