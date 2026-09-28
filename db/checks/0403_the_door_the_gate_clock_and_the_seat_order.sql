@@ -272,3 +272,28 @@ SELECT v.current_state, v.config->>'svc_step' AS step, count(*) AS restamped_wit
 --   themselves. The readiness gate is not affected: its six held cars at the probe read the same minutes from
 --   `last_state_change` as from their hold stamp (22 and 22), because STEP 0 does not touch need_deploy cars at or
 --   above the floor. G272. The fix is 0546, applied after this run.
+
+-- ══ §10 G271 AGAIN: WHO THE CHARGERS WENT TO, BY WHETHER THE CAR HAD A VISIT ══════════════════════════════════════════
+--
+--   0545 (c) orders OTTO-Q's charge cursor by response ratio, but only after its first key: `(SELECT vn.urgency =
+--   'immediate_dispatch' FROM ottoq_visit_needs vn ...) DESC NULLS LAST`. For a car with no open visit that subquery is
+--   NULL, and NULLS LAST sorts it after every car with a visit, whatever it has waited. G271's cars were mostly boot
+--   cars with no visit. Each charge session here is placed by when it started and whether its car had a visit.
+
+\echo '=== 0403 §10 — charge sessions by start time and by whether the car had a visit ==='
+WITH r AS (SELECT * FROM public.ottoq_sim_runs WHERE sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c'),
+s AS (
+  SELECT o.vehicle_id, o.started_at, o.soc_start,
+         (SELECT vn.urgency FROM public.ottoq_visit_needs vn
+           WHERE vn.vehicle_id = o.vehicle_id AND vn.sim_run_id = r.sim_run_id AND vn.arrived_at <= o.started_at
+           ORDER BY vn.created_at DESC LIMIT 1) AS urgency
+    FROM public.ocpp_sessions o, r WHERE o.sim_run_id = r.sim_run_id)
+SELECT CASE WHEN started_at < timestamptz '2026-09-27 10:00:00+00' THEN 'before 5:00 AM CT' ELSE 'from 5:00 AM CT' END AS started,
+       COALESCE(urgency, 'no visit') AS car, count(*) AS sessions, min(soc_start) AS min_soc, max(soc_start) AS max_soc
+  FROM s GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ (2026-09-28 04:27 UTC, 11:27 PM CT; tick 202, sim 6:30 AM CT): **from 5:00 AM, 35 sessions started, every one on
+--   a car with a visit** (18 immediate dispatches at 16-56%, 17 standard visits at 26-69%). **None went to a car with no
+--   visit**, while 14 boot cars at 78-96% waited on need_charge, one of them for 102 minutes. Before 5:00 AM, 20 no-visit
+--   cars had charged (at 84-98%), when the boot left chargers free, beside 24 visit cars. The ratio can only order cars
+--   inside the first key's groups, and a car with no visit is always in the last group. That is the rest of G271, and
+--   0546 (c) makes a car with no visit read as not an immediate dispatch (false) instead of NULL.
