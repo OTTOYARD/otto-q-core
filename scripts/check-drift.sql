@@ -643,7 +643,8 @@ repo_manifest(version, name, file) AS (
     ('20260928013804'::text, 'no_car_leaves_the_depot_with_a_service_still_needed'::text, '0543_no_car_leaves_the_depot_with_a_service_still_needed.sql'::text),
     ('20260928033602'::text, 'a_car_that_is_not_finished_cannot_be_dispatched'::text, '0544_a_car_that_is_not_finished_cannot_be_dispatched.sql'::text),
     ('20260928034458'::text, 'no_queue_starves_a_car_that_cannot_leave_until_it_is_finished'::text, '0545_no_queue_starves_a_car_that_cannot_leave_until_it_is_finished.sql'::text),
-    ('20260928053318'::text, 'a_car_waiting_for_a_charger_keeps_its_place_in_line'::text, '0546_a_car_waiting_for_a_charger_keeps_its_place_in_line.sql'::text)
+    ('20260928053318'::text, 'a_car_waiting_for_a_charger_keeps_its_place_in_line'::text, '0546_a_car_waiting_for_a_charger_keeps_its_place_in_line.sql'::text),
+    ('20260928074913'::text, 'a_charger_its_car_has_left_for_a_bay_is_free'::text, '0547_a_charger_its_car_has_left_for_a_bay_is_free.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
