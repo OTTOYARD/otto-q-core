@@ -90,6 +90,9 @@ SELECT (SELECT count(*) FROM dv) AS departures,
        (SELECT count(DISTINCT (vehicle_id, left_at)) FROM open_at) AS left_with_open_work;
 -- READ: pending.
 
+--   Mid-run (04:46 UTC, 11:46 PM CT; tick 532, sim 9:08 AM CT): 61 departures, 0 below 99% (the lowest was 99), 0 with a
+--   service open. 9eab647f's mid-run probe had 49 departures by 8:43 AM.
+
 -- ══ §3 THE DOOR AND THE FLOOR (0544): NEITHER SHOULD EVER FIRE ════════════════════════════════════════════════════════
 --
 --   The deploy plan offers only a departure-clear car, so the door never refuses and the trigger never rejects. A
@@ -101,6 +104,7 @@ SELECT count(*) FILTER (WHERE e.event_type = 'twin.dispatch_refused_unfinished')
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed' AND e.payload::text LIKE '%0544 (CLAUDE.md rule 9)%') AS floor_rejections
   FROM public.ottoq_events e WHERE e.sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c';
 -- READ: pending. All three must be 0.
+--   Mid-run (tick 532, sim 9:08 AM CT): 0 door refusals, 0 tick failures, 0 floor rejections, and 0 escalations so far.
 
 -- ══ §4 G269: AN ESCALATION IS A CAR THAT WAITED, NOT ONE THAT WAS SERVED ═══════════════════════════════════════════════
 --
@@ -297,3 +301,7 @@ SELECT CASE WHEN started_at < timestamptz '2026-09-27 10:00:00+00' THEN 'before 
 --   cars had charged (at 84-98%), when the boot left chargers free, beside 24 visit cars. The ratio can only order cars
 --   inside the first key's groups, and a car with no visit is always in the last group. That is the rest of G271, and
 --   0546 (c) makes a car with no visit read as not an immediate dispatch (false) instead of NULL.
+--   Mid-run (04:46 UTC, 11:46 PM CT; tick 532, sim 9:08 AM CT): **61 sessions since 5:00 AM, still none on a car with
+--   no visit.** 14 no-visit cars were on need_charge, 4 at 50-79%, 8 at 80-89% and 2 at 90-99%, each waiting about 260
+--   minutes (since 4:48 AM). Every one of the 19 cars below 50% had a visit and read a wait of 0 (G272). A car waiting
+--   on need_charge is never escalated to a person: the gate's hard cap judges only need_deploy cars.
