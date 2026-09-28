@@ -238,3 +238,37 @@ SELECT flag_type, count(*) AS releases_keeping_the_flag, count(DISTINCT entity_i
             AND e3.payload->'diff'->'current_state'->>'to' = 'in_service_bay')) AS later_in_service_bay
   FROM rel GROUP BY flag_type ORDER BY flag_type;
 -- READ: pending.
+
+-- ══ §9 LIVE PROBE: WHO STAMPS last_state_change WITHOUT A STATE CHANGE (G272) ══════════════════════════════════════════
+--
+--   0545 (a) and (c) read `vehicles.last_state_change` as the time a car last changed state. A car whose stamp is this
+--   tick with no state change in the signed stream was re-stamped by a writer, and the stream cannot show it:
+--   `ottoq_vehicles_state_change` drops a diff of clock keys alone (0015). Run while the run is live.
+
+\echo '=== 0403 §9 — cars stamped this tick with no state change ==='
+WITH r AS (SELECT * FROM public.ottoq_sim_runs WHERE sim_run_id = '4acf0b1d-f32d-4a24-9f12-2d3049e7ab0c' AND status = 'running')
+SELECT v.current_state, v.config->>'svc_step' AS step, count(*) AS restamped_without_a_state_change,
+       count(*) FILTER (WHERE v.current_soc < 80) AS below_80,
+       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM public.ottoq_visit_needs n, jsonb_array_elements(n.atoms) a
+               WHERE n.vehicle_id = v.id AND n.sim_run_id = r.sim_run_id AND a->>'svc' = 'charge'
+                 AND COALESCE(a->>'status', 'open') <> 'done')) AS open_charge_atom,
+       r.tick_count
+  FROM public.vehicles v, r
+ WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111' AND v.category = 'autonomous'
+   AND v.last_state_change = r.sim_clock_current
+   AND NOT EXISTS (SELECT 1 FROM public.ottoq_events e WHERE e.sim_run_id = r.sim_run_id AND e.entity_id = v.id
+                     AND e.event_type = 'vehicle.state_changed' AND e.sim_clock_at = r.sim_clock_current
+                     AND e.payload->'diff' ? 'current_state')
+ GROUP BY 1, 2, r.tick_count ORDER BY 3 DESC;
+-- READ (2026-09-28 04:20 UTC, 11:20 PM CT; tick 95, sim 5:35 AM CT): **17 cars staged on need_charge were stamped this
+--   tick with no state change, all 17 below 80% with an open charge atom**, plus 14 deployed cars (11 `ready`, 3 with no
+--   step). The 17 are exactly STEP 0's set in `twin.ottoq_sim_advance_service_flow`, the stranded under-floor deadlock
+--   breaker. Each tick it writes `staged_awaiting_service` / `need_charge` / `last_state_change = <this tick>` onto
+--   every car below `deploy_floor_soc` with an open charge atom, even one already exactly there. The 14 deployed cars
+--   are the deployed telemetry, which stamps with each SoC drain.
+--   The first probe had shown the effect before the cause (tick 41, sim 5:08 AM): 24 cars on need_charge at 12-46%,
+--   every one with a visit, read a wait of 0 minutes, beside boot cars at 78-96% with 18-21 minutes. So 0545 (c)'s
+--   ratio is exactly 1 for every waiting visit car below 80%, and those cars fall back to lowest charge first among
+--   themselves. The readiness gate is not affected: its six held cars at the probe read the same minutes from
+--   `last_state_change` as from their hold stamp (22 and 22), because STEP 0 does not touch need_deploy cars at or
+--   above the floor. G272. The fix is 0546, applied after this run.
