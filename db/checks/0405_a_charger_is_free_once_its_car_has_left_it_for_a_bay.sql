@@ -110,6 +110,8 @@ SELECT (SELECT count(*) FROM dv) AS departures,
        (SELECT count(*) FROM dv WHERE soc < 99) AS below_99,
        (SELECT min(soc) FROM dv) AS min_soc,
        (SELECT count(DISTINCT (vehicle_id, left_at)) FROM open_at) AS left_with_open_work;
+-- READ mid-run (2026-09-28 09:00 UTC, 4:00 AM CT; sim ~10:00 AM CT): **73 departures, 0 below 99% (the lowest was 99), 0
+--   with a service open.**
 
 -- ══ §3 THE DOOR AND THE FLOOR (0544): NEITHER SHOULD EVER FIRE ════════════════════════════════════════════════════════
 
@@ -118,6 +120,7 @@ SELECT count(*) FILTER (WHERE e.event_type = 'twin.dispatch_refused_unfinished')
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed') AS tick_failures,
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed' AND e.payload::text LIKE '%0544 (CLAUDE.md rule 9)%') AS floor_rejections
   FROM public.ottoq_events e WHERE e.sim_run_id = '921e349c-ded0-4907-9e0b-6b288b61831f';
+-- READ mid-run (09:00 UTC): 0 door refusals, 0 tick failures, 0 floor rejections.
 
 -- ══ §4 ESCALATIONS: THE GATE'S (G269) AND THE WAITS FOR A CHARGER OR THE SERVICE BAY (0546 (d), G274) ══════════════════
 --
@@ -142,6 +145,12 @@ SELECT v.display_name, e.sim_clock_at AT TIME ZONE 'America/Chicago' AS escalate
   FROM public.ottoq_events e LEFT JOIN public.vehicles v ON v.id = e.entity_id
  WHERE e.sim_run_id = '921e349c-ded0-4907-9e0b-6b288b61831f' AND e.event_type = 'twin.deploy_gate_escalated'
  ORDER BY e.sim_clock_at;
+-- READ mid-run (09:01 UTC; through sim ~10:00 AM CT): **13 escalations, each car once.** 12 `waiting_for_a_charger`: 11 at
+--   8:54 AM (standard visits at 12-33%, 240.2 minutes) and Zoox-004 at 9:40 AM (38%, 240.3). 1 `must_do_work_open`:
+--   Tesla-AV-042 at 100% held 240.3 minutes for a deep clean, 0 state changes inside, a real one (dbdffd5c had none;
+--   4acf0b1d had Tesla-AV-050's). The 11 rows at 8:54 AM that read one state change inside are each car's own entry
+--   into staged_awaiting_service at 4:53:59 AM, 2.81 seconds after the window start `held_min` rounds to: the start of
+--   the wait, as 0404 §4 found for one car.
 
 -- ══ §5 G270: WHO GOT THE BAY SEATS ═══════════════════════════════════════════════════════════════════════════════════
 
@@ -406,6 +415,10 @@ SELECT s.stall_code, f.at AT TIME ZONE 'America/Chicago' AS fault_ct, f.reason, 
                                    WHERE o2.sim_run_id = '921e349c-ded0-4907-9e0b-6b288b61831f' AND o2.stall_id = f.stall_id AND o2.started_at > f.at)
                                  - f.at))::numeric / 60, 1) AS stood_until_next_car_min
   FROM f JOIN public.stalls s ON s.id = f.stall_id ORDER BY f.at;
+-- READ mid-run (09:02 UTC; through sim ~10:15 AM CT): DCFC-08 437 min from 4:54 AM (thermal; the same draw as on
+--   dbdffd5c), **DCFC-04 168 min from 5:12 AM** (not on dbdffd5c; its next car 170.1 min later, 2.1 after the repair),
+--   L2-30 47 min from 5:17 (as on dbdffd5c), L2-13 177 min from 7:40. The fault side diverged from the first session
+--   the runs placed differently.
 
 \echo '=== 0405 §11c — per hour: cars waiting on need_charge, and chargers free by the stall pointer ==='
 WITH run AS MATERIALIZED (SELECT r.sim_run_id AS id, r.sim_clock_start AS t0, r.sim_clock_current AS t1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '921e349c-ded0-4907-9e0b-6b288b61831f'),
@@ -450,6 +463,12 @@ SELECT to_char(date_trunc('hour', at AT TIME ZONE 'America/Chicago'), 'HH12 AM')
        sum(dcfc_free) FILTER (WHERE cars_waiting > 0) * 2 AS dcfc_free_min_while_waiting,
        sum(l2_free) FILTER (WHERE cars_waiting > 0) * 2 AS l2_free_min_while_waiting
   FROM g GROUP BY date_trunc('hour', at AT TIME ZONE 'America/Chicago') ORDER BY date_trunc('hour', at AT TIME ZONE 'America/Chicago');
+-- READ mid-run (09:03 UTC; through sim ~10:15 AM CT): cars waiting on need_charge on average in each hour, this run
+--   against dbdffd5c: 4 AM 19.1 / 16.3 · 5 AM 35.7 / 35.8 · 6 AM 16.1 / 17.6 · 7 AM 14.3 / 12.4 · 8 AM 14.7 / 12.3 ·
+--   9 AM 14.1 / 13.9. **The same queue.** Fast chargers free by the pointer while cars waited: 24, 120, 124, 130, 84,
+--   80 stall-minutes per hour (dbdffd5c 26, 130, 156, 88, 104, 136). Most of it is the two faulted fast chargers (a
+--   faulted charger's stall reads available): DCFC-08 all morning, and DCFC-04 from 5:12 to 8:00 AM, which dbdffd5c did
+--   not lose. So the minutes 0547 returned (§12) were spent covering a fault dbdffd5c did not have.
 
 \echo '=== 0405 §11e — charger turnover: from a session''s end to the charger''s next car, by where the car went ==='
 --   Completed sessions only (a faulted session's gap is its repair, §11b). `car_went` is the car's first state after
@@ -479,6 +498,10 @@ SELECT kind, CASE WHEN car_went_to IN ('in_wash_bay','in_detail_bay','in_service
        round(avg(extract(epoch FROM next_start - ended_at) / 60)::numeric, 1) AS avg_gap_min,
        round(max(extract(epoch FROM next_start - ended_at) / 60)::numeric, 1) AS max_gap_min
   FROM nx GROUP BY 1, 2 ORDER BY 1, 2;
+-- READ mid-run (08:59 UTC; tick 620, sim 10:00 AM CT): **a fast charger whose car left for a bay took its next car a
+--   median 1.3 minutes after the session ended, mean 1.6, max 4.8 (16 sessions)**, against dbdffd5c's whole-run p50 2.1,
+--   mean 7.6, max 46.9 (27). It now reads as the other exits do: fast charger to departure p50 1.3, mean 2.1, max 13.2
+--   (16); L2 to a bay p50 0.9, mean 1.6 (13); L2 to departure p50 0.6, mean 1.0 (33).
 
 -- ══ §12 G276 UNDER 0547: A CHARGER IS FREE ONCE ITS CAR HAS LEFT IT FOR A BAY ═══════════════════════════════════════
 --
@@ -506,6 +529,8 @@ SELECT ch.kind, count(*) AS episodes, count(DISTINCT seg.stall_id) AS stalls,
   FROM seg JOIN ch ON ch.id = seg.stall_id
  WHERE seg.status = 'available' AND seg.ptr IS NOT NULL AND seg.ptr <> 'NULL'
  GROUP BY ch.kind ORDER BY 1;
+-- READ mid-run (08:58 UTC; through sim 10:00 AM CT): **0 episodes on any stall.** On dbdffd5c by sim 9:47 AM: 8
+--   episodes on 7 of the 10 fast chargers, 132.5 fast-charger minutes.
 
 \echo '=== 0405 §12b — the guard''s refusals, by where the car was when it asked ==='
 WITH a AS (
@@ -527,6 +552,8 @@ SELECT from_kind, state, status,
   FROM pos GROUP BY 1, 2, 3, 4 ORDER BY 1, 2, 3, 4;
 -- READ early (08:31 UTC; through sim ~5:55 AM CT): 20 refusals, **every one with the car charging on the stall** (19 L2,
 --   1 DCFC); none with the car on no stall or on another stall.
+-- READ mid-run (08:58 UTC): **55 refusals, every one with the car charging on the stall** (53 L2 declined, 1 L2
+--   approved, 1 DCFC declined); **0 with the car on no stall** (dbdffd5c: 19 by the end, all from fast chargers).
 
 \echo '=== 0405 §12c — live: a stall that reads available with a pointer set, and where its car is ==='
 --   Run while the run is live. G121's census, at the twin depot. Under 0547 no charger should appear; a bay may, if a
@@ -540,3 +567,4 @@ SELECT s.stall_code, s.stall_type::text AS kind, s.status::text, v.display_name 
  WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.status::text = 'available' AND s.current_vehicle_id IS NOT NULL
  ORDER BY 2, 1;
 -- READ (08:30 UTC; sim 5:51 AM CT): **no stall read available with a pointer set.**
+-- READ mid-run (08:58 UTC; sim 10:00 AM CT): no stall read available with a pointer set.
