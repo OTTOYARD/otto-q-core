@@ -255,3 +255,10 @@ SELECT v.display_name, v.current_state, v.config->>'svc_step' AS step, v.current
 --   only a top-off never reached the front. Rule 9 keeps it until it is full; the cursor never fills it. About 80 car-hours
 --   idle, against 126.4 deployed. The ninth, Tesla-AV-051, also owed a deep clean from a rider flag the in-depot sweep
 --   raised at 9:49 AM; that visit shows `superseded` only because the teardown closed it (`run_completed`).
+--   **CORRECTED 2026-09-28 04:10 UTC by 0403 §0 (§7's query, on this run's rows before the next run purged them): sixteen
+--   cars, not nine, and 142.5 car-hours, not about 80.** This read picked up nine. The state stream shows 16 staged cars
+--   that went on need_charge and never changed state or step before the teardown, with their charge never moving:
+--     15 boot cars set at 4:51 AM at 91-98%, which adds Tesla-AV-042, -045, -056, -063, Tesla-RT-006, Waymo-AV-036 and
+--       Zoox-AV-078 to the nine named above (Zoox-AV-100's charge is not in the stream);
+--     Waymo-AV-015, which went on need_charge at 5:17 AM at 89%, not at 91-98% from the boot.
+--   14 of the 16 had no visit. Waiting 536 and 510 minutes, they idled 142.5 car-hours, more than the day's 126.4 deployed.
