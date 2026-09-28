@@ -1018,6 +1018,72 @@ SELECT w.car, b.state, b.purpose, count(*) AS bookings,
  GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
 -- READ: pending.
 
+--   §19c, why the seat refused: every needs-card attempt at a wash bay that was refused, against the three bays at that
+--   moment. `cars_in_bays` comes from the state stream; `calendar_free_bays` is the number of bays with no booking, known
+--   at that moment and not yet released, overlapping the attempt's window (25 minutes for a deep clean, 9 for a wash). A
+--   held booking re-timed later by the bay reconciler is read at its CURRENT window, so this undercounts the calendar's
+--   share. §19d reads the reconciler's own log for one refused stretch.
+\echo '=== 0409 §19c — each refused wash-bay seat: bays physically empty, and bays free on the calendar ==='
+WITH run AS MATERIALIZED (SELECT sim_run_id AS id, sim_clock_current AS t1 FROM public.ottoq_sim_runs WHERE sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727'),
+bays AS MATERIALIZED (SELECT id FROM public.stalls WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND stall_type::text = 'wash_bay'),
+att AS MATERIALIZED (
+  SELECT DISTINCT d.sim_clock AS at, d.entity_id AS vehicle_id, d.proposed_action->>'purpose' AS purpose,
+         CASE d.proposed_action->>'purpose' WHEN 'detail' THEN interval '25 minutes' ELSE interval '9 minutes' END AS need
+    FROM public.ottoq_decisions d, run
+   WHERE d.sim_run_id = run.id AND d.proposed_action->>'source' = 'needs_card'
+     AND d.proposed_action->>'stall_type' = 'wash_bay' AND d.outcome_status = 'noop_no_candidate'),
+st AS MATERIALIZED (
+  SELECT e.entity_id AS vehicle_id, e.sim_clock_at AS at, e.event_seq AS seq, e.payload->'diff'->'current_state'->>'to' AS s_to
+    FROM public.ottoq_events e, run WHERE e.sim_run_id = run.id AND e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state'),
+seg AS MATERIALIZED (
+  SELECT vehicle_id, at AS began, COALESCE(lead(at) OVER (PARTITION BY vehicle_id ORDER BY seq), (SELECT t1 FROM run)) AS ended, s_to FROM st),
+inbay AS MATERIALIZED (SELECT * FROM seg WHERE s_to IN ('in_wash_bay','in_detail_bay')),
+bk AS MATERIALIZED (SELECT b.* FROM public.ottoq_stall_bookings b, run WHERE b.sim_run_id = run.id AND b.stall_id IN (SELECT id FROM bays)),
+per AS (
+  SELECT a.*,
+         (SELECT count(*) FROM inbay i WHERE i.began <= a.at AND i.ended > a.at) AS cars_in_bays,
+         (SELECT count(*) FROM bays y WHERE NOT EXISTS (
+             SELECT 1 FROM bk WHERE bk.stall_id = y.id AND COALESCE(bk.booked_at_sim, lower(bk.during)) <= a.at
+                AND (bk.released_at IS NULL OR bk.released_at > a.at)
+                AND bk.during && tstzrange(a.at, a.at + a.need))) AS calendar_free_bays
+    FROM att a)
+SELECT purpose, count(*) AS refused_attempts,
+       count(*) FILTER (WHERE cars_in_bays >= 3) AS all_3_bays_physically_full,
+       count(*) FILTER (WHERE cars_in_bays < 3 AND calendar_free_bays = 0) AS empty_bay_but_none_free_on_the_calendar,
+       count(*) FILTER (WHERE calendar_free_bays > 0) AS free_on_todays_calendar_yet_refused,
+       round(avg(3 - cars_in_bays), 2) AS avg_empty_bays
+  FROM per GROUP BY 1 ORDER BY 1;
+-- READ (17:20 UTC, through sim 9:15 AM CT): deep cleans 113 refused attempts, washes 191. Not one refusal came with all
+--   three bays physically full: on average 2.18 of the 3 bays were empty at a refused deep clean, 2.12 at a refused wash.
+--   51 deep-clean and 47 wash refusals had no bay free on the calendar as it stands today. The other 62 and 144 read as free
+--   on today's calendar, but the bay reconciler had moved those holds since, so they were not free at the time (§19d).
+
+\echo '=== 0409 §19d — the bay reconciler''s log for one refused stretch: Waymo-AV-014''s deep clean, 8:50 to 8:58 AM CT ==='
+SELECT to_char(r.sim_clock AT TIME ZONE 'America/Chicago', 'HH12:MI:SS') AS at_ct, s.stall_code, v.display_name AS car, r.purpose,
+       r.action, r.reason, r.blocked_by,
+       to_char(r.old_from AT TIME ZONE 'America/Chicago', 'HH12:MI') || '-' || to_char(r.old_to AT TIME ZONE 'America/Chicago', 'HH12:MI') AS held_before,
+       to_char(r.new_from AT TIME ZONE 'America/Chicago', 'HH12:MI') || '-' || to_char(r.new_to AT TIME ZONE 'America/Chicago', 'HH12:MI') AS moved_to,
+       r.defer_seq
+  FROM public.bay_reservation_reconcile_2026_08_02 r JOIN public.stalls s ON s.id = r.stall_id LEFT JOIN public.vehicles v ON v.id = r.vehicle_id
+ WHERE r.sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727' AND s.stall_type::text = 'wash_bay'
+   AND r.sim_clock BETWEEN timestamptz '2026-09-28 13:44:00+00' AND timestamptz '2026-09-28 13:59:00+00'
+ ORDER BY r.sim_clock, s.stall_code;
+-- READ (17:24 UTC): the cause of G283, and it is not the bays' capacity. Waymo-AV-014, at 100%, was refused a deep clean
+--   every minute from 8:50 to 8:57 AM CT. Two of the three wash bays were physically empty the whole time. What held them:
+--   - WSH-03: Zoox-AV-099's deep-clean hold, 8:49-9:10, booked at 5:32 AM. Its car never came. Released at 9:04:57,
+--     `no_show_grace_elapsed`.
+--   - WSH-01: Zoox-AV-099's wash hold, 8:49-8:57, also booked at 5:32 AM. Released at 8:57:29, `window_elapsed`.
+--   - WSH-02, empty from 8:46:38: Zoox-AV-094's wash hold, 8:55-9:05. The reconciler deferred it at 8:53:01 to 10:58,
+--     because the car was still charging. Waymo-004's deep-clean hold, 8:58-9:23, was deferred at 8:58:21 to 10:28,
+--     because that car was in another bay.
+--   AV-014 was seated on WSH-01 at 8:58:21, the tick after the release.
+--   The mechanism: `ottoq_reconcile_bay_reservations` moves a held bay booking only when its start is within the taxi time
+--   (3 minutes) and its car cannot be there. A hold for a car that is still charging or in another bay therefore sits in the
+--   bay's next 25 minutes until it is 3 minutes away. `ottoq_stall_free_between` reads it as occupancy, and the car that is
+--   physically waiting is refused the empty bay. When the move comes, it is to the car's ETA (here 2 hours and 1.5 hours
+--   out), which frees the bay. Holds booked hours ahead for cars that never come (Zoox-AV-099's two) block the same way
+--   until the no-show grace runs out.
+
 -- ══ §20 G285: THE FAULT DOOR DEADLOCKED WITH THE TICK, AND 0552 ═════════════════════════════════════════════════════════
 --
 --   Every attempt of the injection job that got past its clock gate, with its outcome and, for a deadlock, the relation
