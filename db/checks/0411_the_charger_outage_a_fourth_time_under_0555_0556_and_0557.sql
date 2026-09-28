@@ -585,7 +585,8 @@ SELECT s.stall_code, s.stall_type::text AS kind, s.status::text, v.display_name 
   LEFT JOIN public.stalls ts ON ts.id = v.robotic_tether_stall_id
  WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.status::text = 'available' AND s.current_vehicle_id IS NOT NULL
  ORDER BY 2, 1;
--- READ: pending.
+-- READ (live, 23:26 UTC, 6:26 PM CT; sim 11:24 AM): nothing listed: no stall at the twin depot read `available` with a
+--   car's pointer on it. G121's census is clean at this moment.
 
 -- ══ §13 G278 STAYS FIXED: NO CAR HOLDS A BAY BEFORE ITS BOOKING ═══════════════════════════════════════════════════
 --
@@ -1198,7 +1199,12 @@ SELECT v.display_name AS car, v.current_state::text AS state, v.config->>'svc_st
  WHERE r.sim_run_id = 'cdf87081-a62b-452e-be2c-5bef64d596bb' AND v.home_depot_id = '11111111-1111-1111-1111-111111111111'
    AND v.config->'charge_wait'->>'run' = 'cdf87081-a62b-452e-be2c-5bef64d596bb'
  ORDER BY banked_min DESC NULLS LAST LIMIT 15;
--- READ: pending.
+-- READ (live, 23:26 UTC, 6:26 PM CT; sim 11:24 AM): 15 cars carry a charge-wait bank for this run (the query's limit).
+--   The largest: Waymo-AV-008 271.1 minutes (on L2 at 52%, episode from 6:38 AM), Zoox-AV-091 207.6 (in the service bay
+--   at 49%), Waymo-AV-013 189.9 (L2, 62%), Waymo-AV-004 180.6 (L2, 82%; its episode runs from 4:36 AM, so the cursor
+--   reads 407.5 minutes). Two still wait staged on need_charge with a bank: Zoox-004, 161.7 banked at 89% (episode from
+--   4:26 AM, cursor 379.3), and Waymo-006, 157.8 at 50%. The bank carries each car's wait across the charger faults, as
+--   0551 made it; what it measures here is how long the line is, which is §11c's question.
 
 -- ══ §23 G282 UNDER 0551: A CAR WAITING AT THE GATE IS ESCALATED ═══════════════════════════════════════════════════════
 --
@@ -1300,7 +1306,12 @@ SELECT q.queue_position, q.queue_depth, q.vehicle_ref, q.current_soc, q.is_immed
        to_char(q.waiting_since AT TIME ZONE 'America/Chicago', 'HH12:MI AM') AS waiting_since_ct
   FROM public.ottoq_depot_queue('11111111-1111-1111-1111-111111111111', 'cdf87081-a62b-452e-be2c-5bef64d596bb') q
  WHERE q.queue_kind = 'charge' ORDER BY q.queue_position LIMIT 10;
--- READ: pending.
+-- READ (live, 23:26 UTC, 6:26 PM CT; sim 11:24 AM): 65 cars in the charge queue (0410 read 31 at sim 5:44 AM; this is
+--   five and a half hours later, after the outage). The head: Waymo-AV-002 at 98% and Zoox-004 at 89%, then
+--   Tesla-AV-048 70%, Zoox-AV-081 75%, then six cars at 27-31% all waiting since 4:36 AM. With the response ratio (wait
+--   + points) / points a car two points short ranks first, and still Waymo-AV-002 has waited since 4:36 AM for its last
+--   2%: the line is longer than the chargers, which is the capacity question (G280), not the order's. The faulted
+--   Zoox-AV-080 is not in the queue (0557 (f)).
 
 -- ══ §26 G289 UNDER 0556: NO SERVICE-BAY VISIT FOR THE GATE'S FLAG ALONE ══════════════════════════════════════════════
 --
