@@ -95,6 +95,8 @@ SELECT (SELECT count(*) FROM dv) AS departures,
        (SELECT count(DISTINCT (vehicle_id, left_at)) FROM open_at) AS left_with_open_work;
 -- READ early (2026-09-28 11:48 UTC, 6:48 AM CT; tick 43, sim 5:11 AM CT): 4 departures, 0 below 99% (the lowest was
 --   100), 0 with a service open.
+-- READ mid-run (12:27 UTC, 7:27 AM CT; tick 655, sim 10:16 AM CT): **89 departures, 0 below 99% (the lowest was 99),
+--   0 with a service open** (921e349c: 73 by sim 10:00 AM).
 
 -- ══ §3 THE DOOR AND THE FLOOR (0544): NEITHER SHOULD EVER FIRE ════════════════════════════════════════════════════════
 
@@ -104,6 +106,7 @@ SELECT count(*) FILTER (WHERE e.event_type = 'twin.dispatch_refused_unfinished')
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed' AND e.payload::text LIKE '%0544 (CLAUDE.md rule 9)%') AS floor_rejections
   FROM public.ottoq_events e WHERE e.sim_run_id = 'ae0597b7-439c-46db-9e8e-8b5fa241629c';
 -- READ early (11:48 UTC): 0 door refusals, 0 tick failures, 0 floor rejections.
+-- READ mid-run (12:27 UTC): 0 door refusals, 0 tick failures, 0 floor rejections.
 
 -- ══ §4 ESCALATIONS: THE GATE'S (G269) AND THE WAITS FOR A CHARGER OR THE SERVICE BAY (0546 (d), G274) ══════════════════
 --
@@ -128,6 +131,9 @@ SELECT v.display_name, e.sim_clock_at AT TIME ZONE 'America/Chicago' AS escalate
   FROM public.ottoq_events e LEFT JOIN public.vehicles v ON v.id = e.entity_id
  WHERE e.sim_run_id = 'ae0597b7-439c-46db-9e8e-8b5fa241629c' AND e.event_type = 'twin.deploy_gate_escalated'
  ORDER BY e.sim_clock_at;
+-- READ mid-run (12:27 UTC; through sim 10:16 AM CT): 14 escalations, every one `waiting_for_a_charger`. **No
+--   `must_do_work_open`**: no car at 100% held 240 minutes for a wash or deep clean (921e349c: 1 by sim 10:00 AM,
+--   9 by the end).
 
 -- ══ §5 G270: WHO GOT THE BAY SEATS ═══════════════════════════════════════════════════════════════════════════════════
 
@@ -165,6 +171,9 @@ SELECT (SELECT jsonb_object_agg(to_state, k) FROM (
             FROM public.ottoq_events e WHERE e.sim_run_id = 'ae0597b7-439c-46db-9e8e-8b5fa241629c' AND e.event_type = 'vehicle.state_changed'
              AND e.payload->'diff'->'current_state'->>'to' IN ('in_wash_bay', 'in_detail_bay', 'in_service_bay')
            GROUP BY 1) q) AS bay_entries;
+-- READ mid-run (12:27 UTC): bay entries so far **27 wash, 13 detail**, 17 service: already more wash and detail
+--   entries than 921e349c's whole day (25, 11). The gate held at most 32 cars at once and staging overflow peaked at
+--   54, as on both runs before.
 
 -- ══ §7 G271: NO CAR STARVES WAITING FOR A CHARGER OR THE SERVICE BAY ═════════════════════════════════════════════════
 --
@@ -487,6 +496,7 @@ SELECT ch.kind, count(*) AS episodes, count(DISTINCT seg.stall_id) AS stalls,
   FROM seg JOIN ch ON ch.id = seg.stall_id
  WHERE seg.status = 'available' AND seg.ptr IS NOT NULL AND seg.ptr <> 'NULL'
  GROUP BY ch.kind ORDER BY 1;
+-- READ mid-run (12:28 UTC; through sim 10:16 AM CT): 0 episodes on any stall. G276 stays fixed.
 
 \echo '=== 0406 §12b — the guard''s refusals, by where the car was when it asked ==='
 WITH a AS (
@@ -506,6 +516,8 @@ SELECT from_kind, state, status,
             ELSE 'car on another stall' END AS car_position,
        count(*) AS n
   FROM pos GROUP BY 1, 2, 3, 4 ORDER BY 1, 2, 3, 4;
+-- READ mid-run (12:28 UTC): 64 guard asks, every one with the car on the stall being emptied (62 declined, 1
+--   approved, 1 pending); 0 with the car on no stall or another stall.
 
 \echo '=== 0406 §12c — live: a stall that reads available with a pointer set, and where its car is ==='
 --   Run while the run is live. G121's census, at the twin depot. Under 0547 no charger should appear; a bay may, if a
@@ -519,6 +531,7 @@ SELECT s.stall_code, s.stall_type::text AS kind, s.status::text, v.display_name 
  WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.status::text = 'available' AND s.current_vehicle_id IS NOT NULL
  ORDER BY 2, 1;
 -- READ early (11:48 UTC; sim 5:12 AM CT): no stall read available with a pointer set.
+-- READ mid-run (12:28 UTC; sim 10:16 AM CT): no stall read available with a pointer set.
 
 -- ══ §13 G278 UNDER 0549: A CAR SEATED IN A BAY EARLY IS SERVED NOW ════════════════════════════════════════════════
 --
@@ -543,6 +556,9 @@ SELECT purpose, count(*) AS entries,
        round(max(extract(epoch FROM lower(during) - issued_at) / 60)::numeric, 1) AS max_early_min,
        round(sum(GREATEST(extract(epoch FROM lower(during) - issued_at), 0) / 60) FILTER (WHERE lower(during) > issued_at + interval '5 minutes')::numeric, 1) AS bay_minutes_held_before_the_window
   FROM c GROUP BY 1 ORDER BY 1;
+-- READ mid-run (12:26 UTC; through sim 10:16 AM CT): 18 bay commands with a booking: wash 11, detail 4, service 3.
+--   **0 entered more than 5 minutes before its booking; 0 bay-minutes held before a window** (921e349c by sim 10:00
+--   AM: Tesla-RT-003 in WSH-02 since 7:02 AM for a 10:45 booking).
 
 \echo '=== 0406 §13b — the early entries, and the other cars'' bookings on the same bay while the early car sat there ==='
 WITH c AS (
@@ -574,6 +590,10 @@ SELECT v.display_name AS car, x.stall_code AS bay, x.purpose,
            AND b2.during && tstzrange(x.issued_at, COALESCE(x.left_bay_at, upper(x.during)))) AS other_bookings_while_it_sat
   FROM x JOIN public.vehicles v ON v.id = x.vehicle_id
  ORDER BY x.issued_at;
+-- READ mid-run (12:26 UTC): nothing to list. **0549 (a) seen live:** Waymo-AV-020 held a wash reservation on WSH-03
+--   made at 4:51 AM for its planned leg at 7:33-7:41 AM. Seated at 6:24 AM, the reservation moved to 6:24-6:33 AM
+--   with its 9 minutes and the car left after 10.3. WSH-03 then washed Tesla-AV-048 at 6:40 and Waymo-AV-011 at 7:31,
+--   the bookings the old stretch would have collided with and left to elapse.
 
 \echo '=== 0406 §13c — every bay command''s booking and time in the bay, by purpose (a stretched booking shows as a long one) ==='
 WITH c AS (
@@ -600,3 +620,7 @@ SELECT purpose, count(*) AS entries,
   FROM x GROUP BY 1 ORDER BY 1;
 -- READ early (11:48 UTC; sim 5:12 AM CT): 1 bay command so far, a service entry, booked 45 minutes from the minute
 --   the car went in; no wash or detail entry yet.
+-- READ mid-run (12:26 UTC; through sim 10:16 AM CT): wash 11 entries, booked 9 minutes each, in the bay p50 9.3 and
+--   max 10.3; detail 4, booked 25, in the bay max 25.3; service 3, booked 45, in the bay max 45.3. **No booking
+--   longer than its service and nobody stayed past a booking** (921e349c: wash max 232.0 in the bay, detail max 182.2,
+--   a stretched detail booking of 52.3).
