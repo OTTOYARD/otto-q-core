@@ -1074,9 +1074,12 @@ SELECT to_char(r.sim_clock AT TIME ZONE 'America/Chicago', 'HH12:MI:SS') AS at_c
  ORDER BY r.sim_clock, s.stall_code;
 -- READ (17:24 UTC): the cause of G283, and it is not the bays' capacity. Waymo-AV-014, at 100%, was refused a deep clean
 --   every minute from 8:50 to 8:57 AM CT. Two of the three wash bays were physically empty the whole time. What held them:
---   - WSH-03: Zoox-AV-099's deep-clean hold, 8:49-9:10, booked at 5:32 AM. Its car never came. Released at 9:04:57,
---     `no_show_grace_elapsed`.
+--   - WSH-03: Zoox-AV-099's deep-clean hold, 8:49-9:10, booked at 5:32 AM. Released at 9:04:57, `no_show_grace_elapsed`.
 --   - WSH-01: Zoox-AV-099's wash hold, 8:49-8:57, also booked at 5:32 AM. Released at 8:57:29, `window_elapsed`.
+--     (Corrected 17:45 UTC. The first version of this READ said the car never came. It was on DCFC-08 from 7:26 to 9:10.
+--     The reconciler had moved both holds twice, to 8:49 at 8:42:14, taking the charge leg's planned end, 8:46, plus the
+--     taxi as the car's arrival. The charge ran past its plan (G240), so at 8:49 the reconciler no longer counted the car
+--     as blocked, and the holds sat in the bays' window until they lapsed.)
 --   - WSH-02, empty from 8:46:38: Zoox-AV-094's wash hold, 8:55-9:05. The reconciler deferred it at 8:53:01 to 10:58,
 --     because the car was still charging. Waymo-004's deep-clean hold, 8:58-9:23, was deferred at 8:58:21 to 10:28,
 --     because that car was in another bay.
@@ -1085,8 +1088,8 @@ SELECT to_char(r.sim_clock AT TIME ZONE 'America/Chicago', 'HH12:MI:SS') AS at_c
 --   (3 minutes) and its car cannot be there. A hold for a car that is still charging or in another bay therefore sits in the
 --   bay's next 25 minutes until it is 3 minutes away. `ottoq_stall_free_between` reads it as occupancy, and the car that is
 --   physically waiting is refused the empty bay. When the move comes, it is to the car's ETA (here 2 hours and 1.5 hours
---   out), which frees the bay. Holds booked hours ahead for cars that never come (Zoox-AV-099's two) block the same way
---   until the no-show grace runs out.
+--   out), which frees the bay. A hold whose car is still charging after its leg's planned end (Zoox-AV-099's two, G240)
+--   is no longer counted as blocked, and it stays in the window until it lapses.
 
 -- ══ §20 G285: THE FAULT DOOR DEADLOCKED WITH THE TICK, AND 0552 ═════════════════════════════════════════════════════════
 --

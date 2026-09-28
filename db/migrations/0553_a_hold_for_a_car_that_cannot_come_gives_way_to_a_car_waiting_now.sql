@@ -12,8 +12,10 @@
 --   were empty at a refused deep clean. The chooser, `ottoq.ottoq_stall_free_between`, refuses a bay whose calendar has a
 --   booking in the job's window, 25 minutes for a deep clean, and what held the empty bays was held bookings for cars that
 --   were not there:
---     - holds booked hours ahead for a car that never came. Zoox-AV-099's wash and deep clean, booked at 5:32 AM for 8:49
---       AM, held two bays until `window_elapsed` (8:57:29) and `no_show_grace_elapsed` (9:04:57);
+--     - holds for a car still charging after its charge leg's planned end. Zoox-AV-099's wash and deep clean, booked at
+--       5:32 AM, had been moved to 8:49 AM, the leg's planned end (8:46) plus the taxi. The charge ran on to 9:10 (G240),
+--       so at 8:49 the reconciler no longer counted the car as blocked, and the holds kept two bays until `window_elapsed`
+--       (8:57:29) and `no_show_grace_elapsed` (9:04:57);
 --     - holds for cars still charging or in another bay. `ottoq.ottoq_reconcile_bay_reservations` moves such a hold to its
 --       car's ETA only when its start is within the 3-minute taxi time, so until then it blocks the bay's next 25 minutes.
 --       Zoox-AV-094's wash hold, 8:55-9:05, sat in the window until 8:53:01, when it was deferred to 10:58; Waymo-004's
