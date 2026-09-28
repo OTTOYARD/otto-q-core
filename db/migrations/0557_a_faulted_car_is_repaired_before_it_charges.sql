@@ -1,5 +1,6 @@
--- migration-version: PENDING
+-- migration-version: 20260928220015
 -- migration-name:    a_faulted_car_is_repaired_before_it_charges
+-- (applied 2026-09-28, 5:00 PM CT, after the 0555/0556 sweep passed 9 of 9, verdicts 594-602.)
 --
 -- 0557  **A car with an open vehicle fault is repaired before it charges.** (G291; CLAUDE.md rule 9)
 --
@@ -422,3 +423,14 @@ END $v3$;
 -- 0555's step (6) as it was).
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-28 to gxdrcyphqjzjsuhxuqtg, 5:00 PM CT (ledger 20260928220015).
+--   public.ottoq_decide_tick                         2187f8565d4e8d33c646f8efb7316e2c -> 1595b2f51574023543dc1c6ed5c76aea
+--   twin.ottoq_sim_advance_service_flow              0b852abe1944dd93f8e35c9d2f6967bd -> 1c90e987c63f44deab38f22d1986e743
+--   ottoq.ottoq_validate_assignment                  d896e3b23991675840157f7357190ba5 -> 623d97cf801d1123b04160d3862a74b5
+--   ottoq.ottoq_route_faulted_cars_to_repair         eb428364241f3d112ea59d4787b82e7c -> e04e790f6e4f843c6de1b08078f7b52e
+--   ottoq.ottoq_plan_opportunistic_charges           7b010072f6f3b52f534aa4e6194e6afa -> a181dddde70d2a4d46c3f37d1cac752b
+--   public.ottoq_depot_queue                         b1c77098b93d8ff19e209aa5811c48b6 -> b1988a81261ce4ba3295099e526df1cf
+--   V1 and V3 passed: the transaction commits only if both do. A dry run (ROLLBACK in place of COMMIT) passed first and
+--   left nothing behind. ottoq_cert_recert_floor() moved to 2026-09-28 22:00:15.710223+00; the sweep restarted.

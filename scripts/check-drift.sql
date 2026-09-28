@@ -654,7 +654,7 @@ repo_manifest(version, name, file) AS (
     ('APPLIED-NO-LEDGER-ROW'::text, 'a_car_is_in_a_bay_only_when_it_stands_in_one'::text, '0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql'::text),
     ('20260928212503'::text, 'a_faulted_car_is_repaired_and_the_gate_flag_is_a_note'::text, '0555_a_faulted_car_is_repaired_before_it_goes_back_to_work.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'the_gates_patience_flag_is_a_note_for_a_person_not_service_work'::text, '0556_the_gates_patience_flag_is_a_note_for_a_person_not_service_work.sql'::text),
-    ('PENDING'::text, 'a_faulted_car_is_repaired_before_it_charges'::text, '0557_a_faulted_car_is_repaired_before_it_charges.sql'::text)
+    ('20260928220015'::text, 'a_faulted_car_is_repaired_before_it_charges'::text, '0557_a_faulted_car_is_repaired_before_it_charges.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
