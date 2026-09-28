@@ -635,7 +635,9 @@ repo_manifest(version, name, file) AS (
     ('20260927175201'::text, 'a_top_off_is_offered_to_a_car_still_waiting_for_one'::text, '0535_a_top_off_is_offered_to_a_car_still_waiting_for_one.sql'::text),
     ('20260927180246'::text, 'the_cockpits_see_what_the_brain_questions_and_what_it_learns'::text, '0536_the_cockpits_see_what_the_brain_questions_and_what_it_learns.sql'::text),
     ('20260927194349'::text, 'a_question_is_one_the_next_scan_still_sees'::text, '0537_a_question_is_one_the_next_scan_still_sees.sql'::text),
-    ('20260927210230'::text, 'a_challenger_grade_says_what_it_measures_and_what_tests_its_lever'::text, '0538_a_challenger_grade_says_what_it_measures_and_what_tests_its_lever.sql'::text)
+    ('20260927210230'::text, 'a_challenger_grade_says_what_it_measures_and_what_tests_its_lever'::text, '0538_a_challenger_grade_says_what_it_measures_and_what_tests_its_lever.sql'::text),
+    ('PENDING'::text, 'an_outside_agent_asks_through_one_door_and_a_person_decides'::text, '0550_an_outside_agent_asks_through_one_door_and_a_person_decides.sql'::text),
+    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0551_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
