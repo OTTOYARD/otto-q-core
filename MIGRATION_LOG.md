@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0554 — GENERATED, not a log
+## Index, 0134–0556 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -559,7 +559,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0552](db/migrations/0552_the_fault_door_waits_for_the_tick_instead_of_deadlocking_with_it.sql) | `20260928170009` | yes — ledger | **The cockpit's charger-fault door waits for the tick instead of deadlocking with it.** (G285) |
 | [0553](db/migrations/0553_a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now.sql) | `20260928184413` | yes — ledger | **A bay held for a car that cannot come in time gives way to a car waiting for it now.** (G283; CLAUDE.md rule 9) |
 | [0554](db/migrations/0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | **A car is in a wash, detail or service bay only when it stands in one.** (G286) |
+| [0555](db/migrations/0555_a_faulted_car_is_repaired_before_it_goes_back_to_work.sql) | `20260928212503` | yes — ledger | **A car with a vehicle fault is repaired in the service bay before it goes back to work.** (G290) |
+| [0556](db/migrations/0556_the_gates_patience_flag_is_a_note_for_a_person_not_service_work.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | **The readiness gate's patience flag is a note for a person, not service work.** (G289) |
 
-420 migrations indexed.
+422 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
