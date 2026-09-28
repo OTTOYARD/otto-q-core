@@ -636,8 +636,6 @@ repo_manifest(version, name, file) AS (
     ('20260927180246'::text, 'the_cockpits_see_what_the_brain_questions_and_what_it_learns'::text, '0536_the_cockpits_see_what_the_brain_questions_and_what_it_learns.sql'::text),
     ('20260927194349'::text, 'a_question_is_one_the_next_scan_still_sees'::text, '0537_a_question_is_one_the_next_scan_still_sees.sql'::text),
     ('20260927210230'::text, 'a_challenger_grade_says_what_it_measures_and_what_tests_its_lever'::text, '0538_a_challenger_grade_says_what_it_measures_and_what_tests_its_lever.sql'::text),
-    ('PENDING'::text, 'an_outside_agent_asks_through_one_door_and_a_person_decides'::text, '0550_an_outside_agent_asks_through_one_door_and_a_person_decides.sql'::text),
-    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0551_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text)
     ('20260927223621'::text, 'a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it'::text, '0539_a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it.sql'::text),
     ('20260927230739'::text, 'every_result_the_learner_reaches_is_a_recommendation_a_person_ships'::text, '0540_every_result_the_learner_reaches_is_a_recommendation_a_person_ships.sql'::text),
     ('20260927230859'::text, 'a_car_charging_to_its_target_is_never_a_question'::text, '0541_a_car_charging_to_its_target_is_never_a_question.sql'::text),
@@ -648,7 +646,9 @@ repo_manifest(version, name, file) AS (
     ('20260928053318'::text, 'a_car_waiting_for_a_charger_keeps_its_place_in_line'::text, '0546_a_car_waiting_for_a_charger_keeps_its_place_in_line.sql'::text),
     ('20260928074913'::text, 'a_charger_its_car_has_left_for_a_bay_is_free'::text, '0547_a_charger_its_car_has_left_for_a_bay_is_free.sql'::text),
     ('20260928093601'::text, 'a_paired_test_can_keep_a_fast_charger_for_a_car_that_wants_one'::text, '0548_a_paired_test_can_keep_a_fast_charger_for_a_car_that_wants_one.sql'::text),
-    ('20260928111517'::text, 'a_car_seated_in_a_bay_early_is_served_now'::text, '0549_a_car_seated_in_a_bay_early_is_served_now.sql'::text)
+    ('20260928111517'::text, 'a_car_seated_in_a_bay_early_is_served_now'::text, '0549_a_car_seated_in_a_bay_early_is_served_now.sql'::text),
+    ('PENDING'::text, 'an_outside_agent_asks_through_one_door_and_a_person_decides'::text, '0550_an_outside_agent_asks_through_one_door_and_a_person_decides.sql'::text),
+    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0551_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
