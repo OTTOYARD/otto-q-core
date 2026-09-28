@@ -648,7 +648,7 @@ repo_manifest(version, name, file) AS (
     ('20260928093601'::text, 'a_paired_test_can_keep_a_fast_charger_for_a_car_that_wants_one'::text, '0548_a_paired_test_can_keep_a_fast_charger_for_a_car_that_wants_one.sql'::text),
     ('20260928111517'::text, 'a_car_seated_in_a_bay_early_is_served_now'::text, '0549_a_car_seated_in_a_bay_early_is_served_now.sql'::text),
     ('20260928163347'::text, 'a_charger_fault_from_the_cockpit_stops_the_charge'::text, '0550_a_charger_fault_from_the_cockpit_stops_the_charge.sql'::text),
-    ('PENDING'::text, 'a_car_keeps_its_place_in_the_charge_line_through_a_fault'::text, '0551_a_car_keeps_its_place_in_the_charge_line_through_a_fault.sql'::text),
+    ('20260928180804'::text, 'a_car_keeps_its_place_in_the_charge_line_through_a_fault'::text, '0551_a_car_keeps_its_place_in_the_charge_line_through_a_fault.sql'::text),
     ('20260928170009'::text, 'the_fault_door_waits_for_the_tick_instead_of_deadlocking_with_it'::text, '0552_the_fault_door_waits_for_the_tick_instead_of_deadlocking_with_it.sql'::text),
     ('PENDING'::text, 'a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now'::text, '0553_a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now.sql'::text),
     ('PENDING'::text, 'a_car_is_in_a_bay_only_when_it_stands_in_one'::text, '0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql'::text)

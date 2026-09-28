@@ -89,7 +89,7 @@ END $live$;
 DO $premises$
 BEGIN
   IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.ottoq_decide_tick(uuid)'::regprocedure)
-     <> 'SET_AFTER_0551_IS_APPLIED' THEN
+     <> '9c5f7289e50a83c5a2e5ca65c6595a75' THEN
     RAISE EXCEPTION '0553 P2: public.ottoq_decide_tick is not the function measured';
   END IF;
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname IN ('ottoq_bay_hold_car_eta', 'ottoq_yield_bay_holds')) THEN

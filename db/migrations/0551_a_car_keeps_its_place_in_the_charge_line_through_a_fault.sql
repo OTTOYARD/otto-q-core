@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260928180804
 -- migration-name:    a_car_keeps_its_place_in_the_charge_line_through_a_fault
 --
 -- 0551  **A car keeps its place in the charge line through a charger fault and through every move it makes while it

@@ -81,7 +81,7 @@ DO $premises$
 BEGIN
   IF (SELECT md5(prosrc) FROM pg_proc
        WHERE oid = 'twin.ottoq_sim_advance_service_flow(uuid,timestamp with time zone,numeric,uuid)'::regprocedure)
-     <> 'SET_AFTER_0551_IS_APPLIED' THEN
+     <> '732568fb8dd8bec2a0a02ed188a13d4a' THEN
     RAISE EXCEPTION '0554 P2: twin.ottoq_sim_advance_service_flow is not the function measured';
   END IF;
 END $premises$;
