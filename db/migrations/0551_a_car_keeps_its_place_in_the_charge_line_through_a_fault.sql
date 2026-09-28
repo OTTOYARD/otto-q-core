@@ -61,7 +61,8 @@
 --   Every arm runs the decide tick and the service flow. The cursor's order moves whenever a car carries a bank (a fault,
 --   a gate-to-staging move, a bay visit while below target), and the escalation writes events and a stamp. The stamp is
 --   in `vehicles.config`, which the world fingerprint hashes through `ottoq_scrub_ids`, so the run id in it does not split
---   the arms; `since` and `banked_min` are sim-clock values.
+--   the arms; `since` and `banked_min` are sim-clock values. No arm starts with a stamp: the pair's fleet reset
+--   (`ottoq_tick_invariance_reset_fleet`) rebuilds `config` from an allowlist of static keys, and `charge_wait` is not one.
 --
 -- ══ §4 NOT IN THIS FILE ═══════════════════════════════════════════════════════════════════════════════════════════════
 --
