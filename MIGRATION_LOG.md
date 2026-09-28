@@ -432,7 +432,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0425](db/migrations/0425_the_walkaround_claims_a_service_bay_because_its_leg_type_falls_through_and_the_one_line_fix_would_have_broken_the_planner.sql) | `20260922155332` | yes — ledger | **`perimeter_walkaround` is performed AT THE VEHICLE and holds 3,257 bookings on the twin depot's |
 | [0426](db/migrations/0426_a_charge_only_rule_fails_every_walkaround_because_my_probe_spells_the_service_key_svc_and_it_reads_service.sql) | `20260922155423` | yes — ledger | **`HW.003.sensor_liveness` is `safety_critical`/`block` and fails 1,288 of 3,550 evaluations at |
 | [0427](db/migrations/0427_the_presence_rule_finally_gets_a_stall_by_probing_where_a_charge_actually_ends.sql) | `20260922163008` | yes — ledger | **`HW.006.physical_presence_verification` asks whether the vehicle is physically in the stall, and |
-| [0428](db/migrations/0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence.sql) | `PENDING` | no — pending | **`charge_session_start` is the first of the six advisory checkpoints to become ENFORCING.** Four |
+| [0428](db/migrations/0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence.sql) | `20260922170157` | yes — ledger | **`charge_session_start` is the first of the six advisory checkpoints to become ENFORCING.** Four |
 | [0429](db/migrations/0429_the_depot_is_in_entity_id_and_every_query_written_to_this_repos_own_mandated_predicate_reads_zero.sql) | `20260922171450` | yes — ledger | **Ten event types emit `p_entity_type := 'depot', p_entity_id := p_depot_id` and never pass |
 | [0430](db/migrations/0430_the_ledger_says_blocked_and_cannot_say_whether_anything_was_blocked_so_it_learns_to_say_both.sql) | `20260922172845` | yes — ledger | **`ottoq_rule_evaluations.enforcement_taken='blocked'` is the shield's RECOMMENDATION, and at FIVE |
 | [0431](db/migrations/0431_a_quarter_of_departures_skipped_the_readiness_check_because_it_runs_before_the_vehicle_is_staged.sql) | `20260922224038` | yes — ledger | **The dispatcher holds a staged vehicle until its readiness check is done.** `db/checks/0351` |
@@ -557,8 +557,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0550](db/migrations/0550_a_charger_fault_from_the_cockpit_stops_the_charge.sql) | `20260928163347` | yes — ledger | **A charger fault injected from the cockpit stops the charge, and only a repair clears a fault.** (G281.) |
 | [0551](db/migrations/0551_a_car_keeps_its_place_in_the_charge_line_through_a_fault.sql) | `20260928180804` | yes — ledger | **A car keeps its place in the charge line through a charger fault and through every move it makes while it |
 | [0552](db/migrations/0552_the_fault_door_waits_for_the_tick_instead_of_deadlocking_with_it.sql) | `20260928170009` | yes — ledger | **The cockpit's charger-fault door waits for the tick instead of deadlocking with it.** (G285) |
-| [0553](db/migrations/0553_a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now.sql) | `PENDING` | no — pending | **A bay held for a car that cannot come in time gives way to a car waiting for it now.** (G283; CLAUDE.md rule 9) |
-| [0554](db/migrations/0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql) | `PENDING` | no — pending | **A car is in a wash, detail or service bay only when it stands in one.** (G286) |
+| [0553](db/migrations/0553_a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now.sql) | `20260928184413` | yes — ledger | **A bay held for a car that cannot come in time gives way to a car waiting for it now.** (G283; CLAUDE.md rule 9) |
+| [0554](db/migrations/0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | **A car is in a wash, detail or service bay only when it stands in one.** (G286) |
 
 420 migrations indexed.
 
