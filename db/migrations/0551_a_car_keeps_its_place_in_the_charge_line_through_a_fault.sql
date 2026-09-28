@@ -594,7 +594,11 @@ BEGIN
     UPDATE public.ottoq_ocpp_chargers c SET station_state = 'Faulted'
       FROM public.stalls s
      WHERE s.ocpp_charger_id = c.charger_id AND s.depot_id = v_depot AND s.stall_type::text IN ('dcfc', 'l2') AND s.id <> l2[2];
-    UPDATE public.ottoq_ocpp_chargers SET station_state = 'Available' WHERE charger_id = ch[2];
+    -- The world tick stamps every charger's heartbeat before the decide tick (0424), and the proposer offers only a
+    -- charger heard from in the last 90 seconds. V3 calls the decide tick alone, a day past the run's end, so it stamps
+    -- the one free charger itself.
+    UPDATE public.ottoq_ocpp_chargers SET station_state = 'Available', last_heartbeat_at = t + interval '10 minutes'
+     WHERE charger_id = ch[2];
     UPDATE public.ottoq_sim_runs SET sim_clock_current = t + interval '10 minutes', tick_count = tick_count + 1 WHERE sim_run_id = v_run;
     SELECT max(queue_position) FILTER (WHERE vehicle_id = a), max(queue_position) FILTER (WHERE vehicle_id = b) INTO pa, pb
       FROM public.ottoq_depot_queue(v_depot, v_run) WHERE queue_kind = 'charge';
