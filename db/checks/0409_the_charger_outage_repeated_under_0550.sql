@@ -28,6 +28,17 @@
 --         - what does G279 (a fault sends the car to the back of the line) cost when three fast chargers fault at once?
 --       It also re-reads G282 (§18) and G283 (§19) on a second day.
 --
+--       **What the end reads found (17:47 UTC).** The governor stopped the run at 12:46 PM CT, sim 1:40 PM.
+--         - Rule 9 held all day: 133 departures, none below 99%, none with a service open (§2). No fault left a car short (§16).
+--         - The outage did what a real one does. Each injected fault stopped its charge. Each car was re-queued, recharged
+--           86.5-138.4 minutes later, and left at 100%. Each charger was out its full 120 minutes (§17).
+--         - G279: the 16 faults below 99% erased 26.1 hours of accumulated wait. Six cars at 40-96% were still not recharged
+--           when the run ended, up to 423.6 minutes after their faults (§16b).
+--         - G282: 32 gate stays below target reached 240 minutes, and none was escalated (§18).
+--         - G283: 332 refused wash-bay seats, not one with the three bays full (§19c).
+--         - New, G286: 34 of 93 bay visits, 960 of 2,008 bay-minutes, were in no bay. The twin's wash and service lanes set
+--           the bay state without seating the car (§21).
+--
 --       **Not a paired test.** 0408's caveat holds. The three runs share the seed, but a charger's fault card is keyed on the
 --       car, the stall and the minute its session starts (0058), and a live run's ticks follow the wall clock. Both earlier
 --       runs were purged when this one started. A difference from them is read against §11b first.
@@ -66,7 +77,14 @@ SELECT r.sim_run_id, r.run_by, r.status, r.random_seed, r.sim_clock_start, r.sim
 SELECT public.ottoq_kpi_five('eff13379-c00d-4112-993a-7c8562681727');
 SELECT public.ottoq_kpi_charge_wait('eff13379-c00d-4112-993a-7c8562681727');
 SELECT public.ottoq_kpi_supply_gap('eff13379-c00d-4112-993a-7c8562681727') - 'by_hour_ct';
--- READ: pending.
+-- READ (17:47 UTC): the governor stopped the run at 17:46:00 UTC (12:46 PM CT), `run_governor_sim_minute_ceiling`: 553.1
+--   sim-minutes against the 540 ceiling, 1,108 ticks, sim 4:26 AM to 1:40:38 PM CT (the tick in flight at the stop
+--   landed after it, so the clock reads 554.6 minutes).
+--   KPI 1 153.36 · KPI 2 3.57 · peak site kW 912.8 (demand 1,154.3) · KPI 4 1.283 · KPI 5 p50 28.6, p95 290.7 min ·
+--   returns unserved 45. Charge wait (visits) p50 53.2, p95 326.6 (floor 346.3); 154 of 208 charged, 54 still waiting at
+--   the end. Supply gap: 57.2% of demand car-hours unmet (200.5 of 350.7), peak shortfall 40.
+--   Against §0 (0405bf42 | ca448d95): KPI 1 148.8 | 149.38, returns unserved 35 | 30, KPI 5 p95 263.5 | 250.6, supply gap
+--   57.9% | 58.4%. Not a paired test (§0); §11b reads the day's faults first.
 
 -- ══ §2 RULE 9 STILL HOLDS: NO DEPARTURE WITH A SERVICE OPEN OR A CHARGE SHORT ═════════════════════════════════════════
 --
@@ -103,7 +121,8 @@ SELECT (SELECT count(*) FROM dv) AS departures,
        (SELECT count(*) FROM dv WHERE soc < 99) AS below_99,
        (SELECT min(soc) FROM dv) AS min_soc,
        (SELECT count(DISTINCT (vehicle_id, left_at)) FROM open_at) AS left_with_open_work;
--- READ: pending.
+-- READ (17:47 UTC): 133 departures, 0 below 99% (lowest 99), 0 with a service open. Rule 9 held through the outage
+--   (0405bf42 | ca448d95: 132, 0, 0).
 
 -- ══ §3 THE DOOR AND THE FLOOR (0544): NEITHER SHOULD EVER FIRE ════════════════════════════════════════════════════════
 
@@ -112,7 +131,7 @@ SELECT count(*) FILTER (WHERE e.event_type = 'twin.dispatch_refused_unfinished')
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed') AS tick_failures,
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed' AND e.payload::text LIKE '%0544 (CLAUDE.md rule 9)%') AS floor_rejections
   FROM public.ottoq_events e WHERE e.sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727';
--- READ: pending.
+-- READ (17:47 UTC): 0 door refusals, 0 tick failures, 0 floor rejections.
 
 -- ══ §4 ESCALATIONS: THE GATE'S (G269) AND THE WAITS FOR A CHARGER OR THE SERVICE BAY (0546 (d), G274) ══════════════════
 --
@@ -137,7 +156,13 @@ SELECT v.display_name, e.sim_clock_at AT TIME ZONE 'America/Chicago' AS escalate
   FROM public.ottoq_events e LEFT JOIN public.vehicles v ON v.id = e.entity_id
  WHERE e.sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727' AND e.event_type = 'twin.deploy_gate_escalated'
  ORDER BY e.sim_clock_at;
--- READ: pending.
+-- READ (17:47 UTC): 7 escalations, all `waiting_for_a_charger`, each held 240.0-240.2 minutes with no state change
+--   inside the counted wait, one per car and start:
+--   - 8:31 AM: Tesla-AV-057 (23%), Tesla-AV-051 (17%), Zoox-004 (27%), Waymo-AV-007 (20%), staged since 4:31 AM;
+--   - 10:37 AM: Waymo-AV-035 (40%), 240 minutes after its L2 fault at 6:37 (§16b);
+--   - 12:40 PM: Waymo-AV-004 (66%), after its L2 fault at 8:40;
+--   - 1:16 PM: Tesla-AV-043 (52%), after its L2 fault at 9:16.
+--   No `must_do_work_open` this time (ca448d95 had 2, G283).
 
 -- ══ §5 G270: WHO GOT THE BAY SEATS ═══════════════════════════════════════════════════════════════════════════════════
 
@@ -161,7 +186,9 @@ WITH holds AS (
 SELECT count(*) AS cars_held, round(avg(held)) AS mean_max_hold_min, max(held) AS longest_hold_min,
        count(*) FILTER (WHERE held >= 240) AS reached_the_cap
   FROM holds;
--- READ: pending.
+-- READ (17:47 UTC): 45 needs-card seats: 29 washes (17 for a car due later, 8 late, 4 with no deploy time), 12 deep
+--   cleans (5, 6, 1) and 4 service (2, 2). 83 cars were held at the gate: mean longest hold 28 minutes, longest 209.8,
+--   none at the 240-minute cap.
 
 -- ══ §6 WHAT HOLDING COSTS ═════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -176,7 +203,9 @@ SELECT (SELECT jsonb_object_agg(to_state, k) FROM (
             FROM public.ottoq_events e WHERE e.sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727' AND e.event_type = 'vehicle.state_changed'
              AND e.payload->'diff'->'current_state'->>'to' IN ('in_wash_bay', 'in_detail_bay', 'in_service_bay')
            GROUP BY 1) q) AS bay_entries;
--- READ: pending.
+-- READ (17:47 UTC): 34 departure rechecks, 7 escalations (§4). The gate held at most 25 cars at once; staging
+--   overflowed by up to 50. Bay entries by state: 39 wash, 24 detail, 30 service. 34 of those 93 were in no bay (§21,
+--   G286).
 
 -- ══ §7 G271: NO CAR STARVES WAITING FOR A CHARGER OR THE SERVICE BAY ═════════════════════════════════════════════════
 --
@@ -228,7 +257,11 @@ SELECT step, band, how, count(*) AS waits, count(DISTINCT vehicle_id) AS cars,
        round(sum(wait_min)::numeric / 60, 1) AS car_hours,
        count(*) FILTER (WHERE wait_min >= 240) AS reached_240
   FROM w GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
--- READ: pending.
+-- READ (17:47 UTC): need_charge, below 90%: 43 waits ended at a charger (40 cars; p50 17.3, p95 121.1, max 141.9
+--   minutes); 5 were still waiting at the end (40-66%, max 423.5; 3 past 240). 5 of unknown charge ended at a charger
+--   (p50 312.0, max 352.7; 4 past 240, the 8:31 AM escalations). Top-offs from 90%: 35 ended at a charger (p50 1.4, p95
+--   52.6, max 86.1), 1 still waiting (96%, 120.0). need_service: 24 ended in the service bay (p50 29.3, p95 74.3, max
+--   83.5); 74 went back to the gate within 3.2 minutes (the need gate, 0468).
 
 --   The same waits still open at the teardown, by whether the car had a visit (0546 (c)), and whether each wait that
 --   reached 240 minutes was escalated once in its stay (0546 (d)). A stay is the car's time in staged_awaiting_service
@@ -276,7 +309,9 @@ SELECT step, CASE WHEN ended IS NULL THEN 'still waiting at the end' ELSE 'ended
   FROM w
  WHERE ended IS NULL OR wait_min >= 240 OR escalations_in_stay > 0
  GROUP BY 1, 2, 3, 4, 5 ORDER BY 1, 2, 3, 4, 5;
--- READ: pending.
+-- READ (17:47 UTC): every staged wait that reached 240 minutes was escalated exactly once: 4 ended, 3 were still open
+--   at the end (40-66%, up to 423.5 minutes). Also open at the end: 3 need_charge waits under 240 (45-96%, up to 208.0) and
+--   2 need_service (100%, 36.5 and 41.6; one an immediate dispatch).
 
 -- ══ §8 G273: NO RELEASE KEEPS A FLAG THE GATE RAISED ═══════════════════════════════════════════════════════════════════
 --
@@ -298,7 +333,7 @@ SELECT flag_type, count(*) AS releases_keeping_the_flag, count(DISTINCT entity_i
             AND e3.event_type = 'vehicle.state_changed' AND e3.event_seq > rel.event_seq
             AND e3.payload->'diff'->'current_state'->>'to' = 'in_service_bay')) AS later_in_service_bay
   FROM rel GROUP BY flag_type ORDER BY flag_type;
--- READ: pending.
+-- READ (17:47 UTC): none. No release kept a gate flag.
 
 -- ══ §9 LIVE PROBE: NO STAGED CAR IS RE-STAMPED WITHOUT A STATE CHANGE (G272) ═══════════════════════════════════════════
 --
@@ -321,7 +356,8 @@ SELECT v.current_state, v.config->>'svc_step' AS step, count(*) AS restamped_wit
                      AND e.event_type = 'vehicle.state_changed' AND e.sim_clock_at = r.sim_clock_current
                      AND e.payload->'diff' ? 'current_state')
  GROUP BY 1, 2, r.tick_count ORDER BY 3 DESC;
--- READ: pending.
+-- READ (17:47 UTC): not read live. The run was read after the governor stopped it, and the stop's teardown took all 116
+--   cars offline, so the final tick has no staged car to test: 0 rows.
 
 --   §9b, the same moment from the queue's side: every car on need_charge with the wait the charge cursor reads (sim now
 --   minus `last_state_change`), by whether it has a visit and by its charge.
@@ -340,7 +376,7 @@ SELECT CASE WHEN EXISTS (SELECT 1 FROM public.ottoq_visit_needs vn WHERE vn.vehi
  WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111' AND v.category = 'autonomous'
    AND v.current_state = 'staged_awaiting_service' AND v.config->>'svc_step' = 'need_charge'
  GROUP BY 1, 2, r.tick_count, r.sim_clock_current ORDER BY 1, 2;
--- READ: pending.
+-- READ (17:47 UTC): 0 rows, for the same reason as §9.
 
 -- ══ §10 G271: WHO THE CHARGERS WENT TO, BY WHETHER THE CAR HAD A VISIT ══════════════════════════════════════════════════
 --
@@ -358,7 +394,8 @@ s AS (
 SELECT CASE WHEN started_at < timestamptz '2026-09-28 10:00:00+00' THEN 'before 5:00 AM CT' ELSE 'from 5:00 AM CT' END AS started,
        COALESCE(urgency, 'no visit') AS car, count(*) AS sessions, min(soc_start) AS min_soc, max(soc_start) AS max_soc
   FROM s GROUP BY 1, 2 ORDER BY 1, 2;
--- READ: pending.
+-- READ (17:47 UTC): 191 sessions. Before 5:00 AM CT: 23 for immediate dispatches (12-97%), 26 for cars with no visit
+--   (80-97%), 8 standard (90-98%). From 5:00 AM: 35 immediate (14-88%), 3 with no visit (78-98%), 96 standard (17-98%).
 
 -- ══ §11 THE CHARGERS: HOW BUSY, HOW MANY FAULTED, AND WHAT WAS FREE WHILE CARS WAITED ═══════════════════════════════════
 --
@@ -379,7 +416,10 @@ x AS (
 SELECT x.kind, k.stalls, count(*) AS sessions, round(sum(mins)::numeric / 60, 1) AS session_hours,
        round((sum(mins) / (k.stalls * extract(epoch FROM (r.t1 - r.t0)) / 60.0) * 100)::numeric, 1) AS pct_of_nameplate_time
   FROM x JOIN k USING (kind), r GROUP BY x.kind, k.stalls, r.t0, r.t1 ORDER BY 1;
--- READ: pending.
+-- READ (17:47 UTC): fast chargers 71 sessions, 80.0 session-hours, 86.5% of nameplate time; L2 120 sessions, 264.2
+--   hours, 95.3% (0405bf42 | ca448d95: fast 81.4% | 83.1%, L2 90.8% | 95.3%). The fast chargers were busier than on either
+--   earlier day although three stood 120.6 minutes each for the outage. The twin's own faults differ by day (§0's
+--   caveat): 15 here against 19 | 18, 5 of them on fast chargers (§11b).
 
 \echo '=== 0409 §11d — sessions by charger kind and by charge at the start ==='
 WITH r AS (SELECT * FROM public.ottoq_sim_runs WHERE sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727'),
@@ -395,7 +435,9 @@ SELECT kind, CASE WHEN soc_start >= 90 THEN 'a >=90' WHEN soc_start >= 70 THEN '
        count(*) AS sessions, count(*) FILTER (WHERE car = 'immediate_dispatch') AS immediate,
        round(avg(mins) FILTER (WHERE finished)::numeric, 1) AS avg_min_finished, round(sum(mins)::numeric / 60, 1) AS charger_hours
   FROM s GROUP BY 1, 2 ORDER BY 1, 2;
--- READ: pending.
+-- READ (17:47 UTC): fast chargers: 53 sessions from below 50% (28 immediate; 88.6 minutes on average to finish, 69.3
+--   charger-hours), 3 from 50-69% (91.4), 4 from 70-89% (49.7), 11 top-offs from 90% (6 immediate; 20.0 minutes, 3.4
+--   hours). L2: 72 from below 50% (21 immediate; 252.8 minutes, 227.7 hours), 22 from 70-89% (70.6), 26 top-offs (29.4).
 
 \echo '=== 0409 §11b — every charger fault, its repair time, and how long its charger stood before its next car ==='
 WITH f AS (
@@ -407,7 +449,10 @@ SELECT s.stall_code, f.at AT TIME ZONE 'America/Chicago' AS fault_ct, f.reason, 
                                    WHERE o2.sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727' AND o2.stall_id = f.stall_id AND o2.started_at > f.at)
                                  - f.at))::numeric / 60, 1) AS stood_until_next_car_min
   FROM f JOIN public.stalls s ON s.id = f.stall_id ORDER BY f.at;
--- READ: pending.
+-- READ (17:47 UTC): 18 faults, 15 the twin's own and the 3 injected. Every faulted charger stood for its repair and took
+--   its next car within a minute of it: the injected three 120.6 minutes each (declared 120). The twin's fast-charger
+--   faults: DCFC-10 48 minutes (4:41 AM), -05 10 (5:50), -04 10 (10:12), -08 23 (1:13 PM), and -07's thermal emergency at
+--   10:44 AM (176 minutes), which ran past the end. L2-09's fault at 1:26 PM also ran past it.
 
 --   §11c counts cars at the gate too (`avg_at_gate`): the charge cursor reads them as well as staged cars on need_charge
 --   (§15). A charger that reads free by the pointer may be faulted: §11b lists the faults.
@@ -459,7 +504,10 @@ SELECT to_char(date_trunc('hour', at AT TIME ZONE 'America/Chicago'), 'HH12 AM')
        sum(dcfc_free) FILTER (WHERE cars_waiting + at_gate > 0) * 2 AS dcfc_free_min_while_waiting,
        sum(l2_free) FILTER (WHERE cars_waiting + at_gate > 0) * 2 AS l2_free_min_while_waiting
   FROM g GROUP BY date_trunc('hour', at AT TIME ZONE 'America/Chicago') ORDER BY date_trunc('hour', at AT TIME ZONE 'America/Chicago');
--- READ: pending.
+-- READ (17:47 UTC): per hour, 21.5-55.2 cars at the gate on average and 5.2-27.5 staged on need_charge. During the
+--   outage (8 and 9 AM) 48.4 and 47.9 were at the gate. With cars waiting, fast chargers read free 0-70 minutes an hour
+--   by the stall's status (0-14 from 6 to 10 AM, 60-70 from 11 AM), L2 6-172. A free charger with cars at the gate is
+--   not by itself a missed charge: this does not say which of those cars still owed one.
 
 \echo '=== 0409 §11e — charger turnover: from a session''s end to the charger''s next car, by where the car went ==='
 --   Completed sessions only (a faulted session's gap is its repair, §11b). `car_went` is the car's first state after
@@ -489,7 +537,9 @@ SELECT kind, CASE WHEN car_went_to IN ('in_wash_bay','in_detail_bay','in_service
        round(avg(extract(epoch FROM next_start - ended_at) / 60)::numeric, 1) AS avg_gap_min,
        round(max(extract(epoch FROM next_start - ended_at) / 60)::numeric, 1) AS max_gap_min
   FROM nx GROUP BY 1, 2 ORDER BY 1, 2;
--- READ: pending.
+-- READ (17:47 UTC): a fast charger took its next car a median 1.1 minutes after its car left for a bay (25 sessions,
+--   max 2.9) and 0.9 after one left for departure (29, max 2.7); L2 0.8 (37, max 2.1) and 0.8 (42, max 3.2). G276 stays
+--   fixed.
 
 -- ══ §12 G276 STAYS FIXED: A CHARGER IS FREE ONCE ITS CAR HAS LEFT IT FOR A BAY ══════════════════════════════════════
 --
@@ -516,7 +566,7 @@ SELECT ch.kind, count(*) AS episodes, count(DISTINCT seg.stall_id) AS stalls,
   FROM seg JOIN ch ON ch.id = seg.stall_id
  WHERE seg.status = 'available' AND seg.ptr IS NOT NULL AND seg.ptr <> 'NULL'
  GROUP BY ch.kind ORDER BY 1;
--- READ: pending.
+-- READ (17:47 UTC): none. No charger read available with a car's pointer set at any moment of the run.
 
 \echo '=== 0409 §12b — the guard''s refusals, by where the car was when it asked ==='
 WITH a AS (
@@ -536,7 +586,9 @@ SELECT from_kind, state, status,
             ELSE 'car on another stall' END AS car_position,
        count(*) AS n
   FROM pos GROUP BY 1, 2, 3, 4 ORDER BY 1, 2, 3, 4;
--- READ: pending.
+-- READ (17:47 UTC): 99 refusals: 89 L2 and 5 fast-charger reassignments of a car charging on its own stall, 2 L2
+--   requests that expired, and 3 fast-charger requests for a car already on another stall. Those three are the injected
+--   faults at 7:40:35 AM: the report asked to move cars the stop had already moved to staging (S015, S013, S019).
 
 \echo '=== 0409 §12c — live: a stall that reads available with a pointer set, and where its car is ==='
 --   Run while the run is live. G121's census, at the twin depot. Under 0547 no charger should appear; a bay may, if a
@@ -549,7 +601,7 @@ SELECT s.stall_code, s.stall_type::text AS kind, s.status::text, v.display_name 
   LEFT JOIN public.stalls ts ON ts.id = v.robotic_tether_stall_id
  WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.status::text = 'available' AND s.current_vehicle_id IS NOT NULL
  ORDER BY 2, 1;
--- READ: pending.
+-- READ (17:47 UTC): not read live; see §9.
 
 -- ══ §13 G278 STAYS FIXED: NO CAR HOLDS A BAY BEFORE ITS BOOKING ═══════════════════════════════════════════════════
 --
@@ -575,7 +627,8 @@ SELECT purpose, count(*) AS entries,
        round(max(extract(epoch FROM lower(during) - issued_at) / 60)::numeric, 1) AS max_early_min,
        round(sum(GREATEST(extract(epoch FROM lower(during) - issued_at), 0) / 60) FILTER (WHERE lower(during) > issued_at + interval '5 minutes')::numeric, 1) AS bay_minutes_held_before_the_window
   FROM c GROUP BY 1 ORDER BY 1;
--- READ: pending.
+-- READ (17:47 UTC): 46 bay entries by command (12 deep cleans, 5 service, 29 washes); none entered more than 5 minutes
+--   before its booking.
 
 \echo '=== 0409 §13b — the early entries, and the other cars'' bookings on the same bay while the early car sat there ==='
 WITH c AS (
@@ -607,7 +660,7 @@ SELECT v.display_name AS car, x.stall_code AS bay, x.purpose,
            AND b2.during && tstzrange(x.issued_at, COALESCE(x.left_bay_at, upper(x.during)))) AS other_bookings_while_it_sat
   FROM x JOIN public.vehicles v ON v.id = x.vehicle_id
  ORDER BY x.issued_at;
--- READ: pending.
+-- READ (17:47 UTC): none to list (§13a).
 
 \echo '=== 0409 §13c — every bay command''s booking and time in the bay, by purpose (a stretched booking shows as a long one) ==='
 WITH c AS (
@@ -632,7 +685,8 @@ SELECT purpose, count(*) AS entries,
        round(max(in_bay_min)::numeric, 1) AS max_in_bay_min,
        count(*) FILTER (WHERE in_bay_min > booked_min + 5) AS stayed_past_the_booking
   FROM x GROUP BY 1 ORDER BY 1;
--- READ: pending.
+-- READ (17:47 UTC): no entry stayed past its booking by more than 5 minutes: deep cleans p50 25.3 minutes in the bay
+--   (booked 25), service 40.2 (40), washes 9.3 (9). G278 stays fixed.
 
 -- ══ §14 G195 RE-MEASURED: PARKING HOLDS THAT OUTLIVE THEIR CAR, AND WHETHER STAGING EVER BINDS ═══════════════════════
 --
@@ -665,33 +719,39 @@ SELECT x.purpose, x.renewed, count(*) AS holds,
          WHERE y.purpose = x.purpose AND y.renewed IS NOT DISTINCT FROM x.renewed) AS p50_min,
        (SELECT round(max(m)::numeric, 1) FROM y WHERE y.purpose = x.purpose AND y.renewed IS NOT DISTINCT FROM x.renewed) AS max_min
   FROM x GROUP BY 1, 2 ORDER BY 1, 2;
--- READ: pending.
+-- READ (17:47 UTC): temp holds: 137 not renewed, 112 of which outlived their car (1,975 stall-minutes, p50 14.1, max
+--   79.3); 230 renewed, 143 outlived their car (1,117, p50 7.8, max 14.5). Perimeter holds: 10 not renewed, 9 outlived
+--   their car (612 stall-minutes, p50 91.7, max 119.5); 4 renewed, none.
 
 \echo '=== 0409 §14b — staging stalls on the calendar every ten sim-minutes, and how many of them held a car that had left ==='
-WITH r AS (SELECT sim_run_id AS run, sim_clock_start AS t0, sim_clock_current AS t1 FROM public.ottoq_sim_runs WHERE sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727'),
-stg AS (SELECT id FROM public.stalls WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND stall_type::text = 'staging'),
-b AS (
-  SELECT b.booking_id, b.stall_id, b.vehicle_id, b.purpose, b.state, lower(b.during) AS lo,
+WITH r AS MATERIALIZED (SELECT sim_run_id AS run, sim_clock_start AS t0, sim_clock_current AS t1 FROM public.ottoq_sim_runs WHERE sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727'),
+stg AS MATERIALIZED (SELECT id FROM public.stalls WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND stall_type::text = 'staging'),
+lv AS MATERIALIZED (
+  SELECT e.entity_id AS vehicle_id, (e.payload->'diff'->'current_stall_id'->>'from')::uuid AS stall_id, e.sim_clock_at AS at
+    FROM public.ottoq_events e, r
+   WHERE e.sim_run_id = r.run AND e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_stall_id'
+     AND e.payload->'diff'->'current_stall_id'->>'from' IS NOT NULL),
+b AS MATERIALIZED (
+  SELECT b.booking_id, b.stall_id, b.vehicle_id, lower(b.during) AS lo,
          LEAST(upper(b.during), COALESCE(b.released_at, 'infinity'::timestamptz)) AS hi
     FROM public.ottoq_stall_bookings b JOIN r ON b.sim_run_id = r.run
    WHERE b.stall_id IN (SELECT id FROM stg) AND b.state IN ('held', 'active', 'done', 'interrupted')),
-bl AS (
-  SELECT b.*,
-         (SELECT min(e.sim_clock_at) FROM public.ottoq_events e, r
-           WHERE e.sim_run_id = r.run AND e.entity_id = b.vehicle_id AND e.event_type = 'vehicle.state_changed'
-             AND e.payload->'diff'->'current_stall_id'->>'from' = b.stall_id::text
-             AND e.sim_clock_at > b.lo) AS left_at
+bl AS MATERIALIZED (
+  SELECT b.*, (SELECT min(lv.at) FROM lv WHERE lv.vehicle_id = b.vehicle_id AND lv.stall_id = b.stall_id AND lv.at > b.lo) AS left_at
     FROM b),
 t AS (SELECT generate_series((SELECT t0 FROM r), (SELECT t1 FROM r), interval '10 minutes') AS at),
 c AS (
   SELECT t.at,
-         count(DISTINCT bl.stall_id) FILTER (WHERE bl.lo <= t.at AND bl.hi > t.at) AS stalls_on_calendar,
-         count(DISTINCT bl.stall_id) FILTER (WHERE bl.lo <= t.at AND bl.hi > t.at AND bl.left_at IS NOT NULL AND bl.left_at <= t.at) AS leaked
-    FROM t CROSS JOIN bl GROUP BY t.at)
+         count(DISTINCT bl.stall_id) AS stalls_on_calendar,
+         count(DISTINCT bl.stall_id) FILTER (WHERE bl.left_at IS NOT NULL AND bl.left_at <= t.at) AS leaked
+    FROM t JOIN bl ON bl.lo <= t.at AND bl.hi > t.at GROUP BY t.at)
 SELECT (SELECT count(*) FROM stg) AS staging_stalls, max(stalls_on_calendar) AS peak_on_calendar,
        round(avg(stalls_on_calendar), 1) AS mean_on_calendar, max(leaked) AS peak_leaked, round(avg(leaked), 1) AS mean_leaked
   FROM c;
--- READ: pending.
+-- READ (17:49 UTC): the 113 staging stalls: at most 83 on the calendar at once (mean 42.3), of which at most 15 (mean
+--   5.2) were held for a car that had already left. Staging never bound. (The query as first written timed out at the
+--   API's 60 seconds on this run; it now finds each car's leave once and counts only the ten-minute marks that have a
+--   booking, which every mark had.)
 
 -- ══ §15 WHERE THE FLEET'S HOURS WENT ═══════════════════════════════════════════════════════════════════════════════════
 --
@@ -737,7 +797,10 @@ lab AS (
 SELECT what, round((sum(secs) / 3600)::numeric, 1) AS car_hours,
        round((100 * sum(secs) / (SELECT 116 * extract(epoch FROM (t1 - t0)) FROM run))::numeric, 1) AS pct_of_fleet_time
   FROM lab GROUP BY 1 ORDER BY 1;
--- READ: pending.
+-- READ (17:47 UTC): working 150.5 car-hours (14.0%); at the gate 381.5 (35.6%) and staged waiting for a charger 80.6
+--   (7.5%), so 43.1% of fleet time waiting for a charger (0405bf42 | ca448d95: 45.4% | 43.4%); charging 344.2 (32.1%: L2
+--   24.6, fast 7.5); in a bay state 33.4 (3.1%), 16.0 of those hours in no bay (§21); staged on need_deploy 41.8 (3.9%),
+--   need_service 16.3 (1.5%), staged for departure 14.3 (1.3%).
 
 -- ══ §16 RULE 9 AT A CHARGER FAULT: EVERY INTERRUPTED CAR IS RE-QUEUED TO FINISH ═════════════════════════════════════
 --
@@ -783,7 +846,10 @@ SELECT kind, outcome, count(*) AS faults, min(soc_at_fault) AS min_soc_at_fault,
        min(soc_at_departure) AS min_soc_at_departure,
        count(*) FILTER (WHERE outcome = 'left without resuming' AND soc_at_fault < 99) AS left_short_without_resuming
   FROM y GROUP BY 1, 2 ORDER BY 1, 2;
--- READ: pending.
+-- READ (17:47 UTC): 18 faults, none left short. Fast chargers: 6 resumed and finished (57-92% at the fault; waited p50
+--   91.4, max 138.4 minutes; left at 100%), 1 resumed and was still charging at the end (88%, 11.9), 1 not resumed by the
+--   end (Waymo-AV-007, 45%, 208.0). L2: 3 resumed and finished (86-98%; p50 30.3, max 49.5), 2 left at 99% without
+--   resuming (the charge rule's target minus 1), 5 not resumed by the end (40-96%; p50 264.0, max 423.5).
 
 -- OPEN-ITEM: G279 — a car whose charger faults re-enters the charge line as if it had just arrived (§16b).
 
@@ -815,7 +881,17 @@ SELECT v.display_name AS car, w.kind, w.soc_start, w.soc_at_fault,
          WHERE o2.sim_run_id = r.sim_run_id AND o2.vehicle_id = w.vehicle_id AND o2.started_at >= w.faulted_at) AS waited_after_min
   FROM w JOIN public.vehicles v ON v.id = w.vehicle_id
  ORDER BY w.faulted_at;
--- READ: pending.
+-- READ (17:47 UTC): G279 under the clustered outage. The 16 faults below 99% erased 1,568.1 minutes (26.1 hours) of
+--   accumulated wait (0405bf42 | ca448d95: about 28 hours | 993.8 minutes). The three injected faults erased 374.9 of
+--   them (Waymo-AV-032 155.7, Zoox-AV-075 118.7, Waymo-AV-002 100.5), and those cars waited 138.4, 116.9 and 86.5
+--   minutes to plug in again (§17b). The sharpest cases were the twin's own faults:
+--   - Waymo-AV-007 waited 323.2 minutes for its first charger, charged 18.5 minutes (20% to 45%), faulted at 10:12 AM, and
+--     was not charged again by the end, 208.0 minutes later;
+--   - Waymo-AV-011 waited 324.1 minutes, charged 48.9 (49% to 63%), faulted at 1:26 PM;
+--   - Waymo-AV-035 waited 104.6 minutes, charged 26.5 (32% to 40%), faulted at 6:37 AM, and was still waiting 423.6
+--     minutes later when the run ended.
+--   Six cars at 40-96% were not recharged by the end. Rule 9 held, since none left, but each re-entered the line with its
+--   wait reset to zero.
 
 -- ══ §17 THE OUTAGE: A FAULT FROM THE COCKPIT STOPS THE CHARGE NOW (0550, G281) ═══════════════════════════════════════
 --
@@ -900,6 +976,11 @@ SELECT x.stall_code AS charger, v.display_name AS car, x.sessions_stopped, x.rep
 --   - DCFC-STALL-03: Waymo-AV-032, 27% → 67%.
 --   Each car went to `staged_awaiting_service`, and the readiness gate routed it to `need_charge`: re-queued to finish, as
 --   rule 9 requires. Each charger reads `Faulted` and its stall `maintenance`. No car had charged again yet.
+-- READ (17:47 UTC, the end): each car charged again and left full. Waymo-AV-002 plugged in at 9:07 AM, 86.5 minutes after
+--   the fault, and left at 10:10 AM at 100%. Zoox-AV-075 plugged in at 9:37 AM (116.9) and left at 11:46 AM at 100%.
+--   Waymo-AV-032 plugged in at 9:59 AM (138.4) and left at 12:24 PM at 100%. Each charger was out 120.6 minutes against
+--   the declared 120 and reads `Available`, its stall `available`. Under 0550 the outage did what a real one does. What it
+--   cost the three cars is G279's (§16b).
 
 --   §17c, the injected stalls' own stream through the outage: every change of status, so the repair is seen returning the
 --   stall (0550 (d)) and nothing else is seen returning it earlier.
@@ -963,7 +1044,8 @@ SELECT CASE WHEN soc_at_arrival < 99 THEN 'below target' ELSE 'at target' END AS
        count(*) FILTER (WHERE wait_min >= 240 AND escalations = 0) AS of_which_never_escalated,
        round(max(wait_min)::numeric, 1) AS longest_min, count(*) FILTER (WHERE still_there) AS still_there
   FROM esc GROUP BY 1 ORDER BY 1;
--- READ: pending.
+-- READ (17:47 UTC): 127 gate stays began below target. 32 reached 240 minutes (longest 371.6) and not one was
+--   escalated (G282; ca448d95: 16 of 124).
 
 
 -- ══ §19 G283 ON A SECOND DAY: CARS HELD AT THE GATE FOR BAY WORK, AND THE WASH BAYS WHILE THEY WAITED ═════════════════
@@ -974,7 +1056,7 @@ SELECT CASE WHEN soc_at_arrival < 99 THEN 'below target' ELSE 'at target' END AS
 --   `held_min`) to its next entry into a wash or detail bay, or the end of the run. For each window, the minutes cars
 --   spent in the wash bays (either purpose) against the bays' minutes, and the bays' calendar.
 
--- OPEN-ITEM: G283 — cars at 100% held hours for a deep clean while the wash bays are half idle; cause not established (§19).
+-- OPEN-ITEM: G283 — an empty wash bay is refused to a waiting car because of holds for cars that cannot come; cause established (§19c-§19d), fix written in 0553.
 
 \echo '=== 0409 §19 — each car escalated for bay work: its wait, and the wash bays in that window ==='
 WITH run AS MATERIALIZED (SELECT r.sim_run_id AS id, r.sim_clock_current AS t1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727'),
@@ -998,7 +1080,8 @@ SELECT v.display_name AS car, w.missing,
        count(*) FILTER (WHERE i.ended > w.w0 AND i.began < w.w1) AS bay_visits_in_window
   FROM w JOIN public.vehicles v ON v.id = w.vehicle_id LEFT JOIN inbay i ON true
  GROUP BY v.display_name, w.missing, w.w0, w.w1 ORDER BY w.w0;
--- READ: pending.
+-- READ (17:47 UTC): no rows. No car was escalated for bay work (`must_do_work_open`) on this day. G283 shows in §19c's
+--   refusals instead.
 
 \echo '=== 0409 §19b — the wash bays'' calendar in the same windows: bookings used, released unused and superseded ==='
 WITH run AS MATERIALIZED (SELECT r.sim_run_id AS id, r.sim_clock_current AS t1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727'),
@@ -1020,7 +1103,7 @@ SELECT w.car, b.state, b.purpose, count(*) AS bookings,
        round((sum(extract(epoch FROM (LEAST(upper(b.during), w.w1) - GREATEST(lower(b.during), w.w0)))) / 60)::numeric, 1) AS booked_min_in_window
   FROM w JOIN b ON b.during && tstzrange(w.w0, w.w1)
  GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
--- READ: pending.
+-- READ (17:47 UTC): no rows (§19).
 
 --   §19c, why the seat refused: every needs-card attempt at a wash bay that was refused, against the three bays at that
 --   moment. `cars_in_bays` comes from the state stream; `calendar_free_bays` is the number of bays with no booking, known
@@ -1061,6 +1144,10 @@ SELECT purpose, count(*) AS refused_attempts,
 --   three bays physically full: on average 2.18 of the 3 bays were empty at a refused deep clean, 2.12 at a refused wash.
 --   51 deep-clean and 47 wash refusals had no bay free on the calendar as it stands today. The other 62 and 144 read as free
 --   on today's calendar, but the bay reconciler had moved those holds since, so they were not free at the time (§19d).
+-- READ (17:47 UTC, the end): deep cleans 136 refused attempts, washes 196. Still not one came with all three bays full
+--   (2.15 and 2.11 empty on average). 51 and 52 had no bay free on today's calendar; 85 and 144 read free on it. And
+--   `cars_in_bays` counts cars in a wash or detail bay STATE: §21 shows 14 such visits were in no bay (G286), so the bays
+--   were emptier still than this reads.
 
 \echo '=== 0409 §19d — the bay reconciler''s log for one refused stretch: Waymo-AV-014''s deep clean, 8:50 to 8:58 AM CT ==='
 SELECT to_char(r.sim_clock AT TIME ZONE 'America/Chicago', 'HH12:MI:SS') AS at_ct, s.stall_code, v.display_name AS car, r.purpose,
@@ -1125,6 +1212,8 @@ SELECT d.jobid, d.start_time, d.status, round(extract(epoch FROM (d.end_time - d
 --   Each bay visit (a vehicle state segment in a bay state) is classed by both pointers: the car's own
 --   `current_stall_id` while in that state, and any bay's `current_vehicle_id` naming it in that interval.
 
+-- OPEN-ITEM: G286 — the twin sets a car to a wash, detail or service bay state without seating it in a bay (§21).
+
 \echo '=== 0409 §21 — each bay visit: in a bay, or in no bay, by where the car came from ==='
 WITH run AS MATERIALIZED (SELECT sim_run_id AS id, sim_clock_current AS t1 FROM public.ottoq_sim_runs WHERE sim_run_id = 'eff13379-c00d-4112-993a-7c8562681727'),
 bays AS MATERIALIZED (SELECT id, stall_type::text AS stype FROM public.stalls
@@ -1164,4 +1253,9 @@ SELECT s_to AS bay_state, s_from AS came_from, count(*) AS visits,
        round((sum(extract(epoch FROM (ended - began))) FILTER (WHERE in_a_bay) / 60)::numeric) AS bay_minutes,
        round((sum(extract(epoch FROM (ended - began))) FILTER (WHERE NOT in_a_bay) / 60)::numeric) AS no_bay_minutes
   FROM cls GROUP BY ROLLUP (1, 2) ORDER BY 1 NULLS LAST, 2 NULLS LAST;
--- READ: pending.
+-- READ (17:47 UTC, the end): 93 bay visits, 34 in no bay: 960 of 2,008 bay-minutes (47.8%).
+--   - Deep cleans straight off a charger: 9 of 9 in no bay (214 minutes).
+--   - Washes straight off a charger: 5 of 8 (44 minutes).
+--   - Service visits from staging: 20 of 30 (702 minutes).
+--   All 46 wash and deep-clean visits from staging were in a bay (the needs card, the door, the bay reservations). G286,
+--   fix written in 0554.
