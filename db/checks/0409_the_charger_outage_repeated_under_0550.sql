@@ -921,6 +921,10 @@ SELECT i.stall_code, to_char(e.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH1
  LIMIT 30;
 -- READ (17:03 UTC, sim 7:48 AM CT): each stall, at 7:40:35 AM, went `occupied` → `available` as its car was moved to
 --   staging, then `available` → `maintenance` as the report took it out of the pool, in the same instant. Nothing since.
+-- READ (17:16 UTC, sim 9:41 AM CT): all three went `maintenance` → `available` at 9:40:36 AM, the first tick past the
+--   120-minute repair (0550 (d): recovery returns the stall), and each took its next car at 9:41:12 AM. Nothing returned a
+--   stall early: 120.0 minutes out, as declared. On ca448d95 (0408) the same chargers were back after 19, 75 and 149
+--   minutes, each on a normal completion.
 
 -- ══ §18 G282: A CAR AT THE GATE BELOW ITS TARGET IS NEVER ESCALATED, HOWEVER LONG IT WAITS FOR A CHARGER ═══════════════
 --
