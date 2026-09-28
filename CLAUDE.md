@@ -202,6 +202,25 @@ When information is missing:
      default, urgency or top-off lowers it. An immediate dispatch keeps its due time and charges to
      100 too, unless its owner asks for less. A lower limit is only ever the owner's, set verified
      and confirmed and read at that one function. The engine never writes one.
+   - **NO CAR LEAVES WITH A SERVICE STILL NEEDED, EVER — Chase, 2026-09-27, 8:00 PM CT:**
+     *"vehicles cannot leave the depot with any remaining service still needed, EVER. Re-optimizations
+     can occur, especially if there is a delay, or flagging, or hardware fault, etc. This is what OTTO-Q
+     should optimize for, and can always use temporary or perimeter parking if needed, while temporary
+     re-orchestration occurs. If there is an immediate option that otto-q identifies for a
+     re-submission, the vehicle can go straight to that next reservation or stall without the temporary
+     staging recommendation. Again, OTTO-Q has to be all seeing and all knowing."*
+     So a service OTTO-Q has found a car to need is required, whatever its urgency. There is no
+     "optional" or "deferrable past departure": a wash on the night rotation, a scheduled deep clean,
+     preventive maintenance, a sensor calibration after a failed clean, a cosmetic repair, remote
+     diagnostics, a pending software update and a started top-off are all finished before the car
+     leaves. A car below its charge target does not leave either, visit or no visit. When a car is
+     not ready it is re-orchestrated, not released: it goes straight to its next charger or bay if
+     one is free, and otherwise to temporary or perimeter parking until one is. This answered the
+     sensor-calibration question put to Chase at 7:45 PM CT. Measured on `c9d14225` before the
+     change: 10 of 90 departures left with optional work open, and 10 boot cars with no visit left
+     below 99%, as low as 80% (FINDINGS G268). Built by `0543`: one departure test at both
+     dispatchers (`public.ottoq_departure_clear`), and a recheck each tick that sends a car staged to
+     leave but unfinished back to its charger or bay.
 
 **10. OTTO-Q DOES NOT EXPERIMENT IN PRODUCTION. HYPOTHESES AND TESTS BELONG TO THE RESEARCH WING, IN THE TWIN — added 2026-09-27 in Chase's words.**
 

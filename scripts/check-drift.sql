@@ -639,7 +639,8 @@ repo_manifest(version, name, file) AS (
     ('20260927223621'::text, 'a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it'::text, '0539_a_car_charges_to_full_and_nothing_the_depot_decides_lowers_it.sql'::text),
     ('20260927230739'::text, 'every_result_the_learner_reaches_is_a_recommendation_a_person_ships'::text, '0540_every_result_the_learner_reaches_is_a_recommendation_a_person_ships.sql'::text),
     ('20260927230859'::text, 'a_car_charging_to_its_target_is_never_a_question'::text, '0541_a_car_charging_to_its_target_is_never_a_question.sql'::text),
-    ('20260928003702'::text, 'a_car_that_owes_its_charge_goes_to_the_charger_and_no_gate_sends_a_car_out_unfinished'::text, '0542_a_car_that_owes_its_charge_goes_to_the_charger_and_no_gate_sends_a_car_out_unfinished.sql'::text)
+    ('20260928003702'::text, 'a_car_that_owes_its_charge_goes_to_the_charger_and_no_gate_sends_a_car_out_unfinished'::text, '0542_a_car_that_owes_its_charge_goes_to_the_charger_and_no_gate_sends_a_car_out_unfinished.sql'::text),
+    ('20260928013804'::text, 'no_car_leaves_the_depot_with_a_service_still_needed'::text, '0543_no_car_leaves_the_depot_with_a_service_still_needed.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
