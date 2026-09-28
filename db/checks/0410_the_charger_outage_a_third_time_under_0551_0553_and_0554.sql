@@ -113,7 +113,7 @@ SELECT count(*) FILTER (WHERE e.event_type = 'twin.dispatch_refused_unfinished')
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed') AS tick_failures,
        count(*) FILTER (WHERE e.event_type = 'sim_tick_failed' AND e.payload::text LIKE '%0544 (CLAUDE.md rule 9)%') AS floor_rejections
   FROM public.ottoq_events e WHERE e.sim_run_id = 'ab8075a3-4001-45b5-b9e2-747033ad2273';
--- READ: pending.
+-- READ (19:26 UTC, 2:26 PM CT; sim 5:43 AM, tick 140): 0 door refusals, 0 tick failures, 0 floor rejections.
 
 -- ══ §4 ESCALATIONS: THE GATE'S (G269) AND THE WAITS FOR A CHARGER OR THE SERVICE BAY (0546 (d), G274) ══════════════════
 --
@@ -322,7 +322,7 @@ SELECT v.current_state, v.config->>'svc_step' AS step, count(*) AS restamped_wit
                      AND e.event_type = 'vehicle.state_changed' AND e.sim_clock_at = r.sim_clock_current
                      AND e.payload->'diff' ? 'current_state')
  GROUP BY 1, 2, r.tick_count ORDER BY 3 DESC;
--- READ: pending.
+-- READ (19:26 UTC, sim 5:43 AM): 14 deployed cars re-stamped with their SoC drain, as expected (0546 §4); no staged car.
 
 --   §9b, the same moment from the queue's side: every car on need_charge with the wait the charge cursor reads (sim now
 --   minus `last_state_change`), by whether it has a visit and by its charge.
@@ -1114,7 +1114,8 @@ SELECT s_to AS bay_state, s_from AS came_from, count(*) AS visits,
        round((sum(extract(epoch FROM (ended - began))) FILTER (WHERE in_a_bay) / 60)::numeric) AS bay_minutes,
        round((sum(extract(epoch FROM (ended - began))) FILTER (WHERE NOT in_a_bay) / 60)::numeric) AS no_bay_minutes
   FROM cls GROUP BY ROLLUP (1, 2) ORDER BY 1 NULLS LAST, 2 NULLS LAST;
--- READ: pending.
+-- READ (live, 19:19 and 19:26 UTC; sim 4:47 and 5:43 AM): 5 cars in a bay state each time, all 5 standing in a bay that
+--   names them; 0 in a bay state in no bay.
 
 -- ══ §22 G279 UNDER 0551: WHO WENT AHEAD OF A CAR RE-QUEUED BY A FAULT ══════════════════════════════════════════════════
 --
@@ -1264,4 +1265,7 @@ SELECT q.queue_position, q.queue_depth, q.vehicle_ref, q.current_soc, q.is_immed
        to_char(q.waiting_since AT TIME ZONE 'America/Chicago', 'HH12:MI AM') AS waiting_since_ct
   FROM public.ottoq_depot_queue('11111111-1111-1111-1111-111111111111', 'ab8075a3-4001-45b5-b9e2-747033ad2273') q
  WHERE q.queue_kind = 'charge' ORDER BY q.queue_position LIMIT 10;
--- READ: pending.
+-- READ (19:26:47 UTC, 2:26 PM CT; sim 5:44:22 AM): 31 cars in the charge queue. The head is ten cars at the gate, all
+--   waiting since 4:35 AM (the boot cohort), in charge order: Zoox-AV-077 45%, Zoox-AV-099 44%, Waymo-AV-015 43%,
+--   Tesla-AV-053 43%, Zoox-AV-073 43%, Waymo-AV-037 42%, ... With equal waits the response ratio (wait + points) / points
+--   ranks the car needing the fewest points first, which is the cursor's own order (0545 (c)).
