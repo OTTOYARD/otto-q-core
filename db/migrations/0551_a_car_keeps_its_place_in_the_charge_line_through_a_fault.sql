@@ -26,7 +26,10 @@
 --   field-ops cockpit), and says it mirrors the decide path's order. It mirrors the order from before 0545: lowest charge
 --   first, a car with no visit last (the NULL 0546 (c) removed), `current_soc < target` (0493 made it target − 1), and
 --   reservations judged against `now()`, the wall clock, which on a sim run reads every reservation as expired. Since
---   0545 the cockpit has shown a car a place in a line the engine does not serve.
+--   0545 the cockpit has shown a car a place in a line the engine does not serve. Measured on eff13379 at sim 8:25 AM CT
+--   (a rolled-back compile of this file's mirror under another name, 17:10 UTC): both mirrors list the same 52 cars, and
+--   they agree on the position of 1. The old mirror's head is Tesla-RT-001, Tesla-AV-055, Tesla-AV-068; the engine's
+--   order, with no bank yet, is Tesla-AV-055, Tesla-AV-068, Tesla-RT-001.
 --
 -- ══ §2 WHAT THIS CHANGES ══════════════════════════════════════════════════════════════════════════════════════════════
 --
