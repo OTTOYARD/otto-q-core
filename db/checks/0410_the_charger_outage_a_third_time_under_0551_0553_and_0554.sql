@@ -844,7 +844,10 @@ SELECT r->>'stall_code' AS charger, (r->>'ok')::boolean AS ok, (r->>'sessions_st
   CROSS JOIN LATERAL jsonb_array_elements(sr.payload->'stress_injection_0410'->'results') r
  WHERE sr.sim_run_id = 'ab8075a3-4001-45b5-b9e2-747033ad2273'
  ORDER BY 1;
--- READ: pending.
+-- READ (19:45 UTC, 2:45 PM CT): job 780 fired once, at 19:42:00 UTC, and succeeded in 0.44 s: no deadlock (0552 holds).
+--   It unscheduled itself. DCFC-STALL-01, -02 and -03, each `ok`: one session stopped, no car replanned, faulted at sim
+--   7:45:05 AM CT with a 120-minute repair, due back at 9:45:05. That is 4.5 sim-minutes later than eff13379's 7:40:35:
+--   the job fires on the minute, and a real minute is 8 sim-minutes at 8x.
 
 \echo '=== 0410 §17b — per injected charger: the stopped session, where its car went, and the charger''s outage ==='
 WITH run AS MATERIALIZED (
@@ -892,7 +895,13 @@ SELECT x.stall_code AS charger, v.display_name AS car, x.sessions_stopped, x.rep
   JOIN public.ottoq_ocpp_chargers c ON c.charger_id = x.charger_id
   JOIN public.stalls st ON st.id = x.stall_id
  ORDER BY 1;
--- READ: pending.
+-- READ (19:47 UTC, 2:47 PM CT; sim 8:17 AM): all three sessions `faulted`, `fault.operator_injected`; each car went to
+--   `staged_awaiting_service`; each charger reads `Faulted` and its stall `maintenance`.
+--   - DCFC-STALL-01: Tesla-AV-069, 48% → 92%. Plugged in again at 7:49:20 AM, 4.3 minutes after the fault, finished at
+--     8:02:31 and left at 8:03:55 at 100%.
+--   - DCFC-STALL-03: Waymo-AV-040, 49% → 67%. Charging again on a fast charger at 8:17 (75%).
+--   - DCFC-STALL-02: Waymo-AV-004, 32% → 73%. Staged on need_charge, not yet recharged: at 8:25 no charger was free.
+--   eff13379's three injected cars waited 86.5, 116.9 and 138.4 minutes to plug in again.
 
 --   §17c, the injected stalls' own stream through the outage: every change of status, so the repair is seen returning the
 --   stall (0550 (d)) and nothing else is seen returning it earlier.
@@ -1044,7 +1053,12 @@ SELECT purpose, count(*) AS refused_attempts,
        count(*) FILTER (WHERE calendar_free_bays > 0) AS free_on_todays_calendar_yet_refused,
        round(avg(3 - cars_in_bays), 2) AS avg_empty_bays
   FROM per GROUP BY 1 ORDER BY 1;
--- READ: pending.
+-- READ (live, 19:50 UTC, through sim 8:40 AM): 72 refused deep cleans and 53 refused washes, none with all three bays
+--   physically full (2.25 and 2.17 empty on average): 54 and 32 had an empty bay held on today's calendar. The live
+--   snapshot at 8:48 AM shows what holds them now. The yield rightly leaves these holds alone: each is for a car that
+--   can be at the bay before the waiting car would finish. WSH-01 stood empty with Tesla-RT-006's wash, 8:40-8:50,
+--   while the car finished its L2 charge at 99% (ETA 8:51, G240), and Waymo-AV-035's at 9:03 (fast charger at 94%,
+--   ETA 9:06). A deep clean (25 minutes) from 8:48 would have run into both.
 
 -- ══ §20 THE INJECTION JOB ═══════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -1164,7 +1178,9 @@ SELECT v.display_name AS car, v.current_state::text AS state, v.config->>'svc_st
  WHERE r.sim_run_id = 'ab8075a3-4001-45b5-b9e2-747033ad2273' AND v.home_depot_id = '11111111-1111-1111-1111-111111111111'
    AND v.config->'charge_wait'->>'run' = 'ab8075a3-4001-45b5-b9e2-747033ad2273'
  ORDER BY banked_min DESC NULLS LAST LIMIT 15;
--- READ: pending.
+-- READ (19:47 UTC, sim 8:17 AM): the three injected cars. Waymo-AV-004 carries a bank of 141.1 minutes, its whole wait
+--   from 4:35 AM to its 6:56 AM session, so the cursor reads its wait as 173.2 minutes, not the 32 since the fault.
+--   Waymo-AV-040 carries 31.8 (episode from 7:11 AM). Tesla-AV-069 has none: its episode ended when it reached target.
 
 -- ══ §23 G282 UNDER 0551: A CAR WAITING AT THE GATE IS ESCALATED ═══════════════════════════════════════════════════════
 --
@@ -1229,12 +1245,15 @@ SELECT count(*) AS stays_240_plus_below_target, count(*) FILTER (WHERE told) AS 
 
 \echo '=== 0410 §24a — needs-card bay seats: outcome, and whether a yield came first ==='
 SELECT d.proposed_action->>'stall_type' AS bay, d.proposed_action->>'purpose' AS purpose, d.outcome_status,
-       COALESCE((d.proposed_action->>'yielded_holds')::boolean, false) AS after_a_yield, count(*) AS decisions
+       -- the seat folds `yielded_holds` into the action it enacts or holds (enacted_action), not the proposal
+       COALESCE((d.enacted_action->>'yielded_holds')::boolean, false) AS after_a_yield, count(*) AS decisions
   FROM public.ottoq_decisions d
  WHERE d.sim_run_id = 'ab8075a3-4001-45b5-b9e2-747033ad2273' AND d.proposed_action->>'source' = 'needs_card'
    AND d.proposed_action->>'stall_type' IN ('wash_bay', 'service_bay')
  GROUP BY 1, 2, 3, 4 ORDER BY 1, 2, 3, 4;
--- READ: pending.
+-- READ (live, 19:48 UTC, sim 8:35 AM): 5 seats came straight after a yield, 4 washes and 1 service, all seated
+--   (`enacted_action.yielded_holds`; this query first read `proposed_action`, where the seat does not write it).
+--   Refused so far: 125 wash-bay seats and 45 service-bay seats.
 
 \echo '=== 0410 §24b — the yields, from the bay reconciler''s log ==='
 SELECT s.stall_type::text AS bay, r.action, r.reason, r.blocked_by, count(*) AS holds, count(DISTINCT r.vehicle_id) AS cars,
@@ -1243,7 +1262,10 @@ SELECT s.stall_type::text AS bay, r.action, r.reason, r.blocked_by, count(*) AS 
   FROM public.bay_reservation_reconcile_2026_08_02 r JOIN public.stalls s ON s.id = r.stall_id
  WHERE r.sim_run_id = 'ab8075a3-4001-45b5-b9e2-747033ad2273' AND r.blocked_by LIKE 'yield:%'
  GROUP BY 1, 2, 3, 4 ORDER BY 1, 5 DESC;
--- READ: pending.
+-- READ (live, 19:48 UTC): 5 `ottoq.bay_hold_yielded` events, at 6:37, 7:12, 7:15, 7:17 and 8:22 AM, for Waymo-AV-026
+--   (WSH-01), Zoox-002 (WSH-03), Waymo-AV-018 (SVC-02), Tesla-RT-004 (WSH-01) and Zoox-AV-079 (WSH-03). Six holds moved,
+--   every one `yield:charging_l2`: a car on L2 whose charge would run past the waiting car's job. Each waiting car was
+--   seated in the same tick.
 
 \echo '=== 0410 §24c — what became of each hold a yield moved ==='
 SELECT b.purpose, b.state, b.release_reason, count(*) AS holds
@@ -1269,3 +1291,14 @@ SELECT q.queue_position, q.queue_depth, q.vehicle_ref, q.current_soc, q.is_immed
 --   waiting since 4:35 AM (the boot cohort), in charge order: Zoox-AV-077 45%, Zoox-AV-099 44%, Waymo-AV-015 43%,
 --   Tesla-AV-053 43%, Zoox-AV-073 43%, Waymo-AV-037 42%, ... With equal waits the response ratio (wait + points) / points
 --   ranks the car needing the fewest points first, which is the cursor's own order (0545 (c)).
+-- READ (19:47 UTC, the follow-up): the head was served in exactly its order: #1 at 5:54:27 AM; #2 and #3 in the same tick
+--   at 5:55:26; #4 5:57:09; #5 6:05:10; #6 6:07:37; #7 6:11:31; #8 6:13:20. Eight other cars charged in between:
+--   - three staged since 4:37 AM (Zoox-AV-080, Waymo-AV-039, Tesla-AV-065). The queue lists a staged car only while a
+--     charger is free (the cursor's candidate filter, copied as it is), and none was at the probe;
+--   - two immediate dispatches that came back after the probe (Tesla-AV-067, Waymo-AV-025);
+--   - two standard returns seated on the charger their recall had booked (`reservation_honoured`: Tesla-AV-045 at 6:08,
+--     Waymo-001 at 6:13).
+--   So the queue's order is the engine's order (G284 holds), but its positions leave out two kinds of car that go
+--   ahead: staged cars while every charger is busy, and cars holding a reservation. At sim 8:25 AM, with no charger free,
+--   the queue listed 52 cars at the gate and none of the 5 staged on need_charge, among them Waymo-AV-004 (§17b), whose
+--   173-minute wait likely puts it near the front of the line. G288.
