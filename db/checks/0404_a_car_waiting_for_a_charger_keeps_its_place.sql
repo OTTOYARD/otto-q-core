@@ -319,6 +319,30 @@ SELECT v.current_state, v.config->>'svc_step' AS step, count(*) AS restamped_wit
                      AND e.event_type = 'vehicle.state_changed' AND e.sim_clock_at = r.sim_clock_current
                      AND e.payload->'diff' ? 'current_state')
  GROUP BY 1, 2, r.tick_count ORDER BY 3 DESC;
+-- READ (2026-09-28 06:05 UTC, 1:05 AM CT; tick 21, sim 5:01 AM CT): **no staged car was stamped that tick without a
+--   state change.** 2 deployed cars and 1 car en route to the depot were (the deployed telemetry, 0546 §4). On 4acf0b1d
+--   at tick 95, 17 staged cars on need_charge were (G272).
+
+--   §9b, the same moment from the queue's side: every car on need_charge with the wait the charge cursor reads (sim now
+--   minus `last_state_change`), by whether it has a visit and by its charge.
+
+\echo '=== 0404 §9b — the charge queue and the wait each car reads ==='
+WITH r AS (SELECT * FROM public.ottoq_sim_runs WHERE sim_run_id = 'dbdffd5c-a878-43ce-8b64-578bd776c813')
+SELECT CASE WHEN EXISTS (SELECT 1 FROM public.ottoq_visit_needs vn WHERE vn.vehicle_id = v.id AND vn.sim_run_id = r.sim_run_id)
+            THEN 'visit' ELSE 'no visit' END AS car,
+       CASE WHEN v.current_soc >= 90 THEN 'top-off (>=90%)' WHEN v.current_soc >= 80 THEN '80-89%' ELSE 'below 80%' END AS band,
+       count(*) AS cars, min(v.current_soc) AS min_soc, max(v.current_soc) AS max_soc,
+       round(min(extract(epoch FROM (r.sim_clock_current - v.last_state_change)) / 60)::numeric, 1) AS min_wait_min,
+       round(max(extract(epoch FROM (r.sim_clock_current - v.last_state_change)) / 60)::numeric, 1) AS max_wait_min,
+       count(*) FILTER (WHERE v.last_state_change = r.sim_clock_current) AS wait_zero,
+       r.tick_count, r.sim_clock_current AT TIME ZONE 'America/Chicago' AS sim_ct
+  FROM public.vehicles v, r
+ WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111' AND v.category = 'autonomous'
+   AND v.current_state = 'staged_awaiting_service' AND v.config->>'svc_step' = 'need_charge'
+ GROUP BY 1, 2, r.tick_count, r.sim_clock_current ORDER BY 1, 2;
+-- READ (06:05 UTC, 1:05 AM CT; tick 25, sim 5:03 AM CT): 39 cars on need_charge, **none reading a wait of 0.** The 24
+--   visit cars below 80% (12-46%) read 8.7 minutes, where on 4acf0b1d at tick 41 the same group read 0 (0403 §9). 11
+--   visit top-offs at 90-98% and 2 visit cars at 88-89% read 10.0; the 2 no-visit boot cars at 91-96% read 7.6-11.8.
 
 -- ══ §10 G271: WHO THE CHARGERS WENT TO, BY WHETHER THE CAR HAD A VISIT ══════════════════════════════════════════════════
 --
