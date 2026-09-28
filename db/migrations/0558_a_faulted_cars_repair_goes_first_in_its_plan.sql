@@ -274,7 +274,7 @@ BEGIN
       JOIN public.vehicles vh ON vh.id = b.vehicle_id
      WHERE b.sim_run_id = p_sim_run_id AND b.state = 'held' AND b.purpose IN ('charge_dcfc', 'charge_l2')
        AND vh.home_depot_id = p_depot_id AND public.ottoq_vehicle_fault_open(vh.config)
-     ORDER BY b.vehicle_id, b.booking_id   -- run-stable cursor order (0050)
+     ORDER BY b.vehicle_id, lower(b.during), b.stall_id   -- run-stable cursor order (0050): no minted id
   LOOP
     UPDATE public.ottoq_stall_bookings b
        SET state = 'released', released_at = GREATEST(p_clock, COALESCE(b.booked_at_sim, p_clock)),
