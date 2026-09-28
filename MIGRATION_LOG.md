@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0547 — GENERATED, not a log
+## Index, 0134–0548 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -552,7 +552,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0545](db/migrations/0545_no_queue_starves_a_car_that_cannot_leave_until_it_is_finished.sql) | `20260928034458` | yes — ledger | **No queue starves a car that cannot leave until it is finished. The readiness gate times a car only while it |
 | [0546](db/migrations/0546_a_car_waiting_for_a_charger_keeps_its_place_in_line.sql) | `20260928053318` | yes — ledger | **A car waiting for a charger keeps its place in line, a car with no visit is not sent to the back of it, and a |
 | [0547](db/migrations/0547_a_charger_its_car_has_left_for_a_bay_is_free.sql) | `20260928074913` | yes — ledger | **A charger is free the moment its car has left it for a bay.** (G276, and the writer G121 could not find.) |
+| [0548](db/migrations/0548_a_paired_test_can_keep_a_fast_charger_for_a_car_that_wants_one.sql) | `20260928093601` | yes — ledger | **A paired test can keep a free fast charger for a car that wants one.** (G277; research wing, rule 10.) |
 
-413 migrations indexed.
+414 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
