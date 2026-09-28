@@ -1175,6 +1175,11 @@ SELECT v.display_name AS car, x.kind, x.soc_at_fault, x.stopped_reason,
 --   98.5 minutes), 4 ahead of Tesla-AV-042 (L2 station fault at 9:07 AM, 54%, 98.3), 2 ahead of Waymo-AV-033, 1 ahead
 --   of Zoox-AV-080, and none ahead of the other five. Waits after the fault: 1.0 to 98.5 minutes. eff13379, over its
 --   whole day: 179 overtakings over 16 faults, and 6 cars at 40-96% never recharged (§0).
+-- READ (20:10 UTC): each car that charged ahead of Waymo-AV-004 (plugged in again at 9:23:35 AM), with how it was
+--   seated. Four were immediate dispatches, which the cursor serves first by design: Tesla-AV-055 (8:51, DCFC; the
+--   seat's rationale reads `immediate_dispatch`), Waymo-AV-026 (9:02), Waymo-AV-009 (9:09) and Waymo-AV-018 (9:22, L2).
+--   The fifth, Tesla-AV-064, was seated at 8:43 on the fast charger its recall had booked (`reservation_honoured`). No
+--   standard car overtook the banked car through the cursor.
 
 --   §22b, live only (the teardown ends every episode): the banks the cursor reads, `config.charge_wait`, on this run's cars.
 \echo '=== 0410 §22b — live: cars carrying a charge-wait bank for this run ==='
