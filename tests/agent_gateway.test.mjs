@@ -1,5 +1,5 @@
 // The ottoq-agent-gateway: its pure half (edge-functions/_shared/agent_gateway.ts), its contract with the database
-// half (db/migrations/0550), and -- when a scratch PostgreSQL is reachable -- the two together, end to end.
+// half (db/migrations/0555), and -- when a scratch PostgreSQL is reachable -- the two together, end to end.
 //
 // WHAT EACH PART PROVES
 //   1. contract     the TypeScript catalog and the SQL dispatcher name the same tools, capabilities, statuses and
@@ -11,7 +11,7 @@
 //                   initialize-based revisions older clients speak, on one endpoint.
 //   5. engine       the PostgREST caller: headers, body, and every failure it can meet.
 //   6. no writes    nothing an agent's token can reach names an engine door or writes outside ottoq_agent_*.
-//   7. end to end   (skips without a server) the HTTP handler over the REAL 0550 SQL against the stub engine:
+//   7. end to end   (skips without a server) the HTTP handler over the REAL 0555 SQL against the stub engine:
 //                   operator A cannot read or act on operator B's vehicle, a person's approval reaches the door.
 //
 // The SQL half's own suite is tests/test_agent_gateway_sql.py (21 tests); this file does not repeat it.
@@ -57,10 +57,10 @@ import { INERT_OPS } from "../edge-functions/_shared/agent_dial_discipline.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(ROOT, p), "utf8");
-const M0550_PATH = "db/migrations/0550_an_outside_agent_asks_through_one_door_and_a_person_decides.sql";
-const M0551_PATH = "db/migrations/0551_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql";
+const M0555_PATH = "db/migrations/0555_an_outside_agent_asks_through_one_door_and_a_person_decides.sql";
+const M0556_PATH = "db/migrations/0556_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql";
 const STUB_PATH = "tests/fixtures/agent_gateway_stub_engine.sql";
-const M0550 = read(M0550_PATH);
+const M0555 = read(M0555_PATH);
 const STUB = read(STUB_PATH);
 const SHELL = read("edge-functions/ottoq-agent-gateway/index.ts");
 const SHARED = read("edge-functions/_shared/agent_gateway.ts");
@@ -69,14 +69,14 @@ const sha = (t) => createHash("sha256").update(t, "utf8").digest("hex");
 const stripSqlComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "");
 const stripTsComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
-/** Every CREATE FUNCTION in 0550, name -> body (all of them use the $fn$ tag). */
+/** Every CREATE FUNCTION in 0555, name -> body (all of them use the $fn$ tag). */
 function functionBodies(sql) {
   const out = new Map();
   const re = /CREATE OR REPLACE FUNCTION (?:public|ottoq)\.(\w+)\([\s\S]*?\nAS \$fn\$([\s\S]*?)\$fn\$;/g;
   for (const m of sql.matchAll(re)) out.set(m[1], m[2]);
   return out;
 }
-const FUNCS = functionBodies(M0550);
+const FUNCS = functionBodies(M0555);
 
 /** A CASE ... WHEN 'a' THEN 'b' ... map out of a function body, starting at `anchor`. */
 function caseMap(body, anchor) {
@@ -90,7 +90,7 @@ function caseMap(body, anchor) {
 
 // ════════════════════════════════════════════════════════════════════════════════════════ 1. contract ══
 
-test("0550 defines the functions this suite reads (the parser saw all 26)", () => {
+test("0555 defines the functions this suite reads (the parser saw all 26)", () => {
   assert.equal(FUNCS.size, 26, [...FUNCS.keys()].join(", "));
   for (const f of ["ottoq_agent_call", "ottoq_agent_submit_request", "ottoq_agent_request_decide", "ottoq_agent_issue_token"]) {
     assert.ok(FUNCS.has(f), f);
@@ -107,14 +107,14 @@ test("the tool catalog is exactly the dispatcher's vocabulary, with the same cap
 });
 
 test("capabilities, request kinds, statuses and priorities agree with the tables' CHECKs", () => {
-  const caps = /capabilities <@ ARRAY\[([^\]]+)\]/.exec(M0550);
+  const caps = /capabilities <@ ARRAY\[([^\]]+)\]/.exec(M0555);
   assert.deepEqual(caps[1].split(",").map((s) => s.trim().replace(/'/g, "")), [...CAPABILITIES]);
-  const kinds = /ottoq_agent_requests_kind_check CHECK \(kind IN \(([^)]+)\)/.exec(M0550);
+  const kinds = /ottoq_agent_requests_kind_check CHECK \(kind IN \(([^)]+)\)/.exec(M0555);
   assert.deepEqual(kinds[1].split(",").map((s) => s.trim().replace(/'/g, "")).sort(),
     ["note", ...Object.keys(REQUEST_KIND_CAPABILITY)].sort());
-  const status = /ottoq_agent_requests_status_check CHECK \(status IN \(([^)]+)\)/.exec(M0550);
+  const status = /ottoq_agent_requests_status_check CHECK \(status IN \(([^)]+)\)/.exec(M0555);
   assert.deepEqual(status[1].split(",").map((s) => s.trim().replace(/'/g, "")), [...REQUEST_STATUSES]);
-  const prio = /ottoq_agent_requests_priority_check CHECK \(priority IN \(([^)]+)\)/.exec(M0550);
+  const prio = /ottoq_agent_requests_priority_check CHECK \(priority IN \(([^)]+)\)/.exec(M0555);
   assert.deepEqual(prio[1].split(",").map((s) => s.trim().replace(/'/g, "")), [...PRIORITIES]);
 });
 
@@ -708,7 +708,7 @@ test("the engine's failures are named: not enabled, unreachable, timed out, misc
   };
   let r = await run(() => json(404, { code: "PGRST202", message: "Could not find the function public.ottoq_agent_call" }));
   assert.deepEqual([r.http_status, r.error.code], [503, "gateway_not_enabled"]);
-  assert.match(r.error.message, /0550/);
+  assert.match(r.error.message, /0555/);
   r = await run(() => { throw new TypeError("fetch failed"); });
   assert.deepEqual([r.http_status, r.error.code], [503, "engine_unreachable"]);
   r = await run(() => { throw new DOMException("The operation timed out.", "TimeoutError"); });
@@ -783,12 +783,12 @@ test("no function an agent's token can reach names an engine door or writes outs
   assert.match(decide, /public\.ottoq_apply_ops_action\(/);
   assert.doesNotMatch(stripSqlComments(FUNCS.get("ottoq_agent_call")), /ottoq_agent_request_decide/);
   // and the grants say the same: the dispatcher is service_role's alone, the decide door authenticated's
-  assert.match(M0550, /GRANT EXECUTE ON FUNCTION public\.ottoq_agent_call\(text, text, jsonb, text, jsonb\)\s+TO service_role;/);
-  assert.doesNotMatch(M0550, /GRANT EXECUTE ON FUNCTION public\.ottoq_agent_call\([^)]*\)\s+TO [^;]*\b(anon|authenticated)\b/);
+  assert.match(M0555, /GRANT EXECUTE ON FUNCTION public\.ottoq_agent_call\(text, text, jsonb, text, jsonb\)\s+TO service_role;/);
+  assert.doesNotMatch(M0555, /GRANT EXECUTE ON FUNCTION public\.ottoq_agent_call\([^)]*\)\s+TO [^;]*\b(anon|authenticated)\b/);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════════════ 7. end to end ══
-// The HTTP handler over the REAL 0550 SQL, executed against tests/fixtures/agent_gateway_stub_engine.sql (whose
+// The HTTP handler over the REAL 0555 SQL, executed against tests/fixtures/agent_gateway_stub_engine.sql (whose
 // engine doors are byte-identical to the live catalog -- tests/test_agent_gateway_sql.py asserts it by md5).
 
 function pgConn() {
@@ -809,7 +809,7 @@ const SERVER_UP = (() => {
   return r.status === 0;
 })();
 
-describe("end to end: the HTTP gateway over the real 0550 SQL", { skip: SERVER_UP ? false : "no scratch PostgreSQL (PGHOST or /var/tmp:55432)" }, () => {
+describe("end to end: the HTTP gateway over the real 0555 SQL", { skip: SERVER_UP ? false : "no scratch PostgreSQL (PGHOST or /var/tmp:55432)" }, () => {
   const DB = `ottoq_agw_node_${process.pid}_${randomBytes(3).toString("hex")}`;
   const W1 = "ee000000-0000-0000-0000-0000000000a1";
   const T1 = "ee000000-0000-0000-0000-0000000000b1";
@@ -832,7 +832,7 @@ describe("end to end: the HTTP gateway over the real 0550 SQL", { skip: SERVER_U
 
   before(() => {
     spawnSync("psql", [...pgConn(), "-d", "postgres", "-X", "-q", "-c", `CREATE DATABASE ${DB}`], { encoding: "utf8" });
-    for (const f of [STUB_PATH, M0550_PATH, M0551_PATH]) {
+    for (const f of [STUB_PATH, M0555_PATH, M0556_PATH]) {
       const r = spawnSync("psql", [...pgConn(), "-d", DB, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-f", join(ROOT, f)], { encoding: "utf8" });
       if (r.status !== 0) throw new Error(`${f} did not load: ${r.stderr}`);
     }

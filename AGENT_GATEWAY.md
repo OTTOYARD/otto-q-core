@@ -1,7 +1,7 @@
 # AGENT_GATEWAY — how an outside agent reads OTTO-Q and asks for changes
 
 *Written 2026-09-28, 12:00–1:30 AM CT (05:00–06:30 UTC). Everything here is **committed, not applied and not
-deployed**: migrations `0550` and `0551` are `PENDING`, and the edge function `ottoq-agent-gateway` has never run on
+deployed**: migrations `0555` and `0556` are `PENDING`, and the edge function `ottoq-agent-gateway` has never run on
 the platform. What was verified, and how, is in [§9](#9-what-was-verified-and-what-was-not). The morning checklist is
 [§8](#8-morning-checklist).*
 
@@ -34,7 +34,7 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
   └───────────────────────────────────────────────────────────┬──────────────────────────────────────────────────────┘
                                                               │ POST /rest/v1/rpc/ottoq_agent_call (service key)
                                                               v
-  ┌──────────────────────────── otto-q-core database (0550) ─────────────────────────────────────────────────────────┐
+  ┌──────────────────────────── otto-q-core database (0555) ─────────────────────────────────────────────────────────┐
   │ ottoq_agent_call(token_hash, tool, args, transport, meta)            service_role ONLY                           │
   │   token hash -> active principal -> rate limit (from the ledger) -> capability -> tool -> call ledger (1 txn)   │
   │   READ tools   whoami · depot_status · fleet_summary · vehicle_card · recent_decisions · stall_availability ·     │
@@ -52,19 +52,19 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
   └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
         ^                                                     ^
         │ supabase.rpc('ottoq_agent_inbox' / '..._decide')    │ ottoqRpc('ottoq_agent_requests_for_operator')  (anon;
-  OTTO-PULSE: OTTO-Q > Agents (crew approve / decline)   OrchestrAV: Fleet > Agent requests (read-only)       needs 0551)
+  OTTO-PULSE: OTTO-Q > Agents (crew approve / decline)   OrchestrAV: Fleet > Agent requests (read-only)       needs 0556)
 ```
 
 Files:
 
 | | |
 |---|---|
-| `db/migrations/0550_an_outside_agent_asks_through_one_door_and_a_person_decides.sql` | tables, dispatcher, tools, people's doors, admin, grants, V1–V8 |
-| `db/migrations/0551_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql` | optional: one `GRANT EXECUTE … TO anon` for OrchestrAV's read panel |
+| `db/migrations/0555_an_outside_agent_asks_through_one_door_and_a_person_decides.sql` | tables, dispatcher, tools, people's doors, admin, grants, V1–V8 |
+| `db/migrations/0556_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql` | optional: one `GRANT EXECUTE … TO anon` for OrchestrAV's read panel |
 | `edge-functions/ottoq-agent-gateway/index.ts` | the I/O shell (≈40 lines) |
 | `edge-functions/_shared/agent_gateway.ts` | the pure half: tool catalog, JSON schemas, validation, REST, MCP, A2A card, PostgREST caller |
 | `tests/agent_gateway.test.mjs` | 33 contract/HTTP/MCP tests + 6 end-to-end over the real SQL |
-| `tests/test_agent_gateway_sql.py` + `tests/fixtures/agent_gateway_stub_engine.sql` | 21 tests executing 0550/0551 against a stub engine whose doors are the live bodies (md5-proven) |
+| `tests/test_agent_gateway_sql.py` + `tests/fixtures/agent_gateway_stub_engine.sql` | 21 tests executing 0555/0556 against a stub engine whose doors are the live bodies (md5-proven) |
 | `scripts/agent-gateway-smoke.mjs` | the morning smoke test |
 
 ## 2. Security model
@@ -89,9 +89,9 @@ Files:
 - **Everything is revoked, then granted narrowly** (the "REVOKE that removed nothing" class of 0405): the three
   tables have RLS on with no policy and no privilege for anon, authenticated or service_role; the dispatcher and admin
   functions are service_role only; the inbox and decide door are authenticated only; the internal tool functions
-  (which take a principal row) are executable by nobody but their owner. `0550` V3 asserts every bit with
+  (which take a principal row) are executable by nobody but their owner. `0555` V3 asserts every bit with
   `has_function_privilege` / `has_table_privilege`.
-- **No write path to world state.** `0550` V5 asserts, on comment-stripped source, that no function a token can reach
+- **No write path to world state.** `0555` V5 asserts, on comment-stripped source, that no function a token can reach
   names an engine door or writes outside `ottoq_agent_*`; the node suite asserts the same from the file. Only
   `ottoq_agent_request_decide` calls a door, only for a signed-in person with the authority below, and identity is
   read from `auth.uid()`, never an argument.
@@ -159,7 +159,7 @@ or `{"error": {"code","message","hint?","details?"}, "meta": {…}}`. `call_id` 
 2. **OTTO-PULSE → OTTO-Q → Agents** shows the request (`ottoq_agent_inbox`, any staff of the depot may read). A
    **yard supervisor or ops manager** approves or declines it (`ottoq_agent_request_decide`) — the same authority
    PULSE already requires for `ai.approve_action`. A note is acknowledged or dismissed.
-3. **OrchestrAV → Fleet → Agent requests** shows a fleet operator its own fleet's requests (read-only; needs 0551).
+3. **OrchestrAV → Fleet → Agent requests** shows a fleet operator its own fleet's requests (read-only; needs 0556).
    The database already lets the fleet's *bound* operator decide its own fleet's requests (never a depot-wide one),
    but OrchestrAV cannot use that yet — see §6.
 4. On approval the request goes to the engine's own door and the reply is recorded **exactly** (`engine_door`,
@@ -208,7 +208,7 @@ Specs, read 2026-09-28:
 3. **OrchestrAV cannot decide.** It reaches this database with the anon key only; `fleet_operators.auth_user_id` is
    NULL for all four operators (measured 2026-09-28). The database door for an operator exists and is tested; using it
    needs OrchestrAV to sign its users in to this project and each operator row to be bound. Until then the crew
-   decides in PULSE. OrchestrAV's read panel needs **0551**, an explicit exposure decision (0551 §2): anyone holding
+   decides in PULSE. OrchestrAV's read panel needs **0556**, an explicit exposure decision (0556 §2): anyone holding
    the public anon key who knows an operator's id can read that operator's agent requests.
 4. **`adjustment` requests have no engine door** (`approved_no_engine_door`, nothing changes). Charge targets,
    holds, etc. would each need a door OTTO-Q does not have.
@@ -225,9 +225,9 @@ Specs, read 2026-09-28:
    well-formed request costs one database call, bounded by the ledger caps).
 8. **Findings are not given G-numbers here.** PR #211 is concurrently claiming G265–G273; the items above should be
    numbered after both merge.
-9. **Numbering and merge conflicts with PR #211.** #211 claimed 0539–0545 when this started and has since added its
-   own `0546_a_car_waiting_for_a_charger_keeps_its_place_in_line`, so these files are **0550 and 0551**, leaving
-   0547–0549 for it; if #211 grows past 0549, renumber these at merge. Conflicts are expected in the generated files
+9. **Numbering and merge conflicts.** These files were written as 0550 and 0551, leaving 0547–0549 for the
+   concurrent charger work (PR #211). That work grew to 0554 (PR #213: 0550–0554 are its fault door, charge line,
+   bay holds and bay seats), so at the merge of 2026-09-28 these were renumbered **0555 and 0556**, as planned. Conflicts are expected in the generated files
    (`MIGRATION_LOG.md` index, the manifest in `scripts/check-drift.sql`): rebase and re-run
    `bash scripts/regen-artefacts.sh`, never resolve them by hand.
 10. **Edge drift:** `_MANIFEST.md` lists the function as committed-not-deployed. `scripts/check-edge-drift.sh` only
@@ -275,7 +275,7 @@ A generic MCP client entry: URL `$OTTOQ_GATEWAY/mcp`, transport Streamable HTTP,
 `Authorization: Bearer <token>` (for example `claude mcp add --transport http ottoq "$OTTOQ_GATEWAY/mcp" --header "$H"`,
 syntax per [Claude Code: MCP](https://code.claude.com/docs/en/mcp), read 2026-09-28).
 
-Every example above was run against a local rehearsal of the gateway over the real 0550 SQL (§9), not against
+Every example above was run against a local rehearsal of the gateway over the real 0555 SQL (§9), not against
 production.
 
 ## 8. Morning checklist
@@ -284,7 +284,7 @@ All times CT. Nothing below is urgent; each step is safe to stop after.
 
 1. **Review and merge** the otto-q-core PR (and, when ready, the OTTO-PULSE and OrchestrAV PRs — their panels show
    "Agent access is built but not enabled yet" until steps 2–3 are done, so they are safe to merge first).
-2. **Apply 0550 per `scripts/APPLYING.md`.** Dry-run first (§3b): its P0–P2 premises were dry-run read-only against
+2. **Apply 0555 per `scripts/APPLYING.md`.** Dry-run first (§3b): its P0–P2 premises were dry-run read-only against
    live at 12:41 AM CT and every P1/P2 premise held. **P0 will refuse while the recert runner is certifying** (cron
    746 fires every minute and certifies for up to ~10½ minutes; it was mid-sweep at 12:41 AM CT) — if it refuses, wait
    a few minutes and apply again. Apply the **whole, unedited file** (≈129 KB) with the Supabase MCP `apply_migration`,
@@ -292,8 +292,8 @@ All times CT. Nothing below is urgent; each step is safe to stop after.
    existing function, and classifies itself `forces_recert = false`, `forces_dial_restart = false` (so neither the
    canon streaks nor the dial experiments restart). Record the version, run `bash scripts/regen-artefacts.sh`, log it
    in `MIGRATION_LOG.md`, commit.
-3. **Decide on 0551** (optional). Apply it only if OrchestrAV's read-only "Agent requests" panel is worth the anon
-   exposure in 0551 §2. Skip it and the panel says honestly that it is not enabled.
+3. **Decide on 0556** (optional). Apply it only if OrchestrAV's read-only "Agent requests" panel is worth the anon
+   exposure in 0556 §2. Skip it and the panel says honestly that it is not enabled.
 4. **Deploy the edge function, JWT verification OFF:**
    ```bash
    supabase functions deploy ottoq-agent-gateway --project-ref gxdrcyphqjzjsuhxuqtg --no-verify-jwt
@@ -349,7 +349,7 @@ A token's scope cannot be edited (the guard refuses it): issue a new principal a
 ## 9. What was verified, and what was not
 
 **Verified (2026-09-28, 12:00–1:30 AM CT):**
-- `0550` and `0551` applied cleanly to a scratch PostgreSQL 16 over `tests/fixtures/agent_gateway_stub_engine.sql`,
+- `0555` and `0556` applied cleanly to a scratch PostgreSQL 16 over `tests/fixtures/agent_gateway_stub_engine.sql`,
   whose ten engine functions (the two doors, `ottoq_policy_set`, `ottoq_dial_clamp`, `ottoq_is_agent_actor`,
   `ottoq_policy_get`, `ottoq.ottoq_stall_free_between`, `ottoq_twin_run_context`, `ottoq_vehicle_card`,
   `ottoq_check_run_scope_registry`) are byte-identical to the live catalog (md5, read-only). All in-file checks
@@ -358,7 +358,7 @@ A token's scope cannot be edited (the guard refuses it): issue a new principal a
   the HTTP handler over the real SQL). Mutation-checked: forwarding the raw token, opening a schema, skipping the
   database on a refusal, disabling the Origin check, not authenticating notifications, dropping the fleet filter in
   SQL, and leaving `forces_dial_restart` NULL each turn the suite red.
-- 0550's P1/P2 premises dry-run read-only against live at 12:41 AM CT: all hold (P0 correctly saw the recert runner).
+- 0555's P1/P2 premises dry-run read-only against live at 12:41 AM CT: all hold (P0 correctly saw the recert runner).
 - The smoke script and every curl in §7 were run against a local HTTP rehearsal (node:http → the shared handler →
   the real SQL in a scratch database): 7 of 7 steps passed.
 - The shared module and the shell type-check under `tsc --strict` (with a Deno shim), and import under Node 22.18+

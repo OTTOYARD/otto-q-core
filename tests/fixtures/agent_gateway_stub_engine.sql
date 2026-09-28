@@ -1,7 +1,7 @@
 -- ============================================================================================================
 -- tests/fixtures/agent_gateway_stub_engine.sql
 --
--- A STUB ENGINE for exercising db/migrations/0550 (and 0551) on a throwaway PostgreSQL. NOT the engine, NOT a
+-- A STUB ENGINE for exercising db/migrations/0555 (and 0556) on a throwaway PostgreSQL. NOT the engine, NOT a
 -- migration, NEVER applied anywhere real: the guard below refuses to run on a database that has ottoq_events or a
 -- supabase_migrations schema. Loaded by tests/test_agent_gateway_sql.py into a database it creates and drops.
 --
@@ -117,7 +117,7 @@ CREATE TABLE public.stub_activity (
   held_ticks integer, last_at timestamptz, standing boolean);
 
 -- the run-scoped stub tables are registered as the engine registers its own, so the registry guard is clean before
--- 0550 touches it and "clean afterwards" means something
+-- 0555 touches it and "clean afterwards" means something
 INSERT INTO public.ottoq_run_scope_registry (table_schema, table_name, column_name, class, note) VALUES
   ('public','ottoq_sim_runs','sim_run_id','run_ledger','stub'),
   ('public','ottoq_stall_bookings','sim_run_id','engine','stub'),

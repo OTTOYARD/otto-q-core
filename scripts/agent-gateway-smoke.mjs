@@ -64,7 +64,7 @@ try {
 
   const who = await call("/v1/whoami");
   if (who.status === 503 && who.json?.error?.code === "gateway_not_enabled") {
-    check("whoami", false, "the function is deployed but migration 0550 is not applied");
+    check("whoami", false, "the function is deployed but migration 0555 is not applied");
   }
   const me = who.json?.data;
   check("whoami", who.status === 200 && !!me?.principal?.name,

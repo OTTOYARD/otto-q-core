@@ -1,14 +1,14 @@
 -- migration-version: PENDING
 -- migration-name:    the_fleet_owner_cockpit_reads_its_own_agent_requests
 --
--- 0551  **The fleet owner's cockpit can read its own agent requests.** One GRANT, in its own file, because it is an
+-- 0556  **The fleet owner's cockpit can read its own agent requests.** One GRANT, in its own file, because it is an
 --       exposure decision and not a mechanism.
 --
--- ══ §1 WHY THIS IS NOT PART OF 0550 ═════════════════════════════════════════════════════════════════════════════════
+-- ══ §1 WHY THIS IS NOT PART OF 0555 ═════════════════════════════════════════════════════════════════════════════════
 --
 --   OrchestrAV reaches this database with the anon key and nothing else: its sign-in lives on the legacy project
 --   (ycsisvozzgmisboumfqc) and its user -> fleet-operator binding is a picker on the device. So the only way its
---   "Agent requests" panel can show anything is an anon-executable read. 0550 builds that read,
+--   "Agent requests" panel can show anything is an anon-executable read. 0555 builds that read,
 --   ottoq_agent_requests_for_operator(fleet_operator_id, depot_id, limit), and grants it to authenticated only. This
 --   file adds anon. Apply it if the exposure below is acceptable for the demo; skip it and the panel says, honestly,
 --   that agent access is built but not enabled for OrchestrAV.
@@ -44,24 +44,24 @@ BEGIN
           -- G194: the recert runner names the pair past pg_stat_activity's 1 kB of query text.
           OR query ILIKE '%ottoq_recert_runner%')
      AND state = 'active' AND pid <> pg_backend_pid();
-  IF v_pairs > 0 THEN RAISE EXCEPTION '0551 P0: a pair or the recert runner is running right now'; END IF;
+  IF v_pairs > 0 THEN RAISE EXCEPTION '0556 P0: a pair or the recert runner is running right now'; END IF;
 END $inflight$;
 
--- ── P1: 0550 is applied, the read is the one it built, anon does not have it yet, and it writes nothing ──
+-- ── P1: 0555 is applied, the read is the one it built, anon does not have it yet, and it writes nothing ──
 DO $premises$
 DECLARE
   v_fn  regprocedure := to_regprocedure('public.ottoq_agent_requests_for_operator(uuid,uuid,integer)');
   v_src text;
 BEGIN
   IF v_fn IS NULL THEN
-    RAISE EXCEPTION '0551 P1: ottoq_agent_requests_for_operator does not exist; apply 0550 first';
+    RAISE EXCEPTION '0556 P1: ottoq_agent_requests_for_operator does not exist; apply 0555 first';
   END IF;
   IF NOT (SELECT prosecdef FROM pg_proc WHERE oid = v_fn)
      OR (SELECT provolatile FROM pg_proc WHERE oid = v_fn) <> 's' THEN
-    RAISE EXCEPTION '0551 P1: ottoq_agent_requests_for_operator is not the STABLE SECURITY DEFINER read 0550 built';
+    RAISE EXCEPTION '0556 P1: ottoq_agent_requests_for_operator is not the STABLE SECURITY DEFINER read 0555 built';
   END IF;
   IF has_function_privilege('anon', v_fn, 'EXECUTE') THEN
-    RAISE EXCEPTION '0551 P1: anon can already execute ottoq_agent_requests_for_operator; something else granted it';
+    RAISE EXCEPTION '0556 P1: anon can already execute ottoq_agent_requests_for_operator; something else granted it';
   END IF;
   -- 0405's safety gate, on the comment-stripped body and the two helpers it calls
   FOR v_src IN
@@ -70,12 +70,12 @@ BEGIN
      WHERE p.oid IN (v_fn, 'public.ottoq_agent_request_json(public.ottoq_agent_requests,text)'::regprocedure)
   LOOP
     IF v_src ~* '(INSERT[[:space:]]+INTO[[:space:]]|UPDATE[[:space:]]+[a-z_."]+[[:space:]]+SET[[:space:]]|DELETE[[:space:]]+FROM[[:space:]]|TRUNCATE[[:space:]]|nextval[[:space:]]*\()' THEN
-      RAISE EXCEPTION '0551 P1: the operator read (or a helper it calls) contains a write statement; it must not be granted to anon';
+      RAISE EXCEPTION '0556 P1: the operator read (or a helper it calls) contains a write statement; it must not be granted to anon';
     END IF;
   END LOOP;
   -- it never returns every operator at once
   IF (public.ottoq_agent_requests_for_operator(NULL) ->> 'error') IS DISTINCT FROM 'fleet_operator_required' THEN
-    RAISE EXCEPTION '0551 P1: ottoq_agent_requests_for_operator answers without naming an operator';
+    RAISE EXCEPTION '0556 P1: ottoq_agent_requests_for_operator answers without naming an operator';
   END IF;
 END $premises$;
 
@@ -87,7 +87,7 @@ DECLARE v_fn regprocedure;
 BEGIN
   -- V1: anon has exactly this one read
   IF NOT has_function_privilege('anon', 'public.ottoq_agent_requests_for_operator(uuid,uuid,integer)', 'EXECUTE') THEN
-    RAISE EXCEPTION '0551 V1: the grant did not take';
+    RAISE EXCEPTION '0556 V1: the grant did not take';
   END IF;
   -- V2: and still nothing else of the agent surface: not the inbox, not the decide door, not the dispatcher, not admin
   FOREACH v_fn IN ARRAY ARRAY[
@@ -98,23 +98,23 @@ BEGIN
       'public.ottoq_agent_revoke(text,text,boolean)',
       'public.ottoq_agent_request_json(public.ottoq_agent_requests,text)']::regprocedure[] LOOP
     IF has_function_privilege('anon', v_fn, 'EXECUTE') THEN
-      RAISE EXCEPTION '0551 V2: anon can execute %', v_fn;
+      RAISE EXCEPTION '0556 V2: anon can execute %', v_fn;
     END IF;
   END LOOP;
   -- V3: and no agent table directly
   IF has_table_privilege('anon', 'public.ottoq_agent_requests', 'SELECT')
      OR has_table_privilege('anon', 'public.ottoq_agent_principals', 'SELECT')
      OR has_table_privilege('anon', 'public.ottoq_agent_call_ledger', 'SELECT') THEN
-    RAISE EXCEPTION '0551 V3: anon can read an agent table directly';
+    RAISE EXCEPTION '0556 V3: anon can read an agent table directly';
   END IF;
 END $verify$;
 
 -- Rollback: REVOKE EXECUTE ON FUNCTION public.ottoq_agent_requests_for_operator(uuid, uuid, integer) FROM anon;
--- and DELETE FROM public.ottoq_cert_lineage WHERE name = '0551_the_fleet_owner_cockpit_reads_its_own_agent_requests'.
+-- and DELETE FROM public.ottoq_cert_lineage WHERE name = '0556_the_fleet_owner_cockpit_reads_its_own_agent_requests'.
 
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0551_the_fleet_owner_cockpit_reads_its_own_agent_requests', false, false,
-  'One GRANT EXECUTE to anon on a read-only, operator-scoped function built by 0550. No body changes; a privilege bit is invisible to every certification atom and to every dial arm.',
+VALUES ('0556_the_fleet_owner_cockpit_reads_its_own_agent_requests', false, false,
+  'One GRANT EXECUTE to anon on a read-only, operator-scoped function built by 0555. No body changes; a privilege bit is invisible to every certification atom and to every dial arm.',
   now())
 ON CONFLICT (name) DO NOTHING;
 COMMIT;

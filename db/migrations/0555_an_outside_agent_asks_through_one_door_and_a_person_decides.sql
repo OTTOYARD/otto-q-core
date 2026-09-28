@@ -1,7 +1,7 @@
 -- migration-version: PENDING
 -- migration-name:    an_outside_agent_asks_through_one_door_and_a_person_decides
 --
--- 0550  **An outside agent asks through one door, and a person decides.** Hermes, a fleet manager's own agent, or a
+-- 0555  **An outside agent asks through one door, and a person decides.** Hermes, a fleet manager's own agent, or a
 --       depot-operations agent can now hold a credential for this engine, read the twin depot within a scope the
 --       database enforces, and ASK for a change. Nothing it asks for happens until a person approves it, and nothing
 --       a person approves happens except through a door the engine already has. Where no door exists, the approval
@@ -79,7 +79,7 @@
 --                                         auth user bound in fleet_operators.auth_user_id, deciding only requests of
 --                                         its own fleet, never a depot-wide ops action. Identity is read from the
 --                                         session (auth.uid()), never from an argument.
---     ottoq_agent_requests_for_operator   OrchestrAV: one operator's requests. anon is NOT granted here; 0551 is the
+--     ottoq_agent_requests_for_operator   OrchestrAV: one operator's requests. anon is NOT granted here; 0556 is the
 --                                         separate, optional file that grants it, because it is an exposure decision.
 --
 --   ROUTING ON APPROVAL (total: every kind lands in a defined status)
@@ -164,7 +164,7 @@ BEGIN
           -- advisory-lock key is in its first 100 characters.
           OR query ILIKE '%ottoq_recert_runner%')
      AND state = 'active' AND pid <> pg_backend_pid();
-  IF v_pairs > 0 THEN RAISE EXCEPTION '0550 P0: a pair or the recert runner is running right now'; END IF;
+  IF v_pairs > 0 THEN RAISE EXCEPTION '0555 P0: a pair or the recert runner is running right now'; END IF;
 END $inflight$;
 
 -- ── P1: every object this file READS or CALLS is the one it was written against ──
@@ -177,7 +177,7 @@ DECLARE
 BEGIN
   -- the two doors an approval routes to: present, jsonb, SECURITY DEFINER, closed to anon
   IF v_recall IS NULL OR v_ops IS NULL THEN
-    RAISE EXCEPTION '0550 P1: a door this file routes to is missing (recall %, ops %)', v_recall, v_ops;
+    RAISE EXCEPTION '0555 P1: a door this file routes to is missing (recall %, ops %)', v_recall, v_ops;
   END IF;
   IF (SELECT prorettype FROM pg_proc WHERE oid = v_recall) <> 'jsonb'::regtype
      OR (SELECT prorettype FROM pg_proc WHERE oid = v_ops) <> 'jsonb'::regtype
@@ -185,12 +185,12 @@ BEGIN
      OR NOT (SELECT prosecdef FROM pg_proc WHERE oid = v_ops)
      OR has_function_privilege('anon', v_recall, 'EXECUTE')
      OR has_function_privilege('anon', v_ops, 'EXECUTE') THEN
-    RAISE EXCEPTION '0550 P1: a door is not the jsonb SECURITY DEFINER anon-closed function this file was written against';
+    RAISE EXCEPTION '0555 P1: a door is not the jsonb SECURITY DEFINER anon-closed function this file was written against';
   END IF;
   -- the replies the router maps: recall answers ok true/false; the ops door applied / no_change / refused
   v_src := (SELECT prosrc FROM pg_proc WHERE oid = v_recall);
   IF position('''ok'', true' IN v_src) = 0 OR position('''ok'', false' IN v_src) = 0 THEN
-    RAISE EXCEPTION '0550 P1: ottoq_hw_recall_vehicle no longer answers {ok: true|false}';
+    RAISE EXCEPTION '0555 P1: ottoq_hw_recall_vehicle no longer answers {ok: true|false}';
   END IF;
   v_src := (SELECT prosrc FROM pg_proc WHERE oid = v_ops);
   FOREACH v_need IN ARRAY ARRAY[
@@ -199,12 +199,12 @@ BEGIN
       $a$p_action = 'enable_energy_reserve'$a$,   $a$v_param := 'energy_reserve_shave'$a$,
       $a$'status','applied'$a$, $a$'status','no_change'$a$, $a$'status','refused'$a$] LOOP
     IF position(v_need IN v_src) = 0 THEN
-      RAISE EXCEPTION '0550 P1: ottoq_apply_ops_action no longer contains %; re-read its whitelist before routing to it', v_need;
+      RAISE EXCEPTION '0555 P1: ottoq_apply_ops_action no longer contains %; re-read its whitelist before routing to it', v_need;
     END IF;
   END LOOP;
   -- an approval must not launder the agent's request into a person-privileged write
   IF NOT public.ottoq_is_agent_actor('ottoq_prime:agent_gateway:probe') THEN
-    RAISE EXCEPTION '0550 P1: ottoq_is_agent_actor no longer treats ottoq_prime:<suffix> as an agent';
+    RAISE EXCEPTION '0555 P1: ottoq_is_agent_actor no longer treats ottoq_prime:<suffix> as an agent';
   END IF;
   -- the reads this file composes
   IF to_regprocedure('public.ottoq_depot_cards(uuid,uuid)') IS NULL
@@ -212,23 +212,23 @@ BEGIN
      OR to_regprocedure('public.ottoq_twin_run_context(uuid)') IS NULL
      OR to_regprocedure('public.ottoq_activity_feed(uuid,integer,uuid,boolean,integer)') IS NULL
      OR to_regprocedure('ottoq.ottoq_stall_free_between(uuid,uuid,timestamp with time zone,timestamp with time zone,text,text,integer,text[])') IS NULL THEN
-    RAISE EXCEPTION '0550 P1: a read this file composes is missing';
+    RAISE EXCEPTION '0555 P1: a read this file composes is missing';
   END IF;
   -- the columns the people's doors and the catalog check read
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='fleet_operators' AND column_name='auth_user_id')
      OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='staff_users' AND column_name='auth_user_id')
      OR NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='ottoq_policy_param_catalog' AND column_name='agent_writable') THEN
-    RAISE EXCEPTION '0550 P1: fleet_operators.auth_user_id, staff_users.auth_user_id or ottoq_policy_param_catalog.agent_writable is missing';
+    RAISE EXCEPTION '0555 P1: fleet_operators.auth_user_id, staff_users.auth_user_id or ottoq_policy_param_catalog.agent_writable is missing';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = 'staff_role' AND e.enumlabel = 'yard_supervisor')
      OR NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = 'staff_role' AND e.enumlabel = 'ops_manager') THEN
-    RAISE EXCEPTION '0550 P1: staff_role no longer has yard_supervisor and ops_manager';
+    RAISE EXCEPTION '0555 P1: staff_role no longer has yard_supervisor and ops_manager';
   END IF;
   IF to_regprocedure('extensions.gen_random_bytes(integer)') IS NULL THEN
-    RAISE EXCEPTION '0550 P1: pgcrypto gen_random_bytes is not in the extensions schema';
+    RAISE EXCEPTION '0555 P1: pgcrypto gen_random_bytes is not in the extensions schema';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.depots WHERE id = '11111111-1111-1111-1111-111111111111') THEN
-    RAISE EXCEPTION '0550 P1: the twin depot does not exist';
+    RAISE EXCEPTION '0555 P1: the twin depot does not exist';
   END IF;
 END $premises$;
 
@@ -239,7 +239,7 @@ BEGIN
   IF to_regclass('public.ottoq_agent_principals') IS NOT NULL
      OR to_regclass('public.ottoq_agent_requests') IS NOT NULL
      OR to_regclass('public.ottoq_agent_call_ledger') IS NOT NULL THEN
-    RAISE EXCEPTION '0550 P2: an ottoq_agent_* table already exists; this file has already been applied';
+    RAISE EXCEPTION '0555 P2: an ottoq_agent_* table already exists; this file has already been applied';
   END IF;
   SELECT string_agg(p.proname, ', ') INTO v_fn
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -253,11 +253,11 @@ BEGIN
                        'ottoq_agent_call','ottoq_agent_issue_token','ottoq_agent_revoke','ottoq_agent_expire_lapsed',
                        'ottoq_agent_inbox','ottoq_agent_request_decide','ottoq_agent_requests_for_operator');
   IF v_fn IS NOT NULL THEN
-    RAISE EXCEPTION '0550 P2: function(s) this file creates already exist: %', v_fn;
+    RAISE EXCEPTION '0555 P2: function(s) this file creates already exist: %', v_fn;
   END IF;
   SELECT count(*) INTO v_block FROM public.ottoq_check_run_scope_registry() WHERE severity = 'block';
   IF v_block > 0 THEN
-    RAISE EXCEPTION '0550 P2: the run-scope registry already reports % blocking defect(s)', v_block;
+    RAISE EXCEPTION '0555 P2: the run-scope registry already reports % blocking defect(s)', v_block;
   END IF;
 END $fresh$;
 
@@ -306,7 +306,7 @@ CREATE TABLE public.ottoq_agent_principals (
 );
 
 COMMENT ON TABLE public.ottoq_agent_principals IS
-'0550. An outside agent''s identity for the ottoq-agent-gateway: kind (personal | fleet_operator | depot_ops), the depot it is scoped to (the twin depot only, CLAUDE.md rule 8), an optional fleet-operator scope, its capabilities (read, note, request_recall, request_ops_action, request_adjustment) and the SHA-256 of its token. The token is shown once by ottoq_agent_issue_token and never stored. A principal''s scope is FIXED at issue (a trigger refuses any change but last_used_at and revocation): to change what an agent may do, issue a new principal and revoke the old one. Not ottow_api_keys, deliberately: a row there is an ingestion source for otto-q-api.';
+'0555. An outside agent''s identity for the ottoq-agent-gateway: kind (personal | fleet_operator | depot_ops), the depot it is scoped to (the twin depot only, CLAUDE.md rule 8), an optional fleet-operator scope, its capabilities (read, note, request_recall, request_ops_action, request_adjustment) and the SHA-256 of its token. The token is shown once by ottoq_agent_issue_token and never stored. A principal''s scope is FIXED at issue (a trigger refuses any change but last_used_at and revocation): to change what an agent may do, issue a new principal and revoke the old one. Not ottow_api_keys, deliberately: a row there is an ingestion source for otto-q-api.';
 
 CREATE TABLE public.ottoq_agent_requests (
   request_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -374,7 +374,7 @@ CREATE TABLE public.ottoq_agent_requests (
 );
 
 COMMENT ON TABLE public.ottoq_agent_requests IS
-'0550. What an outside agent asked and what became of it -- the request/decision ledger behind the agent inbox in OTTO-PULSE and the agent-requests panel in OrchestrAV. Lifecycle: pending -> declined | expired | acknowledged (a note) | applied | refused_by_engine | approved_no_engine_door | approved_not_applied | apply_failed. `decision` is the person''s verdict; `status` is where the request ended up; `engine_door` / `engine_reply` are the door that was called and exactly what it said. A trigger freezes a closed row and freezes what was asked on an open one. Registered class=evidence with NO foreign key to ottoq_sim_runs (0340''s reasoning), so a request survives the purge of the run it was made against; sim_run_id is a durable historical key. expires_at is REAL time; sim_clock is SIM time.';
+'0555. What an outside agent asked and what became of it -- the request/decision ledger behind the agent inbox in OTTO-PULSE and the agent-requests panel in OrchestrAV. Lifecycle: pending -> declined | expired | acknowledged (a note) | applied | refused_by_engine | approved_no_engine_door | approved_not_applied | apply_failed. `decision` is the person''s verdict; `status` is where the request ended up; `engine_door` / `engine_reply` are the door that was called and exactly what it said. A trigger freezes a closed row and freezes what was asked on an open one. Registered class=evidence with NO foreign key to ottoq_sim_runs (0340''s reasoning), so a request survives the purge of the run it was made against; sim_run_id is a durable historical key. expires_at is REAL time; sim_clock is SIM time.';
 
 CREATE UNIQUE INDEX ottoq_agent_requests_idempotency_idx
   ON public.ottoq_agent_requests (principal_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
@@ -408,7 +408,7 @@ CREATE TABLE public.ottoq_agent_call_ledger (
 );
 
 COMMENT ON TABLE public.ottoq_agent_call_ledger IS
-'0550. One row per call an outside agent made to the ottoq-agent-gateway, reads included: principal, transport (rest | mcp), tool, ok, HTTP status, error code, latency. Written by ottoq_agent_call in the same transaction as the tool it ran, so a write tool''s row and its request row commit together. Append-only (override: ottoq.agent_ledger_unlock=on in a migration that says why). Calls with an unknown or revoked token are ledgered with principal_id NULL, bounded at 60 a minute. Calls refused before the database (a malformed token, an oversized body) are not here; the edge function answers those itself. No retention rule yet.';
+'0555. One row per call an outside agent made to the ottoq-agent-gateway, reads included: principal, transport (rest | mcp), tool, ok, HTTP status, error code, latency. Written by ottoq_agent_call in the same transaction as the tool it ran, so a write tool''s row and its request row commit together. Append-only (override: ottoq.agent_ledger_unlock=on in a migration that says why). Calls with an unknown or revoked token are ledgered with principal_id NULL, bounded at 60 a minute. Calls refused before the database (a malformed token, an oversized body) are not here; the edge function answers those itself. No retention rule yet.';
 
 CREATE INDEX ottoq_agent_call_ledger_principal_idx ON public.ottoq_agent_call_ledger (principal_id, called_at DESC);
 CREATE INDEX ottoq_agent_call_ledger_unauth_idx ON public.ottoq_agent_call_ledger (called_at) WHERE principal_id IS NULL;
@@ -521,7 +521,7 @@ CREATE TRIGGER ottoq_agent_principals_no_truncate_trg
 -- ══ 3. register the one run-scoped column, as evidence ══════════════════════════════════════════════════════════════
 INSERT INTO public.ottoq_run_scope_registry (table_schema, table_name, column_name, class, note)
 VALUES ('public', 'ottoq_agent_requests', 'sim_run_id', 'evidence',
-        '0550: the run an outside agent''s request was made against. Evidence, not engine: the request, the person''s decision and the engine''s reply must survive ottoq_purge_prior_runs. Deliberately NO foreign key to ottoq_sim_runs -- check (b) asks for one from engine/stamp only, and an enforcing FK on evidence can only block the purge or, as CASCADE, erase what check (c) forbids erasing (0340).');
+        '0555: the run an outside agent''s request was made against. Evidence, not engine: the request, the person''s decision and the engine''s reply must survive ottoq_purge_prior_runs. Deliberately NO foreign key to ottoq_sim_runs -- check (b) asks for one from engine/stamp only, and an enforcing FK on evidence can only block the purge or, as CASCADE, erase what check (c) forbids erasing (0340).');
 
 -- ══ 4. small internal helpers ═══════════════════════════════════════════════════════════════════════════════════════
 --
@@ -1209,7 +1209,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_call(
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0550. The ONLY function the ottoq-agent-gateway edge function calls. It resolves the token hash to an active
+/* 0555. The ONLY function the ottoq-agent-gateway edge function calls. It resolves the token hash to an active
    principal, applies the per-principal rate limit, checks the tool's capability, runs the tool and writes the call
    ledger, in one transaction. Business refusals from a tool (SQLSTATE OQAxx) roll back whatever the tool started and
    come back as an HTTP status the edge function forwards. This function names no engine door: an agent can read and
@@ -1371,7 +1371,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_request_decide(p_request_id uuid, 
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0550. A person approves or declines an outside agent's request. Who is deciding is read from the session
+/* 0555. A person approves or declines an outside agent's request. Who is deciding is read from the session
    (auth.uid()), never from an argument. Crew: a yard_supervisor or ops_manager of the request's depot. Operator: the
    auth user bound in fleet_operators.auth_user_id, deciding only its own fleet's requests, never a depot-wide ops
    action. On approval the request goes to the engine's own door, if one exists, and the reply is recorded exactly. */
@@ -1506,7 +1506,7 @@ BEGIN
     ELSE
       v_door := 'ottoq_apply_ops_action';
       BEGIN
-        --: 'ottoq_prime:<suffix>' keeps the AGENT envelope and agent_writable guard in force (0550 P1): a person's
+        --: 'ottoq_prime:<suffix>' keeps the AGENT envelope and agent_writable guard in force (0555 P1): a person's
         --: approval does not turn an agent's request into a person-privileged write
         v_reply := public.ottoq_apply_ops_action(v_req.sim_run_id, v_req.depot_id, v_req.payload ->> 'action',
                                                  COALESCE(v_req.payload -> 'args', '{}'::jsonb),
@@ -1547,7 +1547,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_inbox(
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0550. PULSE's agent inbox: every outside agent's request at one depot, open ones first. For the depot's own crew
+/* 0555. PULSE's agent inbox: every outside agent's request at one depot, open ones first. For the depot's own crew
    (any role may read; only a supervisor or ops manager may decide, and `viewer.can_decide` says which). */
 DECLARE
   v_uid   uuid    := auth.uid();
@@ -1602,7 +1602,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_requests_for_operator(
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0550. OrchestrAV's view: one fleet operator's agent requests at one depot -- requests its own agents made, and
+/* 0555. OrchestrAV's view: one fleet operator's agent requests at one depot -- requests its own agents made, and
    requests any agent made about its vehicles. Never all operators at once. Who decided is shown as crew/operator,
    never by name. `can_decide` is true only for the auth user bound to this operator in fleet_operators.auth_user_id. */
 DECLARE
@@ -1661,7 +1661,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_issue_token(
  SECURITY DEFINER
  SET search_path TO 'public', 'extensions', 'pg_temp'
 AS $fn$
-/* 0550. Creates an agent principal and returns its token ONCE. Only sha256(token) is stored; a lost token cannot be
+/* 0555. Creates an agent principal and returns its token ONCE. Only sha256(token) is stored; a lost token cannot be
    recovered -- revoke the principal and issue a new one. */
 DECLARE
   v_name  text   := lower(btrim(COALESCE(p_name, '')));
@@ -1733,7 +1733,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_revoke(p_principal text, p_reason 
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0550. Revokes a principal by name or id. Final: a revoked principal cannot be re-activated. By default its open
+/* 0555. Revokes a principal by name or id. Final: a revoked principal cannot be re-activated. By default its open
    requests expire with it -- a revoked token may have been stolen, and its questions should not reach a person. */
 DECLARE
   v_key text := btrim(COALESCE(p_principal, ''));
@@ -1776,8 +1776,8 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_expire_lapsed()
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0550. Records every lapsed pending request as expired. Reads already show a lapsed request as expired, so nothing
-   depends on this running; it exists for a future scheduled job, and none is scheduled by 0550. */
+/* 0555. Records every lapsed pending request as expired. Reads already show a lapsed request as expired, so nothing
+   depends on this running; it exists for a future scheduled job, and none is scheduled by 0555. */
 DECLARE v_n integer;
 BEGIN
   UPDATE public.ottoq_agent_requests r
@@ -1836,17 +1836,17 @@ GRANT EXECUTE ON FUNCTION public.ottoq_agent_request_decide(uuid, text, text) TO
 GRANT EXECUTE ON FUNCTION public.ottoq_agent_requests_for_operator(uuid, uuid, integer) TO authenticated, service_role;
 
 COMMENT ON FUNCTION public.ottoq_agent_call(text, text, jsonb, text, jsonb) IS
-'0550. The one door the ottoq-agent-gateway edge function calls (service_role only): token hash -> active principal -> rate limit -> capability -> tool -> call ledger, in one transaction. Tools: handshake, whoami, depot_status, fleet_summary, vehicle_card, recent_decisions, stall_availability, list_requests, send_note, submit_request. Returns {ok, http_status, tool, call_id, principal?, data? | error?}. Names no engine door: an agent reads and ASKS; a person decides through ottoq_agent_request_decide.';
+'0555. The one door the ottoq-agent-gateway edge function calls (service_role only): token hash -> active principal -> rate limit -> capability -> tool -> call ledger, in one transaction. Tools: handshake, whoami, depot_status, fleet_summary, vehicle_card, recent_decisions, stall_availability, list_requests, send_note, submit_request. Returns {ok, http_status, tool, call_id, principal?, data? | error?}. Names no engine door: an agent reads and ASKS; a person decides through ottoq_agent_request_decide.';
 COMMENT ON FUNCTION public.ottoq_agent_request_decide(uuid, text, text) IS
-'0550. A signed-in person approves or declines an outside agent''s request. Crew = yard_supervisor/ops_manager of the request''s depot; operator = the auth user in fleet_operators.auth_user_id, own fleet only, never an ops action. Approval routes: note -> acknowledged; recall_vehicle -> ottoq_hw_recall_vehicle; ops_action -> ottoq_apply_ops_action as ottoq_prime:agent_gateway:<principal> (agent envelope kept), on the run it was asked against; adjustment -> approved_no_engine_door. The door''s reply is stored verbatim in engine_reply.';
+'0555. A signed-in person approves or declines an outside agent''s request. Crew = yard_supervisor/ops_manager of the request''s depot; operator = the auth user in fleet_operators.auth_user_id, own fleet only, never an ops action. Approval routes: note -> acknowledged; recall_vehicle -> ottoq_hw_recall_vehicle; ops_action -> ottoq_apply_ops_action as ottoq_prime:agent_gateway:<principal> (agent envelope kept), on the run it was asked against; adjustment -> approved_no_engine_door. The door''s reply is stored verbatim in engine_reply.';
 COMMENT ON FUNCTION public.ottoq_agent_inbox(uuid, boolean, integer) IS
-'0550. OTTO-PULSE''s agent inbox for one depot: open requests first. Readable by that depot''s staff (auth.uid() in staff_users); viewer.can_decide is true for yard_supervisor and ops_manager.';
+'0555. OTTO-PULSE''s agent inbox for one depot: open requests first. Readable by that depot''s staff (auth.uid() in staff_users); viewer.can_decide is true for yard_supervisor and ops_manager.';
 COMMENT ON FUNCTION public.ottoq_agent_requests_for_operator(uuid, uuid, integer) IS
-'0550. OrchestrAV''s agent requests for ONE fleet operator (never all). anon is not granted by 0550; 0551 is the separate, optional grant. can_decide is true only for the auth user bound in fleet_operators.auth_user_id.';
+'0555. OrchestrAV''s agent requests for ONE fleet operator (never all). anon is not granted by 0555; 0556 is the separate, optional grant. can_decide is true only for the auth user bound in fleet_operators.auth_user_id.';
 COMMENT ON FUNCTION public.ottoq_agent_issue_token(text, text, text[], uuid, uuid, text, integer, integer) IS
-'0550. Issue an agent token (service_role / SQL editor). Returns the token ONCE; stores only sha256. Twin depot only (rule 8). Scope is fixed at issue.';
+'0555. Issue an agent token (service_role / SQL editor). Returns the token ONCE; stores only sha256. Twin depot only (rule 8). Scope is fixed at issue.';
 COMMENT ON FUNCTION public.ottoq_agent_revoke(text, text, boolean) IS
-'0550. Revoke an agent principal by name or id, with a reason. Final. Expires its open requests unless p_expire_pending is false.';
+'0555. Revoke an agent principal by name or id, with a reason. Final. Expires its open requests unless p_expire_pending is false.';
 
 -- ═══ verification ══════════════════════════════════════════════════════════════════════════════════════════════════
 DO $verify$
@@ -1891,15 +1891,15 @@ BEGIN
        OR has_table_privilege('authenticated', v_tbl, 'UPDATE') OR has_table_privilege('authenticated', v_tbl, 'DELETE')
        OR has_table_privilege('service_role', v_tbl, 'INSERT') OR has_table_privilege('service_role', v_tbl, 'UPDATE')
        OR has_table_privilege('service_role', v_tbl, 'DELETE') OR has_table_privilege('service_role', v_tbl, 'TRUNCATE') THEN
-      RAISE EXCEPTION '0550 V1: % is reachable by a client role or writable by service_role', v_tbl;
+      RAISE EXCEPTION '0555 V1: % is reachable by a client role or writable by service_role', v_tbl;
     END IF;
     IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = v_tbl::regclass)
        OR EXISTS (SELECT 1 FROM pg_policy WHERE polrelid = v_tbl::regclass) THEN
-      RAISE EXCEPTION '0550 V1: % does not have RLS on with no policy', v_tbl;
+      RAISE EXCEPTION '0555 V1: % does not have RLS on with no policy', v_tbl;
     END IF;
     IF EXISTS (SELECT 1 FROM pg_constraint WHERE contype = 'f' AND conrelid = v_tbl::regclass
                   AND confrelid = 'public.ottoq_sim_runs'::regclass) THEN
-      RAISE EXCEPTION '0550 V1: % acquired a foreign key to ottoq_sim_runs', v_tbl;
+      RAISE EXCEPTION '0555 V1: % acquired a foreign key to ottoq_sim_runs', v_tbl;
     END IF;
   END LOOP;
 
@@ -1910,39 +1910,39 @@ BEGIN
      AND NOT EXISTS (SELECT 1 FROM unnest(COALESCE(p.proconfig, ARRAY[]::text[])) c WHERE c LIKE 'search_path=%')
      AND p.oid = ANY ((v_internal || v_service || v_people)::oid[]);
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0550 V2: SECURITY DEFINER without a pinned search_path: %', v_bad;
+    RAISE EXCEPTION '0555 V2: SECURITY DEFINER without a pinned search_path: %', v_bad;
   END IF;
 
   -- V3: grants, measured rather than trusted
   FOREACH v_fn IN ARRAY v_internal LOOP
     IF has_function_privilege('anon', v_fn, 'EXECUTE') OR has_function_privilege('authenticated', v_fn, 'EXECUTE')
        OR has_function_privilege('service_role', v_fn, 'EXECUTE') THEN
-      RAISE EXCEPTION '0550 V3: internal % is executable by a client role (a caller that passes its own principal row needs no token)', v_fn;
+      RAISE EXCEPTION '0555 V3: internal % is executable by a client role (a caller that passes its own principal row needs no token)', v_fn;
     END IF;
   END LOOP;
   FOREACH v_fn IN ARRAY v_service LOOP
     IF has_function_privilege('anon', v_fn, 'EXECUTE') OR has_function_privilege('authenticated', v_fn, 'EXECUTE')
        OR NOT has_function_privilege('service_role', v_fn, 'EXECUTE') THEN
-      RAISE EXCEPTION '0550 V3: % is not service_role-only', v_fn;
+      RAISE EXCEPTION '0555 V3: % is not service_role-only', v_fn;
     END IF;
   END LOOP;
   FOREACH v_fn IN ARRAY v_people LOOP
     IF has_function_privilege('anon', v_fn, 'EXECUTE') OR NOT has_function_privilege('authenticated', v_fn, 'EXECUTE') THEN
-      RAISE EXCEPTION '0550 V3: % is not authenticated-only', v_fn;
+      RAISE EXCEPTION '0555 V3: % is not authenticated-only', v_fn;
     END IF;
   END LOOP;
 
   -- V4: registered as evidence, and the guard is clean and silent about the new tables
   IF NOT EXISTS (SELECT 1 FROM public.ottoq_run_scope_registry
                   WHERE table_name = 'ottoq_agent_requests' AND column_name = 'sim_run_id' AND class = 'evidence') THEN
-    RAISE EXCEPTION '0550 V4: ottoq_agent_requests.sim_run_id is not registered as evidence';
+    RAISE EXCEPTION '0555 V4: ottoq_agent_requests.sim_run_id is not registered as evidence';
   END IF;
   SELECT count(*) INTO v_block FROM public.ottoq_check_run_scope_registry() WHERE severity = 'block';
   IF v_block > 0 THEN
-    RAISE EXCEPTION '0550 V4: the registry guard now reports % blocking defect(s)', v_block;
+    RAISE EXCEPTION '0555 V4: the registry guard now reports % blocking defect(s)', v_block;
   END IF;
   IF EXISTS (SELECT 1 FROM public.ottoq_check_run_scope_registry() WHERE table_name LIKE 'ottoq\_agent\_%') THEN
-    RAISE EXCEPTION '0550 V4: the registry guard reports an ottoq_agent_* table';
+    RAISE EXCEPTION '0555 V4: the registry guard reports an ottoq_agent_* table';
   END IF;
 
   -- V5: NOTHING AN AGENT'S TOKEN CAN REACH NAMES A DOOR OR WRITES OUTSIDE THE AGENT LEDGER. Comment-stripped and
@@ -1951,31 +1951,31 @@ BEGIN
     v_src := regexp_replace(regexp_replace((SELECT prosrc FROM pg_proc WHERE oid = v_fn), '/\*.*?\*/', '', 'g'),
                             '--[^' || chr(10) || ']*', '', 'g');
     IF v_src ~* '(ottoq_hw_recall_vehicle|ottoq_apply_ops_action|ottoq_agent_request_decide|ottoq_submit_external_proposal|ottoq_policy_set|ottoq_hw_set_return_threshold)' THEN
-      RAISE EXCEPTION '0550 V5: % names an engine door', v_fn;
+      RAISE EXCEPTION '0555 V5: % names an engine door', v_fn;
     END IF;
     FOR v_target IN
       SELECT lower(regexp_replace(m[2], '^public\.', ''))
         FROM regexp_matches(v_src, '(insert[[:space:]]+into|update|delete[[:space:]]+from)[[:space:]]+([a-z_.]+)', 'gi') AS m
     LOOP
       IF v_target NOT LIKE 'ottoq\_agent\_%' THEN
-        RAISE EXCEPTION '0550 V5: % writes to % (the agent side may write only ottoq_agent_* tables)', v_fn, v_target;
+        RAISE EXCEPTION '0555 V5: % writes to % (the agent side may write only ottoq_agent_* tables)', v_fn, v_target;
       END IF;
     END LOOP;
   END LOOP;
   -- ...and the decide door is the one function here that does name the doors
   v_src := (SELECT prosrc FROM pg_proc WHERE oid = 'public.ottoq_agent_request_decide(uuid,text,text)'::regprocedure);
   IF position('ottoq_hw_recall_vehicle' IN v_src) = 0 OR position('ottoq_apply_ops_action' IN v_src) = 0 THEN
-    RAISE EXCEPTION '0550 V5: the decide door does not route to both engine doors';
+    RAISE EXCEPTION '0555 V5: the decide door does not route to both engine doors';
   END IF;
 
   -- V6: a decision needs a signed-in person, whoever holds the connection
   v_res := public.ottoq_agent_request_decide('00000000-0000-0000-0000-000000000000'::uuid, 'approved');
   IF v_res ->> 'error' IS DISTINCT FROM 'sign_in_required' THEN
-    RAISE EXCEPTION '0550 V6: the decide door answered % without a signed-in person', v_res;
+    RAISE EXCEPTION '0555 V6: the decide door answered % without a signed-in person', v_res;
   END IF;
   v_res := public.ottoq_agent_request_decide('00000000-0000-0000-0000-000000000000'::uuid, 'maybe');
   IF COALESCE((v_res ->> 'ok')::boolean, true) THEN
-    RAISE EXCEPTION '0550 V6: the decide door accepted a decision that is neither approved nor declined';
+    RAISE EXCEPTION '0555 V6: the decide door accepted a decision that is neither approved nor declined';
   END IF;
 
   -- V8: forces_recert FALSE, executed: no pre-existing routine reads the new tables
@@ -1985,7 +1985,7 @@ BEGIN
      AND p.prosrc ~* 'ottoq_agent_(principals|requests|call_ledger)'
      AND p.proname NOT LIKE 'ottoq\_agent\_%';
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0550 V8: an existing routine already reads the new tables: %', v_bad;
+    RAISE EXCEPTION '0555 V8: an existing routine already reads the new tables: %', v_bad;
   END IF;
 END $verify$;
 
@@ -2000,31 +2000,31 @@ DECLARE
   v_ok     boolean;
 BEGIN
   BEGIN
-    v := public.ottoq_agent_issue_token('probe-0550-v7', 'personal', ARRAY['read','note'], NULL,
-                                        '11111111-1111-1111-1111-111111111111', '0550 V7, rolled back', 60, 5);
-    IF NOT COALESCE((v ->> 'ok')::boolean, false) THEN RAISE EXCEPTION '0550 V7a: issue refused: %', v - 'token'; END IF;
+    v := public.ottoq_agent_issue_token('probe-0555-v7', 'personal', ARRAY['read','note'], NULL,
+                                        '11111111-1111-1111-1111-111111111111', '0555 V7, rolled back', 60, 5);
+    IF NOT COALESCE((v ->> 'ok')::boolean, false) THEN RAISE EXCEPTION '0555 V7a: issue refused: %', v - 'token'; END IF;
     v_hash := encode(sha256(convert_to(v ->> 'token', 'UTF8')), 'hex');
 
     v := public.ottoq_agent_call(v_hash, 'whoami', '{}'::jsonb, 'rest', '{}'::jsonb);
-    IF NOT COALESCE((v ->> 'ok')::boolean, false) OR v #>> '{data,principal,name}' IS DISTINCT FROM 'probe-0550-v7' THEN
-      RAISE EXCEPTION '0550 V7b: whoami read %', v;
+    IF NOT COALESCE((v ->> 'ok')::boolean, false) OR v #>> '{data,principal,name}' IS DISTINCT FROM 'probe-0555-v7' THEN
+      RAISE EXCEPTION '0555 V7b: whoami read %', v;
     END IF;
 
     v := public.ottoq_agent_call(v_hash, 'send_note',
-           jsonb_build_object('title', '0550 V7 probe', 'body', 'rolled back', 'idempotency_key', 'v7'), 'rest', '{}'::jsonb);
-    IF (v ->> 'http_status')::integer IS DISTINCT FROM 201 THEN RAISE EXCEPTION '0550 V7c: a note read %', v; END IF;
+           jsonb_build_object('title', '0555 V7 probe', 'body', 'rolled back', 'idempotency_key', 'v7'), 'rest', '{}'::jsonb);
+    IF (v ->> 'http_status')::integer IS DISTINCT FROM 201 THEN RAISE EXCEPTION '0555 V7c: a note read %', v; END IF;
     v_req := (v #>> '{data,request,request_id}')::uuid;
 
     v := public.ottoq_agent_call(v_hash, 'send_note',
-           jsonb_build_object('title', '0550 V7 probe', 'idempotency_key', 'v7'), 'rest', '{}'::jsonb);
+           jsonb_build_object('title', '0555 V7 probe', 'idempotency_key', 'v7'), 'rest', '{}'::jsonb);
     IF NOT COALESCE((v #>> '{data,duplicate}')::boolean, false) OR (v #>> '{data,request,request_id}')::uuid IS DISTINCT FROM v_req THEN
-      RAISE EXCEPTION '0550 V7d: the same idempotency key did not replay: %', v;
+      RAISE EXCEPTION '0555 V7d: the same idempotency key did not replay: %', v;
     END IF;
 
     v := public.ottoq_agent_call(v_hash, 'submit_request',
            jsonb_build_object('kind', 'recall_vehicle', 'title', 'x', 'vehicle_id', gen_random_uuid()), 'rest', '{}'::jsonb);
     IF (v ->> 'http_status')::integer IS DISTINCT FROM 403 THEN
-      RAISE EXCEPTION '0550 V7e: a token without request_recall was not refused: %', v;
+      RAISE EXCEPTION '0555 V7e: a token without request_recall was not refused: %', v;
     END IF;
 
     --: arguments the gateway refused still come here first: authenticated, refused, and ledgered under their tool
@@ -2034,60 +2034,60 @@ BEGIN
        OR NOT EXISTS (SELECT 1 FROM public.ottoq_agent_call_ledger l
                        WHERE l.call_id = (v ->> 'call_id')::bigint AND l.tool = 'vehicle_card'
                          AND l.http_status = 400 AND l.error_code = 'invalid_arguments') THEN
-      RAISE EXCEPTION '0550 V7e2: a call the gateway refused was not refused and ledgered here: %', v;
+      RAISE EXCEPTION '0555 V7e2: a call the gateway refused was not refused and ledgered here: %', v;
     END IF;
 
     v := public.ottoq_agent_call(repeat('0', 64), 'whoami', '{}'::jsonb, 'rest', '{}'::jsonb);
-    IF (v ->> 'http_status')::integer IS DISTINCT FROM 401 THEN RAISE EXCEPTION '0550 V7f: an unknown token read %', v; END IF;
+    IF (v ->> 'http_status')::integer IS DISTINCT FROM 401 THEN RAISE EXCEPTION '0555 V7f: an unknown token read %', v; END IF;
 
     BEGIN
       UPDATE public.ottoq_agent_requests SET title = 'edited' WHERE request_id = v_req;
       v_ok := false;
     EXCEPTION WHEN insufficient_privilege THEN v_ok := true;
     END;
-    IF NOT v_ok THEN RAISE EXCEPTION '0550 V7g: what the agent asked could be edited'; END IF;
+    IF NOT v_ok THEN RAISE EXCEPTION '0555 V7g: what the agent asked could be edited'; END IF;
     BEGIN
       DELETE FROM public.ottoq_agent_requests WHERE request_id = v_req;
       v_ok := false;
     EXCEPTION WHEN insufficient_privilege THEN v_ok := true;
     END;
-    IF NOT v_ok THEN RAISE EXCEPTION '0550 V7h: a request could be deleted'; END IF;
+    IF NOT v_ok THEN RAISE EXCEPTION '0555 V7h: a request could be deleted'; END IF;
     BEGIN
-      DELETE FROM public.ottoq_agent_call_ledger WHERE principal_name = 'probe-0550-v7';
+      DELETE FROM public.ottoq_agent_call_ledger WHERE principal_name = 'probe-0555-v7';
       v_ok := false;
     EXCEPTION WHEN insufficient_privilege THEN v_ok := true;
     END;
-    IF NOT v_ok THEN RAISE EXCEPTION '0550 V7i: the call ledger could be deleted from'; END IF;
+    IF NOT v_ok THEN RAISE EXCEPTION '0555 V7i: the call ledger could be deleted from'; END IF;
 
-    v := public.ottoq_agent_revoke('probe-0550-v7', '0550 V7', true);
+    v := public.ottoq_agent_revoke('probe-0555-v7', '0555 V7', true);
     IF NOT COALESCE((v ->> 'ok')::boolean, false) OR (v ->> 'open_requests_expired')::integer IS DISTINCT FROM 1 THEN
-      RAISE EXCEPTION '0550 V7j: revoke read %', v;
+      RAISE EXCEPTION '0555 V7j: revoke read %', v;
     END IF;
     v := public.ottoq_agent_call(v_hash, 'whoami', '{}'::jsonb, 'rest', '{}'::jsonb);
-    IF (v ->> 'http_status')::integer IS DISTINCT FROM 401 THEN RAISE EXCEPTION '0550 V7k: a revoked token read %', v; END IF;
+    IF (v ->> 'http_status')::integer IS DISTINCT FROM 401 THEN RAISE EXCEPTION '0555 V7k: a revoked token read %', v; END IF;
 
-    RAISE EXCEPTION USING ERRCODE = 'OQA99', MESSAGE = '0550_v7_rollback';
+    RAISE EXCEPTION USING ERRCODE = 'OQA99', MESSAGE = '0555_v7_rollback';
   EXCEPTION WHEN SQLSTATE 'OQA99' THEN
     NULL;  -- everything above is undone; each step proved what it set out to
   END;
-  IF EXISTS (SELECT 1 FROM public.ottoq_agent_principals WHERE name = 'probe-0550-v7')
+  IF EXISTS (SELECT 1 FROM public.ottoq_agent_principals WHERE name = 'probe-0555-v7')
      OR EXISTS (SELECT 1 FROM public.ottoq_agent_requests)
      OR EXISTS (SELECT 1 FROM public.ottoq_agent_call_ledger) THEN
-    RAISE EXCEPTION '0550 V7: the probe survived its own rollback';
+    RAISE EXCEPTION '0555 V7: the probe survived its own rollback';
   END IF;
 END $probe$;
 
 -- Rollback: DROP FUNCTION each ottoq_agent_* function this file created (the list in section 9), DROP TABLE
 -- public.ottoq_agent_call_ledger, public.ottoq_agent_requests, public.ottoq_agent_principals (in that order),
 -- DELETE FROM public.ottoq_run_scope_registry WHERE table_name = 'ottoq_agent_requests', and
--- DELETE FROM public.ottoq_cert_lineage WHERE name = '0550_an_outside_agent_asks_through_one_door_and_a_person_decides'.
+-- DELETE FROM public.ottoq_cert_lineage WHERE name = '0555_an_outside_agent_asks_through_one_door_and_a_person_decides'.
 -- Nothing else was touched.
 
 --: forces_dial_restart is FALSE, stated rather than left NULL: 0523 reads COALESCE(forces_dial_restart, true), so an
 --: omitted value would restart every dial experiment's pair count for a file that cannot move an arm. A dial pair runs
 --: inside a certification transaction that takes no outside input, and no tick-path function reads these tables (V8).
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0550_an_outside_agent_asks_through_one_door_and_a_person_decides', false, false,
+VALUES ('0555_an_outside_agent_asks_through_one_door_and_a_person_decides', false, false,
   'Additive: three agent tables (principals, requests as evidence, call ledger), the gateway dispatcher, the people''s decide/inbox doors and one registry row. No existing function body changes; nothing on the tick path reads the new tables (V8); a certification pair or a dial pair takes no outside input, so it cannot carry an agent request, and no dial arm can come out differently. The two engine doors are called only from ottoq_agent_request_decide, by a signed-in person.',
   now())
 ON CONFLICT (name) DO NOTHING;
