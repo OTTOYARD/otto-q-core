@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260929024700
 -- migration-name:    a_manual_start_interrupts_a_running_check
 --
 -- 0564  **A manual start from the depot simulation always interrupts a running check.** Chase, 2026-09-28, 9:33 PM

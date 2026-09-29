@@ -102,7 +102,7 @@ against this table without trusting any metadata column.
 | Function | v | verify_jwt | Deployed (UTC) | match | Deployed sha256 |
 |---|---:|---|---|---|---|
 | otto-q-api | 26 | false | 2026-04-19 01:54 | yes | `01762cf6734e0dd506a057a3a9ac58f09aa2acd18dc4dc23868b42c1afb9eff0` |
-| otto-twin-control | 24 | false | 2026-09-16 18:06 | yes | `596f551e67ad827c8fbdb422ed86a46ec3fd3e095f4193f1d60a1a0da4dc80e6` |
+| otto-twin-control | 30 | false | 2026-09-29 02:48 | deployed from this file¹ | `12a5c37d616fa19efcd43bda11f235ca644fa946cd4e3d112d748a8341746700` |
 | ottoq-amend | 9 | true | 2026-06-18 04:24 | yes | `70f038ae2cfdb8891f2589f2e3158cc59792f0318718963cfa9c544249b1376b` |
 | ottoq-approval-copilot | 4 | true | 2026-07-25 01:46 | yes | `3abc122e20aa24a1222abe7a3bd7ce8ef6e91f78cc236b5afe2f0dc7f46293c0` |
 | ottoq-assign-optimize | 8 | true | 2026-09-09 03:41 | yes | `5508a9c95d4b98e736b3215fca9cc006ae6b5e4a399de174165cad69f100c34e` |
@@ -132,6 +132,15 @@ against this table without trusting any metadata column.
 
 Shared modules `_shared/agent_solver_chain.ts` and `_shared/cpsat_agent_chain.ts`
 were also pulled and are byte-identical to the committed copies.
+
+¹ **`otto-twin-control` is the one row updated after the 09-19 pull (2026-09-29, migration 0564).**
+Versions 25-29 were deployed after the pull and never recorded here. v30 was deployed at
+9:48 PM CT on 2026-09-28 with this directory's `index.ts` as its content, through the Supabase
+MCP deploy tool: the start route calls `ottoq_operator_start_run`, so a manual start interrupts
+a running check. Its sha256 is of the repo file and was **not** re-pulled and hashed, so this row
+reads `deployed from this file` rather than `yes` until `scripts/check-edge-drift.sh` runs with a
+token. What was measured live: `/health` reads `1.10.0-start-interrupts-checks`, and a blank
+`scenario_code` start returns the new function's own `scenario_code required`.
 
 ## Committed, not deployed
 
