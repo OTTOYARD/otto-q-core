@@ -661,7 +661,8 @@ repo_manifest(version, name, file) AS (
     ('20260929014318'::text, 'every_charger_stall_is_angled_and_the_database_says_so'::text, '0561_every_charger_stall_is_angled_and_the_database_says_so.sql'::text),
     ('PENDING'::text, 'a_charger_is_not_held_for_a_car_still_on_its_way_back'::text, '0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql'::text),
     ('20260929024700'::text, 'a_manual_start_interrupts_a_running_check'::text, '0564_a_manual_start_interrupts_a_running_check.sql'::text),
-    ('PENDING'::text, 'a_scorecard_that_counts_cars_served'::text, '0565_a_scorecard_that_counts_cars_served.sql'::text)
+    ('PENDING'::text, 'a_scorecard_that_counts_cars_served'::text, '0565_a_scorecard_that_counts_cars_served.sql'::text),
+    ('PENDING'::text, 'the_scorecard_reads_the_step_a_run_actually_took'::text, '0566_the_scorecard_reads_the_step_a_run_actually_took.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

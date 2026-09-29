@@ -20,6 +20,7 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STUB = os.path.join(ROOT, "tests", "fixtures", "throughput_stub_engine.sql")
 M0565 = os.path.join(ROOT, "db", "migrations", "0565_a_scorecard_that_counts_cars_served.sql")
+M0566 = os.path.join(ROOT, "db", "migrations", "0566_the_scorecard_reads_the_step_a_run_actually_took.sql")
 
 RUN = "a0000000-0000-0000-0000-000000000001"
 LIVE_RUN = "a0000000-0000-0000-0000-000000000002"
@@ -76,6 +77,9 @@ def db():
         rc, err = d.file(M0565)
         assert rc == 0, f"0565 did not apply: {err}"
         d.apply_notices = err
+        d.scorecard_0565 = d.json(f"SELECT public.ottoq_throughput_scorecard('{RUN}')")
+        rc, err = d.file(M0566)
+        assert rc == 0, f"0566 did not apply: {err}"
         yield d
     finally:
         subprocess.run(admin + ["-c", f"DROP DATABASE IF EXISTS {name} WITH (FORCE)"], capture_output=True)
@@ -89,6 +93,8 @@ def sc(db):
 def test_a_second_apply_refuses(db):
     rc, err = db.file(M0565)
     assert rc != 0 and "0565 P2" in err, err
+    rc, err = db.file(M0566)
+    assert rc != 0 and "0566 P" in err, err
 
 
 def test_throughput_counts_served_visits_not_cars_parked(sc):
@@ -148,8 +154,39 @@ def test_fast_chargers(sc):
 
 
 def test_the_step_travels_with_every_time(sc):
-    assert float(sc["step_min"]) == 30.0
-    assert sc["caveats"][0].startswith("Times are quantized to 30.00-minute steps")
+    assert sc["scorecard_version"] == "0566"
+    assert float(sc["step_min"]) == 30.0 and float(sc["step_min_nominal"]) == 30.0
+    assert sc["caveats"][0].startswith("Times are quantized to the run's 30.00-minute steps")
+    assert None not in sc["caveats"]
+
+
+def test_the_step_is_the_one_the_run_took_not_the_nominal_one(db):
+    # KPI_FAIL_RUN: 7 ticks over 14 sim-minutes (2-minute steps), nominal 120 s x 1 = 2 minutes. Stretch the nominal:
+    # the scorecard must still read the step off the clock. Run ...02 is live and 0566 never scored it.
+    k = db.json(f"SELECT public.ottoq_throughput_scorecard('{KPI_FAIL_RUN}')")
+    assert float(k["step_min"]) == 2.0
+    live = db.json(f"SELECT public.ottoq_throughput_scorecard('{LIVE_RUN}')")
+    assert float(live["step_min"]) == 12.0 and float(live["step_min_nominal"]) == 30.0   # 120 min over 10 ticks
+
+
+def test_a_short_run_carries_no_daily_rate(db):
+    k = db.json(f"SELECT public.ottoq_throughput_scorecard('{KPI_FAIL_RUN}')")
+    assert k["throughput"]["served_per_day"] is None
+    assert k["fast_chargers"]["turns_per_charger_per_day"] is None
+    assert any("under 6, so per-day rates are not extrapolated" in c for c in k["caveats"]), k["caveats"]
+
+
+def test_0565_scored_the_nominal_step_and_its_rows_stay(db):
+    assert db.scorecard_0565["scorecard_version"] == "0565"
+    n = db.val("SELECT count(*) FROM public.ottoq_throughput_scores WHERE origin = 'backfill_0565'")
+    assert n == "4"
+
+
+def test_the_latest_view_reads_the_newest_scorecard(db):
+    got = db.val("SELECT string_agg(DISTINCT scorecard->>'scorecard_version', ',') FROM public.ottoq_throughput_scores_latest")
+    assert got == "0566"
+    assert db.val("SELECT count(*) FROM public.ottoq_throughput_scores_latest") == "4"
+    assert db.val("SELECT has_table_privilege('anon', 'public.ottoq_throughput_scores_latest', 'SELECT')") == "f"
 
 
 def test_a_failing_kpi_is_reported_not_fatal(db):
