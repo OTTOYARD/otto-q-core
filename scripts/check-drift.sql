@@ -663,7 +663,7 @@ repo_manifest(version, name, file) AS (
     ('20260929024700'::text, 'a_manual_start_interrupts_a_running_check'::text, '0564_a_manual_start_interrupts_a_running_check.sql'::text),
     ('20260929183923'::text, 'a_scorecard_that_counts_cars_served'::text, '0565_a_scorecard_that_counts_cars_served.sql'::text),
     ('20260929184316'::text, 'the_scorecard_reads_the_step_a_run_actually_took'::text, '0566_the_scorecard_reads_the_step_a_run_actually_took.sql'::text),
-    ('PENDING'::text, 'a_charger_build_out_lives_only_inside_a_test_day'::text, '0567_a_charger_build_out_lives_only_inside_a_test_day.sql'::text)
+    ('20260929191451'::text, 'a_charger_build_out_lives_only_inside_a_test_day'::text, '0567_a_charger_build_out_lives_only_inside_a_test_day.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

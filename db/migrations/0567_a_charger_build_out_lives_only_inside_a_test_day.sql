@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260929191451
 -- migration-name:    a_charger_build_out_lives_only_inside_a_test_day
 --
 -- 0567  **A robotic fast-charger build-out the twin can test, which lives only inside the test day that uses it.**
