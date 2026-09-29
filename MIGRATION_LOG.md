@@ -127,7 +127,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0569 — GENERATED, not a log
+## Index, 0134–0570 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0561, 0564, 0565, 0566, 0567, 0568, 0569 — which are indexed below as well as logged above; the log row is
@@ -580,7 +580,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0567](db/migrations/0567_a_charger_build_out_lives_only_inside_a_test_day.sql) | `20260929191451` | yes — ledger | **A robotic fast-charger build-out the twin can test, which lives only inside the test day that uses it.** |
 | [0568](db/migrations/0568_an_overnight_sweep_scores_one_test_day_at_a_time.sql) | `20260929193249` | yes — ledger | **An overnight sweep that runs the twin's test days one at a time, scores each, and keeps the scores.** |
 | [0569](db/migrations/0569_a_margin_ledger_prices_what_the_twin_measured.sql) | `20260929200104` | yes — ledger | **A margin ledger that prices what the twin measured, and nothing it did not.** Lane A, phase 3 (its database |
+| [0570](db/migrations/0570_the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does.sql) | `PENDING` | no — pending | **The batch optimizer can hand chargers out in the order the charge cursor serves cars.** (G297; research wing, |
 
-434 migrations indexed.
+435 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

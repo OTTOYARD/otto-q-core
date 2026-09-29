@@ -178,6 +178,16 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_throughput_sweep_sql.py
 
+      - name: Charge batch order, executed (0570 against the live optimizer's own source)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_charge_batch_order_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
