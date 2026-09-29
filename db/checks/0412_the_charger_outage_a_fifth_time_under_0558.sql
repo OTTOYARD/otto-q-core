@@ -1798,4 +1798,4 @@ SELECT h.stype, count(*) AS reservations, count(DISTINCT h.vehicle_id) AS cars,
 --   17.4): 80.7 charger-minutes in all. 3,441 charge refusals fell inside those holds (car-ticks; every refusal in the
 --   window, not only those the held charger could have served). The reservations came from the appointment book at the
 --   recall and from the reservation re-optimizer, neither of which reads `prearrival_charge_yields_to_solver` (1 on
---   this run); 0559 makes both read it.
+--   this run); 0562 makes both read it.
