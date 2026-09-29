@@ -32,7 +32,8 @@ CREATE TABLE public.ottoq_policy_param_catalog (
   affects text, agent_writable boolean);
 INSERT INTO public.ottoq_policy_param_catalog (param_key, min_value, max_value, default_value) VALUES
   ('proposer_seat', 0, 2, 0), ('deploy_peak_fraction', 0.30, 1.00, 0.90), ('cuopt_propose_enabled', 0, 1, 1),
-  ('cuopt_first_refusal_max_defers', 0, 5, 1), ('orchestrator_agent_enabled', 0, 1, 1);
+  ('cuopt_first_refusal_max_defers', 0, 5, 1), ('orchestrator_agent_enabled', 0, 1, 1),
+  ('charge_batch_order', 0, 1, 0);                 -- as 0570 catalogues it (0571's premise)
 CREATE TABLE public.ottoq_policy_params (
   scope_type text, scope_id uuid, param_key text, param_value numeric, updated_by text,
   PRIMARY KEY (scope_type, scope_id, param_key));
@@ -138,14 +139,16 @@ CREATE FUNCTION public.ottoq_ab_arm_atoms(p_depot uuid, p_run uuid) RETURNS json
 
 -- the arm metrics: OTTO-Q's seat deploys five more car-hours, so the pairs have something to show. Every seat is asked
 -- for the same 120 car-hours; OTTO-Q leaves 20 unmet, FIFO 24 and greedy 26, and OTTO-Q's site costs $11.25 more.
+-- 0570's dial at 1 leaves 3 fewer unmet, so a night-2 contrast has something to show too.
 CREATE FUNCTION public.ottoq_dial_arm_metrics(p_run uuid, p_depot uuid, p_soc0 numeric) RETURNS jsonb LANGUAGE sql STABLE AS $$
   SELECT jsonb_build_object(
     'rule_evaluations', 12, 'soc_start_kwh', p_soc0,
     'demand_car_hours', 120,
     'deployed_car_hours', 100 + CASE WHEN seat = 0 THEN 5 ELSE 0 END,
-    'unmet_demand_car_hours', CASE seat WHEN 0 THEN 20 WHEN 1 THEN 24 ELSE 26 END,
+    'unmet_demand_car_hours', CASE seat WHEN 0 THEN 20 WHEN 1 THEN 24 ELSE 26 END - 3 * batch_order,
     'unmet_demand_pct', 3.5, 'site_cost_usd_per_day', CASE WHEN seat = 0 THEN 431.50 ELSE 420.25 END, 'peak_site_kw', 900)
-    FROM (SELECT public.ottoq_policy_get(p_run, 'proposer_seat', 0) AS seat) z
+    FROM (SELECT public.ottoq_policy_get(p_run, 'proposer_seat', 0) AS seat,
+                 public.ottoq_policy_get(p_run, 'charge_batch_order', 0) AS batch_order) z
 $$;
 
 CREATE FUNCTION public.ottoq_sim_stop_and_reset(p_run uuid, p_reason text) RETURNS jsonb LANGUAGE plpgsql AS $$

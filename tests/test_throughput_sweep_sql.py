@@ -9,7 +9,9 @@ tests/fixtures/throughput_sweep_stub.sql reduces the engine to exactly what thos
 
 0569 is tested here too, because it only reads what 0568 keeps: the margin ledger prices each OTTO-Q-against-baseline
 pair on demand met (never on cars out beyond demand), keeps a loss a loss, sets aside a pair whose arms were not asked for
-the same demand, and moves with a customer's price while the measurement stays put.
+the same demand, and moves with a customer's price while the measurement stays put. So is 0571: a treatment cell is
+measured against its own control cell, the ledger prices that contrast and keeps every row it held, night 2 is defined on
+night 1's seeds, and the same cell definition run on two nights is checked for identity.
 
 It SKIPS where no scratch PostgreSQL is reachable, like tests/test_throughput_scorecard_sql.py.
 """
@@ -32,6 +34,8 @@ LOAD = [os.path.join(FIX, "throughput_stub_engine.sql"), os.path.join(FIX, "site
         os.path.join(MIG, "0567_a_charger_build_out_lives_only_inside_a_test_day.sql")]
 M0568 = os.path.join(MIG, "0568_an_overnight_sweep_scores_one_test_day_at_a_time.sql")
 M0569 = os.path.join(MIG, "0569_a_margin_ledger_prices_what_the_twin_measured.sql")
+M0571 = os.path.join(MIG, "0571_a_sweep_measures_a_dial_against_its_own_control.sql")
+NIGHT2 = "charge_order_2026_09_30"
 TWIN = "11111111-1111-1111-1111-111111111111"
 SWEEP = "frontier_2026_09_29"
 
@@ -95,7 +99,7 @@ class Db:
         return p.returncode, p.stderr
 
 
-def _make_db(tag, release=True, ledger=True):
+def _make_db(tag, release=True, ledger=True, night2=True):
     name = f"ottoq_{tag}_{os.getpid()}_{uuid.uuid4().hex[:6]}"
     admin = ["psql", *_conn_args(), "-d", "postgres", "-q", "-v", "ON_ERROR_STOP=1"]
     subprocess.run(admin + ["-c", f"CREATE DATABASE {name}"], check=True, capture_output=True)
@@ -109,6 +113,9 @@ def _make_db(tag, release=True, ledger=True):
     if ledger:
         rc, err = d.file(M0569)
         assert rc == 0, f"0569 did not apply: {err}"
+    if ledger and night2:
+        rc, err = d.file(M0571)
+        assert rc == 0, f"0571 did not apply: {err}"
     if release:
         # Most tests drive night 1 directly: the smoke sweep is set aside and night 1 is made due now.
         d.val("UPDATE public.ottoq_throughput_sweeps SET status = 'concluded' WHERE sweep_code = 'smoke_2026_09_29'")
@@ -164,7 +171,7 @@ def test_the_smoke_arm_runs_first_and_night_one_waits_for_its_window():
         assert a["ticks"] == 24 and a["buildout"]["buildout_code"] == "dcfc20" and a["restore"]["spaces"] == 10
         assert d.json(RUN) == {"ran": False, "why": "no active sweep has an arm left to run"}
         st = d.json("SELECT jsonb_object_agg(sweep_code, status) FROM public.ottoq_throughput_sweeps")
-        assert st == {"smoke_2026_09_29": "concluded", SWEEP: "active"}      # night 1 is not due before 11 PM CT
+        assert st == {"smoke_2026_09_29": "concluded", SWEEP: "active", NIGHT2: "active"}   # nights 1, 2 not yet due
         assert d.val(f"SELECT run_after FROM public.ottoq_throughput_sweeps WHERE sweep_code = '{SWEEP}'").startswith(
             "2026-09-30 04:00:00")
     finally:
@@ -483,3 +490,119 @@ def test_the_ledger_refuses_to_build_on_arm_metrics_without_unmet_demand():
         assert d.val("SELECT to_regclass('public.ottoq_margin_prices') IS NULL") == "t"
     finally:
         _drop(d)
+
+
+# ── 0571: a dial against its own control, priced; night 2; the same cell on two nights ──────────────────────────────────
+
+def _release_night2(d, pause_night1=True):
+    if pause_night1:
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code = '{SWEEP}'")
+    d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{NIGHT2}'")
+
+
+def test_night_two_is_four_cells_and_two_contrasts_on_night_ones_seeds(db):
+    cells = db.json(f"""SELECT jsonb_agg(jsonb_build_array(c.ord, c.cell_code, c.seat, c.buildout_code, c.fixed_params,
+                                                           c.control_cell_code) ORDER BY c.ord)
+                          FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+                         WHERE s.sweep_code = '{NIGHT2}'""")
+    assert cells == [
+        [1, "dcfc10.otto_q", "otto_q", "dcfc10", {"deploy_peak_fraction": 0.90}, None],
+        [2, "dcfc10.otto_q.batch_order", "otto_q", "dcfc10", {"deploy_peak_fraction": 0.90, "charge_batch_order": 1},
+         "dcfc10.otto_q"],
+        [3, "dcfc20.otto_q", "otto_q", "dcfc20", {"deploy_peak_fraction": 0.90}, None],
+        [4, "dcfc20.otto_q.batch_order", "otto_q", "dcfc20", {"deploy_peak_fraction": 0.90, "charge_batch_order": 1},
+         "dcfc20.otto_q"]]
+    n1 = db.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{SWEEP}'")
+    n2 = db.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{NIGHT2}'")
+    assert n2["seeds"] == n1["seeds"] and n2["ticks"] == 144 and n2["replicates"] == 0 and n2["status"] == "active"
+    assert n2["run_after"].startswith("2026-10-01T04:00:00") and n2["priority"] == n1["priority"]
+    assert db.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
+                     WHERE name = '0571_a_sweep_measures_a_dial_against_its_own_control'""") == "false/false"
+    # a second apply is refused: by P1 (the ledger is no longer 0569's) before P2 can say so itself
+    rc, err = db.file(M0571)
+    assert rc != 0 and ("0571 P2" in err or "0571 P1" in err)
+
+
+def test_a_control_is_a_sibling_that_differs_only_by_its_dials(fresh):
+    d = fresh
+    sid = d.val(f"SELECT sweep_id FROM public.ottoq_throughput_sweeps WHERE sweep_code = '{NIGHT2}'")
+
+    def add(code, ord_, seat, bo, params, control):
+        return d.fails(f"""INSERT INTO public.ottoq_throughput_sweep_cells
+                             (sweep_id, cell_code, ord, seat, buildout_code, fixed_params, control_cell_code)
+                           VALUES ('{sid}', '{code}', {ord_}, '{seat}', '{bo}', '{params}', '{control}')""")
+    assert "not seat" in add("x1", 11, "fifo", "dcfc10", '{"charge_batch_order": 1}', "dcfc10.otto_q")
+    assert "not seat" in add("x2", 12, "otto_q", "dcfc20", '{"charge_batch_order": 1}', "dcfc10.otto_q")
+    assert "is itself a treatment" in add("x3", 13, "otto_q", "dcfc10", '{"charge_batch_order": 0}',
+                                          "dcfc10.otto_q.batch_order")
+    assert "nothing to contrast" in add("x4", 14, "otto_q", "dcfc10", '{"deploy_peak_fraction": 0.90}', "dcfc10.otto_q")
+    assert "not a cell of the same sweep" in add("x5", 15, "otto_q", "dcfc10", '{"charge_batch_order": 1}', "no_such_cell")
+    # a control cannot later become a treatment itself, even against a sibling that would otherwise qualify
+    d.val(f"""INSERT INTO public.ottoq_throughput_sweep_cells (sweep_id, cell_code, ord, seat, buildout_code, fixed_params)
+              VALUES ('{sid}', 'dcfc10.otto_q.alt', 21, 'otto_q', 'dcfc10', '{{"deploy_peak_fraction": 0.80}}')""")
+    assert "another cell's control" in d.fails(f"""UPDATE public.ottoq_throughput_sweep_cells
+                                                     SET control_cell_code = 'dcfc10.otto_q.alt'
+                                                   WHERE sweep_id = '{sid}' AND cell_code = 'dcfc10.otto_q'""")
+
+
+def test_night_two_contrasts_are_measured_and_priced(fresh):
+    d = fresh
+    _release_night2(d)
+    d.val(OPEN)
+    for _ in range(8):                      # seeds 1 and 2, four cells each
+        assert d.json(RUN)["ran"] is True
+    con = d.json("""SELECT jsonb_agg(jsonb_build_array(treatment_cell, control_cell, world_identical, served_delta,
+                                                       deployed_car_hours_delta, site_cost_usd_delta)
+                                     ORDER BY treatment_cell, seed) FROM public.ottoq_throughput_sweep_contrasts""")
+    assert [c[:3] for c in con] == [["dcfc10.otto_q.batch_order", "dcfc10.otto_q", True]] * 2 + \
+                                   [["dcfc20.otto_q.batch_order", "dcfc20.otto_q", True]] * 2
+    assert all(float(c[3]) == 0 and float(c[4]) == 0 and float(c[5]) == 0 for c in con)
+    led = d.json("""SELECT jsonb_agg(jsonb_build_object('b', buildout_code, 'base', baseline, 'met', demand_met_car_hours_delta,
+                                                        'up', jsonb_build_array(uptime_usd_low, uptime_usd_point, uptime_usd_high),
+                                                        'cars', cars_at_work_delta,
+                                                        'cap', jsonb_build_array(fleet_capex_equiv_usd_low,
+                                                                                 fleet_capex_equiv_usd_point,
+                                                                                 fleet_capex_equiv_usd_high))
+                                     ORDER BY buildout_code, seed)
+                      FROM public.ottoq_margin_ledger WHERE comparison = 'dial'""")
+    assert len(led) == 4
+    for r in led:
+        # the dial left 3 fewer car-hours of demand unmet: $48 / $60 / $72; a quarter of a car at work over 12 hours
+        assert r["base"] == f"{r['b']}.otto_q" and float(r["met"]) == 3 and r["up"] == [48, 60, 72]
+        assert float(r["cars"]) == 0.25 and r["cap"] == [18750, 37500, 50000]
+    summ = d.json(f"""SELECT jsonb_object_agg(baseline, jsonb_build_array(seeds, seeds_set_aside, uptime_usd->'mean_point'))
+                        FROM public.ottoq_margin_summary WHERE sweep_code = '{NIGHT2}'""")
+    assert summ == {"dcfc10.otto_q": [2, 0, 60], "dcfc20.otto_q": [2, 0, 60]}
+
+
+def test_the_ledger_kept_every_row_it_held_before():
+    d = _make_db("tswk", night2=False)
+    try:
+        d.val(OPEN)
+        for _ in range(7):                  # seed 1 on all six cells, and its replicate
+            d.json(RUN)
+        rows = """SELECT jsonb_agg(to_jsonb(l) - 'comparison' ORDER BY buildout_code, baseline, seed)
+                    FROM public.ottoq_margin_ledger l"""
+        before = d.json(rows)
+        assert len(before) == 4
+        rc, err = d.file(M0571)
+        assert rc == 0, f"0571 did not apply: {err}"
+        assert d.json(rows) == before       # every column of every row, unchanged
+        assert d.val("SELECT string_agg(DISTINCT comparison, ',') FROM public.ottoq_margin_ledger") == "seat"
+    finally:
+        _drop(d)
+
+
+def test_the_same_cell_on_two_nights_is_checked_for_identity(fresh):
+    d = fresh
+    d.val(OPEN)
+    for _ in range(6):                      # night 1, seed 1: all six cells
+        d.json(RUN)
+    _release_night2(d)
+    for _ in range(4):                      # night 2, seed 1: its four cells
+        d.json(RUN)
+    tw = d.json("""SELECT jsonb_agg(jsonb_build_array(earlier_sweep, earlier_cell, later_sweep, later_cell, identical, moved)
+                                    ORDER BY earlier_cell) FROM public.ottoq_throughput_cross_sweep_twins""")
+    # only the controls repeat a night-1 definition; the treatments carry a dial night 1 never set
+    assert tw == [[SWEEP, "dcfc10.otto_q", NIGHT2, "dcfc10.otto_q", True, []],
+                  [SWEEP, "dcfc20.otto_q", NIGHT2, "dcfc20.otto_q", True, []]]
