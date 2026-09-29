@@ -127,7 +127,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0571 — GENERATED, not a log
+## Index, 0134–0572 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0561, 0564, 0565, 0566, 0567, 0568, 0569 — which are indexed below as well as logged above; the log row is
@@ -582,7 +582,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0569](db/migrations/0569_a_margin_ledger_prices_what_the_twin_measured.sql) | `20260929200104` | yes — ledger | **A margin ledger that prices what the twin measured, and nothing it did not.** Lane A, phase 3 (its database |
 | [0570](db/migrations/0570_the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does.sql) | `PENDING` | no — pending | **The batch optimizer can hand chargers out in the order the charge cursor serves cars.** (G297; research wing, |
 | [0571](db/migrations/0571_a_sweep_measures_a_dial_against_its_own_control.sql) | `PENDING` | no — pending | **A sweep measures a dial against its own control, the margin ledger prices it, and night 2 measures G297's.** |
+| [0572](db/migrations/0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql) | `PENDING` | no — pending | **A fleet build-out borrows cars for one test day, so the twin depot can be measured at 150 and 200 cars.** |
 
-436 migrations indexed.
+437 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

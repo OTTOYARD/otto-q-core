@@ -7,11 +7,14 @@ build-out before the operator's door and takes it back out after the teardown, f
 engine error with its arm and a failed arm without retrying it forever; and what it keeps is evidence nobody can edit.
 tests/fixtures/throughput_sweep_stub.sql reduces the engine to exactly what those claims can be tested against.
 
-0569 is tested here too, because it only reads what 0568 keeps: the margin ledger prices each OTTO-Q-against-baseline
+0569, 0571 and 0572 are tested here too, because they only read or extend what 0568 keeps. 0569: the margin ledger prices each OTTO-Q-against-baseline
 pair on demand met (never on cars out beyond demand), keeps a loss a loss, sets aside a pair whose arms were not asked for
 the same demand, and moves with a customer's price while the measurement stays put. So is 0571: a treatment cell is
 measured against its own control cell, the ledger prices that contrast and keeps every row it held, night 2 is defined on
-night 1's seeds, and the same cell definition run on two nights is checked for identity.
+night 1's seeds, and the same cell definition run on two nights is checked for identity. And 0572: a fleet build-out
+borrows the same lender cars every time, parks them, lets the fleet reset seed them, and puts every car and stall pointer
+back from its pre-image; it cannot commit applied; and a fleet night's arm borrows before the reset and returns after the
+teardown. tests/fixtures/fleet_buildout_stub.sql gives the stub both depots' cars.
 
 It SKIPS where no scratch PostgreSQL is reachable, like tests/test_throughput_scorecard_sql.py.
 """
@@ -28,14 +31,17 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIX = os.path.join(ROOT, "tests", "fixtures")
 MIG = os.path.join(ROOT, "db", "migrations")
 LOAD = [os.path.join(FIX, "throughput_stub_engine.sql"), os.path.join(FIX, "site_buildout_stub.sql"),
-        os.path.join(FIX, "throughput_sweep_stub.sql"),
+        os.path.join(FIX, "throughput_sweep_stub.sql"), os.path.join(FIX, "fleet_buildout_stub.sql"),
         os.path.join(MIG, "0565_a_scorecard_that_counts_cars_served.sql"),
         os.path.join(MIG, "0566_the_scorecard_reads_the_step_a_run_actually_took.sql"),
         os.path.join(MIG, "0567_a_charger_build_out_lives_only_inside_a_test_day.sql")]
 M0568 = os.path.join(MIG, "0568_an_overnight_sweep_scores_one_test_day_at_a_time.sql")
 M0569 = os.path.join(MIG, "0569_a_margin_ledger_prices_what_the_twin_measured.sql")
 M0571 = os.path.join(MIG, "0571_a_sweep_measures_a_dial_against_its_own_control.sql")
+M0572 = os.path.join(MIG, "0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql")
 NIGHT2 = "charge_order_2026_09_30"
+F150, F200 = "fleet150_2026_10_01", "fleet200_2026_10_01"
+LENDER = "22222222-2222-2222-2222-222222222222"
 TWIN = "11111111-1111-1111-1111-111111111111"
 SWEEP = "frontier_2026_09_29"
 
@@ -99,7 +105,7 @@ class Db:
         return p.returncode, p.stderr
 
 
-def _make_db(tag, release=True, ledger=True, night2=True):
+def _make_db(tag, release=True, ledger=True, night2=True, fleet=True):
     name = f"ottoq_{tag}_{os.getpid()}_{uuid.uuid4().hex[:6]}"
     admin = ["psql", *_conn_args(), "-d", "postgres", "-q", "-v", "ON_ERROR_STOP=1"]
     subprocess.run(admin + ["-c", f"CREATE DATABASE {name}"], check=True, capture_output=True)
@@ -116,6 +122,9 @@ def _make_db(tag, release=True, ledger=True, night2=True):
     if ledger and night2:
         rc, err = d.file(M0571)
         assert rc == 0, f"0571 did not apply: {err}"
+    if ledger and night2 and fleet:
+        rc, err = d.file(M0572)
+        assert rc == 0, f"0572 did not apply: {err}"
     if release:
         # Most tests drive night 1 directly: the smoke sweep is set aside and night 1 is made due now.
         d.val("UPDATE public.ottoq_throughput_sweeps SET status = 'concluded' WHERE sweep_code = 'smoke_2026_09_29'")
@@ -171,7 +180,8 @@ def test_the_smoke_arm_runs_first_and_night_one_waits_for_its_window():
         assert a["ticks"] == 24 and a["buildout"]["buildout_code"] == "dcfc20" and a["restore"]["spaces"] == 10
         assert d.json(RUN) == {"ran": False, "why": "no active sweep has an arm left to run"}
         st = d.json("SELECT jsonb_object_agg(sweep_code, status) FROM public.ottoq_throughput_sweeps")
-        assert st == {"smoke_2026_09_29": "concluded", SWEEP: "active", NIGHT2: "active"}   # nights 1, 2 not yet due
+        assert st == {"smoke_2026_09_29": "concluded", SWEEP: "active", NIGHT2: "active",    # nights 1-3 not yet due
+                      F150: "active", F200: "active"}
         assert d.val(f"SELECT run_after FROM public.ottoq_throughput_sweeps WHERE sweep_code = '{SWEEP}'").startswith(
             "2026-09-30 04:00:00")
     finally:
@@ -606,3 +616,128 @@ def test_the_same_cell_on_two_nights_is_checked_for_identity(fresh):
     # only the controls repeat a night-1 definition; the treatments carry a dial night 1 never set
     assert tw == [[SWEEP, "dcfc10.otto_q", NIGHT2, "dcfc10.otto_q", True, []],
                   [SWEEP, "dcfc20.otto_q", NIGHT2, "dcfc20.otto_q", True, []]]
+
+
+# ── 0572: a fleet build-out borrows cars for one test day ────────────────────────────────────────────────────────────────
+
+LENDER_ROWS = """SELECT COALESCE(jsonb_object_agg(id, to_jsonb(v) - 'updated_at'), '{}')
+                   FROM public.vehicles v WHERE vin LIKE 'LENDER-%'"""
+LENDER_STALLS = f"""SELECT COALESCE(jsonb_object_agg(id, to_jsonb(s)), '{{}}') FROM public.stalls s WHERE depot_id = '{LENDER}'"""
+
+
+def test_the_fleet_build_outs_are_the_twins_mix_and_night_three_is_defined(db):
+    fb = db.json("""SELECT jsonb_object_agg(fleet_code, jsonb_build_array(borrow_by_class, fleet_size))
+                      FROM public.ottoq_fleet_buildouts""")
+    assert fb == {"fleet150": [{"tesla_model_y_robotaxi_2024": 11, "waymo_jaguar_ipace_2024": 13, "zoox_robotaxi_2024": 10}, 150],
+                  "fleet200": [{"tesla_model_y_robotaxi_2024": 26, "waymo_jaguar_ipace_2024": 34, "zoox_robotaxi_2024": 24}, 200]}
+    n1 = db.json(f"SELECT to_jsonb(seeds) FROM public.ottoq_throughput_sweeps WHERE sweep_code = '{SWEEP}'")
+    for code, fleet in ((F150, "fleet150"), (F200, "fleet200")):
+        sw = db.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{code}'")
+        assert sw["fleet_code"] == fleet and sw["seeds"] == n1[:3] and sw["replicates"] == 0
+        assert sw["run_after"].startswith("2026-10-02T04:00:00") and sw["ticks"] == 144
+        cells = db.json(f"""SELECT jsonb_agg(jsonb_build_array(c.cell_code, c.seat, c.buildout_code) ORDER BY c.ord)
+                              FROM public.ottoq_throughput_sweep_cells c WHERE c.sweep_id = '{sw["sweep_id"]}'""")
+        assert cells == [["dcfc20.otto_q", "otto_q", "dcfc20"], ["dcfc20.fifo", "fifo", "dcfc20"],
+                         ["dcfc10.otto_q", "otto_q", "dcfc10"]]
+    assert db.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
+                     WHERE name = '0572_a_fleet_build_out_borrows_cars_for_one_test_day'""") == "false/false"
+    rc, err = db.file(M0572)
+    assert rc != 0 and ("0572 P1" in err or "0572 P2" in err)
+
+
+def test_a_fleet_build_out_borrows_the_same_cars_and_puts_every_one_back(fresh):
+    d = fresh
+    cars, stalls = d.json(LENDER_ROWS), d.json(LENDER_STALLS)
+    out = d.json(f"""BEGIN;
+        CREATE TEMP TABLE r AS SELECT public.ottoq_fleet_buildout_apply('{TWIN}', 'fleet200') AS apply;
+        CREATE TEMP TABLE m AS SELECT
+            public.ottoq_fleet_buildout_census('{TWIN}') AS census,
+            (SELECT count(*) FROM public.vehicles WHERE vin LIKE 'LENDER-%' AND home_depot_id = '{TWIN}'
+                                                    AND current_state = 'offline' AND current_stall_id IS NULL) AS parked,
+            (SELECT count(*) FROM public.stalls WHERE depot_id = '{LENDER}'
+                AND (current_vehicle_id IN (SELECT id FROM public.vehicles WHERE home_depot_id = '{TWIN}')
+                  OR reserved_by IN (SELECT id FROM public.vehicles WHERE home_depot_id = '{TWIN}'))) AS still_pointing;
+        SELECT public.ottoq_tick_invariance_reset_fleet('{TWIN}', 42, '2026-09-01 11:00+00');
+        SELECT public.ottoq_sim_stop_and_reset(gen_random_uuid(), 'test');
+        CREATE TEMP TABLE x AS SELECT public.ottoq_fleet_buildout_restore('{TWIN}') AS restore;
+        SELECT jsonb_build_object('apply', (SELECT apply FROM r), 'census', (SELECT census FROM m),
+                                  'parked', (SELECT parked FROM m), 'pointing', (SELECT still_pointing FROM m),
+                                  'restore', (SELECT restore FROM x),
+                                  'reset_fleet', (SELECT args->'fleet' FROM public.stub_calls WHERE fn = 'reset'
+                                                   ORDER BY n DESC LIMIT 1));
+        COMMIT;""")
+    a = out["apply"]
+    assert a["borrowed"] == 84 and a["fleet_size"] == 200 and a["lender_stalls_cleared"] == 3
+    assert out["census"] == {"depot_id": TWIN, "fleet": 200, "applied": "fleet200"}
+    assert out["parked"] == 84 and out["pointing"] == 0     # the two frozen in a bay and the reservation let go
+    assert out["reset_fleet"] == 200                          # the reset seeded the lent cars with the twin's own
+    assert out["restore"]["restored"] is True and out["restore"]["vehicles"] == 84 and out["restore"]["fleet_size"] == 116
+    # every lent car and every lender stall is back as it was, although the teardown left one tethered to a twin charger
+    assert d.json(LENDER_ROWS) == cars and d.json(LENDER_STALLS) == stalls
+    assert d.json(f"SELECT public.ottoq_fleet_buildout_census('{TWIN}')")["fleet"] == 116
+    # and the next borrow takes the same cars: per class, in id order
+    again = d.json(f"""BEGIN;
+        CREATE TEMP TABLE r2 AS SELECT public.ottoq_fleet_buildout_apply('{TWIN}', 'fleet200') AS apply;
+        SELECT public.ottoq_fleet_buildout_restore('{TWIN}');
+        SELECT apply->'borrowed_ids' FROM r2;
+        COMMIT;""")
+    assert again == a["borrowed_ids"] and len(again) == 84
+
+
+def test_a_fleet_build_out_cannot_commit(fresh):
+    d = fresh
+    cars = d.json(LENDER_ROWS)
+    err = d.fails(f"BEGIN; SELECT public.ottoq_fleet_buildout_apply('{TWIN}', 'fleet150'); COMMIT;")
+    assert "still applied to depot" in err
+    assert d.json(LENDER_ROWS) == cars
+    assert d.val("SELECT count(*) FROM public.ottoq_fleet_buildout_active") == "0"
+
+
+def test_apply_refuses_what_it_cannot_do_cleanly(fresh):
+    d = fresh
+    assert "is not defined" in d.fails(f"SELECT public.ottoq_fleet_buildout_apply('{TWIN}', 'fleet999')")
+    assert "is for depot" in d.fails(f"SELECT public.ottoq_fleet_buildout_apply('{LENDER}', 'fleet150')")
+    assert "already applied" in d.fails(f"""BEGIN; SELECT public.ottoq_fleet_buildout_apply('{TWIN}', 'fleet150');
+                                              SELECT public.ottoq_fleet_buildout_apply('{TWIN}', 'fleet150'); ROLLBACK;""")
+    # a run live at the lender: cars move only between runs
+    d.val(f"""UPDATE public.ottoq_sim_runs SET status = 'running', depot_id = '{LENDER}'
+              WHERE sim_run_id = 'a0000000-0000-0000-0000-000000000002'""")
+    assert "a run is live" in d.fails(f"SELECT public.ottoq_fleet_buildout_apply('{TWIN}', 'fleet150')")
+    d.val(f"""UPDATE public.ottoq_sim_runs SET status = 'completed', depot_id = '{TWIN}'
+              WHERE sim_run_id = 'a0000000-0000-0000-0000-000000000002'""")
+    # a car it would borrow with an open visit
+    d.val(f"""INSERT INTO public.ottoq_visit_needs (visit_id, vehicle_id, status)
+              SELECT gen_random_uuid(), id, 'open' FROM public.vehicles
+               WHERE home_depot_id = '{LENDER}' AND vehicle_class_code = 'zoox_robotaxi_2024' ORDER BY id LIMIT 1""")
+    assert "have live rows" in d.fails(f"SELECT public.ottoq_fleet_buildout_apply('{TWIN}', 'fleet150')")
+
+
+def test_a_fleet_night_borrows_before_the_reset_and_returns_after_the_teardown(fresh):
+    d = fresh
+    cars = d.json(LENDER_ROWS)
+    d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code IN ('{SWEEP}', '{NIGHT2}', '{F150}')")
+    d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{F200}'")
+    d.val(OPEN)
+    res = d.json(RUN)
+    assert res["ran"] is True and res["arm"]["sweep"] == F200 and res["arm"]["complete"] is True
+    a = d.json("SELECT to_jsonb(a) FROM public.ottoq_throughput_sweep_arms a")
+    assert a["fleet_buildout"]["borrowed"] == 84 and a["fleet_buildout"]["fleet_size"] == 200
+    assert a["fleet_restore"]["restored"] is True and a["fleet_restore"]["fleet_size"] == 116
+    assert a["restore"]["restored"] is True       # the chargers went back first, then the cars
+    run = d.json(f"SELECT payload FROM public.ottoq_sim_runs WHERE sim_run_id = '{a['sim_run_id']}'")
+    assert run["fleet_buildout"]["fleet_code"] == "fleet200"
+    resets = d.json("SELECT jsonb_agg(args ORDER BY n) FROM public.stub_calls WHERE fn = 'reset'")
+    assert resets[-1]["fleet"] == 200 and resets[-1]["guc"] == "none"    # borrowed BEFORE the reset, filed to no run
+    assert d.json(LENDER_ROWS) == cars
+    assert d.json(f"SELECT public.ottoq_fleet_buildout_census('{TWIN}')") == {"depot_id": TWIN, "fleet": 116, "applied": None}
+
+
+def test_the_same_cell_at_two_fleet_sizes_is_not_a_twin(fresh):
+    d = fresh
+    d.val(OPEN)
+    for _ in range(4):                      # night 1, seed 1: cells 1-4 (the fourth is dcfc20.otto_q)
+        d.json(RUN)
+    d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code IN ('{SWEEP}', '{NIGHT2}', '{F200}')")
+    d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{F150}'")
+    assert d.json(RUN)["arm"]["cell"] == "dcfc20.otto_q"     # night 3 at 150 cars, seed 1: the same cell definition
+    assert d.val("SELECT count(*) FROM public.ottoq_throughput_cross_sweep_twins") == "0"
