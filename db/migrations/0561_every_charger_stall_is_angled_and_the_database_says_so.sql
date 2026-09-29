@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260929014318
 -- migration-name:    every_charger_stall_is_angled_and_the_database_says_so
 --
 -- 0561  **Every charger stall at the twin depot is angled 60° to its gap lane, and public.stalls now says so.** 40
