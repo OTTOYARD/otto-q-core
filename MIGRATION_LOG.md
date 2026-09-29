@@ -122,7 +122,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0564 — GENERATED, not a log
+## Index, 0134–0565 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0561, 0564 — which are indexed below as well as logged above; the log row is
@@ -570,7 +570,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0561](db/migrations/0561_every_charger_stall_is_angled_and_the_database_says_so.sql) | `20260929014318` | yes — ledger | **Every charger stall at the twin depot is angled 60° to its gap lane, and public.stalls now says so.** 40 |
 | [0562](db/migrations/0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql) | `PENDING` | no — pending | **A charger is not held for a car still on its way back when the run leaves the charge to the line.** (G293, |
 | [0564](db/migrations/0564_a_manual_start_interrupts_a_running_check.sql) | `20260929024700` | yes — ledger | **A manual start from the depot simulation always interrupts a running check.** Chase, 2026-09-28, 9:33 PM |
+| [0565](db/migrations/0565_a_scorecard_that_counts_cars_served.sql) | `PENDING` | no — pending | **A scorecard that counts the cars a depot serves.** Lane A, phase 1. Chase, 2026-09-29: "I am very interested |
 
-429 migrations indexed.
+430 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
