@@ -653,13 +653,13 @@ repo_manifest(version, name, file) AS (
     ('20260928184413'::text, 'a_hold_gives_way_and_a_car_is_in_a_bay_only_when_it_stands_in_one'::text, '0553_a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'a_car_is_in_a_bay_only_when_it_stands_in_one'::text, '0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql'::text),
     ('20260928212503'::text, 'a_faulted_car_is_repaired_and_the_gate_flag_is_a_note'::text, '0555_a_faulted_car_is_repaired_before_it_goes_back_to_work.sql'::text),
-    ('PENDING'::text, 'an_outside_agent_asks_through_one_door_and_a_person_decides'::text, '0555_an_outside_agent_asks_through_one_door_and_a_person_decides.sql'::text),
-    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0556_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'the_gates_patience_flag_is_a_note_for_a_person_not_service_work'::text, '0556_the_gates_patience_flag_is_a_note_for_a_person_not_service_work.sql'::text),
     ('20260928220015'::text, 'a_faulted_car_is_repaired_before_it_charges'::text, '0557_a_faulted_car_is_repaired_before_it_charges.sql'::text),
-    ('PENDING'::text, 'every_charger_stall_is_angled_and_the_database_says_so'::text, '0557_every_charger_stall_is_angled_and_the_database_says_so.sql'::text),
     ('20260928235524'::text, 'a_faulted_cars_repair_goes_first_in_its_plan'::text, '0558_a_faulted_cars_repair_goes_first_in_its_plan.sql'::text),
-    ('PENDING'::text, 'a_charger_is_not_held_for_a_car_still_on_its_way_back'::text, '0559_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql'::text)
+    ('PENDING'::text, 'a_charger_is_not_held_for_a_car_still_on_its_way_back'::text, '0559_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql'::text),
+    ('PENDING'::text, 'an_outside_agent_asks_through_one_door_and_a_person_decides'::text, '0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql'::text),
+    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text),
+    ('PENDING'::text, 'every_charger_stall_is_angled_and_the_database_says_so'::text, '0561_every_charger_stall_is_angled_and_the_database_says_so.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

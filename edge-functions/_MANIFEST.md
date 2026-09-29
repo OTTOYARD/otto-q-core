@@ -137,7 +137,7 @@ were also pulled and are byte-identical to the committed copies.
 
 | Function | Committed | verify_jwt when deployed | Shared modules | Notes |
 |---|---|---|---|---|
-| `ottoq-agent-gateway` | 2026-09-28 | **false** (agent tokens are not JWTs; the Bearer token is the authentication, resolved by `ottoq_agent_call`) | `_shared/agent_gateway.ts`, `_shared/agent_dial_discipline.ts` | Needs migration `0555` applied first. Deploy: `supabase functions deploy ottoq-agent-gateway --project-ref gxdrcyphqjzjsuhxuqtg --no-verify-jwt`. Move it into the table above, with its deployed sha256, after the first deploy. `AGENT_GATEWAY.md`. |
+| `ottoq-agent-gateway` | 2026-09-28 | **false** (agent tokens are not JWTs; the Bearer token is the authentication, resolved by `ottoq_agent_call`) | `_shared/agent_gateway.ts`, `_shared/agent_dial_discipline.ts` | Needs migration `0559` applied first. Deploy: `supabase functions deploy ottoq-agent-gateway --project-ref gxdrcyphqjzjsuhxuqtg --no-verify-jwt`. Move it into the table above, with its deployed sha256, after the first deploy. `AGENT_GATEWAY.md`. |
 
 `scripts/check-edge-drift.sh` walks deployed functions only, so it says nothing
 about this one until it is deployed.

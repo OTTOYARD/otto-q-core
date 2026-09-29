@@ -1,5 +1,5 @@
 // ottoq-agent-gateway: the one door outside agents (a founder's personal agent, a fleet operator's agent, a depot's
-// own) use to read the OTTOYARD twin depot and to ASK for changes. db/migrations/0555, AGENT_GATEWAY.md.
+// own) use to read the OTTOYARD twin depot and to ASK for changes. db/migrations/0559, AGENT_GATEWAY.md.
 //
 //   agent --Bearer oqa_...--> this function --sha256(token)--> public.ottoq_agent_call (service_role only)
 //                                                               |-- resolves the principal, rate-limits, checks the
