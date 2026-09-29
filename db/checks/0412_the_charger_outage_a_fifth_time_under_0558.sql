@@ -6,6 +6,12 @@
 --       CT). I started it at 00:27 UTC (7:27 PM CT), with no certification in flight and the canon at 9 of 9 under
 --       the 0558 floor (verdicts 612-620). It repeats 0409's, 0410's and 0411's stress test in the twin (rule 10).
 --
+--       **Stopped early, at Chase's request.** At 8:19 PM CT (01:19 UTC), sim 11:20 AM, after 812 ticks, I stopped the
+--       run ("No more testing for now") through `ottoq_sim_stop_and_reset`, the run governor's own path, which archived it
+--       and reset the depot; no certification was in flight and no injection job remained. Only §28 (G292) and §29 (G293)
+--       were read, from the stopped run; every other READ below is still pending and was not taken. Both faults came late
+--       enough that neither repair was reached (§28c).
+--
 --       **The designed difference, as in 0408-0411.** A one-shot pg_cron job (`ottoq_0412_inject_dcfc_outage_once`,
 --       job 782) takes three DC fast chargers down for 120 sim-minutes through the cockpit's door,
 --       `ottoq_twin_inject_charger_fault`, once the run passes sim 7:39 AM CT. It records what it did on the run's
@@ -1539,7 +1545,15 @@ SELECT v.display_name AS car, it.made,
        lg.first_because_fault, lg.legs
   FROM itin it JOIN public.vehicles v ON v.id = it.vehicle_id LEFT JOIN legs lg ON lg.itinerary_id = it.itinerary_id
  ORDER BY it.opened_at, it.sim_created_at;
--- READ: pending.
+-- READ (stopped run; read 01:19-01:27 UTC, 8:19-8:27 PM CT; sim 4:26-11:20 AM): Two fault spells, and both exercised
+--   the fix. Waymo-AV-020 (a major `non_critical_major`, not immobilizing, at 96% with its charge still to finish) was
+--   flagged at 8:41 AM, retrieved to emergency staging, and routed by step (6) at 9:07:20 AM; its plan from 6:10 AM
+--   (charge first) was closed and it was planned again at 9:07:20 with the repair's service leg first, then the L2
+--   charge, then the readiness check (`first_because` vehicle_fault_open). Tesla-AV-050 (a critical, immobilizing
+--   `steering_brake_fault`, at 49%) was flagged at 10:53:23 AM, towed to emergency staging and routed at 11:18:29 AM,
+--   planned the same way: the repair first, then the L2 charge, the interior inspection and the readiness check. Every
+--   plan made inside a spell put the repair before every charge and bay leg (0411: the repair last, behind an 8-hour
+--   charge).
 
 \echo '=== 0412 §28b — charge bookings of a faulted car live inside its fault spell ==='
 WITH run AS MATERIALIZED (SELECT r.sim_run_id AS id, r.sim_clock_start AS t0, r.sim_clock_current AS t1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '4b0999db-a9ef-4b35-b3e2-c985d1a259f2'),
@@ -1575,7 +1589,10 @@ SELECT v.display_name AS car, bk.purpose, st.stall_code,
   FROM bk JOIN public.stalls st ON st.id = bk.stall_id JOIN public.vehicles v ON v.id = bk.vehicle_id
  WHERE bk.booked_at_sim < COALESCE(bk.closed_at, (SELECT t1 FROM run)) AND bk.live_until > bk.opened_at
  ORDER BY bk.opened_at, bk.booked_at_sim;
--- READ: pending.
+-- READ (stopped run; read 01:19-01:27 UTC, 8:19-8:27 PM CT; sim 4:26-11:20 AM): No charge booking was made inside
+--   either spell. The one held into a spell was released at step (6)'s first pass: Tesla-AV-050's `charge_l2` on
+--   NASH-L2-STALL-27 (booked 6:28 AM) was released at 10:53:23 AM, the second the fault was flagged
+--   (`vehicle_fault_open`). Waymo-AV-020 held no charge booking when its fault opened.
 
 \echo '=== 0412 §28c — the repair: its service-bay booking against the first window free when it was made, the bay, and the charge after ==='
 WITH run AS MATERIALIZED (SELECT r.sim_run_id AS id, r.sim_clock_start AS t0, r.sim_clock_current AS t1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '4b0999db-a9ef-4b35-b3e2-c985d1a259f2'),
@@ -1630,7 +1647,11 @@ SELECT v.display_name AS car, rb.need_atom, st.stall_code AS bay,
            AND rb.closed_at IS NOT NULL AND e.sim_clock_at >= rb.closed_at) AS first_charge_after_ct
   FROM rb JOIN ff USING (booking_id) JOIN public.stalls st ON st.id = rb.stall_id JOIN public.vehicles v ON v.id = rb.vehicle_id
  ORDER BY rb.opened_at, rb.booked_at_sim;
--- READ: pending.
+-- READ (stopped run; read 01:19-01:27 UTC, 8:19-8:27 PM CT; sim 4:26-11:20 AM): Not reached. Waymo-AV-020's repair was
+--   booked at 9:32 AM on NASH-SVC-01, its window later moved to start at 11:51 AM, and the run was stopped at 11:20 AM
+--   (the booking released `run_stopped`); Tesla-AV-050 was routed two minutes before the stop and had no service
+--   booking yet. So neither car was repaired, and "repaired, then charged" was not observed on this run; the
+--   first-free-window comparison was not taken.
 
 \echo '=== 0412 §28d — step (6)''s passes, and amend_plan on each faulted car inside its spell ==='
 SELECT to_char(e.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH12:MI:SS AM') AS at_ct,
@@ -1669,7 +1690,11 @@ SELECT v.display_name AS car, to_char(s.opened_at AT TIME ZONE 'America/Chicago'
         AND (s.closed_at IS NULL OR d.sim_clock < s.closed_at)
  GROUP BY v.display_name, s.opened_at
  ORDER BY s.opened_at;
--- READ: pending.
+-- READ (stopped run; read 01:19-01:27 UTC, 8:19-8:27 PM CT; sim 4:26-11:20 AM): Step (6) fired three times: at 9:07:20
+--   AM it routed Waymo-AV-020 and re-planned it repair first; at 10:53:23 AM it released one held charge booking
+--   (Tesla-AV-050's, `charge_bookings_released` 1); at 11:18:29 AM it routed Tesla-AV-050 and re-planned it repair
+--   first. No charger reservation had to be cleared and no bay booking was released. The `amend_plan` count inside the
+--   spells was not read.
 
 -- ══ §29 G293 RE-DIAGNOSED: WHO TAKES A CHARGER A CAR AHEAD IN THE LINE WAS REFUSED ════════════════════════════════════
 --
@@ -1717,7 +1742,14 @@ SELECT s.source, count(*) AS seatings,
        sum(COALESCE(ah.refused_ahead, 0)) AS refused_cars_ahead
   FROM seat s LEFT JOIN ahead ah USING (tick_seq, decision_seq) JOIN own o USING (tick_seq, decision_seq)
  GROUP BY 1 ORDER BY 2 DESC;
--- READ: pending.
+-- READ (stopped run; read 01:19-01:27 UTC, 8:19-8:27 PM CT; sim 4:26-11:20 AM): Over the run (sim 4:26 to 11:20 AM):
+--   158 charge seatings. 125 by the kernel's own pick, none with a refused car ahead. 20 by the in-kernel optimizer
+--   (`greedy_constrained`): 17 had cars ahead of them in the same tick refused for want of a charger (413 refusals),
+--   and all 17 sat on a charge booking of their own made before that tick. 8 `reservation_honoured`: 6 had refused cars
+--   ahead (183), 1 on its own earlier booking and 5 on a charger reserved for them while they were still out (§29b). 4
+--   `reservation_reopt` and 1 `forward_lex`, none with a refused car ahead. So of 23 seatings past refused cars, 18
+--   were a plan's first-come booking and 5 a pre-arrival reservation; none was the optimizer's order (G293
+--   re-diagnosed).
 
 --   §29b: the `reservation_honoured` seatings above with refused cars ahead were, at sim 6:58 AM, all three standard cars
 --   recalled and still on their way back when the engine reserved them a free fast charger (at 4:32, 4:32 and 6:33 AM;
@@ -1760,4 +1792,10 @@ SELECT h.stype, count(*) AS reservations, count(DISTINCT h.vehicle_id) AS cars,
        sum((SELECT count(*) FROM refused f WHERE f.sim_clock >= h.at AND f.sim_clock < h.until_at)) AS refusals_while_held
   FROM held h
  GROUP BY h.stype ORDER BY h.stype;
--- READ: pending.
+-- READ (stopped run; read 01:19-01:27 UTC, 8:19-8:27 PM CT; sim 4:26-11:20 AM): 10 chargers were reserved for a car not
+--   yet at the depot (deployed or driving back): 7 fast chargers, held empty 57.6 charger-minutes (median 7.6, longest
+--   21.9, Zoox-AV-098 on NASH-DCFC-STALL-10 from 4:31:57 AM), and 3 L2, 23.1 charger-minutes (median 3.4, longest
+--   17.4): 80.7 charger-minutes in all. 3,441 charge refusals fell inside those holds (car-ticks; every refusal in the
+--   window, not only those the held charger could have served). The reservations came from the appointment book at the
+--   recall and from the reservation re-optimizer, neither of which reads `prearrival_charge_yields_to_solver` (1 on
+--   this run); 0559 makes both read it.
