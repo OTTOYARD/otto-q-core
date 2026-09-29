@@ -137,7 +137,9 @@ run whose `run_by` is `cert_harness`.
 
 1. **No HTTP surface is deployed for this.** The 27 committed edge functions do
    other jobs; none of them is a general proposal endpoint, and nothing here
-   deploys one.
+   deploys one. *(2026-09-28: `ottoq-agent-gateway` — see `AGENT_GATEWAY.md` — is
+   committed but not deployed. It is an HTTP door for reading the twin depot and
+   for ASKING a person for a change, not for proposals, so this item stands.)*
 2. **No client has exercised the door as a plain `authenticated` user.** The
    privilege table proves an operator *can*, and the body proves its source would
    be rewritten to `operator:<uuid>`; no run has done it. That is the cheapest

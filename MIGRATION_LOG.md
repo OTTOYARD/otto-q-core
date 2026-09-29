@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0554 — GENERATED, not a log
+## Index, 0134–0557 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -559,7 +559,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0552](db/migrations/0552_the_fault_door_waits_for_the_tick_instead_of_deadlocking_with_it.sql) | `20260928170009` | yes — ledger | **The cockpit's charger-fault door waits for the tick instead of deadlocking with it.** (G285) |
 | [0553](db/migrations/0553_a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now.sql) | `PENDING` | no — pending | **A bay held for a car that cannot come in time gives way to a car waiting for it now.** (G283; CLAUDE.md rule 9) |
 | [0554](db/migrations/0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql) | `PENDING` | no — pending | **A car is in a wash, detail or service bay only when it stands in one.** (G286) |
+| [0555](db/migrations/0555_an_outside_agent_asks_through_one_door_and_a_person_decides.sql) | `PENDING` | no — pending | **An outside agent asks through one door, and a person decides.** Hermes, a fleet manager's own agent, or a |
+| [0556](db/migrations/0556_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql) | `PENDING` | no — pending | **The fleet owner's cockpit can read its own agent requests.** One GRANT, in its own file, because it is an |
+| [0557](db/migrations/0557_every_charger_stall_is_angled_and_the_database_says_so.sql) | `PENDING` | no — pending | **Every charger stall at the twin depot is angled 60° to its gap lane, and public.stalls now says so.** 40 |
 
-420 migrations indexed.
+423 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
