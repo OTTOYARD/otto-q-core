@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260929200104
 -- migration-name:    a_margin_ledger_prices_what_the_twin_measured
 --
 -- 0569  **A margin ledger that prices what the twin measured, and nothing it did not.** Lane A, phase 3 (its database
@@ -50,7 +50,7 @@
 --   public.ottoq_margin_summary   per sweep, build-out, dials and baseline, over the pairs that booted from one world and
 --                                 were asked for the same demand: how many seeds, how many were set aside, and each
 --                                 lever's mean and range.
-
+--
 -- ══ §3 WHAT IT DOES NOT CLAIM ══════════════════════════════════════════════════════════════════════════════════════
 --
 --   * Chargers avoided is not a column. It is a cross-cell reading (OTTO-Q on 10 chargers against a baseline on 20), made
