@@ -1,5 +1,5 @@
 /**
- * The ottoq-agent-gateway's pure half (db/migrations/0555, AGENT_GATEWAY.md).
+ * The ottoq-agent-gateway's pure half (db/migrations/0559, AGENT_GATEWAY.md).
  *
  * Pure functions only -- no Deno, no network, no database -- so `node --test tests/*.test.mjs` imports this file
  * directly, exactly as it imports agent_dial_discipline.ts. The edge function (ottoq-agent-gateway/index.ts) is the
@@ -43,7 +43,7 @@ export const MAX_BODY_BYTES = 64 * 1024;
 export const CAPABILITIES = ["read", "note", "request_recall", "request_ops_action", "request_adjustment"] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
-/** ottoq_apply_ops_action's whitelist, action -> the dial it sets. The database (0555's submit function) is the
+/** ottoq_apply_ops_action's whitelist, action -> the dial it sets. The database (0559's submit function) is the
  *  authority and refuses the two whose dial is not agent_writable; this copy only shapes the schema. */
 export const OPS_ACTIONS = {
   raise_deploy_surge: "deploy_surge_catchup",
@@ -893,7 +893,7 @@ export function postgrestEngine(o: { supabaseUrl: string; serviceKey: string; fe
     const pgCode = isObject(body) && typeof body.code === "string" ? body.code : "";
     if (res.status === 404 || pgCode === "PGRST202" || pgCode === "42883") {
       return { ok: false, http_status: 503, tool, call_id: null, error: { code: "gateway_not_enabled",
-        message: "Agent access is built but not enabled yet: its database half (migration 0555) is not applied." } };
+        message: "Agent access is built but not enabled yet: its database half (migration 0559) is not applied." } };
     }
     if (res.status === 401 || res.status === 403 || pgCode === "42501") {
       return { ok: false, http_status: 502, tool, call_id: null, error: { code: "engine_misconfigured", message: "The gateway could not authenticate to OTTO-Q." } };

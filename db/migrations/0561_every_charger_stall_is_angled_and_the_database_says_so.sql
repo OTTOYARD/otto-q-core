@@ -1,7 +1,7 @@
 -- migration-version: PENDING
 -- migration-name:    every_charger_stall_is_angled_and_the_database_says_so
 --
--- 0557  **Every charger stall at the twin depot is angled 60° to its gap lane, and public.stalls now says so.** 40
+-- 0561  **Every charger stall at the twin depot is angled 60° to its gap lane, and public.stalls now says so.** 40
 --       rows: heading, declared footprint, and — on the 36 whose row moved — relative_y and absolute_lat. No stall
 --       changes column (relative_x), code, type, charger, status, pointer or reservation.
 --
@@ -64,7 +64,7 @@
 --   columns. That is the record of this change and it is wanted — but not as a live run's evidence and not attributed
 --   to the engine: the trigger files a row under whichever run happens to be live and infers the actor from that
 --   (db/checks/0337 §4). So the file detaches from any run the way 0421 detaches harness setup
---   (ottoq.sim_run_id = 'none') and names itself: actor_type migration_script, actor_id 0557. V3 counts them. The
+--   (ottoq.sim_run_id = 'none') and names itself: actor_type migration_script, actor_id 0561. V3 counts them. The
 --   SM.003 probe does not fire: no status moves.
 --
 -- ══ §5 WHEN TO APPLY ════════════════════════════════════════════════════════════════════════════════════════════════
@@ -89,24 +89,24 @@ BEGIN
           -- G194: the recert runner names the pair past pg_stat_activity's 1 kB of query text.
           OR query ILIKE '%ottoq_recert_runner%')
      AND state = 'active' AND pid <> pg_backend_pid();
-  IF v_pairs > 0 THEN RAISE EXCEPTION '0557 P0: a pair or the recert runner is running right now'; END IF;
+  IF v_pairs > 0 THEN RAISE EXCEPTION '0561 P0: a pair or the recert runner is running right now'; END IF;
 
   SELECT string_agg(sim_run_id::text || ' (' || status || ', ' || scenario_code || ')', ', ') INTO v_runs
     FROM public.ottoq_sim_runs
    WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND status IN ('initializing', 'running', 'paused');
   IF v_runs IS NOT NULL THEN
-    RAISE EXCEPTION '0557 P0: a run is live at the twin depot (%); moving stalls mid-run changes its leg lengths from one tick to the next. Apply when it has ended.', v_runs;
+    RAISE EXCEPTION '0561 P0: a run is live at the twin depot (%); moving stalls mid-run changes its leg lengths from one tick to the next. Apply when it has ended.', v_runs;
   END IF;
 END $inflight$;
 
 -- The 40 rows: where they are (the seed on ottoyarddepot-sim main, which the database equals) and where the angled
 -- seed puts them (builder SEED MD5 4da9a8d7bc209dfeaa5dbfcd46a34f4c). x and longitude are the same in both.
-CREATE TEMP TABLE _0557_target (
+CREATE TEMP TABLE _0561_target (
   stall_code text PRIMARY KEY, stall_type text, relative_x double precision,
   old_y double precision, new_y double precision, heading smallint, width_ft numeric, depth_ft numeric,
   old_lat double precision, new_lat double precision, lng double precision, old_heading smallint, old_depth numeric
 ) ON COMMIT DROP;
-INSERT INTO _0557_target VALUES
+INSERT INTO _0561_target VALUES
     ('NASH-DCFC-STALL-01', 'dcfc', 141.2894, 185.2461, 185.2461, 60, 10.0000, 19.0276, 36.14020892, 36.14020892, -86.77231936, 180, 20.0000),
     ('NASH-DCFC-STALL-02', 'dcfc', 141.2894, 160.1280, 163.2677, 60, 10.0000, 19.0276, 36.14013991, 36.14014854, -86.77231936, 180, 20.0000),
     ('NASH-DCFC-STALL-03', 'dcfc', 141.2894, 135.0098, 141.2894, 60, 10.0000, 19.0276, 36.14007091, 36.14008816, -86.77231936, 180, 20.0000),
@@ -156,25 +156,25 @@ DECLARE
   v_live    int;
   v_bad     text;
 BEGIN
-  SELECT count(*) INTO v_n FROM _0557_target;
-  IF v_n <> 40 THEN RAISE EXCEPTION '0557 P1: expected 40 target rows, the file carries %', v_n; END IF;
+  SELECT count(*) INTO v_n FROM _0561_target;
+  IF v_n <> 40 THEN RAISE EXCEPTION '0561 P1: expected 40 target rows, the file carries %', v_n; END IF;
 
   SELECT count(*) INTO v_live FROM public.stalls
    WHERE depot_id = v_depot AND stall_type::text IN ('dcfc','l2');
   IF v_live <> 40 THEN
-    RAISE EXCEPTION '0557 P1: the twin depot has % charger stalls, not 40 — the layout moved since this file was written', v_live;
+    RAISE EXCEPTION '0561 P1: the twin depot has % charger stalls, not 40 — the layout moved since this file was written', v_live;
   END IF;
 
   -- each row: right code and type, in its column, and either all-old or all-new (anything else is a third layout)
   SELECT string_agg(t.stall_code, ', ' ORDER BY t.stall_code) INTO v_bad
-    FROM _0557_target t
+    FROM _0561_target t
     LEFT JOIN public.stalls s ON s.stall_code = t.stall_code AND s.depot_id = v_depot
    WHERE s.id IS NULL OR s.stall_type::text <> t.stall_type
       OR abs(s.relative_x - t.relative_x) > 0.001 OR abs(s.absolute_lng - t.lng) > 1e-7
       OR NOT (   (abs(s.relative_y - t.old_y) <= 0.001 AND abs(s.absolute_lat - t.old_lat) <= 1e-7 AND s.heading_degrees = t.old_heading)
               OR (abs(s.relative_y - t.new_y) <= 0.001 AND abs(s.absolute_lat - t.new_lat) <= 1e-7 AND s.heading_degrees = t.heading));
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0557 P1: neither the old layout nor the angled one (missing, retyped, moved or half-applied): %', v_bad;
+    RAISE EXCEPTION '0561 P1: neither the old layout nor the angled one (missing, retyped, moved or half-applied): %', v_bad;
   END IF;
 END $premises$;
 
@@ -201,22 +201,22 @@ BEGIN
                     'public.ottoq_twin_snapshot', 'public.ottoq_twin_depot_layout', 'public.ottoq_twin_playback_timeline',
                     'public.ottoq_check_stall_overlap', 'public.ottoq_check_fence_containment', 'public.ottoq_site_geometry');
   IF v_new IS NOT NULL THEN
-    RAISE EXCEPTION '0557 P2: stall position or geometry has readers this file did not measure: % — read them before moving stalls', v_new;
+    RAISE EXCEPTION '0561 P2: stall position or geometry has readers this file did not measure: % — read them before moving stalls', v_new;
   END IF;
 END $readers$;
 
 -- The before-state, for V1-V5 and the rollback note: every row, each column's north-to-south order, each type's
 -- (relative_y, id) order, and where the event stream and the two geometry guards stood.
-CREATE TEMP TABLE _0557_before ON COMMIT DROP AS
+CREATE TEMP TABLE _0561_before ON COMMIT DROP AS
 SELECT s.id, s.stall_code, s.stall_type::text AS stall_type, s.relative_x, s.relative_y, s.absolute_lat, s.heading_degrees,
        s.stall_width_ft, s.stall_depth_ft,
        rank() OVER (PARTITION BY s.stall_type, round(s.relative_x::numeric, 3) ORDER BY s.relative_y DESC) AS col_rank,
        rank() OVER (PARTITION BY s.stall_type ORDER BY s.relative_y, s.id) AS type_rank,
        (abs(s.relative_y - t.new_y) > 0.001 OR s.heading_degrees IS DISTINCT FROM t.heading
         OR s.stall_width_ft IS DISTINCT FROM t.width_ft OR s.stall_depth_ft IS DISTINCT FROM t.depth_ft) AS will_change
-  FROM public.stalls s JOIN _0557_target t ON t.stall_code = s.stall_code
+  FROM public.stalls s JOIN _0561_target t ON t.stall_code = s.stall_code
  WHERE s.depot_id = '11111111-1111-1111-1111-111111111111';
-CREATE TEMP TABLE _0557_mark ON COMMIT DROP AS
+CREATE TEMP TABLE _0561_mark ON COMMIT DROP AS
 SELECT (SELECT max(event_seq) FROM public.ottoq_events) AS seq0,
        (public.ottoq_check_stall_overlap('11111111-1111-1111-1111-111111111111'::uuid) ->> 'failure_count')::int AS overlap0,
        jsonb_array_length(public.ottoq_check_fence_containment('11111111-1111-1111-1111-111111111111'::uuid) -> 'failures') AS fence0;
@@ -224,7 +224,7 @@ SELECT (SELECT max(event_seq) FROM public.ottoq_events) AS seq0,
 -- ── the change: detached from any live run, and named ──
 SELECT set_config('ottoq.sim_run_id', 'none', true),
        set_config('ottoq.actor_type', 'migration_script', true),
-       set_config('ottoq.actor_id', '0557', true);
+       set_config('ottoq.actor_id', '0561', true);
 
 UPDATE public.stalls s
    SET relative_y      = t.new_y,
@@ -232,7 +232,7 @@ UPDATE public.stalls s
        heading_degrees = t.heading,
        stall_width_ft  = t.width_ft,
        stall_depth_ft  = t.depth_ft
-  FROM _0557_target t
+  FROM _0561_target t
  WHERE s.stall_code = t.stall_code
    AND s.depot_id = '11111111-1111-1111-1111-111111111111'
    AND (abs(s.relative_y - t.new_y) > 0.001
@@ -258,81 +258,81 @@ DECLARE
 BEGIN
   -- V1: all 40 at the angled seed's geometry, and not one changed column
   SELECT string_agg(t.stall_code, ', ' ORDER BY t.stall_code) INTO v_bad
-    FROM _0557_target t JOIN public.stalls s ON s.stall_code = t.stall_code AND s.depot_id = v_depot
-    JOIN _0557_before b ON b.id = s.id
+    FROM _0561_target t JOIN public.stalls s ON s.stall_code = t.stall_code AND s.depot_id = v_depot
+    JOIN _0561_before b ON b.id = s.id
    WHERE abs(s.relative_y - t.new_y) > 0.001 OR abs(s.absolute_lat - t.new_lat) > 1e-7
       OR s.heading_degrees <> t.heading OR s.stall_width_ft <> t.width_ft OR s.stall_depth_ft <> t.depth_ft
       OR s.relative_x <> b.relative_x;
-  IF v_bad IS NOT NULL THEN RAISE EXCEPTION '0557 V1: not at the angled seed geometry, or changed column: %', v_bad; END IF;
+  IF v_bad IS NOT NULL THEN RAISE EXCEPTION '0561 V1: not at the angled seed geometry, or changed column: %', v_bad; END IF;
   IF (SELECT count(*) FROM public.stalls WHERE depot_id = v_depot AND stall_type::text IN ('dcfc','l2')
          AND heading_degrees IN (60, 300)) <> 40 THEN
-    RAISE EXCEPTION '0557 V1: fewer than 40 charger stalls read angled (60 / 300)';
+    RAISE EXCEPTION '0561 V1: fewer than 40 charger stalls read angled (60 / 300)';
   END IF;
 
   -- V1b: every column keeps its north-to-south order — the invariant the renderer maps charger stalls by while
   -- the two worlds disagree (TwinMotionDriver.setTwinStallMap, column and rank)
   SELECT string_agg(b.stall_code, ', ' ORDER BY b.stall_code) INTO v_bad
-    FROM _0557_before b JOIN (
+    FROM _0561_before b JOIN (
       SELECT s.id, rank() OVER (PARTITION BY s.stall_type, round(s.relative_x::numeric, 3) ORDER BY s.relative_y DESC) AS r
         FROM public.stalls s WHERE s.depot_id = v_depot AND s.stall_type::text IN ('dcfc','l2')
     ) a ON a.id = b.id
    WHERE a.r <> b.col_rank;
-  IF v_bad IS NOT NULL THEN RAISE EXCEPTION '0557 V1b: a charger stall changed rank in its column: %', v_bad; END IF;
+  IF v_bad IS NOT NULL THEN RAISE EXCEPTION '0561 V1b: a charger stall changed rank in its column: %', v_bad; END IF;
 
   -- V1c: every type keeps its (relative_y, id) order — what ottoq_book_appointment, ottoq_sim_prearrival_contracts
   -- and ottoq_l2_propose_stall_assignment choose within a type by
   SELECT string_agg(b.stall_code, ', ' ORDER BY b.stall_code) INTO v_bad
-    FROM _0557_before b JOIN (
+    FROM _0561_before b JOIN (
       SELECT s.id, rank() OVER (PARTITION BY s.stall_type ORDER BY s.relative_y, s.id) AS r
         FROM public.stalls s WHERE s.depot_id = v_depot AND s.stall_type::text IN ('dcfc','l2')
     ) a ON a.id = b.id
    WHERE a.r <> b.type_rank;
-  IF v_bad IS NOT NULL THEN RAISE EXCEPTION '0557 V1c: a charger stall changed its place in its type''s order: %', v_bad; END IF;
+  IF v_bad IS NOT NULL THEN RAISE EXCEPTION '0561 V1c: a charger stall changed its place in its type''s order: %', v_bad; END IF;
 
   -- V2: nothing else at the depot was touched in this transaction
   SELECT count(*) INTO v_n FROM public.stalls WHERE depot_id = v_depot AND updated_at = now();
-  SELECT count(*) INTO v_want FROM _0557_before WHERE will_change;
+  SELECT count(*) INTO v_want FROM _0561_before WHERE will_change;
   IF v_n <> v_want THEN
-    RAISE EXCEPTION '0557 V2: % stall rows at the twin depot were updated in this transaction, expected %', v_n, v_want;
+    RAISE EXCEPTION '0561 V2: % stall rows at the twin depot were updated in this transaction, expected %', v_n, v_want;
   END IF;
-  SELECT count(*) INTO v_moved FROM _0557_before b JOIN _0557_target t USING (stall_code)
+  SELECT count(*) INTO v_moved FROM _0561_before b JOIN _0561_target t USING (stall_code)
    WHERE abs(b.relative_y - t.new_y) > 0.001;
 
-  -- V3: one stall.state_changed per changed row, filed under no run and named migration_script / 0557
-  SELECT seq0 INTO v_seq0 FROM _0557_mark;
+  -- V3: one stall.state_changed per changed row, filed under no run and named migration_script / 0561
+  SELECT seq0 INTO v_seq0 FROM _0561_mark;
   SELECT count(*), count(*) FILTER (WHERE e.sim_run_id IS NOT NULL OR e.actor_type <> 'migration_script'
-                                        OR e.actor_id IS DISTINCT FROM '0557')
+                                        OR e.actor_id IS DISTINCT FROM '0561')
     INTO v_ev, v_evbad
     FROM public.ottoq_events e
    WHERE e.event_seq > v_seq0 AND e.entity_type = 'stall' AND e.event_type = 'stall.state_changed'
-     AND e.entity_id IN (SELECT id FROM _0557_before);
+     AND e.entity_id IN (SELECT id FROM _0561_before);
   IF v_ev <> v_want OR v_evbad > 0 THEN
-    RAISE EXCEPTION '0557 V3: % stall.state_changed events (% misattributed), expected % filed under no run as migration_script/0557',
+    RAISE EXCEPTION '0561 V3: % stall.state_changed events (% misattributed), expected % filed under no run as migration_script/0561',
       v_ev, v_evbad, v_want;
   END IF;
 
   -- V4 / V5: the database's own stall-overlap and fence-containment guards read no worse than before
-  SELECT overlap0, fence0 INTO v_ov0, v_fe0 FROM _0557_mark;
+  SELECT overlap0, fence0 INTO v_ov0, v_fe0 FROM _0561_mark;
   v_ov1 := (public.ottoq_check_stall_overlap(v_depot) ->> 'failure_count')::int;
   v_fe1 := jsonb_array_length(public.ottoq_check_fence_containment(v_depot) -> 'failures');
   IF v_ov1 > v_ov0 THEN
-    RAISE EXCEPTION '0557 V4: ottoq_check_stall_overlap went from % to % failures', v_ov0, v_ov1;
+    RAISE EXCEPTION '0561 V4: ottoq_check_stall_overlap went from % to % failures', v_ov0, v_ov1;
   END IF;
   IF v_fe1 > v_fe0 THEN
-    RAISE EXCEPTION '0557 V5: ottoq_check_fence_containment went from % to % failures', v_fe0, v_fe1;
+    RAISE EXCEPTION '0561 V5: ottoq_check_fence_containment went from % to % failures', v_fe0, v_fe1;
   END IF;
-  RAISE NOTICE '0557: % of 40 charger stalls changed (% moved north); % events filed under no run; stall-overlap failures % -> %; fence failures % -> %',
+  RAISE NOTICE '0561: % of 40 charger stalls changed (% moved north); % events filed under no run; stall-overlap failures % -> %; fence failures % -> %',
     v_want, v_moved, v_ev, v_ov0, v_ov1, v_fe0, v_fe1;
 END $verify$;
 
--- Rollback (the before-state, which _0557_before held and _0557_target's old_* columns carry): relative_y = old_y,
+-- Rollback (the before-state, which _0561_before held and _0561_target's old_* columns carry): relative_y = old_y,
 -- absolute_lat = old_lat, heading_degrees = 180 and stall_depth_ft = old_depth (20 on DCFC, 16.1407 on the 16 L2
 -- west-column rows, 16.7687 on the 14 L2 east-column rows) on all 40; width unchanged at 10. Run it the same way —
 -- ottoq.sim_run_id 'none', actor migration_script — with no run live, after reverting ottoyarddepot-sim#115, and
--- DELETE FROM public.ottoq_cert_lineage WHERE name = '0557_every_charger_stall_is_angled_and_the_database_says_so'.
+-- DELETE FROM public.ottoq_cert_lineage WHERE name = '0561_every_charger_stall_is_angled_and_the_database_says_so'.
 
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0557_every_charger_stall_is_angled_and_the_database_says_so', true, true,
+VALUES ('0561_every_charger_stall_is_angled_and_the_database_says_so', true, true,
   'The 40 twin-depot charger stalls are angled 60° to their gap lanes (ottoyarddepot-sim#115): heading 60/300, footprint 10 x 19.0276 ft, and 36 rows re-pitched north (DCFC 14u, L2 8.4u; relative_y and absolute_lat), columns unchanged. ottoq_itin_travel_leg reads stall positions, so taxi legs to and from a moved stall change length: a certified cell re-run after this does not reproduce its digests, and a dial experiment spanning it compares two depots. Within each type the (relative_y, id) order and each column''s rank are unchanged (V1b, V1c).',
   now())
 ON CONFLICT (name) DO NOTHING;
