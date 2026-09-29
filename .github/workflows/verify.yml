@@ -126,6 +126,20 @@ jobs:
           python3 -m pytest -q tests/test_agent_gateway_sql.py
           node --test tests/agent_gateway.test.mjs
 
+      # 0564, EXECUTED with real concurrent sessions against a stub engine: a manual start interrupts a running
+      # check (a recertification pair, a hand-run pair, a dial experiment), leaves a migration and a monitor alone,
+      # and holds the world lock so no check starts before the run is live. Its claims are about concurrency, so a
+      # compile-check cannot see them. SKIPS without these variables, like the gateway step above.
+      - name: Operator start interrupts a running check, executed (0564 against a stub engine)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_operator_start_interrupt_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #

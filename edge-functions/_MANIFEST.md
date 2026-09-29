@@ -102,7 +102,7 @@ against this table without trusting any metadata column.
 | Function | v | verify_jwt | Deployed (UTC) | match | Deployed sha256 |
 |---|---:|---|---|---|---|
 | otto-q-api | 26 | false | 2026-04-19 01:54 | yes | `01762cf6734e0dd506a057a3a9ac58f09aa2acd18dc4dc23868b42c1afb9eff0` |
-| otto-twin-control | 24 | false | 2026-09-16 18:06 | yes | `596f551e67ad827c8fbdb422ed86a46ec3fd3e095f4193f1d60a1a0da4dc80e6` |
+| otto-twin-control | 30 | false | 2026-09-29 02:48 | markers¹ | `12a5c37d616fa19efcd43bda11f235ca644fa946cd4e3d112d748a8341746700` (repo file) |
 | ottoq-amend | 9 | true | 2026-06-18 04:24 | yes | `70f038ae2cfdb8891f2589f2e3158cc59792f0318718963cfa9c544249b1376b` |
 | ottoq-approval-copilot | 4 | true | 2026-07-25 01:46 | yes | `3abc122e20aa24a1222abe7a3bd7ce8ef6e91f78cc236b5afe2f0dc7f46293c0` |
 | ottoq-assign-optimize | 8 | true | 2026-09-09 03:41 | yes | `5508a9c95d4b98e736b3215fca9cc006ae6b5e4a399de174165cad69f100c34e` |
@@ -132,6 +132,25 @@ against this table without trusting any metadata column.
 
 Shared modules `_shared/agent_solver_chain.ts` and `_shared/cpsat_agent_chain.ts`
 were also pulled and are byte-identical to the committed copies.
+
+¹ **`otto-twin-control` is the one row updated after the 09-19 pull (2026-09-29, migration 0564).**
+Versions 25-29 were deployed after the pull and never recorded here. v30 was deployed at
+9:48 PM CT on 2026-09-28 with this directory's `index.ts` as its content, through the Supabase
+MCP deploy tool: the start route calls `ottoq_operator_start_run`, so a manual start interrupts
+a running check. As `db/checks/0306` §8 requires of any session that deploys, the deployed
+source was re-read through the connector in the same session. The agreement is **marker-level,
+not byte-level** (§8a: the byte check needs the repository secret that was declined on
+2026-09-21, so its absence is a ceiling, not a pending item). The deployed v30 carries these
+markers:
+- the 0564 lines in the endpoint header;
+- `supabase.rpc("ottoq_operator_start_run"`;
+- `interrupted_checks: start?.interrupted ?? []`;
+- health version `1.10.0-start-interrupts-checks`;
+- verify_jwt false.
+
+The sha256 in the row is of the repo file, so it is not a deployed hash. Measured live: `/health`
+reads `1.10.0-start-interrupts-checks`, and a blank `scenario_code` start returns the new
+function's own `scenario_code required`.
 
 ## Committed, not deployed
 
