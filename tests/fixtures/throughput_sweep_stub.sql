@@ -136,12 +136,16 @@ CREATE FUNCTION public.ottoq_ab_arm_atoms(p_depot uuid, p_run uuid) RETURNS json
     'ticks', r.tick_count, 'fp', md5(public.stub_census(p_depot)))
     FROM public.ottoq_sim_runs r WHERE r.sim_run_id = p_run $$;
 
--- the arm metrics: OTTO-Q's seat deploys five more car-hours, so the pairs have something to show
+-- the arm metrics: OTTO-Q's seat deploys five more car-hours, so the pairs have something to show. Every seat is asked
+-- for the same 120 car-hours; OTTO-Q leaves 20 unmet, FIFO 24 and greedy 26, and OTTO-Q's site costs $11.25 more.
 CREATE FUNCTION public.ottoq_dial_arm_metrics(p_run uuid, p_depot uuid, p_soc0 numeric) RETURNS jsonb LANGUAGE sql STABLE AS $$
   SELECT jsonb_build_object(
     'rule_evaluations', 12, 'soc_start_kwh', p_soc0,
-    'deployed_car_hours', 100 + CASE WHEN public.ottoq_policy_get(p_run, 'proposer_seat', 0) = 0 THEN 5 ELSE 0 END,
-    'unmet_demand_pct', 3.5, 'site_cost_usd_per_day', 420.25, 'peak_site_kw', 900)
+    'demand_car_hours', 120,
+    'deployed_car_hours', 100 + CASE WHEN seat = 0 THEN 5 ELSE 0 END,
+    'unmet_demand_car_hours', CASE seat WHEN 0 THEN 20 WHEN 1 THEN 24 ELSE 26 END,
+    'unmet_demand_pct', 3.5, 'site_cost_usd_per_day', CASE WHEN seat = 0 THEN 431.50 ELSE 420.25 END, 'peak_site_kw', 900)
+    FROM (SELECT public.ottoq_policy_get(p_run, 'proposer_seat', 0) AS seat) z
 $$;
 
 CREATE FUNCTION public.ottoq_sim_stop_and_reset(p_run uuid, p_reason text) RETURNS jsonb LANGUAGE plpgsql AS $$

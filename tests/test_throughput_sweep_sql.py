@@ -7,6 +7,10 @@ build-out before the operator's door and takes it back out after the teardown, f
 engine error with its arm and a failed arm without retrying it forever; and what it keeps is evidence nobody can edit.
 tests/fixtures/throughput_sweep_stub.sql reduces the engine to exactly what those claims can be tested against.
 
+0569 is tested here too, because it only reads what 0568 keeps: the margin ledger prices each OTTO-Q-against-baseline
+pair on demand met (never on cars out beyond demand), keeps a loss a loss, sets aside a pair whose arms were not asked for
+the same demand, and moves with a customer's price while the measurement stays put.
+
 It SKIPS where no scratch PostgreSQL is reachable, like tests/test_throughput_scorecard_sql.py.
 """
 import json
@@ -27,6 +31,7 @@ LOAD = [os.path.join(FIX, "throughput_stub_engine.sql"), os.path.join(FIX, "site
         os.path.join(MIG, "0566_the_scorecard_reads_the_step_a_run_actually_took.sql"),
         os.path.join(MIG, "0567_a_charger_build_out_lives_only_inside_a_test_day.sql")]
 M0568 = os.path.join(MIG, "0568_an_overnight_sweep_scores_one_test_day_at_a_time.sql")
+M0569 = os.path.join(MIG, "0569_a_margin_ledger_prices_what_the_twin_measured.sql")
 TWIN = "11111111-1111-1111-1111-111111111111"
 SWEEP = "frontier_2026_09_29"
 
@@ -90,7 +95,7 @@ class Db:
         return p.returncode, p.stderr
 
 
-def _make_db(tag, release=True):
+def _make_db(tag, release=True, ledger=True):
     name = f"ottoq_{tag}_{os.getpid()}_{uuid.uuid4().hex[:6]}"
     admin = ["psql", *_conn_args(), "-d", "postgres", "-q", "-v", "ON_ERROR_STOP=1"]
     subprocess.run(admin + ["-c", f"CREATE DATABASE {name}"], check=True, capture_output=True)
@@ -101,6 +106,9 @@ def _make_db(tag, release=True):
     rc, err = d.file(M0568)
     assert rc == 0, f"0568 did not apply: {err}"
     d.apply_notices = err
+    if ledger:
+        rc, err = d.file(M0569)
+        assert rc == 0, f"0569 did not apply: {err}"
     if release:
         # Most tests drive night 1 directly: the smoke sweep is set aside and night 1 is made due now.
         d.val("UPDATE public.ottoq_throughput_sweeps SET status = 'concluded' WHERE sweep_code = 'smoke_2026_09_29'")
@@ -333,3 +341,145 @@ def test_grants_and_lineage(db):
         assert db.val(f"SELECT has_table_privilege('anon', 'public.{v}', 'SELECT')") == "f"
     assert db.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
                      WHERE name = '0568_an_overnight_sweep_scores_one_test_day_at_a_time'""") == "false/false"
+
+
+# ── 0569: the margin ledger ──────────────────────────────────────────────────────────────────────────────────────────
+
+LEDGER = """SELECT jsonb_agg(jsonb_build_object(
+                'b', buildout_code, 'base', baseline, 'seed', seed, 'world', world_identical, 'same_demand', demand_identical,
+                'window_h', window_h, 'demand', demand_car_hours, 'deployed', deployed_car_hours_delta,
+                'met', demand_met_car_hours_delta,
+                'up', jsonb_build_array(uptime_usd_low, uptime_usd_point, uptime_usd_high),
+                'cost', site_cost_usd_delta, 'cars', cars_at_work_delta,
+                'cap', jsonb_build_array(fleet_capex_equiv_usd_low, fleet_capex_equiv_usd_point, fleet_capex_equiv_usd_high))
+                ORDER BY buildout_code, baseline, seed)
+             FROM public.ottoq_margin_ledger"""
+
+
+def _synthetic_pair(d, seed, q_unmet, b_unmet, q_demand=120, b_demand=120):
+    """Two arms written the way the arm writes them, on dcfc10 OTTO-Q against dcfc10 FIFO, for a seed the sweep does not
+    run: the only way to put a loss, or a pair asked for different demand, in front of the ledger."""
+    for cell, unmet, demand in (("dcfc10.otto_q", q_unmet, q_demand), ("dcfc10.fifo", b_unmet, b_demand)):
+        d.val(f"""INSERT INTO public.ottoq_throughput_sweep_arms
+                    (sweep_id, cell_id, seed, sim_run_id, engine_hash, dial_floor, complete, ticks, paid_shield, boot_md5,
+                     h_cal, scorecard, arm_metrics)
+                  SELECT s.sweep_id, c.cell_id, {seed}, gen_random_uuid(), 'stub', public.ottoq_dial_pair_floor(), true,
+                         144, true, 'boot-{seed}', 'cal-{seed}',
+                         '{{"run": {{"horizon_h": 12}}, "throughput": {{"visits_served": 1}},
+                           "timeliness": {{"on_time_pct": 90, "door_p50_min": 30}}}}'::jsonb,
+                         jsonb_build_object('demand_car_hours', {demand}, 'deployed_car_hours', 100,
+                                            'unmet_demand_car_hours', {unmet}, 'site_cost_usd_per_day', 420.25)
+                    FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+                   WHERE s.sweep_code = '{SWEEP}' AND c.cell_code = '{cell}'""")
+
+
+@pytest.fixture(scope="module")
+def priced():
+    """Seed 1 on all six cells, its replicate, and seed 2 on all six: eight real pairs. Then two written by hand: seed
+    991, where the baseline beats OTTO-Q on the same demand, and seed 992, whose arms were asked for different demand."""
+    d = _make_db("tswm")
+    try:
+        d.val(OPEN)
+        for _ in range(13):
+            assert d.json(RUN)["ran"] is True
+        d.val(CLOSE)
+        _synthetic_pair(d, 991, q_unmet=30, b_unmet=24)
+        _synthetic_pair(d, 992, q_unmet=20, b_unmet=24, b_demand=130)
+        yield d
+    finally:
+        _drop(d)
+
+
+def test_the_margin_ledger_prices_demand_met_not_cars_out(priced):
+    rows = priced.json(LEDGER)
+    real = [r for r in rows if r["seed"] not in (991, 992)]
+    assert len(real) == 8          # 2 seeds x 2 build-outs x 2 baselines; the replicate is never a pair
+    for r in real:
+        assert r["world"] is True and r["same_demand"] is True
+        assert float(r["window_h"]) == 12 and float(r["demand"]) == 120
+        assert float(r["deployed"]) == 5          # shown beside it, never priced
+        assert float(r["cost"]) == 11.25          # OTTO-Q's site cost more: passed through, not re-priced
+        if r["base"] == "fifo":
+            # 24 unmet against 20: 4 car-hours of demand met, at $16/$20/$24; 4/12 of a car at $75k/$150k/$200k
+            assert float(r["met"]) == 4 and r["up"] == [64, 80, 96]
+            assert float(r["cars"]) == 0.33 and r["cap"] == [25000, 50000, 66667]
+        else:
+            assert r["base"] == "greedy"
+            assert float(r["met"]) == 6 and r["up"] == [96, 120, 144]
+            assert float(r["cars"]) == 0.5 and r["cap"] == [37500, 75000, 100000]
+
+
+def test_a_loss_stays_a_loss_and_a_pair_asked_for_different_demand_is_shown_but_set_aside(priced):
+    rows = {r["seed"]: r for r in priced.json(LEDGER) if r["seed"] in (991, 992)}
+    loss = rows[991]
+    assert loss["same_demand"] is True and float(loss["met"]) == -6
+    assert loss["up"] == [-144, -120, -96] and loss["cap"] == [-100000, -75000, -37500]
+    skew = rows[992]
+    assert skew["same_demand"] is False and skew["world"] is True and float(skew["met"]) == 4
+    summ = priced.json("""SELECT jsonb_object_agg(buildout_code || '.' || baseline, jsonb_build_object(
+                                 'seeds', seeds, 'aside', seeds_set_aside, 'met', demand_met_car_hours_delta,
+                                 'up', uptime_usd, 'cars', cars_at_work_delta, 'window_h', window_h))
+                            FROM public.ottoq_margin_summary""")
+    assert set(summ) == {"dcfc10.fifo", "dcfc10.greedy", "dcfc20.fifo", "dcfc20.greedy"}
+    f10 = summ["dcfc10.fifo"]
+    # seeds 1, 2 and 991 (a loss counts); 992 is set aside, not averaged in
+    assert f10["seeds"] == 3 and f10["aside"] == 1
+    assert f10["met"] == {"mean": 0.7, "min": -6, "max": 4}
+    assert f10["up"] == {"mean_point": 13, "min_low": -144, "max_high": 96}
+    g20 = summ["dcfc20.greedy"]
+    assert g20["seeds"] == 2 and g20["aside"] == 0 and g20["up"] == {"mean_point": 120, "min_low": 96, "max_high": 144}
+    assert float(g20["window_h"]) == 12
+
+
+def test_a_customer_price_moves_the_dollars_and_not_the_measurement(priced):
+    moved = priced.val("""BEGIN;
+        UPDATE public.ottoq_margin_prices SET low = 30, point = 35, high = 40
+         WHERE price_code = 'revenue_per_deployed_car_hour';
+        SELECT jsonb_build_array(demand_met_car_hours_delta, uptime_usd_low, uptime_usd_point, uptime_usd_high)
+          FROM public.ottoq_margin_ledger WHERE baseline = 'fifo' AND buildout_code = 'dcfc20' ORDER BY seed LIMIT 1;
+        ROLLBACK;""")
+    met, lo, pt, hi = json.loads(moved)
+    assert float(met) == 4 and [lo, pt, hi] == [120, 140, 160]
+    assert priced.val("SELECT point FROM public.ottoq_margin_prices WHERE price_code = 'revenue_per_deployed_car_hour'") == "20"
+
+
+def test_the_band_keeps_its_order_and_never_reads_a_missing_number_as_zero(db):
+    assert db.json("SELECT to_jsonb(public.ottoq_margin_band(-6, 16, 20, 24))") == [-144, -120, -96]
+    assert db.json("SELECT to_jsonb(public.ottoq_margin_band(2.5, 16, 20, 24))") == [40, 50, 60]
+    assert db.val("SELECT public.ottoq_margin_band(NULL, 16, 20, 24) IS NULL") == "t"
+    assert db.val("SELECT public.ottoq_margin_band(6, NULL, 20, 24) IS NULL") == "t"
+    # a price whose range is out of order is refused at the door
+    assert "check" in db.fails("""INSERT INTO public.ottoq_margin_prices (price_code, unit, low, point, high, lever, basis,
+                                    sources, confidence) VALUES ('x', 'usd', 5, 4, 6, 'x', 'x',
+                                    '[{"url": "https://example.org", "retrieved": "2026-09-29"}]', 'low')""").lower()
+
+
+def test_the_prices_carry_their_sources_and_the_ledger_is_read_only(db):
+    prices = db.json("""SELECT jsonb_object_agg(price_code, jsonb_build_array(low, point, high, confidence,
+                                (SELECT bool_and(s->>'url' ~ '^https://' AND s->>'retrieved' = '2026-09-29')
+                                   FROM jsonb_array_elements(sources) s)))
+                          FROM public.ottoq_margin_prices""")
+    assert prices == {"revenue_per_deployed_car_hour": [16, 20, 24, "medium", True],
+                      "vehicle_capex": [75000, 150000, 200000, "low", True],
+                      "dcfc_350kw_installed": [193984, 205984, 215984, "medium", True]}
+    for v in ("ottoq_margin_prices", "ottoq_margin_ledger", "ottoq_margin_summary"):
+        assert db.val(f"SELECT has_table_privilege('authenticated', 'public.{v}', 'SELECT')") == "t"
+        assert db.val(f"SELECT has_table_privilege('anon', 'public.{v}', 'SELECT')") == "f"
+        assert db.val(f"SELECT has_table_privilege('authenticated', 'public.{v}', 'INSERT')") == "f"
+    assert db.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
+                     WHERE name = '0569_a_margin_ledger_prices_what_the_twin_measured'""") == "false/false"
+    rc, err = db.file(M0569)
+    assert rc != 0 and "0569 P2" in err
+
+
+def test_the_ledger_refuses_to_build_on_arm_metrics_without_unmet_demand():
+    d = _make_db("tswp", ledger=False)
+    try:
+        d.val("""CREATE OR REPLACE FUNCTION public.ottoq_dial_arm_metrics(p_run uuid, p_depot uuid, p_soc0 numeric)
+                 RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT jsonb_build_object('deployed_car_hours', 100,
+                   'site_cost_usd_per_day', 420.25) $$""")
+        rc, err = d.file(M0569)
+        assert rc != 0 and "0569 P1" in err and "unmet_demand_car_hours" in err
+        assert d.val("SELECT to_regclass('public.ottoq_margin_prices') IS NULL") == "t"
+    finally:
+        _drop(d)
