@@ -654,7 +654,7 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'a_car_is_in_a_bay_only_when_it_stands_in_one'::text, '0554_a_car_is_in_a_bay_only_when_it_stands_in_one.sql'::text),
     ('PENDING'::text, 'an_outside_agent_asks_through_one_door_and_a_person_decides'::text, '0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql'::text),
     ('PENDING'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text),
-    ('PENDING'::text, 'every_charger_stall_is_angled_and_the_database_says_so'::text, '0561_every_charger_stall_is_angled_and_the_database_says_so.sql'::text)
+    ('20260929014318'::text, 'every_charger_stall_is_angled_and_the_database_says_so'::text, '0561_every_charger_stall_is_angled_and_the_database_says_so.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
