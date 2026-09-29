@@ -107,15 +107,15 @@ jobs:
           printf 'compile-checking %d PENDING migration(s)\n' "${#PENDING[@]}"
           python3 scripts/compile-check.py "${PENDING[@]}"
 
-      # The agent gateway's database half, EXECUTED rather than only compiled. The step above stops at 0550's first
+      # The agent gateway's database half, EXECUTED rather than only compiled. The step above stops at 0559's first
       # precondition in an empty database (by design), so its tables, grants, dispatcher, scoping, routing and guards
       # would otherwise reach an apply window unexecuted. tests/test_agent_gateway_sql.py loads a stub engine whose
       # doors are the live bodies (md5-asserted) into a throwaway database on the same scratch server, applies
-      # 0550/0551 and drops it again; tests/agent_gateway.test.mjs then drives the gateway's HTTP handler over the same
+      # 0559/0560 and drops it again; tests/agent_gateway.test.mjs then drives the gateway's HTTP handler over the same
       # SQL end to end. Both SKIP without these variables, which the pytest and edge-function steps above do not set,
       # so this is the step where they run. Ordered AFTER the compile-check because the stub creates the cluster-wide roles
       # anon/authenticated/service_role, and the compile-check's premise is a server that holds nothing.
-      - name: Agent gateway, executed (0550/0551 against a stub engine; HTTP end to end)
+      - name: Agent gateway, executed (0559/0560 against a stub engine; HTTP end to end)
         env:
           PGHOST: localhost
           PGPORT: "5432"
