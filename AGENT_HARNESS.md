@@ -197,6 +197,11 @@ and its note that the committed production posture disables the agent by default
    what the kernel decided. That is what would make this a harness other people's
    agents can enter — and it would turn the twin into a scoring rig for third-party
    optimizers.
+   **Partly addressed 2026-09-28, committed and not yet applied or deployed:** `0555`
+   / `0556` and the `ottoq-agent-gateway` edge function (`AGENT_GATEWAY.md`) give an
+   outside agent a token, reads scoped by the database, and a way to ASK a person for
+   a change that then goes through the engine's own doors. Submitting a physical
+   proposal over HTTP and reading back the kernel's decision on it is still not there.
 3. **G47, now root-caused (`db/checks/0188`): the proposer is asked after the
    resource is gone.** Two service bays, booked 1,725 times in three days by an
    earlier section of the same tick; the service proposer's 446 consumptions all
