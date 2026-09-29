@@ -165,6 +165,19 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_site_buildout_sql.py
 
+      # 0568: the overnight sweep runs only in its window, between runs and after certification; seed by seed and cell
+      # by cell, never repeating an arm since the dial floor; build-out applied before the door and restored after the
+      # teardown; an engine error recorded with its arm, a failed arm recorded and not retried; the arms are evidence.
+      - name: Throughput sweep, executed (0568 against a stub engine)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_throughput_sweep_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
