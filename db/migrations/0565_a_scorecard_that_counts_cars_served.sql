@@ -21,7 +21,10 @@
 --   public.ottoq_visit_outcomes(run)          one row per visit: arrival, due, departure, door to door, on time,
 --                                              charge out, needed work open at departure.
 --   public.ottoq_throughput_scorecard(run)    the run's scorecard, throughput first. Deterministic: no clock reads and
---                                              stable ordering, so the two arms of a determinism pair must agree.
+--                                              stable ordering, so the two arms of a determinism pair must agree. A
+--                                              KPI function it reuses that fails on a run is reported under kpi_errors
+--                                              rather than failing the scorecard (ottoq_kpi_five fails on one August
+--                                              production run, e8a0ba01: "field name must not be null").
 --   public.ottoq_throughput_scores            evidence: a scorecard outlives the run it scores (0340's pattern -- no
 --                                              FK to ottoq_sim_runs, registered class evidence, append-only).
 --   public.ottoq_throughput_score_write(run)  writes one row. This file backfills every finished twin-depot run.
@@ -221,9 +224,26 @@ $fn$;
 -- ── 2. the run's scorecard ──
 CREATE FUNCTION public.ottoq_throughput_scorecard(p_run uuid)
 RETURNS jsonb
-LANGUAGE sql STABLE SECURITY DEFINER
+LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = twin, ottoq, public, extensions
 AS $fn$
+DECLARE
+  v_five   jsonb;
+  v_wait   jsonb;
+  v_svc    jsonb;
+  v_errors jsonb := '{}'::jsonb;
+  v_out    jsonb;
+BEGIN
+  -- The KPI functions this reuses are read as they are. One that fails on a run (ottoq_kpi_five raises "field name
+  -- must not be null" on the August production run e8a0ba01) is reported under kpi_errors, never allowed to take the
+  -- throughput numbers down with it.
+  BEGIN v_five := public.ottoq_kpi_five(p_run);
+  EXCEPTION WHEN OTHERS THEN v_errors := v_errors || jsonb_build_object('kpi_five', SQLERRM); END;
+  BEGIN v_wait := public.ottoq_kpi_charge_wait(p_run);
+  EXCEPTION WHEN OTHERS THEN v_errors := v_errors || jsonb_build_object('charge_wait', SQLERRM); END;
+  BEGIN v_svc := public.ottoq_kpi_service_completion(p_run);
+  EXCEPTION WHEN OTHERS THEN v_errors := v_errors || jsonb_build_object('service_completion', SQLERRM); END;
+
   WITH r AS (
     SELECT sr.sim_run_id, sr.depot_id, sr.scenario_code, sr.random_seed, sr.tick_count, sr.policy, sr.status,
            sr.sim_clock_start, sr.sim_clock_current,
@@ -270,10 +290,6 @@ AS $fn$
     SELECT count(*) AS dcfc_at_depot FROM public.stalls st, r WHERE st.depot_id = r.depot_id AND st.stall_type = 'dcfc'
   ), ar AS (
     SELECT a.engine_hash, a.config_hash FROM public.ottoq_run_archives a WHERE a.sim_run_id = p_run LIMIT 1
-  ), k AS (
-    SELECT public.ottoq_kpi_five(p_run) AS five,
-           public.ottoq_kpi_charge_wait(p_run) AS wait,
-           public.ottoq_kpi_service_completion(p_run) AS sc
   )
   SELECT jsonb_build_object(
     'sim_run_id', r.sim_run_id,
@@ -331,13 +347,16 @@ AS $fn$
        'mean_kw',                   round(dc.mean_kw::numeric, 1),
        'kwh_per_session_hour',      round((dc.kwh / NULLIF(dc.hours, 0))::numeric, 1)),
     'l2_sessions', (SELECT count(*) FROM sess WHERE stall_type = 'l2'),
-    'charge_wait', (SELECT wait FROM k),
-    'service_completion', (SELECT jsonb_build_object('must_do', sc->'must_do', 'must_do_done', sc->'must_do_done',
-                                                     'pct', sc->'service_completion_pct') FROM k),
-    'kpi', (SELECT jsonb_build_object('peak_site_kw', five->'peak_site_kw',
-                                      'peak_site_kw_demand', five->'peak_site_kw_demand',
-                                      'touch_events_per_turn', five->'touch_events_per_turn',
-                                      'p95_time_to_service_min', five->'p95_time_to_service_min') FROM k),
+    'charge_wait', v_wait,
+    'service_completion', CASE WHEN v_svc IS NOT NULL THEN
+                            jsonb_build_object('must_do', v_svc->'must_do', 'must_do_done', v_svc->'must_do_done',
+                                               'pct', v_svc->'service_completion_pct') END,
+    'kpi', CASE WHEN v_five IS NOT NULL THEN
+             jsonb_build_object('peak_site_kw', v_five->'peak_site_kw',
+                                'peak_site_kw_demand', v_five->'peak_site_kw_demand',
+                                'touch_events_per_turn', v_five->'touch_events_per_turn',
+                                'p95_time_to_service_min', v_five->'p95_time_to_service_min') END,
+    'kpi_errors', v_errors,
     'comparability', jsonb_build_object(
        'all_policies', 'visits, dispatches and charge sessions: every arm''s vehicles produce them, because the policy only proposes and the kernel disposes (0261)',
        'rule', 'db/checks/0149: a comparative metric read from an artifact only one arm produces measures which arm it is'),
@@ -345,8 +364,10 @@ AS $fn$
        format('Times are quantized to %s-minute steps. At 30 minutes a visit needs about three steps before it can leave.', r.step_min),
        'tier_group groups the generator''s visit archetypes. It is not yet a commercial tier.',
        'A visit still in the depot at the horizon is counted in in_depot_at_horizon and kept out of every time percentile.'))
+    INTO v_out
   FROM r, dc;
-$fn$;
+  RETURN v_out;
+END $fn$;
 
 -- ── 3. the evidence table: a scorecard outlives the run it scores ──
 CREATE TABLE public.ottoq_throughput_scores (
@@ -520,7 +541,8 @@ BEGIN
       RAISE EXCEPTION '0565 V2: run % tier groups sum to % of % visits', s.sim_run_id, v_sum,
         (v_sc #>> '{throughput,visits}');
     END IF;
-    IF (v_sc->'charge_wait') IS DISTINCT FROM public.ottoq_kpi_charge_wait(s.sim_run_id) THEN
+    IF NOT (v_sc->'kpi_errors') ? 'charge_wait'
+       AND (v_sc->'charge_wait') IS DISTINCT FROM public.ottoq_kpi_charge_wait(s.sim_run_id) THEN
       RAISE EXCEPTION '0565 V2: run % charge_wait differs from ottoq_kpi_charge_wait', s.sim_run_id;
     END IF;
     IF (v_sc #>> '{rule9,left_below_target}')::bigint > 0

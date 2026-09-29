@@ -91,9 +91,15 @@ LANGUAGE sql AS $$ SELECT NULL::text, NULL::text, NULL::text, NULL::text, NULL::
 -- Stub KPIs: deterministic, and each names its run as the live ones do.
 CREATE FUNCTION public.ottoq_kpi_charge_wait(p_run uuid) RETURNS jsonb LANGUAGE sql STABLE
 AS $$ SELECT jsonb_build_object('sim_run_id', p_run, 'p50_wait_min', 30.0, 'p95_wait_min', 60.0) $$;
-CREATE FUNCTION public.ottoq_kpi_five(p_run uuid) RETURNS jsonb LANGUAGE sql STABLE
-AS $$ SELECT jsonb_build_object('sim_run_id', p_run, 'peak_site_kw', 400.0, 'peak_site_kw_demand', 380.0,
-                                'touch_events_per_turn', 1.0, 'p95_time_to_service_min', 90.0) $$;
+-- The live ottoq_kpi_five raises on one old run (e8a0ba01); the stub raises on run ...03 the same way.
+CREATE FUNCTION public.ottoq_kpi_five(p_run uuid) RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  IF p_run = 'a0000000-0000-0000-0000-000000000003' THEN
+    RAISE EXCEPTION 'field name must not be null';
+  END IF;
+  RETURN jsonb_build_object('sim_run_id', p_run, 'peak_site_kw', 400.0, 'peak_site_kw_demand', 380.0,
+                            'touch_events_per_turn', 1.0, 'p95_time_to_service_min', 90.0);
+END $$;
 CREATE FUNCTION public.ottoq_kpi_service_completion(p_run uuid) RETURNS jsonb LANGUAGE sql STABLE
 AS $$ SELECT jsonb_build_object('sim_run_id', p_run, 'must_do', 9, 'must_do_done', 7, 'service_completion_pct', 77.8) $$;
 
@@ -161,6 +167,17 @@ INSERT INTO public.ocpp_sessions VALUES
   ('a0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-00000000dc01', '2026-09-01 10:00+00', '2026-09-01 11:00+00', 40, 40),
   ('a0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-00000000dc02', '2026-09-01 11:30+00', '2026-09-01 12:30+00', 40, 40),
   ('a0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-00000000c0c2', '2026-09-01 10:00+00', '2026-09-01 12:00+00', 30, 15);
+
+-- A finished run on which ottoq_kpi_five fails: the scorecard must still be written, with the failure under kpi_errors.
+INSERT INTO public.ottoq_sim_runs VALUES
+  ('a0000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'completed', 'production', 9, 7,
+   'otto_q', 120, 1, '2026-09-01 08:00+00', '2026-09-01 08:14+00', '2026-09-29 08:00+00', 'production_live', NULL);
+INSERT INTO public.ottoq_visit_needs VALUES
+  ('b0000000-0000-0000-0000-0000000000b3', 'c0000000-0000-0000-0000-0000000000b3', 'a0000000-0000-0000-0000-000000000003',
+   '11111111-1111-1111-1111-111111111111', 'D_charge_and_go', '2026-09-01 08:00+00', NULL, 100,
+   '[{"svc":"charge","status":"done","must_do":true,"closed_at":"2026-09-01T08:10:00+00:00"}]');
+INSERT INTO public.ottoq_vehicle_dispatches (vehicle_id, sim_run_id, dispatched_at, soc_at_dispatch_pct) VALUES
+  ('c0000000-0000-0000-0000-0000000000b3', 'a0000000-0000-0000-0000-000000000003', '2026-09-01 08:12+00', 100);
 
 -- A live run: the backfill must skip it.
 INSERT INTO public.ottoq_sim_runs VALUES

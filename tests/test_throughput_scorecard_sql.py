@@ -23,6 +23,7 @@ M0565 = os.path.join(ROOT, "db", "migrations", "0565_a_scorecard_that_counts_car
 
 RUN = "a0000000-0000-0000-0000-000000000001"
 LIVE_RUN = "a0000000-0000-0000-0000-000000000002"
+KPI_FAIL_RUN = "a0000000-0000-0000-0000-000000000003"
 
 
 def _conn_args():
@@ -151,6 +152,17 @@ def test_the_step_travels_with_every_time(sc):
     assert sc["caveats"][0].startswith("Times are quantized to 30.00-minute steps")
 
 
+def test_a_failing_kpi_is_reported_not_fatal(db):
+    k = db.json(f"SELECT public.ottoq_throughput_scorecard('{KPI_FAIL_RUN}')")
+    assert k["throughput"]["visits_served"] == 1 and k["kpi"] is None
+    assert k["kpi_errors"] == {"kpi_five": "field name must not be null"}, k["kpi_errors"]
+    assert k["charge_wait"] is not None and k["service_completion"] is not None
+
+
+def test_a_healthy_run_reports_no_kpi_errors(sc):
+    assert sc["kpi_errors"] == {} and sc["kpi"]["peak_site_kw"] == 400.0
+
+
 def test_the_scorecard_is_deterministic(db, sc):
     again = db.json(f"SELECT public.ottoq_throughput_scorecard('{RUN}')")
     assert again == sc
@@ -159,7 +171,7 @@ def test_the_scorecard_is_deterministic(db, sc):
 def test_the_backfill_scored_finished_runs_and_skipped_the_live_one(db):
     runs = db.val("SELECT string_agg(sim_run_id::text, ',' ORDER BY sim_run_id) FROM public.ottoq_throughput_scores "
                   "WHERE origin = 'backfill_0565'").split(",")
-    assert LIVE_RUN not in runs and RUN in runs and len(runs) == 3, runs
+    assert LIVE_RUN not in runs and RUN in runs and KPI_FAIL_RUN in runs and len(runs) == 4, runs
     assert db.val("SELECT bool_and(scorecard_md5 = md5(scorecard::text)) FROM public.ottoq_throughput_scores") == "t"
 
 
