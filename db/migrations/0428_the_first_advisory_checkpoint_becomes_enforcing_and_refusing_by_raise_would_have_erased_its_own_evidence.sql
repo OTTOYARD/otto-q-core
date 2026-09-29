@@ -1,5 +1,5 @@
--- migration-version: PENDING
--- migration-name:    the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence
+-- migration-version: 20260922170157
+-- migration-name:    0428_the_first_advisory_checkpoint_becomes_enforcing_and_refusing_by_raise_would_have_erased_its_own_evidence
 --
 -- 0428  **`charge_session_start` is the first of the six advisory checkpoints to become ENFORCING.** Four
 --       blocking energy rules — `EN.001.grid_capacity_ceiling` and `EN.005.grid_event_hardstop`, both

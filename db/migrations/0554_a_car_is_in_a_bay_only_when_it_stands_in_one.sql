@@ -1,5 +1,8 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    a_car_is_in_a_bay_only_when_it_stands_in_one
+-- (applied 2026-09-28, 1:44 PM CT, in the same transaction as 0553 through apply_migration, which wrote ONE ledger row
+--  for the two files: version 20260928184413, name a_hold_gives_way_and_a_car_is_in_a_bay_only_when_it_stands_in_one,
+--  carried by 0553's header. This file has no row of its own; its APPLIED footer is its record.)
 --
 -- 0554  **A car is in a wash, detail or service bay only when it stands in one.** (G286)
 --
@@ -287,3 +290,9 @@ END $v3$;
 -- Rollback: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0554_pre' as it is.
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-28 to gxdrcyphqjzjsuhxuqtg, 1:44 PM CT, in one transaction with 0553 (ledger 20260928184413).
+--   twin.ottoq_sim_advance_service_flow  732568fb8dd8bec2a0a02ed188a13d4a -> 64694ab064894736f35b5bc13314a529
+--   Both lanes carry `WHERE q.booked_stall IS NOT NULL` (2 of 2) and the stand-in-the-bay guard. V1 and V3 passed:
+--   the transaction commits only if both do.
