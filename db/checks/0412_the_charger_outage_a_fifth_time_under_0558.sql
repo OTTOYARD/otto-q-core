@@ -1666,3 +1666,94 @@ SELECT v.display_name AS car, to_char(s.opened_at AT TIME ZONE 'America/Chicago'
  GROUP BY v.display_name, s.opened_at
  ORDER BY s.opened_at;
 -- READ: pending.
+
+-- ══ §29 G293 RE-DIAGNOSED: WHO TAKES A CHARGER A CAR AHEAD IN THE LINE WAS REFUSED ════════════════════════════════════
+--
+--   0411 §22 counted 11 overtakings seated by the in-kernel L2 optimizer (`greedy_constrained`) and G293 blamed its order
+--   (lowest charge first, gate cars only). Measured live on this run at sim 6:24 and 6:33 AM, that is not the mechanism.
+--   The decide path's cursor walks the line in order (immediate dispatch, then the banked response ratio) and asks, per
+--   car, for a reservation, then the optimizer's proposal for that car, then the heuristic; the optimizer only chooses
+--   which charger a gate car is offered. In both cases the charger went to a car whose plan had booked it on the calendar
+--   20 minutes earlier (`charge_l2`, booked 6:02 and 6:09 AM), and the 28 and 25 cars ahead of it in the same tick were
+--   refused `no_compatible_available_stall`: the gate refuses a charger another car's live booking covers. The calendar is
+--   claimed by the booker, which the placer (`ottoq.ottoq_place_unplaced_vehicles`) runs every tick for cars with an
+--   unbooked leg `ORDER BY vehicle_id` with `LIMIT 60`: when the chargers are saturated, the next free window goes to the
+--   unbooked car with the lowest id, not to the head of the line.
+--
+--   Per charge seating over the run: by what seated the car (`source`), how many had a car ahead of them in the same
+--   tick's cursor refused for want of a charger, and how many of those sat on a charge booking of their own made before
+--   that tick. A seating on its own earlier booking with refused cars ahead is the calendar serving a different order from
+--   the line; the immediate dispatches are served first by design, and a later car on a charger no car ahead could take
+--   (inlet, stall type) is no overtaking at all.
+
+\echo '=== 0412 §29 — charge seatings with a car ahead in the line refused in the same tick, by what seated the later car ==='
+WITH run AS (SELECT '4b0999db-a9ef-4b35-b3e2-c985d1a259f2'::uuid AS id),
+seat AS (
+  SELECT d.tick_seq, d.decision_seq, d.entity_id AS vehicle_id, d.sim_clock,
+         (d.enacted_action->>'stall_id')::uuid AS stall_id, COALESCE(d.enacted_action->>'source', 'kernel') AS source
+    FROM public.ottoq_decisions d JOIN public.stalls st ON st.id = (d.enacted_action->>'stall_id')::uuid, run
+   WHERE d.sim_run_id = run.id AND d.action_context = 'stall_assignment' AND d.outcome_status = 'enacted'
+     AND st.stall_type::text IN ('dcfc', 'l2')),
+ahead AS (
+  SELECT s.tick_seq, s.decision_seq, count(a.decision_id) AS refused_ahead
+    FROM seat s JOIN public.ottoq_decisions a
+      ON a.sim_run_id = (SELECT id FROM run) AND a.tick_seq = s.tick_seq AND a.action_context = 'stall_assignment'
+     AND a.decision_seq < s.decision_seq AND a.outcome_status = 'noop_no_candidate'
+   GROUP BY 1, 2),
+own AS (
+  SELECT s.tick_seq, s.decision_seq,
+         EXISTS (SELECT 1 FROM public.ottoq_stall_bookings b
+                  WHERE b.sim_run_id = (SELECT id FROM run) AND b.stall_id = s.stall_id AND b.vehicle_id = s.vehicle_id
+                    AND b.purpose IN ('charge_dcfc', 'charge_l2') AND b.booked_at_sim < s.sim_clock
+                    AND b.during @> s.sim_clock) AS on_own_booking
+    FROM seat s)
+SELECT s.source, count(*) AS seatings,
+       count(*) FILTER (WHERE COALESCE(ah.refused_ahead, 0) > 0) AS with_a_refused_car_ahead,
+       count(*) FILTER (WHERE COALESCE(ah.refused_ahead, 0) > 0 AND o.on_own_booking) AS of_which_on_own_earlier_booking,
+       sum(COALESCE(ah.refused_ahead, 0)) AS refused_cars_ahead
+  FROM seat s LEFT JOIN ahead ah USING (tick_seq, decision_seq) JOIN own o USING (tick_seq, decision_seq)
+ GROUP BY 1 ORDER BY 2 DESC;
+-- READ: pending.
+
+--   §29b: the `reservation_honoured` seatings above with refused cars ahead were, at sim 6:58 AM, all three standard cars
+--   recalled and still on their way back when the engine reserved them a free fast charger (at 4:32, 4:32 and 6:33 AM;
+--   they arrived 1 to 21 minutes later). Two functions reserve a charger for a returning car:
+--   `ottoq.ottoq_sim_prearrival_contracts` (backstop 2: any free charger for an en-route car with a charge to do, TTL the
+--   ETA plus 40 minutes, refreshed while it approaches; its dial `prearrival_charge_yields_to_solver`, 0339, is 0, which
+--   keeps that behaviour) and `ottoq.ottoq_reoptimize_reservation_book` (moves a returning car below 45% from its reserved
+--   L2 to a free fast charger). Per charger reserved while its car was deployed or driving back: how long it stood
+--   reserved and empty until a car took it or the reservation was cleared, and the charge seatings refused meanwhile.
+
+\echo '=== 0412 §29b — chargers reserved for a car still on its way back: how long each stood empty, and the refusals meanwhile ==='
+WITH run AS MATERIALIZED (SELECT r.sim_run_id AS id, r.sim_clock_current AS t1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = '4b0999db-a9ef-4b35-b3e2-c985d1a259f2'),
+res AS MATERIALIZED (
+  SELECT e.entity_id AS stall_id, (e.payload->'diff'->'reserved_by'->>'to')::uuid AS vehicle_id, e.sim_clock_at AS at,
+         e.event_seq AS seq
+    FROM public.ottoq_events e, run
+   WHERE e.sim_run_id = run.id AND e.event_type = 'stall.state_changed'
+     AND jsonb_typeof(e.payload->'diff'->'reserved_by'->'to') = 'string'),
+enr AS MATERIALIZED (
+  SELECT r.*, st.stall_type::text AS stype,
+         (SELECT e2.payload->'diff'->'current_state'->>'to' FROM public.ottoq_events e2, run
+           WHERE e2.sim_run_id = run.id AND e2.entity_id = r.vehicle_id AND e2.event_type = 'vehicle.state_changed'
+             AND e2.payload->'diff' ? 'current_state' AND e2.event_seq <= r.seq
+           ORDER BY e2.event_seq DESC LIMIT 1) AS veh_state_then,
+         (SELECT min(e3.sim_clock_at) FROM public.ottoq_events e3, run
+           WHERE e3.sim_run_id = run.id AND e3.entity_id = r.stall_id AND e3.event_type = 'stall.state_changed'
+             AND e3.event_seq > r.seq
+             AND (e3.payload->'diff' ? 'current_vehicle_id' OR e3.payload->'diff' ? 'reserved_by')) AS ended_at
+    FROM res r JOIN public.stalls st ON st.id = r.stall_id
+   WHERE st.stall_type::text IN ('dcfc', 'l2')),
+held AS (
+  SELECT n.*, COALESCE(n.ended_at, (SELECT t1 FROM run)) AS until_at FROM enr n WHERE n.veh_state_then IN ('deployed', 'en_route_to_depot')),
+refused AS (
+  SELECT d.sim_clock FROM public.ottoq_decisions d, run
+   WHERE d.sim_run_id = run.id AND d.action_context = 'stall_assignment' AND d.outcome_status = 'noop_no_candidate')
+SELECT h.stype, count(*) AS reservations, count(DISTINCT h.vehicle_id) AS cars,
+       round((sum(extract(epoch FROM (h.until_at - h.at))) / 60)::numeric, 1) AS charger_min_held_empty,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (h.until_at - h.at))) / 60)::numeric, 1) AS p50_min,
+       round((max(extract(epoch FROM (h.until_at - h.at))) / 60)::numeric, 1) AS max_min,
+       sum((SELECT count(*) FROM refused f WHERE f.sim_clock >= h.at AND f.sim_clock < h.until_at)) AS refusals_while_held
+  FROM held h
+ GROUP BY h.stype ORDER BY h.stype;
+-- READ: pending.
