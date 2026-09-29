@@ -1,7 +1,7 @@
 -- migration-version: PENDING
 -- migration-name:    a_charger_is_not_held_for_a_car_still_on_its_way_back
 --
--- 0559  **A charger is not held for a car still on its way back when the run leaves the charge to the line.** (G293,
+-- 0562  **A charger is not held for a car still on its way back when the run leaves the charge to the line.** (G293,
 --       part 1; CLAUDE.md rule 9: "freeing a charger the moment its car is done, and better ordering of who is served
 --       next")
 --
@@ -64,7 +64,7 @@ BEGIN;
 DO $inflight$
 BEGIN
   IF public.ottoq_certification_in_flight(true) > 0 THEN
-    RAISE EXCEPTION '0559 P0: a pair, the recert runner or a dial pair is running right now';
+    RAISE EXCEPTION '0562 P0: a pair, the recert runner or a dial pair is running right now';
   END IF;
 END $inflight$;
 
@@ -73,7 +73,7 @@ DO $live$
 BEGIN
   IF EXISTS (SELECT 1 FROM public.ottoq_sim_runs
               WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND status IN ('initializing', 'running', 'paused')) THEN
-    RAISE EXCEPTION '0559 P1: a run is live at the twin depot';
+    RAISE EXCEPTION '0562 P1: a run is live at the twin depot';
   END IF;
 END $live$;
 
@@ -87,13 +87,13 @@ BEGIN
       ('ottoq.ottoq_reoptimize_reservation_book(uuid,timestamp with time zone)',  'd3bc978503d2ded0eece6650af75582b')) x(sig, md5)
   LOOP
     IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = r.sig::regprocedure) IS DISTINCT FROM r.md5 THEN
-      RAISE EXCEPTION '0559 P2: % is not the function measured', r.sig;
+      RAISE EXCEPTION '0562 P2: % is not the function measured', r.sig;
     END IF;
   END LOOP;
 END $premises$;
 
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0559_pre', 'function', p.pronamespace::regnamespace::text, p.proname,
+SELECT '0562_pre', 'function', p.pronamespace::regnamespace::text, p.proname,
        pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p
  WHERE p.oid IN ('ottoq.ottoq_book_appointment(uuid,uuid,timestamp with time zone,text,text,boolean,numeric,numeric,uuid)'::regprocedure,
@@ -109,7 +109,7 @@ BEGIN
 $o$  IF v_has_charge THEN
     -- reserve only an INLET-COMPATIBLE charge stall so the booking is honourable on arrival
 $o$,
-$n$  -- 0559 (G293, CLAUDE.md rule 9): no charger is held for a car still on its way back when the run leaves the charge
+$n$  -- 0562 (G293, CLAUDE.md rule 9): no charger is held for a car still on its way back when the run leaves the charge
   -- to the line (prearrival_charge_yields_to_solver = 1, 0339; ottoq_agentic_arm sets it on every armed run). The
   -- appointment is made at the recall, so the car is never here yet: on 0412's run a free charger reserved here for a
   -- returning car stood empty up to 22 minutes while the cars waiting at the depot were refused it, and the car then took
@@ -129,7 +129,7 @@ $n$  IF NOT FOUND OR COALESCE(v_run.policy,'otto_q') <> 'otto_q' THEN
     RETURN jsonb_build_object('swaps', 0);
   END IF;
 
-  -- 0559 (G293, CLAUDE.md rule 9): when the run leaves the charge to the line (prearrival_charge_yields_to_solver = 1,
+  -- 0562 (G293, CLAUDE.md rule 9): when the run leaves the charge to the line (prearrival_charge_yields_to_solver = 1,
   -- 0339), a returning car holds no charger before it arrives, so there is nothing to upgrade, and a free fast charger
   -- taken for it now would stand empty until it arrives while the cars at the depot wait (0412: Waymo-AV-006 and
   -- Tesla-AV-049, moved from a staging or L2 hold to a free fast charger while driving back).
@@ -140,13 +140,13 @@ $n$)) x(sig, a_old, a_new)
   LOOP
     v_def := pg_get_functiondef(r.sig::regprocedure);
     n := (length(v_def) - length(replace(v_def, r.a_old, ''))) / length(r.a_old);
-    IF n <> 1 THEN RAISE EXCEPTION '0559 splice: the anchor matches % times in %, not 1: %', n, r.sig, left(r.a_old, 80); END IF;
+    IF n <> 1 THEN RAISE EXCEPTION '0562 splice: the anchor matches % times in %, not 1: %', n, r.sig, left(r.a_old, 80); END IF;
     EXECUTE replace(v_def, r.a_old, r.a_new);
   END LOOP;
 END $splice$;
 
 COMMENT ON FUNCTION ottoq.ottoq_reoptimize_reservation_book(uuid, timestamptz) IS
-  'Moves a returning car below 45% from a non-fast stall it holds to a free fast charger (cuOpt''s pick first). 0559 '
+  'Moves a returning car below 45% from a non-fast stall it holds to a free fast charger (cuOpt''s pick first). 0562 '
   '(G293): does nothing when the run leaves the charge to the line (prearrival_charge_yields_to_solver = 1): the car holds '
   'no charger before it arrives, and a charger taken for it now would stand empty while the cars at the depot wait.';
 
@@ -165,12 +165,12 @@ BEGIN
   LOOP
     v_src := regexp_replace(regexp_replace(pg_get_functiondef(r.sig::regprocedure), '/\*.*?\*/', '', 'gs'), '--[^\n]*', '', 'g');
     k := (SELECT count(*) FROM regexp_matches(v_src, r.pat, 'g'));
-    IF k <> r.want THEN RAISE EXCEPTION '0559 V1: % matches % times in %, not %', r.pat, k, r.sig, r.want; END IF;
+    IF k <> r.want THEN RAISE EXCEPTION '0562 V1: % matches % times in %, not %', r.pat, k, r.sig, r.want; END IF;
   END LOOP;
 END $verify$;
 
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0559_a_charger_is_not_held_for_a_car_still_on_its_way_back', true, true,
+VALUES ('0562_a_charger_is_not_held_for_a_car_still_on_its_way_back', true, true,
   'G293 part 1: the appointment book reserved a free charger for a car still driving back (at the recall, for its ETA '
   'plus 40 minutes) and the reservation re-optimizer moved a returning car below 45% to a free fast charger, both '
   'ignoring prearrival_charge_yields_to_solver (0339), which every armed run sets to 1. On 0412''s run by sim 7:21 AM, '
@@ -200,7 +200,7 @@ BEGIN
     SELECT r.sim_run_id INTO v_run FROM public.ottoq_sim_runs r
      WHERE r.depot_id = v_depot AND r.run_by = 'operator_demo' AND r.status NOT IN ('initializing', 'running', 'paused')
      ORDER BY r.started_at DESC LIMIT 1;
-    IF v_run IS NULL THEN RAISE EXCEPTION '0559 V3: no ended operator run at the twin depot'; END IF;
+    IF v_run IS NULL THEN RAISE EXCEPTION '0562 V3: no ended operator run at the twin depot'; END IF;
     SELECT sim_clock_current + interval '1 day' INTO t FROM public.ottoq_sim_runs WHERE sim_run_id = v_run;
     UPDATE public.ottoq_sim_runs SET status = 'running', sim_clock_current = t, tick_count = tick_count + 1,
                                      policy = 'otto_q'
@@ -214,7 +214,7 @@ BEGIN
          AND v.robotic_tether_until IS NULL
          AND NOT EXISTS (SELECT 1 FROM public.stalls s WHERE s.current_vehicle_id = v.id OR s.reserved_by = v.id)
        ORDER BY v.id LIMIT 3) q;
-    IF coalesce(array_length(car, 1), 0) < 3 THEN RAISE EXCEPTION '0559 V3: fewer than three free twin cars'; END IF;
+    IF coalesce(array_length(car, 1), 0) < 3 THEN RAISE EXCEPTION '0562 V3: fewer than three free twin cars'; END IF;
     a := car[1]; b := car[2]; rr := car[3];
 
     -- only these three in play; every twin charger free, Available and fresh
@@ -227,7 +227,7 @@ BEGIN
       FROM public.stalls s
      WHERE s.ocpp_charger_id = c2.charger_id AND s.depot_id = v_depot AND s.stall_type::text IN ('dcfc', 'l2');
     UPDATE public.ottoq_stall_bookings
-       SET state = 'released', released_at = GREATEST(t, COALESCE(booked_at_sim, t)), release_reason = 'v3_0559_setup'
+       SET state = 'released', released_at = GREATEST(t, COALESCE(booked_at_sim, t)), release_reason = 'v3_0562_setup'
      WHERE sim_run_id = v_run AND state IN ('held', 'active');
     UPDATE public.ottoq_visit_needs SET status = 'superseded'
      WHERE vehicle_id = ANY (car) AND sim_run_id = v_run AND status IN ('open', 'in_progress');
@@ -238,14 +238,14 @@ BEGIN
      WHERE id = ANY (car);
     INSERT INTO public.ottoq_visit_needs (vehicle_id, sim_run_id, depot_id, arrived_at, visit_key, urgency, target_soc, atoms,
                                           status, source)
-    SELECT x.vid, v_run, v_depot, t + interval '20 minutes', 'V3-0559-' || x.vid::text, 'standard', 100,
+    SELECT x.vid, v_run, v_depot, t + interval '20 minutes', 'V3-0562-' || x.vid::text, 'standard', 100,
            jsonb_build_array(jsonb_build_object('svc', 'charge', 'concurrency', 'anchor', 'must_do', true, 'status', 'pending'),
                              jsonb_build_object('svc', 'readiness_check', 'concurrency', 'gate', 'must_do', true, 'status', 'pending')),
-           'open', 'v3_0559'
+           'open', 'v3_0562'
       FROM unnest(car) AS x(vid);
 
     -- (1) dial 1: A gets no charger, with fast chargers free
-    PERFORM public.ottoq_policy_set('run', v_run, 'prearrival_charge_yields_to_solver', 1, 'v3_0559');
+    PERFORM public.ottoq_policy_set('run', v_run, 'prearrival_charge_yields_to_solver', 1, 'v3_0562');
     SELECT count(*) INTO free_fast FROM public.stalls s
       JOIN public.ottoq_ocpp_chargers c ON c.charger_id = s.ocpp_charger_id
      WHERE s.depot_id = v_depot AND s.stall_type::text = 'dcfc' AND s.current_vehicle_id IS NULL AND s.reserved_by IS NULL
@@ -253,7 +253,7 @@ BEGIN
     res_a := ottoq.ottoq_book_appointment(a, v_run, t, 'low_soc_reserve', 'urgent', false, 20, 30, v_depot);
     SELECT count(*) INTO a_chg FROM public.stalls WHERE reserved_by = a AND stall_type::text IN ('dcfc', 'l2');
     IF free_fast < 1 OR a_chg <> 0 OR COALESCE(res_a->>'stall_type', 'none') IN ('dcfc', 'l2') THEN
-      RAISE EXCEPTION '0559 V3 FAILED (1): with % fast charger(s) free and the dial at 1 the appointment book returned % and A holds % charger(s)',
+      RAISE EXCEPTION '0562 V3 FAILED (1): with % fast charger(s) free and the dial at 1 the appointment book returned % and A holds % charger(s)',
         free_fast, res_a, a_chg;
     END IF;
 
@@ -262,41 +262,41 @@ BEGIN
      WHERE s.depot_id = v_depot AND s.stall_type::text = 'staging' AND s.current_vehicle_id IS NULL AND s.reserved_by IS NULL
      ORDER BY s.stall_code LIMIT 1;
     IF stg IS NULL OR NOT public.ottoq_reserve_stall(stg, rr, t, 1800) THEN
-      RAISE EXCEPTION '0559 V3 setup: no staging stall could be reserved for R (%)', stg;
+      RAISE EXCEPTION '0562 V3 setup: no staging stall could be reserved for R (%)', stg;
     END IF;
     ro1 := ottoq.ottoq_reoptimize_reservation_book(v_run, t);
     SELECT count(*) INTO r_chg1 FROM public.stalls WHERE reserved_by = rr AND stall_type::text IN ('dcfc', 'l2');
     IF COALESCE((ro1->>'swaps')::int, -1) <> 0 OR NOT COALESCE((ro1->>'yields_to_the_line')::boolean, false) OR r_chg1 <> 0 THEN
-      RAISE EXCEPTION '0559 V3 FAILED (2): with the dial at 1 the re-optimizer returned % and R holds % charger(s)', ro1, r_chg1;
+      RAISE EXCEPTION '0562 V3 FAILED (2): with the dial at 1 the re-optimizer returned % and R holds % charger(s)', ro1, r_chg1;
     END IF;
 
     -- (3) dial 0: B gets a charger, as before
-    PERFORM public.ottoq_policy_set('run', v_run, 'prearrival_charge_yields_to_solver', 0, 'v3_0559');
+    PERFORM public.ottoq_policy_set('run', v_run, 'prearrival_charge_yields_to_solver', 0, 'v3_0562');
     res_b := ottoq.ottoq_book_appointment(b, v_run, t, 'low_soc_reserve', 'urgent', false, 20, 30, v_depot);
     SELECT count(*) INTO b_chg FROM public.stalls WHERE reserved_by = b AND stall_type::text IN ('dcfc', 'l2');
     IF COALESCE(res_b->>'stall_type', 'none') NOT IN ('dcfc', 'l2') OR b_chg <> 1 THEN
-      RAISE EXCEPTION '0559 V3 FAILED (3): with the dial at 0 the appointment book returned % and B holds % charger(s)', res_b, b_chg;
+      RAISE EXCEPTION '0562 V3 FAILED (3): with the dial at 0 the appointment book returned % and B holds % charger(s)', res_b, b_chg;
     END IF;
 
     -- (4) dial 0: the re-optimizer moves R to a free fast charger, as before
     ro0 := ottoq.ottoq_reoptimize_reservation_book(v_run, t);
     SELECT count(*) INTO r_fast0 FROM public.stalls WHERE reserved_by = rr AND stall_type::text = 'dcfc';
     IF COALESCE((ro0->>'swaps')::int, 0) < 1 OR r_fast0 <> 1 OR (ro0 ? 'yields_to_the_line') THEN
-      RAISE EXCEPTION '0559 V3 FAILED (4): with the dial at 0 the re-optimizer returned % and R holds % fast charger(s)', ro0, r_fast0;
+      RAISE EXCEPTION '0562 V3 FAILED (4): with the dial at 0 the re-optimizer returned % and R holds % fast charger(s)', ro0, r_fast0;
     END IF;
 
-    v_pass := format('0559 V3 PASSED on run %s: at dial 1 the appointment book gave A %s with %s fast charger(s) free, and '
+    v_pass := format('0562 V3 PASSED on run %s: at dial 1 the appointment book gave A %s with %s fast charger(s) free, and '
                      || 'the re-optimizer upgraded nothing (%s); at dial 0 the appointment book reserved B a %s and the '
                      || 're-optimizer moved R to a fast charger (%s)',
                      v_run, COALESCE(res_a->>'stall_type', 'nothing'), free_fast, ro1, res_b->>'stall_type', ro0);
     RAISE EXCEPTION '%', v_pass;
   EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM;
   END;
-  IF v_msg IS NULL OR v_msg NOT LIKE '0559 V3 PASSED%' THEN RAISE EXCEPTION '%', COALESCE(v_msg, '0559 V3: no verdict'); END IF;
+  IF v_msg IS NULL OR v_msg NOT LIKE '0562 V3 PASSED%' THEN RAISE EXCEPTION '%', COALESCE(v_msg, '0562 V3: no verdict'); END IF;
   RAISE NOTICE '%', v_msg;
 END $v3$;
 
--- Rollback: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0559_pre' as it is (the appointment book
+-- Rollback: EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0562_pre' as it is (the appointment book
 -- and the reservation re-optimizer as they were).
 
 COMMIT;
