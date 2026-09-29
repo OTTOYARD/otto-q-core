@@ -660,7 +660,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text),
     ('20260929014318'::text, 'every_charger_stall_is_angled_and_the_database_says_so'::text, '0561_every_charger_stall_is_angled_and_the_database_says_so.sql'::text),
     ('PENDING'::text, 'a_charger_is_not_held_for_a_car_still_on_its_way_back'::text, '0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql'::text),
-    ('20260929024700'::text, 'a_manual_start_interrupts_a_running_check'::text, '0564_a_manual_start_interrupts_a_running_check.sql'::text)
+    ('20260929024700'::text, 'a_manual_start_interrupts_a_running_check'::text, '0564_a_manual_start_interrupts_a_running_check.sql'::text),
+    ('PENDING'::text, 'each_charger_choice_says_what_it_chose_from'::text, '0590_each_charger_choice_says_what_it_chose_from.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
