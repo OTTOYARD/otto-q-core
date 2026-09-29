@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260929193249
 -- migration-name:    an_overnight_sweep_scores_one_test_day_at_a_time
 --
 -- 0568  **An overnight sweep that runs the twin's test days one at a time, scores each, and keeps the scores.**
