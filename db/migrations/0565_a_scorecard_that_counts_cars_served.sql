@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260929183923
 -- migration-name:    a_scorecard_that_counts_cars_served
 --
 -- 0565  **A scorecard that counts the cars a depot serves.** Lane A, phase 1. Chase, 2026-09-29: "I am very interested

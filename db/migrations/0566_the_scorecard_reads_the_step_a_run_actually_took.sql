@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260929184316
 -- migration-name:    the_scorecard_reads_the_step_a_run_actually_took
 --
 -- 0566  **The throughput scorecard reads the step a run actually took, and extrapolates no daily rate from a short run.**
