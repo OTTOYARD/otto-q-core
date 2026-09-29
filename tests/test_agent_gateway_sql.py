@@ -1,6 +1,6 @@
-"""db/migrations/0555 + 0556, EXECUTED against a stub engine -- the agent gateway's database half.
+"""db/migrations/0559 + 0560, EXECUTED against a stub engine -- the agent gateway's database half.
 
-WHY THIS EXISTS. scripts/compile-check.py stops at 0555's first precondition in an empty database (by design) and
+WHY THIS EXISTS. scripts/compile-check.py stops at 0559's first precondition in an empty database (by design) and
 compiles only DO blocks and plpgsql bodies whose types exist, so the tables, the grants, the dispatcher, the scoping,
 the routing and the guards would all reach the apply window unexecuted. 0364 made the same point and validated by
 hand; this makes it a test.
@@ -25,8 +25,8 @@ import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STUB = os.path.join(ROOT, "tests", "fixtures", "agent_gateway_stub_engine.sql")
-M0555 = os.path.join(ROOT, "db", "migrations", "0555_an_outside_agent_asks_through_one_door_and_a_person_decides.sql")
-M0556 = os.path.join(ROOT, "db", "migrations", "0556_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql")
+M0559 = os.path.join(ROOT, "db", "migrations", "0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql")
+M0560 = os.path.join(ROOT, "db", "migrations", "0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql")
 
 TWIN = "11111111-1111-1111-1111-111111111111"
 RUN = "5e5e5e5e-0000-0000-0000-000000000001"
@@ -129,10 +129,10 @@ def db():
     try:
         rc, err = d.file(STUB)
         assert rc == 0, f"stub engine did not load: {err}"
-        rc, err = d.file(M0555)
-        assert rc == 0, f"0555 did not apply: {err}"
-        rc, err = d.file(M0556)
-        assert rc == 0, f"0556 did not apply: {err}"
+        rc, err = d.file(M0559)
+        assert rc == 0, f"0559 did not apply: {err}"
+        rc, err = d.file(M0560)
+        assert rc == 0, f"0560 did not apply: {err}"
         yield d
     finally:
         subprocess.run(admin + ["-c", f"DROP DATABASE IF EXISTS {name} WITH (FORCE)"], capture_output=True)
@@ -155,24 +155,24 @@ def test_the_copied_doors_are_byte_identical_to_the_live_catalog(db):
 
 
 def test_a_second_apply_refuses_before_touching_anything(db):
-    rc, err = db.file(M0555)
-    assert rc != 0 and "0555 P2" in err, err
-    rc, err = db.file(M0556)
-    assert rc != 0 and "0556 P1" in err, err
+    rc, err = db.file(M0559)
+    assert rc != 0 and "0559 P2" in err, err
+    rc, err = db.file(M0560)
+    assert rc != 0 and "0560 P1" in err, err
 
 
 def test_the_verification_probe_left_nothing_behind(db):
-    # 0555 V7 issues a token, reads, writes a note, revokes, and rolls it all back. A fresh apply holds no rows.
+    # 0559 V7 issues a token, reads, writes a note, revokes, and rolls it all back. A fresh apply holds no rows.
     fresh = f"ottoq_agw_fresh_{uuid.uuid4().hex[:6]}"
     admin = ["psql", *_conn_args(), "-d", "postgres", "-q", "-v", "ON_ERROR_STOP=1"]
     subprocess.run(admin + ["-c", f"CREATE DATABASE {fresh}"], check=True, capture_output=True)
     try:
         f = Db(fresh)
-        assert f.file(STUB)[0] == 0 and f.file(M0555)[0] == 0
+        assert f.file(STUB)[0] == 0 and f.file(M0559)[0] == 0
         assert f.val("SELECT count(*) FROM ottoq_agent_principals") == "0"
         assert f.val("SELECT count(*) FROM ottoq_agent_requests") == "0"
         assert f.val("SELECT count(*) FROM ottoq_agent_call_ledger") == "0"
-        # 0555 alone does not open the operator read to anon; 0556 is the separate decision
+        # 0559 alone does not open the operator read to anon; 0560 is the separate decision
         assert f.val("SELECT has_function_privilege('anon', 'ottoq_agent_requests_for_operator(uuid,uuid,integer)', 'EXECUTE')") == "f"
     finally:
         subprocess.run(admin + ["-c", f"DROP DATABASE IF EXISTS {fresh} WITH (FORCE)"], capture_output=True)
@@ -186,7 +186,7 @@ def test_every_role_reaches_exactly_its_doors(db):
         "ottoq_agent_revoke(text,text,boolean)": ("f", "f", "t"),
         "ottoq_agent_inbox(uuid,boolean,integer)": ("f", "t", "t"),
         "ottoq_agent_request_decide(uuid,text,text)": ("f", "t", "t"),
-        "ottoq_agent_requests_for_operator(uuid,uuid,integer)": ("t", "t", "t"),  # anon by 0556
+        "ottoq_agent_requests_for_operator(uuid,uuid,integer)": ("t", "t", "t"),  # anon by 0560
         "ottoq_agent_submit_request(ottoq_agent_principals,text,jsonb)": ("f", "f", "f"),
         "ottoq_agent_read_fleet(ottoq_agent_principals,jsonb)": ("f", "f", "f"),
         "ottoq_agent_resolve(text)": ("f", "f", "f"),
@@ -466,7 +466,7 @@ def test_both_files_classify_themselves_for_the_recert_floor_and_the_dial_floor(
     A missing row, or a NULL in either column, restarts every canon streak or every dial experiment's pair count for a
     change that can move neither -- the class tests/test_migration_hygiene.py records five times. So both columns are
     asserted FALSE here, by the name each file writes, which must be its own stem."""
-    for path in (M0555, M0556):
+    for path in (M0559, M0560):
         stem = os.path.splitext(os.path.basename(path))[0]
         row = db.json(f"SELECT jsonb_build_object('recert', forces_recert, 'dial', forces_dial_restart) "
                       f"FROM ottoq_cert_lineage WHERE name = '{stem}'")
