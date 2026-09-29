@@ -1,5 +1,5 @@
 -- migration-version: 20260926040843
--- migration-name:    the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick
+-- migration-name:    0462_the_events_feed_printed_real_time_painted_passing_rules_critical_and_restated_every_tick
 --
 -- 0462  **The cockpit's Events feed printed real insert time beside a sim-time cockpit, painted passing rule checks
 --       as critical alerts, and was mostly the row-diff audit trail restated every tick.** FINDINGS G193.

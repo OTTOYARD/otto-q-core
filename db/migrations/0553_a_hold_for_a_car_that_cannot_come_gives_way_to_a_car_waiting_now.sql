@@ -1,5 +1,9 @@
--- migration-version: PENDING
--- migration-name:    a_hold_for_a_car_that_cannot_come_gives_way_to_a_car_waiting_now
+-- migration-version: 20260928184413
+-- migration-name:    a_hold_gives_way_and_a_car_is_in_a_bay_only_when_it_stands_in_one
+-- (applied 2026-09-28, 1:44 PM CT, together with 0554 in ONE transaction through apply_migration, which wrote one
+--  ledger row for the two files: this version and the joint name above. 0554 carries APPLIED-NO-LEDGER-ROW and points
+--  here. The ledger name has no ottoq_cert_lineage row of its own, so the recert floor reads it as forcing, which is
+--  what both files' own lineage rows, 0553_... and 0554_..., also say.)
 --
 -- 0553  **A bay held for a car that cannot come in time gives way to a car waiting for it now.** (G283; CLAUDE.md rule 9)
 --
@@ -484,3 +488,9 @@ END $v3$;
 --   two new functions are then called by nothing.
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- APPLIED 2026-09-28 to gxdrcyphqjzjsuhxuqtg, 1:44 PM CT (ledger 20260928184413), in one transaction with 0554.
+--   public.ottoq_decide_tick  9c5f7289e50a83c5a2e5ca65c6595a75 -> 2187f8565d4e8d33c646f8efb7316e2c
+--   ottoq.ottoq_bay_hold_car_eta and ottoq.ottoq_yield_bay_holds created. V1 and V3 passed: the transaction commits
+--   only if both do. ottoq_cert_recert_floor() moved to 2026-09-28 18:44:13.338283+00; the sweep restarted.
