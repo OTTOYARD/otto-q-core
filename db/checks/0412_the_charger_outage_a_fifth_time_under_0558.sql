@@ -17,8 +17,12 @@
 --       (00:35 UTC, 7:35 PM CT) I set the run-scoped dial `vehicle_fault_rate_per_eligible_vehicle_hour` to 0.004 through
 --       `ottoq_policy_set('run', ..., 'research_wing_stress_0412')` (its catalog row names a higher rate a legitimate stress
 --       setting) and recorded it on the run's payload (`stress_vehicle_fault_rate_0412`). It is read at this run's scope
---       only: no other run, dial arm or canon column sees it. About three faults are expected over the remaining eight
---       sim-hours. Each adds a repair to the two service bays, so §7, §15 and §26 read a heavier service-bay load than
+--       only: no other run, dial arm or canon column sees it. I expected about three faults over the remaining eight
+--       sim-hours, counting every car at the depot; but the handler rolls only for a car charging, in a bay, holding after
+--       its charge or staged (`twin.ottoq_sim_vehicle_exception_handler`), not for the ~30 waiting at the gate, and by sim
+--       8:38 AM none had faulted (44 cars eligible at that moment). At sim 8:38:29 AM (00:59 UTC, 7:59 PM CT) I raised it
+--       to 0.01 the same way, recorded under the same payload key (`raised`): about two faults expected over the rest of
+--       the run. Each adds a repair to the two service bays, so §7, §15 and §26 read a heavier service-bay load than
 --       0411's, and §1's scorecard differs from 0411's on that account too.
 --
 --       **What it tests.** The finding 0411 left open, against the fix written for it:

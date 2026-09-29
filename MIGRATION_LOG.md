@@ -120,7 +120,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0558 — GENERATED, not a log
+## Index, 0134–0559 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450 — which are indexed below as well as logged above; the log row is
@@ -566,7 +566,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0557](db/migrations/0557_a_faulted_car_is_repaired_before_it_charges.sql) | `20260928220015` | yes — ledger | **A car with an open vehicle fault is repaired before it charges.** (G291; CLAUDE.md rule 9) |
 | [0557](db/migrations/0557_every_charger_stall_is_angled_and_the_database_says_so.sql) | `PENDING` | no — pending | **Every charger stall at the twin depot is angled 60° to its gap lane, and public.stalls now says so.** 40 |
 | [0558](db/migrations/0558_a_faulted_cars_repair_goes_first_in_its_plan.sql) | `20260928235524` | yes — ledger | **A faulted car's repair goes first in its plan, and no charger is held for it before the repair.** (G292; |
+| [0559](db/migrations/0559_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql) | `PENDING` | no — pending | **A charger is not held for a car still on its way back when the run leaves the charge to the line.** (G293, |
 
-427 migrations indexed.
+428 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
