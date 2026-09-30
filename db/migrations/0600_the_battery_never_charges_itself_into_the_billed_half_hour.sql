@@ -137,7 +137,7 @@ DECLARE
   a4 text := E'    ''ratchet_kw'', round(v_ratchet, 1), ''forecast_peak_kw'', round(v_lmax, 1), ''level_energy_bound'', v_level_bound,\n';
 BEGIN
   v_def := replace(v_def, a1, a1
-    || E'  v_ratchet_sample numeric; v_n30 int; v_sum30 numeric; v_cap30 numeric;                        /* 0600 */\n'
+    || E'  v_ratchet_sample numeric; v_n30 int; v_sum30 numeric; v_cap30 numeric; v_bill_from timestamptz;   /* 0600 */\n'
     || E'  v_need numeric; v_fill numeric; v_kdl int; v_flo numeric; v_fhi numeric; v_fmid numeric; v_fe numeric; v_hfk numeric;\n');
   v_def := replace(v_def, a2, a2
     || E'  /* 0600 (G310): the billed peak so far is the highest COMPLETED 30-minute average of this run''s grid draw this\n'
@@ -145,17 +145,17 @@ BEGIN
     || E'     as the highest single SAMPLE. On the smoke arm (88e46ad3) the sample was 2,415.1 kW when the billed half hour was\n'
     || E'     1,960.8, and the plan treated the difference as already paid for. */\n'
     || E'  v_ratchet_sample := v_ratchet;\n'
+    || E'  v_bill_from := GREATEST(date_trunc(''month'', p_sim_clock),\n'
+    || E'                  COALESCE((SELECT r.sim_clock_start FROM ottoq_sim_runs r WHERE r.sim_run_id = p_sim_run_id),\n'
+    || E'                           ''-infinity''::timestamptz)\n'
+    || E'                  + make_interval(mins => GREATEST(0, ottoq_policy_get(p_sim_run_id, ''bess_plan_bill_from_min'', 0))::int));\n'
     || E'  SELECT COALESCE(max(w.g30), 0) INTO v_ratchet\n'
     || E'    FROM (SELECT e.timestamp AS t,\n'
     || E'                 avg(GREATEST(COALESCE(e.grid_import_kw, 0), 0))\n'
     || E'                   OVER (ORDER BY e.timestamp RANGE BETWEEN CURRENT ROW AND interval ''29 minutes 59 seconds'' FOLLOWING) AS g30\n'
     || E'            FROM site_energy_snapshots e\n'
     || E'           WHERE e.depot_id = p_depot_id AND e.sim_run_id = p_sim_run_id\n'
-    || E'             AND e.timestamp >= GREATEST(date_trunc(''month'', p_sim_clock),\n'
-    || E'                   COALESCE((SELECT r.sim_clock_start FROM ottoq_sim_runs r WHERE r.sim_run_id = p_sim_run_id),\n'
-    || E'                            ''-infinity''::timestamptz)\n'
-    || E'                   + make_interval(mins => GREATEST(0, ottoq_policy_get(p_sim_run_id, ''bess_plan_bill_from_min'', 0))::int))\n'
-    || E'             AND e.timestamp < p_sim_clock) w\n'
+    || E'             AND e.timestamp >= v_bill_from AND e.timestamp < p_sim_clock) w\n'
     || E'   WHERE w.t + interval ''30 minutes'' <= p_sim_clock;\n');
   v_def := replace(v_def, a3, a3
     || E'    /* 0600 (G310): a reserve short of its DR target refills in the lowest-load half hours before the DR window\n'
@@ -207,7 +207,7 @@ DECLARE
 BEGIN
   SELECT prosrc INTO v_src FROM pg_proc
    WHERE oid = 'public.ottoq_bess_day_plan(uuid,uuid,timestamp with time zone,numeric)'::regprocedure;
-  FOREACH v_m IN ARRAY ARRAY['v_ratchet_sample := v_ratchet;', 'v_fill := v_fhi;',
+  FOREACH v_m IN ARRAY ARRAY['v_ratchet_sample := v_ratchet;', 'v_bill_from := GREATEST(', 'v_fill := v_fhi;',
                              'v_charge := LEAST(v_charge, GREATEST(0, v_cap30 * (v_n30 + 1) - v_sum30 - v_net[1]));',
                              '''half_hour_cap_kw'', round(v_cap30, 1),'] LOOP
     n := (length(v_src) - length(replace(v_src, v_m, ''))) / length(v_m);

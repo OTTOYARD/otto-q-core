@@ -15,8 +15,8 @@
 --   tasks" for that car on every run, and refuses its task start.
 --
 --   Measured on the twin depot's surviving runs (2026-09-30): HW.005 refused that one car on every tick of the smoke arm
---   (88e46ad3, 23 of 24 ticks) and of night 1's arm 3 (85a5d396, dcfc10.otto_q: 143 of 144, ticks 2-144), and in ten more
---   OTTO-Q runs since 2026-09-29. On arm 3 the car sat at 24% from 6:05 AM to 6 PM CT, its deploy gate escalated at 240
+--   (88e46ad3, 23 of 24 ticks) and of night 1's arm 3 (85a5d396, dcfc10.otto_q: 143 of 144, ticks 2-144): 332 refusals in
+--   all, always this one car, across the 13 twin runs whose evaluations survive (from 2026-09-29 00:46 UTC). On arm 3 the car sat at 24% from 6:05 AM to 6 PM CT, its deploy gate escalated at 240
 --   minutes ("a person must look ... not released", rule 9 held), and it never plugged in. On the same seed, night 1's
 --   fifo arm (d038fb17) and greedy arm (1edc847e), whose seats reach charging by another path, plugged it in at 11:10 UTC
 --   and took it to 100%. So every OTTO-Q arm carries one stranded car that its baselines do not: arm 3's 720-minute
@@ -27,7 +27,9 @@
 --   The four rows, pinned by id, go from `in_progress` to `cancelled`, with a note naming this migration. The table's own
 --   trigger records a `task.state_changed` event for each; the transaction's run context is set to none first (0421's
 --   idiom), so no running run is handed the evidence. HW.005 itself is unchanged: a real second active task is still
---   refused. Whether HW.005 should read a table the running engine no longer writes is a rule question left open (G313).
+--   refused. Every other reader of the table was read for what a cancellation could do (2026-09-30): SLA.004's legacy
+--   path and ottoq_cleaning_due count only `completed` rows, SLA.007 joins exceptions to tasks without reading the task's
+--   status, and the attribution trigger and SDR coverage key on task ids. None can refuse or release anything new. Whether HW.005 should read a table the running engine no longer writes is a rule question left open (G313).
 --
 -- ══ §3 CHECKS ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --

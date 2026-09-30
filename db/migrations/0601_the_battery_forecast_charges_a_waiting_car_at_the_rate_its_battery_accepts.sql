@@ -33,16 +33,21 @@
 --       its battery would take more than 0.60 x the inlet keeps 0444's figure. On an L2 charger the rate stays the L2
 --       charger's own. Nothing else in the forecast moves, and `ottoq_ev_queue_schedule` is untouched.
 --
---   The rate function is the one 0573 calibrates; after 0573 this reads the calibrated curve with no change here.
+--   The rate function is the one 0573 calibrates; after 0573 this reads the calibrated curve with no change here. That
+--   matters for the size of the effect, not its direction: on the curve the twin runs tonight a car at 90% averages
+--   8-15% of its maximum to 100%, which is what arm 3 measured; on 0573's measured tails a Model Y averages about 0.4
+--   kW per usable kWh from 90% and the median curve about 0.5, so the phantom shrinks with 0573 and this keeps the
+--   forecast on whichever curve the twin charges by. Executed against both curves in the tests.
 --
 -- ══ §3 CHECKS ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   P0: nothing in flight. P1: ottoq_forecast_ev_queue_kw is 0444's function unchanged (prosrc md5
 --   ff2cfc482ce702e664b24ed514435569), its job query line occurs exactly once, the helper does not exist, not yet applied.
 --   The forecast goes to `ottoq_schema_snapshots` as '0601_pre'.
---   V1: the new forecast passes the helper once, on the job query. V2: every twin car charging to 100 is
---   forecast at 90% at a quarter
---   of 0444's rate for that car or less, and an unknown car is left as 0444 had it.
+--   V1: the new forecast passes the helper once, on the job query. V2, written to hold on whatever charge curve the twin
+--   runs when this is applied (0573 recalibrates it, and goes first): every twin car charging to 100 is forecast at 90%
+--   at exactly the twin's own harmonic-mean rate, never above 0444's rate for that car, and at least one strictly below;
+--   an unknown car is left as 0444 had it.
 --   Executed against the live source by tests/test_bess_half_hour_sql.py (tests/fixtures/bess_half_hour_stub.sql).
 --
 -- ══ §4 RECERT AND DIAL CLASSIFICATION ═════════════════════════════════════════════════════════════════════════════════
@@ -159,26 +164,48 @@ BEGIN
   END IF;
 END $v1$;
 
--- ── V2: a car at 90% is forecast at a quarter of 0444's rate or less; an unknown car is left alone ──
+-- ── V2: the forecast rate is the twin's own, and it never rises ──
+-- Checked against whatever charge curve the twin runs when this is applied (0573 recalibrates it and goes first), so the
+-- assertions are the design's invariants, not tonight's numbers: (a) an unknown car is left as 0444 had it; (b) for every
+-- twin car charging to 100, the rate the scheduler will charge at 90% is the harmonic mean of the twin's own rate function
+-- at 91.25/93.75/96.25/98.75% on a 250 kW charger, computed here independently, to the watt; (c) that rate is never above
+-- 0444's 0.60 x LEAST(inlet, 250); (d) at least one of them is strictly below it, or this file changed nothing.
 DO $v2$
 DECLARE
-  r record;
   v_bad text;
+  v_lower int;
 BEGIN
   IF public.ottoq_queue_job_inlet_kw('f0000000-0601-0601-0601-000000000001', 90) IS NOT NULL THEN
     RAISE EXCEPTION '0601 V2: an unknown car was given a rate';
   END IF;
-  -- every twin car charging to 100: its forecast rate at 90% against 0444's 0.60 x LEAST(inlet, 250) for the same car
-  SELECT string_agg(x.id::text || ' ' || round(x.new_kw, 1) || '/' || round(x.old_kw, 1), ', ') INTO v_bad
-    FROM (SELECT v.id, LEAST(COALESCE(v.inlet_max_kw, 150), 250) * 0.60 AS old_kw,
-                 CASE WHEN e.inl <= 30 THEN e.inl ELSE e.inl * 0.60 END AS new_kw
-            FROM public.vehicles v
-            CROSS JOIN LATERAL (SELECT public.ottoq_queue_job_inlet_kw(v.id, 90) AS inl) e
-           WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111' AND COALESCE(v.target_soc, 100) = 100
-             AND COALESCE(v.inlet_max_kw, 150) > 50 AND e.inl IS NOT NULL) x
-   WHERE x.new_kw > x.old_kw / 4;
+  WITH c AS (
+    SELECT v.id, LEAST(COALESCE(v.inlet_max_kw, 150), 250) * 0.60 AS old_kw,
+           public.ottoq_queue_job_inlet_kw(v.id, 90) AS enc,
+           4.0 / (SELECT sum(1.0 / public.ottoq_sim_compute_charge_rate(
+                      -- the helper's own expression: the rate function salts its noise with the SoC's text
+                      p_soc_pct := 90 + (g - 0.5) * (COALESCE(v.target_soc, public.ottoq_default_target_soc()) - 90) / 4.0,
+                      p_battery_temp_c := 27, p_ambient_temp_c := 22,
+                      p_charger_max_kw := 250, p_vehicle_max_kw := COALESCE(v.inlet_max_kw, 150),
+                      p_battery_capacity_kwh := COALESCE(v.battery_capacity_kwh, 75), p_battery_soh_pct := 95,
+                      p_noise_seed := 1, p_noise_salt := v.id::text))
+                    FROM generate_series(1, 4) g) AS want_kw
+      FROM public.vehicles v
+     WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111' AND COALESCE(v.target_soc, 100) = 100
+       AND COALESCE(v.inlet_max_kw, 150) > 50
+  ), d AS (
+    SELECT c.*, CASE WHEN c.enc <= 30 THEN c.enc ELSE c.enc * 0.60 END AS new_kw FROM c WHERE c.enc IS NOT NULL
+  )
+  SELECT string_agg(d.id::text || ' ' || round(d.new_kw, 3) || '/' || round(d.want_kw, 3) || '/' || round(d.old_kw, 1), ', '),
+         (SELECT count(*) FROM d WHERE d.new_kw < d.old_kw - 0.001)
+    INTO v_bad, v_lower
+    FROM d
+   WHERE abs(d.new_kw - d.want_kw) > 0.001 OR d.new_kw > d.old_kw + 0.001;
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0601 V2: cars at 90%% forecast above a quarter of 0444''s rate (new/old kW): %', v_bad;
+    RAISE EXCEPTION '0601 V2: forecast rates at 90%% off the twin''s own or above 0444''s (new/twin/0444 kW): %', v_bad;
+  END IF;
+  IF COALESCE(v_lower, 0) = 0 AND EXISTS (SELECT 1 FROM public.vehicles
+                                           WHERE home_depot_id = '11111111-1111-1111-1111-111111111111') THEN
+    RAISE EXCEPTION '0601 V2: no twin car at 90%% is forecast below 0444''s rate; this file changed nothing';
   END IF;
 END $v2$;
 

@@ -678,7 +678,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_battery_never_charges_itself_into_the_billed_half_hour'::text, '0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql'::text),
     ('PENDING'::text, 'the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts'::text, '0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql'::text),
     ('PENDING'::text, 'the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes'::text, '0602_the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes.sql'::text),
-    ('PENDING'::text, 'a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day'::text, '0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql'::text)
+    ('PENDING'::text, 'a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day'::text, '0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql'::text),
+    ('PENDING'::text, 'every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them'::text, '0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

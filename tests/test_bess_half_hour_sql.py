@@ -32,6 +32,7 @@ STUB = os.path.join(ROOT, "tests", "fixtures", "bess_half_hour_stub.sql")
 M0600 = os.path.join(ROOT, "db", "migrations", "0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql")
 M0601 = os.path.join(ROOT, "db", "migrations",
                      "0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql")
+M0573 = os.path.join(ROOT, "db", "migrations", "0573_every_charge_and_service_takes_the_time_public_data_says.sql")
 DEPOT = "11111111-1111-1111-1111-111111111111"
 RUN = "88e46ad3-8ed5-4609-892a-38298e19dfca"
 PLAN_MD5 = "8f136624ad07b64a3ef3022b3bab0753"
@@ -351,6 +352,35 @@ def test_after_0601_a_forecast_rate_never_rises(db):
     assert db.val("SELECT public.ottoq_queue_job_inlet_kw(gen_random_uuid(), 50) IS NULL") == "t"
     assert _md5(db, "public.ottoq_ev_queue_schedule(numeric[],numeric[],numeric[],numeric[],numeric[],numeric,integer)") \
         == "bb2a1dce2e7d984bb8707dea1873d137"
+
+
+def _rate_function_from_0573():
+    """0573's calibrated charge-rate function, exactly as 0573 creates it (Lane A applies 0573 before 0601)."""
+    src = open(M0573).read()
+    a = src.index("CREATE OR REPLACE FUNCTION public.ottoq_sim_compute_charge_rate(")
+    b = src.index("$function$;", src.index("AS $function$", a) + 13) + len("$function$;")
+    return src[a:b]
+
+
+def test_0601_holds_on_0573s_calibrated_curves_too(db):
+    # the twin's cars with 0573's vehicle facts, near full, on 0573's measured curves
+    db.val(_rate_function_from_0573())
+    db.val(FLEET)
+    facts = {"ipace": (84.7, 104), "mody": (75, 250), "zoox": (133, 200)}
+    for i in range(1, 31):
+        cls = ("ipace", "zoox", "mody")[i % 3]
+        kwh, kw = facts[cls]
+        db.val(f"INSERT INTO public.vehicles VALUES ('b0000000-0000-0000-0000-{i:012d}', '{DEPOT}', "
+               f"'staged_awaiting_service', {86 + (i % 12)}, 100, {kwh}, {kw})")
+    before = _queue(db)
+    rc, err = db.file(M0601)                                    # its V2 asserts the invariants on this curve
+    assert rc == 0, err
+    after = _queue(db)
+    assert after["load"][0] < before["load"][0] and abs(sum(before["load"]) - sum(after["load"])) < 1
+    # a calibrated I-PACE at 90% takes about 16 kW of the 62.4 0444 forecast; a median-curve car far more than 15
+    ipace = float(db.val("SELECT public.ottoq_queue_job_inlet_kw('b0000000-0000-0000-0000-000000000003', 90)"))
+    zoox = float(db.val("SELECT public.ottoq_queue_job_inlet_kw('b0000000-0000-0000-0000-000000000001', 90)"))
+    assert 10 < ipace <= 30 < zoox * 0.60 < 0.60 * 200
 
 
 def test_0601_refuses_in_flight_twice_and_rolls_back(db):
