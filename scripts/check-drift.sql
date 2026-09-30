@@ -676,7 +676,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'a_test_days_opening_surge_is_not_the_depots_peak'::text, '0577_a_test_days_opening_surge_is_not_the_depots_peak.sql'::text),
     ('20260929192241'::text, 'each_charger_choice_says_what_it_chose_from'::text, '0590_each_charger_choice_says_what_it_chose_from.sql'::text),
     ('PENDING'::text, 'the_battery_never_charges_itself_into_the_billed_half_hour'::text, '0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql'::text),
-    ('PENDING'::text, 'the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts'::text, '0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql'::text)
+    ('PENDING'::text, 'the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts'::text, '0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql'::text),
+    ('PENDING'::text, 'the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes'::text, '0602_the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
