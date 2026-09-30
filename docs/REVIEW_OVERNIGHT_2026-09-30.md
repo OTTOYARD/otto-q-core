@@ -27,7 +27,8 @@ summer). Three things went wrong on the smoke day:
 - When it needed to refill its afternoon reserve, it did so at once, at 6 AM, into the busiest half hours of the
   morning.
 - Its forecast saw a phantom peak in the next half hour on every tick. It assumed every waiting car would draw
-  60% of a fast charger's nameplate power, even cars at 90% that take about 15 kW.
+  60% of a fast charger's nameplate power, even cars at 90% that take about 15 kW on the twin's current charge curve.
+  Lane A's calibration (0573) raises that figure. 0601 follows whichever curve is live.
 
 **Fixes: 0600 and 0601.**
 
@@ -35,7 +36,7 @@ summer). Three things went wrong on the smoke day:
 nothing has used since. The safety shield counts them, concludes the car is "busy with two tasks", and refuses every
 job it is offered. That Zoox sat at 24% for the whole twelve-hour test day on night 1's first OTTO-Q arm. On the
 second (20 fast chargers) it waited 8 h 45 min before it first plugged in. Under the FIFO and greedy baselines, which
-reach charging another way, the same car charged to 100% within ten minutes. So every OTTO-Q arm tonight carries one
+reach charging another way, the same car plugged in within ten minutes of the start and charged to 100%. So every OTTO-Q arm tonight carries one
 stranded car that its baselines don't. That skews night 1's comparison against OTTO-Q, and whoever reads it should
 know. **Fix: 0603.**
 
@@ -72,7 +73,8 @@ scored on it.
 
 **What checked out:**
 
-- Rule 9 held on every night-1 arm: no car left below target or with needed work open.
+- Rule 9 held on all five night-1 arms completed by 1 AM CT: 668 departures, none below target, none with needed work
+  open, and no charge unknown at departure.
 - The fast-charger pointer leak (G121) is not present in the committed world tonight.
 - CP-SAT's high "zero proposals" rate is mostly the depot having nothing free to assign, not a solver fault.
 
@@ -109,6 +111,7 @@ tests now re-anchor the dated sweeps to `now()` and still assert the authored da
 - **0603** changes OTTO-Q's seat on every test day (the car charges). It is TRUE/TRUE for that reason.
 - **0602** is FALSE/FALSE (no function changes, and no accepted or refused row changes, which V2 executes). Applying
   it in the same window keeps things simple.
+- **0604** is FALSE/FALSE: a new read-only function with no caller.
 
 ---
 
@@ -121,7 +124,7 @@ tests now re-anchor the dated sweeps to `now()` and still assert the authored da
 `ottoq_ev_queue_schedule`. The site-energy step writes `billing_period_peak_kw`. The orchestrator defends the plan's
 level against the actual net load and publishes the plan as the site's forward schedule (0442).
 
-**Tested.** `tests/test_bess_half_hour_sql.py` has 13 tests. They run against the live plan, evaluator, forecast,
+**Tested.** `tests/test_bess_half_hour_sql.py` has 14 tests. They run against the live plan, evaluator, forecast,
 scheduler and rate function, each carried byte for byte (md5-asserted), on the smoke arm's own samples. Before 0600,
 the stub reproduces the live 118.1 kW refill at 11:25 UTC exactly.
 
@@ -194,7 +197,7 @@ design an L2-to-fast upgrade. Rule 9 is untouched by both: faster charging to th
 
 **Validated.** On night 1 arm 3, the only rule that refused anything was `HW.005` (143 refusals), and every one was
 the stranded Zoox (G313). The SLA rules at `redeployment` (SLA.001, 004, 007) evaluated 166–462 times with zero
-failures. `safety_critical_unprevented` = 0 on all three arms.
+failures. `safety_critical_unprevented` = 0 on arms 3, 4 and 5 (the seed's three dcfc10 seats).
 
 **New finding (G313).** A critical, enforced rule was reading a table the engine stopped writing in June, with no run
 scope. This is the "a wiring count is not a protection count" lesson from CLAUDE.md 2.5 in a new form: the rule was
@@ -202,8 +205,9 @@ wired and enforced, and its input was dead.
 
 ### Visits, needs, atoms, and the rule-9 departure test
 
-**Validated.** `scorecard.rule9` on all three night-1 arms shows `left_below_target` 0, `left_with_needed_work_open`
-0 and `charge_unknown_at_departure` 0. That covers 118, 102 and 141 departures on the otto_q, fifo and greedy seats.
+**Validated.** `scorecard.rule9` on all five night-1 arms completed by 1 AM CT shows `left_below_target` 0,
+`left_with_needed_work_open` 0 and `charge_unknown_at_departure` 0. That covers 118, 102, 141, 159 and 148 departures
+(dcfc10 otto_q, fifo, greedy; dcfc20 otto_q, fifo).
 The stranded Zoox was held, not released (its deploy gate escalated at 240 minutes). Rule 9 did its job even when the
 shield misfired.
 
@@ -237,8 +241,9 @@ fault and safety triggers are never timed. It is not built tonight.
 - `vehicles` held 226 rows in 6,422 pages at 05:09 UTC, 6,938 at 05:24, and 8,074 at 05:59 with arm 7 nineteen
   minutes in. That is about 5,700 more versions of 226 rows inside one open transaction. See G314 for the mechanism
   and the structural fix.
-- The same cell, early and late: the smoke arm (dcfc20.otto_q, `88e46ad3`) averaged 2.9 s a tick over its first 24
-  ticks, and night 1's arm 6 (dcfc20.otto_q, `9cbe9eae`) averaged 9.3 s a tick over 144 (1,339.4 s).
+- The same cell, early and late, on two seeds: the smoke arm (dcfc20.otto_q, `88e46ad3`, seed 481151490073635577)
+  averaged 2.9 s a tick over its 24 ticks, and night 1's arm 6 (dcfc20.otto_q, `9cbe9eae`, seed 686364201590009433)
+  averaged 9.3 s a tick over 144 (1,339.4 s).
 
 **The structural fix for G314, as a design for Lane A** (0568's arm is one plpgsql function: the world lock is an
 advisory *transaction* lock, each tick is a subtransaction, and 0567's build-out guard is a deferred constraint trigger
@@ -304,7 +309,7 @@ That is enough to fit night 2's 24 value arms in the window. The first run after
 
 ## Evidence: the queries behind each number
 
-All read-only, run 2026-09-30 between 04:56 and 06:00 UTC, filtered by run or by the twin depot
+All read-only, run 2026-09-30 between 04:56 and 06:25 UTC (11:56 PM–1:25 AM CT), filtered by run or by the twin depot
 (`11111111-1111-1111-1111-111111111111`).
 
 - **G310.** Energy commands for the smoke arm:
@@ -359,7 +364,11 @@ All read-only, run 2026-09-30 between 04:56 and 06:00 UTC, filtered by run or by
    WHERE sim_run_id = '85a5d396-…'
    GROUP BY 1;
   ```
-  Plus `pg_relation_size('public.vehicles')`, sampled at 05:09 and 05:24 UTC with an arm active.
+  Plus `pg_relation_size('public.vehicles')`, sampled at 05:09, 05:24 and 05:59 UTC with an arm active.
+  `pg_stat_user_tables.n_tup_upd` / `n_tup_hot_upd` for `vehicles` sampled at 05:47 and 06:07 UTC, differenced across
+  arm 7's commit, against `count(*)` of its `vehicle.state_changed` events. The census counted
+  `update\s+(public\.)?vehicles\s` matches in comment-stripped `prosrc` over `public`, `twin` and `ottoq`, with
+  `IF (NOT) FOUND` / `GET DIAGNOSTICS … = ROW_COUNT` per function.
 - **G315.** 0604's function body, run read-only with the parameters inlined, on `85a5d396`, `d038fb17` and
   `1edc847e`. Enacted `stall_assignment` decisions of `85a5d396` grouped by
   `proposed_action->>'stall_type'`, `(rationale->>'soc') >= 80`, `l2_engine` and `rationale->>'wanted_type'`. The
