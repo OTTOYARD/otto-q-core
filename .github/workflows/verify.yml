@@ -213,6 +213,55 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_energy_price_sql.py
 
+      # 0600/0601: the battery's day plan bills the completed half hour, refills its reserve in the valleys and never lifts
+      # its own half hour over the cap; the queue forecast charges a waiting car at the rate its battery takes. Against the
+      # live plan, evaluator, forecast and scheduler carried byte for byte, on the smoke arm's own samples.
+      - name: Battery half hour, executed (0600, 0601 against the live day plan and queue forecast)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_bess_half_hour_sql.py
+
+      # 0602: the calendar sheds the exclusion constraint its strongest one subsumes. Every overlap v2 refused is still
+      # refused, by v3; v1's own region still by v1; the refusals and the header's rollback.
+      - name: Calendar exclusion, executed (0602 against the live calendar's constraints)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_calendar_exclusion_sql.py
+
+      # 0603: two scheduler tasks orphaned in June stop stranding a car on every OTTO-Q test day. HW.005 passes the car
+      # it refused and still refuses a real second task; the change is filed under no run; refusals and rollback.
+      - name: Legacy task repair, executed (0603 against the live HW.005 evaluator)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_legacy_task_sql.py
+
+      # 0604: a read-only measure of whether a run's fast chargers went to the cars that needed them; its arithmetic on
+      # sessions worked by hand, rule 8's depot predicate, the refusals and the rollback.
+      - name: Charger fit profile, executed (0604)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_charger_fit_profile_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
