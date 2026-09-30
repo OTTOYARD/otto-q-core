@@ -150,7 +150,14 @@ CREATE FUNCTION public.ottoq_dial_arm_metrics(p_run uuid, p_depot uuid, p_soc0 n
     'unmet_demand_car_hours', CASE seat WHEN 0 THEN 20 WHEN 1 THEN 24 ELSE 26 END - 3 * batch_order,
     'unmet_demand_pct', 3.5,
     'site_cost_usd_per_day', CASE WHEN seat = 0 THEN 431.50 ELSE 420.25 END + CASE WHEN energy = 0 THEN 150 ELSE 0 END,
-    'peak_site_kw', 900 + CASE WHEN energy = 0 THEN 400 ELSE 0 END)
+    'peak_site_kw', 900 + CASE WHEN energy = 0 THEN 400 ELSE 0 END,
+    -- the energy terms 0576 bills (a 24-hour day): the planner off buys 1,000 kWh more and peaks 500 kW higher
+    'grid_import_kwh', 20000 + CASE WHEN energy = 0 THEN 1000 ELSE 0 END,
+    'energy_cost_usd', 1400 + CASE WHEN energy = 0 THEN 200 ELSE 0 END,
+    'terminal_soc_usd', 0, 'bess_degradation_usd', CASE WHEN energy = 0 THEN 0 ELSE 10 END,
+    'peak_30min_kw', 1000 + CASE WHEN energy = 0 THEN 500 ELSE 0 END,
+    'demand_charge_usd_month', 21400 + CASE WHEN energy = 0 THEN 10700 ELSE 0 END,
+    'charge_wait_p50_min', CASE WHEN seat = 0 THEN 12 ELSE 18 END)
     FROM (SELECT public.ottoq_policy_get(p_run, 'proposer_seat', 0) AS seat,
                  public.ottoq_policy_get(p_run, 'charge_batch_order', 0) AS batch_order,
                  public.ottoq_policy_get(p_run, 'energy_orchestration_enabled', 1) AS energy) z
