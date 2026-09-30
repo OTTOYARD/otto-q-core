@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930115452
 -- migration-name:    night_two_measures_what_a_customer_is_paying_for
 --
 -- 0575  **Night 2 measures the three things a customer is paying for, on the calibrated twin.** One overnight sweep of
