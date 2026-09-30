@@ -44,6 +44,7 @@ M0572 = os.path.join(MIG, "0572_a_fleet_build_out_borrows_cars_for_one_test_day.
 M0575 = os.path.join(MIG, "0575_night_two_measures_what_a_customer_is_paying_for.sql")
 M0576 = os.path.join(MIG, "0576_the_value_tab_reads_what_night_two_measured.sql")
 M0577 = os.path.join(MIG, "0577_a_test_days_opening_surge_is_not_the_depots_peak.sql")
+M0578 = os.path.join(MIG, "0578_a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id.sql")
 VALUE_STUB = os.path.join(FIX, "value_summary_stub.sql")
 PEAK_STUB = os.path.join(FIX, "peak_profile_stub.sql")
 VALUE = "value_2026_09_30"
@@ -180,6 +181,12 @@ def test_the_first_sweep_is_defined_and_the_runner_waits_for_its_window(db):
 def test_the_smoke_arm_runs_first_and_night_one_waits_for_its_window():
     d = _make_db("tsws", release=False)
     try:
+        # the definition: night 1 is due at 11 PM CT on Sep 29
+        assert d.val(f"SELECT run_after FROM public.ottoq_throughput_sweeps WHERE sweep_code = '{SWEEP}'").startswith(
+            "2026-09-30 04:00:00")
+        # the behaviour, on any date: every night not yet due waits (night 1's own date has passed since it was written)
+        d.val("""UPDATE public.ottoq_throughput_sweeps SET run_after = now() + interval '1 day'
+                  WHERE sweep_code <> 'smoke_2026_09_29'""")
         d.val(OPEN)
         res = d.json(RUN)
         assert res["ran"] is True and res["arm"]["sweep"] == "smoke_2026_09_29" and res["arm"]["cell"] == "dcfc20.otto_q"
@@ -190,8 +197,6 @@ def test_the_smoke_arm_runs_first_and_night_one_waits_for_its_window():
         st = d.json("SELECT jsonb_object_agg(sweep_code, status) FROM public.ottoq_throughput_sweeps")
         assert st == {"smoke_2026_09_29": "concluded", SWEEP: "active", NIGHT2: "active",    # nights 1-3 not yet due
                       F150: "active", F200: "active"}
-        assert d.val(f"SELECT run_after FROM public.ottoq_throughput_sweeps WHERE sweep_code = '{SWEEP}'").startswith(
-            "2026-09-30 04:00:00")
     finally:
         _drop(d)
 
@@ -771,15 +776,16 @@ def test_the_value_sweep_waits_for_the_calibration_and_is_what_it_says():
                              FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
                             WHERE s.sweep_code = '{VALUE}'""")
         on, off = {"deploy_peak_fraction": 0.90}, {"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}
+        # the headline first (db/checks/0413 §7): OTTO-Q and the plain depot at 10 and 20 chargers, then the split cells
         assert cells == [
             [1, "dcfc10.otto_q", "otto_q", "dcfc10", on, "dcfc10.otto_q.energy_off"],
-            [2, "dcfc10.otto_q.energy_off", "otto_q", "dcfc10", off, None],
-            [3, "dcfc10.fifo", "fifo", "dcfc10", on, "dcfc10.fifo.energy_off"],
-            [4, "dcfc10.fifo.energy_off", "fifo", "dcfc10", off, None],
-            [5, "dcfc20.otto_q", "otto_q", "dcfc20", on, "dcfc20.otto_q.energy_off"],
-            [6, "dcfc20.otto_q.energy_off", "otto_q", "dcfc20", off, None],
-            [7, "dcfc20.fifo", "fifo", "dcfc20", on, "dcfc20.fifo.energy_off"],
-            [8, "dcfc20.fifo.energy_off", "fifo", "dcfc20", off, None]]
+            [2, "dcfc10.fifo.energy_off", "fifo", "dcfc10", off, None],
+            [3, "dcfc20.otto_q", "otto_q", "dcfc20", on, "dcfc20.otto_q.energy_off"],
+            [4, "dcfc20.fifo.energy_off", "fifo", "dcfc20", off, None],
+            [5, "dcfc10.otto_q.energy_off", "otto_q", "dcfc10", off, None],
+            [6, "dcfc10.fifo", "fifo", "dcfc10", on, "dcfc10.fifo.energy_off"],
+            [7, "dcfc20.otto_q.energy_off", "otto_q", "dcfc20", off, None],
+            [8, "dcfc20.fifo", "fifo", "dcfc20", on, "dcfc20.fifo.energy_off"]]
         n1 = d.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{SWEEP}'")
         v = d.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{VALUE}'")
         assert v["seeds"] == n1["seeds"][:3] and v["ticks"] == 288 and float(v["sim_min_per_tick"]) == 5
@@ -808,8 +814,8 @@ def test_the_value_sweep_runs_first_and_its_comparisons_line_up():
                           FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
                           JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id""")
         assert [r[0] for r in ran] == [VALUE] * 8
-        assert [r[1] for r in ran] == ["dcfc10.otto_q", "dcfc10.otto_q.energy_off", "dcfc10.fifo", "dcfc10.fifo.energy_off",
-                                       "dcfc20.otto_q", "dcfc20.otto_q.energy_off", "dcfc20.fifo", "dcfc20.fifo.energy_off"]
+        assert [r[1] for r in ran] == ["dcfc10.otto_q", "dcfc10.fifo.energy_off", "dcfc20.otto_q", "dcfc20.fifo.energy_off",
+                                       "dcfc10.otto_q.energy_off", "dcfc10.fifo", "dcfc20.otto_q.energy_off", "dcfc20.fifo"]
         # the energy comparison under each seat: planner on minus off, the same world
         con = d.json(f"""SELECT jsonb_agg(jsonb_build_array(treatment_cell, control_cell, world_identical, site_cost_usd_delta)
                                           ORDER BY treatment_cell)
@@ -966,8 +972,9 @@ def test_the_peak_after_the_opening_is_the_scorers_own_arithmetic():
         # the night-1 arm that ran before 0577 (planner on, 144 ticks): 1,100 kW in the opening half hour, then 800
         run = d.val("SELECT sim_run_id FROM public.ottoq_throughput_sweep_arms ORDER BY arm_id LIMIT 1")
         p = d.json(f"SELECT public.ottoq_arm_peak_profile('{run}', '{TWIN}')")
-        assert p["offsets_min"] == [0, 30, 60, 90, 120]
-        assert p["peak_30min_kw"] == {"0": 1100.0, "30": 850.0, "60": 800.0, "90": 800.0, "120": 800.0}
+        assert p["offsets_min"] == [0, 30, 60, 90, 120, 180, 240]
+        assert p["peak_30min_kw"] == {"0": 1100.0, "30": 850.0, "60": 800.0, "90": 800.0, "120": 800.0, "180": 800.0,
+                                      "240": 800.0}
         assert p["starts_min"]["0"] == 5 and p["starts_min"]["60"] == 60
         # NES summer: $21.40 a kW for the first 1,000, $21.78 above: 1,100 kW is $23,578 and 800 kW is $17,120
         assert p["demand_charge_usd_month"]["0"] == 23578.0 and p["demand_charge_usd_month"]["60"] == 17120.0
@@ -983,6 +990,7 @@ def test_the_peak_after_the_opening_is_the_scorers_own_arithmetic():
             assert po["peak_30min_kw"]["0"] == peak and po["demand_charge_usd_month"]["0"] == demand, cell
             if cell.endswith("energy_off"):   # the opening is the day's peak; the evening's returns are the peak after it
                 assert (peak, po["peak_30min_kw"]["60"], po["starts_min"]["60"]) == (1900.0, 1400.0, 845), cell
+                assert (po["peak_30min_kw"]["180"], po["starts_min"]["180"]) == (1400.0, 845), cell
             else:                              # the planner shaved both
                 assert (peak, po["peak_30min_kw"]["60"]) == (1100.0, 1000.0), cell
         rc, err = d.file(M0577)
@@ -998,7 +1006,7 @@ def test_the_value_tab_bills_the_peak_after_the_opening_and_says_so():
         assert rc == 0, err
         _value_arms(d)
         j = d.json("SELECT public.ottoq_value_summary(NULL)")
-        assert j["status"] == "measured" and j["sweep"]["peak_read_from_min"] == 60
+        assert j["status"] == "measured" and j["sweep"]["peak_read_from_min"] == 180
         v = j["views"][0]
         q, p = v["otto_q"], v["plain"]
         assert (q["peak_kw"], q["peak_kw_incl_opening"], p["peak_kw"], p["peak_kw_incl_opening"]) == (1000, 1100, 1400, 1900)
@@ -1008,7 +1016,7 @@ def test_the_value_tab_bills_the_peak_after_the_opening_and_says_so():
         assert (q["demand_charge_usd_month"], p["demand_charge_usd_month"]) == (21400, 30112)
         vs = v["vs_plain"]
         assert vs["peak_cut_kw"]["mid"] == 400 and vs["power_bill_saved_usd_month"]["mid"] == 12922
-        assert any("read from 60 minutes into each test day" in n for n in j["notes"])
+        assert any("read from 3 hours into each test day" in n for n in j["notes"])
         # one arm without the profile, and every arm goes back to its full-day peak: one basis, never a mix
         d.val("ALTER TABLE public.ottoq_throughput_sweep_arms DISABLE TRIGGER trg_ottoq_throughput_sweep_arms_append_only")
         d.val("""UPDATE public.ottoq_throughput_sweep_arms SET arm_metrics = arm_metrics - 'peak_after_open'
@@ -1048,3 +1056,53 @@ def test_0577_refuses_what_it_cannot_do_safely():
         assert d.val("SELECT count(*) FROM public.ottoq_cert_lineage WHERE name LIKE '0577%'") == "0"
     finally:
         _drop(d)
+
+
+# ── 0578: a replicate is judged on what it did, not on its own run id ─────────────────────────────────────────────────
+
+RUN_IN_ATOMS = """ALTER TABLE public.ottoq_throughput_sweep_arms DISABLE TRIGGER trg_ottoq_throughput_sweep_arms_append_only;
+                  UPDATE public.ottoq_throughput_sweep_arms SET atoms = atoms || jsonb_build_object('run', sim_run_id)
+                   WHERE atoms IS NOT NULL AND NOT atoms ? 'run';
+                  ALTER TABLE public.ottoq_throughput_sweep_arms ENABLE TRIGGER trg_ottoq_throughput_sweep_arms_append_only;"""
+
+
+def test_a_replicate_and_a_twin_are_judged_without_their_own_run_id(fresh):
+    d = fresh
+    d.val(OPEN)
+    for _ in range(7):                      # night 1, seed 1: all six cells, then the replicate
+        d.json(RUN)
+    _release_night2(d)
+    for _ in range(4):                      # night 2, seed 1: its four cells
+        d.json(RUN)
+    # the live ottoq_ab_arm_atoms carries run, the arm's own sim_run_id; the stub's does not (db/checks/0413 §5)
+    d.val(RUN_IN_ATOMS)
+    rep = "SELECT jsonb_agg(jsonb_build_array(cell_code, identical, moved)) FROM public.ottoq_throughput_sweep_replicates"
+    twins = """SELECT jsonb_agg(jsonb_build_array(earlier_cell, identical, moved) ORDER BY earlier_cell)
+                 FROM public.ottoq_throughput_cross_sweep_twins"""
+    assert d.json(rep) == [["dcfc10.otto_q", False, ["run"]]]                    # G301: it can never pass
+    assert d.json(twins) == [["dcfc10.otto_q", False, ["run"]], ["dcfc20.otto_q", False, ["run"]]]
+    rc, err = d.file(M0578)
+    assert rc == 0, f"0578 did not apply: {err}"
+    assert "1 current replicate(s), 1 identical" in err
+    assert d.json(rep) == [["dcfc10.otto_q", True, []]]
+    assert d.json(twins) == [["dcfc10.otto_q", True, []], ["dcfc20.otto_q", True, []]]
+    # an atom that really moved is still caught, and named
+    d.val("""ALTER TABLE public.ottoq_throughput_sweep_arms DISABLE TRIGGER trg_ottoq_throughput_sweep_arms_append_only;
+             UPDATE public.ottoq_throughput_sweep_arms SET atoms = atoms || '{"h_evt": "moved"}'
+              WHERE arm_id = (SELECT max(arm_id) FROM public.ottoq_throughput_sweep_arms WHERE replicate);""")
+    assert d.json(rep) == [["dcfc10.otto_q", False, ["h_evt"]]]
+    assert d.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
+                    WHERE name = '0578_a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id'""") == "false/false"
+    assert d.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0578_pre'") == "2"
+    rc, err = d.file(M0578)
+    assert rc != 0 and "0578 P2" in err
+
+
+def test_0578_waits_for_0572():
+    d = _make_db("tsw78", fleet=False)
+    try:
+        rc, err = d.file(M0578)
+        assert rc != 0 and "0578 P1" in err
+    finally:
+        _drop(d)
+

@@ -25,12 +25,12 @@
 --
 --   `public.ottoq_arm_peak_profile(run, depot)`, read-only, computes the 30-minute peak and its monthly demand charge the
 --   way `ottoq_dial_arm_metrics` does: the same samples, the same forward 30-minute window and the same tariff row. It
---   does so over the windows that start at least 0, 30, 60, 90 and 120 minutes into the day, and gives the minute each
+--   does so over the windows that start at least 0, 30, 60, 90, 120, 180 and 240 minutes into the day, and gives the minute each
 --   peak window starts. At 0 it is the scorer's own figure, which V1 proves on a live run.
 --   `ottoq_throughput_sweep_arm` merges it into each arm's `arm_metrics` as `peak_after_open`. It is read before the
 --   teardown, like everything else the runner scores. The scorer the dial lab uses is untouched, and every existing key
 --   keeps its value.
---   0576 reads it. When every arm carries it, the Value tab bills peak demand from an hour in and says so. The full-day
+--   0576 reads it. When every arm carries it, the Value tab bills peak demand from three hours in and says so. The full-day
 --   figure stays on every arm and beside every peak the tab shows.
 --
 -- ══ §3 CHECKS ═════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -47,7 +47,11 @@
 --   the whole day, and 1,524.9, 1,414.9, 1,367.5 and 1,254.3 kW from 30, 60, 90 and 120 minutes in: $30,435.80 a month
 --   from an hour in. The 24-hour day (c8fe7bda) reads 901.7 kW ($19,296.38) at every offset, its peak at 8 PM. The demo
 --   run 1ebae97a reads 624.2 kW ($13,357.30) through 60 minutes, its peak 63 minutes in.
---   The hour 0576 bills from is a reading of the smoke arm, to be confirmed on night 1's arms before this is applied.
+--   Confirmed on night 1 (db/checks/0413 §4), and it lasts longer than an hour. On all 20 arms the profile equals the
+--   scorer at 0, and the opening set the whole day's peak. The load it left kept falling for about three hours: the
+--   highest half hour after the cut still sat right at the cut on 13 of 19 primary arms at 60 minutes, 9 at 90, 7 at 120,
+--   4 at 180 and 3 at 240. The mean peak was 1,017 kW from 60 minutes and 849 kW from 180. So 0576 bills from 180
+--   minutes, and this reads to 240.
 --
 -- ══ §4 RECERT AND DIAL CLASSIFICATION ═════════════════════════════════════════════════════════════════════════════════
 --
@@ -119,7 +123,7 @@ CREATE FUNCTION public.ottoq_arm_peak_profile(p_run uuid, p_depot uuid)
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
 /* 0577: the sweep scorer's 30-minute peak and monthly demand charge (ottoq_dial_arm_metrics, 0439: the same samples,
-   forward window and tariff row), over the windows that start at least 0, 30, 60, 90 and 120 minutes after the run's
+   forward window and tariff row), over the windows that start at least 0, 30, 60, 90, 120, 180 and 240 minutes after the run's
    sim_clock_start, and the minute each peak window starts. Read-only. At 0 it equals the scorer (0577 V1). */
 WITH r AS (
   SELECT x.sim_clock_start AS t0,
@@ -137,7 +141,7 @@ WITH r AS (
    ORDER BY t.effective_from DESC LIMIT 1
 ), o AS (
   SELECT m.k, (SELECT max(w.g30) FROM w, r WHERE w.t >= r.t0 + make_interval(mins => m.k)) AS peak
-    FROM unnest(ARRAY[0, 30, 60, 90, 120]) AS m(k)
+    FROM unnest(ARRAY[0, 30, 60, 90, 120, 180, 240]) AS m(k)
 ), o2 AS (
   SELECT o.k, o.peak,
          (SELECT round(EXTRACT(EPOCH FROM min(w.t - r.t0)) / 60.0)::int FROM w, r
@@ -156,7 +160,7 @@ SELECT jsonb_build_object(
 $fn$;
 
 COMMENT ON FUNCTION public.ottoq_arm_peak_profile(uuid, uuid) IS
-'0577. A test day opens with every parked car plugging in at once, which a depot running around the clock never does. The sweep scorer''s 30-minute peak and monthly demand charge, computed its way, over the windows starting at least 0, 30, 60, 90 and 120 minutes into the day, with the minute each peak window starts. At 0 it is the scorer''s own figure.';
+'0577. A test day opens with every parked car plugging in at once, which a depot running around the clock never does. The sweep scorer''s 30-minute peak and monthly demand charge, computed its way, over the windows starting at least 0, 30, 60, 90, 120, 180 and 240 minutes into the day, with the minute each peak window starts. At 0 it is the scorer''s own figure.';
 REVOKE ALL ON FUNCTION public.ottoq_arm_peak_profile(uuid, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.ottoq_arm_peak_profile(uuid, uuid) TO authenticated, service_role;
 
@@ -210,11 +214,15 @@ END $v1$;
 DO $v2$
 DECLARE
   p jsonb := public.ottoq_arm_peak_profile(current_setting('ottoq.m0577_run')::uuid, '11111111-1111-1111-1111-111111111111');
-  k int;
+  v_offsets int[] := ARRAY(SELECT jsonb_array_elements_text(p -> 'offsets_min')::int);
+  i int;
 BEGIN
-  FOREACH k IN ARRAY ARRAY[30, 60, 90, 120] LOOP
-    IF (p #>> ARRAY['peak_30min_kw', k::text])::numeric > (p #>> ARRAY['peak_30min_kw', (k - 30)::text])::numeric THEN
-      RAISE EXCEPTION '0577 V2: the peak from % minutes is above the peak from %: %', k, k - 30, p;
+  IF v_offsets IS DISTINCT FROM ARRAY[0, 30, 60, 90, 120, 180, 240] THEN
+    RAISE EXCEPTION '0577 V2: the offsets are %', v_offsets;
+  END IF;
+  FOR i IN 2 .. cardinality(v_offsets) LOOP
+    IF (p #>> ARRAY['peak_30min_kw', v_offsets[i]::text])::numeric > (p #>> ARRAY['peak_30min_kw', v_offsets[i - 1]::text])::numeric THEN
+      RAISE EXCEPTION '0577 V2: the peak from % minutes is above the peak from %: %', v_offsets[i], v_offsets[i - 1], p;
     END IF;
   END LOOP;
 END $v2$;
@@ -237,9 +245,10 @@ END $v3$;
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0577_a_test_days_opening_surge_is_not_the_depots_peak', false, false,
   'Lane A value. ottoq_arm_peak_profile: the sweep scorer''s 30-minute peak and demand charge over the windows starting '
-  'at least 0/30/60/90/120 minutes into a test day, kept on each sweep arm as arm_metrics.peak_after_open. A test day opens '
-  'with every parked car plugging in at once (the smoke arm: 1,635 kW in the first half hour, then 980, 687); the Value '
-  'tab (0576) bills the peak from an hour in. Harness and reading only; no existing score moves.', now())
+  'at least 0/30/60/90/120/180/240 minutes into a test day, kept on each sweep arm as arm_metrics.peak_after_open. A test day '
+  'opens with every parked car plugging in at once, and on night 1 that opening set the day''s peak on 20 of 20 arms with a tail '
+  'of about three hours (db/checks/0413); the Value tab (0576) bills the peak from 180 minutes. Harness and reading only; no '
+  'existing score moves.', now())
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;

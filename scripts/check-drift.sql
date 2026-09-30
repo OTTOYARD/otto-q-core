@@ -674,6 +674,7 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'night_two_measures_what_a_customer_is_paying_for'::text, '0575_night_two_measures_what_a_customer_is_paying_for.sql'::text),
     ('PENDING'::text, 'the_value_tab_reads_what_night_two_measured'::text, '0576_the_value_tab_reads_what_night_two_measured.sql'::text),
     ('PENDING'::text, 'a_test_days_opening_surge_is_not_the_depots_peak'::text, '0577_a_test_days_opening_surge_is_not_the_depots_peak.sql'::text),
+    ('PENDING'::text, 'a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id'::text, '0578_a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id.sql'::text),
     ('20260929192241'::text, 'each_charger_choice_says_what_it_chose_from'::text, '0590_each_charger_choice_says_what_it_chose_from.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),

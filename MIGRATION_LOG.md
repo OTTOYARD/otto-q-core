@@ -589,8 +589,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0575](db/migrations/0575_night_two_measures_what_a_customer_is_paying_for.sql) | `PENDING` | no — pending | **Night 2 measures the three things a customer is paying for, on the calibrated twin.** One overnight sweep of |
 | [0576](db/migrations/0576_the_value_tab_reads_what_night_two_measured.sql) | `PENDING` | no — pending | **The twin's Value tab reads what night 2 measured, and nothing else.** One read-only contract, |
 | [0577](db/migrations/0577_a_test_days_opening_surge_is_not_the_depots_peak.sql) | `PENDING` | no — pending | **A test day opens with every parked car plugging in at once, which a depot that runs around the clock never |
+| [0578](db/migrations/0578_a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id.sql) | `PENDING` | no — pending | **A replicate, or the same cell on another night, is judged on what it did, not on its own run id.** Lane A, |
 | [0590](db/migrations/0590_each_charger_choice_says_what_it_chose_from.sql) | `20260929192241` | yes — ledger | **Each charger choice says what it had to choose from.** One read-only cockpit contract, |
 
-443 migrations indexed.
+444 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

@@ -45,9 +45,10 @@
 --   Only current evidence counts: primary arms that completed, paid the shield and ran at or after the dial floor.
 --   A night measured before an engine change that restarts the floor (0573, 0574) is not mixed in.
 --
---   Peak demand, and so the demand charge, is read from an hour into each test day when every arm carries 0577's
+--   Peak demand, and so the demand charge, is read from three hours into each test day when every arm carries 0577's
 --   `peak_after_open`. A test day opens with every car the seed parks at the depot plugging in at once, which a depot
---   running around the clock never does; on the smoke arm that opening was the day's peak (G300). Each block also keeps
+--   running around the clock never does. On night 1 that opening set the day's peak on 20 of 20 arms, and its tail
+--   lasted about three hours (G300, db/checks/0413 §4). Each block also keeps
 --   the full-day peak (`peak_kw_incl_opening`), `sweep.peak_read_from_min` says which was billed, and the notes say it in
 --   words. If any arm lacks the profile, every arm is billed on its full-day peak: one basis per answer, never a mix.
 --
@@ -140,8 +141,9 @@ CREATE FUNCTION public.ottoq_value_summary(p_sweep_code text DEFAULT NULL)
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
 DECLARE
-  -- 0577: the demand charge is read from this many minutes into each test day, past the opening plug-in
-  c_open_min CONSTANT int := 60;
+  -- 0577: the demand charge is read from this many minutes into each test day, past the opening plug-in. Night 1
+  -- (db/checks/0413 §4): the opening's tail kept the next peak at the cut on 13 of 19 days at 60 minutes, 4 of 19 at 180.
+  c_open_min CONSTANT int := 180;
   sw        public.ottoq_throughput_sweeps%ROWTYPE;
   v_floor   timestamptz := public.ottoq_dial_pair_floor();
   v_depot   uuid;
@@ -394,8 +396,9 @@ BEGIN
     'notes', v_notes || CASE
       WHEN NOT EXISTS (SELECT 1 FROM arm) THEN '[]'::jsonb
       WHEN (SELECT ok FROM opn) THEN jsonb_build_array(format(
-        'Peak demand is read from %s minutes into each test day. A test day starts with every car already parked at the depot plugging in at once, which a depot running around the clock never does. The full-day peak is shown beside it.',
-        c_open_min))
+        'Peak demand is read from %s into each test day. A test day starts with every car already parked at the depot plugging in at once, which a depot running around the clock never does, and it takes about three hours to clear. The full-day peak is shown beside it.',
+        CASE WHEN c_open_min % 60 = 0 THEN (c_open_min / 60)::text || CASE WHEN c_open_min = 60 THEN ' hour' ELSE ' hours' END
+             ELSE c_open_min::text || ' minutes' END))
       ELSE jsonb_build_array('Peak demand counts the whole test day, including its first minutes, when every car already parked at the depot plugs in at once.') END)
     INTO v_result;
   RETURN v_result;
