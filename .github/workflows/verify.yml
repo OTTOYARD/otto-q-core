@@ -168,7 +168,7 @@ jobs:
       # 0568: the overnight sweep runs only in its window, between runs and after certification; seed by seed and cell
       # by cell, never repeating an arm since the dial floor; build-out applied before the door and restored after the
       # teardown; an engine error recorded with its arm, a failed arm recorded and not retried; the arms are evidence.
-      - name: Throughput sweep, margin ledger, dial contrasts and fleet build-outs, executed (0568, 0569, 0571, 0572 against a stub engine)
+      - name: Throughput sweep, margin ledger, dial contrasts, fleet build-outs and night 2's value sweep, executed (0568, 0569, 0571, 0572, 0575 against a stub engine)
         env:
           PGHOST: localhost
           PGPORT: "5432"

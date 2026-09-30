@@ -39,6 +39,8 @@ M0568 = os.path.join(MIG, "0568_an_overnight_sweep_scores_one_test_day_at_a_time
 M0569 = os.path.join(MIG, "0569_a_margin_ledger_prices_what_the_twin_measured.sql")
 M0571 = os.path.join(MIG, "0571_a_sweep_measures_a_dial_against_its_own_control.sql")
 M0572 = os.path.join(MIG, "0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql")
+M0575 = os.path.join(MIG, "0575_night_two_measures_what_a_customer_is_paying_for.sql")
+VALUE = "value_2026_09_30"
 NIGHT2 = "charge_order_2026_09_30"
 F150, F200 = "fleet150_2026_10_01", "fleet200_2026_10_01"
 LENDER = "22222222-2222-2222-2222-222222222222"
@@ -741,3 +743,80 @@ def test_the_same_cell_at_two_fleet_sizes_is_not_a_twin(fresh):
     d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{F150}'")
     assert d.json(RUN)["arm"]["cell"] == "dcfc20.otto_q"     # night 3 at 150 cars, seed 1: the same cell definition
     assert d.val("SELECT count(*) FROM public.ottoq_throughput_cross_sweep_twins") == "0"
+
+
+# ── 0575: night 2 measures what a customer is paying for, on the calibrated twin ─────────────────────────────────────────
+
+CALIBRATED = """INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at) VALUES
+  ('0573_every_charge_and_service_takes_the_time_public_data_says', true, true, 'stub', now()),
+  ('0574_the_twin_prices_power_at_nashvilles_published_rate', true, true, 'stub', now())"""
+
+
+def test_the_value_sweep_waits_for_the_calibration_and_is_what_it_says():
+    d = _make_db("tswv")
+    try:
+        rc, err = d.file(M0575)
+        assert rc != 0 and "0575 P1" in err and "calibrated" in err
+        d.val(CALIBRATED)
+        rc, err = d.file(M0575)
+        assert rc == 0, f"0575 did not apply: {err}"
+        cells = d.json(f"""SELECT jsonb_agg(jsonb_build_array(c.ord, c.cell_code, c.seat, c.buildout_code, c.fixed_params,
+                                                               c.control_cell_code) ORDER BY c.ord)
+                             FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+                            WHERE s.sweep_code = '{VALUE}'""")
+        on, off = {"deploy_peak_fraction": 0.90}, {"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}
+        assert cells == [
+            [1, "dcfc10.otto_q", "otto_q", "dcfc10", on, "dcfc10.otto_q.energy_off"],
+            [2, "dcfc10.otto_q.energy_off", "otto_q", "dcfc10", off, None],
+            [3, "dcfc10.fifo", "fifo", "dcfc10", on, "dcfc10.fifo.energy_off"],
+            [4, "dcfc10.fifo.energy_off", "fifo", "dcfc10", off, None],
+            [5, "dcfc20.otto_q", "otto_q", "dcfc20", on, "dcfc20.otto_q.energy_off"],
+            [6, "dcfc20.otto_q.energy_off", "otto_q", "dcfc20", off, None],
+            [7, "dcfc20.fifo", "fifo", "dcfc20", on, "dcfc20.fifo.energy_off"],
+            [8, "dcfc20.fifo.energy_off", "fifo", "dcfc20", off, None]]
+        n1 = d.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{SWEEP}'")
+        v = d.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{VALUE}'")
+        assert v["seeds"] == n1["seeds"][:3] and v["ticks"] == 288 and float(v["sim_min_per_tick"]) == 5
+        assert v["priority"] == 50 and v["replicates"] == 0 and v["run_after"].startswith("2026-10-01T04:00:00")
+        assert d.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
+                        WHERE name = '0575_night_two_measures_what_a_customer_is_paying_for'""") == "false/false"
+        rc, err = d.file(M0575)
+        assert rc != 0 and "0575 P2" in err
+    finally:
+        _drop(d)
+
+
+def test_the_value_sweep_runs_first_and_its_comparisons_line_up():
+    d = _make_db("tswr")
+    try:
+        d.val(CALIBRATED)
+        rc, err = d.file(M0575)
+        assert rc == 0, f"0575 did not apply: {err}"
+        # night 1 still has work and night 2's charge-order sweep is due too: the value sweep (priority 50) goes first
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code IN ('{VALUE}', '{NIGHT2}')")
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code = '{SWEEP}'")
+        d.val(OPEN)
+        for _ in range(8):                  # seed 1, all eight cells
+            assert d.json(RUN)["ran"] is True
+        ran = d.json("""SELECT jsonb_agg(jsonb_build_array(s.sweep_code, c.cell_code) ORDER BY a.arm_id)
+                          FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+                          JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id""")
+        assert [r[0] for r in ran] == [VALUE] * 8
+        assert [r[1] for r in ran] == ["dcfc10.otto_q", "dcfc10.otto_q.energy_off", "dcfc10.fifo", "dcfc10.fifo.energy_off",
+                                       "dcfc20.otto_q", "dcfc20.otto_q.energy_off", "dcfc20.fifo", "dcfc20.fifo.energy_off"]
+        # the energy comparison under each seat: planner on minus off, the same world
+        con = d.json(f"""SELECT jsonb_agg(jsonb_build_array(treatment_cell, control_cell, world_identical, site_cost_usd_delta)
+                                          ORDER BY treatment_cell)
+                           FROM public.ottoq_throughput_sweep_contrasts WHERE sweep_code = '{VALUE}'""")
+        assert [c[:3] for c in con] == [["dcfc10.fifo", "dcfc10.fifo.energy_off", True],
+                                        ["dcfc10.otto_q", "dcfc10.otto_q.energy_off", True],
+                                        ["dcfc20.fifo", "dcfc20.fifo.energy_off", True],
+                                        ["dcfc20.otto_q", "dcfc20.otto_q.energy_off", True]]
+        assert all(float(c[3]) == -150 for c in con)
+        # the seat comparison under each energy setting
+        pairs = d.json(f"""SELECT jsonb_agg(jsonb_build_array(buildout_code, fixed_params, baseline, world_identical)
+                                            ORDER BY buildout_code, fixed_params::text)
+                             FROM public.ottoq_throughput_sweep_pairs WHERE sweep_code = '{VALUE}'""")
+        assert len(pairs) == 4 and all(p[2] == "fifo" and p[3] is True for p in pairs)
+    finally:
+        _drop(d)

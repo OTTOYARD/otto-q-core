@@ -585,8 +585,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0572](db/migrations/0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql) | `PENDING` | no — pending | **A fleet build-out borrows cars for one test day, so the twin depot can be measured at 150 and 200 cars.** |
 | [0573](db/migrations/0573_every_charge_and_service_takes_the_time_public_data_says.sql) | `PENDING` | no — pending | **Every charge and service in the twin takes the time public data says it takes.** Lane A calibration |
 | [0574](db/migrations/0574_the_twin_prices_power_at_nashvilles_published_rate.sql) | `PENDING` | no — pending | **The twin depot's price of power is Nashville's published time-of-use rate, not an unsourced table.** Lane A |
+| [0575](db/migrations/0575_night_two_measures_what_a_customer_is_paying_for.sql) | `PENDING` | no — pending | **Night 2 measures the three things a customer is paying for, on the calibrated twin.** One overnight sweep of |
 | [0590](db/migrations/0590_each_charger_choice_says_what_it_chose_from.sql) | `PENDING` | no — pending | **Each charger choice says what it had to choose from.** One read-only cockpit contract, |
 
-440 migrations indexed.
+441 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
