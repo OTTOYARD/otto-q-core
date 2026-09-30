@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930115650
 -- migration-name:    the_value_tab_reads_what_night_two_measured
 --
 -- 0576  **The twin's Value tab reads what night 2 measured, and nothing else.** One read-only contract,
