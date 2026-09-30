@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930114616
 -- migration-name:    a_fleet_build_out_borrows_cars_for_one_test_day
 --
 -- 0572  **A fleet build-out borrows cars for one test day, so the twin depot can be measured at 150 and 200 cars.**
