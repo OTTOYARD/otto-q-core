@@ -34,6 +34,8 @@ CREATE TABLE public.ottoq_depot_tariffs (
   season text, season_months int[], demand_first_block_usd_kw numeric, effective_from date NOT NULL DEFAULT '2024-10-01');
 CREATE TABLE public.ottoq_tariff_windows (depot_id uuid NOT NULL, active boolean NOT NULL DEFAULT true, season text,
   rate_usd_per_kwh numeric);
+CREATE TABLE public.ottoq_policy_param_catalog (param_key text PRIMARY KEY, min_value numeric, max_value numeric,
+  default_value numeric, agent_writable boolean NOT NULL DEFAULT false, affects text, description text);
 CREATE TABLE public.ottoq_policy_params (scope_type text NOT NULL, scope_id uuid NOT NULL, param_key text NOT NULL,
   param_value numeric NOT NULL, PRIMARY KEY (scope_type, scope_id, param_key));
 

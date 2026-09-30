@@ -75,6 +75,7 @@
 --
 -- ROLLBACK: DO $$ BEGIN EXECUTE (SELECT definition FROM public.ottoq_schema_snapshots WHERE label = '0600_pre'
 --                                  AND object_name = 'ottoq_bess_day_plan' ORDER BY snapshot_id DESC LIMIT 1); END $$;
+--   DELETE FROM public.ottoq_policy_param_catalog WHERE param_key = 'bess_plan_bill_from_min';
 --   DELETE FROM public.ottoq_cert_lineage WHERE name = '0600_the_battery_never_charges_itself_into_the_billed_half_hour'.
 
 BEGIN;
@@ -102,6 +103,9 @@ BEGIN
   IF md5(v_src) IS DISTINCT FROM '8f136624ad07b64a3ef3022b3bab0753' THEN
     RAISE EXCEPTION '0600 P1: ottoq_bess_day_plan is not the function measured on 2026-09-30 (md5 %)', md5(v_src);
   END IF;
+  IF EXISTS (SELECT 1 FROM public.ottoq_policy_param_catalog WHERE param_key = 'bess_plan_bill_from_min') THEN
+    RAISE EXCEPTION '0600 P1: bess_plan_bill_from_min is already catalogued';
+  END IF;
   FOREACH v_a IN ARRAY ARRAY[
       E'  v_charge numeric := 0; v_head numeric; v_surplus numeric; v_why_charge text := NULL;\n',
       E'  v_ev_persist := COALESCE(v_ev_persist, v_ev_now);\n',
@@ -117,6 +121,12 @@ INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, obje
 SELECT '0600_pre', 'function', 'public', 'ottoq_bess_day_plan',
        pg_get_functiondef('public.ottoq_bess_day_plan(uuid,uuid,timestamp with time zone,numeric)'::regprocedure),
        md5(pg_get_functiondef('public.ottoq_bess_day_plan(uuid,uuid,timestamp with time zone,numeric)'::regprocedure));
+
+INSERT INTO public.ottoq_policy_param_catalog (param_key, min_value, max_value, default_value, agent_writable, affects, description)
+VALUES ('bess_plan_bill_from_min', 0, 240, 0, false, 'ottoq_bess_day_plan',
+  '0600 (G310, research wing): the battery day plan bills completed 30-minute windows starting this many minutes after '
+  'the run''s sim_clock_start. 0 (the default) = the NES bill: every window. A test day that bills from an hour in '
+  '(0576/0577) sets 60 run-scoped so its plan and its bill agree. Never set by the engine.');
 
 DO $splice$
 DECLARE
@@ -141,7 +151,11 @@ BEGIN
     || E'                   OVER (ORDER BY e.timestamp RANGE BETWEEN CURRENT ROW AND interval ''29 minutes 59 seconds'' FOLLOWING) AS g30\n'
     || E'            FROM site_energy_snapshots e\n'
     || E'           WHERE e.depot_id = p_depot_id AND e.sim_run_id = p_sim_run_id\n'
-    || E'             AND e.timestamp >= date_trunc(''month'', p_sim_clock) AND e.timestamp < p_sim_clock) w\n'
+    || E'             AND e.timestamp >= GREATEST(date_trunc(''month'', p_sim_clock),\n'
+    || E'                   COALESCE((SELECT r.sim_clock_start FROM ottoq_sim_runs r WHERE r.sim_run_id = p_sim_run_id),\n'
+    || E'                            ''-infinity''::timestamptz)\n'
+    || E'                   + make_interval(mins => GREATEST(0, ottoq_policy_get(p_sim_run_id, ''bess_plan_bill_from_min'', 0))::int))\n'
+    || E'             AND e.timestamp < p_sim_clock) w\n'
     || E'   WHERE w.t + interval ''30 minutes'' <= p_sim_clock;\n');
   v_def := replace(v_def, a3, a3
     || E'    /* 0600 (G310): a reserve short of its DR target refills in the lowest-load half hours before the DR window\n'
@@ -227,7 +241,9 @@ BEGIN
                    OVER (ORDER BY e.timestamp RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS g30
             FROM public.site_energy_snapshots e
            WHERE e.sim_run_id = v_run AND e.depot_id = '11111111-1111-1111-1111-111111111111'
-             AND e.timestamp >= date_trunc('month', v_clock) AND e.timestamp < v_clock) w
+             AND e.timestamp >= GREATEST(date_trunc('month', v_clock), COALESCE(v_t0, '-infinity'::timestamptz)
+                   + make_interval(mins => GREATEST(0, public.ottoq_policy_get(v_run, 'bess_plan_bill_from_min', 0))::int))
+             AND e.timestamp < v_clock) w
    WHERE w.t + interval '30 minutes' <= v_clock;
   p := public.ottoq_bess_day_plan(v_run, '11111111-1111-1111-1111-111111111111', v_clock, NULL);
   IF NOT COALESCE((p ->> 'ok')::boolean, false) THEN

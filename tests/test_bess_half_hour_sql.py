@@ -175,6 +175,18 @@ def test_after_0600_the_billed_peak_is_the_completed_half_hour(db):
     assert p["ratchet_kw"] == 1960.8 and p["ratchet_sample_kw"] == 2415.1
 
 
+def test_a_test_day_that_bills_from_an_hour_in_can_plan_that_way(db):
+    rc, err = db.file(M0600)
+    assert rc == 0, err
+    assert db.val("SELECT default_value FROM public.ottoq_policy_param_catalog WHERE param_key = 'bess_plan_bill_from_min'") \
+        == "0"
+    db.val(f"INSERT INTO public.ottoq_policy_params VALUES ('run', '{RUN}', 'bess_plan_bill_from_min', 30)")
+    # windows from 11:30: 11:30-12:00 (1,567.5 kW) and 11:35-12:05 (1,539.9) have closed by 12:05; the opening has not
+    assert _plan(db, "2026-09-01 12:05+00", 700)["ratchet_kw"] == 1567.5
+    db.val(f"UPDATE public.ottoq_policy_params SET param_value = 60 WHERE scope_id = '{RUN}'")
+    assert _plan(db, "2026-09-01 12:05+00", 700)["ratchet_kw"] == 0
+
+
 def test_after_0600_the_refill_waits_for_the_valley_and_still_fits(db):
     rc, err = db.file(M0600)
     assert rc == 0, err
@@ -218,6 +230,7 @@ def test_after_0600_no_grid_charge_lifts_its_half_hour_over_the_cap(db):
 def _quiet_site(d, soc):
     """A quiet night: the battery above its reserve, 100 kW of load, no forecast load."""
     d.val(f"""UPDATE public.ottoq_bess_units SET current_soc_pct = {soc};
+              UPDATE public.ottoq_sim_runs SET sim_clock_start = '2026-09-01 05:00+00';
               DELETE FROM public.stub_known_kw;
               DELETE FROM public.site_energy_snapshots;
               INSERT INTO public.site_energy_snapshots (depot_id, sim_run_id, "timestamp", grid_import_kw, building_load_kw,
