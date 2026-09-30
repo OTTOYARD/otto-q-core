@@ -35,6 +35,21 @@
 --     - it does not read `day_of_week_mask`, so it prices weekend hours as weekdays. The on-peak rows carry mask 62
 --       (Monday-Friday) so the data says what NES says.
 --
+--   What this does to the battery, predicted here from the planner's own rule and measured by night 2 (0575): the day
+--   plan (0435) discharges to trade only where price exceeds refill cost plus wear, i.e. the season's lowest rate over
+--   the round trip plus `bess_plan_degradation_usd_kwh`. At the twin's battery (round trip 0.96, wear $0.02) that is
+--   6.724 / 0.96 + 2.0 = 9.004 c against an on-peak 8.182 c, so under NES the battery stops trading on price in every
+--   season and works only to cut the month's peak half hour and to bank surplus solar. The old table paid up to 16 c
+--   a kWh for trading. Measured on the smoke arm's own BESS commands (88e46ad3, 6-8 AM): of the 1,135 kWh it charged,
+--   508.8 kWh was `worth_more_later` at $0.092 against a $0.235 spare price, which these prices remove; the other 626.4
+--   kWh was `restore_dr_reserve`, because that seed started the battery at 21%, under the 600 kWh demand-response
+--   reserve. Night 2's three seeds start it at 65%, 70% and 94%.
+--
+--   Every other reader of these rows was checked: `ottoq_bess_day_plan` prices each step through the reader and takes
+--   the season's lowest active rate as its refill cost, which the overlapping windows answer correctly (summer 0.06724,
+--   winter 0.07054, shoulder 0.07187); the `ottoq-energy-optimize` edge function ranks labels, so on_peak outranks the
+--   all-day off_peak, and only OttoCommand's `get_energy_status` reaches it, never the tick.
+--
 -- ══ §3 CHECKS ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   P0: nothing in flight. P1: no run is live at the twin depot. P2: the reader is the function measured (md5

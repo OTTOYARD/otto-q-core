@@ -45,6 +45,12 @@
 --   Only current evidence counts: primary arms that completed, paid the shield and ran at or after the dial floor.
 --   A night measured before an engine change that restarts the floor (0573, 0574) is not mixed in.
 --
+--   Peak demand, and so the demand charge, is read from an hour into each test day when every arm carries 0577's
+--   `peak_after_open`. A test day opens with every car the seed parks at the depot plugging in at once, which a depot
+--   running around the clock never does; on the smoke arm that opening was the day's peak (G300). Each block also keeps
+--   the full-day peak (`peak_kw_incl_opening`), `sweep.peak_read_from_min` says which was billed, and the notes say it in
+--   words. If any arm lacks the profile, every arm is billed on its full-day peak: one basis per answer, never a mix.
+--
 -- ══ §3 CHECKS ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   P1: 0569's prices, 0568's sweep tables and 0572's fleet column exist. P2: not already applied. V1: the rates give the
@@ -134,6 +140,8 @@ CREATE FUNCTION public.ottoq_value_summary(p_sweep_code text DEFAULT NULL)
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
 DECLARE
+  -- 0577: the demand charge is read from this many minutes into each test day, past the opening plug-in
+  c_open_min CONSTANT int := 60;
   sw        public.ottoq_throughput_sweeps%ROWTYPE;
   v_floor   timestamptz := public.ottoq_dial_pair_floor();
   v_depot   uuid;
@@ -217,6 +225,13 @@ BEGIN
       JOIN public.ottoq_throughput_sweep_cells c ON c.cell_id = a.cell_id
      WHERE a.sweep_id = sw.sweep_id AND NOT a.replicate AND a.complete AND a.paid_shield AND a.ran_at >= v_floor
        AND c.seat IN ('otto_q', 'fifo')
+  ), opn AS (   -- 0577: bill the peak after the opening only when every arm carries it
+    -- bool_and skips NULLs, so a missing key must read as false, not as nothing
+    SELECT COALESCE(bool_and(COALESCE(jsonb_typeof(arm.am #> ARRAY['peak_after_open', 'peak_30min_kw', c_open_min::text]) = 'number'
+                                      AND jsonb_typeof(arm.am #> ARRAY['peak_after_open', 'demand_charge_usd_month', c_open_min::text]) = 'number',
+                                      false)),
+                    false) AS ok
+      FROM arm
   ), m AS (
     SELECT arm.*,
            CASE WHEN seat = 'otto_q' AND planner >= 1 THEN 'otto_q'
@@ -228,8 +243,11 @@ BEGIN
            COALESCE((am ->> 'terminal_soc_usd')::numeric, 0)
              + COALESCE((am ->> 'bess_degradation_usd')::numeric, 0)                        AS batt_day,
            (am ->> 'energy_cost_usd')::numeric                                              AS tou_day,
-           (am ->> 'demand_charge_usd_month')::numeric                                      AS demand_month,
-           (am ->> 'peak_30min_kw')::numeric                                                AS peak_kw,
+           CASE WHEN opn.ok THEN (am #>> ARRAY['peak_after_open', 'demand_charge_usd_month', c_open_min::text])::numeric
+                ELSE (am ->> 'demand_charge_usd_month')::numeric END                        AS demand_month,
+           CASE WHEN opn.ok THEN (am #>> ARRAY['peak_after_open', 'peak_30min_kw', c_open_min::text])::numeric
+                ELSE (am ->> 'peak_30min_kw')::numeric END                                  AS peak_kw,
+           (am ->> 'peak_30min_kw')::numeric                                                AS peak_full,
            (sc #>> '{throughput,visits_served}')::numeric                                   AS served,
            (sc #>> '{timeliness,door_p50_min}')::numeric                                    AS door_p50,
            (sc #>> '{fast_chargers,busy_pct}')::numeric                                     AS busy,
@@ -240,7 +258,7 @@ BEGIN
            GREATEST(0, COALESCE((sc #>> '{rule9,departures}')::int, 0)
                        - COALESCE((sc #>> '{rule9,left_below_target}')::int, 0)
                        - COALESCE((sc #>> '{rule9,left_with_needed_work_open}')::int, 0))  AS full_ok
-      FROM arm
+      FROM arm, opn
   ), b AS (
     SELECT m.*,
            30 * (m.tou_day + m.batt_day) + m.demand_month + r.tgsa_fixed                    AS bill_tgsa,
@@ -264,6 +282,7 @@ BEGIN
              'power_rate', mode() WITHIN GROUP (ORDER BY rate),
              'effective_cents_per_kwh', round(avg(cents_kwh), 1),
              'peak_kw', round(avg(peak_kw)),
+             'peak_kw_incl_opening', round(avg(peak_full)),
              'demand_charge_usd_month', round(avg(demand_paid)),
              'kwh_bought_day', round(avg(kwh_day)),
              'cars_served_day', round(avg(served), 1),
@@ -360,6 +379,7 @@ BEGIN
                                             HAVING count(*) = (SELECT count(*) FROM public.ottoq_throughput_sweep_cells c
                                                                 WHERE c.sweep_id = sw.sweep_id)) s),
       'day_hours', round(v_hours, 1), 'step_min', sw.sim_min_per_tick,
+      'peak_read_from_min', CASE WHEN (SELECT ok FROM opn) THEN c_open_min ELSE 0 END,
       'first_arm_at', (SELECT min(ran_at) FROM arm), 'last_arm_at', (SELECT max(ran_at) FROM arm)),
     'depot', v_depot_j,
     'views', (SELECT j FROM views),
@@ -371,7 +391,12 @@ BEGIN
                                                           'sim_run_id', sim_run_id, 'ran_at', ran_at) ORDER BY arm_id)
                         FROM arm), '[]'::jsonb),
     'sources', v_sources,
-    'notes', v_notes)
+    'notes', v_notes || CASE
+      WHEN NOT EXISTS (SELECT 1 FROM arm) THEN '[]'::jsonb
+      WHEN (SELECT ok FROM opn) THEN jsonb_build_array(format(
+        'Peak demand is read from %s minutes into each test day. A test day starts with every car already parked at the depot plugging in at once, which a depot running around the clock never does. The full-day peak is shown beside it.',
+        c_open_min))
+      ELSE jsonb_build_array('Peak demand counts the whole test day, including its first minutes, when every car already parked at the depot plugs in at once.') END)
     INTO v_result;
   RETURN v_result;
 END
