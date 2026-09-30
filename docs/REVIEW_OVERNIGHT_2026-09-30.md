@@ -148,6 +148,11 @@ by. Its V-block asserts that invariant rather than tonight's numbers. It was fir
 rate" threshold that 0573's curves would have failed at apply time. That was caught by applying it on top of 0573's
 actual rate function in a test, which now stays in the suite.
 
+**One downstream reader to watch after applying 0601.** The plan's level becomes the published `charge_cap_kw`.
+`ottoq_build_site_descriptor` hands that to CP-SAT as a hard cumulative power bound. A phantom-free level is lower, so
+CP-SAT may propose fewer charges. No car is held back: the decide gate never reads that cap (0136), and the local path
+assigns whatever CP-SAT declines.
+
 **Also noted.** Solar uses clear-sky-index persistence with a nameplate prior. It is sound for a forecast of this
 horizon and unchanged.
 
@@ -218,14 +223,40 @@ Partitioned by day, per CLAUDE.md's standing test (`ottoq_model_call_ledger`, tw
 **Validated.** Night 1 arm 3 made 1,406 decisions, all `naive_threshold_v1`, and 182 of them returned a car. That is a
 placeholder recalling into a depot with 93% of demand unmet. See G317.
 
+**Rule 9 bounds the fix, and it was checked before writing it.** 0542 retired `interval_scheduled_v1` because it kept
+cars working past their maintenance interval. So the site-aware recall G317 recommends may only *time* a return inside
+the slack the car's own need allows, and reserve its slot. It must never recall later than the need requires. Low-SoC,
+fault and safety triggers are never timed. It is not built tonight.
+
 ### Twin core: tick pipeline, determinism, canon, research throughput
 
 **Validated.**
 
 - Night 1 arms: 1,309.8 s (otto_q), 1,022.7 s (fifo) and 932.5 s (greedy) for 144 five-minute ticks.
 - Decision latency per tick rose from 416 to 2,376 ms across arm 3 while decisions per tick stayed flat.
-- `vehicles` held 226 rows in 6,422 pages and grew to 6,938 during the next arm. See G314 for the mechanism and the
-  structural fix.
+- `vehicles` held 226 rows in 6,422 pages at 05:09 UTC, 6,938 at 05:24, and 8,074 at 05:59 with arm 7 nineteen
+  minutes in. That is about 5,700 more versions of 226 rows inside one open transaction. See G314 for the mechanism
+  and the structural fix.
+- The same cell, early and late: the smoke arm (dcfc20.otto_q, `88e46ad3`) averaged 2.9 s a tick over its first 24
+  ticks, and night 1's arm 6 (dcfc20.otto_q, `9cbe9eae`) averaged 9.3 s a tick over 144 (1,339.4 s).
+
+**The structural fix for G314, as a design for Lane A** (0568's arm is one plpgsql function: the world lock is an
+advisory *transaction* lock, each tick is a subtransaction, and 0567's build-out guard is a deferred constraint trigger
+that refuses COMMIT while a build-out is applied):
+
+1. Run the arm as a procedure that `CALL`s from pg_cron and COMMITs every N ticks. N = 12 is one sim-hour. The
+   retention purge already runs as a committing procedure (0294).
+2. Hold the world lock as a *session* advisory lock across those commits, released in a final block and on error.
+3. Rebuild 0567's guarantee as a lease instead of a commit-time refusal. The applied build-out records its holder
+   (pid and run); the arm restores it at teardown; a janitor restores any build-out whose holder is gone.
+4. Accept that a failed arm leaves committed run-scoped rows. They are purged like any run's, and the arm row still
+   records the failure.
+
+**Expected effect, an estimate and not a measurement.** If a committed hour costs what the first two hours cost
+today, a 144-tick arm drops from about 22 minutes to about 7, and a 24-hour test day from 45–80 minutes to about 15.
+That is enough to fit night 2's 24 value arms in the window. The first run after the change says whether it holds.
+0602 is a separate, static saving on the calendar's path.
+
 - `pg_stat_user_functions` still carries counters from an earlier profiling session: `ottoq_policy_get` has 21.2M
   calls and 924 s of self time, and `ottoq_approach_zone` averages 78.5 ms per call including children. They date from
   an unknown window, so they are named, not ranked.
@@ -236,6 +267,9 @@ placeholder recalling into a depot with 93% of demand unmet. See G317.
   `charge_cap_kw` is advisory.
 - A shift change would plug everyone in at full power, as the smoke arm's 2,369 kW at 11:10 UTC shows.
 - 0577 separates the artificial test opening from a real one for scoring; nothing yet manages a real one.
+- **Rule 9 bounds any fix.** Metered charging may share site power by due time, but every car still reaches 100%,
+  none is made ready later than its owner's due time, and a car with no due time charges at full rate. Slowing a car
+  to trim the site's bill beyond that is a lever on the vehicle.
 
 ### Overnight learning loop
 

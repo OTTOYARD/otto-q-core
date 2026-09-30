@@ -33,6 +33,13 @@
 --       its battery would take more than 0.60 x the inlet keeps 0444's figure. On an L2 charger the rate stays the L2
 --       charger's own. Nothing else in the forecast moves, and `ottoq_ev_queue_schedule` is untouched.
 --
+--   One downstream reader to watch. The level this forecast sets becomes the orchestrator's published `charge_cap_kw`,
+--   and `ottoq_build_site_descriptor` hands that to CP-SAT as a HARD cumulative power bound (`solvers/cpsat/model.py`,
+--   `AddCumulative`). An honest level is lower, so CP-SAT's model tightens and it may propose fewer charges. No car is
+--   held back: the decide path's admission gate reads only the service contract and any DR call (0136,
+--   `ottoq_ev_charge_allowance_kw`), and the local path assigns whatever CP-SAT declines. Watch CP-SAT's enacted count
+--   after applying; whether CP-SAT should treat an advisory level as hard at all is G316's question.
+--
 --   The rate function is the one 0573 calibrates; after 0573 this reads the calibrated curve with no change here. That
 --   matters for the size of the effect, not its direction: on the curve the twin runs tonight a car at 90% averages
 --   8-15% of its maximum to 100%, which is what arm 3 measured; on 0573's measured tails a Model Y averages about 0.4
