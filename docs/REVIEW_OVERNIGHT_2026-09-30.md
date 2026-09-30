@@ -36,9 +36,11 @@ summer). Three things went wrong on the smoke day:
 nothing has used since. The safety shield counts them, concludes the car is "busy with two tasks", and refuses every
 job it is offered. That Zoox sat at 24% for the whole twelve-hour test day on night 1's first OTTO-Q arm. On the
 second (20 fast chargers) it waited 8 h 45 min before it first plugged in. Under the FIFO and greedy baselines, which
-reach charging another way, the same car plugged in within ten minutes of the start and charged to 100%. So every OTTO-Q arm tonight carries one
-stranded car that its baselines don't. That skews night 1's comparison against OTTO-Q, and whoever reads it should
-know. **Fix: 0603.**
+reach charging another way, the same car plugged in within ten minutes of the start and charged to 100%. **Corrected at
+5:45 AM CT, once all three seeds were in:** that was seed 1 only. On seeds 2 and 3 the shield refused the same car under
+FIFO and greedy too (36-144 refusals per arm), and greedy never charged it at 10 fast chargers on either seed. So the
+stranded car costs every seat, not just OTTO-Q's, and it does not skew the comparison one way. See the addendum.
+**Fix: 0603.**
 
 **The research wing's test days are too slow, and they slow down as they run.** The engine's own decision time per
 tick rises about 5.7x from the first hour of a test day to the last, while the amount of work per tick stays flat.
@@ -59,7 +61,9 @@ rebuilds the rest. It needs Chase's explicit sign-off, because the rules protect
 
 On the same seed and the same chargers, OTTO-Q's seat does this more than either baseline: 52% of fast-charger hours
 on nearly-full cars, against FIFO's 41% and greedy's 28%. Greedy put **18.5% more energy into cars** (6,683 kWh against
-5,639) and served 141 visits against 118. This is the biggest lever on "fewer chargers". The rule that would stop a
+5,639) and served 141 visits against 118. **Corrected at 5:45 AM CT:** the fast-charger pattern held at 10 fast
+chargers on all three seeds, but not at 20, and greedy serving more visits was seed 1 only. On seeds 2 and 3 OTTO-Q served
+the most visits in both charger counts. See the addendum. This is the biggest lever on "fewer chargers". The rule that would stop a
 car that wanted L2 from grabbing a free fast charger already exists as a dial (0548) and has never been measured. It is
 a sweep cell to add, in Lane A's lane. **0604** adds a read-only measure, so any arm (night 1's included) can be
 scored on it.
@@ -304,6 +308,98 @@ That is enough to fit night 2's 24 value arms in the window. The first run after
 - `challenger_scan` runs every minute (cron 765).
 - Automatic dial promotion is off per rule 10 (0540).
 - Nothing in tonight's evidence contradicts either. Not further reviewed tonight.
+
+---
+
+## Addendum: night 1 complete (5:45 AM CT)
+
+Read at 10:40-10:50 UTC (5:40-5:50 AM CT), read-only, with `ottoq_certification_in_flight(true) = 0`. Sweep
+`frontier_2026_09_29`, twin depot `11111111-…` only. **18 of its 19 arms are complete** (six cells by three seeds, plus one replicate); the last one
+(`dcfc20.greedy`, seed 1071807412374370855) was still running at this reading and is marked "running" below. Every
+test day opens at 11:00 UTC sim time (6:00 AM CDT sim), and the times in the Zoox table are sim clock.
+
+### 1. How the fast chargers were used, per arm
+
+Columns: share of fast-charger session-hours from cars that started at 80% or more; fast-charger hours; fast-charger
+kWh; kWh to the whole fleet; fast-charger sessions started below 50%; visits served. The body of 0604's
+`ottoq_charger_fit_profile` was run inline (defaults 80 / 50).
+
+| cell | seed | run | fast hrs ≥80% | fast h | fast kWh | all kWh | fast starts <50% | served |
+|---|---|---|---|---|---|---|---|---|
+| dcfc10.otto_q | 686364201590009433 | `85a5d396` | **51.8%** | 84.0 | 2,038 | 5,639 | 15 | 118 |
+| dcfc10.fifo | 686364201590009433 | `d038fb17` | 40.5% | 84.9 | 2,131 | 5,905 | 16 | 102 |
+| dcfc10.greedy | 686364201590009433 | `1edc847e` | 27.8% | 97.2 | 2,722 | 6,683 | 21 | **141** |
+| dcfc20.otto_q | 686364201590009433 | `9cbe9eae` | 29.0% | 97.3 | 2,544 | 7,519 | 22 | 159 |
+| dcfc20.fifo | 686364201590009433 | `55f57dfe` | 32.2% | 92.4 | 2,424 | 7,687 | 24 | 148 |
+| dcfc20.greedy | 686364201590009433 | `b6c8cc5b` | **32.7%** | 92.5 | 2,576 | 7,355 | 19 | **168** |
+| dcfc10.otto_q (replicate) | 686364201590009433 | `8fb88df0` | 51.8% | 84.0 | 2,038 | 5,639 | 15 | 118 |
+| dcfc10.otto_q | 305838298283560562 | `13de7d61` | **44.0%** | 98.5 | 2,204 | 5,692 | 13 | **132** |
+| dcfc10.fifo | 305838298283560562 | `6639f2cc` | 43.6% | 80.9 | 2,080 | 6,198 | 19 | 94 |
+| dcfc10.greedy | 305838298283560562 | `f25337e2` | 21.8% | 86.1 | 2,395 | 6,300 | 23 | 119 |
+| dcfc20.otto_q | 305838298283560562 | `14f0fe7c` | **29.7%** | 90.0 | 2,532 | 7,345 | 24 | **167** |
+| dcfc20.fifo | 305838298283560562 | `d5280ace` | 21.3% | 101.0 | 3,020 | 8,466 | 38 | 128 |
+| dcfc20.greedy | 305838298283560562 | `305ac53e` | 14.7% | 103.1 | 3,374 | 9,273 | 43 | 157 |
+| dcfc10.otto_q | 1071807412374370855 | `412c1595` | **43.8%** | 79.8 | 2,336 | 6,648 | 19 | **150** |
+| dcfc10.fifo | 1071807412374370855 | `a6b2f192` | 26.1% | 90.0 | 3,109 | 7,716 | 39 | 116 |
+| dcfc10.greedy | 1071807412374370855 | `6c77c32a` | 21.1% | 93.2 | 2,981 | 7,374 | 30 | 144 |
+| dcfc20.otto_q | 1071807412374370855 | `73d1cb94` | **32.0%** | 80.1 | 2,517 | 8,049 | 21 | **192** |
+| dcfc20.fifo | 1071807412374370855 | `54c25658` | 16.0% | 90.8 | 3,092 | 9,180 | 39 | 141 |
+| dcfc20.greedy | 1071807412374370855 | — | running | | | | | |
+
+What this changes:
+
+- **At 10 fast chargers the pattern holds on every seed.** OTTO-Q gives the largest share of fast-charger hours to
+  nearly-full cars on all three seeds (51.8%, 44.0%, 43.8%). FIFO is close on seed 2 (43.6%). Greedy is lowest on all
+  three.
+- **At 20 fast chargers it does not.** OTTO-Q is lowest on seed 1 (29.0% against 32.2% and 32.7%) and highest on seeds
+  2 and 3. With twice the fast chargers, every seat's share falls to 15-33%. So G315 is a finding about a
+  charger-scarce site. That is still the site "fewer chargers" is aiming for.
+- **Greedy serving the most visits was seed 1 only.** On seeds 2 and 3 OTTO-Q served the most visits at both charger
+  counts (132 / 150 at 10 fast chargers, 167 / 192 at 20). Of the 5 seed-and-charger combinations with all three seats
+  in, OTTO-Q served the most in 3 and greedy in 2, both on seed 1. In the sixth, OTTO-Q leads FIFO 192 to 141 with
+  greedy still running.
+- **OTTO-Q delivered the least energy to the fleet in 4 of those 5** (all but seed 1 at 20). That is not a saving. Every
+  car left at 100% on every arm (below), so the gap measures how empty the cars it served were on arrival, not waste.
+  Do not quote it as an efficiency number.
+- **The replicate is identical.** `8fb88df0` reproduces `85a5d396` on every column above and on the Zoox counts below.
+  Per `db/checks/0339` (G153) that is one independent observation, not two.
+
+### 2. The stranded Zoox (G313), per arm, every seat
+
+`HW.005.vehicle_one_active_task` refusals, and the car `229f655b`'s first plug-in (sim clock).
+
+| cell | seed 686364201590009433 | seed 305838298283560562 | seed 1071807412374370855 |
+|---|---|---|---|
+| dcfc10.otto_q | 143, **never** (`85a5d396`; replicate the same) | 72, 15:10 (`13de7d61`) | 99, 15:20 (`412c1595`) |
+| dcfc10.fifo | 0, 11:10 (`d038fb17`) | 66, 16:35 (`6639f2cc`) | 85, 15:55 (`a6b2f192`) |
+| dcfc10.greedy | 0, 11:10 (`1edc847e`) | 144, **never** (`f25337e2`) | 144, **never** (`6c77c32a`) |
+| dcfc20.otto_q | 103, 19:45 (`9cbe9eae`) | 53, 12:45 (`14f0fe7c`) | 49, 13:25 (`73d1cb94`) |
+| dcfc20.fifo | 6, 11:10 (`55f57dfe`) | 36, 14:05 (`d5280ace`) | 74, 13:50 (`54c25658`) |
+| dcfc20.greedy | 0, 11:10 (`b6c8cc5b`) | 117, 20:50 (`305ac53e`) | running |
+
+Every HW.005 refusal on every arm of the night, all 1,334 of them (662 on OTTO-Q arms, 672 on the baselines), is this
+one car. **This corrects the review and G313.** I wrote that only OTTO-Q's seat carries the stranded car and that it
+skews night 1 against OTTO-Q. That was true of seed 1 only, where the baselines plugged the car in on the first tick,
+before the shield first judged it. On seeds 2 and 3 the shield refuses it under every seat, and greedy never charges it
+at 10 fast chargers. **So the stranded car is a cost to every seat, not a bias between them. 0603 matters more, not
+less**: two legacy rows kept that car off a charger past the first ten minutes on 14 of 18 arms, and off it all day
+on 4 (3 independent: the replicate repeats one).
+
+### 3. Rule 9, per arm
+
+All 18 complete arms: `left_below_target = 0`, `left_with_needed_work_open = 0`, `charge_unknown_at_departure = 0`,
+`done_atoms_without_a_time = 0`, over **2,494 departures** (every served visit left at 100% with nothing open).
+`atoms_cleared_by_triage` ran 5-14 per arm. That is the triage path clearing atoms it may clear, and it is not a rule-9
+breach.
+
+### Queries
+
+- Arms: `ottoq_throughput_sweep_arms a JOIN ottoq_throughput_sweep_cells c USING (cell_id) JOIN ottoq_throughput_sweeps s
+  ON s.sweep_id = a.sweep_id WHERE s.sweep_code = 'frontier_2026_09_29' AND a.complete`, reading `scorecard->'rule9'`
+  and `scorecard->'throughput'->>'visits_served'`.
+- Charger fit: 0604's function body inlined per `sim_run_id`, `depot_id = '11111111-…'`.
+- Zoox: `ottoq_rule_evaluations WHERE rule_code = 'HW.005.vehicle_one_active_task' AND NOT passed` per `sim_run_id`, with
+  `entity_id` read for the car; `min(started_at)` from `ocpp_sessions` for vehicle `229f655b…` at the twin depot.
 
 ---
 
