@@ -140,6 +140,54 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_operator_start_interrupt_sql.py
 
+      # 0565's throughput scorecard, executed: each definition in its section 3 (served, departure, on time, needed work
+      # open at departure, a triage clear, the tier groups, the step) is pinned by a visit built to exercise it, and the
+      # migration's own V-blocks (append-only, a determinism pair scoring identically) run during the apply.
+      - name: Throughput scorecard, executed (0565 against a stub engine)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_throughput_scorecard_sql.py
+
+      # 0567: a build-out converts exactly the spaces it names, the restore puts back exactly what it found, a
+      # transaction that forgets to restore cannot commit, and a build-out day scores from its own record afterwards.
+      - name: Charger build-out, executed (0567 against a stub engine)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_site_buildout_sql.py
+
+      # 0568: the overnight sweep runs only in its window, between runs and after certification; seed by seed and cell
+      # by cell, never repeating an arm since the dial floor; build-out applied before the door and restored after the
+      # teardown; an engine error recorded with its arm, a failed arm recorded and not retried; the arms are evidence.
+      - name: Throughput sweep, margin ledger, dial contrasts and fleet build-outs, executed (0568, 0569, 0571, 0572 against a stub engine)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_throughput_sweep_sql.py
+
+      - name: Charge batch order, executed (0570 against the live optimizer's own source)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_charge_batch_order_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
