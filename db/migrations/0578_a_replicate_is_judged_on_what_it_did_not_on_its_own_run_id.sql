@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930114742
 -- migration-name:    a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id
 --
 -- 0578  **A replicate, or the same cell on another night, is judged on what it did, not on its own run id.** Lane A,
