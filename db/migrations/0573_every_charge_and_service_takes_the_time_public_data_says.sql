@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930115308
 -- migration-name:    every_charge_and_service_takes_the_time_public_data_says
 --
 -- 0573  **Every charge and service in the twin takes the time public data says it takes.** Lane A calibration.

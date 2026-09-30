@@ -669,7 +669,7 @@ repo_manifest(version, name, file) AS (
     ('20260930113817'::text, 'the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does'::text, '0570_the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does.sql'::text),
     ('20260930114255'::text, 'a_sweep_measures_a_dial_against_its_own_control'::text, '0571_a_sweep_measures_a_dial_against_its_own_control.sql'::text),
     ('20260930114616'::text, 'a_fleet_build_out_borrows_cars_for_one_test_day'::text, '0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql'::text),
-    ('PENDING'::text, 'every_charge_and_service_takes_the_time_public_data_says'::text, '0573_every_charge_and_service_takes_the_time_public_data_says.sql'::text),
+    ('20260930115308'::text, 'every_charge_and_service_takes_the_time_public_data_says'::text, '0573_every_charge_and_service_takes_the_time_public_data_says.sql'::text),
     ('PENDING'::text, 'the_twin_prices_power_at_nashvilles_published_rate'::text, '0574_the_twin_prices_power_at_nashvilles_published_rate.sql'::text),
     ('PENDING'::text, 'night_two_measures_what_a_customer_is_paying_for'::text, '0575_night_two_measures_what_a_customer_is_paying_for.sql'::text),
     ('PENDING'::text, 'the_value_tab_reads_what_night_two_measured'::text, '0576_the_value_tab_reads_what_night_two_measured.sql'::text),
