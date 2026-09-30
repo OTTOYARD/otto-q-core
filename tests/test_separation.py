@@ -126,6 +126,9 @@ NON_KERNEL_PACKAGES = {
     "scripts": "operator tooling (migration index, drift SQL) — runs against the "
                "repo and the ledger by design, never inside a decide path",
     "db":      "SQL, checks and canons; the one .py is tooling beside them",
+    "docs":    "research write-ups; a .py here reproduces its document's numbers from "
+               "public data (e.g. docs/research/direct/2026-09-30-lane-a-charge-curve-fit.py) "
+               "and is run by hand, never imported by the kernel",
     "load":    "the load harness (task G24). It is a NETWORK and DATABASE client "
                "on purpose — measuring the served system is its whole job — which "
                "is exactly why it must never be importable from a kernel package. "
