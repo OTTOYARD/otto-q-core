@@ -252,6 +252,29 @@ that refuses COMMIT while a build-out is applied):
 4. Accept that a failed arm leaves committed run-scoped rows. They are purged like any run's, and the arm row still
    records the failure.
 
+**What the growing versions are.** I differenced the table statistics across arm 7's commit (`55f57dfe`,
+dcfc20.fifo, 06:01 UTC):
+
+- The 226-row `vehicles` table took 33,541 updates in one test day. Only 9% were HOT, so 91% wrote a new entry into
+  each of its 9 indexes.
+- Only 14,049 of those updates produced a `vehicle.state_changed` event. So 58% changed nothing but clock columns.
+  That is the trigger's own test (0015): only `updated_at`, `current_soc_updated_at` or `last_state_change` moved, or
+  nothing did.
+- **Most of them come from one statement.** `twin.ottoq_sim_emit_depot_heartbeats` rewrites every in-depot car's
+  whole 1.5 KB row on every tick, only to bump `current_soc_updated_at`, the liveness timestamp HW.003 reads. With
+  roughly 90–100 cars in its ten states over 144 ticks, that is about 13,000–15,000 of arm 7's 33,541 updates. That
+  figure is an estimate from the arms' state counts, not a measurement. A narrow per-vehicle liveness table would take
+  that churn off the vehicle row, and it is what a production telemetry stream would write anyway, so it adds no
+  simulation-only path.
+- Two cuts follow, neither built tonight. First, stop the writers that re-stamp a car's sim-clock columns when nothing
+  else moved. Then drop the byte-identical rest with PostgreSQL's `suppress_redundant_updates_trigger()`. The
+  suppressor alone catches only that subset, because the two sim-clock columns change on every re-stamp. And a
+  suppressed UPDATE reports zero rows, which flips `FOUND` and `ROW_COUNT` for any caller that branches on them.
+- I ran that census tonight, comment-stripped, over `public`, `twin` and `ottoq`. 59 functions hold 113
+  `UPDATE vehicles` sites, and 27 of those functions branch on `FOUND` or `ROW_COUNT`. The suppressor is therefore not
+  a safe blanket fix: each of the 27 would need reading first. The heartbeat statement is the one to move first. It
+  reads `ROW_COUNT` only to return it.
+
 **Expected effect, an estimate and not a measurement.** If a committed hour costs what the first two hours cost
 today, a 144-tick arm drops from about 22 minutes to about 7, and a 24-hour test day from 45–80 minutes to about 15.
 That is enough to fit night 2's 24 value arms in the window. The first run after the change says whether it holds.
