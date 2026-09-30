@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930115753
 -- migration-name:    a_test_days_opening_surge_is_not_the_depots_peak
 --
 -- 0577  **A test day opens with every parked car plugging in at once, which a depot that runs around the clock never
