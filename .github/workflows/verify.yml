@@ -238,6 +238,18 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_calendar_exclusion_sql.py
 
+      # 0603: two scheduler tasks orphaned in June stop stranding a car on every OTTO-Q test day. HW.005 passes the car
+      # it refused and still refuses a real second task; the change is filed under no run; refusals and rollback.
+      - name: Legacy task repair, executed (0603 against the live HW.005 evaluator)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_legacy_task_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
