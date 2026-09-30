@@ -128,7 +128,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0590 — GENERATED, not a log
+## Index, 0134–0601 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0590 — which are indexed below as well as logged above; the log row is
@@ -590,7 +590,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0576](db/migrations/0576_the_value_tab_reads_what_night_two_measured.sql) | `PENDING` | no — pending | **The twin's Value tab reads what night 2 measured, and nothing else.** One read-only contract, |
 | [0577](db/migrations/0577_a_test_days_opening_surge_is_not_the_depots_peak.sql) | `PENDING` | no — pending | **A test day opens with every parked car plugging in at once, which a depot that runs around the clock never |
 | [0590](db/migrations/0590_each_charger_choice_says_what_it_chose_from.sql) | `20260929192241` | yes — ledger | **Each charger choice says what it had to choose from.** One read-only cockpit contract, |
+| [0600](db/migrations/0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql) | `PENDING` | no — pending | **The battery's day plan treated the highest five-minute SAMPLE as the demand already billed, and refilled its |
+| [0601](db/migrations/0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql) | `PENDING` | no — pending | **The battery's EV forecast put every car waiting on site onto a charger at 60% of the charger's nameplate, so a |
 
-443 migrations indexed.
+445 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

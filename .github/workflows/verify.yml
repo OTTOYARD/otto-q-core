@@ -213,6 +213,19 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_energy_price_sql.py
 
+      # 0600/0601: the battery's day plan bills the completed half hour, refills its reserve in the valleys and never lifts
+      # its own half hour over the cap; the queue forecast charges a waiting car at the rate its battery takes. Against the
+      # live plan, evaluator, forecast and scheduler carried byte for byte, on the smoke arm's own samples.
+      - name: Battery half hour, executed (0600, 0601 against the live day plan and queue forecast)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_bess_half_hour_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #

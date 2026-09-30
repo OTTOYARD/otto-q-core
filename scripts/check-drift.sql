@@ -674,7 +674,9 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'night_two_measures_what_a_customer_is_paying_for'::text, '0575_night_two_measures_what_a_customer_is_paying_for.sql'::text),
     ('PENDING'::text, 'the_value_tab_reads_what_night_two_measured'::text, '0576_the_value_tab_reads_what_night_two_measured.sql'::text),
     ('PENDING'::text, 'a_test_days_opening_surge_is_not_the_depots_peak'::text, '0577_a_test_days_opening_surge_is_not_the_depots_peak.sql'::text),
-    ('20260929192241'::text, 'each_charger_choice_says_what_it_chose_from'::text, '0590_each_charger_choice_says_what_it_chose_from.sql'::text)
+    ('20260929192241'::text, 'each_charger_choice_says_what_it_chose_from'::text, '0590_each_charger_choice_says_what_it_chose_from.sql'::text),
+    ('PENDING'::text, 'the_battery_never_charges_itself_into_the_billed_half_hour'::text, '0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql'::text),
+    ('PENDING'::text, 'the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts'::text, '0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
