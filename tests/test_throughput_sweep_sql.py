@@ -14,7 +14,9 @@ measured against its own control cell, the ledger prices that contrast and keeps
 night 1's seeds, and the same cell definition run on two nights is checked for identity. And 0572: a fleet build-out
 borrows the same lender cars every time, parks them, lets the fleet reset seed them, and puts every car and stall pointer
 back from its pre-image; it cannot commit applied; and a fleet night's arm borrows before the reset and returns after the
-teardown. tests/fixtures/fleet_buildout_stub.sql gives the stub both depots' cars.
+teardown. tests/fixtures/fleet_buildout_stub.sql gives the stub both depots' cars. And 0577: each arm keeps its peak demand read
+from 0-120 minutes into the day by the scorer's own arithmetic, equal to the scorer at 0, and the Value tab bills from an
+hour in only when every arm carries it; tests/fixtures/peak_profile_stub.sql gives the stub a day with an opening surge.
 
 It SKIPS where no scratch PostgreSQL is reachable, like tests/test_throughput_scorecard_sql.py.
 """
@@ -39,6 +41,12 @@ M0568 = os.path.join(MIG, "0568_an_overnight_sweep_scores_one_test_day_at_a_time
 M0569 = os.path.join(MIG, "0569_a_margin_ledger_prices_what_the_twin_measured.sql")
 M0571 = os.path.join(MIG, "0571_a_sweep_measures_a_dial_against_its_own_control.sql")
 M0572 = os.path.join(MIG, "0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql")
+M0575 = os.path.join(MIG, "0575_night_two_measures_what_a_customer_is_paying_for.sql")
+M0576 = os.path.join(MIG, "0576_the_value_tab_reads_what_night_two_measured.sql")
+M0577 = os.path.join(MIG, "0577_a_test_days_opening_surge_is_not_the_depots_peak.sql")
+VALUE_STUB = os.path.join(FIX, "value_summary_stub.sql")
+PEAK_STUB = os.path.join(FIX, "peak_profile_stub.sql")
+VALUE = "value_2026_09_30"
 NIGHT2 = "charge_order_2026_09_30"
 F150, F200 = "fleet150_2026_10_01", "fleet200_2026_10_01"
 LENDER = "22222222-2222-2222-2222-222222222222"
@@ -741,3 +749,302 @@ def test_the_same_cell_at_two_fleet_sizes_is_not_a_twin(fresh):
     d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{F150}'")
     assert d.json(RUN)["arm"]["cell"] == "dcfc20.otto_q"     # night 3 at 150 cars, seed 1: the same cell definition
     assert d.val("SELECT count(*) FROM public.ottoq_throughput_cross_sweep_twins") == "0"
+
+
+# ── 0575: night 2 measures what a customer is paying for, on the calibrated twin ─────────────────────────────────────────
+
+CALIBRATED = """INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at) VALUES
+  ('0573_every_charge_and_service_takes_the_time_public_data_says', true, true, 'stub', now()),
+  ('0574_the_twin_prices_power_at_nashvilles_published_rate', true, true, 'stub', now())"""
+
+
+def test_the_value_sweep_waits_for_the_calibration_and_is_what_it_says():
+    d = _make_db("tswv")
+    try:
+        rc, err = d.file(M0575)
+        assert rc != 0 and "0575 P1" in err and "calibrated" in err
+        d.val(CALIBRATED)
+        rc, err = d.file(M0575)
+        assert rc == 0, f"0575 did not apply: {err}"
+        cells = d.json(f"""SELECT jsonb_agg(jsonb_build_array(c.ord, c.cell_code, c.seat, c.buildout_code, c.fixed_params,
+                                                               c.control_cell_code) ORDER BY c.ord)
+                             FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+                            WHERE s.sweep_code = '{VALUE}'""")
+        on, off = {"deploy_peak_fraction": 0.90}, {"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}
+        assert cells == [
+            [1, "dcfc10.otto_q", "otto_q", "dcfc10", on, "dcfc10.otto_q.energy_off"],
+            [2, "dcfc10.otto_q.energy_off", "otto_q", "dcfc10", off, None],
+            [3, "dcfc10.fifo", "fifo", "dcfc10", on, "dcfc10.fifo.energy_off"],
+            [4, "dcfc10.fifo.energy_off", "fifo", "dcfc10", off, None],
+            [5, "dcfc20.otto_q", "otto_q", "dcfc20", on, "dcfc20.otto_q.energy_off"],
+            [6, "dcfc20.otto_q.energy_off", "otto_q", "dcfc20", off, None],
+            [7, "dcfc20.fifo", "fifo", "dcfc20", on, "dcfc20.fifo.energy_off"],
+            [8, "dcfc20.fifo.energy_off", "fifo", "dcfc20", off, None]]
+        n1 = d.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{SWEEP}'")
+        v = d.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{VALUE}'")
+        assert v["seeds"] == n1["seeds"][:3] and v["ticks"] == 288 and float(v["sim_min_per_tick"]) == 5
+        assert v["priority"] == 50 and v["replicates"] == 0 and v["run_after"].startswith("2026-10-01T04:00:00")
+        assert d.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
+                        WHERE name = '0575_night_two_measures_what_a_customer_is_paying_for'""") == "false/false"
+        rc, err = d.file(M0575)
+        assert rc != 0 and "0575 P2" in err
+    finally:
+        _drop(d)
+
+
+def test_the_value_sweep_runs_first_and_its_comparisons_line_up():
+    d = _make_db("tswr")
+    try:
+        d.val(CALIBRATED)
+        rc, err = d.file(M0575)
+        assert rc == 0, f"0575 did not apply: {err}"
+        # night 1 still has work and night 2's charge-order sweep is due too: the value sweep (priority 50) goes first
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code IN ('{VALUE}', '{NIGHT2}')")
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code = '{SWEEP}'")
+        d.val(OPEN)
+        for _ in range(8):                  # seed 1, all eight cells
+            assert d.json(RUN)["ran"] is True
+        ran = d.json("""SELECT jsonb_agg(jsonb_build_array(s.sweep_code, c.cell_code) ORDER BY a.arm_id)
+                          FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+                          JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id""")
+        assert [r[0] for r in ran] == [VALUE] * 8
+        assert [r[1] for r in ran] == ["dcfc10.otto_q", "dcfc10.otto_q.energy_off", "dcfc10.fifo", "dcfc10.fifo.energy_off",
+                                       "dcfc20.otto_q", "dcfc20.otto_q.energy_off", "dcfc20.fifo", "dcfc20.fifo.energy_off"]
+        # the energy comparison under each seat: planner on minus off, the same world
+        con = d.json(f"""SELECT jsonb_agg(jsonb_build_array(treatment_cell, control_cell, world_identical, site_cost_usd_delta)
+                                          ORDER BY treatment_cell)
+                           FROM public.ottoq_throughput_sweep_contrasts WHERE sweep_code = '{VALUE}'""")
+        assert [c[:3] for c in con] == [["dcfc10.fifo", "dcfc10.fifo.energy_off", True],
+                                        ["dcfc10.otto_q", "dcfc10.otto_q.energy_off", True],
+                                        ["dcfc20.fifo", "dcfc20.fifo.energy_off", True],
+                                        ["dcfc20.otto_q", "dcfc20.otto_q.energy_off", True]]
+        assert all(float(c[3]) == -150 for c in con)
+        # the seat comparison under each energy setting
+        pairs = d.json(f"""SELECT jsonb_agg(jsonb_build_array(buildout_code, fixed_params, baseline, world_identical)
+                                            ORDER BY buildout_code, fixed_params::text)
+                             FROM public.ottoq_throughput_sweep_pairs WHERE sweep_code = '{VALUE}'""")
+        assert len(pairs) == 4 and all(p[2] == "fifo" and p[3] is True for p in pairs)
+    finally:
+        _drop(d)
+
+
+# ── 0576: the Value tab reads what night 2 measured ──────────────────────────────────────────────────────────────────────
+
+def _value_db(tag):
+    d = _make_db(tag)
+    for path in (VALUE_STUB, M0576):
+        rc, err = d.file(path)
+        assert rc == 0, f"{os.path.basename(path)} did not load: {err}"
+    return d
+
+
+def test_the_value_tab_says_nothing_before_night_two():
+    d = _value_db("tswn")
+    try:
+        j = d.json("SELECT public.ottoq_value_summary(NULL)")
+        assert j["status"] == "none" and j["views"] == [] and j["investor"] is None and j["runs"] == []
+        assert j["depot"] == {"name": "OTTOYARD Nashville Flagship", "fleet": 116, "battery_kwh": 3000,
+                              "battery_kw": 1500, "solar_kw": 600,
+                              "tariff": "Nashville Electric Service, time-of-use (TGSA-3) plus the TVA fuel adjustment"}
+        assert len(j["sources"]) == 7
+        # a 12-hour sweep is not read as a day
+        assert d.json(f"SELECT public.ottoq_value_summary('{SWEEP}')")["status"] == "none"
+        d.val(CALIBRATED)
+        rc, err = d.file(M0575)
+        assert rc == 0, err
+        j = d.json("SELECT public.ottoq_value_summary(NULL)")
+        assert j["status"] == "measuring" and j["sweep"]["code"] == VALUE
+        assert (j["sweep"]["arms_planned"], j["sweep"]["arms_done"], j["sweep"]["day_hours"]) == (24, 0, 24.0)
+        # the contract is the one thing the twin's public key may call
+        assert d.val("SELECT has_function_privilege('anon', 'public.ottoq_value_summary(text)', 'EXECUTE')") == "t"
+        assert d.val("SELECT has_table_privilege('anon', 'public.ottoq_energy_rates', 'SELECT')") == "f"
+    finally:
+        _drop(d)
+
+
+def test_the_value_tab_bills_each_day_on_its_cheapest_rate_and_prices_demand_met():
+    d = _value_db("tswb")
+    try:
+        d.val(CALIBRATED)
+        rc, err = d.file(M0575)
+        assert rc == 0, err
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{VALUE}'")
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code IN ('{SWEEP}', '{NIGHT2}')")
+        d.val(OPEN)
+        for _ in range(16):                 # seeds 1 and 2, all eight cells
+            assert d.json(RUN)["ran"] is True
+        j = d.json("SELECT public.ottoq_value_summary(NULL)")
+        assert j["status"] == "measured" and j["sweep"]["arms_done"] == 16 and j["sweep"]["seeds_done"] == 2
+        assert len(j["views"]) == 2 and j["views"][0]["fast_chargers"] < j["views"][1]["fast_chargers"]
+        v = j["views"][0]
+        q, p = v["otto_q"], v["plain"]
+        # OTTO-Q: 30 x ($1,400 + $10 wear) + $21,400 demand + $1,571.37 fixed on TGSA-3 = $65,271; the plain depot is
+        # cheapest on GSA-3: 30 x 21,000 kWh x 7.300 c + $32,100 + $2,091.71 = $80,182
+        assert (q["power_bill_usd_month"], q["power_rate"], p["power_bill_usd_month"], p["power_rate"]) == \
+               (65271, "TGSA-3", 80182, "GSA-3")
+        assert (q["peak_kw"], p["peak_kw"], q["demand_charge_usd_month"]) == (1000, 1500, 21400)
+        assert q["effective_cents_per_kwh"] == 10.9 and q["seeds"] == 2
+        vs = v["vs_plain"]
+        assert vs["power_bill_saved_usd_month"] == {"low": 14910, "mid": 14910, "high": 14910}
+        assert vs["power_bill_saved_pct"]["mid"] == 18.6 and vs["peak_cut_kw"]["mid"] == 500
+        # demand met: 100 of 120 car-hours against 96, over 116 cars; priced at $20 a car-hour ($16-$24)
+        assert (q["demand_met_pct"], p["demand_met_pct"]) == (83.3, 80.0)
+        assert vs["revenue_hours_per_car_day_delta"]["mid"] == 0.03
+        assert vs["revenue_usd_per_car_day"]["mid"] == 0.69 and vs["revenue_usd_per_car_day_band"] == [0.55, 0.83]
+        # where the saving comes from: all of it the planner in this stub, none the assignment
+        assert v["split"] == {"energy_planning_usd_month": 14910, "charger_assignment_usd_month": 0}
+        inv = j["investor"]
+        assert inv["chargers_avoided"] == j["views"][1]["fast_chargers"] - j["views"][0]["fast_chargers"]
+        assert inv["chargers_statement"].startswith("On every test day")
+        assert inv["charger_capex_avoided_usd"][1] == inv["chargers_avoided"] * 205984
+        assert j["guarantee"]["full_and_serviced"] <= j["guarantee"]["departures"]
+        assert len(j["runs"]) == 16 and {r["cell"] for r in j["runs"]} >= {"dcfc10.otto_q", "dcfc10.fifo.energy_off"}
+        # one day on which the plain depot with the MORE chargers met more ride demand than OTTO-Q with the fewer: the
+        # capital claim is withdrawn, not averaged away (the evidence is edited in this throwaway database only)
+        d.val("ALTER TABLE public.ottoq_throughput_sweep_arms DISABLE TRIGGER trg_ottoq_throughput_sweep_arms_append_only")
+        d.val(f"""UPDATE public.ottoq_throughput_sweep_arms a SET arm_metrics = a.arm_metrics || '{{"unmet_demand_car_hours": 5}}'
+                  FROM public.ottoq_throughput_sweep_cells c
+                 WHERE c.cell_id = a.cell_id AND c.cell_code = 'dcfc20.fifo.energy_off'
+                   AND a.arm_id = (SELECT min(x.arm_id) FROM public.ottoq_throughput_sweep_arms x WHERE x.cell_id = c.cell_id)""")
+        inv = d.json("SELECT public.ottoq_value_summary(NULL)")["investor"]
+        assert inv["chargers_statement"].startswith("Not on every test day")
+        assert inv["chargers_avoided"] is None and inv["charger_capex_avoided_usd"] is None
+    finally:
+        _drop(d)
+
+
+def test_the_value_tab_never_counts_stale_or_unfinished_days():
+    d = _value_db("tsws2")
+    try:
+        d.val(CALIBRATED)
+        rc, err = d.file(M0575)
+        assert rc == 0, err
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{VALUE}'")
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code IN ('{SWEEP}', '{NIGHT2}')")
+        d.val(OPEN)
+        for _ in range(8):
+            assert d.json(RUN)["ran"] is True
+        assert d.json("SELECT public.ottoq_value_summary(NULL)")["sweep"]["arms_done"] == 8
+        # an engine change that restarts the dial floor makes every arm so far stale: the tab goes back to measuring
+        d.val("UPDATE public.stub_floor SET floor = clock_timestamp()")
+        j = d.json("SELECT public.ottoq_value_summary(NULL)")
+        assert j["status"] == "measuring" and j["sweep"]["arms_done"] == 0 and j["views"] == []
+    finally:
+        _drop(d)
+
+
+# ── 0577: a test day's opening surge is not the depot's peak ────────────────────────────────────────────────────────────
+
+def _peak_db(tag):
+    """The value stack with a day whose opening is its peak: one night-1 arm first, so 0577's V1 has a run to prove on."""
+    d = _value_db(tag)
+    rc, err = d.file(PEAK_STUB)
+    assert rc == 0, f"peak_profile_stub.sql did not load: {err}"
+    d.val(OPEN)
+    assert d.json(RUN)["ran"] is True
+    return d
+
+
+def _value_arms(d, n=8):
+    d.val(CALIBRATED)
+    rc, err = d.file(M0575)
+    assert rc == 0, err
+    d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{VALUE}'")
+    d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code IN ('{SWEEP}', '{NIGHT2}')")
+    for _ in range(n):
+        assert d.json(RUN)["ran"] is True
+
+
+def test_the_peak_after_the_opening_is_the_scorers_own_arithmetic():
+    d = _peak_db("tswp")
+    try:
+        rc, err = d.file(M0577)
+        assert rc == 0, f"0577 did not apply: {err}"
+        assert d.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
+                        WHERE name = '0577_a_test_days_opening_surge_is_not_the_depots_peak'""") == "false/false"
+        assert d.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0577_pre'") == "1"
+        # the night-1 arm that ran before 0577 (planner on, 144 ticks): 1,100 kW in the opening half hour, then 800
+        run = d.val("SELECT sim_run_id FROM public.ottoq_throughput_sweep_arms ORDER BY arm_id LIMIT 1")
+        p = d.json(f"SELECT public.ottoq_arm_peak_profile('{run}', '{TWIN}')")
+        assert p["offsets_min"] == [0, 30, 60, 90, 120]
+        assert p["peak_30min_kw"] == {"0": 1100.0, "30": 850.0, "60": 800.0, "90": 800.0, "120": 800.0}
+        assert p["starts_min"]["0"] == 5 and p["starts_min"]["60"] == 60
+        # NES summer: $21.40 a kW for the first 1,000, $21.78 above: 1,100 kW is $23,578 and 800 kW is $17,120
+        assert p["demand_charge_usd_month"]["0"] == 23578.0 and p["demand_charge_usd_month"]["60"] == 17120.0
+        # every arm run after 0577 keeps it, and at 0 it is exactly what the scorer billed
+        _value_arms(d)
+        rows = d.json(f"""SELECT jsonb_agg(jsonb_build_array(c.cell_code, a.arm_metrics->'peak_30min_kw',
+                                                             a.arm_metrics->'demand_charge_usd_month',
+                                                             a.arm_metrics->'peak_after_open') ORDER BY a.arm_id)
+                            FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+                            JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id WHERE s.sweep_code = '{VALUE}'""")
+        assert len(rows) == 8
+        for cell, peak, demand, po in rows:
+            assert po["peak_30min_kw"]["0"] == peak and po["demand_charge_usd_month"]["0"] == demand, cell
+            if cell.endswith("energy_off"):   # the opening is the day's peak; the evening's returns are the peak after it
+                assert (peak, po["peak_30min_kw"]["60"], po["starts_min"]["60"]) == (1900.0, 1400.0, 845), cell
+            else:                              # the planner shaved both
+                assert (peak, po["peak_30min_kw"]["60"]) == (1100.0, 1000.0), cell
+        rc, err = d.file(M0577)
+        assert rc != 0 and "0577 P3" in err
+    finally:
+        _drop(d)
+
+
+def test_the_value_tab_bills_the_peak_after_the_opening_and_says_so():
+    d = _peak_db("tswo")
+    try:
+        rc, err = d.file(M0577)
+        assert rc == 0, err
+        _value_arms(d)
+        j = d.json("SELECT public.ottoq_value_summary(NULL)")
+        assert j["status"] == "measured" and j["sweep"]["peak_read_from_min"] == 60
+        v = j["views"][0]
+        q, p = v["otto_q"], v["plain"]
+        assert (q["peak_kw"], q["peak_kw_incl_opening"], p["peak_kw"], p["peak_kw_incl_opening"]) == (1000, 1100, 1400, 1900)
+        # the plain depot's bill carries the evening's 1,400 kW ($30,112), not the opening's 1,900 ($41,002): GSA-3 is
+        # cheapest at 30 x 21,000 kWh x 7.300 c + $30,112 + $2,091.71 = $78,194. OTTO-Q's is $65,271 as before
+        assert (q["power_bill_usd_month"], p["power_bill_usd_month"], p["power_rate"]) == (65271, 78194, "GSA-3")
+        assert (q["demand_charge_usd_month"], p["demand_charge_usd_month"]) == (21400, 30112)
+        vs = v["vs_plain"]
+        assert vs["peak_cut_kw"]["mid"] == 400 and vs["power_bill_saved_usd_month"]["mid"] == 12922
+        assert any("read from 60 minutes into each test day" in n for n in j["notes"])
+        # one arm without the profile, and every arm goes back to its full-day peak: one basis, never a mix
+        d.val("ALTER TABLE public.ottoq_throughput_sweep_arms DISABLE TRIGGER trg_ottoq_throughput_sweep_arms_append_only")
+        d.val("""UPDATE public.ottoq_throughput_sweep_arms SET arm_metrics = arm_metrics - 'peak_after_open'
+                  WHERE arm_id = (SELECT max(arm_id) FROM public.ottoq_throughput_sweep_arms)""")
+        j = d.json("SELECT public.ottoq_value_summary(NULL)")
+        assert j["sweep"]["peak_read_from_min"] == 0
+        q, p = j["views"][0]["otto_q"], j["views"][0]["plain"]
+        assert (q["peak_kw"], p["peak_kw"]) == (1100, 1900) and q["peak_kw"] == q["peak_kw_incl_opening"]
+        assert any("counts the whole test day" in n for n in j["notes"])
+    finally:
+        _drop(d)
+
+
+def test_0577_refuses_what_it_cannot_do_safely():
+    d = _make_db("tswq", fleet=False)
+    try:
+        rc, err = d.file(PEAK_STUB)
+        assert rc == 0, err
+        rc, err = d.file(M0577)                     # 0572 not applied: it pins the runner 0577 edits
+        assert rc != 0 and "0577 P1" in err
+    finally:
+        _drop(d)
+    d = _make_db("tswq2")
+    try:
+        rc, err = d.file(PEAK_STUB)
+        assert rc == 0, err
+        rc, err = d.file(M0577)                     # no run with energy samples yet: V1 has nothing to prove on
+        assert rc != 0 and "0577 V1" in err
+        assert d.val("SELECT to_regprocedure('public.ottoq_arm_peak_profile(uuid,uuid)') IS NULL") == "t"
+        d.val(OPEN)
+        assert d.json(RUN)["ran"] is True
+        # the scorer's energy block is not the one measured: the mirror would no longer be the scorer's arithmetic
+        d.val("""DO $$ BEGIN EXECUTE replace(pg_get_functiondef('public.ottoq_dial_arm_metrics(uuid,uuid,numeric)'::regprocedure),
+                                         '29 minutes 59 seconds', '30 minutes'); END $$""")
+        rc, err = d.file(M0577)
+        assert rc != 0 and "0577 P2" in err
+        assert d.val("SELECT count(*) FROM public.ottoq_cert_lineage WHERE name LIKE '0577%'") == "0"
+    finally:
+        _drop(d)

@@ -168,7 +168,7 @@ jobs:
       # 0568: the overnight sweep runs only in its window, between runs and after certification; seed by seed and cell
       # by cell, never repeating an arm since the dial floor; build-out applied before the door and restored after the
       # teardown; an engine error recorded with its arm, a failed arm recorded and not retried; the arms are evidence.
-      - name: Throughput sweep, margin ledger, dial contrasts and fleet build-outs, executed (0568, 0569, 0571, 0572 against a stub engine)
+      - name: Throughput sweep, margin ledger, dial contrasts, fleet build-outs, night 2's value sweep, the Value tab's contract and the peak after a test day's opening, executed (0568, 0569, 0571, 0572, 0575, 0576, 0577 against a stub engine)
         env:
           PGHOST: localhost
           PGPORT: "5432"
@@ -187,6 +187,31 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_charge_batch_order_sql.py
+
+      # 0573: the charge curves and service times calibrated to public data. The calibrated minutes, what did not change
+      # (every L2 charge, a DC charge with no battery size), which cars' facts change, the sixty-minute sensor
+      # calibration, the refusals and the header's rollback, against the live charge functions carried byte for byte.
+      - name: Charge and service calibration, executed (0573 against the live charge functions' own source)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_charge_calibration_sql.py
+
+      # 0574: the twin depot's price of power is NES Schedule TGSA Part 3 plus the fuel adjustment. What the reader
+      # returns before and after, across the seasons, against the live reader carried byte for byte; no other depot.
+      - name: Energy price, executed (0574 against the live tariff reader's own source)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_energy_price_sql.py
 
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.

@@ -584,8 +584,13 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0570](db/migrations/0570_the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does.sql) | `PENDING` | no — pending | **The batch optimizer can hand chargers out in the order the charge cursor serves cars.** (G297; research wing, |
 | [0571](db/migrations/0571_a_sweep_measures_a_dial_against_its_own_control.sql) | `PENDING` | no — pending | **A sweep measures a dial against its own control, the margin ledger prices it, and night 2 measures G297's.** |
 | [0572](db/migrations/0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql) | `PENDING` | no — pending | **A fleet build-out borrows cars for one test day, so the twin depot can be measured at 150 and 200 cars.** |
+| [0573](db/migrations/0573_every_charge_and_service_takes_the_time_public_data_says.sql) | `PENDING` | no — pending | **Every charge and service in the twin takes the time public data says it takes.** Lane A calibration |
+| [0574](db/migrations/0574_the_twin_prices_power_at_nashvilles_published_rate.sql) | `PENDING` | no — pending | **The twin depot's price of power is Nashville's published time-of-use rate, not an unsourced table.** Lane A |
+| [0575](db/migrations/0575_night_two_measures_what_a_customer_is_paying_for.sql) | `PENDING` | no — pending | **Night 2 measures the three things a customer is paying for, on the calibrated twin.** One overnight sweep of |
+| [0576](db/migrations/0576_the_value_tab_reads_what_night_two_measured.sql) | `PENDING` | no — pending | **The twin's Value tab reads what night 2 measured, and nothing else.** One read-only contract, |
+| [0577](db/migrations/0577_a_test_days_opening_surge_is_not_the_depots_peak.sql) | `PENDING` | no — pending | **A test day opens with every parked car plugging in at once, which a depot that runs around the clock never |
 | [0590](db/migrations/0590_each_charger_choice_says_what_it_chose_from.sql) | `20260929192241` | yes — ledger | **Each charger choice says what it had to choose from.** One read-only cockpit contract, |
 
-438 migrations indexed.
+443 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
