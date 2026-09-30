@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930113817
 -- migration-name:    the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does
 --
 -- 0570  **The batch optimizer can hand chargers out in the order the charge cursor serves cars.** (G297; research wing,

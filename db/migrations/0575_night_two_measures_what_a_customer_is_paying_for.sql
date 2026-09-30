@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930115452
 -- migration-name:    night_two_measures_what_a_customer_is_paying_for
 --
 -- 0575  **Night 2 measures the three things a customer is paying for, on the calibrated twin.** One overnight sweep of
@@ -34,6 +34,10 @@
 --     dcfcN.fifo.energy_off     first-come, planner off   control (the plain depot)
 --   for N = 10 and 20. So 0571's contrasts hold the energy comparison under each seat, and 0568's pairs hold the seat
 --   comparison under each energy setting. The runner goes seed by seed, so a night that ends early leaves whole seeds.
+--   Within a seed the four HEADLINE cells run first: OTTO-Q (ord 1, 3) and the plain depot (ord 2, 4) at 10 and at 20
+--   chargers. The four split cells follow (ord 5-8). Night 1 measured about 20 minutes per 12-hour arm, with tick cost
+--   rising through the day (db/checks/0413 §7). A 24-hour arm is estimated at 50-80 minutes, so one night fits about
+--   6-8 of the 24 arms. This order puts OTTO-Q against the plain depot at both charger counts into the first night.
 --
 -- ══ §3 CHECKS ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -101,19 +105,19 @@ WITH sw AS (
 INSERT INTO public.ottoq_throughput_sweep_cells (sweep_id, cell_code, ord, seat, buildout_code, fixed_params)
 SELECT sw.sweep_id, c.cell_code, c.ord, c.seat, c.buildout_code, c.fixed_params
   FROM sw, (VALUES
-    ('dcfc10.otto_q.energy_off', 2, 'otto_q', 'dcfc10', '{"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}'::jsonb),
-    ('dcfc10.fifo.energy_off',   4, 'fifo',   'dcfc10', '{"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}'::jsonb),
-    ('dcfc20.otto_q.energy_off', 6, 'otto_q', 'dcfc20', '{"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}'::jsonb),
-    ('dcfc20.fifo.energy_off',   8, 'fifo',   'dcfc20', '{"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}'::jsonb))
+    ('dcfc10.otto_q.energy_off', 5, 'otto_q', 'dcfc10', '{"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}'::jsonb),
+    ('dcfc10.fifo.energy_off',   2, 'fifo',   'dcfc10', '{"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}'::jsonb),
+    ('dcfc20.otto_q.energy_off', 7, 'otto_q', 'dcfc20', '{"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}'::jsonb),
+    ('dcfc20.fifo.energy_off',   4, 'fifo',   'dcfc20', '{"deploy_peak_fraction": 0.90, "energy_orchestration_enabled": 0}'::jsonb))
     AS c(cell_code, ord, seat, buildout_code, fixed_params);
 
 INSERT INTO public.ottoq_throughput_sweep_cells (sweep_id, cell_code, ord, seat, buildout_code, fixed_params, control_cell_code)
 SELECT s.sweep_id, c.cell_code, c.ord, c.seat, c.buildout_code, c.fixed_params, c.control
   FROM public.ottoq_throughput_sweeps s,
        (VALUES ('dcfc10.otto_q', 1, 'otto_q', 'dcfc10', '{"deploy_peak_fraction": 0.90}'::jsonb, 'dcfc10.otto_q.energy_off'),
-               ('dcfc10.fifo',   3, 'fifo',   'dcfc10', '{"deploy_peak_fraction": 0.90}'::jsonb, 'dcfc10.fifo.energy_off'),
-               ('dcfc20.otto_q', 5, 'otto_q', 'dcfc20', '{"deploy_peak_fraction": 0.90}'::jsonb, 'dcfc20.otto_q.energy_off'),
-               ('dcfc20.fifo',   7, 'fifo',   'dcfc20', '{"deploy_peak_fraction": 0.90}'::jsonb, 'dcfc20.fifo.energy_off'))
+               ('dcfc10.fifo',   6, 'fifo',   'dcfc10', '{"deploy_peak_fraction": 0.90}'::jsonb, 'dcfc10.fifo.energy_off'),
+               ('dcfc20.otto_q', 3, 'otto_q', 'dcfc20', '{"deploy_peak_fraction": 0.90}'::jsonb, 'dcfc20.otto_q.energy_off'),
+               ('dcfc20.fifo',   8, 'fifo',   'dcfc20', '{"deploy_peak_fraction": 0.90}'::jsonb, 'dcfc20.fifo.energy_off'))
          AS c(cell_code, ord, seat, buildout_code, fixed_params, control)
  WHERE s.sweep_code = 'value_2026_09_30';
 
@@ -130,6 +134,12 @@ BEGIN
        WHERE s.sweep_code = 'value_2026_09_30' AND c.control_cell_code = c.cell_code || '.energy_off'
          AND c.fixed_params = '{"deploy_peak_fraction": 0.90}'::jsonb) <> 4 THEN
     RAISE EXCEPTION '0575 V1: the four energy contrasts are not each on their own seat''s energy-off cell';
+  END IF;
+  -- the headline first: OTTO-Q and the plain depot at 10 and 20 chargers are ords 1-4
+  IF (SELECT string_agg(c.cell_code, ',' ORDER BY c.ord) FROM public.ottoq_throughput_sweep_cells c
+        JOIN public.ottoq_throughput_sweeps s USING (sweep_id) WHERE s.sweep_code = 'value_2026_09_30' AND c.ord <= 4)
+     IS DISTINCT FROM 'dcfc10.otto_q,dcfc10.fifo.energy_off,dcfc20.otto_q,dcfc20.fifo.energy_off' THEN
+    RAISE EXCEPTION '0575 V1: the four headline cells do not run first';
   END IF;
   IF (SELECT seeds FROM public.ottoq_throughput_sweeps WHERE sweep_code = 'value_2026_09_30')
        IS DISTINCT FROM (SELECT seeds[1:3] FROM public.ottoq_throughput_sweeps WHERE sweep_code = 'frontier_2026_09_29')

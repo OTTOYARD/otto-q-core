@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930114255
 -- migration-name:    a_sweep_measures_a_dial_against_its_own_control
 --
 -- 0571  **A sweep measures a dial against its own control, the margin ledger prices it, and night 2 measures G297's.**
