@@ -669,6 +669,7 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does'::text, '0570_the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does.sql'::text),
     ('PENDING'::text, 'a_sweep_measures_a_dial_against_its_own_control'::text, '0571_a_sweep_measures_a_dial_against_its_own_control.sql'::text),
     ('PENDING'::text, 'a_fleet_build_out_borrows_cars_for_one_test_day'::text, '0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql'::text),
+    ('PENDING'::text, 'every_charge_and_service_takes_the_time_public_data_says'::text, '0573_every_charge_and_service_takes_the_time_public_data_says.sql'::text),
     ('PENDING'::text, 'each_charger_choice_says_what_it_chose_from'::text, '0590_each_charger_choice_says_what_it_chose_from.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),

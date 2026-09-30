@@ -583,8 +583,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0570](db/migrations/0570_the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does.sql) | `PENDING` | no — pending | **The batch optimizer can hand chargers out in the order the charge cursor serves cars.** (G297; research wing, |
 | [0571](db/migrations/0571_a_sweep_measures_a_dial_against_its_own_control.sql) | `PENDING` | no — pending | **A sweep measures a dial against its own control, the margin ledger prices it, and night 2 measures G297's.** |
 | [0572](db/migrations/0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql) | `PENDING` | no — pending | **A fleet build-out borrows cars for one test day, so the twin depot can be measured at 150 and 200 cars.** |
+| [0573](db/migrations/0573_every_charge_and_service_takes_the_time_public_data_says.sql) | `PENDING` | no — pending | **Every charge and service in the twin takes the time public data says it takes.** Lane A calibration |
 | [0590](db/migrations/0590_each_charger_choice_says_what_it_chose_from.sql) | `PENDING` | no — pending | **Each charger choice says what it had to choose from.** One read-only cockpit contract, |
 
-438 migrations indexed.
+439 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

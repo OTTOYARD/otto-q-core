@@ -188,6 +188,19 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_charge_batch_order_sql.py
 
+      # 0573: the charge curves and service times calibrated to public data. The calibrated minutes, what did not change
+      # (every L2 charge, a DC charge with no battery size), which cars' facts change, the sixty-minute sensor
+      # calibration, the refusals and the header's rollback, against the live charge functions carried byte for byte.
+      - name: Charge and service calibration, executed (0573 against the live charge functions' own source)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_charge_calibration_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
