@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260929192241
 -- migration-name:    each_charger_choice_says_what_it_chose_from
 --
 -- 0590  **Each charger choice says what it had to choose from.** One read-only cockpit contract,
