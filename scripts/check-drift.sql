@@ -661,6 +661,14 @@ repo_manifest(version, name, file) AS (
     ('20260929014318'::text, 'every_charger_stall_is_angled_and_the_database_says_so'::text, '0561_every_charger_stall_is_angled_and_the_database_says_so.sql'::text),
     ('PENDING'::text, 'a_charger_is_not_held_for_a_car_still_on_its_way_back'::text, '0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql'::text),
     ('20260929024700'::text, 'a_manual_start_interrupts_a_running_check'::text, '0564_a_manual_start_interrupts_a_running_check.sql'::text),
+    ('20260929183923'::text, 'a_scorecard_that_counts_cars_served'::text, '0565_a_scorecard_that_counts_cars_served.sql'::text),
+    ('20260929184316'::text, 'the_scorecard_reads_the_step_a_run_actually_took'::text, '0566_the_scorecard_reads_the_step_a_run_actually_took.sql'::text),
+    ('20260929191451'::text, 'a_charger_build_out_lives_only_inside_a_test_day'::text, '0567_a_charger_build_out_lives_only_inside_a_test_day.sql'::text),
+    ('20260929193249'::text, 'an_overnight_sweep_scores_one_test_day_at_a_time'::text, '0568_an_overnight_sweep_scores_one_test_day_at_a_time.sql'::text),
+    ('20260929200104'::text, 'a_margin_ledger_prices_what_the_twin_measured'::text, '0569_a_margin_ledger_prices_what_the_twin_measured.sql'::text),
+    ('PENDING'::text, 'the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does'::text, '0570_the_batch_optimizer_can_serve_cars_in_the_order_the_cursor_does.sql'::text),
+    ('PENDING'::text, 'a_sweep_measures_a_dial_against_its_own_control'::text, '0571_a_sweep_measures_a_dial_against_its_own_control.sql'::text),
+    ('PENDING'::text, 'a_fleet_build_out_borrows_cars_for_one_test_day'::text, '0572_a_fleet_build_out_borrows_cars_for_one_test_day.sql'::text),
     ('PENDING'::text, 'each_charger_choice_says_what_it_chose_from'::text, '0590_each_charger_choice_says_what_it_chose_from.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
