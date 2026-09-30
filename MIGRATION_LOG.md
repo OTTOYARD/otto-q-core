@@ -137,7 +137,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0590 — GENERATED, not a log
+## Index, 0134–0604 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0590 — which are indexed below as well as logged above; the log row is
@@ -600,7 +600,12 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0577](db/migrations/0577_a_test_days_opening_surge_is_not_the_depots_peak.sql) | `20260930115753` | yes — ledger | **A test day opens with every parked car plugging in at once, which a depot that runs around the clock never |
 | [0578](db/migrations/0578_a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id.sql) | `20260930114742` | yes — ledger | **A replicate, or the same cell on another night, is judged on what it did, not on its own run id.** Lane A, |
 | [0590](db/migrations/0590_each_charger_choice_says_what_it_chose_from.sql) | `20260929192241` | yes — ledger | **Each charger choice says what it had to choose from.** One read-only cockpit contract, |
+| [0600](db/migrations/0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql) | `PENDING` | no — pending | **The battery's day plan treated the highest five-minute SAMPLE as the demand already billed, and refilled its |
+| [0601](db/migrations/0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql) | `PENDING` | no — pending | **The battery's EV forecast put every car waiting on site onto a charger at 60% of the charger's nameplate, so a |
+| [0602](db/migrations/0602_the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes.sql) | `PENDING` | no — pending | **The stall calendar carries three EXCLUDE constraints on one key, and one of them can never refuse a row the |
+| [0603](db/migrations/0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql) | `PENDING` | no — pending | **Two scheduler tasks left `in_progress` on 2026-06-04 make the L1 shield refuse every task one Zoox is offered, |
+| [0604](db/migrations/0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql) | `PENDING` | no — pending | **A read-only measure of charger fit: how much of a run's fast-charger time went to cars that were already |
 
-444 migrations indexed.
+449 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

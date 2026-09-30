@@ -111,7 +111,35 @@ class Db:
     def file(self, path):
         p = subprocess.run(["psql", *_conn_args(), "-d", self.name, "-q", "-v", "ON_ERROR_STOP=1", "-f", path],
                            capture_output=True, text=True)
+        if p.returncode == 0:
+            self.run(REANCHOR)
         return p.returncode, p.stderr
+
+
+# The sweeps carry real calendar dates (night 1 waits for 2026-09-30 04:00 UTC, night 2 for 10-01, night 3 for 10-02),
+# and the runner compares them with now(). Read literally, every "this night is not yet due" assertion expires the
+# moment its night arrives: the smoke test went red at 04:00 UTC on 2026-09-30, the minute night 1 opened. So after each
+# file loads, every dated sweep not yet re-anchored keeps its authored date in `_authored_run_after` (what the
+# migration wrote, which the tests still assert) and is moved to now() plus its distance from the moment the schedule
+# was written (2026-09-29 20:00 UTC, the smoke arm). Order and spacing are kept; only the calendar stops mattering.
+REANCHOR = """DO $r$ BEGIN
+  IF to_regclass('public.ottoq_throughput_sweeps') IS NULL THEN RETURN; END IF;
+  CREATE TABLE IF NOT EXISTS public._authored_run_after (sweep_code text PRIMARY KEY, run_after timestamptz);
+  WITH n AS (
+    INSERT INTO public._authored_run_after
+    SELECT s.sweep_code, s.run_after FROM public.ottoq_throughput_sweeps s
+     WHERE s.run_after IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM public._authored_run_after a WHERE a.sweep_code = s.sweep_code)
+    RETURNING sweep_code)
+  UPDATE public.ottoq_throughput_sweeps s
+     SET run_after = now() + (s.run_after - timestamptz '2026-09-29 20:00:00+00')
+    FROM n WHERE n.sweep_code = s.sweep_code;
+END $r$"""
+
+
+def _authored(d, code):
+    return d.val("SELECT to_char(run_after AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS') "
+                 + f"FROM public._authored_run_after WHERE sweep_code = '{code}'")
 
 
 def _make_db(tag, release=True, ledger=True, night2=True, fleet=True):
@@ -181,12 +209,6 @@ def test_the_first_sweep_is_defined_and_the_runner_waits_for_its_window(db):
 def test_the_smoke_arm_runs_first_and_night_one_waits_for_its_window():
     d = _make_db("tsws", release=False)
     try:
-        # the definition: night 1 is due at 11 PM CT on Sep 29
-        assert d.val(f"SELECT run_after FROM public.ottoq_throughput_sweeps WHERE sweep_code = '{SWEEP}'").startswith(
-            "2026-09-30 04:00:00")
-        # the behaviour, on any date: every night not yet due waits (night 1's own date has passed since it was written)
-        d.val("""UPDATE public.ottoq_throughput_sweeps SET run_after = now() + interval '1 day'
-                  WHERE sweep_code <> 'smoke_2026_09_29'""")
         d.val(OPEN)
         res = d.json(RUN)
         assert res["ran"] is True and res["arm"]["sweep"] == "smoke_2026_09_29" and res["arm"]["cell"] == "dcfc20.otto_q"
@@ -197,6 +219,7 @@ def test_the_smoke_arm_runs_first_and_night_one_waits_for_its_window():
         st = d.json("SELECT jsonb_object_agg(sweep_code, status) FROM public.ottoq_throughput_sweeps")
         assert st == {"smoke_2026_09_29": "concluded", SWEEP: "active", NIGHT2: "active",    # nights 1-3 not yet due
                       F150: "active", F200: "active"}
+        assert _authored(d, SWEEP) == "2026-09-30T04:00:00"
     finally:
         _drop(d)
 
@@ -538,7 +561,7 @@ def test_night_two_is_four_cells_and_two_contrasts_on_night_ones_seeds(db):
     n1 = db.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{SWEEP}'")
     n2 = db.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{NIGHT2}'")
     assert n2["seeds"] == n1["seeds"] and n2["ticks"] == 144 and n2["replicates"] == 0 and n2["status"] == "active"
-    assert n2["run_after"].startswith("2026-10-01T04:00:00") and n2["priority"] == n1["priority"]
+    assert _authored(db, NIGHT2) == "2026-10-01T04:00:00" and n2["priority"] == n1["priority"]
     assert db.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
                      WHERE name = '0571_a_sweep_measures_a_dial_against_its_own_control'""") == "false/false"
     # a second apply is refused: by P1 (the ledger is no longer 0569's) before P2 can say so itself
@@ -647,7 +670,7 @@ def test_the_fleet_build_outs_are_the_twins_mix_and_night_three_is_defined(db):
     for code, fleet in ((F150, "fleet150"), (F200, "fleet200")):
         sw = db.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{code}'")
         assert sw["fleet_code"] == fleet and sw["seeds"] == n1[:3] and sw["replicates"] == 0
-        assert sw["run_after"].startswith("2026-10-02T04:00:00") and sw["ticks"] == 144
+        assert _authored(db, code) == "2026-10-02T04:00:00" and sw["ticks"] == 144
         cells = db.json(f"""SELECT jsonb_agg(jsonb_build_array(c.cell_code, c.seat, c.buildout_code) ORDER BY c.ord)
                               FROM public.ottoq_throughput_sweep_cells c WHERE c.sweep_id = '{sw["sweep_id"]}'""")
         assert cells == [["dcfc20.otto_q", "otto_q", "dcfc20"], ["dcfc20.fifo", "fifo", "dcfc20"],
@@ -789,7 +812,7 @@ def test_the_value_sweep_waits_for_the_calibration_and_is_what_it_says():
         n1 = d.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{SWEEP}'")
         v = d.json(f"SELECT to_jsonb(s) FROM public.ottoq_throughput_sweeps s WHERE sweep_code = '{VALUE}'")
         assert v["seeds"] == n1["seeds"][:3] and v["ticks"] == 288 and float(v["sim_min_per_tick"]) == 5
-        assert v["priority"] == 50 and v["replicates"] == 0 and v["run_after"].startswith("2026-10-01T04:00:00")
+        assert v["priority"] == 50 and v["replicates"] == 0 and _authored(d, VALUE) == "2026-10-01T04:00:00"
         assert d.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
                         WHERE name = '0575_night_two_measures_what_a_customer_is_paying_for'""") == "false/false"
         rc, err = d.file(M0575)
