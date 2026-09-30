@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20260930115405
 -- migration-name:    the_twin_prices_power_at_nashvilles_published_rate
 --
 -- 0574  **The twin depot's price of power is Nashville's published time-of-use rate, not an unsourced table.** Lane A
