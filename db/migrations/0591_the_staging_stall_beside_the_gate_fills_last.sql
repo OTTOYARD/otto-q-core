@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261001232134
 -- migration-name:    the_staging_stall_beside_the_gate_fills_last
 --
 -- 0591  **The staging stall beside the gate fills last.** One data row at the twin depot: NASH-STG-S024 (the renderer's
