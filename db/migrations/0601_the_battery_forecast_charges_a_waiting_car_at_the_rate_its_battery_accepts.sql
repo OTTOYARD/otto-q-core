@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261002200039
 -- migration-name:    the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts
 --
 -- 0601  **The battery's EV forecast put every car waiting on site onto a charger at 60% of the charger's nameplate, so a

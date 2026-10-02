@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261002194524
 -- migration-name:    the_overnight_sweep_keeps_its_own_window_and_starts_no_arm_it_cannot_finish
 --
 -- 0580  **The overnight sweep keeps its own window, and starts no test day it cannot finish before the window closes.**

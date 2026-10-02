@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261002194411
 -- migration-name:    the_in_flight_probe_sees_an_overnight_sweep_arm
 --
 -- 0579  **The in-flight probe every migration's P0 relies on now sees an overnight sweep arm.** Harness only. (G305)

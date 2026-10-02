@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261002195507
 -- migration-name:    a_run_that_has_ended_dispatches_no_car
 --
 -- 0582  **A run that has ended dispatches no car.** On a test day's last tick the twin decided and dispatched after the

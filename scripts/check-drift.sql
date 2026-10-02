@@ -675,19 +675,19 @@ repo_manifest(version, name, file) AS (
     ('20260930115650'::text, 'the_value_tab_reads_what_night_two_measured'::text, '0576_the_value_tab_reads_what_night_two_measured.sql'::text),
     ('20260930115753'::text, 'a_test_days_opening_surge_is_not_the_depots_peak'::text, '0577_a_test_days_opening_surge_is_not_the_depots_peak.sql'::text),
     ('20260930114742'::text, 'a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id'::text, '0578_a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id.sql'::text),
-    ('PENDING'::text, 'the_in_flight_probe_sees_an_overnight_sweep_arm'::text, '0579_the_in_flight_probe_sees_an_overnight_sweep_arm.sql'::text),
-    ('PENDING'::text, 'the_overnight_sweep_keeps_its_own_window_and_starts_no_arm_it_cannot_finish'::text, '0580_the_overnight_sweep_keeps_its_own_window_and_starts_no_arm_it_cannot_finish.sql'::text),
-    ('PENDING'::text, 'the_value_tab_names_the_test_a_charger_claim_failed'::text, '0581_the_value_tab_names_the_test_a_charger_claim_failed.sql'::text),
-    ('PENDING'::text, 'a_run_that_has_ended_dispatches_no_car'::text, '0582_a_run_that_has_ended_dispatches_no_car.sql'::text),
+    ('20261002194411'::text, 'the_in_flight_probe_sees_an_overnight_sweep_arm'::text, '0579_the_in_flight_probe_sees_an_overnight_sweep_arm.sql'::text),
+    ('20261002194524'::text, 'the_overnight_sweep_keeps_its_own_window_and_starts_no_arm_it_cannot_finish'::text, '0580_the_overnight_sweep_keeps_its_own_window_and_starts_no_arm_it_cannot_finish.sql'::text),
+    ('20261002195422'::text, 'the_value_tab_names_the_test_a_charger_claim_failed'::text, '0581_the_value_tab_names_the_test_a_charger_claim_failed.sql'::text),
+    ('20261002195507'::text, 'a_run_that_has_ended_dispatches_no_car'::text, '0582_a_run_that_has_ended_dispatches_no_car.sql'::text),
     ('20260929192241'::text, 'each_charger_choice_says_what_it_chose_from'::text, '0590_each_charger_choice_says_what_it_chose_from.sql'::text),
     ('20261001232134'::text, 'the_staging_stall_beside_the_gate_fills_last'::text, '0591_the_staging_stall_beside_the_gate_fills_last.sql'::text),
     ('20261001233144'::text, 'a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced'::text, '0592_a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced.sql'::text),
     ('20261002014128'::text, 'the_entrance_sign_stands_outside_the_fence_where_the_twin_draws_it'::text, '0593_the_entrance_sign_stands_outside_the_fence_where_the_twin_draws_it.sql'::text),
-    ('PENDING'::text, 'the_battery_never_charges_itself_into_the_billed_half_hour'::text, '0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql'::text),
-    ('PENDING'::text, 'the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts'::text, '0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql'::text),
+    ('20261002195616'::text, 'the_battery_never_charges_itself_into_the_billed_half_hour'::text, '0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql'::text),
+    ('20261002200039'::text, 'the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts'::text, '0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql'::text),
     ('PENDING'::text, 'the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes'::text, '0602_the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes.sql'::text),
     ('PENDING'::text, 'a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day'::text, '0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql'::text),
-    ('PENDING'::text, 'every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them'::text, '0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql'::text)
+    ('20261002200316'::text, 'every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them'::text, '0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

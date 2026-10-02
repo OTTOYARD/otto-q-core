@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261002195422
 -- migration-name:    the_value_tab_names_the_test_a_charger_claim_failed
 --
 -- 0581  **When the Value tab withholds the charger claim, it says which test failed, in that test's numbers.** Read-only.

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261002195616
 -- migration-name:    the_battery_never_charges_itself_into_the_billed_half_hour
 --
 -- 0600  **The battery's day plan treated the highest five-minute SAMPLE as the demand already billed, and refilled its

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261002200316
 -- migration-name:    every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them
 --
 -- 0604  **A read-only measure of charger fit: how much of a run's fast-charger time went to cars that were already
