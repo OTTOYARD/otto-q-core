@@ -66,11 +66,12 @@ INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, obje
 SELECT '0581_pre', 'function', 'public', 'ottoq_value_summary', d, md5(d)
   FROM (SELECT pg_get_functiondef('public.ottoq_value_summary(text)'::regprocedure) AS d) z;
 
--- the body 0576 wrote, kept under another name for V1 and dropped before COMMIT
+-- the body 0576 wrote, kept for V1 as a temporary function: it lives in this session's own schema and goes with it
 DO $pre$
 BEGIN
   EXECUTE replace(pg_get_functiondef('public.ottoq_value_summary(text)'::regprocedure),
-                  'public.ottoq_value_summary(', 'public.ottoq_value_summary_0581_pre(');
+                  'public.ottoq_value_summary(', 'pg_temp.ottoq_value_summary_0581_pre(');
+  REVOKE ALL ON FUNCTION pg_temp.ottoq_value_summary_0581_pre(text) FROM PUBLIC;
 END $pre$;
 
 CREATE OR REPLACE FUNCTION public.ottoq_value_summary(p_sweep_code text DEFAULT NULL)
@@ -378,7 +379,7 @@ DECLARE r record; v_new jsonb; v_old jsonb; v_ni jsonb; v_oi jsonb; n int := 0;
 BEGIN
   FOR r IN SELECT NULL::text AS code UNION ALL SELECT sweep_code FROM public.ottoq_throughput_sweeps LOOP
     v_new := public.ottoq_value_summary(r.code);
-    v_old := public.ottoq_value_summary_0581_pre(r.code);
+    v_old := pg_temp.ottoq_value_summary_0581_pre(r.code);
     v_ni  := CASE WHEN jsonb_typeof(v_new->'investor') = 'object' THEN v_new->'investor' END;
     v_oi  := CASE WHEN jsonb_typeof(v_old->'investor') = 'object' THEN v_old->'investor' END;
     IF (v_new - 'investor') IS DISTINCT FROM (v_old - 'investor')
@@ -414,8 +415,6 @@ BEGIN
   END IF;
   RAISE NOTICE '0581 V2: %', v->>'chargers_statement';
 END $v2$;
-
-DROP FUNCTION public.ottoq_value_summary_0581_pre(text);
 
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0581_the_value_tab_names_the_test_a_charger_claim_failed', false, false,
