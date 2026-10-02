@@ -17,6 +17,8 @@ back from its pre-image; it cannot commit applied; and a fleet night's arm borro
 teardown. tests/fixtures/fleet_buildout_stub.sql gives the stub both depots' cars. And 0577: each arm keeps its peak demand read
 from 0-120 minutes into the day by the scorer's own arithmetic, equal to the scorer at 0, and the Value tab bills from an
 hour in only when every arm carries it; tests/fixtures/peak_profile_stub.sql gives the stub a day with an opening surge.
+And 0580: the runner reads its window itself, so a starved close cannot keep it open, and starts no arm whose measured
+length (its cell's, else its sweep's, else its budget; never a failed arm's) would carry it past the close.
 
 It SKIPS where no scratch PostgreSQL is reachable, like tests/test_throughput_scorecard_sql.py.
 """
@@ -1129,3 +1131,272 @@ def test_0578_waits_for_0572():
     finally:
         _drop(d)
 
+
+
+# ── 0580: the runner keeps its own window and starts no arm it cannot finish ───────────────────────────────────────────
+
+M0580 = os.path.join(MIG, "0580_the_overnight_sweep_keeps_its_own_window_and_starts_no_arm_it_cannot_finish.sql")
+GLOBAL = "'global', '00000000-0000-0000-0000-000000000000'"
+NOW_MIN = "(extract(hour FROM now() AT TIME ZONE 'UTC') * 60 + extract(minute FROM now() AT TIME ZONE 'UTC'))::int"
+
+
+def _with_0580(d):
+    rc, err = d.file(M0580)
+    assert rc == 0, f"0580 did not apply: {err}"
+    return err
+
+
+def _window(d, open_off, close_off, grace=0):
+    """The window as minutes from now (server clock), wrapped onto the UTC day."""
+    for key, off in (("throughput_sweep_window_open_utc_min", open_off), ("throughput_sweep_window_close_utc_min", close_off)):
+        d.val(f"SELECT public.ottoq_policy_set({GLOBAL}, '{key}', ((({NOW_MIN}) + ({off})) % 1440 + 1440) % 1440, 'test')")
+    d.val(f"SELECT public.ottoq_policy_set({GLOBAL}, 'throughput_sweep_close_grace_min', {grace}, 'test')")
+
+
+def _measured(d, ord_, wall_s, error=False, sweep=SWEEP):
+    """An arm of known length in a cell, at a seed the sweep does not run, so it measures the cell and does no task."""
+    complete, arm_error = ("false", """'{"error": "stub"}'::jsonb""") if error else ("true", "NULL")
+    d.val(f"""INSERT INTO public.ottoq_throughput_sweep_arms (sweep_id, cell_id, seed, replicate, engine_hash, dial_floor,
+                                                               complete, wall_s, arm_error)
+              SELECT s.sweep_id, c.cell_id, 7, false, 'measured', now(), {complete}, {wall_s}, {arm_error}
+                FROM public.ottoq_throughput_sweeps s JOIN public.ottoq_throughput_sweep_cells c USING (sweep_id)
+               WHERE s.sweep_code = '{sweep}' AND c.ord = {ord_}""")
+
+
+def _primary_arms(d):
+    return int(d.val("SELECT count(*) FROM public.ottoq_throughput_sweep_arms WHERE seed <> 7"))
+
+
+def test_0580_outside_its_window_the_runner_does_nothing_whatever_the_switch_reads(fresh):
+    d = fresh
+    _with_0580(d)
+    d.val(OPEN)
+    _window(d, 60, 120)                                     # opens in an hour
+    res = d.json(RUN)
+    assert res["ran"] is False and res["why"].startswith("outside the sweep window, ")
+    _window(d, -180, -1)                                    # closed a minute ago: night 2's arm 29 would not start
+    assert d.json(RUN)["why"].startswith("outside the sweep window, ")
+    assert _primary_arms(d) == 0
+
+
+def test_0580_inside_its_window_the_runner_runs_as_before(fresh):
+    d = fresh
+    _with_0580(d)
+    d.val(OPEN)
+    _window(d, -60, 360)
+    res = d.json(RUN)
+    assert res["ran"] is True and res["arm"]["cell"] == "dcfc10.otto_q" and res["arm"]["complete"] is True
+    assert d.json(ARMS)[0]["ord"] == 1
+
+
+def test_0580_a_window_whose_open_is_after_its_close_wraps_midnight(fresh):
+    d = fresh
+    _with_0580(d)
+    d.val(OPEN)
+    _window(d, 60, -60)                                     # 22 hours from close to open: now is in the gap
+    assert d.json(RUN)["why"].startswith("outside the sweep window, ")
+    _window(d, -60, -120)                                   # opened an hour ago, closes in 22 hours, across midnight
+    assert d.json(RUN)["ran"] is True
+
+
+def test_0580_reads_the_default_window_as_4_to_11_utc(fresh):
+    d = fresh
+    _with_0580(d)
+    assert [d.val(f"SELECT public.ottoq_policy_get(NULL, '{k}', -1)") for k in
+            ("throughput_sweep_window_open_utc_min", "throughput_sweep_window_close_utc_min",
+             "throughput_sweep_close_grace_min")] == ["240", "660", "0"]
+    d.val(OPEN)
+    res = d.json(RUN)
+    if not (240 <= int(d.val(f"SELECT {NOW_MIN}")) < 660):
+        assert res == {"ran": False, "why": "outside the sweep window, 04:00-11:00 UTC"}
+    else:
+        assert not str(res.get("why", "")).startswith("outside the sweep window")
+
+
+def test_0580_an_arm_that_would_end_after_the_close_is_not_started(fresh):
+    d = fresh
+    _with_0580(d)
+    d.val(OPEN)
+    _measured(d, 1, 600)                                    # this cell has taken 10 minutes
+    _window(d, -60, 2)                                      # and the window closes within 2 minutes
+    res = d.json(RUN)
+    assert res["ran"] is False and res["why"].startswith("the next arm would end after the window closes: about 10 min (this cell)")
+    assert res["estimate_from"] == "this cell" and res["estimate_s"] == 600 and res["replicate"] is False
+    assert _primary_arms(d) == 0                            # refused, not recorded: it runs first next night
+    _window(d, -60, 2, grace=15)                            # 15 minutes of grace covers it
+    assert d.json(RUN)["ran"] is True
+    assert _primary_arms(d) == 1
+
+
+def test_0580_an_unmeasured_cell_is_timed_by_its_sweep_and_an_unmeasured_sweep_by_its_budget(fresh):
+    d = fresh
+    _with_0580(d)
+    d.val(OPEN)
+    budget = int(d.val(f"SELECT COALESCE(arm_budget_s, GREATEST(240, ticks * 30)) FROM public.ottoq_throughput_sweeps "
+                       f"WHERE sweep_code = '{SWEEP}'"))
+    assert budget == 4320                                   # 144 ticks x 30 s: where the arm's tick loop stops
+    _window(d, -60, 30)
+    res = d.json(RUN)
+    assert res["ran"] is False and res["estimate_from"] == "its budget" and res["estimate_s"] == budget
+    _measured(d, 2, 900)                                    # another cell of the sweep has taken 15 minutes
+    _window(d, -60, 10)
+    res = d.json(RUN)
+    assert res["ran"] is False and res["estimate_from"] == "this sweep" and res["estimate_s"] == 900
+    _window(d, -60, 30)
+    res = d.json(RUN)
+    assert res["ran"] is True                               # 15 minutes fit in the half hour left
+    _measured(d, 3, 2400)                                   # 40 minutes: now the sweep's longest
+    _window(d, -60, 30)
+    res = d.json(RUN)                                       # cell 2 is next and has its own measure: 15 minutes
+    assert res["ran"] is True and res["arm"]["cell"] == d.val(
+        f"SELECT cell_code FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id) "
+        f"WHERE s.sweep_code = '{SWEEP}' AND c.ord = 2")
+
+
+def test_0580_a_failed_arm_is_not_taken_as_the_measure(fresh):
+    d = fresh
+    _with_0580(d)
+    d.val(OPEN)
+    _measured(d, 1, 5, error=True)                          # failed after 5 s: not how long the cell takes
+    _window(d, -60, 30)
+    res = d.json(RUN)
+    assert res["ran"] is False and res["estimate_from"] == "its budget"
+
+
+def test_0580_moves_only_night_ones_frontier_behind_the_sweeps_never_run(fresh):
+    d = fresh
+    before = d.json("SELECT jsonb_object_agg(sweep_code, priority) FROM public.ottoq_throughput_sweeps")
+    _with_0580(d)
+    after = d.json("SELECT jsonb_object_agg(sweep_code, priority) FROM public.ottoq_throughput_sweeps")
+    assert before[SWEEP] == 100 and after[SWEEP] == 200
+    assert {k: v for k, v in after.items() if k != SWEEP} == {k: v for k, v in before.items() if k != SWEEP}
+    assert d.val("SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage WHERE name = "
+                 "'0580_the_overnight_sweep_keeps_its_own_window_and_starts_no_arm_it_cannot_finish'") == "false/false"
+    assert d.val("SELECT count(*) FROM public.ottoq_policy_params WHERE updated_by = '0580 V2'") == "0"
+
+
+def test_0580_refuses_a_second_time_and_a_runner_it_did_not_read(fresh):
+    d = fresh
+    _with_0580(d)
+    rc, err = d.file(M0580)
+    assert rc != 0 and "0580 P1: already applied" in err
+    d2 = _make_db("tsw80")
+    try:
+        d2.val("""DO $$ BEGIN EXECUTE replace(pg_get_functiondef('public.ottoq_throughput_sweep_runner()'::regprocedure),
+                                           'a run is live', 'a run is live now'); END $$""")
+        rc, err = d2.file(M0580)
+        assert rc != 0 and "0580 P1: ottoq_throughput_sweep_runner is not the body 0568 wrote" in err
+    finally:
+        _drop(d2)
+
+
+def test_0580_the_rollback_snapshot_restores_0568s_runner(fresh):
+    d = fresh
+    _with_0580(d)
+    d.val("DO $r$ BEGIN EXECUTE (SELECT definition FROM public.ottoq_schema_snapshots WHERE label = '0580_pre'); END $r$")
+    assert d.val("SELECT md5(prosrc) FROM pg_proc WHERE proname = 'ottoq_throughput_sweep_runner'") == \
+        "7f477c3924f9617c8515021a36223064"
+
+
+# ── 0581: a withheld charger claim names the test that failed ──────────────────────────────────────────────────────────
+
+M0581 = os.path.join(MIG, "0581_the_value_tab_names_the_test_a_charger_claim_failed.sql")
+
+
+def _edit_arm(d, cell, which, expr):
+    """Edit one arm's evidence in this throwaway database: `which` is min or max arm_id of the cell."""
+    d.val("ALTER TABLE public.ottoq_throughput_sweep_arms DISABLE TRIGGER trg_ottoq_throughput_sweep_arms_append_only")
+    d.val(f"""UPDATE public.ottoq_throughput_sweep_arms a SET {expr}
+                FROM public.ottoq_throughput_sweep_cells c
+               WHERE c.cell_id = a.cell_id AND c.cell_code = '{cell}'
+                 AND a.arm_id = (SELECT {which}(x.arm_id) FROM public.ottoq_throughput_sweep_arms x WHERE x.cell_id = c.cell_id)""")
+    d.val("ALTER TABLE public.ottoq_throughput_sweep_arms ENABLE TRIGGER trg_ottoq_throughput_sweep_arms_append_only")
+
+
+def test_0581_a_withheld_charger_claim_names_the_test_that_failed():
+    d = _value_db("tsw81")
+    try:
+        d.val(CALIBRATED)
+        rc, err = d.file(M0575)
+        assert rc == 0, err
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{VALUE}'")
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code IN ('{SWEEP}', '{NIGHT2}')")
+        d.val(OPEN)
+        for _ in range(16):                 # seeds 1 and 2, all eight cells
+            assert d.json(RUN)["ran"] is True
+        before = d.json("SELECT public.ottoq_value_summary(NULL)")
+        rc, err = d.file(M0581)
+        assert rc == 0, f"0581 did not apply: {err}"
+        assert "summaries read the same but for the withholding sentence" in err and "nothing withheld to read" in err
+        after = d.json("SELECT public.ottoq_value_summary(NULL)")
+        # the claim and everything else are as they were; the comparison is also given as numbers
+        assert {k: v for k, v in after.items() if k != "investor"} == {k: v for k, v in before.items() if k != "investor"}
+        inv = after["investor"]
+        assert inv["chargers_statement"] == before["investor"]["chargers_statement"]
+        assert inv["chargers_statement"].startswith("On every test day")
+        t = inv["chargers_test"]
+        assert t["test_days"] == 2 and t["cars_served_per_day"]["days_at_least_as_many"] == 2
+        assert t["ride_demand_met_pct"]["days_at_least_as_much"] == 2
+        lo, hi = after["views"][0]["fast_chargers"], after["views"][1]["fast_chargers"]
+
+        # night 2's case: the plain depot with more chargers met more ride demand on one day; OTTO-Q served no fewer cars
+        unmet0 = d.val("""SELECT a.arm_metrics->>'unmet_demand_car_hours' FROM public.ottoq_throughput_sweep_arms a
+                            JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+                           WHERE c.cell_code = 'dcfc20.fifo.energy_off' ORDER BY a.arm_id LIMIT 1""")
+        _edit_arm(d, "dcfc20.fifo.energy_off", "min", "arm_metrics = a.arm_metrics || '{\"unmet_demand_car_hours\": 5}'")
+        inv = d.json("SELECT public.ottoq_value_summary(NULL)")["investor"]
+        t = inv["chargers_test"]
+        assert inv["chargers_statement"] == (
+            f"Not on every test day. Against a plain depot with {hi} fast chargers, OTTO-Q with {lo} served at least as many "
+            f"cars ({t['cars_served_per_day']['otto_q']} a day against {t['cars_served_per_day']['plain']}) but met less of "
+            f"the ride demand on 1 of 2 test days ({t['ride_demand_met_pct']['otto_q']}% against "
+            f"{t['ride_demand_met_pct']['plain']}%).")
+        assert t["ride_demand_met_pct"]["days_at_least_as_much"] == 1 and t["cars_served_per_day"]["days_at_least_as_many"] == 2
+        assert inv["chargers_avoided"] is None and inv["charger_capex_avoided_usd"] is None
+
+        # both fail, on different days: joined by "and"
+        _edit_arm(d, "dcfc20.fifo.energy_off", "max", "scorecard = jsonb_set(a.scorecard, '{throughput,visits_served}', '3')")
+        inv = d.json("SELECT public.ottoq_value_summary(NULL)")["investor"]
+        assert "served fewer cars on 1 of 2 test days (" in inv["chargers_statement"]
+        assert ") and met less of the ride demand on 1 of 2 test days (" in inv["chargers_statement"]
+
+        # only cars served fails: named, and ride demand said to have held
+        _edit_arm(d, "dcfc20.fifo.energy_off", "min",
+                  f"arm_metrics = a.arm_metrics || jsonb_build_object('unmet_demand_car_hours', {unmet0}::numeric)")
+        inv = d.json("SELECT public.ottoq_value_summary(NULL)")["investor"]
+        t = inv["chargers_test"]
+        assert inv["chargers_statement"] == (
+            f"Not on every test day. Against a plain depot with {hi} fast chargers, OTTO-Q with {lo} served fewer cars on 1 "
+            f"of 2 test days ({t['cars_served_per_day']['otto_q']} a day against {t['cars_served_per_day']['plain']}) but met "
+            f"at least as much of the ride demand ({t['ride_demand_met_pct']['otto_q']}% against "
+            f"{t['ride_demand_met_pct']['plain']}%).")
+
+        assert d.val("""SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
+                        WHERE name = '0581_the_value_tab_names_the_test_a_charger_claim_failed'""") == "false/false"
+        assert d.val("SELECT count(*) FROM pg_proc WHERE proname = 'ottoq_value_summary_0581_pre'") == "0"
+        assert d.val("SELECT has_function_privilege('anon', 'public.ottoq_value_summary(text)', 'EXECUTE')") == "t"
+        rc, err = d.file(M0581)
+        assert rc != 0 and "0581 P1: already applied" in err
+    finally:
+        _drop(d)
+
+
+def test_0581_on_one_test_day_says_the_one_test_day():
+    d = _value_db("tsw81b")
+    try:
+        d.val(CALIBRATED)
+        rc, err = d.file(M0575)
+        assert rc == 0, err
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET run_after = NULL WHERE sweep_code = '{VALUE}'")
+        d.val(f"UPDATE public.ottoq_throughput_sweeps SET status = 'paused' WHERE sweep_code IN ('{SWEEP}', '{NIGHT2}')")
+        d.val(OPEN)
+        for _ in range(8):                  # seed 1 only, as on night 2
+            assert d.json(RUN)["ran"] is True
+        rc, err = d.file(M0581)
+        assert rc == 0, err
+        _edit_arm(d, "dcfc20.fifo.energy_off", "min", "arm_metrics = a.arm_metrics || '{\"unmet_demand_car_hours\": 5}'")
+        inv = d.json("SELECT public.ottoq_value_summary(NULL)")["investor"]
+        assert "but met less of the ride demand on the one test day (" in inv["chargers_statement"]
+        assert inv["chargers_test"]["test_days"] == 1
+    finally:
+        _drop(d)

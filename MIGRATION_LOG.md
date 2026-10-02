@@ -602,6 +602,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0576](db/migrations/0576_the_value_tab_reads_what_night_two_measured.sql) | `20260930115650` | yes — ledger | **The twin's Value tab reads what night 2 measured, and nothing else.** One read-only contract, |
 | [0577](db/migrations/0577_a_test_days_opening_surge_is_not_the_depots_peak.sql) | `20260930115753` | yes — ledger | **A test day opens with every parked car plugging in at once, which a depot that runs around the clock never |
 | [0578](db/migrations/0578_a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id.sql) | `20260930114742` | yes — ledger | **A replicate, or the same cell on another night, is judged on what it did, not on its own run id.** Lane A, |
+| [0579](db/migrations/0579_the_in_flight_probe_sees_an_overnight_sweep_arm.sql) | `PENDING` | no — pending | **The in-flight probe every migration's P0 relies on now sees an overnight sweep arm.** Harness only. (G305) |
+| [0580](db/migrations/0580_the_overnight_sweep_keeps_its_own_window_and_starts_no_arm_it_cannot_finish.sql) | `PENDING` | no — pending | **The overnight sweep keeps its own window, and starts no test day it cannot finish before the window closes.** |
+| [0581](db/migrations/0581_the_value_tab_names_the_test_a_charger_claim_failed.sql) | `PENDING` | no — pending | **When the Value tab withholds the charger claim, it says which test failed, in that test's numbers.** Read-only |
+| [0582](db/migrations/0582_a_run_that_has_ended_dispatches_no_car.sql) | `PENDING` | no — pending | **A run that has ended dispatches no car.** On a test day's last tick the twin decided and dispatched after the |
 | [0590](db/migrations/0590_each_charger_choice_says_what_it_chose_from.sql) | `20260929192241` | yes — ledger | **Each charger choice says what it had to choose from.** One read-only cockpit contract, |
 | [0591](db/migrations/0591_the_staging_stall_beside_the_gate_fills_last.sql) | `20261001232134` | yes — ledger | **The staging stall beside the gate fills last.** One data row at the twin depot: NASH-STG-S024 (the renderer's |
 | [0592](db/migrations/0592_a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced.sql) | `20261001233144` | yes — ledger | **A vehicle card names each step's station, and the bookings OTTO-Q replaced on this visit.** Contract 1.5 of |
@@ -612,6 +616,6 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0603](db/migrations/0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql) | `PENDING` | no — pending | **Two scheduler tasks left `in_progress` on 2026-06-04 make the L1 shield refuse every task one Zoox is offered, |
 | [0604](db/migrations/0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql) | `PENDING` | no — pending | **A read-only measure of charger fit: how much of a run's fast-charger time went to cars that were already |
 
-452 migrations indexed.
+456 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
