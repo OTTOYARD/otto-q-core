@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261002200039
 -- migration-name:    the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts
 --
 -- 0601  **The battery's EV forecast put every car waiting on site onto a charger at 60% of the charger's nameplate, so a
@@ -53,8 +53,12 @@
 --   The forecast goes to `ottoq_schema_snapshots` as '0601_pre'.
 --   V1: the new forecast passes the helper once, on the job query. V2, written to hold on whatever charge curve the twin
 --   runs when this is applied (0573 recalibrates it, and goes first): every twin car charging to 100 is forecast at 90%
---   at exactly the twin's own harmonic-mean rate, never above 0444's rate for that car, and at least one strictly below;
---   an unknown car is left as 0444 had it.
+--   at exactly the lesser of the twin's own harmonic-mean rate and 0444's rate for that car (the forecast's LEAST), so
+--   never above 0444's, and at least one strictly below; an unknown car is left as 0444 had it.
+--   (Amended 2026-10-02, before its first apply, which V2 refused: it judged the helper's own rate rather than the rate
+--   the forecast charges. The twin's Zoox run at a 100 kW inlet and on 0573's curve take 60.0-60.9 kW from 90% to 100%,
+--   a little more than 0444's 0.60 x 100; the LEAST keeps 0444's 60 for them, as §2(b) says. The engine change is as
+--   written.)
 --   Executed against the live source by tests/test_bess_half_hour_sql.py (tests/fixtures/bess_half_hour_stub.sql).
 --
 -- ══ §4 RECERT AND DIAL CLASSIFICATION ═════════════════════════════════════════════════════════════════════════════════
@@ -174,9 +178,10 @@ END $v1$;
 -- ── V2: the forecast rate is the twin's own, and it never rises ──
 -- Checked against whatever charge curve the twin runs when this is applied (0573 recalibrates it and goes first), so the
 -- assertions are the design's invariants, not tonight's numbers: (a) an unknown car is left as 0444 had it; (b) for every
--- twin car charging to 100, the rate the scheduler will charge at 90% is the harmonic mean of the twin's own rate function
--- at 91.25/93.75/96.25/98.75% on a 250 kW charger, computed here independently, to the watt; (c) that rate is never above
--- 0444's 0.60 x LEAST(inlet, 250); (d) at least one of them is strictly below it, or this file changed nothing.
+-- twin car charging to 100, the rate the scheduler will charge at 90%, through the forecast's LEAST(inlet, helper), is the
+-- lesser of the harmonic mean of the twin's own rate function at 91.25/93.75/96.25/98.75% on a 250 kW charger, computed
+-- here independently, and 0444's 0.60 x LEAST(inlet, 250), to the watt; (c) so it is never above 0444's; (d) at least
+-- one of them is strictly below it, or this file changed nothing.
 DO $v2$
 DECLARE
   v_bad text;
@@ -186,7 +191,7 @@ BEGIN
     RAISE EXCEPTION '0601 V2: an unknown car was given a rate';
   END IF;
   WITH c AS (
-    SELECT v.id, LEAST(COALESCE(v.inlet_max_kw, 150), 250) * 0.60 AS old_kw,
+    SELECT v.id, LEAST(COALESCE(v.inlet_max_kw, 150), 250) AS inlet, LEAST(COALESCE(v.inlet_max_kw, 150), 250) * 0.60 AS old_kw,
            public.ottoq_queue_job_inlet_kw(v.id, 90) AS enc,
            4.0 / (SELECT sum(1.0 / public.ottoq_sim_compute_charge_rate(
                       -- the helper's own expression: the rate function salts its noise with the SoC's text
@@ -200,15 +205,17 @@ BEGIN
      WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111' AND COALESCE(v.target_soc, 100) = 100
        AND COALESCE(v.inlet_max_kw, 150) > 50
   ), d AS (
-    SELECT c.*, CASE WHEN c.enc <= 30 THEN c.enc ELSE c.enc * 0.60 END AS new_kw FROM c WHERE c.enc IS NOT NULL
+    -- the inlet the forecast passes is LEAST(inlet, helper), charged by the scheduler's arithmetic
+    SELECT c.*, CASE WHEN LEAST(c.inlet, c.enc) <= 50 THEN LEAST(c.inlet, c.enc) ELSE LEAST(c.inlet, c.enc) * 0.60 END AS new_kw
+      FROM c WHERE c.enc IS NOT NULL
   )
   SELECT string_agg(d.id::text || ' ' || round(d.new_kw, 3) || '/' || round(d.want_kw, 3) || '/' || round(d.old_kw, 1), ', '),
          (SELECT count(*) FROM d WHERE d.new_kw < d.old_kw - 0.001)
     INTO v_bad, v_lower
     FROM d
-   WHERE abs(d.new_kw - d.want_kw) > 0.001 OR d.new_kw > d.old_kw + 0.001;
+   WHERE abs(d.new_kw - LEAST(d.want_kw, d.old_kw)) > 0.001 OR d.new_kw > d.old_kw + 0.001;
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0601 V2: forecast rates at 90%% off the twin''s own or above 0444''s (new/twin/0444 kW): %', v_bad;
+    RAISE EXCEPTION '0601 V2: forecast rates at 90%% off the lesser of the twin''s own and 0444''s (new/twin/0444 kW): %', v_bad;
   END IF;
   IF COALESCE(v_lower, 0) = 0 AND EXISTS (SELECT 1 FROM public.vehicles
                                            WHERE home_depot_id = '11111111-1111-1111-1111-111111111111') THEN

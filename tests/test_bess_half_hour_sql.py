@@ -383,6 +383,29 @@ def test_0601_holds_on_0573s_calibrated_curves_too(db):
     assert 10 < ipace <= 30 < zoox * 0.60 < 0.60 * 200
 
 
+def test_0601_a_battery_that_takes_more_than_0444s_rate_keeps_0444s(db):
+    # The twin's Zoox run at a 100 kW inlet (2026-10-02). On 0573's curve one takes a little more from 90% to 100% than
+    # 0444's 0.60 x 100 = 60 kW, so the forecast's LEAST keeps 0444's 60. 0601's first live apply refused on exactly these
+    # cars: its V2 judged the helper's own rate instead of the rate the forecast charges. An I-PACE keeps V2's "at least
+    # one lower" honest.
+    db.val(_rate_function_from_0573())
+    db.val(FLEET)
+    for i in range(1, 9):
+        db.val(f"INSERT INTO public.vehicles VALUES ('b0000000-0000-0000-0000-{i:012d}', '{DEPOT}', "
+               f"'staged_awaiting_service', 90, 100, 133, 100)")
+    db.val(f"INSERT INTO public.vehicles VALUES ('b0000000-0000-0000-0000-000000000009', '{DEPOT}', "
+           f"'staged_awaiting_service', 90, 100, 84.7, 104)")
+    before = _queue(db)
+    rc, err = db.file(M0601)
+    assert rc == 0, err
+    zoox = [float(db.val(f"SELECT public.ottoq_queue_job_inlet_kw('b0000000-0000-0000-0000-{i:012d}', 90)"))
+            for i in range(1, 9)]
+    assert any(z * 0.60 > 60 for z in zoox)                 # some batteries take more than 0444's 60 kW
+    assert all(min(100, z) * 0.60 <= 60 for z in zoox)      # and the forecast's LEAST never charges more than 0444's
+    after = _queue(db)
+    assert after["load"][0] < before["load"][0] and abs(sum(before["load"]) - sum(after["load"])) < 1
+
+
 def test_0601_refuses_in_flight_twice_and_rolls_back(db):
     db.val("UPDATE public.stub_in_flight SET n = 1")
     rc, err = db.file(M0601)
