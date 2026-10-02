@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261002014128
 -- migration-name:    the_entrance_sign_stands_outside_the_fence_where_the_twin_draws_it
 --
 -- 0593  **The entrance sign stands outside the fence, where the twin draws it.** One data row at the twin depot:
