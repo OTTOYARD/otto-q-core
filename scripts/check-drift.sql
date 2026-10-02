@@ -677,7 +677,7 @@ repo_manifest(version, name, file) AS (
     ('20260930114742'::text, 'a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id'::text, '0578_a_replicate_is_judged_on_what_it_did_not_on_its_own_run_id.sql'::text),
     ('20260929192241'::text, 'each_charger_choice_says_what_it_chose_from'::text, '0590_each_charger_choice_says_what_it_chose_from.sql'::text),
     ('20261001232134'::text, 'the_staging_stall_beside_the_gate_fills_last'::text, '0591_the_staging_stall_beside_the_gate_fills_last.sql'::text),
-    ('PENDING'::text, 'a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced'::text, '0592_a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced.sql'::text),
+    ('20261001233144'::text, 'a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced'::text, '0592_a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced.sql'::text),
     ('PENDING'::text, 'the_battery_never_charges_itself_into_the_billed_half_hour'::text, '0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql'::text),
     ('PENDING'::text, 'the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts'::text, '0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql'::text),
     ('PENDING'::text, 'the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes'::text, '0602_the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes.sql'::text),

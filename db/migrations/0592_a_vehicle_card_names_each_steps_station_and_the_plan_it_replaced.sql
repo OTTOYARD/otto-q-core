@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261001233144
 -- migration-name:    a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced
 --
 -- 0592  **A vehicle card names each step's station, and the bookings OTTO-Q replaced on this visit.** Contract 1.5 of
