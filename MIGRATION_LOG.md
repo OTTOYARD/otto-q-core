@@ -604,12 +604,13 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0590](db/migrations/0590_each_charger_choice_says_what_it_chose_from.sql) | `20260929192241` | yes — ledger | **Each charger choice says what it had to choose from.** One read-only cockpit contract, |
 | [0591](db/migrations/0591_the_staging_stall_beside_the_gate_fills_last.sql) | `20261001232134` | yes — ledger | **The staging stall beside the gate fills last.** One data row at the twin depot: NASH-STG-S024 (the renderer's |
 | [0592](db/migrations/0592_a_vehicle_card_names_each_steps_station_and_the_plan_it_replaced.sql) | `20261001233144` | yes — ledger | **A vehicle card names each step's station, and the bookings OTTO-Q replaced on this visit.** Contract 1.5 of |
+| [0593](db/migrations/0593_the_entrance_sign_stands_outside_the_fence_where_the_twin_draws_it.sql) | `PENDING` | no — pending | **The entrance sign stands outside the fence, where the twin draws it.** One data row at the twin depot: |
 | [0600](db/migrations/0600_the_battery_never_charges_itself_into_the_billed_half_hour.sql) | `PENDING` | no — pending | **The battery's day plan treated the highest five-minute SAMPLE as the demand already billed, and refilled its |
 | [0601](db/migrations/0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql) | `PENDING` | no — pending | **The battery's EV forecast put every car waiting on site onto a charger at 60% of the charger's nameplate, so a |
 | [0602](db/migrations/0602_the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes.sql) | `PENDING` | no — pending | **The stall calendar carries three EXCLUDE constraints on one key, and one of them can never refuse a row the |
 | [0603](db/migrations/0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql) | `PENDING` | no — pending | **Two scheduler tasks left `in_progress` on 2026-06-04 make the L1 shield refuse every task one Zoox is offered, |
 | [0604](db/migrations/0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql) | `PENDING` | no — pending | **A read-only measure of charger fit: how much of a run's fast-charger time went to cars that were already |
 
-451 migrations indexed.
+452 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
