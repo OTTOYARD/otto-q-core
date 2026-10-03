@@ -18,6 +18,14 @@ This is AGENT_HARNESS.md's second-ranked gap ("no agent-facing door"), closed fo
 door for physical proposals (stall assignments): `ottoq_submit_external_proposal` remains that door, unchanged
 (AGENT_API.md).
 
+> **2026-10-03 — an owner's own agent (migrations `0605`/`0606`, [PERSONAL_AGENT.md](PERSONAL_AGENT.md)).** A token
+> bound to one fleet with the `owner_settings` capability can also **set what its own cars need** without a person in
+> between: a charge limit inside its contract, service orders, holds, undo. The database checks each against the
+> contract and OTTO-Q's rules, records it (refusals included) and the engine applies it at its next tick; nothing moves a
+> car, and the run's end lifts it all. The gateway gains the owner tools over MCP and `/v1/me/…`, `POST /v1/ask` (OTTO-Command
+> reading the owner's words with the owner's own token), and a public `GET /v1/openapi.json`. Everything below about
+> requests is unchanged.
+
 ---
 
 ## 1. Architecture
@@ -65,7 +73,11 @@ Files:
 | `edge-functions/_shared/agent_gateway.ts` | the pure half: tool catalog, JSON schemas, validation, REST, MCP, A2A card, PostgREST caller |
 | `tests/agent_gateway.test.mjs` | 33 contract/HTTP/MCP tests + 6 end-to-end over the real SQL |
 | `tests/test_agent_gateway_sql.py` + `tests/fixtures/agent_gateway_stub_engine.sql` | 21 tests executing 0559/0560 against a stub engine whose doors are the live bodies (md5-proven) |
-| `scripts/agent-gateway-smoke.mjs` | the morning smoke test |
+| `scripts/agent-gateway-smoke.mjs` | the morning smoke test (with an owner's token, also OpenAPI, `my_fleet` and a preview; `--ask` for `/v1/ask`) |
+| `db/migrations/0605_…` · `0606_…` | an owner's agent sets what its own cars need; OrchestrAV's read of it ([PERSONAL_AGENT.md](PERSONAL_AGENT.md)) |
+| `edge-functions/_shared/ottocommand_owner.ts` | `POST /v1/ask`: OTTO-Command for an owner's agent (model injected; dry run, tool set and step limit in code) |
+| `tests/owner_agent.test.mjs` · `tests/test_owner_agent_sql.py` | 31 node tests (incl. end to end over the real SQL) · 50 SQL tests on a stub engine md5-pinned to the live catalog |
+| `integrations/hermes/` | Hermes: the MCP config and the `ottoq-owner` skill |
 
 ## 2. Security model
 
@@ -131,7 +143,21 @@ Every tool is available over REST and MCP. `sim_*` and `at_sim` fields are **sim
 | `send_note` | `POST /v1/notes` | `note` | a note for the crew's inbox (and the operator's panel when it names their vehicle); changes nothing |
 | `submit_request` | `POST /v1/requests` | `request_recall` / `request_ops_action` / `request_adjustment` | ask for a recall, the energy-reserve ops action, or an adjustment |
 
-`GET /v1/tools` lists the tools **your** token may use with their JSON Schemas; `GET /v1` lists every endpoint.
+**An owner's tools (0605)** — offered only to a token bound to one fleet; full table and rules in
+[PERSONAL_AGENT.md](PERSONAL_AGENT.md) §1–2:
+
+| Tool | REST | Capability | What it does |
+|---|---|---|---|
+| `my_fleet` · `my_vehicle` · `my_settings` | `GET /v1/me/fleet` · `/v1/me/vehicles/{name}` · `/v1/me/settings` | `read` | the owner's cars, one car, what is in force: plain English + data + the OrchestrAV link |
+| `my_commands` | `GET /v1/me/commands[/{id}]` | any (fleet-bound) | the owner's commands and their receipts |
+| `set_charge_limit` · `clear_charge_limit` | `POST /v1/me/charge-limit` · `/clear` | `owner_settings` | how full the cars charge, inside the contract |
+| `request_service` · `cancel_service` | `POST /v1/me/services` · `/cancel` | `owner_settings` | order (now, next return, every return) or withdraw an owner's service |
+| `hold_vehicle` · `release_hold` | `POST /v1/me/holds` · `/release` | `owner_settings` | "not before" a sim time, at most 24 sim hours |
+| `undo_command` | `POST /v1/me/undo` | `owner_settings` | reverse one applied command |
+| *(plain English)* | `POST /v1/ask` | an owner's token | OTTO-Command reads the owner's words and calls the tools above with that token |
+
+`GET /v1/tools` lists the tools **your** token may use with their JSON Schemas; `GET /v1` lists every endpoint;
+`GET /v1/openapi.json` is the OpenAPI 3.1 document, generated from the same catalog (public).
 `POST` accepts an `Idempotency-Key` header (or `idempotency_key` in the body): resending returns the first request.
 
 **Request kinds**
