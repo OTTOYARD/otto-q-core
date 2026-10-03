@@ -687,7 +687,9 @@ repo_manifest(version, name, file) AS (
     ('20261002200039'::text, 'the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts'::text, '0601_the_battery_forecast_charges_a_waiting_car_at_the_rate_its_battery_accepts.sql'::text),
     ('PENDING'::text, 'the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes'::text, '0602_the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes.sql'::text),
     ('PENDING'::text, 'a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day'::text, '0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql'::text),
-    ('20261002200316'::text, 'every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them'::text, '0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql'::text)
+    ('20261002200316'::text, 'every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them'::text, '0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql'::text),
+    ('PENDING'::text, 'an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back'::text, '0605_an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back.sql'::text),
+    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_what_its_agent_set'::text, '0606_the_fleet_owner_cockpit_reads_what_its_agent_set.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
