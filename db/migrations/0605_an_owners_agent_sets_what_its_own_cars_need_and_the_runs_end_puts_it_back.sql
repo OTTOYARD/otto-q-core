@@ -92,6 +92,11 @@
 --       release_hold {vehicles}
 --       undo_command {command_id}                   reverts what a command set and restores what it replaced
 --     `vehicles` is "all" or names: "Tesla-AV-045", "AV-45", "45", "twin-sim-045", "RT-3", or the uuid.
+--     A preview answers with its plan_hash and a ready-to-send confirm that applies exactly the plan shown: the plan hash
+--     covers the cars and each one's before -> after, never telemetry, and a hold's confirm names the absolute time it
+--     resolved to, so "for 90 minutes" previewed at 7:00 still means 8:30 when confirmed at 7:30. The same
+--     idempotency_key replays the first receipt; the same key with a different command is refused (422,
+--     idempotency_key_reused) rather than answered with the first command's receipt.
 --     Services an owner may request (11): exterior_wash, interior_deep_clean, interior_tidy, interior_inspection,
 --     sensor_clean, sensor_calibration, software_update, remote_diagnostics, mechanical_pm, cosmetic_repair,
 --     item_retrieval. Not requestable: charge (the limit is the owner's lever), readiness_check (OTTO-Q's gate),
@@ -152,7 +157,9 @@
 --   tests/fixtures/owner_agent_stub_engine.sql loads after 0559's stub and adds the six engine functions this file
 --   replaces or patches, each byte-identical to the live catalog (md5 asserted by the test), with the tables they
 --   read. tests/test_owner_agent_sql.py applies 0559, 0560, 0605 and 0606 and drives every tool, the tick step, the
---   visit trigger, the departure test, the run's end and the grants. It skips where no scratch server exists.
+--   visit trigger, the departure test, the run's end and the grants (50 tests). tests/owner_agent.test.mjs drives the
+--   gateway's owner tools, REST, MCP and POST /v1/ask over the same SQL end to end. Both skip where no scratch server
+--   exists; CI's executed-gateway step runs them.
 
 BEGIN;
 
@@ -1372,7 +1379,12 @@ AS $fn$
       'lifted_at', p_c.lifted_at, 'lifted_reason', p_c.lifted_reason),
     'confirm', CASE WHEN p_c.outcome = 'previewed' THEN jsonb_build_object(
                  'tool', p_c.tool,
-                 'args', (p_c.args - 'mode' - 'expect_plan_hash' - 'idempotency_key')
+                 -- what the preview showed, exactly: a hold goes back as the absolute time it resolved to, so a
+                 -- confirm sent after the sim clock moved holds until the time shown, not "90 minutes from now"
+                 'args', (p_c.args - 'mode' - 'expect_plan_hash' - 'idempotency_key' - 'until_sim'
+                          - CASE WHEN p_c.args ? 'until_sim' THEN ARRAY['until', 'for_minutes'] ELSE ARRAY[]::text[] END)
+                         || CASE WHEN p_c.args ? 'until_sim' THEN jsonb_build_object('until', p_c.args ->> 'until_sim')
+                                 ELSE '{}'::jsonb END
                          || jsonb_build_object('mode', 'apply', 'expect_plan_hash', p_c.plan_hash),
                  'note', 'Send this to apply exactly the plan shown. If the cars or settings change first, OTTO-Q refuses with the new plan.') END,
     'undo', CASE WHEN p_c.outcome = 'applied' AND p_c.undone_at IS NULL AND p_c.lifted_at IS NULL AND p_c.tool <> 'undo_command'
@@ -1473,15 +1485,6 @@ BEGIN
       DETAIL = 'Owner commands need a token bound to one fleet with the owner_settings capability.';
   END IF;
 
-  -- ── the same key is the same command: a retry replays it instead of acting twice ──
-  IF v_idem IS NOT NULL AND v_mode = 'apply' THEN
-    SELECT * INTO v_cmd FROM public.ottoq_owner_commands c
-     WHERE c.principal_id = p_agent.principal_id AND c.idempotency_key = v_idem;
-    IF FOUND THEN
-      RETURN public.ottoq_owner_command_reply(v_cmd, true);
-    END IF;
-  END IF;
-
   v_run := public.ottoq_agent_live_run(p_agent.depot_id);
   v_run_id := (v_run ->> 'sim_run_id')::uuid;
   v_clock := (v_run ->> 'sim_clock')::timestamptz;
@@ -1547,6 +1550,30 @@ BEGIN
     v_norm := v_norm || jsonb_build_object('command_id', public.ottoq_agent_arg_uuid(v_args, 'command_id'));
   END IF;
   IF v_note IS NOT NULL THEN v_norm := v_norm || jsonb_build_object('note', v_note); END IF;
+
+  -- ── the same key is the same command: a retry replays it instead of acting twice. A key sent again with a DIFFERENT
+  -- command is refused, not answered with the first command's receipt: a client that reuses a key by mistake must not
+  -- be told its new command was done (draft-ietf-httpapi-idempotency-key-header-07, 2025-10-15, "Error Scenarios": "If
+  -- there is an attempt to reuse an idempotency key with a different request payload, the resource SHOULD reply with a
+  -- HTTP 422 status code", https://www.ietf.org/archive/id/draft-ietf-httpapi-idempotency-key-header-07.html). The
+  -- payload compared is the normalized one, so "service bay" and "mechanical_pm" are the same command; mode and note are
+  -- not part of it, and until_sim is what the first command derived from its own until. ──
+  IF v_idem IS NOT NULL AND v_mode = 'apply' THEN
+    SELECT * INTO v_cmd FROM public.ottoq_owner_commands c
+     WHERE c.principal_id = p_agent.principal_id AND c.idempotency_key = v_idem;
+    IF FOUND THEN
+      IF v_cmd.tool IS DISTINCT FROM v_tool
+         OR (v_cmd.args - 'mode' - 'note' - 'until_sim')
+            IS DISTINCT FROM ((v_norm - 'mode' - 'note')
+                              || CASE WHEN v_tool <> 'undo_command' THEN jsonb_build_object('vehicles', v_args -> 'vehicles')
+                                      ELSE '{}'::jsonb END) THEN
+        RAISE EXCEPTION USING ERRCODE = 'OQA22', MESSAGE = 'idempotency_key_reused',
+          DETAIL = format('idempotency_key "%s" was already used for a different command (%s, sent at %s). Nothing was done; a new command needs a new key.',
+                          v_idem, replace(v_cmd.tool, '_', ' '), public.ottoq_owner_clock(v_cmd.created_at, false));
+      END IF;
+      RETURN public.ottoq_owner_command_reply(v_cmd, true);
+    END IF;
+  END IF;
 
   -- ── the cars ──
   IF v_tool <> 'undo_command' THEN
@@ -1893,11 +1920,13 @@ BEGIN
   END IF;
 
   -- ── the plan's hash: what changes (cars, settings, before -> after), never telemetry, so a car's state of charge
-  -- moving between a preview and its confirmation does not invalidate the plan; a setting moving does ──
+  -- moving between a preview and its confirmation does not invalidate the plan; a setting moving does. A hold is hashed
+  -- by the time it RESOLVED to (until_sim), not the words that named it: "for 90 minutes" previewed at 7:00 and
+  -- confirmed as "until 8:30" is the same plan, and the clock moving in between must not make it a different one ──
   v_changed := (SELECT count(*) FROM jsonb_array_elements(v_effects) e WHERE COALESCE((e ->> 'change')::boolean, false));
   v_hash := md5(jsonb_build_object(
               'tool', v_tool, 'run', v_run_id,
-              'args', v_norm - 'mode' - 'note' - 'vehicles' - 'expect_plan_hash' - 'idempotency_key',
+              'args', v_norm - 'mode' - 'note' - 'vehicles' - 'expect_plan_hash' - 'idempotency_key' - 'until' - 'for_minutes',
               'plan', COALESCE((SELECT jsonb_agg(jsonb_build_array(e ->> 'vehicle_id', e ->> 'key', e -> 'before', e -> 'after', e -> 'change')
                                                  ORDER BY e ->> 'vehicle_id', e ->> 'key')
                                   FROM jsonb_array_elements(v_effects) e), '[]'::jsonb))::text);
@@ -2002,11 +2031,17 @@ BEGIN
       END IF;
     END IF;
   EXCEPTION WHEN unique_violation THEN
-    --: the same idempotency key sent twice at once: the second replays the first
+    --: the same idempotency key sent twice at once: the second replays the first, if it is the same command
     IF v_idem IS NOT NULL AND v_mode = 'apply' THEN
       SELECT * INTO v_target FROM public.ottoq_owner_commands c
        WHERE c.principal_id = p_agent.principal_id AND c.idempotency_key = v_idem;
       IF FOUND THEN
+        IF v_target.tool IS DISTINCT FROM v_tool
+           OR (v_target.args - 'mode' - 'note' - 'until_sim') IS DISTINCT FROM (v_norm - 'mode' - 'note' - 'until_sim') THEN
+          RAISE EXCEPTION USING ERRCODE = 'OQA22', MESSAGE = 'idempotency_key_reused',
+            DETAIL = format('idempotency_key "%s" was used at the same moment for a different command (%s). Nothing was done; a new command needs a new key.',
+                            v_idem, replace(v_target.tool, '_', ' '));
+        END IF;
         RETURN public.ottoq_owner_command_reply(v_target, true);
       END IF;
     END IF;
@@ -2140,7 +2175,7 @@ BEGIN
         FROM (SELECT (c #>> '{yours,charge_limit_pct}') AS pct, count(*) AS n FROM jsonb_array_elements(v_cars) c
                WHERE c #> '{yours,charge_limit_pct}' IS NOT NULL GROUP BY 1) l
       UNION ALL
-      SELECT 2, o.n || CASE WHEN o.n = 1 THEN ' car has ' ELSE ' cars have ' END || lower(o.name)
+      SELECT 2, o.n || CASE WHEN o.n = 1 THEN ' car has ' ELSE ' cars have ' END || public.ottoq_owner_lc(o.name)
                 || CASE o.w WHEN 'every_return' THEN ' on every return' WHEN 'next_return' THEN ' on the next return' ELSE ' ordered on this visit' END
         FROM (SELECT x ->> 'name' AS name, x ->> 'when' AS w, count(*) AS n
                 FROM jsonb_array_elements(v_cars) c CROSS JOIN LATERAL jsonb_array_elements(COALESCE(c #> '{yours,orders}', '[]'::jsonb)) x
@@ -2190,12 +2225,12 @@ BEGIN
     END IF;
     v_text := format('%s (%s) is %s%s', v_veh.display_name, COALESCE(v_veh.model, 'car'), v_car ->> 'state_phrase',
                      CASE WHEN v_car ? 'stall' THEN ' at ' || (v_car ->> 'stall') ELSE '' END)
-      || CASE WHEN v_car ? 'soc' THEN format(', at %s%%, charging to %s%%', v_car ->> 'soc', v_car ->> 'charge_target') ELSE '' END
+      || CASE WHEN v_car ? 'soc' THEN format(', at %s%%, target %s%%', v_car ->> 'soc', v_car ->> 'charge_target') ELSE '' END
       || CASE WHEN v_car #> '{yours,charge_limit_pct}' IS NOT NULL THEN format(' (your limit; full is %s%%)', v_ceiling) ELSE '' END
       || '.'
       || CASE WHEN jsonb_array_length(v_car -> 'open_services') > 0
               THEN ' Still to do before it leaves: '
-                   || (SELECT string_agg(lower(x ->> 'name') || CASE WHEN (x ->> 'yours')::boolean THEN ' (yours)' ELSE '' END
+                   || (SELECT string_agg(public.ottoq_owner_lc(x ->> 'name') || CASE WHEN (x ->> 'yours')::boolean THEN ' (yours)' ELSE '' END
                                          || CASE WHEN x ->> 'status' = 'in_progress' THEN ', under way' ELSE '' END, '; ')
                          FROM jsonb_array_elements(v_car -> 'open_services') x) || '.'
               WHEN v_run_id IS NOT NULL THEN ' Nothing is left to do on its visit.' ELSE '' END
@@ -2231,7 +2266,7 @@ BEGIN
                        || ' to at most ' || (s ->> 'charge_limit_pct') || '%' AS line
         FROM jsonb_array_elements(v_rows) s WHERE s ->> 'kind' = 'charge_limit' GROUP BY s ->> 'charge_limit_pct'
       UNION ALL
-      SELECT 2, count(*) || CASE WHEN count(*) = 1 THEN ' car has ' ELSE ' cars have ' END || lower(s ->> 'service_name')
+      SELECT 2, count(*) || CASE WHEN count(*) = 1 THEN ' car has ' ELSE ' cars have ' END || public.ottoq_owner_lc(s ->> 'service_name')
                 || CASE s ->> 'when' WHEN 'every_return' THEN ' on every return' WHEN 'next_return' THEN ' on the next return'
                                      ELSE ' ordered on this visit' END
         FROM jsonb_array_elements(v_rows) s WHERE s ->> 'kind' = 'service' GROUP BY s ->> 'service_name', s ->> 'when'

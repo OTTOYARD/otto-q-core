@@ -115,7 +115,11 @@ jobs:
       # SQL end to end. Both SKIP without these variables, which the pytest and edge-function steps above do not set,
       # so this is the step where they run. Ordered AFTER the compile-check because the stub creates the cluster-wide roles
       # anon/authenticated/service_role, and the compile-check's premise is a server that holds nothing.
-      - name: Agent gateway, executed (0559/0560 against a stub engine; HTTP end to end)
+      # 0605/0606 ride in the same step for the same reason: an owner's agent setting what its own cars need changes
+      # three tick-path bodies and adds two triggers, none of which a compile-check can see. tests/test_owner_agent_sql.py
+      # drives them on a second stub engine (its copied bodies md5-pinned to the live catalog), and
+      # tests/owner_agent.test.mjs drives the gateway's owner tools and POST /v1/ask over the same SQL end to end.
+      - name: Agent gateway, executed (0559/0560/0605/0606 against stub engines; HTTP end to end)
         env:
           PGHOST: localhost
           PGPORT: "5432"
@@ -123,8 +127,8 @@ jobs:
           PGPASSWORD: postgres
         run: |
           set -euo pipefail
-          python3 -m pytest -q tests/test_agent_gateway_sql.py
-          node --test tests/agent_gateway.test.mjs
+          python3 -m pytest -q tests/test_agent_gateway_sql.py tests/test_owner_agent_sql.py
+          node --test tests/agent_gateway.test.mjs tests/owner_agent.test.mjs
 
       # 0564, EXECUTED with real concurrent sessions against a stub engine: a manual start interrupts a running
       # check (a recertification pair, a hand-run pair, a dial experiment), leaves a migration and a monitor alone,

@@ -3,7 +3,8 @@
 //
 // WHAT EACH PART PROVES
 //   1. contract     the TypeScript catalog and the SQL dispatcher name the same tools, capabilities, statuses and
-//                   ops actions, read out of the migration file itself, so neither half can drift alone.
+//                   ops actions, read out of the migration files themselves (0559, and 0605 where it replaces the
+//                   dispatcher and the capability CHECK), so neither half can drift alone.
 //   2. schemas      every tool's input schema is closed: no argument can carry a scope (fleet, depot, principal).
 //   3. http         auth first (a missing or malformed token never reaches the engine; the raw token never does),
 //                   the Origin rule, the body cap, REST routing and envelopes, the public agent card.
@@ -14,7 +15,8 @@
 //   7. end to end   (skips without a server) the HTTP handler over the REAL 0559 SQL against the stub engine:
 //                   operator A cannot read or act on operator B's vehicle, a person's approval reaches the door.
 //
-// The SQL half's own suite is tests/test_agent_gateway_sql.py (21 tests); this file does not repeat it.
+// The SQL half's own suite is tests/test_agent_gateway_sql.py (21 tests); this file does not repeat it. The owner's
+// tools and POST /v1/ask (0605) have their own suite, tests/owner_agent.test.mjs.
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -59,8 +61,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(ROOT, p), "utf8");
 const M0559_PATH = "db/migrations/0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql";
 const M0560_PATH = "db/migrations/0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql";
+const M0605_PATH = "db/migrations/0605_an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back.sql";
 const STUB_PATH = "tests/fixtures/agent_gateway_stub_engine.sql";
 const M0559 = read(M0559_PATH);
+const M0605 = read(M0605_PATH);
 const STUB = read(STUB_PATH);
 const SHELL = read("edge-functions/ottoq-agent-gateway/index.ts");
 const SHARED = read("edge-functions/_shared/agent_gateway.ts");
@@ -77,6 +81,8 @@ function functionBodies(sql) {
   return out;
 }
 const FUNCS = functionBodies(M0559);
+/** The bodies as they stand after every migration: 0605 replaces the dispatcher, the token issuer and whoami. */
+const LATEST = new Map([...FUNCS, ...functionBodies(M0605)]);
 
 /** A CASE ... WHEN 'a' THEN 'b' ... map out of a function body, starting at `anchor`. */
 function caseMap(body, anchor) {
@@ -98,17 +104,22 @@ test("0559 defines the functions this suite reads (the parser saw all 26)", () =
 });
 
 test("the tool catalog is exactly the dispatcher's vocabulary, with the same capability each", () => {
-  const need = caseMap(FUNCS.get("ottoq_agent_call"), "v_need := CASE v_tool");
+  // 0559's dispatcher, and the one that replaces it in 0605: the catalog must match the LATEST
+  const first = caseMap(FUNCS.get("ottoq_agent_call"), "v_need := CASE v_tool");
+  const need = caseMap(LATEST.get("ottoq_agent_call"), "v_need := CASE v_tool");
+  for (const [tool, cap] of Object.entries(first)) assert.equal(need[tool], cap, `0605 changed ${tool}'s capability`);
   assert.equal(need.handshake, "", "handshake is the authentication-only tool");
   delete need.handshake;
   assert.deepEqual(Object.keys(need).sort(), TOOLS.map((t) => t.name).sort());
-  const asTs = { "": null, read: "read", note: "note", per_kind: "any_request" };
+  const asTs = { "": null, read: "read", note: "note", per_kind: "any_request", owner_settings: "owner_settings" };
   for (const t of TOOLS) assert.equal(t.capability, asTs[need[t.name]], t.name);
 });
 
 test("capabilities, request kinds, statuses and priorities agree with the tables' CHECKs", () => {
-  const caps = /capabilities <@ ARRAY\[([^\]]+)\]/.exec(M0559);
-  assert.deepEqual(caps[1].split(",").map((s) => s.trim().replace(/'/g, "")), [...CAPABILITIES]);
+  // the CHECK as it stands after 0605 re-creates it, and 0559's must be a prefix of it (nothing was taken away)
+  const capsOf = (sql) => [...sql.matchAll(/capabilities <@ ARRAY\[([^\]]+)\]/g)].at(-1)[1].split(",").map((s) => s.trim().replace(/'/g, ""));
+  assert.deepEqual(capsOf(M0605), [...CAPABILITIES]);
+  assert.deepEqual(capsOf(M0559), CAPABILITIES.slice(0, capsOf(M0559).length));
   const kinds = /ottoq_agent_requests_kind_check CHECK \(kind IN \(([^)]+)\)/.exec(M0559);
   assert.deepEqual(kinds[1].split(",").map((s) => s.trim().replace(/'/g, "")).sort(),
     ["note", ...Object.keys(REQUEST_KIND_CAPABILITY)].sort());
@@ -162,6 +173,12 @@ const MINIMAL = {
   vehicle_card: { vehicle_id: "ee000000-0000-0000-0000-0000000000a1" },
   send_note: { title: "hello" },
   submit_request: { kind: "recall_vehicle", title: "home", vehicle_id: "ee000000-0000-0000-0000-0000000000a1" },
+  // 0605
+  my_fleet: {}, my_settings: {}, my_commands: {}, my_vehicle: { vehicle: "Tesla 45" },
+  set_charge_limit: { vehicles: "all", percent: 90 }, clear_charge_limit: { vehicles: "all" },
+  request_service: { vehicles: ["Tesla-AV-045"], service: "mechanical_pm" }, cancel_service: { vehicles: "all" },
+  hold_vehicle: { vehicles: ["RT-003"], until: "6:00 AM" }, release_hold: { vehicles: "all" },
+  undo_command: { command_id: "ee000000-0000-0000-0000-0000000000c9" },
 };
 
 function closedEverywhere(schema, path) {
@@ -258,15 +275,25 @@ test("a token sees the tools its capabilities allow, and submit_request only the
   assert.equal(TOOLS.find((t) => t.name === "submit_request").inputSchema.properties.kind.enum.length, 3);
 });
 
-test("only send_note and submit_request can change anything, and what they change is the request ledger", () => {
+test("no tool changes the world: two write the request ledger, and the owner's seven write only its own cars' settings", () => {
   for (const t of TOOLS) {
     const writes = t.effect !== "read";
     assert.equal(t.annotations.readOnlyHint, !writes, t.name);
     assert.equal(t.annotations.destructiveHint, false, t.name);
     assert.equal(t.annotations.openWorldHint, false, t.name);
-    if (writes) assert.equal(t.effect, "ledger_write", t.name);
   }
-  assert.deepEqual(TOOLS.filter((t) => t.effect !== "read").map((t) => t.name), ["send_note", "submit_request"]);
+  assert.deepEqual(TOOLS.filter((t) => t.effect === "ledger_write").map((t) => t.name), ["send_note", "submit_request"]);
+  const owner = TOOLS.filter((t) => t.effect === "owner_setting");
+  assert.deepEqual(owner.map((t) => t.name), ["set_charge_limit", "clear_charge_limit", "request_service", "cancel_service",
+    "hold_vehicle", "release_hold", "undo_command"]);
+  for (const t of owner) {
+    assert.equal(t.capability, "owner_settings", t.name);
+    assert.equal(t.scope, "fleet", t.name);
+    // idempotent where resending the same arguments changes nothing more; a for_minutes hold counts from when it is sent
+    assert.equal(t.annotations.idempotentHint, t.name !== "hold_vehicle", t.name);
+  }
+  assert.deepEqual(TOOLS.filter((t) => t.effect === "read" && t.scope === "fleet").map((t) => t.name),
+    ["my_fleet", "my_vehicle", "my_settings", "my_commands"]);
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════ 3. http ══
@@ -545,7 +572,9 @@ test("MCP tools/list: the token's tools, each with a closed JSON Schema and hone
     assert.equal(t.inputSchema.additionalProperties, false);
     assert.equal(typeof t.annotations.readOnlyHint, "boolean");
   }
-  assert.deepEqual(mcpToolList([...CAPABILITIES]).map((t) => t.name), TOOLS.map((t) => t.name));
+  // every tool needs every capability AND a fleet; without a fleet the owner's tools are not offered at all
+  assert.deepEqual(mcpToolList([...CAPABILITIES], { fleetBound: true }).map((t) => t.name), TOOLS.map((t) => t.name));
+  assert.deepEqual(mcpToolList([...CAPABILITIES]).map((t) => t.name), TOOLS.filter((t) => t.scope !== "fleet").map((t) => t.name));
   assert.equal(calls[0].tool, "handshake");
   assert.equal(calls[0].transport, "mcp");
   assert.deepEqual(calls[0].meta, { http_method: "POST", path: "/mcp", mcp_method: "tools/list", mcp_version: MCP_MODERN_VERSION, client: "hermes/2.1" });

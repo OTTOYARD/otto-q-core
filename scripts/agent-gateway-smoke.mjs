@@ -2,7 +2,7 @@
 // scripts/agent-gateway-smoke.mjs -- the morning smoke test for the ottoq-agent-gateway (AGENT_GATEWAY.md, step 5).
 //
 //   GATEWAY_URL=https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-agent-gateway \
-//   AGENT_TOKEN=oqa_... node scripts/agent-gateway-smoke.mjs [--no-note]
+//   AGENT_TOKEN=oqa_... node scripts/agent-gateway-smoke.mjs [--no-note] [--ask]
 //
 // Seven steps, each printed with what came back, stopping at the first failure (exit 1):
 //   1. the public agent card            no token
@@ -13,11 +13,20 @@
 //   6. send a note (unless --no-note)   lands in the OTTO-PULSE agent inbox; changes nothing in the engine
 //   7. read the note back               status pending until someone in PULSE acknowledges or dismisses it
 //
+// And when the token is an OWNER's (0605, PERSONAL_AGENT.md: whoami carries an owner block), three more before the note,
+// none of which changes anything:
+//   o1. the OpenAPI document           public, no token
+//   o2. my_fleet                       the owner's cars in plain English, and the OrchestrAV link
+//   o3. a PREVIEW of a 90% charge limit    the plan and its confirm; nothing is applied (422 no_live_demo when no
+//                                          demo run is live, which is reported, not failed)
+//   o4. (--ask) POST /v1/ask, a question   OTTO-Command answers in plain English; costs one model call
+//
 // The token is read from the environment and never printed. The note carries an idempotency key per minute, so an
 // accidental double run inside a minute replays the first note instead of sending two.
 const BASE = (process.env.GATEWAY_URL ?? "").replace(/\/+$/, "");
 const TOKEN = process.env.AGENT_TOKEN ?? "";
 const SEND_NOTE = !process.argv.includes("--no-note");
+const ASK = process.argv.includes("--ask");
 
 if (!BASE || !TOKEN) {
   console.error("Set GATEWAY_URL (…/functions/v1/ottoq-agent-gateway) and AGENT_TOKEN (oqa_…).");
@@ -87,8 +96,27 @@ try {
   check("MCP initialize + tools/list", init.status === 200 && list.status === 200 && Array.isArray(list.json?.result?.tools),
     `protocol ${init.json?.result?.protocolVersion}; tools: ${(list.json?.result?.tools ?? []).map((t) => t.name).join(", ")}`);
 
+  if (me?.owner) {
+    const spec = await call("/v1/openapi.json", { token: "" });
+    check("OpenAPI document (public)", spec.status === 200 && spec.json?.openapi === "3.1.0",
+      `${Object.keys(spec.json?.paths ?? {}).length} paths, ${spec.ms} ms`);
+    const fleet = await call("/v1/me/fleet");
+    check("my_fleet", fleet.status === 200 && typeof fleet.json?.data?.summary === "string",
+      `${fleet.json?.data?.summary ?? fleet.text.slice(0, 120)}\n        ${fleet.json?.data?.link ?? ""}`);
+    const preview = await call("/v1/me/charge-limit", { method: "POST", body: { vehicles: "all", percent: 90, mode: "preview" } });
+    const noDemo = preview.status === 422 && preview.json?.error?.code === "no_live_demo";
+    check("a preview changes nothing", (preview.status === 200 && preview.json?.data?.outcome === "previewed") || noDemo,
+      noDemo ? "no demo run is live, so there is nothing to preview against (start one in OTTO-TWIN)"
+        : (preview.json?.data?.summary ?? preview.text.slice(0, 160)).split("\n")[0]);
+    if (ASK) {
+      const answered = await call("/v1/ask", { method: "POST", body: { text: "How are my cars doing right now?" } });
+      check("POST /v1/ask (a question)", answered.status === 200 && typeof answered.json?.data?.answer === "string",
+        answered.status === 200 ? answered.json.data.answer : `${answered.status} ${answered.json?.error?.code ?? answered.text.slice(0, 80)}`);
+    }
+  }
+
   if (!SEND_NOTE) {
-    console.log("\n--no-note: skipped steps 6-7. Done.");
+    console.log("\n--no-note: skipped sending a note. Done.");
     process.exit(0);
   }
   const minute = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");

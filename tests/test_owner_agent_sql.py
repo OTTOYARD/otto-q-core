@@ -460,6 +460,19 @@ def test_the_same_key_is_the_same_command(db, owner):
     b = db.call(owner, "set_charge_limit", {"vehicles": "all", "percent": 95, "idempotency_key": "limit-95"})
     assert a["http_status"] == 201 and b["http_status"] == 200 and b["data"]["duplicate"] is True
     assert a["data"]["command"]["command_id"] == b["data"]["command"]["command_id"]
+    # the same command in other words is still the same command: "95%" as text and a note do not make it new
+    c = db.call(owner, "set_charge_limit", {"vehicles": "all", "percent": "95%", "note": "retry", "idempotency_key": "limit-95"})
+    assert c["http_status"] == 200 and c["data"]["duplicate"] is True, c
+    # a key reused for a DIFFERENT command is refused (422), never answered with the first command's receipt
+    for args in ({"tool": "set_charge_limit", "vehicles": "all", "percent": 90},
+                 {"tool": "set_charge_limit", "vehicles": ["Tesla-AV-041"], "percent": 95},
+                 {"tool": "request_service", "vehicles": "all", "service": "exterior_wash"}):
+        tool = args.pop("tool")
+        r = db.call(owner, tool, {**args, "idempotency_key": "limit-95"})
+        assert r["ok"] is False and r["http_status"] == 422, r
+        assert r["error"]["code"] == "idempotency_key_reused" and "limit-95" in r["error"]["message"], r
+    assert db.val("SELECT count(*) FROM ottoq_owner_commands WHERE idempotency_key = 'limit-95'") == "1"
+    assert db.val("SELECT count(*) FROM ottoq_owner_settings WHERE status = 'active' AND charge_limit_pct = 90") == "0"
 
 
 # ──────────────────────────────────────────────────────────────────────────────────────────── services ──
@@ -589,6 +602,22 @@ def test_a_hold_only_delays_and_ends_on_time(db, owner):
     assert db.call(owner, "hold_vehicle", {"vehicles": ["45"], "until": "2026-09-27T11:00:00Z"})["error"]["code"] == "hold_in_the_past"
 
 
+def test_a_previewed_hold_confirms_to_the_time_it_showed_after_the_clock_moves(db, owner):
+    run = fresh_run(db)                                    # sim clock 12:00 UTC = 7:00 AM CDT
+    prev = db.call(owner, "hold_vehicle", {"vehicles": ["45"], "for_minutes": 90, "mode": "preview"})
+    assert prev["data"]["outcome"] == "previewed" and "8:30 AM sim time" in prev["data"]["summary"], prev
+    confirm = prev["data"]["confirm"]
+    # the confirm names the time the preview showed, never "90 minutes from whenever it arrives", and carries only
+    # arguments the gateway's closed schema knows
+    assert "for_minutes" not in confirm["args"] and "until_sim" not in confirm["args"], confirm
+    assert db.val(f"SELECT '{confirm['args']['until']}'::timestamptz = '2026-09-27 13:30+00'") == "t", confirm
+    db.run(f"UPDATE ottoq_sim_runs SET sim_clock_current = '2026-09-27 12:30+00' WHERE sim_run_id = '{run}'")
+    done = db.call(owner, "hold_vehicle", {**confirm["args"]})
+    assert done["http_status"] == 201 and done["data"]["outcome"] == "applied", done
+    assert db.val(f"""SELECT hold_until_sim = '2026-09-27 13:30+00' FROM ottoq_owner_settings
+                      WHERE sim_run_id = '{run}' AND kind = 'hold' AND status = 'active'""") == "t"
+
+
 def test_release_lets_a_held_car_go(db, owner):
     run = fresh_run(db)
     db.run(f"""UPDATE ottoq_visit_needs SET atoms = '[{{"svc":"charge","status":"done"}},{{"svc":"readiness_check","status":"done"}}]'
@@ -681,7 +710,11 @@ def test_my_commands_and_my_settings_read_back(db, owner):
     cmds = db.call(owner, "my_commands", {"limit": 2})["data"]["commands"]
     assert [c["command"]["tool"] for c in cmds] == ["request_service", "set_charge_limit"]
     car = db.call(owner, "my_vehicle", {"vehicle": "45"})["data"]
-    assert car["summary"].startswith("Tesla-AV-045 (Model Y) is staged to leave, at 99%, charging to 90% (your limit; full is 100%).")
+    assert car["summary"].startswith("Tesla-AV-045 (Model Y) is staged to leave, at 99%, target 90% (your limit; full is 100%).")
+    # a catalog acronym stays an acronym inside a sentence, in every read as in every receipt
+    db.call(owner, "request_service", {"vehicles": ["45"], "service": "mechanical_pm"})
+    assert "1 car has mechanical PM ordered on this visit" in db.call(owner, "my_settings")["data"]["summary"]
+    assert "1 car has mechanical PM ordered on this visit" in db.call(owner, "my_fleet")["data"]["summary"]
 
 
 def test_the_ask_transport_is_ledgered(db, owner):

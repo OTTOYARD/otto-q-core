@@ -7,7 +7,12 @@
 //                                                               '-- reads only; "asks" land in ottoq_agent_requests
 //   a person (OTTO-PULSE crew / OrchestrAV fleet owner) --> ottoq_agent_request_decide --> OTTO-Q's own door
 //
-// THIS FILE IS THE I/O SHELL ONLY. Routing, schemas, validation, MCP and the A2A card live in
+// An OWNER's agent (0605, PERSONAL_AGENT.md) can also set what its own cars need -- a charge limit inside its contract,
+// a service, a hold, an undo -- and the engine applies it at its next tick. POST /v1/ask is that same door in plain
+// English: OTTO-Command (../_shared/ottocommand_owner.ts) reads the owner's words and calls the same tools through the
+// same engine call, with the owner's own token, so it can do nothing the token could not.
+//
+// THIS FILE IS THE I/O SHELL ONLY. Routing, schemas, validation, MCP, OpenAPI and the A2A card live in
 // ../_shared/agent_gateway.ts, which tests/agent_gateway.test.mjs imports directly. Scope, rate limits and the
 // ledger live in the database, so nothing here can widen what a token may see or do.
 //
@@ -20,8 +25,13 @@
 // Environment: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (injected by the platform). Optional:
 //   AGENT_GATEWAY_PUBLIC_URL       the base URL advertised in the agent card (default: SUPABASE_URL/functions/v1/<name>)
 //   AGENT_GATEWAY_ALLOWED_ORIGINS  comma-separated browser origins; unset = no browser may call it (agents are servers)
+//   ANTHROPIC_API_KEY              the key OTTO-Command already uses; without it, POST /v1/ask answers 503 to a
+//                                  plain-English ask (a previewed plan's confirm still applies: it needs no model)
+//   OTTOCOMMAND_OWNER_MODEL        the model the owner door uses; falls back to ANTHROPIC_MODEL (OTTO-Command's own
+//                                  setting). With neither set, a plain-English ask answers 503 ask_not_configured.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { GATEWAY_NAME, handleGatewayRequest, postgrestEngine } from "../_shared/agent_gateway.ts";
+import { anthropicModel, ownerAskHandler } from "../_shared/ottocommand_owner.ts";
 
 const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -33,4 +43,12 @@ const ALLOWED_ORIGINS = (Deno.env.get("AGENT_GATEWAY_ALLOWED_ORIGINS") ?? "")
 // Fail closed: without both variables there is no engine, and every authenticated path answers 500 not_configured.
 const engine = SUPABASE_URL && SERVICE_KEY ? postgrestEngine({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY }) : null;
 
-Deno.serve((req: Request) => handleGatewayRequest(req, { publicUrl: PUBLIC_URL, allowedOrigins: ALLOWED_ORIGINS, engine }));
+// The owner door's model. Its name is the deployment's choice, never a constant in this repository.
+const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+const OWNER_MODEL = (Deno.env.get("OTTOCOMMAND_OWNER_MODEL") ?? Deno.env.get("ANTHROPIC_MODEL") ?? "").trim();
+const ask = ownerAskHandler({
+  model: ANTHROPIC_KEY && OWNER_MODEL ? anthropicModel({ apiKey: ANTHROPIC_KEY, model: OWNER_MODEL }) : null,
+  modelName: OWNER_MODEL || undefined,
+});
+
+Deno.serve((req: Request) => handleGatewayRequest(req, { publicUrl: PUBLIC_URL, allowedOrigins: ALLOWED_ORIGINS, engine, ask }));
