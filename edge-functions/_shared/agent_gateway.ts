@@ -14,6 +14,13 @@
  *     rendered for REST, MCP or A2A discovery. It never widens scope: every tool schema rejects unknown properties,
  *     so a client cannot smuggle a fleet_operator_id, depot_id or principal into a call.
  *
+ * 0605 (PERSONAL_AGENT.md): an OWNER's agent -- a token bound to one fleet and carrying owner_settings -- can also set
+ * what its own cars need: a charge limit inside its contract, a service, a hold, an undo. The database checks each one
+ * against the contract and OTTO-Q's rules, records it (refusals included), and the engine applies it at its next tick;
+ * nothing an agent sends moves a car. POST /v1/ask is the same door in plain English: OTTO-Command reads the owner's
+ * words and calls these same tools with the owner's own token, so it can do nothing the token could not
+ * (./ottocommand_owner.ts).
+ *
  * Specs this implements, read 2026-09-28:
  *   MCP 2026-07-28 (stateless core; initialize retired; Mcp-Method / Mcp-Name mirrored headers; -32020 HeaderMismatch;
  *     -32022 UnsupportedProtocolVersion; 404 for an unknown method; 405 for GET/DELETE; 202 for a notification):
@@ -40,8 +47,23 @@ export const ENGINE_RPC = "ottoq_agent_call";
 export const TOKEN_PATTERN = /^oqa_[0-9a-f]{64}$/;
 export const MAX_BODY_BYTES = 64 * 1024;
 
-export const CAPABILITIES = ["read", "note", "request_recall", "request_ops_action", "request_adjustment"] as const;
+export const CAPABILITIES = ["read", "note", "request_recall", "request_ops_action", "request_adjustment", "owner_settings"] as const;
 export type Capability = (typeof CAPABILITIES)[number];
+
+/** 0605: the owner's reads and commands, exactly as public.ottoq_agent_call names them. */
+export const OWNER_READS = ["my_fleet", "my_vehicle", "my_settings", "my_commands"] as const;
+export const OWNER_COMMANDS = [
+  "set_charge_limit", "clear_charge_limit", "request_service", "cancel_service", "hold_vehicle", "release_hold", "undo_command",
+] as const;
+/** public.ottoq_owner_requestable_services(): what an owner may ask for. Charging, the readiness check, triage, fault
+ *  repair and the depot's own walkaround are OTTO-Q's, not an owner's. A contract may block some of these too. */
+export const OWNER_SERVICES = [
+  "exterior_wash", "interior_deep_clean", "interior_tidy", "interior_inspection", "sensor_clean", "sensor_calibration",
+  "software_update", "remote_diagnostics", "mechanical_pm", "cosmetic_repair", "item_retrieval",
+] as const;
+export const SERVICE_WHEN = ["now", "next_return", "every_return"] as const;
+/** ottoq_owner_commands.outcome */
+export const OWNER_OUTCOMES = ["applied", "previewed", "no_change", "refused"] as const;
 
 /** ottoq_apply_ops_action's whitelist, action -> the dial it sets. The database (0559's submit function) is the
  *  authority and refuses the two whose dial is not agent_writable; this copy only shapes the schema. */
@@ -90,6 +112,9 @@ export type JsonSchema = {
   properties?: Record<string, JsonSchema>;
   required?: readonly string[];
   additionalProperties?: boolean;
+  items?: JsonSchema;
+  minItems?: number;
+  maxItems?: number;
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -116,8 +141,11 @@ export type ToolDef = {
   description: string;
   /** null = any active token; 'any_request' = at least one request_* capability (checked per kind by the database). */
   capability: Capability | "any_request" | null;
-  /** What the tool can change: nothing, or the agent's own request ledger. Never world state. */
-  effect: "read" | "ledger_write";
+  /** What the tool can change: nothing; the agent's own request ledger; or (0605) the settings of the owner's OWN cars,
+   *  which the engine applies at its next tick. Never a car's movement, a stall, a booking or a session. */
+  effect: "read" | "ledger_write" | "owner_setting";
+  /** 'fleet' = only for a token bound to one fleet (the database refuses any other with fleet_scope_required). */
+  scope?: "fleet";
   inputSchema: JsonSchema;
   annotations: ToolAnnotations;
   rest: { method: "GET" | "POST"; path: string };
@@ -127,12 +155,58 @@ export type ToolDef = {
 
 const READ: ToolAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const ASK: ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
+/** An owner command changes the owner's own settings, so it is not read-only. It is not destructive in MCP's sense:
+ *  nothing it replaces is lost (the ledger is append-only, undo_command restores what a command replaced, and the run's
+ *  end lifts everything). Idempotent where sending the same arguments again changes nothing more -- every command but
+ *  hold_vehicle, whose for_minutes counts from the clock at the time it is sent. */
+const SET: ToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const SET_ONCE: ToolAnnotations = { ...SET, idempotentHint: false };
+
+// ── 0605: the owner's arguments ──
+const VEHICLES: JsonSchema = {
+  type: ["string", "array"], minLength: 1, maxLength: 80, minItems: 1, maxItems: 100,
+  items: { type: "string", minLength: 1, maxLength: 80 },
+  description: "Which of your cars: \"all\", one name, or a list of up to 100 names, said the way a person says them " +
+    "(\"Tesla-AV-045\", \"Tesla 45\", \"AV-045\", \"RT-003\"). Names are matched only inside your own fleet; a name that " +
+    "matches none or several of your cars is refused, and the refusal lists your cars' names.",
+};
+const MODE: JsonSchema = {
+  type: "string", enum: ["apply", "preview"],
+  description: "apply (the default) makes the change. preview changes nothing and answers with the exact plan, its " +
+    "plan_hash and a ready-to-send confirm; send that confirm to apply exactly what was shown.",
+};
+const PLAN_HASH: JsonSchema = {
+  type: "string", pattern: "^[0-9a-f]{32}$",
+  description: "Optional, with mode apply: the plan_hash a preview returned. OTTO-Q then applies only that plan; if a " +
+    "setting moved in between, it refuses with plan_changed and the new plan.",
+};
+const OWNER_IDEMPOTENCY: JsonSchema = {
+  type: "string", pattern: "^[A-Za-z0-9._:-]{1,100}$",
+  description: "Optional. Sending the same command again with the same key returns the first receipt instead of acting " +
+    "twice; the same key with a different command is refused (idempotency_key_reused).",
+};
+const OWNER_NOTE: JsonSchema = {
+  type: "string", maxLength: 500,
+  description: "Optional: why, in your person's words (at most 500 characters). Shown on the receipt and in OrchestrAV.",
+};
+const COMMAND_OPTIONS: Record<string, JsonSchema> = {
+  mode: MODE, expect_plan_hash: PLAN_HASH, idempotency_key: OWNER_IDEMPOTENCY, note: OWNER_NOTE,
+};
+const RECEIPT =
+  " Answers with a receipt: outcome (applied, previewed, no_change or refused), a plain-English summary, and an " +
+  "OrchestrAV link to see it. Relay the summary and the link to your person; a change is done only when outcome is " +
+  "applied. Lasts until the demo run ends or you undo it.";
+const serviceProp = (description: string): JsonSchema => ({ type: "string", enum: OWNER_SERVICES, description });
+const SERVICE_GUIDE =
+  "exterior_wash (external cleaning, a wash bay), interior_deep_clean (a full detail), interior_tidy (a quick clean), " +
+  "interior_inspection, sensor_clean (cameras and sensors), sensor_calibration, software_update, remote_diagnostics, " +
+  "mechanical_pm (a service-bay visit with a technician), cosmetic_repair, item_retrieval (an item left in the car)";
 
 export const TOOLS: readonly ToolDef[] = [
   {
     name: "whoami",
     title: "Who am I",
-    description: "Your principal: kind, the depot and fleet you are scoped to, your capabilities and limits, and how a change you ask for gets decided.",
+    description: "Your principal: kind, the depot and fleet you are scoped to, your capabilities and limits, and how a change you ask for gets decided. An owner's token also gets an owner block: its cars, its contract's charge-limit range, the services it may order, and its OrchestrAV link.",
     capability: null, effect: "read", inputSchema: EMPTY, annotations: READ,
     rest: { method: "GET", path: "/v1/whoami" }, tags: ["identity"], examples: ["Who am I and what may I do?"],
   },
@@ -260,6 +334,153 @@ export const TOOLS: readonly ToolDef[] = [
       "{\"kind\": \"adjustment\", \"title\": \"Cap Waymo-AV-012 at 90% tonight\", \"vehicle_id\": \"<uuid>\", \"adjustment\": \"charge_target\", \"value\": 90}",
     ],
   },
+  // ── 0605: an owner's agent, on its own cars. Everything below needs a token bound to one fleet. ──
+  {
+    name: "my_fleet",
+    title: "My cars",
+    description: "Your cars at the depot, in plain English (summary) and as data (cars): how many are charging, in a bay, waiting or out on the road, their average charge, the settings you have in force, which will be ready next, and the OrchestrAV link to watch them. Start here for anything about your cars. Times marked \"sim time\" are the simulation's clock, in Nashville time.",
+    capability: "read", effect: "read", scope: "fleet", inputSchema: EMPTY, annotations: READ,
+    rest: { method: "GET", path: "/v1/me/fleet" }, tags: ["owner", "fleet"],
+    examples: ["How are my Teslas doing?", "Which of my cars will be ready next?"],
+  },
+  {
+    name: "my_vehicle",
+    title: "One of my cars",
+    description: "One of your cars in plain English: where it is and what it is doing, its charge and the target it charges to, what is still to do before it leaves (your orders marked), any hold you set, when OTTO-Q plans it to be ready, and OTTO-Q's last decision for it.",
+    capability: "read", effect: "read", scope: "fleet",
+    inputSchema: {
+      type: "object", additionalProperties: false, required: ["vehicle"],
+      properties: { vehicle: { type: "string", minLength: 1, maxLength: 80, description: "The car, as a person says it: \"Tesla-AV-045\", \"Tesla 45\", \"RT-003\"." } },
+    },
+    annotations: READ, rest: { method: "GET", path: "/v1/me/vehicles/{vehicle}" }, tags: ["owner", "vehicles"],
+    examples: ["Where is Tesla 45 and when will it be ready?", "{\"vehicle\": \"Tesla-RT-003\"}"],
+  },
+  {
+    name: "my_settings",
+    title: "My settings in force",
+    description: "Everything you have in force on the current demo run, car by car: charge limits, holds and service orders, each with the command that set it. Everything lifts when the run ends.",
+    capability: "read", effect: "read", scope: "fleet", inputSchema: EMPTY, annotations: READ,
+    rest: { method: "GET", path: "/v1/me/settings" }, tags: ["owner", "settings"],
+    examples: ["What have I set on my cars?"],
+  },
+  {
+    name: "my_commands",
+    title: "My commands",
+    description: "Your commands, newest first: each one's outcome, its plain-English receipt, the cars it touched, and whether it was undone or lifted when its run ended.",
+    capability: null, effect: "read", scope: "fleet",
+    inputSchema: {
+      type: "object", additionalProperties: false,
+      properties: {
+        command_id: uuidProp("Just this command."),
+        outcome: { type: "string", enum: OWNER_OUTCOMES, description: "Only commands with this outcome." },
+        limit: { type: "integer", minimum: 1, maximum: 50, description: "At most this many (default 10)." },
+      },
+    },
+    annotations: READ, rest: { method: "GET", path: "/v1/me/commands" }, tags: ["owner", "commands"],
+    examples: ["Did my last change go through?", "{\"outcome\": \"refused\"}"],
+  },
+  {
+    name: "set_charge_limit",
+    title: "Set how full my cars charge",
+    description: "Set the most your cars charge to, for example 90 instead of the full 100, so they can get back to work sooner. Only inside your contract's range (whoami: owner.charge_limit_pct); outside it is refused. A car charging now stops at the new limit; a car already above it is not drained." + RECEIPT,
+    capability: "owner_settings", effect: "owner_setting", scope: "fleet",
+    inputSchema: {
+      type: "object", additionalProperties: false, required: ["vehicles", "percent"],
+      properties: {
+        vehicles: VEHICLES,
+        percent: { type: "integer", minimum: 1, maximum: 100, description: "The most a car charges to, in percent, e.g. 90." },
+        ...COMMAND_OPTIONS,
+      },
+    },
+    annotations: SET, rest: { method: "POST", path: "/v1/me/charge-limit" }, tags: ["owner", "charging"],
+    examples: ["{\"vehicles\": \"all\", \"percent\": 90}", "{\"vehicles\": [\"Tesla-AV-045\"], \"percent\": 85, \"mode\": \"preview\"}"],
+  },
+  {
+    name: "clear_charge_limit",
+    title: "Charge my cars full again",
+    description: "Lift your charge limit so these cars charge to the full target again." + RECEIPT,
+    capability: "owner_settings", effect: "owner_setting", scope: "fleet",
+    inputSchema: {
+      type: "object", additionalProperties: false, required: ["vehicles"],
+      properties: { vehicles: VEHICLES, ...COMMAND_OPTIONS },
+    },
+    annotations: SET, rest: { method: "POST", path: "/v1/me/charge-limit/clear" }, tags: ["owner", "charging"],
+    examples: ["{\"vehicles\": \"all\"}"],
+  },
+  {
+    name: "request_service",
+    title: "Order a service for my cars",
+    description: "Order a service for your cars: " + SERVICE_GUIDE + ". when: now (this visit, or the next one for a car that is out), next_return, or every_return (a standing order; include_current_visit false starts it from the next return). OTTO-Q decides when and where: bay work comes after the charge, work at the car runs during it, and no car leaves with an ordered service undone. So \"a service bay right after charging\" is mechanical_pm, when now. Your contract may block some services." + RECEIPT,
+    capability: "owner_settings", effect: "owner_setting", scope: "fleet",
+    inputSchema: {
+      type: "object", additionalProperties: false, required: ["vehicles", "service"],
+      properties: {
+        vehicles: VEHICLES,
+        service: serviceProp("The service to order."),
+        when: { type: "string", enum: SERVICE_WHEN, description: "now (default), next_return or every_return." },
+        include_current_visit: { type: "boolean", description: "every_return only: true (default) includes the visit under way now; false starts from the next return." },
+        ...COMMAND_OPTIONS,
+      },
+    },
+    annotations: SET, rest: { method: "POST", path: "/v1/me/services" }, tags: ["owner", "services"],
+    examples: [
+      "{\"vehicles\": [\"Tesla-AV-045\"], \"service\": \"mechanical_pm\"}",
+      "{\"vehicles\": \"all\", \"service\": \"exterior_wash\", \"when\": \"every_return\"}",
+    ],
+  },
+  {
+    name: "cancel_service",
+    title: "Withdraw my service orders",
+    description: "Withdraw your service orders on these cars: one service, or every order you placed on them if service is omitted. Only what you ordered comes off: a service OTTO-Q found a car to need stays, and a service already under way finishes." + RECEIPT,
+    capability: "owner_settings", effect: "owner_setting", scope: "fleet",
+    inputSchema: {
+      type: "object", additionalProperties: false, required: ["vehicles"],
+      properties: { vehicles: VEHICLES, service: serviceProp("Optional: just this service's order."), ...COMMAND_OPTIONS },
+    },
+    annotations: SET, rest: { method: "POST", path: "/v1/me/services/cancel" }, tags: ["owner", "services"],
+    examples: ["{\"vehicles\": \"all\", \"service\": \"exterior_wash\"}"],
+  },
+  {
+    name: "hold_vehicle",
+    title: "Keep my cars at the depot until a time",
+    description: "Keep cars at the depot until a time: until is a time of day on the sim clock (\"06:00\", \"6:00 AM\", taken as its next occurrence) or an ISO timestamp (Nashville time when it has no offset); or for_minutes, 1 to 1440. Give exactly one. At most 24 sim hours. A hold only delays a departure: it never moves a car, and a car that is ready waits in staging without keeping a charger." + RECEIPT,
+    capability: "owner_settings", effect: "owner_setting", scope: "fleet",
+    inputSchema: {
+      type: "object", additionalProperties: false, required: ["vehicles"],
+      properties: {
+        vehicles: VEHICLES,
+        until: { type: "string", minLength: 1, maxLength: 40, description: "\"06:00\", \"6:00 AM\" or an ISO timestamp." },
+        for_minutes: { type: "integer", minimum: 1, maximum: 1440, description: "Or: hold for this many sim minutes." },
+        ...COMMAND_OPTIONS,
+      },
+    },
+    annotations: SET_ONCE, rest: { method: "POST", path: "/v1/me/holds" }, tags: ["owner", "holds"],
+    examples: ["{\"vehicles\": [\"Tesla-RT-003\"], \"until\": \"6:00 AM\"}", "{\"vehicles\": \"all\", \"for_minutes\": 90}"],
+  },
+  {
+    name: "release_hold",
+    title: "Let my held cars go",
+    description: "Lift your hold so these cars may leave as soon as they are ready." + RECEIPT,
+    capability: "owner_settings", effect: "owner_setting", scope: "fleet",
+    inputSchema: {
+      type: "object", additionalProperties: false, required: ["vehicles"],
+      properties: { vehicles: VEHICLES, ...COMMAND_OPTIONS },
+    },
+    annotations: SET, rest: { method: "POST", path: "/v1/me/holds/release" }, tags: ["owner", "holds"],
+    examples: ["{\"vehicles\": [\"Tesla-RT-003\"]}"],
+  },
+  {
+    name: "undo_command",
+    title: "Undo one of my commands",
+    description: "Reverse one of your applied commands by its command_id (from its receipt or my_commands): what it set is withdrawn, and anything it replaced comes back. A command whose run has ended was already lifted with it." + RECEIPT,
+    capability: "owner_settings", effect: "owner_setting", scope: "fleet",
+    inputSchema: {
+      type: "object", additionalProperties: false, required: ["command_id"],
+      properties: { command_id: uuidProp("The command to undo."), ...COMMAND_OPTIONS },
+    },
+    annotations: SET, rest: { method: "POST", path: "/v1/me/undo" }, tags: ["owner", "commands"],
+    examples: ["{\"command_id\": \"<command_id from a receipt>\"}"],
+  },
 ];
 
 export function findTool(name: unknown): ToolDef | undefined {
@@ -271,10 +492,15 @@ export function allowedKinds(capabilities: readonly string[]): RequestKind[] {
   return (Object.keys(REQUEST_KIND_CAPABILITY) as RequestKind[]).filter((k) => capabilities.includes(REQUEST_KIND_CAPABILITY[k]));
 }
 
-/** The tools a principal can use, with submit_request's `kind` narrowed to the kinds it may ask for. */
-export function toolsFor(capabilities: readonly string[]): ToolDef[] {
+/** What a token is, as far as choosing its tools goes. */
+export type ToolScope = { fleetBound?: boolean };
+
+/** The tools a principal can use, with submit_request's `kind` narrowed to the kinds it may ask for. A fleet-scoped
+ *  tool is offered only to a token bound to one fleet: offering one the database will always refuse is a placebo. */
+export function toolsFor(capabilities: readonly string[], scope: ToolScope = {}): ToolDef[] {
   const out: ToolDef[] = [];
   for (const t of TOOLS) {
+    if (t.scope === "fleet" && !scope.fleetBound) continue;
     if (t.capability === null || (t.capability !== "any_request" && capabilities.includes(t.capability))) {
       out.push(t);
     } else if (t.capability === "any_request") {
@@ -285,6 +511,13 @@ export function toolsFor(capabilities: readonly string[]): ToolDef[] {
     }
   }
   return out;
+}
+
+/** A token's capabilities and fleet binding, read from a handshake (its data is whoami's). */
+export function principalScope(outcome: EngineOutcome): { capabilities: string[]; fleetBound: boolean } {
+  const data = isObject(outcome.data) ? outcome.data : {};
+  const scope = isObject(data.scope) ? data.scope : {};
+  return { capabilities: outcome.principal?.capabilities ?? [], fleetBound: isObject(scope.fleet_operator) };
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────── validation ──
@@ -329,6 +562,11 @@ export function validateAgainst(schema: JsonSchema, value: unknown, path = "$"):
     if (schema.minimum !== undefined && value < schema.minimum) errs.push({ path, message: `must be at least ${schema.minimum}` });
     if (schema.maximum !== undefined && value > schema.maximum) errs.push({ path, message: `must be at most ${schema.maximum}` });
   }
+  if (Array.isArray(value)) {
+    if (schema.minItems !== undefined && value.length < schema.minItems) errs.push({ path, message: `must have at least ${schema.minItems} item${schema.minItems === 1 ? "" : "s"}` });
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) errs.push({ path, message: `must have at most ${schema.maxItems} items` });
+    if (schema.items !== undefined) value.forEach((v, i) => errs.push(...validateAgainst(schema.items as JsonSchema, v, `${path}[${i}]`)));
+  }
   if (isObject(value) && (schema.properties || schema.required || schema.additionalProperties === false)) {
     for (const key of schema.required ?? []) {
       if (value[key] === undefined || value[key] === null) errs.push({ path: `${path}.${key}`, message: "is required" });
@@ -360,6 +598,22 @@ export function validateToolArgs(tool: ToolDef, args: unknown): Validated {
     if (kind !== "ops_action" && (value.action !== undefined || value.args !== undefined)) errors.push({ path: "$.action", message: "is only for ops_action" });
     if (kind !== "adjustment" && (value.adjustment !== undefined || value.value !== undefined)) errors.push({ path: "$.adjustment", message: "is only for adjustment" });
     if (typeof value.value === "string" && [...value.value].length > 200) errors.push({ path: "$.value", message: "must be at most 200 characters" });
+  }
+  if (errors.length === 0 && (OWNER_COMMANDS as readonly string[]).includes(tool.name)) {
+    // the rules the database also enforces, so an agent hears them before it asks
+    if (tool.name === "hold_vehicle" && (value.until === undefined) === (value.for_minutes === undefined)) {
+      errors.push({ path: "$.until", message: "give exactly one of until or for_minutes" });
+    }
+    if (tool.name === "request_service" && value.include_current_visit !== undefined && value.when !== "every_return") {
+      errors.push({ path: "$.include_current_visit", message: "is only for when = every_return" });
+    }
+    if (value.expect_plan_hash !== undefined && value.mode === "preview") {
+      errors.push({ path: "$.expect_plan_hash", message: "is for mode apply: it binds the apply to a plan a preview showed" });
+    }
+    if (Array.isArray(value.vehicles)) {
+      const all = value.vehicles.filter((v) => typeof v === "string" && /^\s*(all|all cars|every car|fleet|my fleet)\s*$/i.test(v));
+      if (all.length > 0 && value.vehicles.length > 1) errors.push({ path: "$.vehicles", message: "\"all\" stands alone: send \"all\" or a list of names" });
+    }
   }
   return errors.length ? { ok: false, errors } : { ok: true, value };
 }
@@ -479,6 +733,19 @@ export function routeRest(method: string, path: string): RestRoute {
     { re: /^\/v1\/requests\/([^/]+)$/, methods: { GET: "list_requests" }, keys: ["request_id"] },
     { re: /^\/v1\/notes$/, methods: { POST: "send_note" } },
     { re: /^\/v1\/tools$/, methods: { GET: "tools_catalog" } },
+    // 0605: an owner's agent, on its own cars
+    { re: /^\/v1\/me\/fleet$/, methods: { GET: "my_fleet" } },
+    { re: /^\/v1\/me\/vehicles\/([^/]+)$/, methods: { GET: "my_vehicle" }, keys: ["vehicle"] },
+    { re: /^\/v1\/me\/settings$/, methods: { GET: "my_settings" } },
+    { re: /^\/v1\/me\/commands$/, methods: { GET: "my_commands" } },
+    { re: /^\/v1\/me\/commands\/([^/]+)$/, methods: { GET: "my_commands" }, keys: ["command_id"] },
+    { re: /^\/v1\/me\/charge-limit$/, methods: { POST: "set_charge_limit" } },
+    { re: /^\/v1\/me\/charge-limit\/clear$/, methods: { POST: "clear_charge_limit" } },
+    { re: /^\/v1\/me\/services$/, methods: { POST: "request_service" } },
+    { re: /^\/v1\/me\/services\/cancel$/, methods: { POST: "cancel_service" } },
+    { re: /^\/v1\/me\/holds$/, methods: { POST: "hold_vehicle" } },
+    { re: /^\/v1\/me\/holds\/release$/, methods: { POST: "release_hold" } },
+    { re: /^\/v1\/me\/undo$/, methods: { POST: "undo_command" } },
   ];
   for (const r of table) {
     const hit = r.re.exec(p);
@@ -499,12 +766,17 @@ export function restIndex(baseUrl: string) {
   return {
     name: GATEWAY_TITLE,
     version: GATEWAY_VERSION,
-    about: "Read the OTTOYARD twin depot and ASK for changes. A person approves or declines every request; OTTO-Q's own doors decide what can happen. Send Authorization: Bearer <token>.",
+    about: "Read the OTTOYARD twin depot and ASK for changes. A person approves or declines every request; OTTO-Q's own doors decide what can happen. A vehicle owner's token can also set what its own cars need (/v1/me/...), inside its contract, and OTTO-Q applies it at its next tick. Send Authorization: Bearer <token>.",
     documentation: "https://github.com/OTTOYARD/otto-q-core/blob/main/AGENT_GATEWAY.md",
+    owner_guide: "https://github.com/OTTOYARD/otto-q-core/blob/main/PERSONAL_AGENT.md",
     mcp: `${baseUrl}/mcp`,
+    openapi: `${baseUrl}/v1/openapi.json`,
     agent_card: `${baseUrl}/.well-known/agent-card.json`,
     endpoints: TOOLS.map((t) => ({ method: t.rest.method, path: t.rest.path, tool: t.name, capability: t.capability, title: t.title }))
-      .concat([{ method: "GET", path: "/v1/tools", tool: "tools_catalog", capability: null, title: "The tools your token may use, with JSON schemas" }]),
+      .concat([
+        { method: "GET", path: "/v1/tools", tool: "tools_catalog", capability: null, title: "The tools your token may use, with JSON schemas" },
+        { method: "POST", path: "/v1/ask", tool: "ask", capability: "read", title: "Ask OTTO-Command in plain English (an owner's token)" },
+      ]),
   };
 }
 
@@ -519,7 +791,10 @@ export function restResponse(outcome: EngineOutcome): HttpOut {
     };
   }
   const err = outcome.error ?? { code: "error", message: "The request failed." };
-  return { status: outcome.http_status, headers: errorHeaders(outcome.http_status, err.retry_after_s), body: { error: err, meta } };
+  // A refused owner command was RECORDED (0605): its receipt -- the summary, the refusal, the command_id -- comes back
+  // beside the error, so an agent can relay why in OTTO-Q's own words.
+  const body = outcome.data !== undefined && outcome.data !== null ? { error: err, data: outcome.data, meta } : { error: err, meta };
+  return { status: outcome.http_status, headers: errorHeaders(outcome.http_status, err.retry_after_s), body };
 }
 
 export async function handleRest(
@@ -536,7 +811,8 @@ export async function handleRest(
   if (route.tool === "tools_catalog") {
     const who = await call("handshake", {}, {});
     if (!who.ok) return restResponse(who);
-    const tools = toolsFor(who.principal?.capabilities ?? []).map((t) => ({
+    const { capabilities, fleetBound } = principalScope(who);
+    const tools = toolsFor(capabilities, { fleetBound }).map((t) => ({
       name: t.name, title: t.title, description: t.description, method: t.rest.method, path: t.rest.path, input_schema: t.inputSchema,
     }));
     return { status: 200, headers: {}, body: { data: { tools }, meta: { tool: "tools_catalog", call_id: who.call_id ?? null } } };
@@ -595,9 +871,15 @@ export const JSONRPC = {
 
 export const MCP_INSTRUCTIONS =
   "You are connected to OTTO-Q, the orchestration engine for the OTTOYARD Nashville Flagship twin depot. Reads are live. " +
-  "Every change you ask for (send_note, submit_request) is a REQUEST: a person approves or declines it, and OTTO-Q's own " +
-  "doors decide whether it can happen. Never report a change as done until list_requests shows status 'applied' with the " +
-  "engine's reply. Times named sim_* or labelled SIMULATION are simulation time; created_at and expires_at are real time (UTC).";
+  "A change you ask for with send_note or submit_request is a REQUEST: a person approves or declines it, and OTTO-Q's own " +
+  "doors decide whether it can happen; never report one as done until list_requests shows status 'applied' with the " +
+  "engine's reply. If your token belongs to a vehicle owner (whoami shows an owner block), the owner commands " +
+  "(set_charge_limit, clear_charge_limit, request_service, cancel_service, hold_vehicle, release_hold, undo_command) set " +
+  "what YOUR cars need: OTTO-Q checks each one against your contract and its own rules, applies it at its next tick, and " +
+  "answers with a plain-English summary and an OrchestrAV link to relay to your person. Such a change is done only when " +
+  "its outcome is 'applied'; mode 'preview' shows the plan first. Nothing you send moves a car: OTTO-Q decides when and " +
+  "where, and the car's own driving system moves it. Times named sim_* or marked 'sim time' are simulation time; " +
+  "created_at and expires_at are real time (UTC), and *_local times are Nashville time.";
 
 type RpcId = string | number | null;
 const rpcError = (id: RpcId, code: number, message: string, data?: unknown) =>
@@ -620,8 +902,8 @@ export function decodeHeaderValue(v: string): string | null {
 }
 
 /** The tools/list entries for a principal: name, title, description, inputSchema, annotations. */
-export function mcpToolList(capabilities: readonly string[]) {
-  return toolsFor(capabilities).map((t) => ({
+export function mcpToolList(capabilities: readonly string[], scope: ToolScope = {}) {
+  return toolsFor(capabilities, scope).map((t) => ({
     name: t.name,
     title: t.title,
     description: t.description,
@@ -763,10 +1045,11 @@ export async function handleMcp(req: { method: string; headers: HeaderGetter; bo
       if (params.cursor !== undefined) return reply(200, rpcError(id, JSONRPC.INVALID_PARAMS, "Invalid cursor: every tool is returned on one page."));
       const who = await call("handshake", {}, callMeta);
       if (!who.ok) return engineFailure(id, who);
-      // The list varies by the token's capabilities, so it may be cached only for this token.
+      // The list varies by the token's capabilities and fleet, so it may be cached only for this token.
+      const { capabilities, fleetBound } = principalScope(who);
       return reply(200, rpcResult(id, {
         ...modernFields,
-        tools: mcpToolList(who.principal?.capabilities ?? []),
+        tools: mcpToolList(capabilities, { fleetBound }),
         ...(modern ? { ttlMs: 300_000, cacheScope: "private" } : {}),
       }));
     }
@@ -791,7 +1074,10 @@ export async function handleMcp(req: { method: string; headers: HeaderGetter; bo
       const outcome = await call(tool.name, v.value, callMeta);
       if (isTransportFailure(outcome)) return engineFailure(id, outcome);
       if (!outcome.ok) {
-        return reply(200, rpcResult(id, toolCallResult(modern, { error: outcome.error ?? { code: "error", message: "The request failed." }, call_id: outcome.call_id ?? null }, true)));
+        // A refused owner command carries its recorded receipt (0605): the agent relays the refusal in OTTO-Q's words.
+        const failed: Record<string, unknown> = { error: outcome.error ?? { code: "error", message: "The request failed." }, call_id: outcome.call_id ?? null };
+        if (outcome.data !== undefined && outcome.data !== null) failed.data = outcome.data;
+        return reply(200, rpcResult(id, toolCallResult(modern, failed, true)));
       }
       return reply(200, rpcResult(id, toolCallResult(modern, outcome.data, false)));
     }
@@ -808,9 +1094,11 @@ export function agentCard(baseUrl: string) {
   return {
     name: GATEWAY_TITLE,
     description:
-      "Read the OTTOYARD Nashville Flagship twin depot through OTTO-Q, and ask for changes. Every change is a request a " +
-      "person approves or declines; OTTO-Q's own doors decide what can happen. Discovery card only: the gateway speaks " +
-      "MCP and a REST API, not A2A task messaging.",
+      "Read the OTTOYARD Nashville Flagship twin depot through OTTO-Q, and ask for changes. A change to the depot is a " +
+      "request a person approves or declines; OTTO-Q's own doors decide what can happen. A vehicle owner's agent can also " +
+      "set what its own cars need (charge limit, services, holds), inside its contract, applied at OTTO-Q's next tick and " +
+      "never moving a car. Discovery card only: the gateway speaks MCP, a REST API (OpenAPI at /v1/openapi.json) and a " +
+      "plain-English door (POST /v1/ask), not A2A task messaging.",
     supportedInterfaces: [
       { url: `${baseUrl}/mcp`, protocolBinding: "https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http", protocolVersion: MCP_MODERN_VERSION },
       { url: `${baseUrl}/v1`, protocolBinding: "https://github.com/OTTOYARD/otto-q-core/blob/main/AGENT_GATEWAY.md#rest-api", protocolVersion: "1.0" },
@@ -843,6 +1131,216 @@ export function agentCard(baseUrl: string) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────── OpenAPI ──
+
+/** The REST table's second routes for a tool, beside the tool's own path. */
+const EXTRA_REST_PATHS: ReadonlyArray<{ tool: string; path: string }> = [
+  { tool: "list_requests", path: "/v1/requests/{request_id}" },
+  { tool: "my_commands", path: "/v1/me/commands/{command_id}" },
+];
+
+const ERROR_RESPONSES: Record<string, string> = {
+  "400": "The arguments are not valid; error.details names each problem.",
+  "401": "No token, or an unknown or revoked one.",
+  "403": "The token lacks the capability, or is not bound to a fleet.",
+  "404": "Not found, or outside the token's scope: the two read the same.",
+  "409": "A conflict with the request's current state (a request already decided).",
+  "422": "Refused. For an owner command OTTO-Q RECORDED the refusal and changed nothing; data carries the receipt with the reason. Also: an idempotency key reused for a different command.",
+  "429": "Over the token's rate limit (see Retry-After), or too many requests awaiting a decision.",
+  "503": "OTTO-Q could not be reached, or this part of the gateway is not switched on yet.",
+};
+
+const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
+const errorResponses = () => Object.fromEntries(Object.entries(ERROR_RESPONSES).map(([code, description]) =>
+  [code, { description, content: { "application/json": { schema: ref("Error") } } }]));
+
+function openApiOperation(t: ToolDef, path: string): Record<string, unknown> {
+  const keys = [...path.matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
+  const props = t.inputSchema.properties ?? {};
+  const required = t.inputSchema.required ?? [];
+  const parameters: Record<string, unknown>[] = keys.map((k) => ({
+    name: k, in: "path", required: true, description: props[k]?.description, schema: props[k] ?? { type: "string" },
+  }));
+  const op: Record<string, unknown> = {
+    operationId: path === t.rest.path ? t.name : `${t.name}_by_${keys.join("_")}`,
+    summary: t.title,
+    description: t.description,
+    tags: [t.tags[0]],
+    "x-ottoq-tool": t.name,
+    "x-ottoq-capability": t.capability,
+    "x-ottoq-effect": t.effect,
+    ...(t.scope ? { "x-ottoq-scope": t.scope } : {}),
+  };
+  if (t.rest.method === "GET") {
+    for (const [k, schema] of Object.entries(props)) {
+      if (!keys.includes(k)) parameters.push({ name: k, in: "query", required: required.includes(k), description: schema.description, schema });
+    }
+  } else {
+    const bodyProps = Object.fromEntries(Object.entries(props).filter(([k]) => !keys.includes(k)));
+    const bodyRequired = required.filter((k) => !keys.includes(k));
+    op.requestBody = {
+      required: bodyRequired.length > 0,
+      content: { "application/json": { schema: { type: "object", additionalProperties: false, properties: bodyProps, ...(bodyRequired.length ? { required: bodyRequired } : {}) } } },
+    };
+    if ("idempotency_key" in props) {
+      parameters.push({ name: "Idempotency-Key", in: "header", required: false, description: "The same as the idempotency_key argument; the body's wins when both are sent.", schema: props.idempotency_key });
+    }
+  }
+  if (parameters.length) op.parameters = parameters;
+  const okStatus = t.effect === "read" ? "200" : "201";
+  const dataSchema = t.effect === "owner_setting" ? ref("OwnerReceipt") : {};
+  op.responses = {
+    [okStatus]: { description: t.effect === "read" ? "The answer." : "Recorded.", content: { "application/json": { schema: { allOf: [ref("Ok"), { type: "object", properties: { data: dataSchema } }] } } } },
+    ...(t.effect !== "read" ? { "200": { description: "A duplicate (the same idempotency key), or an owner command that previewed or changed nothing.", content: { "application/json": { schema: ref("Ok") } } } } : {}),
+    ...errorResponses(),
+  };
+  return op;
+}
+
+/** OpenAPI 3.1 for the REST API, generated from the same catalog MCP serves, so the two cannot drift. Public, like the
+ *  agent card: it describes the door, not what any token may see. */
+export function openApiDocument(baseUrl: string) {
+  const paths: Record<string, Record<string, unknown>> = {};
+  const add = (t: ToolDef, path: string) => { (paths[path] ??= {})[t.rest.method.toLowerCase()] = openApiOperation(t, path); };
+  for (const t of TOOLS) add(t, t.rest.path);
+  for (const extra of EXTRA_REST_PATHS) {
+    const t = findTool(extra.tool);
+    if (t) add(t, extra.path);
+  }
+  paths["/v1/tools"] = { get: {
+    operationId: "tools_catalog", summary: "The tools your token may use", tags: ["identity"],
+    description: "Each tool your token may use, with its REST method and path and its JSON input schema.",
+    responses: { "200": { description: "The catalog.", content: { "application/json": { schema: ref("Ok") } } }, ...errorResponses() },
+  } };
+  paths["/v1/ask"] = { post: {
+    operationId: "ask", summary: "Ask OTTO-Command in plain English", tags: ["owner"],
+    description: "For an owner's token. Send your person's words; OTTO-Command reads them, calls the owner tools with YOUR token (so it can do nothing your token could not), and answers in plain English with OTTO-Q's receipts and the OrchestrAV link. dry_run runs every change as a preview, enforced in code. To apply a previewed plan exactly, send the confirm objects it returned (no model is involved).",
+    requestBody: { required: true, content: { "application/json": { schema: ref("AskRequest") } } },
+    responses: { "200": { description: "The answer.", content: { "application/json": { schema: ref("AskResponse") } } }, ...errorResponses() },
+  } };
+  return {
+    openapi: "3.1.0",
+    jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema",
+    info: {
+      title: GATEWAY_TITLE,
+      version: GATEWAY_VERSION,
+      summary: "Read the OTTOYARD twin depot through OTTO-Q; ask for changes; set what your own cars need.",
+      description: "Generated from the gateway's tool catalog, the same one its MCP endpoint serves. Every call is answered by the database, which resolves the token, rate-limits it, checks its capability and scope, and writes the call ledger.",
+    },
+    servers: [{ url: baseUrl }],
+    security: [{ agentToken: [] }],
+    tags: [...new Set(TOOLS.map((t) => t.tags[0]))].map((name) => ({ name })),
+    paths,
+    components: {
+      securitySchemes: {
+        agentToken: { type: "http", scheme: "bearer", bearerFormat: "oqa_ + 64 hex", description: "An agent token issued by ottoq_agent_issue_token. Its depot, fleet and capabilities are fixed at issue and enforced by the database." },
+      },
+      schemas: {
+        Meta: { type: "object", properties: {
+          tool: { type: ["string", "null"] }, call_id: { type: ["integer", "null"], description: "This call's row in the gateway's call ledger." },
+          principal: { type: ["object", "null"], properties: { name: { type: "string" }, kind: { type: "string" } } },
+        } },
+        Ok: { type: "object", required: ["data", "meta"], properties: { data: {}, meta: ref("Meta") } },
+        Error: { type: "object", required: ["error", "meta"], properties: {
+          error: { type: "object", required: ["code", "message"], properties: {
+            code: { type: "string" }, message: { type: "string" }, hint: { type: "string" }, retry_after_s: { type: "integer" },
+            details: { type: "array", items: { type: "object", properties: { path: { type: "string" }, message: { type: "string" } } } },
+          } },
+          data: { description: "For a refused owner command: its recorded receipt (OwnerReceipt)." },
+          meta: ref("Meta"),
+        } },
+        OwnerReceipt: { type: "object", required: ["outcome", "summary", "command"], properties: {
+          outcome: { type: "string", enum: OWNER_OUTCOMES },
+          duplicate: { type: "boolean", description: "true when this answers a resent idempotency key." },
+          summary: { type: "string", description: "OTTO-Q's plain-English account of what changed, or why not. Relay it." },
+          link: { type: "string", format: "uri", description: "Where to see it in OrchestrAV." },
+          refusal: { type: "object", properties: { code: { type: "string" }, message: { type: "string" }, hint: { type: "string" } } },
+          command: { type: "object", description: "The recorded command: command_id, tool, mode, outcome, cars, vehicles, effects (per car: before, after, now), args, plan_hash, sim_clock, created_at, undone_at, lifted_at." },
+          confirm: { type: "object", description: "After a preview: the exact tool and arguments that apply this plan.", properties: { tool: { type: "string" }, args: { type: "object" } } },
+          undo: { type: "object", description: "After an apply: the call that reverses it.", properties: { tool: { type: "string" }, args: { type: "object" } } },
+          expires: { type: "string" },
+        } },
+        AskRequest: askInputSchema(),
+        AskResponse: { type: "object", required: ["data", "meta"], properties: {
+          data: { type: "object", properties: {
+            answer: { type: "string", description: "Plain English, ready to forward." },
+            answered_by: { type: "string" },
+            dry_run: { type: "boolean" },
+            actions: { type: "array", description: "Each command made, with OTTO-Q's receipt. The authoritative record of what changed.", items: { type: "object" } },
+            reads: { type: "array", items: { type: "string" } },
+            link: { type: ["string", "null"], description: "The OrchestrAV link to open." },
+            incomplete: { type: "boolean", description: "true when OTTO-Command could not finish its reply; actions still says what was done." },
+          } },
+          meta: ref("Meta"),
+        } },
+      },
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────── POST /v1/ask ──
+
+export const ASK_MAX_TEXT = 2000;
+export const ASK_MAX_HISTORY = 12;
+export const ASK_MAX_CONFIRMS = 10;
+
+/** POST /v1/ask's body. One schema for the door's own check and for the OpenAPI document. */
+export function askInputSchema(): JsonSchema {
+  return {
+    type: "object", additionalProperties: false,
+    properties: {
+      text: { type: "string", minLength: 1, maxLength: ASK_MAX_TEXT, description: "Your person's words, as they said them." },
+      dry_run: { type: "boolean", description: "Every change runs as a preview and nothing is applied. Enforced in code, not in the prompt." },
+      history: {
+        type: "array", maxItems: ASK_MAX_HISTORY, description: "Earlier turns of this conversation, oldest first.",
+        items: {
+          type: "object", additionalProperties: false, required: ["role", "text"],
+          properties: { role: { type: "string", enum: ["user", "assistant"] }, text: { type: "string", minLength: 1, maxLength: ASK_MAX_TEXT * 2 } },
+        },
+      },
+      confirm: {
+        type: "array", minItems: 1, maxItems: ASK_MAX_CONFIRMS,
+        description: "Instead of text: the confirm objects a dry run returned. Each is applied exactly as previewed, with no model involved.",
+        items: {
+          type: "object", additionalProperties: false, required: ["tool", "args"],
+          properties: {
+            tool: { type: "string", enum: OWNER_COMMANDS },
+            args: { type: "object" },
+            note: { type: "string", maxLength: 500, description: "The preview's own note; sent back as it came, and ignored." },
+          },
+        },
+      },
+      idempotency_key: {
+        type: "string", pattern: "^[A-Za-z0-9._:-]{1,60}$",
+        description: "Resend the same ask with the same key and each command it makes replays its first receipt instead of acting twice.",
+      },
+    },
+  };
+}
+
+/** What the gateway hands its plain-English door: the authenticated handshake (whoami), the engine call already bound to
+ *  the caller's token hash (transport 'ask'), and the body. The door itself is injected (./ottocommand_owner.ts), so this
+ *  file holds no model code and a test can stand one in. */
+export type AskContext = { who: EngineOutcome; call: EngineCall; bodyText: string; headers: HeaderGetter };
+export type AskHandler = (ctx: AskContext) => Promise<HttpOut>;
+
+/** POST /v1/ask: authenticate first (an unknown token learns nothing, not even whether the door is switched on), then
+ *  hand over to the injected door. */
+export async function handleAsk(req: { method: string; headers: HeaderGetter; bodyText: string }, call: EngineCall,
+                                ask: AskHandler | null | undefined): Promise<HttpOut> {
+  if (req.method.toUpperCase() !== "POST") {
+    return { status: 405, headers: { Allow: "POST" }, body: { error: { code: "method_not_allowed", message: "Use POST." }, meta: { tool: "ask", call_id: null } } };
+  }
+  const who = await call("handshake", {}, {});
+  if (!who.ok) return restResponse(who);
+  if (!ask) {
+    return { status: 503, headers: {}, body: { error: { code: "ask_not_configured",
+      message: "The plain-English door is built but not switched on: the gateway has no model configured. Every tool works directly over MCP and REST." },
+      meta: { tool: "ask", call_id: who.call_id ?? null } } };
+  }
+  return ask({ who, call, bodyText: req.bodyText, headers: req.headers });
+}
+
 // ───────────────────────────────────────────────────────────────────────────── the engine, over PostgREST ──
 
 /** One call into the database: token hash, tool, validated arguments, transport, and small request metadata. */
@@ -850,7 +1348,7 @@ export type EngineRpc = (
   tokenHash: string,
   tool: string,
   args: Record<string, unknown>,
-  transport: "rest" | "mcp",
+  transport: "rest" | "mcp" | "ask",
   meta: Record<string, unknown>,
 ) => Promise<EngineOutcome>;
 
@@ -911,11 +1409,14 @@ export type GatewayOptions = {
   allowedOrigins: readonly string[];
   /** null when the deployment lacks SUPABASE_URL or the service key: authenticated paths then answer 500. */
   engine: EngineRpc | null;
+  /** POST /v1/ask's plain-English door (./ottocommand_owner.ts). Absent or null: the door answers 503 ask_not_configured. */
+  ask?: AskHandler | null;
 };
 
 export const CORS_ALLOW_HEADERS = "authorization, content-type, idempotency-key, mcp-protocol-version, mcp-method, mcp-name";
 const CORS_EXPOSE_HEADERS = "www-authenticate, retry-after, x-ottoq-gateway";
 const CARD_PATHS = new Set(["/.well-known/agent-card.json", "/.well-known/agent.json"]);
+const OPENAPI_PATH = "/v1/openapi.json";
 
 function baseHeaders(): Record<string, string> {
   return {
@@ -959,12 +1460,13 @@ export async function readBodyBounded(body: ReadableStream<Uint8Array> | null, l
 
 /**
  * Every request the edge function receives. Order matters and is the security model's outer half:
- *   1. the public discovery documents (agent card, endpoint index) -- no token, no database;
+ *   1. the public discovery documents (agent card, OpenAPI, endpoint index) -- no token, no database;
  *   2. the Origin check (a browser origin not on the list is refused; agents send none);
  *   3. a well-formed Bearer token, or 401 before the database is asked;
  *   4. a bounded body (64 KiB);
- *   5. the token's SHA-256 -- the raw token never leaves this function -- and then REST or MCP, each of which asks
- *      the database, which resolves the principal, rate-limits, checks the capability and writes the call ledger.
+ *   5. the token's SHA-256 -- the raw token never leaves this function -- and then REST, MCP or the plain-English door,
+ *      each of which asks the database, which resolves the principal, rate-limits, checks the capability and writes
+ *      the call ledger. The plain-English door reaches the engine only through that same call, with the same token.
  */
 export async function handleGatewayRequest(req: Request, opts: GatewayOptions): Promise<Response> {
   const url = new URL(req.url);
@@ -973,6 +1475,7 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
   const method = req.method.toUpperCase();
   const origin = req.headers.get("origin");
   const isMcp = path === "/mcp";
+  const isAsk = path === "/v1/ask";
   const cors: Record<string, string> = origin && opts.allowedOrigins.includes(origin)
     ? { "Access-Control-Allow-Origin": origin, "Access-Control-Expose-Headers": CORS_EXPOSE_HEADERS, Vary: "Origin" }
     : {};
@@ -985,11 +1488,12 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
 
   try {
     // 1. public discovery
-    if (CARD_PATHS.has(path)) {
+    if (CARD_PATHS.has(path) || path === OPENAPI_PATH) {
       const pub = { "Access-Control-Allow-Origin": "*" };
       if (method === "OPTIONS") return toResponse({ status: 204, headers: { ...pub, "Access-Control-Allow-Methods": "GET, OPTIONS", Allow: "GET, HEAD, OPTIONS" }, body: null });
       if (method !== "GET" && method !== "HEAD") return toResponse({ status: 405, headers: { Allow: "GET, HEAD, OPTIONS" }, body: { error: { code: "method_not_allowed", message: "Use GET." } } });
-      const res = toResponse({ status: 200, headers: { ...pub, "Cache-Control": "public, max-age=300" }, body: agentCard(opts.publicUrl) });
+      const doc = path === OPENAPI_PATH ? openApiDocument(opts.publicUrl) : agentCard(opts.publicUrl);
+      const res = toResponse({ status: 200, headers: { ...pub, "Cache-Control": "public, max-age=300" }, body: doc });
       return method === "HEAD" ? new Response(null, { status: 200, headers: res.headers }) : res;
     }
     if ((path === "/" || path === "/v1") && method === "GET") {
@@ -1039,11 +1543,13 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
       const merged: Record<string, unknown> = { ...baseMeta };
       for (const [k, v] of Object.entries(meta)) if (v !== undefined && v !== null && v !== "") merged[k] = v;
       for (const k of Object.keys(merged)) if (merged[k] === undefined) delete merged[k];
-      return engine(tokenHash, tool, args, isMcp ? "mcp" : "rest", merged);
+      return engine(tokenHash, tool, args, isMcp ? "mcp" : isAsk ? "ask" : "rest", merged);
     };
     const out = isMcp
       ? await handleMcp({ method, headers: req.headers, bodyText }, call)
-      : await handleRest({ method, path, query: url.searchParams, headers: req.headers, bodyText }, call);
+      : isAsk
+        ? await handleAsk({ method, headers: req.headers, bodyText }, call, opts.ask)
+        : await handleRest({ method, path, query: url.searchParams, headers: req.headers, bodyText }, call);
     return toResponse(out, cors);
   } catch (e) {
     console.error(`${GATEWAY_NAME}: unhandled`, (e as Error)?.name ?? "error", (e as Error)?.message?.slice(0, 200) ?? "");

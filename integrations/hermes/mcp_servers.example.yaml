@@ -1,0 +1,14 @@
+# Hermes Agent: OTTO-Q as a remote MCP server. Merge into ~/.hermes/config.yaml, put the token in ~/.hermes/.env
+# (OTTOQ_AGENT_TOKEN=oqa_...), then /reload-mcp. Keys per the Hermes MCP config reference, read 2026-10-03:
+# https://hermes-agent.nousresearch.com/docs/reference/mcp-config-reference
+# The token is a secret: never in this file, a chat, or a URL. PERSONAL_AGENT.md section 5.
+mcp_servers:
+  ottoq:
+    url: "https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-agent-gateway/mcp"
+    headers:
+      Authorization: "Bearer ${OTTOQ_AGENT_TOKEN}"
+    timeout: 60          # a command answers in well under a second; the plain-English door can take longer, but it is REST
+    connect_timeout: 30
+    tools:
+      resources: false   # the gateway serves tools only
+      prompts: false
