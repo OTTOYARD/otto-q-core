@@ -122,6 +122,10 @@ jobs:
       # 0607/0608 too: the passcode door lets a caller with no key in, so tests/test_passcode_door_sql.py drives the
       # welcome, the passcode and its throttle, sessions and their end with the run, and the confirmation code, and
       # tests/passcode_door.test.mjs drives the same through the gateway over MCP and REST with no Authorization header.
+      # The node files run ONE AT A TIME (--test-concurrency=1). Each end-to-end block loads the migrations into its own
+      # database, but a migration's P0 reads pg_stat_activity, which spans every database on the server. Run side by
+      # side, one file loading 0559 (whose text names ottoq_determinism_pair) made another file's 0560 P0 refuse with
+      # "a pair or the recert runner is running right now" (verify on 23b8572).
       - name: Agent gateway, executed (0559/0560/0605-0608 against stub engines; HTTP end to end)
         env:
           PGHOST: localhost
@@ -131,7 +135,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_gateway_sql.py tests/test_owner_agent_sql.py tests/test_passcode_door_sql.py
-          node --test tests/agent_gateway.test.mjs tests/owner_agent.test.mjs tests/passcode_door.test.mjs
+          node --test --test-concurrency=1 tests/agent_gateway.test.mjs tests/owner_agent.test.mjs tests/passcode_door.test.mjs
 
       # 0564, EXECUTED with real concurrent sessions against a stub engine: a manual start interrupts a running
       # check (a recertification pair, a hand-run pair, a dial experiment), leaves a migration and a monitor alone,
