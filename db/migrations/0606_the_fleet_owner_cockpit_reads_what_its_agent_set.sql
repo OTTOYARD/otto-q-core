@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261004112719
 -- migration-name:    the_fleet_owner_cockpit_reads_what_its_agent_set
 --
 -- 0606  **The fleet owner's cockpit reads what its agent set.** One read-only function and its grant, in their own

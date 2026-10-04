@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261004113230
 -- migration-name:    the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code
 --
 -- 0608  **The crew and the twin see what every owner's agent set, with its confirmation code.** One new read-only

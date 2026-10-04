@@ -1,9 +1,10 @@
 # AGENT_GATEWAY — how an outside agent reads OTTO-Q and asks for changes
 
-*Written 2026-09-28, 12:00–1:30 AM CT (05:00–06:30 UTC). Everything here is **committed, not applied and not
-deployed**: migrations `0559` and `0560` are `PENDING`, and the edge function `ottoq-agent-gateway` has never run on
-the platform. What was verified, and how, is in [§9](#9-what-was-verified-and-what-was-not). The morning checklist is
-[§8](#8-morning-checklist).*
+*Written 2026-09-28, 12:00–1:30 AM CT (05:00–06:30 UTC). **Live since 2026-10-04, 6:14–6:42 AM CT:** migrations
+`0559`, `0560` and `0605`–`0608` are applied (versions in their headers), the edge function `ottoq-agent-gateway` is
+deployed (version 1, JWT verification off), and the demo passcode is on. That morning's live checks are in
+[PERSONAL_AGENT.md §9](PERSONAL_AGENT.md#9-verified-and-not-verified). What was verified before then, and how, is in
+[§9](#9-what-was-verified-and-what-was-not). The morning checklist is [§8](#8-morning-checklist).*
 
 A personal agent (Chase's Hermes bot), a fleet operator's own agent, or a depot-operations agent can now hold a
 token, **read** the OTTOYARD Nashville Flagship twin depot inside a scope the database enforces, and **ask** for a

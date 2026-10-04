@@ -9,6 +9,8 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **In sync with this directory:** **27 of 28**, verified by SHA-256 of the source
 - **Out of sync:** **1 — `ottoq-energy-mpc`, and the repo copy is the correct one.**
   See the finding below; the deployed body must never be synced into the repo.
+- **Since the capture:** `otto-twin-control` v30 (footnote ¹) and `ottoq-agent-gateway` v1, its first
+  deploy (footnote ²). 29 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
 
@@ -103,6 +105,7 @@ against this table without trusting any metadata column.
 |---|---:|---|---|---|---|
 | otto-q-api | 26 | false | 2026-04-19 01:54 | yes | `01762cf6734e0dd506a057a3a9ac58f09aa2acd18dc4dc23868b42c1afb9eff0` |
 | otto-twin-control | 30 | false | 2026-09-29 02:48 | markers¹ | `12a5c37d616fa19efcd43bda11f235ca644fa946cd4e3d112d748a8341746700` (repo file) |
+| ottoq-agent-gateway | 1 | false | 2026-10-04 11:40 | yes² | `9c9a848146bf78631b34f9753f6bf4b62873003bed1add275193ce122d44c2b0` |
 | ottoq-amend | 9 | true | 2026-06-18 04:24 | yes | `70f038ae2cfdb8891f2589f2e3158cc59792f0318718963cfa9c544249b1376b` |
 | ottoq-approval-copilot | 4 | true | 2026-07-25 01:46 | yes | `3abc122e20aa24a1222abe7a3bd7ce8ef6e91f78cc236b5afe2f0dc7f46293c0` |
 | ottoq-assign-optimize | 8 | true | 2026-09-09 03:41 | yes | `5508a9c95d4b98e736b3215fca9cc006ae6b5e4a399de174165cad69f100c34e` |
@@ -152,14 +155,21 @@ The sha256 in the row is of the repo file, so it is not a deployed hash. Measure
 reads `1.10.0-start-interrupts-checks`, and a blank `scenario_code` start returns the new
 function's own `scenario_code required`.
 
+² **`ottoq-agent-gateway` v1 is its first deploy, 2026-10-04 at 6:40 AM CT (11:40 UTC)**, through the Supabase
+MCP deploy tool, with JWT verification off (agent keys and passcode session keys are not JWTs; the key is the
+authentication, resolved by `ottoq_agent_call`). Its content is the four files as merged in #229 (main `df41751`).
+The deployed source was read back through `get_edge_function` in the same session and hashed from the API's own
+response, nothing retyped: **byte-identical**, all four files. The shared modules hash to
+`5b37876df195105d987b06a44355dcce4de40ebba6ed75bad6f3755c74571eed` (`_shared/agent_gateway.ts`),
+`e4944c7272a2c798e329aee0875df79408dc7f66c2cba9729d93c40563f5ebb5` (`_shared/agent_dial_discipline.ts`) and
+`ace3aacb4ed22d50cc14abee2c0003d750d10c3eca4a89d341b42dd0d8785b45` (`_shared/ottocommand_owner.ts`). Live, the same
+morning: `scripts/agent-gateway-smoke.mjs --passcode` passed 6 of 6, and `POST /v1/ask` answers 503
+`ask_not_configured`: it needs the function secrets `ANTHROPIC_API_KEY` and a model name in
+`OTTOCOMMAND_OWNER_MODEL` (or `ANTHROPIC_MODEL`), and at least one is not set.
+
 ## Committed, not deployed
 
-| Function | Committed | verify_jwt when deployed | Shared modules | Notes |
-|---|---|---|---|---|
-| `ottoq-agent-gateway` | 2026-09-28 (owner tools and `POST /v1/ask` 2026-10-03; the passcode door 2026-10-04) | **false** (agent keys and passcode sessions are not JWTs; the Bearer key, or a session key a tool call carries, is the authentication, resolved by `ottoq_agent_call`; a caller with no key reaches only `welcome` and `enter_passcode`) | `_shared/agent_gateway.ts`, `_shared/agent_dial_discipline.ts`, `_shared/ottocommand_owner.ts` | Needs migration `0559` applied first (and `0605` for the owner tools, `0607` for the passcode door). Deploy: `supabase functions deploy ottoq-agent-gateway --project-ref gxdrcyphqjzjsuhxuqtg --no-verify-jwt`. `POST /v1/ask` needs `ANTHROPIC_API_KEY` and a model in `OTTOCOMMAND_OWNER_MODEL` (or `ANTHROPIC_MODEL`); without them it answers 503 and everything else works. Move it into the table above, with its deployed sha256, after the first deploy. `AGENT_GATEWAY.md`, `PERSONAL_AGENT.md`. |
-
-`scripts/check-edge-drift.sh` walks deployed functions only, so it says nothing
-about this one until it is deployed.
+None. `ottoq-agent-gateway`, the last one here, was deployed on 2026-10-04 (footnote ²).
 
 ## What the four synced functions gained, and why it mattered to the audit
 
