@@ -134,7 +134,7 @@ export const SYSTEM_PROMPT = [
   "",
   "How to answer:",
   "1. Facts come only from tool results. Never invent a car, a number, a time or a setting. If the owner names a car that does not exist, the tool refuses and lists the real names: say so.",
-  "2. A change is done only when its tool returns outcome \"applied\". Then begin with \"Done.\", give OTTO-Q's own summary from the receipt (shorten it, never contradict it), and end with the OrchestrAV link from the receipt. \"refused\": say it was not done, why, in one sentence, and what is allowed instead. \"no_change\": it was already so. \"previewed\": nothing has changed yet.",
+  "2. A change is done only when its tool returns outcome \"applied\". Then begin with \"Done.\", give OTTO-Q's own summary from the receipt (shorten it, never contradict it), and end with the receipt's confirmation code and its OrchestrAV link. \"refused\": say it was not done, why, in one sentence, and what is allowed instead. \"no_change\": it was already so. \"previewed\": nothing has changed yet.",
   "3. When the owner's words clearly name a change, make it; do not ask for confirmation. If they ask to see it first (\"what would happen if\", \"preview\", \"before you do it\"), send mode \"preview\" and say nothing has changed.",
   "4. When a request is truly ambiguous (which service, which car, until when), ask one short question instead of guessing.",
   "5. Words to tools: \"service bay\", \"maintenance\", \"have a tech look at it\" -> mechanical_pm. \"wash\", \"external cleaning\", \"exterior cleaning\" -> exterior_wash. \"detail\", \"deep clean\" -> interior_deep_clean. \"quick clean\", \"tidy\" -> interior_tidy. \"lost item\", \"left my bag\" -> item_retrieval. \"update\" -> software_update. \"clean the sensors or cameras\" -> sensor_clean. \"calibrate\" -> sensor_calibration. \"after charging\": OTTO-Q always plans bay work after the charge, so request the service with when \"now\". \"every time it comes back\", \"always\", \"from now on\" -> when \"every_return\". \"next time\" -> \"next_return\". \"all my cars\", \"the fleet\", \"all Teslas\" -> vehicles \"all\". \"Tesla 45\" is fine as a name.",
@@ -230,6 +230,8 @@ export type AskAction = {
   summary: string | null;
   link: string | null;
   command_id: string | null;
+  /** 0607: an applied command's "OQ-XXXX-XXXX", the same code OrchestrAV, OTTO-PULSE and the twin show. */
+  confirmation_code: string | null;
   cars: number | null;
   confirm?: unknown;
   undo?: unknown;
@@ -274,6 +276,7 @@ function actionOf(tool: string, args: Record<string, unknown>, outcome: EngineOu
     summary: typeof d.summary === "string" ? d.summary : null,
     link: typeof d.link === "string" ? d.link : null,
     command_id: typeof cmd.command_id === "string" ? cmd.command_id : null,
+    confirmation_code: typeof d.confirmation_code === "string" ? d.confirmation_code : null,
     cars: typeof cmd.cars === "number" ? cmd.cars : null,
     ...(d.confirm !== undefined ? { confirm: d.confirm } : {}),
     ...(d.undo !== undefined ? { undo: d.undo } : {}),
@@ -289,12 +292,16 @@ export function receiptsText(actions: readonly AskAction[]): string {
 const CLAIMS_DONE = /^\s*(done\b|all set\b|it'?s done\b|completed\b|finished\b)/i;
 
 /** The model's answer, held to the receipts: it may not claim a change nothing applied, and an applied change always
- *  carries its OrchestrAV link. */
+ *  carries its confirmation code (0607) and its OrchestrAV link. */
 export function settleAnswer(answer: string, actions: readonly AskAction[], dryRun: boolean): string {
   const applied = actions.filter((a) => a.outcome === "applied");
   let out = answer.trim();
   if (out === "") out = actions.length ? receiptsText(actions) : "OTTO-Command has no answer to give.";
   if (CLAIMS_DONE.test(out) && (applied.length === 0 || dryRun)) out = receiptsText(actions) || out.replace(CLAIMS_DONE, "Not done.");
+  if (!dryRun) {
+    const missing = applied.map((a) => a.confirmation_code).filter((c): c is string => !!c && !out.includes(c));
+    if (missing.length) out = `${out}\nConfirmation code${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}.`;
+  }
   const link = [...applied].reverse().find((a) => a.link)?.link;
   if (link && !out.includes(link)) out = `${out}\nSee it in OrchestrAV: ${link}`;
   return out;

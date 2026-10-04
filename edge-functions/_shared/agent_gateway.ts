@@ -44,11 +44,22 @@ export const TWIN_DEPOT_ID = "11111111-1111-1111-1111-111111111111";
 /** The ONLY database function the gateway calls. Everything else is the database's business. */
 export const ENGINE_RPC = "ottoq_agent_call";
 /** 'oqa_' + 64 lowercase hex characters, as ottoq_agent_issue_token mints them. Anything else is refused before the database. */
-export const TOKEN_PATTERN = /^oqa_[0-9a-f]{64}$/;
+/** An agent key (oqa_, issued by ottoq_agent_issue_token) or a passcode session key (oqs_, from enter_passcode, 0607). */
+export const TOKEN_PATTERN = /^oq[as]_[0-9a-f]{64}$/;
+/** A passcode session key: the only kind an agent may also send as a tool's `session` argument, never a long-lived key. */
+export const SESSION_PATTERN = /^oqs_[0-9a-f]{64}$/;
 export const MAX_BODY_BYTES = 64 * 1024;
 
 export const CAPABILITIES = ["read", "note", "request_recall", "request_ops_action", "request_adjustment", "owner_settings"] as const;
 export type Capability = (typeof CAPABILITIES)[number];
+
+// ── 0607: the passcode door ──
+/** What a passcode session holds: exactly an owner key's capabilities (a CHECK in the database pins it). */
+export const PASSCODE_CAPABILITIES = ["read", "note", "owner_settings"] as const;
+/** The tools a caller without a key is offered, in order: the two public ones, then what a session can do. */
+export const PASSCODE_TOOL_NAMES: readonly string[] = ["welcome", "enter_passcode", "whoami", "my_fleet", "my_vehicle",
+  "my_settings", "my_commands", "set_charge_limit", "clear_charge_limit", "request_service", "cancel_service", "hold_vehicle",
+  "release_hold", "undo_command", "depot_status", "send_note"];
 
 /** 0605: the owner's reads and commands, exactly as public.ottoq_agent_call names them. */
 export const OWNER_READS = ["my_fleet", "my_vehicle", "my_settings", "my_commands"] as const;
@@ -142,8 +153,11 @@ export type ToolDef = {
   /** null = any active token; 'any_request' = at least one request_* capability (checked per kind by the database). */
   capability: Capability | "any_request" | null;
   /** What the tool can change: nothing; the agent's own request ledger; or (0605) the settings of the owner's OWN cars,
-   *  which the engine applies at its next tick. Never a car's movement, a stall, a booking or a session. */
-  effect: "read" | "ledger_write" | "owner_setting";
+   *  which the engine applies at its next tick; or (0607) open a passcode session for the caller. Never a car's
+   *  movement, a stall, a booking or a charge session. */
+  effect: "read" | "ledger_write" | "owner_setting" | "session";
+  /** 0607: callable with no key at all (welcome, enter_passcode). */
+  public?: true;
   /** 'fleet' = only for a token bound to one fleet (the database refuses any other with fleet_scope_required). */
   scope?: "fleet";
   inputSchema: JsonSchema;
@@ -202,7 +216,46 @@ const SERVICE_GUIDE =
   "interior_inspection, sensor_clean (cameras and sensors), sensor_calibration, software_update, remote_diagnostics, " +
   "mechanical_pm (a service-bay visit with a technician), cosmetic_repair, item_retrieval (an item left in the car)";
 
+const SESSION_PROP: JsonSchema = {
+  type: "string", pattern: "^oqs_[0-9a-f]{64}$",
+  description: "The session key enter_passcode gave you. Send it with every call. If OTTOYARD says the session ended " +
+    "(a stop or reset of the demo ends every session) or expired, call enter_passcode again for a new one.",
+};
+
 export const TOOLS: readonly ToolDef[] = [
+  {
+    name: "welcome",
+    title: "Welcome to OTTOYARD",
+    description: "Start here. With no key: what OTTOYARD is, what its demo passcode opens (a fleet's cars at the twin " +
+      "depot: how full they charge, which services they get, when they may leave), whether a demo run is live, and the " +
+      "exact next call (enter_passcode). Connected: who you are, until when, and what to try. Changes nothing.",
+    capability: null, effect: "read", public: true,
+    inputSchema: {
+      type: "object", additionalProperties: false,
+      properties: { agent: { type: "string", minLength: 1, maxLength: 80, description: "Optional: your name. Not needed here; give it to enter_passcode." } },
+    },
+    annotations: READ, rest: { method: "GET", path: "/v1/welcome" }, tags: ["start", "identity"],
+    examples: ["Hi OTTOYARD, what can I do here?", "Connect me to OTTOYARD."],
+  },
+  {
+    name: "enter_passcode",
+    title: "Enter OTTOYARD's passcode",
+    description: "Open a session with OTTOYARD's demo passcode, which your person gives you, and your own name. Answers " +
+      "with a session key: send it as the `session` argument on every other OTTOYARD tool (on the REST API, as " +
+      "Authorization: Bearer), and never show it to anyone. The session reads and adjusts one fleet's cars until the demo " +
+      "run ends or for a few hours. A wrong passcode is refused in plain English; repeated wrong tries make you wait.",
+    capability: null, effect: "session", public: true,
+    inputSchema: {
+      type: "object", additionalProperties: false, required: ["passcode"],
+      properties: {
+        passcode: { type: "string", minLength: 1, maxLength: 200, description: "OTTOYARD's demo passcode, exactly as your person gave it." },
+        agent: { type: "string", minLength: 1, maxLength: 80, description: "Your name, as your person would recognize it (\"Hermes\", \"Grok\"). Shown on receipts and in OrchestrAV." },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    rest: { method: "POST", path: "/v1/passcode" }, tags: ["start", "session"],
+    examples: ["{\"passcode\": \"<from your person>\", \"agent\": \"Hermes\"}"],
+  },
   {
     name: "whoami",
     title: "Who am I",
@@ -492,8 +545,9 @@ export function allowedKinds(capabilities: readonly string[]): RequestKind[] {
   return (Object.keys(REQUEST_KIND_CAPABILITY) as RequestKind[]).filter((k) => capabilities.includes(REQUEST_KIND_CAPABILITY[k]));
 }
 
-/** What a token is, as far as choosing its tools goes. */
-export type ToolScope = { fleetBound?: boolean };
+/** What a token is, as far as choosing its tools goes. `passcode` (0607): the caller has no key yet, so enter_passcode
+ *  is offered; a caller that has a key or a session never needs it. */
+export type ToolScope = { fleetBound?: boolean; passcode?: boolean };
 
 /** The tools a principal can use, with submit_request's `kind` narrowed to the kinds it may ask for. A fleet-scoped
  *  tool is offered only to a token bound to one fleet: offering one the database will always refuse is a placebo. */
@@ -501,6 +555,7 @@ export function toolsFor(capabilities: readonly string[], scope: ToolScope = {})
   const out: ToolDef[] = [];
   for (const t of TOOLS) {
     if (t.scope === "fleet" && !scope.fleetBound) continue;
+    if (t.name === "enter_passcode" && !scope.passcode) continue;
     if (t.capability === null || (t.capability !== "any_request" && capabilities.includes(t.capability))) {
       out.push(t);
     } else if (t.capability === "any_request") {
@@ -511,6 +566,27 @@ export function toolsFor(capabilities: readonly string[], scope: ToolScope = {})
     }
   }
   return out;
+}
+
+/** A tool as a caller WITHOUT a key sees it (0607): a `session` argument first and required, since the session key that
+ *  enter_passcode returns is the only credential such a caller has. The two public tools are left as they are. */
+export function withSessionArg(t: ToolDef): ToolDef {
+  if (t.public) return t;
+  return {
+    ...t,
+    inputSchema: {
+      ...t.inputSchema,
+      properties: { session: SESSION_PROP, ...(t.inputSchema.properties ?? {}) },
+      required: ["session", ...(t.inputSchema.required ?? [])],
+    },
+  };
+}
+
+/** The tools a caller without a key is offered (0607): welcome and enter_passcode, then what a passcode session can do,
+ *  each with its `session` argument. The same for every such caller, so it may be cached publicly. */
+export function passcodeTools(): ToolDef[] {
+  const offered = toolsFor(PASSCODE_CAPABILITIES, { fleetBound: true, passcode: true });
+  return PASSCODE_TOOL_NAMES.map((n) => offered.find((t) => t.name === n)).filter((t): t is ToolDef => !!t).map(withSessionArg);
 }
 
 /** A token's capabilities and fleet binding, read from a handshake (its data is whoami's). */
@@ -723,6 +799,9 @@ export function routeRest(method: string, path: string): RestRoute {
   const m = method.toUpperCase();
   const p = path.length > 1 ? path.replace(/\/+$/, "") : path;
   const table: Array<{ re: RegExp; methods: Record<string, string>; keys?: string[] }> = [
+    // 0607: the two doors a caller without a key may use
+    { re: /^\/v1\/welcome$/, methods: { GET: "welcome" } },
+    { re: /^\/v1\/passcode$/, methods: { POST: "enter_passcode" } },
     { re: /^\/v1\/whoami$/, methods: { GET: "whoami" } },
     { re: /^\/v1\/depot$/, methods: { GET: "depot_status" } },
     { re: /^\/v1\/fleet$/, methods: { GET: "fleet_summary" } },
@@ -766,7 +845,7 @@ export function restIndex(baseUrl: string) {
   return {
     name: GATEWAY_TITLE,
     version: GATEWAY_VERSION,
-    about: "Read the OTTOYARD twin depot and ASK for changes. A person approves or declines every request; OTTO-Q's own doors decide what can happen. A vehicle owner's token can also set what its own cars need (/v1/me/...), inside its contract, and OTTO-Q applies it at its next tick. Send Authorization: Bearer <token>.",
+    about: "Read the OTTOYARD twin depot and ASK for changes. A person approves or declines every request; OTTO-Q's own doors decide what can happen. A vehicle owner's token can also set what its own cars need (/v1/me/...), inside its contract, and OTTO-Q applies it at its next tick. Send Authorization: Bearer <key>. No key? GET /v1/welcome, then POST /v1/passcode with OTTOYARD's demo passcode for a session key.",
     documentation: "https://github.com/OTTOYARD/otto-q-core/blob/main/AGENT_GATEWAY.md",
     owner_guide: "https://github.com/OTTOYARD/otto-q-core/blob/main/PERSONAL_AGENT.md",
     mcp: `${baseUrl}/mcp`,
@@ -876,10 +955,22 @@ export const MCP_INSTRUCTIONS =
   "engine's reply. If your token belongs to a vehicle owner (whoami shows an owner block), the owner commands " +
   "(set_charge_limit, clear_charge_limit, request_service, cancel_service, hold_vehicle, release_hold, undo_command) set " +
   "what YOUR cars need: OTTO-Q checks each one against your contract and its own rules, applies it at its next tick, and " +
-  "answers with a plain-English summary and an OrchestrAV link to relay to your person. Such a change is done only when " +
+  "answers with a plain-English summary, a confirmation code and an OrchestrAV link to relay to your person. Such a change is done only when " +
   "its outcome is 'applied'; mode 'preview' shows the plan first. Nothing you send moves a car: OTTO-Q decides when and " +
   "where, and the car's own driving system moves it. Times named sim_* or marked 'sim time' are simulation time; " +
   "created_at and expires_at are real time (UTC), and *_local times are Nashville time.";
+
+/** What a caller WITHOUT a key is told on connecting (0607): the welcome, and how the passcode and the session work. */
+export const MCP_PASSCODE_INSTRUCTIONS =
+  "You are connected to OTTOYARD: the agent door of OTTO-Q, the engine that orchestrates the OTTOYARD Nashville Flagship " +
+  "depot's live digital twin. Start with the welcome tool. To read and adjust a fleet's cars you need OTTOYARD's demo " +
+  "passcode: ask your person for it, then call enter_passcode with it and your own name. It answers with a session key: " +
+  "send it as the `session` argument on every other tool, and never show it to anyone. OTTO-Q checks every change against " +
+  "the owner's contract and its own rules. A change that does not fit comes back refused, with the reason in plain " +
+  "English; one that fits comes back with a confirmation code and an OrchestrAV link: relay both to your person. Nothing " +
+  "you send moves a car: OTTO-Q decides when and where, and the car's own driving system moves it. Everything set in a " +
+  "session lasts until the demo run ends; a stop or reset of the twin ends the session too, and enter_passcode opens a " +
+  "new one. Times marked 'sim time' are simulation time; 'CT' is Nashville real time.";
 
 type RpcId = string | number | null;
 const rpcError = (id: RpcId, code: number, message: string, data?: unknown) =>
@@ -901,15 +992,22 @@ export function decodeHeaderValue(v: string): string | null {
   return /^[\x20-\x7e\t]*$/.test(v) && v === v.trim() ? v : null;
 }
 
+const mcpTool = (t: ToolDef) => ({
+  name: t.name,
+  title: t.title,
+  description: t.description,
+  inputSchema: t.inputSchema,
+  annotations: { title: t.title, ...t.annotations },
+});
+
 /** The tools/list entries for a principal: name, title, description, inputSchema, annotations. */
 export function mcpToolList(capabilities: readonly string[], scope: ToolScope = {}) {
-  return toolsFor(capabilities, scope).map((t) => ({
-    name: t.name,
-    title: t.title,
-    description: t.description,
-    inputSchema: t.inputSchema,
-    annotations: { title: t.title, ...t.annotations },
-  }));
+  return toolsFor(capabilities, scope).map(mcpTool);
+}
+
+/** The tools/list a caller without a key gets (0607): the same for everyone. */
+export function mcpPasscodeToolList() {
+  return passcodeTools().map(mcpTool);
 }
 
 function toolCallResult(modern: boolean, data: unknown, isError: boolean) {
@@ -935,12 +1033,26 @@ function engineFailure(id: RpcId, outcome: EngineOutcome): HttpOut {
   return { status, headers: JSON_HEADERS, body: rpcError(id, JSONRPC.INTERNAL_ERROR, err.message, { code: err.code, call_id: outcome.call_id ?? null }) };
 }
 
+/** How a request without a key reaches the MCP endpoint (0607): `call` is bound to no key at all, and `bindSession` binds
+ *  a call to the session key a tool's `session` argument carries. */
+export type McpOptions = { anonymous?: boolean; bindSession?: (sessionKey: string) => Promise<EngineCall> };
+
+const withoutSession = (args: unknown): unknown => {
+  if (!isObject(args) || !("session" in args)) return args;
+  const { session: _session, ...rest } = args;
+  return rest;
+};
+
 /**
  * One POST to the MCP endpoint. Dual-era: a request carrying `_meta["io.modelcontextprotocol/protocolVersion"]` (or the
  * MCP-Protocol-Version header) of 2026-07-28 is served statelessly with the mirrored-header checks; `initialize` and
  * header-less requests are served as the negotiated initialize-based revision. No sessions are minted in either era.
+ * 0607: with no Authorization header at all the endpoint is the passcode door: the welcome, enter_passcode, and every
+ * other tool with its `session` argument. A session problem is then a tool result the agent can read and act on (call
+ * enter_passcode again), never an HTTP 401 that a client could take as "this server needs OAuth".
  */
-export async function handleMcp(req: { method: string; headers: HeaderGetter; bodyText: string }, call: EngineCall): Promise<HttpOut> {
+export async function handleMcp(req: { method: string; headers: HeaderGetter; bodyText: string }, call: EngineCall,
+                                opts: McpOptions = {}): Promise<HttpOut> {
   const reply = (status: number, body: unknown, extra: Record<string, string> = {}): HttpOut => ({ status, headers: { ...JSON_HEADERS, ...extra }, body });
   const method = req.method.toUpperCase();
   if (method !== "POST") {
@@ -966,6 +1078,7 @@ export async function handleMcp(req: { method: string; headers: HeaderGetter; bo
   // A notification changes nothing here. It is still authenticated (an unknown token reaches nothing, not even a
   // 202), then accepted with no body.
   if (!hasId) {
+    if (opts.anonymous) return { status: 202, headers: {}, body: null };
     const who = await call("handshake", {}, { mcp_method: msg.method });
     if (!who.ok) return engineFailure(null, who);
     return { status: 202, headers: {}, body: null };
@@ -1009,6 +1122,7 @@ export async function handleMcp(req: { method: string; headers: HeaderGetter; bo
   };
   const serverInfo = { name: GATEWAY_NAME, title: GATEWAY_TITLE, version: GATEWAY_VERSION };
   const modernFields = modern ? { resultType: "complete" } : {};
+  if (opts.anonymous) return mcpWithoutKey({ id, method: msg.method, params, modern, callMeta, serverInfo, call, bindSession: opts.bindSession });
 
   switch (msg.method) {
     case "initialize": {
@@ -1056,6 +1170,8 @@ export async function handleMcp(req: { method: string; headers: HeaderGetter; bo
     case "tools/call": {
       const refusal = { ...callMeta, gateway_refusal: "invalid_arguments" };
       const tool = findTool(params.name);
+      // 0607: a `session` argument means nothing beside a key in the Authorization header; it is dropped, not refused
+      params.arguments = withoutSession(params.arguments);
       if (!tool) {
         // Asked of the database too (it answers 404 unknown_tool after authenticating), so the attempt is ledgered.
         const r = await call(typeof params.name === "string" ? params.name.slice(0, 64) : "", {}, refusal);
@@ -1086,6 +1202,94 @@ export async function handleMcp(req: { method: string; headers: HeaderGetter; bo
   }
 }
 
+/** The MCP endpoint for a caller with no key (0607). initialize, discovery, ping and tools/list need no database; a tool
+ *  call reaches it through the same single door as every other call, bound to no key (welcome, enter_passcode) or to the
+ *  session key the call carries. */
+async function mcpWithoutKey(x: {
+  id: RpcId; method: string; params: Record<string, unknown>; modern: boolean; callMeta: Record<string, unknown>;
+  serverInfo: Record<string, string>; call: EngineCall; bindSession?: (sessionKey: string) => Promise<EngineCall>;
+}): Promise<HttpOut> {
+  const reply = (status: number, body: unknown): HttpOut => ({ status, headers: JSON_HEADERS, body });
+  const modernFields = x.modern ? { resultType: "complete" } : {};
+  const result = (data: unknown, isError: boolean) => reply(200, rpcResult(x.id, toolCallResult(x.modern, data, isError)));
+  const failed = (r: EngineOutcome) => {
+    const out: Record<string, unknown> = { error: r.error ?? { code: "error", message: "The request failed." }, call_id: r.call_id ?? null };
+    if (r.data !== undefined && r.data !== null) out.data = r.data;
+    return result(out, true);
+  };
+  switch (x.method) {
+    case "initialize": {
+      const legacy = MCP_SUPPORTED_VERSIONS.filter((v) => v !== MCP_MODERN_VERSION) as string[];
+      const requested = typeof x.params.protocolVersion === "string" ? x.params.protocolVersion : null;
+      return reply(200, rpcResult(x.id, {
+        protocolVersion: requested !== null && legacy.includes(requested) ? requested : legacy[0],
+        capabilities: { tools: { listChanged: false } },
+        serverInfo: x.serverInfo,
+        instructions: MCP_PASSCODE_INSTRUCTIONS,
+      }));
+    }
+    case "server/discover":
+      return reply(200, rpcResult(x.id, {
+        resultType: "complete",
+        supportedVersions: [...MCP_SUPPORTED_VERSIONS],
+        capabilities: { tools: { listChanged: false } },
+        _meta: { "io.modelcontextprotocol/serverInfo": x.serverInfo },
+        instructions: MCP_PASSCODE_INSTRUCTIONS,
+        ttlMs: 3_600_000,
+        cacheScope: "public",
+      }));
+    case "ping":
+      return reply(200, rpcResult(x.id, { ...modernFields }));
+    case "tools/list":
+      if (x.params.cursor !== undefined) return reply(200, rpcError(x.id, JSONRPC.INVALID_PARAMS, "Invalid cursor: every tool is returned on one page."));
+      return reply(200, rpcResult(x.id, {
+        ...modernFields,
+        tools: mcpPasscodeToolList(),
+        ...(x.modern ? { ttlMs: 300_000, cacheScope: "public" } : {}),
+      }));
+    case "tools/call": {
+      const refusal = { ...x.callMeta, gateway_refusal: "invalid_arguments" };
+      const tool = findTool(x.params.name);
+      if (!tool) return reply(200, rpcError(x.id, JSONRPC.INVALID_PARAMS, `Unknown tool: ${String(x.params.name)}. Start with welcome.`));
+      const raw = x.params.arguments === undefined ? {} : x.params.arguments;
+      if (tool.public) {
+        const v = validateToolArgs(tool, raw);
+        if (!v.ok) {
+          const r = await x.call(tool.name, {}, refusal);
+          if (r.http_status >= 502) return engineFailure(x.id, r);
+          return result({ error: { code: "invalid_arguments", message: "The arguments are not valid.", details: v.errors }, call_id: r.call_id ?? null }, true);
+        }
+        const out = await x.call(tool.name, v.value, x.callMeta);
+        if (out.http_status >= 502) return engineFailure(x.id, out);
+        return out.ok ? result(out.data, false) : failed(out);
+      }
+      const session = isObject(raw) ? raw.session : undefined;
+      if (typeof session !== "string" || !SESSION_PATTERN.test(session) || !x.bindSession) {
+        // asked of the database with no key, so the attempt is ledgered and the answer is its own: connect first
+        const r = await x.call(tool.name, {}, refusal);
+        if (r.http_status >= 502) return engineFailure(x.id, r);
+        if (typeof session === "string" && session !== "" && !SESSION_PATTERN.test(session)) {
+          return result({ error: { code: "invalid_session", message: "That is not a session key OTTOYARD issues (oqs_ and 64 hex). Call enter_passcode for a new one." }, call_id: r.call_id ?? null }, true);
+        }
+        return failed(r);
+      }
+      const bound = await x.bindSession(session);
+      const v = validateToolArgs(tool, withoutSession(raw));
+      if (!v.ok) {
+        const r = await bound(tool.name, {}, refusal);
+        if (r.http_status >= 502) return engineFailure(x.id, r);
+        if (isRefusalOtherThanArguments(r)) return failed(r);
+        return result({ error: { code: "invalid_arguments", message: "The arguments are not valid.", details: v.errors }, call_id: r.call_id ?? null }, true);
+      }
+      const out = await bound(tool.name, v.value, x.callMeta);
+      if (out.http_status >= 502) return engineFailure(x.id, out);
+      return out.ok ? result(out.data, false) : failed(out);
+    }
+    default:
+      return reply(x.modern ? 404 : 200, rpcError(x.id, JSONRPC.METHOD_NOT_FOUND, `Method not found: ${x.method}`));
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────────────────────── A2A ──
 
 /** A2A 1.0 Agent Card for DISCOVERY. The gateway does not implement A2A's SendMessage/Task operations; its two
@@ -1097,8 +1301,9 @@ export function agentCard(baseUrl: string) {
       "Read the OTTOYARD Nashville Flagship twin depot through OTTO-Q, and ask for changes. A change to the depot is a " +
       "request a person approves or declines; OTTO-Q's own doors decide what can happen. A vehicle owner's agent can also " +
       "set what its own cars need (charge limit, services, holds), inside its contract, applied at OTTO-Q's next tick and " +
-      "never moving a car. Discovery card only: the gateway speaks MCP, a REST API (OpenAPI at /v1/openapi.json) and a " +
-      "plain-English door (POST /v1/ask), not A2A task messaging.",
+      "never moving a car. Any agent can start with the welcome tool: OTTOYARD's demo passcode (enter_passcode) opens a " +
+      "session on a fleet's cars until the demo run ends. Discovery card only: the gateway speaks MCP, a REST API " +
+      "(OpenAPI at /v1/openapi.json) and a plain-English door (POST /v1/ask), not A2A task messaging.",
     supportedInterfaces: [
       { url: `${baseUrl}/mcp`, protocolBinding: "https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http", protocolVersion: MCP_MODERN_VERSION },
       { url: `${baseUrl}/v1`, protocolBinding: "https://github.com/OTTOYARD/otto-q-core/blob/main/AGENT_GATEWAY.md#rest-api", protocolVersion: "1.0" },
@@ -1111,8 +1316,8 @@ export function agentCard(baseUrl: string) {
       ottoqAgentToken: {
         httpAuthSecurityScheme: {
           scheme: "Bearer",
-          bearerFormat: "opaque: oqa_ + 64 hex",
-          description: "An agent token issued by ottoq_agent_issue_token. Its scope (depot, fleet, capabilities) is fixed at issue and enforced by the database.",
+          bearerFormat: "opaque: oqa_ or oqs_ + 64 hex",
+          description: "An agent key issued by ottoq_agent_issue_token (oqa_), or a passcode session key from enter_passcode (oqs_, which also travels as a tool's `session` argument over MCP). Its scope (depot, fleet, capabilities) is fixed at issue and enforced by the database. welcome and enter_passcode need neither.",
         },
       },
     },
@@ -1141,13 +1346,13 @@ const EXTRA_REST_PATHS: ReadonlyArray<{ tool: string; path: string }> = [
 
 const ERROR_RESPONSES: Record<string, string> = {
   "400": "The arguments are not valid; error.details names each problem.",
-  "401": "No token, or an unknown or revoked one.",
-  "403": "The token lacks the capability, or is not bound to a fleet.",
+  "401": "No key, or an unknown or revoked one, or a passcode session that ended with its demo run or expired.",
+  "403": "The key lacks the capability, or is not bound to a fleet; or (enter_passcode) the passcode is not right.",
   "404": "Not found, or outside the token's scope: the two read the same.",
   "409": "A conflict with the request's current state (a request already decided).",
   "422": "Refused. For an owner command OTTO-Q RECORDED the refusal and changed nothing; data carries the receipt with the reason. Also: an idempotency key reused for a different command.",
-  "429": "Over the token's rate limit (see Retry-After), or too many requests awaiting a decision.",
-  "503": "OTTO-Q could not be reached, or this part of the gateway is not switched on yet.",
+  "429": "Over the key's rate limit (see Retry-After), too many requests awaiting a decision, or too many wrong passcodes.",
+  "503": "OTTO-Q could not be reached, this part of the gateway is not switched on yet, or the demo passcode is off.",
 };
 
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
@@ -1170,6 +1375,8 @@ function openApiOperation(t: ToolDef, path: string): Record<string, unknown> {
     "x-ottoq-capability": t.capability,
     "x-ottoq-effect": t.effect,
     ...(t.scope ? { "x-ottoq-scope": t.scope } : {}),
+    // 0607: the two doors a caller without a key uses
+    ...(t.public ? { security: [] } : {}),
   };
   if (t.rest.method === "GET") {
     for (const [k, schema] of Object.entries(props)) {
@@ -1191,7 +1398,7 @@ function openApiOperation(t: ToolDef, path: string): Record<string, unknown> {
   const dataSchema = t.effect === "owner_setting" ? ref("OwnerReceipt") : {};
   op.responses = {
     [okStatus]: { description: t.effect === "read" ? "The answer." : "Recorded.", content: { "application/json": { schema: { allOf: [ref("Ok"), { type: "object", properties: { data: dataSchema } }] } } } },
-    ...(t.effect !== "read" ? { "200": { description: "A duplicate (the same idempotency key), or an owner command that previewed or changed nothing.", content: { "application/json": { schema: ref("Ok") } } } } : {}),
+    ...(t.effect !== "read" && t.effect !== "session" ? { "200": { description: "A duplicate (the same idempotency key), or an owner command that previewed or changed nothing.", content: { "application/json": { schema: ref("Ok") } } } } : {}),
     ...errorResponses(),
   };
   return op;
@@ -1224,7 +1431,7 @@ export function openApiDocument(baseUrl: string) {
     info: {
       title: GATEWAY_TITLE,
       version: GATEWAY_VERSION,
-      summary: "Read the OTTOYARD twin depot through OTTO-Q; ask for changes; set what your own cars need.",
+      summary: "Read the OTTOYARD twin depot through OTTO-Q; ask for changes; set what your own cars need. No key? GET /v1/welcome, then POST /v1/passcode.",
       description: "Generated from the gateway's tool catalog, the same one its MCP endpoint serves. Every call is answered by the database, which resolves the token, rate-limits it, checks its capability and scope, and writes the call ledger.",
     },
     servers: [{ url: baseUrl }],
@@ -1233,7 +1440,7 @@ export function openApiDocument(baseUrl: string) {
     paths,
     components: {
       securitySchemes: {
-        agentToken: { type: "http", scheme: "bearer", bearerFormat: "oqa_ + 64 hex", description: "An agent token issued by ottoq_agent_issue_token. Its depot, fleet and capabilities are fixed at issue and enforced by the database." },
+        agentToken: { type: "http", scheme: "bearer", bearerFormat: "oqa_ or oqs_ + 64 hex", description: "An agent key issued by ottoq_agent_issue_token (oqa_), or a passcode session key from POST /v1/passcode (oqs_; it ends with the demo run). Its depot, fleet and capabilities are fixed at issue and enforced by the database." },
       },
       schemas: {
         Meta: { type: "object", properties: {
@@ -1345,7 +1552,8 @@ export async function handleAsk(req: { method: string; headers: HeaderGetter; bo
 
 /** One call into the database: token hash, tool, validated arguments, transport, and small request metadata. */
 export type EngineRpc = (
-  tokenHash: string,
+  /** null: the caller sent no key (0607's welcome and enter_passcode, and the database's "connect first" answer). */
+  tokenHash: string | null,
   tool: string,
   args: Record<string, unknown>,
   transport: "rest" | "mcp" | "ask",
@@ -1462,7 +1670,8 @@ export async function readBodyBounded(body: ReadableStream<Uint8Array> | null, l
  * Every request the edge function receives. Order matters and is the security model's outer half:
  *   1. the public discovery documents (agent card, OpenAPI, endpoint index) -- no token, no database;
  *   2. the Origin check (a browser origin not on the list is refused; agents send none);
- *   3. a well-formed Bearer token, or 401 before the database is asked;
+ *   3. a well-formed Bearer key or session key, or 401 before the database is asked -- except (0607) a request with no
+ *      Authorization header at all to the MCP endpoint, GET /v1/welcome or POST /v1/passcode: the passcode door;
  *   4. a bounded body (64 KiB);
  *   5. the token's SHA-256 -- the raw token never leaves this function -- and then REST, MCP or the plain-English door,
  *      each of which asks the database, which resolves the principal, rate-limits, checks the capability and writes
@@ -1511,10 +1720,16 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
       } }, cors);
     }
 
-    // 3. a well-formed token, before anything else is read
-    const token = bearerToken(req.headers.get("authorization"));
-    if (token === null || !isWellFormedToken(token)) {
-      return refuse(401, "unauthenticated", "Send Authorization: Bearer <agent token>. Tokens are issued by the depot; see the documentation.",
+    // 3. a well-formed key, before anything else is read -- or (0607) no Authorization header at all, which only the
+    //    passcode door accepts: the MCP endpoint (welcome, enter_passcode, tools with a `session` argument), GET
+    //    /v1/welcome and POST /v1/passcode
+    const authorization = req.headers.get("authorization");
+    const anonymous = authorization === null || authorization.trim() === "";
+    const token = anonymous ? null : bearerToken(authorization);
+    const passcodeRoute = !isMcp && !isAsk && (() => { const r = routeRest(method, path); return "tool" in r && (r.tool === "welcome" || r.tool === "enter_passcode"); })();
+    if (anonymous ? !(isMcp || passcodeRoute) : token === null || !isWellFormedToken(token)) {
+      return refuse(401, "unauthenticated",
+        "Send Authorization: Bearer <agent key or session key>. No key? GET /v1/welcome, then POST /v1/passcode with OTTOYARD's demo passcode for a session key (over MCP, call welcome and enter_passcode).",
         { "WWW-Authenticate": WWW_AUTHENTICATE });
     }
     if (!opts.engine) return refuse(500, "not_configured", "The gateway is deployed without its database connection.");
@@ -1531,7 +1746,7 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
     }
 
     // 5. hash, then the conversation
-    const tokenHash = await sha256Hex(token);
+    const tokenHash = token === null ? null : await sha256Hex(token);
     const userAgent = req.headers.get("user-agent");
     const baseMeta: Record<string, unknown> = {
       http_method: method,
@@ -1539,14 +1754,17 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
       ip: firstForwardedFor(req.headers.get("x-forwarded-for")),
       client: userAgent ? userAgent.slice(0, 120) : undefined,
     };
-    const call: EngineCall = (tool, args, meta) => {
+    const callFor = (hash: string | null): EngineCall => (tool, args, meta) => {
       const merged: Record<string, unknown> = { ...baseMeta };
       for (const [k, v] of Object.entries(meta)) if (v !== undefined && v !== null && v !== "") merged[k] = v;
       for (const k of Object.keys(merged)) if (merged[k] === undefined) delete merged[k];
-      return engine(tokenHash, tool, args, isMcp ? "mcp" : isAsk ? "ask" : "rest", merged);
+      return engine(hash, tool, args, isMcp ? "mcp" : isAsk ? "ask" : "rest", merged);
     };
+    const call = callFor(tokenHash);
+    // a session key a tool call carries as its `session` argument is hashed here like a header key: it never leaves
+    const bindSession = async (sessionKey: string) => callFor(await sha256Hex(sessionKey));
     const out = isMcp
-      ? await handleMcp({ method, headers: req.headers, bodyText }, call)
+      ? await handleMcp({ method, headers: req.headers, bodyText }, call, { anonymous, bindSession })
       : isAsk
         ? await handleAsk({ method, headers: req.headers, bodyText }, call, opts.ask)
         : await handleRest({ method, path, query: url.searchParams, headers: req.headers, bodyText }, call);

@@ -344,6 +344,7 @@ AS $fn$
     'id', p_fleet_operator_id,
     'name', (SELECT f.name FROM public.fleet_operators f WHERE f.id = p_fleet_operator_id),
     'cars', COALESCE(sum(m.n), 0),
+    'cars_phrase', COALESCE(sum(m.n), 0) || CASE WHEN COALESCE(sum(m.n), 0) = 1 THEN ' car' ELSE ' cars' END,
     'models', regexp_replace(string_agg(m.n || ' ' || m.model, ', ' ORDER BY m.n DESC, m.model), ', ([^,]*)$', ' and \1'))
     FROM (SELECT COALESCE(NULLIF(btrim(v.model), ''), 'car') AS model, count(*) AS n
             FROM public.vehicles v
@@ -386,8 +387,8 @@ BEGIN
     'summary', 'Welcome to OTTOYARD. You have reached OTTO-Q, the engine that orchestrates the '
       || COALESCE(v_depot, 'OTTOYARD') || ' depot (a live digital twin).'
       || CASE WHEN v_on AND v_fleet IS NOT NULL THEN
-           format(' With OTTOYARD''s demo passcode you can see and adjust %s''s %s cars here (%s): how full they charge, which services they get, and when they may leave. Ask your person for the passcode, then call enter_passcode with it and your name.',
-                  v_fleet ->> 'name', v_fleet ->> 'cars', v_fleet ->> 'models')
+           format(' With OTTOYARD''s demo passcode you can see and adjust %s''s %s here (%s): how full they charge, which services they get, and when they may leave. Ask your person for the passcode, then call enter_passcode with it and your name.',
+                  v_fleet ->> 'name', v_fleet ->> 'cars_phrase', v_fleet ->> 'models')
          ELSE ' The demo passcode is not switched on right now, so no fleet can be opened. Ask the person who gave you this address.' END
       || v_runl,
     'depot', jsonb_build_object('id', p_depot_id, 'name', v_depot),
@@ -444,7 +445,7 @@ BEGIN
     'connected', true,
     'summary', format('You are connected to OTTOYARD as %s%s', v_who,
                       CASE WHEN p_agent.origin = 'passcode' THEN '' ELSE ' (an agent key)' END)
-      || CASE WHEN v_fleet IS NOT NULL THEN format(', for %s''s %s cars at %s', v_fleet ->> 'name', v_fleet ->> 'cars', COALESCE(v_depot, 'the depot'))
+      || CASE WHEN v_fleet IS NOT NULL THEN format(', for %s''s %s at %s', v_fleet ->> 'name', v_fleet ->> 'cars_phrase', COALESCE(v_depot, 'the depot'))
               ELSE format(', at %s', COALESCE(v_depot, 'the depot')) END
       || CASE WHEN p_agent.origin = 'passcode' THEN format(', until %s or until the demo run ends, whichever comes first', v_until) ELSE '' END
       || '.' || v_runl || COALESCE(' ' || v_try, ''),
@@ -656,7 +657,7 @@ BEGIN
     'summary', format('Welcome, %s. The passcode is right: you have %s until %s, or until the demo run ends, whichever comes first.',
                       v_display,
                       CASE WHEN v_data ? 'fleet'
-                           THEN format('%s''s %s cars at %s', v_data #>> '{fleet,name}', v_data #>> '{fleet,cars}', v_data #>> '{depot,name}')
+                           THEN format('%s''s %s at %s', v_data #>> '{fleet,name}', v_data #>> '{fleet,cars_phrase}', v_data #>> '{depot,name}')
                            ELSE 'your fleet' END,
                       public.ottoq_owner_clock(v_row.expires_at, false))
       || COALESCE(' ' || (v_data ->> 'run_line'), '') || COALESCE(' ' || (v_data ->> 'try_line'), ''),

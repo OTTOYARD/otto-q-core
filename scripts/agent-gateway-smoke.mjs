@@ -21,18 +21,34 @@
 //                                          demo run is live, which is reported, not failed)
 //   o4. (--ask) POST /v1/ask, a question   OTTO-Command answers in plain English; costs one model call
 //
+// And the passcode door (0607), with NO token at all -- what any new agent sees:
+//   GATEWAY_URL=... PASSCODE=... node scripts/agent-gateway-smoke.mjs --passcode
+//   p1. GET /v1/welcome                  the welcome, no key
+//   p2. MCP initialize + tools/list      no key: the passcode instructions, welcome and enter_passcode first
+//   p3. a wrong passcode                 refused in plain English (one wrong try counts toward this caller's five)
+//   p4. the right passcode               a session key (never printed), named "OTTOYARD smoke test"
+//   p5. my_fleet with the session        over MCP, as a tool's `session` argument
+//   p6. a PREVIEW of a 90% limit          over REST with the session as a Bearer; nothing is applied
+// The session stays open until the demo run ends or it expires, like any agent's.
+//
 // The token is read from the environment and never printed. The note carries an idempotency key per minute, so an
 // accidental double run inside a minute replays the first note instead of sending two.
 const BASE = (process.env.GATEWAY_URL ?? "").replace(/\/+$/, "");
 const TOKEN = process.env.AGENT_TOKEN ?? "";
 const SEND_NOTE = !process.argv.includes("--no-note");
 const ASK = process.argv.includes("--ask");
+const PASSCODE_MODE = process.argv.includes("--passcode");
+const PASSCODE = process.env.PASSCODE ?? "";
 
-if (!BASE || !TOKEN) {
+if (PASSCODE_MODE && (!BASE || !PASSCODE)) {
+  console.error("Set GATEWAY_URL (…/functions/v1/ottoq-agent-gateway) and PASSCODE (OTTOYARD's demo passcode).");
+  process.exit(2);
+}
+if (!PASSCODE_MODE && (!BASE || !TOKEN)) {
   console.error("Set GATEWAY_URL (…/functions/v1/ottoq-agent-gateway) and AGENT_TOKEN (oqa_…).");
   process.exit(2);
 }
-if (!/^oqa_[0-9a-f]{64}$/.test(TOKEN)) {
+if (!PASSCODE_MODE && !/^oqa_[0-9a-f]{64}$/.test(TOKEN)) {
   console.error("AGENT_TOKEN is not an agent token (expected oqa_ followed by 64 lowercase hex characters).");
   process.exit(2);
 }
@@ -61,6 +77,40 @@ function check(label, ok, detail) {
 }
 
 console.log(`ottoq-agent-gateway smoke test, ${ct()} (${new Date().toISOString()} UTC)\n  ${BASE}\n`);
+
+if (PASSCODE_MODE) {
+  try {
+    const mcp = (id, method, params = {}) => call("/mcp", { method: "POST", token: "", headers: { "MCP-Protocol-Version": "2025-06-18" },
+      body: { jsonrpc: "2.0", id, method, params } });
+    const tool = async (name, args) => (await mcp(10 + step, "tools/call", { name, arguments: args })).json?.result;
+    const hello = await call("/v1/welcome", { token: "" });
+    check("the welcome, with no key", hello.status === 200 && /^Welcome to OTTOYARD\./.test(hello.json?.data?.summary ?? ""),
+      `${hello.status}, passcode ${hello.json?.data?.passcode}: ${hello.json?.data?.summary ?? hello.text.slice(0, 160)}`);
+    const init = await mcp(1, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "agent-gateway-smoke", version: "1" } });
+    const list = await mcp(2, "tools/list");
+    const names = (list.json?.result?.tools ?? []).map((t) => t.name);
+    check("MCP with no key: initialize + tools/list", init.status === 200 && /enter_passcode/.test(init.json?.result?.instructions ?? "")
+      && names[0] === "welcome" && names[1] === "enter_passcode", names.join(", "));
+    const wrong = await tool("enter_passcode", { passcode: "not-the-passcode-smoke", agent: "OTTOYARD smoke test" });
+    check("a wrong passcode is refused in plain English", wrong?.isError === true && wrong.structuredContent?.error?.code === "wrong_passcode",
+      wrong?.structuredContent?.error?.message ?? JSON.stringify(wrong).slice(0, 160));
+    const open = await tool("enter_passcode", { passcode: PASSCODE, agent: "OTTOYARD smoke test" });
+    const session = open?.structuredContent?.session ?? "";
+    check("the right passcode opens a session", open?.isError === false && /^oqs_[0-9a-f]{64}$/.test(session),
+      open?.structuredContent?.summary ?? open?.structuredContent?.error?.message ?? JSON.stringify(open).slice(0, 160));
+    const fleet = await tool("my_fleet", { session });
+    check("my_fleet with the session (MCP argument)", fleet?.isError === false, (fleet?.structuredContent?.summary ?? JSON.stringify(fleet).slice(0, 160)).split("\n")[0]);
+    const preview = await call("/v1/me/charge-limit", { method: "POST", token: session, body: { vehicles: "all", percent: 90, mode: "preview" } });
+    const noDemo = preview.status === 422 && preview.json?.error?.code === "no_live_demo";
+    check("a preview with the session (REST Bearer) changes nothing", (preview.status === 200 && preview.json?.data?.outcome === "previewed") || noDemo,
+      noDemo ? "no demo run is live, so there is nothing to preview against (start one in OTTO-TWIN)"
+        : (preview.json?.data?.summary ?? preview.text.slice(0, 160)).split("\n")[0]);
+    console.log("\nThe passcode door works. The session key was not printed; it ends with the demo run.");
+    process.exit(0);
+  } catch (e) {
+    check("reach the gateway", false, `${e?.name ?? "error"}: ${e?.message ?? e}`);
+  }
+}
 
 try {
   const card = await call("/.well-known/agent-card.json", { token: "" });

@@ -440,7 +440,8 @@ test("the door: OTTO-Command calls the owner's tool with the owner's token, and 
   assert.equal(out.data.actions.length, 1);
   assert.deepEqual({ ...out.data.actions[0], summary: undefined, link: undefined, undo: undefined }, {
     tool: "set_charge_limit", args: { vehicles: "all", percent: 90 }, ok: true, http_status: 201, outcome: "applied",
-    summary: undefined, link: undefined, command_id: "cccccccc-0000-0000-0000-000000000002", cars: 36, undo: undefined,
+    summary: undefined, link: undefined, command_id: "cccccccc-0000-0000-0000-000000000002", confirmation_code: null, cars: 36,
+    undo: undefined,
   });
   assert.equal(out.data.link, out.data.actions[0].link);
   assert.equal(out.data.dry_run, false);
