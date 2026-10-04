@@ -1,14 +1,19 @@
-# Hermes Agent: OTTO-Q as a remote MCP server. Merge into ~/.hermes/config.yaml, put the token in ~/.hermes/.env
-# (OTTOQ_AGENT_TOKEN=oqa_...), then /reload-mcp. Keys per the Hermes MCP config reference, read 2026-10-03:
+# Hermes Agent: OTTOYARD (OTTO-Q's agent gateway) as a remote MCP server. Merge into ~/.hermes/config.yaml, then
+# /reload-mcp. Keys per the Hermes MCP config reference, read 2026-10-03:
 # https://hermes-agent.nousresearch.com/docs/reference/mcp-config-reference
-# The token is a secret: never in this file, a chat, or a URL. PERSONAL_AGENT.md section 5.
+#
+# No key here (0607): in a new chat, say "connect to OTTOYARD". Hermes calls mcp__ottoyard__welcome, asks you for
+# OTTOYARD's demo passcode, calls mcp__ottoyard__enter_passcode, and passes the session key it gets back with every
+# other call. The session ends with the demo run (a stop or reset of the twin) or after 4 hours. PERSONAL_AGENT.md §0, §5.
 mcp_servers:
-  ottoq:
+  ottoyard:
     url: "https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-agent-gateway/mcp"
-    headers:
-      Authorization: "Bearer ${OTTOQ_AGENT_TOKEN}"
     timeout: 60          # a command answers in well under a second; the plain-English door can take longer, but it is REST
     connect_timeout: 30
     tools:
       resources: false   # the gateway serves tools only
       prompts: false
+    # Option K, an issued key instead of the passcode (PERSONAL_AGENT.md §5): put OTTOQ_AGENT_TOKEN=oqa_... in
+    # ~/.hermes/.env and uncomment. The key is a secret: never in this file, a chat, or a URL.
+    # headers:
+    #   Authorization: "Bearer ${OTTOQ_AGENT_TOKEN}"

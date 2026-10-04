@@ -26,6 +26,16 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > reading the owner's words with the owner's own token), and a public `GET /v1/openapi.json`. Everything below about
 > requests is unchanged.
 
+> **2026-10-04 — any agent, with OTTOYARD's demo passcode (migrations `0607`/`0608`).** A caller with **no key** may use
+> two public tools: `welcome` (what OTTOYARD is, what the passcode opens, the next call) and `enter_passcode` (the demo
+> passcode opens a **session**: an `ottoq_agent_principals` row of origin `passcode`, an `oqs_` key shown once, exactly an
+> owner key's capabilities, lasting 240 minutes or until the demo run ends). Over MCP the no-key endpoint lists both doors
+> and every tool with a required `session` argument, answers session problems as tool results (never an HTTP 401), and
+> needs no database for initialize, discovery, ping or tools/list; over REST, `GET /v1/welcome` and `POST /v1/passcode`
+> are the only no-key routes, and the session key is then a Bearer. Every applied owner command now carries a
+> confirmation code (`OQ-XXXX-XXXX`); `ottoq_depot_owner_board` (0608) shows OTTO-PULSE and the twin every owner's
+> settings with their codes. A stop or reset of the twin ends every passcode session. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §0.
+
 ---
 
 ## 1. Architecture
@@ -133,6 +143,8 @@ Every tool is available over REST and MCP. `sim_*` and `at_sim` fields are **sim
 
 | Tool | REST | Capability | What it does |
 |---|---|---|---|
+| `welcome` | `GET /v1/welcome` | **none** (0607) | no key: what OTTOYARD is, what the demo passcode opens, whether a demo run is live, the next call; a key or session: who you are and until when |
+| `enter_passcode` | `POST /v1/passcode` | **none** (0607; offered only to a caller without a key) | `{passcode, agent?}`: a session key (`oqs_`, shown once) that reads and adjusts the passcode's fleet until the demo run ends; wrong passcodes refused in plain English and throttled (5 per caller per 15 min) |
 | `whoami` | `GET /v1/whoami` | any token | principal, scope, capabilities, limits, and how a change gets decided |
 | `depot_status` | `GET /v1/depot` | `read` | live run (`ottoq_twin_run_context`), sim clock, your vehicles by state |
 | `fleet_summary` | `GET /v1/fleet?state=&limit=` | `read` | your vehicles from `ottoq_depot_cards` (the cockpits' card feed) |
