@@ -147,7 +147,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0606 — GENERATED, not a log
+## Index, 0134–0608 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604 — which are indexed below as well as logged above; the log row is
@@ -624,7 +624,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0604](db/migrations/0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql) | `20261002200316` | yes — ledger | **A read-only measure of charger fit: how much of a run's fast-charger time went to cars that were already |
 | [0605](db/migrations/0605_an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back.sql) | `PENDING` | no — pending | **An owner's agent sets what its own cars need, and the run's end puts it back.** A vehicle owner's own agent |
 | [0606](db/migrations/0606_the_fleet_owner_cockpit_reads_what_its_agent_set.sql) | `PENDING` | no — pending | **The fleet owner's cockpit reads what its agent set.** One read-only function and its grant, in their own |
+| [0607](db/migrations/0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends.sql) | `PENDING` | no — pending | **Any agent is welcomed, and the demo passcode opens the fleet until the run ends.** An agent that reaches |
+| [0608](db/migrations/0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql) | `PENDING` | no — pending | **The crew and the twin see what every owner's agent set, with its confirmation code.** One new read-only |
 
-458 migrations indexed.
+460 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

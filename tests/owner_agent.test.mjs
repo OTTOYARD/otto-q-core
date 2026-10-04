@@ -113,7 +113,10 @@ test("services, when, outcomes and the capability are the ones 0605's SQL declar
   assert.deepEqual(list(/service_when IN \(([^)]+)\)/.exec(M0605)[1]), [...SERVICE_WHEN]);
   const outcomes = [...M0605.matchAll(/outcome IN \(([^)]+)\)/g)].flatMap((m) => list(m[1]));
   assert.deepEqual(sorted(new Set(outcomes)), sorted(OWNER_OUTCOMES));
-  assert.match(M0605, /capabilities <@ ARRAY\[[^\]]*'owner_settings'[^\]]*\]/);
+  // 0559's capabilities CHECK admits the capability (0605's P1 asserts it); 0605 adds that it needs a fleet
+  assert.match(read(M0559_PATH), /capabilities <@ ARRAY\[[^\]]*'owner_settings'[^\]]*\]/);
+  assert.match(M0605, /ADD CONSTRAINT ottoq_agent_principals_owner_scope_check CHECK \(\s*NOT \('owner_settings' = ANY \(capabilities\)\) OR fleet_operator_id IS NOT NULL\)/);
+  assert.match(M0605, /0559''s capabilities CHECK does not admit owner_settings/);
 });
 
 /** Every argument key a SQL body reads: p_args/v_args ->> 'k', -> 'k', ? 'k', and the arg helpers. */
@@ -440,7 +443,8 @@ test("the door: OTTO-Command calls the owner's tool with the owner's token, and 
   assert.equal(out.data.actions.length, 1);
   assert.deepEqual({ ...out.data.actions[0], summary: undefined, link: undefined, undo: undefined }, {
     tool: "set_charge_limit", args: { vehicles: "all", percent: 90 }, ok: true, http_status: 201, outcome: "applied",
-    summary: undefined, link: undefined, command_id: "cccccccc-0000-0000-0000-000000000002", cars: 36, undo: undefined,
+    summary: undefined, link: undefined, command_id: "cccccccc-0000-0000-0000-000000000002", confirmation_code: null, cars: 36,
+    undo: undefined,
   });
   assert.equal(out.data.link, out.data.actions[0].link);
   assert.equal(out.data.dry_run, false);

@@ -51,7 +51,9 @@
 -- ══ §2 WHAT THIS BUILDS ═════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   A CAPABILITY: `owner_settings`, only for a principal bound to one fleet operator (a CHECK on 0559's table). Chase's
---   token: kind personal, fleet Tesla Robotaxi TN, capabilities read + note + owner_settings.
+--   token: kind personal, fleet Tesla Robotaxi TN, capabilities read + note + owner_settings. 0559's capabilities CHECK
+--   already admits it (all three files were written before any was applied), so this file only ADDs the fleet check
+--   and drops nothing.
 --
 --   TWO TABLES
 --     ottoq_owner_commands   EVIDENCE. Every owner command, previews and refusals included: who, which tool, the
@@ -185,6 +187,13 @@ BEGIN
   IF to_regclass('public.ottoq_agent_principals') IS NULL OR to_regclass('public.ottoq_agent_call_ledger') IS NULL THEN
     RAISE EXCEPTION '0605 P1: 0559 (the agent gateway) is not applied; apply it first';
   END IF;
+  -- 0559's table admits the capability, so §1 adds a CHECK and drops none
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint c
+                  WHERE c.conrelid = 'public.ottoq_agent_principals'::regclass
+                    AND c.conname = 'ottoq_agent_principals_capabilities_check'
+                    AND pg_get_constraintdef(c.oid) LIKE '%''owner_settings''%') THEN
+    RAISE EXCEPTION '0605 P1: 0559''s capabilities CHECK does not admit owner_settings; apply 0559 as merged with this file';
+  END IF;
   -- md5(prosrc), measured: 0559's three bodies as 0559 writes them; the three engine bodies on the live catalog
   -- 2026-10-03 ~01:00 UTC
   SELECT string_agg(f, ', ') INTO v_bad FROM (VALUES
@@ -295,11 +304,8 @@ SELECT v.id AS vehicle_id,
     OR v.current_depot_id = '11111111-1111-1111-1111-111111111111';
 
 -- ══ 1. the capability ═══════════════════════════════════════════════════════════════════════════════════════════════
-ALTER TABLE public.ottoq_agent_principals DROP CONSTRAINT ottoq_agent_principals_capabilities_check;
-ALTER TABLE public.ottoq_agent_principals ADD CONSTRAINT ottoq_agent_principals_capabilities_check CHECK (
-  cardinality(capabilities) > 0
-  AND capabilities <@ ARRAY['read','note','request_recall','request_ops_action','request_adjustment','owner_settings']::text[]);
---: an owner's settings are for its own cars: the capability needs a fleet
+--: 0559's capabilities CHECK already admits owner_settings (P1 asserts it). An owner's settings are for its own cars,
+--: so the capability needs a fleet.
 ALTER TABLE public.ottoq_agent_principals ADD CONSTRAINT ottoq_agent_principals_owner_scope_check CHECK (
   NOT ('owner_settings' = ANY (capabilities)) OR fleet_operator_id IS NOT NULL);
 
@@ -2966,9 +2972,9 @@ END $probe$;
 -- ottoq_effective_target_soc_at, ottoq_departure_clear, ottoq_agent_call, ottoq_agent_issue_token,
 -- ottoq_agent_read_whoami); DROP TRIGGER ottoq_visit_needs_owner_orders_trg ON ottoq_visit_needs and
 -- ottoq_sim_runs_lift_owner_settings ON ottoq_sim_runs; DROP every ottoq_owner_* function and the two ottoq_tg_*
--- functions this file created; DROP TABLE ottoq_owner_settings, then ottoq_owner_commands; restore 0559's capabilities
--- CHECK and drop ottoq_agent_principals_owner_scope_check (revoke any principal holding owner_settings first); DELETE the
--- two registry rows, the event-catalog row and this file's ottoq_cert_lineage row.
+-- functions this file created; DROP TABLE ottoq_owner_settings, then ottoq_owner_commands; drop
+-- ottoq_agent_principals_owner_scope_check (revoke any principal holding owner_settings first; 0559's capabilities CHECK
+-- stays as 0559 created it); DELETE the two registry rows, the event-catalog row and this file's ottoq_cert_lineage row.
 
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0605_an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back', true, true,

@@ -62,9 +62,11 @@ const read = (p) => readFileSync(join(ROOT, p), "utf8");
 const M0559_PATH = "db/migrations/0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql";
 const M0560_PATH = "db/migrations/0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql";
 const M0605_PATH = "db/migrations/0605_an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back.sql";
+const M0607_PATH = "db/migrations/0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends.sql";
 const STUB_PATH = "tests/fixtures/agent_gateway_stub_engine.sql";
 const M0559 = read(M0559_PATH);
 const M0605 = read(M0605_PATH);
+const M0607 = read(M0607_PATH);
 const STUB = read(STUB_PATH);
 const SHELL = read("edge-functions/ottoq-agent-gateway/index.ts");
 const SHARED = read("edge-functions/_shared/agent_gateway.ts");
@@ -81,8 +83,9 @@ function functionBodies(sql) {
   return out;
 }
 const FUNCS = functionBodies(M0559);
-/** The bodies as they stand after every migration: 0605 replaces the dispatcher, the token issuer and whoami. */
-const LATEST = new Map([...FUNCS, ...functionBodies(M0605)]);
+/** The bodies as they stand after every migration: 0605 replaces the dispatcher, the token issuer and whoami; 0607 the
+ *  dispatcher and whoami again (the passcode door). */
+const LATEST = new Map([...FUNCS, ...functionBodies(M0605), ...functionBodies(M0607)]);
 
 /** A CASE ... WHEN 'a' THEN 'b' ... map out of a function body, starting at `anchor`. */
 function caseMap(body, anchor) {
@@ -110,16 +113,26 @@ test("the tool catalog is exactly the dispatcher's vocabulary, with the same cap
   for (const [tool, cap] of Object.entries(first)) assert.equal(need[tool], cap, `0605 changed ${tool}'s capability`);
   assert.equal(need.handshake, "", "handshake is the authentication-only tool");
   delete need.handshake;
-  assert.deepEqual(Object.keys(need).sort(), TOOLS.map((t) => t.name).sort());
+  // 0607: enter_passcode is answered before any key is resolved, so it is not in the capability map, but in the public block
+  assert.match(LATEST.get("ottoq_agent_call"), /IF v_tool IN \('welcome', 'enter_passcode'\) THEN/);
+  assert.deepEqual(Object.keys(need).sort(), TOOLS.map((t) => t.name).filter((n) => n !== "enter_passcode").sort());
   const asTs = { "": null, read: "read", note: "note", per_kind: "any_request", owner_settings: "owner_settings" };
-  for (const t of TOOLS) assert.equal(t.capability, asTs[need[t.name]], t.name);
+  for (const t of TOOLS) {
+    if (t.name === "enter_passcode") assert.ok(t.capability === null && t.public === true);
+    else assert.equal(t.capability, asTs[need[t.name]], t.name);
+  }
 });
 
 test("capabilities, request kinds, statuses and priorities agree with the tables' CHECKs", () => {
-  // the CHECK as it stands after 0605 re-creates it, and 0559's must be a prefix of it (nothing was taken away)
-  const capsOf = (sql) => [...sql.matchAll(/capabilities <@ ARRAY\[([^\]]+)\]/g)].at(-1)[1].split(",").map((s) => s.trim().replace(/'/g, ""));
-  assert.deepEqual(capsOf(M0605), [...CAPABILITIES]);
-  assert.deepEqual(capsOf(M0559), CAPABILITIES.slice(0, capsOf(M0559).length));
+  // 0559 creates the CHECK in its final shape, owner_settings included, and the prefix CHECK admits oqa_ and oqs_:
+  // none of 0559, 0605 and 0607 had been applied, so 0605 and 0607 add checks and drop none (the database tool holds a
+  // DROP for a person's confirmation)
+  const caps = /ottoq_agent_principals_capabilities_check CHECK \(\s*cardinality\(capabilities\) > 0\s*AND capabilities <@ ARRAY\[([^\]]+)\]/.exec(M0559);
+  assert.deepEqual(caps[1].split(",").map((s) => s.trim().replace(/'/g, "")), [...CAPABILITIES]);
+  assert.match(M0559, /ottoq_agent_principals_token_prefix_check CHECK \(token_prefix ~ '\^oq\[as\]_\[0-9a-f\]\{8\}\$'\)/);
+  for (const [name, sql] of [["0605", M0605], ["0607", M0607]]) {
+    assert.doesNotMatch(stripSqlComments(sql), /\bDROP\s+CONSTRAINT\b/i, `${name} drops a constraint`);
+  }
   const kinds = /ottoq_agent_requests_kind_check CHECK \(kind IN \(([^)]+)\)/.exec(M0559);
   assert.deepEqual(kinds[1].split(",").map((s) => s.trim().replace(/'/g, "")).sort(),
     ["note", ...Object.keys(REQUEST_KIND_CAPABILITY)].sort());
@@ -169,6 +182,8 @@ test("the token shape is what ottoq_agent_issue_token mints, and the hash is wha
 // ═════════════════════════════════════════════════════════════════════════════════════════ 2. schemas ══
 
 const MINIMAL = {
+  // 0607
+  welcome: {}, enter_passcode: { passcode: "harbor-quartz-42" },
   whoami: {}, depot_status: {}, fleet_summary: {}, recent_decisions: {}, stall_availability: {}, list_requests: {},
   vehicle_card: { vehicle_id: "ee000000-0000-0000-0000-0000000000a1" },
   send_note: { title: "hello" },
@@ -263,10 +278,12 @@ test("REST query strings are coerced to the schema's types, and unknown paramete
 
 test("a token sees the tools its capabilities allow, and submit_request only the kinds it may ask for", () => {
   const names = (caps) => toolsFor(caps).map((t) => t.name);
-  assert.deepEqual(names([]), ["whoami", "list_requests"]);
+  // welcome is for every key (0607); enter_passcode only for a caller without one
+  assert.deepEqual(names([]), ["welcome", "whoami", "list_requests"]);
   assert.deepEqual(names(["read"]),
-    ["whoami", "depot_status", "fleet_summary", "vehicle_card", "recent_decisions", "stall_availability", "list_requests"]);
-  assert.deepEqual(names(["note"]), ["whoami", "list_requests", "send_note"]);
+    ["welcome", "whoami", "depot_status", "fleet_summary", "vehicle_card", "recent_decisions", "stall_availability", "list_requests"]);
+  assert.deepEqual(names(["note"]), ["welcome", "whoami", "list_requests", "send_note"]);
+  assert.ok(!names([...CAPABILITIES]).includes("enter_passcode"));
   const recallOnly = toolsFor(["request_recall"]).find((t) => t.name === "submit_request");
   assert.deepEqual(recallOnly.inputSchema.properties.kind.enum, ["recall_vehicle"]);
   const all = toolsFor([...CAPABILITIES]).find((t) => t.name === "submit_request");
@@ -366,11 +383,16 @@ test("auth failure: no token, a malformed token or another scheme never reaches 
       assert.equal((await bodyOf(res)).error.code, "unauthenticated");
     }
   }
-  const mcp = await gw("/mcp", { method: "POST", body: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
+  // a MALFORMED key on the MCP endpoint is refused at the edge; NO key at all is the passcode door (0607), whose
+  // tools/list needs no database
+  const mcp = await gw("/mcp", { method: "POST", headers: { authorization: `Bearer ${T_ALL}x` }, body: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
   assert.equal(mcp.status, 401);
   const rpc = await bodyOf(mcp);
   assert.equal(rpc.error.code, JSONRPC.UNAUTHORIZED);
   assert.equal(rpc.id, null);
+  const door = await gw("/mcp", { method: "POST", body: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
+  assert.equal(door.status, 200);
+  assert.deepEqual((await bodyOf(door)).result.tools.slice(0, 2).map((t) => t.name), ["welcome", "enter_passcode"]);
   assert.equal(calls.length, 0, "a request without a well-formed token reached the engine");
 });
 
@@ -463,7 +485,7 @@ test("REST: /v1/tools lists what this token may use, and 429s say when to come b
   });
   const gw = gateway(engine);
   const tools = await bodyOf(await gw("/v1/tools", { token: T_NOTE }));
-  assert.deepEqual(tools.data.tools.map((t) => t.name), ["whoami", "list_requests", "send_note"]);
+  assert.deepEqual(tools.data.tools.map((t) => t.name), ["welcome", "whoami", "list_requests", "send_note"]);
   assert.ok(tools.data.tools.every((t) => t.input_schema.type === "object" && t.path.startsWith("/v1/")));
   const limited = await gw("/v1/whoami", { token: T_LIMITED });
   assert.equal(limited.status, 429);
@@ -573,8 +595,9 @@ test("MCP tools/list: the token's tools, each with a closed JSON Schema and hone
     assert.equal(typeof t.annotations.readOnlyHint, "boolean");
   }
   // every tool needs every capability AND a fleet; without a fleet the owner's tools are not offered at all
-  assert.deepEqual(mcpToolList([...CAPABILITIES], { fleetBound: true }).map((t) => t.name), TOOLS.map((t) => t.name));
-  assert.deepEqual(mcpToolList([...CAPABILITIES]).map((t) => t.name), TOOLS.filter((t) => t.scope !== "fleet").map((t) => t.name));
+  const keyed = TOOLS.filter((t) => t.name !== "enter_passcode");
+  assert.deepEqual(mcpToolList([...CAPABILITIES], { fleetBound: true }).map((t) => t.name), keyed.map((t) => t.name));
+  assert.deepEqual(mcpToolList([...CAPABILITIES]).map((t) => t.name), keyed.filter((t) => t.scope !== "fleet").map((t) => t.name));
   assert.equal(calls[0].tool, "handshake");
   assert.equal(calls[0].transport, "mcp");
   assert.deepEqual(calls[0].meta, { http_method: "POST", path: "/mcp", mcp_method: "tools/list", mcp_version: MCP_MODERN_VERSION, client: "hermes/2.1" });
@@ -641,7 +664,7 @@ test("MCP server/discover and ping (stateless), and initialize for older clients
   }
   assert.equal((await bodyOf(await init("2024-11-05"))).result.protocolVersion, "2025-11-25", "an unknown version is answered with the latest");
   const legacyList = await bodyOf(await gw("/mcp", { method: "POST", token: T_NOTE, headers: { "mcp-protocol-version": "2025-06-18" }, body: { jsonrpc: "2.0", id: 2, method: "tools/list" } }));
-  assert.deepEqual(legacyList.result.tools.map((t) => t.name), ["whoami", "list_requests", "send_note"]);
+  assert.deepEqual(legacyList.result.tools.map((t) => t.name), ["welcome", "whoami", "list_requests", "send_note"]);
   assert.equal(legacyList.result.resultType, undefined, "no 2026 fields in a 2025 reply");
   const legacyUnknown = await gw("/mcp", { method: "POST", token: T_ALL, headers: { "mcp-protocol-version": "2025-06-18" }, body: { jsonrpc: "2.0", id: 3, method: "resources/list" } });
   assert.equal(legacyUnknown.status, 200);

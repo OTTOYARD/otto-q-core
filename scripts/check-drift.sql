@@ -689,7 +689,9 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day'::text, '0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql'::text),
     ('20261002200316'::text, 'every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them'::text, '0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql'::text),
     ('PENDING'::text, 'an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back'::text, '0605_an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back.sql'::text),
-    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_what_its_agent_set'::text, '0606_the_fleet_owner_cockpit_reads_what_its_agent_set.sql'::text)
+    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_what_its_agent_set'::text, '0606_the_fleet_owner_cockpit_reads_what_its_agent_set.sql'::text),
+    ('PENDING'::text, 'any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends'::text, '0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends.sql'::text),
+    ('PENDING'::text, 'the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code'::text, '0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
