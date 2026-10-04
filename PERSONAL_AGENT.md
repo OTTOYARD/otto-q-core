@@ -1,8 +1,8 @@
 # PERSONAL_AGENT: any agent sets what your cars need
 
 *Updated 2026-10-03/04, 10:50 PM–3:00 AM CT (2026-10-04 03:50–08:00 UTC), for the passcode door (0607/0608). Written
-first 2026-10-02 for an owner's issued key (0605/0606). Section 7 is the go-live list; section 9 says exactly what was
-and was not verified.*
+first 2026-10-02 for an owner's issued key (0605/0606). **Live since 2026-10-04, 6:42 AM CT:** applied, deployed, the
+passcode on and the live smoke passed (section 7). Section 9 says exactly what was and was not verified.*
 
 Chase, 2026-10-03: *"I want to be able to setup and activate a new agent from theoretically Hermes or [Grok] or any
 other agent and be able to call OTTOYARD ... and allow me to access my fleet ... a general password or passcode that I
@@ -84,8 +84,8 @@ again.
 | **Anything else** | REST: `GET /v1/welcome`, then `POST /v1/passcode {"passcode": "…", "agent": "…"}`, then the session key as `Authorization: Bearer` on `/v1/me/…`, or `POST /v1/ask` with your words. A GPT Action or any OpenAPI client can import `/v1/openapi.json`. |
 
 **Not verified yet with each client**: the gateway answers every no-key MCP request without asking for sign-in, which is
-what "No authentication" / "No sign-in" expects, and the end-to-end tests drive exactly those requests. A real Hermes,
-ChatGPT, Claude or Grok has not been pointed at it until the deploy (section 9).
+what "No authentication" / "No sign-in" expects, and the end-to-end tests drive exactly those requests, as did the live
+smoke on 2026-10-04. A real Hermes, ChatGPT, Claude or Grok has not been pointed at it yet (section 9).
 
 **Setting the passcode.** One line in the Supabase SQL editor (6–64 characters; it is stored only as a bcrypt hash):
 
@@ -345,9 +345,24 @@ from a UI"); signed push for ready / refused / lifted; a signed receipt a third 
 - The gateway as a real HTTP server over that database: `scripts/agent-gateway-smoke.mjs --passcode`, 6 of 6.
 - OrchestrAV 208 tests, on real `ottoq_owner_board` output with 0608 applied.
 
-**Not verified:** anything on the platform until the deploy (latency, a cold start); a real Hermes, ChatGPT, Claude or
-Grok client; a live model behind `/v1/ask` (driven by a scripted model); 0605 against the live tick (its copies are
-md5-pinned, and V2 measures inertness live at apply time).
+**Verified live (2026-10-04, 6:14–6:50 AM CT):**
+- The six migrations applied from their files. Each ledger row is byte-identical to its file (md5 and length), and all
+  67 functions they create or replace match the scratch cluster's `md5(prosrc)`.
+- The gateway deployed as version 1. Its source, read back through the Supabase connector and hashed from the API's own
+  response, is byte-identical to the committed files, and the five documents it builds from its catalog match what the
+  repo builds.
+- `scripts/agent-gateway-smoke.mjs --passcode` against the live URL: 6 of 6. The welcome named Tesla Robotaxi TN's 36
+  cars (32 Model Y and 4 Cybercab); a wrong passcode was refused in plain English; the right one opened a session; a
+  preview answered `no_live_demo`, since no demo run was live. The smoke session was then revoked.
+- The cockpits' reads (`ottoq_depot_owner_board`, `ottoq_owner_board`) answer the publishable key. The dispatcher and the
+  passcode setter answer it 404.
+- `POST /v1/ask` answers 503 `ask_not_configured`: it needs `ANTHROPIC_API_KEY` and a model name in
+  `OTTOCOMMAND_OWNER_MODEL` (or `ANTHROPIC_MODEL`), and at least one of those function secrets is not set (section 7,
+  step 2). Every tool works without it.
+
+**Not verified:** a real Hermes, ChatGPT, Claude or Grok client; a live model behind `/v1/ask`; a change applied on a
+live demo run, which needs one running (section 7, step 5); 0605's tick step under a demo (V2 measured it inert on the
+live catalog at apply time, and it acts only on settings an agent has set).
 
 ## Sources (external facts; read 2026-10-03 unless marked)
 

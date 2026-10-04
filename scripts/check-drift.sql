@@ -656,8 +656,8 @@ repo_manifest(version, name, file) AS (
     ('APPLIED-NO-LEDGER-ROW'::text, 'the_gates_patience_flag_is_a_note_for_a_person_not_service_work'::text, '0556_the_gates_patience_flag_is_a_note_for_a_person_not_service_work.sql'::text),
     ('20260928220015'::text, 'a_faulted_car_is_repaired_before_it_charges'::text, '0557_a_faulted_car_is_repaired_before_it_charges.sql'::text),
     ('20260928235524'::text, 'a_faulted_cars_repair_goes_first_in_its_plan'::text, '0558_a_faulted_cars_repair_goes_first_in_its_plan.sql'::text),
-    ('PENDING'::text, 'an_outside_agent_asks_through_one_door_and_a_person_decides'::text, '0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql'::text),
-    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text),
+    ('20261004111417'::text, 'an_outside_agent_asks_through_one_door_and_a_person_decides'::text, '0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql'::text),
+    ('20261004111501'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text),
     ('20260929014318'::text, 'every_charger_stall_is_angled_and_the_database_says_so'::text, '0561_every_charger_stall_is_angled_and_the_database_says_so.sql'::text),
     ('PENDING'::text, 'a_charger_is_not_held_for_a_car_still_on_its_way_back'::text, '0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql'::text),
     ('20260929024700'::text, 'a_manual_start_interrupts_a_running_check'::text, '0564_a_manual_start_interrupts_a_running_check.sql'::text),
@@ -688,10 +688,10 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes'::text, '0602_the_calendar_keeps_the_exclusion_that_binds_and_sheds_the_one_it_subsumes.sql'::text),
     ('PENDING'::text, 'a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day'::text, '0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day.sql'::text),
     ('20261002200316'::text, 'every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them'::text, '0604_every_test_day_can_say_whether_its_fast_chargers_went_to_the_cars_that_needed_them.sql'::text),
-    ('PENDING'::text, 'an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back'::text, '0605_an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back.sql'::text),
-    ('PENDING'::text, 'the_fleet_owner_cockpit_reads_what_its_agent_set'::text, '0606_the_fleet_owner_cockpit_reads_what_its_agent_set.sql'::text),
-    ('PENDING'::text, 'any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends'::text, '0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends.sql'::text),
-    ('PENDING'::text, 'the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code'::text, '0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql'::text)
+    ('20261004112442'::text, 'an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back'::text, '0605_an_owners_agent_sets_what_its_own_cars_need_and_the_runs_end_puts_it_back.sql'::text),
+    ('20261004112719'::text, 'the_fleet_owner_cockpit_reads_what_its_agent_set'::text, '0606_the_fleet_owner_cockpit_reads_what_its_agent_set.sql'::text),
+    ('20261004113110'::text, 'any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends'::text, '0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends.sql'::text),
+    ('20261004113230'::text, 'the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code'::text, '0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

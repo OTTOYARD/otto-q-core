@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261004113110
 -- migration-name:    any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends
 --
 -- 0607  **Any agent is welcomed, and the demo passcode opens the fleet until the run ends.** An agent that reaches
