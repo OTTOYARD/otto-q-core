@@ -124,10 +124,15 @@ test("the tool catalog is exactly the dispatcher's vocabulary, with the same cap
 });
 
 test("capabilities, request kinds, statuses and priorities agree with the tables' CHECKs", () => {
-  // the CHECK as it stands after 0605 re-creates it, and 0559's must be a prefix of it (nothing was taken away)
-  const capsOf = (sql) => [...sql.matchAll(/capabilities <@ ARRAY\[([^\]]+)\]/g)].at(-1)[1].split(",").map((s) => s.trim().replace(/'/g, ""));
-  assert.deepEqual(capsOf(M0605), [...CAPABILITIES]);
-  assert.deepEqual(capsOf(M0559), CAPABILITIES.slice(0, capsOf(M0559).length));
+  // 0559 creates the CHECK in its final shape, owner_settings included, and the prefix CHECK admits oqa_ and oqs_:
+  // none of 0559, 0605 and 0607 had been applied, so 0605 and 0607 add checks and drop none (the database tool holds a
+  // DROP for a person's confirmation)
+  const caps = /ottoq_agent_principals_capabilities_check CHECK \(\s*cardinality\(capabilities\) > 0\s*AND capabilities <@ ARRAY\[([^\]]+)\]/.exec(M0559);
+  assert.deepEqual(caps[1].split(",").map((s) => s.trim().replace(/'/g, "")), [...CAPABILITIES]);
+  assert.match(M0559, /ottoq_agent_principals_token_prefix_check CHECK \(token_prefix ~ '\^oq\[as\]_\[0-9a-f\]\{8\}\$'\)/);
+  for (const [name, sql] of [["0605", M0605], ["0607", M0607]]) {
+    assert.doesNotMatch(stripSqlComments(sql), /\bDROP\s+CONSTRAINT\b/i, `${name} drops a constraint`);
+  }
   const kinds = /ottoq_agent_requests_kind_check CHECK \(kind IN \(([^)]+)\)/.exec(M0559);
   assert.deepEqual(kinds[1].split(",").map((s) => s.trim().replace(/'/g, "")).sort(),
     ["note", ...Object.keys(REQUEST_KIND_CAPABILITY)].sort());

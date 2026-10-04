@@ -45,7 +45,8 @@
 --   A SESSION IS A PRINCIPAL. The right passcode creates an ottoq_agent_principals row exactly like an issued owner key
 --   (kind personal, the passcode's fleet, the twin depot, read + note + owner_settings, 30 calls a minute) plus three
 --   new columns: origin 'passcode' (issued keys are 'issued'), display_name (the name the agent gave, e.g. "Grok") and
---   expires_at. Its key is 'oqs_' + 64 hex (an issued key is 'oqa_'), returned once and stored as SHA-256. So all that
+--   expires_at. Its key is 'oqs_' + 64 hex (an issued key is 'oqa_'; 0559's prefix CHECK admits both, so nothing here
+--   drops a constraint), returned once and stored as SHA-256. So all that
 --   0559 and 0605 built (scope, rate limit, ledger, owner tools, receipts, refusals, undo, OrchestrAV) serves a
 --   passcode session unchanged, and a session can do nothing an issued owner key cannot.
 --
@@ -154,6 +155,13 @@ BEGIN
      OR to_regprocedure('extensions.gen_random_bytes(integer)') IS NULL THEN
     RAISE EXCEPTION '0607 P1: pgcrypto (crypt, gen_salt, gen_random_bytes) is not in schema extensions';
   END IF;
+  -- 0559's table admits a session's oqs_ prefix, so §1 adds CHECKs and drops none
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint c
+                  WHERE c.conrelid = 'public.ottoq_agent_principals'::regclass
+                    AND c.conname = 'ottoq_agent_principals_token_prefix_check'
+                    AND pg_get_constraintdef(c.oid) LIKE '%^oq[as]%') THEN
+    RAISE EXCEPTION '0607 P1: 0559''s token_prefix CHECK does not admit oqs_; apply 0559 as merged with this file';
+  END IF;
 END $premises$;
 
 -- ── P2: nothing this file creates exists yet ──
@@ -195,9 +203,7 @@ ALTER TABLE public.ottoq_agent_principals
   ADD COLUMN display_name text,
   ADD COLUMN expires_at   timestamptz;
 
-ALTER TABLE public.ottoq_agent_principals DROP CONSTRAINT ottoq_agent_principals_token_prefix_check;
-ALTER TABLE public.ottoq_agent_principals ADD CONSTRAINT ottoq_agent_principals_token_prefix_check
-  CHECK (token_prefix ~ '^oq[as]_[0-9a-f]{8}$');
+--: 0559's token_prefix CHECK already admits oqs_ (P1 asserts it): all three files were written before any was applied
 ALTER TABLE public.ottoq_agent_principals ADD CONSTRAINT ottoq_agent_principals_origin_check
   CHECK (origin IN ('issued', 'passcode'));
 --: an issued key starts oqa_ and never lapses on its own; a passcode session starts oqs_, carries the agent's name and
@@ -1226,9 +1232,9 @@ END $probe$;
 -- ottoq_agent_resolve, ottoq_agent_principals_guard, ottoq_agent_read_whoami and ottoq_owner_command_reply from their
 -- '0607_pre' snapshots; DROP the eight functions this file created and TABLE ottoq_agent_demo_passcode; revoke every
 -- principal of origin 'passcode' (UPDATE ... SET status = 'revoked', revoked_at = now(), revoked_reason = 'rollback 0607'),
--- then, with ottoq.agent_ledger_unlock = on, DROP the three constraints and the index this file added, restore 0559's
--- token_prefix CHECK ('^oqa_[0-9a-f]{8}$', which then requires the passcode rows gone or re-keyed) and DROP COLUMN
--- origin, display_name, expires_at; DELETE this file's ottoq_cert_lineage row.
+-- then, with ottoq.agent_ledger_unlock = on, DROP the three constraints and the index this file added and DROP COLUMN
+-- origin, display_name, expires_at (0559's token_prefix CHECK, which admits oqa_ and oqs_, stays as 0559 created it);
+-- DELETE this file's ottoq_cert_lineage row.
 
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends', false, false,

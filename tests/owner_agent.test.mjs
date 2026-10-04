@@ -113,7 +113,10 @@ test("services, when, outcomes and the capability are the ones 0605's SQL declar
   assert.deepEqual(list(/service_when IN \(([^)]+)\)/.exec(M0605)[1]), [...SERVICE_WHEN]);
   const outcomes = [...M0605.matchAll(/outcome IN \(([^)]+)\)/g)].flatMap((m) => list(m[1]));
   assert.deepEqual(sorted(new Set(outcomes)), sorted(OWNER_OUTCOMES));
-  assert.match(M0605, /capabilities <@ ARRAY\[[^\]]*'owner_settings'[^\]]*\]/);
+  // 0559's capabilities CHECK admits the capability (0605's P1 asserts it); 0605 adds that it needs a fleet
+  assert.match(read(M0559_PATH), /capabilities <@ ARRAY\[[^\]]*'owner_settings'[^\]]*\]/);
+  assert.match(M0605, /ADD CONSTRAINT ottoq_agent_principals_owner_scope_check CHECK \(\s*NOT \('owner_settings' = ANY \(capabilities\)\) OR fleet_operator_id IS NOT NULL\)/);
+  assert.match(M0605, /0559''s capabilities CHECK does not admit owner_settings/);
 });
 
 /** Every argument key a SQL body reads: p_args/v_args ->> 'k', -> 'k', ? 'k', and the arg helpers. */

@@ -291,14 +291,17 @@ CREATE TABLE public.ottoq_agent_principals (
   CONSTRAINT ottoq_agent_principals_kind_check CHECK (kind IN ('personal', 'fleet_operator', 'depot_ops')),
   CONSTRAINT ottoq_agent_principals_fleet_scope_check CHECK (kind <> 'fleet_operator' OR fleet_operator_id IS NOT NULL),
   CONSTRAINT ottoq_agent_principals_depot_ops_scope_check CHECK (kind <> 'depot_ops' OR fleet_operator_id IS NULL),
+  --: owner_settings (0605) and an oqs_ prefix (0607's passcode session) are admitted in the table's first shape. All three
+  --: files were written before any was applied, and a later file that widened a CHECK would have to DROP it first. This
+  --: file issues neither: ottoq_agent_issue_token refuses owner_settings and mints only oqa_ keys.
   CONSTRAINT ottoq_agent_principals_capabilities_check CHECK (
     cardinality(capabilities) > 0
-    AND capabilities <@ ARRAY['read','note','request_recall','request_ops_action','request_adjustment']::text[]),
+    AND capabilities <@ ARRAY['read','note','request_recall','request_ops_action','request_adjustment','owner_settings']::text[]),
   --: an ops action changes the whole depot; a fleet-scoped principal may not ask for one
   CONSTRAINT ottoq_agent_principals_ops_scope_check CHECK (
     NOT ('request_ops_action' = ANY (capabilities)) OR fleet_operator_id IS NULL),
   CONSTRAINT ottoq_agent_principals_token_hash_check CHECK (token_hash ~ '^[0-9a-f]{64}$'),
-  CONSTRAINT ottoq_agent_principals_token_prefix_check CHECK (token_prefix ~ '^oqa_[0-9a-f]{8}$'),
+  CONSTRAINT ottoq_agent_principals_token_prefix_check CHECK (token_prefix ~ '^oq[as]_[0-9a-f]{8}$'),
   CONSTRAINT ottoq_agent_principals_status_check CHECK (status IN ('active', 'revoked')),
   CONSTRAINT ottoq_agent_principals_revoked_check CHECK ((status = 'revoked') = (revoked_at IS NOT NULL)),
   CONSTRAINT ottoq_agent_principals_rate_check CHECK (rate_limit_per_min BETWEEN 1 AND 600),
