@@ -53,7 +53,7 @@
 --       new `agent_order` block) order the line the same way, so the planners plan the cars the kernel will seat.
 --   (h) `ottoq_agent_board` carries `charge_queue` under the dial: the line's head in the kernel's order with each car's
 --       charge minutes on each kind, wait against its contract, other work and the kernel's rule for its kind; the
---       chargers free, down and freeing soon; the cars inbound; and what the agent's last order did.
+--       chargers free, down and freeing soon; and what the agent's last order did.
 --   (i) `ottoq_agent_charge_order_usage(run, limit)`: what the orders did, read-only: seats made under an order, by
 --       rank, pinned, unranked, the seats where the agent put a car ahead of the kernel's own order, and the kinds it
 --       named that the car then took.
