@@ -9,8 +9,9 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **In sync with this directory:** **27 of 28**, verified by SHA-256 of the source
 - **Out of sync:** **1 — `ottoq-energy-mpc`, and the repo copy is the correct one.**
   See the finding below; the deployed body must never be synced into the repo.
-- **Since the capture:** `otto-twin-control` v30 (footnote ¹) and `ottoq-agent-gateway` v1, its first
-  deploy (footnote ²). 29 ACTIVE functions.
+- **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
+  deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³).
+  29 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
 
@@ -111,7 +112,7 @@ against this table without trusting any metadata column.
 | ottoq-assign-optimize | 8 | true | 2026-09-09 03:41 | yes | `5508a9c95d4b98e736b3215fca9cc006ae6b5e4a399de174165cad69f100c34e` |
 | ottoq-benchmark-run | 7 | true | 2026-07-11 15:55 | yes | `abf1ac4718537993239bf33dc2ff29ed7a03e3f7324519c13af36a8a4a238155` |
 | ottoq-cleaning-cadence | 7 | true | 2026-06-18 18:21 | yes | `e829fe2709f831e04f6eac24c89f4cfee759f99a7b5ee2033f9dd2131bff5e25` |
-| ottoq-cpsat-propose | 5 | false | 2026-09-17 00:26 | yes | `544694112a505ddceb3ab9e6b0253897c0449a0fed9f3e8b954819df80759310` |
+| ottoq-cpsat-propose | 11 | false | 2026-10-07 13:56 | yes³ | `7c40c6fe93cf6c21a77958033a4015f12051f720c3a5c94305985a443aa121b5` |
 | ottoq-cuopt-lp-probe | 8 | true | 2026-08-01 17:43 | yes | `bea55aa4120f0d25fde967aa1fbcab3cdeb9f79bebef9009b77ada7dffc6d580` |
 | ottoq-cuopt-propose | 29 | true | 2026-09-16 00:10 | yes | `5425ba3dcf0350d87152b497cc66c7897d4013e6227bd80fa3e6e1a7bba5ddf9` |
 | ottoq-depot-resources | 5 | true | 2026-06-19 02:57 | yes | `06c303ee7662f8f8f1fcb549d7e22a8e1128b5d870863a1d652afa39171084a0` |
@@ -124,7 +125,7 @@ against this table without trusting any metadata column.
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
 | ottoq-orchestrate-tick | 12 | true | 2026-09-09 03:42 | yes | `47bc38feb463a9c103820d087c6a86f5856a3cdc049a73ab0a76387c1a73becf` |
-| ottoq-orchestrator-agent | 26 | true | 2026-09-17 00:23 | yes | `ff7ed9e0d9f3222a96f859929806a5292aba930aa4fa17763058d184f9539a35` |
+| ottoq-orchestrator-agent | 34 | true | 2026-10-07 13:59 | yes³ | `8efe1a3912344ab233d93a9013c5f7340e45cffc0e1c70d09f82dc56be49e311` |
 | ottoq-ottocommand | 8 | true | 2026-06-27 18:47 | yes | `dac7eca5d514286ddebb97c9ba096b22adff09d97f08ec485dcfc91f49e5761a` |
 | ottoq-progress | 9 | true | 2026-06-18 04:05 | yes | `eaced82147a69688e977ddede528272370c8facbe60de6787e525731090db0aa` |
 | ottoq-run-blackbox | 5 | false | 2026-07-18 00:23 | yes | `0f63f9cff1bb3e2c10ab7874b80648bbf2848da9a971dbc1d163ad198a18317e` |
@@ -154,6 +155,14 @@ markers:
 The sha256 in the row is of the repo file, so it is not a deployed hash. Measured live: `/health`
 reads `1.10.0-start-interrupts-checks`, and a blank `scenario_code` start returns the new
 function's own `scenario_code required`.
+
+³ **`ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34, 2026-10-07 (8:56 and 8:59 AM CT), for 0613.**
+Both through the Supabase MCP `deploy_edge_function` and read back with `get_edge_function`; every deployed file is
+byte-identical to the committed one, hashed from the API's own response (the sha256 column is the deployed
+`index.ts`). **The repo copy of `ottoq-cpsat-propose` had drifted again**: it held this manifest's 2026-09-19 v5
+while the live function was v10 (0301's 20-second bound and ledger rows, 0398's endpoint lookup). The deployed v10
+was written into the repo from the API before the change (commit `842f6bf`), so v11 is v10 plus 0613 and nothing
+was rolled back. `ottoq-orchestrator-agent` v33 was byte-identical to the repo copy before its edit.
 
 ² **`ottoq-agent-gateway` v1 is its first deploy, 2026-10-04 at 6:40 AM CT (11:40 UTC)**, through the Supabase
 MCP deploy tool, with JWT verification off (agent keys and passcode session keys are not JWTs; the key is the
