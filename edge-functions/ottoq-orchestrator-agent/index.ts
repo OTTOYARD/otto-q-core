@@ -551,7 +551,8 @@ serve(async (req) => {
                          charge_order: chargeOrder },
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
                         solver_handoff: solverHandoff,
-                        // v23: the kernel's receipt for the charge order: accepted, partial or rejected, and why
+                        // v23: the kernel's receipt for the charge order: accepted, partial or rejected, and why;
+                        // v24 (0618): or refused, with the projection that refused it
                         charge_order: chargeOrderReceipt,
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
       // v23: an order the kernel accepted is an enacted action, as a dial write is
