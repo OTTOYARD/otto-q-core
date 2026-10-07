@@ -496,3 +496,115 @@ def test_0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named(
     # at the default (no live order) the key is never read: the kernel's own line
     _dial(db, "agent_charge_order", 0)
     assert _line(db) == ["I", "P", "B", "A", "D", "C"]
+
+
+# ── 0618: the kernel projects the line in its own order and in the agent's, and takes the agent's only when no worse ──
+
+M0618 = os.path.join(ROOT, "db", "migrations",
+                     "0618_the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it.sql")
+
+
+def _through_0618(d):
+    _apply(d)
+    for path in (M0616, M0617, M0618):
+        rc, err = d.file(path)
+        assert rc == 0, f"{os.path.basename(path)} did not apply: {err}"
+    _dial(d, "agent_charge_order", 1)
+
+
+def _projection(d, order=None):
+    o = "'{}'::jsonb" if order is None else f"$j${json.dumps({_vid(n): {'rank': r, 'kind': k} for r, (n, k) in enumerate(order, 1)})}$j$::jsonb"
+    return d.json(f"SELECT public.ottoq_charge_line_projection('{RUN}', '{DEPOT}', '{T}', {o})")
+
+
+def test_0618_the_kernels_own_line_projected(db):
+    # Minutes from ottoq_charge_minutes_estimate (75 kWh, 150 kW fast, 19.2 kW L2): I 41 fast; P 70 L2; B 94 L2;
+    # A 117 L2; D 15 on a fast charger (no L2 left at 0); C 45 fast from minute 15. Only I has a due time (40): late.
+    _through_0618(db)
+    k = _projection(db)
+    assert (k["cars"], k["chargers"], k["seated"], k["with_due"], k["on_time"]) == (6, 5, 6, 1, 0), k
+    assert float(k["ready_sum_min"]) == 41 + 70 + 94 + 117 + 15 + (15 + 45), k
+    assert (k["on_dcfc"], k["on_l2"]) == (3, 3), k
+    # the projection is a read: nothing was written
+    assert db.val("SELECT count(*) FROM public.ottoq_agent_charge_orders") == "0"
+
+
+def test_0618_an_order_that_sends_low_batteries_to_the_only_free_l2s_first_is_refused(db):
+    _through_0618(db)
+    _occupy(db, ["F1", "F2"])                              # only the three L2 are free
+    rec = _order(db, [("C", "l2"), ("A", "l2"), ("B", "l2")])
+    # kernel: I 141, P 70, B 94, then A at 70 (187), D at 94 (129), C at 129 (293) = 914
+    # agent:  I 141, P 70, C 164, then A at 70 (187), B at 141 (235), D at 164 (199) = 996
+    assert rec["status"] == "refused" and rec["projection"]["reason"] == "line_ready_later", rec
+    assert float(rec["projection"]["kernel"]["ready_sum_min"]) == 914 and float(rec["projection"]["agent"]["ready_sum_min"]) == 996
+    row = db.json("SELECT to_jsonb(o) FROM public.ottoq_agent_charge_orders o ORDER BY order_id DESC LIMIT 1")
+    assert row["status"] == "refused" and row["n_accepted"] == 3 and row["projection"]["take"] is False
+    # a refused order steers nothing: the live read is empty and the line is the kernel's
+    assert db.json(f"SELECT public.ottoq_agent_charge_order_live('{RUN}', 100)") == {}
+    assert _line(db) == ["I", "P", "B", "A", "D", "C"]
+
+
+def test_0618_the_kernels_own_order_sent_by_the_agent_is_taken(db):
+    _through_0618(db)
+    rec = _order(db, [("B", "either"), ("A", "either"), ("D", "either"), ("C", "either")])
+    assert rec["status"] == "accepted" and rec["projection"]["reason"] == "no_worse", rec
+    assert rec["projection"]["kernel"]["ready_sum_min"] == rec["projection"]["agent"]["ready_sum_min"]
+    assert db.json(f"SELECT public.ottoq_agent_charge_order_live('{RUN}', 100)") != {}
+
+
+def test_0618_an_order_that_gets_a_due_car_ready_in_time_on_a_fast_charger_is_taken(db):
+    _through_0618(db)
+    _car(db, "E", 40, 1)                                   # 40%, just arrived: last in the kernel's ratio order
+    db.val(f"UPDATE public.ottoq_visit_needs SET dispatch_due_at = '{T}'::timestamptz + interval '60 minutes' "
+           f"WHERE vehicle_id = '{_vid('E')}'")
+    k = _projection(db)
+    # kernel: E takes the first fast charger to free, at 41, and is ready at 82 against a due of 60
+    assert (k["with_due"], k["on_time"], float(k["ready_sum_min"])) == (2, 0, 479), k
+    rec = _order(db, [("E", "dcfc")])
+    # agent: E takes the second fast charger at 0 and is ready at 41; D and C follow at 41 (56, 86): 505 <= 1.1 x 479
+    assert rec["status"] == "accepted" and rec["projection"]["reason"] == "more_cars_ready_by_due", rec
+    assert (rec["projection"]["agent"]["on_time"], float(rec["projection"]["agent"]["ready_sum_min"])) == (1, 505)
+
+
+def test_0618_usage_counts_refusals_and_the_board_says_why(db):
+    _through_0618(db)
+    _occupy(db, ["F1", "F2"])
+    refused = _order(db, [("C", "l2"), ("A", "l2"), ("B", "l2")])["order_id"]
+    db.val("UPDATE public.stalls SET current_vehicle_id = NULL")
+    taken = _order(db, [("B", "either"), ("A", "either")])["order_id"]
+    empty = _order(db, [])
+    assert empty["status"] == "rejected" and empty.get("projection") is None   # nothing named, nothing to check
+    u = db.json(f"SELECT public.ottoq_agent_charge_order_usage('{RUN}', 5)")
+    assert (u["orders"], u["orders_accepted"], u["orders_refused"]) == (3, 1, 1), u
+    assert u["cars_ranked"] == 2, u                        # a refused order's cars were never ranked in the line
+    verdicts = {o["order_id"]: o["verdict"] for o in u["by_order"]}
+    assert verdicts[refused] == "line_ready_later" and verdicts[taken] == "no_worse", verdicts
+    b = db.json(f"SELECT public.ottoq_agent_charge_queue_board('{RUN}', '{DEPOT}', '{T}')")
+    assert b["last_order"]["status"] == "rejected" and b["last_order"]["projection"] is None
+    _order(db, [("C", "either"), ("D", "either"), ("A", "either"), ("B", "either")])
+    b = db.json(f"SELECT public.ottoq_agent_charge_queue_board('{RUN}', '{DEPOT}', '{T}')")
+    assert b["last_order"]["projection"]["reason"] in ("no_worse", "line_ready_sooner", "line_ready_later"), b["last_order"]
+    assert "kernel" in b["last_order"]["projection"] and "agent" in b["last_order"]["projection"]
+
+
+def test_0618_an_order_the_kernel_cannot_check_is_never_taken(db):
+    _through_0618(db)
+    db.val("""CREATE OR REPLACE FUNCTION public.ottoq_charge_line_projection(p_sim_run_id uuid, p_depot_id uuid,
+                p_clock timestamptz, p_order jsonb) RETURNS jsonb
+              LANGUAGE plpgsql AS $f$ BEGIN RAISE EXCEPTION 'no projection today'; END $f$""")
+    rec = _order(db, [("B", "either")])
+    assert rec["ok"] is True and rec["status"] == "refused", rec
+    assert rec["projection"]["reason"] == "projection_failed" and "no projection today" in rec["projection"]["error"]
+    assert db.json(f"SELECT public.ottoq_agent_charge_order_live('{RUN}', 100)") == {}
+
+
+def test_0618_refuses_a_door_it_was_not_written_against(db):
+    _apply(db)
+    for path in (M0616, M0617):
+        rc, err = db.file(path)
+        assert rc == 0, err
+    db.val("""CREATE OR REPLACE FUNCTION public.ottoq_agent_charge_order_record(p_sim_run_id uuid, p_board_tick bigint,
+                p_chain_id text, p_model text, p_order jsonb) RETURNS jsonb
+              LANGUAGE sql AS $f$ SELECT '{}'::jsonb $f$""")
+    rc, err = db.file(M0618)
+    assert rc != 0 and "0618 P1" in err and "the door" in err, err
