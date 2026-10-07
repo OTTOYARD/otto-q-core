@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261007203510
 -- migration-name:    the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it
 --
 -- 0618  **The kernel checks the agent's charge order against its own before it takes it.** When the agent sends an
