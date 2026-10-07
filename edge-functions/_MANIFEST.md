@@ -10,7 +10,8 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **Out of sync:** **1 — `ottoq-energy-mpc`, and the repo copy is the correct one.**
   See the finding below; the deployed body must never be synced into the repo.
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
-  deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³).
+  deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
+  `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴).
   29 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
@@ -125,7 +126,7 @@ against this table without trusting any metadata column.
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
 | ottoq-orchestrate-tick | 12 | true | 2026-09-09 03:42 | yes | `47bc38feb463a9c103820d087c6a86f5856a3cdc049a73ab0a76387c1a73becf` |
-| ottoq-orchestrator-agent | 34 | true | 2026-10-07 13:59 | yes³ | `8efe1a3912344ab233d93a9013c5f7340e45cffc0e1c70d09f82dc56be49e311` |
+| ottoq-orchestrator-agent | 35 | true | 2026-10-07 18:28 | yes⁴ | `2ed844d7f2faafbc7e39b0836d352d54e214794a0747d23399589054b23b6d87` |
 | ottoq-ottocommand | 8 | true | 2026-06-27 18:47 | yes | `dac7eca5d514286ddebb97c9ba096b22adff09d97f08ec485dcfc91f49e5761a` |
 | ottoq-progress | 9 | true | 2026-06-18 04:05 | yes | `eaced82147a69688e977ddede528272370c8facbe60de6787e525731090db0aa` |
 | ottoq-run-blackbox | 5 | false | 2026-07-18 00:23 | yes | `0f63f9cff1bb3e2c10ab7874b80648bbf2848da9a971dbc1d163ad198a18317e` |
@@ -163,6 +164,14 @@ byte-identical to the committed one, hashed from the API's own response (the sha
 while the live function was v10 (0301's 20-second bound and ledger rows, 0398's endpoint lookup). The deployed v10
 was written into the repo from the API before the change (commit `842f6bf`), so v11 is v10 plus 0613 and nothing
 was rolled back. `ottoq-orchestrator-agent` v33 was byte-identical to the repo copy before its edit.
+
+⁴ **`ottoq-orchestrator-agent` v35 (agent v23), 2026-10-07 at 1:28 PM CT (18:28 UTC), for 0614.** Through the Supabase
+MCP `deploy_edge_function` with five files, `verify_jwt` true as before, and read back with `get_edge_function` in the
+same session: all five byte-identical to the committed ones, hashed from the API's own response (index.ts `2ed844d7`,
+`_shared/agent_model_call.ts` `222f9136`, `_shared/agent_charge_order.ts` `c1959166`, and the unchanged
+`_shared/agent_solver_chain.ts` `7fae9d72` and `_shared/agent_dial_discipline.ts` `e4944c72`). v34, the version
+replaced, was byte-identical to the repo copy before the edit (all three files, hashed the same way). The function now
+imports two more shared modules, so a future deploy must send five files, not three.
 
 ² **`ottoq-agent-gateway` v1 is its first deploy, 2026-10-04 at 6:40 AM CT (11:40 UTC)**, through the Supabase
 MCP deploy tool, with JWT verification off (agent keys and passcode session keys are not JWTs; the key is the
