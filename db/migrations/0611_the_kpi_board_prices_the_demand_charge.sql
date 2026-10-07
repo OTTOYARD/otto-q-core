@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261007031040
 -- migration-name:    the_kpi_board_prices_the_demand_charge
 --
 -- 0611  **The KPI board prices the demand charge.** The board's energy cost was the energy charge alone: $229.92 on

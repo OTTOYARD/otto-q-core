@@ -637,7 +637,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0608](db/migrations/0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql) | `20261004113230` | yes — ledger | **The crew and the twin see what every owner's agent set, with its confirmation code.** One new read-only |
 | [0609](db/migrations/0609_the_kpi_tab_reads_uptime_turnaround_service_and_energy.sql) | `20261007024116` | yes — ledger | **The KPI tab reads what a depot owner, an OEM and an investor ask first: uptime, turnaround, service and |
 | [0610](db/migrations/0610_the_kpi_boards_turnaround_in_one_pass.sql) | `20261007024824` | yes — ledger | **The KPI board's turnaround in one pass.** 0609's turnaround found each visit's moments (ready, left, first |
-| [0611](db/migrations/0611_the_kpi_board_prices_the_demand_charge.sql) | `PENDING` | no — pending | **The KPI board prices the demand charge.** The board's energy cost was the energy charge alone: $229.92 on |
+| [0611](db/migrations/0611_the_kpi_board_prices_the_demand_charge.sql) | `20261007031040` | yes — ledger | **The KPI board prices the demand charge.** The board's energy cost was the energy charge alone: $229.92 on |
 
 463 migrations indexed.
 
