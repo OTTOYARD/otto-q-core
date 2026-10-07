@@ -441,3 +441,33 @@ def test_0615_refuses_an_arm_it_was_not_written_against(db):
               LANGUAGE sql AS $f$ SELECT '{}'::jsonb $f$""")
     rc, err = db.file(M0615)
     assert rc != 0 and "0615 P1" in err
+
+
+# ── 0616: the usage read counts the orders that seated a car ──
+
+M0616 = os.path.join(ROOT, "db", "migrations", "0616_the_order_usage_counts_the_orders_that_seated_cars.sql")
+
+
+def test_0616_usage_counts_the_orders_that_seated_a_car(db):
+    _apply(db)
+    rc, err = db.file(M0616)
+    assert rc == 0, f"0616 did not apply: {err}"
+    _dial(db, "agent_charge_order", 1)
+    first = _order(db, [("C", "dcfc"), ("A", "l2")])["order_id"]
+    second = _order(db, [("D", "either")])["order_id"]
+    third = _order(db, [("B", "l2")])["order_id"]
+
+    def seat(car, tick, ctx):
+        db.val(f"""INSERT INTO public.ottoq_decisions (sim_run_id, tick_seq, action_context, entity_id, outcome_status,
+                                                       context_frame, enacted_action)
+                   VALUES ('{RUN}', {tick}, 'stall_assignment', '{_vid(car)}', 'enacted',
+                           jsonb_build_object('agent_charge_order', '{json.dumps(ctx)}'::jsonb),
+                           jsonb_build_object('stall_type', 'l2'))""")
+    seat("C", 101, {"order_id": first, "rank": 1, "kind": "dcfc", "pinned": False, "kernel_pos": 3})
+    seat("A", 101, {"order_id": first, "rank": 2, "kind": "l2", "pinned": False, "kernel_pos": 1})
+    seat("D", 103, {"order_id": second, "rank": 1, "kind": "either", "pinned": False, "kernel_pos": 1})
+    seat("P", 104, {"order_id": third, "rank": None, "kind": None, "pinned": True, "kernel_pos": 1})   # pinned: not by rank
+    u = db.json(f"SELECT public.ottoq_agent_charge_order_usage('{RUN}', 5)")
+    assert (u["orders"], u["seats_by_rank"], u["orders_seating"]) == (3, 3, 2), u
+    # an unknown run reads zero, not null
+    assert db.json("SELECT public.ottoq_agent_charge_order_usage('00000000-0000-4000-8000-000000000001', 5)")["orders_seating"] == 0
