@@ -195,12 +195,18 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
          start_within_min: int = DEFAULT_START_WITHIN_MIN,
          allow_rejection: bool = False,
          fired_at: str | None = None,
-         serviceable_states: frozenset[str] | None = None) -> dict:
+         serviceable_states: frozenset[str] | None = None,
+         priority: list[str] | None = None) -> dict:
     """One proposer invocation over one frame. Pure: writes nothing.
 
     Returns {"rows": [...door-shaped rows...], "fire": {...the fire record...}}.
     A frame with nothing plannable is a fire with status 'empty' and zero rows,
     never an exception -- "invoked and had nothing to say" is a ledger fact.
+
+    `priority` (0613) is the kernel's charge queue in service order, from
+    public.ottoq_run_learning; see propose(). The fire record says which order
+    chose the batch, so a plan made in the kernel's order is never mistaken for
+    one made in the proposer's own.
     """
     sim_run_id = _require_uuid(sim_run_id, "sim_run_id")
     depot_id = _require_uuid(depot_id, "depot_id")
@@ -289,6 +295,10 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
         "max_assets": max_assets,
         "det_budget_s": det_budget_s,
         "allow_rejection": allow_rejection,
+        #: 0613: which order chose this fire's batch, and how long the kernel's
+        #: queue was when it did.
+        "batch_order": "kernel_queue" if priority is not None else "urgency",
+        "priority_len": len(priority) if priority is not None else None,
     }
 
     try:
@@ -298,7 +308,8 @@ def fire(frame: dict, class_rows: list[dict], *, site: dict,
                          det_budget_s=det_budget_s, ready_by_min=ready_by_min,
                          default_ready_delta_min=default_ready_delta_min,
                          allow_rejection=allow_rejection,
-                         serviceable_states=states)
+                         serviceable_states=states,
+                         priority=priority)
     except FrameError as exc:
         #: e.g. "frame has no charge-capable stalls that declare an accepted
         #: inlet". Nothing to propose ON, which is a fact about the frame and is

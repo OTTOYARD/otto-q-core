@@ -80,7 +80,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
@@ -1089,7 +1089,8 @@ def propose(frame: dict, class_table: dict, *, site: dict,
             signals: frozenset = frozenset(),
             intent=None,
             class_key: str = DEFAULT_CLASS_KEY,
-            serviceable_states: frozenset[str] | None = None) -> dict:
+            serviceable_states: frozenset[str] | None = None,
+            priority: Sequence[str] | None = None) -> dict:
     """Frame in, advisory rows out. Writes nothing, ever.
 
     The result carries the rows AND the solve's own accounting (T*, peak,
@@ -1126,6 +1127,13 @@ def propose(frame: dict, class_table: dict, *, site: dict,
     bring its own priority orderings (finding L-52). policies/regime.py's
     intent_for_pack(pack_id) resolves a pack's artifact, and any Intent loaded
     by intent.load_intent is accepted here.
+
+    `priority` (0613) is the KERNEL'S charge queue in the order it serves it, as
+    public.ottoq_run_learning publishes it. Given, the batch is the first
+    max_assets of that list that are plannable, and a plannable vehicle the list
+    does not name is deferred with a reason: the kernel will not seat it this
+    tick, so a plan for it has nowhere to land. Left None the batch keeps its
+    urgency order and every row is byte-for-byte what it was.
     """
     #: L-60: narrow (never widen) which states are planned for, and drop the
     #: vehicles that already hold a place. Built once so the counts below
@@ -1191,25 +1199,60 @@ def propose(frame: dict, class_table: dict, *, site: dict,
     #: "nobody asked". Left unset there is no batching and the whole frame is
     #: solved, which is right for offline planning.
     deferred: list[dict] = []
-    if max_assets is not None:
-        if max_assets < 1:
-            raise ValueError(f"max_assets must be >= 1, got {max_assets}")
-        explicit = scenario["assets_spec"]["explicit"]
-        if len(explicit) > max_assets:
-            ranked = sorted(explicit,
-                            key=lambda a: (a["ready_by_min"], a["soc"], a["aid"]))
-            keep, drop = ranked[:max_assets], ranked[max_assets:]
-            for a in drop:
+    if max_assets is not None and max_assets < 1:
+        raise ValueError(f"max_assets must be >= 1, got {max_assets}")
+    explicit = scenario["assets_spec"]["explicit"]
+    #: 0613. THE KERNEL'S SERVICE ORDER, WHEN THE CALLER HAS IT. Measured on run
+    #: fd6ed035 (busy_day): on all 46 ticks this proposer fired, about 34 cars
+    #: waited for a charger and about one charger came free, and the batch above
+    #: chose its 8 by deadline and SoC while the kernel seats cars by its own
+    #: order (immediate dispatch first, then the longest wait for the charge
+    #: still owed). So 48 of 49 offers named a charger the kernel had just given
+    #: to a car ahead in its queue, and none was used. A vehicle the list does not
+    #: name is not seated by the kernel this tick (a fault to repair first, already
+    #: at target), so it is deferred, never dropped: it still gets its row.
+    if priority is not None:
+        order = {str(aid): i for i, aid in enumerate(priority)}
+        for a in explicit:
+            if str(a["aid"]) not in order:
                 deferred.append(_abstain(
                     {"id": a["aid"]},
-                    f"outside this tick's batch of {max_assets} most urgent "
-                    f"(ready_by {a['ready_by_min']} min, soc {a['soc']}%); "
-                    f"re-offered next tick"))
-            kept = {a["aid"] for a in keep}
-            scenario["assets_spec"]["explicit"] = [
-                a for a in explicit if a["aid"] in kept]
-            scenario["assets"] = [a for a in scenario["assets"]
-                                  if a.aid in kept]
+                    "not in the kernel's charge queue this tick; re-offered "
+                    "when it joins the queue"))
+        explicit = [a for a in explicit if str(a["aid"]) in order]
+
+        def rank(a):
+            return (order[str(a["aid"])], a["aid"])
+        basis = "next in the kernel's service order"
+    else:
+        def rank(a):
+            return (a["ready_by_min"], a["soc"], a["aid"])
+        basis = "most urgent"
+    if max_assets is not None and len(explicit) > max_assets:
+        ranked = sorted(explicit, key=rank)
+        explicit, drop = ranked[:max_assets], ranked[max_assets:]
+        for a in drop:
+            deferred.append(_abstain(
+                {"id": a["aid"]},
+                f"outside this tick's batch of {max_assets} {basis} "
+                f"(ready_by {a['ready_by_min']} min, soc {a['soc']}%); "
+                f"re-offered next tick"))
+    if len(explicit) != len(scenario["assets_spec"]["explicit"]):
+        kept = {a["aid"] for a in explicit}
+        scenario["assets_spec"]["explicit"] = [
+            a for a in scenario["assets_spec"]["explicit"] if a["aid"] in kept]
+        scenario["assets"] = [a for a in scenario["assets"]
+                              if a.aid in kept]
+    if not scenario["assets_spec"]["explicit"]:
+        #: Every plannable vehicle was outside the kernel's queue. Nothing to
+        #: solve, and every vehicle still has its row.
+        return {"proposals": abstentions + deferred,
+                "abstained": len(abstentions) + len(deferred),
+                "deferred": len(deferred),
+                "planned": 0, "solver": None, "stalls_busy": stalls_busy,
+                "stalls_blocked": stalls_blocked, "vehicles_held": vehicles_held,
+                "facts_version": facts_version,
+                "note": "no plannable vehicle is in the kernel's charge queue"}
 
     budget = {"time_limit_s": time_limit_s, "allow_rejection": allow_rejection}
     if det_budget_s is not None:

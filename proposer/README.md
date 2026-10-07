@@ -24,6 +24,13 @@ every deferred vehicle still gets an abstention row naming the batch, so *deferr
 tick* stays distinguishable from *nobody asked*. Left unset there is no batching, which is
 right for offline planning.
 
+`priority` (0613) is the kernel's charge queue in the order the kernel seats it, as
+`public.ottoq_run_learning` publishes it. Given, the batch is the head of that queue, and a
+plannable vehicle the queue does not name is deferred with its own reason. The live caller sets
+`max_assets` to the free chargers, so the solver plans the cars the next free chargers will go to.
+On run fd6ed035 the urgency order planned 8 cars of about 34 waiting for about one free charger,
+and 48 of 49 offers were refused.
+
 ```
 decision frame ──▶ frame_to_scenario ──▶ lexicographic solve ──▶ plan_to_proposals ──▶ rows
  (ottoq_build_      (adapter: DB           (policies/forward:      (production

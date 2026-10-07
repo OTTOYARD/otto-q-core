@@ -197,6 +197,22 @@ def test_max_assets_defers_the_rest_with_a_row_each():
                for d in deferred)
 
 
+def test_the_fire_record_says_which_order_chose_the_batch():
+    """0613: a plan made in the kernel's queue order is never mistaken for one
+    made in the proposer's own urgency order."""
+    plain = _fire(max_assets=1)
+    assert plain["fire"]["batch_order"] == "urgency"
+    assert plain["fire"]["priority_len"] is None
+    queued = _fire(max_assets=1, priority=[V2, V1])
+    assert queued["fire"]["batch_order"] == "kernel_queue"
+    assert queued["fire"]["priority_len"] == 2
+    planned = [row["entity_id"] for row in queued["rows"] if not row["proposal"]["abstain"]]
+    assert planned == [V2]
+    left_out = {row["entity_id"]: row["proposal"]["rationale"]["reason"]
+                for row in queued["rows"] if row["proposal"]["abstain"]}
+    assert "not in the kernel's charge queue" in left_out[V3]
+
+
 def test_fire_refuses_a_bad_run_id_and_a_site_without_the_cooldown():
     with pytest.raises(pb.BridgeError, match="sim_run_id must be a uuid"):
         pb.fire(_frame(), CLASS_ROWS, site=SITE, sim_run_id="run-1", depot_id=DEPOT)
