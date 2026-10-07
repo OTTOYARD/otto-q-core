@@ -376,3 +376,68 @@ def test_the_decide_tick_reads_the_order_once_and_gates_both_keys(db):
     assert src.count("CASE WHEN v_ao_on THEN public.ottoq_charge_wait_min(") == 1
     assert src.count("THEN public.ottoq_agent_charge_order_key(v_ao_order, v.id, v_ao_mode) END ASC NULLS LAST") == 1
     assert src.index("'immediate_dispatch' FROM ottoq_visit_needs vn") < src.index("CASE WHEN v_ao_on THEN")
+
+
+# ── 0615: an operator's demo run is armed with the order; a sweep arm is not; a certification arm is still refused ──
+
+M0615 = os.path.join(ROOT, "db", "migrations", "0615_an_operators_demo_run_takes_the_agents_charge_order.sql")
+ARM_STUB = os.path.join(ROOT, "tests", "fixtures", "agentic_arm_stub.sql")
+ARMED_KEYS = ["agent_asset_depth_enabled", "agent_board_grounding_enabled", "agent_review_enabled",
+              "agent_solver_chain_enabled", "cuopt_first_refusal_max_defers", "cuopt_propose_enabled",
+              "orchestrator_agent_enabled", "prearrival_charge_yields_to_solver", "proposer_frame_facts",
+              "proposer_hold_enabled"]
+
+
+def _with_arm(d):
+    rc, err = d.file(ARM_STUB)
+    assert rc == 0, f"arm stub did not load: {err}"
+    for k in ARMED_KEYS:
+        d.val(f"""INSERT INTO public.ottoq_policy_param_catalog (param_key, min_value, max_value, default_value, agent_writable)
+                  VALUES ('{k}', 0, 10, 0, false) ON CONFLICT DO NOTHING""")
+
+
+def _run(d, run_by):
+    rid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"0615-{run_by}"))
+    d.val(f"""INSERT INTO public.ottoq_sim_runs (sim_run_id, depot_id, status, tick_count, sim_clock_current, started_at, run_by, policy)
+              VALUES ('{rid}', '{DEPOT}', 'running', 1, '{T}', now(), '{run_by}', 'otto_q')""")
+    return rid
+
+
+def _dials(d, rid):
+    return d.json(f"""SELECT COALESCE(jsonb_object_agg(param_key, param_value), '{{}}') FROM public.ottoq_policy_params
+                       WHERE scope_type = 'run' AND scope_id = '{rid}'""")
+
+
+def test_0615_arms_the_order_on_an_operators_run_and_nowhere_else(db):
+    _with_arm(db)
+    _apply(db)
+    rc, err = db.file(M0615)
+    assert rc == 0, f"0615 did not apply: {err}"
+    demo, sweep, cert = _run(db, "operator_demo"), _run(db, "ab_harness"), _run(db, "cert_harness")
+
+    out = db.json(f"SELECT public.ottoq_agentic_arm('{demo}', 'auto:operator_demo')")
+    assert out["ok"] is True
+    assert _dials(db, demo).get("agent_charge_order") == 1
+    assert len(out["receipts"]) == len(ARMED_KEYS) + 1
+
+    db.json(f"SELECT public.ottoq_agentic_arm('{sweep}', 'auto:ab_harness')")
+    dials = _dials(db, sweep)
+    assert "agent_charge_order" not in dials
+    assert sorted(dials) == sorted(ARMED_KEYS)      # a sweep arm's dial set is the one before 0615
+
+    rc, _, err = db.run(f"SELECT public.ottoq_agentic_arm('{cert}', 'auto:cert_harness')")
+    assert rc != 0 and "certification arm" in err
+    assert _dials(db, cert) == {}
+
+    # the armed run's door now records an order (the dial reads 1 there)
+    rec = db.json(f"""SELECT public.ottoq_agent_charge_order_record('{demo}', 1, 'c', 'm', '{{"cars":[]}}'::jsonb)""")
+    assert rec.get("skipped") != "agent_charge_order is 0 for this run"
+
+
+def test_0615_refuses_an_arm_it_was_not_written_against(db):
+    _with_arm(db)
+    _apply(db)
+    db.val("""CREATE OR REPLACE FUNCTION public.ottoq_agentic_arm(p_sim_run_id uuid, p_by text) RETURNS jsonb
+              LANGUAGE sql AS $f$ SELECT '{}'::jsonb $f$""")
+    rc, err = db.file(M0615)
+    assert rc != 0 and "0615 P1" in err
