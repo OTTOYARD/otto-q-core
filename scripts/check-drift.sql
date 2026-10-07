@@ -692,7 +692,8 @@ repo_manifest(version, name, file) AS (
     ('20261004112719'::text, 'the_fleet_owner_cockpit_reads_what_its_agent_set'::text, '0606_the_fleet_owner_cockpit_reads_what_its_agent_set.sql'::text),
     ('20261004113110'::text, 'any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends'::text, '0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends.sql'::text),
     ('20261004113230'::text, 'the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code'::text, '0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql'::text),
-    ('20261007024116'::text, 'the_kpi_tab_reads_uptime_turnaround_service_and_energy'::text, '0609_the_kpi_tab_reads_uptime_turnaround_service_and_energy.sql'::text)
+    ('20261007024116'::text, 'the_kpi_tab_reads_uptime_turnaround_service_and_energy'::text, '0609_the_kpi_tab_reads_uptime_turnaround_service_and_energy.sql'::text),
+    ('20261007024824'::text, 'the_kpi_boards_turnaround_in_one_pass'::text, '0610_the_kpi_boards_turnaround_in_one_pass.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
