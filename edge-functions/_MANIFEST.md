@@ -11,7 +11,7 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
   See the finding below; the deployed body must never be synced into the repo.
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
-  `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴).
+  `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), and v36, agent v24 (footnote ⁵).
   29 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
@@ -126,7 +126,7 @@ against this table without trusting any metadata column.
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
 | ottoq-orchestrate-tick | 12 | true | 2026-09-09 03:42 | yes | `47bc38feb463a9c103820d087c6a86f5856a3cdc049a73ab0a76387c1a73becf` |
-| ottoq-orchestrator-agent | 35 | true | 2026-10-07 18:28 | yes⁴ | `2ed844d7f2faafbc7e39b0836d352d54e214794a0747d23399589054b23b6d87` |
+| ottoq-orchestrator-agent | 36 | true | 2026-10-07 20:41 | yes⁵ | `1c37f3c94e75171a1c050ca6d5f47c7f9335678407789fd7085a57825effd1d5` |
 | ottoq-ottocommand | 8 | true | 2026-06-27 18:47 | yes | `dac7eca5d514286ddebb97c9ba096b22adff09d97f08ec485dcfc91f49e5761a` |
 | ottoq-progress | 9 | true | 2026-06-18 04:05 | yes | `eaced82147a69688e977ddede528272370c8facbe60de6787e525731090db0aa` |
 | ottoq-run-blackbox | 5 | false | 2026-07-18 00:23 | yes | `0f63f9cff1bb3e2c10ab7874b80648bbf2848da9a971dbc1d163ad198a18317e` |
@@ -172,6 +172,14 @@ same session: all five byte-identical to the committed ones, hashed from the API
 `_shared/agent_solver_chain.ts` `7fae9d72` and `_shared/agent_dial_discipline.ts` `e4944c72`). v34, the version
 replaced, was byte-identical to the repo copy before the edit (all three files, hashed the same way). The function now
 imports two more shared modules, so a future deploy must send five files, not three.
+
+⁵ **`ottoq-orchestrator-agent` v36 (agent v24), 2026-10-07 at 3:41 PM CT (20:41 UTC), for 0617 and 0618.** The same
+five files through the same MCP tool, `verify_jwt` true, read back with `get_edge_function` and hashed from the API's
+response: all five byte-identical to commit `b16b01b` (index.ts `1c37f3c9`, `_shared/agent_charge_order.ts`
+`2ba73323`, and the unchanged `_shared/agent_model_call.ts` `222f9136`, `_shared/agent_solver_chain.ts` `7fae9d72`,
+`_shared/agent_dial_discipline.ts` `e4944c72`). v35, the version replaced, was byte-identical to the five hashes in
+footnote ⁴ when read back before the deploy. The change is the charge-line prompt (0618's check, and the ordering it
+rewards) and the version string; the first pass on it was run 089f46bd's, all 14 answered by sim 13:28.
 
 ² **`ottoq-agent-gateway` v1 is its first deploy, 2026-10-04 at 6:40 AM CT (11:40 UTC)**, through the Supabase
 MCP deploy tool, with JWT verification off (agent keys and passcode session keys are not JWTs; the key is the
