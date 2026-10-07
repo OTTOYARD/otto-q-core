@@ -8,6 +8,8 @@ import {
 } from "../edge-functions/_shared/agent_solver_chain.ts";
 import {
   assignmentRequest,
+  DEFAULT_MAX_ASSETS,
+  learningBatch,
   rejectionFeedback,
 } from "../edge-functions/_shared/cpsat_agent_chain.ts";
 
@@ -127,6 +129,77 @@ test("CP-SAT request bounds agent influence and retries", () => {
   assert.equal(request.max_retries, 2);
   assert.equal(request.hour_of_day, 23);
   assert.equal(request.site.dcfc_cooldown_min, 18);
+});
+
+test("0613: without the run's learning the request is exactly the pre-0613 shape", () => {
+  const request = assignmentRequest({
+    simRunId: "11111111-1111-1111-1111-111111111111",
+    depotId: "22222222-2222-2222-2222-222222222222",
+    frame: { vehicles: [], stalls: [] },
+    classRows: [],
+    directive: { objective: "readiness_first", why: "x" },
+    feedback: [],
+    hourOfDay: 12,
+  });
+  assert.equal(request.max_assets, DEFAULT_MAX_ASSETS);
+  assert.equal("priority" in request, false);
+});
+
+test("0613: the batch comes from the run -- free chargers, the kernel's order -- and is bounded", () => {
+  const batch = learningBatch({
+    ok: true,
+    batch: { max_assets: 3, priority: ["v-2", "v-1", 7, "", "v-3"] },
+  });
+  assert.deepEqual(batch, { maxAssets: 3, priority: ["v-2", "v-1", "v-3"], source: "run_learning", detail: null });
+  const request = assignmentRequest({
+    simRunId: "11111111-1111-1111-1111-111111111111",
+    depotId: "22222222-2222-2222-2222-222222222222",
+    frame: { vehicles: [], stalls: [] },
+    classRows: [],
+    directive: { objective: "readiness_first", why: "x" },
+    feedback: [],
+    hourOfDay: 12,
+    maxAssets: batch.maxAssets,
+    priority: batch.priority,
+  });
+  assert.equal(request.max_assets, 3);
+  assert.deepEqual(request.priority, ["v-2", "v-1", "v-3"]);
+  // a run cannot ask for more than a 30-second tick can solve, or for nothing
+  assert.equal(learningBatch({ ok: true, batch: { max_assets: 40 } }).maxAssets, DEFAULT_MAX_ASSETS);
+  assert.equal(learningBatch({ ok: true, batch: { max_assets: 0 } }).maxAssets, DEFAULT_MAX_ASSETS);
+  const long = learningBatch({ ok: true, batch: { max_assets: 1, priority: Array.from({ length: 40 }, (_, i) => `v-${i}`) } });
+  assert.equal(long.priority.length, 24);
+});
+
+test("0613: a failed learning read fails open to the old batch and says why", () => {
+  assert.deepEqual(learningBatch(null),
+    { maxAssets: DEFAULT_MAX_ASSETS, priority: null, source: "default", detail: "learning read unavailable" });
+  const failed = learningBatch({ ok: false, error: "run_not_found" });
+  assert.equal(failed.source, "default");
+  assert.equal(failed.priority, null);
+  assert.equal(failed.detail, "run_not_found");
+});
+
+test("0613: the CP-SAT bridge reads the run's learning and learns only from offers that named a charger", () => {
+  const source = readFileSync(
+    new URL("../edge-functions/ottoq-cpsat-propose/index.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /sb\.rpc\("ottoq_run_learning"/);
+  assert.match(source, /\.not\("proposal->>stall_id", "is", null\)/);
+  assert.match(source, /maxAssets: batch\.maxAssets/);
+  assert.match(source, /priority: batch\.priority/);
+  assert.match(source, /priority_applied: result\.fire\?\.batch_order === "kernel_queue"/);
+});
+
+test("0613: the agent is told how to read the planners' lesson, and that a refusal never costs a vehicle", () => {
+  const source = readFileSync(
+    new URL("../edge-functions/ottoq-orchestrator-agent/index.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /grounding\.planner_learning/);
+  assert.match(source, /more_cars_than_chargers is a capacity finding, not a planner fault/);
+  assert.match(source, /never hold a vehicle back or shorten a charge because of it/);
 });
 
 test("rejection feedback is pair-specific and deduplicated", () => {

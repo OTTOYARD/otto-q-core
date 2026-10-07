@@ -10,6 +10,12 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v22 (0613): THE PLANNERS' LESSON REACHES THE AGENT. The board's grounding carries planner_learning:
+//      free chargers by type, the cars waiting for one, the solver's batch, its recent offers by outcome
+//      and a one-line lesson. On run fd6ed035 48 of 49 solver offers were refused while about 34 cars
+//      waited for about one free charger -- capacity, not a planner fault -- and nothing told this agent.
+//      The prompt names the field and says how to read it: a directive that cites the numbers, never a
+//      dial moved and never a vehicle held back or a charge shortened because of a refusal.
 // v21 (G188, db/checks/0356): 🔴 THE AGENT WENT DARK AND SAID NOTHING. Neither outbound call had a
 //      deadline -- not the Nemotron request, not the CP-SAT handoff -- and the decision insert's error
 //      was never read. On run 736406cf the agent claimed ticks 9, 26, 51, 75 and 109 and wrote NOTHING:
@@ -155,6 +161,7 @@ READ THE BOARD THIS WAY:
 - grounding.energy_limits.dr_call, when present, is a demand-response call: the site must cut its grid draw by the call's reduction for minutes_left. New charging is admitted up to grounding.energy_limits.ev_charge_allowance_kw, which counts building load, solar and what the battery can sustain for the rest of the call — so a battery that still holds energy at the call is what keeps vehicles charging.
 - grounding.energy_limits.battery_plan (when energy_reserve_shave = 1) is the battery's plan for the rest of the day: mode, the grid level it defends (level_kw), the billed peak (ratchet_kw), the DR reserve it holds (reserve_now_kwh), and whether it is charging and why.
 - "assets" (when present): SoC distribution, hard constraints with their causes (dcfc blocked by pack_temp_high clears by waiting; cell_balance_overdue needs service; soh_derate is permanent), deadline pressure, and a named attention list. Use it to choose the solver objective and to write directives about named vehicles.
+- grounding.planner_learning is what the planners learned in THIS run: free chargers by type, cars waiting for one, the solver's batch (it plans only as many cars as there are free chargers, in the kernel's own order), its recent offers by outcome (used, moved to an equal free charger, refused by reason) and lesson {code, text}. A refusal for stall_occupied or stall_reserved while lesson.code is more_cars_than_chargers is a capacity finding, not a planner fault: the charger went to a car ahead in line. Say so in one directive that cites the numbers; do not move an energy dial for it, and never hold a vehicle back or shorten a charge because of it. When lesson.code is offers_lost_their_charger, name it in a directive as well.
 
 DIALS (the only keys set_policy accepts; value in [min, max]). Each grounding.actuators[dial].live says whether the dial does anything right now, and why not:
   energy_reserve_shave 0|1 — 1 = the battery follows its day plan (price- and demand-charge-aware to midnight, holding a demand-response reserve through the afternoon); 0 = a fixed grid-draw target set by the two factors below.
@@ -482,7 +489,7 @@ serve(async (req) => {
                        // separate a grounded decision from one made on counters alone.
                        board_blocks: { grounding: board.grounding != null, assets: board.assets != null,
                                        review: board.review != null },
-                       agent_version: "v21" },
+                       agent_version: "v22" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId },
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),

@@ -465,6 +465,70 @@ def test_a_batch_bound_below_one_is_refused():
         propose(FRAME, CLASSES, site=SITE, horizon_min=480, max_assets=0)
 
 
+# ---- 0613: the kernel's service order chooses the batch -------------------------------
+
+def _queue_frame():
+    return _frame([_vehicle("v-late", soc=80), _vehicle("v-urgent", soc=10),
+                   _vehicle("v-mid", soc=45)],
+                  [_stall("s-0"), _stall("s-1")])
+
+
+def _reasons(rows):
+    return {p["entity_id"]: (p["proposal"]["abstain"],
+                             p["proposal"]["rationale"].get("reason", ""))
+            for p in rows["proposals"]}
+
+
+def test_the_kernel_queue_chooses_the_batch_not_the_proposers_urgency():
+    """Measured on run fd6ed035: the kernel seats cars in its own order, and a
+    batch chosen by deadline and SoC offered chargers to cars the kernel was not
+    seating next, so 48 of 49 offers were refused. Given the queue, the batch is
+    its head, whatever the proposer would have called urgent."""
+    ready = {"v-late": 600, "v-urgent": 30, "v-mid": 120}
+    r = propose(_queue_frame(), CLASSES, site=SITE, horizon_min=720,
+                ready_by_min=ready, max_assets=1,
+                priority=["v-late", "v-mid", "v-urgent"])
+    planned = {p["entity_id"] for p in r["proposals"] if not p["proposal"]["abstain"]}
+    assert planned == {"v-late"}
+    why = _reasons(r)
+    assert "outside this tick's batch of 1 next in the kernel's service order" in why["v-mid"][1]
+    assert "outside this tick's batch of 1 next in the kernel's service order" in why["v-urgent"][1]
+    assert r["deferred"] == 2
+
+
+def test_a_vehicle_the_queue_does_not_name_is_deferred_with_its_reason():
+    """The kernel does not seat a car its queue leaves out (a fault to repair
+    first, already at target), so a plan for it has nowhere to land. It still
+    gets its row: deferred, never dropped."""
+    r = propose(_queue_frame(), CLASSES, site=SITE, horizon_min=720,
+                max_assets=2, priority=["v-mid", "v-late"])
+    why = _reasons(r)
+    assert why["v-urgent"] == (True, "not in the kernel's charge queue this tick; "
+                                     "re-offered when it joins the queue")
+    assert {p["entity_id"] for p in r["proposals"]} == {"v-late", "v-urgent", "v-mid"}
+    assert r["planned"] <= 2 and not why["v-mid"][0] and not why["v-late"][0]
+
+
+def test_a_queue_that_names_no_plannable_vehicle_solves_nothing_and_drops_nobody():
+    r = propose(_queue_frame(), CLASSES, site=SITE, horizon_min=720,
+                max_assets=2, priority=["v-elsewhere"])
+    assert r["planned"] == 0 and r["solver"] is None
+    assert r["deferred"] == 3
+    assert {p["entity_id"] for p in r["proposals"]} == {"v-late", "v-urgent", "v-mid"}
+
+
+def test_no_queue_is_byte_for_byte_the_urgency_batch():
+    """priority=None must leave every existing caller exactly where it was."""
+    ready = {"v-late": 600, "v-urgent": 30, "v-mid": 120}
+    a = propose(_queue_frame(), CLASSES, site=SITE, horizon_min=720,
+                ready_by_min=ready, max_assets=2)
+    b = propose(_queue_frame(), CLASSES, site=SITE, horizon_min=720,
+                ready_by_min=ready, max_assets=2, priority=None)
+    assert a["proposals"] == b["proposals"]
+    assert {p["entity_id"] for p in a["proposals"]
+            if not p["proposal"]["abstain"]} == {"v-urgent", "v-mid"}
+
+
 def test_the_chemistry_cap_reaches_the_production_path(): 
     """R-11 through the BRIDGE, which is where it was dead.
 
