@@ -696,7 +696,7 @@ repo_manifest(version, name, file) AS (
     ('20261007024824'::text, 'the_kpi_boards_turnaround_in_one_pass'::text, '0610_the_kpi_boards_turnaround_in_one_pass.sql'::text),
     ('20261007031040'::text, 'the_kpi_board_prices_the_demand_charge'::text, '0611_the_kpi_board_prices_the_demand_charge.sql'::text),
     ('20261007131113'::text, 'the_twin_sees_a_faulted_charger_and_when_it_comes_back'::text, '0612_the_twin_sees_a_faulted_charger_and_when_it_comes_back.sql'::text),
-    ('PENDING'::text, 'the_planners_learn_inside_the_run_where_their_offers_went'::text, '0613_the_planners_learn_inside_the_run_where_their_offers_went.sql'::text)
+    ('20261007135127'::text, 'the_planners_learn_inside_the_run_where_their_offers_went'::text, '0613_the_planners_learn_inside_the_run_where_their_offers_went.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

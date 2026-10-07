@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261007135127
 -- migration-name:    the_planners_learn_inside_the_run_where_their_offers_went
 --
 -- 0613  **The planners learn, inside the run, where their offers went.** Chase, 2026-10-07: *"Maybe it should have a
