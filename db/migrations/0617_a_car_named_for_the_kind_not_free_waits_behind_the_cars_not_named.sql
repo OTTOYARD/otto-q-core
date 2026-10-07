@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261007202316
 -- migration-name:    a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named
 --
 -- 0617  **Under the agent's charge order, a car named for the kind of charger that is not free waits behind the cars the

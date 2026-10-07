@@ -700,7 +700,7 @@ repo_manifest(version, name, file) AS (
     ('20261007181946'::text, 'the_agent_can_order_the_charge_line_and_the_decide_path_disposes'::text, '0614_the_agent_can_order_the_charge_line_and_the_decide_path_disposes.sql'::text),
     ('20261007183516'::text, 'an_operators_demo_run_takes_the_agents_charge_order'::text, '0615_an_operators_demo_run_takes_the_agents_charge_order.sql'::text),
     ('20261007184459'::text, 'the_order_usage_counts_the_orders_that_seated_cars'::text, '0616_the_order_usage_counts_the_orders_that_seated_cars.sql'::text),
-    ('PENDING'::text, 'a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named'::text, '0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named.sql'::text)
+    ('20261007202316'::text, 'a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named'::text, '0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
