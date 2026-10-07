@@ -192,6 +192,16 @@ test("0613: the CP-SAT bridge reads the run's learning and learns only from offe
   assert.match(source, /priority_applied: result\.fire\?\.batch_order === "kernel_queue"/);
 });
 
+test("0613: the agent is told how to read the planners' lesson, and that a refusal never costs a vehicle", () => {
+  const source = readFileSync(
+    new URL("../edge-functions/ottoq-orchestrator-agent/index.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /grounding\.planner_learning/);
+  assert.match(source, /more_cars_than_chargers is a capacity finding, not a planner fault/);
+  assert.match(source, /never hold a vehicle back or shorten a charge because of it/);
+});
+
 test("rejection feedback is pair-specific and deduplicated", () => {
   const feedback = rejectionFeedback([
     { entity_id: "vehicle-1", proposal: { stall_id: "stall-1" }, disposition_reason: "stall_occupied" },
