@@ -156,7 +156,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0611 — GENERATED, not a log
+## Index, 0134–0612 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610 — which are indexed below as well as logged above; the log row is
@@ -638,7 +638,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0609](db/migrations/0609_the_kpi_tab_reads_uptime_turnaround_service_and_energy.sql) | `20261007024116` | yes — ledger | **The KPI tab reads what a depot owner, an OEM and an investor ask first: uptime, turnaround, service and |
 | [0610](db/migrations/0610_the_kpi_boards_turnaround_in_one_pass.sql) | `20261007024824` | yes — ledger | **The KPI board's turnaround in one pass.** 0609's turnaround found each visit's moments (ready, left, first |
 | [0611](db/migrations/0611_the_kpi_board_prices_the_demand_charge.sql) | `20261007031040` | yes — ledger | **The KPI board prices the demand charge.** The board's energy cost was the energy charge alone: $229.92 on |
+| [0612](db/migrations/0612_the_twin_sees_a_faulted_charger_and_when_it_comes_back.sql) | `PENDING` | no — pending | **The twin sees a faulted charger, and when it comes back.** Chase, 2026-10-07: *"make sure it indicates |
 
-463 migrations indexed.
+464 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
