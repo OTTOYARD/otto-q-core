@@ -101,6 +101,44 @@ export async function resolveSite(
   }
 }
 
+// 0613. THE BATCH COMES FROM THE RUN, NOT FROM A CONSTANT.
+//
+// Measured on run fd6ed035 (busy_day): on all 46 ticks this proposer fired, about 34 cars waited
+// for a charger and about one charger came free, and a fixed batch of 8 chosen by the solver's own
+// urgency put 48 of 49 offers on chargers the kernel had just given to cars ahead in its line.
+// public.ottoq_run_learning publishes the two numbers that fix it: max_assets = the free chargers
+// (1..8) and priority = the kernel's charge queue in the order it seats cars.
+export const DEFAULT_MAX_ASSETS = 8;
+export const MAX_PRIORITY = 24;
+
+export type LearningBatch = {
+  maxAssets: number;
+  priority: string[] | null;
+  source: "run_learning" | "default";
+  detail: string | null;
+};
+
+/** The batch ottoq_run_learning asks for, or the old fixed batch with the reason why.
+ *
+ * NEVER THROWS, and fails OPEN to exactly what the request was before 0613 (8 cars, the solver's
+ * own order). The learning read is advice to an advisory proposer; losing it must cost the plan its
+ * focus, never the chain its pass.
+ */
+export function learningBatch(learning: unknown): LearningBatch {
+  const l = learning && typeof learning === "object" ? learning as Record<string, unknown> : null;
+  if (!l || l.ok !== true) {
+    const why = l && typeof l.error === "string" ? l.error : "learning read unavailable";
+    return { maxAssets: DEFAULT_MAX_ASSETS, priority: null, source: "default", detail: why.slice(0, 200) };
+  }
+  const batch = l.batch && typeof l.batch === "object" ? l.batch as Record<string, unknown> : {};
+  const n = Number(batch.max_assets);
+  const maxAssets = Number.isInteger(n) && n >= 1 ? Math.min(n, DEFAULT_MAX_ASSETS) : DEFAULT_MAX_ASSETS;
+  const priority = Array.isArray(batch.priority)
+    ? batch.priority.filter((id): id is string => typeof id === "string" && id.length > 0).slice(0, MAX_PRIORITY)
+    : null;
+  return { maxAssets, priority, source: "run_learning", detail: null };
+}
+
 export function assignmentRequest(input: {
   simRunId: string;
   depotId: string;
@@ -110,7 +148,10 @@ export function assignmentRequest(input: {
   feedback: RejectionFeedback[];
   hourOfDay: number;
   site?: SiteDescriptor;
+  maxAssets?: number;
+  priority?: string[] | null;
 }) {
+  const n = Number(input.maxAssets);
   return {
     sim_run_id: input.simRunId,
     depot_id: input.depotId,
@@ -119,7 +160,10 @@ export function assignmentRequest(input: {
     site: input.site ?? { ...STRUCTURAL_SITE },
     directive: input.directive,
     feedback: input.feedback,
-    max_assets: 8,
+    max_assets: Number.isInteger(n) && n >= 1 ? Math.min(n, DEFAULT_MAX_ASSETS) : DEFAULT_MAX_ASSETS,
+    // Sent only when the run supplied it. A service that predates 0613 ignores the key (pydantic's
+    // default), so this request is safe against the image that is running before the redeploy.
+    ...(Array.isArray(input.priority) ? { priority: input.priority.slice(0, MAX_PRIORITY) } : {}),
     det_budget_s: 0.25,
     max_retries: 2,
     hour_of_day: Math.max(0, Math.min(23, Math.trunc(input.hourOfDay))),

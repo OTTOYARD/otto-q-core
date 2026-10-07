@@ -27,12 +27,25 @@
 //
 //     `p_source` stays 'forward_lex' and MUST: ottoq_proposer_precedence ranks it rank 0 with
 //     holds_tick=true, so renaming it would strip CP-SAT's right of first refusal.
+//
+// == 0613: THE SOLVER LEARNS INSIDE THE RUN ==================================
+//
+// Measured on run fd6ed035 (busy_day): 49 real offers, none used, 48 refused. On every tick a
+// pass landed about 34 cars waited and about one charger came free; the request asked for 8 cars
+// chosen by the solver's own urgency, while the kernel seats cars in its own order, so the offers
+// went to cars behind the head of the line. And the rejection feedback read the last 24 refused
+// rows, which 436 abstentions crowded out. So each pass now reads public.ottoq_run_learning and
+// asks the solver to plan as many cars as there are free chargers (max_assets), taken in the
+// kernel's order (priority); the feedback reads refused offers that named a charger; and the fire
+// record carries what the pass knew. A service that predates the priority field ignores it, and a
+// failed learning read leaves the request exactly as it was (learningBatch fails open).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeSolverDirective } from "../_shared/agent_solver_chain.ts";
 import {
   assignmentRequest,
   FALLBACK_ASSIGNMENT_ENGINE,
+  learningBatch,
   PRIMARY_ASSIGNMENT_ENGINE,
   rejectionFeedback,
   resolveSite,
@@ -172,21 +185,28 @@ Deno.serve(async (req) => {
     }
     ledgerRun = { depotId: run.depot_id, tick: run.tick_count ?? null, simClock: run.sim_clock_current ?? null };
 
-    const [frameResult, classResult, feedbackResult] = await Promise.all([
+    const [frameResult, classResult, feedbackResult, learningResult] = await Promise.all([
       sb.rpc("ottoq_build_decision_frame", { p_depot_id: run.depot_id, p_sim_run_id: simRunId }),
       sb.from("ottoq_vehicle_classes")
         .select("vehicle_class_code,battery_capacity_kwh,max_charge_rate_kw,charge_kinds,energy_curve,battery_chemistry")
         .eq("status", "active").order("vehicle_class_code"),
+      // 0613: only offers that named a charger. An abstention has no pair to learn from, and 436
+      // of them on fd6ed035 filled this window and left the solver almost no feedback at all.
       sb.from("ottoq_external_proposals")
         .select("entity_id,proposal,disposition_reason,status,created_at")
         .eq("sim_run_id", simRunId).eq("source", "forward_lex")
         .in("status", ["refused", "expired"])
+        .not("proposal->>stall_id", "is", null)
         .order("created_at", { ascending: false }).limit(24),
+      // 0613: what this run has taught the planners -- free chargers, the kernel's queue, the batch.
+      sb.rpc("ottoq_run_learning", { p_sim_run_id: simRunId, p_lookback_ticks: 20, p_detail: true }),
     ]);
     if (frameResult.error || !frameResult.data) throw new Error(`decision frame: ${frameResult.error?.message ?? "missing"}`);
     if (classResult.error) throw new Error(`class table: ${classResult.error.message}`);
 
     const directive = normalizeSolverDirective(handoff.solver);
+    const learning = learningResult.error ? null : learningResult.data as Record<string, unknown> | null;
+    const batch = learningBatch(learningResult.error ? { ok: false, error: learningResult.error.message } : learning);
     const simClock = new Date(run.sim_clock_current ?? Date.now());
     // 0389: the site power cap CP-SAT plans against is derived from the engine, not a constant in
     // this file. resolveSite never throws -- it degrades to the structural limits and says so.
@@ -204,6 +224,8 @@ Deno.serve(async (req) => {
       feedback: rejectionFeedback((feedbackResult.data ?? []) as Array<Record<string, unknown>>),
       hourOfDay: Number.isNaN(simClock.getUTCHours()) ? 12 : simClock.getUTCHours(),
       site: resolvedSite.site,
+      maxAssets: batch.maxAssets,
+      priority: batch.priority,
     });
 
     // THE ONE EXTERNAL HOP, TIMED. assignMs is wall-clock around the fetch and the body read, so
@@ -293,6 +315,20 @@ Deno.serve(async (req) => {
       submit_path: "edge:ottoq-cpsat-propose",
       endpoint_source: endpointSource,
       assign_latency_ms: assignMs,
+      // 0613: what this pass knew when it asked, so a plan made blind and a plan made with the
+      // run's lesson are never confused. priority_applied is the service's own answer: an image
+      // that predates 0613 has no batch_order and reads false.
+      run_learning: {
+        source: batch.source,
+        detail: batch.detail,
+        max_assets: batch.maxAssets,
+        priority_len: batch.priority?.length ?? null,
+        priority_applied: result.fire?.batch_order === "kernel_queue",
+        chargers_free: learning?.chargers_free ?? null,
+        waiting_for_a_charger: (learning?.queue as Record<string, unknown> | undefined)?.waiting_for_a_charger ?? null,
+        lesson: (learning?.lesson as Record<string, unknown> | undefined)?.code ?? null,
+        feedback_pairs: requestBody.feedback.length,
+      },
     };
     const { data: receipt, error: submitError } = await sb.rpc("ottoq_proposer_submit_batch", {
       p_sim_run_id: simRunId,
@@ -335,6 +371,9 @@ Deno.serve(async (req) => {
         accepted: receipt?.accepted ?? null,
         site_source: resolvedSite.source,
         attempts: result.pipeline?.attempts ?? null,
+        max_assets: batch.maxAssets,
+        batch_source: batch.source,
+        priority_applied: result.fire?.batch_order === "kernel_queue",
       },
     });
 
