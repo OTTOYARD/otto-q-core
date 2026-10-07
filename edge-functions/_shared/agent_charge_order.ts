@@ -13,8 +13,9 @@
  * order they should take the next free chargers, each with a kind. normalizeChargeOrder maps the names the model uses
  * to vehicle ids from the same board, and the edge function hands the result to ottoq_agent_charge_order_record. The
  * kernel disposes: immediate dispatch first, any car waiting agent_charge_order_pin_wait_min or longer next, then the
- * agent's order, then everyone else; no charger idles for the order, and every car charges to its full target
- * (CLAUDE.md rule 9) on whichever charger it takes.
+ * cars the agent named for a kind free now, then the cars it did not name, then (0617) the cars it named for the other
+ * kind; no charger idles for the order, and every car charges to its full target (CLAUDE.md rule 9) on whichever
+ * charger it takes.
  *
  * Pure functions only, so `node --test tests/*.test.mjs` imports this file directly.
  */
@@ -93,12 +94,12 @@ export const CHARGE_ORDER_PROMPT = `
 THE CHARGE LINE — this board carries "charge_queue", so the depot takes your charge order this pass.
 charge_queue.cars are the cars waiting for a charger, the head 24 in the kernel's own order (kernel_pos). For each: soc and target (the car's full target, 100 unless its owner set less), kwh_owed, min_on_dcfc and min_on_l2 (minutes to target on this depot's fastest charger of that kind), wait_min against contract_wait_limit_min (over_limit_min = minutes already past the contract), urgency and due_in_min (when it must be ready), other_work (in_place runs while it charges; bay needs a bay of its own), rule_kind (the kind the kernel would give it), dcfc_ok and l2_ok (whether it can plug into that kind here). charge_queue.chargers: free and down by kind, kw by kind, and freeing_soonest (chargers in use and the minutes until their car is full). last_order and usage say what your recent orders did: seats_by_rank (cars your order seated), moved_ahead (cars it moved ahead of the kernel's order), kind_followed of kind_named, seats_pinned (cars that waited pin_wait_min or longer and went ahead of your order).
 
-YOUR JOB: add "charge_order" to the JSON — up to 12 cars from charge_queue.cars, in the order they should take the next free chargers, each with the kind of charger it should take. The kernel disposes: immediate-dispatch cars go first and any car waiting pin_wait_min or longer goes next, whatever you send; then your cars in your order, the ones you named for the kind that is free right now first; then everyone else in the kernel's order. No charger is left idle for your order, and every car charges to its full target on whichever charger it takes. Your order decides who goes next and on which kind of charger — never how much charge a car gets, and never whether it charges.
+YOUR JOB: add "charge_order" to the JSON — up to 12 cars from charge_queue.cars, in the order they should take the next free chargers, each with the kind of charger it should take. The kernel disposes: immediate-dispatch cars go first and any car waiting pin_wait_min or longer goes next, whatever you send; then the cars you named for a kind of charger that is free now, in your order; then the cars you did not name, in the kernel's order; and last the cars you named for a kind that is not free, which wait for that kind. No charger is left idle for your order: a car still takes the other kind when no other car waits for it. Every car charges to its full target on whichever charger it takes. Your order decides who goes next and on which kind of charger — never how much charge a car gets, and never whether it charges.
 
 HOW TO ORDER THE LINE:
 1. The contract first: cars with over_limit_min above 0, then those nearest contract_wait_limit_min.
 2. Due times next: a car whose due_in_min is shorter than its min_on_l2 needs a fast charger — name it dcfc.
-3. A fast charger is the scarce resource. Give it where it returns the most time: the highest min_on_l2 ÷ min_on_dcfc, which is a car with a lot of charge owed; a car near its target tapers on a fast charger and gains little over L2. Name l2 for a car whose due time its min_on_l2 still meets.
+3. A fast charger is the scarce resource. Give it where it returns the most time: the highest min_on_l2 ÷ min_on_dcfc, which is a car with a lot of charge owed; a car near its target tapers on a fast charger and gains little over L2. Name l2 for a car whose due time its min_on_l2 still meets. A car you name dcfc waits for a fast charger while a free L2 goes to another car, so name dcfc where the time it saves is worth that wait (freeing_soonest says when one frees).
 4. Among cars otherwise equal, the shortest charge first (the fewest minutes on the kind you name): it clears the line soonest and shortens everyone's wait.
 5. Never name a kind a car cannot plug into (dcfc_ok / l2_ok false). Use "either" when the kind does not matter.
 6. Read usage before you order again. If seats_by_rank stays at 0 while cars wait, or kind_followed is far below kind_named, your order is not landing: name only cars in charge_queue.cars and kinds that are free or freeing soon.

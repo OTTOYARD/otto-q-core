@@ -471,3 +471,28 @@ def test_0616_usage_counts_the_orders_that_seated_a_car(db):
     assert (u["orders"], u["seats_by_rank"], u["orders_seating"]) == (3, 3, 2), u
     # an unknown run reads zero, not null
     assert db.json("SELECT public.ottoq_agent_charge_order_usage('00000000-0000-4000-8000-000000000001', 5)")["orders_seating"] == 0
+
+
+# ── 0617: a car named for the kind not free waits behind the cars the order did not name ──
+
+M0617 = os.path.join(ROOT, "db", "migrations", "0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named.sql")
+
+
+def test_0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named(db):
+    _apply(db)
+    _dial(db, "agent_charge_order", 1)
+    _order(db, [("C", "dcfc"), ("A", "l2")])            # B and D not named; kernel order I, P, B, A, D, C
+    assert _line(db) == ["I", "P", "C", "A", "B", "D"]   # both kinds free: the agent's ranks, then the rest
+    _occupy(db, ["F1", "F2"])                            # only L2 free
+    assert _line(db) == ["I", "P", "A", "C", "B", "D"]   # 0614: C (named dcfc) still ahead of B and D
+    rc, err = db.file(M0617)
+    assert rc == 0, f"0617 did not apply: {err}"
+    assert _line(db) == ["I", "P", "A", "B", "D", "C"]   # 0617: C waits for a fast charger behind the cars not named
+    db.val("UPDATE public.stalls SET current_vehicle_id = NULL")
+    _occupy(db, ["L1", "L2", "L3"])                      # only fast chargers free
+    assert _line(db) == ["I", "P", "C", "B", "D", "A"]   # A (named l2) waits behind B and D
+    db.val("UPDATE public.stalls SET current_vehicle_id = NULL")
+    assert _line(db) == ["I", "P", "C", "A", "B", "D"]   # both free again: unchanged from 0614
+    # at the default (no live order) the key is never read: the kernel's own line
+    _dial(db, "agent_charge_order", 0)
+    assert _line(db) == ["I", "P", "B", "A", "D", "C"]

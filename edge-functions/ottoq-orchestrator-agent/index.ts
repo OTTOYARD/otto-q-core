@@ -10,6 +10,10 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v24 (0617): THE PROMPT STATES THE LINE AS THE KERNEL NOW KEEPS IT. Under a live order a car named for the kind of
+//      charger that is not free waits behind the cars the order did not name (on run 0bbdcc07, 7 of the first 19 cars
+//      seated by rank were named for a fast charger and took an L2 because only L2s were free: G315's pattern, made by
+//      the agent's own order). The charge-line section says so, and that naming dcfc costs a wait while L2s go to others.
 // v23 (0614): THE AGENT ORDERS THE CHARGE LINE, AND A REFUSED CALL IS TRIED AGAIN.
 //      * On run 81787ef9 every answered pass kept one solver objective and wrote no dial, so the depot made the
 //        same decisions whether the model answered or not (FINDINGS G315). When the board carries charge_queue
@@ -535,7 +539,7 @@ serve(async (req) => {
                                        review: board.review != null, charge_queue: board.charge_queue != null },
                        // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
                        model_attempts: call.attempts,
-                       agent_version: "v23" },
+                       agent_version: "v24" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId,
                          // v23: the order as sent to the door, with any name the board did not hold

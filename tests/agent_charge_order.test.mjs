@@ -95,7 +95,10 @@ test("an accepted or partial receipt counts as enacted; a skip, a rejection or a
 
 test("the prompt states what the kernel enforces, and rule 9 in the agent's own words", () => {
   assert.match(CHARGE_ORDER_PROMPT, /immediate-dispatch cars go first and any car waiting pin_wait_min or longer goes next, whatever you send/);
-  assert.match(CHARGE_ORDER_PROMPT, /No charger is left idle for your order, and every car charges to its full target/);
+  assert.match(CHARGE_ORDER_PROMPT, /No charger is left idle for your order: a car still takes the other kind when no other car waits for it/);
+  assert.match(CHARGE_ORDER_PROMPT, /Every car charges to its full target on whichever charger it takes/);
+  // 0617: the order the kernel keeps under a live order, as the prompt states it
+  assert.match(CHARGE_ORDER_PROMPT, /then the cars you did not name, in the kernel's order; and last the cars you named for a kind that is not free, which wait for that kind/);
   assert.match(CHARGE_ORDER_PROMPT, /never how much charge a car gets, and never whether it charges/);
   assert.match(CHARGE_ORDER_PROMPT, /Never hold a car back, never end a charge early, never lower a target/);
   assert.match(CHARGE_ORDER_PROMPT, /min_on_l2 ÷ min_on_dcfc/);
@@ -116,13 +119,13 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23: the model call goes through the retry module, with the fallback model, and the row says v23", () => {
+test("v23/v24: the model call goes through the retry module, with the fallback model, and the row says v24", () => {
   assert.match(code, /await callModelWithRetry\(/);
   assert.match(code, /models: \[MODEL, FALLBACK_MODEL\]/);
   assert.match(code, /const FALLBACK_MODEL = "nvidia\/nemotron-3-super-120b-a12b";/);
   assert.match(code, /model_attempts: call\.attempts/);
-  assert.match(code, /agent_version: "v23"/);
-  assert.doesNotMatch(code, /agent_version: "v22"/);
+  assert.match(code, /agent_version: "v24"/);
+  assert.doesNotMatch(code, /agent_version: "v2[23]"/);
   // the single-try key loop is gone
   assert.doesNotMatch(code, /for \(const candidate of keys\)/);
   // an accepted order is an enacted action

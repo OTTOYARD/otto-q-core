@@ -165,7 +165,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0616 — GENERATED, not a log
+## Index, 0134–0617 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616 — which are indexed below as well as logged above; the log row is
@@ -652,7 +652,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0614](db/migrations/0614_the_agent_can_order_the_charge_line_and_the_decide_path_disposes.sql) | `20261007181946` | yes — ledger | **The agent can propose who charges next and on which kind of charger, and the decide path disposes.** Chase, |
 | [0615](db/migrations/0615_an_operators_demo_run_takes_the_agents_charge_order.sql) | `20261007183516` | yes — ledger | **An operator's demo run takes the agent's charge order.** 0614 built the order and left its dial at 0 |
 | [0616](db/migrations/0616_the_order_usage_counts_the_orders_that_seated_cars.sql) | `20261007184459` | yes — ledger | **What the agent's orders did, counted by order.** `ottoq_agent_charge_order_usage` (0614) counts SEATS: how many |
+| [0617](db/migrations/0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named.sql) | `PENDING` | no — pending | **Under the agent's charge order, a car named for the kind of charger that is not free waits behind the cars the |
 
-468 migrations indexed.
+469 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
