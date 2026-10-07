@@ -693,7 +693,8 @@ repo_manifest(version, name, file) AS (
     ('20261004113110'::text, 'any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends'::text, '0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends.sql'::text),
     ('20261004113230'::text, 'the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code'::text, '0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql'::text),
     ('20261007024116'::text, 'the_kpi_tab_reads_uptime_turnaround_service_and_energy'::text, '0609_the_kpi_tab_reads_uptime_turnaround_service_and_energy.sql'::text),
-    ('20261007024824'::text, 'the_kpi_boards_turnaround_in_one_pass'::text, '0610_the_kpi_boards_turnaround_in_one_pass.sql'::text)
+    ('20261007024824'::text, 'the_kpi_boards_turnaround_in_one_pass'::text, '0610_the_kpi_boards_turnaround_in_one_pass.sql'::text),
+    ('PENDING'::text, 'the_kpi_board_prices_the_demand_charge'::text, '0611_the_kpi_board_prices_the_demand_charge.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
