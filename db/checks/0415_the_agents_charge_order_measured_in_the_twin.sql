@@ -1,9 +1,9 @@
 -- 0415  **The agent's charge order, measured in the twin: taken whole (0614) it cost the depot uptime, departures and
 --        on-time readiness against the same seed without it, because it put low batteries on L2s and left top-offs
---        waiting; 0617 and 0618 make the kernel check each order against its own before taking it.** One paired run
---        per arm, single readings, not ranges. (G318 new)
+--        waiting. Checked by the kernel (0617, 0618, agent v24) it cost less, and still did not match the kernel's own
+--        order: uptime 35.9% against 40.6%.** One paired run per arm, single readings, not ranges. (G318 new)
 --
---       Written 2026-10-07, 4:10 PM CT. Read-only. Twin depot 11111111-…, scenario busy_day, seed 8950314943655796957,
+--       Written 2026-10-07, 4:10 PM CT; §5 at 5:30 PM CT. Read-only. Twin depot 11111111-…, scenario busy_day, seed 8950314943655796957,
 --       sim 13:00 to 15:11:06 (2.19 sim-hours, 116 cars), live playback x3 (about 4.3 real seconds a tick in every
 --       arm). Arms:
 --
@@ -102,7 +102,45 @@
 --
 -- ══ §5 THE CHECKED ORDER: 089f46bd, SAME SEED, SAME WINDOW ═════════════════════════════════════════════════════════════
 --
---   PENDING: filled when 089f46bd passes sim 15:11:06.
+--   Agent v24 answered 65 of 65 passes in the window (Ultra 62, Super 3; a mean of 38 s a call). The check took 27 of
+--   its 64 orders (25 projected the line ready 4.0-5.5 minutes sooner on average, 2 no worse) and refused 37 (35
+--   projected later by a mean of 3.8 minutes, 2 with fewer cars ready by their due time). Same windowed copies (§6).
+--
+--                                               81787ef9 kernel    0bbdcc07 taken whole   089f46bd checked
+--   uptime, % of fleet time                         40.6               33.2                   35.9
+--   on the road, %                                  37.0               31.5                   33.7
+--   revenue hours                                   93.7               79.9                   85.3
+--   departures (per hour)                           71 (32.5)          61 (27.9)              62 (28.4)
+--   arrivals                                        78                 82                     83
+--   ready by the due time                           14 of 31 (45.2%)   13 of 33 (39.4%)       12 of 30 (40.0%)
+--   still waiting for a charger at the cut          36 of 95           46 of 100              49 of 104
+--   p95 wait counting those still waiting           84.6               131.1                  131.1
+--   first service after arrival, p50 / p90 min      8.0 / 59.1         0.8 / 21.2             2.6 / 15.6
+--   between steps (staged), car-hours               14.75              34.07                  30.86
+--   sessions started / completed                    118 / 73           106 / 64               108 / 67
+--   L2 / DCFC busy, %                               89.6 / 84.6        86.0 / 88.2            87.5 / 79.0
+--   energy to cars, kWh                             1,673              1,681                  1,535
+--   seats under a live order / by its rank          -                  66 / 41                40 / 24
+--   low batteries (<50%) put on an L2 by its rank   -                  7                      5
+--   energy dials the agent wrote                    none               reserve shave + both   none
+--
+--   **Read plainly.** The check cut the order's reach (24 seats by its rank against 41) and recovered about a third of
+--   the uptime the order cost (35.9% against 33.2%; the kernel 40.6%), and none of the departures (62 against 61; the
+--   kernel 71) or of the on-time share (40.0% against 39.4%; the kernel 45.2%). **It did not make the agent's order as
+--   good as the kernel's.** Not claimed: the plugged cars' charge-wait p95 (43.3 minutes) and turnaround p50 (56.4)
+--   read better, but more cars were still waiting at the cut and fewer visits had finished, so both are censored.
+--   Not attributed: energy to cars fell 8% with the fast chargers busy 79.0% of the window against 84.6%; charge rates
+--   by kind and battery band match the other arms and the agent wrote no energy dial, and one run cannot say more.
+--
+--   **Why the check lets some harm through.** The projection scores the line waiting now, with no arrivals (0618 §2a).
+--   In a busy hour the line refills, and a low battery that holds an L2 for 2-3 hours delays the cars that arrive
+--   behind it, which the projection never sees. 5 of the 24 seats the checked orders made put a low battery on an L2,
+--   §3a's pattern. The next version must count the inbound cars the board already lists, at their ETAs, or charge a
+--   long L2 session for the charger-hours it takes from the next hour; that is research-wing work measured on the twin
+--   (CLAUDE.md rule 10).
+--
+--   **Single readings.** One paired run per arm. The arms share the seed, so the world matches until the first
+--   decision differs (tick 48, §3a); how large each difference is, is one draw.
 --
 -- ══ §6 REPRODUCE ═════════════════════════════════════════════════════════════════════════════════════════════════════
 --
