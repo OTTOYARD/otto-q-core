@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261007184459
 -- migration-name:    the_order_usage_counts_the_orders_that_seated_cars
 --
 -- 0616  **What the agent's orders did, counted by order.** `ottoq_agent_charge_order_usage` (0614) counts SEATS: how many
