@@ -489,7 +489,7 @@ serve(async (req) => {
                        // separate a grounded decision from one made on counters alone.
                        board_blocks: { grounding: board.grounding != null, assets: board.assets != null,
                                        review: board.review != null },
-                       agent_version: "v21" },
+                       agent_version: "v22" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId },
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
