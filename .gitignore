@@ -5,4 +5,6 @@ __pycache__/
 
 # Claude Code machine-local settings (may contain a permission mode; never shared)
 .claude/settings.local.json
+# Claude Code subagent worktrees: session scratch checkouts, never part of the repo
+.claude/worktrees/
 supabase/.temp/
