@@ -10,6 +10,20 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v23 (0614): THE AGENT ORDERS THE CHARGE LINE, AND A REFUSED CALL IS TRIED AGAIN.
+//      * On run 81787ef9 every answered pass kept one solver objective and wrote no dial, so the depot made the
+//        same decisions whether the model answered or not (FINDINGS G315). When the board carries charge_queue
+//        (agent_charge_order = 1, OTTO-Q's seat), the prompt asks for charge_order: up to 12 cars from the line in
+//        the order they should take the next free chargers, each with a kind (dcfc | l2 | either). The names the
+//        model uses become vehicle ids from the same board (_shared/agent_charge_order.ts), and the order goes to
+//        ottoq_agent_charge_order_record BEFORE the solver handoff, so the planners' batch already follows it.
+//        The kernel disposes: immediate dispatch first, then any car waited past the pin, then the order; no
+//        charger idles for it and every car charges to its full target (CLAUDE.md rule 9).
+//      * From 2026-10-06 the hosted endpoint refused a third to a half of the calls (run 81787ef9, 17:00 UTC hour:
+//        74 answered, 26 HTTP 429, 20 HTTP 503, 1 timeout), fast, and v22 gave up after one try per key. The call now
+//        goes through _shared/agent_model_call.ts: the primary model twice, then nemotron-3-super twice, with
+//        Retry-After or 1-2-4 s backoff, all inside a 90 s budget so the handoff and the decision row still fit the
+//        runtime's 150 s. Every attempt is on the decision row (model, status, ms, pause; never a key).
 // v22 (0613): THE PLANNERS' LESSON REACHES THE AGENT. The board's grounding carries planner_learning:
 //      free chargers by type, the cars waiting for one, the solver's batch, its recent offers by outcome
 //      and a one-line lesson. On run fd6ed035 48 of 49 solver offers were refused while about 34 cars
@@ -106,6 +120,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeSolverDirective } from "../_shared/agent_solver_chain.ts";
+import { callModelWithRetry } from "../_shared/agent_model_call.ts";
+import { chargeOrderAccepted, chargeQueueOf, normalizeChargeOrder, withChargeOrder } from "../_shared/agent_charge_order.ts";
 import {
   KNOBS, WORK_SIDE_KEYS, OPS_ACTION_DIAL, INERT_KEYS, INERT_OPS,
   clampDial, currentDialValue, reversalDwellMin, admitDialChange, opsActionDirection, reversalHold,
@@ -119,11 +135,21 @@ const OPS_WHITELIST = new Set(Object.keys(OPS_ACTION_DIAL));
 const NV_KEYS = ["NVIDIA_API_KEY_NEMOTRON", "NVIDIA_API_KEY_CUOPT", "NVIDIA_API_KEY"];
 const NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
+// v23. The fallback when the primary refuses twice. Listed by https://integrate.api.nvidia.com/v1/models on
+// 2026-10-07. Its model card (https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, v1.0 GA,
+// released 2026-03-11; read 2026-10-07) documents reasoning off via chat_template_kwargs enable_thinking=false and
+// says to "use temperature=1.0 and top_p=0.95 across all tasks", so this model is sent those; the primary keeps the
+// 0.1 it has run on since v15.
+const FALLBACK_MODEL = "nvidia/nemotron-3-super-120b-a12b";
 // v21 (G188). Live-era p95 agent latency is 66.6 s (CLAUDE.md 2.5, 0417), so 75 s keeps the calls
 // that answer and ends the ones that never will. Both bounds together stay under the runtime's
 // 150 s wall clock, so the decision below is always written.
 const MODEL_TIMEOUT_MS = 75_000;
 const SOLVER_TIMEOUT_MS = 30_000;
+// v23. Every model attempt and every pause between them, together. 90 s + the 30 s handoff + the board read and
+// the inserts stay under the runtime's 150 s, as v21 required of the single call.
+const MODEL_BUDGET_MS = 90_000;
+const MIN_ATTEMPT_MS = 12_000;
 const isTimeout = (error: unknown) =>
   error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
 
@@ -219,55 +245,44 @@ serve(async (req) => {
     if (bErr || !board) return json({ ok: false, error: bErr?.message ?? "no board" }, 500);
 
     // ---- the ONE model call (three lenses). Reasoning disabled for reliable, fast JSON. ----
-    let parsed: any = null; let modelUsed = "none"; let raw = "";
-    let proposeMs = 0;
+    // v23: through _shared/agent_model_call.ts -- the primary twice, then the fallback model twice, with backoff
+    // on 429/5xx, the next key on 401/403/404 and on a 429, the next model on 400/422, an unparseable answer or a
+    // timeout, all inside MODEL_BUDGET_MS. It never throws; every attempt comes back with its status.
     const keys = NV_KEYS
       .map((name) => ({ name, value: Deno.env.get(name) }))
       .filter((candidate): candidate is { name: string; value: string } => Boolean(candidate.value));
-    if (keys.length > 0) {
-      const tModel = Date.now();
-      const requestBody = JSON.stringify({
-        model: MODEL, temperature: 0.1, max_tokens: 1400,
+    const system = withChargeOrder(SYSTEM, board);
+    const userMessage = `BOARD DIGEST:\n${JSON.stringify(board, null, 1)}\n\nReturn ONLY the JSON object.`;
+    // v23: a charge order is up to 12 cars with a reason each, so the answer needs room beyond v15's 1400
+    const maxTokens = chargeQueueOf(board) ? 2400 : 1400;
+    const call = await callModelWithRetry({
+      url: NV_URL,
+      keys,
+      models: [MODEL, FALLBACK_MODEL],
+      body: (model) => ({
+        model,
+        ...(model === MODEL ? { temperature: 0.1 } : { temperature: 1.0, top_p: 0.95 }),
+        max_tokens: maxTokens,
         chat_template_kwargs: { enable_thinking: false }, // fast structured output for the control loop
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: `BOARD DIGEST:\n${JSON.stringify(board, null, 1)}\n\nReturn ONLY the JSON object.` },
+          { role: "system", content: system },
+          { role: "user", content: userMessage },
         ],
-      });
-      for (const candidate of keys) {
-        try {
-          const r = await fetch(NV_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${candidate.value}` },
-            body: requestBody,
-            signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
-          });
-          const responseText = await r.text();
-          if (!r.ok) {
-            // A legacy NVCF key can be valid yet point at a retired function and return
-            // 404. Keep trying the remaining configured NVIDIA keys before falling safe.
-            raw = `HTTP ${r.status}: ${responseText.slice(0, 240)}`;
-            continue;
-          }
-          const j = JSON.parse(responseText);
-          raw = j?.choices?.[0]?.message?.content ?? "";
-          parsed = extractJson(raw);
-          if (parsed && Array.isArray(parsed.actions)) modelUsed = MODEL;
-          break;
-        } catch (error) {
-          if (isTimeout(error)) {
-            // Every key points at the same host; a second attempt would only spend the
-            // budget the decision insert needs.
-            raw = `model timeout after ${MODEL_TIMEOUT_MS} ms`;
-            break;
-          }
-          raw = `request error: ${error instanceof Error ? error.message : "unknown"}`;
-        }
-      }
-      proposeMs = Date.now() - tModel;
-    }
-    if (!parsed || !Array.isArray(parsed.actions)) parsed = { actions: [], solver: { objective: "readiness_first", why: "model unavailable" }, rationale: `fallback: model unavailable or unparseable (${raw ? raw.slice(0,40) : "no key"}) — no action taken` };
+      }),
+      parse: (content) => {
+        const candidate = extractJson(content) as any;
+        return candidate && Array.isArray(candidate.actions) ? candidate : null;
+      },
+      budgetMs: MODEL_BUDGET_MS,
+      attemptTimeoutMs: MODEL_TIMEOUT_MS,
+      minAttemptMs: MIN_ATTEMPT_MS,
+    });
+    let parsed: any = call.parsed;
+    const modelUsed = call.model ?? "none";
+    const raw = call.raw;
+    const proposeMs = call.ms;
+    if (!parsed || !Array.isArray(parsed.actions)) parsed = { actions: [], solver: { objective: "readiness_first", why: "model unavailable" }, rationale: `fallback: model unavailable or unparseable (${raw ? raw.slice(0,40) : "no key"}) — no action taken after ${call.attempts.length} attempt(s)` };
     const solverDirective = normalizeSolverDirective(parsed.solver);
 
     // ---- SQL disposes: whitelist + clamps + drift, execute or QUEUE FOR APPROVAL ----
@@ -364,11 +379,40 @@ serve(async (req) => {
       }
     }
 
+    const chainId = crypto.randomUUID();
+
+    // ---- v23 (0614): THE CHARGE ORDER. Recorded before the solver handoff, so the planners' batch
+    // (ottoq_run_learning, which ottoq-cpsat-propose reads) already follows it on this pass. The door decides what
+    // it accepts and records what it drops, with the reason, in the agent's own ledger; a failure here is recorded
+    // on the decision row and never stops the pass. No order on the board means the run does not take one. ----
+    const chargeOrder = modelUsed !== "none" ? normalizeChargeOrder(parsed.charge_order, board) : null;
+    let chargeOrderReceipt: Record<string, unknown> | null = null;
+    if (chargeQueueOf(board)) {
+      if (!chargeOrder || chargeOrder.cars.length === 0) {
+        chargeOrderReceipt = { ok: false,
+          skipped: modelUsed === "none" ? "model unavailable" : "no charge_order in the answer: the kernel's order stands" };
+      } else {
+        try {
+          const { data, error } = await sb.rpc("ottoq_agent_charge_order_record", {
+            p_sim_run_id: run.sim_run_id,
+            p_board_tick: Number.isFinite(Number(board.tick)) ? Number(board.tick) : chainTriggerTick,
+            p_chain_id: chainId,
+            p_model: modelUsed,
+            p_order: { cars: chargeOrder.cars, why: chargeOrder.why },
+          });
+          chargeOrderReceipt = error ? { ok: false, error: `rpc: ${error.message}` }
+            : (data && typeof data === "object" ? data as Record<string, unknown> : { ok: false, error: "no receipt" });
+        } catch (error) {
+          chargeOrderReceipt = { ok: false, error: error instanceof Error ? error.message.slice(0, 300) : "record failed" };
+        }
+      }
+    }
+    const orderAccepted = chargeOrderAccepted(chargeOrderReceipt);
+
     // ---- ONE PROCESS: agent analysis -> CP-SAT proposal -> deterministic core ----
     // The bridge response is awaited so the audit trail records completion,
     // fallback, or failure instead of claiming that an unobserved request queued.
     // The bridge bounds the external solver call and falls back to cuOpt.
-    const chainId = crypto.randomUUID();
     let solverHandoff: Record<string, unknown> = {
       chain_id: chainId,
       status: "disabled",
@@ -473,7 +517,7 @@ serve(async (req) => {
     const solverAccepted = ["completed", "fallback"].includes(String(solverHandoff.status));
     const verb =
       solverAccepted ? "analyze_and_solve"
-      : applied.length === 0 ? "no_op"
+      : applied.length === 0 ? (orderAccepted ? "order_charge_line" : "no_op")
       : applied.length === 1
         ? (a0.type === "ops_action" ? String(a0.action ?? "ops_action")
            : a0.type === "set_policy" ? `set_policy:${a0.key}`
@@ -488,14 +532,21 @@ serve(async (req) => {
                        // v19: which halves of the board the model actually saw, so an audit can
                        // separate a grounded decision from one made on counters alone.
                        board_blocks: { grounding: board.grounding != null, assets: board.assets != null,
-                                       review: board.review != null },
-                       agent_version: "v22" },
+                                       review: board.review != null, charge_queue: board.charge_queue != null },
+                       // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
+                       model_attempts: call.attempts,
+                       agent_version: "v23" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
-                         agent_solver_chain_id: chainId },
+                         agent_solver_chain_id: chainId,
+                         // v23: the order as sent to the door, with any name the board did not hold
+                         charge_order: chargeOrder },
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
                         solver_handoff: solverHandoff,
+                        // v23: the kernel's receipt for the charge order: accepted, partial or rejected, and why
+                        charge_order: chargeOrderReceipt,
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
-      outcome_status: applied.length > 0 || solverAccepted ? "enacted" : "noop_no_candidate",
+      // v23: an order the kernel accepted is an enacted action, as a dial write is
+      outcome_status: applied.length > 0 || solverAccepted || orderAccepted ? "enacted" : "noop_no_candidate",
       propose_latency_ms: proposeMs, total_latency_ms: totalMs,
     });
     if (decisionError) {
@@ -507,7 +558,7 @@ serve(async (req) => {
     }
 
     return json({ ok: true, run: run.sim_run_id, model: modelUsed, applied, queued, rejected,
-      solver_handoff: solverHandoff,
+      solver_handoff: solverHandoff, charge_order: chargeOrderReceipt, model_attempts: call.attempts,
       latency_ms: { propose: proposeMs, total: totalMs }, rationale: parsed.rationale });
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : "unknown" }, 500);
