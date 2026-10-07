@@ -325,6 +325,8 @@ Modeling requirements that bite: piecewise charging demand above ~70% SoC; DCFC 
 
 Still true, and still the governing instruction: **do not rip out a working propose/dispose pipeline to install a textbook.** The local path remains a named policy regardless (C4 step 5).
 
+**ADDED 2026-10-07 (`db/checks/0415`, G318): THE DISPOSER CHECKS A PROPOSAL AGAINST ITS OWN ANSWER BEFORE TAKING IT.** The agent's charge order (0614), taken whole, cost the twin depot uptime (33.2% against 40.6%), departures (61 against 71) and on-time readiness against the same seed with the kernel's order, with the same energy delivered. It was answered, accepted and followed, and it was the wrong order: low batteries on L2s for hours, top-offs waiting up to three. Since 0618 the door projects the charge line under the agent's order and under the kernel's, and refuses the agent's unless at least as many cars are ready by their due time and the line is ready no later. **A lever an agent can pull without that check is a lever that can make the depot worse; "agents propose, solver disposes" means the disposer can say no on the numbers.** One paired run per arm: single readings, not ranges.
+
 **Power publication boundary:** production interfaces publish forward demand schedules (smart-charging-profile shaped) to site controllers and vendor EMS. Real-time setpoint commands to physical inverters are never issued by OTTO-Q directly; the existing MPC bridge is a planning input inside the twin, and the boundary is encoded in adapter types when C10 lands.
 
 ## 2.6 The data contract (OCPI-shaped on purpose)

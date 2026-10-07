@@ -696,7 +696,12 @@ repo_manifest(version, name, file) AS (
     ('20261007024824'::text, 'the_kpi_boards_turnaround_in_one_pass'::text, '0610_the_kpi_boards_turnaround_in_one_pass.sql'::text),
     ('20261007031040'::text, 'the_kpi_board_prices_the_demand_charge'::text, '0611_the_kpi_board_prices_the_demand_charge.sql'::text),
     ('20261007131113'::text, 'the_twin_sees_a_faulted_charger_and_when_it_comes_back'::text, '0612_the_twin_sees_a_faulted_charger_and_when_it_comes_back.sql'::text),
-    ('20261007135127'::text, 'the_planners_learn_inside_the_run_where_their_offers_went'::text, '0613_the_planners_learn_inside_the_run_where_their_offers_went.sql'::text)
+    ('20261007135127'::text, 'the_planners_learn_inside_the_run_where_their_offers_went'::text, '0613_the_planners_learn_inside_the_run_where_their_offers_went.sql'::text),
+    ('20261007181946'::text, 'the_agent_can_order_the_charge_line_and_the_decide_path_disposes'::text, '0614_the_agent_can_order_the_charge_line_and_the_decide_path_disposes.sql'::text),
+    ('20261007183516'::text, 'an_operators_demo_run_takes_the_agents_charge_order'::text, '0615_an_operators_demo_run_takes_the_agents_charge_order.sql'::text),
+    ('20261007184459'::text, 'the_order_usage_counts_the_orders_that_seated_cars'::text, '0616_the_order_usage_counts_the_orders_that_seated_cars.sql'::text),
+    ('20261007202316'::text, 'a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named'::text, '0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named.sql'::text),
+    ('20261007203510'::text, 'the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it'::text, '0618_the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
