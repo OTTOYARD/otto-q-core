@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261007181946
 -- migration-name:    the_agent_can_order_the_charge_line_and_the_decide_path_disposes
 --
 -- 0614  **The agent can propose who charges next and on which kind of charger, and the decide path disposes.** Chase,
