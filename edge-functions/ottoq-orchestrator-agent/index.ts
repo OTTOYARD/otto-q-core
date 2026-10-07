@@ -10,10 +10,15 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
-// v24 (0617): THE PROMPT STATES THE LINE AS THE KERNEL NOW KEEPS IT. Under a live order a car named for the kind of
-//      charger that is not free waits behind the cars the order did not name (on run 0bbdcc07, 7 of the first 19 cars
-//      seated by rank were named for a fast charger and took an L2 because only L2s were free: G315's pattern, made by
-//      the agent's own order). The charge-line section says so, and that naming dcfc costs a wait while L2s go to others.
+// v24 (0617, 0618): THE KERNEL CHECKS THE ORDER, AND THE PROMPT SAYS WHAT THE CHECK REWARDS. On run 0bbdcc07 the
+//      agent's order, taken whole, cost uptime (33.2% against 40.6%), departures (61 against 71) and on-time readiness
+//      against the same seed without it (db/checks/0415): it ranked low batteries first, named them for a fast charger
+//      and put them on L2s for hours when only L2s were free, while cars needing a top-off waited up to three hours.
+//      0617 puts a car named for the kind not free behind the cars not named; 0618 makes the door project the line in
+//      the kernel's order and in the agent's and refuse an order that is worse (the reason reaches the next board as
+//      last_order.projection). The charge-line section now says so, and orders the line the way the check rewards:
+//      a car that makes its due time only on a fast charger first, then the shortest charge first, a late car as
+//      either, and dcfc for a car that owes a lot only when one frees soon. A refused order is not an enacted action.
 // v23 (0614): THE AGENT ORDERS THE CHARGE LINE, AND A REFUSED CALL IS TRIED AGAIN.
 //      * On run 81787ef9 every answered pass kept one solver objective and wrote no dial, so the depot made the
 //        same decisions whether the model answered or not (FINDINGS G315). When the board carries charge_queue

@@ -101,8 +101,25 @@ test("the prompt states what the kernel enforces, and rule 9 in the agent's own 
   assert.match(CHARGE_ORDER_PROMPT, /then the cars you did not name, in the kernel's order; and last the cars you named for a kind that is not free, which wait for that kind/);
   assert.match(CHARGE_ORDER_PROMPT, /never how much charge a car gets, and never whether it charges/);
   assert.match(CHARGE_ORDER_PROMPT, /Never hold a car back, never end a charge early, never lower a target/);
-  assert.match(CHARGE_ORDER_PROMPT, /min_on_l2 ÷ min_on_dcfc/);
   assert.match(CHARGE_ORDER_PROMPT, /"charge_order":\{"cars":\[\{"car":/);
+});
+
+test("v24 / 0618: the prompt says the kernel checks the order, and orders the line the way the check rewards", () => {
+  assert.match(CHARGE_ORDER_PROMPT, /THE KERNEL CHECKS IT FIRST: it projects the whole line from now in its own order and in yours/);
+  assert.match(CHARGE_ORDER_PROMPT, /as many cars are ready by their due time and the line is ready no later on average, or more cars are ready by their due time at most 10% later on average/);
+  assert.match(CHARGE_ORDER_PROMPT, /last_order\.projection is the kernel's check on your last order/);
+  // the guidance that made run 0bbdcc07's orders lose is gone: overdue cars are not sent to a fast charger
+  assert.match(CHARGE_ORDER_PROMPT, /due_in_min at least its min_on_dcfc but less than its min_on_l2\): name it dcfc, earliest due first/);
+  assert.match(CHARGE_ORDER_PROMPT, /Then the shortest charge first/);
+  assert.match(CHARGE_ORDER_PROMPT, /already past its due time \(due_in_min 0 or less\) gains nothing by waiting for a fast charger: name it either/);
+  assert.match(CHARGE_ORDER_PROMPT, /A car near its target gains little on a fast charger: name it l2 or either/);
+  assert.match(CHARGE_ORDER_PROMPT, /never send the same order again/);
+  assert.doesNotMatch(CHARGE_ORDER_PROMPT, /a car whose due_in_min is shorter than its min_on_l2 needs a fast charger/);
+  assert.doesNotMatch(CHARGE_ORDER_PROMPT, /The contract first: cars with over_limit_min above 0/);
+});
+
+test("0618: a refused order is not an enacted action", () => {
+  assert.equal(chargeOrderAccepted({ ok: true, status: "refused", projection: { take: false, reason: "line_ready_later" } }), false);
 });
 
 const orchestrator = readFileSync(new URL("../edge-functions/ottoq-orchestrator-agent/index.ts", import.meta.url), "utf8");
