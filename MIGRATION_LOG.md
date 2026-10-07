@@ -638,7 +638,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0609](db/migrations/0609_the_kpi_tab_reads_uptime_turnaround_service_and_energy.sql) | `20261007024116` | yes — ledger | **The KPI tab reads what a depot owner, an OEM and an investor ask first: uptime, turnaround, service and |
 | [0610](db/migrations/0610_the_kpi_boards_turnaround_in_one_pass.sql) | `20261007024824` | yes — ledger | **The KPI board's turnaround in one pass.** 0609's turnaround found each visit's moments (ready, left, first |
 | [0611](db/migrations/0611_the_kpi_board_prices_the_demand_charge.sql) | `20261007031040` | yes — ledger | **The KPI board prices the demand charge.** The board's energy cost was the energy charge alone: $229.92 on |
-| [0612](db/migrations/0612_the_twin_sees_a_faulted_charger_and_when_it_comes_back.sql) | `PENDING` | no — pending | **The twin sees a faulted charger, and when it comes back.** Chase, 2026-10-07: *"make sure it indicates |
+| [0612](db/migrations/0612_the_twin_sees_a_faulted_charger_and_when_it_comes_back.sql) | `20261007131113` | yes — ledger | **The twin sees a faulted charger, and when it comes back.** Chase, 2026-10-07: *"make sure it indicates |
 
 464 migrations indexed.
 

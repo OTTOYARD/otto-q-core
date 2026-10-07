@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261007131113
 -- migration-name:    the_twin_sees_a_faulted_charger_and_when_it_comes_back
 --
 -- 0612  **The twin sees a faulted charger, and when it comes back.** Chase, 2026-10-07: *"make sure it indicates
