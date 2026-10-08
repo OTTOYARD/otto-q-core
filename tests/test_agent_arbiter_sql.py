@@ -185,3 +185,219 @@ def test_0619_refuses_an_estimate_it_was_not_written_against(db):
               LANGUAGE sql IMMUTABLE AS $f$ SELECT 1::numeric $f$""")
     rc, err = db.file(M0619)
     assert rc != 0 and "0619 P1" in err and "ottoq_charge_minutes_estimate" in err, err
+
+
+# ── 0620: the kernel takes the agent's order only when it wins the expected future and most sampled ones ─────────────
+
+M0620 = os.path.join(ROOT, "db", "migrations", "0620_the_kernel_takes_an_agent_order_only_when_it_wins_most_futures.sql")
+
+
+def _through_0620(d):
+    _file(d, M0619)
+    return _file(d, M0620)
+
+
+def _state(d):
+    return d.json(f"SELECT public.ottoq_charge_line_state('{RUN}', '{DEPOT}', '{T}')")
+
+
+def _omap(order):
+    """[(name, kind)] -> the door's map {vehicle_id: {rank, kind}}."""
+    return {_vid(n): {"rank": r, "kind": k} for r, (n, k) in enumerate(order, 1)}
+
+
+def _sim(d, state, order=None, scenario=0, seed="t"):
+    o = "NULL" if order is None else f"$j${json.dumps(_omap(order))}$j$::jsonb"
+    return d.json(f"SELECT public.ottoq_charge_line_simulate($j${json.dumps(state)}$j$::jsonb, {o}, {scenario}, '{seed}')")
+
+
+def _rollout(d, state, order, futures=12, seed="t"):
+    return d.json(f"""SELECT public.ottoq_charge_order_verdict_v2(public.ottoq_charge_line_rollout(
+                        $j${json.dumps(state)}$j$::jsonb, $j${json.dumps(_omap(order))}$j$::jsonb, {futures}, '{seed}'), 0.8)""")
+
+
+def _spread_model(d, log_sd=0.3):
+    """A usable charge_time_v1 for the depot: factor 1 (0614's minutes) with a log spread, so the futures differ."""
+    cells = {f"{k}:{b}": {"n": 100, "runs": 5, "usable": True, "population": "fine_ticks", "factor": 1, "log_sd": log_sd,
+                          "p10": 0.7, "p90": 1.4} for k in ("dcfc", "l2") for b in ("a", "b", "c", "d", "*")}
+    d.val(f"""INSERT INTO public.ottoq_learned_estimates (depot_id, model, n_evidence, n_runs, usable, params, code_md5, note)
+              VALUES ('{DEPOT}', 'charge_time_v1', 1000, 5, true, $j${json.dumps({"cells": cells})}$j$::jsonb, 'test', 'test')""")
+
+
+def test_0620_applies_and_its_checks_run(db):
+    err = _through_0620(db)
+    assert "0620 V4: no twin run is running" in err or "0620 V4 on run" in err, err
+    assert db.val("SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage "
+                  "WHERE name LIKE '0620_%'") == "falsefalse"
+    dials = db.json("""SELECT jsonb_object_agg(param_key, jsonb_build_array(default_value, min_value, max_value, agent_writable))
+                         FROM public.ottoq_policy_param_catalog WHERE param_key IN ('agent_charge_order_futures',
+                                                                                    'agent_charge_order_win_frac')""")
+    assert dials == {"agent_charge_order_futures": [12, 1, 64, False], "agent_charge_order_win_frac": [0.8, 0.5, 1, False]}
+    assert db.val("SELECT class FROM public.ottoq_run_scope_registry WHERE table_name = 'ottoq_charge_order_snapshots'") == "evidence"
+
+
+def test_0620_the_state_is_the_line_the_chargers_and_the_clock(db):
+    _through_0620(db)
+    s = _state(db)
+    # five free chargers; six cars in the kernel's order with 0614's minutes (no usable fit yet: factor 1.0)
+    assert [base.NAMES[c["id"]] for c in s["cars"]] == ["I", "P", "B", "A", "D", "C"], s["cars"]
+    assert len(s["chargers"]) == 5 and all(c["free"] == 0 for c in s["chargers"])
+    i = s["cars"][0]
+    assert (i["imm"], i["md"], i["ml"], i["due"]) == (True, 41, 141, 40), i
+    # the order's life in minutes: 15 ticks x the run's minutes a tick (no clock start on this run: 0.25)
+    assert (s["tick_min"], s["ttl_min"], s["pin_min"]) == (0.25, 3.75, 90), s
+    assert s["inbound"] == [] and s["models"]["return_usable"] is False
+
+
+def test_0620_the_kernels_line_rolled_forward_by_hand(db):
+    # I 41 on a fast charger (due 40: a minute late); P 70, B 94, A 117 on the L2s; D 15 on the other fast charger;
+    # C waits for it and is ready at 15 + 45 = 60. 397 minutes in the depot, as 0618's projection had it.
+    _through_0620(db)
+    k = _sim(db, _state(db))
+    assert (k["cars"], k["seated"], k["with_due"], k["on_time"], k["late_sum"], k["flow_sum"]) == (6, 6, 1, 0, 1, 397), k
+    assert (k["on_dcfc"], k["on_l2"]) == (3, 3), k
+
+
+def test_0620_the_kernels_own_order_sent_by_the_agent_changes_nothing(db):
+    _through_0620(db)
+    v = _rollout(db, _state(db), [("B", "either"), ("A", "either"), ("D", "either"), ("C", "either")])
+    assert v["take"] is False and v["reason"] == "same_as_kernel" and v["futures"] == 1, v
+    rec = _order(db, [("B", "either"), ("A", "either"), ("D", "either"), ("C", "either")])
+    assert rec["status"] == "refused" and rec["projection"]["reason"] == "same_as_kernel", rec
+    assert db.json(f"SELECT public.ottoq_agent_charge_order_live('{RUN}', 100)") == {}
+
+
+def test_0620_low_batteries_sent_to_the_only_free_l2s_lose_the_expected_future(db):
+    _through_0620(db)
+    _occupy(db, ["F1", "F2"])                    # a car out at work holds each fast charger: only the L2 are offered
+    v = _rollout(db, _state(db), [("C", "l2"), ("A", "l2"), ("B", "l2")])
+    assert v["take"] is False and v["reason"] == "worse_in_expected_future", v
+    assert v["agent"]["flow_sum"] > v["kernel"]["flow_sum"], v
+
+
+def test_0620_a_car_made_ready_by_its_due_time_on_a_fast_charger_wins_every_future(db):
+    _through_0620(db)
+    base._car(db, "E", 40, 1)
+    db.val(f"UPDATE public.ottoq_visit_needs SET dispatch_due_at = '{T}'::timestamptz + interval '60 minutes' "
+           f"WHERE vehicle_id = '{_vid('E')}'")
+    _spread_model(db, 0.3)                       # the futures now differ, the same draws on both sides
+    v = _rollout(db, _state(db), [("E", "dcfc")])
+    assert v["take"] is True and v["reason"] == "wins_most_futures" and v["expected_by"] == "on_time", v
+    assert v["wins"] >= v["need"] == 10 and v["futures"] == 12, v
+    assert v["agent"]["on_time"] == v["kernel"]["on_time"] + 1, v
+    rec = _order(db, [("E", "dcfc")])
+    assert rec["status"] == "accepted" and rec["projection"]["reason"] == "wins_most_futures", rec
+
+
+def test_0620_the_futures_are_seeded_and_shared_by_both_sides(db):
+    _through_0620(db)
+    _spread_model(db, 0.3)
+    s = _state(db)
+    k1, k1b, k2 = _sim(db, s, None, 1, "x"), _sim(db, s, None, 1, "x"), _sim(db, s, None, 2, "x")
+    assert k1 == k1b and k1 != k2                # a pure function of (state, order, scenario, seed)
+    assert _sim(db, s, None, 0, "x") == _sim(db, s, None, 0, "y")   # the expected future draws nothing
+    order = [("C", "dcfc"), ("A", "l2")]
+    r1 = db.json(f"""SELECT public.ottoq_charge_line_rollout($j${json.dumps(s)}$j$::jsonb,
+                       $j${json.dumps(_omap(order))}$j$::jsonb, 12, 'x')""")
+    r2 = db.json(f"""SELECT public.ottoq_charge_line_rollout($j${json.dumps(s)}$j$::jsonb,
+                       $j${json.dumps(_omap(order))}$j$::jsonb, 12, 'x')""")
+    assert r1 == r2 and r1["futures"] == 12 and r1["wins"] + r1["ties"] + r1["losses"] == 12, r1
+    # common random numbers: an order equal to the kernel's ties in every future, perturbed or not
+    same = db.json(f"""SELECT public.ottoq_charge_line_compare(public.ottoq_charge_line_simulate(s, NULL, 3, 'x'),
+                                                               public.ottoq_charge_line_simulate(s, '{{}}'::jsonb, 3, 'x'))
+                        FROM (SELECT $j${json.dumps(s)}$j$::jsonb AS s) q""")
+    assert same["cmp"] == 0 and same["by"] == "tie", same
+
+
+def test_0620_cars_coming_home_join_the_line_when_they_arrive(db):
+    _through_0620(db)
+    # the return model: a working car is called home at 50%, drains 0.5% a minute, drives 2 minutes home
+    db.val(f"""INSERT INTO public.ottoq_learned_estimates (depot_id, model, n_evidence, n_runs, usable, params, code_md5, note)
+               VALUES ('{DEPOT}', 'return_v1', 100, 5, true, '{{"threshold_soc": 50, "drain_pct_per_min": 0.5,
+                       "drain_log_sd": 0.1, "trip_min": 2, "other_share": 0.1}}', 'test', 'test')""")
+    w, h = _vid("W"), _vid("H")
+    for name, soc in (("W", 70), ("H", 30)):
+        base._car(db, name, soc, 0, state="deployed")
+        db.val(f"DELETE FROM public.ottoq_visit_needs WHERE vehicle_id = '{_vid(name)}'")
+    db.val(f"""INSERT INTO public.ottoq_vehicle_dispatches (vehicle_id, sim_run_id, dispatched_at, scheduled_return_at,
+                                                            planned_duration_min, status)
+               VALUES ('{w}', '{RUN}', '{T}'::timestamptz - interval '40 minutes', '{T}'::timestamptz + interval '1 hour', 30, 'active'),
+                      ('{h}', '{RUN}', '{T}'::timestamptz - interval '60 minutes', '{T}'::timestamptz + interval '6 minutes', 30, 'returning')""")
+    inb = {base.NAMES[r["vehicle_id"]]: r for r in db.json(
+        f"""SELECT jsonb_agg(to_jsonb(i)) FROM public.ottoq_charge_line_inbound('{RUN}', '{DEPOT}', '{T}', 180, NULL) i""")}
+    # W at 70%: (70 - 50) / 0.5 + 2 = 42 minutes, arriving at 50 - 0.5 x 2 = 49%; H driving home: 6 minutes, 27%
+    assert (inb["W"]["eta_min"], inb["W"]["soc_at_arrival"], inb["W"]["source"]) == (42, 49, "forecast"), inb
+    assert (inb["H"]["eta_min"], inb["H"]["soc_at_arrival"], inb["H"]["source"]) == (6, 27, "returning"), inb
+    s = _state(db)
+    assert [base.NAMES[c["id"]] for c in s["inbound"]] == ["H", "W"], s["inbound"]
+    k = _sim(db, s)
+    # both come home and are seated after they arrive; their minutes count from their arrival
+    assert (k["cars"], k["inbound"], k["seated"]) == (8, 2, 8), k
+    assert k["flow_sum"] > 397 and k["line_flow_sum"] == 397, k
+    # the board sees them too
+    b = db.json(f"SELECT public.ottoq_agent_charge_queue_board('{RUN}', '{DEPOT}', '{T}')")
+    assert [(x["name"], x["eta_min"], x["source"]) for x in b["arriving"]] == [("H", 6, "returning"), ("W", 42, "forecast")]
+    assert b["contention"]["arriving_60_min"] == 2 and b["check"]["return_model"]["reserve_soc"] == 50
+
+
+def test_0620_the_door_keeps_the_state_it_judged_and_the_usage_says_how_it_went(db):
+    _through_0620(db)
+    _occupy(db, ["F1", "F2"])
+    refused = _order(db, [("C", "l2"), ("A", "l2"), ("B", "l2")])
+    assert refused["status"] == "refused" and refused["projection"]["reason"] == "worse_in_expected_future", refused
+    snap = db.json(f"SELECT to_jsonb(s) FROM public.ottoq_charge_order_snapshots s WHERE order_id = {refused['order_id']}")
+    assert snap["futures"] == 12 and float(snap["win_frac"]) == 0.8 and len(snap["state"]["cars"]) == 6, snap
+    assert snap["agent_order"][_vid("C")] == {"rank": 1, "kind": "l2"} and len(snap["code_md5"]) == 32
+    same = _order(db, [("B", "either")])
+    assert same["projection"]["reason"] in ("same_as_kernel", "worse_in_expected_future", "no_better_in_expected_future")
+    u = db.json(f"SELECT public.ottoq_agent_charge_order_usage('{RUN}', 5)")
+    assert u["orders_refused"] == 2 and sum(u["refused_by_reason"].values()) == 2, u
+    first = next(o for o in u["by_order"] if o["order_id"] == refused["order_id"])
+    assert first["verdict"] == "worse_in_expected_future" and first["futures"] == 12 and first["need"] == 10, first
+    rc, _, err = db.run("DELETE FROM public.ottoq_charge_order_snapshots")
+    assert rc != 0 and "append-only" in err, err
+
+
+def test_0620_the_board_times_charges_by_the_learned_clock_and_says_how_tight_the_line_is(db):
+    _through_0620(db)
+    b = db.json(f"SELECT public.ottoq_agent_charge_queue_board('{RUN}', '{DEPOT}', '{T}')")
+    # six cars waiting, five chargers free and none freeing within 15 minutes: one car cannot plug in yet
+    assert b["contention"] == {"waiting": 6, "free_now": 5, "freeing_15_min": 0, "arriving_60_min": 0,
+                               "pressure": "congested"}, b["contention"]
+    # two cars leave the line: four waiting, five free, nothing for an order to decide
+    db.val(f"UPDATE public.vehicles SET current_state = 'deployed' WHERE id IN ('{_vid('C')}', '{_vid('D')}')")
+    b = db.json(f"SELECT public.ottoq_agent_charge_queue_board('{RUN}', '{DEPOT}', '{T}')")
+    assert (b["contention"]["waiting"], b["contention"]["pressure"]) == (4, "none"), b["contention"]
+    db.val(f"UPDATE public.vehicles SET current_state = 'arrived_at_gate' WHERE id IN ('{_vid('C')}', '{_vid('D')}')")
+    assert b["check"]["futures"] == 12 and float(b["check"]["win_frac"]) == 0.8
+    i = next(c for c in b["cars"] if c["name"] == "I")
+    assert (i["min_on_dcfc"], i["min_on_l2"]) == (41, 141), i              # no usable fit: 0614's minutes
+    _spread_model(db, 0.2)
+    db.val(f"""INSERT INTO public.ottoq_learned_estimates (depot_id, model, n_evidence, n_runs, usable, params, code_md5, note)
+               SELECT depot_id, model, n_evidence, n_runs, usable,
+                      jsonb_set(params, '{{cells,dcfc:a,factor}}', '2'), code_md5, 'test x2'
+                 FROM public.ottoq_learned_estimates WHERE model = 'charge_time_v1' ORDER BY estimate_id DESC LIMIT 1""")
+    b = db.json(f"SELECT public.ottoq_agent_charge_queue_board('{RUN}', '{DEPOT}', '{T}')")
+    i = next(c for c in b["cars"] if c["name"] == "I")
+    assert (i["min_on_dcfc"], i["min_on_l2"]) == (82, 141), i              # I at 40% is band a: the fast charger x2
+    assert b["check"]["charge_time_factors"]["dcfc:a"] == 2
+
+
+def test_0620_an_order_the_kernel_cannot_check_is_never_taken(db):
+    _through_0620(db)
+    db.val("""CREATE OR REPLACE FUNCTION public.ottoq_charge_line_rollout(p_state jsonb, p_order jsonb, p_futures integer,
+                p_seed text) RETURNS jsonb LANGUAGE plpgsql AS $f$ BEGIN RAISE EXCEPTION 'no rollout today'; END $f$""")
+    rec = _order(db, [("C", "dcfc")])
+    assert rec["ok"] is True and rec["status"] == "refused" and rec["projection"]["reason"] == "rollout_failed", rec
+    assert "no rollout today" in rec["projection"]["error"]
+    assert db.val(f"SELECT count(*) FROM public.ottoq_charge_order_snapshots WHERE order_id = {rec['order_id']}") == "0"
+    assert db.json(f"SELECT public.ottoq_agent_charge_order_live('{RUN}', 100)") == {}
+
+
+def test_0620_refuses_a_door_it_was_not_written_against(db):
+    _file(db, M0619)
+    db.val("""CREATE OR REPLACE FUNCTION public.ottoq_agent_charge_order_record(p_sim_run_id uuid, p_board_tick bigint,
+                p_chain_id text, p_model text, p_order jsonb) RETURNS jsonb
+              LANGUAGE sql AS $f$ SELECT '{}'::jsonb $f$""")
+    rc, err = db.file(M0620)
+    assert rc != 0 and "0620 P1" in err and "the door" in err, err
