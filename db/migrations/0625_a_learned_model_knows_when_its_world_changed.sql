@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261008214932
 -- migration-name:    a_learned_model_knows_when_its_world_changed
 --
 -- 0625  **A learned model knows when its world changed, and finds the change itself.**

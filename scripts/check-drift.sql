@@ -708,7 +708,7 @@ repo_manifest(version, name, file) AS (
     ('20261008162412'::text, 'the_kernel_learns_each_cars_charge_clock_from_its_own_charges'::text, '0622_the_kernel_learns_each_cars_charge_clock_from_its_own_charges.sql'::text),
     ('20261008191129'::text, 'the_check_sees_cars_leave_and_come_back'::text, '0623_the_check_sees_cars_leave_and_come_back.sql'::text),
     ('20261008204412'::text, 'the_check_reads_each_cars_open_work'::text, '0624_the_check_reads_each_cars_open_work.sql'::text),
-    ('PENDING'::text, 'a_learned_model_knows_when_its_world_changed'::text, '0625_a_learned_model_knows_when_its_world_changed.sql'::text)
+    ('20261008214932'::text, 'a_learned_model_knows_when_its_world_changed'::text, '0625_a_learned_model_knows_when_its_world_changed.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
