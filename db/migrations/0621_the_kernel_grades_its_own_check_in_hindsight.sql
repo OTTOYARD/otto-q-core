@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261008144612
 -- migration-name:    the_kernel_grades_its_own_check_in_hindsight
 --
 -- 0621  **The kernel grades its own check in hindsight, and says what made it wrong.** 0620 judges each agent charge
