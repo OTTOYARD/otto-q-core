@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261008132327
 -- migration-name:    the_kernel_learns_how_long_a_charge_takes_and_when_a_car_comes_back
 --
 -- 0619  **The kernel learns how long a charge takes and when a car comes back, from its own evidence.** Two learned
@@ -27,9 +27,11 @@
 --   reaching its low-battery reserve, at 49.2% (p10 44.9, p90 50.0), after draining 0.69% a minute (sd 0.08) since it
 --   left at 98%, with a 1.6-minute drive home; over the last 21 days of runs at fine ticks (18 runs, 1,376 returns),
 --   1,205 were, at 49.9% with a 1.25-minute drive. When a working car comes back is a forecast the depot can make. 0618
---   made none. The other returns are not: over every run at the depot in those 21 days, mostly the overnight sweeps,
---   83.5% of returns were for a service interval, a wash cadence, a surplus on the road or another reason no battery
---   reading foretells. That share is reported with each fit, as the size of what the forecast cannot see.
+--   made none. The other returns are not: over every run at the depot in those 21 days (22,509 returns, mostly the
+--   overnight sweeps at 5-minute ticks), 79.2% were for a service interval, a wash cadence, a surplus on the road or
+--   another reason no battery reading foretells: 83.5% at the sweeps, 12.4% at fine ticks. That share is reported with
+--   each fit, as the size of what the forecast cannot see. (Corrected after apply: the file as applied said 83.5% of
+--   every run, which is the sweeps' share alone; the fit's own `other_share_all_ticks` read 0.7917.)
 --
 -- ══ §2 WHAT ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
