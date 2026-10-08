@@ -1,5 +1,7 @@
-"""db/migrations/0619-0621, EXECUTED: the kernel learns how long a charge takes and when a car comes back, checks the
-agent's charge order against its own across sampled futures before taking it, and grades its own checks in hindsight.
+"""db/migrations/0619-0622, EXECUTED: the kernel learns how long a charge takes and when a car comes back, checks the
+agent's charge order against its own across sampled futures before taking it, grades its own checks in hindsight, and
+learns each car's charge clock from its own charges (class, make and model, the car, the run, the car in the run, and
+the charge under way), with an audit that names the variable the clock misses.
 
 WHY THIS EXISTS. db/checks/0415 measured that 0618's check let through orders that cost the depot uptime: it projected
 the line on a charge clock that runs 35-140% short and saw no car coming back. 0619 learns both from the engine's own
@@ -11,6 +13,7 @@ tests/test_agent_charge_order_sql.py uses, with the same miniature depot (two fa
 It SKIPS where no scratch PostgreSQL is reachable.
 """
 import json
+import math
 import os
 import subprocess
 import sys
@@ -823,3 +826,422 @@ def test_0621_refuses_a_simulator_it_was_not_written_against(db):
                 p_seed text) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $f$ SELECT '{}'::jsonb $f$""")
     rc, err = db.file(M0621)
     assert rc != 0 and "0621 P1" in err and "the simulator" in err, err
+
+
+# ── 0622: the kernel learns each car's charge clock from its own charges ─────────────────────────────────────────────
+
+M0622 = os.path.join(ROOT, "db", "migrations",
+                     "0622_the_kernel_learns_each_cars_charge_clock_from_its_own_charges.sql")
+
+
+def _through_0622(d):
+    _through_0621(d)
+    return _file(d, M0622)
+
+
+# the planted fleet: (class, make, model, the class's log factor on a fast charger, the model's within its class)
+FLEET = (("alpha_av_2024", "Alpha", "A1", -0.693, 0.0),
+         ("beta_av_2024", "Beta", "One", 0.405, 0.15),
+         ("beta_av_2024", "Beta", "Two", 0.405, -0.15))
+CAR_EFF = (0.1, -0.1, 0.05, -0.05)        # each car's own log factor on a fast charger, the same in every run
+RUN_EFF = (-0.1, -0.06, -0.02, 0.02, 0.06, 0.1)
+
+
+def _fleet_car(cls, model, k):
+    return _vid(f"cc-{cls}-{model}-{k}")
+
+
+def _fleet(d, runs=6):
+    """Twelve cars of two classes (one class in two makes and models), each charging three times on a fast charger and
+    twice on an L2 in each of `runs` runs, the last run a day ago. A fast charge runs exp(class + model + car + run +
+    the car's condition in the run + session + noise) times 0614's estimate (condition uniform in +-0.08, session in
+    +-0.1, noise in +-0.03); an L2 charge exp(noise), the 19.2
+    kW charger being every car's limit. Each fast charge's MeterValues put a quarter, a half and three quarters of it at
+    the pace of the whole, so a charge's progress predicts what is left of it. Every number is a hash: deterministic."""
+    cars = []
+    for cls, make, model, ce, me in FLEET:
+        for k, ve in enumerate(CAR_EFF):
+            vid = _fleet_car(cls, model, k)
+            d.val(f"""INSERT INTO public.vehicles (id, fleet_operator_id, home_depot_id, category, display_name, current_soc,
+                                                   battery_capacity_kwh, inlet_type, inlet_max_kw, current_state,
+                                                   vehicle_class_code, make, model)
+                      VALUES ('{vid}', '{base.OPERATOR}', '{DEPOT}', 'autonomous', '{model}-{k}', 80, 75, 'NACS', 250,
+                              'deployed', '{cls}', '{make}', '{model}')""")
+            cars.append(f"('{vid}', {ce + me + ve})")
+    run_vals = ", ".join(f"({r}, {RUN_EFF[r % len(RUN_EFF)]})" for r in range(runs))
+    d.val(f"""
+      INSERT INTO public.ottoq_charge_duration_ledger (session_id, recorded_at, source_kind, sim_run_id, run_by, depot_id,
+             charger_type, charger_kw, vehicle_id, vehicle_kw, battery_kwh, soc_start, soc_end, started_at, ended_at,
+             duration_min, stopped_reason, tick_minutes)
+      SELECT x.sid, x.rec, 'live', x.run, 'operator_demo', '{DEPOT}', x.kind, x.kw, x.vid, 250, 75, x.s0, 100, x.st,
+             x.st + make_interval(secs => x.dur * 60), x.dur, 'completed', 0.25
+        FROM (SELECT md5(c.vid || ':' || r.r || ':' || q.i)::uuid AS sid,
+                     now() - make_interval(days => {runs} - r.r) + make_interval(mins => q.i) AS rec,
+                     md5('cc-run-' || r.r)::uuid AS run, q.kind, q.kw, c.vid::uuid AS vid, q.s0,
+                     '{T}'::timestamptz + make_interval(days => r.r, hours => 2 * q.i) AS st,
+                     round((public.ottoq_charge_minutes_estimate(75, q.s0, 100, q.kw, 250)
+                            * exp(CASE WHEN q.kind = 'dcfc' THEN c.eff + r.eff + h.cr + h.d ELSE 0 END + h.e))::numeric, 3) AS dur
+                FROM (VALUES {", ".join(cars)}) c(vid, eff)
+                CROSS JOIN (VALUES {run_vals}) r(r, eff)
+                CROSS JOIN (VALUES (1, 'dcfc', 150, 30), (2, 'dcfc', 150, 50), (3, 'dcfc', 150, 70),
+                                   (4, 'l2', 19.2, 40), (5, 'l2', 19.2, 60)) q(i, kind, kw, s0)
+                CROSS JOIN LATERAL (
+                  SELECT (('x' || substr(md5(c.vid || r.r || 'cr'), 1, 8))::bit(32)::int % 1000) / 12500.0 AS cr,
+                         (('x' || substr(md5(c.vid || r.r || q.i || 'd'), 1, 8))::bit(32)::int % 1000) / 10000.0 AS d,
+                         (('x' || substr(md5(c.vid || r.r || q.i || 'e'), 1, 8))::bit(32)::int % 1000) / 33333.0 AS e) h) x""")
+    d.val(f"""
+      INSERT INTO public.ottoq_ocpp_messages (ocpp_session_id, vehicle_id, sim_run_id, message_at, sim_clock_at, direction,
+                                              message_type, payload)
+      SELECT l.session_id, l.vehicle_id, l.sim_run_id, t.at, t.at, 'cs_to_csms', 'MeterValues',
+             jsonb_build_object('sampledValue', jsonb_build_array(
+               jsonb_build_object('measurand', 'Energy.Active.Import.Register', 'value', 0),
+               jsonb_build_object('measurand', 'SoC', 'value', s.soc)))
+        FROM public.ottoq_charge_duration_ledger l
+        CROSS JOIN (VALUES (0.25), (0.5), (0.75)) q(frac)
+        CROSS JOIN LATERAL (SELECT l.soc_start + q.frac * (l.soc_end - l.soc_start) AS soc) s
+        CROSS JOIN LATERAL (SELECT l.started_at + make_interval(secs => l.duration_min * 60
+                                     * public.ottoq_charge_minutes_estimate(75, l.soc_start, s.soc, l.charger_kw, 250)
+                                     / public.ottoq_charge_minutes_estimate(75, l.soc_start, l.soc_end, l.charger_kw, 250)) AS at) t
+       WHERE l.depot_id = '{DEPOT}' AND l.charger_type = 'dcfc'""")
+
+
+def _who(d, vid):
+    return d.json(f"""SELECT public.ottoq_charge_clock_who(v.id, v.vehicle_class_code, v.make, v.model)
+                        FROM public.vehicles v WHERE v.id = '{vid}'""")
+
+
+def _clock(d, model, kind, who, s0, s1=100, run=None):
+    kw = 150 if kind == "dcfc" else 19.2
+    r = "NULL" if run is None else f"$j${json.dumps(run)}$j$::jsonb"
+    return d.json(f"""SELECT public.ottoq_charge_clock($j${json.dumps(model)}$j$::jsonb, '{kind}',
+                        $j${json.dumps(who)}$j$::jsonb, 75, {s0}, {s1}, {kw}, 250, {r})""")
+
+
+def _fit(d, through="now()"):
+    fid = int(d.val(f"SELECT public.ottoq_fit_charge_time_v2('{DEPOT}', {through}, interval '21 days', 3, 'test')"))
+    m = d.json(f"SELECT public.ottoq_charge_clock_model('{DEPOT}')")
+    return fid, m
+
+
+def test_0622_applies_and_its_checks_run(db):
+    # a v1 fit worth checking against: factors and spreads that differ by kind and band
+    _file(db, M0619)
+    _charges(db, "dcfc", 30, 40, 1.4, 0.2)
+    _charges(db, "dcfc", 75, 40, 0.8, 0.2)
+    _charges(db, "l2", 50, 40, 1.1, 0.2)
+    _charges(db, "l2", 90, 40, 2.0, 0.2)
+    eid = int(db.val(f"SELECT public.ottoq_fit_charge_time_model('{DEPOT}', NULL, interval '1 day', 'test')"))
+    _file(db, M0620)
+    _file(db, M0621)
+    err = _file(db, M0622)
+    assert f"0622 V1: on the depot's v1 fit (estimate {eid}) the clock returns 0619's minutes and 0620's spread on 4320 cases" \
+        in err, err
+    assert "0622 V2/V3: run d9d49732 is not here" in err, err
+    # the first fit, at apply: no class or car in the ledger is enough for a v2 clock here, so the depot keeps v1
+    assert "0622 V4: the first fit is not usable" in err and "the depot keeps its charge_time_v1 clock" in err, err
+    assert "0622 V4 on running run a0000000-0000-0000-0000-000000000614" in err, err
+    assert "0622 V5: 0 graded orders" in err, err
+    fit = db.json("SELECT to_jsonb(f) FROM public.ottoq_charge_clock_fits f")
+    assert (fit["model"], fit["usable"], fit["note"]) == ("charge_time_v2", False, "0622: the first fit, at apply"), fit
+    assert db.json(f"SELECT public.ottoq_charge_clock_model('{DEPOT}')")["estimate_id"] == eid
+    job = db.json("SELECT to_jsonb(j) FROM cron.job j WHERE jobname = 'ottoq-learn-charge-clock-nightly'")
+    assert job["schedule"] == "22 11 * * *" and "ottoq_fit_charge_time_v2" in job["command"] and DEPOT in job["command"]
+    assert db.val("SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage "
+                  "WHERE name LIKE '0622_%'") == "falsefalse"
+    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0622_pre'") == "4"
+
+
+def test_0622_the_fit_finds_the_class_the_model_and_the_car(db):
+    _through_0622(db)
+    _fleet(db)
+    fid, m = _fit(db)
+    p = m["params"]
+    assert (m["model"], m["estimate_id"], m["usable"], m["n_evidence"], m["n_runs"]) == \
+        ("charge_time_v2", fid, True, 360, 6), {k: m[k] for k in ("model", "estimate_id", "usable", "n_evidence", "n_runs")}
+    assert p["population"] == {"dcfc": "fine_ticks", "l2": "fine_ticks"}
+    # every car's clock on a fast charger lands near its planted factor: class, model and its own, each recovered
+    errs = []
+    for cls, make, model, ce, me in FLEET:
+        for k, ve in enumerate(CAR_EFF):
+            c = _clock(db, m, "dcfc", _who(db, _fleet_car(cls, model, k)), 50)
+            assert abs(float(c["f"]) - (ce + me + ve)) < 0.1, (cls, model, k, c, ce + me + ve)
+            assert "+vehicle" in c["lvl"] and "+model" in c["lvl"], c
+            errs.append(abs(float(c["f"]) - (ce + me + ve)))
+    assert sum(errs) / len(errs) < 0.05, errs
+    # a car the fit never saw is timed by its class and model alone
+    new = {"cls": "beta_av_2024", "mdl": "beta_av_2024/Beta Two", "veh": str(uuid.uuid4())}
+    c = _clock(db, m, "dcfc", new, 50)
+    assert abs(float(c["f"]) - (0.405 - 0.15)) < 0.08 and "+vehicle" not in c["lvl"], c
+    # on L2 the charger is the limit for every car: no class moves the clock
+    for key, cell in p["class_cells"].items():
+        if key.startswith("l2|"):
+            assert abs(cell["off"]) < 0.05, (key, cell)
+    # what each level explained, and the correlations that set the car's and the run's weight
+    lad = p["diagnostics"]["rms_ladder"]
+    assert lad["before_class"]["dcfc"] > 0.4 > lad["after_class_levels"]["dcfc"] > lad["after_vehicle"]["dcfc"], lad
+    assert p["icc"]["dcfc"]["vehicle"] > 0.3 and p["icc"]["dcfc"]["vehicle_pairs"] >= 20, p["icc"]
+    assert p["run"]["dcfc"]["runs"] == 6 and p["run"]["dcfc"]["tau"] > 0.03, p["run"]
+    # deterministic for a given ledger and through
+    t = db.val("SELECT evidence_through FROM public.ottoq_charge_clock_fits WHERE fit_id = " + str(fid))
+    assert db.val(f"""SELECT public.ottoq_charge_time_v2_params('{DEPOT}', '{t}', interval '21 days', 3)
+                        = (SELECT params FROM public.ottoq_charge_clock_fits WHERE fit_id = {fid})""") == "t"
+    # the clock's minutes are 0614's estimate times its factor, and nothing when nothing is owed
+    base_m = float(db.val("SELECT public.ottoq_charge_minutes_estimate(75, 50, 100, 150, 250)"))
+    assert abs(float(c["m"]) - base_m * math.exp(float(c["f"]))) <= 0.1, (c, base_m)
+    assert float(_clock(db, m, "dcfc", new, 100)["m"]) == 0
+
+
+def test_0622_on_a_v1_model_the_clock_is_0619s_minutes_and_0620s_spread(db):
+    _file(db, M0619)
+    _charges(db, "dcfc", 30, 40, 1.4, 0.2)
+    _charges(db, "dcfc", 30, 40, 1.9, 0.2)
+    _charges(db, "l2", 90, 40, 2.0, 0.2)
+    _file(db, M0620)
+    _file(db, M0621)
+    db.val(f"SELECT public.ottoq_fit_charge_time_model('{DEPOT}', NULL, interval '1 day', 'test')")
+    _file(db, M0622)
+    m = db.json(f"SELECT public.ottoq_learned_estimate('{DEPOT}', 'charge_time_v1')")
+    for kind in ("dcfc", "l2"):
+        for s0 in (0, 30, 44, 45, 69, 70, 84, 85, 99, 100):
+            c = _clock(db, m, kind, {"cls": "x", "mdl": "x/y", "veh": "z"}, s0)
+            assert float(c["m"]) == _est(db, m, kind, s0), (kind, s0, c)
+            assert float(c["sd"]) == float(db.val(f"""SELECT public.ottoq_charge_time_log_sd(
+                $j${json.dumps(m)}$j$::jsonb, '{kind}', {s0})""")), (kind, s0, c)
+    # with no model at all, 0614's minutes
+    c = db.json("SELECT public.ottoq_charge_clock(NULL, 'dcfc', '{}'::jsonb, 75, 30, 100, 150, 250, NULL)")
+    assert float(c["m"]) == float(db.val("SELECT public.ottoq_charge_minutes_estimate(75, 30, 100, 150, 250)"))
+
+
+def test_0622_a_run_and_a_car_in_it_move_the_clock_by_their_own_charges(db):
+    _through_0622(db)
+    _fleet(db)
+    fid, m = _fit(db)
+    # a seventh run where every fast charge so far ran 30% longer than the cross-run clock says, and one car 30% more
+    run7 = str(uuid.uuid4())
+    slow = _fleet_car("alpha_av_2024", "A1", 0)
+    for i, (cls, make, model, ce, me) in enumerate(FLEET):
+        for k, ve in enumerate(CAR_EFF):
+            vid = _fleet_car(cls, model, k)
+            extra = 0.6 if vid == slow else 0.3
+            f = float(_clock(db, m, "dcfc", _who(db, vid), 50)["f"])
+            db.val(f"""INSERT INTO public.ottoq_charge_duration_ledger (session_id, source_kind, sim_run_id, depot_id,
+                         charger_type, charger_kw, vehicle_id, vehicle_kw, battery_kwh, soc_start, soc_end, started_at,
+                         ended_at, duration_min, stopped_reason, tick_minutes)
+                       SELECT gen_random_uuid(), 'live', '{run7}', '{DEPOT}', 'dcfc', 150, '{vid}', 250, 75, 50, 100,
+                              '{T}'::timestamptz + make_interval(mins => {10 * (4 * i + k)} + 3 * j),
+                              '{T}'::timestamptz + make_interval(mins => {10 * (4 * i + k)} + 3 * j + 2),
+                              public.ottoq_charge_minutes_estimate(75, 50, 100, 150, 250) * exp({f + extra}),
+                              'completed', 0.25
+                         FROM generate_series(0, 1) j""")
+    ev = db.json(f"SELECT public.ottoq_charge_clock_run_evidence($j${json.dumps(m)}$j$::jsonb, '{run7}', "
+                 f"'{T}'::timestamptz + interval '1 day')")
+    d = ev["dcfc"]
+    p_k = float(m["params"]["run"]["dcfc"]["k"])
+    assert d["n"] == 24 and abs(float(d["s"]) - 24 / (24 + p_k)) < 1e-3, (d, p_k)
+    # the run's mean residual is 0.3 plus the slow car's share; shrunk by n / (n + k)
+    assert abs(float(d["off"]) - float(d["s"]) * (0.3 + 0.3 / 12)) < 0.02, d
+    # the slow car's own charges in the run, less the run's offset, shrunk by Spearman-Brown on the in-run correlation
+    rho = float(m["params"]["icc"]["dcfc"]["in_run"])
+    assert rho > 0.1, m["params"]["icc"]          # planted: a condition of +-0.08 shared by a car's charges in a run
+    sb = 2 * rho / (1 + rho)
+    assert d["veh"][slow]["n"] == 2 and abs(float(d["veh"][slow]["s"]) - sb) < 1e-3, (d["veh"][slow], rho)
+    assert abs(float(d["veh"][slow]["off"]) - sb * (0.6 - float(d["off"]))) < 2e-3, (d["veh"][slow], d["off"], rho)
+    c0 = _clock(db, m, "dcfc", _who(db, slow), 50)
+    c1 = _clock(db, m, "dcfc", _who(db, slow), 50, run=d)
+    assert "+run" in c1["lvl"] and "+vehicle_in_run" in c1["lvl"], c1
+    assert abs(float(c1["f"]) - float(c0["f"]) - float(d["off"]) - float(d["veh"][slow]["off"])) < 2e-4, (c0, c1)
+    assert float(c1["sd"]) <= float(c0["sd"]), (c0, c1)
+    # as of before its first charge, the run says nothing
+    assert db.json(f"SELECT public.ottoq_charge_clock_run_evidence($j${json.dumps(m)}$j$::jsonb, '{run7}', '{T}')") == {}
+    # and a 0619 model has no run level at all
+    v1 = db.json(f"SELECT public.ottoq_learned_estimate('{DEPOT}', 'charge_time_v1')")
+    assert db.val(f"SELECT public.ottoq_charge_clock_run_evidence($j${json.dumps(v1)}$j$::jsonb, '{run7}', "
+                  f"'{T}'::timestamptz + interval '1 day') IS NULL") == "t"
+
+
+def test_0622_a_charge_under_way_is_timed_by_its_own_progress(db):
+    _through_0622(db)
+    _fleet(db)
+    fid, m = _fit(db)
+    s = m["params"]["session"]
+    # the planted pace of a charge is its pace throughout: what is done predicts what is left
+    assert s["dcfc"]["b"] > 0.5 and s["dcfc"]["n"] >= 30 and s["dcfc"]["s"] < s["dcfc"]["s_without"], s
+    assert "l2" not in s, s                    # no MeterValues on L2 here: nothing to learn from
+    who = _who(db, _fleet_car("beta_av_2024", "One", 0))
+
+    def rem(elapsed, now=65):
+        return db.json(f"""SELECT public.ottoq_charge_clock_remaining($j${json.dumps(m)}$j$::jsonb, 'dcfc',
+                             $j${json.dumps(who)}$j$::jsonb, 75, 30, {now}, 100, 150, 250, {elapsed}, NULL)""")
+    plain = _clock(db, m, "dcfc", who, 65)
+    done = _clock(db, m, "dcfc", who, 30, 65)
+    on_pace = rem(float(done["m"]))
+    slow = rem(float(done["m"]) * math.exp(0.2))
+    assert on_pace["session"] is True and slow["session"] is True and 0.15 <= float(slow["frac"]) <= 1, slow
+    # a charge running 20% slow so far is expected to run slow to the end; one on pace, as the clock says
+    assert float(slow["m"]) > float(plain["m"]) * math.exp(0.5 * 0.2) and abs(float(slow["done_res"]) - 0.2) < 0.01, \
+        (plain, slow)
+    assert abs(math.log(float(on_pace["m"]) / float(plain["m"])) - float(s["dcfc"]["a"])) < 0.02, (plain, on_pace, s)
+    # too little done to say: the clock from now, unchanged
+    early = rem(1.0, now=31)
+    assert early["session"] is False and float(early["m"]) == float(_clock(db, m, "dcfc", who, 31)["m"]), early
+    # a 0619 model has no session level
+    v1 = db.json(f"SELECT public.ottoq_learned_estimate('{DEPOT}', 'charge_time_v1')")
+    r = db.json(f"""SELECT public.ottoq_charge_clock_remaining($j${json.dumps(v1)}$j$::jsonb, 'dcfc',
+                      $j${json.dumps(who)}$j$::jsonb, 75, 30, 65, 100, 150, 250, 20, NULL)""")
+    assert r["session"] is False
+
+
+def test_0622_the_state_and_the_board_time_each_car_by_its_own_clock(db):
+    _through_0622(db)
+    _fleet(db)
+    # the line's cars: A and C are the fast class, B the slow one's first model; the rest unknown to the fit
+    for name, (cls, make, model) in {"A": ("alpha_av_2024", "Alpha", "A1"), "C": ("alpha_av_2024", "Alpha", "A1"),
+                                     "B": ("beta_av_2024", "Beta", "One")}.items():
+        db.val(f"""UPDATE public.vehicles SET vehicle_class_code = '{cls}', make = '{make}', model = '{model}'
+                    WHERE id = '{_vid(name)}'""")
+    before = _state(db)
+    assert before["models"]["charge_time_model"] == "charge_time_v1"
+    fid, m = _fit(db)
+    s = _state(db)
+    assert (s["models"]["charge_time"], s["models"]["charge_time_model"]) == (fid, "charge_time_v2"), s["models"]
+    cars = {base.NAMES[c["id"]]: c for c in s["cars"]}
+    assert (cars["A"]["cls"], cars["B"]["cls"], cars["D"]["cls"]) == ("alpha_av_2024", "beta_av_2024", "?"), cars
+    assert all(c["lv"] for c in cars.values()), cars
+    # each car's minutes are its clock's: a fast-class car at the same battery charges in about a third of the time
+    for name in ("A", "B", "D"):
+        c = _clock(db, m, "dcfc", _who(db, _vid(name)), cars[name]["soc"])
+        assert float(cars[name]["md"]) == float(c["m"]) and float(cars[name]["sd"]) == float(c["sd"]), (name, c)
+    a = _clock(db, m, "dcfc", _who(db, _vid("A")), 50)
+    b = _clock(db, m, "dcfc", _who(db, _vid("B")), 50)
+    assert 0.25 < float(a["m"]) / float(b["m"]) < 0.45, (a, b)
+    board = db.json(f"SELECT public.ottoq_agent_charge_queue_board('{RUN}', '{DEPOT}', '{T}')")
+    cc = board["check"]["charge_clock"]
+    assert (cc["model"], cc["estimate_id"]) == ("charge_time_v2", fid), cc
+    assert cc["class_vs_typical"]["alpha_av_2024"]["dcfc"] < 0.7 < cc["class_vs_typical"]["beta_av_2024"]["dcfc"], cc
+    bc = {x["name"]: x for x in board["cars"]}
+    assert bc["A"]["min_on_dcfc"] == round(float(cars["A"]["md"])) and bc["A"]["clock"] == cars["A"]["lv"], bc["A"]
+
+
+def test_0622_the_realized_reader_times_a_v2_snapshot_by_its_own_fit(db):
+    _through_0622(db)
+    _fleet(db)
+    db.val(f"""INSERT INTO public.ottoq_learned_estimates (depot_id, model, n_evidence, n_runs, usable, params, code_md5, note)
+               VALUES ('{DEPOT}', 'return_v1', 100, 5, true, '{{"threshold_soc": 50, "drain_pct_per_min": 0.5,
+                       "drain_log_sd": 0.1, "trip_min": 2, "other_share": 0.1}}', 'test', 'test')""")
+    # H, a fast-class car, is driving home at 30%
+    h = _vid("H")
+    base._car(db, "H", 30, 0, state="deployed")
+    db.val(f"DELETE FROM public.ottoq_visit_needs WHERE vehicle_id = '{h}'")
+    db.val(f"UPDATE public.vehicles SET vehicle_class_code = 'alpha_av_2024', make = 'Alpha', model = 'A1' WHERE id = '{h}'")
+    db.val(f"""INSERT INTO public.ottoq_vehicle_dispatches (vehicle_id, sim_run_id, dispatched_at, scheduled_return_at,
+                                                            planned_duration_min, status)
+               VALUES ('{h}', '{RUN}', '{T}'::timestamptz - interval '60 minutes', '{T}'::timestamptz + interval '6 minutes',
+                       30, 'returning')""")
+    fid, m = _fit(db)
+    # a v1 estimate carries the same id as the fit, so a reader that looked in the wrong table would time H by it
+    assert db.val(f"SELECT count(*) FROM public.ottoq_learned_estimates WHERE estimate_id = {fid}") == "1"
+    rec = _order(db, [("C", "dcfc")])
+    assert rec["order_id"], rec
+    snap = db.json(f"SELECT state FROM public.ottoq_charge_order_snapshots WHERE order_id = {rec['order_id']}")
+    assert snap["models"]["charge_time_model"] == "charge_time_v2" and snap["models"]["charge_time"] == fid
+    r = db.json(f"SELECT public.ottoq_charge_order_realized({rec['order_id']}, 90)")
+    inb = next(x for x in snap["inbound"] if x["id"] == h)       # H arrives at 27%: 3 points of the drive home
+    c = _clock(db, m, "dcfc", _who(db, h), inb["soc"])
+    assert float(inb["md"]) == float(c["m"]) and inb["cls"] == "alpha_av_2024", (inb, c)
+    assert float(r["inbound"][h]["md"]) == float(c["m"]) and float(r["inbound"][h]["sd"]) == float(c["sd"]), \
+        (r["inbound"][h], c)
+    # what a reader of the v1 estimate with the same id would have said: 0614's minutes, about twice as long
+    assert float(c["m"]) < 0.7 * float(db.val(f"SELECT public.ottoq_charge_minutes_estimate(75, {inb['soc']}, 100, 150, 250)"))
+
+
+def _hindsight(d, oid, at_min, cars, realized, observed=90):
+    """A graded order at minute at_min with the check's cars (state entries) and what came of them (realized['cars'])."""
+    st = {"ttl_min": 3, "pin_min": 90, "horizon_min": 480, "cars": cars, "inbound": [], "chargers": []}
+    rz = {"observed_min": observed, "cars": realized, "inbound": {}, "appeared": [], "chargers": {}, "back": []}
+    at = f"'{T}'::timestamptz + interval '{at_min} minutes'"
+    d.val(f"""INSERT INTO public.ottoq_charge_order_snapshots (order_id, sim_run_id, depot_id, sim_clock, seed, futures,
+                                                               win_frac, state, agent_order, code_md5)
+              VALUES ({oid}, '{RUN}', '{DEPOT}', {at}, 'hand', 12, 0.8, $j${json.dumps(st)}$j$::jsonb, '{{}}', 'hand')""")
+    d.val(f"""INSERT INTO public.ottoq_charge_order_hindsight (order_id, sim_run_id, depot_id, sim_clock, window_min,
+                observed_min, status, reason, taken, decision, futures, wins, need, p_win, expected, hindsight, outcome,
+                moves, forecast, fidelity, realized, code_md5)
+              VALUES ({oid}, '{RUN}', '{DEPOT}', {at}, 90, {observed}, 'accepted', 'wins_most_futures', true, true, 12,
+                      12, 10, 1, '{{}}', '{{}}', 'right_take', '{{}}', '{{}}', '{{}}', $j${json.dumps(rz)}$j$::jsonb, 'hand')""")
+
+
+def test_0622_the_calibration_takes_one_forecast_per_charge_and_leaves_out_the_late(db):
+    _through_0622(db)
+    a, b, c = _vid("A"), _vid("B"), _vid("C")
+    # order 1 at minute 0: A's charge (starting at minute 10, 33 minutes) forecast 30; B's L2 charge starts at 80 and
+    # could not finish inside the window at its 90th percentile; C's runs past the cut at 60, forecast 40
+    _hindsight(db, 9301, 0,
+               [{"id": a, "md": 30, "sd": 0.2, "ml": 100, "sl": 0.1, "cls": "alpha_av_2024", "lv": "class"},
+                {"id": b, "md": 30, "sd": 0.2, "ml": 100, "sl": 0.1, "cls": "beta_av_2024", "lv": "class"},
+                {"id": c, "md": 40, "sd": 0.1, "ml": 100, "sl": 0.1, "cls": "alpha_av_2024", "lv": "class"}],
+               {a: {"k0": "dcfc", "s0": 10, "m": 33, "cen": False}, b: {"k0": "l2", "s0": 80, "m": 20, "cen": False},
+                c: {"k0": "dcfc", "s0": 0, "m": 60, "cen": True}})
+    # order 2 at minute 5 saw A's same charge (now 5 minutes away) and forecast 28: the later forecast is the one counted
+    _hindsight(db, 9302, 5, [{"id": a, "md": 28, "sd": 0.2, "ml": 100, "sl": 0.1, "cls": "alpha_av_2024", "lv": "class"}],
+               {a: {"k0": "dcfc", "s0": 5, "m": 33, "cen": False}})
+    cal = db.json(f"SELECT public.ottoq_charge_clock_calibration('{DEPOT}', now() - interval '1 day')")
+    k = cal["by_kind"]
+    assert set(k) == {"dcfc"}, k                                  # B's late L2 charge is left out
+    d = k["dcfc"]
+    assert (d["charges"], d["finished"], d["overran"]) == (2, 1, 1), d
+    assert float(d["factor_off_by"]) == round(33 / 28, 3), d       # one forecast per charge: order 2's 28, not 30
+    assert float(d["in_80pct_band"]) == 0.5, d                    # A inside its band; C overran, outside
+    assert set(cal["by_class"]) == {"dcfc|alpha_av_2024"} and set(cal["by_level"]) == {"dcfc|class"}, cal
+
+
+def test_0622_the_audit_names_a_variable_the_clock_misses(db):
+    _through_0622(db)
+    _fleet(db)
+    fid, m = _fit(db)
+    # after the fit: 72 fast charges, half of them in the cold, which costs 40% the clock knows nothing of
+    rows = []
+    for cls, make, model, ce, me in FLEET:
+        for k, ve in enumerate(CAR_EFF):
+            vid = _fleet_car(cls, model, k)
+            f = float(_clock(db, m, "dcfc", _who(db, vid), 50)["f"])
+            for j in range(6):
+                cold = j % 2 == 0
+                rows.append(f"('{vid}', {-10 if cold else 20}, {f + (0.34 if cold else 0) + (j - 2.5) * 0.01}, "
+                            f"{4 * FLEET.index((cls, make, model, ce, me)) + k})")
+    db.val(f"""INSERT INTO public.ottoq_charge_duration_ledger (session_id, source_kind, sim_run_id, depot_id, charger_type,
+                 charger_kw, vehicle_id, vehicle_kw, battery_kwh, soc_start, soc_end, started_at, ended_at, duration_min,
+                 stopped_reason, tick_minutes, ambient_temp_c)
+               SELECT gen_random_uuid(), 'live', md5('cc-run-cold')::uuid, '{DEPOT}', 'dcfc', 150, x.vid::uuid, 250, 75, 50,
+                      100, '{T}'::timestamptz + make_interval(hours => x.j), '{T}'::timestamptz + make_interval(hours => x.j + 1),
+                      public.ottoq_charge_minutes_estimate(75, 50, 100, 150, 250) * exp(x.f), 'completed', 0.25, x.amb
+                 FROM (VALUES {", ".join(rows)}) x(vid, amb, f, j)""")      # j: the car's own hour, not the cold's
+    since = db.val(f"SELECT fitted_at FROM public.ottoq_charge_clock_fits WHERE fit_id = {fid}")
+    aud = db.json(f"SELECT public.ottoq_charge_clock_audit('{DEPOT}', '{since}', NULL)")
+    d = aud["by_kind"]["dcfc"]
+    assert d["charges"] == 72 and d["out_of_sample"] is True and d["clock"]["estimate_id"] == fid, d
+    cov = {x["covariate"]: x for x in d["covariates"]}
+    assert cov["ambient_c"]["modelled"] is False and float(cov["ambient_c"]["adj_eta2"]) > 0.9, cov["ambient_c"]
+    assert float(cov["class"]["adj_eta2"]) < 0.05 and float(cov["vehicle"]["adj_eta2"]) < 0.05, cov
+    assert d["covariates"][0]["covariate"] == "ambient_c", d["covariates"][0]
+    # the clock beats 0619's on the cars it knows; it misses the cold all the same
+    assert float(d["clock"]["mean_abs_log_error"]) < float(d["v1"]["mean_abs_log_error"]), d
+    sa = db.json(f"SELECT public.ottoq_arbiter_self_assessment_v2('{DEPOT}', '{since}')")
+    areas = {x["area"]: x for x in sa["improvement_areas"]}
+    miss = areas["charge_clock_misses_ambient_c_dcfc"]
+    assert miss["kind"] == "capability_gap" and "does not model it" in miss["finding"], miss
+    assert sa["v"] == 2 and "charge_clock" in sa and "clock_audit" in sa, sa.keys()
+
+
+def test_0622_the_fits_are_append_only(db):
+    _through_0622(db)
+    rc, _, err = db.run("UPDATE public.ottoq_charge_clock_fits SET note = 'x'")
+    assert rc != 0 and "append-only" in err, err
+    rc, _, err = db.run("DELETE FROM public.ottoq_charge_clock_fits")
+    assert rc != 0 and "append-only" in err, err
+
+
+def test_0622_refuses_a_state_it_was_not_written_against(db):
+    _through_0621(db)
+    db.val("""CREATE OR REPLACE FUNCTION public.ottoq_charge_line_state(p_sim_run_id uuid, p_depot_id uuid,
+                p_clock timestamptz) RETURNS jsonb LANGUAGE sql STABLE AS $f$ SELECT '{}'::jsonb $f$""")
+    rc, err = db.file(M0622)
+    assert rc != 0 and "0622 P1" in err and "the state" in err, err
