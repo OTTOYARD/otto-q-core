@@ -706,7 +706,7 @@ repo_manifest(version, name, file) AS (
     ('20261008134303'::text, 'the_kernel_takes_an_agent_order_only_when_it_wins_most_futures'::text, '0620_the_kernel_takes_an_agent_order_only_when_it_wins_most_futures.sql'::text),
     ('20261008144612'::text, 'the_kernel_grades_its_own_check_in_hindsight'::text, '0621_the_kernel_grades_its_own_check_in_hindsight.sql'::text),
     ('20261008162412'::text, 'the_kernel_learns_each_cars_charge_clock_from_its_own_charges'::text, '0622_the_kernel_learns_each_cars_charge_clock_from_its_own_charges.sql'::text),
-    ('PENDING'::text, 'the_check_sees_cars_leave_and_come_back'::text, '0623_the_check_sees_cars_leave_and_come_back.sql'::text)
+    ('20261008191129'::text, 'the_check_sees_cars_leave_and_come_back'::text, '0623_the_check_sees_cars_leave_and_come_back.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

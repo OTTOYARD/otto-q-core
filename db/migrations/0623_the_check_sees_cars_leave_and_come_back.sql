@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261008191129
 -- migration-name:    the_check_sees_cars_leave_and_come_back
 --
 -- 0623  **The check sees cars leave and come back.**
