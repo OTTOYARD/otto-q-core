@@ -247,7 +247,6 @@ serve(async (req) => {
     const { data: run } = await runQuery.maybeSingle();
     if (!run) return json({ ok: true, skipped: "no running run" });
     const depot = run.depot_id;
-
     // 0332: multiple clocks can request an agent pass at the same run tick.
     // Claim the tick atomically before spending a model call or changing policy.
     // Chain-disabled sessions preserve the legacy behavior and are admitted by
