@@ -176,7 +176,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0624 — GENERATED, not a log
+## Index, 0134–0625 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624 — which are indexed below as well as logged above; the log row is
@@ -671,7 +671,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0622](db/migrations/0622_the_kernel_learns_each_cars_charge_clock_from_its_own_charges.sql) | `20261008162412` | yes — ledger | **The kernel learns each car's charge clock from its own charges, and looks for the variable its clock misses.** |
 | [0623](db/migrations/0623_the_check_sees_cars_leave_and_come_back.sql) | `20261008191129` | yes — ledger | **The check sees cars leave and come back.** |
 | [0624](db/migrations/0624_the_check_reads_each_cars_open_work.sql) | `20261008204412` | yes — ledger | **The check reads each car's open work.** |
+| [0625](db/migrations/0625_a_learned_model_knows_when_its_world_changed.sql) | `PENDING` | no — pending | **A learned model knows when its world changed, and finds the change itself.** |
 
-476 migrations indexed.
+477 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
