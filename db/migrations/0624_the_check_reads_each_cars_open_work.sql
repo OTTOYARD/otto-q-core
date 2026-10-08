@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261008204412
 -- migration-name:    the_check_reads_each_cars_open_work
 --
 -- 0624  **The check reads each car's open work.**
