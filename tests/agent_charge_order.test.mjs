@@ -125,6 +125,18 @@ test("v25 / 0620: the prompt says the kernel rolls the line forward over sampled
   assert.doesNotMatch(CHARGE_ORDER_PROMPT, /The contract first: cars with over_limit_min above 0/);
 });
 
+test("v26 / 0621: the prompt reads the track record and learns from the moves", () => {
+  assert.match(CHARGE_ORDER_PROMPT, /track_record is how your orders did in what actually happened: 90 sim-minutes after each order the kernel replays it/);
+  assert.match(CHARGE_ORDER_PROMPT, /the real arrivals, the real charge times, the cars it never saw coming and the chargers that faulted/);
+  assert.match(CHARGE_ORDER_PROMPT, /due_rescue_fast \(a car late in the kernel's order made ready by its due time on a fast charger\)/);
+  assert.match(CHARGE_ORDER_PROMPT, /low_battery_on_l2 \(a car under 45% put on an L2 ahead of the kernel's order\)/);
+  assert.match(CHARGE_ORDER_PROMPT, /9\. Learn from track_record\.moves, this depot's own hindsight: make the moves that won in what actually happened; stop making a move that has lost more often than it won over 3 or more orders/);
+  // every move the kernel names (0621 ottoq_charge_order_moves) is one the prompt explains
+  for (const move of ["due_rescue_fast", "due_rescue", "low_battery_on_l2", "top_off_ahead", "late_car_first", "kind_swap", "reorder_only"]) {
+    assert.match(CHARGE_ORDER_PROMPT, new RegExp(`${move} \\(`), move);
+  }
+});
+
 test("0618/0620: a refused order is not an enacted action", () => {
   assert.equal(chargeOrderAccepted({ ok: true, status: "refused", projection: { take: false, reason: "line_ready_later" } }), false);
   assert.equal(chargeOrderAccepted({ ok: true, status: "refused", projection: { take: false, reason: "same_as_kernel" } }), false);
@@ -144,13 +156,13 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v25: the model call goes through the retry module, with the fallback model, and the row says v25", () => {
+test("v23-v26: the model call goes through the retry module, with the fallback model, and the row says v26", () => {
   assert.match(code, /await callModelWithRetry\(/);
   assert.match(code, /models: \[MODEL, FALLBACK_MODEL\]/);
   assert.match(code, /const FALLBACK_MODEL = "nvidia\/nemotron-3-super-120b-a12b";/);
   assert.match(code, /model_attempts: call\.attempts/);
-  assert.match(code, /agent_version: "v25"/);
-  assert.doesNotMatch(code, /agent_version: "v2[234]"/);
+  assert.match(code, /agent_version: "v26"/);
+  assert.doesNotMatch(code, /agent_version: "v2[2345]"/);
   // the single-try key loop is gone
   assert.doesNotMatch(code, /for \(const candidate of keys\)/);
   // an accepted order is an enacted action

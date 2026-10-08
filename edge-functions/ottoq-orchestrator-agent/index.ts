@@ -10,6 +10,12 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v26 (0621): THE AGENT READS ITS OWN TRACK RECORD. The kernel now replays every order it checked 90 sim-minutes
+//      later with what actually happened and keeps the result (ottoq_charge_order_hindsight); the board carries it as
+//      track_record: this run and the depot's last days by outcome, each kind of move the agent's orders made with how
+//      often it won and lost in hindsight, and what most often made the check wrong. The charge-line section reads it
+//      and asks for the moves that won and against the ones that lost: the agent learns inside a run and across runs,
+//      from the depot's own evidence, without a weight changing anywhere.
 // v25 (0619, 0620): THE CHECK ROLLS THE LINE FORWARD, AND THE AGENT ORDERS WHEN THE LINE IS TIGHT. Under 0618's
 //      one-shot projection the order still trailed the kernel's own (uptime 35.9% against 40.6%, db/checks/0415 §5):
 //      every order it took was a few minutes better on the line waiting at that moment, on a charge clock 35-140%
@@ -551,7 +557,7 @@ serve(async (req) => {
                                        review: board.review != null, charge_queue: board.charge_queue != null },
                        // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
                        model_attempts: call.attempts,
-                       agent_version: "v25" },
+                       agent_version: "v26" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId,
                          // v23: the order as sent to the door, with any name the board did not hold
@@ -560,7 +566,8 @@ serve(async (req) => {
                         solver_handoff: solverHandoff,
                         // v23: the kernel's receipt for the charge order: accepted, partial or rejected, and why;
                         // v24 (0618): or refused, with the projection that refused it;
-                        // v25 (0620): with the futures it won of those rolled, and why
+                        // v25 (0620): with the futures it won of those rolled, and why; v26 (0621): the board's
+                        // track_record grades each order later, against what actually happened
                         charge_order: chargeOrderReceipt,
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
       // v23: an order the kernel accepted is an enacted action, as a dial write is
