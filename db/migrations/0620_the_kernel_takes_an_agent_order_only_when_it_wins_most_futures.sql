@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261008134303
 -- migration-name:    the_kernel_takes_an_agent_order_only_when_it_wins_most_futures
 --
 -- 0620  **The kernel takes the agent's charge order only when it beats the kernel's own order in the expected future
