@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261008225037
 -- migration-name:    the_self_review_judges_the_clock_within_runs_and_ranks_what_to_build
 --
 -- 0626  **The self-review judges the clock within runs, finds what changed, and ranks what to build in plain words.**
