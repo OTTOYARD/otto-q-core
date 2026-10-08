@@ -20,8 +20,11 @@
 --       L2     1.35 below 45%   1.40 at 45-70%   1.43 at 70-85%   1.85 at 85% and above   (robust log sd 0.10-0.16)
 --       DCFC   1.46 below 45%   1.81 at 45-70%   1.92 at 70-85%   2.38 at 85% and above   (robust log sd 0.29-0.52)
 --
---   So the check read a top-off on a fast charger as 17 minutes when it takes about 40, as long as on an L2, and a car
+--   So the check read the median top-off on a fast charger as 17 minutes when the fitted factor puts it near 40, and a car
 --   at 27% as 174 minutes on an L2 when it takes about 239 (the sessions of db/checks/0415's three runs say the same).
+--   (Corrected after apply: the file as applied added "as long as on an L2", comparing the band's averages over two
+--   different groups of cars; for the depot's average car (96.5 kWh) from 90% the fitted clock gives 31 minutes on a
+--   350 kW fast charger against 56 on an L2.)
 --   An order compared on that clock can look better than the kernel's and be worse. And the check saw no car coming
 --   back, though the engine's own dispatches say when one will: on those three runs, 265 of 349 returns were a car
 --   reaching its low-battery reserve, at 49.2% (p10 44.9, p90 50.0), after draining 0.69% a minute (sd 0.08) since it
