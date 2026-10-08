@@ -168,7 +168,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0618 — GENERATED, not a log
+## Index, 0134–0619 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618 — which are indexed below as well as logged above; the log row is
@@ -657,7 +657,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0616](db/migrations/0616_the_order_usage_counts_the_orders_that_seated_cars.sql) | `20261007184459` | yes — ledger | **What the agent's orders did, counted by order.** `ottoq_agent_charge_order_usage` (0614) counts SEATS: how many |
 | [0617](db/migrations/0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named.sql) | `20261007202316` | yes — ledger | **Under the agent's charge order, a car named for the kind of charger that is not free waits behind the cars the |
 | [0618](db/migrations/0618_the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it.sql) | `20261007203510` | yes — ledger | **The kernel checks the agent's charge order against its own before it takes it.** When the agent sends an |
+| [0619](db/migrations/0619_the_kernel_learns_how_long_a_charge_takes_and_when_a_car_comes_back.sql) | `PENDING` | no — pending | **The kernel learns how long a charge takes and when a car comes back, from its own evidence.** Two learned |
 
-470 migrations indexed.
+471 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
