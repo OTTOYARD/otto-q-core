@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261008162412
 -- migration-name:    the_kernel_learns_each_cars_charge_clock_from_its_own_charges
 --
 -- 0622  **The kernel learns each car's charge clock from its own charges, and looks for the variable its clock misses.**
