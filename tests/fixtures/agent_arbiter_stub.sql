@@ -35,3 +35,5 @@ CREATE TABLE public.ottoq_events (event_id uuid NOT NULL DEFAULT gen_random_uuid
 -- default becomes a plain bigserial here).
 CREATE TABLE public.ottoq_ocpp_messages (message_id uuid NOT NULL DEFAULT gen_random_uuid(), message_seq bigserial NOT NULL, ocpp_session_id uuid, charger_id uuid, vehicle_id uuid, sim_run_id uuid, message_at timestamp with time zone NOT NULL DEFAULT now(), sim_clock_at timestamp with time zone, direction text NOT NULL, message_type text NOT NULL, ocpp_version text NOT NULL DEFAULT '2.0.1'::text, payload jsonb NOT NULL, data_source text NOT NULL DEFAULT 'twin'::text, created_at timestamp with time zone NOT NULL DEFAULT now());
 CREATE INDEX idx_ocpp_msgs_session ON public.ottoq_ocpp_messages USING btree (ocpp_session_id, message_at);
+-- 0626 names a vehicle class by its maker in the self-review's words (live catalog, 2026-10-08; the columns 0626 reads).
+CREATE TABLE public.ottoq_vehicle_classes (vehicle_class_code text NOT NULL PRIMARY KEY, oem_name text NOT NULL, manufacturer text, model text, status text NOT NULL DEFAULT 'active'::text);
