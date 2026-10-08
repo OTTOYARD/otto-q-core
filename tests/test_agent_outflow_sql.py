@@ -11,6 +11,8 @@ tests/test_agent_arbiter_sql.py applies them:
   - it applies, its checks run, its dial is a person's, its grants keep the readers of the ledgers to the service role;
   - without an outflow block the schedule and the comparison return 0622's results, key for key, on random lines, and
     a stored order reads and grades as it did;
+  - hindsight reads only its window: a charge still running at the cut keeps its minutes when its charger faults
+    after it, and V1 holds a grade stored without them to everything else it read;
   - the draws are pure and the dwell grid reads both ways;
   - one car's departure and return, its real durations kept, the cut respected, a car past the evidence staying;
   - the fit learns the dwell by Kaplan-Meier with the parked cars censored, from fine-tick runs when they hold 30;
@@ -108,7 +110,7 @@ def test_0623_applies_and_its_checks_run(db):
     md5_before = db.val("SELECT public.ottoq_hindsight_code_md5()")
     err = _apply(db)
     assert ("0623 V1: 0 stored simulations and comparisons (0 snapshots x 2 futures) and 0 graded orders read as "
-            "before") in err, err
+            "graded, but for 0 charges in 0 of them") in err, err
     assert "0623 V2: run d9d49732 is not here" in err, err
     assert "0623 V3: return_v1 estimate" in err and "dwell from 0 charges (0 left, 0 still parked)" in err, err
     assert "0623 V3 on running run a0000000-0000-0000-0000-000000000614" in err and "outflow <NULL>" in err, err
@@ -189,6 +191,50 @@ def test_0623_a_stored_order_without_an_outflow_reads_and_grades_as_before(db):
     assert fe3 == fe2 and "outflow" not in fe3
     g = db.json(f"SELECT public.ottoq_charge_order_grade({oid}, 90)")
     assert g["order_id"] == oid and "outflow" not in g["forecast"], g["forecast"]
+
+
+def test_0623_hindsight_reads_only_its_window(db):
+    """§1(g), §2(h): a charge still running at the cut keeps its minutes when its charger faults after the cut; one a
+    fault cut inside the window still has none; and V1 holds a grade stored without them to all else it read."""
+    oid = arb._a_morning(db)
+    _file(db, arb.M0622)
+    p, b = _vid("P"), _vid("B")
+    # P was still charging on L1 at the cut (minute 90); its charger faults at 95, before the run's clock (100)
+    db.val(f"""UPDATE public.ocpp_sessions SET status = 'faulted', stopped_reason = 'fault.station_hardware',
+                      ended_at = '{T}'::timestamptz + interval '95 minutes' WHERE vehicle_id = '{p}' AND ended_at IS NULL""")
+    leak = db.json(f"SELECT public.ottoq_charge_order_realized({oid}, 90)")
+    assert leak["cars"][p] == {"s0": 0.25, "k0": "l2", "m": None, "cen": True, "end": "running"}, leak["cars"][p]
+    # graded so while the run was live; then the run ends
+    out = db.json(f"SELECT public.ottoq_charge_order_grade_pending('{RUN}', 5, true, 60000, 90)")
+    assert (out["graded"], out["errors"]) == (1, 0), out
+    db.val(f"UPDATE public.ottoq_sim_runs SET status = 'completed', ended_at = clock_timestamp() + interval '1 minute' "
+           f"WHERE sim_run_id = '{RUN}'")
+    err = _apply(db)
+    assert ("and 1 graded orders read as graded, but for 1 charges in 1 of them still running at the cut that a fault "
+            "after it had left without minutes: they read their minutes to the cut, as all 1 charges running at a cut "
+            "do") in err, err
+    real = db.json(f"SELECT public.ottoq_charge_order_realized({oid}, 90)")
+    assert real["cars"][p] == {"s0": 0.25, "k0": "l2", "m": 89.75, "cen": True, "end": "running"}, real["cars"][p]
+    assert real["cars"][b] == {"s0": 0.25, "k0": "l2", "m": None, "cen": True, "end": "fault.connector_cable"}, \
+        real["cars"][b]
+
+    def rest(r):
+        return {k: v for k, v in r.items() if k not in ("cars", "run_status")}
+    assert rest(real) == rest(leak)
+    assert {k: v for k, v in real["cars"].items() if k != p} == {k: v for k, v in leak["cars"].items() if k != p}
+    # the grade replays P's charge as it ran, at least its 89.75 minutes on the L2, where without them it kept the
+    # check's own clock: its real minutes were in no part
+    snap = db.json(f"SELECT state FROM public.ottoq_charge_order_snapshots WHERE order_id = {oid}")
+    sp = next(c for c in snap["cars"] if c["id"] == p)
+
+    def ml(r):
+        st = db.json(f"SELECT public.ottoq_charge_line_realize({_j(snap)}, {_j(r)}, ARRAY['charge_times'])")
+        return float(next(c for c in st["cars"] if c["id"] == p)["ml"])
+    assert ml(leak) == float(sp["ml"])
+    assert ml(real) == round(max(89.75, float(sp["ml"])), 2) > ml(leak)     # here 89.75 against the clock's 70
+    # the stored grade is evidence: it stays as it was graded
+    assert db.json(f"SELECT realized FROM public.ottoq_charge_order_hindsight WHERE order_id = {oid}")["cars"][p]["m"] \
+        is None
 
 
 # ── the draws ─────────────────────────────────────────────────────────────────────────────────────────────────────────

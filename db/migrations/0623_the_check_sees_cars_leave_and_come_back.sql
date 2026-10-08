@@ -54,6 +54,17 @@
 --       swings inside a run: of the cars that left, 30% fell under the curve's median while the run had shown fewer
 --       than 20 charges, and 72% once it had shown 20 to 50. A run's past dwells lag its next ones. What decides a
 --       dwell is the car's own open work and the hour's demand, which no curve over all cars carries (G356).
+--   (g) Found by V1 at the first apply, and fixed here: hindsight read past its window. 0621's reader gives a charge
+--       still running at the cut its minutes so far (a lower bound) and a charge a fault cut inside the window none
+--       (that charge is the faults' part). It told the two apart by the session's status when read, not at the cut, so
+--       a charge whose charger faulted after the cut read as one a fault had cut, and the grade replayed it on the
+--       check's own clock: its real minutes were in no part. The first apply stopped at V1 on order 410: graded while
+--       its run was live, it read 14.36 minutes for a fast charge that faulted 6.3 minutes past the cut, and read none
+--       once the run had ended. Of the 61 graded orders, 48 were stored with 71 such entries between them, from 4
+--       charges (an L2 and three fast) that faulted 0.8 to 60.5 minutes past a cut; read today, 0622's reader blanks
+--       78 in 54. Nothing else had moved: with those minutes set aside, all 61 read today exactly as graded (measured
+--       2026-10-08 18:30-18:50 UTC). Stored grades are evidence and stay as written; db/checks/0417 grades them again
+--       (G357).
 --
 -- ══ §2 WHAT ═══════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -93,8 +104,12 @@
 --       `ottoq_charge_line_realize` puts them in for the `appeared` part (the part is now "the outflow and the unseen").
 --       `ottoq_charge_order_forecast_errors(state, real, expected)` grades the outflow forecast against them (returns
 --       modelled and real, hits, timing; departures; the unseen), and `ottoq_charge_order_grade` passes it the expected
---       future of the order that ran. A state without an outflow block reads and grades as before (V1).
+--       future of the order that ran. A state without an outflow block reads and grades as before (V1), but for (h).
 --   (g) A person's dial, catalogued, not agent-writable: `agent_charge_order_outflow` (1; 0 is 0622's check).
+--   (h) Hindsight reads only its window. In `ottoq_charge_order_realized` a charge's minutes are blank only when a
+--       fault ended it inside the window; one still running at the cut reads its minutes to the cut whatever came
+--       after (§1(g)). It holds on every state, with an outflow block or without, and it is the one change to what a
+--       stored order reads.
 --
 --   The tick path is untouched. The check, the grader and the board run only on runs that take an agent's charge
 --   order (0615); the dwell fit writes one row a night.
@@ -104,8 +119,10 @@
 --   P0: nothing in flight. P1: every body replaced or relied on is the one this file was written against (md5);
 --   nothing this file creates exists. Nothing here drops or deletes anything.
 --   V1: on the 40 latest stored snapshots (none carries an outflow block), in the expected future and a sampled one, the
---   schedule and the comparison return what they returned before this file, key for key; and ten graded orders read as
---   they were graded.
+--   schedule and the comparison return what they returned before this file, key for key; and every graded order (to
+--   100) reads as it was graded, but for §2(h): blank again the minutes a fault after the cut had blanked and each
+--   reads exactly as stored, and every charge running at its cut reads its minutes to the cut. (Its first form compared
+--   ten orders whole, and stopped the first apply on §1(g).)
 --   V2: THE GATE. On run d9d49732's graded orders, each stored state given the outflow as of its clock (the dwell fitted
 --   through the run's start, so out of sample), against the session and dispatch ledgers. Of the cars that left inside
 --   the window, the share whose dwell fell under the curve's median for its stretch (from how long the car had already
@@ -123,7 +140,8 @@
 --
 --   FALSE/FALSE. The check, its grader and the board run only on operator_demo runs that take an agent's charge order
 --   (0615); no certification, sweep or dial pair arms an order. Without an outflow block every reader returns what it
---   returned (V1); the new estimate keys are evidence.
+--   returned (V1), the hindsight reader but for a charge running at its cut (§2(h)), and no tick reads hindsight; the
+--   new estimate keys are evidence.
 --
 -- ROLLBACK: set agent_charge_order_outflow to 0 on the runs that should not see it (0622's check, exactly), or EXECUTE
 --   each `definition` in ottoq_schema_snapshots WHERE label = '0623_pre' (the state, schedule, comparison, realize,
@@ -1292,7 +1310,9 @@ AS $fn$
    0623: on a state with an outflow block, the cars it models leaving (each busy charger's car and the parked ones) are
    no longer appeared, and returns gives, for every car the state models, when the charge before its first trip after
    the order ended (ce), when it left on that trip (left) and when it came back (eta, with its battery soc), each inside
-   the window or absent. A state without one reads exactly as before (V1). */
+   the window or absent. A state without one reads exactly as before (V1), but for one thing on every state: m is NULL
+   only for a fault inside the window. A charge still running at the cut reads its minutes to the cut whatever came
+   after it; 0621-0622 read the session's status as it stood when read, so a fault after the cut blanked them (§1(g)). */
 DECLARE
   s record; v_clock timestamptz; v_status text; v_t0 timestamptz; v_cut timestamptz; v_obs numeric;
   v_model jsonb; v_kw_d numeric; v_kw_l numeric; v_ids text[]; v_ch_ids text[]; v_back_ids text[];
@@ -1403,7 +1423,10 @@ BEGIN
            'j', jsonb_build_object(
                   's0', round((extract(epoch FROM (f.started_at - v_t0)) / 60.0)::numeric, 2),
                   'k0', f.kind,
-                  'm', CASE WHEN f.status = 'faulted' OR COALESCE(f.stopped_reason, '') LIKE 'fault.%' THEN NULL
+                  -- 0623: a fault cuts the charge only when it came inside the window (0621-0622 asked the session's
+                  -- status when read, so a charge still running at the cut lost its minutes to a fault after it)
+                  'm', CASE WHEN f.ended_at IS NOT NULL AND f.ended_at <= v_cut
+                             AND (f.status = 'faulted' OR COALESCE(f.stopped_reason, '') LIKE 'fault.%') THEN NULL
                             ELSE round((extract(epoch FROM (LEAST(COALESCE(f.ended_at, v_cut), v_cut) - f.started_at)) / 60.0)::numeric, 2) END,
                   'cen', NOT (f.ended_at IS NOT NULL AND f.ended_at <= v_cut AND f.stopped_reason = 'completed'),
                   'end', CASE WHEN f.ended_at IS NULL OR f.ended_at > v_cut THEN 'running'
@@ -1733,7 +1756,7 @@ GRANT EXECUTE ON FUNCTION public.ottoq_charge_line_outflow(uuid, uuid, timestamp
 
 -- ══ V ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 DO $v1$
-DECLARE v_n int; v_bad int; v_rn int := 0; r record; v_now jsonb;
+DECLARE v_n int; v_bad int; v_rn int; v_rbad int; v_blank int; v_blank_orders int; v_running int; v_mbad int;
 BEGIN
   -- the stored snapshots (none carries an outflow block) simulate and compare as before this file
   SELECT count(*), count(*) FILTER (WHERE b.k IS DISTINCT FROM public.ottoq_charge_line_schedule(s.state, NULL, b.sc, s.seed, true)
@@ -1746,21 +1769,75 @@ BEGIN
   IF v_bad > 0 THEN
     RAISE EXCEPTION '0623 V1: % of % stored simulations changed without an outflow block', v_bad, v_n;
   END IF;
-  -- and the graded orders read as they were graded
-  FOR r IN
-    SELECT h.order_id, h.window_min, h.realized
-      FROM ottoq_charge_order_hindsight h JOIN ottoq_sim_runs x ON x.sim_run_id = h.sim_run_id
-     WHERE h.observed_min = h.window_min AND x.status = 'completed' AND h.graded_at < x.ended_at
-     ORDER BY h.order_id DESC LIMIT 10
-  LOOP
-    v_now := public.ottoq_charge_order_realized(r.order_id, r.window_min);
-    IF (v_now - 'run_status') IS DISTINCT FROM (r.realized - 'run_status') THEN
-      RAISE EXCEPTION '0623 V1: order % no longer reads as it was graded', r.order_id;
-    END IF;
-    v_rn := v_rn + 1;
-  END LOOP;
-  RAISE NOTICE '0623 V1: % stored simulations and comparisons (% snapshots x 2 futures) and % graded orders read as before',
-    v_n, v_n / 2, v_rn;
+  -- and the graded orders read as they were graded, but for one thing (§1(g)): a charge still running at the cut that
+  -- its grade read without minutes, because its charger faulted after the cut, now reads them. Blank those again and
+  -- every grade reads exactly as stored; and no reading now leaves a charge running at its cut without its minutes to
+  -- the cut (its observed minutes less its start, to the rounding of the two)
+  WITH g AS (
+         SELECT h.order_id, h.realized - 'run_status' AS st,
+                public.ottoq_charge_order_realized(h.order_id, h.window_min) - 'run_status' AS nw
+           FROM ottoq_charge_order_hindsight h JOIN ottoq_sim_runs x ON x.sim_run_id = h.sim_run_id
+          WHERE h.observed_min = h.window_min AND x.status = 'completed' AND h.graded_at < x.ended_at
+          ORDER BY h.order_id DESC LIMIT 100),
+       -- the grade's charges still running at the cut and without their minutes, by car (in appeared, by id)
+       bl AS (
+         SELECT g.order_id, v.cont, v.car
+           FROM g CROSS JOIN LATERAL (
+                  SELECT 'cars'::text AS cont, k.key AS car, k.value AS o
+                    FROM jsonb_each(CASE WHEN jsonb_typeof(g.st -> 'cars') = 'object' THEN g.st -> 'cars' ELSE '{}'::jsonb END) k
+                  UNION ALL
+                  SELECT 'inbound', k.key, k.value
+                    FROM jsonb_each(CASE WHEN jsonb_typeof(g.st -> 'inbound') = 'object' THEN g.st -> 'inbound' ELSE '{}'::jsonb END) k
+                  UNION ALL
+                  SELECT 'appeared', a.value ->> 'id', a.value
+                    FROM jsonb_array_elements(CASE WHEN jsonb_typeof(g.st -> 'appeared') = 'array' THEN g.st -> 'appeared'
+                                                   ELSE '[]'::jsonb END) a) v
+          WHERE v.o ? 'k0' AND v.o ->> 'end' = 'running' AND jsonb_typeof(v.o -> 'm') = 'null'),
+       -- every charge still running at the cut in the readings now
+       rn AS (
+         SELECT v.o, (g.nw ->> 'observed_min')::numeric AS w
+           FROM g CROSS JOIN LATERAL (
+                  SELECT k.value AS o
+                    FROM jsonb_each(CASE WHEN jsonb_typeof(g.nw -> 'cars') = 'object' THEN g.nw -> 'cars' ELSE '{}'::jsonb END) k
+                  UNION ALL
+                  SELECT k.value
+                    FROM jsonb_each(CASE WHEN jsonb_typeof(g.nw -> 'inbound') = 'object' THEN g.nw -> 'inbound' ELSE '{}'::jsonb END) k
+                  UNION ALL
+                  SELECT a.value
+                    FROM jsonb_array_elements(CASE WHEN jsonb_typeof(g.nw -> 'appeared') = 'array' THEN g.nw -> 'appeared'
+                                                   ELSE '[]'::jsonb END) a) v
+          WHERE v.o ? 'k0' AND v.o ->> 'end' = 'running'),
+       -- the readings now with the grade's blanks blanked again
+       rb AS (
+         SELECT g.st, g.nw
+                || CASE WHEN jsonb_typeof(g.nw -> 'cars') = 'object' THEN jsonb_build_object('cars', (
+                     SELECT COALESCE(jsonb_object_agg(k.key,
+                              CASE WHEN EXISTS (SELECT 1 FROM bl WHERE bl.order_id = g.order_id AND bl.cont = 'cars' AND bl.car = k.key)
+                                   THEN k.value || '{"m": null}'::jsonb ELSE k.value END), '{}'::jsonb)
+                       FROM jsonb_each(g.nw -> 'cars') k)) ELSE '{}'::jsonb END
+                || CASE WHEN jsonb_typeof(g.nw -> 'inbound') = 'object' THEN jsonb_build_object('inbound', (
+                     SELECT COALESCE(jsonb_object_agg(k.key,
+                              CASE WHEN EXISTS (SELECT 1 FROM bl WHERE bl.order_id = g.order_id AND bl.cont = 'inbound' AND bl.car = k.key)
+                                   THEN k.value || '{"m": null}'::jsonb ELSE k.value END), '{}'::jsonb)
+                       FROM jsonb_each(g.nw -> 'inbound') k)) ELSE '{}'::jsonb END
+                || CASE WHEN jsonb_typeof(g.nw -> 'appeared') = 'array' THEN jsonb_build_object('appeared', (
+                     SELECT COALESCE(jsonb_agg(
+                              CASE WHEN EXISTS (SELECT 1 FROM bl WHERE bl.order_id = g.order_id AND bl.cont = 'appeared'
+                                                                   AND bl.car = a.value ->> 'id')
+                                   THEN a.value || '{"m": null}'::jsonb ELSE a.value END ORDER BY a.i), '[]'::jsonb)
+                       FROM jsonb_array_elements(g.nw -> 'appeared') WITH ORDINALITY a(value, i))) ELSE '{}'::jsonb END AS nb
+           FROM g)
+  SELECT (SELECT count(*) FROM g), (SELECT count(*) FROM rb WHERE rb.nb IS DISTINCT FROM rb.st),
+         (SELECT count(*) FROM bl), (SELECT count(DISTINCT bl.order_id) FROM bl), (SELECT count(*) FROM rn),
+         (SELECT count(*) FROM rn WHERE jsonb_typeof(rn.o -> 'm') IS DISTINCT FROM 'number'
+                                      OR abs((rn.o ->> 'm')::numeric - (rn.w - (rn.o ->> 's0')::numeric)) > 0.02)
+    INTO v_rn, v_rbad, v_blank, v_blank_orders, v_running, v_mbad;
+  IF v_rbad > 0 OR v_mbad > 0 THEN
+    RAISE EXCEPTION '0623 V1: % of % graded orders no longer read as graded, or % of % charges running at a cut read other than their minutes to it',
+      v_rbad, v_rn, v_mbad, v_running;
+  END IF;
+  RAISE NOTICE '0623 V1: % stored simulations and comparisons (% snapshots x 2 futures) and % graded orders read as graded, but for % charges in % of them still running at the cut that a fault after it had left without minutes: they read their minutes to the cut, as all % charges running at a cut do',
+    v_n, v_n / 2, v_rn, v_blank, v_blank_orders, v_running;
 END $v1$;
 
 DO $v2$
@@ -1909,9 +1986,10 @@ INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, 
 VALUES ('0623_the_check_sees_cars_leave_and_come_back', false, false,
   'The agent''s charge-order check sees the depot''s own outflow: cars leave after the learned dwell (Kaplan-Meier, '
   'refitted nightly with return_v1), work to the reserve or are called home first, and come back owing a charge; each '
-  'car is compared over its visit now and its next. The grader grades the outflow forecast. Without an outflow block '
-  'every reader returns what it returned (V1); a person''s dial turns it off. FALSE/FALSE: the tick path is untouched '
-  'and orders exist only on operator_demo runs (0615).',
+  'car is compared over its visit now and its next. The grader grades the outflow forecast, and hindsight reads only '
+  'its window: a charge still running at the cut keeps its minutes when its charger faults after it. Without an '
+  'outflow block every other reader returns what it returned (V1); a person''s dial turns it off. FALSE/FALSE: the '
+  'tick path is untouched and orders exist only on operator_demo runs (0615).',
   now())
 ON CONFLICT (name) DO NOTHING;
 
