@@ -326,6 +326,10 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_regrade_sql.py tests/test_agent_fault_cut_sql.py
 
+      # 0632 gives the charge clock a level for the air, per kind of charger, chosen by leaving each run out (none, a
+      # line, or a line with a bend), on a planted fleet whose fast charges slow 3% a degree above 22 and whose L2
+      # charges slow 2% a degree above 18: it finds the bend, a world with no effect gets no level, {"air": false} is
+      # 0625's fit, the clock holds the edge of what it saw, the run offset is what the air leaves. 10 tests, about 60 s.
       - name: The charge clock reads the air, executed (0632 against stub engines)
         env:
           PGHOST: localhost
@@ -335,6 +339,21 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_air_clock_sql.py
+
+      # 0633 has the return fit learn the spread of the check's own arrival forecasts from its graded orders (a floor, a
+      # walk and a drift by relative least squares) and the inbound forecast spread each car at work by it, behind a
+      # person's dial. On graded forecasts planted from a known spread for 150 returns at 8 horizons: the fit recovers
+      # it and the futures' reader finds 80% inside the band, a flat world is a floor alone, too few returns or the dial
+      # at 0 is 0628's forecast, a past fit reads the grades that stood then. 8 tests, about 55 seconds.
+      - name: The futures spread each arrival as the returns show, executed (0633 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_arrival_spread_sql.py
 
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
