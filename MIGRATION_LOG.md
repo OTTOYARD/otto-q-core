@@ -180,7 +180,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0628 — GENERATED, not a log
+## Index, 0134–0629 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628 — which are indexed below as well as logged above; the log row is
@@ -679,7 +679,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0626](db/migrations/0626_the_self_review_judges_the_clock_within_runs_and_ranks_what_to_build.sql) | `20261008225037` | yes — ledger | **The self-review judges the clock within runs, finds what changed, and ranks what to build in plain words.** |
 | [0627](db/migrations/0627_the_futures_call_cars_home_the_way_the_kernel_does.sql) | `20261009002205` | yes — ledger | **The futures call cars home the way the kernel does.** |
 | [0628](db/migrations/0628_the_futures_drain_each_car_at_its_own_rate.sql) | `20261009021006` | yes — ledger | **The futures drain each car at its own rate.** |
+| [0629](db/migrations/0629_a_production_session_is_armed_and_no_agent_write_reaches_it.sql) | `PENDING` | no — pending | **A production session is armed, and no write under an agent's name reaches it.** |
 
-480 migrations indexed.
+481 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

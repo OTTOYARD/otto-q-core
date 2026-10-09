@@ -254,6 +254,15 @@ When information is missing:
      (2) Automatic dial promotion is **off** (`0540`): a win is `recommended`, and a person ships it
      as a certified change. (3) The cockpits' "Learner" card is renamed so that it reads as the
      research wing's tests in the twin, not as OTTO-Q testing itself.
+   - **THE AGENT IS ON IN PRODUCTION, AND PROPOSES ONLY — Chase, the evening of 2026-10-08 CT:**
+     *"Agent should always be on when runs are activated, and definitely when actual vehicle data is
+     integrated."* Built by `0629`: `ottoq_production_start` arms the session as an operator's run is
+     armed (it used to quiesce it). The agent proposes and the kernel disposes. `ottoq_policy_set`
+     refuses every write under an agent's name that would reach a production session
+     (`production_never_self_tunes`), so in production no setting changes except under a person's
+     name. The arm's three tick-counted dials are set for production's 120-second tick: no car is held
+     at the gate for a proposer, and an agent's charge order stands 6 minutes, not 30. One self-applied
+     setting is still in force at the twin depot and waits on a person (FINDINGS G370).
 
 ---
 
