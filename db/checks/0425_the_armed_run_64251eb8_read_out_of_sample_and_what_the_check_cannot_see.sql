@@ -2,11 +2,12 @@
 --        The first run on the batch 0630-0641 and agent v27: busy_day, seed 5920364814268136782, the operator's start
 --        door, live playback at 3x, 6:05-7:20 AM CT on 2026-10-09, stopped at sim 17:00 and graded. Its forecasts are
 --        out of sample for everything the batch fitted on b2efcc07. The arrivals got better at every horizon and the
---        fast-charge clock much better; the L2 clock got worse (G386). The check took 1 of the agent's 100 orders and
---        refused 10 for cause, and in what really happened 7 of those 10 would have won: every one decided on due
---        times, and the check's futures see one due car in nine, because a car coming home is not known to be due
---        until it reaches the gate (G385). The kernel's own line still left low batteries waiting about two hours
---        (G384, built as 0642 and live from 7:32 AM CT).
+--        fast-charge clock much better; the L2 clock read worse (G386, withdrawn in 0426 §4: the way it was counted).
+--        The check took 1 of the agent's 100 orders and refused 10 for cause, and in what really happened 7 of those 10
+--        would have won, every one decided on due times; the check's futures see one due car in nine, because a car
+--        coming home is not known to be due until it reaches the gate (G385; 0426 §3: a draw at the depot's rate does
+--        not recover those wins). The kernel's own line still left low batteries waiting about two hours (G384, built
+--        as 0642 and live from 7:32 AM CT).
 --
 --        Written 2026-10-09, 7:40-8:00 AM CT. Read-only. Twin depot 11111111-…. One run: single readings, not ranges.
 --
@@ -46,7 +47,8 @@
 --   car in nine. All 7 of 64251eb8's missed wins were decided in hindsight on those terms (6 on lateness, 1 on cars on
 --   time). The next build: the futures draw each arriving car's urgency the way the depot's own history shows it (the
 --   share by hour, and the due offset), the same draw for both sides of a future so it cancels where the orders agree,
---   and the expected future carries the expected share. Filed as G385.
+--   and the expected future carries the expected share. Filed as G385. REHEARSED IN 0426 §3 AND NOT BUILT: with the
+--   draw the check gets 10 of the 18 scored decisions right against 9, and takes none of the 8 missed wins.
 --
 -- ══ §4 THE ARRIVALS BY HORIZON, OUT OF SAMPLE (0633, 0634; reproduce: (4)) ══
 --
@@ -66,6 +68,10 @@
 --   run grows the spread faster than this run needed. Not acted on from one run.
 --
 -- ══ §5 THE CHARGE CLOCK, OUT OF SAMPLE (0632, 0636; reproduce: (5)) ══
+--
+--   CORRECTED in 0426 §4: the table below sums per-order forecasts, which count a charge once for every order whose
+--   window held it and keep only the charges that finish inside the window. Per charge, out of sample, the clock is
+--   within a few percent on both kinds and the air level helps L2. Do not quote this table as the clock's error.
 --
 --                 kind   charges   inside the 80% band   mean z   rms z    actual / forecast   rms log ratio
 --     64251eb8    dcfc     230          62.6%            +0.58    2.27         1.053              0.209
