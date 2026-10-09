@@ -10,6 +10,12 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v27 (0640): THE AGENT SEES THE CALENDAR'S HOLDS. The kernel's calendar books chargers ahead for named cars and its
+//      assignment gate gives a held charger to no other car; 0639 taught the kernel's check so, and on b2efcc07 the
+//      calendar held a mean 21.4 chargers within the hour at each order while the board showed none, and 215 of the
+//      1,331 cars the agent named already had one waiting. The board now lists charge_queue.chargers.held and each car's
+//      held, and the charge-line section says what they mean: a held charger is not free to other cars while its hold
+//      lasts, and a car with one is already placed.
 // v26 (0621): THE AGENT READS ITS OWN TRACK RECORD. The kernel now replays every order it checked 90 sim-minutes
 //      later with what actually happened and keeps the result (ottoq_charge_order_hindsight); the board carries it as
 //      track_record: this run and the depot's last days by outcome, each kind of move the agent's orders made with how
@@ -556,7 +562,7 @@ serve(async (req) => {
                                        review: board.review != null, charge_queue: board.charge_queue != null },
                        // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
                        model_attempts: call.attempts,
-                       agent_version: "v26" },
+                       agent_version: "v27" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId,
                          // v23: the order as sent to the door, with any name the board did not hold

@@ -18,6 +18,8 @@ tests/test_agent_charge_order_sql.py, through 0619-0638 as tests/test_agent_revi
   - the realizer carries the state's holds into the hindsight replay;
   - the self-review: neither area lists holds among what the simulator does not model, and v3 says how many graded
     orders were made before the futures read them.
+And 0640's: the agent's board lists the chargers the calendar holds for a named car within the hour and each car the
+charger held for it, from the same reading, and nothing else on the board moves.
 It SKIPS where no scratch PostgreSQL is reachable.
 """
 import json
@@ -367,3 +369,77 @@ def test_the_review_no_longer_lists_holds_and_counts_the_orders_made_before_them
     f = _sim_area(db, depot=HOLDS_DEPOT)["finding"]
     assert "made before it held" not in f and f.endswith("or the next order taking over, and no forecast can remove that "
                                                           "error."), f
+
+
+# ── 0640: the agent sees the chargers the calendar holds ─────────────────────────────────────────────────────────────
+
+M0640 = os.path.join(ROOT, "db", "migrations", "0640_the_agent_sees_the_chargers_the_calendar_holds.sql")
+
+
+def _board(d, at_min=0):
+    return d.json(f"SELECT public.ottoq_agent_charge_queue_board('{RUN}', '{DEPOT}', '{T}'::timestamptz + interval '{at_min} minutes')")
+
+
+def _without_held(b):
+    b = json.loads(json.dumps(b))
+    b["chargers"].pop("held", None)
+    b["cars"] = [{k: v for k, v in c.items() if k != "held"} for c in b["cars"]]
+    return b
+
+
+def test_0640_applies_and_its_checks_run(db):
+    _through_0639(db)
+    err = _file(db, M0640)
+    assert "0640 V1: no stored order; the board is executed by the tests" in err, err
+    assert "0640 V2: 0 boards at stored orders unchanged beyond the two fields" in err, err
+    assert db.val("SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage "
+                  "WHERE name = '0640_the_agent_sees_the_chargers_the_calendar_holds'") == "falsefalse"
+    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0640_pre'") == "1"
+
+
+def test_0640_refuses_an_engine_before_0639_a_run_running_and_a_second_apply(db):
+    _through_0638(db)
+    rc, err = db.file(M0640)
+    assert rc != 0 and "0640 P1: 0639 is not applied; apply it first" in err, err
+    _apply(db)
+    status = db.val(f"SELECT status FROM public.ottoq_sim_runs WHERE sim_run_id = '{RUN}'")
+    db.val(f"UPDATE public.ottoq_sim_runs SET status = 'running' WHERE sim_run_id = '{RUN}'")
+    rc, err = db.file(M0640)
+    assert rc != 0 and "0640 P0: a run is running" in err, err
+    db.val(f"UPDATE public.ottoq_sim_runs SET status = '{status}' WHERE sim_run_id = '{RUN}'")
+    _file(db, M0640)
+    rc, err = db.file(M0640)
+    assert rc != 0 and "0640 P1: ottoq_agent_charge_queue_board is not the body 0637 left" in err, err
+
+
+def test_0640_the_board_lists_the_holds_within_the_hour_and_each_car_its_own(db):
+    _through_0639(db)
+    _book(db, "L1", "A", 15, 75)                                         # for a car in the line, within the hour
+    _book(db, "L3", "B", 90, 150)                                        # past the hour: not on the board
+    _book(db, "F1", "X", 20, None)                                       # for a car out at work, open-ended
+    _book(db, "L2", "C", 5, 45, state="superseded", booked=-30, released=-1)   # released before the moment
+    before = _board(db)
+    _file(db, M0640)
+    b = _board(db)
+    assert _without_held(b) == before
+    assert b["chargers"]["held"] == [
+        {"kind": "l2", "stall": "L1", "car": "A", "from_min": 15, "until_min": 75},
+        {"kind": "dcfc", "stall": "F1", "car": "X", "from_min": 20, "until_min": None}], b["chargers"]["held"]
+    cars = {c["name"]: c for c in b["cars"]}
+    assert cars["A"]["held"] == {"kind": "l2", "stall": "L1", "from_min": 15, "until_min": 75}, cars["A"]
+    assert all(cars[n]["held"] is None for n in cars if n != "A"), {n: cars[n]["held"] for n in cars}
+    # forty minutes on, A's and X's windows have opened (soonest first, then by stall) and B's has come inside the hour
+    later = _board(db, 40)
+    assert [(h["stall"], h["car"], h["from_min"]) for h in later["chargers"]["held"]] == \
+        [("F1", "X", 0), ("L1", "A", 0), ("L3", "B", 50)], later["chargers"]["held"]
+
+
+def test_0640_its_checks_speak_with_stored_orders(db):
+    _through_0638(db)
+    _graded_world(db)
+    _apply(db)
+    err = _file(db, M0640)
+    assert re.search(r"0640 V1: the board at order 9819 \(run a0000000, sim 14:59\) lists 1 of the 1 chargers the calendar "
+                     r"held then for a named car within the hour \(the first an l2 from minute 0 to 81\); 1 of its \d+ "
+                     r"cars carry a hold of their own", err), err
+    assert "0640 V2: 8 boards at stored orders unchanged beyond the two fields" in err, err

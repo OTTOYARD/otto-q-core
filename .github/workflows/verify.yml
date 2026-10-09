@@ -436,10 +436,11 @@ jobs:
           python3 -m pytest -q tests/test_agent_review_memory_sql.py
 
       # 0639 has the check's futures hold a charger for the car the depot's calendar names, as the kernel's assignment
-      # gate does, and say how many held chargers it could not model (G380). On bookings planted by hand and hand lines:
-      # the holds as the calendar held them at a moment, the state behind the dial, the simulator unchanged without a
-      # list and by meaning with one, the realizer, and the review's words. 10 tests, about 160 seconds.
-      - name: The futures hold a charger for the car the calendar names, executed (0639 against stub engines)
+      # gate does, and say how many held chargers it could not model (G380); 0640 shows the agent the same holds on its
+      # board. On bookings planted by hand and hand lines: the holds as the calendar held them at a moment, the state
+      # behind the dial, the simulator unchanged without a list and by meaning with one, the realizer, the review's
+      # words, and the board's two fields with nothing else moving. 15 tests, about 240 seconds.
+      - name: The futures and the agent see the calendar's holds, executed (0639-0640 against stub engines)
         env:
           PGHOST: localhost
           PGPORT: "5432"
