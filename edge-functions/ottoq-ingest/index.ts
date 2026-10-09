@@ -11,8 +11,12 @@
 //   - A source key (X-OTTO-Q-API-Key, issued by ottoq_issue_source_key) binds depot, data source, source name and
 //     the streams it may send; the door hashes it and asks ottoq_source_key_check. A body naming another depot or
 //     data source is refused, not overridden.
-//   - The platform (a service_role JWT, which verify_jwt has already checked) may name both, and must name the
-//     depot; an unknown data source is refused, never stored as production.
+//   - The platform (the injected service key itself, in apikey or as the Bearer; compared in constant time, as
+//     ottoq-cpsat-propose does) may name both, and must name the depot; an unknown data source is refused, never
+//     stored as production.
+//   - Deployed with verify_jwt OFF, on purpose: the gateway now refuses legacy JWT keys (UNAUTHORIZED_LEGACY_JWT,
+//     measured 2026-10-09), so with it on, an outside source holding only its source key could never reach this code.
+//     Every check is here instead, before the first read.
 //   - Anything else, the public key included, is refused before a single row is read or written.
 //   - A vehicle or charger is looked up only at that depot. One elsewhere reads "not found", exactly like one that
 //     does not exist, so a key can neither write to another depot's car nor learn that it exists.
@@ -68,16 +72,19 @@ async function sha256Hex(s: string): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-// The bearer's role claim. verify_jwt is on for this function, so the platform has already checked the signature;
-// reading the claim here is safe, and nothing else in the token is trusted.
-function bearerRole(req: Request): string | null {
-  const tok = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  const part = tok.split(".")[1];
-  if (!part) return null;
-  try {
-    const pad = part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=");
-    return JSON.parse(atob(pad))?.role ?? null;
-  } catch { return null; }
+function sameSecret(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a), y = new TextEncoder().encode(b);
+  if (x.length !== y.length || x.length === 0) return false;
+  let d = 0;
+  for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i];
+  return d === 0;
+}
+// The platform is whoever holds the injected service key: in apikey (the new sb_secret_ keys are sent there alone)
+// or as the Bearer (the legacy service_role JWT).
+function isPlatform(req: Request): boolean {
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  return sameSecret(req.headers.get("apikey") ?? "", key) || sameSecret(bearer, key);
 }
 async function brainSignal(sb: any, vehicleId: string, soc: number | null, etaMin: number | null, source: string) {
   try {
@@ -109,7 +116,7 @@ serve(async (req) => {
       if (DATA_SOURCES.includes(String(body.source)) && body.source !== cred.data_source) return json({ error: "data_source comes from the source key, and this body names another" }, 403);
       depot_id = cred.depot_id; DS = cred.data_source; source = cred.source_name;
       credential = { kind: "source_key", key_prefix: cred.key_prefix, source_name: cred.source_name };
-    } else if (bearerRole(req) === "service_role") {
+    } else if (isPlatform(req)) {
       if (!body.depot_id || !UUID_RE.test(String(body.depot_id))) return json({ error: "the platform must name depot_id" }, 422);
       if (!DATA_SOURCES.includes(String(body.source))) return json({ error: "source must be one of " + DATA_SOURCES.join("|") + "; an unknown source is never stored as production" }, 422);
       depot_id = String(body.depot_id); DS = String(body.source); source = DS;
