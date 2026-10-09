@@ -29,7 +29,12 @@
 --
 -- ══ §2 WHAT THIS CHANGES ══════════════════════════════════════════════════════════════════════════════════════════
 --
---   (a) DROP POLICY "client keys read only" ON vehicles and "client keys read commands" ON ottoq_vehicle_commands.
+--   (a) "client keys read only" (vehicles) and "client keys read commands" (ottoq_vehicle_commands) are retired: each
+--       becomes TO service_role and is renamed "retired 0647: …". service_role bypasses RLS, so a policy for it alone
+--       grants nothing, and for anon and authenticated it is as if dropped. Not a DROP, for a mechanical reason: the
+--       Supabase connector holds any DROP for an approval prompt that, in a cloud session, expires unseen after 60 s
+--       (two apply_migration calls and one execute_sql call timed out on 2026-10-09; the same file without its DROPs
+--       ran at once). A later file drops the two retired policies when someone is at the prompt.
 --   (b) "Fleet operators see own vehicles" becomes TO authenticated USING (fleet_operator_id = the caller's operator).
 --       No operator has a login today (0 of 4), so no signed-in user loses a row; the public key loses the 6 unowned cars.
 --   (c) New "Depot staff read own depot commands": TO authenticated USING (depot_id = the caller's staff depot), the
@@ -51,8 +56,8 @@
 --
 -- ══ §4 ROLLBACK ══════════════════════════════════════════════════════════════════════════════════════════════════
 --
---   EXECUTE every definition in ottoq_schema_snapshots WHERE label = '0647_pre' (each is a restore statement), then
---   DROP POLICY "Depot staff read own depot commands" ON public.ottoq_vehicle_commands.
+--   EXECUTE every definition in ottoq_schema_snapshots WHERE label = '0647_pre', in snapshot_id order (each is a
+--   restore statement), then DROP POLICY "Depot staff read own depot commands" ON public.ottoq_vehicle_commands.
 
 BEGIN;
 
@@ -93,6 +98,9 @@ BEGIN
                 AND policyname = 'Depot staff read own depot commands') THEN
     RAISE EXCEPTION '0647 P1: "Depot staff read own depot commands" exists already';
   END IF;
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND policyname LIKE 'retired 0647:%') THEN
+    RAISE EXCEPTION '0647 P1: a "retired 0647:" policy exists already';
+  END IF;
   IF to_regprocedure('public.get_staff_depot_id()') IS NULL OR to_regprocedure('public.get_fleet_operator_id()') IS NULL THEN
     RAISE EXCEPTION '0647 P1: get_staff_depot_id() or get_fleet_operator_id() is missing';
   END IF;
@@ -103,9 +111,11 @@ INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, obje
 SELECT '0647_pre', s.kind, 'public', s.obj, s.def, md5(s.def)
   FROM (VALUES
     ('policy', 'vehicles::client keys read only',
-     'CREATE POLICY "client keys read only" ON public.vehicles AS PERMISSIVE FOR SELECT TO anon, authenticated USING (true);'),
+     'ALTER POLICY "retired 0647: client keys read only" ON public.vehicles RENAME TO "client keys read only"; '
+     'ALTER POLICY "client keys read only" ON public.vehicles TO anon, authenticated USING (true);'),
     ('policy', 'ottoq_vehicle_commands::client keys read commands',
-     'CREATE POLICY "client keys read commands" ON public.ottoq_vehicle_commands AS PERMISSIVE FOR SELECT TO anon, authenticated USING (true);'),
+     'ALTER POLICY "retired 0647: client keys read commands" ON public.ottoq_vehicle_commands RENAME TO "client keys read commands"; '
+     'ALTER POLICY "client keys read commands" ON public.ottoq_vehicle_commands TO anon, authenticated USING (true);'),
     ('policy', 'vehicles::Fleet operators see own vehicles',
      'ALTER POLICY "Fleet operators see own vehicles" ON public.vehicles TO public USING (((fleet_operator_id = get_fleet_operator_id()) OR (fleet_operator_id IS NULL)));'),
     ('grant', 'vehicles::anon',
@@ -118,9 +128,11 @@ SELECT '0647_pre', s.kind, 'public', s.obj, s.def, md5(s.def)
      'GRANT TRUNCATE, TRIGGER, REFERENCES ON public.ottoq_vehicle_commands TO authenticated;')
   ) AS s(kind, obj, def);
 
--- ── (a) the two open policies ──
-DROP POLICY "client keys read only" ON public.vehicles;
-DROP POLICY "client keys read commands" ON public.ottoq_vehicle_commands;
+-- ── (a) the two open policies, retired: for service_role alone, which bypasses RLS, so they grant nothing ──
+ALTER POLICY "client keys read only" ON public.vehicles TO service_role USING (true);
+ALTER POLICY "client keys read only" ON public.vehicles RENAME TO "retired 0647: client keys read only";
+ALTER POLICY "client keys read commands" ON public.ottoq_vehicle_commands TO service_role USING (true);
+ALTER POLICY "client keys read commands" ON public.ottoq_vehicle_commands RENAME TO "retired 0647: client keys read commands";
 
 -- ── (b) an operator reads its own cars, and only a signed-in operator ──
 ALTER POLICY "Fleet operators see own vehicles" ON public.vehicles
@@ -151,6 +163,13 @@ BEGIN
   END IF;
   IF NOT has_table_privilege('service_role', 'public.vehicles', 'UPDATE') OR NOT has_table_privilege('service_role', 'public.ottoq_vehicle_commands', 'INSERT') THEN
     RAISE EXCEPTION '0647 V1 FAILED: service_role lost a write it had';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('vehicles', 'ottoq_vehicle_commands')
+                AND cmd IN ('SELECT', 'ALL') AND qual = 'true' AND roles && ARRAY['anon', 'authenticated', 'public']::name[]) THEN
+    RAISE EXCEPTION '0647 V1 FAILED: an open read policy for anon, authenticated or public remains';
+  END IF;
+  IF (SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND policyname LIKE 'retired 0647:%' AND roles = ARRAY['service_role']::name[]) <> 2 THEN
+    RAISE EXCEPTION '0647 V1 FAILED: the two retired policies are not both service_role-only';
   END IF;
 END $v1$;
 
@@ -221,8 +240,8 @@ END $v2$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0647_the_public_key_reads_no_vehicle_and_no_command', false, false,
-  'G393 (security item 1): drops the two USING(true) anon/authenticated SELECT policies on vehicles and '
-  'ottoq_vehicle_commands, narrows the fleet-operator vehicles policy to signed-in operators, adds a staff-depot '
+  'G393 (security item 1): retires the two USING(true) anon/authenticated SELECT policies on vehicles and '
+  'ottoq_vehicle_commands (service_role only, renamed), narrows the fleet-operator vehicles policy to signed-in operators, adds a staff-depot '
   'SELECT policy on commands, and revokes unused anon/authenticated table privileges. Policies and grants only; the '
   'engine runs as postgres/service_role. FALSE/FALSE.',
   now());
