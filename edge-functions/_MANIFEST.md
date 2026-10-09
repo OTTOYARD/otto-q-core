@@ -12,7 +12,7 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
   `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), v36, agent v24 (footnote ⁵), v37, agent v25
-  (footnote ⁶), v38, agent v26 (footnote ⁷), and v39, agent v27 (footnote ⁸).
+  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹).
   29 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
@@ -127,7 +127,7 @@ against this table without trusting any metadata column.
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
 | ottoq-orchestrate-tick | 12 | true | 2026-09-09 03:42 | yes | `47bc38feb463a9c103820d087c6a86f5856a3cdc049a73ab0a76387c1a73becf` |
-| ottoq-orchestrator-agent | 39 | true | 2026-10-09 10:52 | yes⁸ | `c5c5abf15bb8be7cfa8c71ce0ab5623cc9bf43c803fb7e1aff6b9c01c63e8188` |
+| ottoq-orchestrator-agent | 40 | true | 2026-10-09 12:38 | yes⁹ | `540a2062618508f81c9610118dca53255e9b514811d77684a872eb639bce982e` |
 | ottoq-ottocommand | 8 | true | 2026-06-27 18:47 | yes | `dac7eca5d514286ddebb97c9ba096b22adff09d97f08ec485dcfc91f49e5761a` |
 | ottoq-progress | 9 | true | 2026-06-18 04:05 | yes | `eaced82147a69688e977ddede528272370c8facbe60de6787e525731090db0aa` |
 | ottoq-run-blackbox | 5 | false | 2026-07-18 00:23 | yes | `0f63f9cff1bb3e2c10ab7874b80648bbf2848da9a971dbc1d163ad198a18317e` |
@@ -204,6 +204,17 @@ board's `chargers.held` and each car's `held` (0640: the chargers the depot's ca
 kernel gives to no other car while the hold lasts) and each car's `plan` with `kernel_plan` (0641: what the kernel's own
 order does from now in the check's expected future), and asks for an order only where that plan has something to fix;
 and the version string.
+
+⁹ **`ottoq-orchestrator-agent` v40 (agent v28), 2026-10-09 at 7:38 AM CT (12:38 UTC), for 0642.** The same five
+files through the same MCP tool, `verify_jwt` true, read back with `get_edge_function` and hashed from the API's
+response: all five byte-identical to the repo at commit `5128094` (index.ts `540a2062`, `_shared/agent_charge_order.ts`
+`e0ee80bc`, and the unchanged `_shared/agent_model_call.ts` `222f9136`, `_shared/agent_solver_chain.ts` `7fae9d72`,
+`_shared/agent_dial_discipline.ts` `e4944c72`; sha256 prefixes). Deployed six minutes into run 72b09010, the first
+run under 0642, so its first agent passes ran on v27. The change is the charge-line prompt, which now reads the
+board's `kernel_order` (0642: the kernel serves a car that has waited `floor_min` or longer first, the longest wait
+first, then by minutes of charge) and says the check weighs minutes past each car's contract queue wait right after
+lateness (`expected_by` can read `contract_wait`), so the agent does not spend an order moving up a car the kernel
+already serves first; and the version string.
 
 ⁶ **`ottoq-orchestrator-agent` v37 (agent v25), 2026-10-08 at 8:50 AM CT (13:50 UTC), for 0619 and 0620.** The same
 five files through the same MCP tool, `verify_jwt` true, read back with `get_edge_function` and hashed from the API's
