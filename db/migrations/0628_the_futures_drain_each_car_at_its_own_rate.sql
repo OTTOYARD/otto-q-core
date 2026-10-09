@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009021006
 -- migration-name:    the_futures_drain_each_car_at_its_own_rate
 --
 -- 0628  **The futures drain each car at its own rate.**

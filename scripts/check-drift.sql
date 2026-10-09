@@ -711,7 +711,7 @@ repo_manifest(version, name, file) AS (
     ('20261008214932'::text, 'a_learned_model_knows_when_its_world_changed'::text, '0625_a_learned_model_knows_when_its_world_changed.sql'::text),
     ('20261008225037'::text, 'the_self_review_judges_the_clock_within_runs_and_ranks_what_to_build'::text, '0626_the_self_review_judges_the_clock_within_runs_and_ranks_what_to_build.sql'::text),
     ('20261009002205'::text, 'the_futures_call_cars_home_the_way_the_kernel_does'::text, '0627_the_futures_call_cars_home_the_way_the_kernel_does.sql'::text),
-    ('PENDING'::text, 'the_futures_drain_each_car_at_its_own_rate'::text, '0628_the_futures_drain_each_car_at_its_own_rate.sql'::text)
+    ('20261009021006'::text, 'the_futures_drain_each_car_at_its_own_rate'::text, '0628_the_futures_drain_each_car_at_its_own_rate.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
