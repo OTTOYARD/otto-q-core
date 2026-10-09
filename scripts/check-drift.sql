@@ -716,7 +716,7 @@ repo_manifest(version, name, file) AS (
     ('20261009100905'::text, 'the_grader_reads_a_runs_stop_as_the_stop'::text, '0630_the_grader_reads_a_runs_stop_as_the_stop.sql'::text),
     ('20261009101257'::text, 'a_fault_owns_the_charge_it_cut'::text, '0631_a_fault_owns_the_charge_it_cut.sql'::text),
     ('20261009101743'::text, 'the_charge_clock_reads_the_air'::text, '0632_the_charge_clock_reads_the_air.sql'::text),
-    ('PENDING'::text, 'the_futures_spread_each_arrival_as_the_returns_show'::text, '0633_the_futures_spread_each_arrival_as_the_returns_show.sql'::text),
+    ('20261009102050'::text, 'the_futures_spread_each_arrival_as_the_returns_show'::text, '0633_the_futures_spread_each_arrival_as_the_returns_show.sql'::text),
     ('PENDING'::text, 'a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin'::text, '0634_a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin.sql'::text),
     ('PENDING'::text, 'the_futures_take_chargers_down_as_the_depots_chargers_fail'::text, '0635_the_futures_take_chargers_down_as_the_depots_chargers_fail.sql'::text),
     ('PENDING'::text, 'the_charge_clocks_spread_is_what_its_charges_show'::text, '0636_the_charge_clocks_spread_is_what_its_charges_show.sql'::text),

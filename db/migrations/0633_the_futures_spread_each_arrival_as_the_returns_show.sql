@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009102050
 -- migration-name:    the_futures_spread_each_arrival_as_the_returns_show
 --
 -- 0633  **The futures spread each arrival as the depot's returns show.**
