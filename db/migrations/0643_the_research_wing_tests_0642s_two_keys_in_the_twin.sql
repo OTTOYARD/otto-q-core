@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009132013
 -- migration-name:    the_research_wing_tests_0642s_two_keys_in_the_twin
 --
 -- 0643  **The research wing tests 0642's two keys in the twin, as paired runs.** (G384; research wing, rule 10.)
