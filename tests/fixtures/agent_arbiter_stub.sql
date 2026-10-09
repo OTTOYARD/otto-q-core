@@ -37,3 +37,49 @@ CREATE TABLE public.ottoq_ocpp_messages (message_id uuid NOT NULL DEFAULT gen_ra
 CREATE INDEX idx_ocpp_msgs_session ON public.ottoq_ocpp_messages USING btree (ocpp_session_id, message_at);
 -- 0626 names a vehicle class by its maker in the self-review's words (live catalog, 2026-10-08; the columns 0626 reads).
 CREATE TABLE public.ottoq_vehicle_classes (vehicle_class_code text NOT NULL PRIMARY KEY, oem_name text NOT NULL, manufacturer text, model text, status text NOT NULL DEFAULT 'active'::text);
+
+-- 0627: the recall decision's implementations, as live keeps them, and the reserve a car turns home at (its live body,
+-- md5-pinned by 0627's P1). The evaluator itself is never run here: 0627's P1 reads its reserve rung in its source, so
+-- these are those lines, verbatim, and nothing else.
+CREATE TABLE public.ottoq_recall_implementations (impl_id smallint NOT NULL PRIMARY KEY, implementation text NOT NULL,
+                                                  evaluator_function text NOT NULL, status text NOT NULL, note text);
+INSERT INTO public.ottoq_recall_implementations (impl_id, implementation, evaluator_function, status) VALUES
+  (1, 'naive_threshold_v1', 'ottoq_recall_naive_threshold_v1', 'active'),
+  (2, 'fixed_window_dummy', 'ottoq_recall_fixed_window_dummy', 'parked'),
+  (3, 'interval_scheduled_v1', 'ottoq_recall_interval_scheduled_v1', 'retired');
+CREATE TABLE public.ottoq_recall_decisions (recall_id bigserial PRIMARY KEY, sim_run_id uuid, vehicle_id uuid, depot_id uuid,
+                                            decided_at_sim timestamptz, implementation text, should_return boolean,
+                                            return_trigger text, inputs jsonb, soc_override numeric);
+CREATE OR REPLACE FUNCTION public.ottoq_effective_reserve_soc(p_vehicle_id uuid, p_as_of timestamp with time zone)
+ RETURNS numeric
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
+AS $function$
+  SELECT GREATEST(
+    COALESCE(
+      (SELECT s.return_reserve_soc_pct FROM ottoq_fleet_operator_slas s
+        WHERE s.fleet_operator_id = v.fleet_operator_id AND s.status='active'
+          AND s.effective_from <= p_as_of
+          AND (s.effective_until IS NULL OR s.effective_until > p_as_of)
+        ORDER BY s.version DESC LIMIT 1),
+      v.min_soc_threshold, 20),
+    COALESCE(v.min_soc_threshold, 20)
+  )
+  FROM vehicles v WHERE v.id = p_vehicle_id;
+$function$;
+CREATE OR REPLACE FUNCTION public.ottoq_recall_naive_threshold_v1(p_vehicle_id uuid, p_sim_run_id uuid,
+                                                                  p_sim_clock_now timestamptz, p_horizon_min numeric,
+                                                                  p_soc_pct numeric)
+ RETURNS TABLE(should_return boolean, return_trigger text)
+ LANGUAGE plpgsql STABLE
+AS $function$
+DECLARE v_soc numeric := p_soc_pct; v_reserve numeric; v_reserve_margin numeric;
+BEGIN
+  v_reserve := ottoq_effective_reserve_soc(p_vehicle_id, p_sim_clock_now);
+  v_reserve_margin := ottoq_policy_get(p_sim_run_id,'reserve_margin_pct',15);
+  IF v_soc <= v_reserve + v_reserve_margin THEN
+    RETURN QUERY SELECT true, 'low_soc_reserve'; RETURN;
+  END IF;
+  RETURN QUERY SELECT false, NULL::text;
+END $function$;
