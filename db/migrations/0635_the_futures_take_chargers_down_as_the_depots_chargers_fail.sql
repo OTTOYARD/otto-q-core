@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009103141
 -- migration-name:    the_futures_take_chargers_down_as_the_depots_chargers_fail
 --
 -- 0635  **The futures take chargers down as the depot's chargers fail.**
