@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009123213
 -- migration-name:    the_kernel_serves_a_long_wait_first_and_times_its_line_in_minutes
 --
 -- 0642  **The kernel serves a car that has waited 90 minutes first, and orders the rest by minutes of charge.** (G384)
