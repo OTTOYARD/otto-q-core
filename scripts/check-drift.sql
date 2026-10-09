@@ -717,7 +717,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'a_fault_owns_the_charge_it_cut'::text, '0631_a_fault_owns_the_charge_it_cut.sql'::text),
     ('PENDING'::text, 'the_charge_clock_reads_the_air'::text, '0632_the_charge_clock_reads_the_air.sql'::text),
     ('PENDING'::text, 'the_futures_spread_each_arrival_as_the_returns_show'::text, '0633_the_futures_spread_each_arrival_as_the_returns_show.sql'::text),
-    ('PENDING'::text, 'a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin'::text, '0634_a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin.sql'::text)
+    ('PENDING'::text, 'a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin'::text, '0634_a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin.sql'::text),
+    ('PENDING'::text, 'the_futures_take_chargers_down_as_the_depots_chargers_fail'::text, '0635_the_futures_take_chargers_down_as_the_depots_chargers_fail.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

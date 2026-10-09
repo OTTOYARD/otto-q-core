@@ -371,6 +371,23 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_drain_seen_sql.py
 
+      # 0635 learns each kind of charger's fault rate per minute of charging and its repair curve (charge_fault_v1,
+      # nightly), and the check's futures draw from it behind a person's dial: a charge faults at its kind's rate and its
+      # car rejoins the line owing the rest (rule 9), the charger is down for a drawn repair, and a charger down at the
+      # order comes back after what is left of its repair. On a miniature depot and hand-made lines: the draws by
+      # arithmetic, the fit from planted charges and fault events, the state behind the dial, every simulator output
+      # key for key without the block, a drawn fault equal to 0621's down window, the car under way re-queued and never
+      # counted a return, both sides meeting the same faults, the realizer and the review. 15 tests, about 135 seconds.
+      - name: The futures take chargers down as the depot's chargers fail, executed (0635 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_charger_faults_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
