@@ -51,7 +51,9 @@
 --       charge clock with this run's own charges, the shorter of the kinds it can use, timed exactly as the check's state
 --       times it.
 --   (d) public.ottoq_charge_order_keys(run, depot, clock): the two keys, floor_key (the wait, at or past the floor) and
---       minutes_key ((minutes waited + minutes of charge) / minutes of charge).
+--       minutes_key ((minutes waited + minutes of charge) / minutes of charge). A car the clock cannot time (no battery
+--       size) carries no minutes_key and sorts after the cars that do, until the floor takes it: the floor is what
+--       guarantees no car waits behind the line indefinitely, whatever the clock knows.
 --   (e) ottoq_decide_tick, OTTO-Q's seat: the charge cursor reads the keys once per tick and sorts by them after
 --       immediate dispatch and an agent's live order (the pin, then the agent's ranking), before 0545's ratio in points,
 --       which now breaks only their ties. Each seat made records the keys it was made by (context 'charge_order'). A
@@ -79,11 +81,30 @@
 -- ══ §4 RECERT AND DIAL CLASSIFICATION ═════════════════════════════════════════════════════════════════════════════════════
 --
 --   forces_recert TRUE and forces_dial_restart TRUE: at the defaults every run's seating order changes, as 0545, 0546
---   and 0551 did.
+--   and 0551 did. And one property moves, stated rather than left to be found: the kernel's seating now reads the
+--   depot's charge clock, which the nightly job refits (11:22 UTC) and this run's own charges adjust. A determinism pair
+--   is unaffected (both arms read one fit in one transaction), but a seed replayed on another day can seat differently
+--   once the fit has moved. That is the clock learning, as rule 10 intends (production updates its estimates overnight,
+--   never its rules); a cross-day digest of a run (G140) has to key on the clock's fit as well as the engine.
 --
 -- ══ §5 THE SECOND WORLD ═══════════════════════════════════════════════════════════════════════════════════════════════════
 --
---   SECOND_WORLD
+--   64251eb8, the armed run on b2efcc07's seed this morning (6:05-7:20 AM CT, the same stack, a different world after
+--   its first tick), stopped at sim 17:00 and graded: its 63 full-window orders replayed the same way, 4,518 car-windows.
+--
+--                                    mean wait  p90 wait  under 45%  80% and up  on time (of 720 due)  late, min  past 30, min
+--     the kernel today (points)          66.4     127.2      129.1       41.3          25               80,397     180,666
+--     floor 60, longest wait first       66.3     125.0      116.0       52.3          25               81,637     180,467
+--     minutes of charge                  65.8     127.4      124.4       43.2          33               77,351     178,868
+--     floor 90 first, then minutes       66.1     126.4      120.2       47.7          33               78,737     180,207
+--
+--   The same direction on every variant, smaller: minutes give the on-time and lateness gains (25 -> 33 due cars on
+--   time), the floor buys low batteries a shorter wait (129 -> 120) at the top-offs' cost (41 -> 48). In this world
+--   minutes alone come out ahead of this file on everything but the low batteries; the floor stays because a windowed
+--   replay cannot see the tail it exists for: by minutes alone a car whose charge takes 110 minutes gains priority
+--   eleven times slower than one whose charge takes 10, so under a steady stream of short charges it can still wait
+--   indefinitely, and the floor is what bounds that. Its value (90) is a person's dial, and the research wing's designed
+--   pairs in the twin are where it gets tuned (rule 10).
 --
 -- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0642_pre' AND object_kind = 'function';
 --   DROP FUNCTION public.ottoq_charge_order_keys(uuid, uuid, timestamptz),
