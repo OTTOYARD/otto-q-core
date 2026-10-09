@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009104632
 -- migration-name:    the_agent_sees_the_kernels_own_plan
 --
 -- 0641  **The agent sees the kernel's own plan, car by car.**
