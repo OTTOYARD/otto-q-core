@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009103417
 -- migration-name:    the_charge_clocks_spread_is_what_its_charges_show
 --
 -- 0636  **The charge clock's spread is what its own charges show, by kind and length of charge.**

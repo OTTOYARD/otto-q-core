@@ -719,7 +719,7 @@ repo_manifest(version, name, file) AS (
     ('20261009102050'::text, 'the_futures_spread_each_arrival_as_the_returns_show'::text, '0633_the_futures_spread_each_arrival_as_the_returns_show.sql'::text),
     ('20261009102518'::text, 'a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin'::text, '0634_a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin.sql'::text),
     ('20261009103141'::text, 'the_futures_take_chargers_down_as_the_depots_chargers_fail'::text, '0635_the_futures_take_chargers_down_as_the_depots_chargers_fail.sql'::text),
-    ('PENDING'::text, 'the_charge_clocks_spread_is_what_its_charges_show'::text, '0636_the_charge_clocks_spread_is_what_its_charges_show.sql'::text),
+    ('20261009103417'::text, 'the_charge_clocks_spread_is_what_its_charges_show'::text, '0636_the_charge_clocks_spread_is_what_its_charges_show.sql'::text),
     ('PENDING'::text, 'the_futures_read_the_latest_return_model_that_was_usable'::text, '0637_the_futures_read_the_latest_return_model_that_was_usable.sql'::text),
     ('PENDING'::text, 'the_self_review_remembers_what_it_found'::text, '0638_the_self_review_remembers_what_it_found.sql'::text),
     ('PENDING'::text, 'the_futures_hold_a_charger_for_the_car_the_calendar_names'::text, '0639_the_futures_hold_a_charger_for_the_car_the_calendar_names.sql'::text),
