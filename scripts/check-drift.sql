@@ -701,7 +701,17 @@ repo_manifest(version, name, file) AS (
     ('20261007183516'::text, 'an_operators_demo_run_takes_the_agents_charge_order'::text, '0615_an_operators_demo_run_takes_the_agents_charge_order.sql'::text),
     ('20261007184459'::text, 'the_order_usage_counts_the_orders_that_seated_cars'::text, '0616_the_order_usage_counts_the_orders_that_seated_cars.sql'::text),
     ('20261007202316'::text, 'a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named'::text, '0617_a_car_named_for_the_kind_not_free_waits_behind_the_cars_not_named.sql'::text),
-    ('20261007203510'::text, 'the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it'::text, '0618_the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it.sql'::text)
+    ('20261007203510'::text, 'the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it'::text, '0618_the_kernel_checks_the_agents_charge_order_against_its_own_before_taking_it.sql'::text),
+    ('20261008132327'::text, 'the_kernel_learns_how_long_a_charge_takes_and_when_a_car_comes_back'::text, '0619_the_kernel_learns_how_long_a_charge_takes_and_when_a_car_comes_back.sql'::text),
+    ('20261008134303'::text, 'the_kernel_takes_an_agent_order_only_when_it_wins_most_futures'::text, '0620_the_kernel_takes_an_agent_order_only_when_it_wins_most_futures.sql'::text),
+    ('20261008144612'::text, 'the_kernel_grades_its_own_check_in_hindsight'::text, '0621_the_kernel_grades_its_own_check_in_hindsight.sql'::text),
+    ('20261008162412'::text, 'the_kernel_learns_each_cars_charge_clock_from_its_own_charges'::text, '0622_the_kernel_learns_each_cars_charge_clock_from_its_own_charges.sql'::text),
+    ('20261008191129'::text, 'the_check_sees_cars_leave_and_come_back'::text, '0623_the_check_sees_cars_leave_and_come_back.sql'::text),
+    ('20261008204412'::text, 'the_check_reads_each_cars_open_work'::text, '0624_the_check_reads_each_cars_open_work.sql'::text),
+    ('20261008214932'::text, 'a_learned_model_knows_when_its_world_changed'::text, '0625_a_learned_model_knows_when_its_world_changed.sql'::text),
+    ('20261008225037'::text, 'the_self_review_judges_the_clock_within_runs_and_ranks_what_to_build'::text, '0626_the_self_review_judges_the_clock_within_runs_and_ranks_what_to_build.sql'::text),
+    ('20261009002205'::text, 'the_futures_call_cars_home_the_way_the_kernel_does'::text, '0627_the_futures_call_cars_home_the_way_the_kernel_does.sql'::text),
+    ('20261009021006'::text, 'the_futures_drain_each_car_at_its_own_rate'::text, '0628_the_futures_drain_each_car_at_its_own_rate.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

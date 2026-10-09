@@ -11,7 +11,8 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
   See the finding below; the deployed body must never be synced into the repo.
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
-  `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), and v36, agent v24 (footnote ⁵).
+  `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), v36, agent v24 (footnote ⁵), v37, agent v25
+  (footnote ⁶), and v38, agent v26 (footnote ⁷).
   29 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
@@ -126,7 +127,7 @@ against this table without trusting any metadata column.
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
 | ottoq-orchestrate-tick | 12 | true | 2026-09-09 03:42 | yes | `47bc38feb463a9c103820d087c6a86f5856a3cdc049a73ab0a76387c1a73becf` |
-| ottoq-orchestrator-agent | 36 | true | 2026-10-07 20:41 | yes⁵ | `1c37f3c94e75171a1c050ca6d5f47c7f9335678407789fd7085a57825effd1d5` |
+| ottoq-orchestrator-agent | 38 | true | 2026-10-08 14:56 | yes⁷ | `7c61845401ffc0b67405351604bf8f78fa2b94c07389372f0d59386a0776b415` |
 | ottoq-ottocommand | 8 | true | 2026-06-27 18:47 | yes | `dac7eca5d514286ddebb97c9ba096b22adff09d97f08ec485dcfc91f49e5761a` |
 | ottoq-progress | 9 | true | 2026-06-18 04:05 | yes | `eaced82147a69688e977ddede528272370c8facbe60de6787e525731090db0aa` |
 | ottoq-run-blackbox | 5 | false | 2026-07-18 00:23 | yes | `0f63f9cff1bb3e2c10ab7874b80648bbf2848da9a971dbc1d163ad198a18317e` |
@@ -180,6 +181,27 @@ response: all five byte-identical to commit `b16b01b` (index.ts `1c37f3c9`, `_sh
 `_shared/agent_dial_discipline.ts` `e4944c72`). v35, the version replaced, was byte-identical to the five hashes in
 footnote ⁴ when read back before the deploy. The change is the charge-line prompt (0618's check, and the ordering it
 rewards) and the version string; the first pass on it was run 089f46bd's, all 14 answered by sim 13:28.
+
+⁷ **`ottoq-orchestrator-agent` v38 (agent v26), 2026-10-08 at 9:56 AM CT (14:56 UTC), for 0621.** The same five
+files through the same MCP tool, `verify_jwt` true, read back with `get_edge_function` and hashed from the API's
+response. The read-back of index.ts was one byte short of commit `214ec8c`: the blank line after
+`const depot = run.depot_id;` (line 250) was lost in transcription. Nothing else differs, so the repo copy was made to
+match the deployed bytes rather than deploying again; with that, all five files are byte-identical (index.ts
+`7c618454`, `_shared/agent_charge_order.ts` `112e91af`, and the unchanged `_shared/agent_model_call.ts` `222f9136`,
+`_shared/agent_solver_chain.ts` `7fae9d72`, `_shared/agent_dial_discipline.ts` `e4944c72`; sha256 prefixes). The
+change is the charge-line prompt, which now reads the board's `track_record` (0621: each checked order replayed 90
+sim-minutes later with what actually happened; outcomes for this run and the depot's last days; each kind of move
+with how often it won and lost in hindsight; what most often made the check wrong) and asks the agent to make the
+moves that won and stop making the ones that lost; and the version string.
+
+⁶ **`ottoq-orchestrator-agent` v37 (agent v25), 2026-10-08 at 8:50 AM CT (13:50 UTC), for 0619 and 0620.** The same
+five files through the same MCP tool, `verify_jwt` true, read back with `get_edge_function` and hashed from the API's
+response: all five byte-identical to commit `96678ba` (index.ts `f296085a`, `_shared/agent_charge_order.ts`
+`701191bf`, and the unchanged `_shared/agent_model_call.ts` `222f9136`, `_shared/agent_solver_chain.ts` `7fae9d72`,
+`_shared/agent_dial_discipline.ts` `e4944c72`; sha256 prefixes). The change is the charge-line prompt, which now
+reads the board 0620 builds (`contention`, `arriving`, `check`, the learned minutes) and the rolled-forward check's
+verdict in `last_order.projection` (wins of futures, the bar, what decided the expected future), and asks for an
+order only when the line is tight or congested; and the version string.
 
 ² **`ottoq-agent-gateway` v1 is its first deploy, 2026-10-04 at 6:40 AM CT (11:40 UTC)**, through the Supabase
 MCP deploy tool, with JWT verification off (agent keys and passcode session keys are not JWTs; the key is the

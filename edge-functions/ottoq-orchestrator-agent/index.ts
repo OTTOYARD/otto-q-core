@@ -10,6 +10,19 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v26 (0621): THE AGENT READS ITS OWN TRACK RECORD. The kernel now replays every order it checked 90 sim-minutes
+//      later with what actually happened and keeps the result (ottoq_charge_order_hindsight); the board carries it as
+//      track_record: this run and the depot's last days by outcome, each kind of move the agent's orders made with how
+//      often it won and lost in hindsight, and what most often made the check wrong. The charge-line section reads it
+//      and asks for the moves that won and against the ones that lost: the agent learns inside a run and across runs,
+//      from the depot's own evidence, without a weight changing anywhere.
+// v25 (0619, 0620): THE CHECK ROLLS THE LINE FORWARD, AND THE AGENT ORDERS WHEN THE LINE IS TIGHT. Under 0618's
+//      one-shot projection the order still trailed the kernel's own (uptime 35.9% against 40.6%, db/checks/0415 §5):
+//      every order it took was a few minutes better on the line waiting at that moment, on a charge clock 35-140%
+//      short, with no car coming home. 0619 learns the clock and the returns; 0620 takes an order only when, rolled
+//      forward for its life and then the kernel's, it beats the kernel's own order in the expected future and 10 of
+//      12 sampled ones. The board now carries contention, arriving and check; the charge-line section reads them, asks
+//      for an order only when contention.pressure is tight or congested, and says what each refusal reason means.
 // v24 (0617, 0618): THE KERNEL CHECKS THE ORDER, AND THE PROMPT SAYS WHAT THE CHECK REWARDS. On run 0bbdcc07 the
 //      agent's order, taken whole, cost uptime (33.2% against 40.6%), departures (61 against 71) and on-time readiness
 //      against the same seed without it (db/checks/0415): it ranked low batteries first, named them for a fast charger
@@ -234,7 +247,6 @@ serve(async (req) => {
     const { data: run } = await runQuery.maybeSingle();
     if (!run) return json({ ok: true, skipped: "no running run" });
     const depot = run.depot_id;
-
     // 0332: multiple clocks can request an agent pass at the same run tick.
     // Claim the tick atomically before spending a model call or changing policy.
     // Chain-disabled sessions preserve the legacy behavior and are admitted by
@@ -544,7 +556,7 @@ serve(async (req) => {
                                        review: board.review != null, charge_queue: board.charge_queue != null },
                        // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
                        model_attempts: call.attempts,
-                       agent_version: "v24" },
+                       agent_version: "v26" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId,
                          // v23: the order as sent to the door, with any name the board did not hold
@@ -552,7 +564,9 @@ serve(async (req) => {
       enacted_action: { verb, applied, queued, rejected, rationale: String(parsed.rationale ?? "").slice(0, 1200),
                         solver_handoff: solverHandoff,
                         // v23: the kernel's receipt for the charge order: accepted, partial or rejected, and why;
-                        // v24 (0618): or refused, with the projection that refused it
+                        // v24 (0618): or refused, with the projection that refused it;
+                        // v25 (0620): with the futures it won of those rolled, and why; v26 (0621): the board's
+                        // track_record grades each order later, against what actually happened
                         charge_order: chargeOrderReceipt,
                         source: modelUsed !== "none" ? "nemotron" : "deterministic_fallback" },
       // v23: an order the kernel accepted is an enacted action, as a dial write is
