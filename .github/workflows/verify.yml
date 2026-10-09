@@ -311,8 +311,9 @@ jobs:
       # and a regrade, keeps a regrade beside a wrong first grade, and points every reader at the standing grade. On the
       # miniature depot through 0628 with 0621's morning stopped at minute 50: the interrupted charge is censored and the
       # first grade superseded, a grade after 0630 reads the stop as the stop, the computation is the grade, each
-      # refusal. 10 tests, about 50 seconds.
-      - name: The grader reads a run's stop as the stop, and a wrong grade is superseded, executed (0630 against stub engines)
+      # refusal. 0631 gives a charger fault the whole of the charge it cut and supersedes an attribution with its grade:
+      # the same morning with the charge under way cut by a fault at minute 30. 16 tests, about 80 seconds.
+      - name: The grader reads a run's stop as the stop and a fault's cut as the fault's, executed (0630-0631 against stub engines)
         env:
           PGHOST: localhost
           PGPORT: "5432"
@@ -320,7 +321,7 @@ jobs:
           PGPASSWORD: postgres
         run: |
           set -euo pipefail
-          python3 -m pytest -q tests/test_agent_regrade_sql.py
+          python3 -m pytest -q tests/test_agent_regrade_sql.py tests/test_agent_fault_cut_sql.py
 
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.

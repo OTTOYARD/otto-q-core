@@ -241,7 +241,8 @@ CREATE TABLE public.ottoq_charge_order_regrades (
   --: the ledger's columns, in its order (0621). graded_at is the FIRST grade's, so the standing grade sits in the
   --: windows readers count by; regraded_at is when this grade was computed. NO foreign key (evidence, 0340/0364).
   LIKE public.ottoq_charge_order_hindsight INCLUDING DEFAULTS INCLUDING CONSTRAINTS,
-  regraded_at          timestamptz NOT NULL DEFAULT now(),
+  --: the statement clock, not the transaction's: two regrades of one order in one transaction still stand in order
+  regraded_at          timestamptz NOT NULL DEFAULT clock_timestamp(),
   --: the code of the grade this one supersedes (ottoq_hindsight_code_md5 when it was given)
   supersedes_code_md5  text NOT NULL,
   --: why, as a short code: 0630's is run_stop_read_as_charge_end
