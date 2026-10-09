@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009104324
 -- migration-name:    the_futures_hold_a_charger_for_the_car_the_calendar_names
 --
 -- 0639  **The futures hold a charger for the car the depot's calendar names.**
