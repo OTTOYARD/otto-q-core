@@ -10,6 +10,12 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v28 (0642): THE AGENT KNOWS THE KERNEL'S NEW ORDER AND WHAT THE CHECK NOW COUNTS. 0642 has the kernel serve a car
+//      that has waited 90 minutes first, the longest wait first, and order the rest by minutes of charge, not
+//      battery points (G384: on b2efcc07 low batteries waited a mean 98 minutes against a 30-minute contract wait).
+//      Its check now weighs the minutes cars wait past their contract after lateness. The board says how the kernel
+//      orders (charge_queue.kernel_order), and the charge-line section says both, so the agent does not spend an
+//      order moving up a car the kernel already serves first.
 // v27 (0640): THE AGENT SEES THE CALENDAR'S HOLDS. The kernel's calendar books chargers ahead for named cars and its
 //      assignment gate gives a held charger to no other car; 0639 taught the kernel's check so, and on b2efcc07 the
 //      calendar held a mean 21.4 chargers within the hour at each order while the board showed none, and 215 of the
@@ -567,7 +573,7 @@ serve(async (req) => {
                                        review: board.review != null, charge_queue: board.charge_queue != null },
                        // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
                        model_attempts: call.attempts,
-                       agent_version: "v27" },
+                       agent_version: "v28" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId,
                          // v23: the order as sent to the door, with any name the board did not hold

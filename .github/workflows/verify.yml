@@ -451,6 +451,23 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_holds_sql.py
 
+      # 0642 has the kernel serve a car that has waited 90 minutes first, the longest wait first, and order the rest by
+      # minutes of charge on the depot's charge clock (G384), mirrored in the kernel's order, the cockpits' queue, the
+      # board and the check, whose futures order the line as the kernel does and whose comparison weighs the minutes cars
+      # wait past their contract after lateness. On the miniature depot and hand lines: it applies and refuses twice, the
+      # keys and the check's minutes agree car for car, the dials turn each key off, every reader orders alike, the cursor
+      # reads the keys before 0545's ratio, a state without the keys simulates as before, a sampled draw never reorders the
+      # line, the breach and the comparison as meant, and the board says how the kernel orders.
+      - name: The kernel's own order serves a long wait first and times the line in minutes, executed (0642 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_charge_order_floor_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
