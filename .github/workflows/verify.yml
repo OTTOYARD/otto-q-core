@@ -355,6 +355,22 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_arrival_spread_sql.py
 
+      # 0634 times a car's drain only from a dispatch the depot saw begin (a run's primed cars carry a back-dated
+      # dispatch and a battery set at the start), counts work from the later of the two, and has the arrival spread read
+      # the newest forecast's orders once they alone are usable. On reserve returns seen and primed: the fit reads the
+      # seen ones alone, with no car out before its run every key is 0633's, the spread switches to the new forecast's
+      # orders when it can, the gate passes on cars that drained as the seen returns say and holds back on cars that
+      # drained as the back-dated ones said, and the review marks older orders as history. 8 tests, about 60 seconds.
+      - name: A drain is timed only from a dispatch the depot saw begin, executed (0634 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_drain_seen_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
