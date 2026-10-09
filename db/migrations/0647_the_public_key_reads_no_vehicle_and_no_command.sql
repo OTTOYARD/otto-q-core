@@ -1,7 +1,7 @@
 -- migration-version: PENDING
 -- migration-name:    the_public_key_reads_no_vehicle_and_no_command
 --
--- 0645  **The public key reads no vehicle and no command; depot staff read their own depot's commands.** (G393;
+-- 0647  **The public key reads no vehicle and no command; depot staff read their own depot's commands.** (G393;
 --        security item 1 of the twin data contract review, 2026-10-08. Chase, 2026-10-09 CT: "Start building.")
 --
 -- ══ §1 WHY ═════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -51,7 +51,7 @@
 --
 -- ══ §4 ROLLBACK ══════════════════════════════════════════════════════════════════════════════════════════════════
 --
---   EXECUTE every definition in ottoq_schema_snapshots WHERE label = '0645_pre' (each is a restore statement), then
+--   EXECUTE every definition in ottoq_schema_snapshots WHERE label = '0647_pre' (each is a restore statement), then
 --   DROP POLICY "Depot staff read own depot commands" ON public.ottoq_vehicle_commands.
 
 BEGIN;
@@ -64,7 +64,7 @@ SET LOCAL lock_timeout = '5s';
 DO $inflight$
 BEGIN
   IF public.ottoq_certification_in_flight(true) > 0 THEN
-    RAISE EXCEPTION '0645 P0: a pair, the recert runner or a dial pair is running right now';
+    RAISE EXCEPTION '0647 P0: a pair, the recert runner or a dial pair is running right now';
   END IF;
 END $inflight$;
 
@@ -72,35 +72,35 @@ END $inflight$;
 DO $premises$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage WHERE name = '0644_the_research_safety_check_judges_cars_not_served_across_a_look') THEN
-    RAISE EXCEPTION '0645 P1: 0644 is not classified; apply in order';
+    RAISE EXCEPTION '0647 P1: 0644 is not classified; apply in order';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicles'
                     AND policyname = 'client keys read only' AND cmd = 'SELECT' AND qual = 'true'
                     AND roles = ARRAY['anon','authenticated']::name[]) THEN
-    RAISE EXCEPTION '0645 P1: "client keys read only" on vehicles is not the policy this file was written against';
+    RAISE EXCEPTION '0647 P1: "client keys read only" on vehicles is not the policy this file was written against';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'ottoq_vehicle_commands'
                     AND policyname = 'client keys read commands' AND cmd = 'SELECT' AND qual = 'true'
                     AND roles = ARRAY['anon','authenticated']::name[]) THEN
-    RAISE EXCEPTION '0645 P1: "client keys read commands" on ottoq_vehicle_commands is not the policy this file was written against';
+    RAISE EXCEPTION '0647 P1: "client keys read commands" on ottoq_vehicle_commands is not the policy this file was written against';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'vehicles'
                     AND policyname = 'Fleet operators see own vehicles' AND cmd = 'SELECT' AND roles = ARRAY['public']::name[]
                     AND qual = '((fleet_operator_id = get_fleet_operator_id()) OR (fleet_operator_id IS NULL))') THEN
-    RAISE EXCEPTION '0645 P1: "Fleet operators see own vehicles" is not the policy this file was written against';
+    RAISE EXCEPTION '0647 P1: "Fleet operators see own vehicles" is not the policy this file was written against';
   END IF;
   IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'ottoq_vehicle_commands'
                 AND policyname = 'Depot staff read own depot commands') THEN
-    RAISE EXCEPTION '0645 P1: "Depot staff read own depot commands" exists already';
+    RAISE EXCEPTION '0647 P1: "Depot staff read own depot commands" exists already';
   END IF;
   IF to_regprocedure('public.get_staff_depot_id()') IS NULL OR to_regprocedure('public.get_fleet_operator_id()') IS NULL THEN
-    RAISE EXCEPTION '0645 P1: get_staff_depot_id() or get_fleet_operator_id() is missing';
+    RAISE EXCEPTION '0647 P1: get_staff_depot_id() or get_fleet_operator_id() is missing';
   END IF;
 END $premises$;
 
 -- ── restore statements for everything this file removes or narrows ──
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0645_pre', s.kind, 'public', s.obj, s.def, md5(s.def)
+SELECT '0647_pre', s.kind, 'public', s.obj, s.def, md5(s.def)
   FROM (VALUES
     ('policy', 'vehicles::client keys read only',
      'CREATE POLICY "client keys read only" ON public.vehicles AS PERMISSIVE FOR SELECT TO anon, authenticated USING (true);'),
@@ -140,17 +140,17 @@ REVOKE TRUNCATE, TRIGGER, REFERENCES ON public.vehicles, public.ottoq_vehicle_co
 DO $v1$
 BEGIN
   IF has_table_privilege('anon', 'public.vehicles', 'SELECT') OR has_table_privilege('anon', 'public.ottoq_vehicle_commands', 'SELECT') THEN
-    RAISE EXCEPTION '0645 V1 FAILED: anon still holds SELECT';
+    RAISE EXCEPTION '0647 V1 FAILED: anon still holds SELECT';
   END IF;
   IF has_table_privilege('anon', 'public.vehicles', 'TRUNCATE') OR has_table_privilege('authenticated', 'public.vehicles', 'TRUNCATE')
      OR has_table_privilege('anon', 'public.ottoq_vehicle_commands', 'TRUNCATE') OR has_table_privilege('authenticated', 'public.ottoq_vehicle_commands', 'TRUNCATE') THEN
-    RAISE EXCEPTION '0645 V1 FAILED: TRUNCATE survives';
+    RAISE EXCEPTION '0647 V1 FAILED: TRUNCATE survives';
   END IF;
   IF NOT has_table_privilege('authenticated', 'public.ottoq_vehicle_commands', 'SELECT') THEN
-    RAISE EXCEPTION '0645 V1 FAILED: authenticated lost SELECT, which field-ops Prime Ops needs';
+    RAISE EXCEPTION '0647 V1 FAILED: authenticated lost SELECT, which field-ops Prime Ops needs';
   END IF;
   IF NOT has_table_privilege('service_role', 'public.vehicles', 'UPDATE') OR NOT has_table_privilege('service_role', 'public.ottoq_vehicle_commands', 'INSERT') THEN
-    RAISE EXCEPTION '0645 V1 FAILED: service_role lost a write it had';
+    RAISE EXCEPTION '0647 V1 FAILED: service_role lost a write it had';
   END IF;
 END $v1$;
 
@@ -167,7 +167,7 @@ DECLARE
   v_other_veh bigint; v_other_cmd bigint;
 BEGIN
   SELECT auth_user_id INTO v_staff FROM public.staff_users WHERE depot_id = v_twin AND auth_user_id IS NOT NULL ORDER BY created_at LIMIT 1;
-  IF v_staff IS NULL THEN RAISE EXCEPTION '0645 V2: no twin-depot staff login to probe with'; END IF;
+  IF v_staff IS NULL THEN RAISE EXCEPTION '0647 V2: no twin-depot staff login to probe with'; END IF;
   SELECT count(*) INTO v_veh_before FROM public.vehicles WHERE current_depot_id = v_twin OR home_depot_id = v_twin;
   SELECT count(*) INTO v_cmd_before FROM public.ottoq_vehicle_commands WHERE depot_id = v_twin;
 
@@ -189,38 +189,38 @@ BEGIN
       INTO v_staff_cmd, v_staff_cmd_out FROM public.ottoq_vehicle_commands;
 
     -- a signed-in user with no staff, operator or member row
-    PERFORM set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-4000-8000-000000000645', 'role', 'authenticated')::text, true);
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-4000-8000-000000000647', 'role', 'authenticated')::text, true);
     SELECT count(*) INTO v_other_veh FROM public.vehicles;
     SELECT count(*) INTO v_other_cmd FROM public.ottoq_vehicle_commands;
 
-    RAISE EXCEPTION '0645 V2 PROBED';
+    RAISE EXCEPTION '0647 V2 PROBED';
   EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM;
   END;
-  IF v_msg IS DISTINCT FROM '0645 V2 PROBED' THEN RAISE EXCEPTION '0645 V2: the probe itself failed: %', v_msg; END IF;
-  IF current_user NOT IN ('postgres', session_user) THEN RAISE EXCEPTION '0645 V2: role did not revert (%)', current_user; END IF;
+  IF v_msg IS DISTINCT FROM '0647 V2 PROBED' THEN RAISE EXCEPTION '0647 V2: the probe itself failed: %', v_msg; END IF;
+  IF current_user NOT IN ('postgres', session_user) THEN RAISE EXCEPTION '0647 V2: role did not revert (%)', current_user; END IF;
 
   SELECT count(*) INTO v_veh_after FROM public.vehicles WHERE current_depot_id = v_twin OR home_depot_id = v_twin;
   SELECT count(*) INTO v_cmd_after FROM public.ottoq_vehicle_commands WHERE depot_id = v_twin;
 
-  IF NOT v_anon_refused THEN RAISE EXCEPTION '0645 V2 FAILED: anon can still SELECT vehicles'; END IF;
-  IF NOT v_anon_rpc THEN RAISE EXCEPTION '0645 V2 FAILED: the cockpit RPC returned nothing as anon'; END IF;
+  IF NOT v_anon_refused THEN RAISE EXCEPTION '0647 V2 FAILED: anon can still SELECT vehicles'; END IF;
+  IF NOT v_anon_rpc THEN RAISE EXCEPTION '0647 V2 FAILED: the cockpit RPC returned nothing as anon'; END IF;
   IF v_staff_veh_out <> 0 OR v_staff_cmd_out <> 0 THEN
-    RAISE EXCEPTION '0645 V2 FAILED: staff read % vehicles and % commands outside their depot', v_staff_veh_out, v_staff_cmd_out;
+    RAISE EXCEPTION '0647 V2 FAILED: staff read % vehicles and % commands outside their depot', v_staff_veh_out, v_staff_cmd_out;
   END IF;
   IF v_staff_veh NOT BETWEEN LEAST(v_veh_before, v_veh_after) AND GREATEST(v_veh_before, v_veh_after)
      OR v_staff_cmd NOT BETWEEN LEAST(v_cmd_before, v_cmd_after) AND GREATEST(v_cmd_before, v_cmd_after) THEN
-    RAISE EXCEPTION '0645 V2 FAILED: staff read % vehicles / % commands; the depot held %..% / %..%',
+    RAISE EXCEPTION '0647 V2 FAILED: staff read % vehicles / % commands; the depot held %..% / %..%',
       v_staff_veh, v_staff_cmd, v_veh_before, v_veh_after, v_cmd_before, v_cmd_after;
   END IF;
   IF v_other_veh <> 0 OR v_other_cmd <> 0 THEN
-    RAISE EXCEPTION '0645 V2 FAILED: a stranger reads % vehicles / % commands', v_other_veh, v_other_cmd;
+    RAISE EXCEPTION '0647 V2 FAILED: a stranger reads % vehicles / % commands', v_other_veh, v_other_cmd;
   END IF;
-  RAISE NOTICE '0645 V2 PASSED: anon refused, cockpit RPC still answers; staff read % vehicles / % commands, all at their depot; a stranger reads 0 / 0',
+  RAISE NOTICE '0647 V2 PASSED: anon refused, cockpit RPC still answers; staff read % vehicles / % commands, all at their depot; a stranger reads 0 / 0',
     v_staff_veh, v_staff_cmd;
 END $v2$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0645_the_public_key_reads_no_vehicle_and_no_command', false, false,
+VALUES ('0647_the_public_key_reads_no_vehicle_and_no_command', false, false,
   'G393 (security item 1): drops the two USING(true) anon/authenticated SELECT policies on vehicles and '
   'ottoq_vehicle_commands, narrows the fleet-operator vehicles policy to signed-in operators, adds a staff-depot '
   'SELECT policy on commands, and revokes unused anon/authenticated table privileges. Policies and grants only; the '
