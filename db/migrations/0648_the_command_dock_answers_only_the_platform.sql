@@ -15,6 +15,7 @@
 --                                                                              first delivery wins
 --     ottoq_energy_claim_commands(uuid,int,text)        yes        yes        the same for energy commands (also PUBLIC)
 --     ottoq_energy_ack_command(uuid,text,text,text)     yes        yes        acknowledges a delivered energy command
+--                                                                              (also PUBLIC)
 --     ottoq_fleet_pending_commands(uuid,uuid,int)        -         yes        peeks at pending production commands
 --     ottoq_ack_vehicle_command(uuid,text,text,text)     -         yes        acknowledges a vehicle command
 --
