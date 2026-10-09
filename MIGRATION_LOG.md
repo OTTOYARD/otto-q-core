@@ -181,7 +181,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0638 — GENERATED, not a log
+## Index, 0134–0639 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629 — which are indexed below as well as logged above; the log row is
@@ -690,7 +690,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0636](db/migrations/0636_the_charge_clocks_spread_is_what_its_charges_show.sql) | `PENDING` | no — pending | **The charge clock's spread is what its own charges show, by kind and length of charge.** |
 | [0637](db/migrations/0637_the_futures_read_the_latest_return_model_that_was_usable.sql) | `PENDING` | no — pending | **The futures read the latest return model that was usable, and say when a newer one was not.** |
 | [0638](db/migrations/0638_the_self_review_remembers_what_it_found.sql) | `PENDING` | no — pending | **The self-review remembers what it found until its evidence lets it go, and its window never cuts a run in two.** |
+| [0639](db/migrations/0639_the_futures_hold_a_charger_for_the_car_the_calendar_names.sql) | `PENDING` | no — pending | **The futures hold a charger for the car the depot's calendar names.** |
 
-490 migrations indexed.
+491 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
