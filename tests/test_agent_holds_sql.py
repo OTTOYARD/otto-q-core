@@ -19,10 +19,13 @@ tests/test_agent_charge_order_sql.py, through 0619-0638 as tests/test_agent_revi
   - the self-review: neither area lists holds among what the simulator does not model, and v3 says how many graded
     orders were made before the futures read them.
 And 0640's: the agent's board lists the chargers the calendar holds for a named car within the hour and each car the
-charger held for it, from the same reading, and nothing else on the board moves.
+charger held for it, from the same reading, and nothing else on the board moves. And 0641's: each car on the board
+carries what the kernel's own order does with it in the check's expected future, which is the check's simulator's seat
+for it, and the board counts the cars that plan makes late, leaves low on an L2, or cannot seat.
 It SKIPS where no scratch PostgreSQL is reachable.
 """
 import json
+import math
 import os
 import re
 import sys
@@ -443,3 +446,91 @@ def test_0640_its_checks_speak_with_stored_orders(db):
                      r"held then for a named car within the hour \(the first an l2 from minute 0 to 81\); 1 of its \d+ "
                      r"cars carry a hold of their own", err), err
     assert "0640 V2: 8 boards at stored orders unchanged beyond the two fields" in err, err
+
+
+# ── 0641: the agent sees the kernel's own plan ───────────────────────────────────────────────────────────────────────
+
+M0641 = os.path.join(ROOT, "db", "migrations", "0641_the_agent_sees_the_kernels_own_plan.sql")
+
+
+def _through_0640(d):
+    _through_0639(d)
+    _file(d, M0640)
+
+
+def _r(x):
+    """PostgreSQL's round(numeric): half away from zero (Python's round() is half to even)."""
+    return int(math.floor(abs(x) + 0.5)) * (1 if x >= 0 else -1)
+
+
+def _without_plan(b):
+    b = json.loads(json.dumps(b))
+    b.pop("kernel_plan", None)
+    b["cars"] = [{k: v for k, v in c.items() if k != "plan"} for c in b["cars"]]
+    b["arriving"] = [{k: v for k, v in a.items() if k not in ("plan_start_min", "plan_kind")} for a in b["arriving"]]
+    return b
+
+
+def test_0641_applies_and_its_checks_run(db):
+    _through_0640(db)
+    err = _file(db, M0641)
+    assert "0641 V1: no stored order; the board is executed by the tests" in err, err
+    assert "0641 V2: 0 boards at stored orders unchanged beyond the plan's fields" in err, err
+    assert db.val("SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage "
+                  "WHERE name = '0641_the_agent_sees_the_kernels_own_plan'") == "falsefalse"
+    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0641_pre'") == "1"
+
+
+def test_0641_refuses_an_engine_before_0640_a_run_running_and_a_second_apply(db):
+    _through_0639(db)
+    rc, err = db.file(M0641)
+    assert rc != 0 and "0641 P1: 0640 is not applied; apply it first" in err, err
+    _file(db, M0640)
+    status = db.val(f"SELECT status FROM public.ottoq_sim_runs WHERE sim_run_id = '{RUN}'")
+    db.val(f"UPDATE public.ottoq_sim_runs SET status = 'running' WHERE sim_run_id = '{RUN}'")
+    rc, err = db.file(M0641)
+    assert rc != 0 and "0641 P0: a run is running" in err, err
+    db.val(f"UPDATE public.ottoq_sim_runs SET status = '{status}' WHERE sim_run_id = '{RUN}'")
+    _file(db, M0641)
+    rc, err = db.file(M0641)
+    assert rc != 0 and "0641 P1: ottoq_agent_charge_queue_board is not the body 0640 left" in err, err
+
+
+def test_0641_the_board_carries_the_kernels_plan_car_by_car(db):
+    _through_0640(db)
+    _book(db, "L1", "A", -5, 100, booked=-20)                            # A's L2 is held over the moment
+    before = _board(db)
+    _file(db, M0641)
+    b = _board(db)
+    assert _without_plan(b) == before
+    # each car's plan is the check's own simulator on the check's own state, the kernel's order, the expected future
+    st = _state(db)
+    seats = {s["id"]: s for s in _sim(db, st, None, 0, RUN, True)["seats"]}
+    due = {c["id"]: c.get("due") for c in st["cars"]}
+    soc = {c["id"]: c["soc"] for c in st["cars"]}
+    assert b["cars"], b
+    for c in b["cars"]:
+        s = seats[c["vehicle_id"]]
+        want = {"start_min": _r(s["s0"]), "kind": s["k0"], "ready_min": _r(s["r"]),
+                "late_min": None if due[c["vehicle_id"]] is None else max(_r(s["r"] - due[c["vehicle_id"]]), 0)}
+        assert c["plan"] == want, (c["name"], c["plan"], want)
+    late = [i for i, s in seats.items() if due.get(i) is not None and s["r"] is not None and s["r"] > due[i]]
+    assert b["kernel_plan"] == {
+        "cars": len(st["cars"]), "arriving": 0, "unseated": sum(1 for s in seats.values() if s["s0"] is None),
+        "late": len(late), "late_min": _r(sum(seats[i]["r"] - due[i] for i in late)),
+        "low_on_l2": sum(1 for i, s in seats.items() if s["k0"] == "l2" and soc.get(i, 100) < 45)}, b["kernel_plan"]
+    # the immediate car has a due time; the plan says whether the kernel's own order makes it late
+    i_car = next(c for c in b["cars"] if c["name"] == "I")
+    assert i_car["plan"]["late_min"] is not None and i_car["plan"]["kind"] == "dcfc", i_car
+
+
+def test_0641_its_checks_speak_with_stored_orders(db):
+    _through_0638(db)
+    _graded_world(db)
+    _apply(db)
+    _file(db, M0640)
+    err = _file(db, M0641)
+    assert re.search(r"0641 V1: the board at order 9819 \(run a0000000, sim 14:59, [\d.]+ s\) carries the kernel's plan for "
+                     r"\d+ cars in the line and \d+ coming home: \d+ late by \d+ minutes, \d+ under 45% on an L2, \d+ not "
+                     r"seated within the horizon", err), err
+    assert "0641 V2: 8 boards at stored orders unchanged beyond the plan's fields" in err, err

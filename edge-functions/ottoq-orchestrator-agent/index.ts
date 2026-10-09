@@ -16,6 +16,11 @@
 //      1,331 cars the agent named already had one waiting. The board now lists charge_queue.chargers.held and each car's
 //      held, and the charge-line section says what they mean: a held charger is not free to other cars while its hold
 //      lasts, and a car with one is already placed.
+//      0641: THE AGENT SEES THE KERNEL'S OWN PLAN. The check compares an order against the kernel's own order rolled
+//      forward; the agent saw only that comparison's totals. On b2efcc07 the kernel's plan made 0.75 of the 0.76 cars
+//      with a due time late per order, by a mean 115.5 minutes, and put 4.47 cars under 45% on an L2. The board now
+//      carries each car's plan (start, kind, ready, late) and kernel_plan's counts, from the check's own simulator, and
+//      the section asks for an order where the plan has something to fix.
 // v26 (0621): THE AGENT READS ITS OWN TRACK RECORD. The kernel now replays every order it checked 90 sim-minutes
 //      later with what actually happened and keeps the result (ottoq_charge_order_hindsight); the board carries it as
 //      track_record: this run and the depot's last days by outcome, each kind of move the agent's orders made with how

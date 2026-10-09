@@ -111,7 +111,7 @@ test("v25 / 0620: the prompt says the kernel rolls the line forward over sampled
   assert.match(CHARGE_ORDER_PROMPT, /more cars ready by their due time; then fewer minutes late; then fewer minutes in the depot summed over every car/);
   assert.match(CHARGE_ORDER_PROMPT, /charge_queue\.contention: waiting against free_now and freeing_15_min, arriving_60_min, and pressure/);
   assert.match(CHARGE_ORDER_PROMPT, /charge_queue\.arriving: the cars coming home/);
-  assert.match(CHARGE_ORDER_PROMPT, /WHEN TO ORDER: when contention\.pressure is tight or congested\. When it is none, every car waiting plugs in now whatever you send: leave out charge_order/);
+  assert.match(CHARGE_ORDER_PROMPT, /WHEN TO ORDER: when contention\.pressure is tight or congested and kernel_plan shows something to fix: a car it makes late, a low battery it puts on an L2\. When it is none, every car waiting plugs in now whatever you send: leave out charge_order/);
   assert.match(CHARGE_ORDER_PROMPT, /same_as_kernel means your order changed nothing: do not resend it/);
   assert.match(CHARGE_ORDER_PROMPT, /worse_in_expected_future, no_better_in_expected_future or not_enough_futures_won mean it lost/);
   assert.match(CHARGE_ORDER_PROMPT, /will miss its due time unless it takes the next fast charger to free: name it dcfc, earliest due first/);
@@ -137,11 +137,15 @@ test("v26 / 0621: the prompt reads the track record and learns from the moves", 
   }
 });
 
-test("v27 / 0640: the prompt reads the chargers the calendar holds", () => {
+test("v27 / 0640, 0641: the prompt reads the chargers the calendar holds and the kernel's own plan", () => {
   assert.match(CHARGE_ORDER_PROMPT, /and held \(the chargers the depot's calendar holds for a named car within the next hour, soonest first: kind, stall, car, from_min, until_min\)/);
   assert.match(CHARGE_ORDER_PROMPT, /While a hold covers the moment, the kernel gives that charger to no other car, whatever your order says/);
   assert.match(CHARGE_ORDER_PROMPT, /Each car's held names the charger held for it, if any \(kind, stall, from_min, until_min\): the kernel seats it there when its window opens/);
   assert.match(CHARGE_ORDER_PROMPT, /7\. Read chargers\.held before you count a charger as yours: a charger held for another car is not free to the cars you name while its hold lasts, and a car with a charger held for it is already placed/);
+  // 0641: the kernel's own plan, car by car, and when to order against it
+  assert.match(CHARGE_ORDER_PROMPT, /Each car's plan, each arriving car's plan_start_min and plan_kind, and charge_queue\.kernel_plan are what the kernel's own order does from now in the check's expected future/);
+  assert.match(CHARGE_ORDER_PROMPT, /kernel_plan counts the cars it makes late \(late, late_min\), the cars under 45% it puts on an L2 \(low_on_l2\) and the cars it cannot seat within the horizon \(unseated\)/);
+  assert.match(CHARGE_ORDER_PROMPT, /WHEN TO ORDER: when contention\.pressure is tight or congested and kernel_plan shows something to fix/);
   // the rules after it moved down one, in order
   const at = (re) => CHARGE_ORDER_PROMPT.search(re);
   assert.ok(at(/\n6\. Never name a kind/) < at(/\n7\. Read chargers\.held/) && at(/\n7\. Read chargers\.held/) < at(/\n8\. Read last_order\.projection/)

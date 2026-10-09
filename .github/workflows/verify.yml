@@ -437,10 +437,11 @@ jobs:
 
       # 0639 has the check's futures hold a charger for the car the depot's calendar names, as the kernel's assignment
       # gate does, and say how many held chargers it could not model (G380); 0640 shows the agent the same holds on its
-      # board. On bookings planted by hand and hand lines: the holds as the calendar held them at a moment, the state
-      # behind the dial, the simulator unchanged without a list and by meaning with one, the realizer, the review's
-      # words, and the board's two fields with nothing else moving. 15 tests, about 240 seconds.
-      - name: The futures and the agent see the calendar's holds, executed (0639-0640 against stub engines)
+      # board, and 0641 the kernel's own plan car by car. On bookings planted by hand and hand lines: the holds as the
+      # calendar held them at a moment, the state behind the dial, the simulator unchanged without a list and by meaning
+      # with one, the realizer, the review's words, the board's new fields with nothing else moving, and each car's plan
+      # as the check's simulator seats it. 19 tests, about 300 seconds.
+      - name: The futures and the agent see the calendar's holds and the kernel's plan, executed (0639-0641 against stub engines)
         env:
           PGHOST: localhost
           PGPORT: "5432"
