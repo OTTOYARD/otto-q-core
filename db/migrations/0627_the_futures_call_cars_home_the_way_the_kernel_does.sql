@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009002205
 -- migration-name:    the_futures_call_cars_home_the_way_the_kernel_does
 --
 -- 0627  **The futures call cars home the way the kernel does.**
