@@ -12,7 +12,7 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
   `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), v36, agent v24 (footnote ⁵), v37, agent v25
-  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹).
+  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰).
   29 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
@@ -122,7 +122,7 @@ against this table without trusting any metadata column.
 | ottoq-energy-optimize | 8 | true | 2026-06-17 01:33 | yes | `ef4f5240822dc6064c8051c5f4cd01daf6aeef0f59622f8eca026f60019211b0` |
 | ottoq-feed-agents | 6 | true | 2026-07-09 18:31 | yes | `2b9dae37769c6babbb4401a0b936d31e0a2ebf4af48cea75ace4588d827f7bb2` |
 | ottoq-fleet-vehicles | 5 | true | 2026-06-19 02:56 | yes | `a68d6444315ba0a1b5caccb568c624026a22e59bc9b90d0323890a2b5c2c2ba3` |
-| ottoq-ingest | 12 | true | 2026-07-23 19:00 | yes | `ef7ae8815237ea9fb2cb0de1279f0cbaeb1c3d2df24317308e5d6ec4c4910893` |
+| ottoq-ingest | 16 | false | 2026-10-09 23:37 | yes¹⁰ | `271751cbce1361467d28dad231267bcab225c155d4ed933c3f9a51702714846c` |
 | ottoq-jobs-active | 5 | true | 2026-06-19 12:41 | yes | `620347129158bbe913a40d97ae8d0a8bc712e0ddbc5b4d8c11c76e0a58f26ae0` |
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
@@ -273,3 +273,5 @@ Exit 0 = in sync (acknowledged exceptions aside), 1 = drift named, **2 = could
 not check, which is never reported as a pass.** The token is a Supabase personal
 access token (supabase.com → Account → Access Tokens); it is never stored in this
 repo.
+
+¹⁰ **`ottoq-ingest` v16 (source v10), 2026-10-09 at 6:37 PM CT (23:37 UTC), for G393 security item 4 and 0649.** The depot and the data source now come from the credential: a source key (`X-OTTO-Q-API-Key`, issued by `ottoq_issue_source_key`) or the injected service key, compared in constant time. Deployed with `verify_jwt` **false** on purpose, after v15 (the same code with it true) answered the public key with the gateway's own `UNAUTHORIZED_LEGACY_JWT`: the gateway now refuses legacy JWT keys, so with it on, a source holding only its source key could never reach the door. Read back with `get_edge_function`: compared with the repo at `a5404f1` by inspection, not hashed (the response comes back inline at 16 KB, so there is no file to hash). Proven instead on the live door with a twin-scoped test key, every request a dry run: no credential 401; the public key 401; the key on a twin car 200 as `twin`; a body naming another depot 403; a body naming `production` 403; a stream the key lacks 403; another depot's car "vehicle not found"; the key after `ottoq_revoke_source_key` 401.
