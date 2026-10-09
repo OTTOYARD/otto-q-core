@@ -723,7 +723,7 @@ repo_manifest(version, name, file) AS (
     ('20261009103821'::text, 'the_futures_read_the_latest_return_model_that_was_usable'::text, '0637_the_futures_read_the_latest_return_model_that_was_usable.sql'::text),
     ('20261009104044'::text, 'the_self_review_remembers_what_it_found'::text, '0638_the_self_review_remembers_what_it_found.sql'::text),
     ('20261009104324'::text, 'the_futures_hold_a_charger_for_the_car_the_calendar_names'::text, '0639_the_futures_hold_a_charger_for_the_car_the_calendar_names.sql'::text),
-    ('PENDING'::text, 'the_agent_sees_the_chargers_the_calendar_holds'::text, '0640_the_agent_sees_the_chargers_the_calendar_holds.sql'::text),
+    ('20261009104502'::text, 'the_agent_sees_the_chargers_the_calendar_holds'::text, '0640_the_agent_sees_the_chargers_the_calendar_holds.sql'::text),
     ('PENDING'::text, 'the_agent_sees_the_kernels_own_plan'::text, '0641_the_agent_sees_the_kernels_own_plan.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009104502
 -- migration-name:    the_agent_sees_the_chargers_the_calendar_holds
 --
 -- 0640  **The agent sees the chargers the depot's calendar holds for named cars.**
