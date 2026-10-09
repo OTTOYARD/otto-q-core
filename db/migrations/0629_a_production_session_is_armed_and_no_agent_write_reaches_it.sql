@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009033733
 -- migration-name:    a_production_session_is_armed_and_no_agent_write_reaches_it
 --
 -- 0629  **A production session is armed, and no write under an agent's name reaches it.**
