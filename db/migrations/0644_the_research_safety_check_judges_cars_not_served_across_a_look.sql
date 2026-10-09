@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009174701
 -- migration-name:    the_research_safety_check_judges_cars_not_served_across_a_look
 --
 -- 0644  **The research wing's vehicle-first check judges returned cars left without service across a look's pairs, not
