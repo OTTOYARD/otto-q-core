@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009232411
 -- migration-name:    the_public_key_reads_no_vehicle_and_no_command
 --
 -- 0647  **The public key reads no vehicle and no command; depot staff read their own depot's commands.** (G393;
@@ -247,3 +247,12 @@ VALUES ('0647_the_public_key_reads_no_vehicle_and_no_command', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-09 23:24:11 UTC (6:24 PM CT), version 20261009232411 ════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in aa5d775; the ledger's stored statement is this file byte for
+--   byte (md5 6711ce01f47f4a09e607726a23a8b62f, 17,239 characters, 17,990 bytes on both sides). P0, P1, V1 and V2
+--   passed in the apply's transaction. Read after, as each role: anon REFUSED on vehicles and on commands, and the
+--   cockpit's ottoq_depot_cards still answers; twin-depot staff 120 vehicles / 128,855 commands; a signed-in stranger
+--   0 / 0. Three earlier attempts (two apply_migration as 0645, one execute_sql as 0647, each carrying DROP POLICY)
+--   timed out at the connector and never reached Postgres: nothing in pg_stat_statements, ledger unchanged, and
+--   the same file without its DROPs ran at once (§2 (a)).
