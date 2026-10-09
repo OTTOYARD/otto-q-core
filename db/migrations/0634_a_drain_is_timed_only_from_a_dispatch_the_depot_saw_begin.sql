@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009102518
 -- migration-name:    a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin
 --
 -- 0634  **A car's drain is timed only from a dispatch the depot saw begin.**
