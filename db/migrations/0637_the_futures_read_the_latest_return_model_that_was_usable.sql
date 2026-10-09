@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009103821
 -- migration-name:    the_futures_read_the_latest_return_model_that_was_usable
 --
 -- 0637  **The futures read the latest return model that was usable, and say when a newer one was not.**
