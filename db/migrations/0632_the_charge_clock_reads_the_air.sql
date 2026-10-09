@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009101743
 -- migration-name:    the_charge_clock_reads_the_air
 --
 -- 0632  **The charge clock reads the air.**
