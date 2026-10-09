@@ -388,6 +388,22 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_charger_faults_sql.py
 
+      # 0636 has every charge clock fit measure, on its own charges once the clock knows the run, how wide each kind and
+      # length of charge runs against the spread the clock gives it, and the clock scales its spread by that (the minutes
+      # never move), behind a person's dial at the depot. On charges planted with a known spread within each run: each
+      # length's factor by arithmetic, thin kinds and the 0.5-4 bounds, the window, the regime cut and fine ticks; the
+      # clock's factor by length and 0632's clock key for key without one; the fit with the dial on and off; the audit's
+      # band in and out of sample; the review's built band. 11 tests, about 170 seconds.
+      - name: The charge clock's spread is what its charges show, executed (0636 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_clock_spread_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
