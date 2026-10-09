@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009233223
 -- migration-name:    source_keys_are_issued_by_the_platform_and_bind_a_depot_and_a_data_source
 --
 -- 0649  **A source key is issued only by the platform, and it binds the depot, the data source and the streams its
@@ -309,3 +309,10 @@ VALUES ('0649_source_keys_are_issued_by_the_platform_and_bind_a_depot_and_a_data
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-09 23:32:23 UTC (6:32 PM CT), version 20261009233223 ════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in ce417d8; the ledger's stored statement is that file byte for
+--   byte (md5 ea0200f0daad83860469160f5ff28535, 18,907 characters, 19,663 bytes). P0, P1, V1, V2 passed in the apply's
+--   transaction. Read after: 1 key, oem_webhook / production / no streams / active, as before. Probed from outside at
+--   23:32 UTC: POST /functions/v1/otto-q-api/api/v1/ottow/api-keys with no credential answered HTTP 500 ("Cannot read
+--   properties of null (reading 'id')") and wrote no key (still 1, newest 2026-04-07).
