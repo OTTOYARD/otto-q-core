@@ -56,6 +56,10 @@
 
 BEGIN;
 
+-- DROP/ALTER POLICY and REVOKE take an ACCESS EXCLUSIVE lock on vehicles, which every tick writes. A DDL waiting for
+-- that lock queues every later reader and writer behind it, so this file gives up after 5 s instead of stalling a tick.
+SET LOCAL lock_timeout = '5s';
+
 -- ── P0: nothing in flight ──
 DO $inflight$
 BEGIN
