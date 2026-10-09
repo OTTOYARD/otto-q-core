@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009232737
 -- migration-name:    the_command_dock_answers_only_the_platform
 --
 -- 0648  **The command dock answers only the platform: no public key or signed-in account can peek at, lease or
@@ -157,3 +157,9 @@ VALUES ('0648_the_command_dock_answers_only_the_platform', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-09 23:27:37 UTC (6:27 PM CT), version 20261009232737 ════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in the commit before this footer; the ledger's stored statement
+--   is that file byte for byte (md5 58eb9cf015d24384f36eb3e3a14cc59b, 9,835 characters, 10,559 bytes). P0, P1, V1, V2
+--   passed in the apply's transaction. Read after: all five functions anon false / authenticated false / service_role
+--   true; delivered vehicle commands 0, as before.
