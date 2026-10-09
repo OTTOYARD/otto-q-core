@@ -8,7 +8,10 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 until 2026-10-09, when the job's own steps outgrew it: the agent SQL suites (0614-0628) take ~10 minutes and the
+    # job reached the limit with the 0630-0631 step 36 seconds in (run 37888824528, cancelled, not failed). The limit
+    # catches a hang; it is not a budget for the tests, so it sits well above the job's ~23 minutes.
+    timeout-minutes: 40
     # G12, second rung. A scratch PostgreSQL that holds NOTHING -- no engine
     # schema, no data. It exists so plpgsql can be compiled, which is all the
     # compile-check step needs and all it claims.
