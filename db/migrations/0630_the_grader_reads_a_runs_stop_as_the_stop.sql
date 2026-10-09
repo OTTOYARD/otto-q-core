@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009100905
 -- migration-name:    the_grader_reads_a_runs_stop_as_the_stop
 --
 -- 0630  **The grader reads a run's stop as the stop, and a grade found wrong is superseded beside the first.**

@@ -713,7 +713,7 @@ repo_manifest(version, name, file) AS (
     ('20261009002205'::text, 'the_futures_call_cars_home_the_way_the_kernel_does'::text, '0627_the_futures_call_cars_home_the_way_the_kernel_does.sql'::text),
     ('20261009021006'::text, 'the_futures_drain_each_car_at_its_own_rate'::text, '0628_the_futures_drain_each_car_at_its_own_rate.sql'::text),
     ('20261009033733'::text, 'a_production_session_is_armed_and_no_agent_write_reaches_it'::text, '0629_a_production_session_is_armed_and_no_agent_write_reaches_it.sql'::text),
-    ('PENDING'::text, 'the_grader_reads_a_runs_stop_as_the_stop'::text, '0630_the_grader_reads_a_runs_stop_as_the_stop.sql'::text),
+    ('20261009100905'::text, 'the_grader_reads_a_runs_stop_as_the_stop'::text, '0630_the_grader_reads_a_runs_stop_as_the_stop.sql'::text),
     ('PENDING'::text, 'a_fault_owns_the_charge_it_cut'::text, '0631_a_fault_owns_the_charge_it_cut.sql'::text),
     ('PENDING'::text, 'the_charge_clock_reads_the_air'::text, '0632_the_charge_clock_reads_the_air.sql'::text),
     ('PENDING'::text, 'the_futures_spread_each_arrival_as_the_returns_show'::text, '0633_the_futures_spread_each_arrival_as_the_returns_show.sql'::text),
