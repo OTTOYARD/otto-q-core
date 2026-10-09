@@ -14,7 +14,10 @@
 --
 --   (a) The self-review named it among the four open areas it first ranked (0626, G360-G364): "The charge clock does
 --       not see the air temperature", on 15% of what made the check wrong. Its audit put the air at 41% of what the
---       clock leaves across runs on fast chargers and 28% on L2.
+--       clock leaves across runs on fast chargers and 28% on L2. It has since fallen off the list for want of evidence,
+--       not of effect: the audit reads only the charges recorded after the latest fit once it has 30 of a kind, and
+--       since fit 3 that is one run (b2efcc07), on which no slope between runs can be read (within it, t 0.54 on L2
+--       and 2.01 on fast chargers). That one run, at 26 °C, is the one the clock missed most (c).
 --   (b) The physics it misses. The twin times a charge at the battery's temperature: the depot's air at the session's
 --       start, plus 5, plus up to 8 by the car, plus half a degree per minute of charging up to 15
 --       (twin.ottoq_sim_advance_charge_sessions); above 35 °C the rate falls 2% per degree (ottoq_sim_compute_charge_rate).
