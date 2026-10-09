@@ -36,9 +36,9 @@
 --   range (ottoq_dial_pair refuses otherwise, at run time). V2 the two primary metrics are among the keys an arm's
 --   metrics carry (ottoq_dial_arm_metrics, read from the latest pair in the ledger).
 --
--- ROLLBACK: UPDATE public.ottoq_dial_experiments SET status = 'abandoned', concluded_at = now(),
---   verdict = jsonb_build_object('outcome', 'withdrawn') WHERE created_by = 'claude_code_2026_10_09';
---   DELETE FROM public.ottoq_cert_lineage WHERE name = '0643_the_research_wing_tests_0642s_two_keys_in_the_twin'.
+-- ROLLBACK: mark the two experiments created_by 'claude_code_2026_10_09' abandoned, with a verdict whose outcome is
+--   'withdrawn' and the time it was concluded, so their pairs stay in the ledger as evidence; and take this file's row
+--   out of ottoq_cert_lineage.
 
 BEGIN;
 
