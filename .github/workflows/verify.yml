@@ -404,6 +404,21 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_clock_spread_sql.py
 
+      # 0637 has the check's state, the inbound forecast, the agent's board and the self-review read the depot's latest
+      # usable return model, naming a newer fit it passed over, so a refit that finds too few returns cannot leave the
+      # futures forecasting no car at work (G377). On fits planted by hand: the reader in each case, the state before and
+      # after, every reader unchanged while the latest fit is usable, and the review's area in words. 6 tests, about 90
+      # seconds.
+      - name: The futures read the latest return model that was usable, executed (0637 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_return_usable_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
