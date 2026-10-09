@@ -42,15 +42,16 @@
 --       that moment read them, returns and all: 33 of d9d49732's own returns were in the fit 0623's, 0624's and 0627's
 --       gates call out of sample (late 11, not 9, without them; the verdict stood).
 --   (f) The late tail is the drive home, not the drain (G368). The class drain puts more arrivals past 3 spreads late
---       (11 -> 49 of 2,503, 4 -> 6 returns of 89) while it misses by fewer minutes, so the late ones were split by their
---       own dispatches: their drive home took a mean 10.64 minutes longer than the forecast's, against 0.20 for every
---       other arrival. 43 of the 49 are one car's two returns, called home mid-shift 18.6 and 7.6 minutes out. Each trip
---       home took exactly the minutes the kernel computed when the car turned home (distance over speed and the hour's
---       traffic, ottoq_computed_eta_minutes; 111 of 111, a mean 0.13 minutes apart), and the kernel refreshes that ETA
---       for every car at work every tick (ottoq_refresh_return_eta), while the futures give every car the depot's typical
---       drive (1.24 minutes). A car's battery so far does not predict the rest of its shift (correlation 0.014 between its
---       drain so far and its drain to the reserve, both against its level; every blend of the two scored worse, 2.19
---       minutes at best against 1.58). So the drain by class is built, and the review now names the drive home.
+--       (11 -> 49 of 2,503; 4 -> 6 returns of 89, each a different car) while it misses by fewer minutes, so the late
+--       ones were split by their own dispatches: their drive home took a mean 10.64 minutes longer than the forecast's,
+--       against 0.20 for every other arrival; the longest, a car called home mid-shift on stale telemetry, drove 18.6
+--       minutes against the forecast's 1.24. Each trip home took the minutes the kernel set when the car turned home
+--       (return_eta_minutes: 111 of 111 within a mean 0.13 minutes; 98 of them computed as distance over speed in the
+--       hour's traffic, ottoq_computed_eta_minutes), and the kernel refreshes that ETA for every car at work every tick
+--       (ottoq_refresh_return_eta), while the futures give every car the depot's typical drive (1.24 minutes). A car's
+--       battery so far does not predict the rest of its shift (correlation 0.014 between its drain so far and its drain
+--       to the reserve, both against its level; every blend of the two scored worse, 2.19 minutes at best against
+--       1.58). So the drain by class is built, and the review now names the drive home.
 --   (g) Rehearsed on live 2026-10-09, rolled back (01:10-01:40 UTC, 8:10-8:40 PM CT on the 8th), in three parts that
 --       hold every statement but the six bodies' unchanged sections: P0, P1, the fit and the gate (35 s), the gate with
 --       its returns (18 s), and the review with V4 (2.1 s). V1: the fit through now() keeps 0627's 22 keys and adds
