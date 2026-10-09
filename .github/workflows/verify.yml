@@ -8,7 +8,11 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 until 2026-10-09, when the job's own steps outgrew it: the agent SQL suites (0614-0628) take ~10 minutes and the
+    # job reached the limit with the 0630-0631 step 36 seconds in (run 37888824528, cancelled, not failed). The limit
+    # catches a hang; it is not a budget for the tests, so it sits well above the job's own length: 40 until the 0632-0638
+    # suites took the job to 32 minutes (run 37904376715, 0637's head), then 60.
+    timeout-minutes: 60
     # G12, second rung. A scratch PostgreSQL that holds NOTHING -- no engine
     # schema, no data. It exists so plpgsql can be compiled, which is all the
     # compile-check step needs and all it claims.
@@ -292,6 +296,177 @@ jobs:
           python3 -m pytest -q tests/test_agent_charge_order_sql.py tests/test_agent_arbiter_sql.py tests/test_agent_outflow_sql.py \
             tests/test_agent_dwell_class_sql.py tests/test_agent_regime_sql.py tests/test_agent_self_review_sql.py \
             tests/test_agent_recall_rule_sql.py tests/test_agent_drain_class_sql.py
+
+      # 0629 arms a production session and refuses every write under an agent's name that would reach one (CLAUDE.md
+      # rule 10). Its own fixture carries the five bodies it patches and the setter's helpers, md5-pinned to the live
+      # catalog: the start arms the session for a 120-second tick, an agent's write and ops action are refused there and
+      # taken on a twin run, a person's are taken, and every other run is armed as before. 12 tests, about 5 seconds.
+      - name: A production session is armed and no agent write reaches it, executed (0629 against the live bodies)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_production_arm_sql.py
+
+      # 0630 reads a run's stop as the stop in the hindsight grader, computes a grade in one place for the first grade
+      # and a regrade, keeps a regrade beside a wrong first grade, and points every reader at the standing grade. On the
+      # miniature depot through 0628 with 0621's morning stopped at minute 50: the interrupted charge is censored and the
+      # first grade superseded, a grade after 0630 reads the stop as the stop, the computation is the grade, each
+      # refusal. 0631 gives a charger fault the whole of the charge it cut and supersedes an attribution with its grade:
+      # the same morning with the charge under way cut by a fault at minute 30. 16 tests, about 80 seconds.
+      - name: The grader reads a run's stop as the stop and a fault's cut as the fault's, executed (0630-0631 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_regrade_sql.py tests/test_agent_fault_cut_sql.py
+
+      # 0632 gives the charge clock a level for the air, per kind of charger, chosen by leaving each run out (none, a
+      # line, or a line with a bend), on a planted fleet whose fast charges slow 3% a degree above 22 and whose L2
+      # charges slow 2% a degree above 18: it finds the bend, a world with no effect gets no level, {"air": false} is
+      # 0625's fit, the clock holds the edge of what it saw, the run offset is what the air leaves. 10 tests, about 60 s.
+      - name: The charge clock reads the air, executed (0632 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_air_clock_sql.py
+
+      # 0633 has the return fit learn the spread of the check's own arrival forecasts from its graded orders (a floor, a
+      # walk and a drift by relative least squares) and the inbound forecast spread each car at work by it, behind a
+      # person's dial. On graded forecasts planted from a known spread for 150 returns at 8 horizons: the fit recovers
+      # it and the futures' reader finds 80% inside the band, a flat world is a floor alone, too few returns or the dial
+      # at 0 is 0628's forecast, a past fit reads the grades that stood then. 8 tests, about 55 seconds.
+      - name: The futures spread each arrival as the returns show, executed (0633 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_arrival_spread_sql.py
+
+      # 0634 times a car's drain only from a dispatch the depot saw begin (a run's primed cars carry a back-dated
+      # dispatch and a battery set at the start), counts work from the later of the two, and has the arrival spread read
+      # the newest forecast's orders once they alone are usable. On reserve returns seen and primed: the fit reads the
+      # seen ones alone, with no car out before its run every key is 0633's, the spread switches to the new forecast's
+      # orders when it can, the gate passes on cars that drained as the seen returns say and holds back on cars that
+      # drained as the back-dated ones said, and the review marks older orders as history. 8 tests, about 60 seconds.
+      - name: A drain is timed only from a dispatch the depot saw begin, executed (0634 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_drain_seen_sql.py
+
+      # 0635 learns each kind of charger's fault rate per minute of charging and its repair curve (charge_fault_v1,
+      # nightly), and the check's futures draw from it behind a person's dial: a charge faults at its kind's rate and its
+      # car rejoins the line owing the rest (rule 9), the charger is down for a drawn repair, and a charger down at the
+      # order comes back after what is left of its repair. On a miniature depot and hand-made lines: the draws by
+      # arithmetic, the fit from planted charges and fault events, the state behind the dial, every simulator output
+      # key for key without the block, a drawn fault equal to 0621's down window, the car under way re-queued and never
+      # counted a return, both sides meeting the same faults, the realizer and the review. 15 tests, about 135 seconds.
+      - name: The futures take chargers down as the depot's chargers fail, executed (0635 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_charger_faults_sql.py
+
+      # 0636 has every charge clock fit measure, on its own charges once the clock knows the run, how wide each kind and
+      # length of charge runs against the spread the clock gives it, and the clock scales its spread by that (the minutes
+      # never move), behind a person's dial at the depot. On charges planted with a known spread within each run: each
+      # length's factor by arithmetic, thin kinds and the 0.5-4 bounds, the window, the regime cut and fine ticks; the
+      # clock's factor by length and 0632's clock key for key without one; the fit with the dial on and off; the audit's
+      # band in and out of sample; the review's built band. 11 tests, about 170 seconds.
+      - name: The charge clock's spread is what its charges show, executed (0636 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_clock_spread_sql.py
+
+      # 0637 has the check's state, the inbound forecast, the agent's board and the self-review read the depot's latest
+      # usable return model, naming a newer fit it passed over, so a refit that finds too few returns cannot leave the
+      # futures forecasting no car at work (G377). On fits planted by hand: the reader in each case, the state before and
+      # after, every reader unchanged while the latest fit is usable, and the review's area in words. 6 tests, about 90
+      # seconds.
+      - name: The futures read the latest return model that was usable, executed (0637 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_return_usable_sql.py
+
+      # 0638 has the self-review keep what it found until its evidence lets it go, and read its window whole: an area
+      # that leaves the window is kept as unseen with the reason (its evidence aged out, or the evidence since does not
+      # name it), for one window, and a run is never cut in two (G369, G375). On planted reviews and planted evidence:
+      # the carry case by case, the window by charges and by graded orders, and the nightly review written, carried
+      # again, and not written. 9 tests, about 140 seconds.
+      - name: The self-review remembers what it found, executed (0638 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_review_memory_sql.py
+
+      # 0639 has the check's futures hold a charger for the car the depot's calendar names, as the kernel's assignment
+      # gate does, and say how many held chargers it could not model (G380); 0640 shows the agent the same holds on its
+      # board, and 0641 the kernel's own plan car by car. On bookings planted by hand and hand lines: the holds as the
+      # calendar held them at a moment, the state behind the dial, the simulator unchanged without a list and by meaning
+      # with one, the realizer, the review's words, the board's new fields with nothing else moving, and each car's plan
+      # as the check's simulator seats it. 19 tests, about 300 seconds.
+      - name: The futures and the agent see the calendar's holds and the kernel's plan, executed (0639-0641 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_holds_sql.py
+
+      # 0642 has the kernel serve a car that has waited 90 minutes first, the longest wait first, and order the rest by
+      # minutes of charge on the depot's charge clock (G384), mirrored in the kernel's order, the cockpits' queue, the
+      # board and the check, whose futures order the line as the kernel does and whose comparison weighs the minutes cars
+      # wait past their contract after lateness. On the miniature depot and hand lines: it applies and refuses twice, the
+      # keys and the check's minutes agree car for car, the dials turn each key off, every reader orders alike, the cursor
+      # reads the keys before 0545's ratio, a state without the keys simulates as before, a sampled draw never reorders the
+      # line, the breach and the comparison as meant, and the board says how the kernel orders.
+      - name: The kernel's own order serves a long wait first and times the line in minutes, executed (0642 against stub engines)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_charge_order_floor_sql.py
 
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.

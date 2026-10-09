@@ -108,10 +108,15 @@ test("v25 / 0620: the prompt says the kernel rolls the line forward over sampled
   assert.match(CHARGE_ORDER_PROMPT, /THE KERNEL CHECKS IT FIRST: it rolls the whole line forward from now twice — your order for its ttl and then its own, against its own order throughout/);
   assert.match(CHARGE_ORDER_PROMPT, /with the cars coming home joining the line when they arrive and every charge timed by the learned clock/);
   assert.match(CHARGE_ORDER_PROMPT, /It takes your order only when it beats its own in the expected future AND in at least win_frac of all the futures \(10 of 12\)/);
-  assert.match(CHARGE_ORDER_PROMPT, /more cars ready by their due time; then fewer minutes late; then fewer minutes in the depot summed over every car/);
+  assert.match(CHARGE_ORDER_PROMPT, /more cars ready by their due time; then fewer minutes late; then fewer minutes waited past each car's contract queue wait \(contract_wait_limit_min\), summed; then fewer minutes in the depot summed over every car/);
+  // v28 (0642): the kernel's own order and the check's contract term
+  assert.match(CHARGE_ORDER_PROMPT, /charge_queue\.kernel_order is how the kernel orders its own line after immediate dispatch: any car waiting floor_min or longer first, the longest wait first/);
+  assert.match(CHARGE_ORDER_PROMPT, /what decided the expected future: on_time, lateness, contract_wait or flow/);
+  assert.match(CHARGE_ORDER_PROMPT, /The kernel already serves a car waiting kernel_order\.floor_min or longer first: moving one up gains nothing/);
+  assert.doesNotMatch(CHARGE_ORDER_PROMPT, /Among cars otherwise equal, a car past contract_wait_limit_min goes first/);
   assert.match(CHARGE_ORDER_PROMPT, /charge_queue\.contention: waiting against free_now and freeing_15_min, arriving_60_min, and pressure/);
   assert.match(CHARGE_ORDER_PROMPT, /charge_queue\.arriving: the cars coming home/);
-  assert.match(CHARGE_ORDER_PROMPT, /WHEN TO ORDER: when contention\.pressure is tight or congested\. When it is none, every car waiting plugs in now whatever you send: leave out charge_order/);
+  assert.match(CHARGE_ORDER_PROMPT, /WHEN TO ORDER: when contention\.pressure is tight or congested and kernel_plan shows something to fix: a car it makes late, a low battery it puts on an L2\. When it is none, every car waiting plugs in now whatever you send: leave out charge_order/);
   assert.match(CHARGE_ORDER_PROMPT, /same_as_kernel means your order changed nothing: do not resend it/);
   assert.match(CHARGE_ORDER_PROMPT, /worse_in_expected_future, no_better_in_expected_future or not_enough_futures_won mean it lost/);
   assert.match(CHARGE_ORDER_PROMPT, /will miss its due time unless it takes the next fast charger to free: name it dcfc, earliest due first/);
@@ -130,11 +135,26 @@ test("v26 / 0621: the prompt reads the track record and learns from the moves", 
   assert.match(CHARGE_ORDER_PROMPT, /the real arrivals, the real charge times, the cars it never saw coming and the chargers that faulted/);
   assert.match(CHARGE_ORDER_PROMPT, /due_rescue_fast \(a car late in the kernel's order made ready by its due time on a fast charger\)/);
   assert.match(CHARGE_ORDER_PROMPT, /low_battery_on_l2 \(a car under 45% put on an L2 ahead of the kernel's order\)/);
-  assert.match(CHARGE_ORDER_PROMPT, /9\. Learn from track_record\.moves, this depot's own hindsight: make the moves that won in what actually happened; stop making a move that has lost more often than it won over 3 or more orders/);
+  assert.match(CHARGE_ORDER_PROMPT, /10\. Learn from track_record\.moves, this depot's own hindsight: make the moves that won in what actually happened; stop making a move that has lost more often than it won over 3 or more orders/);
   // every move the kernel names (0621 ottoq_charge_order_moves) is one the prompt explains
   for (const move of ["due_rescue_fast", "due_rescue", "low_battery_on_l2", "top_off_ahead", "late_car_first", "kind_swap", "reorder_only"]) {
     assert.match(CHARGE_ORDER_PROMPT, new RegExp(`${move} \\(`), move);
   }
+});
+
+test("v27 / 0640, 0641: the prompt reads the chargers the calendar holds and the kernel's own plan", () => {
+  assert.match(CHARGE_ORDER_PROMPT, /and held \(the chargers the depot's calendar holds for a named car within the next hour, soonest first: kind, stall, car, from_min, until_min\)/);
+  assert.match(CHARGE_ORDER_PROMPT, /While a hold covers the moment, the kernel gives that charger to no other car, whatever your order says/);
+  assert.match(CHARGE_ORDER_PROMPT, /Each car's held names the charger held for it, if any \(kind, stall, from_min, until_min\): the kernel seats it there when its window opens/);
+  assert.match(CHARGE_ORDER_PROMPT, /7\. Read chargers\.held before you count a charger as yours: a charger held for another car is not free to the cars you name while its hold lasts, and a car with a charger held for it is already placed/);
+  // 0641: the kernel's own plan, car by car, and when to order against it
+  assert.match(CHARGE_ORDER_PROMPT, /Each car's plan, each arriving car's plan_start_min and plan_kind, and charge_queue\.kernel_plan are what the kernel's own order does from now in the check's expected future/);
+  assert.match(CHARGE_ORDER_PROMPT, /kernel_plan counts the cars it makes late \(late, late_min\), the cars under 45% it puts on an L2 \(low_on_l2\) and the cars it cannot seat within the horizon \(unseated\)/);
+  assert.match(CHARGE_ORDER_PROMPT, /WHEN TO ORDER: when contention\.pressure is tight or congested and kernel_plan shows something to fix/);
+  // the rules after it moved down one, in order
+  const at = (re) => CHARGE_ORDER_PROMPT.search(re);
+  assert.ok(at(/\n6\. Never name a kind/) < at(/\n7\. Read chargers\.held/) && at(/\n7\. Read chargers\.held/) < at(/\n8\. Read last_order\.projection/)
+            && at(/\n8\. Read last_order/) < at(/\n9\. Leave out charge_order/) && at(/\n9\. Leave out/) < at(/\n10\. Learn from track_record/));
 });
 
 test("0618/0620: a refused order is not an enacted action", () => {
@@ -156,13 +176,13 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v26: the model call goes through the retry module, with the fallback model, and the row says v26", () => {
+test("v23-v28: the model call goes through the retry module, with the fallback model, and the row says v28", () => {
   assert.match(code, /await callModelWithRetry\(/);
   assert.match(code, /models: \[MODEL, FALLBACK_MODEL\]/);
   assert.match(code, /const FALLBACK_MODEL = "nvidia\/nemotron-3-super-120b-a12b";/);
   assert.match(code, /model_attempts: call\.attempts/);
-  assert.match(code, /agent_version: "v26"/);
-  assert.doesNotMatch(code, /agent_version: "v2[2345]"/);
+  assert.match(code, /agent_version: "v28"/);
+  assert.doesNotMatch(code, /agent_version: "v2[234567]"/);
   // the single-try key loop is gone
   assert.doesNotMatch(code, /for \(const candidate of keys\)/);
   // an accepted order is an enacted action

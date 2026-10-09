@@ -711,7 +711,23 @@ repo_manifest(version, name, file) AS (
     ('20261008214932'::text, 'a_learned_model_knows_when_its_world_changed'::text, '0625_a_learned_model_knows_when_its_world_changed.sql'::text),
     ('20261008225037'::text, 'the_self_review_judges_the_clock_within_runs_and_ranks_what_to_build'::text, '0626_the_self_review_judges_the_clock_within_runs_and_ranks_what_to_build.sql'::text),
     ('20261009002205'::text, 'the_futures_call_cars_home_the_way_the_kernel_does'::text, '0627_the_futures_call_cars_home_the_way_the_kernel_does.sql'::text),
-    ('20261009021006'::text, 'the_futures_drain_each_car_at_its_own_rate'::text, '0628_the_futures_drain_each_car_at_its_own_rate.sql'::text)
+    ('20261009021006'::text, 'the_futures_drain_each_car_at_its_own_rate'::text, '0628_the_futures_drain_each_car_at_its_own_rate.sql'::text),
+    ('20261009033733'::text, 'a_production_session_is_armed_and_no_agent_write_reaches_it'::text, '0629_a_production_session_is_armed_and_no_agent_write_reaches_it.sql'::text),
+    ('20261009100905'::text, 'the_grader_reads_a_runs_stop_as_the_stop'::text, '0630_the_grader_reads_a_runs_stop_as_the_stop.sql'::text),
+    ('20261009101257'::text, 'a_fault_owns_the_charge_it_cut'::text, '0631_a_fault_owns_the_charge_it_cut.sql'::text),
+    ('20261009101743'::text, 'the_charge_clock_reads_the_air'::text, '0632_the_charge_clock_reads_the_air.sql'::text),
+    ('20261009102050'::text, 'the_futures_spread_each_arrival_as_the_returns_show'::text, '0633_the_futures_spread_each_arrival_as_the_returns_show.sql'::text),
+    ('20261009102518'::text, 'a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin'::text, '0634_a_drain_is_timed_only_from_a_dispatch_the_depot_saw_begin.sql'::text),
+    ('20261009103141'::text, 'the_futures_take_chargers_down_as_the_depots_chargers_fail'::text, '0635_the_futures_take_chargers_down_as_the_depots_chargers_fail.sql'::text),
+    ('20261009103417'::text, 'the_charge_clocks_spread_is_what_its_charges_show'::text, '0636_the_charge_clocks_spread_is_what_its_charges_show.sql'::text),
+    ('20261009103821'::text, 'the_futures_read_the_latest_return_model_that_was_usable'::text, '0637_the_futures_read_the_latest_return_model_that_was_usable.sql'::text),
+    ('20261009104044'::text, 'the_self_review_remembers_what_it_found'::text, '0638_the_self_review_remembers_what_it_found.sql'::text),
+    ('20261009104324'::text, 'the_futures_hold_a_charger_for_the_car_the_calendar_names'::text, '0639_the_futures_hold_a_charger_for_the_car_the_calendar_names.sql'::text),
+    ('20261009104502'::text, 'the_agent_sees_the_chargers_the_calendar_holds'::text, '0640_the_agent_sees_the_chargers_the_calendar_holds.sql'::text),
+    ('20261009104632'::text, 'the_agent_sees_the_kernels_own_plan'::text, '0641_the_agent_sees_the_kernels_own_plan.sql'::text),
+    ('20261009123213'::text, 'the_kernel_serves_a_long_wait_first_and_times_its_line_in_minutes'::text, '0642_the_kernel_serves_a_long_wait_first_and_times_its_line_in_minutes.sql'::text),
+    ('20261009132013'::text, 'the_research_wing_tests_0642s_two_keys_in_the_twin'::text, '0643_the_research_wing_tests_0642s_two_keys_in_the_twin.sql'::text),
+    ('20261009174701'::text, 'the_research_safety_check_judges_cars_not_served_across_a_look'::text, '0644_the_research_safety_check_judges_cars_not_served_across_a_look.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
