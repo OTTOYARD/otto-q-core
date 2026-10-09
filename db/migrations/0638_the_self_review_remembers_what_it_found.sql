@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261009104044
 -- migration-name:    the_self_review_remembers_what_it_found
 --
 -- 0638  **The self-review remembers what it found until its evidence lets it go, and its window never cuts a run in two.**
