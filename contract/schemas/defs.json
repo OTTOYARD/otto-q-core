@@ -23,7 +23,10 @@
       "pattern": "^[a-z][a-z0-9_]{1,40}$"
     },
     "stallCode": {"type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[A-Za-z0-9._-]+$"},
-    "stallType": {"enum": ["dcfc", "l2", "staging", "wash_bay", "service_bay"]},
+    "stallType": {
+      "description": "The engine's stall types (the stall_type enum, read 2026-10-09). The twin depot has dcfc, l2, staging, wash_bay and service_bay.",
+      "enum": ["dcfc", "l2", "staging", "wash_bay", "detail_bay", "service_bay", "parking", "safety"]
+    },
     "percent": {"type": "number", "minimum": 0, "maximum": 100},
     "severity": {
       "description": "The operator's own severity, not raw fault codes.",

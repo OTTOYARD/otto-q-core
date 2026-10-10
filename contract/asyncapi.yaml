@@ -7,8 +7,8 @@ info:
     How a fleet operator and an OTTO-Q depot talk. README.md beside this file is the
     contract; this file is its machine-readable index.
 
-    STATUS: documents only. No door serves these channels yet. Step 3 of the twin data
-    contract review builds the door beside the current ottoq-ingest, which stays as it is.
+    The door is the edge function ottoq-depot-v2 (database half: migrations 0650 to 0652),
+    beside ottoq-ingest, which stays until nothing uses it.
 
     Every message is a CloudEvents 1.0.2 event in structured JSON mode
     (application/cloudevents+json), or a batch of them in the CloudEvents JSON batch
@@ -22,13 +22,22 @@ info:
     There is no tenant, depot or data-source field anywhere: the credential decides them.
 defaultContentType: application/cloudevents+json
 
+servers:
+  depot:
+    host: gxdrcyphqjzjsuhxuqtg.supabase.co
+    protocol: https
+    pathname: /functions/v1/ottoq-depot-v2
+    description: The OTTO-Q engine's v2 door. GET /jwks there returns the keys directives are signed with.
+    security:
+      - $ref: '#/components/securitySchemes/sourceKey'
+
 channels:
   events:
-    address: /v2/events
+    address: /events
     title: Operator to OTTO-Q
     description: |
       What an operator tells the depot about its own cars, and its answers to directives.
-      POST one event or a batch. Each event's source names one vehicle
+      POST one event or a batch (?dry_run=true keeps nothing). Each event's source names one vehicle
       (urn:ottoq:src:<operator>:<vehicle_ref>), and its sequence orders that vehicle's
       events. The door keeps each event's time, refuses a source+id it has already taken
       as a duplicate, and refuses anything the schemas refuse.
@@ -44,12 +53,13 @@ channels:
       directiveAck:
         $ref: '#/components/messages/directiveAck'
   directives:
-    address: /v2/directives
+    address: /directives
     title: OTTO-Q to operator
     description: |
       What the depot asks of an operator's cars, and what it tells the operator about
       them. Every event is signed (ottoqsig) and names its depot as the source. An
-      operator sees only events about its own cars and its own holds.
+      operator sees only events about its own cars and its own holds. GET with
+      ?after=<cursor>&limit=<1-500>; the next cursor comes back in the OTTOQ-Next-After header.
     messages:
       stallAssignment:
         $ref: '#/components/messages/stallAssignment'

@@ -3,9 +3,9 @@
 How a fleet operator and an OTTO-Q depot talk: what an operator sends about its own cars,
 what the depot sends back, and the rules both sides keep.
 
-**Status: documents only.** Written 2026-10-09 as step 2 of the twin data contract review.
-Nothing serves it yet. Step 3 builds a door for it beside the current `ottoq-ingest`, which
-stays as it is. Step 4 makes the twin a client of that door as two synthetic operators,
+**Status:** written 2026-10-09 as step 2 of the twin data contract review. Step 3 built the door
+that serves it, `ottoq-depot-v2` (database half: migrations 0650 to 0652), beside the current
+`ottoq-ingest`, which stays until nothing uses it. Step 4 makes the twin a client of that door as two synthetic operators,
 `sim-a` and `sim-b`, so the twin talks to OTTO-Q the way a real operator would.
 
 | Link | What it speaks | State |
@@ -65,6 +65,12 @@ CloudEvents; it never widens it.
   this contract solicits it, at most **500 events and 1 MiB** per batch. Binary mode is not
   accepted in 0.1: every event is one JSON document the schemas judge whole and the signature
   covers whole.
+- **The door** (`ottoq-depot-v2`): `POST /events` takes one event or a batch; `?dry_run=true`
+  does everything and keeps nothing. Each event comes back `applied`, `late`, `duplicate` or
+  `refused` with its reason. `GET /directives?after=<cursor>&limit=<1-500>` returns the key's own
+  directives, oldest first, signed, as a batch, with the next cursor in the `OTTOQ-Next-After`
+  header (`?peek=true` leaves them unmarked as delivered). `GET /jwks` returns the keys they verify
+  under. The key goes in the `X-OTTO-Q-API-Key` header.
 - **Timestamps** are RFC 3339 with an explicit `Z` or offset. `format` is an annotation only;
   every rule on a string is a `pattern`, so any 2020-12 validator enforces the same contract.
 
@@ -76,7 +82,7 @@ CloudEvents; it never widens it.
 | `depot.arrival.intent` | operator | a car is coming home: ETA and its spread, predicted charge, services needed, ready-by | no | `arrival` |
 | `vehicle.fault.summary` | operator | the operator's own reading of a fault: severity, category, whether it takes the car offline | no | `incident` |
 | `vehicle.departed` | operator | the car has left the depot | no | `arrival` |
-| `directive.ack` | operator | the answer to one version of one directive | — | `directive` (step 3 adds it) |
+| `directive.ack` | operator | the answer to one version of one directive | — | none: it answers a directive the key's own operator was sent |
 | `directive.stall.assignment` | OTTO-Q | where the car should go, for what, and for how long | required | — |
 | `directive.charge.plan` | OTTO-Q | the charge it will get at its charger, as an OCPP 2.0.1 charging schedule | required | — |
 | `directive.service.schedule` | OTTO-Q | every service on this visit, where and when; overlapping windows run together | required | — |
@@ -84,21 +90,25 @@ CloudEvents; it never widens it.
 | `capacity.offer` | OTTO-Q | what the depot holds for this operator in a window, in coarse counts | none | — |
 
 The streams are the ones a source key carries (`ottow_api_keys.streams`, migration 0649):
-`energy`, `telemetry`, `ocpp`, `arrival`, `incident`. Acks need a `directive` stream, which
-0649's list lacks; step 3 adds it.
+`energy`, `telemetry`, `ocpp`, `arrival`, `incident`. An ack needs no stream, and reading
+directives needs none: both need the key to speak for the car's fleet
+(`ottow_api_keys.fleet_operator_ids`, set by `ottoq_scope_source_key`, migration 0650).
 
 ## The rules
 
 **1. The credential decides who is talking.** The depot, the operator, the data source
 (`production`, `twin`, `replay` or `shadow`) and the streams come from the credential, never
 from the event. The operator segment of `source` must be the credential's own source name, or
-the event is refused. A `vehicle_ref` resolves only among the credential's own cars at the
-credential's depot; anything else reads as not found, exactly as `ottoq-ingest` does since v10.
+the event is refused. A `vehicle_ref` (the car's `display_name`) resolves only among the cars of
+the fleets the key speaks for, at the key's depot; anything else reads as not found, so a key can
+neither touch another tenant's car nor learn that it exists. A key that speaks for no fleet sends
+no car's events.
 
 **2. Event time is kept, and an old signal reads as unknown.** `time` and every signal's `ts`
 are stored as sent, beside the time the door took the event. A signal older than its time to
 live reads as unknown, never as its last value. "Now" is the clock of the credential's data
-source: the wall clock for `production`, the run's sim clock for `twin`. Mixing the two clocks
+source: the wall clock for `production` and `shadow`, the running run's sim clock for `twin` and
+`replay` (a twin or replay key with no running run at its depot is refused). Mixing the two clocks
 is the bug class `db/checks/0326` §1 measured on the stall calendar. The production defaults
 below are chosen for depot decisions, not measured; an operator agreement may tighten them.
 Twin values are set in step 4 against the run's tick length, because one twin tick can move
@@ -138,14 +148,15 @@ tenant's.
 **5. Precise location only inside the depot.** A latitude and longitude outside the depot's
 geofence are dropped by the door (the rest of the event stands) and the drop is counted. OTTO-Q
 is the pit lane, not the race: where a car is on the road is the operator's business, and its
-ETA comes from the arrival intent. The twin depot's `depots.geofence` is empty today
-(origin 36.1397, -86.7728); step 3 sets it before the door reads a location.
+ETA comes from the arrival intent. The twin depot's geofence is its stalls' convex hull
+buffered by 50 m (set by migration 0650; it was empty before).
 
 **6. Each event once, in order per car.** CloudEvents makes `source` + `id` unique; the door
 refuses a second event with the same pair as a duplicate. An event is applied only if its
 `sequence` is above the last one applied for its source. A lower one is stored as late and
 never overwrites newer state. A gap is recorded and never waited for, so one lost event cannot
-hold a car's telemetry hostage.
+hold a car's telemetry hostage. A refused event is not stored: correct it and send it again with
+a sequence above the last one applied, or it will read as late.
 
 **7. OTTO-Q never actuates a vehicle.** Directives are requests to the operator, never commands
 to a car. `ChargeLimit` is a VSS actuator, so OTTO-Q only reads it. Charging is controlled only
@@ -225,9 +236,18 @@ field ships under a new version URL. A removed or renamed field is always a new 
   is a naming choice, not a fact (`vss_mapping.json`).
 - **Twin power has the opposite sign of VSS:** `instant_power_kw` is positive while driving
   (810,342 of 835,238 driving packets, 30 days), so `CurrentPower` = -1000 x `instant_power_kw`.
-- **Left for step 3:** the door itself, the `directive` stream, directive delivery (the operator
-  reads `/v2/directives`; a push to a registered webhook is the same events on another
-  transport), the JWK Set's address, and the twin depot's geofence.
+- **Settled while building the door (step 3):** a key names the fleets it speaks for; an ack
+  needs no stream; directives are read from `GET /directives` (a push to a registered webhook
+  would be the same events on another transport); the JWK Set is `GET /jwks`; the twin depot has
+  a geofence; `ready_by` on a charge plan is sent only where the depot knows the car's due time;
+  `stall_type` carries every type the engine has. A command renders as a directive with
+  `directive_id` = its command id, version 1 (the engine issues a new command, not a new
+  version, when it changes its mind), an ack deadline one tick after issue and an expiry two
+  ticks after (the hold window the engine already gives a stall), at the owner's target
+  (`ottoq_effective_target_soc_at`), and never at zero watts.
+- **The engine's refusal codes and the contract's reasons are both closed lists.** The door maps
+  one onto the other (`occupied` to `target_occupied`, `charger_fault` to `resource_faulted`, and so
+  on) and keeps the contract's reason verbatim beside the engine's code, so nothing is lost.
 - **Left for step 4:** the twin's TTLs against its tick length, and `sim-a`/`sim-b` as clients,
   with a test that `sim-a` never sees `sim-b`.
 - **Left for step 5:** the OCPP 2.0.1 messages behind `charge.plan`.

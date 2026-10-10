@@ -9,6 +9,7 @@ T6  the telemetry schema admits exactly vss_mapping's VSS paths, each with VSS's
 T7  asyncapi.yaml is 3.1.0, its refs resolve, and its ten messages are the ten event types
 T8  the README names every event type and every ack reason
 T9  every service code in the examples is one the depot publishes
+T10 the schemas the v2 door ships (edge-functions/ottoq-depot-v2/contract_schemas.ts) are these schemas
 """
 from __future__ import annotations
 
@@ -334,3 +335,10 @@ def test_t9_example_service_codes_are_published():
         used |= {op["service_code"] for op in data.get("operations", [])}
     assert used, "no example names a service"
     assert used <= PUBLISHED_SERVICE_CODES, sorted(used - PUBLISHED_SERVICE_CODES)
+
+
+# ------------------------------------------------------------------- T10
+
+def test_t10_the_door_ships_these_schemas():
+    import build_edge_schemas
+    assert build_edge_schemas.OUT.read_text() == build_edge_schemas.render(), "run: python3 contract/build_edge_schemas.py"
