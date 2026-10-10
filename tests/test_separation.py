@@ -58,7 +58,9 @@ FORBIDDEN_IMPORTS = re.compile(
     #: `load` is on this list for the same reason psycopg is: it is a
     #: database client by design (load/harness.py drives pgbench against a
     #: live URL). A kernel module importing it would have a connection.
-    r"httpx|urllib\.request|twin|load|bridge)\b", re.M)
+    #: `csms` and the WebSocket and OCPP libraries are on it for the same reason:
+    #: the charger back end is a NETWORK service by design (csms/README.md).
+    r"httpx|urllib\.request|twin|load|bridge|csms|websockets|ocpp)\b", re.M)
 
 #: Identifiers of the production world. A kernel file that names them has been
 #: told which world it lives in.
@@ -146,6 +148,12 @@ NON_KERNEL_PACKAGES = {
                 "verifies its ottoqsig, and builds the v2 door's schema module. It "
                 "decides, prices, sizes and derives nothing, has no database or "
                 "network, and no kernel package imports it.",
+    "csms":    "OTTO-Q's charger back end and its simulated stations (csms/README.md): "
+               "OCPP 2.0.1 over WebSocket, a NETWORK service and client by design. It "
+               "carries out a charge plan the kernel already made (a SetChargingProfile "
+               "built one to one from directive.charge.plan) and decides nothing, so "
+               "FORBIDDEN_IMPORTS bans `import csms`, websockets and ocpp from the "
+               "kernel as it bans load and bridge.",
 }
 
 
