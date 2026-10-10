@@ -734,6 +734,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0642](db/migrations/0642_the_kernel_serves_a_long_wait_first_and_times_its_line_in_minutes.sql) | `20261009123213` | yes — ledger | **The kernel serves a car that has waited 90 minutes first, and orders the rest by minutes of charge.** (G384) |
 | [0643](db/migrations/0643_the_research_wing_tests_0642s_two_keys_in_the_twin.sql) | `20261009132013` | yes — ledger | **The research wing tests 0642's two keys in the twin, as paired runs.** (G384; research wing, rule 10.) |
 | [0644](db/migrations/0644_the_research_safety_check_judges_cars_not_served_across_a_look.sql) | `20261009174701` | yes — ledger | **The research wing's vehicle-first check judges returned cars left without service across a look's pairs, not |
+| [0645](db/migrations/0645_the_nightly_run_purge_runs_again_and_never_takes_what_the_learning_reads.sql) | `PENDING` | no — pending | **The nightly run purge runs again, keeps a week, and no longer deletes anything the learning reads.** |
+| [0646](db/migrations/0646_the_wall_clock_retention_never_takes_a_production_runs_shield_log.sql) | `PENDING` | no — pending | **The nightly wall-clock retention (cron 11) never deletes a production or running run's rule evaluations.** |
 | [0647](db/migrations/0647_the_public_key_reads_no_vehicle_and_no_command.sql) | `20261009232411` | yes — ledger | **The public key reads no vehicle and no command; depot staff read their own depot's commands.** (G393; |
 | [0648](db/migrations/0648_the_command_dock_answers_only_the_platform.sql) | `20261009232737` | yes — ledger | **The command dock answers only the platform: no public key or signed-in account can peek at, lease or |
 | [0649](db/migrations/0649_source_keys_are_issued_by_the_platform_and_bind_a_depot_and_a_data_source.sql) | `20261009233223` | yes — ledger | **A source key is issued only by the platform, and it binds the depot, the data source and the streams its |
@@ -758,6 +760,6 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0698](db/migrations/0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql) | `20261010113923` | yes — ledger | **A new visit carries the required work the visit it replaces still owes the car; nothing found is dropped.** |
 | [0699](db/migrations/0699_the_twin_apps_determinism_canon_card_reads_again.sql) | `20261010110724` | yes — ledger | **The twin app's determinism canon card reads again: the public key may call the one-timestamp function the |
 
-519 migrations indexed.
+521 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

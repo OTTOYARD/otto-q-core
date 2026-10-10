@@ -728,6 +728,8 @@ repo_manifest(version, name, file) AS (
     ('20261009123213'::text, 'the_kernel_serves_a_long_wait_first_and_times_its_line_in_minutes'::text, '0642_the_kernel_serves_a_long_wait_first_and_times_its_line_in_minutes.sql'::text),
     ('20261009132013'::text, 'the_research_wing_tests_0642s_two_keys_in_the_twin'::text, '0643_the_research_wing_tests_0642s_two_keys_in_the_twin.sql'::text),
     ('20261009174701'::text, 'the_research_safety_check_judges_cars_not_served_across_a_look'::text, '0644_the_research_safety_check_judges_cars_not_served_across_a_look.sql'::text),
+    ('PENDING'::text, 'the_nightly_run_purge_runs_again_and_never_takes_what_the_learning_reads'::text, '0645_the_nightly_run_purge_runs_again_and_never_takes_what_the_learning_reads.sql'::text),
+    ('PENDING'::text, 'the_wall_clock_retention_never_takes_a_production_runs_shield_log'::text, '0646_the_wall_clock_retention_never_takes_a_production_runs_shield_log.sql'::text),
     ('20261009232411'::text, 'the_public_key_reads_no_vehicle_and_no_command'::text, '0647_the_public_key_reads_no_vehicle_and_no_command.sql'::text),
     ('20261009232737'::text, 'the_command_dock_answers_only_the_platform'::text, '0648_the_command_dock_answers_only_the_platform.sql'::text),
     ('20261009233223'::text, 'source_keys_are_issued_by_the_platform_and_bind_a_depot_and_a_data_source'::text, '0649_source_keys_are_issued_by_the_platform_and_bind_a_depot_and_a_data_source.sql'::text),
