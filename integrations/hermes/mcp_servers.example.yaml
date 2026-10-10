@@ -1,19 +1,30 @@
 # Hermes Agent: OTTOYARD (OTTO-Q's agent gateway) as a remote MCP server. Merge into ~/.hermes/config.yaml, then
-# /reload-mcp. Keys per the Hermes MCP config reference, read 2026-10-03:
+# /reload-mcp. Keys per the Hermes MCP config reference, read 2026-10-03 and 2026-10-10:
 # https://hermes-agent.nousresearch.com/docs/reference/mcp-config-reference
+# https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp
 #
-# No key here (0607): in a new chat, say "connect to OTTOYARD". Hermes calls mcp__ottoyard__welcome, asks you for
-# OTTOYARD's demo passcode, calls mcp__ottoyard__enter_passcode, and passes the session key it gets back with every
-# other call. The session ends with the demo run (a stop or reset of the twin) or after 4 hours. PERSONAL_AGENT.md §0, §5.
+# SIGNED IN (0660, PERSONAL_AGENT.md section 10): Hermes signs in to its owner's OTTOYARD account and keeps its own
+# tokens. On the machine running Hermes, once: `hermes mcp login ottoyard --flow device`. It prints a link
+# (www.ottoyard.com/connect) and a code; the owner opens the link, signs in, enters the code and approves; then
+# /reload-mcp. Hermes renews its access token by itself; it needs the login again only if the owner disconnects it or
+# it goes 30 days unused. A Hermes reached through Telegram can run the login in the background and send you the link
+# and code (the skill in integrations/hermes/ottoq-owner/ says how).
 mcp_servers:
   ottoyard:
-    url: "https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-agent-gateway/mcp"
-    timeout: 60          # a command answers in well under a second; the plain-English door can take longer, but it is REST
+    url: "https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-agent-gateway/account/mcp"
+    auth: oauth
+    timeout: 60          # a command answers in well under a second
     connect_timeout: 30
+    oauth:
+      flow: device       # RFC 8628: no browser on the Hermes host, no callback port
+      timeout: 600       # how long the login waits for the owner to approve (the code itself lives 10 minutes)
     tools:
       resources: false   # the gateway serves tools only
       prompts: false
-    # Option K, an issued key instead of the passcode (PERSONAL_AGENT.md §5): put OTTOQ_AGENT_TOKEN=oqa_... in
-    # ~/.hermes/.env and uncomment. The key is a secret: never in this file, a chat, or a URL.
-    # headers:
-    #   Authorization: "Bearer ${OTTOQ_AGENT_TOKEN}"
+
+# THE PASSCODE DOOR instead (0607, PERSONAL_AGENT.md section 5 (P)): no sign-in; in a chat say "connect to OTTOYARD"
+# and give Hermes OTTOYARD's demo passcode. Use this `url` with no `auth` and no `oauth` block:
+#   url: "https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-agent-gateway/mcp"
+#
+# AN ISSUED KEY instead (0559, section 5 (K)): put OTTOQ_AGENT_TOKEN=oqa_... in ~/.hermes/.env and use the /mcp url above
+# with  headers: {Authorization: "Bearer ${OTTOQ_AGENT_TOKEN}"}. The key is a secret: never in this file, a chat, or a URL.

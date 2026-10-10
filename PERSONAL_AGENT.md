@@ -4,6 +4,10 @@
 first 2026-10-02 for an owner's issued key (0605/0606). **Live since 2026-10-04, 6:42 AM CT:** applied, deployed, the
 passcode on and the live smoke passed (section 7). Section 9 says exactly what was and was not verified.*
 
+*2026-10-10: **an owner can now sign in and connect their own agent** (0660, section 10): the agent sends its person to
+www.ottoyard.com/connect, they sign in with their OTTOYARD account and approve it, and it holds its own tokens; no
+passcode or key passes through the chat, and the connection outlasts runs. Set up for Chase and his Hermes first.*
+
 Chase, 2026-10-03: *"I want to be able to setup and activate a new agent from theoretically Hermes or [Grok] or any
 other agent and be able to call OTTOYARD ... and allow me to access my fleet ... a general password or passcode that I
 can enter after the welcome agent triggered ... if it's something that doesn't fit, [OTTO-Q] should send back a
@@ -191,7 +195,7 @@ its run, and the call ledger. Saved per-car preferences across runs are the late
 
 ## 5. Connecting Hermes
 
-Two ways, through the same gateway. **Use the passcode** (option P) unless you want a Hermes that is connected without
+**Chase's Hermes signs in instead (section 10).** The two ways below still work, through the same gateway. **Use the passcode** (option P) unless you want a Hermes that is connected without
 one (option K).
 
 ### (P) The passcode: no key in Hermes at all
@@ -326,8 +330,8 @@ over other owners (a contract entitlement across tenants, not an owner setting);
 decide-path hook); push notifications ("tell me when Tesla 45 is ready": needs the agent's webhook and a signing
 secret); OrchestrAV making changes itself (it is read-only until it signs owners in); a sandbox per visitor.
 
-**The next steps, in order:** OAuth 2.1 for the MCP connection, with a "Connect OTTOYARD" page; saved per-car
-preferences set from OrchestrAV with verification (your "eventually ... a per vehicle or per asset setting ... toggled
+**The next steps, in order:** ~~OAuth 2.1 for the MCP connection, with a "Connect OTTOYARD" page~~ (built: section 10);
+saved per-car preferences set from OrchestrAV with verification (your "eventually ... a per vehicle or per asset setting ... toggled
 from a UI"); signed push for ready / refused / lifted; a signed receipt a third party can verify.
 
 ## 9. Verified, and not verified
@@ -364,6 +368,115 @@ from a UI"); signed push for ready / refused / lifted; a signed receipt a third 
 live demo run, which needs one running (section 7, step 5); 0605's tick step under a demo (V2 measured it inert on the
 live catalog at apply time, and it acts only on settings an agent has set).
 
+## 10. Sign in: your own agent, connected to your OTTOYARD account (0660)
+
+*Built 2026-10-10, 12:45–2:40 AM CT; going live is in "Live" below.* Chase, 2026-10-10: *"I just want one unified login
+no matter what ... let's just set it up for only me and my [Hermes] agent currently ... it has to function super well
+and very close to how actual production will eventually work."*
+
+**What it is.** The way any service lets an app act for you (OAuth 2.1, the standard every MCP client speaks), with
+OTTOYARD as the service and your OTTOYARD account as the login. Your agent asks to connect; you sign in on OTTOYARD's
+page and approve it by name; it gets its own access token (an hour, renewed by itself) and refresh token (30 days,
+single-use). It reaches exactly what an owner key reaches (your fleet's cars: read, notes, and what they need), through
+the same door, rules, receipts and confirmation codes. **No password, passcode or key passes through the chat.** The
+connection outlasts runs (your *settings* still lift when a demo run ends, section 4) and ends when you disconnect it.
+
+```
+  you ── Telegram ──> Hermes (cloud) ── hermes mcp login ottoyard --flow device
+                         │  1. GET /account/mcp              -> 401 + where to sign in (RFC 9728)
+                         │  2. the sign-in's metadata         <- www.ottoyard.com/.well-known/oauth-authorization-server
+                         │  3. register, ask for a device code (RFC 7591, RFC 8628)
+                         │  4. "open www.ottoyard.com/connect  Code: BCDF-GHJK"  ──> you, on your phone
+                         │                                         sign in (your OTTOYARD account), see who is asking, Approve
+                         │  5. its poll gets an access token + refresh token
+                         v
+     ottoq-agent-gateway /account/mcp  (Authorization: Bearer oqt_...)  ->  public.ottoq_agent_call  (0559's one door)
+```
+
+### Connect Chase's Hermes (cloud, through Telegram)
+
+1. **The config, on the Hermes host** (`~/.hermes/config.yaml`; also `integrations/hermes/mcp_servers.example.yaml`):
+   ```yaml
+   mcp_servers:
+     ottoyard:
+       url: "https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-agent-gateway/account/mcp"
+       auth: oauth
+       timeout: 60
+       connect_timeout: 30
+       oauth:
+         flow: device
+         timeout: 600
+       tools:
+         resources: false
+         prompts: false
+   ```
+2. **Tell Hermes, in Telegram:**
+   > Run `hermes mcp login ottoyard --flow device` in the background. When it prints a link and a code, send them to
+   > me, then wait until it says Authenticated.
+3. **On your phone:** open www.ottoyard.com/connect, sign in, type the code, Approve. The page says who is asking and
+   what it could and could not do, and shows it arrive under "Your agents".
+4. **Back in Telegram:** `/reload-mcp`, then *"How are my Teslas doing?"*
+
+Hermes renews its token by itself, before it runs out. It needs step 2 again only if you disconnect it, or if it goes
+30 days without being used. If it reports that OTTOYARD rejected the sign-in, that is what happened.
+
+### Your account
+
+- **The page:** www.ottoyard.com/connect. Sign in to approve an agent, see the agents connected to your account, or
+  disconnect one (it stops at once; its tokens are refused, and so is renewing them).
+- **Accounts:** one, `chase@ottoyard.com`, linked to Tesla Robotaxi TN at the twin depot. Its password is the temporary
+  one Chase chose for now, set in Supabase Auth and written nowhere in this repository; change it in the Supabase
+  dashboard (Authentication, Users) whenever you like. There is no sign-up yet, so nobody else can make an account.
+- **Linking another account** (when it is time): create the user in Supabase Auth, then in the SQL editor
+  `SELECT ottoq_owner_account_link('them@example.com', '<fleet_operators.id>');`. `ottoq_owner_account_unlink` stops an
+  account and disconnects every agent it connected.
+
+### The addresses
+
+| | |
+|---|---|
+| Signed-in MCP | `https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-agent-gateway/account/mcp` |
+| Protected-resource metadata | `{gateway}/.well-known/oauth-protected-resource/account/mcp` (the 401 names it) |
+| Authorization server | `https://www.ottoyard.com` (its metadata at `/.well-known/oauth-authorization-server`, the OTTOYARD-SITE repository) |
+| Sign-in page | `https://www.ottoyard.com/connect` |
+| Endpoints (in the gateway) | `{gateway}/oauth/register`, `/oauth/device`, `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`; `/oauth/metadata` is a copy of the server's metadata to compare with the site's |
+
+**Why the metadata lives on ottoyard.com.** An MCP client looks for it at a fixed place under the server's host, and
+stops at any answer but "not found". Every such place on supabase.co answers 401 (measured), so the metadata is
+published at OTTOYARD's own site, which is also what a production login should look like. The endpoints stay in the
+gateway, where every decision is the database's.
+
+### What the rules are (in the database)
+
+- A connection is an `ottoq_agent_principals` row of origin `oauth` with an owner key's scope, fixed by a CHECK.
+- Nothing connects until a signed-in account linked to a fleet approves the agent by its code. Codes are single-use; a
+  device code lives 10 minutes, a browser code 5.
+- Secrets are SHA-256 at rest. The gateway hashes what it is handed before it calls; the ledger never holds one.
+- A refresh token presented twice closes the connection (a retry within a minute whose new token was never used is
+  forgiven). An access token is honoured five minutes past its hour: a client renews by its own clock, and Hermes
+  measured on its own CLI starts a whole new sign-in, rather than renewing, when a token it believes valid is refused.
+- Agents with a browser (Claude, ChatGPT and others later) use the same page through the authorization-code flow with
+  PKCE; rehearsed, not yet pointed at a real one.
+- The passcode door (section 0) and issued keys (section 5, option K) are unchanged and still work.
+
+### Verified, and not verified
+
+**Verified on a scratch PostgreSQL 16 over the stub engine (2026-10-10):** `tests/test_agent_signin_sql.py` 34 passed;
+`tests/agent_signin.test.mjs` 19 passed, including the whole device sign-in over the real SQL; the existing gateway
+suites still pass (131 SQL and 101 node tests with CI's own commands). **Hermes Agent's own CLI** (NousResearch/
+hermes-agent at `dce1e9b3`, MCP SDK 2.0.0), unmodified, against the gateway's code over that SQL: `hermes mcp login
+ottoyard --flow device` printed the link and code, was approved through this page in a phone-sized headless browser,
+and finished *"Authenticated — 20 tool(s) available"*; it renewed its token through the token endpoint when its clock
+said the hour was up; the MCP SDK's client then called `whoami` ("signed in", chase@ottoyard.com) and `my_fleet`. A
+browser sign-in with PKCE came back with its code, state and issuer and exchanged for tokens.
+
+**Not verified yet:** see "Live" below for what was checked on the live project; the real Hermes on the cloud host
+connects when Chase runs step 2.
+
+### Live
+
+*To be filled in when 0660 is applied, the gateway deployed and the site's page published.*
+
 ## Sources (external facts; read 2026-10-03 unless marked)
 
 - Hermes Agent, MCP config reference (url, headers, `${VAR}` from `~/.hermes/.env`, `mcp__<server>__<tool>`,
@@ -389,3 +502,12 @@ live catalog at apply time, and it acts only on settings an agent has set).
   2026-10-04: https://docs.x.ai/developers/tools/remote-mcp
 - Anthropic, MCP in Claude Code (`claude mcp add --transport http <name> <url>`), read 2026-10-04:
   https://code.claude.com/docs/en/mcp
+- MCP authorization, 2026-07-28 revision (OAuth 2.1, protected-resource metadata, client registration), read 2026-10-10:
+  https://modelcontextprotocol.io/specification/latest/basic/authorization
+- Hermes Agent, MCP OAuth (auth: oauth, device login with `hermes mcp login <server> --flow device`, tokens in
+  `~/.hermes/mcp-tokens/`), read 2026-10-10: https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp; its
+  code, tools/mcp_oauth_device.py at NousResearch/hermes-agent dce1e9b3 (2026-10-09)
+- RFC 8628 (device grant) https://www.rfc-editor.org/rfc/rfc8628 ; RFC 7591 (registration)
+  https://www.rfc-editor.org/rfc/rfc7591 ; RFC 9728 (protected resource metadata) https://www.rfc-editor.org/rfc/rfc9728
+- Supabase Edge Functions answer a GET's text/html as text/plain on the default domain, read 2026-10-10:
+  https://supabase.com/docs/guides/functions/http-methods
