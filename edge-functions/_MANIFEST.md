@@ -12,7 +12,7 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
   `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), v36, agent v24 (footnote ⁵), v37, agent v25
-  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰), and `ottoq-depot-v2` v1, its first deploy (footnote ¹¹). `otto-q-api`'s repo copy is ahead of what is deployed, on purpose, until someone can deploy it (footnote ¹²).
+  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰), and `ottoq-depot-v2` v1, its first deploy (footnote ¹¹). `otto-q-api`'s repo copy is ahead of what is deployed, on purpose, until someone can deploy it (footnote ¹²). `ottoq-csms-relay` is in the repo and not deployed: it is deployed after its database half, migration 0697, which holds a DROP a person approves (csms/README.md).
   30 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON

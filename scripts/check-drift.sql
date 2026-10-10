@@ -747,7 +747,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'a_car_leaving_the_depot_is_reported_through_the_door'::text, '0693_a_car_leaving_the_depot_is_reported_through_the_door.sql'::text),
     ('PENDING'::text, 'the_twins_chargers_speak_ocpp_2_0_1'::text, '0694_the_twins_chargers_speak_ocpp_2_0_1.sql'::text),
     ('PENDING'::text, 'an_autonomous_cars_data_comes_off_while_it_charges'::text, '0695_an_autonomous_cars_data_comes_off_while_it_charges.sql'::text),
-    ('PENDING'::text, 'the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once'::text, '0696_the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once.sql'::text)
+    ('PENDING'::text, 'the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once'::text, '0696_the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once.sql'::text),
+    ('PENDING'::text, 'the_charger_back_end_hears_the_twins_chargers_through_a_relay'::text, '0697_the_charger_back_end_hears_the_twins_chargers_through_a_relay.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
