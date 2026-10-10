@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010031137
 -- migration-name:    the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered
 --
 -- 0655  **The run finalizer no longer expires a directive its operator accepted through the v2 door.** Found while
@@ -182,3 +182,10 @@ VALUES ('0655_the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_a
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 03:11:37 UTC (10:11 PM CT on 2026-10-09), version 20261010031137 ══════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 187a1f9; the ledger's stored statement is that file byte for
+--   byte (md5 544cb5b4fae0fc06ca24525bf7021587, 11,792 characters, 12,516 bytes). P0, P1, V1 (on the twin depot's
+--   newest stopped run, the live finalizer: an unanswered command and one the old dock confirmed expired as before, an
+--   operator's answer kept its status, name and time; rolled back), V2 passed in the apply's transaction. Read after:
+--   the finalizer at dd32bb96cb341205a783f246ae6189d1, one 0655_pre snapshot, no probe command left.
