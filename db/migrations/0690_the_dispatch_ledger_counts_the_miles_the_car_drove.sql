@@ -140,10 +140,13 @@ BEGIN
     RAISE EXCEPTION '0690 V1: no stopped twin run or no twin vehicle to probe';
   END IF;
   BEGIN
-    -- 'returning', so the rule-9 departure check (which guards a new 'active' dispatch) does not judge a synthetic car
+    -- 'returning', so the rule-9 departure check (which guards a new 'active' dispatch) does not judge a synthetic car,
+    -- with the return trigger every returning dispatch carries (the recall sets it, and chk_completed_has_return_trigger
+    -- refuses a completed dispatch without one: the first apply of this file failed here, 2026-10-10 11:10 UTC)
     INSERT INTO public.ottoq_vehicle_dispatches
-      (vehicle_id, sim_run_id, dispatched_at, scheduled_return_at, planned_duration_min, soc_at_dispatch_pct, status)
-    VALUES (v_veh, v_run, v_clock, v_clock + interval '3 hours', 180, 90, 'returning')
+      (vehicle_id, sim_run_id, dispatched_at, scheduled_return_at, planned_duration_min, soc_at_dispatch_pct, status,
+       return_trigger)
+    VALUES (v_veh, v_run, v_clock, v_clock + interval '3 hours', 180, 90, 'returning', 'scheduled')
     RETURNING dispatch_id INTO v_disp;
     v_t := v_clock;
     FOR k IN 1 .. array_length(v_ticks, 1) LOOP
