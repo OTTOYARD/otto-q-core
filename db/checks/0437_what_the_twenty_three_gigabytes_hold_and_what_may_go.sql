@@ -1,4 +1,4 @@
--- 0429  **What the 23 GB hold, what may go, and the tests that decided it.**
+-- 0437  **What the 23 GB hold, what may go, and the tests that decided it.**
 --        Chase, 2026-10-09, 1:45 PM CT: clear out "truly unnecessary or useless items ... old simulation or run data that
 --        becomes stale the second a new run has started", for storage and speed; "If it even closely resembles production
 --        data or something that pertains to active runs or intelligence, do not delete." Then, approving the plan: "Be

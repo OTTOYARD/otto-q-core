@@ -6,7 +6,7 @@
 --       investor and OEM showcase -- "If it even closely resembles production data or something that pertains to
 --       active runs or intelligence, do not delete" -- and then: "Be extremely cautious and test when needed.")
 --
--- == S1 WHY (db/checks/0429) =========================================================================================
+-- == S1 WHY (db/checks/0437) =========================================================================================
 --
 --   otto-q-core is 23 GB and 22 GB of it is class-'engine' run data, every row from a run started since 09-29.
 --   Nothing has cleared a finished run since 09-19:
@@ -35,7 +35,7 @@
 --       the new engine_rows_charge_orders keep (21 days, the window crons 786/789/790 fit over).
 --   (d) ottoq_events leaves the allow-list. The six that remain are 0250's seeds that nothing the learning,
 --       grading, self-review or experiments run reads (measured by per-transaction access counters,
---       db/checks/0429 S3). Events keep their own 7-day wall-clock worker (cron 11), unchanged here.
+--       db/checks/0437 S3). Events keep their own 7-day wall-clock worker (cron 11), unchanged here.
 --   (e) The engine_rows keep goes from 48 hours to 7 days, so the OEM 7-day and 24-hour views never lose a row
 --       they show: no run writes a rule evaluation after it ends (measured), and doomed means ended > 7 days ago.
 --   (f) Cron 625 runs hourly 04:17-11:17 UTC (11:17 PM - 6:17 AM CDT) at a 100-second budget, under the
@@ -101,7 +101,7 @@ UNION ALL
 SELECT '0645_pre', 'cron_job', 'cron', 'job 625', s.d, md5(s.d)
   FROM (SELECT row_to_json(j)::text AS d FROM (SELECT jobid, jobname, schedule, command, active FROM cron.job WHERE jobid = 625) j) s;
 
--- -- the procedure: five edits to 0294's body and nothing else (diff in db/checks/0429 S4) --
+-- -- the procedure: five edits to 0294's body and nothing else (diff in db/checks/0437 S4) --
 CREATE OR REPLACE PROCEDURE public.ottoq_retention_purge_runs(IN p_time_budget_s integer DEFAULT 60, IN p_micro_batch integer DEFAULT 2000, IN p_keep interval DEFAULT '48:00:00'::interval, IN p_dry_run boolean DEFAULT false)
  LANGUAGE plpgsql
 AS $procedure$

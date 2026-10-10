@@ -4,7 +4,7 @@
 -- 0646  **The nightly wall-clock retention (cron 11) never deletes a production or running run's rule evaluations.**
 --       (Chase, 2026-10-09: "If it even closely resembles production data ... do not delete.")
 --
--- == S1 WHY (db/checks/0429 S6) ======================================================================================
+-- == S1 WHY (db/checks/0437 S6) ======================================================================================
 --
 --   ottoq_retention_purge_worker walks three tables by age. Its events walk has always spared running and
 --   production_live runs (v_live, computed at step 4). Its rule-evaluation walk never did: it deletes every row
@@ -19,7 +19,7 @@
 --   policy are byte-identical (V asserts the whole body by md5, so a stray edit cannot hide). House rule 3 holds:
 --   this file reads and writes nothing in ottoq_events.
 --   Rows with no run (sim_run_id IS NULL) are still taken at 7 days, exactly as the events walk takes them; whether
---   production retention should be longer is a decision recorded in db/checks/0429, not made here.
+--   production retention should be longer is a decision recorded in db/checks/0437, not made here.
 --
 -- == S3 forces_recert FALSE; forces_dial_restart FALSE ===============================================================
 --
