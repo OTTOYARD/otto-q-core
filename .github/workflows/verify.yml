@@ -489,7 +489,7 @@ jobs:
       # 0658, G394: the public key loses every grant postgres made it, keeps SELECT on the fifteen relations the cockpits
       # read, and new tables stop granting it. Executed on a stub of the live grants, then asked as the public key what
       # it can still do; the restore statements are run too and must put every grant back.
-      - name: The public key's default deny, executed (0658 against a stub of the grants it was written against)
+      - name: The public key's default deny, executed (0658 against a stub of the grants it was written against; 0699, the canon card's function, as the public key)
         env:
           PGHOST: localhost
           PGPORT: "5432"

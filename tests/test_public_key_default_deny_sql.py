@@ -150,3 +150,44 @@ def test_the_restore_statements_put_every_grant_back(db):
                 END LOOP; END $restore$""")
     assert db.val(ANON_GRANTS) == db.before_grants
     assert db.val(DEFAULT_ACL) == db.before_default
+
+
+MIG_0699 = os.path.join(ROOT, "db", "migrations", "0699_the_twin_apps_determinism_canon_card_reads_again.sql")
+
+
+def test_0699_the_canon_card_reads_again_as_the_public_key():
+    # The live canon view calls ottoq_cert_recert_floor(), a SECURITY DEFINER function only postgres and service_role may
+    # execute, and a view's functions run with the reader's right to call them: the cockpit's select=* was refused
+    # (401, 42501) while a count(*) through the view, which never calls the function, reads. The stub is rebuilt that
+    # way after 0658, then 0699 runs: before it whole rows are refused, after it they read, the public key alone gains
+    # EXECUTE (not PUBLIC), a table off the list still refuses, and a second run refuses at its premises.
+    d = _new_db()
+    try:
+        rc, err = d.file(STUB)
+        assert rc == 0, f"stub did not load: {err}"
+        rc, err = d.file(MIG)
+        assert rc == 0, f"0658 did not apply on the stub: {err}"
+        d.run("""CREATE FUNCTION public.ottoq_cert_recert_floor() RETURNS timestamptz LANGUAGE sql STABLE SECURITY DEFINER
+                   SET search_path = public AS 'SELECT now()';
+                 REVOKE ALL ON FUNCTION public.ottoq_cert_recert_floor() FROM PUBLIC;
+                 GRANT EXECUTE ON FUNCTION public.ottoq_cert_recert_floor() TO service_role;
+                 CREATE OR REPLACE VIEW public.ottoq_determinism_canon AS
+                   SELECT r.rule_code AS cell, public.ottoq_cert_recert_floor() AS floor FROM public.ottoq_rules r;""")
+        whole_rows = "SELECT count(to_jsonb(c)) FROM public.ottoq_determinism_canon c"
+        ok, msg = _as_anon(d, whole_rows)
+        assert not ok and "permission denied for function ottoq_cert_recert_floor" in msg, msg
+        ok, msg = _as_anon(d, "SELECT count(*) FROM public.ottoq_determinism_canon")
+        assert ok, msg   # why a count(*) probe cannot see the defect
+        rc, err = d.file(MIG_0699)
+        assert rc == 0, f"0699 did not apply on the stub: {err}"
+        assert "0699 V1 PASSED" in err, err
+        ok, msg = _as_anon(d, whole_rows)
+        assert ok, msg
+        ok, msg = _as_anon(d, "SELECT 1 FROM public.ottoq_events LIMIT 1")
+        assert not ok and "permission denied" in msg, msg
+        acl = d.val("SELECT proacl::text FROM pg_proc WHERE proname = 'ottoq_cert_recert_floor'")
+        assert "anon=X/postgres" in acl and not acl.startswith("{=X") and ",=X/" not in acl, acl
+        rc, err = d.file(MIG_0699)
+        assert rc != 0 and "0699 P1" in err, err
+    finally:
+        _drop(d)
