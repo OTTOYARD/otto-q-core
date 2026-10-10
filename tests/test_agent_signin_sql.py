@@ -484,6 +484,22 @@ def test_unlinking_an_account_closes_every_agent_it_connected():
         _drop(d)
 
 
+def test_made_up_codes_cannot_flood_the_ledger():
+    d = _new_db()
+    try:
+        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0660):
+            assert d.file(path)[0] == 0
+        client = register(d)
+        d.run(f"""SELECT ottoq_agent_oauth('token', jsonb_build_object('grant_type', '{DEVICE}', 'client_id', '{client}',
+                     'device_code_hash', md5(g::text) || md5(g::text)), '{{}}'::jsonb) FROM generate_series(1, 130) g""")
+        assert d.val("SELECT count(*) FROM ottoq_agent_call_ledger WHERE tool = 'oauth.token' AND NOT ok") == "120"
+        # a success is always ledgered, the bound notwithstanding
+        assert oauth(d, "register", {"client_name": "after the flood", "grant_types": [DEVICE]}, ip="10.9.9.9")["http_status"] == 201
+        assert d.val("SELECT count(*) FROM ottoq_agent_call_ledger WHERE tool = 'oauth.register' AND ok") == "2"
+    finally:
+        _drop(d)
+
+
 def test_the_ledger_holds_every_sign_in_call_and_never_a_secret(db):
     t = connect(db)
     text = db.val("SELECT string_agg(coalesce(detail::text, '') || coalesce(error_code, '') || coalesce(path, ''), ' ') "

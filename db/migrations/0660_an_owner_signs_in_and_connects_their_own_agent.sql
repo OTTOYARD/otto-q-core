@@ -55,7 +55,8 @@
 --   access token to it. So all that 0559, 0605 and 0607 built (scope, rate limit, ledger, owner tools, receipts,
 --   refusals, undo, OrchestrAV's link and confirmation codes) serves a signed-in agent unchanged.
 --   ONE DOOR FOR THE GATEWAY'S SIGN-IN ENDPOINTS: ottoq_agent_oauth(op, args, meta), service_role only: register,
---   device_authorize, authorize, token, revoke. Every call is a row in 0559's call ledger (transport 'oauth').
+--   device_authorize, authorize, token, revoke. Every call is a row in 0559's call ledger (transport 'oauth'), except
+--   that a refusal no connection owns is ledgered at most 120 times a minute (0559 bounds an unknown token the same way).
 --   THE PERSON'S DOORS, authenticated only, identity from auth.uid(): ottoq_account_me, ottoq_oauth_device_lookup /
 --   _decide, ottoq_oauth_request_lookup / _decide, ottoq_account_disconnect. The sign-in page calls them with the
 --   person's own Supabase session.
@@ -994,7 +995,8 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_oauth(p_op text, p_args jsonb DEFA
 AS $fn$
 /* 0660. The ONE function the gateway's sign-in endpoints call (service_role only), beside ottoq_agent_call: register,
    device_authorize, authorize, token, revoke. It reads no engine data and changes no engine state: it mints and closes
-   connections. Every call is a row in 0559's call ledger (transport 'oauth', tool 'oauth.<op>'), refusals included. An
+   connections. Every call is a row in 0559's call ledger (transport 'oauth', tool 'oauth.<op>'), refusals included, up to
+   120 a minute for refusals no connection owns. An
    unexpected error rolls back what the operation started and answers 500 server_error. */
 DECLARE
   t0   timestamptz := clock_timestamp();
@@ -1015,11 +1017,17 @@ BEGIN
     RAISE WARNING 'ottoq_agent_oauth(%): % %', v_op, SQLSTATE, SQLERRM;
     v := public.ottoq_oauth_error(500, 'server_error', 'OTTOYARD''s sign-in hit an internal error. Try again.');
   END;
-  PERFORM public.ottoq_oauth_ledger('oauth.' || CASE WHEN v_op IN ('register', 'device_authorize', 'authorize', 'token', 'revoke') THEN v_op ELSE 'unknown' END,
-    'oauth', COALESCE((v ->> 'ok')::boolean, false), (v ->> 'http_status')::integer, v #>> '{body,error}',
-    (v ->> 'principal_id')::uuid, v_m,
-    COALESCE(v -> 'detail', '{}'::jsonb) || jsonb_strip_nulls(jsonb_build_object('grant_type', CASE WHEN v_op = 'token' THEN left(v_a ->> 'grant_type', 60) END)),
-    t0);
+  --: a refusal no connection owns is ledgered at most 120 times a minute (0559 bounds an unknown token's the same way),
+  --: so made-up codes cannot flood the ledger; every success and every refusal a connection owns is always ledgered
+  IF COALESCE((v ->> 'ok')::boolean, false) OR (v ->> 'principal_id') IS NOT NULL
+     OR (SELECT count(*) FROM public.ottoq_agent_call_ledger l
+          WHERE l.called_at > now() - interval '1 minute' AND l.transport = 'oauth' AND NOT l.ok AND l.principal_id IS NULL) < 120 THEN
+    PERFORM public.ottoq_oauth_ledger('oauth.' || CASE WHEN v_op IN ('register', 'device_authorize', 'authorize', 'token', 'revoke') THEN v_op ELSE 'unknown' END,
+      'oauth', COALESCE((v ->> 'ok')::boolean, false), (v ->> 'http_status')::integer, v #>> '{body,error}',
+      (v ->> 'principal_id')::uuid, v_m,
+      COALESCE(v -> 'detail', '{}'::jsonb) || jsonb_strip_nulls(jsonb_build_object('grant_type', CASE WHEN v_op = 'token' THEN left(v_a ->> 'grant_type', 60) END)),
+      t0);
+  END IF;
   RETURN jsonb_build_object('ok', COALESCE((v ->> 'ok')::boolean, false), 'http_status', (v ->> 'http_status')::integer,
                             'body', v -> 'body')
          || CASE WHEN v ? 'redirect_uri' THEN jsonb_build_object('redirect_uri', v ->> 'redirect_uri', 'state', v -> 'state') ELSE '{}'::jsonb END;
