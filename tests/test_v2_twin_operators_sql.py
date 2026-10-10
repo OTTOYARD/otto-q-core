@@ -36,6 +36,8 @@ OPS_STUB = os.path.join(ROOT, "tests", "fixtures", "v2_twin_operators_stub.sql")
 MIG["0653"] = os.path.join(ROOT, "db", "migrations", "0653_the_twin_speaks_to_otto_q_as_two_operators.sql")
 MIG["0654"] = os.path.join(ROOT, "db", "migrations",
                            "0654_the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first.sql")
+MIG["0655"] = os.path.join(ROOT, "db", "migrations",
+                           "0655_the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -120,6 +122,15 @@ def test_0654_refuses_tick_paths_it_was_not_written_against(db):
     rc, err = db.file(MIG["0654"])
     assert rc != 0, "0654 applied on the stub"
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0654%'") == "0"
+
+
+def test_0655_refuses_a_finalizer_it_was_not_written_against(db):
+    # 0655 patches the live run finalizer at an md5-guarded anchor and is written after 0654; on the stub it must refuse
+    # at its premises and change nothing. That the finalizer keeps an operator's answer is proved on the live finalizer
+    # in 0655's own V1.
+    rc, err = db.file(MIG["0655"])
+    assert rc != 0 and "0655 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0655%'") == "0"
 
 
 def test_only_the_platform_reaches_the_operators(db):
