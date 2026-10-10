@@ -475,7 +475,7 @@ jobs:
       # the live walk at md5-guarded anchors, so on the stub it must refuse, and the suite proves it does.
       # 0653, the twin as two operators: sim-a never sees sim-b (the outbox, the door, the isolation check), one walk
       # serves both in its own order, and the engine learns each outcome only from the operator's ack.
-      - name: The v2 operator door and the twin's two operators, executed (0649-0653 against a stub engine; the guards of 0652, 0654, 0655, 0657, 0659, 0690 and 0691)
+      - name: The v2 operator door and the twin's two operators, executed (0649-0653 against a stub engine; the guards of 0652, 0654, 0655, 0657, 0659 and 0690-0692)
         env:
           PGHOST: localhost
           PGPORT: "5432"

@@ -66,7 +66,7 @@ The receiving half's flag (`twin_operator_door`) is separate and stays separate.
   false). That gives OTTO-Q an exception per DTC, which it does not get today: a change to measure, not a plumbing step.
 
 Stages 1 and 2 therefore ship together, after the drive log, and their pair reads the depot's service demand as well
-as its fleet hours.
+as its fleet hours. **Built 2026-10-10 as pending migrations:** 0691 stamps a twin or replay key's fault report with its run (G411), and 0692 adds the flag `twin_operator_publish`, the drive log, the publisher and the two patched tick functions, and registers the pair.
 
 ## The one gap: OTTO-Q cannot recall a car through the door
 
