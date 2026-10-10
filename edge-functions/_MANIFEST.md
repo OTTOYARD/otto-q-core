@@ -12,7 +12,8 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
   `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), v36, agent v24 (footnote ⁵), v37, agent v25
-  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹).
+  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and
+  `ottoq-agent-gateway` v2, OTTOYARD sign-in (footnote ¹⁰).
   29 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
@@ -108,7 +109,7 @@ against this table without trusting any metadata column.
 |---|---:|---|---|---|---|
 | otto-q-api | 26 | false | 2026-04-19 01:54 | yes | `01762cf6734e0dd506a057a3a9ac58f09aa2acd18dc4dc23868b42c1afb9eff0` |
 | otto-twin-control | 30 | false | 2026-09-29 02:48 | markers¹ | `12a5c37d616fa19efcd43bda11f235ca644fa946cd4e3d112d748a8341746700` (repo file) |
-| ottoq-agent-gateway | 1 | false | 2026-10-04 11:40 | yes² | `9c9a848146bf78631b34f9753f6bf4b62873003bed1add275193ce122d44c2b0` |
+| ottoq-agent-gateway | 2 | false | 2026-10-10 07:23 | yes¹⁰ | `d72d2f7fd123b1844638572625215add017a4457c5ed43641ae69419a2ec4098` |
 | ottoq-amend | 9 | true | 2026-06-18 04:24 | yes | `70f038ae2cfdb8891f2589f2e3158cc59792f0318718963cfa9c544249b1376b` |
 | ottoq-approval-copilot | 4 | true | 2026-07-25 01:46 | yes | `3abc122e20aa24a1222abe7a3bd7ce8ef6e91f78cc236b5afe2f0dc7f46293c0` |
 | ottoq-assign-optimize | 8 | true | 2026-09-09 03:41 | yes | `5508a9c95d4b98e736b3215fca9cc006ae6b5e4a399de174165cad69f100c34e` |
@@ -237,9 +238,22 @@ morning: `scripts/agent-gateway-smoke.mjs --passcode` passed 6 of 6, and `POST /
 `ask_not_configured`: it needs the function secrets `ANTHROPIC_API_KEY` and a model name in
 `OTTOCOMMAND_OWNER_MODEL` (or `ANTHROPIC_MODEL`), and at least one is not set.
 
+¹⁰ **`ottoq-agent-gateway` v2, 2026-10-10 at 2:23 AM CT (07:23 UTC), OTTOYARD sign-in (0700, PERSONAL_AGENT.md section
+10).** Five files through the Supabase MCP deploy tool, JWT verification off as v1 (an `oqt_` access token is no more
+a JWT than an agent key), deployed from the branch of #239 at `4761ed7` before 0700 was applied. Until #239 merges,
+`main`'s copies of `index.ts` and `_shared/agent_gateway.ts` are v1's, and `_shared/agent_signin.ts` is not on `main`.
+Read back with `get_edge_function` and hashed from the API's response: all five byte-identical to `4761ed7` (sha256
+`d72d2f7f` index.ts, `2c93b3ca` `_shared/agent_gateway.ts`, `325f4eda` `_shared/agent_signin.ts`, and the unchanged
+`e4944c72` `_shared/agent_dial_discipline.ts`, `ace3aacb` `_shared/ottocommand_owner.ts`). What it adds: the OAuth 2.1
+endpoints (`/oauth/register`, `/oauth/device`, `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, `/oauth/metadata`),
+the protected-resource metadata, and the signed-in MCP address `/account/mcp`. Probed live with no key the same
+minute: `/account/mcp` answers 401 with the RFC 9728 challenge; the protected-resource metadata names
+`https://www.ottoyard.com`; `/oauth/register` answers 503 `temporarily_unavailable` until 0700 is applied; the passcode
+door's initialize, tools/list (16 tools) and welcome answer as before; a made-up key is refused 401 by the database.
+
 ## Committed, not deployed
 
-None. `ottoq-agent-gateway`, the last one here, was deployed on 2026-10-04 (footnote ²).
+None. `ottoq-agent-gateway` v2 was deployed on 2026-10-10 from the branch of #239, ahead of its merge (footnote ¹⁰).
 
 ## What the four synced functions gained, and why it mattered to the audit
 
