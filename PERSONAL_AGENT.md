@@ -481,7 +481,30 @@ connects when Chase runs step 2.
 
 ### Live
 
-*To be filled in when 0700 is applied, the gateway deployed and the site's page published.*
+*Went live on the engine 2026-10-10, 2:06–6:17 AM CT. The site's half waits on OTTOYARD-SITE #1.*
+
+- **Chase's account:** created at 2:06 AM CT on live Supabase Auth ("Your account" above). Checked live the same minute:
+  the right password signs in, a wrong one is refused (`invalid_credentials`).
+- **The gateway:** `ottoq-agent-gateway` v2, deployed at 2:23 AM CT (`edge-functions/_MANIFEST.md` footnote 10). Read
+  back from the API: all five files byte-identical to the repository. The passcode door and agent keys answered as before.
+- **The migration:** 0700 applied at 6:14 AM CT, version `20261010111411`. The stored statement is the committed file,
+  byte for byte (md5 `8ea4dea3`, 131,578 characters). P0-P2, V1 and V2 passed inside the apply.
+- **The link:** chase@ottoyard.com to Tesla Robotaxi TN, at 6:15 AM CT.
+- **The live smoke** (`scripts/agent-signin-smoke.mjs` with `SKIP_SITE=1`), 6:16:59-6:17:07 AM CT, **14 of 14**:
+  - the signed-in MCP address answers 401 with the challenge;
+  - the protected-resource metadata names `https://www.ottoyard.com`;
+  - a test agent ("OTTOYARD smoke test") registered and asked for a device code;
+  - a poll before approval was pending;
+  - Chase's account signed in and approved it through the page's own doors;
+  - the next poll connected, with an access token and a refresh token;
+  - MCP initialize, tools/list (20 tools) and whoami ("signed in", chase@ottoyard.com) answered;
+  - it was disconnected through the page's door, and its token was then refused with the challenge.
+
+  Every step is a row in the call ledger (`oauth.*` and `web` transports). The test connection stays in "Your agents" as
+  disconnected, because connections are kept as evidence.
+- **Not yet:** www.ottoyard.com serves the sign-in metadata and `/connect` only once OTTOYARD-SITE #1 merges. Until then
+  `/.well-known/oauth-authorization-server` answers 404 there, and Hermes's discovery needs it. After the merge: the
+  smoke without `SKIP_SITE` (it also checks that the site's metadata is exactly the gateway's), then Chase's own Hermes.
 
 ## Sources (external facts; read 2026-10-03 unless marked)
 
