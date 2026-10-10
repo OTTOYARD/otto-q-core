@@ -48,6 +48,8 @@ MIG["0692"] = os.path.join(ROOT, "db", "migrations",
 MIG["0693"] = os.path.join(ROOT, "db", "migrations",
                            "0693_a_car_leaving_the_depot_is_reported_through_the_door.sql")
 MIG["0694"] = os.path.join(ROOT, "db", "migrations", "0694_the_twins_chargers_speak_ocpp_2_0_1.sql")
+MIG["0695"] = os.path.join(ROOT, "db", "migrations",
+                           "0695_an_autonomous_cars_data_comes_off_while_it_charges.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -214,6 +216,19 @@ def test_0694_refuses_out_of_order_and_changes_nothing(db):
     assert rc != 0 and "0694 P1" in err, err
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0694%'") == "0"
     assert db.val("SELECT to_regprocedure('ottoq.ottoq_ocpp_meter_soc(text,jsonb)') IS NULL") == "t"
+
+
+def test_0695_refuses_out_of_order_and_changes_nothing(db):
+    # 0695 declares data offload, adds the twin_data_offload dial, the twin's hours-out helper and the uplink hold, and
+    # patches the observer, deriver, retirable set, starter, completion step and the three movers at md5-guarded
+    # anchors; it is written after 0657, so on the stub it must refuse at its premises and leave no service row, dial,
+    # helper or lineage row. That the dial unset raises nothing, that the dial on raises one uplink-bound transfer on a
+    # visit that charges, and that it starts only on a charger, holds its car there, is reset when its car leaves and
+    # finishes back on the charger, are proved on the live functions in 0695's own V1.
+    rc, err = db.file(MIG["0695"])
+    assert rc != 0 and "0695 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0695%'") == "0"
+    assert db.val("SELECT to_regprocedure('ottoq.ottoq_uplink_transfer_holds(uuid,uuid)') IS NULL") == "t"
 
 
 def test_only_the_platform_reaches_the_operators(db):

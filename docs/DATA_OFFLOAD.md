@@ -79,30 +79,43 @@ The hold and the way back were read in the live functions, comment-stripped, bef
   starter (`public.ottoq_start_concurrent_atoms`), which starts every digital atom at once, anywhere, with no
   technician; it is where a transfer pauses and resumes.
 
-## The build (one migration after 0657, behind a dial, plus a pair)
+## The build: `db/migrations/0695` (written 2026-10-10, pending; applied after 0657)
 
-1. `service_cadence_policy` row `data_offload` (lane `digital`, must-do once raised, declared in the vocabulary and
-   the retirable set, so `ottoq_assert_service_vocabulary()` stays empty).
-2. The visit deriver raises it, sized as above, at `twin_data_offload` 1 (a run's dial; 0, unset, changes nothing),
-   and only on a visit that has a charge to do, so the car will stand on a charger anyway. A visit with no charge
-   carries its hours to the next visit that has one.
-3. The starter starts it only on a charger or a service bay, records `performed_by` `stall_uplink` and the stall, and
-   resumes a paused transfer from the minutes it has left. The completion step pauses a running transfer whose car is
-   no longer on its uplink stall, keeping the minutes done.
-4. The hold: STEP 2's wash admission and the bay-booking activation leave a car whose transfer is running where it is
-   until the transfer ends; the wash and the bay follow it.
-5. The way back, for a car that leaves its uplink anyway (an emergency, a fault): the departure recheck and the
-   readiness gate give an unfinished transfer the remedy `need_charge`, the recheck stops sending such a car back to
-   the gate, and the decide tick's charge cursor takes a car with an unfinished transfer as needing a charger whatever
-   its charge. A session opened for a full car completes with no energy on the next tick (the start function already
-   handles that case), and STEP 1.5 then holds the car on the charger until the transfer ends.
-6. The pair: `twin_data_offload` 0 against 1, busy_day at the twin depot, read for fast-charger hours spent holding a
-   charged car for its offload, turnaround, the wait for a charger, deployed car hours, and any car the readiness gate
-   escalates as stuck. A second question for the research wing after it: the same with uplink on the staging stalls.
+1. `service_cadence_policy` row `data_offload` (lane `digital`, must-do once raised, event-raised), and the retirable
+   set, so `ottoq_assert_service_vocabulary()` stays empty and the atoms guard does not tag it as having no executor.
+2. The dial `twin_data_offload` (a person's, per run; 0, unset, changes nothing). At 1 the twin's observer reports each
+   autonomous fleet car's hours out on the run since its last finished transfer (`twin.ottoq_twin_offload_hours`), and
+   the kernel's deriver raises the transfer from that observation, as it raises a software update from `ota_pending`.
+   The kernel reads an observation, never the twin's dial. It is raised only on a visit that has a charge to do, so the
+   car will stand on a charger anyway; a visit with no charge carries its hours to the next visit that has one.
+3. The starter starts it only on a charger or a service bay and records `performed_by` `stall_uplink` and the stall.
+   The completion step resets a transfer whose car left that stall before its minutes ran out to pending, nothing
+   credited, as 0519 does for the charger's sensors, and the readiness check of a car staged to leave waits for it
+   (0657's rule, extended). **Built as a restart, not a resume:** an interrupted transfer starts again from the full
+   minutes. A real transfer would likely resume from what it had sent, so an interrupted one costs more in the twin than
+   it would on a real uplink. The hold below means only an emergency or fault path moves a car mid-transfer, and the pair
+   counts how often that happens.
+4. The hold: `ottoq.ottoq_uplink_transfer_holds(car, run)` is true while an unfinished transfer's car stands on an uplink
+   stall. Three movers honour it: OTTO-Q's charge disposition in `ottoq_decide_tick`, STEP 2's wash admission in
+   `twin.ottoq_sim_advance_service_flow`, and `ottoq.ottoq_activate_due_bay_reservations`. The wash and the bay follow the
+   transfer.
+5. **Not built: the way back** for a car that leaves its uplink anyway (an emergency, a fault). Such a car with its
+   battery full has no route to a charger, and the readiness gate escalates it as stuck (`deploy_gate_stuck`, then
+   `deploy_gate_hard_cap`). The pair counts these; if it finds any, the route back (the departure recheck and the
+   readiness gate give an unfinished transfer the remedy `need_charge`, and the decide tick's charge cursor takes such a
+   car as needing a charger whatever its charge) is the next build. Nor does a transfer start on its own in a service
+   bay yet: the completion step's catch-up does not visit a car in a bay, so in this build a transfer runs on a charger.
+6. The pair, registered by 0695: `twin_data_offload` 0 against 1, busy_day at the twin depot, read for fast-charger and
+   L2 minutes spent holding a charged car for its transfer, turnaround, the wait for a charger, deployed car hours, and
+   any car the readiness gate escalates as stuck. A second question for the research wing after it: the same with an
+   uplink on the staging stalls.
 
-Steps 3 and 5 patch `twin.ottoq_sim_advance_visit_atoms` as 0657 leaves it, so the migration is applied after 0657.
-Ten patch sites in eight functions, two of them the largest in the engine (`ottoq_decide_tick`,
-`twin.ottoq_sim_advance_service_flow`); each is md5-guarded and the probe exercises each piece on a stopped run.
+Thirteen patch sites in eight functions, two of them the largest in the engine (`ottoq_decide_tick`,
+`twin.ottoq_sim_advance_service_flow`). Each is md5-guarded against the live definition (the completion step against
+0657's), and 0695's V1 probes each piece on a stopped run and rolls it back: the dial unset raises nothing, a car with
+hours out raises one transfer sized from them, a full car raises none, and a transfer stays pending in staging, starts
+and holds its car on an L2, is reset when its car leaves (the readiness check of a car staged to leave waits), and
+finishes back on the charger.
 
 The dial stays 0 until a person sets it, after the pair, as a certified change (rule 10: the research wing measures,
 production does not experiment).
