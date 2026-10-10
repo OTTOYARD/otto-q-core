@@ -141,6 +141,11 @@ NON_KERNEL_PACKAGES = {
                "so FORBIDDEN_IMPORTS bans `import bridge` from the kernel exactly "
                "as it bans load and psycopg: the proposer must never learn it has "
                "a channel.",
+    "contract": "the depot data contract's conformance kit (contract/README.md): it "
+                "checks an event against the contract's JSON Schemas and signs and "
+                "verifies its ottoqsig, and builds the v2 door's schema module. It "
+                "decides, prices, sizes and derives nothing, has no database or "
+                "network, and no kernel package imports it.",
 }
 
 
