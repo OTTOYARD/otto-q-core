@@ -42,6 +42,7 @@ MIG["0657"] = os.path.join(ROOT, "db", "migrations", "0657_the_readiness_check_i
 MIG["0659"] = os.path.join(ROOT, "db", "migrations",
                            "0659_the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it.sql")
 MIG["0690"] = os.path.join(ROOT, "db", "migrations", "0690_the_dispatch_ledger_counts_the_miles_the_car_drove.sql")
+MIG["0691"] = os.path.join(ROOT, "db", "migrations", "0691_a_twin_operators_fault_report_goes_with_its_run.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -163,6 +164,16 @@ def test_0690_refuses_out_of_order_and_changes_nothing(db):
     rc, err = db.file(MIG["0690"])
     assert rc != 0 and "0690 P1" in err, err
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0690%'") == "0"
+
+
+def test_0691_refuses_out_of_order_and_changes_nothing(db):
+    # 0691 gives public.exceptions a run column and patches the live door's fault branch at md5-guarded anchors so a
+    # twin or replay key's fault report goes with its run (FINDINGS G411); it is written after 0690, so on the stub it
+    # must refuse at its premises and leave no lineage row. That a twin fault report carries its run is proved on the
+    # live door in 0691's own V1.
+    rc, err = db.file(MIG["0691"])
+    assert rc != 0 and "0691 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0691%'") == "0"
 
 
 def test_only_the_platform_reaches_the_operators(db):
