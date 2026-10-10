@@ -2,8 +2,8 @@
 --        applied (the five variables it names do not draw flat noise), the tariff is current as NES publishes it, and
 --        the twin's chargers are up 93.7% of the time, below the 97% depot-grade floor 0659 makes a dial.**
 --        Part A of the twin data contract review (2026-10-08), items 6 (apply the corpus mapping) and 7 (tariff
---        refresh), and Chase's charger-fault decision (2026-10-09). Measured 2026-10-10 between 12:40 and 1:40 AM CT
---        (05:40-06:40 UTC), read-only, twin depot 11111111-….
+--        refresh), and Chase's charger-fault decision (2026-10-09). Measured 2026-10-10 04:45-05:10 UTC (11:45 PM CT on
+--        Oct 9 to 12:10 AM CT on Oct 10), read-only, twin depot 11111111-….
 --
 -- ══ §1 THE CORPUS MAPPING: DO NOT APPLY ottoyarddepot-sim/supabase/proposed/002 ════════════════════════════════════
 --
@@ -68,7 +68,7 @@
 -- ══ §4 A DRY RUN THAT WAITED ON THE SWEEP ════════════════════════════════════════════════════════════════════════
 --
 --   A rolled-back dry run of 0659's V1 probe (delete one stopped run's fault card, deal it again) hit the connector's
---   60 s limit at 1:30 AM CT and left nothing behind (pg_stat_activity showed only the sweep runner). The connector
+--   60 s limit at about 12:05 AM CT (05:05 UTC) and left nothing behind (pg_stat_activity showed only the sweep runner). The connector
 --   runs a statement outside a transaction block, so SET LOCAL lock_timeout did nothing, and the DELETE most likely
 --   waited on a card row the throughput sweep's hour-long transaction holds while it purges recent runs. 0657's dry
 --   run did the same on vehicles. Rule kept: inside the sweep window (11 PM-6 AM CT), touch no run-scoped row, even of
