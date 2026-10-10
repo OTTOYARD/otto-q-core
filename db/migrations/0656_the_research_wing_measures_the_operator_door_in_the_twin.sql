@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010031436
 -- migration-name:    the_research_wing_measures_the_operator_door_in_the_twin
 --
 -- 0656  **The research wing measures what the operator door changes in the twin, as a paired run.** (Step 4 of the
@@ -108,3 +108,11 @@ VALUES ('0656_the_research_wing_measures_the_operator_door_in_the_twin', false, 
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 03:14:36 UTC (10:14 PM CT on 2026-10-09), version 20261010031436 ══════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in eaae28d; the ledger's stored statement is that file byte for
+--   byte (md5 5fa65ba34e5545702ca791aa3329ecf9, 7,486 characters, 8,148 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: experiment f6128ef0-ff37-4ed5-8764-aaef15de6bb7 active, its first seed
+--   ottoq_dial_experiment_seed(id, 1) = 718694717691859268; twin_operator_door set nowhere. Its first pair was
+--   scheduled as one-shot cron job 794 (ottoq_measure_0656_operator_door, 03:17 UTC, a 4,500-second arm budget,
+--   unscheduling itself when done); read in db/checks/0431.

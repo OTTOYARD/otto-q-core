@@ -737,7 +737,7 @@ repo_manifest(version, name, file) AS (
     ('20261010013631'::text, 'the_twin_speaks_to_otto_q_as_two_operators'::text, '0653_the_twin_speaks_to_otto_q_as_two_operators.sql'::text),
     ('20261010014628'::text, 'the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first'::text, '0654_the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first.sql'::text),
     ('20261010031137'::text, 'the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered'::text, '0655_the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered.sql'::text),
-    ('PENDING'::text, 'the_research_wing_measures_the_operator_door_in_the_twin'::text, '0656_the_research_wing_measures_the_operator_door_in_the_twin.sql'::text)
+    ('20261010031436'::text, 'the_research_wing_measures_the_operator_door_in_the_twin'::text, '0656_the_research_wing_measures_the_operator_door_in_the_twin.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
