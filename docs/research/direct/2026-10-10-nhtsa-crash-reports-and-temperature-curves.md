@@ -10,7 +10,7 @@ This is Part A, items 2 (NHTSA crash reports) and 4 (fitted temperature effects)
 ## The answer in short
 
 1. **More than half of Waymo's reported crashes end with the car towed.** NHTSA's public crash reports for automated
-   driving systems (incidents from June 2025 to August 2026) hold 1,211 Waymo reports; in **647 (53.4%) the Waymo
+   driving systems (incidents from April 2025 to August 2026) hold 1,211 Waymo reports; in **647 (53.4%) the Waymo
    vehicle was towed**. 87.1% were property damage only, 46.1% happened with the Waymo stopped, and 2 were fatal.
    Combined with the CPUC filing's 10.3 collisions per million miles, that is **about 5.5 tow-ins per million miles**.
    The twin tows 0.23 per million miles (0.09 on busy_day), about a 24th (G408).
