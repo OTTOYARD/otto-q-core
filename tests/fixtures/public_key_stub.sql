@@ -35,7 +35,7 @@ INSERT INTO public.stub_in_flight VALUES (0);
 CREATE FUNCTION public.ottoq_certification_in_flight(p_include_dial boolean DEFAULT true)
 RETURNS integer LANGUAGE sql STABLE AS $f$ SELECT n FROM public.stub_in_flight LIMIT 1 $f$;
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0657_the_readiness_check_is_the_last_thing_a_visit_does', true, true, 'stub: 0658''s premise', now());
+VALUES ('0656_the_research_wing_measures_the_operator_door_in_the_twin', false, false, 'stub: 0658''s premise', now());
 
 -- the fifteen the cockpits read: thirteen tables and two views
 CREATE TABLE public.ottoq_arbiter_assessments (id bigserial PRIMARY KEY, area text);

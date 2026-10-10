@@ -41,6 +41,7 @@ MIG["0655"] = os.path.join(ROOT, "db", "migrations",
 MIG["0657"] = os.path.join(ROOT, "db", "migrations", "0657_the_readiness_check_is_the_last_thing_a_visit_does.sql")
 MIG["0659"] = os.path.join(ROOT, "db", "migrations",
                            "0659_the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it.sql")
+MIG["0690"] = os.path.join(ROOT, "db", "migrations", "0690_the_dispatch_ledger_counts_the_miles_the_car_drove.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -152,6 +153,16 @@ def test_0659_refuses_out_of_order_and_changes_nothing(db):
     rc, err = db.file(MIG["0659"])
     assert rc != 0 and "0659 P1" in err, err
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0659%'") == "0"
+
+
+def test_0690_refuses_out_of_order_and_changes_nothing(db):
+    # 0690 patches the live deployed-telemetry step at md5-guarded anchors so a dispatch accrues each tick's miles
+    # (FINDINGS G406); it is written after 0659, so on the stub it must refuse at its premises and leave no lineage row.
+    # That each tick adds exactly its packet's speed x its minutes, and the close keeps the total, is proved on the live
+    # step in 0690's own V1.
+    rc, err = db.file(MIG["0690"])
+    assert rc != 0 and "0690 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0690%'") == "0"
 
 
 def test_only_the_platform_reaches_the_operators(db):

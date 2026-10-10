@@ -84,8 +84,10 @@ DECLARE
                           'ottoq_variability_catalog', 'ottoq_vehicle_classes'];
   v_missing text;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage WHERE name = '0657_the_readiness_check_is_the_last_thing_a_visit_does') THEN
-    RAISE EXCEPTION '0658 P1: 0657 is not classified; apply in order';
+  -- 0656, not 0657: 0657 forces a recertification, so it is applied after 0658, 0659 and 0690 (its sweep would hold
+  -- their in-flight check closed for most of an hour); nothing here depends on it
+  IF NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage WHERE name = '0656_the_research_wing_measures_the_operator_door_in_the_twin') THEN
+    RAISE EXCEPTION '0658 P1: 0656 is not classified; apply in order';
   END IF;
   SELECT string_agg(t, ', ') INTO v_missing FROM unnest(v_allow) t
    WHERE NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relname = t
