@@ -461,9 +461,9 @@ gateway, where every decision is the database's.
 
 ### Verified, and not verified
 
-**Verified on a scratch PostgreSQL 16 over the stub engine (2026-10-10):** `tests/test_agent_signin_sql.py` 34 passed;
+**Verified on a scratch PostgreSQL 16 over the stub engine (2026-10-10):** `tests/test_agent_signin_sql.py` 35 passed;
 `tests/agent_signin.test.mjs` 19 passed, including the whole device sign-in over the real SQL; the existing gateway
-suites still pass (131 SQL and 101 node tests with CI's own commands). **Hermes Agent's own CLI** (NousResearch/
+suites still pass (132 SQL and 101 node tests with CI's own commands). **Hermes Agent's own CLI** (NousResearch/
 hermes-agent at `dce1e9b3`, MCP SDK 2.0.0), unmodified, against the gateway's code over that SQL: `hermes mcp login
 ottoyard --flow device` printed the link and code, was approved through this page in a phone-sized headless browser,
 and finished *"Authenticated — 20 tool(s) available"*; it renewed its token through the token endpoint when its clock
