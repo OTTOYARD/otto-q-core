@@ -207,7 +207,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0657 — GENERATED, not a log
+## Index, 0134–0658 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656 — which are indexed below as well as logged above; the log row is
@@ -733,7 +733,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0655](db/migrations/0655_the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered.sql) | `20261010031137` | yes — ledger | **The run finalizer no longer expires a directive its operator accepted through the v2 door.** Found while |
 | [0656](db/migrations/0656_the_research_wing_measures_the_operator_door_in_the_twin.sql) | `20261010031436` | yes — ledger | **The research wing measures what the operator door changes in the twin, as a paired run.** (Step 4 of the |
 | [0657](db/migrations/0657_the_readiness_check_is_the_last_thing_a_visit_does.sql) | `PENDING` | no — pending | **A visit's readiness check closes only when every other atom of the visit is done.** (G398; db/checks/0431 |
+| [0658](db/migrations/0658_the_public_key_reads_only_what_a_cockpit_shows.sql) | `PENDING` | no — pending | **The public key reads only the fifteen relations a cockpit shows it, and a new table is closed to it until a |
 
-507 migrations indexed.
+508 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
