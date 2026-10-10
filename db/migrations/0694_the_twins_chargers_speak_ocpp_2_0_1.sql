@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010112739
 -- migration-name:    the_twins_chargers_speak_ocpp_2_0_1
 --
 -- 0694  **The twin's chargers write what an OCPP 2.0.1 station sends, and the charge clock reads either shape.**
@@ -607,3 +607,11 @@ VALUES ('0694_the_twins_chargers_speak_ocpp_2_0_1', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:27:39 UTC (6:27 AM CT), version 20261010112739 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 62da4377f76e5c6f2a5154bda986323d, 39,563 characters, 40,368 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the charge start 05d72524, advance c26a997e, stop 2281c70b and the charge clock's reader
+--   9e6f1694 as written; the six helpers exist, none callable by anon; no TransactionEvent row in the log yet;
+--   snapshot 0694_pre holds the four old definitions; lineage FALSE/FALSE (read 11:28:23 UTC). Applied after the
+--   nightly learners of 11:20, 11:22 and 11:24 UTC had finished.
