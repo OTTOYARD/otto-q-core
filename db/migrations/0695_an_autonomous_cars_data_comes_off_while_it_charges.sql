@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010113609
 -- migration-name:    an_autonomous_cars_data_comes_off_while_it_charges
 --
 -- 0695  **An autonomous car's logged data comes off over a wired uplink while it charges, as a required service, in
@@ -782,3 +782,13 @@ VALUES ('0695_an_autonomous_cars_data_comes_off_while_it_charges', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:36:09 UTC (6:36 AM CT), version 20261010113609 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 5f9d6bb; the ledger's stored statement is that file byte for
+--   byte (md5 18a8352782519396f815934fe4f8287a, 50,732 characters, 51,405 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the eight patched definitions as written (visit atoms 0db32e95, observer 24104d1d,
+--   deriver 9ae0558f, retirable set c4394d5f, starter 6e0d5aac, decide tick 4c9390ad, service flow c0622bc3, bay
+--   activation 9feb46eb); service data_offload declared digital/always; the dial set nowhere; experiment
+--   c1e1430f-13e1-426e-b546-d22379172b47 active; lineage FALSE/FALSE (read 11:36:22 UTC). The first apply, of the file
+--   as committed in 9eeaa49, rolled back at 11:31 UTC in V1b (its probe read the transfer in the same statement that
+--   started it, so it saw the rows as that statement began); 5f9d6bb reads each start back in a statement of its own.
