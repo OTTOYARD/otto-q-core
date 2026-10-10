@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010005934
 -- migration-name:    a_directive_leaves_with_an_id_a_version_an_expiry_and_the_depots_signing_key
 --
 -- 0651  **What OTTO-Q asks of a car leaves the depot as a contract directive: with an id, a version, the directive it
@@ -471,3 +471,11 @@ VALUES ('0651_a_directive_leaves_with_an_id_a_version_an_expiry_and_the_depots_s
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 00:59:34 UTC (7:59 PM CT on 2026-10-09), version 20261010005934 ═══════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in e2315a0; the ledger's stored statement is that file byte for
+--   byte (md5 dbebfe62624f8856576d7400fa4a34cb, 29,616 characters, 30,356 bytes). P0, P1, V1, V2 passed in the apply's
+--   transaction: the twin depot's newest charge command (Zoox-001 to NASH-DCFC-STALL-06, 30 kW asked, a 1,800-second
+--   tick) and newest staging command rendered as stated. Read after: 0 signing keys and 0 Vault secrets (the edge
+--   function makes the first on first use; V1's probe key rolled back), 0 probe source keys, 0 commands stamped
+--   delivered by the outbox.
