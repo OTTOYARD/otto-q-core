@@ -3,7 +3,7 @@
 # https://hermes-agent.nousresearch.com/docs/reference/mcp-config-reference
 # https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp
 #
-# SIGNED IN (0660, PERSONAL_AGENT.md section 10): Hermes signs in to its owner's OTTOYARD account and keeps its own
+# SIGNED IN (0700, PERSONAL_AGENT.md section 10): Hermes signs in to its owner's OTTOYARD account and keeps its own
 # tokens. On the machine running Hermes, once: `hermes mcp login ottoyard --flow device`. It prints a link
 # (www.ottoyard.com/connect) and a code; the owner opens the link, signs in, enters the code and approves; then
 # /reload-mcp. Hermes renews its access token by itself; it needs the login again only if the owner disconnects it or

@@ -1,7 +1,7 @@
 -- migration-version: PENDING
 -- migration-name:    an_owner_signs_in_and_connects_their_own_agent
 --
--- 0660  **An owner signs in, and connects their own agent.** An OTTOYARD account (a Supabase Auth user of this
+-- 0700  **An owner signs in, and connects their own agent.** An OTTOYARD account (a Supabase Auth user of this
 --       project) is linked to the fleet it owns. An agent that wants that fleet is sent to OTTOYARD's sign-in page; the
 --       owner signs in there, sees which agent is asking and what it could do, and approves or denies. Approved, the
 --       agent gets its own short-lived access token and a refresh token, through the standard (OAuth 2.1: the device
@@ -36,7 +36,7 @@
 --       repository) and its endpoints stay in the gateway. The sign-in page lives there too: Supabase Edge Functions
 --       answer a GET's text/html as text/plain.
 --   (d) 0607's three CHECKs on ottoq_agent_principals admit two origins. A third needs them dropped and re-added; no
---       function is dropped. Six bodies are extended (each the measured live body plus the 0660 lines, md5 pinned in
+--       function is dropped. Six bodies are extended (each the measured live body plus the 0700 lines, md5 pinned in
 --       P1): the resolver learns access tokens; the plain-English 401 learns why a token stopped; the welcome, whoami
 --       and the two owner boards say "signed in" and whose account.
 --
@@ -113,7 +113,7 @@ BEGIN;
 DO $inflight$
 BEGIN
   IF public.ottoq_certification_in_flight(true) > 0 THEN
-    RAISE EXCEPTION '0660 P0: a pair, the recert runner, a dial pair or a sweep arm is running right now';
+    RAISE EXCEPTION '0700 P0: a pair, the recert runner, a dial pair or a sweep arm is running right now';
   END IF;
 END $inflight$;
 
@@ -121,12 +121,12 @@ END $inflight$;
 DO $premises$
 DECLARE v_bad text;
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.ottoq_cert_lineage WHERE name = '0660_an_owner_signs_in_and_connects_their_own_agent') THEN
-    RAISE EXCEPTION '0660 P1: already applied';
+  IF EXISTS (SELECT 1 FROM public.ottoq_cert_lineage WHERE name = '0700_an_owner_signs_in_and_connects_their_own_agent') THEN
+    RAISE EXCEPTION '0700 P1: already applied';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage WHERE name = '0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends')
      OR NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage WHERE name = '0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code') THEN
-    RAISE EXCEPTION '0660 P1: 0607 and 0608 (the passcode door and the owner boards) are not applied; apply them first';
+    RAISE EXCEPTION '0700 P1: 0607 and 0608 (the passcode door and the owner boards) are not applied; apply them first';
   END IF;
   -- md5(prosrc), measured on the live catalog 2026-10-10 05:52 UTC and on a scratch cluster with 0559-0608 applied from
   -- their files: identical, all six
@@ -140,7 +140,7 @@ BEGIN
    WHERE to_regprocedure(f) IS NULL
       OR (SELECT md5(prosrc) FROM pg_proc WHERE oid = to_regprocedure(f)) IS DISTINCT FROM want;
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0660 P1: not the body this file was written against (re-measure before applying): %', v_bad;
+    RAISE EXCEPTION '0700 P1: not the body this file was written against (re-measure before applying): %', v_bad;
   END IF;
   -- the three CHECKs this file widens are 0559's and 0607's, as merged
   IF (SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c WHERE c.conrelid = 'public.ottoq_agent_principals'::regclass
@@ -149,14 +149,14 @@ BEGIN
         AND c.conname = 'ottoq_agent_principals_token_prefix_check') NOT LIKE '%^oq[as]_%'
      OR NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.ottoq_agent_principals'::regclass
         AND c.conname = 'ottoq_agent_principals_origin_shape_check') THEN
-    RAISE EXCEPTION '0660 P1: ottoq_agent_principals'' origin, token_prefix or origin_shape CHECK is not the one this file widens';
+    RAISE EXCEPTION '0700 P1: ottoq_agent_principals'' origin, token_prefix or origin_shape CHECK is not the one this file widens';
   END IF;
   IF to_regprocedure('extensions.gen_random_bytes(integer)') IS NULL OR to_regprocedure('auth.uid()') IS NULL THEN
-    RAISE EXCEPTION '0660 P1: pgcrypto''s gen_random_bytes (schema extensions) or auth.uid() is missing';
+    RAISE EXCEPTION '0700 P1: pgcrypto''s gen_random_bytes (schema extensions) or auth.uid() is missing';
   END IF;
   IF to_regprocedure('public.ottoq_agent_no_truncate()') IS NULL OR to_regprocedure('public.ottoq_agent_fleet_line(uuid,uuid)') IS NULL
      OR to_regprocedure('public.ottoq_owner_clock(timestamp with time zone,boolean,boolean)') IS NULL THEN
-    RAISE EXCEPTION '0660 P1: a 0559/0605/0607 helper this file calls is missing';
+    RAISE EXCEPTION '0700 P1: a 0559/0605/0607 helper this file calls is missing';
   END IF;
 END $premises$;
 
@@ -168,20 +168,20 @@ BEGIN
       'public.ottoq_oauth_device_codes', 'public.ottoq_oauth_auth_requests', 'public.ottoq_oauth_grants',
       'public.ottoq_oauth_tokens']) t WHERE to_regclass(t) IS NOT NULL;
   IF v_tb IS NOT NULL THEN
-    RAISE EXCEPTION '0660 P2: table(s) this file creates already exist: %', v_tb;
+    RAISE EXCEPTION '0700 P2: table(s) this file creates already exist: %', v_tb;
   END IF;
   SELECT string_agg(p.proname, ', ') INTO v_fn
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname = 'public' AND (p.proname LIKE 'ottoq\_oauth\_%' OR p.proname IN ('ottoq_agent_oauth', 'ottoq_account_me',
           'ottoq_account_disconnect', 'ottoq_owner_account_link', 'ottoq_owner_account_unlink'));
   IF v_fn IS NOT NULL THEN
-    RAISE EXCEPTION '0660 P2: function(s) this file creates already exist: %', v_fn;
+    RAISE EXCEPTION '0700 P2: function(s) this file creates already exist: %', v_fn;
   END IF;
 END $fresh$;
 
 -- ── the rollback snapshot of the six bodies this file extends ──
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0660_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
+SELECT '0700_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
  WHERE p.oid IN ('public.ottoq_agent_resolve(text)'::regprocedure,
                  'public.ottoq_agent_unauthenticated(text)'::regprocedure,
@@ -222,7 +222,7 @@ ALTER TABLE public.ottoq_agent_principals ADD CONSTRAINT ottoq_agent_principals_
   END);
 
 COMMENT ON COLUMN public.ottoq_agent_principals.origin IS
-'0607. issued = a key minted by ottoq_agent_issue_token (oqa_, no expiry); passcode = a session opened with OTTOYARD''s demo passcode through enter_passcode (oqs_, expires_at set, revoked when a demo run at its depot ends). 0660: oauth = one agent an owner signed in and approved (oqt_ access tokens in ottoq_oauth_tokens, no expiry of its own; it ends when the owner disconnects it, never with a run).';
+'0607. issued = a key minted by ottoq_agent_issue_token (oqa_, no expiry); passcode = a session opened with OTTOYARD''s demo passcode through enter_passcode (oqs_, expires_at set, revoked when a demo run at its depot ends). 0700: oauth = one agent an owner signed in and approved (oqt_ access tokens in ottoq_oauth_tokens, no expiry of its own; it ends when the owner disconnects it, never with a run).';
 
 -- ══ 2. the tables ═══════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -245,7 +245,7 @@ CREATE TABLE public.ottoq_owner_accounts (
   CONSTRAINT ottoq_owner_accounts_email_check CHECK (email = lower(btrim(email)) AND email ~ '^[^@[:space:]]+@[^@[:space:]]+$')
 );
 COMMENT ON TABLE public.ottoq_owner_accounts IS
-'0660. Which OTTOYARD accounts (Supabase Auth users of this project) may sign in and connect their own agents, and the one fleet each owns at the twin depot. Linked and unlinked by ottoq_owner_account_link / ottoq_owner_account_unlink (service_role). An agent connected through an account gets exactly an owner key''s scope: that fleet''s cars, read + note + owner_settings. No FK to auth.users, deliberately (the link function checks the account exists).';
+'0700. Which OTTOYARD accounts (Supabase Auth users of this project) may sign in and connect their own agents, and the one fleet each owns at the twin depot. Linked and unlinked by ottoq_owner_account_link / ottoq_owner_account_unlink (service_role). An agent connected through an account gets exactly an owner key''s scope: that fleet''s cars, read + note + owner_settings. No FK to auth.users, deliberately (the link function checks the account exists).';
 
 --: The agents that registered (RFC 7591). Public clients only: no client secret exists.
 CREATE TABLE public.ottoq_oauth_clients (
@@ -266,7 +266,7 @@ CREATE TABLE public.ottoq_oauth_clients (
   CONSTRAINT ottoq_oauth_clients_status_check CHECK (status IN ('active', 'disabled'))
 );
 COMMENT ON TABLE public.ottoq_oauth_clients IS
-'0660. Agents registered with OTTOYARD''s sign-in (RFC 7591 dynamic client registration through the agent gateway): a name to show the account''s owner, redirect URIs, grant types. Public clients only (token_endpoint_auth_method none): a registration is not a credential, and nothing is reachable until a signed-in owner approves the agent.';
+'0700. Agents registered with OTTOYARD''s sign-in (RFC 7591 dynamic client registration through the agent gateway): a name to show the account''s owner, redirect URIs, grant types. Public clients only (token_endpoint_auth_method none): a registration is not a credential, and nothing is reachable until a signed-in owner approves the agent.';
 
 --: One device authorization (RFC 8628): what an agent with no screen asked for, and what the owner answered.
 CREATE TABLE public.ottoq_oauth_device_codes (
@@ -294,7 +294,7 @@ CREATE TABLE public.ottoq_oauth_device_codes (
   CONSTRAINT ottoq_oauth_device_codes_interval_check CHECK (interval_s BETWEEN 1 AND 60)
 );
 COMMENT ON TABLE public.ottoq_oauth_device_codes IS
-'0660. RFC 8628 device authorizations: an agent with no screen of its own (Hermes on a server, reached through Telegram) asks to connect; the owner opens OTTOYARD''s sign-in page, enters the short user code, signs in and approves or denies; the agent''s polling then gets its tokens once. The device code is stored only as SHA-256 (the gateway hashes before it calls).';
+'0700. RFC 8628 device authorizations: an agent with no screen of its own (Hermes on a server, reached through Telegram) asks to connect; the owner opens OTTOYARD''s sign-in page, enters the short user code, signs in and approves or denies; the agent''s polling then gets its tokens once. The device code is stored only as SHA-256 (the gateway hashes before it calls).';
 
 --: One authorization request (OAuth 2.1 authorization code + PKCE S256), for agents that open a browser.
 CREATE TABLE public.ottoq_oauth_auth_requests (
@@ -322,7 +322,7 @@ CREATE TABLE public.ottoq_oauth_auth_requests (
   CONSTRAINT ottoq_oauth_auth_requests_code_check CHECK ((status IN ('approved', 'consumed')) = (code_hash IS NOT NULL))
 );
 COMMENT ON TABLE public.ottoq_oauth_auth_requests IS
-'0660. OAuth 2.1 authorization requests (code + PKCE S256): an agent that can open a browser sends its person to OTTOYARD''s sign-in page with one of these; approved, it is answered with a one-time code (stored as SHA-256) exchanged at the token endpoint with the PKCE verifier.';
+'0700. OAuth 2.1 authorization requests (code + PKCE S256): an agent that can open a browser sends its person to OTTOYARD''s sign-in page with one of these; approved, it is answered with a one-time code (stored as SHA-256) exchanged at the token endpoint with the PKCE verifier.';
 
 --: One connection: the account that approved it, the agent, and how. The principal row is the connection's identity.
 CREATE TABLE public.ottoq_oauth_grants (
@@ -338,7 +338,7 @@ CREATE TABLE public.ottoq_oauth_grants (
 );
 CREATE INDEX ottoq_oauth_grants_account_idx ON public.ottoq_oauth_grants (account_id, created_at DESC);
 COMMENT ON TABLE public.ottoq_oauth_grants IS
-'0660. One row per agent an owner connected to their OTTOYARD account: the account and its email, the client, the scope and resource, and whether it came through a device code or a browser authorization. Whether it is still connected is its principal''s status (ottoq_agent_principals, origin oauth).';
+'0700. One row per agent an owner connected to their OTTOYARD account: the account and its email, the client, the scope and resource, and whether it came through a device code or a browser authorization. Whether it is still connected is its principal''s status (ottoq_agent_principals, origin oauth).';
 
 --: Access and refresh tokens, as SHA-256 only. An access token lasts an hour (honoured five minutes more, so a client's
 --: clock drift never costs a sign-in); a refresh token 30 days and is single-use (each refresh returns a new pair, and
@@ -360,7 +360,7 @@ CREATE TABLE public.ottoq_oauth_tokens (
 );
 CREATE INDEX ottoq_oauth_tokens_principal_idx ON public.ottoq_oauth_tokens (principal_id, kind, issued_at DESC);
 COMMENT ON TABLE public.ottoq_oauth_tokens IS
-'0660. The access tokens (oqt_, one hour) an agent signed in to an owner''s account presents as Authorization: Bearer, and the refresh tokens (oqr_, 30 days, single-use, rotated) it renews them with. SHA-256 only: the raw tokens are returned once, at the token endpoint, and never stored. ottoq_agent_resolve maps a live access token to its connection''s principal.';
+'0700. The access tokens (oqt_, one hour) an agent signed in to an owner''s account presents as Authorization: Bearer, and the refresh tokens (oqr_, 30 days, single-use, rotated) it renews them with. SHA-256 only: the raw tokens are returned once, at the token endpoint, and never stored. ottoq_agent_resolve maps a live access token to its connection''s principal.';
 
 -- ══ 3. the guards: what was connected, by whom, is evidence ═════════════════════════════════════════════════════════
 
@@ -368,7 +368,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_keep_rows()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $fn$
-/* 0660. The sign-in tables keep their rows: a connection, the account that approved it and its tokens are what answers
+/* 0700. The sign-in tables keep their rows: a connection, the account that approved it and its tokens are what answers
    "who let this agent in". Revoke or disable instead. The 0559 unlock (ottoq.agent_ledger_unlock = on) is the one
    override, for a migration that says why. */
 BEGIN
@@ -662,7 +662,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_register(p_args jsonb, p_meta json
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. RFC 7591 dynamic client registration, public clients only. Throttled per caller (20 an hour) and overall (200). */
+/* 0700. RFC 7591 dynamic client registration, public clients only. Throttled per caller (20 an hour) and overall (200). */
 DECLARE
   v_ip     text := left(p_meta ->> 'ip', 64);
   v_name   text;
@@ -734,7 +734,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_device_authorize(p_args jsonb, p_m
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. RFC 8628 3.1-3.2: an agent with no screen asks to connect. Ten minutes for its person to sign in and approve,
+/* 0700. RFC 8628 3.1-3.2: an agent with no screen asks to connect. Ten minutes for its person to sign in and approve,
    polled no faster than every five seconds. The device code is returned once and kept as SHA-256; the gateway adds the
    sign-in page's address (verification_uri) to the answer. */
 DECLARE
@@ -777,7 +777,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_authorize(p_args jsonb, p_meta jso
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. OAuth 2.1 authorization endpoint (code + PKCE S256): validates the request and records it; the gateway then
+/* 0700. OAuth 2.1 authorization endpoint (code + PKCE S256): validates the request and records it; the gateway then
    sends the browser to OTTOYARD's sign-in page with the request's id. Before the redirect URI is known to be the
    client's own, an error is shown, never redirected (RFC 6749 4.1.2.1); after, it goes back to the client. */
 DECLARE
@@ -831,7 +831,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_token(p_args jsonb, p_meta jsonb)
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. The token endpoint. Three grants: the device code (RFC 8628 3.4-3.5), the authorization code with its PKCE
+/* 0700. The token endpoint. Three grants: the device code (RFC 8628 3.4-3.5), the authorization code with its PKCE
    verifier's S256 (OAuth 2.1 4.1.3), and the refresh token (single-use, rotated: a refresh token presented twice closes
    the connection, except a retry within a minute whose successor was never used). The gateway sends hashes, never the
    raw device code, code or refresh token. */
@@ -970,7 +970,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_revoke(p_args jsonb, p_meta jsonb)
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. RFC 7009: revoking a refresh token closes the connection (its access tokens stop too); revoking an access token
+/* 0700. RFC 7009: revoking a refresh token closes the connection (its access tokens stop too); revoking an access token
    ends that token only. An unknown token is answered 200 like a known one, as 7009 2.2 requires. */
 DECLARE v_tok public.ottoq_oauth_tokens;
 BEGIN
@@ -993,7 +993,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_oauth(p_op text, p_args jsonb DEFA
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. The ONE function the gateway's sign-in endpoints call (service_role only), beside ottoq_agent_call: register,
+/* 0700. The ONE function the gateway's sign-in endpoints call (service_role only), beside ottoq_agent_call: register,
    device_authorize, authorize, token, revoke. It reads no engine data and changes no engine state: it mints and closes
    connections. Every call is a row in 0559's call ledger (transport 'oauth', tool 'oauth.<op>'), refusals included, up to
    120 a minute for refusals no connection owns. An
@@ -1045,7 +1045,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_account_me()
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. Who the signed-in person is to OTTOYARD: their account, the fleet it owns, and the agents connected to it. */
+/* 0700. Who the signed-in person is to OTTOYARD: their account, the fleet it owns, and the agents connected to it. */
 DECLARE
   v_uid  uuid := auth.uid();
   v_acct public.ottoq_owner_accounts := public.ottoq_oauth_caller_account();
@@ -1125,7 +1125,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_device_lookup(p_user_code text)
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. The sign-in page, signed in, with the code an agent showed its person: which agent is asking, and what it will
+/* 0700. The sign-in page, signed in, with the code an agent showed its person: which agent is asking, and what it will
    be able to do if approved. Changes nothing but the ledger. */
 DECLARE
   t0      timestamptz := clock_timestamp();
@@ -1157,7 +1157,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_device_decide(p_user_code text, p_
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. The person approves or denies the agent waiting with this code. Approved, the agent's next poll of the token
+/* 0700. The person approves or denies the agent waiting with this code. Approved, the agent's next poll of the token
    endpoint connects it to this account (one connection, its own tokens); denied, it is told so and nothing is made. */
 DECLARE
   t0       timestamptz := clock_timestamp();
@@ -1203,7 +1203,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_request_lookup(p_request_id uuid)
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. The sign-in page, for an agent that opened a browser: which agent is asking, and what it may do if approved. */
+/* 0700. The sign-in page, for an agent that opened a browser: which agent is asking, and what it may do if approved. */
 DECLARE
   v_acct public.ottoq_owner_accounts := public.ottoq_oauth_caller_account();
   v_req  public.ottoq_oauth_auth_requests;
@@ -1235,7 +1235,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_oauth_request_decide(p_request_id uuid, 
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. The person approves or denies a browser sign-in. Approved: a one-time code (five minutes, stored as SHA-256) in
+/* 0700. The person approves or denies a browser sign-in. Approved: a one-time code (five minutes, stored as SHA-256) in
    the redirect back to the agent, with its state and OTTOYARD's issuer (RFC 9207). Denied: error=access_denied. */
 DECLARE
   t0     timestamptz := clock_timestamp();
@@ -1287,7 +1287,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_account_disconnect(p_connection_id uuid)
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. The account's owner disconnects one of their agents: it can no longer read or change anything, its tokens stop
+/* 0700. The account's owner disconnects one of their agents: it can no longer read or change anything, its tokens stop
    at once, and refreshing them is refused. Final; signing in again makes a new connection. */
 DECLARE
   t0     timestamptz := clock_timestamp();
@@ -1319,7 +1319,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_owner_account_link(p_email text, p_fleet
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. Let an OTTOYARD account (an existing Supabase Auth user of this project, found by email) connect its own agents
+/* 0700. Let an OTTOYARD account (an existing Supabase Auth user of this project, found by email) connect its own agents
    to one fleet at the twin depot. Re-linking an account re-activates it. */
 DECLARE
   v_email text := lower(btrim(COALESCE(p_email, '')));
@@ -1354,7 +1354,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_owner_account_unlink(p_email text, p_rea
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
-/* 0660. Stop an account connecting agents, and close every agent it connected. */
+/* 0700. Stop an account connecting agents, and close every agent it connected. */
 DECLARE
   v_email text := lower(btrim(COALESCE(p_email, '')));
   v_acct  public.ottoq_owner_accounts;
@@ -1376,7 +1376,7 @@ BEGIN
 END $fn$;
 -- ══ 8. 0559/0607's resolver and refusal, 0607's welcome and whoami, 0608's two boards, extended ══════════════════════
 --
--- Each is the measured live body (P1) plus the 0660 lines, which are marked '0660'. A signed-in agent's via is 'signed
+-- Each is the measured live body (P1) plus the 0700 lines, which are marked '0700'. A signed-in agent's via is 'signed
 -- in' wherever a passcode session's is 'passcode' and an issued key's 'key'.
 
 CREATE OR REPLACE FUNCTION public.ottoq_agent_resolve(p_token_hash text)
@@ -1395,7 +1395,7 @@ BEGIN
    WHERE a.token_hash = p_token_hash AND a.status = 'active'
      --: 0607: a passcode session also lapses at its expiry (and a demo run's end revokes it)
      AND (a.expires_at IS NULL OR a.expires_at > now());
-  --: 0660: an agent signed in to an owner's OTTOYARD account presents a short-lived access token, never its principal's
+  --: 0700: an agent signed in to an owner's OTTOYARD account presents a short-lived access token, never its principal's
   --: own token_hash (which nobody holds). The token names the connection; a disconnected connection reaches nothing.
   IF v.principal_id IS NULL THEN
     SELECT a.* INTO v
@@ -1429,7 +1429,7 @@ AS $fn$
        END
        FROM public.ottoq_agent_principals a
       WHERE p_token_hash ~ '^[0-9a-f]{64}$' AND a.token_hash = p_token_hash),
-    --: 0660: a signed-in agent's access token: expired (its agent renews it), revoked, or its connection closed
+    --: 0700: a signed-in agent's access token: expired (its agent renews it), revoked, or its connection closed
     (SELECT CASE
        WHEN a.status = 'revoked' THEN jsonb_build_object(
          'code', 'disconnected',
@@ -1459,7 +1459,7 @@ CREATE OR REPLACE FUNCTION public.ottoq_agent_welcome_connected(p_agent public.o
  SET search_path TO 'public', 'pg_temp'
 AS $fn$
 /* 0607. What a connected agent is told when it calls welcome (and, with its key added, what enter_passcode returns).
-   0660: an agent signed in to an owner's account is told whose account it is, and that the connection outlasts runs. */
+   0700: an agent signed in to an owner's account is told whose account it is, and that the connection outlasts runs. */
 DECLARE
   v_depot text;
   v_fleet jsonb;
@@ -1555,7 +1555,7 @@ BEGIN
                                     'created_at', p_agent.created_at, 'last_used_at', p_agent.last_used_at,
                                     'note', p_agent.note)
                  --: 0607: how this caller got in, and (a passcode session) until when
-                 --: 0660: or (an agent signed in to an owner's account) whose account, until its owner disconnects it
+                 --: 0700: or (an agent signed in to an owner's account) whose account, until its owner disconnects it
                  || jsonb_strip_nulls(jsonb_build_object(
                       'via', CASE p_agent.origin WHEN 'passcode' THEN 'passcode' WHEN 'oauth' THEN 'signed in' ELSE 'key' END,
                       'account', CASE WHEN p_agent.origin = 'oauth'
@@ -1828,7 +1828,7 @@ BEGIN
            WHERE a.depot_id = p_depot_id
              AND ((a.origin = 'passcode' AND a.status = 'active' AND a.expires_at > now())
                   OR (a.origin = 'issued' AND a.status = 'active' AND a.last_used_at > now() - interval '1 hour')
-                  --: 0660: an agent signed in to an owner's account, while connected and used today, or just disconnected
+                  --: 0700: an agent signed in to an owner's account, while connected and used today, or just disconnected
                   OR (a.origin = 'oauth' AND a.status = 'active' AND COALESCE(a.last_used_at, a.created_at) > now() - interval '24 hours')
                   OR (a.origin = 'oauth' AND a.revoked_at BETWEEN now() - interval '2 hours' AND now())
                   OR (a.origin = 'passcode' AND COALESCE(a.revoked_at, a.expires_at) BETWEEN now() - interval '2 hours' AND now()))
@@ -1922,11 +1922,11 @@ GRANT EXECUTE ON FUNCTION public.ottoq_owner_account_link(text, uuid, text), pub
   TO service_role;
 
 COMMENT ON FUNCTION public.ottoq_agent_oauth(text, jsonb, jsonb) IS
-'0660. The one function the ottoq-agent-gateway''s sign-in endpoints call (service_role only): register (RFC 7591), device_authorize (RFC 8628), authorize (OAuth 2.1 code + PKCE S256), token (device_code, authorization_code, refresh_token), revoke (RFC 7009). Returns {ok, http_status, body} with body the exact OAuth answer. Mints and closes connections; reads no engine data and changes no engine state. Every call is ledgered (transport oauth).';
+'0700. The one function the ottoq-agent-gateway''s sign-in endpoints call (service_role only): register (RFC 7591), device_authorize (RFC 8628), authorize (OAuth 2.1 code + PKCE S256), token (device_code, authorization_code, refresh_token), revoke (RFC 7009). Returns {ok, http_status, body} with body the exact OAuth answer. Mints and closes connections; reads no engine data and changes no engine state. Every call is ledgered (transport oauth).';
 COMMENT ON FUNCTION public.ottoq_oauth_device_decide(text, text) IS
-'0660. The signed-in owner (auth.uid(), never an argument) approves or denies the agent waiting with this user code. Called by OTTOYARD''s sign-in page.';
+'0700. The signed-in owner (auth.uid(), never an argument) approves or denies the agent waiting with this user code. Called by OTTOYARD''s sign-in page.';
 COMMENT ON FUNCTION public.ottoq_owner_account_link(text, uuid, text) IS
-'0660. Let an existing Supabase Auth account (by email) sign in and connect its own agents to one fleet at the twin depot. service_role / SQL editor.';
+'0700. Let an existing Supabase Auth account (by email) sign in and connect its own agents to one fleet at the twin depot. service_role / SQL editor.';
 
 -- ═══ verification ══════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -1942,7 +1942,7 @@ BEGIN
    WHERE has_table_privilege(r, t, 'SELECT') OR has_table_privilege(r, t, 'INSERT')
       OR has_table_privilege(r, t, 'UPDATE') OR has_table_privilege(r, t, 'DELETE');
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0660 V1 FAILED: a client role reaches a sign-in table: %', v_bad;
+    RAISE EXCEPTION '0700 V1 FAILED: a client role reaches a sign-in table: %', v_bad;
   END IF;
   SELECT string_agg(format('%s %s %s', r, CASE WHEN has_function_privilege(r, f, 'EXECUTE') THEN 'can' ELSE 'cannot' END, f), '; ') INTO v_bad
     FROM (VALUES
@@ -1972,7 +1972,7 @@ BEGIN
       ('public.ottoq_oauth_secret(text)', 'anon', false)) x(f, r, want)
    WHERE has_function_privilege(r, f, 'EXECUTE') IS DISTINCT FROM want;
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0660 V1 FAILED: %', v_bad;
+    RAISE EXCEPTION '0700 V1 FAILED: %', v_bad;
   END IF;
 END $v1$;
 
@@ -2000,24 +2000,24 @@ DECLARE
 BEGIN
   BEGIN
     INSERT INTO public.ottoq_owner_accounts (account_id, email, fleet_operator_id, note)
-    VALUES (v_acct, 'probe-0660@ottoyard.invalid', '33333333-3333-3333-3333-333333333333', '0660 V2 probe, rolled back');
+    VALUES (v_acct, 'probe-0700@ottoyard.invalid', '33333333-3333-3333-3333-333333333333', '0700 V2 probe, rolled back');
     v_reg := public.ottoq_agent_oauth('register',
       '{"client_name": "Probe Agent", "redirect_uris": ["http://127.0.0.1:8420/callback"], "grant_types": ["urn:ietf:params:oauth:grant-type:device_code", "refresh_token"], "response_types": [], "token_endpoint_auth_method": "none"}'::jsonb,
       '{"ip": "192.0.2.60"}'::jsonb);
     v_client := v_reg #>> '{body,client_id}';
     IF (v_reg ->> 'http_status')::int <> 201 OR v_client !~ '^oqc_[0-9a-f]{32}$' THEN
-      RAISE EXCEPTION '0660 V2 FAILED (register): %', v_reg;
+      RAISE EXCEPTION '0700 V2 FAILED (register): %', v_reg;
     END IF;
     v_dev := public.ottoq_agent_oauth('device_authorize',
       jsonb_build_object('client_id', v_client, 'resource', 'https://probe.invalid/account/mcp'), '{"ip": "192.0.2.60"}'::jsonb);
     IF (v_dev ->> 'http_status')::int <> 200 OR v_dev #>> '{body,user_code}' !~ '^[BCDFGHJKLMNPQRSTVWXZ]{4}-[BCDFGHJKLMNPQRSTVWXZ]{4}$'
        OR v_dev #>> '{body,device_code}' !~ '^oqd_[0-9a-f]{64}$' THEN
-      RAISE EXCEPTION '0660 V2 FAILED (device request): %', v_dev;
+      RAISE EXCEPTION '0700 V2 FAILED (device request): %', v_dev;
     END IF;
     v_t := public.ottoq_agent_oauth('token', jsonb_build_object('grant_type', 'urn:ietf:params:oauth:grant-type:device_code',
       'client_id', v_client, 'device_code_hash', public.ottoq_oauth_sha256(v_dev #>> '{body,device_code}')), '{}'::jsonb);
     IF v_t #>> '{body,error}' IS DISTINCT FROM 'authorization_pending' THEN
-      RAISE EXCEPTION '0660 V2 FAILED (poll before approval): %', v_t;
+      RAISE EXCEPTION '0700 V2 FAILED (poll before approval): %', v_t;
     END IF;
     -- the owner, signed in, with the code read off the agent's message (lower case and a space, as a person types it)
     PERFORM set_config('request.jwt.claims', json_build_object('sub', v_acct, 'role', 'authenticated')::text, true);
@@ -2025,7 +2025,7 @@ BEGIN
     v_dec := public.ottoq_oauth_device_decide(v_dev #>> '{body,user_code}', 'approve');
     PERFORM set_config('request.jwt.claims', '', true);
     IF NOT (v_look ->> 'ok')::boolean OR v_look ->> 'agent' <> 'Probe Agent' OR v_dec ->> 'outcome' <> 'approved' THEN
-      RAISE EXCEPTION '0660 V2 FAILED (approval): % / %', v_look, v_dec;
+      RAISE EXCEPTION '0700 V2 FAILED (approval): % / %', v_look, v_dec;
     END IF;
     UPDATE public.ottoq_oauth_device_codes d SET last_polled_at = now() - interval '10 seconds'
      WHERE d.user_code = v_dev #>> '{body,user_code}';
@@ -2033,24 +2033,24 @@ BEGIN
       'client_id', v_client, 'device_code_hash', public.ottoq_oauth_sha256(v_dev #>> '{body,device_code}')), '{}'::jsonb);
     IF (v_tok ->> 'http_status')::int <> 200 OR v_tok #>> '{body,access_token}' !~ '^oqt_[0-9a-f]{64}$'
        OR v_tok #>> '{body,refresh_token}' !~ '^oqr_[0-9a-f]{64}$' OR v_tok #>> '{body,token_type}' <> 'Bearer' THEN
-      RAISE EXCEPTION '0660 V2 FAILED (connect): %', v_tok;
+      RAISE EXCEPTION '0700 V2 FAILED (connect): %', v_tok;
     END IF;
     SELECT a.principal_id INTO v_pid FROM public.ottoq_agent_principals a JOIN public.ottoq_oauth_grants g USING (principal_id)
      WHERE g.account_id = v_acct AND a.origin = 'oauth' AND a.status = 'active' AND a.kind = 'personal'
        AND a.fleet_operator_id = '33333333-3333-3333-3333-333333333333'
        AND a.capabilities = ARRAY['note', 'owner_settings', 'read']::text[] AND a.display_name = 'Probe Agent';
     IF v_pid IS NULL THEN
-      RAISE EXCEPTION '0660 V2 FAILED: no oauth principal with an owner key''s scope';
+      RAISE EXCEPTION '0700 V2 FAILED: no oauth principal with an owner key''s scope';
     END IF;
     v_who := public.ottoq_agent_call(public.ottoq_oauth_sha256(v_tok #>> '{body,access_token}'), 'whoami', '{}'::jsonb, 'mcp', '{}'::jsonb);
     IF NOT (v_who ->> 'ok')::boolean OR v_who #>> '{data,principal,via}' <> 'signed in'
-       OR v_who #>> '{data,principal,account}' <> 'probe-0660@ottoyard.invalid' THEN
-      RAISE EXCEPTION '0660 V2 FAILED (the access token at the owner door): %', v_who;
+       OR v_who #>> '{data,principal,account}' <> 'probe-0700@ottoyard.invalid' THEN
+      RAISE EXCEPTION '0700 V2 FAILED (the access token at the owner door): %', v_who;
     END IF;
     v_ref := public.ottoq_agent_oauth('token', jsonb_build_object('grant_type', 'refresh_token', 'client_id', v_client,
       'refresh_token_hash', public.ottoq_oauth_sha256(v_tok #>> '{body,refresh_token}')), '{}'::jsonb);
     IF (v_ref ->> 'http_status')::int <> 200 OR v_ref #>> '{body,refresh_token}' = v_tok #>> '{body,refresh_token}' THEN
-      RAISE EXCEPTION '0660 V2 FAILED (refresh): %', v_ref;
+      RAISE EXCEPTION '0700 V2 FAILED (refresh): %', v_ref;
     END IF;
     -- the first refresh token, presented again after the grace: the connection closes
     UPDATE public.ottoq_oauth_tokens t SET used_at = now() - interval '2 minutes'
@@ -2061,22 +2061,22 @@ BEGIN
     IF v_reuse #>> '{body,error}' <> 'invalid_grant'
        OR (SELECT a.status FROM public.ottoq_agent_principals a WHERE a.principal_id = v_pid) <> 'revoked'
        OR (v_after ->> 'ok')::boolean OR (v_after ->> 'http_status')::int <> 401 THEN
-      RAISE EXCEPTION '0660 V2 FAILED (reuse closes the connection): % / %', v_reuse, v_after;
+      RAISE EXCEPTION '0700 V2 FAILED (reuse closes the connection): % / %', v_reuse, v_after;
     END IF;
-    RAISE EXCEPTION '0660 V2 PASSED: registered %, user code %, connected as % (%), whoami via %, refreshed, reuse closed it (%)',
+    RAISE EXCEPTION '0700 V2 PASSED: registered %, user code %, connected as % (%), whoami via %, refreshed, reuse closed it (%)',
       v_client, v_dev #>> '{body,user_code}', v_pid, v_who #>> '{data,principal,account}', v_who #>> '{data,principal,via}',
       v_after #>> '{error,code}';
   EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM;
   END;
-  IF v_msg IS NULL OR v_msg NOT LIKE '0660 V2 PASSED%' THEN RAISE EXCEPTION '%', COALESCE(v_msg, '0660 V2: no verdict'); END IF;
+  IF v_msg IS NULL OR v_msg NOT LIKE '0700 V2 PASSED%' THEN RAISE EXCEPTION '%', COALESCE(v_msg, '0700 V2: no verdict'); END IF;
   RAISE NOTICE '%', v_msg;
 END $v2$;
 
--- Rollback: EXECUTE the six definitions in ottoq_schema_snapshots WHERE label = '0660_pre' as they are, revoke every
+-- Rollback: EXECUTE the six definitions in ottoq_schema_snapshots WHERE label = '0700_pre' as they are, revoke every
 -- origin 'oauth' principal (ottoq_agent_revoke), and re-add 0607's two CHECKs once no oauth principal is active; the
 -- six tables are then unread and can stay. DELETE this file's ottoq_cert_lineage row.
 INSERT INTO public.ottoq_cert_lineage(name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0660_an_owner_signs_in_and_connects_their_own_agent', false, false,
+VALUES ('0700_an_owner_signs_in_and_connects_their_own_agent', false, false,
   'Agent door only (Chase 2026-10-10): an OTTOYARD account (this project''s Supabase Auth) linked to one fleet; OAuth 2.1 sign-in for its own agents (device code grant, authorization code + PKCE, refresh rotation, RFC 7591 registration, RFC 7009 revocation) through ottoq_agent_oauth (service_role) and the signed-in person''s doors (authenticated); a connection is an ottoq_agent_principals row of origin oauth with an owner key''s scope, reached by hashed access tokens. Six agent-door / owner-board bodies extended (resolve, unauthenticated, welcome_connected, whoami, owner_board, depot_owner_board). No engine function, no tick path, no engine table.',
   now());
 

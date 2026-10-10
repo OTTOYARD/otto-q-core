@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The live smoke test for OTTOYARD sign-in (0660, PERSONAL_AGENT.md section 10): an agent signs in by device code,
+// The live smoke test for OTTOYARD sign-in (0700, PERSONAL_AGENT.md section 10): an agent signs in by device code,
 // exactly as Hermes does, and its owner approves it the way the sign-in page does. Nothing is changed but a
 // connection made and closed again.
 //

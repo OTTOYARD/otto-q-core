@@ -47,7 +47,7 @@ export const TWIN_DEPOT_ID = "11111111-1111-1111-1111-111111111111";
 export const ENGINE_RPC = "ottoq_agent_call";
 /** 'oqa_' + 64 lowercase hex characters, as ottoq_agent_issue_token mints them. Anything else is refused before the database. */
 /** An agent key (oqa_, issued by ottoq_agent_issue_token), a passcode session key (oqs_, from enter_passcode, 0607), or an
- *  access token of an agent signed in to an owner's account (oqt_, from the sign-in token endpoint, 0660). */
+ *  access token of an agent signed in to an owner's account (oqt_, from the sign-in token endpoint, 0700). */
 export const TOKEN_PATTERN = /^oq[ast]_[0-9a-f]{64}$/;
 /** A passcode session key: the only kind an agent may also send as a tool's `session` argument, never a long-lived key. */
 export const SESSION_PATTERN = /^oqs_[0-9a-f]{64}$/;
@@ -852,7 +852,7 @@ export function restIndex(baseUrl: string) {
     documentation: "https://github.com/OTTOYARD/otto-q-core/blob/main/AGENT_GATEWAY.md",
     owner_guide: "https://github.com/OTTOYARD/otto-q-core/blob/main/PERSONAL_AGENT.md",
     mcp: `${baseUrl}/mcp`,
-    //: 0660: the MCP address for an agent signed in to an owner's OTTOYARD account (OAuth 2.1; PERSONAL_AGENT.md section 10)
+    //: 0700: the MCP address for an agent signed in to an owner's OTTOYARD account (OAuth 2.1; PERSONAL_AGENT.md section 10)
     mcp_signed_in: `${baseUrl}${ACCOUNT_MCP_PATH}`,
     openapi: `${baseUrl}/v1/openapi.json`,
     agent_card: `${baseUrl}/.well-known/agent-card.json`,
@@ -1624,7 +1624,7 @@ export type GatewayOptions = {
   engine: EngineRpc | null;
   /** POST /v1/ask's plain-English door (./ottocommand_owner.ts). Absent or null: the door answers 503 ask_not_configured. */
   ask?: AskHandler | null;
-  /** 0660: OTTOYARD sign-in (./agent_signin.ts): the OAuth endpoints and the signed-in MCP address. Absent: those paths
+  /** 0700: OTTOYARD sign-in (./agent_signin.ts): the OAuth endpoints and the signed-in MCP address. Absent: those paths
    *  answer 404 and /account/mcp refuses every request. */
   signin?: { config: SigninConfig; rpc: OAuthRpc | null } | null;
 };
@@ -1684,7 +1684,7 @@ export async function readBodyBounded(body: ReadableStream<Uint8Array> | null, l
  *   5. the token's SHA-256 -- the raw token never leaves this function -- and then REST, MCP or the plain-English door,
  *      each of which asks the database, which resolves the principal, rate-limits, checks the capability and writes
  *      the call ledger. The plain-English door reaches the engine only through that same call, with the same token.
- * 0660: the sign-in endpoints (/oauth/*, the protected-resource metadata) come first, open to any origin (they carry
+ * 0700: the sign-in endpoints (/oauth/*, the protected-resource metadata) come first, open to any origin (they carry
  * no ambient credentials); the signed-in MCP address (/account/mcp) takes only an access token, and answers anything
  * else with a 401 that tells an MCP client where to sign in (RFC 9728).
  */
@@ -1708,7 +1708,7 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
   };
 
   try {
-    // 0. OTTOYARD sign-in (0660): its documents and endpoints, before the Origin and key checks
+    // 0. OTTOYARD sign-in (0700): its documents and endpoints, before the Origin and key checks
     if (isSigninPath(path)) {
       if (!opts.signin) return refuse(404, "not_found", "Sign-in is not configured on this gateway.");
       const userAgent = req.headers.get("user-agent");
@@ -1748,7 +1748,7 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
     const anonymous = authorization === null || authorization.trim() === "";
     const token = anonymous ? null : bearerToken(authorization);
     const passcodeRoute = !isMcp && !isAsk && (() => { const r = routeRest(method, path); return "tool" in r && (r.tool === "welcome" || r.tool === "enter_passcode"); })();
-    //: 0660: the signed-in MCP address takes only an access token; anything else is sent to sign in (RFC 9728 5.1)
+    //: 0700: the signed-in MCP address takes only an access token; anything else is sent to sign in (RFC 9728 5.1)
     if (isAccountMcp && (anonymous || token === null || !ACCESS_TOKEN_PATTERN.test(token))) {
       return refuse(401, anonymous ? "sign_in_required" : "invalid_token",
         anonymous
@@ -1797,7 +1797,7 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
       : isAsk
         ? await handleAsk({ method, headers: req.headers, bodyText }, call, opts.ask)
         : await handleRest({ method, path, query: url.searchParams, headers: req.headers, bodyText }, call);
-    //: 0660: an expired or disconnected access token on the signed-in address: tell the client to refresh or sign in again
+    //: 0700: an expired or disconnected access token on the signed-in address: tell the client to refresh or sign in again
     if (isAccountMcp && out.status === 401) out.headers = { ...out.headers, "WWW-Authenticate": accountChallenge(opts.publicUrl, true) };
     return toResponse(out, cors);
   } catch (e) {

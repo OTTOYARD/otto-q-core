@@ -29,12 +29,12 @@
 //                                  plain-English ask (a previewed plan's confirm still applies: it needs no model)
 //   OTTOCOMMAND_OWNER_MODEL        the model the owner door uses; falls back to ANTHROPIC_MODEL (OTTO-Command's own
 //                                  setting). With neither set, a plain-English ask answers 503 ask_not_configured.
-//   AGENT_GATEWAY_OAUTH_ISSUER     0660: OTTOYARD's authorization server, where its RFC 8414 metadata is published
+//   AGENT_GATEWAY_OAUTH_ISSUER     0700: OTTOYARD's authorization server, where its RFC 8414 metadata is published
 //                                  (default https://www.ottoyard.com, served by the OTTOYARD-SITE repository)
-//   AGENT_GATEWAY_SIGNIN_URL       0660: the page a person signs in and approves an agent on
+//   AGENT_GATEWAY_SIGNIN_URL       0700: the page a person signs in and approves an agent on
 //                                  (default https://www.ottoyard.com/connect)
 //
-// 0660: an owner's own agent can also SIGN IN (OAuth 2.1: the device code grant, or a browser with PKCE) and use the
+// 0700: an owner's own agent can also SIGN IN (OAuth 2.1: the device code grant, or a browser with PKCE) and use the
 // signed-in MCP address, /account/mcp, with an access token; ../_shared/agent_signin.ts and PERSONAL_AGENT.md section 10.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { GATEWAY_NAME, handleGatewayRequest, postgrestEngine } from "../_shared/agent_gateway.ts";
@@ -51,7 +51,7 @@ const ALLOWED_ORIGINS = (Deno.env.get("AGENT_GATEWAY_ALLOWED_ORIGINS") ?? "")
 // Fail closed: without both variables there is no engine, and every authenticated path answers 500 not_configured.
 const engine = SUPABASE_URL && SERVICE_KEY ? postgrestEngine({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY }) : null;
 
-// 0660: OTTOYARD sign-in. The issuer and the sign-in page are public addresses, not secrets.
+// 0700: OTTOYARD sign-in. The issuer and the sign-in page are public addresses, not secrets.
 const signin = {
   config: {
     publicUrl: PUBLIC_URL,

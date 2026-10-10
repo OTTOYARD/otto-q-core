@@ -1,5 +1,5 @@
 /**
- * OTTOYARD sign-in for an owner's own agent (db/migrations/0660, PERSONAL_AGENT.md section 10): the gateway's OAuth 2.1
+ * OTTOYARD sign-in for an owner's own agent (db/migrations/0700, PERSONAL_AGENT.md section 10): the gateway's OAuth 2.1
  * endpoints and the signed-in MCP address. Pure functions and one web-standard handler, so `node --test` imports this
  * file directly, as it imports agent_gateway.ts.
  *
@@ -176,7 +176,7 @@ export function postgrestOAuth(o: { supabaseUrl: string; serviceKey: string; fet
     if (res.ok && body && typeof body === "object" && typeof (body as { http_status?: unknown }).http_status === "number") {
       return body as OAuthOutcome;
     }
-    if (res.status === 404) return unavailable(503, "OTTOYARD sign-in is built but not enabled yet (migration 0660).");
+    if (res.status === 404) return unavailable(503, "OTTOYARD sign-in is built but not enabled yet (migration 0700).");
     return unavailable(502, "OTTOYARD's sign-in answered outside the gateway's contract.");
   };
 }

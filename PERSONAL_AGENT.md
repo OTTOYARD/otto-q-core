@@ -4,7 +4,7 @@
 first 2026-10-02 for an owner's issued key (0605/0606). **Live since 2026-10-04, 6:42 AM CT:** applied, deployed, the
 passcode on and the live smoke passed (section 7). Section 9 says exactly what was and was not verified.*
 
-*2026-10-10: **an owner can now sign in and connect their own agent** (0660, section 10): the agent sends its person to
+*2026-10-10: **an owner can now sign in and connect their own agent** (0700, section 10): the agent sends its person to
 www.ottoyard.com/connect, they sign in with their OTTOYARD account and approve it, and it holds its own tokens; no
 passcode or key passes through the chat, and the connection outlasts runs. Set up for Chase and his Hermes first.*
 
@@ -368,7 +368,7 @@ from a UI"); signed push for ready / refused / lifted; a signed receipt a third 
 live demo run, which needs one running (section 7, step 5); 0605's tick step under a demo (V2 measured it inert on the
 live catalog at apply time, and it acts only on settings an agent has set).
 
-## 10. Sign in: your own agent, connected to your OTTOYARD account (0660)
+## 10. Sign in: your own agent, connected to your OTTOYARD account (0700)
 
 *Built 2026-10-10, 12:45–2:40 AM CT; going live is in "Live" below.* Chase, 2026-10-10: *"I just want one unified login
 no matter what ... let's just set it up for only me and my [Hermes] agent currently ... it has to function super well
@@ -475,7 +475,7 @@ connects when Chase runs step 2.
 
 ### Live
 
-*To be filled in when 0660 is applied, the gateway deployed and the site's page published.*
+*To be filled in when 0700 is applied, the gateway deployed and the site's page published.*
 
 ## Sources (external facts; read 2026-10-03 unless marked)
 

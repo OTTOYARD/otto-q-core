@@ -699,7 +699,7 @@ test("no model name is written in the repository: the deployment chooses it", ()
   const shell = stripTsComments(SHELL_SRC);
   assert.match(shell, /Deno\.env\.get\("OTTOCOMMAND_OWNER_MODEL"\) \?\? Deno\.env\.get\("ANTHROPIC_MODEL"\)/);
   assert.match(shell, /ownerAskHandler\(/);
-  //: 0660: and the sign-in endpoints beside it
+  //: 0700: and the sign-in endpoints beside it
   assert.match(shell, /allowedOrigins: ALLOWED_ORIGINS, engine, ask, signin \}/);
 });
 

@@ -1,4 +1,4 @@
-// OTTOYARD sign-in for an owner's own agent (otto-q-core 0660) through the gateway: the OAuth 2.1 endpoints, the
+// OTTOYARD sign-in for an owner's own agent (otto-q-core 0700) through the gateway: the OAuth 2.1 endpoints, the
 // signed-in MCP address, and the whole device sign-in over the real SQL.
 //
 //   1. documents      the protected-resource metadata points at OTTOYARD's authorization server; its metadata lists
@@ -9,7 +9,7 @@
 //   3. the endpoints  registration, device authorization (the sign-in page's address added), the token endpoint (every
 //                     secret hashed before the database sees it, PKCE S256 computed), revocation (always 200), the
 //                     browser authorization (to the sign-in page, or back to the agent with the error).
-//   4. end to end     (skips without a scratch server) the HTTP handler over the REAL 0559-0608 + 0660 SQL: an agent
+//   4. end to end     (skips without a scratch server) the HTTP handler over the REAL 0559-0608 + 0700 SQL: an agent
 //                     registers, asks for a device code, polls, its person approves on the page's doors, it connects,
 //                     lists its tools and reads its fleet over MCP, refreshes, and is disconnected.
 import assert from "node:assert/strict";
@@ -303,7 +303,7 @@ function psql(db, sql, vars = {}) {
 }
 const SERVER_UP = spawnSync("psql", [...pgConn(), "-d", "postgres", "-X", "-Atc", "select 1"], { encoding: "utf8" }).status === 0;
 
-describe("end to end: an agent signs in by device code and uses its owner's fleet, over the real 0559-0608 + 0660 SQL", { skip: SERVER_UP ? false : "no scratch PostgreSQL (PGHOST or /var/tmp:55432)" }, () => {
+describe("end to end: an agent signs in by device code and uses its owner's fleet, over the real 0559-0608 + 0700 SQL", { skip: SERVER_UP ? false : "no scratch PostgreSQL (PGHOST or /var/tmp:55432)" }, () => {
   const DB = `ottoq_signin_${process.pid}_${randomBytes(3).toString("hex")}`;
   const FILES = ["tests/fixtures/agent_gateway_stub_engine.sql", "tests/fixtures/owner_agent_stub_engine.sql",
     "db/migrations/0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql",
@@ -313,7 +313,7 @@ describe("end to end: an agent signs in by device code and uses its owner's flee
     "db/migrations/0607_any_agent_is_welcomed_and_the_demo_passcode_opens_the_fleet_until_the_run_ends.sql",
     "db/migrations/0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql",
     "tests/fixtures/agent_signin_stub_auth.sql",
-    "db/migrations/0660_an_owner_signs_in_and_connects_their_own_agent.sql"];
+    "db/migrations/0700_an_owner_signs_in_and_connects_their_own_agent.sql"];
   const TESLA = "33333333-3333-3333-3333-333333333333";
   const CHASE = "c4a5e000-0000-4000-8000-00000000c4a5";
   const AV041 = "a0000000-0000-4000-8000-000000000041";

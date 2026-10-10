@@ -1,5 +1,5 @@
--- The one Supabase Auth table 0660 reads (ottoq_owner_account_link finds an account by email), on the scratch cluster
--- only: the stub engine has auth.uid() but no auth.users. Columns: only what 0660 reads.
+-- The one Supabase Auth table 0700 reads (ottoq_owner_account_link finds an account by email), on the scratch cluster
+-- only: the stub engine has auth.uid() but no auth.users. Columns: only what 0700 reads.
 DO $guard$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'supabase_migrations') THEN

@@ -1,6 +1,6 @@
-"""db/migrations/0660, EXECUTED on the stub engine: an owner signs in, and connects their own agent.
+"""db/migrations/0700, EXECUTED on the stub engine: an owner signs in, and connects their own agent.
 
-WHY THIS EXISTS. 0660 lets a person with an OTTOYARD account approve their own agent on a sign-in page, and the agent
+WHY THIS EXISTS. 0700 lets a person with an OTTOYARD account approve their own agent on a sign-in page, and the agent
 then holds tokens that reach exactly what an owner key reaches. Every one of these is a security promise no compile
 check can see:
 
@@ -18,7 +18,7 @@ check can see:
   * no client role reaches a sign-in table; the gateway's door is service_role's, the person's doors authenticated's;
   * the ledger records every call and never a raw secret.
 
-Loads the stub engines, 0559, 0560, 0605-0608, tests/fixtures/agent_signin_stub_auth.sql (auth.users) and 0660.
+Loads the stub engines, 0559, 0560, 0605-0608, tests/fixtures/agent_signin_stub_auth.sql (auth.users) and 0700.
 SKIPS where no scratch PostgreSQL is reachable, like the 0559, 0605 and 0607 suites.
 """
 import base64
@@ -36,7 +36,7 @@ from test_owner_agent_sql import (  # noqa: F401  (pytestmark: skip without a sc
 )
 from test_passcode_door_sql import M0607, M0608, PASSCODE, pcall
 
-M0660 = os.path.join(ROOT, "db", "migrations", "0660_an_owner_signs_in_and_connects_their_own_agent.sql")
+M0700 = os.path.join(ROOT, "db", "migrations", "0700_an_owner_signs_in_and_connects_their_own_agent.sql")
 STUB_AUTH = os.path.join(ROOT, "tests", "fixtures", "agent_signin_stub_auth.sql")
 DEVICE = "urn:ietf:params:oauth:grant-type:device_code"
 CHASE = "c4a5e000-0000-4000-8000-00000000c4a5"
@@ -109,7 +109,7 @@ def call(db, token, tool, args=None):
 def db():
     d = _new_db()
     try:
-        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0660):
+        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0700):
             rc, err = d.file(path)
             assert rc == 0, f"{os.path.basename(path)} did not load: {err}"
         d.run(SEED)
@@ -123,48 +123,48 @@ def db():
 
 # ─────────────────────────────────────────────────────────────────────────────────────── the premises ──
 
-def test_0660_needs_0607_and_0608():
+def test_0700_needs_0607_and_0608():
     d = _new_db()
     try:
         for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606):
             assert d.file(path)[0] == 0
-        rc, err = d.file(M0660)
-        assert rc != 0 and "0660 P1: 0607 and 0608" in err, err
+        rc, err = d.file(M0700)
+        assert rc != 0 and "0700 P1: 0607 and 0608" in err, err
     finally:
         _drop(d)
 
 
-def test_0660_refuses_a_second_apply(db):
-    rc, err = db.file(M0660)
-    assert rc != 0 and "0660 P1: already applied" in err, err
+def test_0700_refuses_a_second_apply(db):
+    rc, err = db.file(M0700)
+    assert rc != 0 and "0700 P1: already applied" in err, err
 
 
-def test_0660_refuses_a_body_it_did_not_measure():
+def test_0700_refuses_a_body_it_did_not_measure():
     d = _new_db()
     try:
         for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608):
             assert d.file(path)[0] == 0
         d.run("""CREATE OR REPLACE FUNCTION public.ottoq_agent_resolve(p_token_hash text) RETURNS public.ottoq_agent_principals
                  LANGUAGE sql STABLE AS $$ SELECT NULL::public.ottoq_agent_principals $$""")
-        rc, err = d.file(M0660)
-        assert rc != 0 and "0660 P1: not the body this file was written against" in err and "ottoq_agent_resolve" in err, err
+        rc, err = d.file(M0700)
+        assert rc != 0 and "0700 P1: not the body this file was written against" in err and "ottoq_agent_resolve" in err, err
     finally:
         _drop(d)
 
 
 def test_classified_for_no_recert_round(db):
-    assert db.rows("SELECT forces_recert, forces_dial_restart FROM ottoq_cert_lineage WHERE name LIKE '0660%'") == [["f", "f"]]
+    assert db.rows("SELECT forces_recert, forces_dial_restart FROM ottoq_cert_lineage WHERE name LIKE '0700%'") == [["f", "f"]]
 
 
 def test_the_probe_left_nothing_behind():
     d = _new_db()
     try:
-        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, M0660):
+        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, M0700):
             assert d.file(path)[0] == 0
         for t in ("ottoq_owner_accounts", "ottoq_oauth_clients", "ottoq_oauth_device_codes", "ottoq_oauth_auth_requests",
                   "ottoq_oauth_grants", "ottoq_oauth_tokens", "ottoq_agent_principals", "ottoq_agent_call_ledger"):
             assert d.val(f"SELECT count(*) FROM {t}") == "0", t
-        assert d.val("SELECT count(*) FROM ottoq_schema_snapshots WHERE label = '0660_pre'") == "6"
+        assert d.val("SELECT count(*) FROM ottoq_schema_snapshots WHERE label = '0700_pre'") == "6"
     finally:
         _drop(d)
 
@@ -272,7 +272,7 @@ def test_only_a_linked_signed_in_account_can_answer_a_code(db):
 def test_wrong_codes_are_throttled_per_account():
     d = _new_db()
     try:
-        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0660):
+        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0700):
             assert d.file(path)[0] == 0
         d.run(f"INSERT INTO auth.users (id, email) VALUES ('{CHASE}', 'chase@ottoyard.com')")
         d.json(f"SELECT ottoq_owner_account_link('chase@ottoyard.com', '{TESLA}')")
@@ -467,7 +467,7 @@ def test_the_owner_sees_and_disconnects_their_agents_and_no_one_elses(db):
 def test_unlinking_an_account_closes_every_agent_it_connected():
     d = _new_db()
     try:
-        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0660):
+        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0700):
             assert d.file(path)[0] == 0
         d.run(SEED)
         d.run(f"INSERT INTO auth.users (id, email) VALUES ('{CHASE}', 'chase@ottoyard.com')")
@@ -487,7 +487,7 @@ def test_unlinking_an_account_closes_every_agent_it_connected():
 def test_made_up_codes_cannot_flood_the_ledger():
     d = _new_db()
     try:
-        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0660):
+        for path in (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0700):
             assert d.file(path)[0] == 0
         client = register(d)
         d.run(f"""SELECT ottoq_agent_oauth('token', jsonb_build_object('grant_type', '{DEVICE}', 'client_id', '{client}',

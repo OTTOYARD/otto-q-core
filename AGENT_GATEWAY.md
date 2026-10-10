@@ -89,7 +89,7 @@ Files:
 | `edge-functions/_shared/ottocommand_owner.ts` | `POST /v1/ask`: OTTO-Command for an owner's agent (model injected; dry run, tool set and step limit in code) |
 | `tests/owner_agent.test.mjs` · `tests/test_owner_agent_sql.py` | 31 node tests (incl. end to end over the real SQL) · 50 SQL tests on a stub engine md5-pinned to the live catalog |
 | `integrations/hermes/` | Hermes: the MCP config and the `ottoq-owner` skill |
-| `db/migrations/0660_an_owner_signs_in_and_connects_their_own_agent.sql` | an owner signs in and connects their own agent: OTTOYARD accounts linked to a fleet, OAuth 2.1 (device code, authorization code + PKCE, refresh rotation, registration, revocation) through `ottoq_agent_oauth`, the person's doors ([PERSONAL_AGENT.md](PERSONAL_AGENT.md) section 10) |
+| `db/migrations/0700_an_owner_signs_in_and_connects_their_own_agent.sql` | an owner signs in and connects their own agent: OTTOYARD accounts linked to a fleet, OAuth 2.1 (device code, authorization code + PKCE, refresh rotation, registration, revocation) through `ottoq_agent_oauth`, the person's doors ([PERSONAL_AGENT.md](PERSONAL_AGENT.md) section 10) |
 | `edge-functions/_shared/agent_signin.ts` | the sign-in endpoints (`/oauth/*`, the protected-resource metadata) and the signed-in MCP address `/account/mcp` (access tokens only; anything else gets an RFC 9728 challenge) |
 | `tests/agent_signin.test.mjs` · `tests/test_agent_signin_sql.py` | 19 node tests (incl. the whole device sign-in over the real SQL) · 35 SQL tests on the stub engine |
 | `scripts/agent-signin-smoke.mjs` | the live smoke test: discovery, the site's metadata against the gateway's, a device sign-in approved through the page's doors, MCP with the token, disconnect |
