@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010005456
 -- migration-name:    the_v2_door_takes_cloudevents_keeps_their_time_drops_duplicates_and_orders_them
 --
 -- 0650  **The v2 door takes an operator's CloudEvents: it keeps their time, drops duplicates, and applies each car's
@@ -976,3 +976,10 @@ VALUES ('0650_the_v2_door_takes_cloudevents_keeps_their_time_drops_duplicates_an
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 00:54:56 UTC (7:54 PM CT on 2026-10-09), version 20261010005456 ═══════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in e2315a0; the ledger's stored statement is that file byte for
+--   byte (md5 bf88b500cc0eaedff5c7d037abca01c2, 64,364 characters, 66,136 bytes). P0, P1, V1, V2, V3 passed in the
+--   apply's transaction. Read after: 3 tables (inbox, cursors, signal TTLs), 6 functions, both run-scoped tables
+--   registered with 0 'block' findings, the twin depot's geofence set, 0 inbox and 0 cursor rows (V1's probes rolled
+--   back), anon may not call ottoq_v2_take_events and service_role may.
