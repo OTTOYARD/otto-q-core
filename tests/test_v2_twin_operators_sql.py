@@ -45,6 +45,8 @@ MIG["0690"] = os.path.join(ROOT, "db", "migrations", "0690_the_dispatch_ledger_c
 MIG["0691"] = os.path.join(ROOT, "db", "migrations", "0691_a_twin_operators_fault_report_goes_with_its_run.sql")
 MIG["0692"] = os.path.join(ROOT, "db", "migrations",
                            "0692_the_twins_operators_send_telemetry_and_faults_through_the_door.sql")
+MIG["0693"] = os.path.join(ROOT, "db", "migrations",
+                           "0693_a_car_leaving_the_depot_is_reported_through_the_door.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -187,6 +189,19 @@ def test_0692_refuses_out_of_order_and_changes_nothing(db):
     assert rc != 0 and "0692 P1" in err, err
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0692%'") == "0"
     assert db.val("SELECT to_regclass('twin.ottoq_twin_drive_log') IS NULL") == "t"
+
+
+def test_0693_refuses_out_of_order_and_changes_nothing(db):
+    # 0693 gives the door's com.ottoyard.vehicle.departed its effect (contract rule 8: record what was still open,
+    # mark the car away, release what the depot held for it), adds the twin_operator_departures flag and the operators'
+    # departure report, and patches the live door and the twin's dispatcher at md5-guarded anchors; it is written after
+    # 0692, so on the stub it must refuse at its premises and leave no flag, function or lineage row. That the flag
+    # unset takes the old path, that the flag on releases the same holds through the door, and that a car taken before
+    # its wash is recorded as leaving with work open, are proved on the live functions in 0693's own V1.
+    rc, err = db.file(MIG["0693"])
+    assert rc != 0 and "0693 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0693%'") == "0"
+    assert db.val("SELECT to_regprocedure('twin.ottoq_twin_operator_depart(uuid,timestamptz,uuid)') IS NULL") == "t"
 
 
 def test_only_the_platform_reaches_the_operators(db):

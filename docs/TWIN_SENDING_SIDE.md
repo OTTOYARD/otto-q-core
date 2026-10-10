@@ -25,7 +25,7 @@ operator could do none of them.
 | `vehicle.telemetry` | a packet (VSS signals, each with its own time; a position outside the geofence dropped and counted), and the car's SoC when fresh on the key's clock |
 | `vehicle.fault.summary` | an open `exceptions` row (category, severity, services needed, whether it takes the car offline) |
 | `depot.arrival.intent` | `ottoq_ingest_vehicle_signal`, which asks `ottoq_decide_return_on_signal` and may mark the dispatch `returning`, and the car `en_route_to_depot` |
-| `vehicle.departed` | kept in the inbox only: *"the depot's release of what it held for the car is wired when the twin sends departures (step 4)"* |
+| `vehicle.departed` | kept in the inbox only: *"the depot's release of what it held for the car is wired when the twin sends departures (step 4)"*. From 0693 (pending): the record of what was still open, the car marked away, and the release |
 
 ## The order, and why
 
@@ -42,11 +42,19 @@ The receiving half's flag (`twin_operator_door`) is separate and stays separate.
    to low, medium, high), an electrical breakdown to `vehicle_malfunction`, a tire to `tire_issue`, a stranded car to
    `vehicle_unresponsive`; `takes_vehicle_offline` from the tow. The car's physical state (towed) stays the world's
    own write until full separation, because the twin and OTTO-Q still share the `vehicles` row.
-3. **Leaving.** OTTO-Q decides a car is ready; the operator takes it. Today one write does both, and it is OTTO-Q's:
-   `ottoq_decide_tick` calls the twin's own dispatcher (`twin.ottoq_sim_dispatch_vehicle`, which writes the dispatch,
-   deploys the car, opens its travel leg and releases its visit's artifacts), as does `twin.ottoq_sim_auto_dispatch_tick`. The door's
-   `vehicle.departed` gets its effect (release the stall, the bookings and the holds OTTO-Q kept for the car, and
-   record what was still open if it left early, contract rule 8), and the twin's dispatcher sends it.
+3. **Leaving.** OTTO-Q decides which finished cars may leave; the operator takes them. Read 2026-10-10,
+   comment-stripped: the orchestrator (`ottoq_sim_decide_and_dispatch`) runs the policy's decide tick and then
+   `twin.ottoq_sim_auto_dispatch_tick`, which asks OTTO-Q's planner (`ottoq_plan_dispatch_tick`, `deploy_plan`) which
+   cars to release toward the scenario's deploy target and calls the twin's dispatcher
+   (`twin.ottoq_sim_dispatch_vehicle`) for each. The dispatcher writes the dispatch, deploys the car, opens its taxi
+   leg, and releases what OTTO-Q held for the car itself (`ottoq.ottoq_release_visit_artifacts`: the legs of its
+   active itinerary, the itinerary, its open visit, its stall reservations; not the stall calendar). An earlier draft
+   of this note said `ottoq_decide_tick` calls the dispatcher; it names it only in a comment, and its decision row is
+   the signal the planner ranks by. **Built 2026-10-10 as pending migration 0693:** the door's `vehicle.departed`
+   records what was still open if the car left early (contract rule 8), marks the car away when OTTO-Q's record still
+   has it at the depot, and makes the same release; with the flag `twin_operator_departures` on, the dispatcher sends
+   the departure through the door in place of releasing. One coupling stays for full separation: the twin's
+   auto-dispatch reads OTTO-Q's planner directly, where a real operator would read `readiness.forecast` from the door.
 4. **Coming home**, which needs the contract to grow first (next section).
 
 ## Two couplings found while preparing stage 1 (read 2026-10-10, about 1:00 AM CT)
