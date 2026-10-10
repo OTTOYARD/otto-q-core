@@ -16,7 +16,8 @@ sees sim-b." This is that test, and the promises around it:
   * the run pin: only the step names the run a twin key is judged on.
 
 Loads tests/fixtures/v2_door_stub_engine.sql, tests/fixtures/v2_door_seed.sql, 0649-0651, checks 0652 refuses, then
-tests/fixtures/v2_twin_operators_stub.sql and 0653. SKIPS where no scratch PostgreSQL is reachable.
+tests/fixtures/v2_twin_operators_stub.sql and 0653, and checks 0654 refuses (it patches the live tick path). SKIPS where
+no scratch PostgreSQL is reachable.
 """
 import json
 import os
@@ -33,6 +34,8 @@ from test_v2_door_sql import MIG, SEED, STUB, TWIN, WAYMO, TESLA, Db, _drop, _ne
 ZOOX = "44444444-4444-4444-4444-444444444444"
 OPS_STUB = os.path.join(ROOT, "tests", "fixtures", "v2_twin_operators_stub.sql")
 MIG["0653"] = os.path.join(ROOT, "db", "migrations", "0653_the_twin_speaks_to_otto_q_as_two_operators.sql")
+MIG["0654"] = os.path.join(ROOT, "db", "migrations",
+                           "0654_the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -109,6 +112,14 @@ def test_sim_a_and_sim_b_are_twin_keys_scoped_to_their_own_fleets(db):
 def test_a_second_apply_refuses_before_touching_anything(db):
     rc, err = db.file(MIG["0653"])
     assert rc != 0 and "0653 P1" in err, err
+
+
+def test_0654_refuses_tick_paths_it_was_not_written_against(db):
+    # 0654 patches the live walk and four tick drivers at md5-guarded anchors; on the stub it must refuse and change
+    # nothing. Its report mode is what stub_walk_mode.reports stands in for; it runs against the live walk in 0654's V1.
+    rc, err = db.file(MIG["0654"])
+    assert rc != 0, "0654 applied on the stub"
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0654%'") == "0"
 
 
 def test_only_the_platform_reaches_the_operators(db):
