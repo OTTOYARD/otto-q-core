@@ -5,15 +5,17 @@ what the depot sends back, and the rules both sides keep.
 
 **Status:** written 2026-10-09 as step 2 of the twin data contract review. Step 3 built the door
 that serves it, `ottoq-depot-v2` (database half: migrations 0650 to 0652), beside the current
-`ottoq-ingest`, which stays until nothing uses it. Step 4 makes the twin a client of that door as two synthetic operators,
+`ottoq-ingest`, which stays until nothing uses it. The door is live since 2026-10-09, 8:05 PM CT
+(`https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-depot-v2`), probed from outside in
+`db/checks/0430`. Step 4 makes the twin a client of that door as two synthetic operators,
 `sim-a` and `sim-b`, so the twin talks to OTTO-Q the way a real operator would.
 
 | Link | What it speaks | State |
 |---|---|---|
-| operator to and from OTTO-Q | this contract: CloudEvents 1.0.2 envelope, JSON Schema 2020-12 payloads, COVESA VSS 6.0 signal names | 0.1, documents only |
+| operator to and from OTTO-Q | this contract: CloudEvents 1.0.2 envelope, JSON Schema 2020-12 payloads, COVESA VSS 6.0 signal names | 0.1, served by `ottoq-depot-v2` |
 | OTTO-Q to a charger | OCPP 2.0.1 | the twin's chargers are modeled as 2.0.1; real `TransactionEvent` and `SetChargingProfile` in step 5 |
 | OTTO-Q to the utility | OpenADR 3 | later |
-| who is talking | interim: platform-issued source keys (migration 0649). Target: mutual TLS with OAuth client credentials and certificate-bound tokens (RFC 8705) | interim live on `ottoq-ingest` |
+| who is talking | interim: platform-issued source keys (migration 0649). Target: mutual TLS with OAuth client credentials and certificate-bound tokens (RFC 8705) | interim live on `ottoq-ingest` and `ottoq-depot-v2` |
 
 This contract replaces, for operator traffic, the twin's internal channel
 (`ottoyarddepot-sim/src/lib/ottoq/contracts.ts`, channel version 1.1.0) and answers the open
@@ -70,7 +72,10 @@ CloudEvents; it never widens it.
   `refused` with its reason. `GET /directives?after=<cursor>&limit=<1-500>` returns the key's own
   directives, oldest first, signed, as a batch, with the next cursor in the `OTTOQ-Next-After`
   header (`?peek=true` leaves them unmarked as delivered). `GET /jwks` returns the keys they verify
-  under. The key goes in the `X-OTTO-Q-API-Key` header.
+  under. The key goes in the `X-OTTO-Q-API-Key` header. A `production` key reads its depot's production
+  directives and a `twin` key its depot's running run's; a `shadow` key's events are taken like
+  production's (wall clock, applied to the car's state) and it is sent no directives: OTTO-Q decides
+  in shadow and commands nothing. A `replay` key is sent none either.
 - **Timestamps** are RFC 3339 with an explicit `Z` or offset. `format` is an annotation only;
   every rule on a string is a `pattern`, so any 2020-12 validator enforces the same contract.
 

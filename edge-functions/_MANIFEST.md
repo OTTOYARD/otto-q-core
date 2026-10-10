@@ -12,8 +12,8 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
   `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), v36, agent v24 (footnote ⁵), v37, agent v25
-  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰).
-  29 ACTIVE functions.
+  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰), and `ottoq-depot-v2` v1, its first deploy (footnote ¹¹).
+  30 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
 
@@ -117,6 +117,7 @@ against this table without trusting any metadata column.
 | ottoq-cpsat-propose | 11 | false | 2026-10-07 13:56 | yes³ | `7c40c6fe93cf6c21a77958033a4015f12051f720c3a5c94305985a443aa121b5` |
 | ottoq-cuopt-lp-probe | 8 | true | 2026-08-01 17:43 | yes | `bea55aa4120f0d25fde967aa1fbcab3cdeb9f79bebef9009b77ada7dffc6d580` |
 | ottoq-cuopt-propose | 29 | true | 2026-09-16 00:10 | yes | `5425ba3dcf0350d87152b497cc66c7897d4013e6227bd80fa3e6e1a7bba5ddf9` |
+| ottoq-depot-v2 | 1 | false | 2026-10-10 01:05 | yes¹¹ | `a934466094e8d82f7b2b7f54f7c5f3c1b896c4b94ef3e24aba7df8dd0e4c4fd2` |
 | ottoq-depot-resources | 5 | true | 2026-06-19 02:57 | yes | `06c303ee7662f8f8f1fcb549d7e22a8e1128b5d870863a1d652afa39171084a0` |
 | **ottoq-energy-mpc** | 4 | **false** | 2026-07-15 04:33 | **NO — G69** | `42eae1f61a939ce19c9f60eef4f45a5c539f71dc5f31bec4446a1d683ab0006e` |
 | ottoq-energy-optimize | 8 | true | 2026-06-17 01:33 | yes | `ef4f5240822dc6064c8051c5f4cd01daf6aeef0f59622f8eca026f60019211b0` |
@@ -275,3 +276,5 @@ access token (supabase.com → Account → Access Tokens); it is never stored in
 repo.
 
 ¹⁰ **`ottoq-ingest` v16 (source v10), 2026-10-09 at 6:37 PM CT (23:37 UTC), for G393 security item 4 and 0649.** The depot and the data source now come from the credential: a source key (`X-OTTO-Q-API-Key`, issued by `ottoq_issue_source_key`) or the injected service key, compared in constant time. Deployed with `verify_jwt` **false** on purpose, after v15 (the same code with it true) answered the public key with the gateway's own `UNAUTHORIZED_LEGACY_JWT`: the gateway now refuses legacy JWT keys, so with it on, a source holding only its source key could never reach the door. Read back with `get_edge_function`: compared with the repo at `a5404f1` by inspection, not hashed (the response comes back inline at 16 KB, so there is no file to hash). Proven instead on the live door with a twin-scoped test key, every request a dry run: no credential 401; the public key 401; the key on a twin car 200 as `twin`; a body naming another depot 403; a body naming `production` 403; a stream the key lacks 403; another depot's car "vehicle not found"; the key after `ottoq_revoke_source_key` 401.
+
+¹¹ **`ottoq-depot-v2` v1 is its first deploy, 2026-10-09 at 8:05 PM CT (01:05 UTC on 2026-10-10), for step 3 of the twin data contract review (migrations 0650, 0651, 0652).** The v2 operator door: `POST /events`, `GET /directives`, `GET /jwks` (contract/README.md). Through the Supabase MCP `deploy_edge_function` with three files, entrypoint `ottoq-depot-v2/index.ts`, `verify_jwt` **false** on purpose, as `ottoq-ingest` v16 (footnote ¹⁰): the source key is the credential and the gateway refuses the legacy JWT keys the apps ship. Read back with `get_edge_function`, the response saved to a file by the tool and hashed from that file (nothing retyped): all three byte-identical to the repo at commit `0b2de06` (index.ts `a9344660`, `ottoq-depot-v2/contract_schemas.ts` `fc55ef4c`, `_shared/depot_v2.ts` `f27bd1d6`). The function now imports a shared module and a generated one, so a future deploy sends all three. The depot's Ed25519 signing key was made by the function on its first `GET /jwks` (kid `ottoq-depot-118daaffe483095d`, private half in Vault) and no key was configured by hand. Probed from outside the same minute, `db/checks/0430` §2: unknown route 404, no key 401, malformed key 401, wrong method 405, wrong content type 415, a shadow-key batch of 10 in a dry run (5 applied, 1 late, 1 duplicate, 3 refused: another fleet's car, another operator's source, and a schema failure at the edge; nothing kept), a shadow key's directive read 403, and the probe key after revocation 401. **Not yet seen live:** a signed directive batch, which needs a running twin run (step 4).
