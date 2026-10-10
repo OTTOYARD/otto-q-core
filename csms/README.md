@@ -34,11 +34,12 @@ at the charger; OTTO-Q never commands a car.
 
 ## What comes next, in order
 
-1. **Retire the 1.6 names in the twin's log.** Change `twin.ottoq_sim_emit_ocpp`'s three callers to write what a
-   2.0.1 station sends: `TransactionEvent` Started (with the `idToken`), Updated (with the meter values; it replaces
+1. **Retire the 1.6 names in the twin's log (G412).** Change `twin.ottoq_sim_emit_ocpp`'s three callers to write what
+   a 2.0.1 station sends: `TransactionEvent` Started (with the `idToken`), Updated (with the meter values; it replaces
    the in-transaction `MeterValues`) and Ended (with `stoppedReason`), each with its `seqNo`, plus the
-   `StatusNotification` shape 2.0.1 uses (`connectorStatus`, `evseId`, `connectorId`). A migration with a measured
-   pair: it changes rows the twin writes, and readers of `message_type` must be found and moved with it.
+   `StatusNotification` shape 2.0.1 uses (`connectorStatus`, `evseId`, `connectorId`). One engine function reads the
+   log by name, `public.ottoq_charge_time_v2_params_cut` (it learns the charge clock from `MeterValues`), so it moves in
+   the same file, with an evidence regime row for the clock and a recertification.
 2. **The bridge.** A small process beside the back end that drives one simulated station per twin charger (45 at the
    twin depot: 35 L2 of 19.2 kW, 10 DCFC of 350 kW) from the twin's charge sessions, and writes the back end's log
    into `ottoq_ocpp_messages` and OTTO-Q's charge plans out as `SetChargingProfile`. Then the twin's chargers are
