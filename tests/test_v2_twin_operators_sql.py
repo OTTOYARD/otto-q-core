@@ -38,6 +38,7 @@ MIG["0654"] = os.path.join(ROOT, "db", "migrations",
                            "0654_the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first.sql")
 MIG["0655"] = os.path.join(ROOT, "db", "migrations",
                            "0655_the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered.sql")
+MIG["0657"] = os.path.join(ROOT, "db", "migrations", "0657_the_readiness_check_is_the_last_thing_a_visit_does.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -131,6 +132,15 @@ def test_0655_refuses_a_finalizer_it_was_not_written_against(db):
     rc, err = db.file(MIG["0655"])
     assert rc != 0 and "0655 P1" in err, err
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0655%'") == "0"
+
+
+def test_0657_refuses_a_visit_advancer_it_was_not_written_against(db):
+    # 0657 patches the live visit-atom advancer at an md5-guarded anchor so a readiness check closes only after the
+    # visit's other work (FINDINGS G398); on the stub it must refuse at its premises and change nothing. That the check
+    # waits for a pending charge and closes in the pass the last work ends is proved on the live advancer in 0657's V1.
+    rc, err = db.file(MIG["0657"])
+    assert rc != 0 and "0657 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0657%'") == "0"
 
 
 def test_only_the_platform_reaches_the_operators(db):
