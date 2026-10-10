@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010111503
 -- migration-name:    a_twin_operators_fault_report_goes_with_its_run
 --
 -- 0691  **A fault an operator reports through the v2 door with a twin or replay key goes with its run, like every other
@@ -194,3 +194,10 @@ VALUES ('0691_a_twin_operators_fault_report_goes_with_its_run', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:15:03 UTC (6:15 AM CT), version 20261010111503 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 206d42909c9f162baa9876904d543d11, 11,276 characters, 12,034 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: ottoq.ottoq_v2_apply's definition md5 ed2895cacce4fe27325f7648ed2f208a as written;
+--   public.exceptions.sim_run_id is a uuid column registered engine; the registry check reports no blocking defect; no
+--   exception carries a run yet; lineage FALSE/FALSE (read 11:15:09 UTC).
