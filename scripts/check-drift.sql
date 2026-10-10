@@ -744,7 +744,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_dispatch_ledger_counts_the_miles_the_car_drove'::text, '0690_the_dispatch_ledger_counts_the_miles_the_car_drove.sql'::text),
     ('PENDING'::text, 'a_twin_operators_fault_report_goes_with_its_run'::text, '0691_a_twin_operators_fault_report_goes_with_its_run.sql'::text),
     ('PENDING'::text, 'the_twins_operators_send_telemetry_and_faults_through_the_door'::text, '0692_the_twins_operators_send_telemetry_and_faults_through_the_door.sql'::text),
-    ('PENDING'::text, 'a_car_leaving_the_depot_is_reported_through_the_door'::text, '0693_a_car_leaving_the_depot_is_reported_through_the_door.sql'::text)
+    ('PENDING'::text, 'a_car_leaving_the_depot_is_reported_through_the_door'::text, '0693_a_car_leaving_the_depot_is_reported_through_the_door.sql'::text),
+    ('PENDING'::text, 'the_twins_chargers_speak_ocpp_2_0_1'::text, '0694_the_twins_chargers_speak_ocpp_2_0_1.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

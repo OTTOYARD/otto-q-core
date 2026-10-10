@@ -47,6 +47,7 @@ MIG["0692"] = os.path.join(ROOT, "db", "migrations",
                            "0692_the_twins_operators_send_telemetry_and_faults_through_the_door.sql")
 MIG["0693"] = os.path.join(ROOT, "db", "migrations",
                            "0693_a_car_leaving_the_depot_is_reported_through_the_door.sql")
+MIG["0694"] = os.path.join(ROOT, "db", "migrations", "0694_the_twins_chargers_speak_ocpp_2_0_1.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -202,6 +203,17 @@ def test_0693_refuses_out_of_order_and_changes_nothing(db):
     assert rc != 0 and "0693 P1" in err, err
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0693%'") == "0"
     assert db.val("SELECT to_regprocedure('twin.ottoq_twin_operator_depart(uuid,timestamptz,uuid)') IS NULL") == "t"
+
+
+def test_0694_refuses_out_of_order_and_changes_nothing(db):
+    # 0694 makes the twin's charge start, advance and stop write OCPP 2.0.1 and the charge clock's reader take either
+    # shape, at md5-guarded anchors on the live functions; it is written after 0693, so on the stub it must refuse at its
+    # premises and leave no helper or lineage row. The payloads' 2.0.1 conformance is tests/test_twin_ocpp201_sql.py;
+    # that one charge on the live functions is one 2.0.1 transaction, and that the clock fits the same, is 0694's V1.
+    rc, err = db.file(MIG["0694"])
+    assert rc != 0 and "0694 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0694%'") == "0"
+    assert db.val("SELECT to_regprocedure('ottoq.ottoq_ocpp_meter_soc(text,jsonb)') IS NULL") == "t"
 
 
 def test_only_the_platform_reaches_the_operators(db):
