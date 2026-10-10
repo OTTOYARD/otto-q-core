@@ -50,6 +50,8 @@ MIG["0693"] = os.path.join(ROOT, "db", "migrations",
 MIG["0694"] = os.path.join(ROOT, "db", "migrations", "0694_the_twins_chargers_speak_ocpp_2_0_1.sql")
 MIG["0695"] = os.path.join(ROOT, "db", "migrations",
                            "0695_an_autonomous_cars_data_comes_off_while_it_charges.sql")
+MIG["0696"] = os.path.join(ROOT, "db", "migrations",
+                           "0696_the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -229,6 +231,15 @@ def test_0695_refuses_out_of_order_and_changes_nothing(db):
     assert rc != 0 and "0695 P1" in err, err
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0695%'") == "0"
     assert db.val("SELECT to_regprocedure('ottoq.ottoq_uplink_transfer_holds(uuid,uuid)') IS NULL") == "t"
+
+
+def test_0696_refuses_out_of_order_and_changes_nothing(db):
+    # 0696 replaces the twin's incident draw and arrival drain whole (G408, G410), each guarded by its live md5; on the
+    # stub neither exists, so it must refuse at its premises and leave no snapshot or lineage row. That the draws fire
+    # at the CPUC-filed rate with NHTSA's towed share, and that the drain is zero where it drained, is 0696's own V1.
+    rc, err = db.file(MIG["0696"])
+    assert rc != 0 and "0696 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0696%'") == "0"
 
 
 def test_only_the_platform_reaches_the_operators(db):
