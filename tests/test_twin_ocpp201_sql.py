@@ -166,3 +166,25 @@ def test_a_sessions_seq_no_counts_its_own_events(db):
            f"('{sid}', 'StatusNotification', '{{}}'), ('{sid}', 'TransactionEvent', '{{}}'), "
            f"('{sid}', 'TransactionEvent', '{{}}'), ('{other}', 'TransactionEvent', '{{}}')")
     assert db.val(f"SELECT twin.ottoq_ocpp201_next_seq('{sid}')") == "2"
+
+
+def test_a_charge_the_helpers_build_is_accepted_by_a_real_back_end_over_a_websocket(db):
+    # csms/bridge.py: the twin's rows said by their charger, as a 2.0.1 station, to OTTO-Q's back end on 127.0.0.1
+    sys.path.insert(0, os.path.join(ROOT, "csms"))
+    from bridge import replay
+    started = tx_event(db, "Started", "'CablePluggedIn'", 0, [("Energy.Active.Import.Register", 0, "kWh"), ("SoC", 50, "Percent")],
+                       custom="jsonb_build_object('target_soc_pct', 100, 'ambient_temp_c', 22.5)", id_token="TWIN-abcdef12")
+    updated = tx_event(db, "Updated", "'MeterValuePeriodic'", 1,
+                       [("Power.Active.Import", 11.0412, "kW"), ("SoC", 52.37, "Percent"),
+                        ("Energy.Active.Import.Interval", 1.8402, "kWh"), ("Energy.Active.Import.Register", 1.8402, "kWh")],
+                       custom="jsonb_build_object('battery_temp_c', 31.4)")
+    ended = tx_event(db, "Ended", "(twin.ottoq_ocpp201_ended_reasons('fault.connector_cable')).trigger_reason", 2,
+                     [("Energy.Active.Import.Register", 5.52, "kWh"), ("SoC", 56, "Percent")],
+                     custom="jsonb_build_object('twin_reason', 'fault.connector_cable', 'duration_seconds', 1800.0)",
+                     stopped="(twin.ottoq_ocpp201_ended_reasons('fault.connector_cable')).stopped_reason", spent=1800)
+    rows = [{"message_seq": i, "ocpp_identifier": "NASH-L2-08", "direction": "cs_to_csms", "message_type": "TransactionEvent",
+             "payload": p} for i, p in enumerate([started, updated, ended], 1)]
+    s = asyncio.run(replay(rows))
+    assert s["outcomes"] == {"accepted": 3}, s
+    assert (s["transactions"], s["transactions_ended"], s["transactions_seq_in_order"], s["transactions_seq_from_zero"],
+            s["transactions_opened_by_started"]) == (1, 1, 1, 1, 1)

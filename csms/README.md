@@ -9,6 +9,8 @@ names."* Chase, 2026-10-09: host it on AWS.
 | `csms_server.py` | the back end (a CSMS): takes stations at `ws://host:port/<station id>`, subprotocol `ocpp2.0.1`; answers BootNotification, Heartbeat, StatusNotification, Authorize, MeterValues and TransactionEvent; sends OTTO-Q's charge plan to a station as `SetChargingProfile`; keeps every frame both ways |
 | `station_sim.py` | a simulated charging station: boots, reports its connector, runs a transaction as TransactionEvent Started, Updated and Ended, and draws the lower of its rating, the car's limit and the profile's limit for the period in force |
 | `test_csms.py` | the battery: a back end and two stations over a real WebSocket on 127.0.0.1; runs in CI's pytest step |
+| `bridge.py` | the bridge: the twin's charger rows (`ottoq_ocpp_messages`, in `message_seq` order) said by one station per charger, as that charger, to the back end; every row ends `accepted`, `not_2_0_1` (refused by the station, never sent) or `csms_error` (a CALLERROR or an answer that is not 2.0.1) |
+| `test_bridge.py` | the bridge's battery, in CI's pytest step; `tests/test_twin_ocpp201_sql.py` also sends a charge built by 0694's own SQL helpers through it |
 
 Both sides use [`ocpp`](https://github.com/mobilityhouse/ocpp) 2.1.0 (MIT, released 2025-07-16), which validates
 every frame against the OCPP 2.0.1 JSON schemas in both directions, and [`websockets`](https://pypi.org/project/websockets/)
@@ -42,10 +44,28 @@ at the charger; OTTO-Q never commands a car.
    `public.ottoq_charge_time_v2_params_cut`, takes a reading's charge from either shape, so the charge clock fits the
    same (0694's V1 compares a fit before and after) and needs no evidence regime or recertification. Every shape is
    validated against the 2.0.1 schemas in CI (`tests/test_twin_ocpp201_sql.py`).
-2. **The bridge.** A small process beside the back end that drives one simulated station per twin charger (45 at the
-   twin depot: 35 L2 of 19.2 kW, 10 DCFC of 350 kW) from the twin's charge sessions, and writes the back end's log
-   into `ottoq_ocpp_messages` and OTTO-Q's charge plans out as `SetChargingProfile`. Then the twin's chargers are
-   real WebSocket clients and the log is what a real back end recorded, which is the swap test for chargers.
+2. **The bridge. First part built (`bridge.py`, 2026-10-10).** One station per twin charger (45 at the twin depot: 35
+   ChargePoint CT4000 of 19.2 kW, 10 ABB Terra HP 350), each booted once with its own vendor, model and firmware from
+   `ottoq_ocpp_chargers`, says the twin's rows to the back end over a real WebSocket. A row goes out exactly as the twin
+   wrote it: the library's own `call()` rebuilds a payload from snake_case and would rename the twin's `customData`
+   keys, so the bridge sends the frame itself, validated against the 2.0.1 schemas before it leaves and the answer when
+   it returns. Tested against the shapes the live log holds: a charge as 0694 writes it is accepted frame for frame and
+   arrives unaltered (Started, Updated, Ended with seqNo 0, 1, 2); the log as it is today is refused for every row but
+   its `StatusNotification`s (the `Authorize` carries a timestamp 2.0.1 does not admit, and `StartTransaction`,
+   `StopTransaction` and the 1.6-shaped `MeterValues` are not 2.0.1). Run 17a490fc's 10,537 charger rows, read
+   2026-10-10, are 1,034 `StatusNotification`, 534 `Authorize`, 534 `StartTransaction`, 500 `StopTransaction` and 7,935
+   `MeterValues`; the replay that measures them through the bridge runs after 0694, on the first run that writes 2.0.1
+   rows, beside a replay of rows from before it.
+
+   **Still to build, and how (the live bridge).** The twin's rows come out of the database and the back end's log goes
+   back in, with no inbound port on the box and no database key on it. In: the back end's frames go to OTTO-Q through
+   `ottoq-ingest` under a platform-issued source key carrying the `ocpp` stream, which already takes the tenant and the
+   data source from the credential (0649, and Security 4 of this review). Out: a relay edge function returns the twin's
+   charger rows after a cursor to a key scoped to the twin depot. The key is generated on the box and kept in its
+   parameter store; only its hash leaves it. Then a dial switches the twin from writing its charger log itself to
+   writing an outbox the bridge drains, and the log of record is what the back end received. OTTO-Q's charge plans go
+   out as `SetChargingProfile` through the same relay; the twin's charge physics reading a station's accepted limit is
+   the step after.
 3. **Host it on AWS** beside the intelligence service on `ottoq-intel-2`, deployed the way that service is
    (`ottoq-intelligence/.github/workflows/aws-deploy-ssm.yml`: over SSM, no SSH, no inbound rule). With the simulated
    stations on the same box the back end listens on localhost only. A real charger needs an inbound `wss://` port with

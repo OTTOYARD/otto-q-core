@@ -129,11 +129,12 @@ class StationHandler(ChargePoint):
         if last is not None and seq_no <= last:
             log.warning("station %s transaction %s: seqNo %s after %s", self.id, tx_id, seq_no, last)
         self.state.last_seq_no[tx_id] = seq_no
-        tx = self.state.transactions.setdefault(tx_id, {"events": 0})
+        tx = self.state.transactions.setdefault(tx_id, {"events": 0, "seq_nos": [], "first_event_type": event_type})
         tx.update(event_type=event_type, trigger_reason=trigger_reason, timestamp=timestamp,
                   charging_state=transaction_info.get("charging_state"),
                   stopped_reason=transaction_info.get("stopped_reason"))
         tx["events"] += 1
+        tx["seq_nos"].append(seq_no)
         for mv in kwargs.get("meter_value") or []:
             for sv in mv.get("sampled_value", []):
                 if sv.get("measurand", "Energy.Active.Import.Register") == "Energy.Active.Import.Register":
