@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010110559
 -- migration-name:    the_public_key_reads_only_what_a_cockpit_shows
 --
 -- 0658  **The public key reads only the fifteen relations a cockpit shows it, and a new table is closed to it until a
@@ -285,3 +285,10 @@ VALUES ('0658_the_public_key_reads_only_what_a_cockpit_shows', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:05:59 UTC (6:05 AM CT), version 20261010110559 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 6a5d6c201af372bf47b5b9555ab7b683, 18,903 characters, 19,644 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: 537 restore statements in snapshot 0658_pre (535 grants, 2 default privileges); the
+--   public key holds SELECT on 15 relations in public and twin and nothing else postgres granted; postgres's default
+--   privileges in public name it on nothing; lineage FALSE/FALSE (read 11:06:14 UTC).
