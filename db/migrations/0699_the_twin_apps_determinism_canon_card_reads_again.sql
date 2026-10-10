@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010110724
 -- migration-name:    the_twin_apps_determinism_canon_card_reads_again
 --
 -- 0699  **The twin app's determinism canon card reads again: the public key may call the one-timestamp function the
@@ -146,3 +146,11 @@ VALUES ('0699_the_twin_apps_determinism_canon_card_reads_again', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:07:24 UTC (6:07 AM CT), version 20261010110724 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 44463f58461caee2ba226e10c3b06dc2, 7,695 characters, 8,471 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the floor function's ACL is {postgres=X/postgres,service_role=X/postgres,anon=X/postgres}
+--   (no PUBLIC); lineage FALSE/FALSE (read 11:07:28 UTC). From outside at 11:07:31 UTC, with the legacy anon key and
+--   with the publishable key: the 15 listed relations answer 200, ottoq_determinism_canon among them; the six unlisted
+--   probed answer 401, code 42501.
