@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010014628
 -- migration-name:    the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first
 --
 -- 0654  **The walk reports what it did with a handed directive to the twin's own log instead of writing OTTO-Q's
@@ -529,3 +529,12 @@ VALUES ('0654_the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answe
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 01:46:28 UTC (8:46 PM CT on 2026-10-09), version 20261010014628 ═══════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 2740375; the ledger's stored statement is that file byte for
+--   byte (md5 ca3d2805c139b8a625fe91fbe519c26c, 33,255 characters, 34,039 bytes). P0, P1, V1 (on a copy of the twin
+--   depot's newest run, the live walk: with the flag off it wrote the row as before; with it on it reported to the
+--   twin's log, the world seated the Tesla car first in the contested stall, the operators' acks wrote all three rows
+--   with 3 directive.ack events, isolation 0 violations; rolled back), V2 passed in the apply's transaction. Read
+--   after: the five definitions at their stated md5s, five 0654_pre snapshots, cron job 793 ottoq-twin-operators active
+--   every minute, twin_operator_door set nowhere, 0 operator log rows.

@@ -735,7 +735,7 @@ repo_manifest(version, name, file) AS (
     ('20261010005934'::text, 'a_directive_leaves_with_an_id_a_version_an_expiry_and_the_depots_signing_key'::text, '0651_a_directive_leaves_with_an_id_a_version_an_expiry_and_the_depots_signing_key.sql'::text),
     ('20261010010118'::text, 'the_twin_applies_the_directives_it_is_handed_and_answers_each_with_an_ack'::text, '0652_the_twin_applies_the_directives_it_is_handed_and_answers_each_with_an_ack.sql'::text),
     ('20261010013631'::text, 'the_twin_speaks_to_otto_q_as_two_operators'::text, '0653_the_twin_speaks_to_otto_q_as_two_operators.sql'::text),
-    ('PENDING'::text, 'the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first'::text, '0654_the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first.sql'::text)
+    ('20261010014628'::text, 'the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first'::text, '0654_the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
