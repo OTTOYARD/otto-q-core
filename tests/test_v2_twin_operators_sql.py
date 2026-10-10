@@ -52,6 +52,8 @@ MIG["0695"] = os.path.join(ROOT, "db", "migrations",
                            "0695_an_autonomous_cars_data_comes_off_while_it_charges.sql")
 MIG["0696"] = os.path.join(ROOT, "db", "migrations",
                            "0696_the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once.sql")
+MIG["0698"] = os.path.join(ROOT, "db", "migrations",
+                           "0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -240,6 +242,70 @@ def test_0696_refuses_out_of_order_and_changes_nothing(db):
     rc, err = db.file(MIG["0696"])
     assert rc != 0 and "0696 P1" in err, err
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0696%'") == "0"
+
+
+def test_0698_refuses_out_of_order_and_changes_nothing(db):
+    # 0698 patches the deriver at one md5-guarded anchor (G413) and is written after 0696; on the stub it must refuse at
+    # its premises and leave no snapshot or lineage row. That the live deriver drops what an open visit owes, and that
+    # the patched one carries it, is 0698's own P2 and V1 on the live function.
+    rc, err = db.file(MIG["0698"])
+    assert rc != 0 and "0698 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0698%'") == "0"
+    assert db.val("SELECT count(*) FROM ottoq_schema_snapshots WHERE label = '0698_pre'") == "0"
+
+
+def _patch_block(path, tag, slot):
+    """A migration's md5-guarded replacement string, as the file holds it ($b01$ inside DO $tag$)."""
+    import re
+    src = open(path, encoding="utf-8").read()
+    body = re.search(r"DO (\$" + tag + r"\$)(.*?)\1;", src, re.S).group(2)
+    return re.search(r"\$" + slot + r"\$(.*?)\$" + slot + r"\$", body, re.S).group(1)
+
+
+def test_0698_carries_what_an_open_visit_owes_and_nothing_else():
+    # G413 (CLAUDE.md rule 9): the deriver's new visit must carry every required atom an open or in-progress visit of the
+    # car on the same run still owes. The carry is the code 0698 inserts, taken from the file and run in a wrapper that
+    # declares the deriver's own variables, against a table holding the cases: a duplicate service (the new visit's own
+    # stands), a done, a cancelled, a charge, a readiness check and a guard-demoted atom (none carried), an in-progress
+    # calibration (carried as it stood), another run's visit, another car's and a visit already superseded (untouched).
+    b01 = _patch_block(MIG["0698"], "p_carry", "b01")
+    d = _new_db()
+    try:
+        d.run("""CREATE TABLE public.ottoq_visit_needs (visit_id uuid DEFAULT gen_random_uuid(), vehicle_id uuid,
+                   sim_run_id uuid, status text, atoms jsonb, arrived_at timestamptz, visit_key text)""")
+        d.run("CREATE FUNCTION public.w0698(p_vehicle_id uuid, p_sim_run_id uuid, p_m jsonb) RETURNS jsonb "
+              "LANGUAGE plpgsql AS $w$\nDECLARE\n  v_m jsonb := p_m; v_atom jsonb; v_archetype text; "
+              "v_fault boolean := false;\nBEGIN\n" + b01 + "    ELSE 'std_mixed' END;\n  RETURN v_m;\nEND $w$")
+        car, other_car = "00000000-0000-0000-0000-00000000000a", "00000000-0000-0000-0000-00000000000b"
+        run, other_run = "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"
+        rows = [
+            (car, run, "open", "2026-09-01 10:00+00", "k:A", [
+                {"svc": "interior_deep_clean", "must_do": True, "m": "m1"},
+                {"svc": "interior_tidy", "must_do": True, "status": "done", "m": "done"},
+                {"svc": "charge", "must_do": True, "status": "pending", "m": "charge"},
+                {"svc": "readiness_check", "must_do": True, "m": "ready"},
+                {"svc": "sensor_calibration", "must_do": True, "status": "in_progress",
+                 "ends_at": "2026-09-01T10:30:00+00:00", "m": "m2"},
+                {"svc": "perimeter_walkaround", "must_do": False, "guard_reason": "svc_not_retirable", "m": "demoted"},
+                {"svc": "cosmetic_repair", "must_do": True, "status": "cancelled", "m": "cancelled"}]),
+            (car, run, "in_progress", "2026-09-01 09:00+00", "k:B", [
+                {"svc": "exterior_wash", "must_do": True, "m": "m4"},
+                {"svc": "interior_deep_clean", "must_do": True, "m": "m5"}]),
+            (car, other_run, "open", "2026-09-01 08:00+00", "k:C", [{"svc": "mechanical_pm", "must_do": True, "m": "m6"}]),
+            (other_car, run, "open", "2026-09-01 08:00+00", "k:D", [{"svc": "fault_repair", "must_do": True, "m": "m7"}]),
+            (car, run, "superseded", "2026-09-01 07:00+00", "k:E", [{"svc": "cosmetic_repair", "must_do": True, "m": "m8"}]),
+        ]
+        for veh, r, status, at, key, atoms in rows:
+            d.run(f"INSERT INTO public.ottoq_visit_needs (vehicle_id, sim_run_id, status, arrived_at, visit_key, atoms) "
+                  f"VALUES ('{veh}', '{r}', '{status}', '{at}', '{key}', {q(json.dumps(atoms))}::jsonb)")
+        got = json.loads(d.val(f"SELECT public.w0698('{car}', '{run}', '[{{\"svc\": \"exterior_wash\", \"m\": \"derived\"}}]')"))
+        # in the order the old visits arrived: k:B's cleaning (k:A's duplicate is not carried), then k:A's calibration
+        assert [(a["m"], a.get("carried_from_visit")) for a in got] == [("derived", None), ("m5", "k:B"), ("m2", "k:A")]
+        assert got[2]["status"] == "in_progress" and got[2]["ends_at"] == "2026-09-01T10:30:00+00:00" and got[2]["carried"]
+        # a run with no id (production) carries only what production's own open visits owe: here, none
+        assert d.val(f"SELECT jsonb_array_length(public.w0698('{car}', NULL, '[]'))") == "0"
+    finally:
+        _drop(d)
 
 
 def test_only_the_platform_reaches_the_operators(db):
