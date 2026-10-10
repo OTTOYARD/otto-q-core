@@ -79,7 +79,7 @@ The hold and the way back were read in the live functions, comment-stripped, bef
   starter (`public.ottoq_start_concurrent_atoms`), which starts every digital atom at once, anywhere, with no
   technician; it is where a transfer pauses and resumes.
 
-## The build: `db/migrations/0695` (written 2026-10-10, pending; applied after 0657)
+## The build: `db/migrations/0695` (written 2026-10-10; applied 2026-10-10, 6:36 AM CT, after 0657; the dial set nowhere)
 
 1. `service_cadence_policy` row `data_offload` (lane `digital`, must-do once raised, event-raised), and the retirable
    set, so `ottoq_assert_service_vocabulary()` stays empty and the atoms guard does not tag it as having no executor.

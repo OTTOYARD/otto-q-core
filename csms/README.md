@@ -37,7 +37,7 @@ at the charger; OTTO-Q never commands a car.
 
 ## What comes next, in order
 
-1. **Retire the 1.6 names in the twin's log (G412). Written as pending migration 0694.** The twin's start, advance and
+1. **Retire the 1.6 names in the twin's log (G412). Migration 0694, applied 2026-10-10, 6:27 AM CT.** The twin's start, advance and
    stop write what a 2.0.1 station sends: `Authorize` with the token only, and `TransactionEvent` Started (with the
    `idToken`), Updated (the meter values; it replaces the in-transaction `MeterValues`) and Ended (with `stoppedReason`),
    each with its `seqNo`; the `StatusNotification` was already 2.0.1's shape. The battery temperature, which 2.0.1 has no
