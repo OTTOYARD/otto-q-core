@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -129,6 +130,9 @@ class StationHandler(ChargePoint):
         if last is not None and seq_no <= last:
             log.warning("station %s transaction %s: seqNo %s after %s", self.id, tx_id, seq_no, last)
         self.state.last_seq_no[tx_id] = seq_no
+        if tx_id not in self.state.transactions and len(self.state.transactions) >= self.csms.keep_transactions:
+            self.state.transactions.pop(next(iter(self.state.transactions)))   # the oldest goes
+            self.state.last_seq_no = {k: v for k, v in self.state.last_seq_no.items() if k in self.state.transactions}
         tx = self.state.transactions.setdefault(tx_id, {"events": 0, "seq_nos": [], "first_event_type": event_type})
         tx.update(event_type=event_type, trigger_reason=trigger_reason, timestamp=timestamp,
                   charging_state=transaction_info.get("charging_state"),
@@ -150,10 +154,13 @@ class StationHandler(ChargePoint):
 class CSMS:
     """The back end: the stations it holds, and everything it was told and said."""
 
-    def __init__(self):
+    def __init__(self, log_frames: int | None = None, keep_transactions: int = 5000):
+        # a long-running back end keeps the last log_frames frames and keep_transactions transactions per station; the
+        # bridge reports every frame's outcome upstream, so nothing is lost by forgetting here (None keeps all, for tests)
         self.stations: dict[str, StationState] = {}
         self.handlers: dict[str, StationHandler] = {}
-        self.log: list[dict[str, Any]] = []
+        self.log: deque[dict[str, Any]] = deque(maxlen=log_frames)
+        self.keep_transactions = keep_transactions
         self._next_profile_id = 1
         self._server = None
 

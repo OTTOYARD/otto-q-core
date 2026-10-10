@@ -71,8 +71,13 @@ at the charger; OTTO-Q never commands a car.
      hashed before anything else (`tests/csms_relay.test.mjs`). Deployed after 0697.
    - `relay.py` (`test_relay.py`): the loop beside the back end. It writes the cursor and the batch's report to its
      state file before sending the report, so a crash re-sends a report and never re-delivers its frames.
-   - **Then, in order:** apply 0697; deploy the relay; on `ottoq-intel-2` over SSM, make the key, register its hash, and
-     run `csms_server.py` (listening on 127.0.0.1) and `relay.py` as two services. Later still: a dial switches the
+   - `service.py`, `Dockerfile`, `deploy/deploy_ssm.py`: the back end (on 127.0.0.1 only) and the bridge as one process
+     in its own container on `ottoq-intel-2`, with `--cpus 0.25 --memory 256m` beside the intelligence service, which
+     runs on a burstable t3.medium. `deploy_ssm.py make-key` makes the key on the box and prints only its SHA-256 and
+     prefix; nothing else ever holds it.
+   - **Then, in order:** apply 0697 (with a person, for its DROP); deploy the relay; `deploy_ssm.py discover`,
+     `make-key`, register the hash (`ottoq_register_source_key_hash`, source `charger_backend`, data source `twin`,
+     stream `ocpp`), `deploy`. Later still: a dial switches the
      twin from writing its charger log itself to writing an outbox the bridge drains, so the log of record is what the
      back end received; the back end's frames go to OTTO-Q through `ottoq-ingest`'s `ocpp` stream; and OTTO-Q's charge
      plans go out as `SetChargingProfile` through the same relay, with the twin's charge physics reading a station's
