@@ -44,6 +44,13 @@ names *"freeing a charger the moment its car is done"* as an answer to site pres
 stalls would let a car finish its transfer off the charger. That is a depot design question with a measurable answer,
 which is why the build is a dial and a pair, not a default.
 
+**The risk the build has to close first: a rule-9 deadlock.** If the engine moves a charged car off its charger to
+staging while its offload is unfinished, the car holds a required service it cannot do there, and nothing seats a car
+on a charger that needs no charge, so it never leaves. The hold has to be explicit: a car with a pending or running
+offload keeps its charger (or bay) until the transfer ends. Read 2026-10-10: `charge_complete_holding` is handled in
+over 40 functions, among them `ottoq_decide_tick` (97,675 characters), `twin.ottoq_sim_advance_service_flow` and
+`twin.ottoq_sim_stop_charge_session`, so the release paths are read one by one before anything is written.
+
 ## The build (one migration, behind a dial, plus a pair)
 
 1. `service_cadence_policy` row `data_offload` (lane `digital`, must-do once raised, declared in the vocabulary and
