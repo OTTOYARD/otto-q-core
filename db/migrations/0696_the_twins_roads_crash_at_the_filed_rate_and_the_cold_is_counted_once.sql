@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010113746
 -- migration-name:    the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once
 --
 -- 0696  **The twin's cars crash on the road at the rate Waymo filed with the CPUC, towed as often as NHTSA's reports
@@ -256,3 +256,10 @@ VALUES ('0696_the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_on
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:37:46 UTC (6:37 AM CT), version 20261010113746 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 c6a024ac4a36c2d666b99ff75816fe12, 16,968 characters, 17,742 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the incident draw's source md5 b9ad369159d990015b7bc36635d7a258 and the drain's
+--   3b71e8afbd96b62657ee4f73524d17f1 as written; snapshot 0696_pre holds both old definitions; lineage TRUE/TRUE, the
+--   recert floor now 11:37:46 UTC; the recert runner (cron job 746) still paused for 0698 (read 11:38:03 UTC).
