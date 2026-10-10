@@ -36,6 +36,8 @@
  */
 
 import { INERT_OPS } from "./agent_dial_discipline.ts";
+import { ACCESS_TOKEN_PATTERN, ACCOUNT_MCP_PATH, accountChallenge, handleSignin, isSigninPath, type OAuthRpc,
+         type SigninConfig } from "./agent_signin.ts";
 
 export const GATEWAY_NAME = "ottoq-agent-gateway";
 export const GATEWAY_TITLE = "OTTO-Q Agent Gateway";
@@ -44,8 +46,9 @@ export const TWIN_DEPOT_ID = "11111111-1111-1111-1111-111111111111";
 /** The ONLY database function the gateway calls. Everything else is the database's business. */
 export const ENGINE_RPC = "ottoq_agent_call";
 /** 'oqa_' + 64 lowercase hex characters, as ottoq_agent_issue_token mints them. Anything else is refused before the database. */
-/** An agent key (oqa_, issued by ottoq_agent_issue_token) or a passcode session key (oqs_, from enter_passcode, 0607). */
-export const TOKEN_PATTERN = /^oq[as]_[0-9a-f]{64}$/;
+/** An agent key (oqa_, issued by ottoq_agent_issue_token), a passcode session key (oqs_, from enter_passcode, 0607), or an
+ *  access token of an agent signed in to an owner's account (oqt_, from the sign-in token endpoint, 0700). */
+export const TOKEN_PATTERN = /^oq[ast]_[0-9a-f]{64}$/;
 /** A passcode session key: the only kind an agent may also send as a tool's `session` argument, never a long-lived key. */
 export const SESSION_PATTERN = /^oqs_[0-9a-f]{64}$/;
 export const MAX_BODY_BYTES = 64 * 1024;
@@ -849,6 +852,8 @@ export function restIndex(baseUrl: string) {
     documentation: "https://github.com/OTTOYARD/otto-q-core/blob/main/AGENT_GATEWAY.md",
     owner_guide: "https://github.com/OTTOYARD/otto-q-core/blob/main/PERSONAL_AGENT.md",
     mcp: `${baseUrl}/mcp`,
+    //: 0700: the MCP address for an agent signed in to an owner's OTTOYARD account (OAuth 2.1; PERSONAL_AGENT.md section 10)
+    mcp_signed_in: `${baseUrl}${ACCOUNT_MCP_PATH}`,
     openapi: `${baseUrl}/v1/openapi.json`,
     agent_card: `${baseUrl}/.well-known/agent-card.json`,
     endpoints: TOOLS.map((t) => ({ method: t.rest.method, path: t.rest.path, tool: t.name, capability: t.capability, title: t.title }))
@@ -1619,6 +1624,9 @@ export type GatewayOptions = {
   engine: EngineRpc | null;
   /** POST /v1/ask's plain-English door (./ottocommand_owner.ts). Absent or null: the door answers 503 ask_not_configured. */
   ask?: AskHandler | null;
+  /** 0700: OTTOYARD sign-in (./agent_signin.ts): the OAuth endpoints and the signed-in MCP address. Absent: those paths
+   *  answer 404 and /account/mcp refuses every request. */
+  signin?: { config: SigninConfig; rpc: OAuthRpc | null } | null;
 };
 
 export const CORS_ALLOW_HEADERS = "authorization, content-type, idempotency-key, mcp-protocol-version, mcp-method, mcp-name";
@@ -1676,6 +1684,9 @@ export async function readBodyBounded(body: ReadableStream<Uint8Array> | null, l
  *   5. the token's SHA-256 -- the raw token never leaves this function -- and then REST, MCP or the plain-English door,
  *      each of which asks the database, which resolves the principal, rate-limits, checks the capability and writes
  *      the call ledger. The plain-English door reaches the engine only through that same call, with the same token.
+ * 0700: the sign-in endpoints (/oauth/*, the protected-resource metadata) come first, open to any origin (they carry
+ * no ambient credentials); the signed-in MCP address (/account/mcp) takes only an access token, and answers anything
+ * else with a 401 that tells an MCP client where to sign in (RFC 9728).
  */
 export async function handleGatewayRequest(req: Request, opts: GatewayOptions): Promise<Response> {
   const url = new URL(req.url);
@@ -1683,7 +1694,8 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
   const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
   const method = req.method.toUpperCase();
   const origin = req.headers.get("origin");
-  const isMcp = path === "/mcp";
+  const isAccountMcp = path === ACCOUNT_MCP_PATH;
+  const isMcp = path === "/mcp" || isAccountMcp;
   const isAsk = path === "/v1/ask";
   const cors: Record<string, string> = origin && opts.allowedOrigins.includes(origin)
     ? { "Access-Control-Allow-Origin": origin, "Access-Control-Expose-Headers": CORS_EXPOSE_HEADERS, Vary: "Origin" }
@@ -1696,6 +1708,15 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
   };
 
   try {
+    // 0. OTTOYARD sign-in (0700): its documents and endpoints, before the Origin and key checks
+    if (isSigninPath(path)) {
+      if (!opts.signin) return refuse(404, "not_found", "Sign-in is not configured on this gateway.");
+      const userAgent = req.headers.get("user-agent");
+      return await handleSignin(req, path, opts.signin.config, opts.signin.rpc, {
+        http_method: method, path: path.slice(0, 200), ip: firstForwardedFor(req.headers.get("x-forwarded-for")),
+        ...(userAgent ? { client: userAgent.slice(0, 120) } : {}) });
+    }
+
     // 1. public discovery
     if (CARD_PATHS.has(path) || path === OPENAPI_PATH) {
       const pub = { "Access-Control-Allow-Origin": "*" };
@@ -1727,6 +1748,14 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
     const anonymous = authorization === null || authorization.trim() === "";
     const token = anonymous ? null : bearerToken(authorization);
     const passcodeRoute = !isMcp && !isAsk && (() => { const r = routeRest(method, path); return "tool" in r && (r.tool === "welcome" || r.tool === "enter_passcode"); })();
+    //: 0700: the signed-in MCP address takes only an access token; anything else is sent to sign in (RFC 9728 5.1)
+    if (isAccountMcp && (anonymous || token === null || !ACCESS_TOKEN_PATTERN.test(token))) {
+      return refuse(401, anonymous ? "sign_in_required" : "invalid_token",
+        anonymous
+          ? "Sign in to OTTOYARD: this address is for an agent signed in to an owner's account. Your MCP client finds the sign-in from this response's WWW-Authenticate header (OAuth 2.1, device code or browser)."
+          : "That is not an OTTOYARD access token. Sign in again, or refresh the token.",
+        { "WWW-Authenticate": accountChallenge(opts.publicUrl, !anonymous) });
+    }
     if (anonymous ? !(isMcp || passcodeRoute) : token === null || !isWellFormedToken(token)) {
       return refuse(401, "unauthenticated",
         "Send Authorization: Bearer <agent key or session key>. No key? GET /v1/welcome, then POST /v1/passcode with OTTOYARD's demo passcode for a session key (over MCP, call welcome and enter_passcode).",
@@ -1764,10 +1793,12 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
     // a session key a tool call carries as its `session` argument is hashed here like a header key: it never leaves
     const bindSession = async (sessionKey: string) => callFor(await sha256Hex(sessionKey));
     const out = isMcp
-      ? await handleMcp({ method, headers: req.headers, bodyText }, call, { anonymous, bindSession })
+      ? await handleMcp({ method, headers: req.headers, bodyText }, call, isAccountMcp ? {} : { anonymous, bindSession })
       : isAsk
         ? await handleAsk({ method, headers: req.headers, bodyText }, call, opts.ask)
         : await handleRest({ method, path, query: url.searchParams, headers: req.headers, bodyText }, call);
+    //: 0700: an expired or disconnected access token on the signed-in address: tell the client to refresh or sign in again
+    if (isAccountMcp && out.status === 401) out.headers = { ...out.headers, "WWW-Authenticate": accountChallenge(opts.publicUrl, true) };
     return toResponse(out, cors);
   } catch (e) {
     console.error(`${GATEWAY_NAME}: unhandled`, (e as Error)?.name ?? "error", (e as Error)?.message?.slice(0, 200) ?? "");
