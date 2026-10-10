@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010111411
 -- migration-name:    an_owner_signs_in_and_connects_their_own_agent
 --
 -- 0700  **An owner signs in, and connects their own agent.** An OTTOYARD account (a Supabase Auth user of this

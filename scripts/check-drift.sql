@@ -728,7 +728,7 @@ repo_manifest(version, name, file) AS (
     ('20261009123213'::text, 'the_kernel_serves_a_long_wait_first_and_times_its_line_in_minutes'::text, '0642_the_kernel_serves_a_long_wait_first_and_times_its_line_in_minutes.sql'::text),
     ('20261009132013'::text, 'the_research_wing_tests_0642s_two_keys_in_the_twin'::text, '0643_the_research_wing_tests_0642s_two_keys_in_the_twin.sql'::text),
     ('20261009174701'::text, 'the_research_safety_check_judges_cars_not_served_across_a_look'::text, '0644_the_research_safety_check_judges_cars_not_served_across_a_look.sql'::text),
-    ('PENDING'::text, 'an_owner_signs_in_and_connects_their_own_agent'::text, '0700_an_owner_signs_in_and_connects_their_own_agent.sql'::text)
+    ('20261010111411'::text, 'an_owner_signs_in_and_connects_their_own_agent'::text, '0700_an_owner_signs_in_and_connects_their_own_agent.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
