@@ -740,7 +740,7 @@ repo_manifest(version, name, file) AS (
     ('20261010031436'::text, 'the_research_wing_measures_the_operator_door_in_the_twin'::text, '0656_the_research_wing_measures_the_operator_door_in_the_twin.sql'::text),
     ('PENDING'::text, 'the_readiness_check_is_the_last_thing_a_visit_does'::text, '0657_the_readiness_check_is_the_last_thing_a_visit_does.sql'::text),
     ('20261010110559'::text, 'the_public_key_reads_only_what_a_cockpit_shows'::text, '0658_the_public_key_reads_only_what_a_cockpit_shows.sql'::text),
-    ('PENDING'::text, 'the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it'::text, '0659_the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it.sql'::text),
+    ('20261010110931'::text, 'the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it'::text, '0659_the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it.sql'::text),
     ('PENDING'::text, 'the_dispatch_ledger_counts_the_miles_the_car_drove'::text, '0690_the_dispatch_ledger_counts_the_miles_the_car_drove.sql'::text),
     ('PENDING'::text, 'a_twin_operators_fault_report_goes_with_its_run'::text, '0691_a_twin_operators_fault_report_goes_with_its_run.sql'::text),
     ('PENDING'::text, 'the_twins_operators_send_telemetry_and_faults_through_the_door'::text, '0692_the_twins_operators_send_telemetry_and_faults_through_the_door.sql'::text),

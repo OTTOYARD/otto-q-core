@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010110931
 -- migration-name:    the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it
 --
 -- 0659  **The twin's chargers can be depot-grade, up more than 97% of the time, and the research wing measures what
@@ -310,3 +310,10 @@ VALUES ('0659_the_twins_chargers_can_be_depot_grade_and_the_research_wing_measur
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:09:31 UTC (6:09 AM CT), version 20261010110931 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 62c011d5a6b21320e5a23c9936dcf55f, 20,650 characters, 21,449 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the fault card's definition md5 8a5c3867256504ea2dcbe693e0be07d4 as written; the dial
+--   twin_charger_fault_regime is set nowhere (0 rows); experiment 34696196-c36a-4186-b893-f7437e2f793d active, 0 -> 1;
+--   lineage FALSE/FALSE (read 11:09:44 UTC).
