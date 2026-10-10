@@ -14,6 +14,8 @@ import deploy_ssm  # noqa: E402
 def test_the_service_ships_whole_and_the_same_every_time():
     a, b = deploy_ssm.tarball(), deploy_ssm.tarball()
     assert a == b
+    # no build time in the gzip header (RFC 1952 MTIME, bytes 4-7): two builds a second apart once differed only there
+    assert a[:2] == b"\x1f\x8b" and a[4:8] == b"\x00\x00\x00\x00"
     assert sorted(tarfile.open(fileobj=io.BytesIO(a)).getnames()) == sorted(deploy_ssm.SHIP)
 
 

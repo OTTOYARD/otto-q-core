@@ -23,6 +23,7 @@ bridge's), outbound HTTPS to the relay, restart unless stopped, state in /var/li
 from __future__ import annotations
 
 import base64
+import gzip
 import hashlib
 import io
 import os
@@ -40,15 +41,17 @@ SHIP = ["csms_server.py", "station_sim.py", "charger_bridge.py", "csms_relay.py"
 
 
 def tarball() -> bytes:
-    """csms/'s service files, reproducibly (sorted, mtime 0, owner 0)."""
+    """csms/'s service files, reproducibly (sorted, mtime 0, owner 0, and no build time in the gzip header)."""
     buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
+    with tarfile.open(fileobj=buf, mode="w", format=tarfile.GNU_FORMAT) as tar:
         for name in sorted(SHIP):
             data = open(os.path.join(CSMS, name), "rb").read()
             info = tarfile.TarInfo(name)
             info.size, info.mtime, info.uid, info.gid, info.mode = len(data), 0, 0, 0, 0o644
             tar.addfile(info, io.BytesIO(data))
-    return buf.getvalue()
+    # tarfile's "w:gz" stamps the gzip header with the time it ran (RFC 1952's MTIME), so two builds a second apart
+    # differed; compressed here with mtime 0, the same sources give the same bytes and the same sha256 every time
+    return gzip.compress(buf.getvalue(), compresslevel=9, mtime=0)
 
 
 def chunked(data: bytes, dest: str, label: str) -> list[str]:
