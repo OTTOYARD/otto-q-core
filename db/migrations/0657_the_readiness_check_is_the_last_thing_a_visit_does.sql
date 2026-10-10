@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010112938
 -- migration-name:    the_readiness_check_is_the_last_thing_a_visit_does
 --
 -- 0657  **A visit's readiness check closes only when every other atom of the visit is done.** (G398; db/checks/0431
@@ -198,3 +198,11 @@ VALUES ('0657_the_readiness_check_is_the_last_thing_a_visit_does', true, true,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:29:38 UTC (6:29 AM CT), version 20261010112938 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 0b1b478be3ff895867f3a0e01e92d73f, 12,760 characters, 13,556 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the visit-atom advancer's definition md5 f073e5be363fea71d436c34d790ff610 as written; no
+--   probe visit left; lineage TRUE/TRUE, so the recert floor moved to 11:29:38 UTC and all 9 enabled canon columns
+--   read unsatisfied (read 11:29:45 UTC). The recert runner, cron job 746, was paused at 11:29:00 UTC so that 0657,
+--   0696 and 0698 ride one recertification.

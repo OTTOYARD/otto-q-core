@@ -738,7 +738,7 @@ repo_manifest(version, name, file) AS (
     ('20261010014628'::text, 'the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first'::text, '0654_the_walk_reports_to_the_twin_and_the_ticks_let_its_operators_answer_first.sql'::text),
     ('20261010031137'::text, 'the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered'::text, '0655_the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered.sql'::text),
     ('20261010031436'::text, 'the_research_wing_measures_the_operator_door_in_the_twin'::text, '0656_the_research_wing_measures_the_operator_door_in_the_twin.sql'::text),
-    ('PENDING'::text, 'the_readiness_check_is_the_last_thing_a_visit_does'::text, '0657_the_readiness_check_is_the_last_thing_a_visit_does.sql'::text),
+    ('20261010112938'::text, 'the_readiness_check_is_the_last_thing_a_visit_does'::text, '0657_the_readiness_check_is_the_last_thing_a_visit_does.sql'::text),
     ('20261010110559'::text, 'the_public_key_reads_only_what_a_cockpit_shows'::text, '0658_the_public_key_reads_only_what_a_cockpit_shows.sql'::text),
     ('20261010110931'::text, 'the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it'::text, '0659_the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it.sql'::text),
     ('20261010111333'::text, 'the_dispatch_ledger_counts_the_miles_the_car_drove'::text, '0690_the_dispatch_ledger_counts_the_miles_the_car_drove.sql'::text),
