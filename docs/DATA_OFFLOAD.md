@@ -1,6 +1,6 @@
 # Data offload as a depot service
 
-**Status:** design, 2026-10-10 (about 1:30 AM CT). Part A, item 3 of the twin data contract review: *"The AV view of a
+**Status:** design, 2026-10-10 (about 1:30 AM CT; the stall points read 2:03-2:12 AM CT). Part A, item 3 of the twin data contract review: *"The AV view of a
 depot visit ... No such service exists in the engine."* **Chase, 2026-10-09:** model it as a timing sequence while the
 car charges or during a service-bay stop. This file sets out how, what it costs, and what the twin will measure before
 anything changes the default world. Nothing here is built yet.
@@ -58,17 +58,51 @@ not yet read). The hold goes at the first, and whichever of the others move a ch
 fault still ends the hold (rule 9's own exception: the car is re-queued, and its transfer resumes on the next uplink
 stall).
 
-## The build (one migration, behind a dial, plus a pair)
+## Where the transfer can stall, read 2026-10-10 2:03-2:12 AM CT
+
+The hold and the way back were read in the live functions, comment-stripped, before anything was written:
+
+- **What already holds a charged car on its charger.** `twin.ottoq_sim_advance_service_flow` STEP 1.5 (the
+  deploy-pressure fast track) moves a `charge_complete_holding` car to staging only when no must-do atom other than the
+  charge and the readiness check is open. A raised offload is must-do, so in the ordinary flow a car whose charge ends
+  first keeps its charger until the transfer ends. That is the hold the design asks for, already there.
+- **What moves a charged car off its charger for other work.** STEP 2 of the same function admits a
+  `charge_complete_holding` car with a wash or deep clean open to the wash bay; `ottoq.ottoq_activate_due_bay_reservations`
+  seats a car whose bay booking is due; and the emergency and fault handlers move cars by their own rules. Each of
+  these would take a car with its transfer unfinished off the uplink.
+- **What brings such a car back: nothing, today.** The charge cursor in `ottoq_decide_tick` takes a staged car only below
+  its visit target minus 1 (0493). `twin.ottoq_sim_departure_recheck` (0543) routes an unfinished staged car to a
+  charge, a service bay or the wash, and leaves digital work "to finish where the car is". A car whose battery is full
+  and whose transfer is unfinished, off its charger, has no route back: the departure door keeps it (rule 9), and the
+  readiness gate escalates it as stuck. This is the deadlock the design warned of, located.
+- The completion step (`twin.ottoq_sim_advance_visit_atoms`) also restarts pending digital work each tick through the
+  starter (`public.ottoq_start_concurrent_atoms`), which starts every digital atom at once, anywhere, with no
+  technician; it is where a transfer pauses and resumes.
+
+## The build (one migration after 0657, behind a dial, plus a pair)
 
 1. `service_cadence_policy` row `data_offload` (lane `digital`, must-do once raised, declared in the vocabulary and
    the retirable set, so `ottoq_assert_service_vocabulary()` stays empty).
-2. The visit deriver raises it, sized as above, at `twin_data_offload` 1 (a run's dial; 0, unset, changes nothing).
-3. The concurrent starter starts it only when the car's current stall is a charger or a service bay, records
-   `performed_by` `stall_uplink` and the stall, and the twin's completion step counts its minutes only while the car
-   is on that kind of stall.
-4. The pair: `twin_data_offload` 0 against 1, busy_day at the twin depot, read for fast-charger hours spent holding a
-   charged car for its offload, turnaround, the wait for a charger, and deployed car hours. A second question for the
-   research wing after it: the same with uplink on the staging stalls.
+2. The visit deriver raises it, sized as above, at `twin_data_offload` 1 (a run's dial; 0, unset, changes nothing),
+   and only on a visit that has a charge to do, so the car will stand on a charger anyway. A visit with no charge
+   carries its hours to the next visit that has one.
+3. The starter starts it only on a charger or a service bay, records `performed_by` `stall_uplink` and the stall, and
+   resumes a paused transfer from the minutes it has left. The completion step pauses a running transfer whose car is
+   no longer on its uplink stall, keeping the minutes done.
+4. The hold: STEP 2's wash admission and the bay-booking activation leave a car whose transfer is running where it is
+   until the transfer ends; the wash and the bay follow it.
+5. The way back, for a car that leaves its uplink anyway (an emergency, a fault): the departure recheck and the
+   readiness gate give an unfinished transfer the remedy `need_charge`, the recheck stops sending such a car back to
+   the gate, and the decide tick's charge cursor takes a car with an unfinished transfer as needing a charger whatever
+   its charge. A session opened for a full car completes with no energy on the next tick (the start function already
+   handles that case), and STEP 1.5 then holds the car on the charger until the transfer ends.
+6. The pair: `twin_data_offload` 0 against 1, busy_day at the twin depot, read for fast-charger hours spent holding a
+   charged car for its offload, turnaround, the wait for a charger, deployed car hours, and any car the readiness gate
+   escalates as stuck. A second question for the research wing after it: the same with uplink on the staging stalls.
+
+Steps 3 and 5 patch `twin.ottoq_sim_advance_visit_atoms` as 0657 leaves it, so the migration is applied after 0657.
+Ten patch sites in eight functions, two of them the largest in the engine (`ottoq_decide_tick`,
+`twin.ottoq_sim_advance_service_flow`); each is md5-guarded and the probe exercises each piece on a stopped run.
 
 The dial stays 0 until a person sets it, after the pair, as a certified change (rule 10: the research wing measures,
 production does not experiment).
