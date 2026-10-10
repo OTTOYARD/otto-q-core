@@ -39,6 +39,8 @@ MIG["0654"] = os.path.join(ROOT, "db", "migrations",
 MIG["0655"] = os.path.join(ROOT, "db", "migrations",
                            "0655_the_finalizer_leaves_a_directive_its_operator_answered_as_it_was_answered.sql")
 MIG["0657"] = os.path.join(ROOT, "db", "migrations", "0657_the_readiness_check_is_the_last_thing_a_visit_does.sql")
+MIG["0659"] = os.path.join(ROOT, "db", "migrations",
+                           "0659_the_twins_chargers_can_be_depot_grade_and_the_research_wing_measures_it.sql")
 RUN = "cccccccc-0000-0000-0000-00000000000c"
 CLOCK = "2026-10-09T15:00:00Z"
 
@@ -141,6 +143,15 @@ def test_0657_refuses_a_visit_advancer_it_was_not_written_against(db):
     rc, err = db.file(MIG["0657"])
     assert rc != 0 and "0657 P1" in err, err
     assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0657%'") == "0"
+
+
+def test_0659_refuses_out_of_order_and_changes_nothing(db):
+    # 0659 adds the depot-grade charger dial and patches the live fault card at md5-guarded anchors; it is written after
+    # 0658, so on the stub it must refuse at its premises and leave no dial, plan or lineage row. That the card is byte
+    # for byte the same with the dial unset, and scaled at 1, is proved on the live fault card in 0659's own V1.
+    rc, err = db.file(MIG["0659"])
+    assert rc != 0 and "0659 P1" in err, err
+    assert db.val("SELECT count(*) FROM ottoq_cert_lineage WHERE name LIKE '0659%'") == "0"
 
 
 def test_only_the_platform_reaches_the_operators(db):
