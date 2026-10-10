@@ -141,8 +141,8 @@ busy_day's profile multiplies that by 0.4. Over the 7 days to 2026-10-10 the twi
 recorded no incident (0.15 expected at its rate; about 4.5 at the filing's).
 
 **What the filing cannot say is the part a depot needs:** how many of the 291 brought the car in, and for what work.
-That share, not the crash count, sets body and inspection bay demand. NHTSA's own reports (which carry the crash's
-location type, including parking lots) are the next read. And even at the filing's rate a twin run of about 5,800
+That share, not the crash count, sets body and inspection bay demand. NHTSA's own reports give it: the Waymo was towed
+in 53.4% of its 1,211 reports ([the NHTSA note](2026-10-10-nhtsa-crash-reports-and-temperature-curves.md)). And even at the filing's rate a twin run of about 5,800
 miles meets a collision about once in 17 runs, so the leverage on any single run is small.
 
 ## 5. What to build, and what not to
@@ -153,8 +153,8 @@ miles meets a collision about once in 17 runs, so the leverage on any single run
 - **Do not put the CPUC means in the corpus.** One mean per quarter is a target to check against, not a distribution
   to deal from. Re-read the next quarter's filing (Jul-Sep 2026, due about November) the same way and compare.
 - **Raise the twin's collision rate to the filing's (G408) with the next change to the twin's world, not alone.** It
-  needs a second number the filing lacks (the share of crashes that bring a car in, and for what work), and at
-  either rate a run sees a collision about once in 17 runs. NHTSA's reports are the next read for that share.
+  needs a second number the filing lacks (the share of crashes that bring a car in), which NHTSA's reports supply
+  (53.4% towed), and at the real rate a run sees a tow-in about once in 31 runs.
 - **Give the research wing a third world, later, if a question needs it:** busy_day's arrivals without the 30-point
   drain, so a result can be read at the real fleet's miles per session. Not built tonight: no open question asks
   for it yet, and a new scenario template changes nothing until a pair runs in it.
