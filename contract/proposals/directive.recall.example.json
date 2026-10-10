@@ -1,0 +1,14 @@
+{
+  "directive_id": "8c1f0f9e-2b7d-4a55-9b1e-3d6a2f4c7e10",
+  "version": 1,
+  "supersedes": null,
+  "issued_at": "2026-10-09T15:10:00Z",
+  "valid_from": "2026-10-09T15:10:00Z",
+  "expires_at": "2026-10-09T15:40:00Z",
+  "ack_deadline": "2026-10-09T15:15:00Z",
+  "vehicle_ref": "SIMA-0001",
+  "recall_by": "2026-10-09T15:30:00Z",
+  "reason": "energy_reserve",
+  "services": ["charge", "sensor_clean"],
+  "target_ready_time": {"p50": "2026-10-09T16:40:00Z", "p90": "2026-10-09T17:05:00Z"}
+}

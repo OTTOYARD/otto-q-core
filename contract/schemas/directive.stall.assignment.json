@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.1/directive.stall.assignment.json",
+  "title": "com.ottoyard.directive.stall.assignment (OTTO-Q to operator)",
+  "description": "Where the car should go and for how long. A request, not a command to the car: the operator moves it or answers why not.",
+  "type": "object",
+  "allOf": [{"$ref": "defs.json#/$defs/directiveHeader"}],
+  "required": ["stall", "purpose", "window"],
+  "properties": {
+    "directive_id": true,
+    "version": true,
+    "supersedes": true,
+    "issued_at": true,
+    "valid_from": true,
+    "expires_at": true,
+    "ack_deadline": true,
+    "vehicle_ref": true,
+    "stall": {
+      "type": "object",
+      "required": ["stall_code", "stall_type"],
+      "properties": {
+        "stall_code": {"$ref": "defs.json#/$defs/stallCode"},
+        "stall_type": {"$ref": "defs.json#/$defs/stallType"},
+        "zone": {"type": "string", "maxLength": 32}
+      },
+      "additionalProperties": false
+    },
+    "purpose": {"enum": ["charge", "service", "staging", "hold"]},
+    "window": {"$ref": "defs.json#/$defs/window"}
+  },
+  "additionalProperties": false
+}

@@ -58,7 +58,9 @@ FORBIDDEN_IMPORTS = re.compile(
     #: `load` is on this list for the same reason psycopg is: it is a
     #: database client by design (load/harness.py drives pgbench against a
     #: live URL). A kernel module importing it would have a connection.
-    r"httpx|urllib\.request|twin|load|bridge)\b", re.M)
+    #: `csms` and the WebSocket and OCPP libraries are on it for the same reason:
+    #: the charger back end is a NETWORK service by design (csms/README.md).
+    r"httpx|urllib\.request|twin|load|bridge|csms|websockets|ocpp)\b", re.M)
 
 #: Identifiers of the production world. A kernel file that names them has been
 #: told which world it lives in.
@@ -141,6 +143,17 @@ NON_KERNEL_PACKAGES = {
                "so FORBIDDEN_IMPORTS bans `import bridge` from the kernel exactly "
                "as it bans load and psycopg: the proposer must never learn it has "
                "a channel.",
+    "contract": "the depot data contract's conformance kit (contract/README.md): it "
+                "checks an event against the contract's JSON Schemas and signs and "
+                "verifies its ottoqsig, and builds the v2 door's schema module. It "
+                "decides, prices, sizes and derives nothing, has no database or "
+                "network, and no kernel package imports it.",
+    "csms":    "OTTO-Q's charger back end and its simulated stations (csms/README.md): "
+               "OCPP 2.0.1 over WebSocket, a NETWORK service and client by design. It "
+               "carries out a charge plan the kernel already made (a SetChargingProfile "
+               "built one to one from directive.charge.plan) and decides nothing, so "
+               "FORBIDDEN_IMPORTS bans `import csms`, websockets and ocpp from the "
+               "kernel as it bans load and bridge.",
 }
 
 
@@ -344,7 +357,6 @@ def _forward_lex_rows():
              "sessions": [], "energy": {}, "bess": []}
     classes = {"waymo": {"battery_kwh": 90, "max_charge_kw": 100,
                          "charge_kinds": ["dcfc", "l2"], "chemistry": "NMC",
-                         "max_daily_soc_pct": 80,
                          "energy_curve": [{"above_soc_pct": 0, "accept_frac": 1.0}]}}
     site = {"power_cap_kw_hard": 1000, "power_soft_target_kw": 700,
             "dcfc_cooldown_min": 18, "move_duration_min": 4, "path_capacity": 2,

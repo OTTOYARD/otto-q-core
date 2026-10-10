@@ -1,0 +1,23 @@
+{
+  "specversion": "1.0",
+  "id": "ottoq-000001",
+  "source": "urn:ottoq:depot:11111111-1111-1111-1111-111111111111",
+  "type": "com.ottoyard.directive.stall.assignment",
+  "time": "2026-10-09T14:01:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://ottoyard.com/schemas/ottoq/contract/0.1/directive.stall.assignment.json",
+  "data": {
+    "directive_id": "0b7c6f2e-8a51-4f3e-9d6a-3c1f2b9e7a10",
+    "version": 1,
+    "supersedes": null,
+    "issued_at": "2026-10-09T14:01:00Z",
+    "valid_from": "2026-10-09T14:01:00Z",
+    "ack_deadline": "2026-10-09T14:06:00Z",
+    "vehicle_ref": "SIMA-0001",
+    "stall": {"stall_code": "DC-04", "stall_type": "dcfc"},
+    "purpose": "charge",
+    "window": {"start": "2026-10-09T14:25:00Z", "end": "2026-10-09T15:05:00Z"}
+  },
+  "ottoqsig": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoicmZjODAzNy1hMS10ZXN0LWtleSJ9..FxRt_3MuGeie5zxNvdF6WD-65zKy71KmuboJHKhH4bMMKJgxEgFi8QyNrm1j78qXxbAV2bivQP_3yeWQ3LJ4Aw",
+  "subject": "SIMA-0001"
+}

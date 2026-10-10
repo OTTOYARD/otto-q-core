@@ -85,6 +85,16 @@ class ForwardOrchestratorPolicy(AssignmentPolicy):
         return out
 
 
+def _flow_total(plan: dict) -> int:
+    """F, as the chain reads it: sum(finish) over the assets a plan serves."""
+    return sum(a["finish"] for a in plan["assets"] if a["finish"] is not None)
+
+
+def _served_set(plan: dict) -> set[str]:
+    """The assets a plan serves; a rejected asset carries served=False."""
+    return {a["aid"] for a in plan["assets"] if a.get("served") is not False}
+
+
 def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, dict, list]:
     """The generalized lexicographic chain: ordered passes, each holding prior optima.
 
@@ -201,11 +211,37 @@ def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, di
             kwargs: dict = {"max_tardy_total": max_tardy}
             if max_peak is not None:
                 kwargs["max_peak_total"] = max_peak
+            held = plan
             plan = build_and_solve(sc, objective_mode="min_flow",
                                    previous_plan=plan, **kwargs, **chain_kw,
                                    **budget)
-            max_flow = sum(a["finish"] for a in plan["assets"]
-                           if a["finish"] is not None)
+            max_flow = _flow_total(plan)
+            #: THE FLOW PASS NEVER SHIPS A WORSE PLAN THAN THE ONE IT WAS HANDED
+            #: (FINDINGS G401). The previous pass's plan reaches this pass only as a
+            #: HINT on each car's charger, not on its times, so a budget-truncated
+            #: pass can return an incumbent that finishes the cars LATER than the
+            #: plan it was given. Measured on the canonical scenario once rule 9
+            #: put every car at 100%: the (tardy, peak) plan finished its cars in
+            #: 3,067 summed minutes, and the flow pass, handed it, shipped 3,173 --
+            #: the same tardiness and peak, cars ready 106 minutes later in sum, for
+            #: nothing. The held plan meets every ceiling this pass holds (they were
+            #: read from it), so when it serves the same cars and finishes them
+            #: sooner it is the better answer to this pass, and it ships. The side
+            #: terms of the objective are equal on the two (the same served set
+            #: prices the same rejections, and churn is unpriced after the first
+            #: pass), so the objective is moved by the flow difference alone. The
+            #: pass still ran, so its status, time and repro record stand as the
+            #: solver gave them, and `kept_held_plan` says which plan shipped.
+            if (not plan.get("retained_previous")
+                    and _served_set(held) == _served_set(plan)
+                    and _flow_total(held) < max_flow):
+                held_flow = _flow_total(held)
+                plan = {**held,
+                        "solver_status": plan["solver_status"],
+                        "objective": plan["objective"] - max_flow + held_flow,
+                        **({"repro": plan["repro"]} if "repro" in plan else {}),
+                        "kept_held_plan": True}
+                max_flow = held_flow
             optima["min_flow"] = max_flow
         else:
             raise ValueError(f"unknown pass mode {mode!r}")
@@ -230,6 +266,10 @@ def lexicographic_solve_traced(sc, pass_modes, *, budget=None) -> tuple[dict, di
 
         passes.append({"mode": mode, "status": plan["solver_status"],
                        "retained": False,
+                       #: present only when the pass shipped the plan it was
+                       #: handed (G401), so every other trace is unchanged
+                       **({"kept_held_plan": True}
+                          if plan.get("kept_held_plan") else {}),
                        #: PROVEN OPTIMALITY IS NOT "THE PASS RETURNED A NUMBER".
                        #: When CP-SAT exhausts the deterministic budget with an
                        #: incumbent but no proof, the status is FEASIBLE and the

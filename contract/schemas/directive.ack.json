@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.1/directive.ack.json",
+  "title": "com.ottoyard.directive.ack (operator to OTTO-Q)",
+  "description": "The operator's answer to one version of one directive. accepted means it will be carried out; rejected means the operator chose not to; unable means it could not. Anything but accepted carries a reason from the closed list, and OTTO-Q re-plans on it; 'other' also carries detail. No ack by the directive's ack_deadline reads as not done.",
+  "type": "object",
+  "required": ["directive_id", "directive_version", "disposition", "observed_at"],
+  "properties": {
+    "directive_id": {"$ref": "defs.json#/$defs/uuid"},
+    "directive_version": {"type": "integer", "minimum": 1},
+    "disposition": {"enum": ["accepted", "rejected", "unable"]},
+    "reason": {"$ref": "defs.json#/$defs/ackReason"},
+    "detail": {"type": "string", "maxLength": 500},
+    "observed_at": {"$ref": "defs.json#/$defs/timestamp"}
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "description": "Anything but accepted names its reason; accepted names none.",
+      "if": {"properties": {"disposition": {"const": "accepted"}}},
+      "then": {"not": {"required": ["reason"]}},
+      "else": {"required": ["reason"]}
+    },
+    {
+      "description": "'other' says what happened: it is the reason a person reads, and the one that grows the list.",
+      "if": {"required": ["reason"], "properties": {"reason": {"const": "other"}}},
+      "then": {"required": ["detail"]}
+    }
+  ]
+}

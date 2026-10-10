@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.1/envelope.json",
+  "title": "OTTO-Q depot contract 0.1: the envelope",
+  "description": "A CloudEvents 1.0.2 event in structured JSON mode, narrowed by this contract. There is no tenant, depot or data-source attribute: those come from the credential. Unknown attributes are refused.",
+  "type": "object",
+  "required": ["specversion", "id", "source", "type", "time", "datacontenttype", "dataschema", "data"],
+  "properties": {
+    "specversion": {"const": "1.0"},
+    "id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "source": {"type": "string", "minLength": 1, "maxLength": 256},
+    "type": {
+      "enum": [
+        "com.ottoyard.vehicle.telemetry",
+        "com.ottoyard.depot.arrival.intent",
+        "com.ottoyard.vehicle.fault.summary",
+        "com.ottoyard.vehicle.departed",
+        "com.ottoyard.directive.ack",
+        "com.ottoyard.directive.stall.assignment",
+        "com.ottoyard.directive.charge.plan",
+        "com.ottoyard.directive.service.schedule",
+        "com.ottoyard.readiness.forecast",
+        "com.ottoyard.capacity.offer"
+      ]
+    },
+    "time": {
+      "description": "When the occurrence happened (CloudEvents time), kept as sent. Required here although optional in CloudEvents.",
+      "$ref": "defs.json#/$defs/timestamp"
+    },
+    "datacontenttype": {"const": "application/json"},
+    "dataschema": {"type": "string", "format": "uri"},
+    "subject": {"type": "string", "minLength": 1, "maxLength": 128},
+    "sequence": {
+      "description": "CloudEvents sequence extension: the event's place in its source's stream, compared lexicographically. Zero-padded to 20 digits so that order is numeric order.",
+      "type": "string",
+      "pattern": "^[0-9]{20}$"
+    },
+    "ottoqsig": {
+      "description": "Extension attribute: a detached JWS (RFC 7515 Appendix F, compact form, alg Ed25519 per RFC 9864) whose payload is the RFC 8785 canonical form of this whole event without ottoqsig itself, so the signature binds id, source, type, subject, time and data together. Carried by everything OTTO-Q sends (README, Signatures).",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+\\.\\.[A-Za-z0-9_-]+$"
+    },
+    "data": {"type": "object"}
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "description": "Everything an operator sends concerns one vehicle, is ordered per vehicle, and names the vehicle in its source (the sequence extension's own advice for a per-subject order).",
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "com.ottoyard.vehicle.telemetry",
+              "com.ottoyard.depot.arrival.intent",
+              "com.ottoyard.vehicle.fault.summary",
+              "com.ottoyard.vehicle.departed",
+              "com.ottoyard.directive.ack"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": ["subject", "sequence"],
+        "properties": {
+          "source": {"pattern": "^urn:ottoq:src:[a-z0-9][a-z0-9_.-]{0,62}:[A-Za-z0-9._:-]{1,64}$"},
+          "subject": {"$ref": "defs.json#/$defs/vehicleRef"},
+          "ottoqsig": false
+        }
+      }
+    },
+    {
+      "description": "Everything OTTO-Q sends is signed and names its depot as the source.",
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "com.ottoyard.directive.stall.assignment",
+              "com.ottoyard.directive.charge.plan",
+              "com.ottoyard.directive.service.schedule",
+              "com.ottoyard.readiness.forecast",
+              "com.ottoyard.capacity.offer"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": ["ottoqsig"],
+        "properties": {
+          "source": {
+            "pattern": "^urn:ottoq:depot:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "sequence": true
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.vehicle.telemetry"}}},
+      "then": {
+        "properties": {
+          "dataschema": {"const": "https://ottoyard.com/schemas/ottoq/contract/0.1/vehicle.telemetry.json"},
+          "data": {"$ref": "vehicle.telemetry.json"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.depot.arrival.intent"}}},
+      "then": {
+        "properties": {
+          "dataschema": {"const": "https://ottoyard.com/schemas/ottoq/contract/0.1/depot.arrival.intent.json"},
+          "data": {"$ref": "depot.arrival.intent.json"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.vehicle.fault.summary"}}},
+      "then": {
+        "properties": {
+          "dataschema": {
+            "const": "https://ottoyard.com/schemas/ottoq/contract/0.1/vehicle.fault.summary.json"
+          },
+          "data": {"$ref": "vehicle.fault.summary.json"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.vehicle.departed"}}},
+      "then": {
+        "properties": {
+          "dataschema": {"const": "https://ottoyard.com/schemas/ottoq/contract/0.1/vehicle.departed.json"},
+          "data": {"$ref": "vehicle.departed.json"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.directive.ack"}}},
+      "then": {
+        "properties": {
+          "dataschema": {"const": "https://ottoyard.com/schemas/ottoq/contract/0.1/directive.ack.json"},
+          "data": {"$ref": "directive.ack.json"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.directive.stall.assignment"}}},
+      "then": {
+        "properties": {
+          "dataschema": {
+            "const": "https://ottoyard.com/schemas/ottoq/contract/0.1/directive.stall.assignment.json"
+          },
+          "data": {"$ref": "directive.stall.assignment.json"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.directive.charge.plan"}}},
+      "then": {
+        "properties": {
+          "dataschema": {
+            "const": "https://ottoyard.com/schemas/ottoq/contract/0.1/directive.charge.plan.json"
+          },
+          "data": {"$ref": "directive.charge.plan.json"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.directive.service.schedule"}}},
+      "then": {
+        "properties": {
+          "dataschema": {
+            "const": "https://ottoyard.com/schemas/ottoq/contract/0.1/directive.service.schedule.json"
+          },
+          "data": {"$ref": "directive.service.schedule.json"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.readiness.forecast"}}},
+      "then": {
+        "properties": {
+          "dataschema": {"const": "https://ottoyard.com/schemas/ottoq/contract/0.1/readiness.forecast.json"},
+          "data": {"$ref": "readiness.forecast.json"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "com.ottoyard.capacity.offer"}}},
+      "then": {
+        "properties": {
+          "dataschema": {"const": "https://ottoyard.com/schemas/ottoq/contract/0.1/capacity.offer.json"},
+          "data": {"$ref": "capacity.offer.json"}
+        }
+      }
+    }
+  ]
+}

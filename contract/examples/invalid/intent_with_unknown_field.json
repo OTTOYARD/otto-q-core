@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "sim-a-000002",
+  "source": "urn:ottoq:src:sim-a:SIMA-0001",
+  "type": "com.ottoyard.depot.arrival.intent",
+  "time": "2026-10-09T14:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://ottoyard.com/schemas/ottoq/contract/0.1/depot.arrival.intent.json",
+  "subject": "SIMA-0001",
+  "sequence": "00000000000000000002",
+  "data": {
+    "intent_version": 1,
+    "eta": "2026-10-09T14:25:00Z",
+    "eta_spread_s": 240,
+    "predicted_soc_pct": 31,
+    "services_needed": ["charge", "sensor_clean", "interior_tidy"],
+    "ready_by": "2026-10-09T16:30:00Z",
+    "fleet_operator_id": "x"
+  }
+}
