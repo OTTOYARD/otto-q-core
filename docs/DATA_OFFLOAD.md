@@ -52,9 +52,11 @@ over 40 functions, among them `ottoq_decide_tick` (97,675 characters), `twin.ott
 `twin.ottoq_sim_stop_charge_session`, so the release paths are read one by one before anything is written. The first
 read (2026-10-10): a charger is let go in one place, `twin.ottoq_sim_stop_charge_session` (its tether-guarded clear of
 the stall's car, called from `twin.ottoq_sim_advance_charge_sessions` and `public.ottoq_twin_inject_charger_fault`);
-the charged car is then moved by `ottoq_decide_tick`, `twin.ottoq_sim_advance_service_flow` and
-`twin.ottoq_opportunistic_scan`. The hold goes at the first and is honoured by the other three; a charger fault still
-ends the hold (rule 9's own exception: the car is re-queued, and its transfer resumes on the next uplink stall).
+among the functions that handle a `charge_complete_holding` car afterwards are `ottoq_decide_tick`,
+`twin.ottoq_sim_advance_service_flow` and `twin.ottoq_opportunistic_scan` (found by name; which of them move the car is
+not yet read). The hold goes at the first, and whichever of the others move a charged car must honour it; a charger
+fault still ends the hold (rule 9's own exception: the car is re-queued, and its transfer resumes on the next uplink
+stall).
 
 ## The build (one migration, behind a dial, plus a pair)
 
