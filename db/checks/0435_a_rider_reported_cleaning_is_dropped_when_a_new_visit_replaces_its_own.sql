@@ -1,8 +1,8 @@
 -- 0435  **A rider's reported cleaning, raised while the car is parked, is dropped when the twin derives a new visit
 --        over it, and 15 departures since 0543 left with it owed.** (G413, CLAUDE.md rule 9; fixed by 0698.)
 --        Found reading G399's labels (0431 §5 (c)). Measured 2026-10-10 between 08:22:45 and 08:42:29 UTC
---        (3:22-3:42 AM CT, both read from the clock), read-only, twin depot 11111111-…, during the nightly sweep
---        window (reads only).
+--        (3:22-3:42 AM CT), §4b between 08:54:39 and 08:56:35 UTC (3:54-3:56 AM CT), all read from the clock;
+--        read-only, twin depot 11111111-…, during the nightly sweep window (reads only).
 --
 -- ══ §1 HOW A VISIT ENDS ON THE TWIN DEPOT (reproduce (1)) ═══════════════════════════════════════════════════════
 --
@@ -40,6 +40,14 @@
 --   (9:51 AM CT), whose own meta reads rider_flag_kind 'interior' with rider_flagged false; its four atoms (readiness,
 --   interior inspection, interior tidy, triage) closed; the car left at 14:59:30 UTC (9:59 AM CT) without visiting a
 --   detail bay.
+--
+-- ══ §4b THE CHARGE AT DEPARTURE HOLDS (reproduce (7)) ═════════════════════════════════════════════════════════
+--
+--   The same audit for the other half of rule 9: since 0543, 21,438 twin-depot departures from the depot (6,068 first
+--   departures after a run's start, 15,370 after a return) all left at 99% or more. The 12,669 dispatch rows whose
+--   soc_at_dispatch_pct is below 99 (as low as 85) are every one a run-start deployment: a car the run begins with on
+--   the road, at its seeded charge, that never left the depot. Read soc_at_dispatch_pct as a departure's charge only
+--   after dropping the rows dispatched at the run's sim_clock_start.
 --
 -- ══ §5 WHAT FOLLOWS ═════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -147,3 +155,20 @@ SELECT p.oid::regprocedure AS fn,
   FROM pg_proc p
  WHERE p.oid IN ('ottoq.ottoq_derive_visit_needs(uuid,uuid,uuid,timestamptz,uuid,jsonb)'::regprocedure,
                  'public.ottoq_departure_clear(uuid,uuid,timestamptz,boolean)'::regprocedure);
+
+-- (7) the charge at departure: run-start deployments apart from departures from the depot
+WITH runs AS (SELECT sim_run_id, sim_clock_start FROM public.ottoq_sim_runs
+               WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND started_at >= '2026-09-28 01:38:04+00'),
+d AS (
+  SELECT d.*, r.sim_clock_start,
+         EXISTS (SELECT 1 FROM public.ottoq_vehicle_dispatches p
+                  WHERE p.sim_run_id = d.sim_run_id AND p.vehicle_id = d.vehicle_id
+                    AND p.actual_return_at IS NOT NULL AND p.actual_return_at <= d.dispatched_at
+                    AND p.dispatch_id <> d.dispatch_id) AS came_back_before
+    FROM public.ottoq_vehicle_dispatches d JOIN runs r USING (sim_run_id))
+SELECT CASE WHEN dispatched_at <= sim_clock_start + interval '1 minute' THEN 'at run start'
+            WHEN came_back_before THEN 'left after a return'
+            ELSE 'first departure of the run, after the start' END AS kind,
+       count(*) AS dispatches, count(*) FILTER (WHERE soc_at_dispatch_pct < 99) AS below_99,
+       min(soc_at_dispatch_pct) AS min_soc
+  FROM d GROUP BY 1 ORDER BY 1;
