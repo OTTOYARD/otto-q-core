@@ -1,14 +1,14 @@
 """The live bridge: read the twin's charger frames through ottoq-csms-relay, have each charger say them to the back end,
 and report what the back end did with them. Runs beside csms_server.py on the back end's machine (csms/README.md).
 
-    python3 csms/relay.py --relay https://<project>.supabase.co/functions/v1/ottoq-csms-relay \\
+    python3 csms/csms_relay.py --relay https://<project>.supabase.co/functions/v1/ottoq-csms-relay \\
                           --csms ws://127.0.0.1:9000 --state /var/lib/ottoq-csms/relay.json
 
 The key is read from the environment (OTTOQ_CSMS_KEY) or a file (--key-file), never from the command line, and is
 never printed or logged. It is a charger_backend source key made on this machine; only its SHA-256 was registered
 (db/migrations/0697).
 
-Each round: read up to 500 frames after the cursor, deliver them in order (bridge.ChargerBridge), then write the new
+Each round: read up to 500 frames after the cursor, deliver them in order (charger_bridge.ChargerBridge), then write the new
 cursor and the batch's report to the state file before sending the report, and clear it once the relay has kept it. A
 crash between the two re-sends the report and never re-delivers the frames, so the back end hears each frame once. One
 case does repeat frames: the back end going away in the middle of a batch, after which the batch is said again from its
@@ -29,7 +29,7 @@ from importlib import metadata
 from typing import Any, Callable
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from bridge import ChargerBridge, Delivery, StationFacts, TwinFrame  # noqa: E402
+from charger_bridge import ChargerBridge, Delivery, StationFacts, TwinFrame  # noqa: E402
 
 log = logging.getLogger("ottoq.csms.relay")
 KEY_HEADER = "x-otto-q-api-key"
@@ -42,7 +42,7 @@ def _version(pkg: str) -> str | None:
         return None
 
 
-BRIDGE_INFO = {"bridge": "csms/relay.py", "ocpp": _version("ocpp"), "websockets": _version("websockets")}
+BRIDGE_INFO = {"bridge": "csms/csms_relay.py", "ocpp": _version("ocpp"), "websockets": _version("websockets")}
 
 
 class RelayError(Exception):

@@ -9,9 +9,9 @@ names."* Chase, 2026-10-09: host it on AWS.
 | `csms_server.py` | the back end (a CSMS): takes stations at `ws://host:port/<station id>`, subprotocol `ocpp2.0.1`; answers BootNotification, Heartbeat, StatusNotification, Authorize, MeterValues and TransactionEvent; sends OTTO-Q's charge plan to a station as `SetChargingProfile`; keeps every frame both ways |
 | `station_sim.py` | a simulated charging station: boots, reports its connector, runs a transaction as TransactionEvent Started, Updated and Ended, and draws the lower of its rating, the car's limit and the profile's limit for the period in force |
 | `test_csms.py` | the battery: a back end and two stations over a real WebSocket on 127.0.0.1; runs in CI's pytest step |
-| `bridge.py` | the bridge: the twin's charger rows (`ottoq_ocpp_messages`, in `message_seq` order) said by one station per charger, as that charger, to the back end; every row ends `accepted`, `not_2_0_1` (refused by the station, never sent) or `csms_error` (a CALLERROR or an answer that is not 2.0.1) |
-| `test_bridge.py` | the bridge's battery, in CI's pytest step; `tests/test_twin_ocpp201_sql.py` also sends a charge built by 0694's own SQL helpers through it |
-| `relay.py`, `test_relay.py` | the live bridge's loop through `ottoq-csms-relay` (0697), and its battery against a fake relay and a real back end |
+| `charger_bridge.py` | the bridge: the twin's charger rows (`ottoq_ocpp_messages`, in `message_seq` order) said by one station per charger, as that charger, to the back end; every row ends `accepted`, `not_2_0_1` (refused by the station, never sent) or `csms_error` (a CALLERROR or an answer that is not 2.0.1) |
+| `test_charger_bridge.py` | the bridge's battery, in CI's pytest step; `tests/test_twin_ocpp201_sql.py` also sends a charge built by 0694's own SQL helpers through it |
+| `csms_relay.py`, `test_csms_relay.py` | the live bridge's loop through `ottoq-csms-relay` (0697), and its battery against a fake relay and a real back end |
 
 Both sides use [`ocpp`](https://github.com/mobilityhouse/ocpp) 2.1.0 (MIT, released 2025-07-16), which validates
 every frame against the OCPP 2.0.1 JSON schemas in both directions, and [`websockets`](https://pypi.org/project/websockets/)
@@ -45,7 +45,7 @@ at the charger; OTTO-Q never commands a car.
    `public.ottoq_charge_time_v2_params_cut`, takes a reading's charge from either shape, so the charge clock fits the
    same (0694's V1 compares a fit before and after) and needs no evidence regime or recertification. Every shape is
    validated against the 2.0.1 schemas in CI (`tests/test_twin_ocpp201_sql.py`).
-2. **The bridge. First part built (`bridge.py`, 2026-10-10).** One station per twin charger (45 at the twin depot: 35
+2. **The bridge. First part built (`charger_bridge.py`, 2026-10-10).** One station per twin charger (45 at the twin depot: 35
    ChargePoint CT4000 of 19.2 kW, 10 ABB Terra HP 350), each booted once with its own vendor, model and firmware from
    `ottoq_ocpp_chargers`, says the twin's rows to the back end over a real WebSocket. A row goes out exactly as the twin
    wrote it: the library's own `call()` rebuilds a payload from snake_case and would rename the twin's `customData`
@@ -69,9 +69,9 @@ at the charger; OTTO-Q never commands a car.
      is replaced by a wider one), so it is applied with a person present to approve it at the connector.
    - `edge-functions/ottoq-csms-relay` (in the repo, not deployed): `GET /frames`, `POST /report`, the key checked and
      hashed before anything else (`tests/csms_relay.test.mjs`). Deployed after 0697.
-   - `relay.py` (`test_relay.py`): the loop beside the back end. It writes the cursor and the batch's report to its
+   - `csms_relay.py` (`test_csms_relay.py`): the loop beside the back end. It writes the cursor and the batch's report to its
      state file before sending the report, so a crash re-sends a report and never re-delivers its frames.
-   - `service.py`, `Dockerfile`, `deploy/deploy_ssm.py`: the back end (on 127.0.0.1 only) and the bridge as one process
+   - `csms_service.py`, `Dockerfile`, `deploy/deploy_ssm.py`: the back end (on 127.0.0.1 only) and the bridge as one process
      in its own container on `ottoq-intel-2`, with `--cpus 0.25 --memory 256m` beside the intelligence service, which
      runs on a burstable t3.medium. `deploy_ssm.py make-key` makes the key on the box and prints only its SHA-256 and
      prefix; nothing else ever holds it.

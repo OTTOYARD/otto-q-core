@@ -11,7 +11,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from bridge import ChargerBridge, StationFacts, TwinFrame, replay, summarize  # noqa: E402
+from charger_bridge import ChargerBridge, StationFacts, TwinFrame, replay, summarize  # noqa: E402
 from csms_server import CSMS  # noqa: E402
 
 TX = "TXN-20260902104500-4ad4c580"

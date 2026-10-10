@@ -1,4 +1,4 @@
-"""Put OTTO-Q's charger back end (csms/service.py) on the AWS box beside the intelligence service, over Systems Manager.
+"""Put OTTO-Q's charger back end (csms/csms_service.py) on the AWS box beside the intelligence service, over Systems Manager.
 
     python3 -I csms/deploy/deploy_ssm.py discover    # read only: the box, its load, and whether the key exists
     python3 -I csms/deploy/deploy_ssm.py make-key    # make the back end's key ON THE BOX if it has none; print its hash
@@ -35,7 +35,7 @@ REGION = "us-east-1"
 RELAY = "https://gxdrcyphqjzjsuhxuqtg.supabase.co/functions/v1/ottoq-csms-relay"
 HERE = os.path.dirname(os.path.abspath(__file__))
 CSMS = os.path.dirname(HERE)
-SHIP = ["csms_server.py", "station_sim.py", "bridge.py", "relay.py", "service.py", "Dockerfile"]
+SHIP = ["csms_server.py", "station_sim.py", "charger_bridge.py", "csms_relay.py", "csms_service.py", "Dockerfile"]
 
 
 def tarball() -> bytes:

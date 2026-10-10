@@ -10,7 +10,7 @@ import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from csms_server import CSMS  # noqa: E402
-from relay import Relay, RelayError, StateFile  # noqa: E402
+from csms_relay import Relay, RelayError, StateFile  # noqa: E402
 
 KEY = "ottow_" + "ef" * 32
 AT = "2026-10-10T13:00:00+00:00"

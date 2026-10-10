@@ -169,9 +169,9 @@ def test_a_sessions_seq_no_counts_its_own_events(db):
 
 
 def test_a_charge_the_helpers_build_is_accepted_by_a_real_back_end_over_a_websocket(db):
-    # csms/bridge.py: the twin's rows said by their charger, as a 2.0.1 station, to OTTO-Q's back end on 127.0.0.1
+    # csms/charger_bridge.py: the twin's rows said by their charger, as a 2.0.1 station, to OTTO-Q's back end on 127.0.0.1
     sys.path.insert(0, os.path.join(ROOT, "csms"))
-    from bridge import replay
+    from charger_bridge import replay
     started = tx_event(db, "Started", "'CablePluggedIn'", 0, [("Energy.Active.Import.Register", 0, "kWh"), ("SoC", 50, "Percent")],
                        custom="jsonb_build_object('target_soc_pct', 100, 'ambient_temp_c', 22.5)", id_token="TWIN-abcdef12")
     updated = tx_event(db, "Updated", "'MeterValuePeriodic'", 1,

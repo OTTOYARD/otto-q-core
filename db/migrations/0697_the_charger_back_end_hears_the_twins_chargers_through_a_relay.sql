@@ -14,7 +14,7 @@
 --
 -- ══ §1 WHY ═══════════════════════════════════════════════════════════════════════════════════════════════════
 --
---   csms/bridge.py has each twin charger say its rows of ottoq_ocpp_messages to the back end (csms/csms_server.py) as
+--   csms/charger_bridge.py has each twin charger say its rows of ottoq_ocpp_messages to the back end (csms/csms_server.py) as
 --   an OCPP 2.0.1 station over a real WebSocket. Run beside the back end on AWS, it needs the rows out of this
 --   database and its findings back in, with no inbound port on the box and no database key on it. The relay
 --   (edge-functions/ottoq-csms-relay) is that door; this file is its database half.

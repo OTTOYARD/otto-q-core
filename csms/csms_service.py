@@ -2,7 +2,7 @@
 that has the twin's chargers speak to it (csms/README.md). This is what runs on the AWS box, in its own container.
 
     OTTOQ_CSMS_KEY_FILE=/run/secrets/ottoq_csms_key OTTOQ_CSMS_RELAY=https://<project>.supabase.co/functions/v1/ottoq-csms-relay \\
-    OTTOQ_CSMS_STATE=/var/lib/ottoq-csms/relay.json python3 csms/service.py
+    OTTOQ_CSMS_STATE=/var/lib/ottoq-csms/relay.json python3 csms/csms_service.py
 
 The back end listens on loopback because its only stations are the bridge's; a real charger needs a wss:// port with
 TLS and OCPP security profile 2 or 3, which is a later step. The key is read from a file and never printed.
@@ -16,7 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from csms_server import CSMS  # noqa: E402
-from relay import Relay, StateFile  # noqa: E402
+from csms_relay import Relay, StateFile  # noqa: E402
 
 log = logging.getLogger("ottoq.csms.service")
 
