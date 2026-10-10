@@ -232,7 +232,7 @@ BEGIN
     v_def := replace(v_def, a[i], b[i]);
   END LOOP;
   IF md5(v_def) <> '9e3925550fba1e9f0924ad167731f7cd' THEN
-    RAISE EXCEPTION '0654: the patched the walk is not the definition this file was written to produce (md5 %)', md5(v_def);
+    RAISE EXCEPTION '0654: the walk, patched, is not the definition this file was written to produce (md5 %)', md5(v_def);
   END IF;
   EXECUTE v_def;
   IF md5(pg_get_functiondef('twin.ottoq_sim_confirm_commands(uuid,timestamptz)'::regprocedure)) <> '9e3925550fba1e9f0924ad167731f7cd' THEN
@@ -265,7 +265,7 @@ BEGIN
     v_def := replace(v_def, a[i], b[i]);
   END LOOP;
   IF md5(v_def) <> '3e0ddbb1b097587bc2c0e9135d7895aa' THEN
-    RAISE EXCEPTION '0654: the patched the world tick is not the definition this file was written to produce (md5 %)', md5(v_def);
+    RAISE EXCEPTION '0654: the world tick, patched, is not the definition this file was written to produce (md5 %)', md5(v_def);
   END IF;
   EXECUTE v_def;
   IF md5(pg_get_functiondef('public.ottoq_sim_advance_tick_world(uuid)'::regprocedure)) <> '3e0ddbb1b097587bc2c0e9135d7895aa' THEN
@@ -298,7 +298,7 @@ BEGIN
     v_def := replace(v_def, a[i], b[i]);
   END LOOP;
   IF md5(v_def) <> '3489fb1392073751df4f601d45dc7731' THEN
-    RAISE EXCEPTION '0654: the patched the production world tick is not the definition this file was written to produce (md5 %)', md5(v_def);
+    RAISE EXCEPTION '0654: the production world tick, patched, is not the definition this file was written to produce (md5 %)', md5(v_def);
   END IF;
   EXECUTE v_def;
   IF md5(pg_get_functiondef('twin.ottoq_world_advance()'::regprocedure)) <> '3489fb1392073751df4f601d45dc7731' THEN
@@ -331,7 +331,7 @@ BEGIN
     v_def := replace(v_def, a[i], b[i]);
   END LOOP;
   IF md5(v_def) <> '0dbe2e53e659696e2b16a3745d7b7aeb' THEN
-    RAISE EXCEPTION '0654: the patched the advance tick is not the definition this file was written to produce (md5 %)', md5(v_def);
+    RAISE EXCEPTION '0654: the advance tick, patched, is not the definition this file was written to produce (md5 %)', md5(v_def);
   END IF;
   EXECUTE v_def;
   IF md5(pg_get_functiondef('public.ottoq_sim_advance_tick(uuid)'::regprocedure)) <> '0dbe2e53e659696e2b16a3745d7b7aeb' THEN
@@ -371,7 +371,7 @@ BEGIN
     v_def := replace(v_def, a[i], b[i]);
   END LOOP;
   IF md5(v_def) <> 'd02b6af9e3fa622267247f7277ef7057' THEN
-    RAISE EXCEPTION '0654: the patched the metronome is not the definition this file was written to produce (md5 %)', md5(v_def);
+    RAISE EXCEPTION '0654: the metronome, patched, is not the definition this file was written to produce (md5 %)', md5(v_def);
   END IF;
   EXECUTE v_def;
   IF md5(pg_get_functiondef('public.ottoq_demo_metronome(integer)'::regprocedure)) <> 'd02b6af9e3fa622267247f7277ef7057' THEN
