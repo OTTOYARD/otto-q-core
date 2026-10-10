@@ -41,12 +41,18 @@
 #                     2026-09-07. Syncing the deployed body INTO the repo would
 #                     re-commit a live credential, so it must never be done;
 #                     the fix is to DEPLOY the repo's version and rotate. G69.
+#   otto-q-api        the repo copy is AHEAD, on purpose (G394, 2026-10-10): ten
+#                     lines that refuse a write route without a source key or
+#                     the service key. The 399 KB file cannot go through the MCP
+#                     deploy tool, so it ships from the dashboard editor or a
+#                     CLI with a token (edge-functions/_MANIFEST.md footnote 12).
+#                     Remove this entry the day it is deployed.
 # ============================================================================
 set -uo pipefail
 
 PROJECT_REF="${OTTOQ_PROJECT_REF:-gxdrcyphqjzjsuhxuqtg}"
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)/edge-functions"
-EXPECTED_DRIFT=("ottoq-energy-mpc")
+EXPECTED_DRIFT=("ottoq-energy-mpc" "otto-q-api")
 
 if ! command -v supabase >/dev/null 2>&1; then
   echo "check-edge-drift: the Supabase CLI is not installed (npm i -g supabase)."

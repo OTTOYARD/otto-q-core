@@ -452,8 +452,11 @@ def main():
     #: (was 90%) shrank the tight scenario's energy demand, so it now serves 11/12 and
     #: rejects only AV-07 (was AV-03 + AV-07). The mechanism under test -- rejection
     #: names the unserved, prices it exactly once, and never constrains it -- is unchanged.
-    assert rej["rejected"] == ["AV-07"], (
-        f"T9 FAIL: rejected {rej['rejected']}, expected ['AV-07']")
+    #: Recalibrated 2026-10-09 for rule 9 (CLAUDE.md): with the chemistry cap gone every asset
+    #: charges to 100% (was 80%), and the tight scenario's energy demand rose with it, so it now
+    #: serves 8/12 and rejects AV-03, AV-07, AV-09 and AV-10. The mechanism under test is unchanged.
+    assert rej["rejected"] == ["AV-03", "AV-07", "AV-09", "AV-10"], (
+        f"T9 FAIL: rejected {rej['rejected']}, expected ['AV-03', 'AV-07', 'AV-09', 'AV-10']")
     #: Recalibrated 2026-09-08 for L-29, and the DELTA IS THE FIX. Both moves
     #: (mv1 to the wash bay, mv2 to the service bay) were unconditional
     #: intervals appended straight to `path_intervals`, so a REJECTED asset
@@ -462,9 +465,10 @@ def main():
     #: Gating them on `served` freed that capacity and the served side got 4
     #: units cheaper: 5129 -> 5125, same asset rejected. A/B'd against this
     #: exact scenario with only the move gating reverted, which returns 105129.
-    assert rej["objective"] == 105125, (
-        f"T9 FAIL: objective {rej['objective']}, expected 105125 "
-        f"(= 1 x {DEFAULT_REJECTION_PENALTY} + 5125 of served-side cost)")
+    #: Rule 9 (2026-10-09): 4 rejections and 3455 of served-side cost for the 8 served.
+    assert rej["objective"] == 403455, (
+        f"T9 FAIL: objective {rej['objective']}, expected 403455 "
+        f"(= 4 x {DEFAULT_REJECTION_PENALTY} + 3455 of served-side cost)")
     #: and the penalty dominates by design: rejection is a last resort, never a
     #: cheap way to duck a hard asset.
     assert rej["objective"] - len(rej["rejected"]) * DEFAULT_REJECTION_PENALTY \
@@ -600,21 +604,26 @@ def main():
         "test exists to prevent")
     _say(f"T12 PASS the OR-Tools pin lives in requirements.txt alone ({pinned}); CI installs from it")
 
-    # T13 — CHEMISTRY CAP (R-11): an NMC class caps daily target SoC at 80%; a class
-    # without the field is unchanged. Wikner & Thiringer 2018 (doi:10.3390/app8101825)
-    # and Keil et al. 2016 (doi:10.1149/2.0411609jes): NMC calendar fade climbs steeply
-    # above ~80%, so routine cycling must not park an NMC pack above it. Without the cap
-    # every class charged to 90% -- the exact "nominal value" a reviewer would flag as
-    # ungrounded (R-11).
-    from model import _clamp_target  # noqa: E402
-    assert _clamp_target({"max_daily_soc_pct": 80}, 90) == 80, "T13 FAIL: NMC cap not applied"
-    assert _clamp_target({"max_daily_soc_pct": 80}, 55) == 55, "T13 FAIL: cap applied below ceiling"
-    assert _clamp_target({}, 90) == 90, "T13 FAIL: no-cap default changed legacy behaviour"
+    # T13 — RULE 9 (CLAUDE.md; Chase, 2026-09-27): A CAR CHARGES TO 100% UNLESS ITS OWNER SET
+    # LESS, AND NO CHEMISTRY DEFAULT LOWERS IT. Until 2026-10-09 this test pinned the opposite: a
+    # chemistry cap (R-11) that held every NMC class of the canonical scenario at 80%. Now: a
+    # scenario that states no target gets the fleet default, 100; a class that still declares
+    # `max_daily_soc_pct` is not read; a stated target is kept exactly.
+    from model import DEFAULT_TARGET_SOC_PCT  # noqa: E402
+    assert DEFAULT_TARGET_SOC_PCT == 100, "T13 FAIL: the fleet default is not 100"
     for a in sc["assets"]:
-        cap = sc["asset_classes"][a.cls].get("max_daily_soc_pct", 100)
-        assert a.target_soc <= cap, \
-            f"T13 FAIL: {a.aid} ({a.cls}) target {a.target_soc} > cap {cap}"
-    _say("T13 PASS chemistry cap: NMC target SoC clamped to 80%; no-cap classes unchanged")
+        assert a.target_soc == 100, f"T13 FAIL: {a.aid} ({a.cls}) planned to {a.target_soc}%, not 100"
+    capped = json.loads(SC_PATH.read_text())
+    for c in capped["asset_classes"].values():
+        c["max_daily_soc_pct"] = 80
+    assert all(a.target_soc == 100 for a in materialize(capped)["assets"]), \
+        "T13 FAIL: a class's max_daily_soc_pct lowered a target"
+    stated = json.loads(SC_PATH.read_text())
+    stated["assets_spec"]["target_soc"] = 85
+    assert all(a.target_soc == 85 for a in materialize(stated)["assets"]), \
+        "T13 FAIL: a target the scenario states was not kept"
+    _say("T13 PASS rule 9: every asset planned to 100%; a declared chemistry cap is not read; "
+         "a stated target is kept")
 
     # T14 — AN ASSET THAT NEEDS NO CHARGE MUST NOT TAKE THE WHOLE SITE DOWN.
     # charge_segments returns [] once soc >= target_soc, so an asset that came

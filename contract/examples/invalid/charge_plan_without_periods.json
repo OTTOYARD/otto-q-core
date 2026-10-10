@@ -1,0 +1,25 @@
+{
+  "specversion": "1.0",
+  "id": "ottoq-000002",
+  "source": "urn:ottoq:depot:11111111-1111-1111-1111-111111111111",
+  "type": "com.ottoyard.directive.charge.plan",
+  "time": "2026-10-09T14:01:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://ottoyard.com/schemas/ottoq/contract/0.1/directive.charge.plan.json",
+  "data": {
+    "directive_id": "5d2a9b41-6c0e-4b7a-8f19-2e4c7d1a9b30",
+    "version": 1,
+    "supersedes": null,
+    "issued_at": "2026-10-09T14:01:00Z",
+    "valid_from": "2026-10-09T14:01:00Z",
+    "expires_at": "2026-10-09T14:31:00Z",
+    "ack_deadline": "2026-10-09T14:06:00Z",
+    "vehicle_ref": "SIMA-0001",
+    "stall_code": "DC-04",
+    "target_soc_pct": 100,
+    "ready_by": "2026-10-09T16:30:00Z",
+    "charging_schedule": {"start_schedule": "2026-10-09T14:27:00Z", "charging_rate_unit": "W", "periods": []}
+  },
+  "ottoqsig": "eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoicmZjODAzNy1hMS10ZXN0LWtleSJ9..Y05Zf2LsRV5vLXnIwY-YM6UKKrE1fsSbNF4cHGwj1EmG-Rg9xn04we3XCOWnW7FAqUCAGCKXLnsnJIyN3S0VCA",
+  "subject": "SIMA-0001"
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.2-draft/directive.recall.json",
+  "title": "com.ottoyard.directive.recall (OTTO-Q to operator) -- PROPOSED for contract 0.2, not part of 0.1",
+  "description": "OTTO-Q asks the operator to bring a car home: by when, for what, and when it expects the car ready again (the Recall Decision, CLAUDE.md 2.7). A request the operator may refuse, like every directive; when it turns the car home it sends a depot.arrival.intent with its own ETA. OTTO-Q never commands the car.",
+  "type": "object",
+  "allOf": [
+    {"$ref": "https://ottoyard.com/schemas/ottoq/contract/0.1/defs.json#/$defs/directiveHeader"}
+  ],
+  "required": ["recall_by", "reason", "services", "target_ready_time"],
+  "properties": {
+    "directive_id": true,
+    "version": true,
+    "supersedes": true,
+    "issued_at": true,
+    "valid_from": true,
+    "expires_at": true,
+    "ack_deadline": true,
+    "vehicle_ref": true,
+    "recall_by": {
+      "description": "The latest time OTTO-Q asks the car to be turned home. Earlier is fine; later is a refusal with a reason.",
+      "$ref": "https://ottoyard.com/schemas/ottoq/contract/0.1/defs.json#/$defs/timestamp"
+    },
+    "reason": {
+      "description": "Why now. Closed, so the operator's dispatcher can rank recalls against its own work.",
+      "enum": ["energy_reserve", "service_due", "fault", "depot_window", "owner_request"]
+    },
+    "services": {
+      "description": "What the visit is for, from the depot's published operation catalog. The charge is always to the owner's own target (rule 8); no service listed here is optional once the car is in (rule 9).",
+      "type": "array",
+      "items": {"$ref": "https://ottoyard.com/schemas/ottoq/contract/0.1/defs.json#/$defs/serviceCode"},
+      "uniqueItems": true,
+      "minItems": 1,
+      "maxItems": 16
+    },
+    "target_ready_time": {
+      "description": "When OTTO-Q expects the car ready for work again if it arrives by recall_by, as a band.",
+      "type": "object",
+      "required": ["p50", "p90"],
+      "properties": {
+        "p50": {"$ref": "https://ottoyard.com/schemas/ottoq/contract/0.1/defs.json#/$defs/timestamp"},
+        "p90": {"$ref": "https://ottoyard.com/schemas/ottoq/contract/0.1/defs.json#/$defs/timestamp"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

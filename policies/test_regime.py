@@ -9,26 +9,34 @@ energy, grid_peak and overnight order energy first, and the schedules they
 produce genuinely differ while every one holds the readiness floor.
 
 THE TRADE-OFF IS REAL AND MEASURED, not asserted by prose. On the canonical
-scenario (seed 424242, pinned ortools 9.15.6755):
+scenario (seed 424242, pinned ortools 9.15.6755), every car charging to 100%
+(rule 9; until 2026-10-09 the scenario capped every class at 80%):
 
-    grid_peak  (min_tardy, min_peak):       flow 2937 min, peak 150 kW
-    rush       (min_tardy, min_flow, min_peak): flow 1676 min, peak 400 kW
+    grid_peak  (min_tardy, min_peak):           flow 3067 min, peak 190 kW
+    rush       (min_tardy, min_flow, min_peak): flow 2073 min, peak 395 kW
 
-Rush finishes the fleet ~1260 finish-minutes sooner and pays for it with a
-~250 kW higher peak (a real demand-charge delta at NES GSA-3's $21.40/kW).
-That is the regime meaning something, in numbers.
+Rush finishes the fleet ~990 finish-minutes sooner and pays for it with a
+~205 kW higher peak (a real demand-charge delta at NES GSA-3's $21.40/kW).
+That is the regime meaning something, in numbers. (At the 80% cap the same two
+read flow 2937 / peak 150 and flow 1676 / peak 400.)
 
-PERFORMANCE FINDINGS, STATED NOT HIDDEN (2026-09-07):
-  1. min_flow does NOT prove OPTIMAL on the slack canonical scenario — the flow
+PERFORMANCE FINDINGS, STATED NOT HIDDEN (2026-09-07, re-measured 2026-10-09):
+  1. min_flow does NOT prove OPTIMAL on the canonical scenario — the flow
      objective has a large flat region, so the search runs to its deterministic
      budget and returns FEASIBLE. Determinism comes from the budget, not from
-     optimality, so the plan is still byte-stable; only the third tier is
-     truncated while the first two (tardiness, peak) are proven OPTIMAL.
-  2. A flow-first chain (rush) makes the trailing peak pass harder: holding the
-     tight flow ceiling, min_peak needs ~1.0 work-units to find a solution where
-     the energy-first chain proves OPTIMAL at 0.03. Below that it returns UNKNOWN
-     and the chain reports optima["min_peak"] = None (the retained-pass guard)
-     rather than misreporting the retained plan's objective as a peak.
+     optimality, so the plan is still byte-stable. At the 80% cap the first two
+     tiers (tardiness, peak) proved OPTIMAL; at 100% only tardiness does, and
+     min_peak returns a FEASIBLE incumbent at the default budget too.
+  2. The flow pass is handed the previous pass's plan only as a hint on each
+     car's charger, so at a small budget its own incumbent can finish the cars
+     LATER than the plan it was given (3,173 against 3,067 summed minutes at
+     FLOW_BUDGET). The chain now ships the better of the two (FINDINGS G401).
+  3. A trailing pass that cannot solve within its budget returns UNKNOWN, and
+     the chain reports optima[mode] = None (the retained-pass guard) rather
+     than misreporting the retained plan's objective. At 100% the trailing
+     peak pass of a flow-first chain fails or solves NON-MONOTONICALLY in the
+     chain-wide budget (0.15 fails, 0.18 solves, 0.2 fails, 0.22 solves), so
+     the guard is tested by starving that one pass, not by a budget knife-edge.
   A cheaper per-tick formulation of the flow pass is the honest open item for
   the live hot path; for offline planning and the demo the current solver is fine.
 """
@@ -157,24 +165,65 @@ def test_min_flow_reports_a_real_peak_ceiling_chain():
 
 
 def test_three_pass_reduces_flow_vs_two_pass_holding_both_axes():
-    two, _ = lexicographic_solve(load_scenario(SC), ("min_tardy", "min_peak"))
+    # The claim is about the THIRD pass, so both chains run at one budget and
+    # share their first two passes byte for byte; the two-pass plan is then the
+    # very plan the third pass was handed. (This compared against a two-pass
+    # chain at the default budget, which held only while both reached the same
+    # peak plan -- true at the 80% cap, not at 100%.)
+    two, _ = lexicographic_solve(load_scenario(SC), ("min_tardy", "min_peak"),
+                                 budget=FLOW_BUDGET)
     three, _ = lexicographic_solve(load_scenario(SC),
                                    ("min_tardy", "min_peak", "min_flow"),
                                    budget=FLOW_BUDGET)
     # the third pass can only improve (or tie) flow while holding tardiness+peak
     assert _tardy(three) <= _tardy(two)
+    assert _peak_from_plan(three) <= _peak_from_plan(two)
     assert _flow(three) <= _flow(two)
 
 
-def test_chain_reports_an_unreachable_ceiling_as_none():
-    # A flow-first chain at a budget too small for the trailing peak pass must
-    # NOT report the retained plan's objective as a peak. The guard records the
-    # failed pass as None and the flow optimum that DID complete stays intact.
-    _, opt = lexicographic_solve(load_scenario(SC),
-                                 ("min_tardy", "min_flow", "min_peak"),
-                                 budget={"det_budget_s": 0.4})
+def test_the_flow_pass_ships_the_held_plan_when_its_own_incumbent_is_worse():
+    """FINDINGS G401: the chain never ships a plan worse than the one in hand.
+
+    At FLOW_BUDGET the flow pass's own incumbent finishes the cars in 3,173
+    summed minutes; the (tardy, peak) plan it was handed finishes them in 3,067
+    under the same ceilings. That plan ships, the trace says so, and the
+    recorded optimum is the flow the shipped plan has. Deleting the keep in
+    lexicographic_solve_traced turns this red.
+    """
+    two, _ = lexicographic_solve(load_scenario(SC), ("min_tardy", "min_peak"),
+                                 budget=FLOW_BUDGET)
+    three, opt, passes = lexicographic_solve_traced(
+        load_scenario(SC), ("min_tardy", "min_peak", "min_flow"),
+        budget=FLOW_BUDGET)
+    assert passes[-1]["mode"] == "min_flow"
+    assert passes[-1].get("kept_held_plan") is True
+    assert passes[-1]["proven"] is False
+    assert opt["min_flow"] == _flow(three) == _flow(two)
+    assert passes[-1]["objective"] == _flow(three)
+    # the trace of a pass that shipped its own plan does not carry the key
+    assert all("kept_held_plan" not in p for p in passes[:-1])
+
+
+def test_chain_reports_an_unreachable_ceiling_as_none(monkeypatch):
+    # A flow-first chain whose trailing peak pass gets no budget must NOT report
+    # the retained plan's objective as a peak. The guard records the failed pass
+    # as None and the flow optimum that DID complete stays intact. Only that pass
+    # is starved: a chain-wide budget fails it non-monotonically at 100% targets
+    # (see the module docstring), and a knife-edge is not a test.
+    real = fwd.build_and_solve
+
+    def starved_peak(sc, objective_mode="weighted", **kw):
+        if objective_mode == "min_peak":
+            kw["det_budget_s"] = 0.0
+        return real(sc, objective_mode=objective_mode, **kw)
+
+    monkeypatch.setattr(fwd, "build_and_solve", starved_peak)
+    _, opt, passes = lexicographic_solve_traced(
+        load_scenario(SC), ("min_tardy", "min_flow", "min_peak"),
+        budget={"det_budget_s": 0.4})
     assert opt["min_flow"] is not None      # the flow pass completed
     assert opt["min_peak"] is None          # the peak pass did not — reported
+    assert passes[-1]["retained"] is True and passes[-1]["objective"] is None
 
 
 # ---- the regime reorders the schedule -------------------------------------------

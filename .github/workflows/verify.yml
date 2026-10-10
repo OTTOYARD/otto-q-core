@@ -468,6 +468,37 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_charge_order_floor_sql.py
 
+      # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
+      # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
+      # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry
+      # and the owner's target, for the key's own fleet only, and conforms to contract/schemas once signed. 0652 patches
+      # the live walk at md5-guarded anchors, so on the stub it must refuse, and the suite proves it does.
+      # 0653, the twin as two operators: sim-a never sees sim-b (the outbox, the door, the isolation check), one walk
+      # serves both in its own order, and the engine learns each outcome only from the operator's ack.
+      - name: The v2 operator door and the twin's two operators, executed (0649-0653 and 0697 against a stub engine; the guards of 0652, 0654, 0655, 0657, 0659, 0690-0696 and 0698, and 0698's carry run in a wrapper; the twin's OCPP 2.0.1 payloads against the 2.0.1 schemas, and through the charger bridge)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_v2_door_sql.py tests/test_v2_twin_operators_sql.py tests/test_twin_ocpp201_sql.py \
+            tests/test_csms_relay_sql.py
+
+      # 0658, G394: the public key loses every grant postgres made it, keeps SELECT on the fifteen relations the cockpits
+      # read, and new tables stop granting it. Executed on a stub of the live grants, then asked as the public key what
+      # it can still do; the restore statements are run too and must put every grant back.
+      - name: The public key's default deny, executed (0658 against a stub of the grants it was written against; 0699, the canon card's function, as the public key)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_public_key_default_deny_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #

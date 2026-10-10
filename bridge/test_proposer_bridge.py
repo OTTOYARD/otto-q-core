@@ -376,7 +376,12 @@ def test_the_window_is_inclusive_and_proposer_abstentions_pass_through():
 def test_a_batch_never_names_one_stall_twice_for_immediate_starts():
     #: Six vehicles, few stalls, a tight window: whatever the solver sequences
     #: onto one point, only the first occupant is submitted as an assignment.
-    vehicles = [_vehicle(f"6e7d0b1c-0000-4000-8000-0000000000{i:02x}", soc=20 + i) for i in range(6)]
+    #: soc 30-35 against the fixture's target of 90: the same 55-60 points each car
+    #: charged while an NMC chemistry cap held it at 80 from soc 20-25. Rule 9 removed
+    #: the cap (2026-10-09); at soc 20-25 the six then need more than two 19 kW points
+    #: can give in the horizon and the solver declines the frame, so the batch this
+    #: test reads would never be built.
+    vehicles = [_vehicle(f"6e7d0b1c-0000-4000-8000-0000000000{i:02x}", soc=30 + i) for i in range(6)]
     frame = _frame(vehicles=vehicles, stalls=[_stall(S1, kind="l2", kw=19), _stall(S2, kind="l2", kw=19)])
     r = pb.fire(frame, CLASS_ROWS, site=SITE, sim_run_id=RUN, depot_id=DEPOT, start_within_min=30)
     live = [x["proposal"]["stall_id"] for x in r["rows"] if not x["proposal"]["abstain"]]
