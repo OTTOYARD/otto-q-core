@@ -2,7 +2,7 @@
 --        per charging session, the twin's physics world drives 47-52 and busy_day's stress world 18.2; the dispatch
 --        ledger's miles read 2-68% of what the cars drove; and the twin's collision rate is about a 25th of the
 --        filing's.**
---        Part A of the twin data contract review (2026-10-08), items 5 (CPUC duty cycles) and 6 (incident rates, first
+--        Part A of the twin data contract review (2026-10-08), items 1 (CPUC duty cycles) and 2 (incident rates, first
 --        read). The filing and its definitions: docs/research/direct/2026-10-10-cpuc-waymo-q2-2026-duty-cycle.md.
 --        Measured 2026-10-10 05:20-05:50 UTC (12:20-12:50 AM CT), read-only, twin depot 11111111-…; the throughput sweep
 --        was running, so nothing here touches a row, it only reads.

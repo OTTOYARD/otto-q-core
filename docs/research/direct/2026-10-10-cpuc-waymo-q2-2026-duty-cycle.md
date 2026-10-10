@@ -4,7 +4,7 @@
 by direct download under CLAUDE.md rule 3. No research agents were used. Every external figure carries its file, its
 period and its URL. The twin side is measured read-only on the twin depot (`11111111-…`) in
 [db/checks/0433](../../../db/checks/0433_cpuc_says_a_waymo_charges_every_50_miles_and_busy_day_charges_every_18.sql).
-This is Part A, item 5, of the twin data contract review (2026-10-08), and it answers the Oct 6 note's
+This is Part A, item 1, of the twin data contract review (2026-10-08), and it answers the Oct 6 note's
 [§2A](2026-10-06-av-world-models-and-data-integrations.md) instruction: *"Read the real columns before designing the fit."*
 
 ## The answer in short
@@ -116,7 +116,7 @@ observations (pairs share seeds, G153): these are levels to compare, not rates w
   charger types are redacted, so the gap may be in the kind of charger as much as in the tempo, and nothing here
   says which.
 
-## 4. Collisions (Part A, item 6, first read)
+## 4. Collisions (Part A, item 2, first read)
 
 The incident and complaint file keeps its yes/no flags, so it can be counted. Streamed across its seven parts
 (4,888,011 rows; 2,064 carry any content, the rest are blank):
