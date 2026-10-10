@@ -3847,6 +3847,16 @@ serve(async (req: Request) => {
     }
   }
 
+  // ── G394: no write without a credential ──
+  // Every route but a read writes with the service role, so a write needs a minted source key (above) or the
+  // service key itself. Four weeks of logs (2026-09-12 to 10-10) show apps calling GET routes only.
+  if (method !== "GET" && method !== "HEAD" && !authenticatedSource) {
+    const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    if (bearer !== supabaseServiceKey) {
+      return err("UNAUTHORIZED", "a write needs X-OTTO-Q-API-Key or the service key", 401);
+    }
+  }
+
   try {
     // -----------------------------------------------------------------------
     // Health check
