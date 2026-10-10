@@ -42,7 +42,9 @@ The receiving half's flag (`twin_operator_door`) is separate and stays separate.
    to low, medium, high), an electrical breakdown to `vehicle_malfunction`, a tire to `tire_issue`, a stranded car to
    `vehicle_unresponsive`; `takes_vehicle_offline` from the tow. The car's physical state (towed) stays the world's
    own write until full separation, because the twin and OTTO-Q still share the `vehicles` row.
-3. **Leaving.** OTTO-Q decides a car is ready; the operator takes it. Today one write does both. The door's
+3. **Leaving.** OTTO-Q decides a car is ready; the operator takes it. Today one write does both, and it is OTTO-Q's:
+   `ottoq_decide_tick` calls the twin's own dispatcher (`twin.ottoq_sim_dispatch_vehicle`, which writes the dispatch,
+   deploys the car, opens its travel leg and releases its visit's artifacts), as does `twin.ottoq_sim_auto_dispatch_tick`. The door's
    `vehicle.departed` gets its effect (release the stall, the bookings and the holds OTTO-Q kept for the car, and
    record what was still open if it left early, contract rule 8), and the twin's dispatcher sends it.
 4. **Coming home**, which needs the contract to grow first (next section).
