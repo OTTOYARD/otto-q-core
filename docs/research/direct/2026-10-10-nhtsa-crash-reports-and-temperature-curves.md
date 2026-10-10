@@ -1,6 +1,6 @@
 # Robotaxi crashes that reach a depot, and how temperature costs range: NHTSA's reports and two published curves
 
-**Date:** 2026-10-10 CT (files read 2026-10-10 05:52-06:30 UTC, 12:52-1:30 AM CT). **By:** Claude Code (build track),
+**Date:** 2026-10-10 CT (files read 2026-10-10 05:52-05:57 UTC, 12:52-12:57 AM CT). **By:** Claude Code (build track),
 by direct download and search under CLAUDE.md rule 3. No research agents were used. Every external figure carries its
 file or page, its date and its URL. The twin side is measured read-only on the twin depot (`11111111-…`) in
 [db/checks/0434](../../../db/checks/0434_half_of_waymos_reported_crashes_end_in_a_tow_and_the_twin_counts_the_cold_twice.sql).

@@ -3,7 +3,7 @@
 --        Part A of the twin data contract review (2026-10-08), items 2 (NHTSA crash reports) and 4 (fitted temperature
 --        effects). The external figures, with their files, dates and URLs:
 --        docs/research/direct/2026-10-10-nhtsa-crash-reports-and-temperature-curves.md.
---        Measured 2026-10-10 06:00-06:35 UTC (1:00-1:35 AM CT), read-only, twin depot 11111111-…, during the throughput
+--        Measured 2026-10-10 05:52-05:57 UTC (12:52-12:57 AM CT), read-only, twin depot 11111111-…, during the throughput
 --        sweep (reads only).
 --
 -- ══ §1 TOWED CARS (G408, extended) ═════════════════════════════════════════════════════════════════════════════

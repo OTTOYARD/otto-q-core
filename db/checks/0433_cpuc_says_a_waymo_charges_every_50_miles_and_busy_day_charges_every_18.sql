@@ -4,7 +4,7 @@
 --        filing's.**
 --        Part A of the twin data contract review (2026-10-08), items 5 (CPUC duty cycles) and 6 (incident rates, first
 --        read). The filing and its definitions: docs/research/direct/2026-10-10-cpuc-waymo-q2-2026-duty-cycle.md.
---        Measured 2026-10-10 05:20-06:05 UTC (12:20-1:05 AM CT), read-only, twin depot 11111111-…; the throughput sweep
+--        Measured 2026-10-10 05:20-05:50 UTC (12:20-12:50 AM CT), read-only, twin depot 11111111-…; the throughput sweep
 --        was running, so nothing here touches a row, it only reads.
 --
 -- ══ §1 THE FILING ══════════════════════════════════════════════════════════════════════════════════════════════
