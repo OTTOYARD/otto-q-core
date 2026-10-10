@@ -75,9 +75,13 @@ at the charger; OTTO-Q never commands a car.
      in its own container on `ottoq-intel-2`, with `--cpus 0.25 --memory 256m` beside the intelligence service, which
      runs on a burstable t3.medium. `deploy_ssm.py make-key` makes the key on the box and prints only its SHA-256 and
      prefix; nothing else ever holds it.
-   - **Then, in order:** apply 0697 (with a person, for its DROP); deploy the relay; `deploy_ssm.py discover`,
-     `make-key`, register the hash (`ottoq_register_source_key_hash`, source `charger_backend`, data source `twin`,
-     stream `ocpp`), `deploy`. Later still: a dial switches the
+   - **Where it runs from:** `ottoq-intelligence/.github/workflows/csms-deploy-ssm.yml` (OTTOYARD/ottoq-intelligence#18),
+     by hand, with that repository's AWS secrets and this repository's csms/ at a full commit id. The AWS key in the
+     agent's working environment is a placeholder (STS answers `InvalidClientTokenId`, read 2026-10-10), so the script
+     does not run from there, and no AWS credential is added anywhere.
+   - **Then, in order:** apply 0697 (with a person, for its DROP); deploy the relay; merge ottoq-intelligence#18; run
+     its `discover`, then `make-key`; register the hash (`ottoq_register_source_key_hash`, source `charger_backend`,
+     data source `twin`, stream `ocpp`); run `deploy`. Later still: a dial switches the
      twin from writing its charger log itself to writing an outbox the bridge drains, so the log of record is what the
      back end received; the back end's frames go to OTTO-Q through `ottoq-ingest`'s `ocpp` stream; and OTTO-Q's charge
      plans go out as `SetChargingProfile` through the same relay, with the twin's charge physics reading a station's

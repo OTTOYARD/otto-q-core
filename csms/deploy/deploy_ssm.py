@@ -5,7 +5,8 @@
     python3 -I csms/deploy/deploy_ssm.py deploy      # ship csms/, build the image, run it with CPU and memory limits
     python3 -I csms/deploy/deploy_ssm.py stop        # remove the container (the twin does not depend on it)
 
-Credentials are the caller's AWS environment (boto3's usual chain); none is written anywhere here. It follows
+Credentials are the caller's AWS environment (boto3's usual chain); none is written anywhere here. From GitHub it runs
+in ottoq-intelligence's csms-deploy-ssm workflow, with that repository's AWS secrets, by hand only. It follows
 ottoq-intelligence/.github/workflows/aws-deploy-ssm.yml, whose failures taught most of it: the target is found by its
 Name tag and refused unless exactly one is running and SSM reports it Online; the source ships as a tarball in printf
 chunks of base64 with a breadcrumb after each step, because the box has no git and a single decode line once failed with
