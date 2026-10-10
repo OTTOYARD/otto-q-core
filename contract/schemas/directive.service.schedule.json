@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.1/directive.service.schedule.json",
+  "title": "com.ottoyard.directive.service.schedule (OTTO-Q to operator)",
+  "description": "The services the car will get on this visit, where and when. Operations whose windows overlap run concurrently (a sensor clean during a charge). Every service the depot found the car to need is on it: no car leaves with one open (CLAUDE.md rule 9).",
+  "type": "object",
+  "allOf": [{"$ref": "defs.json#/$defs/directiveHeader"}],
+  "required": ["operations"],
+  "properties": {
+    "directive_id": true,
+    "version": true,
+    "supersedes": true,
+    "issued_at": true,
+    "valid_from": true,
+    "expires_at": true,
+    "ack_deadline": true,
+    "vehicle_ref": true,
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "required": ["service_code", "window"],
+        "properties": {
+          "service_code": {"$ref": "defs.json#/$defs/serviceCode"},
+          "stall_code": {"$ref": "defs.json#/$defs/stallCode"},
+          "window": {"$ref": "defs.json#/$defs/window"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

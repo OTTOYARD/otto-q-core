@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.1/defs.json",
+  "title": "OTTO-Q depot contract 0.1: shared definitions",
+  "$defs": {
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "timestamp": {
+      "description": "RFC 3339 date-time with an explicit offset or Z.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "vehicleRef": {
+      "description": "The operator's own reference for one of its vehicles. OTTO-Q resolves it only within the credential's fleet and depot; a reference outside them reads as not found.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "serviceCode": {
+      "description": "A code from the depot's published operation catalog (service_cadence_policy.svc). The door refuses a code the depot does not publish.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,40}$"
+    },
+    "stallCode": {"type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[A-Za-z0-9._-]+$"},
+    "stallType": {"enum": ["dcfc", "l2", "staging", "wash_bay", "service_bay"]},
+    "percent": {"type": "number", "minimum": 0, "maximum": 100},
+    "severity": {
+      "description": "The operator's own severity, not raw fault codes.",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "window": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {"start": {"$ref": "#/$defs/timestamp"}, "end": {"$ref": "#/$defs/timestamp"}},
+      "additionalProperties": false
+    },
+    "ackReason": {
+      "description": "Why a directive was not carried out. Closed: OTTO-Q re-plans differently for each.",
+      "enum": [
+        "occupied",
+        "vehicle_unresponsive",
+        "unsafe",
+        "charger_fault",
+        "vehicle_not_at_depot",
+        "owner_override",
+        "expired",
+        "superseded",
+        "other"
+      ]
+    },
+    "directiveRef": {
+      "type": "object",
+      "required": ["directive_id", "version"],
+      "properties": {"directive_id": {"$ref": "#/$defs/uuid"}, "version": {"type": "integer", "minimum": 1}},
+      "additionalProperties": false
+    },
+    "directiveHeader": {
+      "description": "Every directive carries these. A directive is a request the operator may refuse: no ack by ack_deadline means not done.",
+      "type": "object",
+      "required": [
+        "directive_id",
+        "version",
+        "supersedes",
+        "issued_at",
+        "valid_from",
+        "expires_at",
+        "ack_deadline",
+        "vehicle_ref"
+      ],
+      "properties": {
+        "directive_id": {"$ref": "#/$defs/uuid"},
+        "version": {"type": "integer", "minimum": 1},
+        "supersedes": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/directiveRef"}]},
+        "issued_at": {"$ref": "#/$defs/timestamp"},
+        "valid_from": {"$ref": "#/$defs/timestamp"},
+        "expires_at": {"$ref": "#/$defs/timestamp"},
+        "ack_deadline": {"$ref": "#/$defs/timestamp"},
+        "vehicle_ref": {"$ref": "#/$defs/vehicleRef"}
+      }
+    }
+  }
+}

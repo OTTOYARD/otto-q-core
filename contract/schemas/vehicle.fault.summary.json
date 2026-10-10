@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.1/vehicle.fault.summary.json",
+  "title": "com.ottoyard.vehicle.fault.summary (operator to OTTO-Q)",
+  "description": "The operator's own reading of a fault: its severity and category. Raw codes may ride along in fault_codes and are never interpreted. takes_vehicle_offline is the one signal that lets OTTO-Q end a charge short or route the car straight to a service stall or long-term staging (CLAUDE.md rule 9).",
+  "type": "object",
+  "required": ["severity", "category"],
+  "properties": {
+    "severity": {"$ref": "defs.json#/$defs/severity"},
+    "category": {
+      "enum": [
+        "vehicle_damage",
+        "vehicle_malfunction",
+        "sensor_anomaly",
+        "tire_issue",
+        "excessive_contamination",
+        "vehicle_unresponsive",
+        "safety_concern",
+        "other"
+      ]
+    },
+    "description": {"type": "string", "maxLength": 500},
+    "services_needed": {
+      "type": "array",
+      "items": {"$ref": "defs.json#/$defs/serviceCode"},
+      "uniqueItems": true,
+      "maxItems": 16
+    },
+    "takes_vehicle_offline": {"type": "boolean"},
+    "fault_codes": {
+      "description": "The operator's own fault codes, proprietary or OBD-II, stored as sent and never interpreted: OTTO-Q acts on severity, category, services_needed and takes_vehicle_offline.",
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,32}$"},
+      "uniqueItems": true,
+      "maxItems": 64
+    }
+  },
+  "additionalProperties": false
+}

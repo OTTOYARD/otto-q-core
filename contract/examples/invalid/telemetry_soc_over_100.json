@@ -1,0 +1,23 @@
+{
+  "specversion": "1.0",
+  "id": "sim-a-000001",
+  "source": "urn:ottoq:src:sim-a:SIMA-0001",
+  "type": "com.ottoyard.vehicle.telemetry",
+  "time": "2026-10-09T14:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://ottoyard.com/schemas/ottoq/contract/0.1/vehicle.telemetry.json",
+  "subject": "SIMA-0001",
+  "sequence": "00000000000000000001",
+  "data": {
+    "signals": {
+      "Vehicle.Powertrain.TractionBattery.StateOfCharge.Current": {"value": 104, "ts": "2026-10-09T13:59:58Z"},
+      "Vehicle.Powertrain.TractionBattery.Temperature.Average": {"value": 24.1, "ts": "2026-10-09T13:59:58Z"},
+      "Vehicle.Powertrain.TractionBattery.CurrentPower": {"value": -11800.0, "ts": "2026-10-09T13:59:58Z"},
+      "Vehicle.Speed": {"value": 0.0, "ts": "2026-10-09T13:59:58Z"},
+      "Vehicle.TraveledDistance": {"value": 48211000, "ts": "2026-10-09T13:59:58Z"},
+      "Vehicle.CurrentLocation.Latitude": {"value": 36.1399, "ts": "2026-10-09T13:59:58Z"},
+      "Vehicle.CurrentLocation.Longitude": {"value": -86.7725, "ts": "2026-10-09T13:59:58Z"},
+      "Vehicle.Diagnostics.DTCList": {"value": [], "ts": "2026-10-09T13:59:58Z"}
+    }
+  }
+}

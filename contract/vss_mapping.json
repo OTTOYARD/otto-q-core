@@ -1,0 +1,235 @@
+{
+  "title": "OTTO-Q depot contract 0.1: today's vehicle fields named in COVESA VSS",
+  "vss": {
+    "pinned": "6.0",
+    "tag": "v6.0",
+    "commit": "20c609b",
+    "tag_date": "2026-01-15",
+    "also_checked": {
+      "tag": "v6.1",
+      "commit": "2817646",
+      "tag_date": "2026-09-17",
+      "result": "every path below exists in 6.1 with the same type, datatype and unit"
+    },
+    "source": "https://github.com/COVESA/vehicle_signal_specification (spec/ at each tag, #include and instances resolved)",
+    "retrieved": "2026-10-09"
+  },
+  "fields": [
+    {
+      "ottoq": "ottoq_telemetry_packets.soc_pct, vehicles.current_soc",
+      "vss": "Vehicle.Powertrain.TractionBattery.StateOfCharge.Current",
+      "unit": "percent",
+      "to_vss": "as is"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.battery_temp_c",
+      "vss": "Vehicle.Powertrain.TractionBattery.Temperature.Average",
+      "unit": "Celsius",
+      "to_vss": "as is"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.range_remaining_km",
+      "vss": "Vehicle.Powertrain.TractionBattery.Range",
+      "unit": "m",
+      "to_vss": "x 1000, rounded to an integer"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.instant_power_kw",
+      "vss": "Vehicle.Powertrain.TractionBattery.CurrentPower",
+      "unit": "W",
+      "to_vss": "x -1000: VSS is positive INTO the battery; in the twin's packets instant_power_kw is positive while driving (810,342 of 835,238 driving packets, 30 days to 2026-10-09), i.e. positive OUT of it"
+    },
+    {"ottoq": "ottoq_telemetry_packets.speed_kmh", "vss": "Vehicle.Speed", "unit": "km/h", "to_vss": "as is"},
+    {
+      "ottoq": "ottoq_telemetry_packets.odometer_km",
+      "vss": "Vehicle.TraveledDistance",
+      "unit": "m",
+      "to_vss": "x 1000, rounded to an integer"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.current_lat",
+      "vss": "Vehicle.CurrentLocation.Latitude",
+      "unit": "degrees",
+      "to_vss": "as is; accepted only inside the depot geofence (README rule 5)"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.current_lng",
+      "vss": "Vehicle.CurrentLocation.Longitude",
+      "unit": "degrees",
+      "to_vss": "as is; accepted only inside the depot geofence (README rule 5)"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.ambient_temp_c",
+      "vss": "Vehicle.Exterior.AirTemperature",
+      "unit": "Celsius",
+      "to_vss": "as is"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.tire_pressures_psi[1]",
+      "vss": "Vehicle.Chassis.Axle.Row1.Wheel.Left.Tire.Pressure",
+      "unit": "kPa",
+      "to_vss": "x 6.894757, rounded; index 1..4 = front-left, front-right, rear-left, rear-right. A naming choice, not a fact: twin.ottoq_sim_emit_telemetry draws the four values independently (34 + 4 x a seeded uniform, salts tire0..tire3) with no wheel position, so any order is equally true of the twin. A real operator states its own."
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.tire_pressures_psi[2]",
+      "vss": "Vehicle.Chassis.Axle.Row1.Wheel.Right.Tire.Pressure",
+      "unit": "kPa",
+      "to_vss": "x 6.894757, rounded"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.tire_pressures_psi[3]",
+      "vss": "Vehicle.Chassis.Axle.Row2.Wheel.Left.Tire.Pressure",
+      "unit": "kPa",
+      "to_vss": "x 6.894757, rounded"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.tire_pressures_psi[4]",
+      "vss": "Vehicle.Chassis.Axle.Row2.Wheel.Right.Tire.Pressure",
+      "unit": "kPa",
+      "to_vss": "x 6.894757, rounded"
+    },
+    {
+      "ottoq": "vehicles.config battery_soh_pct (the twin's VehicleCondition)",
+      "vss": "Vehicle.Powertrain.TractionBattery.StateOfHealth",
+      "unit": "percent",
+      "to_vss": "as is"
+    },
+    {
+      "ottoq": "the vehicle class's usable battery kWh",
+      "vss": "Vehicle.Powertrain.TractionBattery.NetCapacity",
+      "unit": "kWh",
+      "to_vss": "rounded to an integer"
+    },
+    {
+      "ottoq": "vehicles.current_state in (charging_dcfc, charging_l2)",
+      "vss": "Vehicle.Powertrain.TractionBattery.Charging.IsCharging",
+      "unit": null,
+      "to_vss": "true while energy flows into the car"
+    },
+    {
+      "ottoq": "the owner's charge target (ottoq_effective_target_soc_at)",
+      "vss": "Vehicle.Powertrain.TractionBattery.Charging.ChargeLimit",
+      "unit": "percent",
+      "to_vss": "read only: an actuator in VSS, and OTTO-Q never writes a vehicle actuator"
+    },
+    {
+      "ottoq": "the charge clock's remaining time",
+      "vss": "Vehicle.Powertrain.TractionBattery.Charging.TimeToComplete",
+      "unit": "s",
+      "to_vss": "as is"
+    },
+    {
+      "ottoq": "displayed state of charge where an operator reports both",
+      "vss": "Vehicle.Powertrain.TractionBattery.StateOfCharge.Displayed",
+      "unit": "percent",
+      "to_vss": "as is; OTTO-Q plans on Current"
+    },
+    {
+      "ottoq": "range on all energy sources",
+      "vss": "Vehicle.Powertrain.Range",
+      "unit": "m",
+      "to_vss": "x 1000 from km"
+    }
+  ],
+  "not_carried": [
+    {
+      "ottoq": "ottoq_telemetry_packets.dtc_codes",
+      "why": "not OBD-II, so not VSS Vehicle.Diagnostics.DTCList, which VSS 6.0 defines as 'List of currently active DTCs formatted according OBD II (SAE-J2012DA_201812) standard ([P|C|B|U]XXXXX )' (spec/Vehicle/Diagnostics.vspec). Measured 2026-10-09 on the twin depot's vehicles, 30 days: 834,782 packets carry 710 codes in 15 distinct values, every one the twin's own form (AV-P0003, AV-PL010, AV-H0050 ...), none in J2012 form. They travel as vehicle.fault.summary fault_codes, stored as sent and never interpreted. A real operator's OBD-II codes may still use DTCList."
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.vehicle_state (17 states)",
+      "why": "a depot process state OTTO-Q derives; an operator does not send it"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.soc_source, data_source, fleet_operator_id, sim_run_id",
+      "why": "come from the credential and the door, never the payload (README rule 1)"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.motor_temp_c (Vehicle.Powertrain.ElectricMotor.Temperature)",
+      "why": "no depot decision reads it"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.cabin_temp_c (Vehicle.Cabin.HVAC.AmbientAirTemperature)",
+      "why": "cabin conditioning is the operator's"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.heading_deg (Vehicle.CurrentLocation.Heading)",
+      "why": "no depot decision reads it"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.power_15min_avg_kw",
+      "why": "no VSS signal; derived by OTTO-Q from CurrentPower over time"
+    },
+    {
+      "ottoq": "ottoq_telemetry_packets.active_warnings, signal_strength_pct, packet_integrity, dropped_reason",
+      "why": "transport and diagnostics of the old door; the fault summary carries what a warning means"
+    }
+  ],
+  "vss_reference": {
+    "Vehicle.Powertrain.TractionBattery.StateOfCharge.Current": {
+      "type": "sensor",
+      "datatype": "float",
+      "unit": "percent"
+    },
+    "Vehicle.Powertrain.TractionBattery.StateOfCharge.Displayed": {
+      "type": "sensor",
+      "datatype": "float",
+      "unit": "percent"
+    },
+    "Vehicle.Powertrain.TractionBattery.Temperature.Average": {
+      "type": "sensor",
+      "datatype": "float",
+      "unit": "Celsius"
+    },
+    "Vehicle.Powertrain.TractionBattery.Range": {"type": "sensor", "datatype": "uint32", "unit": "m"},
+    "Vehicle.Powertrain.Range": {"type": "sensor", "datatype": "uint32", "unit": "m"},
+    "Vehicle.Powertrain.TractionBattery.StateOfHealth": {
+      "type": "sensor",
+      "datatype": "float",
+      "unit": "percent"
+    },
+    "Vehicle.Powertrain.TractionBattery.CurrentPower": {"type": "sensor", "datatype": "float", "unit": "W"},
+    "Vehicle.Powertrain.TractionBattery.NetCapacity": {"type": "sensor", "datatype": "uint16", "unit": "kWh"},
+    "Vehicle.Powertrain.TractionBattery.Charging.IsCharging": {
+      "type": "sensor",
+      "datatype": "boolean",
+      "unit": null
+    },
+    "Vehicle.Powertrain.TractionBattery.Charging.ChargeLimit": {
+      "type": "actuator",
+      "datatype": "uint8",
+      "unit": "percent"
+    },
+    "Vehicle.Powertrain.TractionBattery.Charging.TimeToComplete": {
+      "type": "sensor",
+      "datatype": "uint32",
+      "unit": "s"
+    },
+    "Vehicle.Speed": {"type": "sensor", "datatype": "float", "unit": "km/h"},
+    "Vehicle.TraveledDistance": {"type": "sensor", "datatype": "uint32", "unit": "m"},
+    "Vehicle.CurrentLocation.Latitude": {"type": "sensor", "datatype": "double", "unit": "degrees"},
+    "Vehicle.CurrentLocation.Longitude": {"type": "sensor", "datatype": "double", "unit": "degrees"},
+    "Vehicle.Diagnostics.DTCList": {"type": "sensor", "datatype": "string[]", "unit": null},
+    "Vehicle.Exterior.AirTemperature": {"type": "sensor", "datatype": "float", "unit": "Celsius"},
+    "Vehicle.Chassis.Axle.Row1.Wheel.Left.Tire.Pressure": {
+      "type": "sensor",
+      "datatype": "uint16",
+      "unit": "kPa"
+    },
+    "Vehicle.Chassis.Axle.Row1.Wheel.Right.Tire.Pressure": {
+      "type": "sensor",
+      "datatype": "uint16",
+      "unit": "kPa"
+    },
+    "Vehicle.Chassis.Axle.Row2.Wheel.Left.Tire.Pressure": {
+      "type": "sensor",
+      "datatype": "uint16",
+      "unit": "kPa"
+    },
+    "Vehicle.Chassis.Axle.Row2.Wheel.Right.Tire.Pressure": {
+      "type": "sensor",
+      "datatype": "uint16",
+      "unit": "kPa"
+    }
+  }
+}

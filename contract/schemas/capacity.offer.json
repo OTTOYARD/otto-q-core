@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.1/capacity.offer.json",
+  "title": "com.ottoyard.capacity.offer (OTTO-Q to operator)",
+  "description": "What the depot holds for this operator in a window, in coarse counts. It never carries another tenant's car ids, charge levels, ETAs or counts (README, rule 4), so the schema admits no vehicle field at all. Informational: no ack.",
+  "type": "object",
+  "required": ["window", "held_for_you"],
+  "properties": {
+    "window": {"$ref": "defs.json#/$defs/window"},
+    "held_for_you": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"$ref": "defs.json#/$defs/stallType"},
+      "additionalProperties": {"type": "integer", "minimum": 0, "maximum": 1000}
+    },
+    "charge_wait_band": {
+      "description": "How long this operator's next arriving car would wait for a charger, in coarse bands. A band, not a position: a position is an exact count of the cars ahead of yours, and some of them are another tenant's (README, rule 4).",
+      "enum": ["none", "under_15_min", "15_to_60_min", "over_60_min"]
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,20 @@
+{
+  "ack_accepted_with_reason": {"expected_keyword": "not", "from": "directive.ack"},
+  "ack_other_without_detail": {"expected_keyword": "required", "from": "directive.ack"},
+  "ack_reason_outside_the_closed_list": {"expected_keyword": "enum", "from": "directive.ack"},
+  "ack_unable_without_reason": {"expected_keyword": "required", "from": "directive.ack"},
+  "capacity_offer_names_a_vehicle": {"expected_keyword": "additionalProperties", "from": "capacity.offer"},
+  "charge_plan_without_periods": {"expected_keyword": "minItems", "from": "directive.charge.plan"},
+  "directive_without_expiry": {"expected_keyword": "required", "from": "directive.stall.assignment"},
+  "inbound_carries_a_signature": {"expected_keyword": "false schema", "from": "vehicle.telemetry"},
+  "inbound_source_not_vehicle_scoped": {"expected_keyword": "pattern", "from": "vehicle.telemetry"},
+  "inbound_without_sequence": {"expected_keyword": "required", "from": "depot.arrival.intent"},
+  "intent_with_unknown_field": {"expected_keyword": "additionalProperties", "from": "depot.arrival.intent"},
+  "outbound_unsigned": {"expected_keyword": "required", "from": "directive.charge.plan"},
+  "telemetry_carries_depot_state": {"expected_keyword": "additionalProperties", "from": "vehicle.telemetry"},
+  "telemetry_half_a_location": {"expected_keyword": "dependentRequired", "from": "vehicle.telemetry"},
+  "telemetry_soc_over_100": {"expected_keyword": "maximum", "from": "vehicle.telemetry"},
+  "telemetry_unknown_signal": {"expected_keyword": "additionalProperties", "from": "vehicle.telemetry"},
+  "tenant_attribute_in_envelope": {"expected_keyword": "additionalProperties", "from": "vehicle.telemetry"},
+  "wrong_dataschema_for_type": {"expected_keyword": "const", "from": "vehicle.telemetry"}
+}

@@ -12,3 +12,12 @@
 # refuses to write the artifact at all on an unpinned version.
 ortools==9.15.6755
 pytest
+
+# The depot contract's battery (contract/test_ottoq_contract.py, collected by CI's pytest step):
+# JSON Schema 2020-12 validation, the AsyncAPI index, and the Ed25519 signatures on the examples.
+# Pinned for the same reason as OR-Tools above: a validator release must not change what the
+# contract accepts between two runs of the same commit.
+jsonschema==4.26.0
+referencing==0.37.0
+PyYAML==6.0.1
+cryptography==50.0.1
