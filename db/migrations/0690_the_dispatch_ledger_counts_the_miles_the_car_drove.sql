@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010111333
 -- migration-name:    the_dispatch_ledger_counts_the_miles_the_car_drove
 --
 -- 0690  **The dispatch ledger counts the miles a car drove, tick by tick, as it already counts the energy.** (G406,
@@ -206,3 +206,12 @@ VALUES ('0690_the_dispatch_ledger_counts_the_miles_the_car_drove', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:13:33 UTC (6:13 AM CT), version 20261010111333 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 83f080a; the ledger's stored statement is that file byte for
+--   byte (md5 c9deab342a18dec8be324b254331194b, 12,049 characters, 12,800 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the deployed-telemetry step's definition md5 10c31929ce82ab46f8821401f384b603 as written;
+--   snapshot 0690_pre holds the old definition (56b54f26); lineage FALSE/FALSE (read 11:13:38 UTC). The first apply,
+--   of the file as committed in 9eeaa49, rolled back at 11:10 UTC in V1 (its synthetic dispatch had no return trigger;
+--   chk_completed_has_return_trigger refused it at the close); 83f080a gave it one and was rehearsed whole with
+--   ROLLBACK at 11:12 UTC before this apply.
