@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010112022
 -- migration-name:    a_car_leaving_the_depot_is_reported_through_the_door
 --
 -- 0693  **A car leaving the depot is reported through the v2 door, and the door releases what the depot held for it.**
@@ -621,3 +621,11 @@ VALUES ('0693_a_car_leaving_the_depot_is_reported_through_the_door', false, fals
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:20:22 UTC (6:20 AM CT), version 20261010112022 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 8b409e81e79870d20616b3426d139175, 41,681 characters, 42,480 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the door's apply d06c41eb8ffd9b600f8246ccbaf5a04d and the dispatcher
+--   b55ea62b8533bca8021eb3330ad0af85 as written; twin.ottoq_twin_operator_depart not callable by anon; event type
+--   vehicle.departed_with_open_work (warning) catalogued; the flag set nowhere; no departure in the inbox; experiment
+--   fbced6a9-7ec2-4dcf-baad-59d49b7ba395 active; lineage FALSE/FALSE (read 11:20:32 UTC).
