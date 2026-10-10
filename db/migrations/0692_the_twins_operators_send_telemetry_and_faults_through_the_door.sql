@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010111739
 -- migration-name:    the_twins_operators_send_telemetry_and_faults_through_the_door
 --
 -- 0692  **The twin's operators send their cars' telemetry and faults through the v2 door, behind a flag, and the
@@ -596,3 +596,12 @@ VALUES ('0692_the_twins_operators_send_telemetry_and_faults_through_the_door', f
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:17:39 UTC (6:17 AM CT), version 20261010111739 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 66a9331a167167ad578b879671a2fd69, 38,484 characters, 39,119 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the deployed tick 97741c8984abf858fa5e5c9bdb1dbb32 and the wear counters
+--   ba486da643dddba31a436f8140f6ee0b as written; twin.ottoq_twin_operator_publish exists, not callable by anon;
+--   twin.ottoq_twin_drive_log registered engine, not readable by anon; the flag set nowhere; experiment
+--   df776bd5-b024-47e1-85bc-75182f3c1a95 active; the registry check reports no blocking defect; lineage FALSE/FALSE
+--   (read 11:17:49 UTC).
