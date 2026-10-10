@@ -1,0 +1,269 @@
+asyncapi: 3.1.0
+id: urn:ottoyard:ottoq:depot-contract:0.1
+info:
+  title: OTTO-Q depot contract
+  version: 0.1.0
+  description: |
+    How a fleet operator and an OTTO-Q depot talk. README.md beside this file is the
+    contract; this file is its machine-readable index.
+
+    The door is the edge function ottoq-depot-v2 (database half: migrations 0650 to 0652),
+    beside ottoq-ingest, which stays until nothing uses it.
+
+    Every message is a CloudEvents 1.0.2 event in structured JSON mode
+    (application/cloudevents+json), or a batch of them in the CloudEvents JSON batch
+    format (application/cloudevents-batch+json, solicited here: at most 500 events and
+    1 MiB per batch). Payloads are JSON Schema 2020-12, which AsyncAPI 3.1.0 admits only
+    as a custom schemaFormat whose support is optional, so a tool that knows only the
+    formats AsyncAPI requires (its own Schema Object and JSON Schema Draft 07) will read
+    this file but not validate the payloads. Validate with contract/ottoq_contract.py or
+    any 2020-12 validator over contract/schemas/.
+
+    There is no tenant, depot or data-source field anywhere: the credential decides them.
+defaultContentType: application/cloudevents+json
+
+servers:
+  depot:
+    host: gxdrcyphqjzjsuhxuqtg.supabase.co
+    protocol: https
+    pathname: /functions/v1/ottoq-depot-v2
+    description: The OTTO-Q engine's v2 door. GET /jwks there returns the keys directives are signed with.
+    security:
+      - $ref: '#/components/securitySchemes/sourceKey'
+
+channels:
+  events:
+    address: /events
+    title: Operator to OTTO-Q
+    description: |
+      What an operator tells the depot about its own cars, and its answers to directives.
+      POST one event or a batch (?dry_run=true keeps nothing). Each event's source names one vehicle
+      (urn:ottoq:src:<operator>:<vehicle_ref>), and its sequence orders that vehicle's
+      events. The door keeps each event's time, refuses a source+id it has already taken
+      as a duplicate, and refuses anything the schemas refuse.
+    messages:
+      vehicleTelemetry:
+        $ref: '#/components/messages/vehicleTelemetry'
+      arrivalIntent:
+        $ref: '#/components/messages/arrivalIntent'
+      faultSummary:
+        $ref: '#/components/messages/faultSummary'
+      vehicleDeparted:
+        $ref: '#/components/messages/vehicleDeparted'
+      directiveAck:
+        $ref: '#/components/messages/directiveAck'
+  directives:
+    address: /directives
+    title: OTTO-Q to operator
+    description: |
+      What the depot asks of an operator's cars, and what it tells the operator about
+      them. Every event is signed (ottoqsig) and names its depot as the source. An
+      operator sees only events about its own cars and its own holds. GET with
+      ?after=<cursor>&limit=<1-500>; the next cursor comes back in the OTTOQ-Next-After header.
+    messages:
+      stallAssignment:
+        $ref: '#/components/messages/stallAssignment'
+      chargePlan:
+        $ref: '#/components/messages/chargePlan'
+      serviceSchedule:
+        $ref: '#/components/messages/serviceSchedule'
+      readinessForecast:
+        $ref: '#/components/messages/readinessForecast'
+      capacityOffer:
+        $ref: '#/components/messages/capacityOffer'
+
+operations:
+  takeOperatorEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/events'
+    title: Take an operator's events
+    security:
+      - $ref: '#/components/securitySchemes/sourceKey'
+    messages:
+      - $ref: '#/channels/events/messages/vehicleTelemetry'
+      - $ref: '#/channels/events/messages/arrivalIntent'
+      - $ref: '#/channels/events/messages/faultSummary'
+      - $ref: '#/channels/events/messages/vehicleDeparted'
+      - $ref: '#/channels/events/messages/directiveAck'
+  sendDepotEvents:
+    action: send
+    channel:
+      $ref: '#/channels/directives'
+    title: Send the depot's directives and forecasts
+    security:
+      - $ref: '#/components/securitySchemes/sourceKey'
+    messages:
+      - $ref: '#/channels/directives/messages/stallAssignment'
+      - $ref: '#/channels/directives/messages/chargePlan'
+      - $ref: '#/channels/directives/messages/serviceSchedule'
+      - $ref: '#/channels/directives/messages/readinessForecast'
+      - $ref: '#/channels/directives/messages/capacityOffer'
+
+components:
+  securitySchemes:
+    sourceKey:
+      type: httpApiKey
+      name: X-OTTO-Q-API-Key
+      in: header
+      description: |
+        Interim. A source key issued by the platform (public.ottoq_issue_source_key,
+        migration 0649), bound to one depot, one data source (production, twin, replay
+        or shadow) and a list of streams, and revocable. The door takes the depot, the
+        data source and the operator from the key, never from the event.
+    clientCertificate:
+      type: X509
+      description: |
+        Target, not yet served: mutual TLS with OAuth 2.0 client credentials and
+        certificate-bound access tokens (RFC 8705). The certificate names the operator;
+        the token carries the depot, data source and streams the key carries today.
+
+  messages:
+    vehicleTelemetry:
+      name: com.ottoyard.vehicle.telemetry
+      title: Vehicle telemetry
+      summary: Signals named by COVESA VSS 6.0 path, each with the time it was observed.
+      contentType: application/cloudevents+json
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.vehicle.telemetry
+    arrivalIntent:
+      name: com.ottoyard.depot.arrival.intent
+      title: Arrival intent
+      summary: A car is coming home, when, with how much charge, needing what, ready by when.
+      contentType: application/cloudevents+json
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.depot.arrival.intent
+    faultSummary:
+      name: com.ottoyard.vehicle.fault.summary
+      title: Fault summary
+      summary: The operator's own reading of a fault, its severity and category.
+      contentType: application/cloudevents+json
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.vehicle.fault.summary
+    vehicleDeparted:
+      name: com.ottoyard.vehicle.departed
+      title: Vehicle departed
+      summary: The car has left the depot.
+      contentType: application/cloudevents+json
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.vehicle.departed
+    directiveAck:
+      name: com.ottoyard.directive.ack
+      title: Directive ack
+      summary: The operator's answer to one version of one directive, with a reason from a closed list unless accepted.
+      contentType: application/cloudevents+json
+      correlationId:
+        location: $message.payload#/data/directive_id
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.directive.ack
+    stallAssignment:
+      name: com.ottoyard.directive.stall.assignment
+      title: Stall assignment
+      summary: Where the car should go and for how long. A request the operator may refuse.
+      contentType: application/cloudevents+json
+      correlationId:
+        location: $message.payload#/data/directive_id
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.directive.stall.assignment
+    chargePlan:
+      name: com.ottoyard.directive.charge.plan
+      title: Charge plan
+      summary: The charge the car will get at its charger, as an OCPP 2.0.1 charging schedule, to the owner's target.
+      contentType: application/cloudevents+json
+      correlationId:
+        location: $message.payload#/data/directive_id
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.directive.charge.plan
+    serviceSchedule:
+      name: com.ottoyard.directive.service.schedule
+      title: Service schedule
+      summary: Every service the car will get on this visit, where and when.
+      contentType: application/cloudevents+json
+      correlationId:
+        location: $message.payload#/data/directive_id
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.directive.service.schedule
+    readinessForecast:
+      name: com.ottoyard.readiness.forecast
+      title: Readiness forecast
+      summary: When the depot expects the car to be ready for work, with its spread. No ack.
+      contentType: application/cloudevents+json
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.readiness.forecast
+    capacityOffer:
+      name: com.ottoyard.capacity.offer
+      title: Capacity offer
+      summary: What the depot holds for this operator in a window, in coarse counts. No ack.
+      contentType: application/cloudevents+json
+      payload:
+        schemaFormat: application/schema+json;version=2020-12
+        schema:
+          allOf:
+            - $ref: ./schemas/envelope.json
+            - required: [type]
+              properties:
+                type:
+                  const: com.ottoyard.capacity.offer

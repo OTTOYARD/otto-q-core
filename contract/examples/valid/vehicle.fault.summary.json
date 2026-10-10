@@ -1,0 +1,19 @@
+{
+  "specversion": "1.0",
+  "id": "sim-a-000003",
+  "source": "urn:ottoq:src:sim-a:SIMA-0001",
+  "type": "com.ottoyard.vehicle.fault.summary",
+  "time": "2026-10-09T14:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "https://ottoyard.com/schemas/ottoq/contract/0.1/vehicle.fault.summary.json",
+  "subject": "SIMA-0001",
+  "sequence": "00000000000000000003",
+  "data": {
+    "severity": "high",
+    "category": "sensor_anomaly",
+    "description": "Front lidar window contaminated after a dust event.",
+    "services_needed": ["sensor_clean", "sensor_calibration"],
+    "takes_vehicle_offline": false,
+    "fault_codes": ["AV-S0010"]
+  }
+}

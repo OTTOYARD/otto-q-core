@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.1/vehicle.telemetry.json",
+  "title": "com.ottoyard.vehicle.telemetry (operator to OTTO-Q)",
+  "description": "Vehicle signals named by their COVESA VSS 6.0 path, each with the time it was observed. Units are VSS units. A signal older than its time to live reads as unknown (README, rule 2). The vehicle's depot state is not sent: OTTO-Q derives it. Precise location is accepted only inside the depot geofence (rule 5).",
+  "type": "object",
+  "required": ["signals"],
+  "properties": {
+    "signals": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "Vehicle.Powertrain.TractionBattery.StateOfCharge.Current": {"$ref": "#/$defs/percentSignal"},
+        "Vehicle.Powertrain.TractionBattery.StateOfCharge.Displayed": {"$ref": "#/$defs/percentSignal"},
+        "Vehicle.Powertrain.TractionBattery.Temperature.Average": {"$ref": "#/$defs/numberSignal"},
+        "Vehicle.Powertrain.TractionBattery.Range": {"$ref": "#/$defs/uintSignal"},
+        "Vehicle.Powertrain.Range": {"$ref": "#/$defs/uintSignal"},
+        "Vehicle.Powertrain.TractionBattery.StateOfHealth": {"$ref": "#/$defs/percentSignal"},
+        "Vehicle.Powertrain.TractionBattery.CurrentPower": {"$ref": "#/$defs/numberSignal"},
+        "Vehicle.Powertrain.TractionBattery.NetCapacity": {"$ref": "#/$defs/uint16Signal"},
+        "Vehicle.Powertrain.TractionBattery.Charging.IsCharging": {"$ref": "#/$defs/boolSignal"},
+        "Vehicle.Powertrain.TractionBattery.Charging.ChargeLimit": {"$ref": "#/$defs/wholePercentSignal"},
+        "Vehicle.Powertrain.TractionBattery.Charging.TimeToComplete": {"$ref": "#/$defs/uintSignal"},
+        "Vehicle.Speed": {"$ref": "#/$defs/numberSignal"},
+        "Vehicle.TraveledDistance": {"$ref": "#/$defs/uintSignal"},
+        "Vehicle.CurrentLocation.Latitude": {"$ref": "#/$defs/latitudeSignal"},
+        "Vehicle.CurrentLocation.Longitude": {"$ref": "#/$defs/longitudeSignal"},
+        "Vehicle.Diagnostics.DTCList": {"$ref": "#/$defs/dtcSignal"},
+        "Vehicle.Exterior.AirTemperature": {"$ref": "#/$defs/numberSignal"},
+        "Vehicle.Chassis.Axle.Row1.Wheel.Left.Tire.Pressure": {"$ref": "#/$defs/kpaSignal"},
+        "Vehicle.Chassis.Axle.Row1.Wheel.Right.Tire.Pressure": {"$ref": "#/$defs/kpaSignal"},
+        "Vehicle.Chassis.Axle.Row2.Wheel.Left.Tire.Pressure": {"$ref": "#/$defs/kpaSignal"},
+        "Vehicle.Chassis.Axle.Row2.Wheel.Right.Tire.Pressure": {"$ref": "#/$defs/kpaSignal"}
+      },
+      "additionalProperties": false,
+      "dependentRequired": {
+        "Vehicle.CurrentLocation.Latitude": ["Vehicle.CurrentLocation.Longitude"],
+        "Vehicle.CurrentLocation.Longitude": ["Vehicle.CurrentLocation.Latitude"]
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "ts": {"$ref": "defs.json#/$defs/timestamp"},
+    "percentSignal": {
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {"value": {"$ref": "defs.json#/$defs/percent"}, "ts": {"$ref": "#/$defs/ts"}}
+    },
+    "wholePercentSignal": {
+      "description": "A whole-number percent (VSS uint8).",
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {"value": {"type": "integer", "minimum": 0, "maximum": 100}, "ts": {"$ref": "#/$defs/ts"}}
+    },
+    "numberSignal": {
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {"value": {"type": "number"}, "ts": {"$ref": "#/$defs/ts"}}
+    },
+    "uintSignal": {
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {
+        "value": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "ts": {"$ref": "#/$defs/ts"}
+      }
+    },
+    "uint16Signal": {
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {
+        "value": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "ts": {"$ref": "#/$defs/ts"}
+      }
+    },
+    "kpaSignal": {
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {
+        "value": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "ts": {"$ref": "#/$defs/ts"}
+      }
+    },
+    "boolSignal": {
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {"value": {"type": "boolean"}, "ts": {"$ref": "#/$defs/ts"}}
+    },
+    "latitudeSignal": {
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {"value": {"type": "number", "minimum": -90, "maximum": 90}, "ts": {"$ref": "#/$defs/ts"}}
+    },
+    "longitudeSignal": {
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {
+        "value": {"type": "number", "minimum": -180, "maximum": 180},
+        "ts": {"$ref": "#/$defs/ts"}
+      }
+    },
+    "dtcSignal": {
+      "type": "object",
+      "required": ["value", "ts"],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[PCBU][0-9A-F]{4,6}$"},
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "ts": {"$ref": "#/$defs/ts"}
+      }
+    }
+  }
+}

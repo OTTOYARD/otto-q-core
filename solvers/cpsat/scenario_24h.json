@@ -29,7 +29,6 @@
       "max_charge_kw": 100,
       "inlet": "CCS",
       "chemistry": "NMC",
-      "max_daily_soc_pct": 80,
       "energy_curve": [
         {
           "above_soc_pct": 0,
@@ -50,7 +49,6 @@
       "max_charge_kw": 150,
       "inlet": "CCS",
       "chemistry": "NMC",
-      "max_daily_soc_pct": 80,
       "energy_curve": [
         {
           "above_soc_pct": 0,
@@ -71,7 +69,6 @@
       "max_charge_kw": 120,
       "inlet": "CCS",
       "chemistry": "NMC",
-      "max_daily_soc_pct": 80,
       "energy_curve": [
         {
           "above_soc_pct": 0,

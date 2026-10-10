@@ -116,33 +116,19 @@ from regime import resolve_active                  # noqa: E402
 #: states -- the vehicle is done and staged out. This proposer proposes charge
 #: assignments; a caller that wants to schedule non-charge service on a holding
 #: vehicle passes its own predicate.
-#: R-11, THE CHEMISTRY DAILY-SoC CAP, AS A TRANSLATION AND NOT A DECISION.
+#: NO CHEMISTRY CAP: RULE 9 (CLAUDE.md; Chase, 2026-09-27).
 #:
-#: The kernel already enforces this rule: model.py::_clamp_target caps a target
-#: at the asset class's `max_daily_soc_pct` and defaults to 100 when the class
-#: declares none. What was missing is the bridge between the two vocabularies.
-#: The production class table (`ottoq_vehicle_classes`) has NO max_daily_soc_pct
-#: column -- it declares `battery_chemistry` (NMC, NCA, or null) -- and
-#: frame_to_scenario never copied either field. So _clamp_target read a class
-#: dict that could not contain a cap, fell through to 100, and the rule was a
-#: NO-OP ON EVERY LIVE FRAME while T13 passed by calling _clamp_target directly
-#: with a hand-built dict. A green guard over a dead path (finding L-51).
-#:
-#: The mapping is DATA WITH A CITATION, not a scheduling opinion, which is why
-#: it may live in the bridge: adapters translate, never decide. NMC degrades
-#: sharply above ~80% SoC (Wikner & Thiringer 2018, doi:10.3390/app8101825;
-#: Keil et al. 2016, doi:10.1149/2.0411609jes) -- the same sources R-11 and the
-#: kernel docstring already cite, and 80 is the value the canonical scenarios
-#: and T13 already use. NCA shares the high-SoC degradation mechanism and is
-#: capped with it. A chemistry not named here gets NO cap rather than a guessed
-#: one: an unknown chemistry is not evidence for a number.
-#:
-#: An explicit `max_daily_soc_pct` on the class always wins, so a pack can state
-#: a cap the chemistry table does not know about, and this stays advisory data.
-CHEMISTRY_DAILY_SOC_CAP_PCT = {
-    "NMC": 80,
-    "NCA": 80,
-}
+#: This bridge used to derive a daily SoC cap from a class's `battery_chemistry`
+#: (R-11: NMC and NCA at 80) and copy it into the scenario, where model.py capped
+#: the target with it. Every robotaxi class in ottoq_vehicle_classes is NMC or
+#: NCA, so on every live frame the proposer planned every car to 80% while the
+#: kernel charged it to 100 (ottoq_effective_target_soc_at, 0539): no car was
+#: stopped short, because a proposal carries a stall and a power and never a
+#: target, but every plan undercounted the last fifth of each charge. Rule 9 says
+#: no chemistry default lowers a car's target; the only lower limit is the
+#: owner's, and it reaches this bridge already resolved, as the frame row's
+#: `target_soc`. So the bridge copies no cap, and a class that declares one is
+#: not read.
 
 
 #: THE PROPOSER IS ALWAYS BOUNDED. propose() used to default det_budget_s and
@@ -551,10 +537,11 @@ def _check_optima(measured: dict, optima: dict) -> None:
 #: a target of 100 and then planned against a target of 90. At soc 95 that meant
 #: admitted as needing charge, then handed to the kernel already past its target
 #: -- an asset with no charge segments, occupying the model and the plan and
-#: proposable to nothing. 90 is the number the kernel itself defaults to
-#: (model.py::materialize twice, harness_alpha, onboarding/sizer), so 90 is the
-#: one that survives; the 100 was the outlier and is gone.
-DEFAULT_TARGET_SOC_PCT = 90
+#: proposable to nothing. The one default is now 100: rule 9's fleet default, the
+#: one ottoq_effective_target_soc_at gives every car whose owner set nothing
+#: lower, and model.py's DEFAULT_TARGET_SOC_PCT. (It was 90, the number the
+#: prototype assumed before rule 9.)
+DEFAULT_TARGET_SOC_PCT = 100
 
 
 def _pct(value: Any) -> float | None:
@@ -949,12 +936,6 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
         eff_kw = float(min(cls["max_charge_kw"],
                            v.get("inlet_max_kw") or cls["max_charge_kw"]))
         cname = f"{ckey}|{int(eff_kw)}|{inlet}"
-        #: The chemistry cap, resolved once per synthesized class. Explicit
-        #: beats derived; derived beats nothing; nothing means no cap, exactly
-        #: as before for any class that declares neither field.
-        cap = cls.get("max_daily_soc_pct")
-        if cap is None:
-            cap = CHEMISTRY_DAILY_SOC_CAP_PCT.get(cls.get("battery_chemistry"))
         classes.setdefault(cname, {
             "battery_kwh": float(cls["battery_kwh"]),
             "max_charge_kw": eff_kw,
@@ -965,7 +946,6 @@ def frame_to_scenario(frame: dict, class_table: dict, *,
             "charge_kinds": list(caps),
             "energy_curve": cls.get("energy_curve",
                                     [{"above_soc_pct": 0, "accept_frac": 1.0}]),
-            **({"max_daily_soc_pct": int(cap)} if cap is not None else {}),
         })
         rb = int(ready_by_min.get(v["id"], default_ready_delta_min))
         explicit.append({

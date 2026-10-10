@@ -411,6 +411,16 @@ fifo $8,162.27, otto_q_asis $9,466.70, greedy $9,532.40 — `pareto_optimal: ["c
 `dominated: ["fifo", "greedy", "otto_q_asis"]`. The synthetic objective prices only *excess above a
 soft target*, which is dead under abundance; a utility bill prices peak **absolutely**.
 
+**RE-MEASURED 2026-10-09, AND THE SENTENCE ABOVE NO LONGER HOLDS.** The canonical scenario has
+changed twice since it was written: R-11 capped every class at 80% on 2026-09-06, and rule 9 removed
+that cap on 2026-10-09 (FINDINGS G400), so every car now charges to 100%. `cost_seed424242.json`
+now reads, at site_alpha: **cpsat 0 tardy / $9,859**, greedy 0 / **$9,004**, fifo 817 / $8,294,
+otto_q_asis 612 / $10,972 — `pareto_optimal: ["fifo", "greedy"]`, and **the weighted cpsat policy
+is dominated by greedy** (same zero tardiness, $855 a month dearer). Do not quote "cpsat is the only
+pareto-optimal policy" again. What holds both axes is the lexicographic **forward** policy,
+`forward_seed424242.json`: **0 tardy, 190 kW, $6,146** a month against a provable floor of 105 kW —
+below every myopic policy on the bill at zero missed deadlines.
+
 **Where a cap actually binds, the naive baselines produce unrunnable schedules.**
 `scenario_vertiport.json` declares 1,231 kW installed against an 800 kW service.
 `policies/multimodal_seed424242.json`: fifo and greedy both peak at 843 kW, 43 kW over, stamped

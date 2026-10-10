@@ -12,3 +12,19 @@
 # refuses to write the artifact at all on an unpinned version.
 ortools==9.15.6755
 pytest
+
+# The depot contract's battery (contract/test_ottoq_contract.py, collected by CI's pytest step):
+# JSON Schema 2020-12 validation, the AsyncAPI index, and the Ed25519 signatures on the examples.
+# Pinned for the same reason as OR-Tools above: a validator release must not change what the
+# contract accepts between two runs of the same commit.
+jsonschema==4.26.0
+referencing==0.37.0
+PyYAML==6.0.1
+cryptography==50.0.1
+
+# The charger back end and its simulated stations (csms/, collected by CI's pytest step): OCPP 2.0.1 over WebSocket.
+# ocpp is mobilityhouse/ocpp (MIT), 2.1.0 released 2025-07-16, and validates every frame against the OCPP 2.0.1
+# JSON schemas; websockets 15.0.1 released 2025-03-05. Pinned so a library release cannot change what a station
+# may send between two runs of the same commit.
+ocpp==2.1.0
+websockets==15.0.1

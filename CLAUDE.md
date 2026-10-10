@@ -112,6 +112,7 @@ When information is missing:
    - `pg_cron` evaluates cron expressions in **UTC**. Convert CT to UTC before writing a schedule, and if the conversion crosses midnight shift the day fields too.
    - `now()`, `started_at`, and every timestamptz in the database are UTC. Read them as UTC; convert only when reporting.
    - Never restate a stored UTC timestamp as though it were CT, and never rewrite a working cron schedule just to make it read nicely.
+   - **Never write a time you have not read from a clock.** A measurement window in a check file or note is stamped after the work ends, from `date` or the rows' own timestamps, never estimated ahead: `db/checks/0432`, `0433` and `0434` each had to be corrected on 2026-10-10 for an end time written before the work ended.
 
 **8. ONE SITE. THE TWIN DEPOT, AND NOTHING ELSE — added 2026-09-19 in Chase's words, and it overrides Part 4 where they conflict.**
 

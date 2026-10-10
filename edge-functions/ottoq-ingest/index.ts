@@ -7,40 +7,57 @@
 // v9: energy+telemetry stamp sim_run_id (resolved from the depot's live run); energy stores
 // lmp/carbon in real columns; incident maps arbitrary OEM types onto the exception_type enum
 // (fallback 'other', raw type preserved) + guards severity; vehicle/charger resolution parameterized.
+// v10 (otto-q-core 0649, G393): the depot and the data source come from the CREDENTIAL, never the body.
+//   - A source key (X-OTTO-Q-API-Key, issued by ottoq_issue_source_key) binds depot, data source, source name and
+//     the streams it may send; the door hashes it and asks ottoq_source_key_check. A body naming another depot or
+//     data source is refused, not overridden.
+//   - The platform (the injected service key itself, in apikey or as the Bearer; compared in constant time, as
+//     ottoq-cpsat-propose does) may name both, and must name the depot; an unknown data source is refused, never
+//     stored as production.
+//   - Deployed with verify_jwt OFF, on purpose: the gateway now refuses legacy JWT keys (UNAUTHORIZED_LEGACY_JWT,
+//     measured 2026-10-09), so with it on, an outside source holding only its source key could never reach this code.
+//     Every check is here instead, before the first read.
+//   - Anything else, the public key included, is refused before a single row is read or written.
+//   - A vehicle or charger is looked up only at that depot. One elsewhere reads "not found", exactly like one that
+//     does not exist, so a key can neither write to another depot's car nor learn that it exists.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const DEFAULT_DEPOT = "11111111-1111-1111-1111-111111111111";
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-otto-q-api-key" };
+const DATA_SOURCES = ["production", "twin", "replay", "shadow"];
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VEHICLE_STATES = new Set(["offline","deployed","en_route_to_depot","arrived_at_gate","staged_awaiting_service","charging_dcfc","charging_l2","charge_complete_holding","in_wash_bay","in_detail_bay","in_service_bay","service_complete_holding","staged_for_departure","en_route_to_deployment","emergency_staged","tow_requested","out_of_service"]);
 const TARIFFS = new Set(["off_peak","mid_peak","on_peak"]);
 const OCPP_STATES = ["Available","Occupied","Reserved","Unavailable","Faulted"];
 const OCPP_DIR = ["cs_to_csms", "csms_to_cs"];
-const VEH_COLS = "id,current_state,current_soc,fleet_operator_id,home_depot_id";
+const VEH_COLS = "id,current_state,current_soc,fleet_operator_id,home_depot_id,current_depot_id";
 const EXC_TYPES = new Set(["vehicle_damage","vehicle_malfunction","sensor_anomaly","tire_issue","excessive_contamination","charger_fault","wash_system_fault","service_bay_fault","vehicle_unresponsive","schedule_conflict","unauthorized_movement","safety_concern","other"]);
 const EXC_SEV = new Set(["low","medium","high","critical"]);
 function json(o: any, s = 200) { return new Response(JSON.stringify(o), { status: s, headers: { ...cors, "Content-Type": "application/json" } }); }
 function n(x: any): number | null { const v = Number(x); return isFinite(v) ? v : null; }
 
-// Resolve a vehicle by UUID, display_name, or VIN. Natural-key lookups use two PARAMETERIZED .eq
-// queries — never a string-built .or() filter — so a crafted vehicle_ref cannot inject into the filter.
-async function resolveVehicle(sb: any, ref: any) {
+// Resolve a vehicle by UUID, display_name, or VIN, AT THE CREDENTIAL'S DEPOT ONLY (v10). Natural-key lookups use
+// PARAMETERIZED .eq queries — never a string-built .or() filter — so a crafted vehicle_ref cannot inject into the filter.
+async function resolveVehicle(sb: any, ref: any, depotId: string) {
   if (ref == null) return null;
   const r = String(ref);
+  const atDepot = (v: any) => !!v && (v.current_depot_id === depotId || v.home_depot_id === depotId);
   if (UUID_RE.test(r)) {
     const { data } = await sb.from("vehicles").select(VEH_COLS).eq("id", r).limit(1).maybeSingle();
-    return data ?? null;
+    return atDepot(data) ? data : null;
   }
-  let { data } = await sb.from("vehicles").select(VEH_COLS).eq("display_name", r).limit(1).maybeSingle();
-  if (!data) ({ data } = await sb.from("vehicles").select(VEH_COLS).eq("vin", r).limit(1).maybeSingle());
-  return data ?? null;
+  for (const col of ["display_name", "vin"]) {
+    const { data } = await sb.from("vehicles").select(VEH_COLS).eq(col, r).limit(20);
+    const hit = (data ?? []).find(atDepot);
+    if (hit) return hit;
+  }
+  return null;
 }
-async function resolveCharger(sb: any, ref: any) {
+async function resolveCharger(sb: any, ref: any, depotId: string) {
   if (ref == null) return null;
   const r = String(ref);
-  if (UUID_RE.test(r)) return r;
-  const { data } = await sb.from("ottoq_ocpp_chargers").select("charger_id").eq("ocpp_identifier", r).limit(1).maybeSingle();
+  const q = sb.from("ottoq_ocpp_chargers").select("charger_id").eq("depot_id", depotId);
+  const { data } = await (UUID_RE.test(r) ? q.eq("charger_id", r) : q.eq("ocpp_identifier", r)).limit(1).maybeSingle();
   return data?.charger_id ?? null;
 }
 // Resolve the depot's live orchestration run so run-scoped consumers see externally-ingested rows.
@@ -50,6 +67,24 @@ async function resolveRunId(sb: any, depotId: string): Promise<string | null> {
   if (!data || !data.length) return null;
   const prod = data.find((r: any) => r.run_by === "production_live");
   return (prod ?? data[0]).sim_run_id;
+}
+async function sha256Hex(s: string): Promise<string> {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function sameSecret(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a), y = new TextEncoder().encode(b);
+  if (x.length !== y.length || x.length === 0) return false;
+  let d = 0;
+  for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i];
+  return d === 0;
+}
+// The platform is whoever holds the injected service key: in apikey (the new sb_secret_ keys are sent there alone)
+// or as the Bearer (the legacy service_role JWT).
+function isPlatform(req: Request): boolean {
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  return sameSecret(req.headers.get("apikey") ?? "", key) || sameSecret(bearer, key);
 }
 async function brainSignal(sb: any, vehicleId: string, soc: number | null, etaMin: number | null, source: string) {
   try {
@@ -65,16 +100,35 @@ serve(async (req) => {
   try {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const stream = String(body.stream || "").toLowerCase();
-    const source = String(body.source || "external");
-    const DS = ["production", "twin", "replay", "shadow"].includes(source) ? source : "production";
-    const depot_id = body.depot_id || DEFAULT_DEPOT;
     const dryRun = body.dry_run === true;
     if (!stream) return json({ error: "stream required (energy|telemetry|ocpp|arrival|incident)" }, 422);
+
+    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // ── the credential decides the depot and the data source (v10) ──
+    let depot_id: string; let DS: string; let source: string; let credential: any;
+    const sourceKey = req.headers.get("x-otto-q-api-key");
+    if (sourceKey) {
+      const { data: cred, error: cErr } = await sb.rpc("ottoq_source_key_check", { p_key_hash: await sha256Hex(sourceKey), p_stream: stream });
+      if (cErr) return json({ error: "credential check failed", detail: cErr.message }, 500);
+      if (!cred?.ok) return json({ error: "source key refused", reason: cred?.reason ?? "unknown" }, cred?.reason === "stream_not_allowed" ? 403 : 401);
+      if (body.depot_id && body.depot_id !== cred.depot_id) return json({ error: "depot_id comes from the source key, and this body names another depot" }, 403);
+      if (DATA_SOURCES.includes(String(body.source)) && body.source !== cred.data_source) return json({ error: "data_source comes from the source key, and this body names another" }, 403);
+      depot_id = cred.depot_id; DS = cred.data_source; source = cred.source_name;
+      credential = { kind: "source_key", key_prefix: cred.key_prefix, source_name: cred.source_name };
+    } else if (isPlatform(req)) {
+      if (!body.depot_id || !UUID_RE.test(String(body.depot_id))) return json({ error: "the platform must name depot_id" }, 422);
+      if (!DATA_SOURCES.includes(String(body.source))) return json({ error: "source must be one of " + DATA_SOURCES.join("|") + "; an unknown source is never stored as production" }, 422);
+      depot_id = String(body.depot_id); DS = String(body.source); source = DS;
+      credential = { kind: "platform" };
+    } else {
+      return json({ error: "ottoq-ingest needs a source key (X-OTTO-Q-API-Key) or the platform credential; the public key is neither" }, 401);
+    }
+
     let events: any[] = Array.isArray(body.events) ? body.events : null;
     if (!events) { const { stream: _s, source: _src, depot_id: _d, events: _e, dry_run: _dr, ...one } = body; events = Object.keys(one).length ? [one] : []; }
     if (!events.length) return json({ error: "no events" }, 422);
 
-    const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const now = new Date().toISOString();
     const runId = await resolveRunId(sb, depot_id);  // may be null when the depot is idle
     const results: any[] = []; let ok = 0;
@@ -97,7 +151,7 @@ serve(async (req) => {
           if (error) { results.push({ stream, error: error.message }); continue; }
           results.push({ stream, wrote: "site_energy_snapshots", sim_run_id: runId, stored_lmp: n(ev.lmp_usd_mwh), stored_carbon: n(ev.carbon_gco2_kwh) }); ok++;
         } else if (stream === "telemetry") {
-          const veh = await resolveVehicle(sb, ev.vehicle_ref ?? ev.vehicle_id ?? ev.vin);
+          const veh = await resolveVehicle(sb, ev.vehicle_ref ?? ev.vehicle_id ?? ev.vin, depot_id);
           if (!veh) { results.push({ stream, error: "vehicle not found", ref: ev.vehicle_ref ?? ev.vehicle_id }); continue; }
           const soc = n(ev.soc ?? ev.soc_pct);
           const st = ev.state && VEHICLE_STATES.has(String(ev.state)) ? String(ev.state) : null;
@@ -117,7 +171,7 @@ serve(async (req) => {
         } else if (stream === "ocpp") {
           const mt = String(ev.message_type ?? ev.messageType ?? "StatusNotification");
           const dir = OCPP_DIR.includes(String(ev.direction || "").toLowerCase()) ? String(ev.direction).toLowerCase() : "cs_to_csms";
-          const chargerId = await resolveCharger(sb, ev.charger_id ?? ev.charger_ref ?? ev.ocpp_identifier);
+          const chargerId = await resolveCharger(sb, ev.charger_id ?? ev.charger_ref ?? ev.ocpp_identifier, depot_id);
           const msg: any = { charger_id: chargerId, message_at: now, direction: dir,
             message_type: mt, ocpp_version: String(ev.ocpp_version ?? "2.0.1"), payload: ev.payload ?? ev, data_source: DS };
           if (dryRun) { results.push({ stream, would_write: "ottoq_ocpp_messages", message_type: mt, charger: chargerId }); ok++; continue; }
@@ -133,7 +187,7 @@ serve(async (req) => {
           }
           results.push({ stream, message_type: mt, charger: chargerId, connector_status: cs ?? null, message_logged: !mErr, charger_updated: chargerUpdated, message_error: mErr?.message ?? null }); ok++;
         } else if (stream === "arrival") {
-          const veh = await resolveVehicle(sb, ev.vehicle_ref ?? ev.vehicle_id ?? ev.vin);
+          const veh = await resolveVehicle(sb, ev.vehicle_ref ?? ev.vehicle_id ?? ev.vin, depot_id);
           if (!veh) { results.push({ stream, error: "vehicle not found", ref: ev.vehicle_ref ?? ev.vehicle_id }); continue; }
           const eta = n(ev.eta_min); const arrivalSoc = n(ev.arrival_soc ?? ev.soc);
           const newState = (eta !== null && eta <= 0) ? "arrived_at_gate" : "en_route_to_depot";
@@ -144,7 +198,7 @@ serve(async (req) => {
           results.push({ stream, vehicle: veh.id, state: newState, eta_min: eta, applied: !aErr,
             appointment: brain?.appointment ?? null, brain, error: aErr?.message ?? null }); ok++;
         } else if (stream === "incident") {
-          const veh = (ev.vehicle_ref || ev.vehicle_id) ? await resolveVehicle(sb, ev.vehicle_ref ?? ev.vehicle_id) : null;
+          const veh = (ev.vehicle_ref || ev.vehicle_id) ? await resolveVehicle(sb, ev.vehicle_ref ?? ev.vehicle_id, depot_id) : null;
           const rawType = String(ev.type ?? "other");
           const excType = EXC_TYPES.has(rawType) ? rawType : "other";
           const sev = EXC_SEV.has(String(ev.severity)) ? String(ev.severity) : "medium";
@@ -158,6 +212,6 @@ serve(async (req) => {
         } else { results.push({ error: "unknown stream: " + stream }); }
       } catch (e) { results.push({ stream, error: e instanceof Error ? e.message : "unknown" }); }
     }
-    return json({ stream, source, data_source: DS, depot_id, sim_run_id: runId, dry_run: dryRun, received: events.length, processed: ok, results });
+    return json({ stream, source, data_source: DS, depot_id, credential, sim_run_id: runId, dry_run: dryRun, received: events.length, processed: ok, results });
   } catch (e) { return json({ error: e instanceof Error ? e.message : "unknown" }, 500); }
 });

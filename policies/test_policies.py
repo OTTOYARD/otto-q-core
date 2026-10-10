@@ -190,14 +190,22 @@ def test_dominated_policies_are_named():
     coefficients now price the schedule into the most expensive slot, so greedy and
     otto_q_asis form the frontier and cpsat joins fifo in the dominated set. The
     mechanism under test -- the dominated set is computed and named -- is unchanged.
+
+    REVISED 2026-10-09 when rule 9 removed that cap (FINDINGS G400): every car now
+    charges to 100%. greedy and cpsat both make every deadline (0 tardy minutes) and
+    greedy does it for less ($9,004 against $9,859 a month), so cpsat is dominated by
+    greedy; fifo is the cheapest ($8,294) at 817 tardy minutes, so it is on the
+    frontier; otto_q_asis (612 tardy minutes, $10,972) is dominated by both. Same
+    mechanism, the scenario's new numbers -- and the weighted cpsat mode is still the
+    one that prices its schedule into dear slots.
     """
     from pathlib import Path as _Path
     from cost import cost_comparison
     sc = _Path(__file__).parent.parent / "solvers" / "cpsat" / "scenario_canonical.json"
     t = cost_comparison(sc)["tradeoff"]
     assert set(t["pareto_optimal"]) | set(t["dominated"]) == set(t["total_tardy_min"])
-    assert t["pareto_optimal"] == ["greedy", "otto_q_asis"]
-    assert set(t["dominated"]) == {"cpsat", "fifo"}
+    assert t["pareto_optimal"] == ["fifo", "greedy"]
+    assert set(t["dominated"]) == {"cpsat", "otto_q_asis"}
 
 
 def test_every_cost_artifact_states_its_assumptions():

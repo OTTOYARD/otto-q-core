@@ -19,7 +19,6 @@ sys.path.insert(0, str(HERE.parent))
 
 import forward_proposer  # noqa: E402
 from forward_proposer import (  # noqa: E402
-    CHEMISTRY_DAILY_SOC_CAP_PCT,
     DEFAULT_DET_BUDGET_S,
     DEFAULT_SERVICEABLE_STATES,
     DEFAULT_TARGET_SOC_PCT,
@@ -529,50 +528,53 @@ def test_no_queue_is_byte_for_byte_the_urgency_batch():
             if not p["proposal"]["abstain"]} == {"v-urgent", "v-mid"}
 
 
-def test_the_chemistry_cap_reaches_the_production_path(): 
-    """R-11 through the BRIDGE, which is where it was dead.
+def test_no_chemistry_lowers_a_cars_target():
+    """RULE 9 (CLAUDE.md; Chase, 2026-09-27) through the bridge, where a cap used to live.
 
-    `_clamp_target` has always capped a target at the class's
-    `max_daily_soc_pct`. T13 proves that by calling it directly with a
-    hand-built dict — and the production class table has no such column, while
-    `frame_to_scenario` copied neither it nor `battery_chemistry`. So every live
-    frame reached `_clamp_target` with a class that could not carry a cap, fell
-    through to the default 100, and the rule did nothing. T13 stayed green the
-    whole time: a guard over a dead path (L-51).
-
-    This asserts the property end-to-end — a frame goes in, and the asset the
-    solver is handed carries the capped target.
+    Until 2026-10-09 this file pinned the opposite: the bridge derived an 80% cap from
+    `battery_chemistry` (R-11) and the solver planned every NMC and NCA car to it. Every
+    robotaxi class in ottoq_vehicle_classes is NMC or NCA, so every live plan undercounted
+    the last fifth of each charge while the kernel charged each car to 100. Now an NMC car
+    whose frame row asks for 100 is planned to 100, and no cap is copied into the scenario.
     """
     classes = {"nmc_ride": {"battery_kwh": 90, "max_charge_kw": 100,
                             "charge_kinds": ["dcfc"], "battery_chemistry": "NMC"}}
-    frame = _frame([_vehicle("v-nmc", platform="nmc_ride", soc=30, target_soc=95)],
+    frame = _frame([_vehicle("v-nmc", platform="nmc_ride", soc=30, target_soc=100)],
                    [_stall("s-0")])
     sc, _ = frame_to_scenario(frame, classes, site=SITE, horizon_min=480)
 
     cname = next(iter(sc["asset_classes"]))
-    assert sc["asset_classes"][cname]["max_daily_soc_pct"] == 80, (
-        "the bridge did not carry the chemistry cap into the scenario")
-    assert sc["assets"][0].target_soc == 80, (
-        f"asset asked for {sc['assets'][0].target_soc}% on an NMC pack; R-11 "
-        f"caps routine daily cycling at 80%")
+    assert "max_daily_soc_pct" not in sc["asset_classes"][cname], (
+        "the bridge copied a chemistry cap into the scenario")
+    assert sc["assets"][0].target_soc == 100, (
+        f"an NMC car asked for 100% and was planned to {sc['assets'][0].target_soc}%")
 
 
-def test_an_explicit_cap_beats_the_chemistry_default():
-    """A pack that states its own cap is not overruled by the chemistry table."""
+def test_a_class_that_declares_a_cap_does_not_lower_the_target():
+    """A class-level cap is a depot or chemistry default, which rule 9 forbids. The only
+    lower limit is the owner's, and it arrives already resolved as the frame row's target."""
     classes = {"odd": {"battery_kwh": 90, "max_charge_kw": 100,
-                       "charge_kinds": ["dcfc"], "battery_chemistry": "NMC",
+                       "charge_kinds": ["dcfc"], "battery_chemistry": "NCA",
                        "max_daily_soc_pct": 70}}
     sc, _ = frame_to_scenario(
         _frame([_vehicle("v-1", platform="odd", soc=30, target_soc=95)],
                [_stall("s-0")]), classes, site=SITE, horizon_min=480)
-    assert sc["assets"][0].target_soc == 70
+    assert sc["assets"][0].target_soc == 95
 
 
-def test_an_unknown_chemistry_is_not_given_a_guessed_cap():
-    """LFP tolerates high SoC and is not in the table; a chemistry we have no
-    evidence for must get NO cap rather than an invented one. Silence is the
-    honest answer, and it keeps legacy behaviour byte-for-byte."""
-    assert "LFP" not in CHEMISTRY_DAILY_SOC_CAP_PCT
+def test_a_frame_row_with_no_target_gets_the_fleet_default():
+    """The one default is rule 9's: 100, as ottoq_effective_target_soc_at gives a car whose
+    owner set nothing lower. It was 90, the number the prototype assumed before rule 9."""
+    assert DEFAULT_TARGET_SOC_PCT == 100
+    classes = {"plain": {"battery_kwh": 90, "max_charge_kw": 100, "charge_kinds": ["dcfc"]}}
+    v = _vehicle("v-1", platform="plain", soc=30)
+    v.pop("target_soc", None)
+    sc, _ = frame_to_scenario(_frame([v], [_stall("s-0")]), classes, site=SITE, horizon_min=480)
+    assert sc["assets"][0].target_soc == 100
+
+
+def test_an_lfp_pack_keeps_its_stated_target():
+    """LFP was never in the cap table; its stated target was always kept, and still is."""
     classes = {"lfp": {"battery_kwh": 90, "max_charge_kw": 100,
                        "charge_kinds": ["dcfc"], "battery_chemistry": "LFP"}}
     sc, _ = frame_to_scenario(
@@ -761,17 +763,18 @@ def test_an_unreadable_soc_is_an_abstention_not_a_raise():
 
 def test_one_default_for_target_soc_serves_both_admission_and_plan():
     #: The two defaults were 100 (admission) and 90 (the plan). At soc 95 that
-    #: pair admitted a vehicle and then planned it past its own target. Under
-    #: one default of 90 it is simply not a candidate -- and the vehicle that
-    #: IS a candidate is planned against the same 90 that admitted it.
+    #: pair admitted a vehicle and then planned it past its own target. There is
+    #: one default now, rule 9's 100: a car at 95 is a candidate and is planned
+    #: against the same 100 that admitted it, and a full car is not a candidate.
     sc, abst = frame_to_scenario(
-        _frame([_vehicle("v-high", soc=95, target_soc=None),
+        _frame([_vehicle("v-full", soc=100, target_soc=None),
+                _vehicle("v-high", soc=95, target_soc=None),
                 _vehicle("v-low", soc=30, target_soc=None)],
                [_stall("s-1")]),
         CLASSES, site=SITE)
     explicit = sc["assets_spec"]["explicit"]
-    assert [a["aid"] for a in explicit] == ["v-low"], "95 is past a target of 90"
-    assert explicit[0]["target_soc"] == DEFAULT_TARGET_SOC_PCT == 90
+    assert sorted(a["aid"] for a in explicit) == ["v-high", "v-low"], "a full car is not a candidate"
+    assert all(a["target_soc"] == DEFAULT_TARGET_SOC_PCT == 100 for a in explicit)
     assert abst == []
 
 

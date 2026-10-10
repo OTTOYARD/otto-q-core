@@ -23,7 +23,7 @@
   "asset_classes": {
     "waymo_jaguar_ipace_2024": {
       "battery_kwh": 90, "max_charge_kw": 100, "inlet": "CCS",
-      "chemistry": "NMC", "max_daily_soc_pct": 80,
+      "chemistry": "NMC",
       "energy_curve": [
         {"above_soc_pct": 0,  "accept_frac": 1.00},
         {"above_soc_pct": 70, "accept_frac": 0.60},
@@ -32,7 +32,7 @@
     },
     "zoox_robotaxi_2024": {
       "battery_kwh": 110, "max_charge_kw": 150, "inlet": "CCS",
-      "chemistry": "NMC", "max_daily_soc_pct": 80,
+      "chemistry": "NMC",
       "energy_curve": [
         {"above_soc_pct": 0,  "accept_frac": 1.00},
         {"above_soc_pct": 70, "accept_frac": 0.60},
@@ -41,7 +41,7 @@
     },
     "generic_robotaxi": {
       "battery_kwh": 80, "max_charge_kw": 120, "inlet": "CCS",
-      "chemistry": "NMC", "max_daily_soc_pct": 80,
+      "chemistry": "NMC",
       "energy_curve": [
         {"above_soc_pct": 0,  "accept_frac": 1.00},
         {"above_soc_pct": 70, "accept_frac": 0.60},

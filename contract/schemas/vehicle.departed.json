@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ottoyard.com/schemas/ottoq/contract/0.1/vehicle.departed.json",
+  "title": "com.ottoyard.vehicle.departed (operator to OTTO-Q)",
+  "description": "The car has left the depot. OTTO-Q releases what it held for the car; it never learns the car's mission.",
+  "type": "object",
+  "required": ["departed_at", "reason"],
+  "properties": {
+    "departed_at": {"$ref": "defs.json#/$defs/timestamp"},
+    "reason": {"enum": ["dispatched", "owner_recall", "towed", "other"]},
+    "soc_pct": {"$ref": "defs.json#/$defs/percent"}
+  },
+  "additionalProperties": false
+}

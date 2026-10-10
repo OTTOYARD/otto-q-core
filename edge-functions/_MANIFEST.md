@@ -12,9 +12,8 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
   `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), v36, agent v24 (footnote ⁵), v37, agent v25
-  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and
-  `ottoq-agent-gateway` v2, OTTOYARD sign-in (footnote ¹⁰).
-  29 ACTIVE functions.
+  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰), and `ottoq-depot-v2` v1, its first deploy (footnote ¹¹). `otto-q-api`'s repo copy is ahead of what is deployed, on purpose, until someone can deploy it (footnote ¹²). `ottoq-csms-relay` is in the repo and not deployed: it is deployed after its database half, migration 0697, which holds a DROP a person approves (csms/README.md). And `ottoq-agent-gateway` v2, OTTOYARD sign-in (footnote ¹³).
+  30 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
 
@@ -107,9 +106,9 @@ against this table without trusting any metadata column.
 
 | Function | v | verify_jwt | Deployed (UTC) | match | Deployed sha256 |
 |---|---:|---|---|---|---|
-| otto-q-api | 26 | false | 2026-04-19 01:54 | yes | `01762cf6734e0dd506a057a3a9ac58f09aa2acd18dc4dc23868b42c1afb9eff0` |
+| otto-q-api | 26 | false | 2026-04-19 01:54 | **repo ahead¹²** | `01762cf6734e0dd506a057a3a9ac58f09aa2acd18dc4dc23868b42c1afb9eff0` |
 | otto-twin-control | 30 | false | 2026-09-29 02:48 | markers¹ | `12a5c37d616fa19efcd43bda11f235ca644fa946cd4e3d112d748a8341746700` (repo file) |
-| ottoq-agent-gateway | 2 | false | 2026-10-10 07:23 | yes¹⁰ | `d72d2f7fd123b1844638572625215add017a4457c5ed43641ae69419a2ec4098` |
+| ottoq-agent-gateway | 2 | false | 2026-10-10 07:23 | yes¹³ | `d72d2f7fd123b1844638572625215add017a4457c5ed43641ae69419a2ec4098` |
 | ottoq-amend | 9 | true | 2026-06-18 04:24 | yes | `70f038ae2cfdb8891f2589f2e3158cc59792f0318718963cfa9c544249b1376b` |
 | ottoq-approval-copilot | 4 | true | 2026-07-25 01:46 | yes | `3abc122e20aa24a1222abe7a3bd7ce8ef6e91f78cc236b5afe2f0dc7f46293c0` |
 | ottoq-assign-optimize | 8 | true | 2026-09-09 03:41 | yes | `5508a9c95d4b98e736b3215fca9cc006ae6b5e4a399de174165cad69f100c34e` |
@@ -118,12 +117,13 @@ against this table without trusting any metadata column.
 | ottoq-cpsat-propose | 11 | false | 2026-10-07 13:56 | yes³ | `7c40c6fe93cf6c21a77958033a4015f12051f720c3a5c94305985a443aa121b5` |
 | ottoq-cuopt-lp-probe | 8 | true | 2026-08-01 17:43 | yes | `bea55aa4120f0d25fde967aa1fbcab3cdeb9f79bebef9009b77ada7dffc6d580` |
 | ottoq-cuopt-propose | 29 | true | 2026-09-16 00:10 | yes | `5425ba3dcf0350d87152b497cc66c7897d4013e6227bd80fa3e6e1a7bba5ddf9` |
+| ottoq-depot-v2 | 1 | false | 2026-10-10 01:05 | yes¹¹ | `a934466094e8d82f7b2b7f54f7c5f3c1b896c4b94ef3e24aba7df8dd0e4c4fd2` |
 | ottoq-depot-resources | 5 | true | 2026-06-19 02:57 | yes | `06c303ee7662f8f8f1fcb549d7e22a8e1128b5d870863a1d652afa39171084a0` |
 | **ottoq-energy-mpc** | 4 | **false** | 2026-07-15 04:33 | **NO — G69** | `42eae1f61a939ce19c9f60eef4f45a5c539f71dc5f31bec4446a1d683ab0006e` |
 | ottoq-energy-optimize | 8 | true | 2026-06-17 01:33 | yes | `ef4f5240822dc6064c8051c5f4cd01daf6aeef0f59622f8eca026f60019211b0` |
 | ottoq-feed-agents | 6 | true | 2026-07-09 18:31 | yes | `2b9dae37769c6babbb4401a0b936d31e0a2ebf4af48cea75ace4588d827f7bb2` |
 | ottoq-fleet-vehicles | 5 | true | 2026-06-19 02:56 | yes | `a68d6444315ba0a1b5caccb568c624026a22e59bc9b90d0323890a2b5c2c2ba3` |
-| ottoq-ingest | 12 | true | 2026-07-23 19:00 | yes | `ef7ae8815237ea9fb2cb0de1279f0cbaeb1c3d2df24317308e5d6ec4c4910893` |
+| ottoq-ingest | 16 | false | 2026-10-09 23:37 | yes¹⁰ | `271751cbce1361467d28dad231267bcab225c155d4ed933c3f9a51702714846c` |
 | ottoq-jobs-active | 5 | true | 2026-06-19 12:41 | yes | `620347129158bbe913a40d97ae8d0a8bc712e0ddbc5b4d8c11c76e0a58f26ae0` |
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
@@ -238,7 +238,7 @@ morning: `scripts/agent-gateway-smoke.mjs --passcode` passed 6 of 6, and `POST /
 `ask_not_configured`: it needs the function secrets `ANTHROPIC_API_KEY` and a model name in
 `OTTOCOMMAND_OWNER_MODEL` (or `ANTHROPIC_MODEL`), and at least one is not set.
 
-¹⁰ **`ottoq-agent-gateway` v2, 2026-10-10 at 2:23 AM CT (07:23 UTC), OTTOYARD sign-in (0700, PERSONAL_AGENT.md section
+¹³ **`ottoq-agent-gateway` v2, 2026-10-10 at 2:23 AM CT (07:23 UTC), OTTOYARD sign-in (0700, PERSONAL_AGENT.md section
 10).** Five files through the Supabase MCP deploy tool, JWT verification off as v1 (an `oqt_` access token is no more
 a JWT than an agent key), deployed from the branch of #239 at `4761ed7` before 0700 was applied. Until #239 merges,
 `main`'s copies of `index.ts` and `_shared/agent_gateway.ts` are v1's, and `_shared/agent_signin.ts` is not on `main`.
@@ -253,7 +253,7 @@ door's initialize, tools/list (16 tools) and welcome answer as before; a made-up
 
 ## Committed, not deployed
 
-None. `ottoq-agent-gateway` v2 was deployed on 2026-10-10 from the branch of #239, ahead of its merge (footnote ¹⁰).
+`otto-q-api`: the repo copy is ahead of the deployed one, on purpose (footnote ¹²). `ottoq-csms-relay`: deployed after migration 0697 (csms/README.md). `ottoq-agent-gateway` v2 was deployed on 2026-10-10 from the branch of #239, ahead of its merge (footnote ¹³).
 
 ## What the four synced functions gained, and why it mattered to the audit
 
@@ -287,3 +287,9 @@ Exit 0 = in sync (acknowledged exceptions aside), 1 = drift named, **2 = could
 not check, which is never reported as a pass.** The token is a Supabase personal
 access token (supabase.com → Account → Access Tokens); it is never stored in this
 repo.
+
+¹⁰ **`ottoq-ingest` v16 (source v10), 2026-10-09 at 6:37 PM CT (23:37 UTC), for G393 security item 4 and 0649.** The depot and the data source now come from the credential: a source key (`X-OTTO-Q-API-Key`, issued by `ottoq_issue_source_key`) or the injected service key, compared in constant time. Deployed with `verify_jwt` **false** on purpose, after v15 (the same code with it true) answered the public key with the gateway's own `UNAUTHORIZED_LEGACY_JWT`: the gateway now refuses legacy JWT keys, so with it on, a source holding only its source key could never reach the door. Read back with `get_edge_function`: compared with the repo at `a5404f1` by inspection, not hashed (the response comes back inline at 16 KB, so there is no file to hash). Proven instead on the live door with a twin-scoped test key, every request a dry run: no credential 401; the public key 401; the key on a twin car 200 as `twin`; a body naming another depot 403; a body naming `production` 403; a stream the key lacks 403; another depot's car "vehicle not found"; the key after `ottoq_revoke_source_key` 401.
+
+¹¹ **`ottoq-depot-v2` v1 is its first deploy, 2026-10-09 at 8:05 PM CT (01:05 UTC on 2026-10-10), for step 3 of the twin data contract review (migrations 0650, 0651, 0652).** The v2 operator door: `POST /events`, `GET /directives`, `GET /jwks` (contract/README.md). Through the Supabase MCP `deploy_edge_function` with three files, entrypoint `ottoq-depot-v2/index.ts`, `verify_jwt` **false** on purpose, as `ottoq-ingest` v16 (footnote ¹⁰): the source key is the credential and the gateway refuses the legacy JWT keys the apps ship. Read back with `get_edge_function`, the response saved to a file by the tool and hashed from that file (nothing retyped): all three byte-identical to the repo at commit `0b2de06` (index.ts `a9344660`, `ottoq-depot-v2/contract_schemas.ts` `fc55ef4c`, `_shared/depot_v2.ts` `f27bd1d6`). The function now imports a shared module and a generated one, so a future deploy sends all three. The depot's Ed25519 signing key was made by the function on its first `GET /jwks` (kid `ottoq-depot-118daaffe483095d`, private half in Vault) and no key was configured by hand. Probed from outside the same minute, `db/checks/0430` §2: unknown route 404, no key 401, malformed key 401, wrong method 405, wrong content type 415, a shadow-key batch of 10 in a dry run (5 applied, 1 late, 1 duplicate, 3 refused: another fleet's car, another operator's source, and a schema failure at the edge; nothing kept), a shadow key's directive read 403, and the probe key after revocation 401. **Not yet seen live:** a signed directive batch, which needs a running twin run (step 4).
+
+¹² **`otto-q-api`: the repo copy is ahead of the deployed v26 (listed as version 28 by the API, same 2026-04-19 01:54 UTC deploy), on purpose, for G394.** Until 2026-10-10 this directory's `index.ts` was byte-identical to the deployed source (sha256 `01762cf6…`, the hash in the table). It now carries ten more lines, right after the source-key block in the route handler: a request that is not GET, HEAD or OPTIONS needs a valid `X-OTTO-Q-API-Key` or the service key as its bearer token, or it gets 401 `UNAUTHORIZED` (repo sha256 `fe35634f…`). Every write route writes with the service role, and four weeks of function logs (2026-09-12 to 10-10, `function_edge_logs` by function id) show apps calling GET routes only: `fleet/summary`, `progression-decisions`, `energy/history`, `fleet/schedule-intelligence`, the `ai/…` reads and the `ottow/…` reads. **Not deployed:** the file is 399 KB and the Supabase MCP deploy tool takes a file's content inline, so this session cannot send it without retyping it, and CI has no Supabase token by decision (2026-09-21). Two ways to ship it, either one a founder action: the dashboard's editor (Edge Functions → otto-q-api → Code: paste the ten lines after the `X-OTTO-Q-API-Key` block, then Deploy, keeping "Enforce JWT verification" off), or `supabase functions deploy otto-q-api --no-verify-jwt` from a checkout that has a token. After it ships: `POST /api/v1/tasks` with no credential answers 401, `GET /api/v1/fleet/summary` still answers 200.
