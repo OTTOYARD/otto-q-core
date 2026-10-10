@@ -349,7 +349,6 @@ def _forward_lex_rows():
              "sessions": [], "energy": {}, "bess": []}
     classes = {"waymo": {"battery_kwh": 90, "max_charge_kw": 100,
                          "charge_kinds": ["dcfc", "l2"], "chemistry": "NMC",
-                         "max_daily_soc_pct": 80,
                          "energy_curve": [{"above_soc_pct": 0, "accept_frac": 1.0}]}}
     site = {"power_cap_kw_hard": 1000, "power_soft_target_kw": 700,
             "dcfc_cooldown_min": 18, "move_duration_min": 4, "path_capacity": 2,

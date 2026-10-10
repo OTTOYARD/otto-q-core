@@ -28,10 +28,17 @@ Headline (seed 424242, reduced canonical scenario; read WITH the caveats below):
 
 | policy | total_tardy_min | p95_wait | peak_kw | moves | makespan |
 |---|---|---|---|---|---|
-| fifo | 237 | 0 | 370 | 9 | 501 |
-| greedy | 0 | 13 | 440 | 9 | 218 |
-| otto_q_asis | 157 | 55 | 372 | 9 | 386 |
-| cpsat | 0 | 90 | 550 | 9 | 270 |
+| fifo | 817 | 6 | 349 | 9 | 740 |
+| greedy | 0 | 42 | 402 | 9 | 277 |
+| otto_q_asis | 612 | 108 | 482 | 9 | 632 |
+| cpsat | 0 | 71 | 440 | 9 | 278 |
+
+**Every car charges to 100% (rule 9, 2026-10-09).** Until then the scenario capped every
+class at 80% (a chemistry default, R-11) and this table read fifo 237/0/370/9/501, greedy
+0/13/440/9/218, otto_q_asis 157/55/372/9/386, cpsat 0/90/550/9/270. Charging the last fifth
+of every battery is slow work above 70% SoC, so the policies that serve in arrival or
+urgency order fall further behind (fifo 237 → 817 tardy minutes, otto_q_asis 157 → 612),
+while `greedy` and `cpsat` still reach zero tardiness.
 
 **This table is CHECKED, not typed.** `policies/test_policies.py` parses it out of
 this file and compares it cell-by-cell against `comparison_seed424242.json`, so it
@@ -44,7 +51,7 @@ guarding.
 each vehicle's finish and ignores energy price and peak entirely; `cpsat`
 minimizes the C4 multi-term objective (tardiness ×10, on-peak kW-minutes, peak
 excursion ×20, moves ×15). On this seed it reaches **zero** tardy minutes and pays
-for it in wait (p95 90 min) and peak (550 kW) — the stale prose here used to claim
+for it in wait (p95 71 min) and peak (440 kW) — the stale prose here used to claim
 it "deliberately trades tardiness minutes", which was a reading of the stale table,
 not of the artifact. `otto_q_asis` is the transcription of the live cursor's
 ordering rules into this reduced harness, NOT the full engine (no shield, no
