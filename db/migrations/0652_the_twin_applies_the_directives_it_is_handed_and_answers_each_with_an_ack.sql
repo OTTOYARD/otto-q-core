@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010010118
 -- migration-name:    the_twin_applies_the_directives_it_is_handed_and_answers_each_with_an_ack
 --
 -- 0652  **The twin's apply door grows a payload: it applies exactly the directives it is handed and answers each with
@@ -316,3 +316,10 @@ VALUES ('0652_the_twin_applies_the_directives_it_is_handed_and_answers_each_with
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 01:01:18 UTC (8:01 PM CT on 2026-10-09), version 20261010010118 ═══════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in e2315a0; the ledger's stored statement is that file byte for
+--   byte (md5 3a977ad055aaff05b4a34d11bba074aa, 20,807 characters, 21,575 bytes). P0, P1, the four anchors, V1 (on
+--   run c9558b2a, the twin depot's newest) and V2 passed in the apply's transaction. Read after: the walk's definition
+--   is fba6dd47836c81eead40a63846e7f282 as written, the 0652_pre snapshot holds 071644ef4db2b539301060f4512e78a3, no
+--   probe command survived, and ottoq.apply_only is unset in a fresh session.
