@@ -749,7 +749,7 @@ repo_manifest(version, name, file) AS (
     ('20261010113609'::text, 'an_autonomous_cars_data_comes_off_while_it_charges'::text, '0695_an_autonomous_cars_data_comes_off_while_it_charges.sql'::text),
     ('20261010113746'::text, 'the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once'::text, '0696_the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once.sql'::text),
     ('PENDING'::text, 'the_charger_back_end_hears_the_twins_chargers_through_a_relay'::text, '0697_the_charger_back_end_hears_the_twins_chargers_through_a_relay.sql'::text),
-    ('PENDING'::text, 'a_new_visit_carries_the_work_the_visit_it_replaces_still_owes'::text, '0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql'::text),
+    ('20261010113923'::text, 'a_new_visit_carries_the_work_the_visit_it_replaces_still_owes'::text, '0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql'::text),
     ('20261010110724'::text, 'the_twin_apps_determinism_canon_card_reads_again'::text, '0699_the_twin_apps_determinism_canon_card_reads_again.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010113923
 -- migration-name:    a_new_visit_carries_the_work_the_visit_it_replaces_still_owes
 --
 -- 0698  **A new visit carries the required work the visit it replaces still owes the car; nothing found is dropped.**
@@ -273,3 +273,11 @@ VALUES ('0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes', tr
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 11:39:23 UTC (6:39 AM CT), version 20261010113923 ═════════════════════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 9eeaa49; the ledger's stored statement is that file byte for
+--   byte (md5 6e0dd2590a93dab7dec456a14edba9c3, 17,418 characters, 18,210 bytes). P1, V1, V2 passed in the apply's
+--   transaction. Read after: the deriver's definition md5 cd5c513bb164a14614003e308009a347 as written; no probe visit
+--   left; lineage TRUE/TRUE, the recert floor now 11:39:23 UTC with the 9 enabled canon columns to recertify. The
+--   recert runner, cron job 746, paused at 11:29:00 UTC for 0657, 0695, 0696 and this file, was re-enabled at 11:39:30
+--   UTC, so one sweep recertifies all three recert-forcing files.
