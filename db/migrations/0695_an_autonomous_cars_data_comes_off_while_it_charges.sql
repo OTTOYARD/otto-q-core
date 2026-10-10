@@ -666,14 +666,19 @@ BEGIN
               {"svc": "readiness_check", "status": "pending", "must_do": true, "concurrency": "gate"}]'::jsonb,
             'in_progress')
     RETURNING visit_id INTO v_visit;
-    v_r := v_r || jsonb_build_object('started_in_staging', public.ottoq_start_concurrent_atoms(v_veh, v_clock),
+    -- each start is read back in a statement of its own: a statement's subqueries see the rows as the statement began,
+    -- so a read beside the call that starts the transfer would see it pending whatever the call did (the first apply
+    -- of this file, 2026-10-10 11:31 UTC, failed on exactly that)
+    v_r := v_r || jsonb_build_object('started_in_staging', public.ottoq_start_concurrent_atoms(v_veh, v_clock));
+    v_r := v_r || jsonb_build_object(
       'in_staging', (SELECT a FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) a
                       WHERE vn.visit_id = v_visit AND a->>'svc' = 'data_offload'),
       'holds_in_staging', ottoq.ottoq_uplink_transfer_holds(v_veh, v_run));
     -- the car on an L2 charger
     UPDATE public.vehicles SET current_state = 'charge_complete_holding', current_stall_id = v_l2 WHERE id = v_veh;
-    v_r := v_r || jsonb_build_object('holds_on_charger_pending', ottoq.ottoq_uplink_transfer_holds(v_veh, v_run),
-      'started_on_charger', public.ottoq_start_concurrent_atoms(v_veh, v_clock),
+    v_r := v_r || jsonb_build_object('holds_on_charger_pending', ottoq.ottoq_uplink_transfer_holds(v_veh, v_run));
+    v_r := v_r || jsonb_build_object('started_on_charger', public.ottoq_start_concurrent_atoms(v_veh, v_clock));
+    v_r := v_r || jsonb_build_object(
       'on_charger', (SELECT a FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) a
                       WHERE vn.visit_id = v_visit AND a->>'svc' = 'data_offload'),
       'holds_running', ottoq.ottoq_uplink_transfer_holds(v_veh, v_run));
