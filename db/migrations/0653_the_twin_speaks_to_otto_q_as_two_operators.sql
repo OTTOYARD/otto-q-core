@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261010013631
 -- migration-name:    the_twin_speaks_to_otto_q_as_two_operators
 --
 -- 0653  **The twin gets two synthetic operators, sim-a and sim-b, each with its own key to the v2 door, and a step in
@@ -807,3 +807,11 @@ VALUES ('0653_the_twin_speaks_to_otto_q_as_two_operators', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-10 01:36:31 UTC (8:36 PM CT on 2026-10-09), version 20261010013631 ═══════════════════════════════
+--   Claude, MCP apply_migration, the file as committed in 2a06582; the ledger's stored statement is that file byte for
+--   byte (md5 bf33a42ce245f485232a67f9702feefc, 50,502 characters, 51,274 bytes). P0, P1, V1 (the step on a copy of the
+--   twin depot's newest run, against the live walk), V2 passed in the apply's transaction. Read after: sim-a (Waymo
+--   Nashville) and sim-b (Tesla Robotaxi TN, Zoox Southeast), both twin keys, active, streams telemetry/arrival/
+--   incident; 0 operator log rows and 0 inbox rows (V1 rolled back); 0 run-scope blocks; twin_operator_door declared
+--   with default 0 and no policy row anywhere, so nothing reads a 1.
