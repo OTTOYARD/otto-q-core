@@ -424,9 +424,15 @@ Hermes renews its token by itself, before it runs out. It needs step 2 again onl
 
 - **The page:** www.ottoyard.com/connect. Sign in to approve an agent, see the agents connected to your account, or
   disconnect one (it stops at once; its tokens are refused, and so is renewing them).
-- **Accounts:** one, `chase@ottoyard.com`, linked to Tesla Robotaxi TN at the twin depot. Its password is the temporary
-  one Chase chose for now, set in Supabase Auth and written nowhere in this repository; change it in the Supabase
-  dashboard (Authentication, Users) whenever you like. There is no sign-up yet, so nobody else can make an account.
+- **Accounts:** one, `chase@ottoyard.com`, linked to Tesla Robotaxi TN at the twin depot. It was created on 2026-10-10
+  at 2:06 AM CT through Supabase Auth's own sign-up endpoint (Auth hashed the password itself) and confirmed by hand.
+  Its password is the temporary one Chase chose for now, written nowhere in this repository; change it in the
+  Supabase dashboard (Authentication, Users) whenever you like.
+- **Who else can sign in:** this project's Supabase Auth has sign-ups switched on (measured from its public settings,
+  2026-10-10: `disable_signup` false, email confirmation required), so anyone with a real mailbox can make an account.
+  Such an account reaches nothing here: it can approve or connect an agent only once `ottoq_owner_account_link` (the
+  service role only) links it to a fleet, and until then the page tells it so. Switching sign-ups off is a setting
+  in the Supabase dashboard (Authentication), not something this file changes.
 - **Linking another account** (when it is time): create the user in Supabase Auth, then in the SQL editor
   `SELECT ottoq_owner_account_link('them@example.com', '<fleet_operators.id>');`. `ottoq_owner_account_unlink` stops an
   account and disconnects every agent it connected.
