@@ -339,8 +339,9 @@ CREATE INDEX ottoq_oauth_grants_account_idx ON public.ottoq_oauth_grants (accoun
 COMMENT ON TABLE public.ottoq_oauth_grants IS
 '0660. One row per agent an owner connected to their OTTOYARD account: the account and its email, the client, the scope and resource, and whether it came through a device code or a browser authorization. Whether it is still connected is its principal''s status (ottoq_agent_principals, origin oauth).';
 
---: Access and refresh tokens, as SHA-256 only. An access token lasts an hour; a refresh token 30 days and is single-use
---: (each refresh returns a new pair, and the one it replaced names its successor).
+--: Access and refresh tokens, as SHA-256 only. An access token lasts an hour (honoured five minutes more, so a client's
+--: clock drift never costs a sign-in); a refresh token 30 days and is single-use (each refresh returns a new pair, and
+--: the one it replaced names its successor).
 CREATE TABLE public.ottoq_oauth_tokens (
   token_hash     text PRIMARY KEY,
   kind           text NOT NULL,
@@ -605,7 +606,10 @@ BEGIN
 END $fn$;
 
 -- A new token pair for a connection: an access token (an hour) and a refresh token (30 days, single-use). The raw values
--- leave here once, in the token endpoint's answer.
+-- leave here once, in the token endpoint's answer. The access token is told to last 3600 seconds and is honoured for 65
+-- minutes: an MCP client renews a token ahead of time by ITS clock, and a 401 on a token it still thinks valid makes it
+-- start a whole new sign-in instead (Hermes Agent cannot start a device login in the background, measured 2026-10-10 on
+-- its own CLI), so five minutes of clock drift or a slow request must not cost the owner a sign-in.
 CREATE OR REPLACE FUNCTION public.ottoq_oauth_mint(p_principal_id uuid, p_scope text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -618,7 +622,7 @@ DECLARE
   v_refresh text := public.ottoq_oauth_secret('oqr_');
 BEGIN
   INSERT INTO public.ottoq_oauth_tokens (token_hash, kind, principal_id, expires_at)
-  VALUES (public.ottoq_oauth_sha256(v_access), 'access', p_principal_id, now() + interval '1 hour'),
+  VALUES (public.ottoq_oauth_sha256(v_access), 'access', p_principal_id, now() + interval '65 minutes'),
          (public.ottoq_oauth_sha256(v_refresh), 'refresh', p_principal_id, now() + interval '30 days');
   RETURN jsonb_build_object('access_token', v_access, 'token_type', 'Bearer', 'expires_in', 3600,
                             'refresh_token', v_refresh, 'scope', p_scope);
