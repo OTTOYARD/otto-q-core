@@ -31,6 +31,7 @@ M = {n: os.path.join(ROOT, "db", "migrations", f) for n, f in (
     ("0704", "0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql"),
     ("0705", "0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql"),
     ("0709", "0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql"),
+    ("0710", "0710_the_wake_gate_reads_the_record_the_claim_reads.sql"),
 )}
 DEPOT = "11111111-1111-1111-1111-111111111111"
 RUN = "a0000000-0000-0000-0000-000000000704"
@@ -310,3 +311,47 @@ def test_0709_the_return_wave_counts_this_runs_cars_only(db):
     assert db.json(f"SELECT public.ottoq_agent_board('{RUN}')")["inbound_60m"] == 7
     _apply(db, "0709")
     assert db.json(f"SELECT public.ottoq_agent_board('{RUN}')")["inbound_60m"] == 2
+
+
+# ── 0710 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+def _decision(d, tick, fp, source="nemotron", objective="readiness_first"):
+    d.val(f"""INSERT INTO ottoq_decisions (sim_run_id, tick_seq, sim_clock, action_context, resolved_action_context,
+                                          outcome_status, context_frame, proposed_action, enacted_action)
+              VALUES ('{RUN}', {tick}, '{T}', 'orchestrator_agent', 'orchestrator_agent', 'noop_no_candidate',
+                      jsonb_build_object('wake', jsonb_build_object('fingerprint', '{json.dumps(fp)}'::jsonb)),
+                      '{{"solver":{{"objective":"{objective}"}}}}', '{{"source":"{source}"}}')""")
+
+
+def test_0710_a_pass_claimed_between_the_decision_and_the_evidence_reads_the_decision(db):
+    """On run 176b2912 pass 5's decision was written 5.6 s before its evidence, and pass 6, claimed in that gap, woke as
+    first_consult. The wake gate now reads the decision row the claim reads, and falls back to evidence only when there
+    is none."""
+    _world(db)
+    _apply(db, "0703", "0704", "0705")
+    db.val(f"INSERT INTO ottoq_policy_params VALUES ('run', '{RUN}', 'agent_wake_enabled', 1, 'test', now())")
+    fp = _wake(db)["fingerprint"]
+    _decision(db, 70, fp, objective="throughput_first")          # the decision is written; the evidence is not yet
+    w = _wake(db)
+    assert w["wake"] is True and w["reasons"] == ["first_consult"], w   # the defect, reproduced
+    _apply(db, "0710")
+    w = _wake(db)
+    assert w["wake"] is False and w["last_consult"]["from"] == "decision", w
+    assert w["standing_objective"] == "throughput_first", w
+
+    # a fallback decision and a solver-only decision are not the agent having looked
+    _decision(db, 71, {"line_waiting": 99}, source="deterministic_fallback")
+    _decision(db, 72, {"line_waiting": 99}, source="kernel_regime")
+    w = _wake(db)
+    assert w["wake"] is False and w["last_consult"]["tick"] == 70, w
+
+
+def test_0710_a_run_without_decision_rows_still_reads_the_evidence(db):
+    _world(db)
+    _apply(db, "0703", "0704", "0705", "0710")
+    db.val(f"INSERT INTO ottoq_policy_params VALUES ('run', '{RUN}', 'agent_wake_enabled', 1, 'test', now())")
+    w = _wake(db)
+    assert w["wake"] is True and w["reasons"] == ["first_consult"] and "error" not in w, w
+    _consult(db, "k1", w["fingerprint"])
+    w = _wake(db)
+    assert w["wake"] is False and w["last_consult"]["from"] == "evidence", w

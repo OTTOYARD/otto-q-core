@@ -72,7 +72,8 @@ CREATE FUNCTION public.ottoq_effective_target_soc_at(uuid, timestamptz) RETURNS 
 -- what the live board reads, as empty stand-ins, so it can be called
 CREATE TABLE public.ottoq_itinerary_legs (sim_run_id uuid, status text, deviation_s numeric);
 CREATE TABLE public.ottoq_decisions (sim_run_id uuid, tick_seq bigint, action_context text, resolved_action_context text,
-  outcome_status text, sim_clock timestamptz);
+  outcome_status text, sim_clock timestamptz, decision_seq bigserial, context_frame jsonb, proposed_action jsonb,
+  enacted_action jsonb);
 CREATE TABLE public.site_energy_snapshots (depot_id uuid, sim_run_id uuid, timestamp timestamptz, building_load_kw numeric,
   total_ev_charging_kw numeric, solar_generation_kw numeric);
 CREATE TABLE public.ottoq_bess_units (depot_id uuid, current_soc_pct numeric, current_power_kw numeric);
