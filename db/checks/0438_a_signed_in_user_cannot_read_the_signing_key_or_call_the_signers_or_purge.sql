@@ -1,8 +1,11 @@
 -- 0438  **Anyone who signs up could read the key that signs every event, SDR and audit bundle, and sign or purge with
---        it; the post-apply proof that 0701 closed it, and the surface it leaves.** (FINDINGS draft G421; G417's grant
---        half.) Measured read-only on 2026-10-13 on the live catalog (gxdrcyphqjzjsuhxuqtg, PostgreSQL 17.6) and the API
---        logs, ending 15:19 UTC (10:19 AM CT, read from the clock after the last query). Every query below is
---        read-only and none calls the resolver or a signer: reading the key to prove it is closed would be the defect.
+--        it; the post-apply proof that 0701 closed the key, the signers and the purge, and the surface it leaves,
+--        including the 35 doors through which a signed-in caller still gets a system-signed event.** (FINDINGS draft
+--        G432, number provisional; G417's grant half.) Measured read-only on 2026-10-13 on the live catalog
+--        (gxdrcyphqjzjsuhxuqtg, PostgreSQL 17.6) and the API logs, ending 15:19 UTC (10:19 AM CT, read from the clock
+--        after the last query); re-measured after review from 18:57:27 UTC (1:57 PM CT) to 19:06:30 UTC (2:06 PM CT,
+--        read from the clock), unchanged, with (E) added. Every query below is read-only and none calls the resolver
+--        or a signer: reading the key to prove it is closed would be the defect.
 --
 -- ══ §1 WHAT WAS OPEN (before 0701; reproduce (A)-(D)) ═══════════════════════════════════════════════════════════
 --
@@ -34,7 +37,8 @@
 --       may execute) equals the 124 below: zero rows. 112 of them carry no file naming a signed-in reader (basis
 --       'OPEN'); that list is the next item, not a clean bill.
 --   (5) ottoq_assert_anon_rpc_surface(): zero rows (it returned ottoq_fit_charge_fault_model before).
---   (6) the lineage row FALSE/FALSE and 31 restore statements under '0701_pre' (1 function, 24 grants, 6 defaults).
+--   (6) the lineage row FALSE/FALSE, carrying Chase's go-ahead with its date and CT time (0701 §0, P0a), and 31
+--       restore statements under '0701_pre' (1 function, 24 grants, 6 defaults).
 --   (7) the engine still signs: every SDR issued after the apply carries a signature (signed = issued; issued > 0 once
 --       any run has produced one since).
 --   (8) the API after the apply: no service_role request for any of the sixteen refused (401/403); a browser request
@@ -43,8 +47,12 @@
 -- ══ §3 WHAT IS NOT PROVED HERE ═══════════════════════════════════════════════════════════════════════════════════
 --
 --   Whether the key was read before 0701. The API logs reach back three days and show no request for the resolver,
---   but the grant has existed since 2026-09-06. Rotating the key is Chase's decision (FINDINGS G421), and it changes
+--   but the grant has existed since 2026-09-06. Rotating the key is Chase's decision (FINDINGS G432), and it changes
 --   every signature from then on, which no atom reads (0701 §3).
+--   That a signed-in caller can no longer get a system signature at all. It cannot read the key or call a signer, but
+--   (E) lists 35 SECURITY DEFINER functions it may still execute that write a signed event (measured 2026-10-13 18:58
+--   UTC: 35, 21 directly, none by anon); authenticated may SELECT ottoq_events.signature, and
+--   ottoq_verify_event_signature returns the HMAC it computes for any existing event. Those go with the 124 in (4).
 
 -- (1) the eighteen, after 0701
 SELECT p.proname || '(' || oidvectortypes(p.proargtypes) || ')' AS fn,
@@ -220,9 +228,14 @@ SELECT coalesce(c.fn, a.fn) AS fn,
 -- (5) the standing anon gate: zero rows after 0701
 SELECT * FROM public.ottoq_assert_anon_rpc_surface();
 
--- (6) the lineage row and the restore statements
+-- (6) the lineage row, Chase's go-ahead in its note, and the restore statements
+--     must read: lineage 'false/false', go_ahead_recorded true, restore_statements 'default_privileges 6, function 1, grant 24'
 SELECT (SELECT forces_recert::text || '/' || forces_dial_restart::text FROM public.ottoq_cert_lineage
-         WHERE name = '0701_a_signed_in_user_cannot_read_the_signing_key_or_sign_or_purge') AS lineage,
+         WHERE name = '0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge') AS lineage,
+       (SELECT note ~ 'Chase''s go-ahead \(FINDINGS G417\): .*2026-\d\d-\d\d' AND note ~* '\d{1,2}:\d\d\s*(AM|PM)\s+CT'
+               AND note !~ 'go-ahead \(FINDINGS G417\): PENDING'
+          FROM public.ottoq_cert_lineage
+         WHERE name = '0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge') AS go_ahead_recorded,
        (SELECT string_agg(k || ' ' || n, ', ' ORDER BY k)
           FROM (SELECT object_kind AS k, count(*) AS n FROM public.ottoq_schema_snapshots WHERE label = '0701_pre'
                  GROUP BY object_kind) s) AS restore_statements;
@@ -231,7 +244,7 @@ SELECT (SELECT forces_recert::text || '/' || forces_dial_restart::text FROM publ
 SELECT count(*) AS issued, count(signature) AS signed, max(issued_at) AS newest
   FROM public.ottoq_service_detail_records
  WHERE issued_at >= (SELECT classified_at FROM public.ottoq_cert_lineage
-                      WHERE name = '0701_a_signed_in_user_cannot_read_the_signing_key_or_sign_or_purge');
+                      WHERE name = '0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge');
 
 -- (8) the API after the apply (Supabase logs, ClickHouse; a window from the apply, at most 24 hours):
 --   SELECT log_attributes['request.path'] AS path, log_attributes['request.sb.jwt.authorization.payload.role'] AS role,
@@ -282,3 +295,36 @@ SELECT n.nspname || '.' || p.proname AS caller, p.prorettype = 'trigger'::regtyp
 --   2026-10-10T14:50Z-10-11T14:50Z: ottoq_account_me 5, ottoq_oauth_device_decide 2, ottoq_oauth_device_lookup 2,
 --   ottoq_account_disconnect 1 (all 200); the two later windows: 0. The same three windows hold 0 requests, from any
 --   role, whose path names any of the sixteen.
+
+-- (E) what a signed-in caller can still get signed, after 0701 as before it: SECURITY DEFINER functions in public,
+--     outside the eighteen, that a browser role may execute and that reach ottoq_record_event within six calls
+--     (comment-stripped prosrc, plpgsql and sql bodies in public, twin and ottoq; name-based, so it over-approximates a
+--     call through a same-named function and cannot see dynamic SQL). Measured 2026-10-13 18:58 UTC: doors 35, direct
+--     21, anon_doors 0. After 0701 it must read the same 35 (0701 closes none of them; the next item does).
+WITH RECURSIVE f AS (
+  SELECT p.oid, p.proname, p.prosecdef, n.nspname, p.prorettype,
+         regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') AS s
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_language l ON l.oid = p.prolang
+   WHERE n.nspname IN ('public', 'twin', 'ottoq') AND l.lanname IN ('plpgsql', 'sql') AND p.prokind IN ('f', 'p')),
+reach(oid, depth) AS (
+  SELECT f.oid, 1 FROM f WHERE f.s ~ '\mottoq_record_event\s*\(' AND f.proname <> 'ottoq_record_event'
+  UNION
+  SELECT c.oid, r.depth + 1 FROM reach r JOIN f callee ON callee.oid = r.oid
+    JOIN f c ON c.s ~ ('\m' || callee.proname || '\s*\(') AND c.oid <> callee.oid
+   WHERE r.depth < 6),
+door AS (
+  SELECT f.oid, f.proname AS fn, min(r.depth) AS d
+    FROM reach r JOIN f ON f.oid = r.oid
+   WHERE f.prosecdef AND f.nspname = 'public' AND f.prorettype <> 'trigger'::regtype
+     AND f.proname <> ALL (ARRAY['ottoq_resolve_signing_secret', 'ottoq_sign_event', 'ottoq_sign_sdr', 'ottoq_sign_bundle',
+                                 'ottoq_oem_deliver_live', 'ottoq_energy_mpc_replan', 'ottoq_purge_prior_runs',
+                                 'ottoq_start_busy_run', 'ottoq_start_busy_run_once', 'ottoq_release_unusable_reservations',
+                                 'ottoq_fit_charge_fault_model', 'ottoq_record_event', 'ottoq_emit_sdr',
+                                 'ottoq_generate_audit_bundle', 'ottoq_complete_audit_report', 'ottoq_probe_task_completion'])
+     AND (has_function_privilege('authenticated', f.oid, 'EXECUTE') OR has_function_privilege('anon', f.oid, 'EXECUTE'))
+   GROUP BY 1, 2)
+SELECT count(*) AS doors, count(*) FILTER (WHERE d = 1) AS direct,
+       count(*) FILTER (WHERE has_function_privilege('anon', oid, 'EXECUTE')) AS anon_doors,
+       string_agg(fn, ', ' ORDER BY fn) AS doors_list,
+       has_column_privilege('authenticated', 'public.ottoq_events', 'signature', 'SELECT') AS authenticated_reads_signatures
+  FROM door;

@@ -1,6 +1,6 @@
 """db/migrations/0701, the signing key and the engine's destructive doors closed to the browser roles, EXECUTED on a stub.
 
-WHY THIS EXISTS. G421: public.ottoq_resolve_signing_secret returned the HMAC key that signs every event, SDR and audit
+WHY THIS EXISTS. G432: public.ottoq_resolve_signing_secret returned the HMAC key that signs every event, SDR and audit
 bundle to any signed-in caller, the three signers signed whatever a caller asked, and purge, run-start and audit writers
 were callable the same way; the resolver also believed two settings before Vault and cached the key for a whole pooled
 session; and every new public function was born executable by anon, authenticated and PUBLIC. A grant change cannot be
@@ -14,13 +14,18 @@ signers and asks the database, as each role, what it can do:
     the new name, a stale stamp) is never believed;
   * a function created later is closed to anon, authenticated and PUBLIC in public, keeps service_role in twin and
     ottoq, keeps PUBLIC in extensions, and is the owner's alone in a new schema;
-  * the file refuses a hotfixed resolver, an unread SECURITY INVOKER path to a target, and a second run; and its
-    restore statements put the resolver, every grant and every default privilege back exactly.
+  * the file refuses a hotfixed resolver, an unread SECURITY INVOKER path to a target (a function, or a trigger a
+    browser role can fire on any of INSERT, UPDATE, DELETE or TRUNCATE), and a second run; and its restore statements
+    put the resolver, every grant and every default privilege back exactly;
+  * the file refuses to apply as committed, because Chase's go-ahead (0701 §0, FINDINGS G417) is not in it; every
+    other test applies a copy with a stand-in go-ahead that says it is not his words, and the lineage note carries it.
 
 Loads tests/fixtures/signing_grants_stub.sql. SKIPS where no scratch PostgreSQL is reachable.
 """
+import atexit
 import os
 import sys
+import tempfile
 
 import pytest
 
@@ -29,7 +34,26 @@ sys.path.insert(0, os.path.join(ROOT, "tests"))
 from test_v2_door_sql import _drop, _new_db, _server_up  # noqa: E402
 
 STUB = os.path.join(ROOT, "tests", "fixtures", "signing_grants_stub.sql")
-MIG = os.path.join(ROOT, "db", "migrations", "0701_a_signed_in_user_cannot_read_the_signing_key_or_sign_or_purge.sql")
+MIG = os.path.join(ROOT, "db", "migrations", "0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge.sql")
+
+#: the line the lead replaces with Chase's words (0701 §0, P0a); the committed file must carry it unedited
+PLACEHOLDER = "$chase$PENDING$chase$"
+#: a stand-in, so the rest of the file can be exercised; it says what it is
+STAND_IN = '2026-01-01, 12:00 PM CT: "test fixture, not Chase\'s words"'
+
+
+def _with_go_ahead(said=STAND_IN):
+    """A copy of 0701 with the P0a line filled in; the committed file is never edited."""
+    src = open(MIG, encoding="utf-8").read()
+    assert src.count(PLACEHOLDER) == 1, "0701's P0a placeholder is not there exactly once"
+    fd, path = tempfile.mkstemp(prefix="0701_go_ahead_", suffix=".sql")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(src.replace(PLACEHOLDER, "$chase$" + said + "$chase$"))
+    atexit.register(lambda: os.path.exists(path) and os.remove(path))
+    return path
+
+
+MIG_OK = _with_go_ahead()
 
 pytestmark = pytest.mark.skipif(not _server_up(), reason="no scratch PostgreSQL reachable (PGHOST or /var/tmp:55432)")
 
@@ -88,7 +112,7 @@ def db():
         }
         d.before["auth_key"] = _as(d, "authenticated", "SELECT public.ottoq_resolve_signing_secret('system:v1')")
         d.before["forged"] = d.val(f"BEGIN; SET LOCAL ottoq.signing_secret_default = 'forged'; SELECT {SIGN_EVENT}; ROLLBACK;")
-        rc, err = d.file(MIG)
+        rc, err = d.file(MIG_OK)
         assert rc == 0, f"0701 did not apply on the stub: {err}"
         d.notices = err
         yield d
@@ -214,7 +238,7 @@ def test_the_census_lost_exactly_the_eighteen_and_the_public_key_keeps_its_card(
 
 
 def test_it_refuses_a_second_run(db):
-    rc, err = db.file(MIG)
+    rc, err = db.file(MIG_OK)
     assert rc != 0 and "0701 P1" in err, err
     assert db.val("SELECT count(*) FROM public.ottoq_cert_lineage WHERE name LIKE '0701%'") == "1"
     assert db.val("SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage "
@@ -225,7 +249,7 @@ def test_the_restore_statements_put_everything_back():
     d = _load()
     try:
         before = (d.val(FN_GRANTS), d.val(DEFAULT_ACL), d.val(RESOLVER_MD5))
-        rc, err = d.file(MIG)
+        rc, err = d.file(MIG_OK)
         assert rc == 0, err
         assert (d.val(FN_GRANTS), d.val(DEFAULT_ACL)) != before[:2]
         d.run("""DO $restore$ DECLARE r record; BEGIN
@@ -241,7 +265,7 @@ def test_it_refuses_a_resolver_someone_hotfixed():
     d = _load("CREATE OR REPLACE FUNCTION public.ottoq_resolve_signing_secret(p_key_id text) RETURNS text "
               "LANGUAGE sql SECURITY DEFINER AS 'SELECT NULL::text'")
     try:
-        rc, err = d.file(MIG)
+        rc, err = d.file(MIG_OK)
         assert rc != 0 and "0701 P1: the resolver is not the definition this file replaces" in err, err
     finally:
         _drop(d)
@@ -253,7 +277,7 @@ def test_it_refuses_an_unread_path_from_a_browser_role_to_a_target():
                  AS $f$ SELECT public.ottoq_record_event('a','b','c',NULL,'{}',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
                                                          NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL) $f$""")
     try:
-        rc, err = d.file(MIG)
+        rc, err = d.file(MIG_OK)
         assert rc != 0 and "ottoq_new_invoker_path" in err and "0701 P1" in err, err
     finally:
         _drop(d)
@@ -262,7 +286,68 @@ def test_it_refuses_an_unread_path_from_a_browser_role_to_a_target():
 def test_it_refuses_while_a_certification_is_in_flight():
     d = _load("UPDATE public.stub_in_flight SET n = 1")
     try:
-        rc, err = d.file(MIG)
-        assert rc != 0 and "0701 P0" in err, err
+        rc, err = d.file(MIG_OK)
+        assert rc != 0 and "0701 P0:" in err, err
     finally:
         _drop(d)
+
+
+#: an INVOKER trigger function that calls a target, attached by each test to a table of its own
+_INVOKER_TRIGGER_FN = """CREATE FUNCTION public.ottoq_new_trigger_path() RETURNS trigger LANGUAGE plpgsql
+    AS $f$ BEGIN PERFORM public.ottoq_record_event('a','b','c',NULL,'{}',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+                                                   NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL); RETURN NULL; END $f$;"""
+
+
+def test_it_refuses_a_trigger_a_browser_role_fires_by_deleting():
+    # P1 used to read INSERT and UPDATE only; a DELETE trigger on a table authenticated may delete from is a live path
+    d = _load(_INVOKER_TRIGGER_FN + """
+        CREATE TABLE public.t_0701_del (id int);
+        GRANT SELECT, DELETE ON public.t_0701_del TO authenticated;
+        CREATE TRIGGER trg_0701_del AFTER DELETE ON public.t_0701_del FOR EACH ROW
+          EXECUTE FUNCTION public.ottoq_new_trigger_path();""")
+    try:
+        rc, err = d.file(MIG_OK)
+        assert rc != 0 and "0701 P1" in err and "ottoq_new_trigger_path" in err, err
+    finally:
+        _drop(d)
+
+
+def test_a_privilege_the_trigger_does_not_fire_on_is_not_a_path():
+    # the live shape on stalls: authenticated holds TRUNCATE, the trigger fires on INSERT or UPDATE, which it cannot do
+    d = _load(_INVOKER_TRIGGER_FN + """
+        CREATE TABLE public.t_0701_trunc (id int);
+        GRANT SELECT, TRUNCATE ON public.t_0701_trunc TO authenticated;
+        CREATE TRIGGER trg_0701_trunc AFTER INSERT OR UPDATE ON public.t_0701_trunc FOR EACH ROW
+          EXECUTE FUNCTION public.ottoq_new_trigger_path();""")
+    try:
+        rc, err = d.file(MIG_OK)
+        assert rc == 0, err
+    finally:
+        _drop(d)
+
+
+def test_as_committed_it_refuses_until_chase_says_go():
+    # the committed file holds the placeholder exactly once, in P0a, and refuses before it changes anything
+    src = open(MIG, encoding="utf-8").read()
+    assert src.count(PLACEHOLDER) == 1
+    d = _load()
+    try:
+        before = (d.val(FN_GRANTS), d.val(DEFAULT_ACL), d.val(RESOLVER_MD5))
+        rc, err = d.file(MIG)
+        assert rc != 0 and "0701 P0a: Chase's go-ahead is not in this file" in err, err
+        assert (d.val(FN_GRANTS), d.val(DEFAULT_ACL), d.val(RESOLVER_MD5)) == before
+        assert d.val("SELECT count(*) FROM public.ottoq_cert_lineage WHERE name LIKE '0701%'") == "0"
+        assert d.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0701_pre'") == "0"
+        # words with no date, or no CT time, are not a go-ahead either
+        for said in ('go ahead', '2026-10-13: "go ahead"', '2026-10-13, 2:15 PM: "go ahead"',
+                     '2026-10-13, 14:15 UTC: "go ahead"'):
+            rc, err = d.file(_with_go_ahead(said))
+            assert rc != 0 and "0701 P0a" in err, (said, err)
+    finally:
+        _drop(d)
+
+
+def test_the_ledger_keeps_the_go_ahead_with_the_change(db):
+    note = db.val("SELECT note FROM public.ottoq_cert_lineage WHERE name LIKE '0701%'")
+    assert note.startswith("G432 (db/checks/0438): ")
+    assert note.endswith("Chase's go-ahead (FINDINGS G417): " + STAND_IN), note

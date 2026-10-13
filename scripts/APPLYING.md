@@ -65,6 +65,24 @@ is in the template's comments; the checklist is:
   and errors are swallowed and warned rather than raised. A rolled-back tick
   looks like "succeeded" in cron and produces zero stall assignments.
 - **One concern per file.**
+- **Grant every function a browser reads in the file that creates it (from
+  0701).** After `db/migrations/0701_*.sql`, a function `postgres` creates in
+  `public` can be executed by `postgres` and `service_role` only: no `anon`, no
+  `authenticated`, no `PUBLIC`. In `twin` and `ottoq` it gets `service_role`, in
+  `extensions` it gets `PUBLIC`, and in any other schema only the owner can run it.
+  `CREATE OR REPLACE` of an existing signature keeps its grants. **A new name, a
+  new overload, or a DROP and CREATE (to change a return type) starts with none**,
+  and that includes the cockpit reads `0405` granted by a loop over names. So if
+  the twin app, a cockpit or a signed-in page calls the function through
+  `/rest/v1/rpc`, write `GRANT EXECUTE ON FUNCTION public.<fn>(<args>) TO anon`
+  (or `authenticated`) in the same file, name the reader in the header, and add a
+  V block that runs `has_function_privilege`. The same applies to a function a
+  browser role reaches inside a view, an RLS policy or a column default, because
+  EXECUTE is checked against the person querying, not the view's owner
+  ("the user of a view must have permissions to call all functions used by the
+  view", https://www.postgresql.org/docs/17/sql-createview.html, read
+  2026-10-13). Forgetting it does not fail the apply. The twin app fails later
+  with `42501`.
 
 ### 3. Commit — *before* applying
 

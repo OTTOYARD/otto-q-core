@@ -1,12 +1,32 @@
 -- migration-version: PENDING
--- migration-name:    a_signed_in_user_cannot_read_the_signing_key_or_sign_or_purge
+-- migration-name:    a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge
 --
 -- 0701  **Anyone who signs up could read the key that signs every event, SDR and audit bundle, sign anything with it,
---        and purge or start runs. Those doors are closed to the browser roles, the key is no longer cached for a
---        whole pooled session, and a new function in public is no longer callable by them until a migration says so.**
---        (FINDINGS draft G421; closes the grant half of G417. db/checks/0438.) Measured read-only on 2026-10-13 on the
---        live catalog and the API logs, ending 15:19 UTC (10:19 AM CT, read from the clock after the last query); the
---        P0/P1 dry-run read now() = 15:10:32 UTC and passed.
+--        and purge or start runs. The key, the three signers and those doors are closed to the browser roles, the key
+--        is no longer cached for a whole pooled session, and a new function in public is no longer callable by them
+--        until a migration says so. A signed-in caller can still get the system's signature on an event through 35
+--        engine doors this file does not close (§2 NOT CHANGED); it can no longer read the key or sign content of its
+--        own choosing.** (FINDINGS draft G432, number provisional; closes the grant half of G417. db/checks/0438.)
+--        Measured read-only on 2026-10-13 on the live catalog and the API logs, ending 15:19 UTC (10:19 AM CT, read
+--        from the clock after the last query); the P0/P1 dry-run read now() = 15:10:32 UTC and passed. Re-measured
+--        after review from 18:57:27 UTC (1:57 PM CT, the first query's own now()) to 19:06:30 UTC (2:06 PM CT, read
+--        from the clock after the last query): the resolver's md5 guard, the 18 ACLs and definition md5s, the census
+--        (142; the 124 others hash to the same 3184962c...), the default privileges and the unread-INVOKER premise all
+--        read as below. 0703-0705, 0709-0713 and 0716 were applied in between and moved none of it.
+--
+-- ══ §0 CHASE'S GO-AHEAD: NOT YET GIVEN. THIS FILE REFUSES TO APPLY UNTIL IT IS. ══════════════════════════════════════
+--
+--   FINDINGS G417 names three of the eighteen (the purge and the two busy-run starters) and leaves taking EXECUTE from
+--   authenticated to Chase: "Revoking a grant is a security change, which Chase set aside for the demo (S-03), so it is
+--   his call | OPEN — Chase's decision". The other fifteen are the same kind of change. S-03's own status reads
+--   "decided to leave it until sign-in returns", and sign-in has returned (0700), but whether that lapses it is his
+--   decision too, and nothing in the build that drafted this file is his voice. So the block P0a below declares
+--   v_said as the word PENDING between two $chase$ quotes, and refuses while it reads PENDING. When Chase says go,
+--   replace PENDING with his words, the date and the CT time he said them (e.g. 2026-10-13, 2:15 PM CT: "..."),
+--   quote the same words here, and they are written into this file's ottoq_cert_lineage note, where the ledger keeps
+--   them. Rotating the key and closing sign-up stay his as well, and are not in this file.
+--
+--   Chase's go-ahead, as given: (PENDING)
 --
 -- ══ §1 WHY ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -92,6 +112,10 @@
 --       unchanged, so it returns the same secret and every signature is byte-identical (V4). A tick is one
 --       transaction, so the new cache decrypts at most once per tick; the old one saved that one decrypt only when a
 --       session outlived its tick. A pair runs both arms in one transaction, so it decrypts once, as before.
+--       One consequence to know: with both overrides gone, a key whose secret_ref is 'env:<NAME>' can never resolve
+--       inside the database (the function's own comment already says env: is not visible here), so a signer handed
+--       such a key returns NULL and the row is recorded unsigned. Only 'system:v1' exists today, and it is 'vault:'
+--       (P1 asserts it); a future env:-backed key needs a Vault entry before the engine can sign with it.
 --   (c) Default privileges for functions postgres creates later:
 --         IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated   (undoes Supabase's per-schema grant)
 --         REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC   (global: the only form that removes PostgreSQL's built-in grant)
@@ -103,11 +127,32 @@
 --       naming its reader (0658's rule for tables, now for functions; 0700 already does this). In a schema postgres
 --       creates later, a new function is the owner's alone. An extension postgres installs INTO public would need
 --       grants too.
+--       THE TRAP THIS SETS FOR EVERY LATER FILE, written into scripts/APPLYING.md step 2 and the template's house rule 7
+--       in this change: CREATE OR REPLACE of an existing signature keeps its ACL, but a NEW public function (a new name,
+--       a new overload, or a DROP and CREATE to change a return type) is born {postgres, service_role}. Until now the
+--       old default quietly gave a recreated function its browser grants back; after this file it does not. Cockpit
+--       reads the public key calls lose anon that way: ottoq_intelligence_stack and ottoq_shield_probe_posture hold
+--       anon only by the old default (no file grants either; their ACLs carry =X/postgres, read 2026-10-13), and the
+--       twin_boot_manifest, events_window, fleet_condition, labor_window, offsite_window, run_context and wear_window
+--       reads hold it from 0405's loop over their names, which granted the oids of the day and does not reach a
+--       recreated one. Recreating any of them without a GRANT in the same file makes the twin app answer 42501. The
+--       same holds for a function a browser role reaches inside a view, an RLS policy or a column default: "the user
+--       of a view must have permissions to call all functions used by the view" (PostgreSQL 17, CREATE VIEW, Notes,
+--       https://www.postgresql.org/docs/17/sql-createview.html, read 2026-10-13).
 --   NOT CHANGED: the 124 other VOLATILE SECURITY DEFINER functions in public a browser role may still execute (for 112
 --   of them no migration names a signed-in reader; db/checks/0438 (4) lists every one with its basis). Among them are
 --   ottoq_promote_dials, ottoq_decide_tick, ottoq_archive_run, ottoq_benchmark_reset, ottoq_sim_run_scenario and
 --   ottoq_cuopt_refresh, which sends a Vault-keyed NVIDIA call. That is the next file, after the signed-in UIs that use
---   any of them are named. No secret is rotated and no Auth setting is changed here: both are Chase's (FINDINGS G421).
+--   any of them are named. No secret is rotated and no Auth setting is changed here: both are Chase's (FINDINGS G432).
+--   NOT CHANGED, AND THE REASON THIS FILE'S NAME SAYS "CALL THE SIGNERS" AND NOT "SIGN": a signed-in caller can still
+--   get the system key's signature on an event. Measured 2026-10-13 18:58 UTC (db/checks/0438 (E)): 35 SECURITY
+--   DEFINER functions in public outside the eighteen, executable by authenticated (none by anon), reach
+--   ottoq_record_event within six calls, 21 of them directly (among them ottoq_emit_recommendation,
+--   ottoq_record_counterfactual, ottoq_score_observation, ottoq_ingest_service_complete, ottoq_pause_run and
+--   ottoq_sim_run_scenario); each writes a signed event whose content the caller partly chooses. authenticated may
+--   also SELECT ottoq_events.signature (policy "client keys read only", USING true; anon holds no column grant on it),
+--   and ottoq_verify_event_signature, which it may execute, returns the HMAC it computes for any existing event. What
+--   this file ends is reading the key and signing content wholly of the caller's choosing; the 35 doors go with the 124.
 --
 -- ══ §3 forces_recert FALSE; forces_dial_restart FALSE ══════════════════════════════════════════════════════════════
 --
@@ -135,6 +180,22 @@ BEGIN
     RAISE EXCEPTION '0701 P0: a pair, the recert runner, a dial pair or a sweep is running right now';
   END IF;
 END $inflight$;
+
+-- ── P0a: Chase's go-ahead (§0). Replace PENDING with his words, the date and the CT time he said them. ──
+CREATE TEMP TABLE p0701_go_ahead (said text NOT NULL) ON COMMIT DROP;
+DO $go_ahead$
+DECLARE
+  v_said text := $chase$PENDING$chase$;
+BEGIN
+  IF v_said ~* '^\s*PENDING\s*$'
+     OR v_said !~ '2026-\d\d-\d\d'
+     OR v_said !~* '\m\d{1,2}:\d\d\s*(AM|PM)\s+CT\M' THEN
+    RAISE EXCEPTION '0701 P0a: Chase''s go-ahead is not in this file. FINDINGS G417 leaves this revoke to him; paste his words, '
+                    'the date and the CT time he said them (e.g. 2026-10-13, 2:15 PM CT: "...") where P0a reads PENDING, '
+                    'and quote them in §0';
+  END IF;
+  INSERT INTO p0701_go_ahead VALUES (v_said);
+END $go_ahead$;
 
 -- ── the eighteen signatures this file closes (qual: schema-qualified with argument names, whatever the search_path) ──
 CREATE TEMP TABLE p0701_targets (sig regprocedure PRIMARY KEY, qual text) ON COMMIT DROP;
@@ -227,8 +288,10 @@ BEGIN
   IF v_bad IS NOT NULL THEN
     RAISE EXCEPTION '0701 P1: SECURITY INVOKER callers of the resolver or a signer: %', v_bad;
   END IF;
-  -- a SECURITY INVOKER caller of any target that a browser role can reach is a trigger on a table it cannot write, or
-  -- one of the six read in §1
+  -- a SECURITY INVOKER caller of any target that a browser role can reach is a trigger that no browser role can fire
+  -- (for each event the trigger fires on, INSERT, UPDATE, DELETE or TRUNCATE, it lacks that privilege on the table),
+  -- or one of the six read in §1. Measured: the four such triggers fire on INSERT/UPDATE or UPDATE only, and neither
+  -- role may do either; authenticated holds TRUNCATE on stalls, on which no trigger of these fires.
   SELECT string_agg(DISTINCT n.nspname || '.' || p.proname, ', ') INTO v_bad
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND NOT p.prosecdef
@@ -237,8 +300,10 @@ BEGIN
      AND CASE WHEN p.prorettype = 'trigger'::regtype THEN
                 EXISTS (SELECT 1 FROM pg_trigger tg, unnest(ARRAY['anon', 'authenticated']) r(rname)
                          WHERE tg.tgfoid = p.oid AND NOT tg.tgisinternal
-                           AND (has_any_column_privilege(r.rname, tg.tgrelid, 'INSERT')
-                                OR has_any_column_privilege(r.rname, tg.tgrelid, 'UPDATE')))
+                           AND (   (tg.tgtype & 4  <> 0 AND has_any_column_privilege(r.rname, tg.tgrelid, 'INSERT'))
+                                OR (tg.tgtype & 16 <> 0 AND has_any_column_privilege(r.rname, tg.tgrelid, 'UPDATE'))
+                                OR (tg.tgtype & 8  <> 0 AND has_table_privilege(r.rname, tg.tgrelid, 'DELETE'))
+                                OR (tg.tgtype & 32 <> 0 AND has_table_privilege(r.rname, tg.tgrelid, 'TRUNCATE'))))
               ELSE EXISTS (SELECT 1 FROM unnest(ARRAY['anon', 'authenticated']) r(rname)
                             WHERE has_function_privilege(r.rname, p.oid, 'EXECUTE')
                               AND has_schema_privilege(r.rname, p.pronamespace, 'USAGE'))
@@ -640,14 +705,16 @@ BEGIN
 END $v6$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0701_a_signed_in_user_cannot_read_the_signing_key_or_sign_or_purge', false, false,
-  'G421 (db/checks/0438): REVOKE EXECUTE from PUBLIC, anon and authenticated (service_role kept) on the signing-key '
+VALUES ('0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge', false, false,
+  'G432 (db/checks/0438): REVOKE EXECUTE from PUBLIC, anon and authenticated (service_role kept) on the signing-key '
   'resolver, the three signers, ottoq_oem_deliver_live, the three energy_mpc_replan overloads, purge_prior_runs, '
   'start_busy_run(_once), release_unusable_reservations, fit_charge_fault_model, record_event, emit_sdr, '
   'generate_audit_bundle, complete_audit_report and probe_task_completion; the resolver drops its two setting overrides '
   'and caches for one transaction under a new, stamped name; new public functions no longer grant anon, authenticated '
   'or PUBLIC (twin and ottoq keep service_role, extensions keeps PUBLIC). No atom reads a signature or a grant and the '
-  'secret is unchanged, so signatures are byte-identical (V4): FALSE/FALSE.',
+  'secret is unchanged, so signatures are byte-identical (V4): FALSE/FALSE. Still open: 35 doors through which a '
+  'signed-in caller gets a system-signed event, and the 124-function census (db/checks/0438 (4), (E)). '
+  'Chase''s go-ahead (FINDINGS G417): ' || (SELECT g.said FROM p0701_go_ahead g),
   now());
 
 COMMIT;
