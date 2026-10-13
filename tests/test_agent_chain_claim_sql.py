@@ -8,7 +8,7 @@ catalog's default_value (G429). Executed here on a stub whose claim is the live 
   - the getter ignores the catalog default (the premise);
   - before 0713 a pass claimed 60 s ago and still running lets the next one in (the defect, reproduced);
   - after it that pass holds the claim; a crashed pass's claim expires at 130 s; a finished pass releases it at once;
-  - a person's run-scoped lease still wins; the catalog agrees with the literal.
+  - a person's run-scoped lease still wins; 0714 brings the catalog row in step, and refuses to before 0713.
 It SKIPS where no scratch PostgreSQL is reachable.
 """
 import os
@@ -24,6 +24,7 @@ import test_agent_charge_order_sql as base  # noqa: E402  (the scratch-server he
 ROOT = base.ROOT
 STUB = os.path.join(ROOT, "tests", "fixtures", "agent_chain_claim_stub.sql")
 M0713 = os.path.join(ROOT, "db", "migrations", "0713_one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take.sql")
+M0714 = os.path.join(ROOT, "db", "migrations", "0714_the_lease_catalog_row_says_what_the_claim_does.sql")
 RUN = "a0000000-0000-0000-0000-000000000713"
 
 pytestmark = pytest.mark.skipif(not base._server_up(),
@@ -71,7 +72,7 @@ def test_0713_before_it_a_pass_still_running_lets_the_next_one_in(db):
 
 def test_0713_a_running_pass_holds_the_claim_a_crashed_one_expires_and_a_finished_one_releases(db):
     rc, err = db.file(M0713)
-    assert rc == 0 and "0713 V1-V2 PASSED" in err, err
+    assert rc == 0 and "0713 V1 PASSED" in err, err
     _in_flight_for(db, 60)
     r = _claim(db)
     assert r["claimed"] is False and r["reason"] == "agent_run_in_flight" and r["retry_after_s"] == 130, r
@@ -85,10 +86,19 @@ def test_0713_a_running_pass_holds_the_claim_a_crashed_one_expires_and_a_finishe
     assert _claim(db)["claimed"] is True                                  # a finished pass releases at once
 
 
-def test_0713_a_persons_run_scoped_lease_still_wins_and_the_catalog_agrees(db):
+def test_0713_a_persons_run_scoped_lease_still_wins_and_0714_brings_the_catalog_in_step(db):
     db.file(M0713)
+    assert db.val("SELECT default_value::int FROM ottoq_policy_param_catalog "
+                  "WHERE param_key = 'agent_chain_inflight_timeout_s'") == "45"          # documents 45, runs 130 (G429)
+    rc, err = db.file(M0714)
+    assert rc == 0 and "0714 V1 PASSED" in err, err
     assert db.val("SELECT default_value::int || '/' || max_value::int FROM ottoq_policy_param_catalog "
                   "WHERE param_key = 'agent_chain_inflight_timeout_s'") == "130/180"
     db.val(f"INSERT INTO ottoq_policy_params VALUES ('run', '{RUN}', 'agent_chain_inflight_timeout_s', 30, 'person', now())")
     _in_flight_for(db, 60)
     assert _claim(db)["claimed"] is True
+
+
+def test_0714_refuses_before_0713(db):
+    rc, err = db.file(M0714)
+    assert rc != 0 and "0714 P1" in err, err

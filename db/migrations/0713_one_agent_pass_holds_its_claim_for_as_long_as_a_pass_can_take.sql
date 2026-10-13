@@ -6,13 +6,14 @@
 --        agent_chain_inflight_timeout_s. That lease was sized at 45 s by 0338, when a Nemotron call took about 29 s. Edge
 --        v23 since gave the model a 90-second retry budget and the solver a 30-second window, so a pass can run about
 --        125 s, and on run 176b2912 58 of 79 passes started while another was still running (G423; the study's DC-6).
---        The default is now 130 s and the ceiling 180. A finished pass still releases the claim at once.
+--        The claim's default is now 130 s. A finished pass still releases the claim at once.
 --
 --        AND THE DEFAULT IS THE CLAIM'S, NOT THE CATALOG'S. public.ottoq_policy_get reads the run, then the depot, then
 --        the global scope, then the caller's own literal; it never reads ottoq_policy_param_catalog.default_value
 --        (measured: a run with no row reads whatever the caller passes, 7 when asked with 7). So the engine's default
 --        for this lease is the 45 written inside ottoq_agent_chain_claim, and changing the catalog row alone would have
---        changed nothing. This file changes the literal, and keeps the catalog row in step with it (G429).
+--        changed nothing. This file changes the literal. Bringing the catalog row in step (default 130, max 180) is an
+--        UPDATE, which the database connector holds for a person's confirmation, so it is its own file, 0714 (G429).
 --
 -- ══ §1 WHY ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -35,8 +36,8 @@
 --
 --   a. public.ottoq_agent_chain_claim (md5 aad09c12), by SUBSTITUTION, one anchor asserted to occur exactly once:
 --      ottoq_policy_get(p_sim_run_id,'agent_chain_inflight_timeout_s',45) → ...,130). Every other byte is the live one.
---   b. The catalog row agent_chain_inflight_timeout_s: default 45 → 130, max 120 → 180 (the write clamp a person's run-
---      scoped value is held to), description says why.
+--   b. NOT the catalog row: 0714 does that, after a person confirms it. Until then the catalog documents 45 while the
+--      claim runs 130 -- the latent disagreement G429 is about, now with a file to close it.
 --
 -- ══ §3 forces_recert FALSE; forces_dial_restart FALSE ═══════════════════════════════════════════════════════════════
 --
@@ -45,9 +46,7 @@
 --
 -- ══ §4 ROLLBACK ══════════════════════════════════════════════════════════════════════════════════════════════════
 --
---   EXECUTE the ottoq_agent_chain_claim definition snapshotted under label '0713_pre', then
---   UPDATE public.ottoq_policy_param_catalog SET default_value = 45, max_value = 120
---    WHERE param_key = 'agent_chain_inflight_timeout_s';
+--   EXECUTE the ottoq_agent_chain_claim definition snapshotted under label '0713_pre'.
 
 BEGIN;
 
@@ -102,15 +101,6 @@ BEGIN
   EXECUTE replace(v_def, v_old, v_new);
 END $claim$;
 
-UPDATE public.ottoq_policy_param_catalog
-   SET default_value = 130,
-       max_value     = 180,
-       description   = 'Real-second lease for one in-flight agent pass per run. A later FIRE beat starts a new pass only '
-                       'after the prior pass''s decision is recorded or this lease expires. 0713: 130 s, because a pass '
-                       'can run about 125 s (a 90 s model budget across two models, a 30 s solver window, the board); '
-                       'at 0338''s 45 s, 58 of 79 passes on run 176b2912 started while another was still running.'
- WHERE param_key = 'agent_chain_inflight_timeout_s';
-
 DO $v$
 DECLARE v_def text := pg_get_functiondef('public.ottoq_agent_chain_claim(uuid,text)'::regprocedure);
         v_old text := (SELECT s.definition FROM public.ottoq_schema_snapshots s
@@ -121,19 +111,15 @@ BEGIN
      OR replace(v_def, ',130)::integer);  --: 0713', ',45)::integer);') <> v_old THEN
     RAISE EXCEPTION '0713 V1 FAILED: the claim changed by more than its lease default';
   END IF;
-  --: V2 the catalog row agrees with the literal its one reader passes
-  IF (SELECT default_value FROM public.ottoq_policy_param_catalog WHERE param_key = 'agent_chain_inflight_timeout_s') <> 130 THEN
-    RAISE EXCEPTION '0713 V2 FAILED: the catalog and the claim disagree';
-  END IF;
-  RAISE NOTICE '0713 V1-V2 PASSED';
+  RAISE NOTICE '0713 V1 PASSED';
 END $v$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0713_one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take', false, false,
   'G423 (db/checks/0440 §6, §10): the agent claim lease, 45 s since 0338, was shorter than a pass (p50 59.5 s, up to '
   '~125 s under edge v23''s budgets); 58 of 79 passes overlapped on run 176b2912, 0 at 120 s on 57188f55. The claim''s '
-  'literal default 130 (ottoq_policy_get never reads the catalog default, G429), catalog in step, max 180. Read only by '
-  'the agent''s claim, quiesced in certification arms: FALSE/FALSE.',
+  'literal default 130 (ottoq_policy_get never reads the catalog default, G429; 0714 brings the catalog in step). Read '
+  'only by the agent''s claim, quiesced in certification arms: FALSE/FALSE.',
   now());
 
 COMMIT;
