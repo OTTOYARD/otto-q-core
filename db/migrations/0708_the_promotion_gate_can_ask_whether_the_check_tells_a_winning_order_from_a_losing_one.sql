@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013195202
 -- migration-name:    the_promotion_gate_can_ask_whether_the_check_tells_a_winning_order_from_a_losing_one
 --
 -- 0708  **The promotion gate can ask, in one call, whether the check tells a winning agent order from a losing one.**

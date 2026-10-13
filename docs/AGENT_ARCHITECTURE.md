@@ -118,6 +118,8 @@ Any additional agent, whether a per-vehicle LLM, a specialist or a swarm, ships 
 
 1. **Its outputs are recorded and replayable**: the 0703 record, per seat.
 2. **The disposer discriminates**: the AUC interval of the check's win probability excludes 0.5 on graded decisions.
+   `ottoq_disposer_discrimination()` (0708) computes it. On 2026-10-13 it read AUC 0.534, interval [0.415, 0.653], over
+   91 decisions from 6 distinct keys, with a Brier score worse than the base rate. The check does not discriminate.
 3. **An ablation beats the noise floor**: a deterministic paired agent-on/off comparison over at least 10 distinct (scenario,
    seed) keys, counted by distinct keys and not by rows (0339).
 4. **It is registered**: an identity, the contexts it may propose into, and its hit rate by proposal id.
