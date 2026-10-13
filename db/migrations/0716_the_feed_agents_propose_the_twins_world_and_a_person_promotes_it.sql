@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013184608
 -- migration-name:    the_feed_agents_propose_the_twins_world_and_a_person_promotes_it
 --
 -- 0716  **The feed agents propose the twin's world; a person promotes it.** Every operator Start fires seven Nemotron
