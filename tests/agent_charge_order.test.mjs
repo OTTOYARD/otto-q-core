@@ -179,13 +179,13 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v29: the model call goes through the retry module, with the fallback model, and the row says v29", () => {
+test("v23-v30: the model call goes through the retry module, with the fallback model, and the row says v30", () => {
   assert.match(code, /await callModelWithRetry\(/);
   assert.match(code, /models: \[MODEL, FALLBACK_MODEL\]/);
   assert.match(code, /const FALLBACK_MODEL = "nvidia\/nemotron-3-super-120b-a12b";/);
   assert.match(code, /model_attempts: call\.attempts/);
-  assert.match(code, /agent_version: "v29"/);
-  assert.doesNotMatch(code, /agent_version: "v2[2345678]"/);
+  assert.match(code, /agent_version: "v30"/);
+  assert.doesNotMatch(code, /agent_version: "v2[23456789]"/);
   // the single-try key loop is gone
   assert.doesNotMatch(code, /for \(const candidate of keys\)/);
   // an accepted order is an enacted action
