@@ -83,11 +83,34 @@ verified controller, and the agent is the high-performance one that can only win
 | edge `v29` | Writes the evidence row, asks the wake gate, and runs the solver-only branch. | node tests; live on both runs |
 | `0712` | The disposer check drew its sampled futures from the run's and the pass's randomly minted ids, so the same order on the same world got different verdicts. It now draws from `world:random_seed:tick`. | pytest reproduces the defect; live: orders after 1:19 PM CT carry `world:` seeds; stored snapshots still replay as decided |
 | `0713` | Passes overlapped (58 of 79) because the claim's lease, 45 s since 0338, was shorter than a pass. The claim's own default is now 130 s. (The catalog row is documentation only, because `ottoq_policy_get` never reads it, G429. Its update, 0714, waits for a person.) | pytest on the live claim; live: 0 overlaps on `57188f55` |
+| `0716` + feed agents v2 | The seven per-run feed agents, OTTO-Q's one existing LLM swarm, used to rewrite the twin's world as the active version (G431). They now propose drafts, and only a person can promote one. | pytest; the edge function was redeployed and now proposes drafts |
+| `0562` | At a recall, the appointment book reserved a free charger for a car still driving back, and the re-optimizer moved returning cars onto fast chargers. Both ignored `prearrival_charge_yields_to_solver`, which every armed run sets to 1. On the two gate runs, 39 chargers were held for cars not yet at the depot, standing empty 152 and 208 charger-minutes. Both functions now read the dial (G293 part 1). | Applied; validation run `02ac27b3` |
+| `0707` | Nothing watched the engine's channels (G433). A watchdog now reads six channels every minute and records each change of colour: cron beats, the run's tick, agent passes, the model, CP-SAT and pg_net. | pytest with three mutations; live: its first change named a cancelled cron run |
+| `0706` (pending) | The agent order that stands is the one built from the newest board, so an outranked order never comes back (the study's DC-6). | Reviewed and ready to apply; it waits for a run with the agent's order switched on to stop |
 
 ## What the gate-on run measured
 
-Run `57188f55`: busy_day with the same seed, started 1:08 PM CT, wake gate on, claim lease 120 s, both run-scoped. *Results
-are filled in `db/checks/0440` §10 when the run ends.*
+Run `57188f55`: busy_day, same seed, started 1:08 PM CT. The wake gate was on and the claim lease 120 s, both scoped to the
+run. It stopped at the governor's 540-minute ceiling at 2:12 PM CT. Full figures are in `db/checks/0440` §10.
+
+| | `176b2912` (shadow, lease 45 s) | `57188f55` (gate on, lease 120 s) |
+|---|---|---|
+| Agent passes | 79 | 288 |
+| Passes that consulted the model | 79 | 21 (heartbeat 12, scout 5, charger 2, contract wait 2, first 1) |
+| Passes that ran CP-SAT alone | 0 | 267, mean 2.1 s |
+| Passes that overlapped another | 58 | 0 |
+| Model tokens | 1,985,250 | 576,986 (−71%) |
+| CP-SAT proposals the kernel enacted | 0 of 117 | 22 |
+
+One consult, a heartbeat, was already in flight when the run stopped and landed 41 seconds later. It is counted above.
+Read before it landed, the figures were 20 of 287 and −72%.
+
+The 22 CP-SAT enactments against 0 have a likely mechanism. Without the gate, every pass waited about a minute on the model,
+so the solver ran on minute-old boards. With the gate, it runs every pass on a board two seconds old. This is still one pair
+of runs under live playback, so it is a lead and not a measured effect (G432).
+
+The agent itself took none of its orders. The check refused all 6 of its graded differing orders, and in hindsight 5 of
+those 6 would have won (G427).
 
 ## When would a second agent earn its place?
 

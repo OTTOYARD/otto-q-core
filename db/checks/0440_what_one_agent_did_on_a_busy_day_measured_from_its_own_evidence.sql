@@ -106,14 +106,21 @@
 --   start; 0712 from 18:19:32 UTC and 0713 from 18:27:17 UTC, mid-run (both read in §11-§12).
 --
 --                                   176b2912 (shadow, lease 45 s)    57188f55 (gate on, lease 120 s)
---     agent passes                  79                               287
---     consulted the model           79                               20 (heartbeat 11, scout 5, charger 2, contract 2, first 1)
+--     agent passes                  79                               287 at the stop (288 with the one in flight)
+--     consulted the model           79                               20 at the stop (heartbeat 11, scout 5, charger 2, contract 2,
+--                                                                     first 1); 21 with the heartbeat in flight
 --     solver-only                   0                                267, mean 2,055 ms
 --     passes overlapping another    58                               0
---     model tokens                  1,985,250                        549,077 (-72%)
+--     model tokens                  1,985,250                        549,077 at the stop (-72%); 576,986 with the pass in
+--                                                                     flight (-71%)
 --     fallback passes               6                                0
 --     decision rows = passes        79 = 79                          287 = 287; Nemotron ledger rows = consults 20 = 20
 --     CP-SAT (forward_lex)          0 enacted, 106 refused, 11 sup.  22 enacted, 461 refused, 574 superseded
+--
+--   CORRECTED 19:45 UTC (2:45 PM CT), read back from the evidence: one more consult, a heartbeat (pass 371, 58.3 s,
+--   27,909 tokens, outcome advisory), was in flight when the governor stopped the run at 19:12:00 and landed 41 s
+--   later. The figures above were read before it landed. Counting it: 21 of 288 passes consulted, tokens -71%.
+--   Every later figure that quotes 72% is the at-the-stop figure.
 --
 --   The solver-only path, which had never run live, wrote its decision and evidence on every one of 267 passes. The
 --   agent's 20 consults: echo 14, advisory 5, no_effect 1; it took no order. Its differing orders were graded 6 times,
