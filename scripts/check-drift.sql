@@ -761,7 +761,8 @@ repo_manifest(version, name, file) AS (
     ('20261013180804'::text, 'the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble'::text, '0711_the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble.sql'::text),
     ('20261013181932'::text, 'the_checks_futures_are_drawn_from_the_world_not_from_the_runs_minted_id'::text, '0712_the_checks_futures_are_drawn_from_the_world_not_from_the_runs_minted_id.sql'::text),
     ('20261013182717'::text, 'one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take'::text, '0713_one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take.sql'::text),
-    ('PENDING'::text, 'the_lease_catalog_row_says_what_the_claim_does'::text, '0714_the_lease_catalog_row_says_what_the_claim_does.sql'::text)
+    ('PENDING'::text, 'the_lease_catalog_row_says_what_the_claim_does'::text, '0714_the_lease_catalog_row_says_what_the_claim_does.sql'::text),
+    ('PENDING'::text, 'a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves'::text, '0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
