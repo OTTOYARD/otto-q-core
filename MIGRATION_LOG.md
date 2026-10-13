@@ -219,7 +219,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0716 — GENERATED, not a log
+## Index, 0134–0717 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699 — which are indexed below as well as logged above; the log row is
@@ -773,7 +773,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0714](db/migrations/0714_the_lease_catalog_row_says_what_the_claim_does.sql) | `PENDING` | no — pending | **The lease's catalog row says what the claim does.** 0713 raised the agent claim's lease from 45 s to 130 s by |
 | [0715](db/migrations/0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql) | `PENDING` | no — pending | **A car with preventive maintenance or calibration due gets it before it leaves.** CLAUDE.md rule 9 (Chase, |
 | [0716](db/migrations/0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql) | `20261013184608` | yes — ledger | **The feed agents propose the twin's world; a person promotes it.** Every operator Start fires seven Nemotron |
+| [0717](db/migrations/0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql) | `PENDING` | no — pending | **The agent's board calls a car's 80% a priority band, not a ready floor.** (G434; CLAUDE.md rule 9.) |
 
-535 migrations indexed.
+536 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
