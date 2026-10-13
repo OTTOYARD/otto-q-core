@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013191424
 -- migration-name:    a_charger_is_not_held_for_a_car_still_on_its_way_back
 --
 -- 0562  **A charger is not held for a car still on its way back when the run leaves the charge to the line.** (G293,
