@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013180804
 -- migration-name:    the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble
 --
 -- 0711  **The wake gate wakes on a change that matters, not on every wobble.** 0705's gate woke the agent whenever a
