@@ -57,8 +57,9 @@
 --   5. public.ottoq_agent_board gains a 'scouts' block when grounding is armed (agent_board_grounding_enabled >= 1)
 --      and agent_scouts_enabled (new catalog row, default 1) >= 1. Done by SUBSTITUTION on the live definition: the
 --      function body is read, the one anchor `RETURN v_board;` is asserted to occur exactly once, the block is
---      inserted before it, and the result is executed -- so every other byte of the board is the live board's. An
---      unarmed board (every certification arm) is byte-identical (V4).
+--      inserted before it, and the result is executed -- so every other byte of the board is the live board's. V1
+--      asserts the board grew by exactly the block; tests/test_agent_scouts_wake_sql.py executes the live board before
+--      and after and shows an unarmed board (every certification arm) is byte-identical.
 --
 --   NOT changed: the departure gate, the recall policy, the twin observer and the shield. The scouts SEE (a)-(d); fixing
 --   them is separate, certified work (G218 decides (a)).
@@ -66,8 +67,8 @@
 -- ══ §3 forces_recert FALSE; forces_dial_restart FALSE ═══════════════════════════════════════════════════════════════
 --
 --   The scan writes only its own evidence table and runs from cron and the agent's edge function, never inside a tick.
---   The board change is gated on agent_board_grounding_enabled, which certification arms never set; V4 asserts an
---   unarmed board is unchanged. No atom hashes the findings table (P2).
+--   The board change is gated on agent_board_grounding_enabled, which certification arms never set; the pytest above
+--   asserts an unarmed board is unchanged. No atom hashes the findings table (P2).
 --
 -- ══ §4 ROLLBACK ══════════════════════════════════════════════════════════════════════════════════════════════════
 --
