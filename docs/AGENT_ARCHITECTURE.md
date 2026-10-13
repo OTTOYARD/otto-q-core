@@ -41,10 +41,19 @@ same section says what would change it.
 5. **Cost and fragility compound per agent.** One consult costs about 25,800 prompt and 1,400 completion tokens and a median
    59.5 s. The primary model answered 60 of its 91 attempts: 15 returned HTTP 503 and 16 timed out (G424).
 
-**The outside evidence says the same:**
+**The outside evidence says the same.** The 2026 results come first. What was read of each, and what it changes, is in
+`docs/research/direct/2026-10-13-agent-architecture-2026-evidence.md`.
 
 | Claim | Source |
 |---|---|
+| On deadline-aware scheduling at the autonomous-vehicle edge, a fixed earliest-deadline heuristic reached 0.902 time-critical completion and about 0.87 of a CP-SAT bound. An LLM control plane added nothing under steady load and won only in a mid-run surge: it "earns its cost only when non-stationarity opens headroom a fixed policy cannot use." That is the wake gate's rule. | Zakerian, [arXiv 2608.19557](https://arxiv.org/abs/2608.19557) (2026-08-20) |
+| With reasoning tokens held equal, single agents match or beat multi-agent systems on multi-hop reasoning across three model families; reported multi-agent gains are often extra compute. | Tran & Kiela, [arXiv 2604.02460](https://arxiv.org/abs/2604.02460) (2026-04) |
+| Over ten benchmarks, five of six multi-agent workflows trailed a single agent by 1.71-8.76 points, at up to 4.34x the tokens; a win on one benchmark did not carry to the pool. | Fu et al., [arXiv 2606.05670](https://arxiv.org/abs/2606.05670) (2026-06, rev. 2026-10-09) |
+| Multi-agent systems help when messages between agents keep nearly everything the task needs, mostly for weaker models; the gain shrinks or reverses for stronger ones. | Yu et al., [arXiv 2607.16133](https://arxiv.org/abs/2607.16133) (2026-07-17) |
+| Gates that judge one action at a time let a fleet of individually authorized agents overdraw a shared risk limit by up to 48x; a per-principal budget held it. In OTTO-Q this needs every agent registered first (0702). | Mohammadi & Bindschaedler, [arXiv 2609.00275](https://arxiv.org/abs/2609.00275) (2026-08-31, AgenticOS @ SOSP) |
+| Recording an agent at its non-deterministic boundaries and replaying some of them turns an incident into a CI regression test; full replay is bit-stable. OTTO-Q records both answers (0703 the model's, the disposition ledger every CP-SAT proposal); what replay lacks is each CP-SAT answer's pass and arrival tick. | Chawla & Koul, [arXiv 2609.20625](https://arxiv.org/abs/2609.20625) (2026-09-17) |
+| Simple sampling baselines match code-evolution methods when budgets and models are held equal; the search space matters more than the search. | Gideoni, Risi & Gal, [arXiv 2602.16805](https://arxiv.org/abs/2602.16805) (2026-02-18) |
+| Swarms in 2026 pay on breadth-first work: Kimi K2.5's agent swarm runs up to 100 sub-agents, with a reported 3-4.5x shorter run on highly parallel tasks (vendor figures, research preview). | [HPCwire](https://www.hpcwire.com/aiwire/2026/01/30/moonshot-ais-kimi-k2-5-expands-what-open-weight-models-can-do/) (2026-01-30) |
 | Across 180 configurations, every multi-agent variant made sequential, shared-resource planning 39-70% worse. Independent agents amplified errors 17.2x, against 4.4x with central coordination, and coordination stops paying once a single agent scores above about 45%. | Google Research, *Towards a Science of Scaling Agent Systems*, [arXiv 2512.08296](https://arxiv.org/abs/2512.08296v2) (v2 2025-12-17); [blog](https://research.google/blog/towards-a-science-of-scaling-agent-systems-when-and-why-agent-systems-work/) (2026-01-28) |
 | Multi-agent gains are real for breadth-first research: +90.2% over a single agent, at about 15x the tokens of chat. | Anthropic, [multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system) (2025-06-13) |
 | Parallel agents writing to shared decisions drift apart; keep one thread of context. | Cognition, [Don't Build Multi-Agents](https://cognition.com/blog/dont-build-multi-agents) (2025-06-12) |
@@ -84,9 +93,13 @@ verified controller, and the agent is the high-performance one that can only win
 | `0712` | The disposer check drew its sampled futures from the run's and the pass's randomly minted ids, so the same order on the same world got different verdicts. It now draws from `world:random_seed:tick`. | pytest reproduces the defect; live: orders after 1:19 PM CT carry `world:` seeds; stored snapshots still replay as decided |
 | `0713` | Passes overlapped (58 of 79) because the claim's lease, 45 s since 0338, was shorter than a pass. The claim's own default is now 130 s. (The catalog row is documentation only, because `ottoq_policy_get` never reads it, G429. Its update, 0714, waits for a person.) | pytest on the live claim; live: 0 overlaps on `57188f55` |
 | `0716` + feed agents v2 | The seven per-run feed agents, OTTO-Q's one existing LLM swarm, used to rewrite the twin's world as the active version (G431). They now propose drafts, and only a person can promote one. | pytest; the edge function was redeployed and now proposes drafts |
-| `0562` | At a recall, the appointment book reserved a free charger for a car still driving back, and the re-optimizer moved returning cars onto fast chargers. Both ignored `prearrival_charge_yields_to_solver`, which every armed run sets to 1. On the two gate runs, 39 chargers were held for cars not yet at the depot, standing empty 152 and 208 charger-minutes. Both functions now read the dial (G293 part 1). | Applied; validation run `02ac27b3` |
+| `0562` | At a recall, the appointment book reserved a free charger for a car still driving back, and the re-optimizer moved returning cars onto fast chargers. Both ignored `prearrival_charge_yields_to_solver`, which every armed run sets to 1. On the two gate runs, 39 chargers were held for cars not yet at the depot, standing empty 152 and 208 charger-minutes. Both functions now read the dial (G293 part 1). | Applied. Live on `02ac27b3` against both earlier runs: 0 chargers held for a car still out (39 and 39 before), 0 reserved seatings, and 18 seatings ahead of a refused car against 37 and 53. Outcomes are inside the noise floor (`0440` §14) |
 | `0707` | Nothing watched the engine's channels (G433). A watchdog now reads six channels every minute and records each change of colour: cron beats, the run's tick, agent passes, the model, CP-SAT and pg_net. | pytest with three mutations; live: its first change named a cancelled cron run |
-| `0706` (pending) | The agent order that stands is the one built from the newest board, so an outranked order never comes back (the study's DC-6). | Reviewed and ready to apply; it waits for a run with the agent's order switched on to stop |
+| `0708` | Whether the check can tell a winning agent order from a losing one is now one call: AUC with a Hanley-McNeil interval, Brier against the base rate, and the distinct keys behind it. The promotion gate's second condition now has an instrument. Its first reading is no: 0.534, interval [0.415, 0.653]. | pytest against an independent computation, mutation-tested |
+| agent `v30` + `0717` | Rule 9 (G434). 114 distinct directives had told operators to charge to 80%, because the board called 80% a "ready floor". The board now calls it a priority band. The prompt states the 100% target. A directive that sets a lower target or skips a service is refused. | node tests on the 15 real directive templates; live: all 6 consults on `02ac27b3` carry the repo's prompt hash, and none of their 25 directives names a percentage (`0440` §15) |
+| `0718` | Production's world step, a hand-made copy of the certified one, never called three of its phases (G436). In a production session each fast charge would leave its charger held by a car that had left it. An owner's service order would be held an hour and then dropped (rule 9). The three calls go in where the certified world makes them. | Applied 4:08 PM CT. A rolled-back production tick at the twin depot: before, the charger stayed held by a car that had left; after, it is available (`0447` §3) |
+| `0719` | A production start now takes the world from research work, as the operator door does (G437). A sweep arm held the scheduler 43.25 of the last 168 hours, and a session started inside one got no tick until it ended. | Applied 4:10 PM CT. pytest cancels a lock-holding arm and a hand-run pair; a rolled-back live start returns `ok` with nothing to interrupt |
+| `0706` | The agent order that stands is the one built from the newest board, so an outranked order never comes back (the study's DC-6). | Applied 4:09 PM CT. Its V3 checked all 285 accepted orders on the engine: 277 stood and 8 were outranked, and the live function agrees with the new succession view on every one |
 
 ## What the gate-on run measured
 
@@ -118,6 +131,8 @@ Any additional agent, whether a per-vehicle LLM, a specialist or a swarm, ships 
 
 1. **Its outputs are recorded and replayable**: the 0703 record, per seat.
 2. **The disposer discriminates**: the AUC interval of the check's win probability excludes 0.5 on graded decisions.
+   `ottoq_disposer_discrimination()` (0708) computes it. On 2026-10-13 it read AUC 0.534, interval [0.415, 0.653], over
+   91 decisions from 6 distinct keys, with a Brier score worse than the base rate. The check does not discriminate.
 3. **An ablation beats the noise floor**: a deterministic paired agent-on/off comparison over at least 10 distinct (scenario,
    seed) keys, counted by distinct keys and not by rows (0339).
 4. **It is registered**: an identity, the contexts it may propose into, and its hit rate by proposal id.
@@ -127,12 +142,17 @@ request, a technician's note. None of the twin's event types is unstructured tod
 
 ## What a person decides
 
-- **Turning the wake gate on** (`agent_wake_enabled`) for demos and production. It cuts consults by about two-thirds, at the cost of
-  about half the agent's differing orders, whose value the check cannot yet establish.
+- **Turning the wake gate on** (`agent_wake_enabled`) for demos and production. On `57188f55` it cut consults from every
+  pass to 21 of 288 and model tokens by 71%. The orders it skips are ones whose value the check cannot establish (0708).
 - **The NVIDIA endpoint.** The primary model failed a third of its attempts on `176b2912`. A dedicated deployment, or a
   batch-invariant self-hosted one, is a cost decision.
-- **The security items** in the study's blind spots: rotating the signing secret and closing open sign-up. Those are Chase's
-  calls. Migration 0701, which revokes the grants, is drafted and reviewed separately.
+- **The security items.** Rotating the signing secret and closing open sign-up are Chase's calls. Three reviewed changes
+  wait on him as draft PRs:
+  - **0701 (#242)** revokes the grants that let any signed-in user read the signing key (G428). It refuses to apply
+    until his go-ahead is pasted into it.
+  - **The blackbox credential (#243)** closes `ottoq-run-blackbox`, which serves whole runs and engine source to anyone
+    with its address. Deploying it breaks the twin's Black Box button until the app sends a key.
+  - **0702 (#241)** gives every guard one registry of agent names, which makes the OttoCommand chat seat an agent.
 - **Rule 9: cars leave with maintenance or calibration due (G430).** 0715 is written and tested but not applied. On busy_day
   the intervals are compressed about a hundredfold, so applying it makes the two service bays the depot's wall. The
   decision is whether to apply it with realistic intervals or with the compression kept.

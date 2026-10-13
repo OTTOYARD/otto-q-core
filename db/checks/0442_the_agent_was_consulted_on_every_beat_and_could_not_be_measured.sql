@@ -2,7 +2,7 @@
 --        db/migrations/0705 (the wake gate), and where its results are. Read-only.
 --
 --        0705's header and its live lineage note (classified 2026-10-13) cite this file. It was named then and written
---        later the same day, at 19:40-19:45 UTC (2:40-2:45 PM CT), from the study's stored results. The measurements of
+--        later the same day, committed 19:39:26 UTC (2:39 PM CT), from the study's stored results. The measurements of
 --        the gate itself are in db/checks/0440 §5-§10; this file keeps the premises and points there.
 --
 -- ══ §0 A LABEL CORRECTED ══

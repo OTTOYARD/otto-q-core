@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013210919
 -- migration-name:    the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does
 --
 -- 0706  **The agent's charge order that stands is the one built from the newest board, not the last one to arrive; an

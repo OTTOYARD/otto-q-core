@@ -8,7 +8,7 @@
 --       noticed. Advisory only: nothing reads the table to decide anything, and nothing is sent anywhere.
 --       (Study 2026-10-13, lane comms CI-7; G433; db/checks/0444.)
 --
--- ══ §1 WHY (measured 2026-10-13, read-only, 19:22-19:31 UTC, 2:22-2:31 PM CT) ══════════════════════════════════════
+-- ══ §1 WHY (measured 2026-10-13, read-only, 19:22:11-19:33:59 UTC, 2:22-2:33 PM CT) ══════════════════════════════════════
 --
 --   (a) NOTHING WATCHES THE CHANNELS.
 --       - 10 functions in public/ottoq/twin call net.http_post (8 names; ottoq_energy_mpc_replan has 3 overloads).
@@ -27,7 +27,7 @@
 --         and every other minute job went up to 2 min 25 s. Those are the recertification pair after 0562 holding
 --         pg_cron (G141): job 746 ran 144.6 s and was cancelled by the operator door at 19:19:24.
 --       - 2 of the last 3,000 cron runs failed, both "canceling statement due to user request".
---       - In the 24 hours to 19:25 UTC the model ledger held 119 agent rows: 112 enacted, 6 fallback, and 1 with no
+--       - In the 24 hours before a read taken between 19:22:11 and 19:25:39 UTC, the model ledger held 119 agent rows: 112 enacted, 6 fallback, and 1 with no
 --         candidate. Attempts carry 503s from the primary model (G424).
 --       - Most of the 20-second pg_net timeouts are agent dispatches whose pass outlives pg_net's timeout and then
 --         completes. That is 51 of 267 calls in the 15:00 UTC hour and 18 of 350 in the 18:00 UTC hour.
