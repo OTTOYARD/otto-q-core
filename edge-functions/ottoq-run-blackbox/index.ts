@@ -7,14 +7,21 @@
 // and the handler in ../_shared/run_blackbox.ts, which tests/run_blackbox_auth.test.mjs imports directly. Since this
 // change a request needs the service-role key (Authorization: Bearer or apikey) or the operator export token
 // (x-ottoq-export-token, the edge secret OTTOQ_BLACKBOX_TOKEN); anything else is answered 401 before the database is
-// touched. Each table returns at most 50,000 rows per request; `export_paging` in the bundle names the next page.
+// touched. One response carries at most 20 MB of JSON; a larger run comes as several, and `export_paging.next_cursor`
+// (also the X-OTTOQ-Next-Cursor header) names the next one.
 //
-// DEPLOY WITH JWT VERIFICATION OFF, and with both shared files:
-//   supabase secrets set OTTOQ_BLACKBOX_TOKEN=$(openssl rand -hex 32) --project-ref gxdrcyphqjzjsuhxuqtg
-//   supabase functions deploy ottoq-run-blackbox --project-ref gxdrcyphqjzjsuhxuqtg --no-verify-jwt
-// The function checks the credential itself; gateway verification would refuse the export token (not a JWT) and the
-// legacy JWT keys (UNAUTHORIZED_LEGACY_JWT). Environment: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (platform) and
-// OTTOQ_BLACKBOX_TOKEN (optional; unset or shorter than 32 characters means only the service-role key opens it).
+// DEPLOY (a person does this; db/checks/0446 §6 has the probes that follow it):
+//   1. Set the token: supabase secrets set OTTOQ_BLACKBOX_TOKEN=$(openssl rand -hex 32) --project-ref gxdrcyphqjzjsuhxuqtg
+//      (or the dashboard's Edge Function Secrets page).
+//   2. Deploy THREE files through the Supabase MCP deploy_edge_function, as edge-functions/_MANIFEST.md footnote 11
+//      did for ottoq-depot-v2: entrypoint ottoq-run-blackbox/index.ts, plus _shared/blackbox_auth.ts and
+//      _shared/run_blackbox.ts, with verify_jwt FALSE. This repo has no supabase/ directory or config.toml, so
+//      `supabase functions deploy` does not work from it as it stands.
+//   3. Read it back with get_edge_function and hash all three files against the repo.
+// verify_jwt must stay false. The function checks the credential itself; gateway verification would refuse the
+// export token (not a JWT) and the legacy JWT keys (UNAUTHORIZED_LEGACY_JWT). Environment: SUPABASE_URL and
+// SUPABASE_SERVICE_ROLE_KEY (platform) and OTTOQ_BLACKBOX_TOKEN (optional; unset or shorter than 32 characters means
+// only the service-role key opens it).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleRunBlackbox } from "../_shared/run_blackbox.ts";
 
