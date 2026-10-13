@@ -120,6 +120,18 @@
 --   And note the shape of that refusal: an order that lost none of 12 futures is refused because ties count as not
 --   winning. Whether a tie should count is the comparator's question (G427), not the seed's.
 --
+-- ══ §13 CARS LEAVE WITH MAINTENANCE OR CALIBRATION DUE (reproduce: (13)) -> 0715, pending ══
+--
+--   The scout interval_due_departure (a departure after a service_interval_due recall with no PM or calibration done
+--   since): 3 on 176b2912 (Tesla-AV-070, Waymo-AV-021, Zoox-AV-100), 5 on 57188f55 by tick 213. Read by hand for
+--   Tesla-AV-070 on 57188f55: its visit carried no PM and no calibration atom at all, and it left at 14:40:24 sim. The
+--   planner adds those atoms only when the twin observer draws them (0.30 / 0.24); 0448's upgrade keys on a trigger no
+--   live recall emits; the departure test reads atoms, never wear. G218 / G181, now measured per run.
+--   What enforcing it would do on busy_day, measured: pm_interval_km median 78 (the need profile says 6,500-9,500),
+--   calib_interval_h median 4.85; at 4:54 PM sim on 57188f55, 71 of 116 cars had one due (67 PM, 18 calibration);
+--   176b2912's two service bays finished 14 PM and 4 calibrations in 9 sim-hours. 0715 is written and tested, and left
+--   for Chase with the scenario's intervals. (G430)
+--
 -- ══ QUERIES ══
 
 -- (1) the record reconciles
@@ -247,3 +259,17 @@ SELECT order_id, recorded_status,
          'world:' || COALESCE(random_seed::text, sim_run_id::text) || ':' || recorded_tick), win_frac)
          - 'per' - 'agent' - 'kernel' - 'first' AS under_world
   FROM s ORDER BY order_id;
+
+-- (13) the twin depot's cars with an interval due, by the recall's own test, on a run
+WITH r AS (SELECT '57188f55-4503-4c5c-82c8-b42000f73ba2'::uuid AS id),
+c AS (
+  SELECT v.id,
+         COALESCE((v.config ->> 'pm_interval_km')::numeric, public.ottoq_policy_get((SELECT id FROM r), 'pm_interval_km', 8000)) AS pm_km,
+         COALESCE((v.config ->> 'calib_interval_h')::numeric, public.ottoq_policy_get((SELECT id FROM r), 'calib_interval_h', 250)) AS cal_h,
+         w.drive_km_total - w.km_at_last_pm AS km_since, w.drive_hours_total - w.hours_at_last_calibration AS h_since
+    FROM public.vehicles v JOIN public.ottoq_vehicle_wear w ON w.vehicle_id = v.id AND w.sim_run_id = (SELECT id FROM r)
+   WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111')
+SELECT count(*) AS cars, count(*) FILTER (WHERE km_since >= pm_km) AS pm_due, count(*) FILTER (WHERE h_since >= cal_h) AS calib_due,
+       count(*) FILTER (WHERE km_since >= pm_km OR h_since >= cal_h) AS any_due,
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY pm_km) AS median_pm_km
+  FROM c;
