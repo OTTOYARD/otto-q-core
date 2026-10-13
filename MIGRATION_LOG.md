@@ -665,7 +665,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0559](db/migrations/0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql) | `20261004111417` | yes — ledger | **An outside agent asks through one door, and a person decides.** Hermes, a fleet manager's own agent, or a |
 | [0560](db/migrations/0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql) | `20261004111501` | yes — ledger | **The fleet owner's cockpit can read its own agent requests.** One GRANT, in its own file, because it is an |
 | [0561](db/migrations/0561_every_charger_stall_is_angled_and_the_database_says_so.sql) | `20260929014318` | yes — ledger | **Every charger stall at the twin depot is angled 60° to its gap lane, and public.stalls now says so.** 40 |
-| [0562](db/migrations/0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql) | `PENDING` | no — pending | **A charger is not held for a car still on its way back when the run leaves the charge to the line.** (G293, |
+| [0562](db/migrations/0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql) | `20261013191424` | yes — ledger | **A charger is not held for a car still on its way back when the run leaves the charge to the line.** (G293, |
 | [0564](db/migrations/0564_a_manual_start_interrupts_a_running_check.sql) | `20260929024700` | yes — ledger | **A manual start from the depot simulation always interrupts a running check.** Chase, 2026-09-28, 9:33 PM |
 | [0565](db/migrations/0565_a_scorecard_that_counts_cars_served.sql) | `20260929183923` | yes — ledger | **A scorecard that counts the cars a depot serves.** Lane A, phase 1. Chase, 2026-09-29: "I am very interested |
 | [0566](db/migrations/0566_the_scorecard_reads_the_step_a_run_actually_took.sql) | `20260929184316` | yes — ledger | **The throughput scorecard reads the step a run actually took, and extrapolates no daily rate from a short run.** |
@@ -762,6 +762,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0703](db/migrations/0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql) | `20261013150710` | yes — ledger | **Every agent pass keeps what it saw and what it changed.** An append-only evidence record per pass of the |
 | [0704](db/migrations/0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql) | `20261013151002` | yes — ledger | **Every car has a deterministic scout, and the agent reads what they find.** Six SQL scouts check each car's |
 | [0705](db/migrations/0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql) | `20261013151112` | yes — ledger | **The agent is consulted when something changes, not on every beat.** A deterministic wake test decides, per |
+| [0706](db/migrations/0706_the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does.sql) | `PENDING` | no — pending | **The agent's charge order that stands is the one built from the newest board, not the last one to arrive; an |
 | [0709](db/migrations/0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql) | `20261013152102` | yes — ledger | **The agent's return wave counts this run's cars, not every run's.** ottoq_agent_board's `inbound_60m` joined |
 | [0710](db/migrations/0710_the_wake_gate_reads_the_record_the_claim_reads.sql) | `20261013180020` | yes — ledger | **The wake gate reads the record the claim reads.** ottoq_agent_wake (0705) found the agent's last answered |
 | [0711](db/migrations/0711_the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble.sql) | `20261013180804` | yes — ledger | **The wake gate wakes on a change that matters, not on every wobble.** 0705's gate woke the agent whenever a |
@@ -771,6 +772,6 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0715](db/migrations/0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql) | `PENDING` | no — pending | **A car with preventive maintenance or calibration due gets it before it leaves.** CLAUDE.md rule 9 (Chase, |
 | [0716](db/migrations/0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql) | `20261013184608` | yes — ledger | **The feed agents propose the twin's world; a person promotes it.** Every operator Start fires seven Nemotron |
 
-532 migrations indexed.
+533 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
