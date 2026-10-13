@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013151002
 -- migration-name:    every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find
 --
 -- 0704  **Every car has a deterministic scout, and the agent reads what they find.** Six SQL scouts check each car's

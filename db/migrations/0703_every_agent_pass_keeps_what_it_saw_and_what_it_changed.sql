@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013150710
 -- migration-name:    every_agent_pass_keeps_what_it_saw_and_what_it_changed
 --
 -- 0703  **Every agent pass keeps what it saw and what it changed.** An append-only evidence record per pass of the

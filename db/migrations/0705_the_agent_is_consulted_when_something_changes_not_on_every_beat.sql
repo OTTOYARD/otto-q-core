@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013151112
 -- migration-name:    the_agent_is_consulted_when_something_changes_not_on_every_beat
 --
 -- 0705  **The agent is consulted when something changes, not on every beat.** A deterministic wake test decides, per
