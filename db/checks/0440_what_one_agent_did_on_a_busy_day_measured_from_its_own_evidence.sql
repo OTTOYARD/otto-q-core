@@ -100,6 +100,16 @@
 --   measures is the gate itself: how many passes consult, how many run solver-only, whether the solver-only path that
 --   had never run live writes its decision and evidence correctly, and whether passes still overlap. Results: §10.
 --
+-- ══ §11 A DIAL'S CATALOG DEFAULT IS NOT THE ENGINE'S DEFAULT (reproduce: (11)) -> 0713, 0714 ══
+--
+--   Found writing 0713. public.ottoq_policy_get reads run, depot, global, then the caller's literal, and never the
+--   catalog's default_value: asked for agent_chain_inflight_timeout_s with fallback 7 on run 176b2912 (no row) it
+--   returns 7. So 0713 changes the literal inside ottoq_agent_chain_claim, 45 -> 130 (applied 20261013182717), and 0714
+--   brings the catalog row in step -- an UPDATE, which the database connector holds for a person's confirmation (two
+--   applies of a combined file timed out unexecuted at the connector, 18:23-18:26 UTC; the split 0713 applied at once).
+--   Census of every ottoq_policy_get call with a literal default: 201 dials; the catalog disagrees on 4, at 7 call
+--   sites, all masked today by a global or depot row. (G429)
+--
 -- ══ QUERIES ══
 
 -- (1) the record reconciles
@@ -199,3 +209,18 @@ SELECT outcome_class, consulted, count(*), round(avg(total_ms)) AS ms,
        count(*) FILTER (WHERE NOT decision_written) AS decision_missing
   FROM public.ottoq_agent_pass_evidence WHERE sim_run_id = '57188f55-4503-4c5c-82c8-b42000f73ba2'
  GROUP BY 1, 2 ORDER BY 3 DESC;
+
+-- (11) every dial read with a literal default, against its catalog row (comments stripped)
+WITH src AS (
+  SELECT p.oid::regprocedure::text AS fn, regexp_replace(pg_get_functiondef(p.oid), '--[^\n]*', '', 'g') AS d
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname IN ('public', 'twin', 'ottoq') AND p.prokind = 'f' AND pg_get_functiondef(p.oid) LIKE '%ottoq_policy_get%'),
+calls AS (
+  SELECT s.fn, m[1] AS key, m[2]::numeric AS lit
+    FROM src s, regexp_matches(s.d, 'ottoq_policy_get\s*\([^,()]+(?:\([^()]*\))?[^,()]*,\s*''([a-z0-9_]+)''\s*,\s*\(?\s*(-?[0-9.]+)', 'g') m)
+SELECT c.key, cat.default_value AS catalog, c.lit, c.fn,
+       (SELECT jsonb_object_agg(pp.scope_type, pp.param_value) FROM public.ottoq_policy_params pp
+         WHERE pp.param_key = c.key AND pp.scope_type IN ('global', 'depot')) AS masked_by
+  FROM calls c LEFT JOIN public.ottoq_policy_param_catalog cat ON cat.param_key = c.key
+ WHERE cat.default_value IS DISTINCT FROM c.lit
+ ORDER BY 1, 4;
