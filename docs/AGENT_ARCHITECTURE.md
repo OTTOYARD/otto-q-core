@@ -41,10 +41,19 @@ same section says what would change it.
 5. **Cost and fragility compound per agent.** One consult costs about 25,800 prompt and 1,400 completion tokens and a median
    59.5 s. The primary model answered 60 of its 91 attempts: 15 returned HTTP 503 and 16 timed out (G424).
 
-**The outside evidence says the same:**
+**The outside evidence says the same.** The 2026 results come first. What was read of each, and what it changes, is in
+`docs/research/direct/2026-10-13-agent-architecture-2026-evidence.md`.
 
 | Claim | Source |
 |---|---|
+| On deadline-aware scheduling at the autonomous-vehicle edge, a fixed earliest-deadline heuristic reached 0.902 time-critical completion and about 0.87 of a CP-SAT bound. An LLM control plane added nothing under steady load and won only in a mid-run surge: it "earns its cost only when non-stationarity opens headroom a fixed policy cannot use." That is the wake gate's rule. | Zakerian, [arXiv 2608.19557](https://arxiv.org/abs/2608.19557) (2026-08-20) |
+| With reasoning tokens held equal, single agents match or beat multi-agent systems on multi-hop reasoning across three model families; reported multi-agent gains are often extra compute. | Tran & Kiela, [arXiv 2604.02460](https://arxiv.org/abs/2604.02460) (2026-04) |
+| Over ten benchmarks, five of six multi-agent workflows trailed a single agent by 1.71-8.76 points, at up to 4.34x the tokens; a win on one benchmark did not carry to the pool. | Fu et al., [arXiv 2606.05670](https://arxiv.org/abs/2606.05670) (2026-06, rev. 2026-10-09) |
+| Multi-agent systems help when messages between agents keep nearly everything the task needs, mostly for weaker models; the gain shrinks or reverses for stronger ones. | Yu et al., [arXiv 2607.16133](https://arxiv.org/abs/2607.16133) (2026-07-17) |
+| Gates that judge one action at a time let a fleet of individually authorized agents overdraw a shared risk limit by up to 48x; a per-principal budget held it. In OTTO-Q this needs every agent registered first (0702). | Mohammadi & Bindschaedler, [arXiv 2609.00275](https://arxiv.org/abs/2609.00275) (2026-08-31, AgenticOS @ SOSP) |
+| Recording an agent at its non-deterministic boundaries and replaying some of them turns an incident into a CI regression test; full replay is bit-stable. OTTO-Q's 0703 records the model boundary; the CP-SAT answer is the one it does not. | Chawla & Koul, [arXiv 2609.20625](https://arxiv.org/abs/2609.20625) (2026-09-17) |
+| Simple sampling baselines match code-evolution methods when budgets and models are held equal; the search space matters more than the search. | Gideoni, Risi & Gal, [arXiv 2602.16805](https://arxiv.org/abs/2602.16805) (2026-02-18) |
+| Swarms in 2026 pay on breadth-first work: Kimi K2.5's agent swarm runs up to 100 sub-agents, with a reported 3-4.5x shorter run on highly parallel tasks (vendor figures, research preview). | [HPCwire](https://www.hpcwire.com/aiwire/2026/01/30/moonshot-ais-kimi-k2-5-expands-what-open-weight-models-can-do/) (2026-01-30) |
 | Across 180 configurations, every multi-agent variant made sequential, shared-resource planning 39-70% worse. Independent agents amplified errors 17.2x, against 4.4x with central coordination, and coordination stops paying once a single agent scores above about 45%. | Google Research, *Towards a Science of Scaling Agent Systems*, [arXiv 2512.08296](https://arxiv.org/abs/2512.08296v2) (v2 2025-12-17); [blog](https://research.google/blog/towards-a-science-of-scaling-agent-systems-when-and-why-agent-systems-work/) (2026-01-28) |
 | Multi-agent gains are real for breadth-first research: +90.2% over a single agent, at about 15x the tokens of chat. | Anthropic, [multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system) (2025-06-13) |
 | Parallel agents writing to shared decisions drift apart; keep one thread of context. | Cognition, [Don't Build Multi-Agents](https://cognition.com/blog/dont-build-multi-agents) (2025-06-12) |
