@@ -759,6 +759,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0697](db/migrations/0697_the_charger_back_end_hears_the_twins_chargers_through_a_relay.sql) | `PENDING` | no — pending | **OTTO-Q's charger back end gets its own credential, made on the machine it runs on, and through it reads the |
 | [0698](db/migrations/0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql) | `20261010113923` | yes — ledger | **A new visit carries the required work the visit it replaces still owes the car; nothing found is dropped.** |
 | [0699](db/migrations/0699_the_twin_apps_determinism_canon_card_reads_again.sql) | `20261010110724` | yes — ledger | **The twin app's determinism canon card reads again: the public key may call the one-timestamp function the |
+| [0701](db/migrations/0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge.sql) | `PENDING` | no — pending | **Anyone who signs up could read the key that signs every event, SDR and audit bundle, sign anything with it, |
 | [0703](db/migrations/0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql) | `20261013150710` | yes — ledger | **Every agent pass keeps what it saw and what it changed.** An append-only evidence record per pass of the |
 | [0704](db/migrations/0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql) | `20261013151002` | yes — ledger | **Every car has a deterministic scout, and the agent reads what they find.** Six SQL scouts check each car's |
 | [0705](db/migrations/0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql) | `20261013151112` | yes — ledger | **The agent is consulted when something changes, not on every beat.** A deterministic wake test decides, per |
@@ -773,6 +774,6 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0715](db/migrations/0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql) | `PENDING` | no — pending | **A car with preventive maintenance or calibration due gets it before it leaves.** CLAUDE.md rule 9 (Chase, |
 | [0716](db/migrations/0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql) | `20261013184608` | yes — ledger | **The feed agents propose the twin's world; a person promotes it.** Every operator Start fires seven Nemotron |
 
-534 migrations indexed.
+535 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

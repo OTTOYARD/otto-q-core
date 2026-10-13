@@ -6,7 +6,7 @@
 --        is no longer cached for a whole pooled session, and a new function in public is no longer callable by them
 --        until a migration says so. A signed-in caller can still get the system's signature on an event through 35
 --        engine doors this file does not close (§2 NOT CHANGED); it can no longer read the key or sign content of its
---        own choosing.** (FINDINGS draft G432, number provisional; closes the grant half of G417. db/checks/0438.)
+--        own choosing.** (FINDINGS G428, the study's CI-1; closes the grant half of G417. db/checks/0438.)
 --        Measured read-only on 2026-10-13 on the live catalog and the API logs, ending 15:19 UTC (10:19 AM CT, read
 --        from the clock after the last query); the P0/P1 dry-run read now() = 15:10:32 UTC and passed. Re-measured
 --        after review from 18:57:27 UTC (1:57 PM CT, the first query's own now()) to 19:06:30 UTC (2:06 PM CT, read
@@ -143,7 +143,7 @@
 --   of them no migration names a signed-in reader; db/checks/0438 (4) lists every one with its basis). Among them are
 --   ottoq_promote_dials, ottoq_decide_tick, ottoq_archive_run, ottoq_benchmark_reset, ottoq_sim_run_scenario and
 --   ottoq_cuopt_refresh, which sends a Vault-keyed NVIDIA call. That is the next file, after the signed-in UIs that use
---   any of them are named. No secret is rotated and no Auth setting is changed here: both are Chase's (FINDINGS G432).
+--   any of them are named. No secret is rotated and no Auth setting is changed here: both are Chase's (FINDINGS G428).
 --   NOT CHANGED, AND THE REASON THIS FILE'S NAME SAYS "CALL THE SIGNERS" AND NOT "SIGN": a signed-in caller can still
 --   get the system key's signature on an event. Measured 2026-10-13 18:58 UTC (db/checks/0438 (E)): 35 SECURITY
 --   DEFINER functions in public outside the eighteen, executable by authenticated (none by anon), reach
@@ -706,7 +706,7 @@ END $v6$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge', false, false,
-  'G432 (db/checks/0438): REVOKE EXECUTE from PUBLIC, anon and authenticated (service_role kept) on the signing-key '
+  'G428 (db/checks/0438): REVOKE EXECUTE from PUBLIC, anon and authenticated (service_role kept) on the signing-key '
   'resolver, the three signers, ottoq_oem_deliver_live, the three energy_mpc_replan overloads, purge_prior_runs, '
   'start_busy_run(_once), release_unusable_reservations, fit_charge_fault_model, record_event, emit_sdr, '
   'generate_audit_bundle, complete_audit_report and probe_task_completion; the resolver drops its two setting overrides '

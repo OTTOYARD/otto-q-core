@@ -1,6 +1,6 @@
 """db/migrations/0701, the signing key and the engine's destructive doors closed to the browser roles, EXECUTED on a stub.
 
-WHY THIS EXISTS. G432: public.ottoq_resolve_signing_secret returned the HMAC key that signs every event, SDR and audit
+WHY THIS EXISTS. G428: public.ottoq_resolve_signing_secret returned the HMAC key that signs every event, SDR and audit
 bundle to any signed-in caller, the three signers signed whatever a caller asked, and purge, run-start and audit writers
 were callable the same way; the resolver also believed two settings before Vault and cached the key for a whole pooled
 session; and every new public function was born executable by anon, authenticated and PUBLIC. A grant change cannot be
@@ -349,5 +349,5 @@ def test_as_committed_it_refuses_until_chase_says_go():
 
 def test_the_ledger_keeps_the_go_ahead_with_the_change(db):
     note = db.val("SELECT note FROM public.ottoq_cert_lineage WHERE name LIKE '0701%'")
-    assert note.startswith("G432 (db/checks/0438): ")
+    assert note.startswith("G428 (db/checks/0438): ")
     assert note.endswith("Chase's go-ahead (FINDINGS G417): " + STAND_IN), note

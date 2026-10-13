@@ -1,7 +1,7 @@
 -- 0438  **Anyone who signs up could read the key that signs every event, SDR and audit bundle, and sign or purge with
 --        it; the post-apply proof that 0701 closed the key, the signers and the purge, and the surface it leaves,
---        including the 35 doors through which a signed-in caller still gets a system-signed event.** (FINDINGS draft
---        G432, number provisional; G417's grant half.) Measured read-only on 2026-10-13 on the live catalog
+--        including the 35 doors through which a signed-in caller still gets a system-signed event.** (FINDINGS
+--        G428, the study's CI-1; G417's grant half.) Measured read-only on 2026-10-13 on the live catalog
 --        (gxdrcyphqjzjsuhxuqtg, PostgreSQL 17.6) and the API logs, ending 15:19 UTC (10:19 AM CT, read from the clock
 --        after the last query); re-measured after review from 18:57:27 UTC (1:57 PM CT) to 19:06:30 UTC (2:06 PM CT,
 --        read from the clock), unchanged, with (E) added. Every query below is read-only and none calls the resolver
@@ -47,7 +47,7 @@
 -- ══ §3 WHAT IS NOT PROVED HERE ═══════════════════════════════════════════════════════════════════════════════════
 --
 --   Whether the key was read before 0701. The API logs reach back three days and show no request for the resolver,
---   but the grant has existed since 2026-09-06. Rotating the key is Chase's decision (FINDINGS G432), and it changes
+--   but the grant has existed since 2026-09-06. Rotating the key is Chase's decision (FINDINGS G428), and it changes
 --   every signature from then on, which no atom reads (0701 §3).
 --   That a signed-in caller can no longer get a system signature at all. It cannot read the key or call a signer, but
 --   (E) lists 35 SECURITY DEFINER functions it may still execute that write a signed event (measured 2026-10-13 18:58
