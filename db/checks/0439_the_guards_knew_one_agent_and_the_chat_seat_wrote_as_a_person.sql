@@ -4,15 +4,21 @@
 --        the feed agents passed the rule-10 production guard, the agent_writable guard and the agent envelope as people.
 --        Measured 2026-10-13, read-only, against otto-q-core (gxdrcyphqjzjsuhxuqtg): the first and last live reads
 --        stamped by the database's own clock were 14:47:52 and 15:13:47 UTC (9:47 and 10:13 AM CT). Query (4) was run
---        before 0702 at 15:12:22 UTC and gave the "before" answers in its notes.
+--        before 0702 at 15:12:22 UTC and gave the "before" answers in its notes. Re-read after 0716 landed (applied
+--        18:46:08 UTC, 1:46 PM CT, adding the predicate's sixth caller): the reads stamped 19:03:47 to 19:16:21 UTC
+--        (2:03 to 2:16 PM CT) gave (1)'s six callers, (10)'s "before" answers and every premise of 0702's P0/P1.
 --
--- ══ §1 WHAT WAS MEASURED BEFORE 0702 (reproduce (1)-(5)) ═══════════════════════════════════════════════════════════
+-- ══ §1 WHAT WAS MEASURED BEFORE 0702 (reproduce (1)-(4), (10)) ═══════════════════════════════════════════════════════
 --
 --   (a) The predicate (definition md5 f349c63ad2c48b7756633024d6da263b, IMMUTABLE, SECURITY INVOKER): with no list the
---       actors are ARRAY['ottoq_prime']. Five callers, comment-stripped: ottoq_policy_set (0432 guard), ottoq_dial_clamp
+--       actors are ARRAY['ottoq_prime']. Six callers, comment-stripped: ottoq_policy_set (0432 guard), ottoq_dial_clamp
 --       (0414 envelope), ottoq_production_write_refusal (0629, rule 10), ottoq_production_start (inherited-settings
---       report), ottoq_rule_eval_agent_dial_envelope (AI.001, its own list from the rule's parameters, ["ottoq_prime"]).
---       No index, constraint, default or view depends on it. (1)
+--       report), ottoq_rule_eval_agent_dial_envelope (AI.001, its own list from the rule's parameters, ["ottoq_prime"]),
+--       and since 0716 ottoq_feed_plan_promote (only a person makes a twin feed plan active; SECURITY DEFINER). The
+--       promote door also decides by literal patterns of its own: v_by ILIKE 'nemotron%', '%agent%' or 'ottocommand%'.
+--       Those only add refusals, so it is at least as strict as the setter; before 0702 it let 'cil' and
+--       'auto_learning_loop' promote. The only other literal agent list is ARRAY['ottoq_prime'], in the predicate and in
+--       AI.001's fallback. No index, constraint, default or view depends on the predicate. (1), (10)
 --   (b) ottoq_policy_set's p_by defaults to 'ottocommand'. Of its 11 call sites in the database, one names nobody:
 --       ottoq_fr1_cert_arm, a retired benchmark procedure on the benchmark depot, called by nothing, whose PERFORMed
 --       energy_mpc_follow write stands as 'ottocommand' (2026-07-15, on a run that no longer exists). 5 cron jobs call
@@ -32,12 +38,14 @@
 --       0.25 (the engine floor; the agent floor is 0.30); on a twin run it could write deploy_peak_fraction, which no
 --       agent may; AI.001 said "actor ottocommand is not an agent". (4) reproduces the read-only half of this.
 --
--- ══ §2 WHAT 0702 DOES, AND WHAT EACH QUERY BELOW MUST RETURN AFTER IT (reproduce (6)-(12)) ═════════════════════════
+-- ══ §2 WHAT 0702 DOES, AND WHAT EACH QUERY BELOW MUST RETURN AFTER IT (reproduce (5)-(10)) ═══════════════════════════
 --
 --   public.ottoq_agent_actors (7 rows, append-only, RLS, SELECT for service_role only); the predicate reads it with no
---   list (ottoq_prime kept as a floor; a list passed is the list alone, as before), STABLE SECURITY DEFINER; AI.001
---   judges a registry name or a parameter name; FR1 names itself; the production guard's comment. Each query below says
---   what it must return. A query that returns anything else is a finding.
+--   list (ottoq_prime kept as a floor; a list passed is the list alone, as before), STABLE SECURITY DEFINER, executable
+--   by anon, authenticated, service_role and supabase_read_only_user, no longer by PUBLIC; AI.001 judges a registry name
+--   or a parameter name; FR1 names itself; the production guard's comment. The promote door is not changed and refuses
+--   'cil' and 'auto_learning_loop' through the predicate. Each query below says what it must return. A query that
+--   returns anything else is a finding.
 --
 -- ══ §3 WHAT 0702 DOES NOT CLAIM ═══════════════════════════════════════════════════════════════════════════════════
 --
@@ -49,6 +57,13 @@
 --     the twin depot the only test site, and that edge function is not changed here.
 --   - Owner agents (0605, 0700) write owner_settings through the gateway, never ottoq_policy_set; an owner's requirement
 --     is the owner's (rule 9), outside this guard by design.
+--   - "SELECT for service_role only" is a statement about grants. A member of pg_read_all_data that bypasses row
+--     security reads the registry whatever its grants say (supabase_read_only_user and supabase_etl_admin on live).
+--   - The platform's own service roles (dashboard_user, pgbouncer, supabase_*_admin, supabase_privileged_role) reached
+--     the predicate only through PUBLIC and no longer do; a guard called as one of them now fails "permission denied".
+--     None of them issued a statement naming a guard or the predicate since pg_stat_statements' reset on 2026-07-30.
+--   - An explicit p_by NULL still reads as a person (the predicate compares COALESCE(p_by, '')); only an omitted p_by is
+--     the chat seat's. A write that names nobody is still recorded under updated_by 'ottocommand'.
 
 -- ══ queries (read-only) ══
 
@@ -62,7 +77,7 @@ SELECT p.oid::regprocedure AS caller
    AND p.oid <> 'public.ottoq_is_agent_actor(text,text[])'::regprocedure
    AND regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'gs'), '--[^\n]*', '', 'g') ~ 'ottoq_is_agent_actor\s*\('
  ORDER BY 1;
---   must return, after 0702: the five callers named in §1(a), unchanged.
+--   must return, after 0702: the six callers named in §1(a), unchanged.
 SELECT count(*) AS dependents FROM pg_depend d
  WHERE d.refclassid = 'pg_proc'::regclass AND d.refobjid = 'public.ottoq_is_agent_actor(text,text[])'::regprocedure;
 --   must return 0.
@@ -134,8 +149,9 @@ SELECT actor, kind, added_in, added_at, left(note, 100) AS note FROM public.otto
 SELECT r AS role, has_table_privilege(r, 'public.ottoq_agent_actors', 'SELECT') AS sel,
        has_table_privilege(r, 'public.ottoq_agent_actors', 'INSERT,UPDATE,DELETE,TRUNCATE') AS write,
        has_function_privilege(r, 'public.ottoq_is_agent_actor(text,text[])', 'EXECUTE') AS predicate
-  FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) r;
---   must return: anon f f t; authenticated f f t; service_role t f t.
+  FROM unnest(ARRAY['anon', 'authenticated', 'service_role', 'supabase_read_only_user', 'dashboard_user']) r;
+--   must return: anon f f t; authenticated f f t; service_role t f t; supabase_read_only_user t f t (its SELECT is
+--   pg_read_all_data's, not a grant); dashboard_user f f f (it had the predicate only through PUBLIC).
 SELECT c.relrowsecurity, (SELECT string_agg(polname, ',') FROM pg_policy WHERE polrelid = c.oid) AS policies,
        (SELECT string_agg(tgname, ',' ORDER BY tgname) FROM pg_trigger WHERE tgrelid = c.oid AND NOT tgisinternal) AS triggers,
        c.relacl::text
@@ -196,3 +212,23 @@ SELECT pp.* FROM public.ottoq_policy_params pp JOIN public.ottoq_sim_runs r ON r
    AND pp.updated_at >= (SELECT classified_at FROM public.ottoq_cert_lineage
                           WHERE name = '0702_the_production_guard_knows_every_agent_by_name');
 --   must return 0 rows.
+
+-- (10) 0716's promote door: still asks the predicate, and whom it refuses (the door's own test, read-only; the door itself
+--      writes, so it is not called here)
+SELECT now() AS read_at,
+       strpos(regexp_replace(regexp_replace(pg_get_functiondef('public.ottoq_feed_plan_promote(uuid,text,text)'::regprocedure),
+                                            '/\*.*?\*/', '', 'gs'), '--[^\n]*', '', 'g'),
+              'public.ottoq_is_agent_actor(v_by) OR v_by ILIKE ''nemotron%'' OR v_by ILIKE ''%agent%'' OR v_by ILIKE ''ottocommand%''') > 0
+         AS door_reads_the_predicate;
+--   must return true.
+SELECT n AS name, public.ottoq_is_agent_actor(n) AS predicate,
+       public.ottoq_is_agent_actor(n) OR n ILIKE 'nemotron%' OR n ILIKE '%agent%' OR n ILIKE 'ottocommand%' AS door_refuses
+  FROM unnest(ARRAY['nemotron-3-ultra', 'cil', 'auto_learning_loop', 'ottoq_prime', 'ottocommand', 'chase',
+                    'research_wing:claude_code']) n;
+--   must return, after 0702: door_refuses true for nemotron-3-ultra, cil, auto_learning_loop, ottoq_prime and ottocommand
+--   (predicate true for all five), false for chase and research_wing:claude_code (predicate false).
+--   before 0702 (measured 19:12:15 UTC): cil and auto_learning_loop were predicate f, door_refuses f; nemotron-3-ultra
+--   and ottocommand predicate f, door_refuses t (the door's own patterns); ottoq_prime t, t.
+SELECT count(*) AS promotions FROM public.ottoq_feed_plan_promotions
+ WHERE promoted_by IN (SELECT n FROM unnest(ARRAY['cil', 'auto_learning_loop']) n) OR promoted_by ~ '^(cil|auto_learning_loop):';
+--   must return 0.

@@ -9,17 +9,33 @@
 --   The window: the first and last live reads stamped by the database's own clock, 14:47:52 and 15:13:47 UTC (9:47 and
 --   10:13 AM CT); catalog reads before the first are unstamped. Logs: the 24 hours before a query run between the reads
 --   stamped 14:51:35 and 15:12:22 UTC (the logs tool's default window; its own end was not read).
+--   Re-read after 0716 landed (applied 18:46:08 UTC, 1:46 PM CT): the reads stamped 19:03:47 to 19:16:21 UTC (2:03 to
+--   2:16 PM CT) found the predicate's sixth caller, the grants and roles in §2(c), and every premise of P1 holding, also
+--   after 0562 landed at 19:14:24 UTC (forces_recert TRUE). P0 read 1 in flight at 19:16:01 and 0 at 19:16:21: a recert
+--   after 0562 may hold it, and the file refuses until nothing is in flight.
 --
 --   (a) ONE FUNCTION DECIDES WHO IS AN AGENT, AND IT KNEW ONE NAME. public.ottoq_is_agent_actor(p_by, p_actors DEFAULT
 --       NULL) is TRUE when p_by equals an actor or starts with "<actor>:", and with no list the actors are
---       ARRAY['ottoq_prime'] (definition md5 f349c63ad2c48b7756633024d6da263b, IMMUTABLE). Its callers, comment-stripped:
+--       ARRAY['ottoq_prime'] (definition md5 f349c63ad2c48b7756633024d6da263b, IMMUTABLE). Its callers, comment-stripped,
+--       six since 0716 (applied 18:46:08 UTC, 1:46 PM CT; re-read at 19:03:56 UTC):
 --         ottoq_policy_set                     the 0432 guard: an agent may write only an agent_writable dial
 --         ottoq_dial_clamp                     the 0414 clamp: an agent is held to agent_min_value..agent_max_value
 --         ottoq_production_write_refusal       the 0629 guard (rule 10): no agent write reaches a production session
 --         ottoq_production_start               reports the settings a session inherits that an agent last wrote
 --         ottoq_rule_eval_agent_dial_envelope  AI.001, which passes its own list from the rule's parameters
 --                                              ({"agent_actors": ["ottoq_prime"]})
---       No other function decides it by name (the only literal agent lists are in the predicate and in AI.001's fallback).
+--         ottoq_feed_plan_promote              0716's door (definition md5 a6c7351618b4844c5e61d33e13c89047): only a
+--                                              person makes a twin feed plan version active. It asks the predicate
+--                                              with no list, about the promoter (v_by) and about the plan's author.
+--       Literal tests on a writer's name exist in three places, not one. The predicate's default and AI.001's fallback
+--       are both ARRAY['ottoq_prime']. And 0716's door refuses by patterns of its own as well as by the predicate:
+--       v_by ILIKE 'nemotron%' OR '%agent%' OR 'ottocommand%' (and 'nemotron%' again in its author test). Those
+--       patterns only add refusals on top of the predicate, so the door is at least as strict as the setter: a name with
+--       'agent' in it is refused a promotion and still writes a setting as a person. 0702 leaves the patterns as they
+--       are (one concern per file); after it, the door also refuses 'cil' and 'auto_learning_loop' through the predicate
+--       (V1). The other literal 'nemotron' and 'cil' tests in the database (ottoq_agent_review, ottoq_agent_wake,
+--       ottoq_capture_decision_model_call, ottoq_cil_tick) read a decision's engine or name an event's actor; none of
+--       them decides whether a writer is an agent.
 --
 --   (b) THE AGENTS IT DID NOT KNOW.
 --       - 'ottocommand', the OttoCommand chat seat: edge function ottoq-ottocommand runs an Anthropic model in a tool loop
@@ -41,9 +57,11 @@
 --         production RUN, but a depot-scoped write is read by every run at the depot, a live production session included.
 --         Reachable from OttoCommand's self_improve tool and by RPC. Latent today: ottoq_cil_adoptions holds 0 rows and
 --         the twin depot carries 7 enabled certification columns, so cil_tune_refusal refuses it there.
---       - the feed agents (ottoq-feed-agents, NVIDIA Nemotron 3 Ultra) write ottoq_feed_plans as 'nemotron-3-ultra', and
---         otto-q-api's forecast learning loop writes model_parameters as 'auto_learning_loop'. Neither reaches a setting
---         today; registered so that if one ever does, it is an agent there.
+--       - the feed agents (ottoq-feed-agents, NVIDIA Nemotron 3 Ultra) write ottoq_feed_plans as 'nemotron-3-ultra'
+--         (since 0716 as drafts that only a person promotes), and otto-q-api's forecast learning loop writes
+--         model_parameters as 'auto_learning_loop'. Neither reaches a setting today; registered so that if one ever does,
+--         it is an agent there, and so that 0716's promote door refuses them through the predicate and not only through
+--         its own 'nemotron%' pattern.
 --       Outside agents through the 0559 door write as 'ottoq_prime:agent_gateway:<principal>' and the promoter as
 --       'ottoq_prime:promoter': both were already agents through the prefix. Owner agents (0605, 0700) reach
 --       owner_settings, never ottoq_policy_set: an owner's requirement is the owner's (rule 9), not OTTO-Q's setting.
@@ -79,6 +97,16 @@
 --       (not agent-writable) stands as 'ottocommand' on a run that no longer exists. It PERFORMs the call, discarding the
 --       verdict, so with 'ottocommand' an agent a revived FR1 would silently run without MPC follow. It names itself
 --       here, so its write stays a harness's. No cron job calls the setter without a name (5 call it, all named).
+--       Outside the database, of the 12 repositories on disk no running code calls the setter without a name. Two places
+--       write it without one, and both now fail closed rather than write: ottoyarddepot-sim's armTimings.test.ts:69
+--       describes a person's acceptance step as ottoq_policy_set('global', null, 'robotic_arm_retract_seconds', 9.0), a
+--       dial no agent may write, so that call now returns not_agent_writable (and production_never_self_tunes while a
+--       production session is live): the person passes their own name. And otto-q-workspace's applied 2026-08-12
+--       migration (..._the_arm_only_latches_when_it_actually_found_the_inlet) made twelve unnamed robotic_* writes in a
+--       one-off DO block that is not re-run. One standing 'ottocommand' row is not the chat seat's and not FR1's: depot
+--       energy_reserve_shave = 0 at the benchmark depot, 2026-07-15 14:26 UTC. The chat seat's only setter call writes
+--       energy_demand_factor_peak, so some caller outside the function census (manual SQL, most likely) relied on the
+--       default. The params table keeps only the last writer per key, so callers like that one can be undercounted.
 --
 --   (f) THE SHIELD JUDGED ITS OWN LIST. AI.001 (log_only) reads its actors from its parameters, so after (a) alone the
 --       setter would clamp and refuse the chat seat while the shield's ledger said "actor ottocommand is not an agent".
@@ -92,7 +120,9 @@
 --       Lower-case names only, no '%' or '\' (a wildcard could make every engine name an agent). Append-only: UPDATE,
 --       DELETE and TRUNCATE are refused (removing an agent makes its writes a person's), overridable only with
 --       ottoq.agent_actors_unlock=on in a migration that says why. RLS on; SELECT for service_role only; no client role
---       may read or write it; rows are added by a migration (postgres).
+--       may read or write it; rows are added by a migration (postgres). "Only service_role" is true of the grants, not
+--       of every role: members of pg_read_all_data that also bypass row security read it regardless (on live,
+--       supabase_read_only_user and supabase_etl_admin; postgres owns it). Nothing in it is secret (it is this file).
 --   (b) Seven rows: ottoq_prime (llm_agent), ottoq_prime:promoter (self_tuner), ottoq_prime:agent_gateway (llm_agent),
 --       ottocommand (chat_tool), cil (self_tuner), nemotron-3-ultra (feed_agent), auto_learning_loop (self_tuner).
 --   (c) public.ottoq_is_agent_actor, same signature and default: with no list it reads the registry, plus 'ottoq_prime'
@@ -100,14 +130,26 @@
 --       alone, as before. The same equality-or-prefix LIKE test, so every answer for a name the registry does not add is
 --       unchanged (V2 proves it over every name with a standing row and every name that tried in the window). STABLE (it reads a table; nothing depended on
 --       IMMUTABLE: no index, constraint, default or view), SECURITY DEFINER with search_path public, pg_temp (the
---       registry is closed to the roles every guard runs as). EXECUTE: anon, authenticated and service_role as before;
---       PUBLIC revoked (0198: no SECURITY DEFINER function is PUBLIC's). It returns one boolean and writes nothing.
+--       registry is closed to the roles every guard runs as). EXECUTE: anon, authenticated and service_role as before,
+--       and supabase_read_only_user where that role exists; PUBLIC revoked (0198: no SECURITY DEFINER function is
+--       PUBLIC's). It returns one boolean and writes nothing.
+--       What the PUBLIC revoke costs, measured at 19:05:42 UTC: every role on live may execute the guards, all through
+--       PUBLIC, so a role granted neither the predicate nor a role that holds it would now get "permission denied for
+--       function ottoq_is_agent_actor" from inside a guard. supabase_read_only_user is granted explicitly because it is
+--       the read-only diagnostic role (db/checks/0439's queries (3), (4), (8) and (9) call the predicate); it reads the
+--       registry through pg_read_all_data anyway, so the grant gives it nothing new. cli_login_postgres acts as postgres
+--       (SET ROLE) and authenticator as anon, authenticated or service_role, which keep it. The rest are the platform's
+--       service roles (dashboard_user, pgbouncer, supabase_auth_admin, supabase_etl_admin, supabase_functions_admin,
+--       supabase_privileged_role, supabase_realtime_admin, supabase_replication_admin, supabase_storage_admin): they
+--       lose it. pg_stat_statements since its reset on 2026-07-30 shows only service_role (21,322 calls) and postgres
+--       (112) issuing a statement that names any guard or the predicate.
 --   (d) public.ottoq_rule_eval_agent_dial_envelope (AI.001): judges an actor the registry names or its parameters name.
 --   (e) public.ottoq_fr1_cert_arm: passes p_by 'fr1_cert_arm' to its one setter call.
 --   (f) public.ottoq_production_write_refusal: its comment named only ottoq_prime; now it names the registry. Comments
 --       only: the comment-stripped body is unchanged (V5).
---   NOT changed: ottoq_policy_set, ottoq_dial_clamp and ottoq_production_start (their calls already read the predicate
---   with no list, so they read the registry); the setter's default p_by; anything in production that is a person's.
+--   NOT changed: ottoq_policy_set, ottoq_dial_clamp, ottoq_production_start and ottoq_feed_plan_promote (their calls
+--   already read the predicate with no list, so they read the registry); the promote door's own ILIKE patterns; the
+--   setter's default p_by; anything in production that is a person's.
 --
 -- ══ §3 forces_recert FALSE; forces_dial_restart FALSE ═══════════════════════════════════════════════════════════════
 --
@@ -117,13 +159,15 @@
 --   certification arms write their dials directly (0 policy_write attempts on a cert_harness run in the window), and
 --   dial pairs and sweeps write as auto:ab_harness, scenario_loader, 0439_dial_* and 0568_sweep_*. FR1 is not a canon
 --   column and has no caller. AI.001's payload is digested by ottoq_hash_rule_evaluations; it changes only for those
---   four names.
+--   four names. The promote door now also refuses 'cil' and 'auto_learning_loop'; no run reads who promoted a plan, and
+--   no plan has been promoted (ottoq_feed_plan_promotions: 0 rows at 19:04:15 UTC).
 --
 -- ══ §4 ROLLBACK ════════════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   EXECUTE each `definition` in ottoq_schema_snapshots WHERE label = '0702_pre' (CREATE OR REPLACE restores IMMUTABLE,
 --   SECURITY INVOKER and no search_path on the predicate); GRANT EXECUTE ON FUNCTION public.ottoq_is_agent_actor(text,
---   text[]) TO PUBLIC; DELETE FROM ottoq_cert_lineage WHERE name = '0702_the_production_guard_knows_every_agent_by_name'.
+--   text[]) TO PUBLIC (and REVOKE it from supabase_read_only_user, which held it only through PUBLIC before); DELETE FROM
+--   ottoq_cert_lineage WHERE name = '0702_the_production_guard_knows_every_agent_by_name'.
 --   The registry stays (never DROP); nothing reads it once the predicate is restored.
 
 BEGIN;
@@ -180,16 +224,27 @@ BEGIN
                     '''ottocommand'' as this file assumes';
   END IF;
 
-  -- the callers of the predicate are the five this file was written against (comment-stripped; a sixth is re-read)
-  SELECT string_agg(p.oid::regprocedure::text, ' | ' ORDER BY p.oid::regprocedure::text) INTO v_callers
+  -- the callers of the predicate are the six this file was written against (comment-stripped; a seventh is re-read)
+  SELECT string_agg(p.oid::regprocedure::text, ' | ' ORDER BY p.oid::regprocedure::text COLLATE "C") INTO v_callers
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND p.prokind IN ('f', 'p')
      AND p.oid <> 'public.ottoq_is_agent_actor(text,text[])'::regprocedure
      AND regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'gs'), '--[^\n]*', '', 'g') ~ 'ottoq_is_agent_actor\s*\(';
   IF v_callers IS DISTINCT FROM
-     'ottoq_dial_clamp(text,numeric,text) | ottoq_policy_set(text,uuid,text,numeric,text) | ottoq_production_start(uuid) | '
+     'ottoq_dial_clamp(text,numeric,text) | ottoq_feed_plan_promote(uuid,text,text) | '
+     'ottoq_policy_set(text,uuid,text,numeric,text) | ottoq_production_start(uuid) | '
      'ottoq_production_write_refusal(text,uuid,text) | ottoq_rule_eval_agent_dial_envelope(text,uuid,jsonb,jsonb)' THEN
-    RAISE EXCEPTION '0702 P1: the predicate''s callers are not the five read: %', v_callers;
+    RAISE EXCEPTION '0702 P1: the predicate''s callers are not the six read: %', v_callers;
+  END IF;
+
+  -- 0716's promote door asks the predicate with no list, about the promoter and about the author (V1 probes it)
+  v_set := regexp_replace(regexp_replace(pg_get_functiondef('public.ottoq_feed_plan_promote(uuid,text,text)'::regprocedure),
+                                         '/\*.*?\*/', '', 'gs'), '--[^\n]*', '', 'g');
+  IF strpos(v_set, 'public.ottoq_is_agent_actor(v_by)') = 0
+     OR strpos(v_set, 'public.ottoq_is_agent_actor(v_new.authored_by)') = 0
+     OR to_regclass('public.ottoq_feed_plans') IS NULL OR to_regclass('public.ottoq_feed_plan_promotions') IS NULL THEN
+    RAISE EXCEPTION '0702 P1: ottoq_feed_plan_promote does not ask the predicate about the promoter and the author as '
+                    'this file assumes';
   END IF;
 
   -- the one call site of the setter that names nobody is FR1's (a new one would become the chat seat's; re-read it)
@@ -253,14 +308,17 @@ DECLARE
   c_global constant uuid  := '00000000-0000-0000-0000-000000000000';
   c_person constant text  := '0702_probe_person';
   c_params constant jsonb := '{"agent_actors": ["ottoq_prime"]}';   -- AI.001's live parameters (P1)
-  v_prod uuid; v_demo uuid; v_r jsonb := '{}'::jsonb; v_x jsonb; v_arm jsonb; v_msg text;
+  c_plan   constant uuid  := '00000000-0000-0000-0000-000000000702'; -- the promote door's probe plan (rolled back)
+  v_prod uuid; v_demo uuid; v_r jsonb := '{}'::jsonb; v_x jsonb; v_y jsonb; v_arm jsonb; v_msg text; v_name text;
 BEGIN
   SELECT sim_run_id INTO v_prod FROM public.ottoq_sim_runs
    WHERE depot_id = c_twin AND run_by = 'production_live' ORDER BY started_at DESC LIMIT 1;
+  --: an operator run that is over: the probes upsert its run-scope rows, and a running run's agent writes the same keys
   SELECT sim_run_id INTO v_demo FROM public.ottoq_sim_runs
-   WHERE depot_id = c_twin AND run_by = 'operator_demo' ORDER BY started_at DESC LIMIT 1;
+   WHERE depot_id = c_twin AND run_by = 'operator_demo' AND status NOT IN ('running', 'paused')
+   ORDER BY started_at DESC LIMIT 1;
   IF v_prod IS NULL OR v_demo IS NULL THEN
-    RAISE EXCEPTION '0702 probe: the twin depot has no production run or no operator run to probe';
+    RAISE EXCEPTION '0702 probe: the twin depot has no production run or no finished operator run to probe';
   END IF;
 
   -- AI.001's verdicts (read-only), with the live rule's parameters
@@ -325,11 +383,32 @@ BEGIN
     v_x := v_x || jsonb_build_object('person_depot', public.ottoq_policy_set('depot', c_twin, 'energy_demand_factor_peak', 0.5,
                                                                               c_person));
     v_r := v_r || jsonb_build_object('live_session', v_x);
+
+    -- (4) 0716's promote door: a draft twin feed plan of the probe's own (no real plan is touched), and who may make it
+    --     active. Each promotion rolls itself back, so every name is asked about the same draft.
+    INSERT INTO public.ottoq_feed_plans (plan_id, var_key, version, status, method, plan, provenance, authored_by, rationale)
+    VALUES (c_plan, '__0702_probe', 1, 'draft', 'probe', '{}'::jsonb, '{}'::jsonb, 'nemotron-3-ultra', '0702 probe');
+    v_x := '{}'::jsonb;
+    FOREACH v_name IN ARRAY ARRAY['nemotron-3-ultra', 'cil', 'auto_learning_loop', 'ottoq_prime', c_person] LOOP
+      BEGIN
+        v_y := public.ottoq_feed_plan_promote(c_plan, v_name, '0702 probe: who may promote a twin feed plan');
+        v_x := v_x || jsonb_build_object(v_name, jsonb_build_object('promoted', v_y));
+        RAISE EXCEPTION USING ERRCODE = 'P0702', MESSAGE = '0702 promote probe rolled back';
+      EXCEPTION
+        WHEN insufficient_privilege THEN v_x := v_x || jsonb_build_object(v_name, jsonb_build_object('refused', SQLERRM));
+        WHEN SQLSTATE 'P0702' THEN NULL;
+      END;
+    END LOOP;
+    v_r := v_r || jsonb_build_object('promote', v_x);
     RAISE EXCEPTION '0702 PROBED';
   EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM;
   END;
   IF v_msg IS DISTINCT FROM '0702 PROBED' THEN
     RAISE EXCEPTION '0702 probe % failed: %', p_phase, v_msg;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.ottoq_feed_plans WHERE plan_id = c_plan OR var_key = '__0702_probe')
+     OR EXISTS (SELECT 1 FROM public.ottoq_feed_plan_promotions WHERE plan_id = c_plan) THEN
+    RAISE EXCEPTION '0702 probe %: the promote door''s probe plan survived its rollback', p_phase;
   END IF;
   INSERT INTO p0702 VALUES (p_phase, v_r);
 END $fn$;
@@ -381,12 +460,20 @@ BEGIN
      OR v #>> '{twin_run,ottocommand_not_writable,ok}' IS DISTINCT FROM 'true'
      OR v #>> '{twin_run,cil_not_writable,ok}' IS DISTINCT FROM 'true'
      OR v #>> '{ai001,ottocommand,reason}' IS DISTINCT FROM 'actor ottocommand is not an agent'
-     OR v #>> '{prod_run,ottoq_prime,error}' IS DISTINCT FROM 'production_never_self_tunes' THEN
+     OR v #>> '{prod_run,ottoq_prime,error}' IS DISTINCT FROM 'production_never_self_tunes'
+     -- 0716's door: the feed agent and the agent refused, the self-tuners and a person let through
+     OR v #>> '{promote,nemotron-3-ultra,refused}' IS NULL
+     OR v #>> '{promote,ottoq_prime,refused}' IS NULL
+     OR v #>> '{promote,cil,promoted,ok}' IS DISTINCT FROM 'true'
+     OR v #>> '{promote,auto_learning_loop,promoted,ok}' IS DISTINCT FROM 'true'
+     OR v #>> '{promote,0702_probe_person,promoted,ok}' IS DISTINCT FROM 'true' THEN
     RAISE EXCEPTION '0702 P2: the live guards did not treat the chat seat and the self-tuner as people (%); this file''s '
                     'premise is wrong', v;
   END IF;
-  RAISE NOTICE '0702 P2: before: the chat seat on production run: %; its depot write in a live session: %; AI.001: %',
-    v #> '{prod_run,ottocommand}', v #> '{live_session,ottocommand_depot}', v #>> '{ai001,ottocommand,reason}';
+  RAISE NOTICE '0702 P2: before: the chat seat on production run: %; its depot write in a live session: %; AI.001: %; '
+               'the promote door for cil: %',
+    v #> '{prod_run,ottocommand}', v #> '{live_session,ottocommand_depot}', v #>> '{ai001,ottocommand,reason}',
+    v #> '{promote,cil}';
 END $p2$;
 
 -- ══ (a) the registry ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -407,7 +494,8 @@ COMMENT ON TABLE public.ottoq_agent_actors IS
 '0702 (CLAUDE.md rule 10). Every writer that is an agent, not a person: an LLM agent, a self-tuner, a feed agent or a chat '
 'tool. public.ottoq_is_agent_actor reads it (with ottoq_prime as a floor) for every guard that asks: the agent_writable '
 'guard and the envelope clamp in ottoq_policy_set, the production guard (ottoq_production_write_refusal: in production no '
-'setting changes under an agent''s name), production_start''s report and AI.001. A row names p_by equal to `actor` or '
+'setting changes under an agent''s name), production_start''s report, AI.001 and 0716''s feed plan promote door (only a '
+'person makes a twin feed plan active). A row names p_by equal to `actor` or '
 'starting "<actor>:". Append-only (removing an agent makes its writes a person''s; override: ottoq.agent_actors_unlock=on, '
 'in a migration that says why). Read by service_role; added to by a migration.';
 
@@ -462,11 +550,12 @@ INSERT INTO public.ottoq_agent_actors (actor, kind, note, added_in) VALUES
    'not a depot write another run reads. Called by OttoCommand''s self_improve tool and by RPC.', '0702'),
   ('nemotron-3-ultra', 'feed_agent',
    'The twin''s feed agents (edge function ottoq-feed-agents, NVIDIA Nemotron 3 Ultra) rewrite simulation sampling plans in '
-   'ottoq_feed_plans as authored_by nemotron-3-ultra. They reach no setting today; listed so that if one ever does, it is '
-   'an agent there.', '0702'),
+   'ottoq_feed_plans as authored_by nemotron-3-ultra, as drafts since 0716. They reach no setting today; listed so that if '
+   'one ever does, it is an agent there, and so that 0716''s promote door (ottoq_feed_plan_promote) refuses them through '
+   'this registry and not only through its own nemotron% pattern.', '0702'),
   ('auto_learning_loop', 'self_tuner',
    'otto-q-api''s forecast learning loop retunes model_parameters as tuned_by auto_learning_loop. It reaches no setting '
-   'today; listed so that if it ever does, it is an agent there.', '0702');
+   'today; listed so that if it ever does, it is an agent there. 0716''s promote door refuses it through this row.', '0702');
 
 -- ══ (c) the predicate reads the registry ══════════════════════════════════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION public.ottoq_is_agent_actor(p_by text, p_actors text[] DEFAULT NULL::text[])
@@ -492,10 +581,19 @@ $function$;
 COMMENT ON FUNCTION public.ottoq_is_agent_actor(text, text[]) IS
 '0702. TRUE when p_by names an agent: equal to an actor or "<actor>:..." for an actor in public.ottoq_agent_actors (or '
 'ottoq_prime), or in p_actors when a list is passed. Read by ottoq_policy_set (agent_writable guard), ottoq_dial_clamp '
-'(agent envelope), ottoq_production_write_refusal (rule 10), ottoq_production_start and AI.001.';
+'(agent envelope), ottoq_production_write_refusal (rule 10), ottoq_production_start, AI.001 and ottoq_feed_plan_promote '
+'(0716).';
 
 REVOKE ALL ON FUNCTION public.ottoq_is_agent_actor(text, text[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.ottoq_is_agent_actor(text, text[]) TO anon, authenticated, service_role;
+--: the read-only diagnostic role reached the guards and the predicate through PUBLIC; it keeps the predicate by name
+--: (it reads the registry through pg_read_all_data anyway). The platform's service roles lose it: §2(c).
+DO $ro$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_read_only_user') THEN
+    GRANT EXECUTE ON FUNCTION public.ottoq_is_agent_actor(text, text[]) TO supabase_read_only_user;
+  END IF;
+END $ro$;
 
 -- ══ (d)-(f) the anchored patches: each anchor once, each stored definition read back as patched ══════════════════════
 CREATE TEMP TABLE _0702_patch (fn text, seq int, c_old text, c_new text) ON COMMIT DROP;
@@ -592,11 +690,19 @@ BEGIN
      OR a #>> '{ai001,cil_not_writable,suggested_action}' IS DISTINCT FROM 'set_agent_writable_or_block_the_actor' THEN
     RAISE EXCEPTION '0702 V1 FAILED: AI.001 does not judge the chat seat or the self-tuner: %', a -> 'ai001';
   END IF;
+  -- 0716's door: it only gets stricter. The self-tuners are refused now, through the predicate
+  IF a #>> '{promote,cil,refused}'
+       IS DISTINCT FROM 'ottoq_feed_plan_promote: cil is an agent; a person promotes a feed plan (0716, rule 10)'
+     OR a #>> '{promote,auto_learning_loop,refused}'
+       IS DISTINCT FROM 'ottoq_feed_plan_promote: auto_learning_loop is an agent; a person promotes a feed plan (0716, rule 10)' THEN
+    RAISE EXCEPTION '0702 V1 FAILED: the promote door does not refuse the self-tuners: %', a -> 'promote';
+  END IF;
   -- ottoq_prime, its gateway and promoter, the 0629 arm and a person: byte for byte as before
   FOREACH k IN ARRAY ARRAY['{arm}', '{prod_run,ottoq_prime}', '{prod_run,gateway}', '{prod_run,person}',
                            '{twin_run,ottoq_prime_low}', '{twin_run,ottoq_prime_not_writable}', '{twin_run,person_low}',
                            '{twin_run,person_not_writable}', '{live_session,ottoq_prime_depot}', '{live_session,person_depot}',
-                           '{ai001,ottoq_prime}', '{ai001,promoter}', '{ai001,person}'] LOOP
+                           '{ai001,ottoq_prime}', '{ai001,promoter}', '{ai001,person}', '{promote,nemotron-3-ultra}',
+                           '{promote,ottoq_prime}', '{promote,0702_probe_person}'] LOOP
     IF a #> k::text[] IS DISTINCT FROM b #> k::text[] OR a #> k::text[] IS NULL THEN
       RAISE EXCEPTION '0702 V1 FAILED: % moved: % -> %', k, b #> k::text[], a #> k::text[];
     END IF;
@@ -612,7 +718,11 @@ BEGIN
      OR a #>> '{prod_run,person,ok}' IS DISTINCT FROM 'true' OR a #>> '{live_session,person_depot,ok}' IS DISTINCT FROM 'true' THEN
     RAISE EXCEPTION '0702 V1 FAILED: 0629''s arm or a person''s write did not land: %', a;
   END IF;
-  RAISE NOTICE '0702 V1 PASSED: the chat seat on a production run: %; its depot write in a live session: %; on a twin run: %; all rolled back',
+  IF a #>> '{promote,0702_probe_person,promoted,ok}' IS DISTINCT FROM 'true' THEN
+    RAISE EXCEPTION '0702 V1 FAILED: a person may no longer promote a feed plan: %', a -> 'promote';
+  END IF;
+  RAISE NOTICE '0702 V1 PASSED: the chat seat on a production run: %; its depot write in a live session: %; on a twin run: %; '
+               'the promote door refuses cil and auto_learning_loop and lets a person through; all rolled back',
     a #>> '{prod_run,ottocommand,error}', a #>> '{live_session,ottocommand_depot,reason}',
     a #>> '{twin_run,ottocommand_low,applied}';
 END $v1$;
@@ -755,8 +865,11 @@ BEGIN
      OR v_svc IS DISTINCT FROM 'AS service_role|registry read 7|predicate agent' THEN
     RAISE EXCEPTION '0702 V4 FAILED: % / % / %', v_anon, v_auth, v_svc;
   END IF;
-  -- every client role that may call a guard may call the predicate it reads (0629's V6), and PUBLIC may not
-  FOREACH r IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
+  -- every client role, and the read-only diagnostic role, that may call a guard may call the predicate it reads (0629's
+  -- V6), and PUBLIC may not. (The five are the SECURITY INVOKER callers: their call runs as the caller. 0716's promote
+  -- door is SECURITY DEFINER, so its call runs as its owner, postgres, whatever role calls the door.)
+  FOREACH r IN ARRAY ARRAY['anon', 'authenticated', 'service_role']
+                     || ARRAY(SELECT rolname::text FROM pg_roles WHERE rolname = 'supabase_read_only_user') LOOP
     FOREACH c IN ARRAY ARRAY['public.ottoq_policy_set(text,uuid,text,numeric,text)', 'public.ottoq_dial_clamp(text,numeric,text)',
                              'public.ottoq_production_write_refusal(text,uuid,text)', 'public.ottoq_production_start(uuid)',
                              'public.ottoq_rule_eval_agent_dial_envelope(text,uuid,jsonb,jsonb)'] LOOP
@@ -768,6 +881,16 @@ BEGIN
   END LOOP;
   IF (SELECT proacl::text FROM pg_proc WHERE oid = 'public.ottoq_is_agent_actor(text,text[])'::regprocedure) ~ '(^|[{,])=X/' THEN
     RAISE EXCEPTION '0702 V4 FAILED: PUBLIC may still call the SECURITY DEFINER predicate';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE oid IN ('public.ottoq_policy_set(text,uuid,text,numeric,text)'::regprocedure,
+                                                 'public.ottoq_dial_clamp(text,numeric,text)'::regprocedure,
+                                                 'public.ottoq_production_write_refusal(text,uuid,text)'::regprocedure,
+                                                 'public.ottoq_production_start(uuid)'::regprocedure,
+                                                 'public.ottoq_rule_eval_agent_dial_envelope(text,uuid,jsonb,jsonb)'::regprocedure)
+                                    AND prosecdef)
+     OR NOT (SELECT prosecdef FROM pg_proc WHERE oid = 'public.ottoq_feed_plan_promote(uuid,text,text)'::regprocedure) THEN
+    RAISE EXCEPTION '0702 V4 FAILED: the five guards are not SECURITY INVOKER or the promote door is not SECURITY DEFINER, '
+                    'as the parity check above assumes';
   END IF;
   RAISE NOTICE '0702 V4 PASSED: % | % | %; rolled back', v_anon, v_auth, v_svc;
 END $v4$;
@@ -810,8 +933,9 @@ VALUES ('0702_the_production_guard_knows_every_agent_by_name', false, false,
   'ottoq_is_agent_actor reads it with no list (ottoq_prime kept as a floor; an explicit list unchanged), STABLE SECURITY '
   'DEFINER; AI.001 judges an actor the registry or its parameters name; ottoq_fr1_cert_arm names itself; the production '
   'guard''s comment. Newly agents: ottocommand (chat seat, and the setter''s default p_by), cil, nemotron-3-ultra, '
-  'auto_learning_loop. FALSE/FALSE: every answer for ottoq_prime and every other name is unchanged (V1, V2); none of the '
-  'four new names writes in a certification arm, a dial pair or a sweep.',
+  'auto_learning_loop (0716''s feed plan promote door, the predicate''s sixth caller, now refuses cil and '
+  'auto_learning_loop too). FALSE/FALSE: every answer for ottoq_prime and every other name is unchanged (V1, V2); none of '
+  'the four new names writes in a certification arm, a dial pair or a sweep.',
   now());
 
 COMMIT;

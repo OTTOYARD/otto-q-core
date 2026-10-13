@@ -6,8 +6,9 @@ and before 0702 it knew one name, 'ottoq_prime'. The OttoCommand chat seat (an L
 and the agent envelope as if they were people. 0702 puts every agent in one registry the predicate reads. Every claim
 it makes is about behaviour, so each is executed here on the live functions' own source: 0629's stub plus 0629 itself
 reproduce the setter, the clamp, the predicate, the refusal and production_start byte for byte, and
-tests/fixtures/agent_actor_registry_stub.sql adds the AI.001 evaluator and the FR1 procedure as live (the first test
-proves all of it by md5):
+tests/fixtures/agent_actor_registry_stub.sql adds the AI.001 evaluator and the FR1 procedure as live, and the feed plan
+table as live so that db/migrations/0716 itself loads next and brings the predicate's sixth caller, the promote door (the
+first test proves all of it by md5):
 
   - in production the chat seat and the self-tuner are refused at run, depot and global scope; a person is not;
   - on a twin run they are held to the agent envelope (0.30, not the engine's 0.25) and refused a dial no agent owns;
@@ -16,7 +17,9 @@ proves all of it by md5):
   - AI.001 judges a registry name and still judges a name its parameters add;
   - the registry is closed to the client roles, append-only, wildcard-free, and one row makes a new agent;
   - production_start reports a setting the chat seat left at the depot;
-  - the file refuses a body it was not written against, refuses a second run, and its rollback restores the old answers.
+  - 0716's promote door only gets stricter: it now refuses the self-tuners as well, and a person still promotes;
+  - the file refuses a body it was not written against, a seventh caller of the predicate and a second run, and its
+    rollback restores the old answers.
 
 It SKIPS where no scratch PostgreSQL is reachable, like tests/test_agent_production_arm_sql.py.
 """
@@ -32,6 +35,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STUB_0629 = os.path.join(ROOT, "tests", "fixtures", "agent_production_arm_stub.sql")
 STUB_0702 = os.path.join(ROOT, "tests", "fixtures", "agent_actor_registry_stub.sql")
 M0629 = os.path.join(ROOT, "db", "migrations", "0629_a_production_session_is_armed_and_no_agent_write_reaches_it.sql")
+M0716 = os.path.join(ROOT, "db", "migrations", "0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql")
 M0702 = os.path.join(ROOT, "db", "migrations", "0702_the_production_guard_knows_every_agent_by_name.sql")
 DEPOT = "11111111-1111-1111-1111-111111111111"
 GLOBAL = "00000000-0000-0000-0000-000000000000"
@@ -49,6 +53,10 @@ LIVE_DEF_MD5 = {
     "public.ottoq_production_write_refusal(text,uuid,text)": "d9e972c68f66b15b7239b256d64d1cee",
     "public.ottoq_rule_eval_agent_dial_envelope(text,uuid,jsonb,jsonb)": "7af6e2b784ec1e358b39f162efe0f31e",
     "public.ottoq_fr1_cert_arm(uuid,bigint,uuid,integer,timestamp with time zone,boolean)": "2c7b9c06574bfff33de5bfe664deba56",
+    # 0716, applied 2026-10-13 18:46:08 UTC; read 19:03:56 UTC
+    "public.ottoq_feed_plan_promote(uuid,text,text)": "a6c7351618b4844c5e61d33e13c89047",
+    "public.ottoq_feed_plans_person_promotes()": "40b8be73d1e13b0a6f0f2e33614d0c3f",
+    "public.ottoq_feed_plan_promotions_append_only()": "e714239334d7e942e97c9cfaf4aad7f0",
 }
 #: md5(prosrc) after 0702, the figures db/checks/0439 asserts on live
 POST_SRC_MD5 = {
@@ -119,6 +127,8 @@ def db():
         assert rc == 0, f"0629 did not apply: {err}"
         rc, err = d.file(STUB_0702)
         assert rc == 0, f"0702's stub did not load: {err}"
+        rc, err = d.file(M0716)
+        assert rc == 0 and "0716 V1-V3 PASSED" in err, f"0716 did not apply: {err}"
         yield d
     finally:
         subprocess.run(["psql", *_conn_args(), "-d", "postgres", "-q", "-c", f"DROP DATABASE IF EXISTS {name} WITH (FORCE)"],
@@ -175,7 +185,8 @@ def test_the_fixture_carries_the_live_bodies(db):
 
 def test_0702_applies_and_its_own_checks_pass(db):
     err = _apply(db)
-    for tag in ("0702 P2: before:", "0702 V1 PASSED", "0702 V2 PASSED", "0702 V4 PASSED"):
+    for tag in ("0702 P2: before:", "0702 V1 PASSED", "0702 V2 PASSED", "0702 V4 PASSED",
+                "the promote door refuses cil and auto_learning_loop and lets a person through"):
         assert tag in err, err
     for sig, want in POST_SRC_MD5.items():
         assert db.val(f"SELECT md5(prosrc) FROM pg_proc WHERE oid = '{sig}'::regprocedure") == want, sig
@@ -184,6 +195,8 @@ def test_0702_applies_and_its_own_checks_pass(db):
     assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0702_pre'") == "4"
     # the probes left nothing behind
     assert db.val("SELECT count(*) FROM public.ottoq_policy_params WHERE updated_by LIKE '0702%'") == "0"
+    assert db.val("SELECT count(*) FROM public.ottoq_feed_plans WHERE var_key = '__0702_probe'") == "0"
+    assert db.val("SELECT count(*) FROM public.ottoq_feed_plan_promotions") == "0"
     assert db.val(f"SELECT status FROM public.ottoq_sim_runs WHERE sim_run_id = '{OLD_PROD}'") == "completed"
 
 
@@ -334,6 +347,42 @@ def test_ai001_judges_the_registry_and_still_its_own_parameters(db):
     assert r["passed"] is False and r["payload"]["judged"] is True
 
 
+# ── 0716's promote door ──
+
+def _promote_rolled_back(d, by):
+    """Who may promote a draft feed plan: 'promoted' or the refusal, with the promotion rolled back."""
+    rc, out, err = d.run(f"""BEGIN;
+        INSERT INTO public.ottoq_feed_plans (plan_id, var_key, version, status, method, plan, provenance, authored_by)
+        VALUES ('00000000-0000-0000-0000-0000000007aa', '__test_probe', 1, 'draft', 'probe', '{{}}', '{{}}',
+                'nemotron-3-ultra');
+        SELECT public.ottoq_feed_plan_promote('00000000-0000-0000-0000-0000000007aa', '{by}', 'reviewed in a test');
+        ROLLBACK;""")
+    if rc == 0:
+        return "promoted" if json.loads(out[-1])["ok"] else out[-1]
+    assert "is an agent" in err, err
+    return "refused"
+
+
+def test_the_promote_door_only_gets_stricter(db):
+    names = ["nemotron-3-ultra", "ottoq_prime", "ottoq_prime:promoter", "ottocommand", "cil", "cil:x",
+             "auto_learning_loop", "chase", "scenario_loader", "research_wing:claude_code"]
+    before = {n: _promote_rolled_back(db, n) for n in names}
+    assert before == {"nemotron-3-ultra": "refused", "ottoq_prime": "refused", "ottoq_prime:promoter": "refused",
+                      "ottocommand": "refused", "cil": "promoted", "cil:x": "promoted", "auto_learning_loop": "promoted",
+                      "chase": "promoted", "scenario_loader": "promoted", "research_wing:claude_code": "promoted"}
+    _apply(db)
+    after = {n: _promote_rolled_back(db, n) for n in names}
+    # the self-tuners are refused now; nothing the door refused before is let through; people still promote
+    assert {n for n in names if before[n] != after[n]} == {"cil", "cil:x", "auto_learning_loop"}
+    assert all(after[n] == "refused" for n in names if before[n] == "refused")
+    assert after["chase"] == after["scenario_loader"] == after["research_wing:claude_code"] == "promoted"
+    # and the real plans are as they were: v4 active, the sourced v1 superseded, nothing promoted
+    assert db.val("""SELECT string_agg(var_key || ':' || version || ':' || status, ',' ORDER BY var_key, version)
+                       FROM public.ottoq_feed_plans""") == \
+        "ambient_temp_c:1:active,charger_fault_repair:1:superseded,charger_fault_repair:4:active"
+    assert db.val("SELECT count(*) FROM public.ottoq_feed_plan_promotions") == "0"
+
+
 # ── the registry ──
 
 def test_the_registry_is_closed_append_only_and_wildcard_free(db):
@@ -393,9 +442,19 @@ def test_the_predicate_is_stable_security_definer_and_not_publics(db):
                            has_function_privilege('anon', oid, 'EXECUTE') || '|' ||
                            has_function_privilege('authenticated', oid, 'EXECUTE') || '|' ||
                            has_function_privilege('service_role', oid, 'EXECUTE') || '|' ||
+                           has_function_privilege('supabase_read_only_user', oid, 'EXECUTE') || '|' ||
                            (proacl::text ~ '(^|[{,])=X/')
                       FROM pg_proc WHERE oid = 'public.ottoq_is_agent_actor(text,text[])'::regprocedure""")
-    assert row == "s|true|search_path=public, pg_temp|true|true|true|false"
+    assert row == "s|true|search_path=public, pg_temp|true|true|true|true|false"
+    # the read-only diagnostic role still reads every guard's answer (db/checks/0439 runs as it)
+    rc, out, err = db.run("""BEGIN; SET LOCAL ROLE supabase_read_only_user;
+                             SELECT public.ottoq_dial_clamp('energy_demand_factor_peak', 0.15, 'ottocommand'); ROLLBACK;""")
+    assert rc == 0 and out[-1] == "0.3", err
+    # a role that reached the predicate only through PUBLIC loses it (the header's measured cost)
+    db.val("DO $r$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dashboard_user') "
+           "THEN CREATE ROLE dashboard_user NOLOGIN; END IF; END $r$")
+    assert db.val("SELECT has_function_privilege('dashboard_user', 'public.ottoq_is_agent_actor(text,text[])', "
+                  "'EXECUTE')") == "f"
 
 
 # ── the migration's own guards ──
@@ -413,6 +472,25 @@ def test_0702_refuses_a_new_caller_that_names_nobody(db):
               BEGIN PERFORM public.ottoq_policy_set('run', p_run, 'energy_mpc_follow', 1); END $f$""")
     rc, err = db.file(M0702)
     assert rc != 0 and "unnamed call sites are not FR1" in err
+
+
+def test_0702_refuses_a_seventh_caller_of_the_predicate(db):
+    db.val("""CREATE FUNCTION public.ottoq_some_new_guard(p_by text) RETURNS boolean LANGUAGE sql STABLE AS $f$
+              SELECT public.ottoq_is_agent_actor(p_by) $f$""")
+    rc, err = db.file(M0702)
+    assert rc != 0 and "0702 P1: the predicate's callers are not the six read" in err, err
+    assert "ottoq_some_new_guard(text)" in err
+    assert db.val("SELECT to_regclass('public.ottoq_agent_actors') IS NULL") == "t"
+
+
+def test_0702_refuses_a_promote_door_that_no_longer_asks_the_predicate(db):
+    # the door as 0716 wrote it, with the author test reading its own pattern only: still a caller, but not as read
+    d = db.json("SELECT to_json(pg_get_functiondef('public.ottoq_feed_plan_promote(uuid,text,text)'::regprocedure))")
+    d = d.replace("OR public.ottoq_is_agent_actor(v_new.authored_by))", ")")
+    rc, _, err = db.run(d)
+    assert rc == 0, err
+    rc, err = db.file(M0702)
+    assert rc != 0 and "ottoq_feed_plan_promote does not ask the predicate" in err, err
 
 
 def test_0702_applies_once(db):

@@ -5,7 +5,43 @@
 -- energy_mpc_follow), a slice of the shield's policy_write log, and the two settings an unnamed or chat-seat writer left
 -- (the 2026-07-15 'ottocommand' rows). Loaded AFTER 0629's stub and 0629 itself, which together reproduce the live
 -- setter, clamp, predicate, refusal and production_start byte for byte (tests/test_agent_actor_registry_sql.py proves it).
+-- Then the table 0716 guards, as live has it (columns, defaults, constraints; read 2026-10-13 19:04:15 UTC), with the
+-- twin's plans in the shape live holds them (charger_fault_repair v1 superseded by the sourced dossier, v4 active by the
+-- feed agent), so that db/migrations/0716 itself can be loaded next: it creates the promote door (the predicate's sixth
+-- caller), its trigger and its evidence table exactly as live holds them (the test proves the md5s), and its own V
+-- block needs an active plan to try to retire. And the read-only diagnostic role as live has it (a member of
+-- pg_read_all_data that bypasses row security), so 0702's grant to it is exercised.
 SET check_function_bodies = off;
+
+DO $roles$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_read_only_user') THEN
+    CREATE ROLE supabase_read_only_user NOLOGIN BYPASSRLS;
+    GRANT pg_read_all_data TO supabase_read_only_user;
+  END IF;
+END $roles$;
+
+CREATE TABLE public.ottoq_run_scope_registry (table_schema text, table_name text, column_name text, class text, note text);
+CREATE TABLE public.ottoq_feed_plans (
+  plan_id     uuid NOT NULL DEFAULT gen_random_uuid(),
+  var_key     text NOT NULL,
+  version     integer NOT NULL,
+  status      text NOT NULL DEFAULT 'active'::text,
+  method      text NOT NULL,
+  plan        jsonb NOT NULL,
+  provenance  jsonb NOT NULL,
+  authored_by text NOT NULL,
+  rationale   text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT ottoq_feed_plans_pkey PRIMARY KEY (plan_id),
+  CONSTRAINT ottoq_feed_plans_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'superseded'::text]))),
+  CONSTRAINT ottoq_feed_plans_var_key_version_key UNIQUE (var_key, version));
+INSERT INTO public.ottoq_feed_plans (plan_id, var_key, version, status, method, plan, provenance, authored_by, rationale) VALUES
+  ('ef4eac4a-d017-42ce-9b98-99112df8dcd7', 'charger_fault_repair', 1, 'superseded', 'quantile_grid',
+   '{"base_session_fault_p": 0.05}', '{}', 'dossier_v1', 'sourced'),
+  ('0dd38d00-710e-4825-aa71-cc61561ab7fd', 'charger_fault_repair', 4, 'active', 'quantile_grid',
+   '{"base_session_fault_p": 0.055}', '{}', 'nemotron-3-ultra', 'fitted to the twin''s own rate'),
+  (gen_random_uuid(), 'ambient_temp_c', 1, 'active', 'profile', '{}', '{}', 'dossier_v1', 'sourced');
 
 CREATE TYPE public.ottoq_rule_result AS (passed boolean, reason text, severity_override text, payload jsonb,
                                          suggested_action text);
