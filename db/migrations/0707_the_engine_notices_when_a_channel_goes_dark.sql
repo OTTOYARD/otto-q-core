@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013193522
 -- migration-name:    the_engine_notices_when_a_channel_goes_dark
 --
 -- 0707  **The engine notices when a channel goes dark.** One function reads six channels: the minute-level cron beats,

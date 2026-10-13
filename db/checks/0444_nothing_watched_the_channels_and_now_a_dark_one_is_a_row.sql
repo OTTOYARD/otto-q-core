@@ -43,6 +43,18 @@
 --
 --   cron.job_run_details: 84,846 rows, 278 MB, one index (runid). The watchdog's cron read takes the newest 1,500
 --   runids through that index: 13.8 ms on live at 19:30 UTC (21 active jobs, 1,500 rows sorted in 121 kB).
+--
+-- ══ §6 AFTER 0707 (applied 20261013193522; reproduce: (7)) ══
+--
+--   The live functions' md5(pg_get_functiondef) equal the committed file's, loaded on scratch PostgreSQL 16:
+--   ottoq_channel_health_read 2b658e4292eb3b74d5f1a8fd27cdcf5e, ottoq_channel_watchdog 38a69e6ff990406e4167d4219b9f59e6.
+--   The apply's own watch, 19:35:22 UTC (2:35 PM CT), on run 02ac27b3 at tick 200: run_tick, agent_passes (74 passes,
+--   the last 1 s ago), cpsat (74 calls in 15 min, all 200), agent_model (18 of 18 answered; the primary failed first on
+--   6) and pg_net (106 replies: 101 2xx, 5 timed out) green; cron red, because the watchdog's own job had not started
+--   yet: a job scheduled a moment ago reads red until its first start, which the record shows. The first cron run,
+--   19:36:00 UTC, took 206 ms and moved cron to amber: "ottoq-recert-runner failed 1 time(s) in the last hour:
+--   canceling statement due to user request", the pair the operator door cancelled at 19:19:24. It stays amber until
+--   that run leaves the hour.
 
 \echo '=== 0444 (1): functions that call out through pg_net, and whether they read the reply ==='
 SELECT n.nspname || '.' || p.proname AS fn,
