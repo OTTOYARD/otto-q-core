@@ -100,6 +100,31 @@
 --   measures is the gate itself: how many passes consult, how many run solver-only, whether the solver-only path that
 --   had never run live writes its decision and evidence correctly, and whether passes still overlap. Results: §10.
 --
+-- ══ §10 THE GATE ON, MEASURED (reproduce: (10)) ══
+--
+--   57188f55 ran 789 ticks to the governor's 540 sim-minute stop at 19:12:00 UTC (2:12 PM CT). 0711 was live from its
+--   start; 0712 from 18:19:32 UTC and 0713 from 18:27:17 UTC, mid-run (both read in §11-§12).
+--
+--                                   176b2912 (shadow, lease 45 s)    57188f55 (gate on, lease 120 s)
+--     agent passes                  79                               287
+--     consulted the model           79                               20 (heartbeat 11, scout 5, charger 2, contract 2, first 1)
+--     solver-only                   0                                267, mean 2,055 ms
+--     passes overlapping another    58                               0
+--     model tokens                  1,985,250                        549,077 (-72%)
+--     fallback passes               6                                0
+--     decision rows = passes        79 = 79                          287 = 287; Nemotron ledger rows = consults 20 = 20
+--     CP-SAT (forward_lex)          0 enacted, 106 refused, 11 sup.  22 enacted, 461 refused, 574 superseded
+--
+--   The solver-only path, which had never run live, wrote its decision and evidence on every one of 267 passes. The
+--   agent's 20 consults: echo 14, advisory 5, no_effect 1; it took no order. Its differing orders were graded 6 times,
+--   all refused by the check, 5 of them missed_win in hindsight (G427 again: on the two runs, 18 graded differing
+--   orders, 11 won in hindsight, the check took 1).
+--
+--   CP-SAT's 22 enactments against 0 are the unexpected result. Behind a 60-second model call the solver ran about
+--   once a minute on a board a minute old; behind the gate it runs every pass, every 2-3 ticks, on a board two seconds
+--   old. That is a mechanism, not yet a measurement: live playback draws a different world after the first tick (0416),
+--   and this is one pair. (G432, a lead.)
+--
 -- ══ §11 A DIAL'S CATALOG DEFAULT IS NOT THE ENGINE'S DEFAULT (reproduce: (11)) -> 0713, 0714 ══
 --
 --   Found writing 0713. public.ottoq_policy_get reads run, depot, global, then the caller's literal, and never the
@@ -273,3 +298,19 @@ SELECT count(*) AS cars, count(*) FILTER (WHERE km_since >= pm_km) AS pm_due, co
        count(*) FILTER (WHERE km_since >= pm_km OR h_since >= cal_h) AS any_due,
        percentile_cont(0.5) WITHIN GROUP (ORDER BY pm_km) AS median_pm_km
   FROM c;
+
+-- (10) the two runs, side by side
+WITH r(id) AS (VALUES ('176b2912-7f91-4700-82e9-bbc42bbad0ff'::uuid), ('57188f55-4503-4c5c-82c8-b42000f73ba2'::uuid)),
+e AS (SELECT *, recorded_at - make_interval(secs => total_ms / 1000.0) AS t0
+        FROM public.ottoq_agent_pass_evidence WHERE sim_run_id IN (SELECT id FROM r))
+SELECT r.id,
+  (SELECT count(*) FROM e WHERE e.sim_run_id = r.id) AS passes,
+  (SELECT count(*) FROM e WHERE e.sim_run_id = r.id AND consulted) AS consulted,
+  (SELECT count(*) FROM e a WHERE a.sim_run_id = r.id AND EXISTS (SELECT 1 FROM e b WHERE b.sim_run_id = r.id
+      AND b.pass_id <> a.pass_id AND b.t0 < a.t0 AND b.recorded_at > a.t0)) AS overlapped,
+  (SELECT sum((usage ->> 'total_tokens')::numeric) FROM e WHERE e.sim_run_id = r.id) AS tokens,
+  (SELECT count(*) FROM public.ottoq_decisions d WHERE d.sim_run_id = r.id AND d.resolved_action_context = 'orchestrator_agent') AS decisions,
+  (SELECT count(*) FROM public.ottoq_model_call_ledger l WHERE l.sim_run_id = r.id AND l.provider = 'nvidia_nemotron') AS nemotron,
+  (SELECT jsonb_object_agg(status, n) FROM (SELECT status, count(*) n FROM public.ottoq_external_proposals p
+      WHERE p.sim_run_id = r.id AND p.source = 'forward_lex' GROUP BY 1) x) AS cpsat
+FROM r;
