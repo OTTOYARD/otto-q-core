@@ -10,6 +10,12 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v30 (the study of 2026-10-13, AV-9; CLAUDE.md rule 9): NO DIRECTIVE SETS A CHARGE TARGET UNDER 100%.
+//      On 2026-10-06 the agent told operators, 101 times on one run, to "charge to 80%+"; 114 distinct directives on
+//      record name an 80% target. The SYSTEM prompt now states the target (100% unless the owner set less) and that the
+//      board's 80% figure ranks who is served first; and every directive passes _shared/agent_rule_nine.ts, which
+//      refuses one that sets a charge target under 100% or skips, defers or shortens a service, and keeps it in the
+//      rejected list with the words it matched.
 // v29 (0703, 0704, 0705; the study of 2026-10-13, docs/AGENT_ARCHITECTURE.md): ONE COORDINATOR, CONSULTED WHEN
 //      SOMETHING CHANGES, AND EVERY PASS KEPT AS EVIDENCE.
 //      * Before spending a model call the pass asks public.ottoq_agent_wake whether anything the agent can act on has
@@ -176,6 +182,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeSolverDirective } from "../_shared/agent_solver_chain.ts";
+import { ruleNineDirective } from "../_shared/agent_rule_nine.ts";
 import { callModelWithRetry } from "../_shared/agent_model_call.ts";
 import { chargeOrderAccepted, chargeQueueOf, normalizeChargeOrder, withChargeOrder } from "../_shared/agent_charge_order.ts";
 import { boardText, classifyPass, leversOf, readWake, sha256Hex, standingObjective, type OutcomeClass, type Wake }
@@ -258,6 +265,7 @@ DIALS (the only keys set_policy accepts; value in [min, max]). Each grounding.ac
 STABILITY: each grounding.actuators[dial] shows last_change {direction, min_ago} and how often your requests were clamped. A dial whose last_change is younger than grounding.stability.reversal_dwell_min may move again ONLY in the same direction — a reversal is rejected. Re-sending the value already in force is rejected as no_change. Values outside [min, max] are clamped, so ask inside the range.
 
 INVIOLABLE: vehicles/chargers are never held back; a vehicle needing charge with a free charger charges immediately; you communicate — you never move vehicles.
+CHARGE TARGET: every car charges to its owner's target, 100% unless the owner set less, and leaves with every service it needs done. "min ready SoC" and any 80% figure on the board rank who is served first; they are never a charge target and never a reason to release a car. A directive that names a charge target under 100%, or skips, defers or shortens a service or a charge, is refused and recorded.
 
 Return EXACTLY: {"actions":[...],"solver":{"objective":"readiness_first|throughput_first|energy_balanced","why":"<short>"},"rationale":"<3-6 sentences citing board numbers>"} where each action is one of:
   {"type":"set_policy","key":"<dial>","value":<number>,"why":"<short>"}  dials: energy_reserve_shave(0|1) | energy_demand_factor_peak | energy_demand_factor_expensive
@@ -402,7 +410,7 @@ serve(async (req) => {
     async function recordPass(row: Record<string, unknown>): Promise<string | null> {
       try {
         const { error } = await sb.from("ottoq_agent_pass_evidence").insert({
-          chain_id: chainId, seat: "ottoq_prime", agent_version: "v29",
+          chain_id: chainId, seat: "ottoq_prime", agent_version: "v30",
           sim_run_id: run.sim_run_id, depot_id: depot, run_by: run.run_by ?? null,
           trigger_tick: chainTriggerTick, recorded_tick: run.tick_count, sim_clock: run.sim_clock_current,
           wake, ...row,
@@ -437,7 +445,7 @@ serve(async (req) => {
         depot_id: depot, action_context: "task_start", resolved_action_context: "orchestrator_agent",
         entity_type: "depot", entity_id: depot,
         context_frame: { lens: "wake_gate", fr4: true, agent_solver_chain_id: chainId,
-                         agent_chain_trigger_tick: chainTriggerTick, wake, agent_version: "v29" },
+                         agent_chain_trigger_tick: chainTriggerTick, wake, agent_version: "v30" },
         proposed_action: { actions: [], solver: solverDirective, model: "kernel_regime", agent_solver_chain_id: chainId },
         enacted_action: { verb: solverAccepted ? "solve_on_standing_objective" : "no_op", applied: [], queued: [],
                           rejected: [], rationale, solver_handoff: solverHandoff, outcome_class: "solver_only", wake,
@@ -597,6 +605,10 @@ serve(async (req) => {
         // approval requests. v18 filed both under `queued`, next to the real ones.
         else { rejected.push({ ...a, reason: status || "no status in response", result: res }); }
       } else if (a?.type === "directive" && typeof a.text === "string") {
+        // v30 (AV-9, rule 9): an operator reads a directive, so one that sets a charge target under 100% or skips,
+        // defers or shortens a service is refused here and kept, with its text, in the rejected list.
+        const r9 = ruleNineDirective(a.text);
+        if (!r9.ok) { rejected.push({ type: "directive", text: a.text.slice(0, 400), reason: r9.reason, matched: r9.matched }); continue; }
         applied.push({ type: "directive", text: a.text.slice(0, 400), severity: a.severity === "warning" ? "warning" : "info" });
       } else {
         rejected.push({ ...a, reason: "unrecognized action shape" });
@@ -677,7 +689,7 @@ serve(async (req) => {
                                        review: board.review != null, charge_queue: board.charge_queue != null },
                        // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
                        model_attempts: call.attempts,
-                       agent_version: "v29" },
+                       agent_version: "v30" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId,
                          // v23: the order as sent to the door, with any name the board did not hold
@@ -699,7 +711,7 @@ serve(async (req) => {
     // v29 (0703): the prompt by hash, once, and this pass's evidence row
     try {
       await sb.from("ottoq_agent_prompts").upsert(
-        { prompt_sha256: promptSha, agent_version: "v29", prompt_text: system },
+        { prompt_sha256: promptSha, agent_version: "v30", prompt_text: system },
         { onConflict: "prompt_sha256", ignoreDuplicates: true });
     } catch { /* the pass's row names the hash either way */ }
     const evidenceError = await recordPass({

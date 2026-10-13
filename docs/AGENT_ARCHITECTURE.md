@@ -86,6 +86,8 @@ verified controller, and the agent is the high-performance one that can only win
 | `0716` + feed agents v2 | The seven per-run feed agents, OTTO-Q's one existing LLM swarm, used to rewrite the twin's world as the active version (G431). They now propose drafts, and only a person can promote one. | pytest; the edge function was redeployed and now proposes drafts |
 | `0562` | At a recall, the appointment book reserved a free charger for a car still driving back, and the re-optimizer moved returning cars onto fast chargers. Both ignored `prearrival_charge_yields_to_solver`, which every armed run sets to 1. On the two gate runs, 39 chargers were held for cars not yet at the depot, standing empty 152 and 208 charger-minutes. Both functions now read the dial (G293 part 1). | Applied; validation run `02ac27b3` |
 | `0707` | Nothing watched the engine's channels (G433). A watchdog now reads six channels every minute and records each change of colour: cron beats, the run's tick, agent passes, the model, CP-SAT and pg_net. | pytest with three mutations; live: its first change named a cancelled cron run |
+| `0708` | Whether the check can tell a winning agent order from a losing one is now one call: AUC with a Hanley-McNeil interval, Brier against the base rate, and the distinct keys behind it. The promotion gate's second condition now has an instrument. Its first reading is no: 0.534, interval [0.415, 0.653]. | pytest against an independent computation, mutation-tested |
+| agent `v30` + `0717` | Rule 9 (G434). 114 distinct directives had told operators to charge to 80%, because the board called 80% a "ready floor". The board now calls it a priority band. The prompt states the 100% target. A directive that sets a lower target or skips a service is refused. | node tests on the 15 real directive templates; live: the deployed prompt's hash equals the repo's |
 | `0706` (pending) | The agent order that stands is the one built from the newest board, so an outranked order never comes back (the study's DC-6). | Reviewed and ready to apply; it waits for a run with the agent's order switched on to stop |
 
 ## What the gate-on run measured
@@ -118,6 +120,8 @@ Any additional agent, whether a per-vehicle LLM, a specialist or a swarm, ships 
 
 1. **Its outputs are recorded and replayable**: the 0703 record, per seat.
 2. **The disposer discriminates**: the AUC interval of the check's win probability excludes 0.5 on graded decisions.
+   `ottoq_disposer_discrimination()` (0708) computes it. On 2026-10-13 it read AUC 0.534, interval [0.415, 0.653], over
+   91 decisions from 6 distinct keys, with a Brier score worse than the base rate. The check does not discriminate.
 3. **An ablation beats the noise floor**: a deterministic paired agent-on/off comparison over at least 10 distinct (scenario,
    seed) keys, counted by distinct keys and not by rows (0339).
 4. **It is registered**: an identity, the contexts it may propose into, and its hit rate by proposal id.
@@ -127,12 +131,17 @@ request, a technician's note. None of the twin's event types is unstructured tod
 
 ## What a person decides
 
-- **Turning the wake gate on** (`agent_wake_enabled`) for demos and production. It cuts consults by about two-thirds, at the cost of
-  about half the agent's differing orders, whose value the check cannot yet establish.
+- **Turning the wake gate on** (`agent_wake_enabled`) for demos and production. On `57188f55` it cut consults from every
+  pass to 21 of 288 and model tokens by 71%. The orders it skips are ones whose value the check cannot establish (0708).
 - **The NVIDIA endpoint.** The primary model failed a third of its attempts on `176b2912`. A dedicated deployment, or a
   batch-invariant self-hosted one, is a cost decision.
-- **The security items** in the study's blind spots: rotating the signing secret and closing open sign-up. Those are Chase's
-  calls. Migration 0701, which revokes the grants, is drafted and reviewed separately.
+- **The security items.** Rotating the signing secret and closing open sign-up are Chase's calls. Three reviewed changes
+  wait on him as draft PRs:
+  - **0701 (#242)** revokes the grants that let any signed-in user read the signing key (G428). It refuses to apply
+    until his go-ahead is pasted into it.
+  - **The blackbox credential (#243)** closes `ottoq-run-blackbox`, which serves whole runs and engine source to anyone
+    with its address. Deploying it breaks the twin's Black Box button until the app sends a key.
+  - **0702 (#241)** gives every guard one registry of agent names, which makes the OttoCommand chat seat an agent.
 - **Rule 9: cars leave with maintenance or calibration due (G430).** 0715 is written and tested but not applied. On busy_day
   the intervals are compressed about a hundredfold, so applying it makes the two service bays the depot's wall. The
   decision is whether to apply it with realistic intervals or with the compression kept.

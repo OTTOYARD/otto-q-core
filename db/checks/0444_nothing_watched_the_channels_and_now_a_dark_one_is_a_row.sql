@@ -1,7 +1,8 @@
 -- 0444  **Nothing watched the channels, and now a dark one is a row.** The premises of db/migrations/0707 (the channel
 --        watchdog), and what to read once it runs. Read-only.
 --
---        Measured 2026-10-13 between 19:22 and 19:31 UTC (2:22-2:31 PM CT), while run 02ac27b3 (busy_day, the twin
+--        Measured 2026-10-13 between 19:22:11 UTC (the commit before the work) and 19:33:59 UTC (the apply's pre-check
+--        now()), 2:22-2:33 PM CT, while run 02ac27b3 (busy_day, the twin
 --        depot, wake gate on) was ticking. Finding G433.
 --
 -- ══ §1 WHO CALLS OUT, AND WHO READS THE REPLY (reproduce: (1)) ══
@@ -27,7 +28,7 @@
 --   recertification runner (job 746) ran 144.6 s, cancelled by the operator door at 19:19:24 (G141). 2 of the last
 --   3,000 runs failed, both "canceling statement due to user request". pg_net, by hour: 15:00 UTC 267 replies, 51 timed
 --   out; 18:00 UTC 350, 18 timed out, 1 error status; 19:00 UTC (part) 109, 6. Every timeout read "Timeout of 20000 ms",
---   the agent dispatch's own timeout. The model ledger, 24 hours to 19:25 UTC: nvidia_nemotron 119 rows, 112 enacted, 6 fallback, 1 noop
+--   the agent dispatch's own timeout. The model ledger, the 24 hours before a read taken between 19:22:11 and 19:25:39 UTC: nvidia_nemotron 119 rows, 112 enacted, 6 fallback, 1 noop
 --   (mean latency 58,186 ms); cpsat_service 347 solved with zero proposals, 52 answered, 28 enacted.
 --
 -- ══ §4 WHAT HEALTHY LOOKS LIKE, FOR THE THRESHOLDS (reproduce: (5)) ══
@@ -42,7 +43,7 @@
 -- ══ §5 THE COST (reproduce: (6)) ══
 --
 --   cron.job_run_details: 84,846 rows, 278 MB, one index (runid). The watchdog's cron read takes the newest 1,500
---   runids through that index: 13.8 ms on live at 19:30 UTC (21 active jobs, 1,500 rows sorted in 121 kB).
+--   runids through that index: 13.8 ms on live, read inside that window (21 active jobs, 1,500 rows sorted in 121 kB).
 --
 -- ══ §6 AFTER 0707 (applied 20261013193522; reproduce: (7)) ══
 --

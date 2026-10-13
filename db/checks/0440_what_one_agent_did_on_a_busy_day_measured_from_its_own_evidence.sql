@@ -117,7 +117,7 @@
 --     decision rows = passes        79 = 79                          287 = 287; Nemotron ledger rows = consults 20 = 20
 --     CP-SAT (forward_lex)          0 enacted, 106 refused, 11 sup.  22 enacted, 461 refused, 574 superseded
 --
---   CORRECTED 19:45 UTC (2:45 PM CT), read back from the evidence: one more consult, a heartbeat (pass 371, 58.3 s,
+--   CORRECTED in the commit of 19:39:26 UTC (2:39 PM CT), read back from the evidence: one more consult, a heartbeat (pass 371, 58.3 s,
 --   27,909 tokens, outcome advisory), was in flight when the governor stopped the run at 19:12:00 and landed 41 s
 --   later. The figures above were read before it landed. Counting it: 21 of 288 passes consulted, tokens -71%.
 --   Every later figure that quotes 72% is the at-the-stop figure.

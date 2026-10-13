@@ -758,6 +758,7 @@ repo_manifest(version, name, file) AS (
     ('20261013151112'::text, 'the_agent_is_consulted_when_something_changes_not_on_every_beat'::text, '0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql'::text),
     ('PENDING'::text, 'the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does'::text, '0706_the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does.sql'::text),
     ('20261013193522'::text, 'the_engine_notices_when_a_channel_goes_dark'::text, '0707_the_engine_notices_when_a_channel_goes_dark.sql'::text),
+    ('20261013195202'::text, 'the_promotion_gate_can_ask_whether_the_check_tells_a_winning_order_from_a_losing_one'::text, '0708_the_promotion_gate_can_ask_whether_the_check_tells_a_winning_order_from_a_losing_one.sql'::text),
     ('20261013152102'::text, 'the_agents_return_wave_counts_this_runs_cars_not_every_run_ever'::text, '0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql'::text),
     ('20261013180020'::text, 'the_wake_gate_reads_the_record_the_claim_reads'::text, '0710_the_wake_gate_reads_the_record_the_claim_reads.sql'::text),
     ('20261013180804'::text, 'the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble'::text, '0711_the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble.sql'::text),
@@ -765,7 +766,8 @@ repo_manifest(version, name, file) AS (
     ('20261013182717'::text, 'one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take'::text, '0713_one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take.sql'::text),
     ('PENDING'::text, 'the_lease_catalog_row_says_what_the_claim_does'::text, '0714_the_lease_catalog_row_says_what_the_claim_does.sql'::text),
     ('PENDING'::text, 'a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves'::text, '0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql'::text),
-    ('20261013184608'::text, 'the_feed_agents_propose_the_twins_world_and_a_person_promotes_it'::text, '0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql'::text)
+    ('20261013184608'::text, 'the_feed_agents_propose_the_twins_world_and_a_person_promotes_it'::text, '0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql'::text),
+    ('20261013201139'::text, 'the_board_calls_eighty_percent_a_priority_band_not_a_floor'::text, '0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
