@@ -659,7 +659,7 @@ repo_manifest(version, name, file) AS (
     ('20261004111417'::text, 'an_outside_agent_asks_through_one_door_and_a_person_decides'::text, '0559_an_outside_agent_asks_through_one_door_and_a_person_decides.sql'::text),
     ('20261004111501'::text, 'the_fleet_owner_cockpit_reads_its_own_agent_requests'::text, '0560_the_fleet_owner_cockpit_reads_its_own_agent_requests.sql'::text),
     ('20260929014318'::text, 'every_charger_stall_is_angled_and_the_database_says_so'::text, '0561_every_charger_stall_is_angled_and_the_database_says_so.sql'::text),
-    ('PENDING'::text, 'a_charger_is_not_held_for_a_car_still_on_its_way_back'::text, '0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql'::text),
+    ('20261013191424'::text, 'a_charger_is_not_held_for_a_car_still_on_its_way_back'::text, '0562_a_charger_is_not_held_for_a_car_still_on_its_way_back.sql'::text),
     ('20260929024700'::text, 'a_manual_start_interrupts_a_running_check'::text, '0564_a_manual_start_interrupts_a_running_check.sql'::text),
     ('20260929183923'::text, 'a_scorecard_that_counts_cars_served'::text, '0565_a_scorecard_that_counts_cars_served.sql'::text),
     ('20260929184316'::text, 'the_scorecard_reads_the_step_a_run_actually_took'::text, '0566_the_scorecard_reads_the_step_a_run_actually_took.sql'::text),
@@ -752,7 +752,20 @@ repo_manifest(version, name, file) AS (
     ('20261010113746'::text, 'the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once'::text, '0696_the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once.sql'::text),
     ('PENDING'::text, 'the_charger_back_end_hears_the_twins_chargers_through_a_relay'::text, '0697_the_charger_back_end_hears_the_twins_chargers_through_a_relay.sql'::text),
     ('20261010113923'::text, 'a_new_visit_carries_the_work_the_visit_it_replaces_still_owes'::text, '0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql'::text),
-    ('20261010110724'::text, 'the_twin_apps_determinism_canon_card_reads_again'::text, '0699_the_twin_apps_determinism_canon_card_reads_again.sql'::text)
+    ('20261010110724'::text, 'the_twin_apps_determinism_canon_card_reads_again'::text, '0699_the_twin_apps_determinism_canon_card_reads_again.sql'::text),
+    ('20261013150710'::text, 'every_agent_pass_keeps_what_it_saw_and_what_it_changed'::text, '0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql'::text),
+    ('20261013151002'::text, 'every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find'::text, '0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql'::text),
+    ('20261013151112'::text, 'the_agent_is_consulted_when_something_changes_not_on_every_beat'::text, '0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql'::text),
+    ('PENDING'::text, 'the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does'::text, '0706_the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does.sql'::text),
+    ('20261013193522'::text, 'the_engine_notices_when_a_channel_goes_dark'::text, '0707_the_engine_notices_when_a_channel_goes_dark.sql'::text),
+    ('20261013152102'::text, 'the_agents_return_wave_counts_this_runs_cars_not_every_run_ever'::text, '0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql'::text),
+    ('20261013180020'::text, 'the_wake_gate_reads_the_record_the_claim_reads'::text, '0710_the_wake_gate_reads_the_record_the_claim_reads.sql'::text),
+    ('20261013180804'::text, 'the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble'::text, '0711_the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble.sql'::text),
+    ('20261013181932'::text, 'the_checks_futures_are_drawn_from_the_world_not_from_the_runs_minted_id'::text, '0712_the_checks_futures_are_drawn_from_the_world_not_from_the_runs_minted_id.sql'::text),
+    ('20261013182717'::text, 'one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take'::text, '0713_one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take.sql'::text),
+    ('PENDING'::text, 'the_lease_catalog_row_says_what_the_claim_does'::text, '0714_the_lease_catalog_row_says_what_the_claim_does.sql'::text),
+    ('PENDING'::text, 'a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves'::text, '0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql'::text),
+    ('20261013184608'::text, 'the_feed_agents_propose_the_twins_world_and_a_person_promotes_it'::text, '0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
