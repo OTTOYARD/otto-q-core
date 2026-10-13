@@ -129,12 +129,17 @@ request, a technician's note. None of the twin's event types is unstructured tod
 
 ## What a person decides
 
-- **Turning the wake gate on** (`agent_wake_enabled`) for demos and production. It cuts consults by about two-thirds, at the cost of
-  about half the agent's differing orders, whose value the check cannot yet establish.
+- **Turning the wake gate on** (`agent_wake_enabled`) for demos and production. On `57188f55` it cut consults from every
+  pass to 21 of 288 and model tokens by 71%. The orders it skips are ones whose value the check cannot establish (0708).
 - **The NVIDIA endpoint.** The primary model failed a third of its attempts on `176b2912`. A dedicated deployment, or a
   batch-invariant self-hosted one, is a cost decision.
-- **The security items** in the study's blind spots: rotating the signing secret and closing open sign-up. Those are Chase's
-  calls. Migration 0701, which revokes the grants, is drafted and reviewed separately.
+- **The security items.** Rotating the signing secret and closing open sign-up are Chase's calls. Three reviewed changes
+  wait on him as draft PRs:
+  - **0701 (#242)** revokes the grants that let any signed-in user read the signing key (G428). It refuses to apply
+    until his go-ahead is pasted into it.
+  - **The blackbox credential (#243)** closes `ottoq-run-blackbox`, which serves whole runs and engine source to anyone
+    with its address. Deploying it breaks the twin's Black Box button until the app sends a key.
+  - **0702 (#241)** gives every guard one registry of agent names, which makes the OttoCommand chat seat an agent.
 - **Rule 9: cars leave with maintenance or calibration due (G430).** 0715 is written and tested but not applied. On busy_day
   the intervals are compressed about a hundredfold, so applying it makes the two service bays the depot's wall. The
   decision is whether to apply it with realistic intervals or with the compression kept.
