@@ -2,7 +2,7 @@
 --        deterministic per-vehicle scouts), and what they have found since. Read-only.
 --
 --        0704's header and its live lineage note (classified 2026-10-13) cite this file. It was named then and written
---        later the same day, at 19:40-19:45 UTC (2:40-2:45 PM CT), from the study's stored results and the scouts' own
+--        later the same day, committed 19:39:26 UTC (2:39 PM CT), from the study's stored results and the scouts' own
 --        evidence. The study's engine-side runs (3390752c, 723fa527, b26ccf07: ab_harness, busy_day) are run-scoped
 --        engine data that later demo starts purge; the figures below from them are as the study measured them that
 --        morning, and the scouts' evidence table (class 'evidence', no foreign key) is what survives to re-derive from.
@@ -27,7 +27,7 @@
 --     (rule 9's charge half, expected 0) and stranded_open_must_do (an open visit over 4 sim-hours with a must-do
 --     open and nothing finished in 2).
 --
--- ══ §2 WHAT THE SCOUTS FOUND, BY RUN (reproduce: (1); read 19:41 UTC) ══
+-- ══ §2 WHAT THE SCOUTS FOUND, BY RUN (reproduce: (1); read between the commits of 19:36:49 and 19:39:26 UTC) ══
 --
 --                               176b2912 (shadow)   57188f55 (gate on)   02ac27b3 (0562, running, sim ~3 h in)
 --     contract_wait_breach      126 (101 cars)      129 (98 cars)         48 (48 cars)
