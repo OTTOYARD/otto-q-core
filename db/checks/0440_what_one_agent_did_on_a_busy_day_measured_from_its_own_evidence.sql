@@ -110,6 +110,16 @@
 --   Census of every ottoq_policy_get call with a literal default: 201 dials; the catalog disagrees on 4, at 7 call
 --   sites, all masked today by a global or depot row. (G429)
 --
+-- ══ §12 0712 LIVE, AND WHAT A FIXED DRAW DOES AND DOES NOT BUY (reproduce: (12)) ══
+--
+--   Applied 20261013181932 (1:19 PM CT) with run 57188f55 under way: its orders 842-844 carry the old seed
+--   (run id : tick : chain id), and 845 onward `world:305838298283560562:<tick>`. The stored snapshots still replay as
+--   decided: the study's two flip cases, 382 and 385 (run d9d49732), give take=true, 10 and 11 of 12, under their stored
+--   seeds, as recorded. Under their world seeds 385 is still taken (10 of 12) and 382 is refused -- 8 won, 4 tied, 0
+--   lost, against 10 needed. So 382 sat on the edge of the draw: a fixed seed makes its verdict repeatable, not right.
+--   And note the shape of that refusal: an order that lost none of 12 futures is refused because ties count as not
+--   winning. Whether a tie should count is the comparator's question (G427), not the seed's.
+--
 -- ══ QUERIES ══
 
 -- (1) the record reconciles
@@ -224,3 +234,16 @@ SELECT c.key, cat.default_value AS catalog, c.lit, c.fn,
   FROM calls c LEFT JOIN public.ottoq_policy_param_catalog cat ON cat.param_key = c.key
  WHERE cat.default_value IS DISTINCT FROM c.lit
  ORDER BY 1, 4;
+
+-- (12) the study's two flip cases under their stored seeds and under the world seed
+WITH s AS (SELECT s.*, r.random_seed, o.recorded_tick, o.status AS recorded_status
+             FROM public.ottoq_charge_order_snapshots s JOIN public.ottoq_agent_charge_orders o USING (order_id)
+             JOIN public.ottoq_sim_runs r ON r.sim_run_id = s.sim_run_id
+            WHERE s.order_id IN (382, 385))
+SELECT order_id, recorded_status,
+       public.ottoq_charge_order_verdict_v2(public.ottoq_charge_line_rollout(state, agent_order, futures, seed), win_frac)
+         - 'per' - 'agent' - 'kernel' - 'first' AS under_stored,
+       public.ottoq_charge_order_verdict_v2(public.ottoq_charge_line_rollout(state, agent_order, futures,
+         'world:' || COALESCE(random_seed::text, sim_run_id::text) || ':' || recorded_tick), win_frac)
+         - 'per' - 'agent' - 'kernel' - 'first' AS under_world
+  FROM s ORDER BY order_id;
