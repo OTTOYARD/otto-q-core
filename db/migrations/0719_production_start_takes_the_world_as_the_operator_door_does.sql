@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013211005
 -- migration-name:    production_start_takes_the_world_as_the_operator_door_does
 --
 -- 0719  **A production start takes the world from research work, as the operator door does.** (G437; the study's

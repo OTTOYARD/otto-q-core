@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013210801
 -- migration-name:    production_runs_the_world_phases_the_twin_certifies
 --
 -- 0718  **Production's world step runs the three phases the certified world runs and it never did.** (G436; the

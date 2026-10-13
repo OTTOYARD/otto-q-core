@@ -45,7 +45,20 @@
 --
 --   A rolled-back transaction at the twin depot: a production_live session, a car left on a DCFC stall the way the
 --   stop leaves it with its demate window one minute past, one call to twin.ottoq_world_advance(), then the car moved
---   off. Before 0718: PENDING (the recert sweep held it). After 0718: PENDING.
+--   off. Run after the recert sweep finished (9 of 9 canon columns current, nothing in flight, no run live):
+--
+--                                     before 0718 (def 3489fb13)        after 0718 (def 546fa1ab)
+--     production ticks the probe ran  1                                 1
+--     the car's tether after the tick  still set (21:06:21 UTC, past)    cleared
+--     the fast charger after the tick  occupied, holding the car         available
+--     the fast charger once the car    occupied, holding the car         available
+--       moved off
+--
+--   The before probe ran at 21:07:21 UTC (its tether deadline is now() minus one minute), the after probe once 0718
+--   was applied at 21:08:01 UTC (version 20261013210801). Both rolled back. The live definition after the apply,
+--   546fa1ab9bedd29f7169ee6b4e7c090b, is the md5 of tests/fixtures/world_advance_stub.sql with 0718 applied on scratch.
+--   The owner-orders step is not probed live: ottoq_owner_settings needs a row in ottoq_owner_commands, and the table
+--   holds none; tests/test_world_advance_parity_sql.py shows the call, in its certified place, on the live definition.
 --
 -- ══ QUERIES ══
 

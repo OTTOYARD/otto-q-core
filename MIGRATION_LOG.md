@@ -762,7 +762,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0703](db/migrations/0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql) | `20261013150710` | yes — ledger | **Every agent pass keeps what it saw and what it changed.** An append-only evidence record per pass of the |
 | [0704](db/migrations/0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql) | `20261013151002` | yes — ledger | **Every car has a deterministic scout, and the agent reads what they find.** Six SQL scouts check each car's |
 | [0705](db/migrations/0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql) | `20261013151112` | yes — ledger | **The agent is consulted when something changes, not on every beat.** A deterministic wake test decides, per |
-| [0706](db/migrations/0706_the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does.sql) | `PENDING` | no — pending | **The agent's charge order that stands is the one built from the newest board, not the last one to arrive; an |
+| [0706](db/migrations/0706_the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does.sql) | `20261013210919` | yes — ledger | **The agent's charge order that stands is the one built from the newest board, not the last one to arrive; an |
 | [0707](db/migrations/0707_the_engine_notices_when_a_channel_goes_dark.sql) | `20261013193522` | yes — ledger | **The engine notices when a channel goes dark.** One function reads six channels: the minute-level cron beats, |
 | [0708](db/migrations/0708_the_promotion_gate_can_ask_whether_the_check_tells_a_winning_order_from_a_losing_one.sql) | `20261013195202` | yes — ledger | **The promotion gate can ask, in one call, whether the check tells a winning agent order from a losing one.** |
 | [0709](db/migrations/0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql) | `20261013152102` | yes — ledger | **The agent's return wave counts this run's cars, not every run's.** ottoq_agent_board's `inbound_60m` joined |
@@ -774,8 +774,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0715](db/migrations/0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql) | `PENDING` | no — pending | **A car with preventive maintenance or calibration due gets it before it leaves.** CLAUDE.md rule 9 (Chase, |
 | [0716](db/migrations/0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql) | `20261013184608` | yes — ledger | **The feed agents propose the twin's world; a person promotes it.** Every operator Start fires seven Nemotron |
 | [0717](db/migrations/0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql) | `20261013201139` | yes — ledger | **The agent's board calls a car's 80% a priority band, not a ready floor.** (G434; CLAUDE.md rule 9.) |
-| [0718](db/migrations/0718_production_runs_the_world_phases_the_twin_certifies.sql) | `PENDING` | no — pending | **Production's world step runs the three phases the certified world runs and it never did.** (G436; the |
-| [0719](db/migrations/0719_production_start_takes_the_world_as_the_operator_door_does.sql) | `PENDING` | no — pending | **A production start takes the world from research work, as the operator door does.** (G437; the study's |
+| [0718](db/migrations/0718_production_runs_the_world_phases_the_twin_certifies.sql) | `20261013210801` | yes — ledger | **Production's world step runs the three phases the certified world runs and it never did.** (G436; the |
+| [0719](db/migrations/0719_production_start_takes_the_world_as_the_operator_door_does.sql) | `20261013211005` | yes — ledger | **A production start takes the world from research work, as the operator door does.** (G437; the study's |
 
 538 migrations indexed.
 
