@@ -81,6 +81,8 @@ verified controller, and the agent is the high-performance one that can only win
 | `0709` | The board's return wave counted open dispatches from every run (315-501 "arriving within the hour" with 8 cars on the road). It now counts this run's. | Found by 0703's first evidence row; pytest; V2 proves nothing else in the board moved |
 | `0710` | The wake gate read the evidence row, written about 0.1-5.6 s after the decision row the claim reads, so a pass claimed in that gap woke as `first_consult`. It now reads the decision row. | pytest reproduces the defect, then the fix |
 | edge `v29` | Writes the evidence row, asks the wake gate, and runs the solver-only branch. | node tests; live on both runs |
+| `0712` | The disposer check drew its sampled futures from the run's and the pass's randomly minted ids, so the same order on the same world got different verdicts. It now draws from `world:random_seed:tick`. | pytest reproduces the defect; live: orders after 1:19 PM CT carry `world:` seeds; stored snapshots still replay as decided |
+| `0713` | Passes overlapped (58 of 79) because the claim's lease, 45 s since 0338, was shorter than a pass. The claim's own default is now 130 s. (The catalog row is documentation only, because `ottoq_policy_get` never reads it, G429. Its update, 0714, waits for a person.) | pytest on the live claim; live: 0 overlaps on `57188f55` |
 
 ## What the gate-on run measured
 
@@ -108,3 +110,6 @@ request, a technician's note. None of the twin's event types is unstructured tod
   batch-invariant self-hosted one, is a cost decision.
 - **The security items** in the study's blind spots: rotating the signing secret and closing open sign-up. Those are Chase's
   calls. Migration 0701, which revokes the grants, is drafted and reviewed separately.
+- **Rule 9: cars leave with maintenance or calibration due (G430).** 0715 is written and tested but not applied. On busy_day
+  the intervals are compressed about a hundredfold, so applying it makes the two service bays the depot's wall. The
+  decision is whether to apply it with realistic intervals or with the compression kept.
