@@ -32,6 +32,7 @@ M = {n: os.path.join(ROOT, "db", "migrations", f) for n, f in (
     ("0705", "0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql"),
     ("0709", "0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql"),
     ("0710", "0710_the_wake_gate_reads_the_record_the_claim_reads.sql"),
+    ("0711", "0711_the_wake_gate_wakes_on_a_change_that_matters_not_on_every_wobble.sql"),
 )}
 DEPOT = "11111111-1111-1111-1111-111111111111"
 RUN = "a0000000-0000-0000-0000-000000000704"
@@ -355,3 +356,93 @@ def test_0710_a_run_without_decision_rows_still_reads_the_evidence(db):
     _consult(db, "k1", w["fingerprint"])
     w = _wake(db)
     assert w["wake"] is False and w["last_consult"]["from"] == "evidence", w
+
+
+# ── 0711 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+def _finding(d, car, scout, key):
+    sev = {"departed_below_target": "critical", "stranded_open_must_do": "high"}[scout]
+    d.val(f"""INSERT INTO ottoq_vehicle_scout_findings (sim_run_id, depot_id, vehicle_id, scout, severity, episode_key)
+              VALUES ('{RUN}', '{DEPOT}', '{_id(car)}', '{scout}', '{sev}', '{key}')""")
+
+
+def test_0711_a_wobble_does_not_wake_the_agent_and_an_onset_or_a_jump_does(db):
+    """On run 176b2912 the counts the gate watches moved by one on almost every beat, and 0705's rules would have woken
+    the agent on 66 of 79 replayed passes. 0711 wakes on an onset or a jump of max(5, 20%)."""
+    _world(db)
+    _apply(db, "0703", "0704", "0705", "0710", "0711")
+    db.val(f"INSERT INTO ottoq_policy_params VALUES ('run', '{RUN}', 'agent_wake_enabled', 1, 'test', now())")
+    # the stub's kernel line takes any vehicle id; the contract-wait count joins vehicles, so use the eight cars
+    cars = [_id(n) for n in "ABCDEFGH"]
+
+    def line(n_over):
+        db.val(f"DELETE FROM stub_kernel_line WHERE sim_run_id = '{RUN}'")
+        for k, c in enumerate(cars):
+            db.val(f"INSERT INTO stub_kernel_line VALUES ('{RUN}', '{c}', {k + 1}, {45 if k < n_over else 5}, 50)")
+
+    line(0)
+    w = _wake(db)
+    assert w["hysteresis"] == {"jump_min": 5, "jump_pct": 20, "charger_delta": 2}, w
+    _consult(db, "k1", w["fingerprint"])
+    assert _wake(db)["wake"] is False
+
+    line(1)                                                    # onset: none past the contract wait, then one
+    w = _wake(db)
+    assert w["wake"] is True and "contract_wait" in w["reasons"], w
+    _consult(db, "k2", w["fingerprint"])
+
+    line(2)                                                    # one more: a wobble
+    assert _wake(db)["wake"] is False
+    line(5)                                                    # +4 from the last consult: still under the jump of 5
+    assert _wake(db)["wake"] is False
+    line(6)                                                    # +5: a jump
+    w = _wake(db)
+    assert w["wake"] is True and w["reasons"] == ["contract_wait"], w
+    _consult(db, "k3", w["fingerprint"])
+
+    # one charger flapping does not wake it; two do, either way
+    db.val(f"UPDATE ottoq_ocpp_chargers SET station_state='Faulted' WHERE charger_id='{_id('F1')}'")
+    assert _wake(db)["wake"] is False
+    db.val(f"UPDATE ottoq_ocpp_chargers SET station_state='Faulted' WHERE charger_id='{_id('L1')}'")
+    w = _wake(db)
+    assert w["wake"] is True and "charger_fault" in w["reasons"], w
+    _consult(db, "k4", w["fingerprint"])
+    db.val(f"UPDATE ottoq_ocpp_chargers SET station_state='Available'")
+    w = _wake(db)
+    assert w["wake"] is True and "charger_restored" in w["reasons"], w
+
+
+def test_0711_a_critical_finding_always_wakes_and_stranded_cars_wake_on_onset_or_a_jump(db):
+    _world(db)
+    _apply(db, "0703", "0704", "0705", "0710", "0711")
+    db.val(f"INSERT INTO ottoq_policy_params VALUES ('run', '{RUN}', 'agent_wake_enabled', 1, 'test', now())")
+    _consult(db, "k1", _wake(db)["fingerprint"])
+
+    _finding(db, "A", "stranded_open_must_do", "v1")           # onset
+    w = _wake(db)
+    assert w["wake"] is True and w["reasons"] == ["scout_finding"], w
+    _consult(db, "k2", w["fingerprint"])
+    for k, car in enumerate("BCDE"):                           # +4: under the jump
+        _finding(db, car, "stranded_open_must_do", f"s{k}")
+    assert _wake(db)["wake"] is False
+    _finding(db, "F", "stranded_open_must_do", "s9")           # +5
+    w = _wake(db)
+    assert w["wake"] is True and w["reasons"] == ["scout_finding"], w
+    _consult(db, "k3", w["fingerprint"])
+
+    _finding(db, "G", "departed_below_target", "d1")           # rule 9: never averaged away
+    w = _wake(db)
+    assert w["wake"] is True and w["reasons"] == ["scout_critical"], w
+    assert w["fingerprint"]["scout_critical"] == 1 and w["fingerprint"]["scout_stranded"] == 6, w
+
+
+def test_0711_a_fingerprint_from_before_it_compares_without_a_spurious_stranded_wake(db):
+    _world(db)
+    _apply(db, "0703", "0704", "0705", "0710", "0711")
+    db.val(f"INSERT INTO ottoq_policy_params VALUES ('run', '{RUN}', 'agent_wake_enabled', 1, 'test', now())")
+    for k, car in enumerate("ABCD"):
+        _finding(db, car, "stranded_open_must_do", f"s{k}")
+    fp = _wake(db)["fingerprint"]
+    old = {k: v for k, v in fp.items() if k not in ("scout_critical", "scout_stranded")}   # what 0705 wrote
+    _consult(db, "k1", old)
+    assert _wake(db)["wake"] is False
