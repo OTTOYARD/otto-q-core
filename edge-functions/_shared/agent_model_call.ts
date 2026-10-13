@@ -37,13 +37,31 @@ export type ModelAttempt = {
   wait_ms: number;      // the pause before it
 };
 
+export type ModelUsage = { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+
 export type ModelCallResult = {
   parsed: unknown | null;
   model: string | null;   // the model that answered, null when none did
   raw: string;            // the answer's text, or the last failure in a line
   attempts: ModelAttempt[];
   ms: number;             // the whole call, pauses included
+  // v29 (0703): what the endpoint itself said about the answer. Until v29 the usage block was discarded, so not one
+  // token of the agent's spend was ever recorded, and the served model was never compared with the one asked for.
+  usage?: ModelUsage | null;
+  responseModel?: string | null;  // the "model" field of the response body
+  responseId?: string | null;     // the "id" field of the response body
 };
+
+/** The usage block, numbers only: anything else in it is dropped rather than trusted. */
+export function usageOf(body: unknown): ModelUsage | null {
+  const u = (body as any)?.usage;
+  if (!u || typeof u !== "object") return null;
+  const out: ModelUsage = {};
+  for (const k of ["prompt_tokens", "completion_tokens", "total_tokens"] as const) {
+    if (typeof u[k] === "number" && Number.isFinite(u[k])) out[k] = u[k];
+  }
+  return Object.keys(out).length ? out : null;
+}
 
 export type ModelCallOptions = {
   url: string;
@@ -140,7 +158,9 @@ export async function callModelWithRetry(o: ModelCallOptions): Promise<ModelCall
         const parsed = content ? o.parse(content) : null;
         if (parsed != null) {
           attempts.push({ model, key: key.name, status: "ok", ms: now() - tA, wait_ms: waited });
-          return { parsed, model, raw: content, attempts, ms: now() - t0 };
+          return { parsed, model, raw: content, attempts, ms: now() - t0, usage: usageOf(j),
+                   responseModel: typeof j?.model === "string" ? j.model.slice(0, 200) : null,
+                   responseId: typeof j?.id === "string" ? j.id.slice(0, 200) : null };
         }
         status = "unparseable";
         raw = `unparseable answer from ${model}: ${content.slice(0, 160)}`;

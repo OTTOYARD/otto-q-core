@@ -167,22 +167,25 @@ const code = orchestrator.split("\n").filter((line) => !line.trim().startsWith("
 
 test("v23: the order is recorded before the solver handoff, under the pass's chain id", () => {
   const record = code.indexOf('sb.rpc("ottoq_agent_charge_order_record"');
-  const handoff = code.indexOf("const response = await fetch(solverUrl");
+  // v29: the handoff lives in solverHandoffFor (shared with the solver-only pass); what must follow the order is the
+  // consulted pass's CALL of it, and the function must still be the one that posts to the solver
+  const handoff = code.indexOf("const solverHandoff = await solverHandoffFor(chainId, solverDirective,\n      modelUsed");
   const chain = code.indexOf("const chainId = crypto.randomUUID();");
   assert.ok(record > 0 && handoff > 0 && chain > 0);
   assert.ok(chain < record && record < handoff, "chain id, then the order, then the handoff");
+  assert.match(code, /async function solverHandoffFor\([^)]*\) \{[\s\S]*const response = await fetch\(solverUrl/);
   assert.match(code, /p_chain_id: chainId/);
   assert.match(code, /charge_order: chargeOrderReceipt/);
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v28: the model call goes through the retry module, with the fallback model, and the row says v28", () => {
+test("v23-v29: the model call goes through the retry module, with the fallback model, and the row says v29", () => {
   assert.match(code, /await callModelWithRetry\(/);
   assert.match(code, /models: \[MODEL, FALLBACK_MODEL\]/);
   assert.match(code, /const FALLBACK_MODEL = "nvidia\/nemotron-3-super-120b-a12b";/);
   assert.match(code, /model_attempts: call\.attempts/);
-  assert.match(code, /agent_version: "v28"/);
-  assert.doesNotMatch(code, /agent_version: "v2[234567]"/);
+  assert.match(code, /agent_version: "v29"/);
+  assert.doesNotMatch(code, /agent_version: "v2[2345678]"/);
   // the single-try key loop is gone
   assert.doesNotMatch(code, /for \(const candidate of keys\)/);
   // an accepted order is an enacted action

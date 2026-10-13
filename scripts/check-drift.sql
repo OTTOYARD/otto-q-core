@@ -752,7 +752,10 @@ repo_manifest(version, name, file) AS (
     ('20261010113746'::text, 'the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once'::text, '0696_the_twins_roads_crash_at_the_filed_rate_and_the_cold_is_counted_once.sql'::text),
     ('PENDING'::text, 'the_charger_back_end_hears_the_twins_chargers_through_a_relay'::text, '0697_the_charger_back_end_hears_the_twins_chargers_through_a_relay.sql'::text),
     ('20261010113923'::text, 'a_new_visit_carries_the_work_the_visit_it_replaces_still_owes'::text, '0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql'::text),
-    ('20261010110724'::text, 'the_twin_apps_determinism_canon_card_reads_again'::text, '0699_the_twin_apps_determinism_canon_card_reads_again.sql'::text)
+    ('20261010110724'::text, 'the_twin_apps_determinism_canon_card_reads_again'::text, '0699_the_twin_apps_determinism_canon_card_reads_again.sql'::text),
+    ('PENDING'::text, 'every_agent_pass_keeps_what_it_saw_and_what_it_changed'::text, '0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql'::text),
+    ('PENDING'::text, 'every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find'::text, '0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql'::text),
+    ('PENDING'::text, 'the_agent_is_consulted_when_something_changes_not_on_every_beat'::text, '0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
