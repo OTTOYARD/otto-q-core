@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013182717
 -- migration-name:    one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take
 --
 -- 0713  **One agent pass holds its claim for as long as a pass can take.** ottoq_agent_chain_claim lets a new agent
