@@ -30,6 +30,7 @@ M = {n: os.path.join(ROOT, "db", "migrations", f) for n, f in (
     ("0703", "0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql"),
     ("0704", "0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql"),
     ("0705", "0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql"),
+    ("0709", "0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql"),
 )}
 DEPOT = "11111111-1111-1111-1111-111111111111"
 RUN = "a0000000-0000-0000-0000-000000000704"
@@ -288,3 +289,24 @@ def test_0705_a_broken_wake_test_wakes_rather_than_skips(db):
     db.val("ALTER TABLE public.ottoq_dr_calls RENAME TO ottoq_dr_calls_gone")
     w = _wake(db)
     assert w["wake"] is True and w["reasons"] == ["wake_error"], w
+
+
+# ── 0709 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+def test_0709_the_return_wave_counts_this_runs_cars_only(db):
+    """On run 176b2912 the board said 315-501 cars were due home within the hour; 8 were on the road. An open dispatch
+    left by an earlier run is counted again for the same car unless the board scopes by run."""
+    _world(db)
+    _apply(db, "0703", "0704", "0705")
+    db.val(f"UPDATE vehicles SET current_state='en_route_to_depot' WHERE id IN ('{_id('A')}', '{_id('B')}')")
+    soon = "2026-10-13 15:30:00+00"
+    for car in ("A", "B"):
+        db.val(f"""INSERT INTO ottoq_vehicle_dispatches (vehicle_id, sim_run_id, dispatched_at, scheduled_return_at)
+                   VALUES ('{_id(car)}', '{RUN}', '2026-10-13 14:00:00+00', '{soon}')""")
+    # five stale open dispatches for A from runs that ended with it on the road
+    for k in range(5):
+        db.val(f"""INSERT INTO ottoq_vehicle_dispatches (vehicle_id, sim_run_id, dispatched_at, scheduled_return_at)
+                   VALUES ('{_id('A')}', gen_random_uuid(), '2026-10-0{k + 1} 10:00:00+00', '2026-10-0{k + 1} 11:00:00+00')""")
+    assert db.json(f"SELECT public.ottoq_agent_board('{RUN}')")["inbound_60m"] == 7
+    _apply(db, "0709")
+    assert db.json(f"SELECT public.ottoq_agent_board('{RUN}')")["inbound_60m"] == 2
