@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013201139
 -- migration-name:    the_board_calls_eighty_percent_a_priority_band_not_a_floor
 --
 -- 0717  **The agent's board calls a car's 80% a priority band, not a ready floor.** (G434; CLAUDE.md rule 9.)

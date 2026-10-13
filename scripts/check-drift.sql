@@ -767,7 +767,7 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_lease_catalog_row_says_what_the_claim_does'::text, '0714_the_lease_catalog_row_says_what_the_claim_does.sql'::text),
     ('PENDING'::text, 'a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves'::text, '0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql'::text),
     ('20261013184608'::text, 'the_feed_agents_propose_the_twins_world_and_a_person_promotes_it'::text, '0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql'::text),
-    ('PENDING'::text, 'the_board_calls_eighty_percent_a_priority_band_not_a_floor'::text, '0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql'::text)
+    ('20261013201139'::text, 'the_board_calls_eighty_percent_a_priority_band_not_a_floor'::text, '0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

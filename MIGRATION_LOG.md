@@ -773,7 +773,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0714](db/migrations/0714_the_lease_catalog_row_says_what_the_claim_does.sql) | `PENDING` | no — pending | **The lease's catalog row says what the claim does.** 0713 raised the agent claim's lease from 45 s to 130 s by |
 | [0715](db/migrations/0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql) | `PENDING` | no — pending | **A car with preventive maintenance or calibration due gets it before it leaves.** CLAUDE.md rule 9 (Chase, |
 | [0716](db/migrations/0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql) | `20261013184608` | yes — ledger | **The feed agents propose the twin's world; a person promotes it.** Every operator Start fires seven Nemotron |
-| [0717](db/migrations/0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql) | `PENDING` | no — pending | **The agent's board calls a car's 80% a priority band, not a ready floor.** (G434; CLAUDE.md rule 9.) |
+| [0717](db/migrations/0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql) | `20261013201139` | yes — ledger | **The agent's board calls a car's 80% a priority band, not a ready floor.** (G434; CLAUDE.md rule 9.) |
 
 536 migrations indexed.
 
