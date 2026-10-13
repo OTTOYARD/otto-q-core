@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013181932
 -- migration-name:    the_checks_futures_are_drawn_from_the_world_not_from_the_runs_minted_id
 --
 -- 0712  **The check's futures are drawn from the world, not from the run's minted id.** The kernel's check on an agent's
