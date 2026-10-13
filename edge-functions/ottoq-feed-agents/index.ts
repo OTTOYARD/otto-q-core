@@ -16,6 +16,11 @@
 //     fallback: the current plan activates unchanged. Runs NEVER block.
 //   • Every activation is recorded (ottoq_feed_activations) with the agent's
 //     rationale — the provenance trail is the product.
+//   • v2 (0716, CLAUDE.md rule 10): an adjustment is a PROPOSAL. It is written
+//     as a draft version and never retires the active plan; only a person makes
+//     a version active (public.ottoq_feed_plan_promote). The database enforces
+//     it too: a trigger on ottoq_feed_plans turns an active insert into a draft
+//     and refuses any change to an active plan outside a promotion.
 //
 // Routes:
 //   POST /activate {sim_run_id, dry_run?}  → run all agents for this run
@@ -241,22 +246,27 @@ Return STRICT JSON:
       if (setPath(newPlan, path, Number(v.toFixed(6)))) applied[path] = { from: cur, to: Number(v.toFixed(6)) };
       else rejected[path] = "path set failed";
     }
+    // v2 (0716, rule 10): the agent PROPOSES. Its version is written as a draft and the active plan is left as it is;
+    // only a person makes a version active (public.ottoq_feed_plan_promote). This run ran on planRow, so the activation
+    // below keeps planRow's id, and the proposal's id goes in the notes. The next version number is the table's, not
+    // planRow's + 1, because earlier drafts may already hold it.
     if (Object.keys(applied).length > 0 && !dryRun) {
+      const { data: top } = await sb.from("ottoq_feed_plans").select("version").eq("var_key", varKey)
+        .order("version", { ascending: false }).limit(1).single();
       const { data: inserted, error } = await sb.from("ottoq_feed_plans").insert({
-        var_key: varKey, version: planRow.version + 1, status: "active", method: planRow.method,
+        var_key: varKey, version: Number(top?.version ?? planRow.version) + 1, status: "draft", method: planRow.method,
         plan: newPlan, provenance: planRow.provenance, authored_by: "nemotron-3-ultra",
         rationale: String(verdict.rationale ?? "").slice(0, 2000),
-      }).select("plan_id").single();
+      }).select("plan_id, version").single();
       if (!error && inserted) {
-        await sb.from("ottoq_feed_plans").update({ status: "superseded" }).eq("plan_id", planRow.plan_id);
-        planId = inserted.plan_id;
-      } else { note = `plan insert failed: ${error?.message}`; applied = {}; }
+        note = `proposed ${varKey} v${inserted.version} as a draft (plan_id ${inserted.plan_id}); a person promotes it`;
+      } else { note = `plan proposal failed: ${error?.message}`; applied = {}; }
     }
   }
 
   const agentNotes = [
     verdict?.run_notes ? String(verdict.run_notes).slice(0, 400) : null,
-    Object.keys(applied).length ? `applied: ${JSON.stringify(applied)}` : "plan kept",
+    Object.keys(applied).length ? `proposed (not applied; 0716): ${JSON.stringify(applied)}` : "plan kept",
     Object.keys(rejected).length ? `rejected: ${JSON.stringify(rejected)}` : null,
     verdict?.rationale ? `rationale: ${String(verdict.rationale).slice(0, 800)}` : null,
     note || null,
