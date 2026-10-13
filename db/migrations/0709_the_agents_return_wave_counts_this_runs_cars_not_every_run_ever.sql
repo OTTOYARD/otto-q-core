@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013152102
 -- migration-name:    the_agents_return_wave_counts_this_runs_cars_not_every_run_ever
 --
 -- 0709  **The agent's return wave counts this run's cars, not every run's.** ottoq_agent_board's `inbound_60m` joined

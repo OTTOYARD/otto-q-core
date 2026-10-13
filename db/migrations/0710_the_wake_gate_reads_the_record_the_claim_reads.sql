@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261013180020
 -- migration-name:    the_wake_gate_reads_the_record_the_claim_reads
 --
 -- 0710  **The wake gate reads the record the claim reads.** ottoq_agent_wake (0705) found the agent's last answered

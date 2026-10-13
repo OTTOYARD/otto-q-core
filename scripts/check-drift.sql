@@ -756,7 +756,8 @@ repo_manifest(version, name, file) AS (
     ('20261013150710'::text, 'every_agent_pass_keeps_what_it_saw_and_what_it_changed'::text, '0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql'::text),
     ('20261013151002'::text, 'every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find'::text, '0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql'::text),
     ('20261013151112'::text, 'the_agent_is_consulted_when_something_changes_not_on_every_beat'::text, '0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql'::text),
-    ('PENDING'::text, 'the_agents_return_wave_counts_this_runs_cars_not_every_run_ever'::text, '0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql'::text)
+    ('20261013152102'::text, 'the_agents_return_wave_counts_this_runs_cars_not_every_run_ever'::text, '0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql'::text),
+    ('20261013180020'::text, 'the_wake_gate_reads_the_record_the_claim_reads'::text, '0710_the_wake_gate_reads_the_record_the_claim_reads.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
