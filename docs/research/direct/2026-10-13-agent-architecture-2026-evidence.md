@@ -21,8 +21,9 @@ standard, and only the Lyft depot was from this month. This file is the 2026 evi
    and the LLM control plane added nothing under steady load. It won only in a mid-run surge (§2). OTTO-Q's wake gate
    (0705, 0711) consults the agent on exactly those onsets and runs the solver otherwise.
 3. **Record-and-replay is now the standard way to make agents testable,** with 2026 tools that replay a recorded run
-   bit for bit or replay only some of its calls. OTTO-Q's evidence row (0703) records the model call already. The
-   solver's answer is the boundary it does not yet record (§3).
+   bit for bit or replay only some of its calls. OTTO-Q already records both boundaries' answers as evidence: the model
+   call (0703) and every CP-SAT proposal (the disposition ledger, 0364). What a replay lacks is the link from each
+   CP-SAT answer to the pass that asked for it and the tick it arrived at (§3).
 4. **Fleet-level risk is a 2026 blind spot for agent systems, and in OTTO-Q it maps to the actor registry.** Gates that
    judge one action at a time let a fleet of individually authorized agents overdraw a shared risk limit by up to 48
    times. Per-principal accounting needs to know every principal, which is 0702 (PR #241) (§4).
@@ -66,10 +67,17 @@ OTTO-Q's "agents propose, the kernel disposes," which is the 2026 consensus rath
 | An audit-replay harness for tool-using financial agents measures trajectory and decision determinism on three 50-case benchmarks. Schema-first architectures reached determinism consistent with audit replay. | 2026-01 | [arXiv 2601.15322](https://www.alphaxiv.org/abs/2601.15322) | search summary only |
 
 **For OTTO-Q:** an agent pass has three non-deterministic boundaries: the model call, the CP-SAT service, and the
-check's sampled futures. 0703 records the first (board, prompt hash, answer) and 0712 made the third a function of the
-world seed. The CP-SAT answer is the one boundary not stored as evidence. Recording it would make a pass replayable
-end to end, which is the input the study's item 19 (the deterministic agent-on harness) needs. Chronicle's cut-point
-idea fits the existing pytest-on-live-definition pattern directly.
+check's sampled futures. 0703 records the first (board, prompt hash, answer), and 0712 made the third a function of the
+world seed. The second is recorded too: `ottoq_proposal_disposition_ledger` (0364, `class='evidence'`) keeps every
+proposal CP-SAT makes, with its car, stall, requested power, the wall-clock time it was made and the tick it was
+disposed (993 `forward_lex` rows on `02ac27b3`, read 2026-10-13 by 20:45 UTC). What it does not keep is the pass that
+asked for the answer or the tick it arrived at, so a replay cannot yet put each answer back where it came in. Those two
+columns are the input the study's item 19 (the deterministic agent-on harness) still needs. Chronicle's cut-point idea
+fits the existing pytest-on-live-definition pattern directly.
+
+*Corrected 2026-10-13, 20:45 UTC:* the first version of this file said the CP-SAT answer was the one boundary not
+stored as evidence. A read of the disposition ledger showed it is stored; the missing part is its link to the pass
+and the tick.
 
 ## 4. Fleet-level risk: per-action gates are not enough
 
@@ -126,5 +134,5 @@ These figures come from news and trackers, not company filings.
 - **`docs/AGENT_ARCHITECTURE.md` and the study page** cite §1, §2 and §4 in place of the 2025 sources where the 2026
   result is stronger, and keep the 2025 ones only where nothing newer was found (Anthropic's research system,
   AlphaEvolve's Borg result, DeepFleet).
-- **No migration follows from this file.** The two engineering consequences are already on the list: record the
-  CP-SAT answer as evidence (study item 19's input, §3), and 0702 before any per-principal budget (§4).
+- **No migration follows from this file.** The two engineering consequences are already on the list: link each
+  CP-SAT answer to its pass and arrival tick (study item 19's input, §3), and 0702 before any per-principal budget (§4).
