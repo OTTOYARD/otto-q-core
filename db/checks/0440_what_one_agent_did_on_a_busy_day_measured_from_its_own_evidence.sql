@@ -164,6 +164,67 @@
 --   176b2912's two service bays finished 14 PM and 4 calibrations in 9 sim-hours. 0715 is written and tested, and left
 --   for Chase with the scenario's intervals. (G430)
 --
+-- ══ §14 0562 LIVE: NO CHARGER HELD FOR A CAR STILL OUT (reproduce: (14)) -> G293 part 1 ══
+--
+--   Run 02ac27b3 (busy_day, seed 305838298283560562, the twin depot, wake gate on, lease 120 s, live playback): started
+--   by ottoq_operator_start_run at 19:19:24 UTC (2:19 PM CT), 0562 applied at 19:14:24, so the run ran under it from
+--   its first tick; the governor stopped it at 20:26:00 UTC (3:26 PM CT), sim 22:07. Measured after the stop, the last
+--   query finishing by 20:28:11 UTC. prearrival_charge_yields_to_solver = 1 on all three runs (the agentic arm sets it),
+--   and all three ran to the governor's ceiling (176b2912 to sim 22:24, 57188f55 to 22:08).
+--
+--   Chargers (dcfc, l2) reserved while their car was deployed or driving back, from stall.state_changed events:
+--
+--                                        176b2912 (before)   57188f55 (before)   02ac27b3 (0562)
+--     reservations for a car still out   39                  39                  0
+--       of which in the first 3 sim h    21                  24                  0
+--     charger-minutes held empty         208.4               151.6               0
+--     longest single hold, min           50.7                16.0                -
+--
+--   All 219 reservations on 02ac27b3 went to a car at the gate (145) or staged waiting for service (74).
+--
+--   Charge seatings by source (stall_assignment, enacted, dcfc or l2), with how many went in ahead of a car refused in
+--   the same tick:
+--                                        176b2912            57188f55            02ac27b3
+--     reservation_honoured               33 (25 ahead)       33 (31 ahead)        0
+--     reservation_reopt                   6                   6                   0
+--     greedy_constrained                 16 (11 ahead)       29 (22 ahead)       21 (16 ahead)
+--     forward_lex (CP-SAT)                0                  22                  27
+--     kernel                             166 (1)             131 (0)             171 (2)
+--     total                              221 (37 ahead)      221 (53 ahead)      219 (18 ahead)
+--
+--   The mechanism is gone: no charger stood empty for a car not yet at the depot, and no car took a pre-held charger
+--   ahead of the line. What remains of G293 is its part 2 (greedy_constrained: a waiting car's plan booked a charger
+--   window first come, 16 of its 21 seatings ahead of a refused car), a research-wing question (0562 §4). CP-SAT's
+--   seatings with the wake gate on, 22 and now 27 against 0 in shadow, are a second reading of G432's lead, still not a
+--   paired measurement.
+--
+--   What this run does NOT show is an outcome. Over the whole run the scouts read: contract-wait breaches 137 findings
+--   on 107 cars, against 126 on 101 and 129 on 98; cars stranded with open must-do work at the stop 79, against 89 and
+--   75; departures with an interval due 1, against 3 and 6; departures below target 0 on all three. All of it is inside
+--   the live twin's noise floor (0416): live playback draws a different world after the first tick. Returning cars now
+--   queue in the line instead of jumping it, which is rule 9's "better ordering of who is served next"; a deterministic
+--   pair is what would measure what that costs or saves.
+--
+-- ══ §15 AGENT v30 LIVE: NO DIRECTIVE SETS A CHARGE TARGET UNDER 100% (reproduce: (15)) -> G434 ══
+--
+--   Deployed as v42 at 20:06:39 UTC (3:06 PM CT), mid-run: the last v29 pass on 02ac27b3 landed at 20:06:39, the first
+--   v30 pass (solver-only) at 20:06:50, and the first v30 consult at 20:07:53. Every v30 consult carries prompt_sha256
+--   7ae8ac4f348ffb45f02954325ba6a83a649a9166d77b943cf33880f5cdfd0974, the sha256 of the repo's SYSTEM prompt plus the
+--   charge-line section computed locally before it landed: the deployed prompt is the committed one byte for byte.
+--
+--                                        v29 (to 20:06:39)   v30 (from 20:06:50)
+--     passes                             224                 96
+--     consults                           18                  6
+--     directives issued                  64 of 68            25 of 25
+--     directives naming any percentage   10                  0
+--     directives naming a target < 100%  0                   0
+--     refused                            3 (no_change dials) 0
+--
+--   On this run neither version named a charge target, so v30's lint had nothing to refuse; its work is in the 114
+--   distinct directive texts on record from earlier runs (G434), which tests/agent_rule_nine.test.mjs carries. One v30
+--   directive names a rule-9 violation itself (Zoox-AV-088 left with maintenance owed). v29's 10 percentages are state
+--   ("contract wait breach (33 min vs 30 min limit) at kernel_pos 6, SoC 98%"), which the lint lets pass by design.
+--
 -- ══ QUERIES ══
 
 -- (1) the record reconciles
@@ -321,3 +382,45 @@ SELECT r.id,
   (SELECT jsonb_object_agg(status, n) FROM (SELECT status, count(*) n FROM public.ottoq_external_proposals p
       WHERE p.sim_run_id = r.id AND p.source = 'forward_lex' GROUP BY 1) x) AS cpsat
 FROM r;
+
+-- (14) 0562: chargers reserved for a car still out, and charge seatings by source (one run at a time; MATERIALIZED, or it
+-- times out)
+WITH ch AS (SELECT id, stall_type::text stype FROM public.stalls WHERE depot_id = '11111111-1111-1111-1111-111111111111'
+              AND stall_type::text IN ('dcfc', 'l2')),
+ev AS MATERIALIZED (SELECT e.entity_id, e.event_seq, e.sim_clock_at, e.payload -> 'diff' d FROM public.ottoq_events e
+                      JOIN ch ON ch.id = e.entity_id
+                     WHERE e.sim_run_id = '02ac27b3-fe50-42b1-bf1b-82ac2a50445f' AND e.event_type = 'stall.state_changed'),
+res AS MATERIALIZED (SELECT entity_id stall_id, (d -> 'reserved_by' ->> 'to')::uuid vehicle_id, sim_clock_at at, event_seq seq
+                       FROM ev WHERE jsonb_typeof(d -> 'reserved_by' -> 'to') = 'string'),
+vs AS MATERIALIZED (SELECT e.entity_id, e.event_seq, e.payload -> 'diff' -> 'current_state' ->> 'to' st FROM public.ottoq_events e
+                     WHERE e.sim_run_id = '02ac27b3-fe50-42b1-bf1b-82ac2a50445f' AND e.event_type = 'vehicle.state_changed'
+                       AND e.entity_id IN (SELECT vehicle_id FROM res) AND e.payload -> 'diff' ? 'current_state'),
+enr AS (SELECT r.*, (SELECT st FROM vs WHERE vs.entity_id = r.vehicle_id AND vs.event_seq <= r.seq
+                      ORDER BY vs.event_seq DESC LIMIT 1) veh_state_then,
+               (SELECT min(sim_clock_at) FROM ev WHERE ev.entity_id = r.stall_id AND ev.event_seq > r.seq
+                   AND (ev.d ? 'current_vehicle_id' OR ev.d ? 'reserved_by')) ended_at FROM res r)
+SELECT veh_state_then, count(*) n, round((sum(extract(epoch FROM (COALESCE(ended_at, at) - at))) / 60)::numeric, 1) min_held
+  FROM enr GROUP BY 1 ORDER BY 1;
+
+WITH seat AS MATERIALIZED (
+  SELECT d.tick_seq, d.decision_seq, COALESCE(d.enacted_action ->> 'source', 'kernel') AS source
+    FROM public.ottoq_decisions d JOIN public.stalls st ON st.id = (d.enacted_action ->> 'stall_id')::uuid
+   WHERE d.sim_run_id = '02ac27b3-fe50-42b1-bf1b-82ac2a50445f' AND d.action_context = 'stall_assignment'
+     AND d.outcome_status = 'enacted' AND st.stall_type::text IN ('dcfc', 'l2')),
+ref AS MATERIALIZED (SELECT a.tick_seq, a.decision_seq FROM public.ottoq_decisions a
+   WHERE a.sim_run_id = '02ac27b3-fe50-42b1-bf1b-82ac2a50445f' AND a.action_context = 'stall_assignment'
+     AND a.outcome_status = 'noop_no_candidate')
+SELECT s.source, count(*) seatings,
+       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM ref r WHERE r.tick_seq = s.tick_seq AND r.decision_seq < s.decision_seq)) ahead
+  FROM seat s GROUP BY 1 ORDER BY 2 DESC;
+
+-- (15) v29 against v30 on 02ac27b3: passes, consults, the prompt hash, and the directives
+WITH d AS (SELECT e.agent_version, x ->> 'text' t FROM public.ottoq_agent_pass_evidence e,
+             jsonb_array_elements(jsonb_path_query_array(e.answer, '$.actions[*] ? (@.type == "directive")')) x
+            WHERE e.sim_run_id = '02ac27b3-fe50-42b1-bf1b-82ac2a50445f' AND e.consulted)
+SELECT e.agent_version, count(*) AS passes, count(*) FILTER (WHERE e.consulted) AS consults,
+       array_agg(DISTINCT e.prompt_sha256) FILTER (WHERE e.consulted) AS prompts,
+       sum(COALESCE((e.levers ->> 'directives_issued')::int, 0)) AS directives_issued,
+       (SELECT count(*) FROM d WHERE d.agent_version = e.agent_version AND d.t ~ '\d+\s*%') AS naming_a_percentage
+  FROM public.ottoq_agent_pass_evidence e WHERE e.sim_run_id = '02ac27b3-fe50-42b1-bf1b-82ac2a50445f'
+ GROUP BY 1 ORDER BY 1;

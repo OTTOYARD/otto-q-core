@@ -756,7 +756,7 @@ repo_manifest(version, name, file) AS (
     ('20261013150710'::text, 'every_agent_pass_keeps_what_it_saw_and_what_it_changed'::text, '0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql'::text),
     ('20261013151002'::text, 'every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find'::text, '0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql'::text),
     ('20261013151112'::text, 'the_agent_is_consulted_when_something_changes_not_on_every_beat'::text, '0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql'::text),
-    ('PENDING'::text, 'the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does'::text, '0706_the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does.sql'::text),
+    ('20261013210919'::text, 'the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does'::text, '0706_the_order_built_from_the_newest_board_stands_and_an_outranked_order_never_does.sql'::text),
     ('20261013193522'::text, 'the_engine_notices_when_a_channel_goes_dark'::text, '0707_the_engine_notices_when_a_channel_goes_dark.sql'::text),
     ('20261013195202'::text, 'the_promotion_gate_can_ask_whether_the_check_tells_a_winning_order_from_a_losing_one'::text, '0708_the_promotion_gate_can_ask_whether_the_check_tells_a_winning_order_from_a_losing_one.sql'::text),
     ('20261013152102'::text, 'the_agents_return_wave_counts_this_runs_cars_not_every_run_ever'::text, '0709_the_agents_return_wave_counts_this_runs_cars_not_every_run_ever.sql'::text),
@@ -767,7 +767,9 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_lease_catalog_row_says_what_the_claim_does'::text, '0714_the_lease_catalog_row_says_what_the_claim_does.sql'::text),
     ('PENDING'::text, 'a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves'::text, '0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql'::text),
     ('20261013184608'::text, 'the_feed_agents_propose_the_twins_world_and_a_person_promotes_it'::text, '0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql'::text),
-    ('20261013201139'::text, 'the_board_calls_eighty_percent_a_priority_band_not_a_floor'::text, '0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql'::text)
+    ('20261013201139'::text, 'the_board_calls_eighty_percent_a_priority_band_not_a_floor'::text, '0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql'::text),
+    ('20261013210801'::text, 'production_runs_the_world_phases_the_twin_certifies'::text, '0718_production_runs_the_world_phases_the_twin_certifies.sql'::text),
+    ('20261013211005'::text, 'production_start_takes_the_world_as_the_operator_door_does'::text, '0719_production_start_takes_the_world_as_the_operator_door_does.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
