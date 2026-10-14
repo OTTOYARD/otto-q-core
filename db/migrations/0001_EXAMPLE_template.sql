@@ -67,6 +67,16 @@
 -- 6. COMMIT THE FILE FIRST, THEN APPLY IT.
 --    See scripts/APPLYING.md. The rule this repo exists for:
 --    if it isn't a committed file, it didn't happen.
+--
+-- 7. GRANT WHAT A BROWSER CALLS, IN THE FILE THAT CREATES IT (from 0701).
+--    A function postgres creates in public is born {postgres, service_role}:
+--    no anon, no authenticated, no PUBLIC. CREATE OR REPLACE of an existing
+--    signature keeps its grants. A new name, a new overload, or a DROP and
+--    CREATE starts with none. If the twin app, a cockpit or a signed-in page
+--    calls it (directly, or through a view, an RLS policy or a column default),
+--    GRANT EXECUTE ... TO anon / authenticated here, name the reader in the
+--    header, and assert it with has_function_privilege in a V block. A missing
+--    grant does not fail the apply. The app fails later with 42501.
 -- ============================================================================
 
 
