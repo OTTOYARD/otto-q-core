@@ -28,9 +28,15 @@
  *   * THE WEB IS UNTRUSTED (0721, Chase 2026-10-14: "Search should cover OTTO-Q and web"): once any web search result
  *     has entered an ask's conversation, every later call to anything but a read is refused here, before the engine
  *     is asked, and the answer tells the owner to ask for the change again on its own. An ask that read the web returns
- *     no confirm objects, so nothing it previewed can be applied from it;
- *   * the answer never claims a change that did not happen: "Done" with nothing applied is replaced by the receipts,
- *     and an applied change always carries its OrchestrAV link; a web fact always travels with its URL;
+ *     no confirm objects, so nothing it previewed can be applied from it. What the model tried after reading the web is
+ *     never handed back as something to send: `blocked_after_web` names the tools only, never the arguments a page may
+ *     have chosen, and the agent is told to relay to its person and send a change only as that person's own new words.
+ *     When a change was refused that way, the answer leads with what really happened, and the model's text is dropped
+ *     if it describes a change (it was written after reading the page that asked for one);
+ *   * the answer never claims a change that did not happen: "Done" with nothing applied is replaced by the receipts
+ *     (or, with no receipts at all, by "Nothing was changed"), and an applied change always carries its OrchestrAV link;
+ *     a web fact always travels with its URL. A page's title is the page's own words: it goes back only in `sources`,
+ *     cleaned and capped, never into the answer;
  *   * confirm: a previewed plan is applied from its confirm objects with NO model involved, through the confirm door
  *     (transport 'confirm', recorded as via 'confirm'), never as OTTO-Command's own call (0721).
  *
@@ -57,7 +63,12 @@
  *     content is replayed exactly as received (thinking, server_tool_use, web_search_tool_result, text with
  *     citations, tool_use, fallback blocks), in order, unmodified, and system and tools never change inside an ask;
  *   * web search is a server tool, {"type": "web_search_20260209", "name": "web_search", "max_uses": N, user_location}
- *     on the models with dynamic filtering and web_search_20250305 on any other; code_execution is not also declared
+ *     on the models with dynamic filtering and web_search_20250305 on any other. max_uses caps the searches of ONE
+ *     REQUEST (the web search tool page: "use max_uses to cap the number of searches for each request"), so an ask's
+ *     total is at most N x its model calls (ASK_MAX_MODEL_CALLS), inside the 50 s budget. A per-ask cap would mean
+ *     changing or removing the tool between the ask's model calls, and "Add, remove, rename, or edit a tool in tools"
+ *     makes every later thinking block invalid (the preserved thinking page, read 2026-10-14:
+ *     https://platform.claude.com/docs/en/build-with-claude/preserved-thinking), so it is not done; code_execution is not also declared
  *     (the API provisions it for dynamic filtering, and its result blocks count as web content for the injection rule
  *     exactly as web_search_tool_result does). A result block's content is a LIST of web_search_result on success and
  *     an error OBJECT on failure (HTTP 200, not raised); text that uses results carries citations of type
@@ -108,10 +119,17 @@ export const ASK_MODEL_CALL_CAP_MS = 45_000;
 export const ASK_MAX_TOKENS = 8000;
 /** A paused server-side turn (stop_reason pause_turn) is resumed at most this many times in one ask. */
 export const ASK_MAX_PAUSES = 3;
+/** The most model calls one ask or search makes: its rounds plus its resumes. Web searches per ask are at most
+ *  max_uses (a per-request cap) times this, and the 50 s budget usually ends an ask well before. */
+export const ASK_MAX_MODEL_CALLS = ASK_MAX_ROUNDS + ASK_MAX_PAUSES;
 /** A tool result longer than this is cut before the model reads it (a 36-car fleet is about 18 KB). */
 export const TOOL_RESULT_MAX_CHARS = 30_000;
 /** At most this many web sources are returned with an answer. */
 export const MAX_SOURCES = 20;
+/** A source's title (the page's own words, untrusted) is cleaned and cut to this many characters. */
+export const SOURCE_TITLE_MAX = 120;
+/** A source URL longer than this is not returned. */
+export const SOURCE_URL_MAX = 2048;
 export const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 export const ANTHROPIC_VERSION = "2023-06-01";
 
@@ -221,10 +239,20 @@ export type ModelReply =
       usage?: ModelUsage; http_status?: number | null };
 export type ModelCall = (req: ModelRequest) => Promise<ModelReply>;
 
+/** A page's title as the sources list carries it: control, format and line-separator characters removed, whitespace
+ *  collapsed, cut to SOURCE_TITLE_MAX. It is still the page's own words: untrusted, and never put into the answer. */
+export function cleanTitle(title: unknown): string | null {
+  if (typeof title !== "string") return null;
+  const t = title.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, " ").replace(/\s+/g, " ").trim();
+  if (t === "") return null;
+  return t.length <= SOURCE_TITLE_MAX ? t : `${t.slice(0, SOURCE_TITLE_MAX - 1).trimEnd()}\u2026`;
+}
+
 function addSource(into: WebSource[], url: unknown, title: unknown): void {
-  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
+  // a URL is an http(s) address with nothing in it that could break a line or hide text, and not absurdly long
+  if (typeof url !== "string" || url.length > SOURCE_URL_MAX || !/^https?:\/\/[^\s\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+$/iu.test(url)) return;
   if (into.some((s) => s.url === url)) return;
-  into.push({ url, title: typeof title === "string" && title.trim() !== "" ? title : null });
+  into.push({ url, title: cleanTitle(title) });
 }
 
 /** Read a reply's raw blocks: text (citation-split blocks joined as written), tool uses, cited and returned web sources,
@@ -420,10 +448,20 @@ const RUNNER_ARGS = ["note", "idempotency_key", "expect_plan_hash", "confirms_co
 export const WEB_WRITE_REFUSAL =
   "Refused, and nothing was sent to OTTO-Q: this ask has read the web, and an ask that read the web cannot change a car " +
   "(web pages are untrusted). Answer the owner's question, and tell them to ask for the change again on its own.";
-/** 0721: added to the answer of an ask whose change was refused because the ask had read the web. */
+/** 0721: leads the answer of an ask whose change was refused because the ask had read the web, when nothing was applied. */
 export const WEB_WRITE_NOTE =
   "Nothing was changed: this ask searched the web, and OTTO-Command never changes a car in an ask that read the web. " +
   "Ask again for the change on its own.";
+/** 0721: the same, when a change was applied earlier in the ask, before any web text arrived (its receipt follows). */
+export const WEB_WRITE_NOTE_AFTER_CHANGE =
+  "Only what OTTO-Q's receipts below say was done, before this ask searched the web; the change asked for after the " +
+  "search was not made, because OTTO-Command never changes a car once an ask has read the web. Ask again for it on its own.";
+/** 0721: said instead of the model's reply when that reply, written after reading the web, described a change. */
+export const WEB_REPLY_WITHHELD =
+  "OTTO-Command's reply described a change that was not made, so it is not shown. Ask your question again on its own " +
+  "(ottocommand_search answers questions and changes nothing).";
+/** 0721: an answer that claims a change while OTTO-Q made none, and has no receipt to say instead. */
+export const NOTHING_CHANGED = "Nothing was changed in this ask.";
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────── the input ──
 
@@ -502,8 +540,6 @@ export type AskAction = {
   undo?: unknown;
   error?: { code: string; message: string };
 };
-/** 0721: a change the model asked for after the ask had read the web: refused here, never sent to OTTO-Q. */
-export type BlockedChange = { tool: string; args: Record<string, unknown> };
 export type AskResult = {
   answer: string;
   answered_by: string;
@@ -519,8 +555,9 @@ export type AskResult = {
   /** 0721: when the ask read the web: the sources it cited (URL and title, de-duplicated) and how many searches ran */
   sources?: WebSource[];
   web_searches?: number;
-  /** 0721: the changes refused because the ask had read the web (nothing was sent to OTTO-Q for them) */
-  blocked_after_web?: BlockedChange[];
+  /** 0721: the NAMES of the tools refused because the ask had read the web (nothing was sent to OTTO-Q for them). Never
+   *  their arguments: those were chosen after reading a page, and are not for anyone to send again. */
+  blocked_after_web?: string[];
 };
 export type SearchResult = {
   answer: string;
@@ -575,6 +612,21 @@ export function receiptsText(actions: readonly AskAction[]): string {
 }
 
 const CLAIMS_DONE = /^\s*(done\b|all set\b|it'?s done\b|completed\b|finished\b)/i;
+const CHANGE_VERB = "(?:set|held|released|cancell?ed|ordered|requested|scheduled|lowered|raised|changed|updated|applied|capped|limited|undone|undid|booked|placed|withdrawn|cleared)";
+/** Text that tells the owner a change was made: a "Done"-style opening on any sentence or line, a car that "now" charges
+ *  to or is held at something, something that "has been" changed, or "I've set ...". A screen, not a parser: it is used
+ *  only where a change was just refused after the web was read, and a false match drops the model's text, which is the
+ *  safe side. */
+const CLAIMS_A_CHANGE: readonly RegExp[] = [
+  /(?:^|[.!?]\s+|\n\s*)(?:done|all set|it'?s done|completed|finished)\b/i,
+  /\b(?:now|already)\s+(?:charges?|charging|held|holds?|limited|capped|set|scheduled|booked|ordered)\b/i,
+  new RegExp(`\\b(?:has|have|had|is|are|was|were)\\s+(?:now\\s+)?(?:been\\s+)?${CHANGE_VERB}\\b`, "i"),
+  new RegExp(`\\bI(?:'ve|\\s+have)?\\s+(?:just\\s+|now\\s+)?${CHANGE_VERB}\\b`, "i"),
+  /\bcharges?\s+to\s+(?:at\s+most\s+)?\d{1,3}\s?%/i,
+];
+export function claimsAChange(text: string): boolean {
+  return CLAIMS_A_CHANGE.some((r) => r.test(text));
+}
 
 /** The model's answer, held to the receipts: it may not claim a change nothing applied, and an applied change always
  *  carries its confirmation code (0607) and its OrchestrAV link. */
@@ -582,7 +634,9 @@ export function settleAnswer(answer: string, actions: readonly AskAction[], dryR
   const applied = actions.filter((a) => a.outcome === "applied");
   let out = answer.trim();
   if (out === "") out = actions.length ? receiptsText(actions) : "OTTO-Command has no answer to give.";
-  if (CLAIMS_DONE.test(out) && (applied.length === 0 || dryRun)) out = receiptsText(actions) || out.replace(CLAIMS_DONE, "Not done.");
+  // a claim of a change nothing applied: OTTO-Q's own receipts instead, or, with none, that nothing was changed (the
+  // claiming text is dropped whole, never patched a word at a time)
+  if (CLAIMS_DONE.test(out) && (applied.length === 0 || dryRun)) out = receiptsText(actions) || NOTHING_CHANGED;
   if (!dryRun) {
     const missing = applied.map((a) => a.confirmation_code).filter((c): c is string => !!c && !out.includes(c));
     if (missing.length) out = `${out}\nConfirmation code${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}.`;
@@ -592,11 +646,12 @@ export function settleAnswer(answer: string, actions: readonly AskAction[], dryR
   return out;
 }
 
-/** 0721: every web source travels with the answer: the ones its text does not already name are listed after it. */
+/** 0721: every web source travels with the answer: the URLs its text does not already name are listed after it. A
+ *  page's title is the page's own words (untrusted), so it never enters the answer; it is in `sources`, cleaned. */
 export function withSources(answer: string, sources: readonly WebSource[]): string {
   const missing = sources.filter((s) => !answer.includes(s.url));
   if (!missing.length) return answer;
-  return `${answer}\nSources: ${missing.map((s) => (s.title ? `${s.title} (${s.url})` : s.url)).join("; ")}`;
+  return `${answer}\nSources: ${missing.map((s) => s.url).join("; ")}`;
 }
 
 /** The confirm objects of the previewed changes, exactly as OTTO-Q returned them. */
@@ -622,7 +677,8 @@ export type AskDeps = {
   /** 0721: the same token bound to transport 'confirm'. A confirm is sent only through it, never through `call`. */
   confirmCall?: EngineCall;
   model: ModelCall | null;
-  /** 0721: offer the web search server tool, with this many uses per ask (null or absent: no web). */
+  /** 0721: offer the web search server tool, with this many uses per model call (the API's max_uses is per request;
+   *  an ask makes at most ASK_MAX_MODEL_CALLS); null or absent: no web. */
   web?: { max_uses: number } | null;
   /** 0721: every model call is recorded here, fire-and-forget: a ledger failure never fails an ask. */
   ledger?: ModelLedger | null;
@@ -709,7 +765,8 @@ type LoopOut = {
   citations: WebSource[];
   webResults: WebSource[];
   webSearches: number;
-  blocked: BlockedChange[];
+  /** the names of the tools refused after the web was read, each once */
+  blocked: string[];
 };
 
 function newAskId(): string {
@@ -810,7 +867,7 @@ async function runLoop(spec: LoopSpec, deps: AskDeps, model: ModelCall): Promise
       for (const k of RUNNER_ARGS) delete args[k];
       // 0721: once the web has been read in this ask, nothing but a read reaches OTTO-Q
       if (out.readWeb && !OTTOCOMMAND_READ_NAMES.has(tool.name)) {
-        out.blocked.push({ tool: tool.name, args });
+        if (!out.blocked.includes(tool.name)) out.blocked.push(tool.name);
         results.push({ type: "tool_result", tool_use_id: use.id, is_error: true, content: WEB_WRITE_REFUSAL });
         continue;
       }
@@ -896,8 +953,19 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
       answer = `${answer}\nNothing has changed yet: lowering how full a car charges applies only when you confirm it, within 15 minutes.`;
     }
   }
-  const sources = sourcesOf(loop);
-  if (loop.blocked.length) answer = `${answer}\n${WEB_WRITE_NOTE}`;
+  let sources = sourcesOf(loop);
+  if (loop.blocked.length) {
+    // 0721: a change was asked for after the web was read, and refused. The answer leads with what really happened; the
+    // model's text, written after reading the page, is kept only if it describes no change (a page that talked the model
+    // into a change can talk it into saying the change was made), and OTTO-Q's own receipts say what was applied before.
+    const applied = actions.some((a) => a.outcome === "applied" && !input.dry_run);
+    const keep = !claimsAChange(draft);
+    const body = keep ? answer : (actions.length ? settleAnswer(receiptsText(actions), actions, input.dry_run) : "");
+    answer = [applied ? WEB_WRITE_NOTE_AFTER_CHANGE : WEB_WRITE_NOTE, body, keep ? "" : WEB_REPLY_WITHHELD]
+      .filter((x) => x.trim() !== "").join("\n");
+    // the sources the withheld text cited are not sources of this answer
+    if (!keep) sources = [];
+  }
   if (sources.length) answer = withSources(answer, sources);
   return {
     answer,

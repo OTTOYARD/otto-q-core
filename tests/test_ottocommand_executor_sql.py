@@ -28,7 +28,11 @@ CLAUDE.md rules 9 and 10 bind hardest. None of what it promises is visible to a 
     holds, one-time orders and anything set without a person stay per run, a person's lower limit is confirmed on every
     run, undo on a later run says the setting is saved; the owner tables refuse rows no applied command set (item 10);
     the demo passcode opens and serves nothing while production is live (item 11); every OTTO-Command model call is
-    ledgered through a service-role-only door that refuses text.
+    ledgered through a service-role-only door that refuses text;
+  * the review of 2026-10-14 (rule 9): a person's clear, limit at the ceiling and cancel end what is saved whatever row
+    the run holds (a passcode session's, or none because the carry skipped it), as an applied change of its own, so the
+    next production run carries nothing back; a person's limit is saved even when the run already held that value; and a
+    passcode session or an issued key reads no `saved` block and no person's email.
 
 Loads the stub engines, 0559, 0560, 0605-0608, tests/fixtures/agent_signin_stub_auth.sql, 0700 and
 tests/fixtures/model_call_ledger_stub.sql (the live model ledger's bodies, md5-asserted) from their files, and
@@ -696,7 +700,8 @@ def test_no_client_role_reaches_anything_new(post):
                "public.ottoq_owner_settings_save()", "public.ottoq_owner_settings_saved_follow()",
                "public.ottoq_owner_saved_carry(uuid)", "public.ottoq_tg_owner_saved_on_run_start()",
                "public.ottoq_owner_settings_guard()", "public.ottoq_owner_saved_settings_guard()",
-               "public.ottoq_owner_settings_read(ottoq_agent_principals,jsonb)"):
+               "public.ottoq_owner_settings_read(ottoq_agent_principals,jsonb)",
+               "public.ottoq_owner_saved_effect(vehicles,text,text,numeric,numeric)"):
         for role in ("anon", "authenticated", "service_role"):
             assert post.val(f"SELECT has_function_privilege('{role}', '{fn}', 'EXECUTE')") == "f", (fn, role)
     assert post.val("SELECT has_function_privilege('service_role', 'public.ottoq_agent_call(text,text,jsonb,text,jsonb)', 'EXECUTE')") == "t"
@@ -880,6 +885,129 @@ def test_the_carry_keeps_to_the_contract_in_force_and_to_the_owners_cars(post):
         assert carried(post, third) == [(AV041, "charge_limit", "82")]
     finally:
         post.run(f"UPDATE vehicles SET fleet_operator_id = '{TESLA}' WHERE id = '{AV045}'")
+
+
+def test_a_persons_clear_ends_what_is_saved_when_a_session_without_a_person_holds_the_runs_limit(post):
+    """The re-review (rule 9, (A)): the run's limit was set by a passcode session, so the run's row is not the saved one. A
+    signed-in owner's clear still clears what is saved, and the next production run carries nothing."""
+    chase = connect(post)["access_token"]
+    fresh_run(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    nxt = fresh_run(post, keep_saved=True)
+    session = unlock(post, agent="Visitor", ip="192.0.2.94")["data"]["session"]
+    assert tcall(post, session, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 90})["data"]["outcome"] == "applied"
+    clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+    assert clr["http_status"] == 201 and clr["data"]["outcome"] == "applied", clr
+    summary = clr["data"]["summary"]
+    assert "the limit saved to it cleared: it charges full on every run" in summary, summary
+    assert "This is saved to your cars: it stays from run to run, production included, until you change it." in summary
+    assert saved(post, AV041) == []
+    ended = post.rows(f"SELECT ended_reason, ended_by_command_id FROM ottoq_owner_saved_settings "
+                      f"WHERE vehicle_id = '{AV041}' AND kind = 'charge_limit' ORDER BY saved_at DESC LIMIT 1")
+    assert ended == [["cleared by the owner", clr["data"]["command"]["command_id"]]]
+    assert target(post) == "100"
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{nxt}'")
+    prod = production_run(post, keep_saved=True)
+    assert carried(post, prod) == [] and target(post) == "100"
+
+
+def test_a_persons_clear_ends_what_is_saved_when_the_carry_skipped_it(post):
+    """The re-review (rule 9, (B)): the contract's minimum rose above the saved limit, so it was not carried and the run has
+    no limit row. The clear is applied (not no_change), and nothing comes back when the contract allows it again."""
+    chase = connect(post)["access_token"]
+    fresh_run(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 82})
+    try:
+        post.run(f"UPDATE ottoq_fleet_operator_slas SET min_charge_target_pct = 85 WHERE fleet_operator_id = '{TESLA}'")
+        nxt = fresh_run(post, keep_saved=True)
+        assert carried(post, nxt) == [] and saved(post, AV041) == [(AV041, "charge_limit", "82")]
+        clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+        assert clr["http_status"] == 201 and clr["data"]["outcome"] == "applied", clr
+        keys = sorted(e["key"] for e in clr["data"]["command"]["effects"])
+        assert keys == ["charge_limit", "saved:charge_limit"], keys
+        assert saved(post, AV041) == []
+    finally:
+        post.run(f"UPDATE ottoq_fleet_operator_slas SET min_charge_target_pct = 80 WHERE fleet_operator_id = '{TESLA}'")
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{nxt}'")
+    prod = production_run(post, keep_saved=True)
+    assert carried(post, prod) == [] and target(post) == "100"
+    # a second clear finds nothing saved and nothing on the run: no_change, as before
+    again = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+    assert again["data"]["outcome"] == "no_change", again
+
+
+def test_a_persons_full_limit_and_cancel_end_what_is_saved_after_a_session_changed_the_run(post):
+    """The re-review (rule 9, (D)): a passcode session set 90 and cancelled the carried wash on the run. The signed-in
+    owner's limit at the ceiling and cancel of the every-return wash both end what is saved; production carries nothing."""
+    chase = connect(post)["access_token"]
+    run = fresh_run(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "every_return"})
+    session = unlock(post, agent="Visitor", ip="192.0.2.95")["data"]["session"]
+    tcall(post, session, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 90})
+    tcall(post, session, "cancel_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash"})
+    assert saved(post, AV041) == [(AV041, "charge_limit", "85"), (AV041, "service", "exterior_wash")]
+    full = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 100})
+    assert full["http_status"] == 201 and full["data"]["outcome"] == "applied", full
+    cnc = tcall(post, chase, "cancel_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash"})
+    assert cnc["http_status"] == 201 and cnc["data"]["outcome"] == "applied", cnc
+    assert "the every-return order for exterior wash saved to it is withdrawn, for every run" in cnc["data"]["summary"], cnc
+    assert "This is saved to your cars" in cnc["data"]["summary"]
+    assert saved(post, AV041) == []
+    reasons = sorted(r[0] for r in post.rows(
+        f"SELECT ended_reason FROM ottoq_owner_saved_settings WHERE vehicle_id = '{AV041}' "
+        f"AND ended_by_command_id IN ('{full['data']['command']['command_id']}', '{cnc['data']['command']['command_id']}')"))
+    assert reasons == ["cancelled by the owner", "cleared by the owner"], reasons
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")
+    prod = production_run(post, keep_saved=True)
+    assert carried(post, prod) == [] and target(post) == "100"
+
+
+def test_a_persons_limit_is_saved_even_when_the_run_already_holds_that_value(post):
+    """The same class from the other side: a passcode session set 88 on the run; the signed-in owner then sets 88. The run
+    has nothing to change, and the saved 85 is replaced by 88 (a raise, one call), so the next run carries what they set."""
+    chase = connect(post)["access_token"]
+    fresh_run(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    nxt = fresh_run(post, keep_saved=True)
+    session = unlock(post, agent="Visitor", ip="192.0.2.96")["data"]["session"]
+    tcall(post, session, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 88})
+    same = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 88})
+    assert same["http_status"] == 201 and same["data"]["outcome"] == "applied", same
+    assert "88% is saved to it for every run, in place of 85%" in same["data"]["summary"] or \
+           "has 88% saved to it for every run" in same["data"]["summary"], same["data"]["summary"]
+    assert saved(post, AV041) == [(AV041, "charge_limit", "88")]
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{nxt}'")
+    third = fresh_run(post, keep_saved=True)
+    assert carried(post, third) == [(AV041, "charge_limit", "88")] and target(post) == "88"
+    # and the plain case is untouched: the carried row is the saved one, and a clear withdraws it with one effect
+    clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+    assert [e["key"] for e in clr["data"]["command"]["effects"]] == ["charge_limit"], clr
+    assert saved(post, AV041) == []
+
+
+def test_a_passcode_session_reads_no_saved_settings_and_no_persons_email(post):
+    """The re-review: what is saved is the account holder's, bound for production, and names the person. A demo passcode
+    session and an issued key get no `saved` block and no line about it; the signed-in owner still does."""
+    chase = connect(post)["access_token"]
+    fresh_run(post)
+    lim = lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    session = unlock(post, agent="Visitor", ip="192.0.2.97")["data"]["session"]
+    key = post.json(f"SELECT ottoq_agent_issue_token('fleet-bot-3', 'personal', ARRAY['read','note','owner_settings'], "
+                    f"'{TESLA}', '{TWIN}', NULL, 600, 20)")["token"]
+    for token, transport in ((session, "mcp"), (key, "rest")):
+        ms = tcall(post, token, "my_settings", transport=transport)
+        blob = json.dumps(ms)
+        assert ms["http_status"] == 200, ms
+        assert "saved" not in ms["data"], ms["data"]
+        # (0605's in-force list names each setting's command id, as it always has, to every principal of the fleet; an id
+        # opens nothing: undo and my_commands are per principal. The person's email appears nowhere.)
+        assert EMAIL not in blob.lower(), blob
+        assert "Saved to your cars" not in ms["data"]["summary"] and "production included" not in ms["data"]["summary"]
+        assert "In force on this run: 1 car charges to at most 85%." in ms["data"]["summary"], ms["data"]["summary"]
+    own = tcall(post, chase, "my_settings")["data"]
+    assert [(x["saved_by"], x["command_id"]) for x in own["saved"]] == [(EMAIL, lim["data"]["command"]["command_id"])]
+    assert "Saved to your cars for every run, production included: 1 car charges to at most 85%." in own["summary"]
 
 
 def test_the_settings_guard_refuses_what_no_applied_command_set(post):

@@ -63,10 +63,14 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > tool that changes anything (annotated `readOnlyHint: true`, `openWorldHint: true`). `ask_ottocommand` may search the
 > web too (now `openWorldHint: true`) and returns `sources` and `web_searches` when it does. **Once any web result has
 > entered an ask, the gateway refuses every write tool for the rest of it**, before OTTO-Q is called, and the answer says
-> to ask for the change again; an ask that searched returns no `confirm`. Every model call is one row in
+> to ask for the change again; an ask that searched returns no `confirm`, names refused tools without their arguments
+> (`blocked_after_web: ["set_charge_limit"]`), drops a model reply that describes a change it did not make, and keeps a
+> page's title out of the answer (cleaned and capped in `sources` only). Web searches are capped per model call
+> (`max_uses`, the API's per-request cap; an ask makes at most 9). Every model call is one row in
 > `ottoq_model_call_ledger` (provider `anthropic_ottocommand`; ids and counts only) through a service-role-only function,
 > fire-and-forget. In the database: a signed-in owner's charge limit and every-return services are saved to the cars
-> and carried onto each new demo and production run; a guard trigger stops any role from writing an owner setting no
+> and carried onto each new demo and production run (their clear, a limit at 100% and a cancel end what is saved whatever
+> a passcode session did on the run, and only a signed-in agent reads `saved`); a guard trigger stops any role from writing an owner setting no
 > applied command made; and a passcode session (and `enter_passcode`) is refused `403 production_live` while a
 > production run is live. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11, "Search, the web, and what lasts".
 
@@ -472,8 +476,11 @@ A token's scope cannot be edited (the guard refuses it): issue a new principal a
 
 **Verified for `ottocommand_search`, the web and the model ledger (2026-10-14, afternoon CT, scratch only):**
 `tests/agent_gateway.test.mjs` 39 passed (the two OTTO-Command doors listed and annotated, `/v1/search` routed, the
-shell posting only to the engine and the ledger function); `tests/ottocommand_executor.test.mjs` 31 passed with a
-scratch PostgreSQL (28 without); `tests/test_ottocommand_executor_sql.py` 30 passed. The gateway, its shared modules
+shell posting only to the engine and the ledger function); `tests/ottocommand_executor.test.mjs` 34 passed with a
+scratch PostgreSQL (31 without); `tests/test_ottocommand_executor_sql.py` 35 passed (after the review fixes of the same
+afternoon: refused changes named without arguments, page titles kept out of the answer, a claimed change with no
+receipt dropped, searches capped per model call, a person's clear and cancel ending what is saved whatever the run
+holds, and no `saved` block for a passcode session). The gateway, its shared modules
 and the shell type-check under `tsc --strict` with a Deno shim, except the `jsr:` edge-runtime type import, which only
 Deno resolves. **Not verified:** a real call to the Anthropic API (every test drives a fake fetch), web search enabled
 for this organization, a fallback actually taken, `EdgeRuntime.waitUntil` keeping the ledger write alive after the

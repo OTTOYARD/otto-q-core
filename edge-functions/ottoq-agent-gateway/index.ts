@@ -38,7 +38,9 @@
 //   OTTOCOMMAND_EFFORT             0721: low (the default) | medium | high | xhigh | max. Low, because the whole ask must
 //                                  end inside Hermes's 60-second MCP timeout.
 //   OTTOCOMMAND_WEB_SEARCH         0721: on (the default) | off. Off: no web search in any ask or search.
-//   OTTOCOMMAND_WEB_MAX_USES       0721: web searches per ask, default 3, clamped to 1..5.
+//   OTTOCOMMAND_WEB_MAX_USES       0721: web searches per MODEL CALL (the API's max_uses is per request), default 3,
+//                                  clamped to 1..5. An ask makes at most 9 model calls inside its 50 s budget, so its
+//                                  total is at most 9 x this; in practice the budget ends it far sooner.
 //                                  A value the door cannot read makes a plain-English ask answer 503 ask_misconfigured,
 //                                  naming the variable; confirms still apply.
 //   AGENT_GATEWAY_OAUTH_ISSUER     0700: OTTOYARD's authorization server, where its RFC 8414 metadata is published
