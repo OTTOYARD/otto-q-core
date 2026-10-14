@@ -1,7 +1,7 @@
 ---
 name: ottoq-owner
 description: Connect to OTTOYARD and read or set what my cars need at the OTTOYARD depot.
-version: 1.2.0
+version: 1.3.0
 author: OTTOYARD (Chase), Hermes Agent
 license: Proprietary
 platforms: [linux, macos, windows]
@@ -50,9 +50,42 @@ steps below. To sign in (the first time, or after the person disconnected you, o
 
 (If this Hermes was given an issued key instead, its tools need no `session`; skip the connecting steps.)
 
-## Tools
+## Every request goes to OTTO-Command first
 
-| When the person says | Call (each with `session`) |
+OTTO-Command is OTTOYARD's own agent: the filter and executor between you and OTTO-Q. **Send every request about the
+cars to it first**, in the person's own words, and forward its answer:
+
+```
+mcp__ottoyard__ask_ottocommand {text: "<what the person said, as they said it>"}
+```
+
+(With the passcode, add `session` as on every other tool.) It reads the cars, answers questions (where a car is, when it
+will be ready, what OTTO-Q decided, which chargers are free), and makes the changes the person asks for, with YOUR token,
+so it can do nothing your token could not. What comes back:
+
+- `answer`: plain English, ready to forward as it is. When something changed it already carries the confirmation code
+  (`OQ-XXXX-XXXX`) and ends with the OrchestrAV link.
+- `actions`: OTTO-Q's receipt for each change, the authoritative record. A change is done only when its `outcome` is
+  `applied`.
+- `confirm` (only when a change was previewed, not applied): ask the person "Shall I go ahead?". If they say yes, call
+  `mcp__ottoyard__ask_ottocommand {confirm: <that array, unchanged>}` and forward the new `answer`. Never change it,
+  never send it without their yes.
+- `incomplete: true`: OTTO-Command ran out of time; `actions` still says what was done. Say so and offer to try again.
+
+Pass the person's earlier turns as `history` (`[{role, text}]`, oldest first, at most 12) when a request depends on them
+("do the same for RT-3"), and `idempotency_key` (the chat message id) so a resend after a timeout replays instead of
+acting twice.
+
+**Production.** When the live run at the depot is a production run, a lower charge limit is always previewed first and
+needs the person's yes (the `confirm` above): say plainly that nothing has changed until they confirm. A passcode
+session can read the cars there but not change them; OTTO-Command says so, and to sign in (Connecting, above).
+
+### Only if OTTO-Command is not available
+
+If `ask_ottocommand` answers with an error (`ask_not_configured`: it is not switched on; `ask_model_failed`; or the tool
+is missing from the list), use the typed tools directly. They are the same database filter:
+
+| When the person says | Call (each with `session` when you have one) |
 |---|---|
 | anything about "my cars", "the fleet", "my Teslas" | `mcp__ottoyard__my_fleet` (start here) |
 | one car: "where is Tesla 45", "is RT-3 ready" | `mcp__ottoyard__my_vehicle {vehicle: "Tesla 45"}` |
@@ -69,27 +102,24 @@ steps below. To sign in (the first time, or after the person disconnected you, o
 | "what have I set", "what did I change" | `mcp__ottoyard__my_settings`, `mcp__ottoyard__my_commands` |
 
 Names go in as the person says them ("Tesla 45", "AV-045", "RT-3"); OTTO-Q matches them inside the person's own fleet.
-"After charging" needs nothing extra: OTTO-Q always plans bay work after the charge.
+"After charging" needs nothing extra: OTTO-Q always plans bay work after the charge. In a production run, preview a
+lower charge limit (`mode: "preview"`) and send its `confirm` only after the person says yes: OTTO-Q refuses it otherwise.
 
 ## How to answer
 
-1. **Facts only from tool results.** Never invent a car, a number, a time or a setting. If a car does not exist, the
+1. **Forward OTTO-Command's `answer`.** Shorten it only if you must, never change its meaning, and keep the
+   confirmation code and the link. With the typed tools, use OTTO-Q's `summary` the same way.
+2. **Facts only from tool results.** Never invent a car, a number, a time or a setting. If a car does not exist, the
    refusal lists the real names: say so and offer them.
-2. **A change is done only when `outcome` is `applied`.** Then reply with OTTO-Q's `summary` (shorten it, never change
-   its meaning), its **confirmation code** (`OQ-XXXX-XXXX`, the same code the person will see in OrchestrAV, OTTO-PULSE
-   and the twin) and the OrchestrAV `link` from the result, so the person can tap it. `refused`: say it was not done and
-   why, in OTTO-Q's plain words, and what is allowed (a charge limit outside the contract's range, 80-100% for this
-   fleet, is refused with the range). `no_change`: it was already so. `previewed`: nothing has changed yet.
-3. **Act when the words are clear.** Do not ask "are you sure?" for a clear command. Preview (`mode: "preview"`) only
-   when the person asks what would happen; then show the plan and, if they say yes, send the result's `confirm`
-   (`tool` + `args`, plus your `session`) exactly as returned.
-4. **Ask one short question** only when it is truly ambiguous (which service? which car? until when?).
+3. **A change is done only when `outcome` is `applied`.** `refused`: say it was not done, why, in OTTO-Q's plain words,
+   and what is allowed (a charge limit outside the contract's range, 80-100% for this fleet, is refused with the range).
+   `no_change`: it was already so. `previewed`: nothing has changed yet.
+4. **Ask one short question** only when it is truly ambiguous (which service? which car? until when?). Do not ask "are
+   you sure?" for a clear command, except where OTTO-Command returns a `confirm`.
 5. **Times:** OTTO-Q writes "7:00 AM sim time" (the simulation's clock) and "9:24 PM CT" (real time). Keep the label.
-6. **Retries:** for a command, pass `idempotency_key` (the chat message id works) so a resend after a timeout replays
-   the first receipt instead of acting twice.
-7. **Everything resets** when the person stops or resets the demo run in OTTO-TWIN: say so if they ask why a setting is
-   gone. With no demo run live, commands are refused with `no_live_demo`.
-8. Short and plain: two to five sentences, no tables, no JSON, no command ids unless asked.
+6. **Everything resets** when the run ends (a stop or reset in OTTO-TWIN, or the end of a production run): say so if
+   they ask why a setting is gone. With no run that accepts changes, OTTO-Q refuses and says why.
+7. Short and plain: two to five sentences, no tables, no JSON, no command ids unless asked.
 
 ## If MCP is not available
 

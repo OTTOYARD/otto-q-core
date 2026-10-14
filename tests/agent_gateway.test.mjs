@@ -115,10 +115,14 @@ test("the tool catalog is exactly the dispatcher's vocabulary, with the same cap
   delete need.handshake;
   // 0607: enter_passcode is answered before any key is resolved, so it is not in the capability map, but in the public block
   assert.match(LATEST.get("ottoq_agent_call"), /IF v_tool IN \('welcome', 'enter_passcode'\) THEN/);
-  assert.deepEqual(Object.keys(need).sort(), TOOLS.map((t) => t.name).filter((n) => n !== "enter_passcode").sort());
+  // 0721: ask_ottocommand is answered by the gateway's OTTO-Command door, never asked of the database as a tool
+  assert.deepEqual(TOOLS.filter((t) => t.gateway).map((t) => t.name), ["ask_ottocommand"]);
+  assert.ok(!("ask_ottocommand" in need), "the dispatcher must not learn the door's name: it would answer it as a tool");
+  assert.deepEqual(Object.keys(need).sort(), TOOLS.filter((t) => !t.gateway).map((t) => t.name).filter((n) => n !== "enter_passcode").sort());
   const asTs = { "": null, read: "read", note: "note", per_kind: "any_request", owner_settings: "owner_settings" };
   for (const t of TOOLS) {
     if (t.name === "enter_passcode") assert.ok(t.capability === null && t.public === true);
+    else if (t.gateway) assert.ok(t.capability === "read" && t.scope === "fleet", "the door asks what a fleet reader may ask");
     else assert.equal(t.capability, asTs[need[t.name]], t.name);
   }
 });
@@ -194,6 +198,8 @@ const MINIMAL = {
   request_service: { vehicles: ["Tesla-AV-045"], service: "mechanical_pm" }, cancel_service: { vehicles: "all" },
   hold_vehicle: { vehicles: ["RT-003"], until: "6:00 AM" }, release_hold: { vehicles: "all" },
   undo_command: { command_id: "ee000000-0000-0000-0000-0000000000c9" },
+  // 0721
+  ask_ottocommand: { text: "How are my cars?" },
 };
 
 function closedEverywhere(schema, path) {

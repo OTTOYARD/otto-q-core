@@ -18,10 +18,17 @@
  *   * the owner's own words travel as each command's note, so its receipt and OrchestrAV show what was asked;
  *   * idempotency: resent with the same idempotency_key, an ask replays each command it makes (one key per command,
  *     derived from the ask's key and the command's content, so a different command can never collide with it);
- *   * a bounded loop: at most ASK_MAX_ROUNDS model turns inside a wall-clock budget;
+ *   * a bounded loop: at most ASK_MAX_ROUNDS model turns inside a 50-second wall-clock budget (0721: Hermes's MCP tool
+ *     timeout is 60 s), each model call timed out at what is left of it, and no engine call started without
+ *     ASK_ENGINE_RESERVE_MS left;
+ *   * (0721) in a production run, a lower charge limit always goes out as a preview: the owner's confirm applies it;
  *   * the answer never claims a change that did not happen: "Done" with nothing applied is replaced by the receipts,
  *     and an applied change always carries its OrchestrAV link;
  *   * confirm: a previewed plan is applied from its confirm objects with NO model involved.
+ *
+ * 0721 (Chase 2026-10-14: OTTO-Command is "the filter and executor" between personal agents and OTTO-Q): the same door is
+ * the MCP tool ask_ottocommand, and OTTO-Command also reads the token's other fleet-scoped reads (depot_status,
+ * vehicle_card, recent_decisions, stall_availability; scope read in their live bodies, md5-pinned by 0721's P1).
  *
  * Pure apart from the injected model call: no Deno, no database. tests/owner_agent.test.mjs drives it with a scripted
  * model and, when a scratch PostgreSQL is reachable, against the real 0605 SQL.
@@ -50,14 +57,23 @@ import type { AskHandler, EngineCall, EngineOutcome, HttpOut, JsonSchema, ToolDe
 
 export const ANSWERED_BY = "OTTO-Command";
 export const ASK_MAX_ROUNDS = 6;
-export const ASK_BUDGET_MS = 100_000;
+/** 0721: the whole ask, under Hermes's 60-second MCP tool timeout with room for the handshake and the reply. */
+export const ASK_BUDGET_MS = 50_000;
+/** A model call is not started with less than this left of the budget. */
+export const ASK_MIN_MODEL_MS = 3_000;
+/** An engine call is not started with less than this left (the engine's own timeout is 15 s), so the ask ends inside 60. */
+export const ASK_ENGINE_RESERVE_MS = 10_000;
 export const ASK_MAX_TOKENS = 1200;
 /** A tool result longer than this is cut before the model reads it (a 36-car fleet is about 18 KB). */
 export const TOOL_RESULT_MAX_CHARS = 30_000;
 export const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 export const ANTHROPIC_VERSION = "2023-06-01";
 
-const OWNER_TOOL_NAMES: ReadonlySet<string> = new Set<string>([...OWNER_READS, ...OWNER_COMMANDS]);
+/** 0721: the token's other reads OTTO-Command uses. Each keeps to the token's fleet (depot_status counts only its cars;
+ *  vehicle_card and recent_decisions go through the fleet scope test) or names no car (stall_availability: stall codes,
+ *  types and gates, never a vehicle or an owner). Read in their live bodies 2026-10-14; 0721's P1 pins them by md5. */
+export const OTTOCOMMAND_READS = ["depot_status", "vehicle_card", "recent_decisions", "stall_availability"] as const;
+const OWNER_TOOL_NAMES: ReadonlySet<string> = new Set<string>([...OWNER_READS, ...OTTOCOMMAND_READS, ...OWNER_COMMANDS]);
 const COMMAND_NAMES: ReadonlySet<string> = new Set<string>(OWNER_COMMANDS);
 /** Arguments the door, not the model, decides: the owner's words go in as the note, the key is derived, and a plan hash
  *  only ever comes from a preview's confirm. */
@@ -75,7 +91,8 @@ export type ModelMessage =
   | { role: "user"; content: string | ToolResultBlock[] }
   | { role: "assistant"; content: string | ModelBlock[] };
 export type ModelTool = { name: string; description: string; input_schema: JsonSchema };
-export type ModelRequest = { system: string; tools: ModelTool[]; messages: ModelMessage[]; max_tokens: number };
+/** timeout_ms (0721): what is left of the ask's budget; the call is cut there, never later than the model's own cap. */
+export type ModelRequest = { system: string; tools: ModelTool[]; messages: ModelMessage[]; max_tokens: number; timeout_ms?: number };
 export type ModelReply =
   | { ok: true; content: ModelBlock[]; stop_reason: string }
   | { ok: false; status: number; message: string };
@@ -97,7 +114,7 @@ export function anthropicModel(o: { apiKey: string; model: string; fetchImpl?: t
           tools: req.tools,
           messages: req.messages,
         }),
-        signal: AbortSignal.timeout(o.timeoutMs ?? 45_000),
+        signal: AbortSignal.timeout(Math.max(1, Math.min(req.timeout_ms ?? Infinity, o.timeoutMs ?? 45_000))),
       });
     } catch (e) {
       const name = (e as { name?: string } | null)?.name;
@@ -127,15 +144,16 @@ export const SYSTEM_PROMPT = [
   "You are OTTO-Command, the voice of OTTO-Q, the orchestration engine at the OTTOYARD Nashville Flagship depot, which runs as a digital twin. You are answering a vehicle owner's personal AI agent, which forwards your answer to the owner, usually on a phone.",
   "",
   "What you can do, only through your tools:",
-  "- Read the owner's own cars: my_fleet (start here for anything about \"my cars\" or \"the fleet\"), my_vehicle (one car), my_settings (what is in force), my_commands (what was asked before, with command ids).",
+  "- Read the owner's own cars: my_fleet (start here for anything about \"my cars\" or \"the fleet\"; it gives each car's vehicle_id), my_vehicle (one car), my_settings (what is in force), my_commands (what was asked before, with command ids).",
+  "- Look further when the owner asks: depot_status (is a run live and of which kind, the sim clock, the owner's cars by state), vehicle_card (one car's full work order, by the vehicle_id my_fleet gives), recent_decisions (what OTTO-Q decided for the owner's cars lately; vehicle_id optional), stall_availability (chargers and bays free at the depot now; it names no car).",
   "- Change what the owner's cars NEED, inside the owner's contract: set_charge_limit and clear_charge_limit (how full they charge), request_service and cancel_service (work done at the depot), hold_vehicle and release_hold (not before a time), undo_command.",
   "",
-  "What you cannot do, and must say plainly when asked: move or drive a car, pick its route, stall, charger or place in line (OTTO-Q decides when and where, and the car's own driving system moves it), lock or unlock it, touch another owner's cars, or change anything when no demo run is live. Offer the nearest thing you can do, such as a hold instead of \"keep it parked\".",
+  "What you cannot do, and must say plainly when asked: move or drive a car, pick its route, stall, charger or place in line (OTTO-Q decides when and where, and the car's own driving system moves it), lock or unlock it, touch another owner's cars, or change anything when the context says changes are not allowed now. Offer the nearest thing you can do, such as a hold instead of \"keep it parked\", and when nothing can change, say why in the context's words and what the owner can do instead.",
   "",
   "How to answer:",
   "1. Facts come only from tool results. Never invent a car, a number, a time or a setting. If the owner names a car that does not exist, the tool refuses and lists the real names: say so.",
-  "2. A change is done only when its tool returns outcome \"applied\". Then begin with \"Done.\", give OTTO-Q's own summary from the receipt (shorten it, never contradict it), and end with the receipt's confirmation code and its OrchestrAV link. \"refused\": say it was not done, why, in one sentence, and what is allowed instead. \"no_change\": it was already so. \"previewed\": nothing has changed yet.",
-  "3. When the owner's words clearly name a change, make it; do not ask for confirmation. If they ask to see it first (\"what would happen if\", \"preview\", \"before you do it\"), send mode \"preview\" and say nothing has changed.",
+  "2. A change is done only when its tool returns outcome \"applied\". Then begin with \"Done.\", give OTTO-Q's own summary from the receipt (shorten it, never contradict it), and end with the receipt's confirmation code and its OrchestrAV link. \"refused\": say it was not done, why (the refusal's own reason), and what is allowed instead (its hint, when it has one). \"no_change\": it was already so. \"previewed\": nothing has changed yet.",
+  "3. When the owner's words clearly name a change, make it; do not ask for confirmation. Two exceptions. If they ask to see it first (\"what would happen if\", \"preview\", \"before you do it\"), send mode \"preview\" and say nothing has changed. In a PRODUCTION run (the context says so), lowering how full cars charge is always previewed first: send mode \"preview\", give the plan, and say nothing has changed until the owner confirms. A previewed change is applied only by the owner's confirm, which their agent sends back; you cannot apply it yourself and must never say it was done.",
   "4. When a request is truly ambiguous (which service, which car, until when), ask one short question instead of guessing.",
   "5. Words to tools: \"service bay\", \"maintenance\", \"have a tech look at it\" -> mechanical_pm. \"wash\", \"external cleaning\", \"exterior cleaning\" -> exterior_wash. \"detail\", \"deep clean\" -> interior_deep_clean. \"quick clean\", \"tidy\" -> interior_tidy. \"lost item\", \"left my bag\" -> item_retrieval. \"update\" -> software_update. \"clean the sensors or cameras\" -> sensor_clean. \"calibrate\" -> sensor_calibration. \"after charging\": OTTO-Q always plans bay work after the charge, so request the service with when \"now\". \"every time it comes back\", \"always\", \"from now on\" -> when \"every_return\". \"next time\" -> \"next_return\". \"all my cars\", \"the fleet\", \"all Teslas\" -> vehicles \"all\". \"Tesla 45\" is fine as a name.",
   "6. Times: tools give times in Nashville local time, marked \"sim time\" (the simulation's clock) or \"CT\" (real time). Keep the mark. A hold time you send is on the sim clock.",
@@ -152,7 +170,20 @@ export function ownerContext(who: EngineOutcome, dryRun: boolean): string {
   const lines = [`Owner: ${fleet}, at ${depot}.`];
   if (owner) {
     const range = isObject(owner.charge_limit_pct) ? owner.charge_limit_pct : {};
-    lines.push(`Cars: ${String(owner.cars ?? "unknown")}. Demo run live: ${owner.live_demo_run ? "yes" : "no (no change can be made until one starts)"}.`);
+    const changes = isObject(owner.changes) ? owner.changes : null;
+    if (!changes) {
+      lines.push(`Cars: ${String(owner.cars ?? "unknown")}. Demo run live: ${owner.live_demo_run ? "yes" : "no (no change can be made until one starts)"}.`);
+    } else if (changes.allowed === true) {
+      const run = changes.run_kind === "production" ? "a PRODUCTION run" : "a demo run";
+      lines.push(`Cars: ${String(owner.cars ?? "unknown")}. Live: ${run}. Changes are allowed now` +
+        `${typeof changes.person === "string" ? `, recorded under ${changes.person}` : ""}.`);
+      if (changes.lower_limit_needs_preview === true) {
+        lines.push("PRODUCTION RULE: a lower charge limit is previewed first and applied only by the owner's confirm (enforced by OTTO-Q).");
+      }
+    } else {
+      lines.push(`Cars: ${String(owner.cars ?? "unknown")}. Changes are NOT allowed now: ${String(changes.message ?? "")}` +
+        `${typeof changes.hint === "string" ? ` ${changes.hint}` : ""}`);
+    }
     if (range.min !== undefined && range.max !== undefined) lines.push(`Charge limit range in the contract: ${String(range.min)}% to ${String(range.max)}%.`);
     if (Array.isArray(owner.requestable_services)) {
       const svc = owner.requestable_services.filter(isObject).map((s) => `${String(s.service)} (${String(s.name)}, about ${String(s.minutes)} min, ${String(s.where)})`);
@@ -246,6 +277,8 @@ export type AskResult = {
   link: string | null;
   incomplete: boolean;
   rounds: number;
+  /** 0721: the confirm objects of every change that was only previewed, ready to send back as `confirm`. */
+  confirm?: AskConfirm[];
 };
 export type AskFailure = { status: number; error: { code: string; message: string; details?: ValidationError[] }; partial?: AskResult };
 
@@ -307,6 +340,26 @@ export function settleAnswer(answer: string, actions: readonly AskAction[], dryR
   return out;
 }
 
+/** The confirm objects of the previewed changes, exactly as OTTO-Q returned them. */
+function confirmsOf(actions: readonly AskAction[]): AskConfirm[] | undefined {
+  const out = actions.filter((a) => a.outcome === "previewed" && isObject(a.confirm)).map((a) => a.confirm as AskConfirm);
+  return out.length ? out : undefined;
+}
+
+/** 0721: the gate's answer from whoami, when the database gives one: may this token change settings now, and how. */
+export function ownerChanges(who: EngineOutcome): { allowed: boolean; production: boolean; lowerNeedsPreview: boolean; max: number } {
+  const data = isObject(who.data) ? who.data : {};
+  const owner = isObject(data.owner) ? data.owner : {};
+  const changes = isObject(owner.changes) ? owner.changes : {};
+  const range = isObject(owner.charge_limit_pct) ? owner.charge_limit_pct : {};
+  return {
+    allowed: changes.allowed === true,
+    production: changes.run_kind === "production",
+    lowerNeedsPreview: changes.lower_limit_needs_preview === true,
+    max: typeof range.max === "number" ? range.max : 100,
+  };
+}
+
 function primaryLink(actions: readonly AskAction[], readLink: string | null): string | null {
   const withLink = [...actions].reverse().find((a) => a.link && (a.outcome === "applied" || a.outcome === "previewed"));
   return withLink?.link ?? readLink;
@@ -336,7 +389,12 @@ export function ownerTools(who: EngineOutcome): ToolDef[] {
 /** Apply previewed plans exactly: each confirm goes out with mode apply and its plan hash, and no model is involved. */
 async function applyConfirms(input: AskInput, deps: AskDeps, tools: readonly ToolDef[]): Promise<AskResult | AskFailure> {
   const actions: AskAction[] = [];
+  const now = deps.now ?? Date.now;
+  const started = now();
+  const budget = deps.budgetMs ?? ASK_BUDGET_MS;
+  let incomplete = false;
   for (const [i, c] of (input.confirm ?? []).entries()) {
+    if (i > 0 && budget - (now() - started) < ASK_ENGINE_RESERVE_MS) { incomplete = true; break; }
     const tool = tools.find((t) => t.name === c.tool && COMMAND_NAMES.has(t.name));
     if (!tool) return { status: 403, error: { code: "tool_not_available", message: `confirm[${i}]: ${c.tool} is not a command this token may send.` } };
     const args: Record<string, unknown> = { ...c.args, mode: "apply" };
@@ -354,7 +412,7 @@ async function applyConfirms(input: AskInput, deps: AskDeps, tools: readonly Too
     if (isTransportFailure(outcome)) break;
   }
   const answer = settleAnswer(receiptsText(actions), actions, false);
-  return { answer, answered_by: ANSWERED_BY, dry_run: false, actions, reads: [], link: primaryLink(actions, null), incomplete: false, rounds: 0 };
+  return { answer, answered_by: ANSWERED_BY, dry_run: false, actions, reads: [], link: primaryLink(actions, null), incomplete, rounds: 0 };
 }
 
 /** One ask: the model reads the owner's words and calls tools through the owner's token until it can answer. */
@@ -380,10 +438,14 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
   let finished = false;
   let stopped: { code: string; message: string } | null = null;
   let rounds = 0;
+  let previewForced = false;
+  const left = () => budget - (now() - started);
+  const spent = { code: "ask_budget_spent", message: "OTTO-Command ran out of time." };
+  const gate = ownerChanges(deps.who);
 
   while (rounds < maxRounds) {
-    if (now() - started > budget) { stopped = { code: "ask_budget_spent", message: "OTTO-Command ran out of time." }; break; }
-    const reply = await deps.model({ system: SYSTEM_PROMPT, tools: offered, messages, max_tokens: ASK_MAX_TOKENS });
+    if (left() < ASK_MIN_MODEL_MS) { stopped = spent; break; }
+    const reply = await deps.model({ system: SYSTEM_PROMPT, tools: offered, messages, max_tokens: ASK_MAX_TOKENS, timeout_ms: left() });
     rounds += 1;
     if (!reply.ok) { stopped = { code: "ask_model_failed", message: reply.message }; break; }
     const text = reply.content.filter((b): b is { type: "text"; text: string } => b.type === "text").map((b) => b.text).join("\n").trim();
@@ -404,6 +466,14 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
       const isCommand = COMMAND_NAMES.has(tool.name);
       if (isCommand) {
         if (input.dry_run) args.mode = "preview";
+        // 0721 (rule 9: a lower limit is "set verified and confirmed"): in a production run a limit below full is always
+        // previewed here, whatever the model asked; the owner's confirm applies it, and the database refuses an apply that
+        // lowers a limit without the preview's plan hash anyway
+        if (tool.name === "set_charge_limit" && gate.lowerNeedsPreview && args.mode !== "preview"
+            && typeof args.percent === "number" && args.percent < gate.max) {
+          args.mode = "preview";
+          previewForced = true;
+        }
         if (words) args.note = words.slice(0, 500);
         if (input.idempotency_key && args.mode !== "preview") args.idempotency_key = await commandKey(input.idempotency_key, tool.name, args);
       }
@@ -412,6 +482,7 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
         results.push({ type: "tool_result", tool_use_id: use.id, is_error: true, content: JSON.stringify({ error: "invalid_arguments", details: v.errors }) });
         continue;
       }
+      if (left() < ASK_ENGINE_RESERVE_MS) { stopped = spent; break; }
       const outcome = await deps.call(tool.name, v.value, {});
       if (isCommand) actions.push(actionOf(tool.name, v.value, outcome));
       else {
@@ -442,8 +513,18 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
       ? `OTTO-Command could not finish its answer, but here is what OTTO-Q did:\n\n${receiptsText(actions)}`
       : lastText)
     : lastText;
+  let answer = settleAnswer(draft, actions, input.dry_run);
+  const confirm = confirmsOf(actions);
+  if (previewForced && confirm) {
+    // the model asked to apply and the door previewed: an answer that does not say it is only a preview is replaced by
+    // OTTO-Q's own receipts, and the answer always says why nothing has changed
+    if (!/\bpreview|nothing has changed/i.test(answer)) answer = receiptsText(actions);
+    if (!/production run/i.test(answer)) {
+      answer = `${answer}\nNothing has changed yet: this is a production run, so a lower charge limit is applied only when you confirm it.`;
+    }
+  }
   return {
-    answer: settleAnswer(draft, actions, input.dry_run),
+    answer,
     answered_by: ANSWERED_BY,
     dry_run: input.dry_run,
     actions,
@@ -451,13 +532,22 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
     link: primaryLink(actions, readLink),
     incomplete,
     rounds,
+    ...(confirm ? { confirm } : {}),
   };
 }
 
 /** The door as the gateway mounts it. Without a model it still applies confirms; a plain-English ask answers 503. */
 export function ownerAskHandler(o: { model: ModelCall | null; modelName?: string; maxRounds?: number; budgetMs?: number }): AskHandler {
-  return async ({ who, call, bodyText }): Promise<HttpOut> => {
+  return async ({ who, call, bodyText, headers }): Promise<HttpOut> => {
     const meta: Record<string, unknown> = { tool: "ask", call_id: who.call_id ?? null };
+    // the Idempotency-Key header, as every other POST honours it; the body's key wins when both are sent
+    const idem = headers?.get("idempotency-key");
+    if (idem) {
+      try {
+        const raw: unknown = JSON.parse(bodyText.trim() === "" ? "{}" : bodyText);
+        if (isObject(raw) && raw.idempotency_key === undefined) bodyText = JSON.stringify({ ...raw, idempotency_key: idem });
+      } catch { /* parseAskBody refuses the body as it came */ }
+    }
     const parsed = parseAskBody(bodyText);
     if (!parsed.ok) {
       return { status: 400, headers: {}, body: { error: { code: "invalid_arguments", message: "The ask is not valid.", details: parsed.errors }, meta } };

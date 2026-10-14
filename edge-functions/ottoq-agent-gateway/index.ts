@@ -10,7 +10,8 @@
 // An OWNER's agent (0605, PERSONAL_AGENT.md) can also set what its own cars need -- a charge limit inside its contract,
 // a service, a hold, an undo -- and the engine applies it at its next tick. POST /v1/ask is that same door in plain
 // English: OTTO-Command (../_shared/ottocommand_owner.ts) reads the owner's words and calls the same tools through the
-// same engine call, with the owner's own token, so it can do nothing the token could not.
+// same engine call, with the owner's own token, so it can do nothing the token could not. 0721: the same door is the
+// MCP tool ask_ottocommand (every token bound to a fleet), answered by the same handler, ledgered as transport 'ask'.
 //
 // THIS FILE IS THE I/O SHELL ONLY. Routing, schemas, validation, MCP, OpenAPI and the A2A card live in
 // ../_shared/agent_gateway.ts, which tests/agent_gateway.test.mjs imports directly. Scope, rate limits and the

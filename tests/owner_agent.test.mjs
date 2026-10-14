@@ -53,6 +53,7 @@ import {
   modelTools,
   ownerAskHandler,
   ownerContext,
+  OTTOCOMMAND_READS,
   parseAskBody,
   receiptsText,
   settleAnswer,
@@ -455,7 +456,7 @@ test("the door: OTTO-Command calls the owner's tool with the owner's token, and 
   assert.deepEqual(calls[1].args, { vehicles: "all", percent: 90, note: WORDS }, "the owner's words ride as the note; no key without one");
   // the model: the cached prompt, the owner's tools only, without the arguments the door decides
   assert.equal(requests[0].system, SYSTEM_PROMPT);
-  assert.deepEqual(sorted(requests[0].tools.map((t) => t.name)), sorted([...OWNER_READS, ...OWNER_COMMANDS]));
+  assert.deepEqual(sorted(requests[0].tools.map((t) => t.name)), sorted([...OWNER_READS, ...OTTOCOMMAND_READS, ...OWNER_COMMANDS]));
   for (const t of requests[0].tools) for (const k of ["note", "idempotency_key", "expect_plan_hash"]) assert.ok(!(k in (t.input_schema.properties ?? {})), `${t.name} offers ${k}`);
   assert.ok("mode" in requests[0].tools.find((t) => t.name === "set_charge_limit").input_schema.properties);
   const first = requests[0].messages[0].content;
@@ -527,7 +528,7 @@ test("only an owner's token may use the door; a fleet reader may ask questions b
   assert.equal(requests.length, 0, "no model call for a token that is not an owner's");
   const reader = await ask(gw, { text: "how are my cars?" }, T_FLEET_READ);
   assert.equal(reader.status, 200);
-  assert.deepEqual(sorted(requests[0].tools.map((t) => t.name)), sorted(OWNER_READS));
+  assert.deepEqual(sorted(requests[0].tools.map((t) => t.name)), sorted([...OWNER_READS, ...OTTOCOMMAND_READS]));
   assert.match(requests[0].messages[0].content, /This token cannot change anything/);
   const stranger = await ask(gw, { text: "hi" }, "oqa_" + "9".repeat(64));
   assert.equal(stranger.status, 401);
@@ -630,7 +631,7 @@ test("the owner's context and tools as the model sees them", () => {
   const off = ownerContext({ ...who, data: { ...who.data, owner: { ...OWNER_DATA, live_demo_run: null } } }, true);
   assert.match(off, /Demo run live: no/);
   assert.match(off, /DRY RUN/);
-  const tools = modelTools(toolsFor(["read", "owner_settings"], { fleetBound: true }).filter((t) => t.scope === "fleet"), false);
+  const tools = modelTools(toolsFor(["read", "owner_settings"], { fleetBound: true }).filter((t) => t.scope === "fleet" && !t.gateway), false);
   assert.equal(tools.length, OWNER_READS.length + OWNER_COMMANDS.length);
   for (const t of tools) {
     assert.match(t.name, /^[a-zA-Z0-9_-]{1,64}$/);

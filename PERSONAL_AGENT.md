@@ -8,6 +8,11 @@ passcode on and the live smoke passed (section 7). Section 9 says exactly what w
 www.ottoyard.com/connect, they sign in with their OTTOYARD account and approve it, and it holds its own tokens; no
 passcode or key passes through the chat, and the connection outlasts runs. Set up for Chase and his Hermes first.*
 
+*2026-10-14: **OTTO-Command is the one door for personal agents** (0721 and the gateway, section 11; built, not yet
+applied or deployed): the MCP tool `ask_ottocommand` takes your words, reads and acts with your agent's own token, and
+answers; a signed-in owner may change their cars on a **production** run, recorded under their name, with a lower charge
+limit previewed and then confirmed.*
+
 Chase, 2026-10-03: *"I want to be able to setup and activate a new agent from theoretically Hermes or [Grok] or any
 other agent and be able to call OTTOYARD ... and allow me to access my fleet ... a general password or passcode that I
 can enter after the welcome agent triggered ... if it's something that doesn't fit, [OTTO-Q] should send back a
@@ -133,8 +138,9 @@ stub fleet is smaller; the live wording follows the same rule over your real car
 
 - **Your cars only.** The session (or key) is bound to Tesla Robotaxi TN at the twin depot; every other car reads as not found.
   Waymo and Zoox cars cannot be named.
-- **Demo runs only.** Settings apply to a live `operator_demo` run at the twin depot, and end with it (section 4).
-  With no demo live, a command is refused with *no_live_demo*.
+- **Demo runs only** (until 0721; section 11). Settings apply to a live `operator_demo` run at the twin depot, and end
+  with it (section 4). With no demo live, a command is refused with *no_live_demo*. After 0721 a production run also
+  takes changes, from an agent signed in to its owner's account only, each recorded under that person.
 - **Charge limits stay inside your contract.** Tesla Robotaxi TN's contract allows **80% to 100%** (read 2026-10-02).
   "Charge to 50%" is refused and recorded, with the range in the reply. Rule 9 holds: the depot never lowers a target;
   only the owner does, verified (the contract) and confirmed (an explicit command).
@@ -232,9 +238,9 @@ For an agent that should never need the passcode: issue a key (section 7 step 6)
 tools then need no `session`, and the key does not end with the run (it is revoked by hand). A key is a secret: never in
 a chat, a repo, or a URL.
 
-### Plain English: `POST /v1/ask`
+### Plain English: `POST /v1/ask`, or the MCP tool `ask_ottocommand` (0721)
 
-Any agent with a session or a key can forward your words; OTTO-Command (inside the gateway) reads them, calls the owner tools with **that** key, and
+Any agent with a session or a key can forward your words (over MCP, as the tool `ask_ottocommand`, section 11); OTTO-Command (inside the gateway) reads them, calls the owner tools with **that** key, and
 answers in plain English with OTTO-Q's receipts and the link. One call, no tool mapping on Hermes's side.
 
 ```bash
@@ -513,6 +519,86 @@ connected at 12:04 PM CT.*
   - 1,571 MCP pings, about one every three minutes;
   - 3 connections (initialize, notifications/initialized, tools/list each time);
   - no tool calls yet: it is connected and has not yet asked about the cars.
+
+## 11. OTTO-Command is the filter and executor (0721)
+
+*Built and tested on scratch 2026-10-14; **not yet applied or deployed** (the steps are at the end of this section).*
+Chase, 2026-10-14: *"It should just act as both a query LLM bot to provide answers and search results, and also execute
+for OTTO-Q when preferences are changed via personal agents like Hermes, Grok, etc. So request comes in from personal
+agents, OTTOCommand processes and acts and returns info back. So it will act as the filter and executor there."*
+
+```
+  your agent (Hermes, Grok, ...) ── your words ──> ask_ottocommand   (MCP, any token bound to your fleet)
+                                                   POST /v1/ask      (REST, the same door)
+                                                        │
+                       OTTO-Command reads the words, then calls, WITH YOUR TOKEN and nothing else:
+                         reads    my_fleet · my_vehicle · my_settings · my_commands
+                                  depot_status · vehicle_card · recent_decisions · stall_availability
+                         changes  set_charge_limit · clear_charge_limit · request_service · cancel_service
+                                  hold_vehicle · release_hold · undo_command
+                                                        │
+                       public.ottoq_agent_call  (the one door: scope, contract, rate limit, the ledger: transport 'ask')
+                                                        │
+  your agent <── answer (plain English) + actions (OTTO-Q's receipts) + confirm (when it only previewed) ──┘
+```
+
+**What changes for your agent.** It sends everything to **`ask_ottocommand`** first: your words as `text`, and it
+forwards the `answer`. The typed tools are still there (they are the same database filter), for an agent that wants
+them or for when OTTO-Command is not switched on. When OTTO-Command only previews a change, the result carries
+`confirm`; once you say yes, your agent calls `ask_ottocommand` again with `confirm` set to that array, unchanged, and
+OTTO-Q applies exactly the plan you saw (no model is involved in a confirm).
+
+**What OTTO-Command can look up for you, now.** Your cars, one car, what you have set, what you asked before; and
+(new) whether a run is live and which kind, the sim clock and your cars by state (`depot_status`), one car's full work
+order (`vehicle_card`), what OTTO-Q decided for your cars lately (`recent_decisions`), and which chargers and bays are
+free at the depot (`stall_availability`). The first three keep to your fleet in their own SQL; the last names no car
+and no owner (stall codes, types and the three gates). 0721's P1 pins all four bodies by md5, so a change to one of them
+stops the migration until its scope is read again.
+
+**Production, for a person.** Today an owner command is refused on anything but a demo run. After 0721:
+
+| The live run at the twin depot | An agent signed in to your OTTOYARD account (section 10) | A passcode session, or an issued key |
+|---|---|---|
+| a demo run | as before; the change is recorded under your account | as before; no person is recorded |
+| **a production run** | **allowed**, recorded under your account (`acting_person`); a **lower charge limit** takes a preview and then your confirm with its plan hash | **refused** (`production_needs_a_person`): it can read your cars but not change them, because in production every change is recorded under the person who made it. The refusal says so and says to sign in |
+| none, or another kind | refused, `no_live_demo` (0605's words) | refused, `no_live_demo` |
+
+- **Rule 9.** A lower limit is yours, *"set verified and confirmed"*. In production, OTTO-Command always previews a
+  limit below full whatever its model asked for, and OTTO-Q itself refuses an apply that lowers a limit without the
+  preview's plan hash (`confirm_required`, with the reason and the hint that raising or clearing needs no preview). An
+  undo that puts back a lower limit you confirmed earlier on the same run is not asked twice.
+- **Rule 10.** Production never self-tunes: nothing here writes a setting (`ottoq_policy_set`); your changes stay in the
+  owner tables and lift when the production run ends, as a demo's do. A trigger refuses any applied production command
+  without a person, whoever writes it.
+- **Who and which door, on every command.** `ottoq_owner_commands.acting_person` is your account's email for a
+  signed-in agent and empty for a passcode or key; `via` is `ottocommand` when OTTO-Command sent it and `direct` when the
+  agent called the tool itself. Both are immutable, and the receipt shows them.
+- **Every refusal says why and what is allowed**, in OTTO-Q's words; OTTO-Command relays the reason and the hint, and
+  its answer can never claim a change the receipts do not show.
+
+**Time.** The whole ask is capped at **50 seconds** (Hermes's MCP tool timeout is 60): each model call is cut at what is
+left, and no engine call starts with less than 10 seconds left, so an engine call that takes its full 15 still ends
+inside 60. A cut-short ask says what OTTO-Q did (`incomplete: true`).
+
+**To go live** (in this order; times in CT when done):
+1. **Apply `db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql`** per `scripts/APPLYING.md`
+   (`forces_recert` FALSE: only the agent door changes, and no certification arm can run while any run is live). It
+   refuses while anything is in flight, and its V3 probes a production session end to end in a block that rolls back.
+2. **Deploy `ottoq-agent-gateway`** with JWT verification off, these five files: `ottoq-agent-gateway/index.ts`,
+   `_shared/agent_gateway.ts`, `_shared/ottocommand_owner.ts`, `_shared/agent_signin.ts`,
+   `_shared/agent_dial_discipline.ts`. Before 0721 is applied the new gateway still works: whoami simply carries no
+   `changes`, OTTO-Command falls back to the demo wording, and production stays refused by the database.
+3. **Switch OTTO-Command on**: the function secrets `ANTHROPIC_API_KEY` and `OTTOCOMMAND_OWNER_MODEL` (or
+   `ANTHROPIC_MODEL`). Without them `ask_ottocommand` answers `ask_not_configured` as a tool error and every typed tool
+   still works.
+4. **Update Hermes's skill** to `integrations/hermes/ottoq-owner/SKILL.md` v1.3 and `/reload-mcp`.
+
+**Verified on scratch (2026-10-14).** `tests/test_ottocommand_executor_sql.py` (17): the bodies are the live ones by
+md5; before 0721 a signed-in owner is refused in production and nothing names a person or a door; after it, everything
+in the table above, the stamps, the guard, the backstop, the grants and the registry. `tests/ottocommand_executor.test.mjs`
+(15): the tool's listing, routing, transport and budget, preview-then-confirm in production, Hermes's skill, and both flows end to end
+over the real SQL with 0721 applied. **Not verified:** a live model behind the door, a real production run, and Hermes
+calling `ask_ottocommand` (it has made no tool call yet: db/checks/0449).
 
 ## Sources (external facts; read 2026-10-03 unless marked)
 

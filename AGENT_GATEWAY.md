@@ -37,6 +37,17 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > confirmation code (`OQ-XXXX-XXXX`); `ottoq_depot_owner_board` (0608) shows OTTO-PULSE and the twin every owner's
 > settings with their codes. A stop or reset of the twin ends every passcode session. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §0.
 
+> **2026-10-14 — OTTO-Command is the filter and executor (migration `0721` and this gateway's code; built and tested on
+> scratch, NOT yet applied or deployed).** Chase: *"request comes in from personal agents, OTTOCommand processes and acts
+> and returns info back. So it will act as the filter and executor there."* The plain-English door is now also the MCP
+> tool **`ask_ottocommand`**, offered to every token bound to a fleet (an owner key, a passcode session, an agent signed
+> in to its owner's account) and to no other; it is answered by the same handler as `POST /v1/ask`, through the caller's
+> own token, ledgered as transport `ask`, and capped at 50 seconds. OTTO-Command also reads `depot_status`,
+> `vehicle_card`, `recent_decisions` and `stall_availability` for the owner. In the database (0721): every owner command
+> records `acting_person` (the signed-in account's email, or none) and `via` (`ottocommand` or `direct`); a
+> **production** run accepts owner commands from an agent signed in to its owner's account and from nothing else; there,
+> a lower charge limit takes a preview and its plan hash. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11.
+
 ---
 
 ## 1. Architecture
@@ -171,7 +182,7 @@ Every tool is available over REST and MCP. `sim_*` and `at_sim` fields are **sim
 | `request_service` · `cancel_service` | `POST /v1/me/services` · `/cancel` | `owner_settings` | order (now, next return, every return) or withdraw an owner's service |
 | `hold_vehicle` · `release_hold` | `POST /v1/me/holds` · `/release` | `owner_settings` | "not before" a sim time, at most 24 sim hours |
 | `undo_command` | `POST /v1/me/undo` | `owner_settings` | reverse one applied command |
-| *(plain English)* | `POST /v1/ask` | an owner's token | OTTO-Command reads the owner's words and calls the tools above with that token |
+| `ask_ottocommand` | `POST /v1/ask` | `read`, fleet-bound (0721) | **the first door**: OTTO-Command reads the person's words, calls the tools above and the fleet's reads with that token, and answers in plain English with the receipts; a preview comes back with a `confirm` to send back once the person says yes |
 
 `GET /v1/tools` lists the tools **your** token may use with their JSON Schemas; `GET /v1` lists every endpoint;
 `GET /v1/openapi.json` is the OpenAPI 3.1 document, generated from the same catalog (public).
@@ -225,6 +236,13 @@ or `{"error": {"code","message","hint?","details?"}, "meta": {…}}`. `call_id` 
   transport errors.
 - **Authorization:** a static Bearer token in the `Authorization` header. OAuth / protected-resource-metadata
   discovery is **not** implemented; configure the client with the header directly.
+- **`ask_ottocommand` (0721)** is answered by the gateway, never by the database as a tool of its own: a handshake
+  authenticates (an unknown token learns nothing, not even whether the door is on), then the same handler `POST /v1/ask`
+  uses runs with the caller's own call bound to transport `ask`, so every engine call it makes is the caller's and is
+  ledgered as the door's. Over the no-key endpoint it takes the `session` argument like every other tool. The door's own
+  failures (no model configured, a model error, a token not bound to a fleet, its 50-second budget spent) are tool
+  results with `isError: true`, so an agent can fall back to the typed tools; only 401 and the rate limit are transport
+  errors, as for every tool. In `/v1/openapi.json` it is the operation `ask_ottocommand` at `POST /v1/ask`.
 
 **A2A** (1.0.0): `GET /.well-known/agent-card.json` (also `/.well-known/agent.json`) is a public **discovery** card —
 `supportedInterfaces` points at `/mcp` and `/v1` as custom bindings, `securitySchemes` declares the Bearer token, and
