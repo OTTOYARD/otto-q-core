@@ -518,6 +518,19 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_public_key_default_deny_sql.py
 
+      # 0702, the production guard knows every agent by name: the registry ottoq_is_agent_actor reads, the rule-10 guard,
+      # the agent_writable guard, the agent envelope and the feed-plan promote door, executed on the live bodies
+      # (md5-pinned) as each actor. Like the thirteen below, it had no executed step and skipped in the pytest step.
+      - name: The production guard knows every agent by name, executed (0702 against the live bodies)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_agent_actor_registry_sql.py
+
       # 0703-0719 (the agent-architecture study of 2026-10-13) and 0579/0582 had no executed step, so these thirteen
       # files skipped in the pytest step above with every other SQL suite, and a green verify never ran one of them
       # (found 2026-10-14 while merging main into the study's branch). 0703-0705 the evidence row, the scouts and the
