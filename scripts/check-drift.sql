@@ -754,6 +754,7 @@ repo_manifest(version, name, file) AS (
     ('20261010113923'::text, 'a_new_visit_carries_the_work_the_visit_it_replaces_still_owes'::text, '0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql'::text),
     ('20261010110724'::text, 'the_twin_apps_determinism_canon_card_reads_again'::text, '0699_the_twin_apps_determinism_canon_card_reads_again.sql'::text),
     ('20261010111411'::text, 'an_owner_signs_in_and_connects_their_own_agent'::text, '0700_an_owner_signs_in_and_connects_their_own_agent.sql'::text),
+    ('PENDING'::text, 'the_production_guard_knows_every_agent_by_name'::text, '0702_the_production_guard_knows_every_agent_by_name.sql'::text),
     ('20261013150710'::text, 'every_agent_pass_keeps_what_it_saw_and_what_it_changed'::text, '0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql'::text),
     ('20261013151002'::text, 'every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find'::text, '0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql'::text),
     ('20261013151112'::text, 'the_agent_is_consulted_when_something_changes_not_on_every_beat'::text, '0705_the_agent_is_consulted_when_something_changes_not_on_every_beat.sql'::text),
