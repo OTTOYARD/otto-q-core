@@ -55,6 +55,21 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > in the OTTOYARD account session is not built). `ask_ottocommand` is annotated `destructiveHint: true`.
 > [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11.
 
+> **2026-10-14, afternoon — OTTO-Command searches OTTO-Q and the web (same `0721`, same gateway; built and tested on
+> scratch, NOT yet applied or deployed).** Chase (read 12:35 PM CT): *"Search should cover OTTO-Q and web. It can be ask
+> and tools as well."* A second door, the MCP tool **`ottocommand_search`** and **`POST /v1/search`**
+> (`{question, scope: "ottoq" | "web" | "both"}`), answers `{answer, sources: [{url, title}], ottoq_reads,
+> web_searches}`, is offered to the same tokens as `ask_ottocommand`, and is read-only by construction: it is given no
+> tool that changes anything (annotated `readOnlyHint: true`, `openWorldHint: true`). `ask_ottocommand` may search the
+> web too (now `openWorldHint: true`) and returns `sources` and `web_searches` when it does. **Once any web result has
+> entered an ask, the gateway refuses every write tool for the rest of it**, before OTTO-Q is called, and the answer says
+> to ask for the change again; an ask that searched returns no `confirm`. Every model call is one row in
+> `ottoq_model_call_ledger` (provider `anthropic_ottocommand`; ids and counts only) through a service-role-only function,
+> fire-and-forget. In the database: a signed-in owner's charge limit and every-return services are saved to the cars
+> and carried onto each new demo and production run; a guard trigger stops any role from writing an owner setting no
+> applied command made; and a passcode session (and `enter_passcode`) is refused `403 production_live` while a
+> production run is live. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11, "Search, the web, and what lasts".
+
 ---
 
 ## 1. Architecture
@@ -189,7 +204,8 @@ Every tool is available over REST and MCP. `sim_*` and `at_sim` fields are **sim
 | `request_service` · `cancel_service` | `POST /v1/me/services` · `/cancel` | `owner_settings` | order (now, next return, every return) or withdraw an owner's service |
 | `hold_vehicle` · `release_hold` | `POST /v1/me/holds` · `/release` | `owner_settings` | "not before" a sim time, at most 24 sim hours |
 | `undo_command` | `POST /v1/me/undo` | `owner_settings` | reverse one applied command |
-| `ask_ottocommand` | `POST /v1/ask` | `read`, fleet-bound (0721) | **the first door**: OTTO-Command reads the person's words, calls the tools above and the fleet's reads with that token, and answers in plain English with the receipts; a preview comes back with a `confirm` to send back once the person says yes |
+| `ask_ottocommand` | `POST /v1/ask` | `read`, fleet-bound (0721) | **the first door**: OTTO-Command reads the person's words, calls the tools above and the fleet's reads with that token (and the web, when needed), and answers in plain English with the receipts; a preview comes back with a `confirm` to send back once the person says yes; an ask that read the web changes nothing |
+| `ottocommand_search` | `POST /v1/search` | `read`, fleet-bound (0721) | read-only: OTTO-Command answers a question from the fleet's reads (`scope` `ottoq`), the web (`web`) or both (the default), with the web sources it cited |
 
 `GET /v1/tools` lists the tools **your** token may use with their JSON Schemas; `GET /v1` lists every endpoint;
 `GET /v1/openapi.json` is the OpenAPI 3.1 document, generated from the same catalog (public).
@@ -253,6 +269,13 @@ or `{"error": {"code","message","hint?","details?"}, "meta": {…}}`. `call_id` 
   failures (no model configured, a model error, a token not bound to a fleet, its 50-second budget spent) are tool
   results with `isError: true`, so an agent can fall back to the typed tools; only 401 and the rate limit are transport
   errors, as for every tool. In `/v1/openapi.json` it is the operation `ask_ottocommand` at `POST /v1/ask`.
+- **`ottocommand_search` (0721)** is answered by the same handler in search mode: the same handshake and token, the
+  fleet's reads only (none for `scope: "web"`), the web search server tool unless `scope: "ottoq"`, and no confirm door.
+  In `/v1/openapi.json` it is the operation `ottocommand_search` at `POST /v1/search`.
+- **The model behind both doors** is configured by the function's environment: `ANTHROPIC_API_KEY` (required),
+  `OTTOCOMMAND_OWNER_MODEL` (default `claude-opus-5-5`), `OTTOCOMMAND_EFFORT` (default `low`), `OTTOCOMMAND_WEB_SEARCH`
+  (`on`/`off`) and `OTTOCOMMAND_WEB_MAX_USES` (default 3, clamped 1-5). A value the gateway cannot read is answered
+  `ask_misconfigured` (503), never guessed around. `ANTHROPIC_MODEL` is no longer read.
 
 **A2A** (1.0.0): `GET /.well-known/agent-card.json` (also `/.well-known/agent.json`) is a public **discovery** card —
 `supportedInterfaces` points at `/mcp` and `/v1` as custom bindings, `securitySchemes` declares the Bearer token, and
@@ -446,3 +469,12 @@ A token's scope cannot be edited (the guard refuses it): issue a new principal a
 - Deno's own type checker (none available here; `tsc` with a shim is the substitute).
 - The recall door's downstream effect (§6 item 2), and the ops door against a live run.
 - Real MCP clients (Claude Code, Hermes) — the protocol behaviour is tested against the spec text, not a client.
+
+**Verified for `ottocommand_search`, the web and the model ledger (2026-10-14, afternoon CT, scratch only):**
+`tests/agent_gateway.test.mjs` 39 passed (the two OTTO-Command doors listed and annotated, `/v1/search` routed, the
+shell posting only to the engine and the ledger function); `tests/ottocommand_executor.test.mjs` 31 passed with a
+scratch PostgreSQL (28 without); `tests/test_ottocommand_executor_sql.py` 30 passed. The gateway, its shared modules
+and the shell type-check under `tsc --strict` with a Deno shim, except the `jsr:` edge-runtime type import, which only
+Deno resolves. **Not verified:** a real call to the Anthropic API (every test drives a fake fetch), web search enabled
+for this organization, a fallback actually taken, `EdgeRuntime.waitUntil` keeping the ledger write alive after the
+response in the deployed function, and the deploy itself.

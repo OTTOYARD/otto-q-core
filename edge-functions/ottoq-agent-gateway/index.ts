@@ -12,6 +12,10 @@
 // English: OTTO-Command (../_shared/ottocommand_owner.ts) reads the owner's words and calls the same tools through the
 // same engine call, with the owner's own token, so it can do nothing the token could not. 0721: the same door is the
 // MCP tool ask_ottocommand (every token bound to a fleet), answered by the same handler, ledgered as transport 'ask'.
+// 0721 (Chase 2026-10-14, 12:35 PM CT: "Search should cover OTTO-Q and web. It can be ask and tools as well."): the
+// door also answers POST /v1/search and the MCP tool ottocommand_search (read-only: reads and the web, never a
+// command), may search the web (untrusted: an ask that read it changes nothing), and records every model call in
+// public.ottoq_model_call_ledger through ottoq_ottocommand_record_model_call, fire-and-forget.
 //
 // THIS FILE IS THE I/O SHELL ONLY. Routing, schemas, validation, MCP, OpenAPI and the A2A card live in
 // ../_shared/agent_gateway.ts, which tests/agent_gateway.test.mjs imports directly. Scope, rate limits and the
@@ -26,10 +30,17 @@
 // Environment: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (injected by the platform). Optional:
 //   AGENT_GATEWAY_PUBLIC_URL       the base URL advertised in the agent card (default: SUPABASE_URL/functions/v1/<name>)
 //   AGENT_GATEWAY_ALLOWED_ORIGINS  comma-separated browser origins; unset = no browser may call it (agents are servers)
-//   ANTHROPIC_API_KEY              the key OTTO-Command already uses; without it, POST /v1/ask answers 503 to a
-//                                  plain-English ask (a previewed plan's confirm still applies: it needs no model)
-//   OTTOCOMMAND_OWNER_MODEL        the model the owner door uses; falls back to ANTHROPIC_MODEL (OTTO-Command's own
-//                                  setting). With neither set, a plain-English ask answers 503 ask_not_configured.
+//   ANTHROPIC_API_KEY              the key OTTO-Command already uses; without it, POST /v1/ask and /v1/search answer
+//                                  503 to a plain-English ask (a previewed plan's confirm still applies: it needs no model)
+//   OTTOCOMMAND_OWNER_MODEL        0721: the model the owner door uses. Unset: the door's default model
+//                                  (DEFAULT_OWNER_MODEL in ../_shared/ottocommand_owner.ts). ANTHROPIC_MODEL, the cockpit
+//                                  seat's own setting, is no longer read here.
+//   OTTOCOMMAND_EFFORT             0721: low (the default) | medium | high | xhigh | max. Low, because the whole ask must
+//                                  end inside Hermes's 60-second MCP timeout.
+//   OTTOCOMMAND_WEB_SEARCH         0721: on (the default) | off. Off: no web search in any ask or search.
+//   OTTOCOMMAND_WEB_MAX_USES       0721: web searches per ask, default 3, clamped to 1..5.
+//                                  A value the door cannot read makes a plain-English ask answer 503 ask_misconfigured,
+//                                  naming the variable; confirms still apply.
 //   AGENT_GATEWAY_OAUTH_ISSUER     0700: OTTOYARD's authorization server, where its RFC 8414 metadata is published
 //                                  (default https://www.ottoyard.com, served by the OTTOYARD-SITE repository)
 //   AGENT_GATEWAY_SIGNIN_URL       0700: the page a person signs in and approves an agent on
@@ -38,9 +49,9 @@
 // 0700: an owner's own agent can also SIGN IN (OAuth 2.1: the device code grant, or a browser with PKCE) and use the
 // signed-in MCP address, /account/mcp, with an access token; ../_shared/agent_signin.ts and PERSONAL_AGENT.md section 10.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { GATEWAY_NAME, handleGatewayRequest, postgrestEngine } from "../_shared/agent_gateway.ts";
+import { GATEWAY_NAME, handleGatewayRequest, postgrestEngine, postgrestModelLedger } from "../_shared/agent_gateway.ts";
 import { postgrestOAuth, SIGNIN_ISSUER_DEFAULT, SIGNIN_PAGE_DEFAULT } from "../_shared/agent_signin.ts";
-import { anthropicModel, ownerAskHandler } from "../_shared/ottocommand_owner.ts";
+import { anthropicModel, ownerAskConfig, ownerAskHandler } from "../_shared/ottocommand_owner.ts";
 
 const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -62,12 +73,21 @@ const signin = {
   rpc: SUPABASE_URL && SERVICE_KEY ? postgrestOAuth({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY }) : null,
 };
 
-// The owner door's model. Its name is the deployment's choice, never a constant in this repository.
+// The owner door's model (0721): OTTOCOMMAND_OWNER_MODEL, or the door's default; its effort and web search from the
+// environment, validated (ownerAskConfig). Every model call is recorded in the evidence ledger, fire-and-forget; the
+// platform keeps the isolate alive for the write (EdgeRuntime.waitUntil) where it can.
 const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
-const OWNER_MODEL = (Deno.env.get("OTTOCOMMAND_OWNER_MODEL") ?? Deno.env.get("ANTHROPIC_MODEL") ?? "").trim();
+const CONFIG = ownerAskConfig((name) => Deno.env.get(name));
+if (!CONFIG.ok) console.error(`${GATEWAY_NAME}: OTTO-Command is misconfigured: ${CONFIG.errors.join("; ")}`);
+const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
 const ask = ownerAskHandler({
-  model: ANTHROPIC_KEY && OWNER_MODEL ? anthropicModel({ apiKey: ANTHROPIC_KEY, model: OWNER_MODEL }) : null,
-  modelName: OWNER_MODEL || undefined,
+  model: ANTHROPIC_KEY ? anthropicModel({ apiKey: ANTHROPIC_KEY, model: CONFIG.value.model, effort: CONFIG.value.effort }) : null,
+  modelName: CONFIG.value.model,
+  effort: CONFIG.value.effort,
+  web: CONFIG.value.web,
+  ledger: SUPABASE_URL && SERVICE_KEY ? postgrestModelLedger({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY }) : null,
+  defer: typeof runtime?.waitUntil === "function" ? (p) => runtime.waitUntil?.(p) : undefined,
+  configError: CONFIG.ok ? undefined : `OTTO-Command is misconfigured, so it answers no plain-English ask: ${CONFIG.errors.join("; ")}. Every tool works directly over MCP and REST.`,
 });
 
 Deno.serve((req: Request) => handleGatewayRequest(req, { publicUrl: PUBLIC_URL, allowedOrigins: ALLOWED_ORIGINS, engine, ask, signin }));

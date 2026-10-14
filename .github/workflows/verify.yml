@@ -558,8 +558,13 @@ jobs:
       # passcode or a key may not, a lower limit there applies only as the one confirm of a preview the same principal
       # recorded within 15 minutes, every command records its person, its door and the preview it confirmed -- and the
       # gateway's ask_ottocommand over HTTP against the same SQL with 0721 applied. OTTO-Q enforces preview-then-confirm
-      # by the same principal; it cannot see a person's yes, which the person's own agent relays.
-      - name: OTTO-Command is the door; production changes carry a signed-in principal, and a lowering is the one confirm of its own preview (0721 against the live bodies; HTTP end to end)
+      # by the same principal; it cannot see a person's yes, which the person's own agent relays. And (the afternoon of
+      # 2026-10-14) a signed-in owner's charge limit and every-return orders saved to the cars and carried onto each new
+      # demo and production run, the owner-settings guard, the passcode refused while production is live, the model
+      # ledger door (over tests/fixtures/model_call_ledger_stub.sql, the live ledger's bodies), and in node the model
+      # request, verbatim replay, pause_turn, refusal and fallback, the web-injection rule and ottocommand_search, all
+      # against a fake fetch: no call reaches the Anthropic API from CI.
+      - name: OTTO-Command is the door; production changes carry a signed-in principal, a lowering is the one confirm of its own preview, saved settings carry across runs, and an ask that read the web changes nothing (0721 against the live bodies; HTTP end to end)
         env:
           PGHOST: localhost
           PGPORT: "5432"

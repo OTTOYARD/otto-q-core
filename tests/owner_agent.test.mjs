@@ -664,22 +664,33 @@ test("the model call: one Messages request, the system prompt cached, the key an
   ], stop_reason: "tool_use" }));
   const call = anthropicModel({ apiKey: "sk-test", model: "the-deployments-model", fetchImpl: f });
   const reply = await call({ system: "S", tools: [{ name: "my_fleet", description: "d", input_schema: { type: "object" } }], messages: [{ role: "user", content: "hi" }], max_tokens: 100 });
-  assert.deepEqual(reply, { ok: true, stop_reason: "tool_use", content: [{ type: "text", text: "Checking." }, { type: "tool_use", id: "tu_1", name: "my_fleet", input: {} }] });
+  // 0721: every block comes back as received (the thinking block too: it is replayed, never dropped), with the runner's
+  // reading of it beside it
+  assert.equal(reply.ok, true);
+  assert.equal(reply.stop_reason, "tool_use");
+  assert.deepEqual(reply.content, [{ type: "thinking", thinking: "..." }, { type: "text", text: "Checking." }, { type: "tool_use", id: "tu_1", name: "my_fleet", input: {} }]);
+  assert.equal(reply.parsed.text, "Checking.");
+  assert.deepEqual(reply.parsed.tool_uses, [{ id: "tu_1", name: "my_fleet", input: {} }]);
   assert.equal(seen[0].url, ANTHROPIC_MESSAGES_URL);
   assert.equal(seen[0].init.method, "POST");
   assert.equal(seen[0].init.headers["x-api-key"], "sk-test");
   assert.equal(seen[0].init.headers["anthropic-version"], ANTHROPIC_VERSION);
+  // a model this door does not know gets the plainest request: no effort field, no fallback, no web unless asked
   assert.deepEqual(seen[0].body, {
     model: "the-deployments-model", max_tokens: 100,
     system: [{ type: "text", text: "S", cache_control: { type: "ephemeral" } }],
     tools: [{ name: "my_fleet", description: "d", input_schema: { type: "object" } }],
     messages: [{ role: "user", content: "hi" }],
   });
+  assert.equal(seen[0].init.headers["anthropic-beta"], undefined);
 });
 
 test("the model call's failures are named, never thrown", async () => {
   const refused = await anthropicModel({ apiKey: "k", model: "m", fetchImpl: async () => json(400, { type: "error", error: { type: "invalid_request_error", message: "bad tools" } }) })({ system: "", tools: [], messages: [], max_tokens: 1 });
-  assert.deepEqual(refused, { ok: false, status: 400, message: "The language model refused the request: bad tools" });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.status, 400);
+  assert.equal(refused.code, "model_error");
+  assert.equal(refused.message, "The language model refused the request: bad tools");
   const down = await anthropicModel({ apiKey: "k", model: "m", fetchImpl: async () => { throw new TypeError("fetch failed"); } })({ system: "", tools: [], messages: [], max_tokens: 1 });
   assert.equal(down.ok, false);
   assert.equal(down.status, 503);
@@ -699,12 +710,20 @@ test("the door reaches OTTO-Q only through the gateway's call: no database clien
   assert.match(door, /deps\.call\(tool\.name, v\.value, \{\}\)/);
 });
 
-test("no model name is written in the repository: the deployment chooses it", () => {
-  for (const [file, src] of [["ottocommand_owner.ts", DOOR_SRC], ["agent_gateway.ts", SHARED_SRC], ["ottoq-agent-gateway/index.ts", SHELL_SRC]]) {
+test("model names live in one place: the door's default and its capability tables; the deployment may override", () => {
+  // 0721: the default model is one constant (DEFAULT_OWNER_MODEL), and the tables that pick the web search tool's
+  // version, the fallback and the effort field name models; no other file names one
+  for (const [file, src] of [["agent_gateway.ts", SHARED_SRC], ["ottoq-agent-gateway/index.ts", SHELL_SRC]]) {
     assert.doesNotMatch(src, /\bclaude-(?:opus|sonnet|haiku|fable|mythos|instant|\d)/i, file);
   }
+  const door = stripTsComments(DOOR_SRC);
+  const lines = door.split("\n").filter((l) => /\bclaude-(?:opus|sonnet|haiku|fable|mythos|instant|\d)/i.test(l));
+  assert.ok(lines.length > 0);
+  const allowed = /^(export const DEFAULT_OWNER_MODEL = "claude-opus-5-5";|\s+"claude-[a-z0-9-]+"(, "claude-[a-z0-9-]+")*,?|export const FALLBACK_MODELS: ReadonlySet<string> = new Set\(\["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-1"\]\);|\s+\.\.\.DYNAMIC_WEB_SEARCH_MODELS, "claude-fable-5", "claude-fable-5-1", "claude-haiku-5-5",)$/;
+  for (const l of lines) assert.match(l, allowed, l);
   const shell = stripTsComments(SHELL_SRC);
-  assert.match(shell, /Deno\.env\.get\("OTTOCOMMAND_OWNER_MODEL"\) \?\? Deno\.env\.get\("ANTHROPIC_MODEL"\)/);
+  assert.match(shell, /ownerAskConfig\(\(name\) => Deno\.env\.get\(name\)\)/);
+  assert.doesNotMatch(shell, /ANTHROPIC_MODEL/, "the cockpit seat's model setting is not the owner door's");
   assert.match(shell, /ownerAskHandler\(/);
   //: 0700: and the sign-in endpoints beside it
   assert.match(shell, /allowedOrigins: ALLOWED_ORIGINS, engine, ask, signin \}/);

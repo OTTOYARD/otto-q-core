@@ -9,6 +9,16 @@
 --        executor there."). The agent gateway's half (the MCP tool ask_ottocommand, the wider reads, the 50-second cap)
 --        is in edge-functions/_shared/; this file is the database's half. CLAUDE.md rules 9 and 10; db/checks/0449.
 --
+--        AND WHAT AN OWNER SETS IS SAVED TO THE CAR; OTTO-COMMAND SEARCHES OTTO-Q AND THE WEB. Chase, 2026-10-14, his
+--        message read at 12:35 PM CT: "Search should cover OTTO-Q and web. It can be ask and tools as well." and
+--        "Everything you listed looks great from a default perspective", which accepted: a vehicle owner's settings
+--        persist per vehicle (they are the owner's, by contract, until the owner changes them), and OTTO-Command answers
+--        questions from OTTO-Q's data and the web and executes owner changes, as the filter and executor for personal
+--        agents (Hermes, Grok, ...). Earlier the same day (8:58 AM CT): "request comes in from personal agents,
+--        OTTOCommand processes and acts and returns info back. So it will act as the filter and executor there. All
+--        services must be completed before vehicle leaves depot." §9-§13 below are that decision's database half; the
+--        gateway's half (web search, the read-only tool ottocommand_search, the model ledger call) is in the TypeScript.
+--
 -- ══ §1 WHY (read-only on the live catalog, 2026-10-14: stamped reads 14:54:24-14:54:35 and 15:18:23-15:18:52 UTC,
 --    9:54 and 10:18 AM CT; reproduce: db/checks/0449) ════════════════════════════════════════════════════════════════
 --
@@ -31,6 +41,29 @@
 --       confirmed is the plan applied. A plan hash alone does not do that: it is md5 of data the token can already
 --       read, so an agent could compute it and skip the preview.
 --
+--   §9-§13 (read-only on the live catalog, 2026-10-14 between 17:59 and 18:17 UTC, 12:59-1:17 PM CT):
+--   (e) NOTHING AN OWNER SETS OUTLIVES ITS RUN. ottoq_owner_settings is registered class 'engine' on sim_run_id, holds 0
+--       rows, and has three writers: ottoq_owner_command, ottoq.ottoq_owner_orders_tick and the run's end,
+--       ottoq_tg_lift_owner_settings_on_terminal (md5 e7d0a3f35a057175f7de8ffc88c98b99), which lifts every active setting
+--       when its run reaches completed, failed or aborted and stamps lifted_at on the commands; ottoq_purge_prior_runs
+--       (called by ottoq_start_demo_run) then deletes them with their run by registry lookup (production_live runs
+--       excepted); ottoq_retention_purge_runs's allowlist (7 tables) does not hold it; ottoq_start_demo_run,
+--       ottoq_operator_start_run and ottoq_production_start carry nothing over. So a charge limit or an every-return order
+--       set today is gone at the next run, in production too. ottoq_effective_target_soc_at reads the limit only through
+--       the run in scope (public.ottoq_owner_charge_limit). 0605 §4 chose this for the demo (Chase 2026-10-02: reset at
+--       stop); Chase's 12:35 PM CT decision makes a setting the owner's until the owner changes it.
+--   (f) NO OTTO-COMMAND MODEL CALL IS LEDGERED. public.ottoq_model_call_ledger (class evidence) holds nvidia_cuopt,
+--       nvidia_nemotron and cpsat_service and no Anthropic row: the owner door's model calls are nowhere (rule 6). Its
+--       writer public.ottoq_log_model_call (md5 482dcde3ae386e07da3e8ebcf5188373) is executable by authenticated as well
+--       as service_role: a finding reported, not changed here.
+--   (g) THE SETTINGS TABLE HAS NO GUARD OF ITS OWN. Only postgres holds privileges on ottoq_owner_settings (RLS on, no
+--       policy), and the three writers above are the only functions that write it. But postgres is also the SQL editor and
+--       the Management API, and a row written there needs no command: the commands table refuses edits by trigger, the
+--       settings table refused nothing.
+--   (h) THE DEMO PASSCODE READS PRODUCTION. ottoq_agent_public_call (md5 222ec84d178ea9063e820347b71a9c3f) issues a
+--       session whatever run is live, and a session's reads (my_fleet, whoami, ...) are served on a production run: 0721's
+--       gate refuses only its changes there.
+
 -- ══ §2 WHAT THIS CHANGES ════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   THREE COLUMNS on ottoq_owner_commands (class evidence in the run-scope registry: none is a run key, so check (a) has
@@ -109,6 +142,47 @@
 --   started service finishes). Production still never self-tunes (rule 10): no agent writes a setting there, and every
 --   owner change in production is recorded under the person whose agent made it.
 --
+--   §9 WHAT A SIGNED-IN OWNER SETS IS SAVED TO THE CAR. A new table, public.ottoq_owner_saved_settings (no run key, so
+--     the purge never reaches it; RLS on, no grants; guarded), holds per car a charge limit or an every-return order made
+--     by an applied command recorded under a person. Saving is a BEFORE INSERT trigger on ottoq_owner_settings (the
+--     owner command's body is not changed for it); a person's replace, clear, cancel or undo ends or restores the saved
+--     row (AFTER UPDATE OF status). Every new demo or production run at the depot (INSERT, or a status change to running
+--     or paused) carries each saved row onto the run as an ordinary ottoq_owner_settings row naming it (saved_id), once,
+--     inside the contract in force; the engine's readers are unchanged. The run's end lifts it from the run and no longer
+--     stamps its command lifted. WHAT IS PER-RUN BY DESIGN: a hold (a time on that run's clock), a one-time order (now,
+--     next_return: consumed when served, lifted with the run if not), and anything set through a passcode session or an
+--     issued key (no person). Because a signed-in owner's lower limit is now carried into production, it is confirmed
+--     the way production confirms one, on every run: preview, then the same principal's confirm within 15 minutes (the
+--     binding's condition becomes "lowers AND (production OR a person)"; the gate says lower_limit_needs_preview). Undo
+--     works on the run a command was made on; on a later run it says the setting is saved and how to change it
+--     (made_on_an_earlier_run). my_settings adds `saved`.
+--   §10 THE OWNER TABLES' OWN GUARD (re-review item 10): BEFORE INSERT/UPDATE/DELETE on ottoq_owner_settings refuses a
+--     row that is not what an applied owner command set (on its run, or carried from a row that command saved), an edit
+--     of what was set, a status change no command, tick or run end makes, a replace or withdraw by anything but an
+--     applied command, and any DELETE but the purge's (ottoq.retention); the saved table gets the same and refuses DELETE
+--     and TRUNCATE. ottoq.agent_ledger_unlock opens both, as it opens the commands table.
+--   §11 my_settings reads `saved` (public.ottoq_owner_settings_read wraps 0605's ottoq_owner_read, md5 pinned).
+--   §12 THE PASSCODE DOOR IN PRODUCTION (re-review item 11): enter_passcode refuses to issue a session while a
+--     production_live run is running or paused at the depot (403 production_live, before the passcode is checked), and
+--     the dispatcher refuses every call of a passcode session for as long as one is (403 production_live, ledgered). No
+--     change to sign-up, OAuth, keys or any grant.
+--   §13 THE MODEL LEDGER: public.ottoq_ottocommand_record_model_call(jsonb), service_role only, records one OTTO-Command
+--     model call through ottoq_log_model_call as provider anthropic_ottocommand, role owner_agent: ids, counts, codes and
+--     the model's name, every field validated and unknown fields refused, so no prompt, answer or thinking is stored.
+--
+--   THE GATEWAY'S HALF (TypeScript, committed beside this file, not deployed): edge-functions/_shared/ottocommand_owner.ts
+--   replays every assistant turn verbatim (thinking, server_tool_use, web_search_tool_result, cited text, tool_use,
+--   fallback blocks), resumes a paused turn (pause_turn, at most 3, inside the 50 s budget), answers a model refusal as a
+--   plain failure with no tool run, sets output_config.effort explicitly (OTTOCOMMAND_EFFORT, default low), max_tokens
+--   8000, the server-side fallback on the models that take it, and a default model when the deployment names none
+--   (OTTOCOMMAND_OWNER_MODEL overrides); offers the web search server tool (max_uses 3, OTTOCOMMAND_WEB_SEARCH=off
+--   disables it, OTTOCOMMAND_WEB_MAX_USES 1..5, located at the depot); refuses in code every change after a web result
+--   has entered an ask (a web_search_tool_result, or any result of the code execution dynamic filtering runs over the
+--   pages; an ask that read the web returns no confirm objects); returns cited sources; adds the read-only
+--   MCP tool ottocommand_search and POST /v1/search (scope ottoq | web | both: reads and the web only, never a command);
+--   and records each model call through §13, fire-and-forget. edge-functions/_shared/agent_gateway.ts carries the catalog
+--   entries, routes and the ledger writer; ottoq-agent-gateway/index.ts reads the configuration.
+
 -- ══ §3 forces_recert FALSE; forces_dial_restart FALSE ═════════════════════════════════════════════════════════════
 --
 --   Every body this file replaces is the agent door (ottoq_agent_call, ottoq_owner_command, its receipt, whoami) or a
@@ -121,11 +195,22 @@
 --   "IF EXISTS (SELECT 1 FROM public.ottoq_sim_runs WHERE status IN ('running','paused')) THEN RETURN"; the same guard in
 --   ottoq_dial_experiment_runner, ottoq_dial_pair, ottoq_throughput_sweep_arm and ottoq_throughput_sweep_runner). So a
 --   setting on a production_live run is never in force while an arm runs, exactly 0605 §1(g)'s argument for demo runs.
+--   §9-§13 change the same answer nowhere: the run-start triggers have WHEN run_by IN ('operator_demo','production_live')
+--   (no arm has either), so they never execute in an arm's transaction; the lift's patch changes only which commands get
+--   lifted_at stamped, and returns at its first line on a run with no owner settings (every arm); the guards and the save
+--   triggers fire only on writes to the owner tables, which no arm makes; the passcode door and the ledger function are
+--   agent doors. The engine's readers of owner settings remain untouched.
 --
 -- ══ §4 WHAT IT DELIBERATELY DOES NOT DO ═════════════════════════════════════════════════════════════════════════════
 --
---   * No persistence across runs: a production setting lifts when its run ends, as 0605 §4 decided for demo runs.
---   * No new credential, and passcode sessions and issued keys keep working on demo runs exactly as before.
+--   * No persistence for what has no person behind it: a passcode session's or an issued key's settings, holds and
+--     one-time orders lift when their run ends, as 0605 §4 decided (§9 says why each). An unserved one-time order is not
+--     carried to the next run (an open option); a setting cannot be saved while no run is live (the door still needs a
+--     demo or production run).
+--   * A saved setting made while two runs are live is carried onto the other at its next start, not at once.
+--   * No new credential, and passcode sessions and issued keys keep working on demo runs exactly as before (and open
+--     nothing while a production run is live, §12).
+--   * ottoq_log_model_call keeps its live grant to authenticated (§1(f)): narrowing it is a separate decision.
 --   * No shield probe on owner writes (the inventory's item 7): the contract checks and the gate are the owner door's.
 --   * The cockpit chat seat (ottoq-ottocommand, finding S-03) is not touched.
 --
@@ -134,7 +219,10 @@
 --   tests/test_ottocommand_executor_sql.py builds the stub engine with 0559, 0560, 0605-0608 and 0700 applied from their
 --   files, asserts every body this file reads is byte for byte the live one (md5), reproduces (a)-(d) before this file,
 --   applies it, and drives the gate, the binding (unbound, bound once, twice, expired, another principal, a hash with no
---   preview, an undo that lowers), the one-call changes, the doors, the stamps, the guard, the backstop and the grants.
+--   preview, an undo that lowers), the one-call changes, the doors, the stamps, the guard, the backstop and the grants;
+--   and (§9-§13) saving, carrying onto demo and production runs, the run's end, undo across runs, the settings guards,
+--   the passcode door in production and the model ledger door, over tests/fixtures/model_call_ledger_stub.sql (the live
+--   ledger's bodies, md5-asserted).
 --
 -- ══ §6 ROLLBACK ══════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -147,6 +235,11 @@
 --   writes. To remove it: DROP TRIGGER ottoq_owner_commands_backstop_trg ON
 --   public.ottoq_owner_commands. The three columns, their CHECKs and the unique index may stay (NULL is their old
 --   meaning), but the restored guard no longer holds the columns immutable. DELETE this file's ottoq_cert_lineage row.
+--   §9-§13: the snapshot also holds ottoq_tg_lift_owner_settings_on_terminal and ottoq_agent_public_call. Then DROP TRIGGER
+--   ottoq_sim_runs_carry_saved_owner_settings and ottoq_sim_runs_carry_saved_owner_settings_on_start ON
+--   public.ottoq_sim_runs (nothing is carried any more), and the restored dispatcher no longer reads `saved` or refuses a
+--   passcode session in production. The saved table, saved_id, the guards and the ledger function may stay: without the
+--   carry nothing reads a saved row, and the guard's rules hold for every writer the restored bodies have.
 --
 -- ══ §7 ORDER: THE GATEWAY FIRST ═════════════════════════════════════════════════════════════════════════════════
 --
@@ -155,7 +248,8 @@
 --   (additionalProperties false) and would answer a confirm 400. So deploy ottoq-agent-gateway from this branch first,
 --   then apply this file. Against the database before this file the new gateway works as it did: confirms_command_id is
 --   an argument the 0605 body never reads, and the 0559 dispatcher ledgers transport 'confirm' as 'other'. Which
---   gateway version is deployed now was not read here.
+--   gateway version is deployed now was not read here. Before this file the gateway's model-ledger call
+--   (ottoq_ottocommand_record_model_call) answers 404 from PostgREST: the gateway logs it and the ask is unaffected.
 
 BEGIN;
 
@@ -217,6 +311,37 @@ BEGIN
   IF to_regclass('public.ottoq_oauth_grants') IS NULL OR to_regclass('public.ottoq_owner_accounts') IS NULL THEN
     RAISE EXCEPTION '0721 P1: 0700''s grants or accounts table is missing';
   END IF;
+  -- §9-§13: the bodies the saved settings, the passcode door and the model ledger patch or call, read on the live
+  -- catalog 2026-10-14 between 17:59 and 18:17 UTC (12:59-1:17 PM CT) and identical on the scratch chain
+  SELECT string_agg(f, ', ') INTO v_bad FROM (VALUES
+      ('public.ottoq_tg_lift_owner_settings_on_terminal()',                                    'e7d0a3f35a057175f7de8ffc88c98b99'),
+      ('public.ottoq_agent_public_call(text,jsonb,text,jsonb,timestamp with time zone)',      '222ec84d178ea9063e820347b71a9c3f'),
+      ('public.ottoq_owner_read(public.ottoq_agent_principals,text,jsonb)',                    '69bd022e5af9e79fc6f15d5de21edc8f'),
+      ('public.ottoq_log_model_call(text,text,text,uuid,uuid,bigint,timestamp with time zone,text,text,text,integer,integer,integer,boolean,jsonb,text)',
+                                                                                                '482dcde3ae386e07da3e8ebcf5188373')) x(f, want)
+   WHERE to_regprocedure(f) IS NULL
+      OR md5(pg_get_functiondef(to_regprocedure(f))) IS DISTINCT FROM want;
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION '0721 P1: not the body §9-§13 were written against (re-measure before applying): %', v_bad;
+  END IF;
+  IF to_regclass('public.ottoq_model_call_ledger') IS NULL OR to_regprocedure('public.ottoq_agent_no_truncate()') IS NULL THEN
+    RAISE EXCEPTION '0721 P1: the model call ledger (0340) or the no-truncate guard (0559) is missing';
+  END IF;
+  -- §9: the owner settings table is the engine-class, run-keyed table 0605 made, and nothing writes it but the three
+  -- functions §1(g) names (a fourth writer would have to learn the saved settings and the guard)
+  IF NOT EXISTS (SELECT 1 FROM public.ottoq_run_scope_registry
+                  WHERE table_name = 'ottoq_owner_settings' AND column_name = 'sim_run_id' AND class = 'engine') THEN
+    RAISE EXCEPTION '0721 P1: ottoq_owner_settings is not registered as engine data on sim_run_id';
+  END IF;
+  SELECT string_agg(n.nspname || '.' || p.proname, ', ' ORDER BY 1) INTO v_bad
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname IN ('public', 'ottoq', 'twin')
+     AND regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^' || chr(10) || ']*', '', 'g')
+         ~* '(insert\s+into|update|delete\s+from)\s+(public\.)?ottoq_owner_settings\M'
+     AND p.proname NOT IN ('ottoq_owner_command', 'ottoq_tg_lift_owner_settings_on_terminal', 'ottoq_owner_orders_tick');
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION '0721 P1: a writer of ottoq_owner_settings this file does not know: %', v_bad;
+  END IF;
 END $premises$;
 
 -- ── P2: nothing this file creates exists yet, and the registry guard is clean before it is touched ──
@@ -231,6 +356,14 @@ BEGIN
   IF to_regclass('public.ottoq_owner_commands_confirms_idx') IS NOT NULL THEN
     RAISE EXCEPTION '0721 P2: the index ottoq_owner_commands_confirms_idx already exists';
   END IF;
+  IF to_regclass('public.ottoq_owner_saved_settings') IS NOT NULL
+     OR EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'ottoq_owner_settings' AND column_name = 'saved_id')
+     OR to_regprocedure('public.ottoq_owner_saved_carry(uuid)') IS NOT NULL
+     OR to_regprocedure('public.ottoq_owner_settings_guard()') IS NOT NULL
+     OR to_regprocedure('public.ottoq_ottocommand_record_model_call(jsonb)') IS NOT NULL THEN
+    RAISE EXCEPTION '0721 P2: the saved settings, their guard or the model ledger door already exist';
+  END IF;
   IF to_regprocedure('public.ottoq_owner_command(public.ottoq_agent_principals,text,jsonb,text)') IS NOT NULL
      OR to_regprocedure('public.ottoq_owner_write_gate(public.ottoq_agent_principals,jsonb)') IS NOT NULL
      OR to_regprocedure('public.ottoq_owner_acting_person(public.ottoq_agent_principals)') IS NOT NULL
@@ -244,7 +377,7 @@ BEGIN
   END IF;
 END $fresh$;
 
--- ── the rollback snapshot of the five bodies this file replaces ──
+-- ── the rollback snapshot of the seven bodies this file replaces ──
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
 SELECT '0721_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -252,7 +385,9 @@ SELECT '0721_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), 
                  'public.ottoq_owner_command(public.ottoq_agent_principals,text,jsonb)'::regprocedure,
                  'public.ottoq_owner_command_reply(public.ottoq_owner_commands,boolean)'::regprocedure,
                  'public.ottoq_agent_read_whoami(public.ottoq_agent_principals)'::regprocedure,
-                 'public.ottoq_owner_commands_guard()'::regprocedure);
+                 'public.ottoq_owner_commands_guard()'::regprocedure,
+                 'public.ottoq_tg_lift_owner_settings_on_terminal()'::regprocedure,
+                 'public.ottoq_agent_public_call(text,jsonb,text,jsonb,timestamp with time zone)'::regprocedure);
 
 -- ══ 1. the three columns ════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -283,6 +418,58 @@ COMMENT ON COLUMN public.ottoq_owner_commands.via IS
 COMMENT ON COLUMN public.ottoq_owner_commands.confirms_command_id IS
 '0721. The preview this apply confirmed: an outcome previewed row by the same principal, on the same run, of the same tool, arguments and plan_hash, made at most 15 minutes before it and confirmed by no other apply (unique). On a production run every applied lowering of a charge limit has one. OTTO-Q enforces preview-then-confirm by the same principal; the confirm itself is relayed by the person''s agent, and OTTO-Q cannot see the person''s yes.';
 
+-- ══ 1b. what a signed-in owner saves to a car (§9 fills it; created here so the receipt and whoami can read it) ══════
+--
+-- One row per car and saved setting: a charge limit, or an every-return service order, set by an applied command
+-- recorded under a person. It has no run key: it is not run-scoped data, so the run-scope registry has nothing to
+-- register and ottoq_purge_prior_runs (which deletes by the registry's engine class) never reaches it. Each run's
+-- ottoq_owner_settings rows are still the engine's working set; a saved row is carried onto every new demo or production
+-- run at the depot (§9), and names the setting that carried it (ottoq_owner_settings.saved_id).
+
+CREATE TABLE public.ottoq_owner_saved_settings (
+  saved_id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  depot_id             uuid NOT NULL,
+  fleet_operator_id    uuid NOT NULL,
+  vehicle_id           uuid NOT NULL,
+  kind                 text NOT NULL,
+  charge_limit_pct     numeric,
+  service              text,
+  --: the applied command that set it, and the person it was recorded under
+  command_id           uuid NOT NULL REFERENCES public.ottoq_owner_commands (command_id),
+  acting_person        text NOT NULL,
+  status               text NOT NULL DEFAULT 'active',
+  saved_at             timestamptz NOT NULL DEFAULT now(),
+  ended_at             timestamptz,
+  ended_reason         text,
+  ended_by_command_id  uuid REFERENCES public.ottoq_owner_commands (command_id),
+  CONSTRAINT ottoq_owner_saved_settings_kind_check CHECK (
+       (kind = 'charge_limit' AND charge_limit_pct BETWEEN 50 AND 100 AND service IS NULL)
+    OR (kind = 'service' AND service IS NOT NULL AND charge_limit_pct IS NULL)),
+  CONSTRAINT ottoq_owner_saved_settings_status_check CHECK (status IN ('active', 'ended')),
+  CONSTRAINT ottoq_owner_saved_settings_ended_check CHECK (
+    (status = 'active') = (ended_at IS NULL) AND (ended_at IS NULL) = (ended_reason IS NULL)),
+  CONSTRAINT ottoq_owner_saved_settings_person_check CHECK (
+    acting_person = lower(btrim(acting_person)) AND acting_person ~ '^[^@[:space:]]+@[^@[:space:]]+$')
+);
+CREATE UNIQUE INDEX ottoq_owner_saved_settings_one_limit_idx
+  ON public.ottoq_owner_saved_settings (vehicle_id) WHERE kind = 'charge_limit' AND status = 'active';
+CREATE UNIQUE INDEX ottoq_owner_saved_settings_one_service_idx
+  ON public.ottoq_owner_saved_settings (vehicle_id, service) WHERE kind = 'service' AND status = 'active';
+CREATE INDEX ottoq_owner_saved_settings_depot_idx ON public.ottoq_owner_saved_settings (depot_id) WHERE status = 'active';
+CREATE INDEX ottoq_owner_saved_settings_command_idx ON public.ottoq_owner_saved_settings (command_id);
+
+COMMENT ON TABLE public.ottoq_owner_saved_settings IS
+'0721 (Chase 2026-10-14, 12:35 PM CT: a vehicle owner''s settings persist per vehicle, the owner''s by contract until the owner changes them). What an owner signed in to their OTTOYARD account saved to a car: a charge limit, or an every-return service order. Carried onto every new demo or production run at the depot as that run''s ottoq_owner_settings row (ottoq_owner_saved_carry), so the engine reads it exactly as it reads a setting made on the run. Ended only by an applied command recorded under a person (a new limit, a clear, a cancelled order, an undo), and put back by an undo. Holds, one-time orders and anything set through a passcode session or an issued key are not saved: they belong to their run. Not run-scoped (no run key), so no purge reaches it; guarded (ottoq_owner_saved_settings_guard_trg): no row without an applied command that set it, no DELETE, no TRUNCATE.';
+
+ALTER TABLE public.ottoq_owner_settings
+  ADD COLUMN saved_id uuid REFERENCES public.ottoq_owner_saved_settings (saved_id);
+CREATE INDEX ottoq_owner_settings_saved_idx ON public.ottoq_owner_settings (saved_id) WHERE saved_id IS NOT NULL;
+COMMENT ON COLUMN public.ottoq_owner_settings.saved_id IS
+'0721. The saved setting (ottoq_owner_saved_settings) this run-scoped row carries: set when a signed-in owner''s command saves it, or when ottoq_owner_saved_carry carries a saved setting onto a new run. NULL for a setting that belongs to its run only (a hold, a one-time order, anything set without a person).';
+
+ALTER TABLE public.ottoq_owner_saved_settings ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.ottoq_owner_saved_settings FROM PUBLIC, anon, authenticated, service_role;
+
 -- ══ 2. who the person is, and whether this agent may change settings on this run ═══════════════════════════════════
 
 CREATE OR REPLACE FUNCTION public.ottoq_owner_acting_person(p_agent public.ottoq_agent_principals)
@@ -311,9 +498,10 @@ CREATE OR REPLACE FUNCTION public.ottoq_owner_write_gate(p_agent public.ottoq_ag
 AS $fn$
 /* 0721. May this agent change its own cars' settings on this run (p_run: ottoq_agent_live_run's answer), and under
    whose name. A demo run, as 0605 allowed. A production run only for an agent signed in to its owner's OTTOYARD account,
-   so that every production change is recorded under a person (CLAUDE.md rule 10); on one, a lower charge limit is
-   applied only as the confirm of a preview the same agent recorded in the last 15 minutes (rule 9). Every refusal says
-   why and what to do instead. Read by ottoq_owner_command and by whoami, so OTTO-Command knows before it acts. */
+   so that every production change is recorded under a person (CLAUDE.md rule 10). Wherever a person is recorded, what
+   they set is saved to the car (§9), and a lower charge limit is applied only as the confirm of a preview the same agent
+   recorded in the last 15 minutes (rule 9). Every refusal says why and what to do instead. Read by ottoq_owner_command
+   and by whoami, so OTTO-Command knows before it acts. */
 DECLARE
   v_person text := public.ottoq_owner_acting_person(p_agent);
   v_kind   text := CASE WHEN p_run IS NULL THEN NULL
@@ -321,13 +509,19 @@ DECLARE
                         WHEN p_run ->> 'run_by' = 'production_live' THEN 'production'
                         ELSE 'other' END;
 BEGIN
-  IF v_kind = 'demo' THEN
-    RETURN jsonb_strip_nulls(jsonb_build_object('allowed', true, 'run_kind', 'demo', 'person', v_person,
-      'message', 'A demo run is live: settings apply to it and lift when it ends.'));
+  IF v_kind = 'demo' AND v_person IS NULL THEN
+    RETURN jsonb_build_object('allowed', true, 'run_kind', 'demo',
+      'message', 'A demo run is live: settings apply to it and lift when it ends.');
+  ELSIF v_kind = 'demo' THEN
+    --: §9: what a signed-in owner sets is saved to the car and carried into production, so a lower limit is confirmed
+    --: here the way production confirms one
+    RETURN jsonb_build_object('allowed', true, 'run_kind', 'demo', 'person', v_person, 'saved', true,
+      'lower_limit_needs_preview', true, 'confirm_window_minutes', 15,
+      'message', format('A demo run is live. You are signed in as %s, so a charge limit or an every-return service you set is saved to your cars and stays from run to run, production included, until you change it; holds and one-time orders last until the run ends. A lower charge limit (or an undo that puts one back) applies only as the confirm of a preview this agent recorded in the last 15 minutes. Everything else is one call.', v_person));
   ELSIF v_kind = 'production' AND v_person IS NOT NULL THEN
-    RETURN jsonb_build_object('allowed', true, 'run_kind', 'production', 'person', v_person, 'lower_limit_needs_preview', true,
-      'confirm_window_minutes', 15,
-      'message', format('A production run is live. Changes are recorded under %s and lift when the run ends. Lowering how full a car charges (a lower limit, or an undo that puts one back) applies only as the confirm of a preview this agent recorded in the last 15 minutes; an apply that names no such preview is recorded as a preview and answered confirm_required. Everything else is one call.', v_person));
+    RETURN jsonb_build_object('allowed', true, 'run_kind', 'production', 'person', v_person, 'saved', true,
+      'lower_limit_needs_preview', true, 'confirm_window_minutes', 15,
+      'message', format('A production run is live. Changes are recorded under %s. A charge limit or an every-return service is saved to your cars and stays from run to run until you change it; holds and one-time orders last until the run ends. Lowering how full a car charges (a lower limit, or an undo that puts one back) applies only as the confirm of a preview this agent recorded in the last 15 minutes; an apply that names no such preview is recorded as a preview and answered confirm_required. Everything else is one call.', v_person));
   ELSIF v_kind = 'production' THEN
     RETURN jsonb_build_object('allowed', false, 'run_kind', 'production', 'code', 'production_needs_a_person',
       'message', CASE p_agent.origin
@@ -364,6 +558,7 @@ DECLARE
   v_bound uuid;
   v_named public.ottoq_owner_commands;
   v_why   text;
+  v_prod  boolean := EXISTS (SELECT 1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = p_run AND r.run_by = 'production_live');
 BEGIN
   IF p_expect IS NULL AND p_confirms IS NULL THEN
     v_why := 'not_named';
@@ -405,8 +600,10 @@ BEGIN
       ELSE 'preview_does_not_match' END;
   END IF;
   RETURN jsonb_build_object('code', 'confirm_required', 'reason', v_why,
-    'message', CASE WHEN p_lowering
+    'message', CASE WHEN p_lowering AND v_prod
                     THEN 'This is a production run, so lowering how full a car charges applies only as the confirm of a preview this agent recorded in the last 15 minutes. '
+                    WHEN p_lowering
+                    THEN 'A lower charge limit you set while signed in is saved to your cars and carried into production, so it applies only as the confirm of a preview this agent recorded in the last 15 minutes. '
                     ELSE 'A confirm applies only a preview this agent recorded in the last 15 minutes. ' END
             || CASE v_why
                  WHEN 'not_named'                 THEN 'This apply named no preview (expect_plan_hash or confirms_command_id). '
@@ -483,7 +680,15 @@ DECLARE
     -- e. a new limit below the one in force lowers how full the car charges
     ARRAY[E'      v_before := LEAST(v_ceiling, COALESCE(v_old.charge_limit_pct, v_ceiling));\n',
           E'      v_before := LEAST(v_ceiling, COALESCE(v_old.charge_limit_pct, v_ceiling));\n'
-       || E'      IF v_pct < v_before THEN v_lowers := true; END IF;   --: 0721: this command lowers how full the car charges\n'],
+       || E'      IF v_pct < v_before THEN v_lowers := true; END IF;   --: 0721: this command lowers how full the car charges\n'
+       || E'      --: §9: a signed-in owner''s limit is saved and carried into production, so it also lowers when it is below the\n'
+       || E'      --: limit saved to the car (or the ceiling, when none is), whatever a session without a person set on this run\n'
+       || E'      IF v_person IS NOT NULL\n'
+       || E'         AND v_pct < LEAST(v_ceiling, COALESCE((SELECT s.charge_limit_pct FROM public.ottoq_owner_saved_settings s\n'
+       || E'                                                 WHERE s.vehicle_id = v_veh.id AND s.kind = ''charge_limit''\n'
+       || E'                                                   AND s.status = ''active''), v_ceiling)) THEN\n'
+       || E'        v_lowers := true;\n'
+       || E'      END IF;\n'],
     -- e2. so does an undo that puts back a lower limit than the one in force
     ARRAY[E'          v_grp := ''limit_back'';\n',
           E'          v_grp := ''limit_back'';\n'
@@ -503,14 +708,15 @@ DECLARE
        || E'      ''message'', ''OTTO-Command does not confirm a plan. Nothing was applied. A preview is confirmed by sending its confirm object back: to ask_ottocommand or POST /v1/ask as confirm, or as the typed tool call it describes.'');\n'
        || E'  END IF;\n'
        || E'  --: An apply must be the confirm of a recorded preview (ottoq_owner_confirm_binding: same principal, run, tool, arguments\n'
-       || E'  --: and plan hash, at most 15 minutes old, not confirmed before) when it lowers a limit on a production run, when it came\n'
+       || E'  --: and plan hash, at most 15 minutes old, not confirmed before) when it lowers a limit on a production run or for a\n'
+       || E'  --: signed-in owner (whose limit is saved and carried into production, §9), when it came\n'
        || E'  --: through the confirm door, or when it names a preview. One that does not bind applies nothing: it is recorded as a\n'
        || E'  --: preview, with its own plan hash and id, and answered confirm_required, so the next confirm can name it. One that\n'
        || E'  --: binds is recorded as via ''confirm'', whichever way it was sent: the agent confirmed a recorded preview.\n'
        || E'  IF v_refusal IS NULL AND v_mode = ''apply''\n'
-       || E'     AND (p_via IS NOT DISTINCT FROM ''confirm'' OR v_confirms IS NOT NULL OR (v_production AND v_lowers)) THEN\n'
+       || E'     AND (p_via IS NOT DISTINCT FROM ''confirm'' OR v_confirms IS NOT NULL OR (v_lowers AND (v_production OR v_person IS NOT NULL))) THEN\n'
        || E'    v_bind := public.ottoq_owner_confirm_binding(p_agent, v_run_id, v_tool, v_norm, v_hash, v_expect, v_confirms,\n'
-       || E'                                                 v_production AND v_lowers);\n'
+       || E'                                                 v_lowers AND (v_production OR v_person IS NOT NULL));\n'
        || E'    v_bound := (v_bind ->> ''bound'')::uuid;\n'
        || E'    IF v_bound IS NULL THEN\n'
        || E'      v_confirm_req := v_bind;\n'
@@ -521,8 +727,9 @@ DECLARE
        || E'    END IF;\n'
        || E'  END IF;\n'],
     -- g. the receipt names the run that ends it
+    --: §9: what a signed-in owner sets as a limit or an every-return order is saved, and the receipt says so
     ARRAY[E'E''\\nThis lasts until the demo run ends or you undo it.''',
-          E'CASE WHEN v_production THEN E''\\nThis lasts until the production run ends or you undo it.'' ELSE E''\\nThis lasts until the demo run ends or you undo it.'' END'],
+          E'CASE WHEN v_person IS NOT NULL AND (v_tool IN (''set_charge_limit'', ''clear_charge_limit'') OR (v_tool = ''request_service'' AND v_when = ''every_return'') OR (v_tool = ''cancel_service'' AND EXISTS (SELECT 1 FROM jsonb_array_elements(v_effects) e WHERE e ->> ''before'' = ''every_return''))) THEN E''\\nThis is saved to your cars: it stays from run to run, production included, until you change it.'' WHEN v_production THEN E''\\nThis lasts until the production run ends or you undo it.'' ELSE E''\\nThis lasts until the demo run ends or you undo it.'' END'],
     -- g2. an apply recorded as a preview says so, and how to confirm it
     ARRAY[E'    WHEN v_mode = ''preview'' THEN ''Preview only, nothing has changed. If you confirm: ''\n',
           E'    WHEN v_confirm_req IS NOT NULL THEN ''Not applied yet: '' || (v_confirm_req ->> ''message'') || E''\\nIf you confirm: ''\n'
@@ -540,6 +747,15 @@ DECLARE
           E'       vehicles, effects, refusal, summary, plan_hash, acting_person, via)\n'],
     ARRAY[E'Nothing was applied; send it again.'', v_hash)\n',
           E'Nothing was applied; send it again.'', v_hash, v_person, v_door)\n'],
+    -- i. (§9) an undo of a command made on an earlier run whose setting is saved says so, and what to do instead
+    ARRAY[E'      v_refusal := jsonb_build_object(''code'', ''run_ended'', ''message'', ''That command applied to a run that has ended; its settings were lifted with it.'');
+',
+          E'      --: 0721 (§9): what a signed-in owner saved outlives its run; undo works on the run a command was made on
+      v_refusal := CASE WHEN EXISTS (SELECT 1 FROM public.ottoq_owner_saved_settings s
+                                      WHERE s.command_id = v_target.command_id AND s.status = ''active'')
+        THEN jsonb_build_object(''code'', ''made_on_an_earlier_run'', ''message'', ''That command was made on an earlier run, and what it set is saved to your cars and still in force: it stays from run to run. Undo works on the run a command was made on; to change it now, set a new charge limit, clear it (clear_charge_limit), or withdraw the order (cancel_service).'')
+        ELSE jsonb_build_object(''code'', ''run_ended'', ''message'', ''That command applied to a run that has ended; its settings were lifted with it.'') END;
+'],
     -- j. an apply recorded as a preview answers confirm_required (ottoq_agent_call: 422), naming that preview
     ARRAY[E'  RETURN public.ottoq_owner_command_reply(v_cmd, false);\n',
           E'  RETURN public.ottoq_owner_command_reply(v_cmd, false)\n'
@@ -587,6 +803,32 @@ DECLARE
        || E'  v_transport text := CASE WHEN p_transport IN (''rest'', ''mcp'', ''ask'', ''confirm'') THEN p_transport ELSE ''other'' END;\n'],
     ARRAY[E'      ELSE public.ottoq_owner_command(v_agent, v_tool, v_args)\n',
           E'      ELSE public.ottoq_owner_command(v_agent, v_tool, v_args, v_transport)   --: 0721: the door it came through\n'],
+    --: §12: no read and no change for a demo passcode session while a production run is live at its depot
+    ARRAY[E'  UPDATE public.ottoq_agent_principals a SET last_used_at = now()
+',
+          E'  --: 0721 (§12): a demo passcode session serves nothing, not even a read, while a production run is live at its depot
+  IF v_agent.origin = ''passcode'' AND EXISTS (SELECT 1 FROM public.ottoq_sim_runs r
+                                              WHERE r.depot_id = v_agent.depot_id AND r.run_by = ''production_live''
+                                                AND r.status IN (''running'', ''paused'')) THEN
+    INSERT INTO public.ottoq_agent_call_ledger (principal_id, principal_name, transport, tool, http_method, path, ok,
+                                               http_status, error_code, latency_ms, depot_id, fleet_operator_id, detail)
+    VALUES (v_agent.principal_id, v_agent.name, v_transport, v_tool, v_meta ->> ''http_method'', v_meta ->> ''path'',
+            false, 403, ''production_live'', (extract(epoch FROM clock_timestamp() - t0) * 1000)::integer,
+            v_agent.depot_id, v_agent.fleet_operator_id, v_meta - ''http_method'' - ''path'')
+    RETURNING call_id INTO v_call;
+    RETURN jsonb_build_object(''ok'', false, ''http_status'', 403, ''tool'', v_tool, ''call_id'', v_call,
+      ''error'', jsonb_build_object(''code'', ''production_live'',
+        ''message'', ''A production run is live at the twin depot, and the demo passcode opens nothing while it is: production is read and changed only by an agent signed in to its owner''''s OTTOYARD account. This session works again once the production run ends, until it expires.'',
+        ''hint'', ''Sign your agent in to your OTTOYARD account (PERSONAL_AGENT.md section 10) to read and change your cars in production.''));
+  END IF;
+
+  UPDATE public.ottoq_agent_principals a SET last_used_at = now()
+'],
+    --: §11: my_settings also says what is saved to the cars, and stops saying everything lifts at the run's end
+    ARRAY[E'      WHEN ''my_settings''        THEN public.ottoq_owner_read(v_agent, ''my_settings'', v_args)
+',
+          E'      WHEN ''my_settings''        THEN public.ottoq_owner_settings_read(v_agent, public.ottoq_owner_read(v_agent, ''my_settings'', v_args))   --: 0721 §11: and what is saved
+'],
     ARRAY[E'      v_status := CASE WHEN v_data ->> ''outcome'' = ''refused'' THEN 422\n',
           E'      --: 0721: an apply that had to confirm a preview and did not is recorded as one, and answered as not done\n'
        || E'      v_status := CASE WHEN v_data ->> ''outcome'' = ''refused'' OR v_data #>> ''{refusal,code}'' = ''confirm_required'' THEN 422\n']];
@@ -620,7 +862,10 @@ DECLARE
        || E'                         || jsonb_build_object(''mode'', ''apply'', ''expect_plan_hash'', p_c.plan_hash, ''confirms_command_id'', p_c.command_id),\n'
        || E'                 ''note'', ''Send this to apply exactly the plan shown, from the agent that previewed it, within 15 minutes; it confirms this preview once. If the cars or settings change first, OTTO-Q refuses with the new plan.'') END,\n'],
     ARRAY[E'                    THEN ''Lasts until this demo run ends or you undo it; a stop or reset of the twin puts every car back to baseline.'' END))\n',
-          E'                    THEN CASE WHEN (SELECT r.run_by FROM public.ottoq_sim_runs r WHERE r.sim_run_id = p_c.sim_run_id) = ''production_live''\n'
+          E'                    THEN CASE WHEN EXISTS (SELECT 1 FROM public.ottoq_owner_saved_settings s\n'
+       || E'                                            WHERE s.command_id = p_c.command_id AND s.status = ''active'')\n'
+       || E'                              THEN ''Saved to the cars: it stays from run to run, production included, until the owner changes it.''\n'
+       || E'                              WHEN (SELECT r.run_by FROM public.ottoq_sim_runs r WHERE r.sim_run_id = p_c.sim_run_id) = ''production_live''\n'
        || E'                              THEN ''Lasts until this production run ends or you undo it; when the run ends every car goes back to its baseline.''\n'
        || E'                              ELSE ''Lasts until this demo run ends or you undo it; a stop or reset of the twin puts every car back to baseline.'' END END))\n']];
   v_n int;
@@ -646,7 +891,7 @@ DECLARE
                        || E'      ''live_production_run'', CASE WHEN v_run ->> ''run_by'' = ''production_live'' THEN v_run -> ''sim_run_id'' END,\n'
                        || E'      ''changes'', public.ottoq_owner_write_gate(p_agent, v_run),\n';
   c_old2 constant text := E'undoable, and lifted when the demo run ends.'',\n';
-  c_new2 constant text := E'undoable, and lifted when the run ends. On a production run only an agent signed in to its owner''''s OTTOYARD account may change them, each change is recorded under that person, and a lower charge limit (or an undo that puts one back) applies only as the confirm of a preview the same agent recorded in the last 15 minutes.'',\n';
+  c_new2 constant text := E'and undoable on the run it was made on. A charge limit or an every-return service set by an agent signed in to the owner''''s OTTOYARD account is saved to the car and stays from run to run, production included, until the owner changes it; holds, one-time orders and anything set through a passcode session or an issued key lift when the run ends. On a production run only an agent signed in to its owner''''s OTTOYARD account may change them, each change is recorded under that person, and wherever a person is recorded a lower charge limit (or an undo that puts one back) applies only as the confirm of a preview the same agent recorded in the last 15 minutes.'',\n';
   v_n1 int; v_n2 int;
 BEGIN
   v_n1 := (length(v_def) - length(replace(v_def, c_old1, ''))) / length(c_old1);
@@ -715,6 +960,519 @@ CREATE TRIGGER ottoq_owner_commands_backstop_trg
   BEFORE INSERT ON public.ottoq_owner_commands
   FOR EACH ROW EXECUTE FUNCTION public.ottoq_owner_commands_backstop();
 
+-- ══ 9. what a signed-in owner sets is saved to the car, and carried onto every new run (Chase 2026-10-14) ════════════
+--
+-- Saving: a BEFORE INSERT trigger on ottoq_owner_settings. An active charge limit or every-return order, written for an
+-- applied command recorded under a person, gets a saved row (ending the one it replaces) and names it in saved_id. The
+-- owner command's body is unchanged for this: the trigger reads the command row it already wrote.
+-- Following: an AFTER UPDATE OF status trigger. When an applied command recorded under a person replaces or withdraws a
+-- saved setting on a run, the saved row ends with it; when an undo puts a replaced setting back, its saved row comes back
+-- (unless the car has another saved one of that kind by then). The run's end ('lifted'), the tick ('fulfilled') and a
+-- change made without a person (a passcode session, an issued key) leave the saved row as it is: they belong to the run.
+-- Carrying: when a demo or production run at the depot starts (INSERT, or a status change to running or paused), each
+-- active saved row becomes that run's ottoq_owner_settings row, once per run, through ottoq_owner_saved_carry: only while
+-- the car is still that owner's at that depot, only when the run has no setting of that kind for the car already, a
+-- limit only inside the contract in force then (below its minimum or at its ceiling it is not carried, and the car
+-- charges full), and an order only for a service still requestable and not blocked. A failure is a WARNING: a run's start
+-- never fails for an owner's setting. The engine then reads it exactly as it reads a setting made on the run
+-- (ottoq_effective_target_soc_at, ottoq_departure_clear, the tick, the visit trigger), none of which changes here.
+-- The run's end: ottoq_tg_lift_owner_settings_on_terminal is patched so that it stamps lifted_at only on commands nothing
+-- saved is still carrying: what a saved command set is lifted from the run, and is not lifted from the car.
+
+CREATE OR REPLACE FUNCTION public.ottoq_owner_settings_save()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+/* 0721 §9. A setting a signed-in owner makes that outlives its run (a charge limit, an every-return order) is saved to the
+   car. Carried rows (saved_id set by ottoq_owner_saved_carry) and anything else are left as they are. A failure here is
+   raised: an owner told a setting is saved must not find it was not. */
+DECLARE
+  c public.ottoq_owner_commands;
+  v_saved uuid;
+BEGIN
+  IF NEW.saved_id IS NOT NULL OR NEW.status <> 'active'
+     OR NOT (NEW.kind = 'charge_limit' OR (NEW.kind = 'service' AND NEW.service_when = 'every_return')) THEN
+    RETURN NEW;
+  END IF;
+  SELECT * INTO c FROM public.ottoq_owner_commands x WHERE x.command_id = NEW.command_id;
+  IF c.acting_person IS NULL OR c.outcome IS DISTINCT FROM 'applied' THEN
+    RETURN NEW;
+  END IF;
+  UPDATE public.ottoq_owner_saved_settings s
+     SET status = 'ended', ended_at = now(), ended_reason = 'replaced by a new setting', ended_by_command_id = c.command_id
+   WHERE s.vehicle_id = NEW.vehicle_id AND s.status = 'active' AND s.kind = NEW.kind
+     AND (NEW.kind = 'charge_limit' OR s.service = NEW.service);
+  INSERT INTO public.ottoq_owner_saved_settings (depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct, service,
+                                                 command_id, acting_person)
+  VALUES (NEW.depot_id, NEW.fleet_operator_id, NEW.vehicle_id, NEW.kind,
+          CASE WHEN NEW.kind = 'charge_limit' THEN NEW.charge_limit_pct END,
+          CASE WHEN NEW.kind = 'service' THEN NEW.service END, c.command_id, c.acting_person)
+  RETURNING saved_id INTO v_saved;
+  NEW.saved_id := v_saved;
+  RETURN NEW;
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.ottoq_owner_settings_saved_follow()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+/* 0721 §9. A saved setting follows what a person does to it on a run: replaced or withdrawn by an applied command recorded
+   under a person, it ends; put back by an undo, it comes back. Anything else (the run's end, the tick, a change made
+   without a person) leaves it. */
+BEGIN
+  IF NEW.saved_id IS NULL OR OLD.status IS NOT DISTINCT FROM NEW.status THEN
+    RETURN NULL;
+  END IF;
+  IF OLD.status = 'active' AND NEW.status IN ('replaced', 'withdrawn')
+     AND EXISTS (SELECT 1 FROM public.ottoq_owner_commands c
+                  WHERE c.command_id = NEW.closed_by_command_id AND c.outcome = 'applied' AND c.acting_person IS NOT NULL) THEN
+    UPDATE public.ottoq_owner_saved_settings s
+       SET status = 'ended', ended_at = now(),
+           ended_reason = CASE NEW.status WHEN 'replaced' THEN 'replaced by a new setting'
+                                          ELSE COALESCE(NEW.closed_reason, 'withdrawn by the owner') END,
+           ended_by_command_id = NEW.closed_by_command_id
+     WHERE s.saved_id = NEW.saved_id AND s.status = 'active';
+  ELSIF OLD.status = 'replaced' AND NEW.status = 'active' THEN
+    UPDATE public.ottoq_owner_saved_settings s
+       SET status = 'active', ended_at = NULL, ended_reason = NULL, ended_by_command_id = NULL
+     WHERE s.saved_id = NEW.saved_id AND s.status = 'ended'
+       AND NOT EXISTS (SELECT 1 FROM public.ottoq_owner_saved_settings x
+                        WHERE x.vehicle_id = s.vehicle_id AND x.status = 'active' AND x.kind = s.kind
+                          AND (x.kind = 'charge_limit' OR x.service = s.service));
+  END IF;
+  RETURN NULL;
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.ottoq_owner_saved_carry(p_run uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+/* 0721 §9. Carry every active saved setting at a run's depot onto that run, once. Only demo and production runs; returns
+   how many settings were carried. Called by the run-start triggers; safe to call again (it carries nothing twice). */
+DECLARE
+  r       public.ottoq_sim_runs;
+  s       public.ottoq_owner_saved_settings;
+  v_clock timestamptz;
+  v_ctr   jsonb;
+  v_max   numeric;
+  v_n     integer := 0;
+BEGIN
+  SELECT * INTO r FROM public.ottoq_sim_runs x WHERE x.sim_run_id = p_run;
+  IF r.sim_run_id IS NULL OR r.run_by IS NULL OR r.run_by NOT IN ('operator_demo', 'production_live')
+     OR r.status NOT IN ('running', 'paused') THEN
+    RETURN 0;
+  END IF;
+  v_clock := COALESCE(r.sim_clock_current, now());
+  FOR s IN SELECT * FROM public.ottoq_owner_saved_settings x
+            WHERE x.depot_id = r.depot_id AND x.status = 'active'
+            ORDER BY x.saved_at, x.saved_id LOOP
+    --: once per run: a pause and a resume never bring back what was withdrawn on the run
+    CONTINUE WHEN EXISTS (SELECT 1 FROM public.ottoq_owner_settings o WHERE o.sim_run_id = p_run AND o.saved_id = s.saved_id);
+    --: the car is still this owner's, at this depot
+    CONTINUE WHEN NOT EXISTS (SELECT 1 FROM public.vehicles v
+                               WHERE v.id = s.vehicle_id AND v.fleet_operator_id = s.fleet_operator_id
+                                 AND (v.home_depot_id = s.depot_id OR v.current_depot_id = s.depot_id));
+    --: a setting of that kind already made on this run stands
+    CONTINUE WHEN EXISTS (SELECT 1 FROM public.ottoq_owner_settings o
+                           WHERE o.sim_run_id = p_run AND o.vehicle_id = s.vehicle_id AND o.status = 'active'
+                             AND o.kind = s.kind AND (s.kind = 'charge_limit' OR o.service = s.service));
+    v_ctr := public.ottoq_owner_contract(s.fleet_operator_id, v_clock);
+    IF s.kind = 'charge_limit' THEN
+      v_max := COALESCE((v_ctr ->> 'max_charge_pct')::numeric, public.ottoq_default_target_soc());
+      --: only inside the contract in force now; outside it the car charges full (rule 9 errs toward a fuller car)
+      CONTINUE WHEN v_ctr IS NULL OR s.charge_limit_pct < (v_ctr ->> 'min_charge_pct')::numeric OR s.charge_limit_pct >= v_max;
+      INSERT INTO public.ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct,
+                                              command_id, set_at_sim, saved_id)
+      VALUES (p_run, s.depot_id, s.fleet_operator_id, s.vehicle_id, 'charge_limit', s.charge_limit_pct, s.command_id, v_clock,
+              s.saved_id);
+    ELSE
+      CONTINUE WHEN NOT (s.service = ANY (public.ottoq_owner_requestable_services()))
+                 OR COALESCE((v_ctr -> 'blocked_services') ? s.service, false);
+      INSERT INTO public.ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, service, service_when,
+                                              include_current_visit, command_id, set_at_sim, saved_id)
+      VALUES (p_run, s.depot_id, s.fleet_operator_id, s.vehicle_id, 'service', s.service, 'every_return', true, s.command_id,
+              v_clock, s.saved_id);
+    END IF;
+    v_n := v_n + 1;
+  END LOOP;
+  RETURN v_n;
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.ottoq_tg_owner_saved_on_run_start()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+/* 0721 §9. A demo or production run that starts (or resumes) carries what owners saved to their cars. Never fails the
+   run's start: a failure is a WARNING, and the cars charge full until an owner sets it again. */
+BEGIN
+  BEGIN
+    PERFORM public.ottoq_owner_saved_carry(NEW.sim_run_id);
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'carrying saved owner settings onto run % failed: % %', NEW.sim_run_id, SQLSTATE, SQLERRM;
+  END;
+  RETURN NULL;
+END $fn$;
+
+CREATE TRIGGER ottoq_owner_settings_save_trg
+  BEFORE INSERT ON public.ottoq_owner_settings
+  FOR EACH ROW EXECUTE FUNCTION public.ottoq_owner_settings_save();
+CREATE TRIGGER ottoq_owner_settings_saved_follow_trg
+  AFTER UPDATE OF status ON public.ottoq_owner_settings
+  FOR EACH ROW EXECUTE FUNCTION public.ottoq_owner_settings_saved_follow();
+--: no arm is a demo or production run, so these never fire inside a certification, a dial pair or a sweep arm
+CREATE TRIGGER ottoq_sim_runs_carry_saved_owner_settings
+  AFTER INSERT ON public.ottoq_sim_runs
+  FOR EACH ROW
+  WHEN (new.run_by = ANY (ARRAY['operator_demo'::text, 'production_live'::text])
+        AND new.status = ANY (ARRAY['running'::text, 'paused'::text]))
+  EXECUTE FUNCTION public.ottoq_tg_owner_saved_on_run_start();
+CREATE TRIGGER ottoq_sim_runs_carry_saved_owner_settings_on_start
+  AFTER UPDATE OF status ON public.ottoq_sim_runs
+  FOR EACH ROW
+  WHEN (old.status IS DISTINCT FROM new.status
+        AND new.run_by = ANY (ARRAY['operator_demo'::text, 'production_live'::text])
+        AND new.status = ANY (ARRAY['running'::text, 'paused'::text]))
+  EXECUTE FUNCTION public.ottoq_tg_owner_saved_on_run_start();
+
+--: the run's end lifts a saved command's settings from the run, and does not stamp the command as lifted
+DO $lift$
+DECLARE
+  v_def text := pg_get_functiondef('public.ottoq_tg_lift_owner_settings_on_terminal()'::regprocedure);
+  c_old constant text := E'     WHERE c.command_id = ANY (COALESCE(v_cmds, ARRAY[]::uuid[])) AND c.lifted_at IS NULL;\n';
+  c_new constant text := E'     WHERE c.command_id = ANY (COALESCE(v_cmds, ARRAY[]::uuid[])) AND c.lifted_at IS NULL\n'
+                      || E'       --: 0721 §9: a command whose setting is saved to the car is carried to the next run, not lifted\n'
+                      || E'       AND NOT EXISTS (SELECT 1 FROM public.ottoq_owner_saved_settings s\n'
+                      || E'                        WHERE s.command_id = c.command_id AND s.status = ''active'');\n';
+  v_n int;
+BEGIN
+  v_n := (length(v_def) - length(replace(v_def, c_old, ''))) / length(c_old);
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION '0721: the lift''s anchor occurs % times, expected exactly 1', v_n;
+  END IF;
+  EXECUTE replace(v_def, c_old, c_new);
+END $lift$;
+
+-- ══ 10. the owner tables' own guard: no setting without an applied command that set it (the 0721 re-review, item 10) ═
+--
+-- Measured (§1(g)): only postgres holds privileges on ottoq_owner_settings, and only ottoq_owner_command, the tick and the
+-- run's end write it; but postgres is also the SQL editor and the Management API, and nothing below the door refused a
+-- row no command made. Now, whoever writes:
+--   INSERT  a row is what an applied owner command set: same fleet and depot, a car the command names, the kind the tool
+--           sets with the value it set, and either on the command's own run or carried from a saved row that command made;
+--   UPDATE  what was set is immutable; status moves only active -> replaced | withdrawn | fulfilled | lifted, or
+--           replaced -> active (an undo); replaced and withdrawn only by an applied owner command;
+--   DELETE  only the run purge (ottoq.retention, armed by ottoq_purge_prior_runs; registry check (d) requires it).
+-- The saved table: a row only for an applied command recorded under a person that set exactly that; status and its end
+-- are all that move; never deleted or truncated. ottoq.agent_ledger_unlock (the owner ledger's existing escape hatch,
+-- to be named in a migration) opens both.
+
+CREATE OR REPLACE FUNCTION public.ottoq_owner_settings_guard()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+DECLARE
+  c  public.ottoq_owner_commands;
+  sv public.ottoq_owner_saved_settings;
+  v_ok boolean;
+BEGIN
+  IF COALESCE(current_setting('ottoq.agent_ledger_unlock', true), '') = 'on' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    IF COALESCE(current_setting('ottoq.retention', true), '') = 'on' THEN
+      RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'ottoq_owner_settings: DELETE refused; an owner setting is withdrawn by an owner command, lifted at its run''s end, and cleared only by the run purge (ottoq.retention)'
+      USING ERRCODE = '42501';
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    SELECT * INTO c FROM public.ottoq_owner_commands x WHERE x.command_id = NEW.command_id;
+    v_ok := c.command_id IS NOT NULL AND c.mode = 'apply' AND c.outcome = 'applied' AND NEW.status = 'active'
+        AND c.fleet_operator_id = NEW.fleet_operator_id AND c.depot_id = NEW.depot_id
+        AND c.vehicles @> jsonb_build_array(jsonb_build_object('id', NEW.vehicle_id::text))
+        AND CASE NEW.kind
+              WHEN 'charge_limit' THEN c.tool = 'set_charge_limit' AND (c.args ->> 'percent')::numeric = NEW.charge_limit_pct
+              WHEN 'hold'         THEN c.tool = 'hold_vehicle' AND (c.args ->> 'until_sim')::timestamptz = NEW.hold_until_sim
+              WHEN 'service'      THEN c.tool = 'request_service' AND c.args ->> 'service' = NEW.service
+                                       AND c.args ->> 'when' = NEW.service_when
+              ELSE false END;
+    IF v_ok AND c.sim_run_id IS DISTINCT FROM NEW.sim_run_id THEN
+      --: on another run: only as the carry of a saved row this very command made
+      SELECT * INTO sv FROM public.ottoq_owner_saved_settings x WHERE x.saved_id = NEW.saved_id;
+      v_ok := sv.saved_id IS NOT NULL AND sv.status = 'active' AND sv.command_id = NEW.command_id
+          AND sv.vehicle_id = NEW.vehicle_id AND sv.kind = NEW.kind
+          AND sv.charge_limit_pct IS NOT DISTINCT FROM NEW.charge_limit_pct AND sv.service IS NOT DISTINCT FROM NEW.service;
+    END IF;
+    IF NOT COALESCE(v_ok, false) THEN
+      RAISE EXCEPTION 'owner setting for car %: refused, it is not what an applied owner command set (on its run, or saved by it)',
+        NEW.vehicle_id USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+  END IF;
+  --: UPDATE
+  IF (NEW.setting_id, NEW.sim_run_id, NEW.depot_id, NEW.fleet_operator_id, NEW.vehicle_id, NEW.kind, NEW.charge_limit_pct,
+      NEW.hold_until_sim, NEW.service, NEW.service_when, NEW.include_current_visit, NEW.command_id, NEW.set_at, NEW.set_at_sim,
+      NEW.saved_id)
+     IS DISTINCT FROM
+     (OLD.setting_id, OLD.sim_run_id, OLD.depot_id, OLD.fleet_operator_id, OLD.vehicle_id, OLD.kind, OLD.charge_limit_pct,
+      OLD.hold_until_sim, OLD.service, OLD.service_when, OLD.include_current_visit, OLD.command_id, OLD.set_at, OLD.set_at_sim,
+      OLD.saved_id)
+     OR (NEW.replaces_setting_id IS DISTINCT FROM OLD.replaces_setting_id AND NEW.replaces_setting_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'owner setting %: what was set is immutable', OLD.setting_id USING ERRCODE = '42501';
+  END IF;
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NOT ((OLD.status = 'active' AND NEW.status IN ('replaced', 'withdrawn', 'fulfilled', 'lifted'))
+            OR (OLD.status = 'replaced' AND NEW.status = 'active')) THEN
+      RAISE EXCEPTION 'owner setting %: % -> % is not a change an owner command, the tick or the run''s end makes',
+        OLD.setting_id, OLD.status, NEW.status USING ERRCODE = '42501';
+    END IF;
+    IF NEW.status IN ('replaced', 'withdrawn')
+       AND NOT EXISTS (SELECT 1 FROM public.ottoq_owner_commands x
+                        WHERE x.command_id = NEW.closed_by_command_id AND x.outcome = 'applied'
+                          AND x.fleet_operator_id = NEW.fleet_operator_id) THEN
+      RAISE EXCEPTION 'owner setting %: replaced or withdrawn only by an applied owner command of its fleet', OLD.setting_id
+        USING ERRCODE = '42501';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.ottoq_owner_saved_settings_guard()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+DECLARE c public.ottoq_owner_commands;
+BEGIN
+  IF COALESCE(current_setting('ottoq.agent_ledger_unlock', true), '') = 'on' THEN
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'ottoq_owner_saved_settings keeps what owners saved: DELETE refused; an owner command ends a saved setting'
+      USING ERRCODE = '42501';
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    SELECT * INTO c FROM public.ottoq_owner_commands x WHERE x.command_id = NEW.command_id;
+    IF NOT COALESCE(c.mode = 'apply' AND c.outcome = 'applied' AND c.acting_person IS NOT NULL
+                    AND c.acting_person = NEW.acting_person AND NEW.status = 'active'
+                    AND c.fleet_operator_id = NEW.fleet_operator_id AND c.depot_id = NEW.depot_id
+                    AND c.vehicles @> jsonb_build_array(jsonb_build_object('id', NEW.vehicle_id::text))
+                    AND CASE NEW.kind
+                          WHEN 'charge_limit' THEN c.tool = 'set_charge_limit'
+                                                   AND (c.args ->> 'percent')::numeric = NEW.charge_limit_pct
+                          WHEN 'service'      THEN c.tool = 'request_service' AND c.args ->> 'service' = NEW.service
+                                                   AND c.args ->> 'when' = 'every_return'
+                          ELSE false END, false) THEN
+      RAISE EXCEPTION 'saved owner setting for car %: refused, it is not what an applied command recorded under a person set',
+        NEW.vehicle_id USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF (NEW.saved_id, NEW.depot_id, NEW.fleet_operator_id, NEW.vehicle_id, NEW.kind, NEW.charge_limit_pct, NEW.service,
+      NEW.command_id, NEW.acting_person, NEW.saved_at)
+     IS DISTINCT FROM
+     (OLD.saved_id, OLD.depot_id, OLD.fleet_operator_id, OLD.vehicle_id, OLD.kind, OLD.charge_limit_pct, OLD.service,
+      OLD.command_id, OLD.acting_person, OLD.saved_at) THEN
+    RAISE EXCEPTION 'saved owner setting %: what was saved is immutable', OLD.saved_id USING ERRCODE = '42501';
+  END IF;
+  IF OLD.status = 'active' AND NEW.status = 'ended'
+     AND NOT EXISTS (SELECT 1 FROM public.ottoq_owner_commands x
+                      WHERE x.command_id = NEW.ended_by_command_id AND x.outcome = 'applied' AND x.acting_person IS NOT NULL
+                        AND x.fleet_operator_id = NEW.fleet_operator_id) THEN
+    RAISE EXCEPTION 'saved owner setting %: ended only by an applied owner command recorded under a person', OLD.saved_id
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $fn$;
+
+CREATE TRIGGER ottoq_owner_settings_guard_trg
+  BEFORE INSERT OR UPDATE OR DELETE ON public.ottoq_owner_settings
+  FOR EACH ROW EXECUTE FUNCTION public.ottoq_owner_settings_guard();
+CREATE TRIGGER ottoq_owner_saved_settings_guard_trg
+  BEFORE INSERT OR UPDATE OR DELETE ON public.ottoq_owner_saved_settings
+  FOR EACH ROW EXECUTE FUNCTION public.ottoq_owner_saved_settings_guard();
+CREATE TRIGGER ottoq_owner_saved_settings_no_truncate_trg
+  BEFORE TRUNCATE ON public.ottoq_owner_saved_settings
+  FOR EACH STATEMENT EXECUTE FUNCTION public.ottoq_agent_no_truncate();
+
+-- ══ 11. my_settings says what is saved to the cars ═════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.ottoq_owner_settings_read(p_agent public.ottoq_agent_principals, p_read jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+/* 0721 §11. my_settings (0605's read, unchanged) plus `saved`: what an owner signed in to their OTTOYARD account saved to
+   this fleet's cars at this depot, carried from run to run. The summary no longer says everything lifts at the run's end. */
+DECLARE
+  v_saved jsonb;
+  v_lines text;
+  v_sum   text := COALESCE(p_read ->> 'summary', '');
+BEGIN
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+           'saved_id', s.saved_id, 'vehicle_id', s.vehicle_id, 'vehicle', v.display_name, 'kind', s.kind,
+           'charge_limit_pct', s.charge_limit_pct, 'service', s.service, 'service_name', c.display_name,
+           'when', CASE WHEN s.kind = 'service' THEN 'every_return' END,
+           'saved_by', s.acting_person, 'saved_at', s.saved_at, 'saved_at_local', public.ottoq_owner_clock(s.saved_at, false),
+           'command_id', s.command_id)
+           ORDER BY s.kind, v.display_name, s.service), '[]'::jsonb)
+    INTO v_saved
+    FROM public.ottoq_owner_saved_settings s
+    JOIN public.vehicles v ON v.id = s.vehicle_id
+    LEFT JOIN public.service_cadence_policy c ON c.svc = s.service
+   WHERE s.fleet_operator_id = p_agent.fleet_operator_id AND s.depot_id = p_agent.depot_id AND s.status = 'active';
+  SELECT string_agg(x.line, '; ' ORDER BY x.ord) INTO v_lines FROM (
+    SELECT 1 AS ord, count(*) || CASE WHEN count(*) = 1 THEN ' car charges' ELSE ' cars charge' END
+                     || ' to at most ' || (e ->> 'charge_limit_pct') || '%' AS line
+      FROM jsonb_array_elements(v_saved) e WHERE e ->> 'kind' = 'charge_limit' GROUP BY e ->> 'charge_limit_pct'
+    UNION ALL
+    SELECT 2, count(*) || CASE WHEN count(*) = 1 THEN ' car has ' ELSE ' cars have ' END
+              || public.ottoq_owner_lc(COALESCE(e ->> 'service_name', e ->> 'service')) || ' on every return'
+      FROM jsonb_array_elements(v_saved) e WHERE e ->> 'kind' = 'service' GROUP BY COALESCE(e ->> 'service_name', e ->> 'service')) x;
+  v_sum := replace(v_sum, ' Everything lifts when the run ends.',
+                   ' Holds, one-time orders and anything set without signing in lift when the run ends.');
+  v_sum := replace(v_sum, 'No run is live, so nothing is in force: every car is at baseline.', 'No run is live, so nothing is in force now.');
+  IF v_lines IS NOT NULL THEN
+    v_sum := v_sum || ' Saved to your cars for every run, production included: ' || v_lines || '.';
+  END IF;
+  RETURN COALESCE(p_read, '{}'::jsonb) || jsonb_build_object('summary', v_sum, 'saved', v_saved);
+END $fn$;
+
+-- ══ 12. the demo passcode opens nothing while a production run is live (the 0721 re-review, item 11) ═══════════════
+--
+-- Measured (§1(h)): enter_passcode issued a session whatever the live run, and the session read the fleet's cars in
+-- production (0721's gate refused only its changes). Now the door refuses to issue one while a production_live run is
+-- running or paused at the depot (before the passcode is checked, so it says nothing about the passcode), and §4 refuses
+-- every call of a session opened earlier for as long as that run is live. Sign-up, OAuth, keys and every grant are as
+-- they were.
+DO $door$
+DECLARE
+  v_def text := pg_get_functiondef('public.ottoq_agent_public_call(text,jsonb,text,jsonb,timestamp with time zone)'::regprocedure);
+  c_old constant text := E'  -- ── the door: on, and the passcode right ──\n  IF v_status IS NULL THEN\n';
+  c_new constant text := E'  -- ── 0721 §12: no session opens while a production run is live at the depot ──\n'
+                      || E'  IF v_status IS NULL AND EXISTS (SELECT 1 FROM public.ottoq_sim_runs r\n'
+                      || E'                                   WHERE r.depot_id = c_twin AND r.run_by = ''production_live''\n'
+                      || E'                                     AND r.status IN (''running'', ''paused'')) THEN\n'
+                      || E'    v_status := 403; v_code := ''production_live'';\n'
+                      || E'    v_msg := ''A production run is live at the twin depot, so the demo passcode opens nothing right now: production is read and changed only by an agent signed in to its owner''''s OTTOYARD account. Nothing was opened. Try again once the production run ends, or sign your agent in to your OTTOYARD account.'';\n'
+                      || E'  END IF;\n\n'
+                      || E'  -- ── the door: on, and the passcode right ──\n  IF v_status IS NULL THEN\n';
+  v_n int;
+BEGIN
+  v_n := (length(v_def) - length(replace(v_def, c_old, ''))) / length(c_old);
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION '0721: the passcode door''s anchor occurs % times, expected exactly 1', v_n;
+  END IF;
+  EXECUTE replace(v_def, c_old, c_new);
+END $door$;
+
+-- ══ 13. every OTTO-Command model call in the evidence ledger (CLAUDE.md rule 6) ═════════════════════════════════════
+--
+-- Measured (§1(f)): public.ottoq_model_call_ledger holds no Anthropic row: the owner door's model calls were nowhere.
+-- The gateway now records each one after it returns, fire-and-forget (a ledger failure never fails an ask), through this
+-- function, which only service_role (the gateway's key) may execute. It takes a closed object of ids, counts, codes and
+-- the model's name, validates every field, and writes through 0340's writer (public.ottoq_log_model_call) as provider
+-- 'anthropic_ottocommand', role 'owner_agent' (not 'agent': the view's agent_calls_with_no_l1_rules counts the tick's
+-- advisor, and an owner's ask is judged by the owner door, not the shield), endpoint the Messages API, chain_id the ask.
+-- No prompt, no answer, no thinking and no owner words can reach it: an unknown key is refused, and every text field is
+-- an enum or a pattern no sentence fits.
+CREATE OR REPLACE FUNCTION public.ottoq_ottocommand_record_model_call(p_entry jsonb)
+ RETURNS bigint
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+DECLARE
+  e       jsonb := COALESCE(p_entry, '{}'::jsonb);
+  v_bad   text;
+  c_keys  constant text[] := ARRAY['ask_id', 'ask_kind', 'round', 'model_requested', 'model', 'http_status', 'latency_ms',
+                                   'outcome', 'stop_reason', 'web_search_requests', 'input_tokens', 'output_tokens',
+                                   'fell_back', 'refusal_category', 'effort', 'depot_id', 'sim_run_id', 'gateway_call_id'];
+  c_model constant text := '^[A-Za-z0-9][A-Za-z0-9._:@\[\]-]{0,99}$';
+  c_uuid  constant text := '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+  v_int   constant text := '^[0-9]{1,9}$';
+BEGIN
+  IF jsonb_typeof(e) <> 'object' THEN
+    RAISE EXCEPTION 'ottoq_ottocommand_record_model_call: the entry is a JSON object' USING ERRCODE = '22023';
+  END IF;
+  SELECT string_agg(k, ', ' ORDER BY k) INTO v_bad FROM jsonb_object_keys(e) k WHERE k <> ALL (c_keys);
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION 'ottoq_ottocommand_record_model_call: unknown field(s) %', v_bad USING ERRCODE = '22023';
+  END IF;
+  v_bad := concat_ws(', ',
+    CASE WHEN COALESCE(e ->> 'ask_id', '') !~ '^[A-Za-z0-9-]{1,64}$' THEN 'ask_id' END,
+    CASE WHEN COALESCE(e ->> 'ask_kind', '') NOT IN ('ask', 'search') THEN 'ask_kind' END,
+    CASE WHEN COALESCE(e ->> 'round', '') !~ v_int OR (e ->> 'round')::int NOT BETWEEN 1 AND 50 THEN 'round' END,
+    CASE WHEN jsonb_typeof(e -> 'model_requested') NOT IN ('null', 'string') OR COALESCE(e ->> 'model_requested', 'x') !~ c_model THEN 'model_requested' END,
+    CASE WHEN jsonb_typeof(e -> 'model') NOT IN ('null', 'string') OR COALESCE(e ->> 'model', 'x') !~ c_model THEN 'model' END,
+    CASE WHEN e ? 'http_status' AND jsonb_typeof(e -> 'http_status') <> 'null'
+              AND (COALESCE(e ->> 'http_status', '') !~ v_int OR (e ->> 'http_status')::int NOT BETWEEN 100 AND 599) THEN 'http_status' END,
+    CASE WHEN COALESCE(e ->> 'latency_ms', '') !~ v_int OR (e ->> 'latency_ms')::int > 600000 THEN 'latency_ms' END,
+    CASE WHEN COALESCE(e ->> 'outcome', '') NOT IN ('answered', 'refused', 'error') THEN 'outcome' END,
+    CASE WHEN jsonb_typeof(e -> 'stop_reason') NOT IN ('null', 'string') OR COALESCE(e ->> 'stop_reason', 'x') !~ '^[a-z_]{1,40}$' THEN 'stop_reason' END,
+    CASE WHEN COALESCE(e ->> 'web_search_requests', '') !~ v_int OR (e ->> 'web_search_requests')::int > 50 THEN 'web_search_requests' END,
+    CASE WHEN jsonb_typeof(e -> 'input_tokens') NOT IN ('null', 'number') OR COALESCE(e ->> 'input_tokens', '0') !~ v_int THEN 'input_tokens' END,
+    CASE WHEN jsonb_typeof(e -> 'output_tokens') NOT IN ('null', 'number') OR COALESCE(e ->> 'output_tokens', '0') !~ v_int THEN 'output_tokens' END,
+    CASE WHEN jsonb_typeof(e -> 'fell_back') IS DISTINCT FROM 'boolean' THEN 'fell_back' END,
+    CASE WHEN jsonb_typeof(e -> 'refusal_category') NOT IN ('null', 'string') OR COALESCE(e ->> 'refusal_category', 'x') !~ '^[a-z_]{1,40}$' THEN 'refusal_category' END,
+    CASE WHEN jsonb_typeof(e -> 'effort') NOT IN ('null', 'string') OR COALESCE(e ->> 'effort', 'low') NOT IN ('low', 'medium', 'high', 'xhigh', 'max') THEN 'effort' END,
+    CASE WHEN jsonb_typeof(e -> 'depot_id') NOT IN ('null', 'string') OR COALESCE(e ->> 'depot_id', '00000000-0000-0000-0000-000000000000') !~ c_uuid THEN 'depot_id' END,
+    CASE WHEN jsonb_typeof(e -> 'sim_run_id') NOT IN ('null', 'string') OR COALESCE(e ->> 'sim_run_id', '00000000-0000-0000-0000-000000000000') !~ c_uuid THEN 'sim_run_id' END,
+    CASE WHEN jsonb_typeof(e -> 'gateway_call_id') NOT IN ('null', 'number') OR COALESCE(e ->> 'gateway_call_id', '0') !~ '^[0-9]{1,18}$' THEN 'gateway_call_id' END);
+  IF v_bad <> '' THEN
+    RAISE EXCEPTION 'ottoq_ottocommand_record_model_call: invalid field(s) %', v_bad USING ERRCODE = '22023';
+  END IF;
+  RETURN public.ottoq_log_model_call(
+    p_provider    := 'anthropic_ottocommand',
+    p_role        := 'owner_agent',
+    p_outcome     := e ->> 'outcome',
+    p_sim_run_id  := (e ->> 'sim_run_id')::uuid,
+    p_depot_id    := (e ->> 'depot_id')::uuid,
+    p_chain_id    := e ->> 'ask_id',
+    p_model       := COALESCE(e ->> 'model', e ->> 'model_requested'),
+    p_endpoint    := 'https://api.anthropic.com/v1/messages',
+    p_http_status := (e ->> 'http_status')::int,
+    p_latency_ms  := (e ->> 'latency_ms')::int,
+    p_rationale_present := false,
+    p_detail      := jsonb_strip_nulls(jsonb_build_object(
+                       'ask_kind', e ->> 'ask_kind', 'round', (e ->> 'round')::int,
+                       'model_requested', e ->> 'model_requested', 'stop_reason', e ->> 'stop_reason',
+                       'web_search_requests', (e ->> 'web_search_requests')::int,
+                       'input_tokens', (e ->> 'input_tokens')::bigint, 'output_tokens', (e ->> 'output_tokens')::bigint,
+                       'fell_back', (e ->> 'fell_back')::boolean, 'refusal_category', e ->> 'refusal_category',
+                       'effort', e ->> 'effort', 'gateway_call_id', (e ->> 'gateway_call_id')::bigint)),
+    p_source_kind := 'live');
+END $fn$;
+
+REVOKE ALL ON FUNCTION
+  public.ottoq_owner_settings_save(),
+  public.ottoq_owner_settings_saved_follow(),
+  public.ottoq_owner_saved_carry(uuid),
+  public.ottoq_tg_owner_saved_on_run_start(),
+  public.ottoq_owner_settings_guard(),
+  public.ottoq_owner_saved_settings_guard(),
+  public.ottoq_owner_settings_read(public.ottoq_agent_principals, jsonb),
+  public.ottoq_ottocommand_record_model_call(jsonb)
+  FROM PUBLIC, anon, authenticated, service_role;
+--: the one grant this file makes: the gateway records its own model calls (the Supabase docs on calling a database
+--: function through the REST API: https://supabase.com/docs/guides/database/functions, read 2026-10-14)
+GRANT EXECUTE ON FUNCTION public.ottoq_ottocommand_record_model_call(jsonb) TO service_role;
+
+COMMENT ON FUNCTION public.ottoq_ottocommand_record_model_call(jsonb) IS
+'0721. Records one OTTO-Command model call (the owner door of ottoq-agent-gateway: an ask or a search) in public.ottoq_model_call_ledger as provider anthropic_ottocommand, role owner_agent: ids, counts, codes and the model''s name only, every field validated, unknown fields refused, so no prompt, answer, thinking or owner words can be stored. service_role only (the gateway). CLAUDE.md rule 6.';
+COMMENT ON FUNCTION public.ottoq_owner_saved_carry(uuid) IS
+'0721. Carries every active saved owner setting at a run''s depot onto that run (a demo or production run), once per run: only while the car is still that owner''s, when the run has no setting of that kind for the car, a limit only inside the contract in force, an order only for a requestable, unblocked service. Called by the run-start triggers ottoq_sim_runs_carry_saved_owner_settings(_on_start).';
+
 -- ══ V1: the bodies say what this file says they do ══════════════════════════════════════════════════════════════════
 DO $v1$
 DECLARE
@@ -753,6 +1511,30 @@ BEGIN
      OR strpos(v_bind, 'a.confirms_command_id = p.command_id') = 0 THEN
     RAISE EXCEPTION '0721 V1 FAILED: the binding does not hold a confirm to the same principal, 15 minutes and one apply';
   END IF;
+  -- §9-§13
+  IF strpos(v_cmd, '(v_lowers AND (v_production OR v_person IS NOT NULL))') = 0
+     OR strpos(v_cmd, 'AND v_pct < LEAST(v_ceiling, COALESCE((SELECT s.charge_limit_pct FROM public.ottoq_owner_saved_settings s') = 0
+     OR strpos(v_cmd, '''made_on_an_earlier_run''') = 0
+     OR strpos(v_cmd, 'This is saved to your cars: it stays from run to run, production included, until you change it.') = 0 THEN
+    RAISE EXCEPTION '0721 V1 FAILED: the owner command does not bind a signed-in owner''s lowering, or does not say what is saved';
+  END IF;
+  IF strpos(v_call, 'IF v_agent.origin = ''passcode'' AND EXISTS (SELECT 1 FROM public.ottoq_sim_runs r') = 0
+     OR strpos(v_call, 'public.ottoq_owner_settings_read(v_agent, public.ottoq_owner_read(v_agent, ''my_settings'', v_args))') = 0
+     OR strpos(v_reply, 'Saved to the cars: it stays from run to run') = 0
+     OR strpos(v_who, 'is saved to the car and stays from run to run') = 0
+     OR strpos(pg_get_functiondef('public.ottoq_tg_lift_owner_settings_on_terminal()'::regprocedure),
+               'AND NOT EXISTS (SELECT 1 FROM public.ottoq_owner_saved_settings s') = 0
+     OR strpos(pg_get_functiondef('public.ottoq_agent_public_call(text,jsonb,text,jsonb,timestamp with time zone)'::regprocedure),
+               'v_status := 403; v_code := ''production_live'';') = 0 THEN
+    RAISE EXCEPTION '0721 V1 FAILED: the dispatcher, the receipt, whoami, the run''s end or the passcode door is not patched for §9-§12';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ottoq_owner_settings_guard_trg' AND tgrelid = 'public.ottoq_owner_settings'::regclass)
+     OR NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ottoq_owner_settings_save_trg' AND tgrelid = 'public.ottoq_owner_settings'::regclass)
+     OR NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ottoq_owner_saved_settings_guard_trg')
+     OR NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ottoq_sim_runs_carry_saved_owner_settings')
+     OR NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'ottoq_sim_runs_carry_saved_owner_settings_on_start') THEN
+    RAISE EXCEPTION '0721 V1 FAILED: a §9/§10 trigger is missing';
+  END IF;
   RAISE NOTICE '0721 V1 PASSED';
 END $v1$;
 
@@ -765,11 +1547,32 @@ BEGIN
                       'public.ottoq_owner_write_gate(public.ottoq_agent_principals,jsonb)',
                       'public.ottoq_owner_acting_person(public.ottoq_agent_principals)',
                       'public.ottoq_owner_confirm_binding(public.ottoq_agent_principals,uuid,text,jsonb,text,text,uuid,boolean)',
-                      'public.ottoq_owner_commands_backstop()']) f
+                      'public.ottoq_owner_commands_backstop()',
+                      'public.ottoq_owner_settings_save()',
+                      'public.ottoq_owner_settings_saved_follow()',
+                      'public.ottoq_owner_saved_carry(uuid)',
+                      'public.ottoq_tg_owner_saved_on_run_start()',
+                      'public.ottoq_owner_settings_guard()',
+                      'public.ottoq_owner_saved_settings_guard()',
+                      'public.ottoq_owner_settings_read(public.ottoq_agent_principals,jsonb)']) f
    CROSS JOIN unnest(ARRAY['anon', 'authenticated', 'service_role']) r
    WHERE has_function_privilege(r, f, 'EXECUTE');
   IF v_bad IS NOT NULL THEN
     RAISE EXCEPTION '0721 V2 FAILED: a client role can execute %', v_bad;
+  END IF;
+  -- §13: the model ledger's door is the gateway's (service_role) and no browser role's
+  IF NOT has_function_privilege('service_role', 'public.ottoq_ottocommand_record_model_call(jsonb)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.ottoq_ottocommand_record_model_call(jsonb)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.ottoq_ottocommand_record_model_call(jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION '0721 V2 FAILED: ottoq_ottocommand_record_model_call is not service_role only';
+  END IF;
+  -- §9-§10: no client role holds any privilege on the owner tables
+  SELECT string_agg(t || ' ' || r, ', ') INTO v_bad
+    FROM unnest(ARRAY['public.ottoq_owner_saved_settings', 'public.ottoq_owner_settings']) t
+   CROSS JOIN unnest(ARRAY['anon', 'authenticated', 'service_role']) r
+   WHERE has_table_privilege(r, t, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE');
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION '0721 V2 FAILED: a client role holds a privilege on %', v_bad;
   END IF;
   IF NOT has_function_privilege('service_role', 'public.ottoq_agent_call(text,text,jsonb,text,jsonb)', 'EXECUTE') THEN
     RAISE EXCEPTION '0721 V2 FAILED: the gateway (service_role) lost ottoq_agent_call';
@@ -822,6 +1625,20 @@ DECLARE
   v_bogus  text := 'not reached';
   v_guard  text := 'not reached';
   v_back   text := 'not reached';
+  --: §9-§13
+  v_run2      uuid := gen_random_uuid();
+  v_saved     int;
+  v_carried   int;
+  v_t_carried numeric;
+  v_lifted    timestamptz;
+  v_saved_after int;
+  r_enter     jsonb;
+  v_fake      text := 'not reached';
+  v_del       text := 'not reached';
+  v_upd       text := 'not reached';
+  v_ledger_id bigint;
+  v_ledger_row text;
+  v_ledger_bad text := 'not reached';
 BEGIN
   SELECT r.sim_run_id INTO v_tpl FROM public.ottoq_sim_runs r WHERE r.depot_id = c_twin ORDER BY r.started_at DESC LIMIT 1;
   --: the twin depot's owner with the most cars and a contract range at least 3 points wide (a lower limit, then a raise
@@ -886,6 +1703,21 @@ BEGIN
                                          '{}'::jsonb);
     v_t_confirm := public.ottoq_effective_target_soc_at(v_car, now());
     v_cmd := (r_confirm #>> '{data,command,command_id}')::uuid;
+    -- 2b. (§9) what the person confirmed is saved to the cars, and carried onto the next production run: a second run,
+    --     started earlier than the probe run so the probe run stays the live one, carries it; ending that run lifts it from
+    --     the run and does not stamp the command as lifted
+    SELECT count(*) INTO v_saved FROM public.ottoq_owner_saved_settings s WHERE s.command_id = v_cmd AND s.status = 'active';
+    EXECUTE format('INSERT INTO public.ottoq_sim_runs (sim_run_id, status, started_at, run_by, %1$s) '
+                   'SELECT $1, ''paused'', clock_timestamp() - interval ''1 day'', ''production_live'', %1$s FROM public.ottoq_sim_runs WHERE sim_run_id = $2',
+                   v_cols) USING v_run2, v_tpl;
+    SELECT count(*) INTO v_carried FROM public.ottoq_owner_settings o
+     WHERE o.sim_run_id = v_run2 AND o.saved_id IS NOT NULL AND o.status = 'active' AND o.command_id = v_cmd;
+    PERFORM set_config('ottoq.sim_run_id', v_run2::text, true);
+    v_t_carried := public.ottoq_effective_target_soc_at(v_car, now());
+    PERFORM set_config('ottoq.sim_run_id', '', true);
+    UPDATE public.ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = v_run2;
+    SELECT c.lifted_at INTO v_lifted FROM public.ottoq_owner_commands c WHERE c.command_id = v_cmd;
+    SELECT count(*) INTO v_saved_after FROM public.ottoq_owner_saved_settings s WHERE s.command_id = v_cmd AND s.status = 'active';
     SELECT l.transport INTO v_ledger FROM public.ottoq_agent_call_ledger l WHERE l.call_id = (r_confirm ->> 'call_id')::bigint;
     -- 3. the same confirm again applies nothing; a second apply naming the preview, written straight into the table, is
     --    refused by the unique index; and a confirm naming a command that is no preview is refused by the backstop
@@ -938,6 +1770,42 @@ BEGIN
                 jsonb_build_object('vehicles', 'all', 'percent', v_low, 'mode', 'preview'), 'mcp', '{}'::jsonb);
     r_key := public.ottoq_agent_call(public.ottoq_oauth_sha256(v_key), 'hold_vehicle',
                jsonb_build_object('vehicles', 'all', 'for_minutes', 30), 'rest', '{}'::jsonb);
+    -- 7b. (§12) and the demo passcode opens no new session while the production run is live
+    r_enter := public.ottoq_agent_call(NULL, 'enter_passcode', jsonb_build_object('passcode', 'v0721-not-the-passcode', 'agent', 'probe'),
+                                       'mcp', '{"ip": "192.0.2.211"}'::jsonb);
+    -- 7c. (§10) a setting no command made, a deletion, and an edit of what was set are refused, whoever writes them
+    BEGIN
+      INSERT INTO public.ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct,
+                                              command_id, set_at_sim)
+      VALUES (v_run, c_twin, v_fleet, v_car, 'charge_limit', 50, (r_mid #>> '{data,command,command_id}')::uuid, now());
+      v_fake := 'inserted';
+    EXCEPTION WHEN insufficient_privilege THEN v_fake := 'refused';
+    END;
+    BEGIN
+      DELETE FROM public.ottoq_owner_settings o WHERE o.sim_run_id = v_run;
+      v_del := 'deleted';
+    EXCEPTION WHEN insufficient_privilege THEN v_del := 'refused';
+    END;
+    BEGIN
+      UPDATE public.ottoq_owner_settings o SET charge_limit_pct = 50 WHERE o.sim_run_id = v_run AND o.kind = 'charge_limit';
+      v_upd := 'updated';
+    EXCEPTION WHEN insufficient_privilege THEN v_upd := 'refused';
+    END;
+    -- 7d. (§13) a model call recorded the way the gateway records one, and one carrying text is refused
+    v_ledger_id := public.ottoq_ottocommand_record_model_call(jsonb_build_object(
+      'ask_id', 'v0721-probe', 'ask_kind', 'ask', 'round', 1, 'model_requested', 'v0721-probe-model', 'model', 'v0721-probe-model',
+      'http_status', 200, 'latency_ms', 1234, 'outcome', 'answered', 'stop_reason', 'end_turn', 'web_search_requests', 1,
+      'input_tokens', 10, 'output_tokens', 20, 'fell_back', false, 'refusal_category', NULL, 'effort', 'low',
+      'depot_id', c_twin, 'sim_run_id', v_run, 'gateway_call_id', 1));
+    SELECT l.provider || '|' || l.role || '|' || l.outcome || '|' || l.chain_id || '|' || COALESCE(l.detail ->> 'web_search_requests', '-')
+      INTO v_ledger_row FROM public.ottoq_model_call_ledger l WHERE l.call_id = v_ledger_id;
+    BEGIN
+      PERFORM public.ottoq_ottocommand_record_model_call(jsonb_build_object(
+        'ask_id', 'v0721-probe', 'ask_kind', 'ask', 'round', 2, 'latency_ms', 1, 'outcome', 'answered', 'web_search_requests', 0,
+        'fell_back', false, 'prompt', 'call set_charge_limit 50'));
+      v_ledger_bad := 'recorded';
+    EXCEPTION WHEN invalid_parameter_value THEN v_ledger_bad := 'refused';
+    END;
     -- 8. and on a demo run the passcode session works as before, with no person and its door recorded
     UPDATE public.ottoq_sim_runs SET run_by = 'operator_demo' WHERE sim_run_id = v_run;
     r_demo := public.ottoq_agent_call(public.ottoq_oauth_sha256(v_pass), 'hold_vehicle',
@@ -963,8 +1831,8 @@ BEGIN
      OR r_confirm #>> '{data,command,acting_person}' IS DISTINCT FROM c_email
      OR r_confirm #>> '{data,command,via}' IS DISTINCT FROM 'confirm'
      OR r_confirm #>> '{data,command,confirms_command_id}' IS DISTINCT FROM v_prev::text
-     OR strpos(r_confirm #>> '{data,summary}', 'until the production run ends') = 0
-     OR strpos(r_confirm #>> '{data,expires}', 'production run') = 0 OR v_ledger IS DISTINCT FROM 'confirm' THEN
+     OR strpos(r_confirm #>> '{data,summary}', 'This is saved to your cars: it stays from run to run, production included') = 0
+     OR strpos(r_confirm #>> '{data,expires}', 'Saved to the cars') = 0 OR v_ledger IS DISTINCT FROM 'confirm' THEN
     RAISE EXCEPTION '0721 V3 FAILED: the confirm of the recorded preview was not applied, bound and recorded under the person: % (ledger %)', r_confirm, v_ledger;
   END IF;
   IF v_t_confirm IS DISTINCT FROM v_low THEN
@@ -994,9 +1862,25 @@ BEGIN
   IF r_clear #>> '{data,outcome}' IS DISTINCT FROM 'applied' OR r_clear #>> '{data,command,via}' IS DISTINCT FROM 'direct' THEN
     RAISE EXCEPTION '0721 V3 FAILED: clearing the limit in production took more than one call, or the arguments set the door: %', r_clear;
   END IF;
-  IF r_pass #>> '{error,code}' IS DISTINCT FROM 'production_needs_a_person' OR r_pass #>> '{data,outcome}' IS DISTINCT FROM 'refused'
+  -- §12: a passcode session is refused before any tool while production is live; an issued key reaches the gate
+  IF (r_pass ->> 'http_status')::int <> 403 OR r_pass #>> '{error,code}' IS DISTINCT FROM 'production_live'
      OR r_key #>> '{error,code}' IS DISTINCT FROM 'production_needs_a_person' THEN
     RAISE EXCEPTION '0721 V3 FAILED: a passcode session or an issued key was not refused in production: % / %', r_pass, r_key;
+  END IF;
+  IF (r_enter ->> 'http_status')::int <> 403 OR r_enter #>> '{error,code}' IS DISTINCT FROM 'production_live' THEN
+    RAISE EXCEPTION '0721 V3 FAILED: the demo passcode door opened (or tried to) while production was live: %', r_enter;
+  END IF;
+  -- §9: saved, carried, read by the engine on the carried run, lifted from the run and not from the car
+  IF v_saved < 1 OR v_carried <> v_saved OR v_t_carried IS DISTINCT FROM v_low OR v_lifted IS NOT NULL OR v_saved_after <> v_saved THEN
+    RAISE EXCEPTION '0721 V3 FAILED: the confirmed limit was not saved (%), carried (%), read on the carried run (%), or survived its end (lifted %, saved after %)',
+      v_saved, v_carried, v_t_carried, v_lifted, v_saved_after;
+  END IF;
+  -- §10 and §13
+  IF v_fake <> 'refused' OR v_del <> 'refused' OR v_upd <> 'refused' THEN
+    RAISE EXCEPTION '0721 V3 FAILED: the owner settings guard let a row through (insert %, delete %, update %)', v_fake, v_del, v_upd;
+  END IF;
+  IF v_ledger_row IS DISTINCT FROM 'anthropic_ottocommand|owner_agent|answered|v0721-probe|1' OR v_ledger_bad <> 'refused' THEN
+    RAISE EXCEPTION '0721 V3 FAILED: the model ledger door wrote % (and a call carrying text was %)', v_ledger_row, v_ledger_bad;
   END IF;
   IF r_demo #>> '{data,outcome}' IS DISTINCT FROM 'applied' OR r_demo #> '{data,command}' ? 'acting_person'
      OR r_demo #>> '{data,command,via}' IS DISTINCT FROM 'ottocommand' THEN
@@ -1007,10 +1891,13 @@ BEGIN
      OR EXISTS (SELECT 1 FROM public.ottoq_owner_accounts WHERE account_id = v_acct)
      OR EXISTS (SELECT 1 FROM public.ottoq_agent_principals WHERE principal_id IN (v_pid, v_pid2))
      OR EXISTS (SELECT 1 FROM public.ottoq_agent_principals WHERE name IN ('v0721-probe-passcode', 'v0721-probe-key'))
-     OR EXISTS (SELECT 1 FROM public.ottoq_owner_commands WHERE acting_person = c_email OR sim_run_id = v_run) THEN
+     OR EXISTS (SELECT 1 FROM public.ottoq_owner_commands WHERE acting_person = c_email OR sim_run_id = v_run)
+     OR EXISTS (SELECT 1 FROM public.ottoq_sim_runs WHERE sim_run_id = v_run2)
+     OR EXISTS (SELECT 1 FROM public.ottoq_owner_saved_settings WHERE acting_person = c_email)
+     OR EXISTS (SELECT 1 FROM public.ottoq_model_call_ledger WHERE chain_id = 'v0721-probe') THEN
     RAISE EXCEPTION '0721 V3 FAILED: the probe left rows behind';
   END IF;
-  RAISE NOTICE '0721 V3 PASSED: production at the twin depot takes a signed-in person (% on %), refuses a passcode and a key, and lowers a limit (or undoes a raise) only as the one confirm of a preview the same principal recorded', c_email, v_run;
+  RAISE NOTICE '0721 V3 PASSED: production at the twin depot takes a signed-in person (% on %), refuses a passcode (and opens none) and a key, lowers a limit (or undoes a raise) only as the one confirm of a preview the same principal recorded, saves it and carries it onto the next run, refuses a setting no command made, and ledgers a model call', c_email, v_run;
 END $v3$;
 
 -- ══ V4: the run-scope registry stays clean ════════════════════════════════════════════════════════════════════════
@@ -1034,7 +1921,10 @@ VALUES ('0721_a_signed_in_owner_changes_production_under_their_own_name', false,
   'a backstop refuses an applied production command with no person (rule 10) and a confirm of anything but such a '
   'preview. Agent door only: ottoq_agent_call, ottoq_owner_command, its '
   'receipt, whoami and the owner-commands guard. No arm reaches any of them, and no arm can run while a run is live '
-  '(every runner''s guard), so no certified run changes: FALSE/FALSE.',
+  '(every runner''s guard), so no certified run changes: FALSE/FALSE. And (Chase 2026-10-14, 12:35 PM CT) what a '
+  'signed-in owner sets as a charge limit or an every-return order is saved to the car (ottoq_owner_saved_settings) and '
+  'carried onto every new demo or production run, by triggers whose WHEN no arm meets; owner tables guarded against rows '
+  'no command made; the demo passcode opens nothing while production is live; OTTO-Command model calls ledgered.',
   now());
 
 COMMIT;
