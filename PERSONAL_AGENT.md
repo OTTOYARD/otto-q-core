@@ -10,8 +10,9 @@ passcode or key passes through the chat, and the connection outlasts runs. Set u
 
 *2026-10-14: **OTTO-Command is the one door for personal agents** (0721 and the gateway, section 11; built, not yet
 applied or deployed): the MCP tool `ask_ottocommand` takes your words, reads and acts with your agent's own token, and
-answers; a signed-in owner may change their cars on a **production** run, recorded under their name, with a lower charge
-limit previewed and then confirmed.*
+answers; a signed-in owner may change their cars on a **production** run, recorded under their name, and a lower charge
+limit there applies only as the confirm of a preview the same agent recorded in the last 15 minutes. OTTO-Q enforces
+that order; the confirm itself is relayed by the owner's agent, and OTTO-Q cannot see the owner's yes.*
 
 Chase, 2026-10-03: *"I want to be able to setup and activate a new agent from theoretically Hermes or [Grok] or any
 other agent and be able to call OTTOYARD ... and allow me to access my fleet ... a general password or passcode that I
@@ -140,7 +141,8 @@ stub fleet is smaller; the live wording follows the same rule over your real car
   Waymo and Zoox cars cannot be named.
 - **Demo runs only** (until 0721; section 11). Settings apply to a live `operator_demo` run at the twin depot, and end
   with it (section 4). With no demo live, a command is refused with *no_live_demo*. After 0721 a production run also
-  takes changes, from an agent signed in to its owner's account only, each recorded under that person.
+  takes changes, from an agent signed in to its owner's account only, each recorded under that person; a lower limit
+  there applies only as the confirm of a recorded preview (section 11).
 - **Charge limits stay inside your contract.** Tesla Robotaxi TN's contract allows **80% to 100%** (read 2026-10-02).
   "Charge to 50%" is refused and recorded, with the range in the reply. Rule 9 holds: the depot never lowers a target;
   only the owner does, verified (the contract) and confirmed (an explicit command).
@@ -253,7 +255,8 @@ curl -sS -X POST "$GATEWAY/v1/ask" -H "$H" -H "Content-Type: application/json" \
 ```
 
 - `dry_run: true` runs every change as a preview, **enforced in code**, and returns each plan's `confirm`. To apply
-  exactly what was shown, send `{"confirm":[<those objects>]}`: no model is involved in a confirm.
+  exactly what was shown, send `{"confirm":[<those objects>]}`: no model is involved in a confirm, which goes out as
+  transport `confirm`, and an apply it confirms is recorded `via = 'confirm'` (0721).
 - `history: [{role, text}]` (up to 12 turns) carries the conversation; it is text only, so nothing can be passed off as
   a tool result.
 - `idempotency_key`: resend the same ask after a timeout and each command it made replays instead of acting twice
@@ -540,13 +543,18 @@ agents, OTTOCommand processes and acts and returns info back. So it will act as 
                        public.ottoq_agent_call  (the one door: scope, contract, rate limit, the ledger: transport 'ask')
                                                         │
   your agent <── answer (plain English) + actions (OTTO-Q's receipts) + confirm (when it only previewed) ──┘
+       │
+       └── your person says yes ── confirm ──> ask_ottocommand / POST /v1/ask   (no model: transport 'confirm')
 ```
 
 **What changes for your agent.** It sends everything to **`ask_ottocommand`** first: your words as `text`, and it
 forwards the `answer`. The typed tools are still there (they are the same database filter), for an agent that wants
 them or for when OTTO-Command is not switched on. When OTTO-Command only previews a change, the result carries
 `confirm`; once you say yes, your agent calls `ask_ottocommand` again with `confirm` set to that array, unchanged, and
-OTTO-Q applies exactly the plan you saw (no model is involved in a confirm).
+OTTO-Q applies exactly the plan you saw. No model is involved in a confirm: the gateway sends it as transport `confirm`,
+and the record says your agent confirmed it (`via = 'confirm'`), never that OTTO-Command made it. `ask_ottocommand` is
+marked destructive for MCP clients (`destructiveHint: true`): one call can hold cars, order or withdraw services and
+undo commands, so a client that asks before destructive tools asks before this one.
 
 **What OTTO-Command can look up for you, now.** Your cars, one car, what you have set, what you asked before; and
 (new) whether a run is live and which kind, the sim clock and your cars by state (`depot_status`), one car's full work
@@ -560,19 +568,40 @@ stops the migration until its scope is read again.
 | The live run at the twin depot | An agent signed in to your OTTOYARD account (section 10) | A passcode session, or an issued key |
 |---|---|---|
 | a demo run | as before; the change is recorded under your account | as before; no person is recorded |
-| **a production run** | **allowed**, recorded under your account (`acting_person`); a **lower charge limit** takes a preview and then your confirm with its plan hash | **refused** (`production_needs_a_person`): it can read your cars but not change them, because in production every change is recorded under the person who made it. The refusal says so and says to sign in |
+| **a production run** | **allowed**, recorded under your account (`acting_person`); a **lower charge limit** (or an undo that puts one back) applies only as the confirm of a preview this same agent recorded in the last 15 minutes; everything else is one call | **refused** (`production_needs_a_person`): it can read your cars but not change them, because in production every change is recorded under the person who made it. The refusal says so and says to sign in |
 | none, or another kind | refused, `no_live_demo` (0605's words) | refused, `no_live_demo` |
 
-- **Rule 9.** A lower limit is yours, *"set verified and confirmed"*. In production, OTTO-Command always previews a
-  limit below full whatever its model asked for, and OTTO-Q itself refuses an apply that lowers a limit without the
-  preview's plan hash (`confirm_required`, with the reason and the hint that raising or clearing needs no preview). An
-  undo that puts back a lower limit you confirmed earlier on the same run is not asked twice.
+- **Rule 9: preview, then confirm, bound in the database.** A lower limit is yours, *"set verified and confirmed"*. In
+  production, OTTO-Q applies a command that lowers how full a car charges (a lower limit, or an undo that puts a lower
+  one back) only as the **confirm of a recorded preview**: an `ottoq_owner_commands` row with outcome `previewed`, made
+  by the **same signed-in agent** (principal), on the same run, of the same tool, arguments and plan hash, **at most 15
+  minutes old**, and confirmed **once** (the apply records it as `confirms_command_id`; a unique index refuses a second).
+  The apply names the preview by `expect_plan_hash` and/or `confirms_command_id`; the confirm object a preview returns
+  carries both. An apply that does not bind is **not applied**: OTTO-Q records it as a preview and answers
+  `confirm_required` with the reason (`not_named`, `no_recorded_preview`, `preview_already_confirmed`,
+  `preview_expired`, `preview_does_not_match`, `not_a_preview`) and that preview's `confirm`, so the next confirm can
+  bind to it. A stale hash is still `plan_changed`. Raising or clearing a limit, holds, service orders and cancelling
+  your own orders stay one call. OTTO-Command's model can never confirm: the gateway strips both arguments from what it
+  may send, and OTTO-Q refuses a call through its door that carries one. No command can skip, defer or shorten a service
+  OTTO-Q found a car to need: `cancel_service` takes off only your own orders, an engine-found need stays, and a started
+  service finishes.
+- **What OTTO-Q enforces, and what it cannot.** It enforces preview-then-confirm by the same signed-in principal within
+  15 minutes, recorded under your account. It **cannot see your yes**: the confirm is relayed by your own agent, which
+  holds the token that made the preview, so an agent that previews and confirms on its own reads exactly like one that
+  asked you in between. The stronger option is a person-only surface, the confirm taken in your OTTOYARD account session
+  (as 0700 already does for approving a sign-in), which no agent can drive. **It is not built: an open option for
+  Chase.**
 - **Rule 10.** Production never self-tunes: nothing here writes a setting (`ottoq_policy_set`); your changes stay in the
   owner tables and lift when the production run ends, as a demo's do. A trigger refuses any applied production command
-  without a person, whoever writes it.
-- **Who and which door, on every command.** `ottoq_owner_commands.acting_person` is your account's email for a
-  signed-in agent and empty for a passcode or key; `via` is `ottocommand` when OTTO-Command sent it and `direct` when the
-  agent called the tool itself. Both are immutable, and the receipt shows them.
+  without a person, and any `confirms_command_id` that is not such a preview, whoever writes the row.
+- **Who, which door and which preview, on every command.** `ottoq_owner_commands.acting_person` is your account's email
+  for a signed-in agent and empty for a passcode or key (it names whose agent sent the command). `via` is set by the
+  database from the gateway's transport and the binding, never from an argument: `ottocommand` when an OTTO-Command
+  model read your words and called the tool; `confirm` when your agent confirmed a recorded preview, and then the row
+  names that preview in `confirms_command_id` (a CHECK makes the two one fact), whether the confirm went back through
+  `ask_ottocommand` / `POST /v1/ask` (transport `confirm`, never as OTTO-Command's own call) or as a typed tool naming the
+  preview; and `direct` when the agent made the call itself (a typed tool, or a confirm that bound to no preview and was
+  recorded as a new one). All three are immutable, and the receipt shows them.
 - **Every refusal says why and what is allowed**, in OTTO-Q's words; OTTO-Command relays the reason and the hint, and
   its answer can never claim a change the receipts do not show.
 
@@ -581,24 +610,36 @@ left, and no engine call starts with less than 10 seconds left, so an engine cal
 inside 60. A cut-short ask says what OTTO-Q did (`incomplete: true`).
 
 **To go live** (in this order; times in CT when done):
-1. **Apply `db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql`** per `scripts/APPLYING.md`
-   (`forces_recert` FALSE: only the agent door changes, and no certification arm can run while any run is live). It
-   refuses while anything is in flight, and its V3 probes a production session end to end in a block that rolls back.
-2. **Deploy `ottoq-agent-gateway`** with JWT verification off, these five files: `ottoq-agent-gateway/index.ts`,
+1. **Deploy `ottoq-agent-gateway`** with JWT verification off, these five files: `ottoq-agent-gateway/index.ts`,
    `_shared/agent_gateway.ts`, `_shared/ottocommand_owner.ts`, `_shared/agent_signin.ts`,
-   `_shared/agent_dial_discipline.ts`. Before 0721 is applied the new gateway still works: whoami simply carries no
-   `changes`, OTTO-Command falls back to the demo wording, and production stays refused by the database.
+   `_shared/agent_dial_discipline.ts`. **The gateway goes first:** after 0721 a preview's confirm object carries
+   `confirms_command_id`, which a gateway built before this change refuses as an unknown argument. Before 0721 the new
+   gateway still works: whoami simply carries no `changes`, OTTO-Command falls back to the demo wording, production
+   stays refused by the database, the 0605 body ignores `confirms_command_id`, and the dispatcher ledgers transport
+   `confirm` as `other`.
+2. **Apply `db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql`** per `scripts/APPLYING.md`
+   (`forces_recert` FALSE: only the agent door changes, and no certification arm can run while any run is live). It
+   refuses while anything is in flight, and its V3 probes a production session end to end in a block that rolls back:
+   an unbound lowering recorded as a preview, its confirm refused to another agent signed in to the same account and
+   applied once, bound, for the agent that made it, a second confirm refused, an undo that lowers gated and then
+   confirmed, a raise and a clear in one call.
 3. **Switch OTTO-Command on**: the function secrets `ANTHROPIC_API_KEY` and `OTTOCOMMAND_OWNER_MODEL` (or
    `ANTHROPIC_MODEL`). Without them `ask_ottocommand` answers `ask_not_configured` as a tool error and every typed tool
    still works.
 4. **Update Hermes's skill** to `integrations/hermes/ottoq-owner/SKILL.md` v1.3 and `/reload-mcp`.
 
-**Verified on scratch (2026-10-14).** `tests/test_ottocommand_executor_sql.py` (17): the bodies are the live ones by
+**Verified on scratch (2026-10-14).** `tests/test_ottocommand_executor_sql.py` (24): the bodies are the live ones by
 md5; before 0721 a signed-in owner is refused in production and nothing names a person or a door; after it, everything
-in the table above, the stamps, the guard, the backstop, the grants and the registry. `tests/ottocommand_executor.test.mjs`
-(15): the tool's listing, routing, transport and budget, preview-then-confirm in production, Hermes's skill, and both flows end to end
-over the real SQL with 0721 applied. **Not verified:** a live model behind the door, a real production run, and Hermes
-calling `ask_ottocommand` (it has made no tool call yet: db/checks/0449).
+in the table above: an unbound lowering recorded as a preview and not applied, a bound confirm applied once, a second
+confirm, a confirm older than 15 minutes, one by another principal and a hash with no recorded preview each applying
+nothing, an undo that lowers gated the same way, every other change one call, `cancel_service` taking only the owner's
+own unstarted orders, `via` set by the door and the binding (never by an argument), the stamps, the guard, the
+backstop, the grants and the registry.
+`tests/ottocommand_executor.test.mjs` (17): the tool's listing and annotations, routing, transport and budget, the
+confirm sent on the confirm door over REST and MCP, the model never sending a binding argument, Hermes's skill, and both
+flows end to end over the real SQL with 0721 applied. **Not verified:** a live model behind the door, a real production
+run, the gateway version deployed now, and Hermes calling `ask_ottocommand` (it has made no tool call yet:
+db/checks/0449).
 
 ## Sources (external facts; read 2026-10-03 unless marked)
 

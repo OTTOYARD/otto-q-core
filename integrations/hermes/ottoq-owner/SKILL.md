@@ -69,16 +69,19 @@ so it can do nothing your token could not. What comes back:
   `applied`.
 - `confirm` (only when a change was previewed, not applied): ask the person "Shall I go ahead?". If they say yes, call
   `mcp__ottoyard__ask_ottocommand {confirm: <that array, unchanged>}` and forward the new `answer`. Never change it,
-  never send it without their yes.
+  never send it without their yes. OTTO-Q cannot see their yes: it checks only that the confirm comes from you, for a
+  preview you made in the last 15 minutes, once. Asking them is your job, and the record says you confirmed it.
 - `incomplete: true`: OTTO-Command ran out of time; `actions` still says what was done. Say so and offer to try again.
 
 Pass the person's earlier turns as `history` (`[{role, text}]`, oldest first, at most 12) when a request depends on them
 ("do the same for RT-3"), and `idempotency_key` (the chat message id) so a resend after a timeout replays instead of
 acting twice.
 
-**Production.** When the live run at the depot is a production run, a lower charge limit is always previewed first and
-needs the person's yes (the `confirm` above): say plainly that nothing has changed until they confirm. A passcode
-session can read the cars there but not change them; OTTO-Command says so, and to sign in (Connecting, above).
+**Production.** When the live run at the depot is a production run, OTTO-Q applies a lower charge limit (or an undo that
+puts a lower one back) only as the confirm of a preview you recorded in the last 15 minutes. Asked for one, it records a
+preview and answers `confirm_required`, and OTTO-Command tells the person what they would confirm: say plainly that
+nothing has changed until they say yes, then send the `confirm` above within 15 minutes. Everything else is one call. A
+passcode session can read the cars there but not change them; OTTO-Command says so, and to sign in (Connecting, above).
 
 ### Only if OTTO-Command is not available
 
@@ -102,8 +105,10 @@ is missing from the list), use the typed tools directly. They are the same datab
 | "what have I set", "what did I change" | `mcp__ottoyard__my_settings`, `mcp__ottoyard__my_commands` |
 
 Names go in as the person says them ("Tesla 45", "AV-045", "RT-3"); OTTO-Q matches them inside the person's own fleet.
-"After charging" needs nothing extra: OTTO-Q always plans bay work after the charge. In a production run, preview a
-lower charge limit (`mode: "preview"`) and send its `confirm` only after the person says yes: OTTO-Q refuses it otherwise.
+"After charging" needs nothing extra: OTTO-Q always plans bay work after the charge. In a production run a lower charge
+limit applies only as the confirm of a preview you made in the last 15 minutes: a plain apply comes back
+`confirm_required` with nothing changed and a `confirm` object. Show the person the plan, and send that object (it names
+the preview) only after they say yes. OTTO-Q enforces the preview and the 15 minutes, not their yes; that part is yours.
 
 ## How to answer
 

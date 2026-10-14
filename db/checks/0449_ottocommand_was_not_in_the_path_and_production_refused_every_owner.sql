@@ -15,9 +15,11 @@
 --   oauth.hermes-agent.08e94d9e (origin oauth, active, created 2026-10-10 17:04:21 UTC): 1,886 MCP handshakes (first
 --   2026-10-10 17:04:21, last 2026-10-14 15:16:07 UTC) and 94 calls at the token endpoint. Tool calls: 0. Its own model
 --   would call the typed tools directly; OTTO-Command is reachable only through REST (POST /v1/ask), and the call ledger
---   holds one transport 'ask' row in its life, the 2026-10-04 smoke test's handshake (it answered 503
---   ask_not_configured, PERSONAL_AGENT.md section 9). Whether the gateway's model secrets are set now is not readable
---   from SQL and is not established here.
+--   holds one transport 'ask' row in its life, the 2026-10-04 11:45:17 UTC smoke test's handshake, with http_status 200
+--   (query (2)'s second statement; re-read 2026-10-14 17:36:51 UTC, 12:36 PM CT, by its own clock_timestamp()). That 200
+--   is the handshake's. The ask behind it was answered 503 ask_not_configured by the gateway itself (PERSONAL_AGENT.md
+--   section 9), an HTTP answer the ledger never records, so a reader re-running (2) finds 200 and no 503, as expected.
+--   Whether the gateway's model secrets are set now is not readable from SQL and is not established here.
 --
 -- ══ §3 THE OWNER DOOR IS DEMO-ONLY, AND RECORDS NEITHER A PERSON NOR A DOOR (reproduce: (3)) ═══════════════════════
 --

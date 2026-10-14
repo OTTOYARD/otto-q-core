@@ -554,10 +554,12 @@ jobs:
             tests/test_certification_probe_sql.py tests/test_run_end_dispatch_sql.py
 
       # 0721, OTTO-Command as the one filter and executor between personal agents and OTTO-Q (Chase 2026-10-14): the
-      # owner door's live bodies (md5-pinned) before and after 0721 -- a signed-in person may change a production run,
-      # a passcode or a key may not, a lower limit there takes a preview and its plan hash, every command records its
-      # person and its door -- and the gateway's ask_ottocommand over HTTP against the same SQL with 0721 applied.
-      - name: OTTO-Command is the door and a person signs every production change, executed (0721 against the live bodies; HTTP end to end)
+      # owner door's live bodies (md5-pinned) before and after 0721 -- a signed-in agent may change a production run, a
+      # passcode or a key may not, a lower limit there applies only as the one confirm of a preview the same principal
+      # recorded within 15 minutes, every command records its person, its door and the preview it confirmed -- and the
+      # gateway's ask_ottocommand over HTTP against the same SQL with 0721 applied. OTTO-Q enforces preview-then-confirm
+      # by the same principal; it cannot see a person's yes, which the person's own agent relays.
+      - name: OTTO-Command is the door; production changes carry a signed-in principal, and a lowering is the one confirm of its own preview (0721 against the live bodies; HTTP end to end)
         env:
           PGHOST: localhost
           PGPORT: "5432"

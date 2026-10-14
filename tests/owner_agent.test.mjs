@@ -132,6 +132,12 @@ const propsOf = (names) => new Set(names.flatMap((n) => Object.keys(findTool(n).
 
 test("every argument the commands' SQL reads is in a tool schema, and every schema argument is one it reads", () => {
   const sql = argKeys(F0605.get("ottoq_owner_command"));
+  // 0721 patches that body by anchored substitution, so the reads it adds sit inside quoted SQL (quotes doubled): the
+  // preview an apply confirms, and nothing else
+  const m0721 = read("db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql");
+  const added = [...m0721.matchAll(/ottoq_agent_arg_(?:int|uuid|text|bool)\(v_args, ''([a-z_]+)''\)/g)].map((m) => m[1]);
+  assert.deepEqual(added, ["confirms_command_id"]);
+  for (const k of added) sql.add(k);
   assert.deepEqual(sorted(propsOf(OWNER_COMMANDS)), sorted(sql));
 });
 

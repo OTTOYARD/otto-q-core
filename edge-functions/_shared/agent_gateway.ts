@@ -24,8 +24,9 @@
  * 0721 (Chase 2026-10-14: OTTO-Command is "the filter and executor" between personal agents and OTTO-Q): the same door
  * is also the MCP tool ask_ottocommand, offered to every token bound to a fleet (an owner's key, a passcode session, an
  * agent signed in to its owner's account) and answered by the same handler with the same bound call, ledgered as
- * transport 'ask'. The typed owner tools stay beside it: they are the same database filter, and OTTO-Command is the
- * first door, not the only one.
+ * transport 'ask'; a preview's confirm sent back through it goes out as transport 'confirm', so the record never says a
+ * model made what the agent confirmed. The typed owner tools stay beside it: they are the same database filter, and
+ * OTTO-Command is the first door, not the only one.
  *
  * Specs this implements, read 2026-09-28:
  *   MCP 2026-07-28 (stateless core; initialize retired; Mcp-Method / Mcp-Name mirrored headers; -32020 HeaderMismatch;
@@ -260,8 +261,18 @@ const OWNER_NOTE: JsonSchema = {
   type: "string", maxLength: 500,
   description: "Optional: why, in your person's words (at most 500 characters). Shown on the receipt and in OrchestrAV.",
 };
+/** 0721: the preview an apply confirms. A preview's confirm object carries it; OTTO-Q binds the apply to that preview
+ *  (made by this same token, on this run, at most 15 minutes ago, confirmed once). */
+const CONFIRMS_COMMAND_ID: JsonSchema = {
+  type: "string", format: "uuid",
+  description: "Optional, with mode apply: the command_id of the preview this apply confirms (a preview's confirm object " +
+    "carries it). OTTO-Q applies it only as the confirm of that preview: made with this same token, on this run, at most " +
+    "15 minutes ago, and confirmed once. In a production run a lower charge limit, or an undo that puts one back, applies " +
+    "only this way; sent without a preview it is recorded as one and answered confirm_required.",
+};
 const COMMAND_OPTIONS: Record<string, JsonSchema> = {
-  mode: MODE, expect_plan_hash: PLAN_HASH, idempotency_key: OWNER_IDEMPOTENCY, note: OWNER_NOTE,
+  mode: MODE, expect_plan_hash: PLAN_HASH, confirms_command_id: CONFIRMS_COMMAND_ID, idempotency_key: OWNER_IDEMPOTENCY,
+  note: OWNER_NOTE,
 };
 const RECEIPT =
   " Answers with a receipt: outcome (applied, previewed, no_change or refused), a plain-English summary, and an " +
@@ -330,14 +341,19 @@ export const TOOLS: readonly ToolDef[] = [
       "`answer` (plain English, ready to forward), `actions` (OTTO-Q's receipt for each change; a change is done only when " +
       "its outcome is applied, and then it carries a confirmation code and an OrchestrAV link) and, when it only previewed " +
       "a change, `confirm`: once your person says yes, call this tool again with `confirm` set to that array, unchanged, " +
-      "to apply exactly the plan shown. A refusal says why and what is allowed. dry_run makes every change a preview. In " +
-      "a production run, a lower charge limit is always previewed first and needs that confirm.",
+      "to apply exactly the plan shown (it is sent through the confirm door, with no model involved). A refusal says why " +
+      "and what is allowed. dry_run makes every change a preview. In a production run OTTO-Q applies a lower charge limit " +
+      "only as the confirm of a preview this same token recorded in the last 15 minutes: asked to make one, OTTO-Command " +
+      "gets a recorded preview back and returns its `confirm`. OTTO-Q enforces that order; it cannot see your person's " +
+      "yes, so send the confirm only after they give it.",
     capability: "read", effect: "ask", scope: "fleet", gateway: true,
     inputSchema: askInputSchema(),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    // 0721: destructive in MCP's sense: one call can hold cars, order or withdraw services and undo commands with no
+    // per-command approval, so a client that gates destructive tools must gate this one too
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     rest: { method: "POST", path: "/v1/ask" }, tags: ["owner", "ask"],
     examples: ["{\"text\": \"How are my Teslas doing?\"}", "{\"text\": \"Charge all my cars to 90% instead of 100%\"}",
-      "{\"confirm\": [{\"tool\": \"set_charge_limit\", \"args\": {\"vehicles\": \"all\", \"percent\": 90, \"mode\": \"apply\", \"expect_plan_hash\": \"<from the preview>\"}}]}"],
+      "{\"confirm\": [{\"tool\": \"set_charge_limit\", \"args\": {\"vehicles\": \"all\", \"percent\": 90, \"mode\": \"apply\", \"expect_plan_hash\": \"<from the preview>\", \"confirms_command_id\": \"<from the preview>\"}}]}"],
   },
   {
     name: "depot_status",
@@ -768,6 +784,9 @@ export function validateToolArgs(tool: ToolDef, args: unknown): Validated {
     if (value.expect_plan_hash !== undefined && value.mode === "preview") {
       errors.push({ path: "$.expect_plan_hash", message: "is for mode apply: it binds the apply to a plan a preview showed" });
     }
+    if (value.confirms_command_id !== undefined && value.mode === "preview") {
+      errors.push({ path: "$.confirms_command_id", message: "is for mode apply: it names the preview this apply confirms" });
+    }
     if (Array.isArray(value.vehicles)) {
       const all = value.vehicles.filter((v) => typeof v === "string" && /^\s*(all|all cars|every car|fleet|my fleet)\s*$/i.test(v));
       if (all.length > 0 && value.vehicles.length > 1) errors.push({ path: "$.vehicles", message: "\"all\" stands alone: send \"all\" or a list of names" });
@@ -1041,7 +1060,8 @@ export const MCP_INSTRUCTIONS =
   "doors decide whether it can happen; never report one as done until list_requests shows status 'applied' with the " +
   "engine's reply. If your token is bound to a fleet, START WITH ask_ottocommand: send your person's words and forward " +
   "its answer; it reads your cars and makes the change asked for with your own token, and when it only previews a change " +
-  "it returns a confirm array to send back once your person says yes. If your token belongs to a vehicle owner (whoami " +
+  "it returns a confirm array to send back once your person says yes (OTTO-Q cannot see that yes: send it only then). " +
+  "If your token belongs to a vehicle owner (whoami " +
   "shows an owner block), the owner commands " +
   "(set_charge_limit, clear_charge_limit, request_service, cancel_service, hold_vehicle, release_hold, undo_command) set " +
   "what YOUR cars need: OTTO-Q checks each one against your contract and its own rules, applies it at its next tick, and " +
@@ -1128,11 +1148,14 @@ function engineFailure(id: RpcId, outcome: EngineOutcome): HttpOut {
  *  a call to the session key a tool's `session` argument carries. */
 export type McpOptions = {
   anonymous?: boolean;
-  /** 0721: `transport` 'ask' binds the session for OTTO-Command's door, so its calls are ledgered as the door's. */
-  bindSession?: (sessionKey: string, transport?: "mcp" | "ask") => Promise<EngineCall>;
-  /** 0721: OTTO-Command's door (the same handler POST /v1/ask uses), and the caller's call bound to transport 'ask'. */
+  /** 0721: `transport` 'ask' binds the session for OTTO-Command's door, so its calls are ledgered as the door's, and
+   *  'confirm' for the door's confirms. */
+  bindSession?: (sessionKey: string, transport?: "mcp" | "ask" | "confirm") => Promise<EngineCall>;
+  /** 0721: OTTO-Command's door (the same handler POST /v1/ask uses), and the caller's call bound to transport 'ask'
+   *  (what the model calls) and to transport 'confirm' (a preview's confirm sent back, no model involved). */
   ask?: AskHandler | null;
   askCall?: EngineCall;
+  askConfirmCall?: EngineCall;
 };
 
 const withoutSession = (args: unknown): unknown => {
@@ -1281,7 +1304,8 @@ export async function handleMcp(req: { method: string; headers: HeaderGetter; bo
       }
       // 0721: OTTO-Command's door, through the caller's own call bound to transport 'ask'
       if (tool.gateway) {
-        return mcpAsk({ id, modern, args: params.arguments, callMeta, call: opts.askCall ?? call, ask: opts.ask, headers: req.headers });
+        return mcpAsk({ id, modern, args: params.arguments, callMeta, call: opts.askCall ?? call, confirmCall: opts.askConfirmCall,
+                        ask: opts.ask, headers: req.headers });
       }
       const v = validateToolArgs(tool, params.arguments);
       if (!v.ok) {
@@ -1312,7 +1336,7 @@ export async function handleMcp(req: { method: string; headers: HeaderGetter; bo
  *  session key the call carries. */
 async function mcpWithoutKey(x: {
   id: RpcId; method: string; params: Record<string, unknown>; modern: boolean; callMeta: Record<string, unknown>;
-  serverInfo: Record<string, string>; call: EngineCall; bindSession?: (sessionKey: string, transport?: "mcp" | "ask") => Promise<EngineCall>;
+  serverInfo: Record<string, string>; call: EngineCall; bindSession?: (sessionKey: string, transport?: "mcp" | "ask" | "confirm") => Promise<EngineCall>;
   ask?: AskHandler | null; headers: HeaderGetter;
 }): Promise<HttpOut> {
   const reply = (status: number, body: unknown): HttpOut => ({ status, headers: JSON_HEADERS, body });
@@ -1379,10 +1403,11 @@ async function mcpWithoutKey(x: {
         }
         return failed(r);
       }
-      // 0721: OTTO-Command's door, through the session's call bound to transport 'ask'
+      // 0721: OTTO-Command's door, through the session's call bound to transport 'ask' (and 'confirm' for its confirms)
       if (tool.gateway) {
         return mcpAsk({ id: x.id, modern: x.modern, args: withoutSession(raw), callMeta: x.callMeta,
-                        call: await x.bindSession(session, "ask"), ask: x.ask, headers: x.headers });
+                        call: await x.bindSession(session, "ask"), confirmCall: await x.bindSession(session, "confirm"),
+                        ask: x.ask, headers: x.headers });
       }
       const bound = await x.bindSession(session);
       const v = validateToolArgs(tool, withoutSession(raw));
@@ -1409,7 +1434,7 @@ async function mcpWithoutKey(x: {
  * token or the rate limit is a protocol error, as for every other tool.
  */
 async function mcpAsk(x: {
-  id: RpcId; modern: boolean; args: unknown; callMeta: Record<string, unknown>; call: EngineCall;
+  id: RpcId; modern: boolean; args: unknown; callMeta: Record<string, unknown>; call: EngineCall; confirmCall?: EngineCall;
   ask: AskHandler | null | undefined; headers: HeaderGetter;
 }): Promise<HttpOut> {
   const result = (data: unknown, isError: boolean): HttpOut =>
@@ -1433,7 +1458,7 @@ async function mcpAsk(x: {
       message: "OTTO-Command is built but not switched on: the gateway has no model configured. Every other tool works directly." },
       call_id: who.call_id ?? null }, true);
   }
-  const out = await x.ask({ who, call: x.call, bodyText: JSON.stringify(v.value), headers: x.headers });
+  const out = await x.ask({ who, call: x.call, confirmCall: x.confirmCall, bodyText: JSON.stringify(v.value), headers: x.headers });
   const body = isObject(out.body) ? out.body : {};
   const meta = isObject(body.meta) ? body.meta : {};
   const callId = typeof meta.call_id === "number" ? meta.call_id : (who.call_id ?? null);
@@ -1583,7 +1608,7 @@ export function openApiDocument(baseUrl: string) {
   paths["/v1/ask"] = { post: {
     ...openApiOperation(door, door.rest.path),
     summary: "Ask OTTO-Command in plain English (MCP: ask_ottocommand)",
-    description: "For a token bound to a fleet. Send your person's words; OTTO-Command reads them, calls the owner tools and your fleet's reads with YOUR token (so it can do nothing your token could not), and answers in plain English with OTTO-Q's receipts and the OrchestrAV link. dry_run runs every change as a preview, enforced in code. To apply a previewed plan exactly, send the confirm objects it returned (no model is involved). In a production run a lower charge limit is always previewed first. The MCP tool ask_ottocommand is this same door.",
+    description: "For a token bound to a fleet. Send your person's words; OTTO-Command reads them, calls the owner tools and your fleet's reads with YOUR token (so it can do nothing your token could not), and answers in plain English with OTTO-Q's receipts and the OrchestrAV link. dry_run runs every change as a preview, enforced in code. To apply a previewed plan exactly, send the confirm objects it returned: they go through the confirm door (recorded as via 'confirm'), with no model involved. In a production run OTTO-Q applies a lower charge limit only as the confirm of a preview this same token recorded in the last 15 minutes; it cannot see your person's yes, so send a confirm only after they give it. The MCP tool ask_ottocommand is this same door.",
     responses: { "200": { description: "The answer.", content: { "application/json": { schema: ref("AskResponse") } } }, ...errorResponses() },
   } };
   return {
@@ -1650,15 +1675,17 @@ export function openApiDocument(baseUrl: string) {
 // ─────────────────────────────────────────────────────────────────────────────────────────── POST /v1/ask ──
 
 /** What the gateway hands its plain-English door: the authenticated handshake (whoami), the engine call already bound to
- *  the caller's token hash (transport 'ask'), and the body. The door itself is injected (./ottocommand_owner.ts), so this
- *  file holds no model code and a test can stand one in. */
-export type AskContext = { who: EngineOutcome; call: EngineCall; bodyText: string; headers: HeaderGetter };
+ *  the caller's token hash (transport 'ask', for what an OTTO-Command model calls), the same token bound to transport
+ *  'confirm' (0721: for a preview's confirm sent back, which no model touches; the database records it as via 'confirm'),
+ *  and the body. The door itself is injected (./ottocommand_owner.ts), so this file holds no model code and a test can
+ *  stand one in. */
+export type AskContext = { who: EngineOutcome; call: EngineCall; confirmCall?: EngineCall; bodyText: string; headers: HeaderGetter };
 export type AskHandler = (ctx: AskContext) => Promise<HttpOut>;
 
 /** POST /v1/ask: authenticate first (an unknown token learns nothing, not even whether the door is switched on), then
  *  hand over to the injected door. */
 export async function handleAsk(req: { method: string; headers: HeaderGetter; bodyText: string }, call: EngineCall,
-                                ask: AskHandler | null | undefined): Promise<HttpOut> {
+                                ask: AskHandler | null | undefined, confirmCall?: EngineCall): Promise<HttpOut> {
   if (req.method.toUpperCase() !== "POST") {
     return { status: 405, headers: { Allow: "POST" }, body: { error: { code: "method_not_allowed", message: "Use POST." }, meta: { tool: "ask", call_id: null } } };
   }
@@ -1669,7 +1696,7 @@ export async function handleAsk(req: { method: string; headers: HeaderGetter; bo
       message: "The plain-English door is built but not switched on: the gateway has no model configured. Every tool works directly over MCP and REST." },
       meta: { tool: "ask", call_id: who.call_id ?? null } } };
   }
-  return ask({ who, call, bodyText: req.bodyText, headers: req.headers });
+  return ask({ who, call, confirmCall, bodyText: req.bodyText, headers: req.headers });
 }
 
 // ───────────────────────────────────────────────────────────────────────────── the engine, over PostgREST ──
@@ -1680,7 +1707,8 @@ export type EngineRpc = (
   tokenHash: string | null,
   tool: string,
   args: Record<string, unknown>,
-  transport: "rest" | "mcp" | "ask",
+  /** 0721: 'confirm' is the plain-English door's confirm (a preview's confirm object sent back, no model involved). */
+  transport: "rest" | "mcp" | "ask" | "confirm",
   meta: Record<string, unknown>,
 ) => Promise<EngineOutcome>;
 
@@ -1902,7 +1930,7 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
       ip: firstForwardedFor(req.headers.get("x-forwarded-for")),
       client: userAgent ? userAgent.slice(0, 120) : undefined,
     };
-    type Transport = "rest" | "mcp" | "ask";
+    type Transport = "rest" | "mcp" | "ask" | "confirm";
     const callFor = (hash: string | null, transport: Transport = isMcp ? "mcp" : isAsk ? "ask" : "rest"): EngineCall => (tool, args, meta) => {
       const merged: Record<string, unknown> = { ...baseMeta };
       for (const [k, v] of Object.entries(meta)) if (v !== undefined && v !== null && v !== "") merged[k] = v;
@@ -1911,14 +1939,15 @@ export async function handleGatewayRequest(req: Request, opts: GatewayOptions): 
     };
     const call = callFor(tokenHash);
     // a session key a tool call carries as its `session` argument is hashed here like a header key: it never leaves
-    const bindSession = async (sessionKey: string, transport?: "mcp" | "ask") => callFor(await sha256Hex(sessionKey), transport);
-    // 0721: OTTO-Command's door over MCP (ask_ottocommand): the same handler, the same token, ledgered as transport 'ask'
-    const mcpAskOpts: McpOptions = { ask: opts.ask, askCall: callFor(tokenHash, "ask") };
+    const bindSession = async (sessionKey: string, transport?: "mcp" | "ask" | "confirm") => callFor(await sha256Hex(sessionKey), transport);
+    // 0721: OTTO-Command's door over MCP (ask_ottocommand): the same handler, the same token, ledgered as transport 'ask',
+    // and its confirms as transport 'confirm'
+    const mcpAskOpts: McpOptions = { ask: opts.ask, askCall: callFor(tokenHash, "ask"), askConfirmCall: callFor(tokenHash, "confirm") };
     const out = isMcp
       ? await handleMcp({ method, headers: req.headers, bodyText }, call,
                         isAccountMcp ? mcpAskOpts : { ...mcpAskOpts, anonymous, bindSession })
       : isAsk
-        ? await handleAsk({ method, headers: req.headers, bodyText }, call, opts.ask)
+        ? await handleAsk({ method, headers: req.headers, bodyText }, call, opts.ask, callFor(tokenHash, "confirm"))
         : await handleRest({ method, path, query: url.searchParams, headers: req.headers, bodyText }, call);
     //: 0700: an expired or disconnected access token on the signed-in address: tell the client to refresh or sign in again
     if (isAccountMcp && out.status === 401) out.headers = { ...out.headers, "WWW-Authenticate": accountChallenge(opts.publicUrl, true) };

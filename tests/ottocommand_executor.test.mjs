@@ -11,12 +11,14 @@
 //                    that is off or refuses is a tool error, an unknown token a protocol error.
 //   3. the budget    the whole ask is capped at 50 s, under Hermes's 60-s MCP timeout; each model call is cut at what is
 //                    left; no engine call starts without its reserve.
-//   4. production    a lower charge limit always goes out as a preview, whatever the model asked; the answer cannot say
-//                    it was done; the confirm the preview returned applies it with no model; raising, clearing and a
-//                    demo run are untouched.
+//   4. production    the door never rewrites a command's mode: OTTO-Q decides. A lowering it records as a preview
+//                    (confirm_required) is answered as not done, with what to confirm; the confirm goes out on the confirm
+//                    door (transport 'confirm'), never as OTTO-Command's own call, with no model; the model can never send
+//                    the arguments that name a preview.
 //   5. end to end    (skips without a scratch server) the HTTP handler over the REAL 0559-0608, 0700 and 0721 SQL: a
-//                    signed-in owner on a production run previews and confirms through ask_ottocommand, and the rows say
-//                    who and which door; a passcode session there is refused with why.
+//                    signed-in owner on a production run asks for a lower limit, OTTO-Q records a preview, and the confirm
+//                    through ask_ottocommand applies it bound to that preview; the rows say who, which door and which
+//                    preview; a passcode session there is refused with why.
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -50,9 +52,10 @@ import {
   ASK_ENGINE_RESERVE_MS,
   ASK_MIN_MODEL_MS,
   OTTOCOMMAND_READS,
+  modelTools,
   ownerAskHandler,
-  ownerChanges,
   ownerContext,
+  ownerTools,
   runOwnerAsk,
   SYSTEM_PROMPT,
 } from "../edge-functions/_shared/ottocommand_owner.ts";
@@ -96,17 +99,35 @@ const principals = (changes = PRODUCTION) => new Map([
   [sha(T_DEPOT), { name: "depot-reader", capabilities: ["read"], whoami: whoami(false, null) }],
 ]);
 
-/** A receipt as ottoq_owner_command_reply shapes one, for a preview or an apply. */
-function receipt(tool, args, n) {
+const VIA = { ask: "ottocommand", confirm: "confirm" };
+const NOTE = "Send this to apply exactly the plan shown, from the agent that previewed it, within 15 minutes; it confirms this preview once.";
+
+/** A receipt as ottoq_owner_command_reply shapes one, for a preview or an apply (0721: the door is the transport's). */
+function receipt(tool, args, n, transport) {
   const command_id = `cccccccc-0000-0000-0000-${String(n).padStart(12, "0")}`;
+  const via = VIA[transport] ?? "direct";
   if (args.mode === "preview") {
+    const { idempotency_key: _key, ...shown } = args;
     return { ok: true, http_status: 200, data: { outcome: "previewed", summary: `Preview only, nothing has changed. If you confirm: ${tool} ${args.percent ?? ""}%.`,
-      command: { command_id, tool, mode: "preview", outcome: "previewed", plan_hash: HASH, via: "ottocommand" },
-      confirm: { tool, args: { ...args, mode: "apply", expect_plan_hash: HASH }, note: "Send this to apply exactly the plan shown." } } };
+      command: { command_id, tool, mode: "preview", outcome: "previewed", plan_hash: HASH, via },
+      confirm: { tool, args: { ...shown, mode: "apply", expect_plan_hash: HASH, confirms_command_id: command_id }, note: NOTE } } };
   }
   const link = `https://ottoyard-orchestra-av.lovable.app/?source=agent&command=${command_id}`;
   return { ok: true, http_status: 201, data: { outcome: "applied", summary: `Done. ${tool}.\nConfirmation code: OQ-ABCD-1234.\nSee it in OrchestrAV: ${link}`,
-    confirmation_code: "OQ-ABCD-1234", link, command: { command_id, tool, mode: "apply", outcome: "applied", acting_person: "chase@ottoyard.com", via: "ottocommand" } } };
+    confirmation_code: "OQ-ABCD-1234", link, command: { command_id, tool, mode: "apply", outcome: "applied", acting_person: "chase@ottoyard.com", via,
+      ...(args.confirms_command_id ? { confirms_command_id: args.confirms_command_id } : {}) } } };
+}
+
+/** 0721, as the database answers it: on a production run a lower limit that names no preview applies nothing; it is
+ *  recorded as a preview and answered 422 confirm_required, with that preview's confirm. */
+function confirmRequired(tool, args, n, transport) {
+  const prev = receipt(tool, { ...args, mode: "preview" }, n, transport);
+  const refusal = { code: "confirm_required", reason: "not_named",
+    message: "This is a production run, so lowering how full a car charges applies only as the confirm of a preview this agent recorded in the last 15 minutes. Nothing was applied.",
+    hint: "Show your person the plan. Once they say yes, send the confirm object this answer carries." };
+  return { ok: false, http_status: 422, error: { code: refusal.code, message: refusal.message, hint: refusal.hint },
+    data: { ...prev.data, summary: `Not applied yet: OTTO-Q needs a confirm.\nIf you confirm: ${tool} ${args.percent}%.`,
+      refusal: { ...refusal, preview_command_id: prev.data.command.command_id } } };
 }
 
 function fakeEngine(changes) {
@@ -120,7 +141,13 @@ function fakeEngine(changes) {
     const principal = { name: p.name, kind: "personal", capabilities: p.capabilities };
     if (meta.gateway_refusal === "invalid_arguments") return { ok: false, http_status: 400, tool, call_id, principal, error: { code: "invalid_arguments", message: "refused" } };
     if (tool === "handshake" || tool === "whoami") return { ok: true, http_status: 200, tool, call_id, principal, data: p.whoami };
-    if (OWNER_COMMANDS.includes(tool)) return { tool, call_id, principal, ...receipt(tool, args, call_id) };
+    if (OWNER_COMMANDS.includes(tool)) {
+      const lowers = tool === "set_charge_limit" && typeof args.percent === "number" && args.percent < 100;
+      if (changes?.run_kind === "production" && lowers && args.mode !== "preview" && !args.confirms_command_id && !args.expect_plan_hash) {
+        return { tool, call_id, principal, ...confirmRequired(tool, args, call_id, transport) };
+      }
+      return { tool, call_id, principal, ...receipt(tool, args, call_id, transport) };
+    }
     if (tool === "my_fleet") return { ok: true, http_status: 200, tool, call_id, principal, data: { summary: "You have 36 cars.", cars: [{ vehicle_id: "ee000000-0000-0000-0000-0000000000b2", name: "Tesla-AV-041" }] } };
     if (tool === ASK_TOOL_NAME) return { ok: false, http_status: 404, tool, call_id, principal, error: { code: "unknown_tool", message: `No tool named ${tool}.` } };
     return { ok: true, http_status: 200, tool, call_id, principal, data: { echo: { tool, args } } };
@@ -161,6 +188,12 @@ test("ask_ottocommand is offered to every token bound to a fleet, first among it
   assert.ok(door && door.gateway === true && door.scope === "fleet" && door.capability === "read" && door.effect === "ask");
   assert.deepEqual(door.inputSchema, askInputSchema());
   assert.equal(door.annotations.readOnlyHint, false, "it can change the owner's settings through the owner's own tools");
+  // 0721: one call can hold cars, order or withdraw services and undo commands, so a client gating destructive tools
+  // must gate this one; the typed tools each stay non-destructive, so a client can gate them one by one
+  assert.equal(door.annotations.destructiveHint, true);
+  assert.deepEqual(mcpToolList(OWNER_CAPS, { fleetBound: true }).find((t) => t.name === ASK_TOOL_NAME).annotations,
+    { title: "Ask OTTO-Command", readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false });
+  for (const n of OWNER_COMMANDS) assert.equal(findTool(n).annotations.destructiveHint, false, n);
   const names = (caps, fleetBound) => toolsFor(caps, { fleetBound }).map((t) => t.name);
   assert.ok(names(OWNER_CAPS, true).includes(ASK_TOOL_NAME));
   assert.ok(names(["read"], true).includes(ASK_TOOL_NAME), "a fleet reader may ask questions");
@@ -347,50 +380,95 @@ test("the model call honours the request's timeout, never later than its own cap
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════ 4. production ══
 
-test("production: a lower charge limit goes out as a preview whatever the model asked, and the confirm applies it", async () => {
+test("production: the door sends the change as asked; OTTO-Q records a lowering as a preview, and the confirm door applies it", async () => {
   const { engine, calls } = fakeEngine(PRODUCTION);
   const { model, requests } = scriptedModel([use(["set_charge_limit", { vehicles: "all", percent: 90, mode: "apply" }]), say("Done. All your Teslas now charge to 90%.")]);
   const gw = gateway(engine, ownerAskHandler({ model }));
-  const out = await callTool(gw, "/account/mcp", T_SIGNED, ASK_TOOL_NAME, { text: "charge all my Teslas to 90% from now on", idempotency_key: "tg-77" });
+  const words = "charge all my Teslas to 90% from now on";
+  const out = await callTool(gw, "/account/mcp", T_SIGNED, ASK_TOOL_NAME, { text: words, idempotency_key: "tg-77" });
   const data = out.result.structuredContent;
   const sent = calls.find((c) => c.tool === "set_charge_limit");
-  assert.equal(sent.args.mode, "preview", "the model asked to apply; the door sent a preview");
-  assert.equal(sent.args.idempotency_key, undefined, "a preview carries no key");
+  assert.deepEqual([sent.transport, sent.args.mode], ["ask", "apply"], "the door does not rewrite the mode: the database decides");
+  assert.match(sent.args.idempotency_key, /^tg-77:[0-9a-f]{24}$/);
   assert.equal(data.actions[0].outcome, "previewed");
-  assert.match(data.answer, /^Preview only, nothing has changed/, "the answer cannot say it was done");
-  assert.match(data.answer, /confirm/i);
-  assert.deepEqual(data.confirm, [{ tool: "set_charge_limit", args: { vehicles: "all", percent: 90, mode: "apply", expect_plan_hash: HASH, note: "charge all my Teslas to 90% from now on" },
-    note: "Send this to apply exactly the plan shown." }]);
-  // the context told the model, and the prompt says why
+  assert.equal(data.actions[0].error.code, "confirm_required");
+  assert.match(data.answer, /^Not applied yet: OTTO-Q needs a confirm\./, "the answer cannot say it was done");
+  assert.match(data.answer, /\nNothing has changed yet: this is a production run, so lowering how full a car charges applies only when you confirm it, within 15 minutes\.$/);
+  const pid = data.actions[0].command_id;
+  assert.deepEqual(data.confirm, [{ tool: "set_charge_limit", args: { vehicles: "all", percent: 90, mode: "apply", expect_plan_hash: HASH, confirms_command_id: pid, note: words }, note: NOTE }]);
+  // the context told the model, and the prompt says what to tell the owner
   assert.match(requests[0].messages[0].content, /Live: a PRODUCTION run\. Changes are allowed now, recorded under chase@ottoyard\.com\./);
-  assert.match(requests[0].messages[0].content, /PRODUCTION RULE: a lower charge limit is previewed first/);
-  assert.match(SYSTEM_PROMPT, /In a PRODUCTION run \(the context says so\), lowering how full cars charge is always previewed first/);
-  // the owner says yes: the agent sends the confirm back, unchanged, and no model is involved
+  assert.match(requests[0].messages[0].content, /PRODUCTION RULE: OTTO-Q applies a lower charge limit \(or an undo that puts one back\) only as the confirm of a preview recorded in the last 15 minutes\./);
+  assert.match(SYSTEM_PROMPT, /it comes back with error code confirm_required and outcome "previewed", and NOTHING has changed\. Then tell the owner exactly what they would be confirming/);
+  // the owner says yes: the agent sends the confirm back, unchanged; it goes out on the confirm door, with no model
   const before = requests.length;
   const yes = await callTool(gw, "/account/mcp", T_SIGNED, ASK_TOOL_NAME, { confirm: data.confirm });
   assert.equal(yes.result.isError, false, JSON.stringify(yes));
   assert.equal(requests.length, before);
   const applied = calls.at(-1);
-  assert.deepEqual([applied.tool, applied.transport, applied.args.mode, applied.args.expect_plan_hash], ["set_charge_limit", "ask", "apply", HASH]);
+  assert.deepEqual([applied.tool, applied.transport, applied.args.mode, applied.args.expect_plan_hash, applied.args.confirms_command_id],
+    ["set_charge_limit", "confirm", "apply", HASH, pid]);
+  assert.equal(calls.at(-2).tool, "handshake");
+  assert.equal(calls.at(-2).transport, "ask");
   assert.match(yes.result.structuredContent.answer, /^Done\. set_charge_limit\.\nConfirmation code: OQ-ABCD-1234\./);
   assert.equal(yes.result.structuredContent.actions[0].outcome, "applied");
 });
 
-test("production leaves raising, clearing and the full limit alone; a demo run is not touched at all", async () => {
-  for (const [changes, args, mode] of [
-    [PRODUCTION, { vehicles: "all", percent: 100 }, undefined],
-    [DEMO, { vehicles: "all", percent: 90 }, undefined],
-    [{ allowed: true, run_kind: "production", person: "chase@ottoyard.com" }, { vehicles: "all", percent: 90 }, undefined],
+test("the door never rewrites a command's mode, in production or not: whether a change needs a confirm is OTTO-Q's", async () => {
+  for (const [changes, tool, args] of [
+    [PRODUCTION, "set_charge_limit", { vehicles: "all", percent: 90 }],
+    [PRODUCTION, "set_charge_limit", { vehicles: "all", percent: 100 }],
+    [PRODUCTION, "clear_charge_limit", { vehicles: "all" }],
+    [PRODUCTION, "undo_command", { command_id: "cccccccc-0000-0000-0000-000000000009" }],
+    [DEMO, "set_charge_limit", { vehicles: "all", percent: 90 }],
   ]) {
     const { engine, calls } = fakeEngine(changes);
-    const { model } = scriptedModel([use(["set_charge_limit", args]), say("Done.")]);
+    const { model } = scriptedModel([use([tool, args]), say("Done.")]);
     await runOwnerAsk({ text: "x", dry_run: false, history: [] }, { who: await engine(sha(T_OWNER), "handshake", {}, "ask", {}), call: (t, a, m) => engine(sha(T_OWNER), t, a, "ask", m), model });
-    assert.equal(calls.find((c) => c.tool === "set_charge_limit").args.mode, mode, JSON.stringify(changes));
+    assert.equal(calls.find((c) => c.tool === tool).args.mode, undefined, JSON.stringify([changes.run_kind, tool, args]));
   }
+});
+
+test("a confirm goes out on the confirm door, never as OTTO-Command's own call, over REST and MCP, keyed or not", async () => {
+  const confirm = [{ tool: "set_charge_limit", args: { vehicles: "all", percent: 90, mode: "apply", expect_plan_hash: HASH, confirms_command_id: "cccccccc-0000-0000-0000-000000000001" } }];
+  for (const [path, token, args] of [["/v1/ask", T_OWNER, null], ["/account/mcp", T_SIGNED, { confirm }], ["/mcp", T_OWNER, { confirm }],
+    ["/mcp", undefined, { session: T_SESSION, confirm }]]) {
+    const { engine, calls } = fakeEngine(PRODUCTION);
+    const gw = gateway(engine, ownerAskHandler({ model: null }));
+    if (args === null) {
+      const res = await gw(path, { token, body: { confirm } });
+      assert.equal(res.status, 200, path);
+    } else {
+      const out = await callTool(gw, path, token, ASK_TOOL_NAME, args);
+      assert.equal(out.result.isError, false, JSON.stringify(out));
+    }
+    assert.deepEqual(calls.map((c) => [c.tool, c.transport]), [["handshake", "ask"], ["set_charge_limit", "confirm"]], `${path} ${token ? "key" : "session"}`);
+    assert.equal(calls[1].tokenHash, sha(token ?? T_SESSION), "the same token, bound to the confirm door");
+  }
+  // a door with no confirm call refuses, and sends nothing as OTTO-Command's own call
   const { engine, calls } = fakeEngine(PRODUCTION);
-  const { model } = scriptedModel([use(["clear_charge_limit", { vehicles: "all" }]), say("Done.")]);
-  await runOwnerAsk({ text: "x", dry_run: false, history: [] }, { who: await engine(sha(T_OWNER), "handshake", {}, "ask", {}), call: (t, a, m) => engine(sha(T_OWNER), t, a, "ask", m), model });
-  assert.equal(calls.find((c) => c.tool === "clear_charge_limit").args.mode, undefined);
+  const who = await engine(sha(T_OWNER), "handshake", {}, "ask", {});
+  const out = await runOwnerAsk({ dry_run: false, history: [], confirm }, { who, call: (t, a, m) => engine(sha(T_OWNER), t, a, "ask", m), model: null });
+  assert.equal(out.status, 500);
+  assert.equal(out.error.code, "confirm_not_wired");
+  assert.equal(calls.length, 1, "only the handshake reached the engine");
+});
+
+test("the model can never send what names a preview: expect_plan_hash and confirms_command_id are not offered, and are stripped", async () => {
+  const { engine, calls } = fakeEngine(PRODUCTION);
+  const who = await engine(sha(T_OWNER), "handshake", {}, "ask", {});
+  for (const t of modelTools(ownerTools(who), false)) {
+    for (const k of ["expect_plan_hash", "confirms_command_id", "idempotency_key", "note"]) assert.ok(!(k in (t.input_schema.properties ?? {})), `${t.name} offers ${k}`);
+  }
+  assert.ok("confirms_command_id" in findTool("set_charge_limit").inputSchema.properties, "the typed tool takes it from a confirm object");
+  const { model } = scriptedModel([use(["set_charge_limit", { vehicles: "all", percent: 90, expect_plan_hash: HASH, confirms_command_id: "cccccccc-0000-0000-0000-000000000001" }]), say("Done.")]);
+  await runOwnerAsk({ text: "x", dry_run: false, history: [] }, { who, call: (t, a, m) => engine(sha(T_OWNER), t, a, "ask", m), model });
+  const sent = calls.find((c) => c.tool === "set_charge_limit");
+  assert.equal(sent.args.expect_plan_hash, undefined);
+  assert.equal(sent.args.confirms_command_id, undefined);
+  // and a typed confirms_command_id goes with mode apply only
+  assert.deepEqual(validateToolArgs(findTool("hold_vehicle"), { vehicles: "all", for_minutes: 30, mode: "preview", confirms_command_id: "cccccccc-0000-0000-0000-000000000001" }).errors,
+    [{ path: "$.confirms_command_id", message: "is for mode apply: it names the preview this apply confirms" }]);
 });
 
 test("the owner's context says whether changes are allowed now, why not, and under whose name", () => {
@@ -403,8 +481,6 @@ test("the owner's context says whether changes are allowed now, why not, and und
   assert.match(refused, /Changes are NOT allowed now: The live run at the twin depot is a production run, and a passcode session can read your cars there but not change them\. Sign your agent in/);
   // a whoami from before 0721 still reads as it did
   assert.match(ownerContext(who(undefined), false), /Demo run live: no \(no change can be made until one starts\)\./);
-  assert.deepEqual(ownerChanges(who(PRODUCTION)), { allowed: true, production: true, lowerNeedsPreview: true, max: 100 });
-  assert.deepEqual(ownerChanges(who(undefined)), { allowed: false, production: false, lowerNeedsPreview: false, max: 100 });
   assert.match(SYSTEM_PROMPT, /what is allowed instead \(its hint, when it has one\)/);
   assert.match(SYSTEM_PROMPT, /stall_availability \(chargers and bays free at the depot now; it names no car\)/);
 });
@@ -481,18 +557,23 @@ describe("end to end: OTTO-Command over the real 0559-0608, 0700 and 0721 SQL", 
     for (const d of [DB, WA]) spawnSync("psql", [...pgConn(), "-d", "postgres", "-X", "-q", "-c", `DROP DATABASE IF EXISTS ${d} WITH (FORCE)`], { encoding: "utf8" });
   });
 
-  test("a signed-in owner on a production run previews and confirms through ask_ottocommand, recorded under the person", async () => {
+  test("a signed-in owner on a production run asks for a lower limit; OTTO-Q records a preview, and the confirm applies it bound to it", async () => {
     const words = "charge all my Teslas to 90% from now on";
     const { model } = scriptedModel([use(["set_charge_limit", { vehicles: "all", percent: 90 }]), say("I have set that up.")]);
     const gw = gateway(sqlEngine, ownerAskHandler({ model }));
-    const listed = (await listTools(gw, "/account/mcp", signedIn)).result.tools.map((t) => t.name);
-    assert.equal(listed.filter((n) => findTool(n).scope === "fleet")[0], ASK_TOOL_NAME);
+    const listed = (await listTools(gw, "/account/mcp", signedIn)).result.tools;
+    assert.equal(listed.map((t) => t.name).filter((n) => findTool(n).scope === "fleet")[0], ASK_TOOL_NAME);
+    assert.equal(listed.find((t) => t.name === ASK_TOOL_NAME).annotations.destructiveHint, true);
     const asked = await callTool(gw, "/account/mcp", signedIn, ASK_TOOL_NAME, { text: words });
     assert.equal(asked.result.isError, false, JSON.stringify(asked));
     const data = asked.result.structuredContent;
     assert.equal(data.actions[0].outcome, "previewed", JSON.stringify(data.actions));
-    assert.match(data.answer, /Nothing has changed yet: this is a production run/);
+    assert.equal(data.actions[0].error.code, "confirm_required");
+    assert.equal(data.actions[0].args.mode, undefined, "the model asked to apply, and the door sent it as asked");
+    assert.match(data.answer, /^Not applied yet: This is a production run, so lowering how full a car charges applies only as the confirm of a preview/);
     assert.equal(psql(DB, `SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '${run}';`).at(-1), "0");
+    const pid = data.actions[0].command_id;
+    assert.equal(data.confirm[0].args.confirms_command_id, pid);
     const yes = await callTool(gw, "/account/mcp", signedIn, ASK_TOOL_NAME, { confirm: data.confirm });
     assert.equal(yes.result.isError, false, JSON.stringify(yes));
     const done = yes.result.structuredContent;
@@ -500,12 +581,16 @@ describe("end to end: OTTO-Command over the real 0559-0608, 0700 and 0721 SQL", 
     assert.match(done.answer, /^Done\./);
     assert.match(done.answer, /Confirmation code: OQ-[0-9A-F]{4}-[0-9A-F]{4}\./);
     assert.match(done.answer, /until the production run ends/);
-    const rows = psql(DB, `SELECT mode || '|' || outcome || '|' || coalesce(acting_person, '-') || '|' || coalesce(via, '-') || '|' || coalesce(args ->> 'note', '-')
+    const rows = psql(DB, `SELECT mode || '|' || outcome || '|' || coalesce(acting_person, '-') || '|' || coalesce(via, '-') || '|' || coalesce(args ->> 'note', '-') || '|' || coalesce(confirms_command_id::text, '-')
                             FROM ottoq_owner_commands WHERE sim_run_id = '${run}' ORDER BY created_at;`);
-    assert.deepEqual(rows, [`preview|previewed|chase@ottoyard.com|ottocommand|${words}`, `apply|applied|chase@ottoyard.com|ottocommand|${words}`]);
+    assert.deepEqual(rows, [`preview|previewed|chase@ottoyard.com|ottocommand|${words}|-`, `apply|applied|chase@ottoyard.com|confirm|${words}|${pid}`]);
     assert.equal(psql(DB, `SELECT round(ottoq_effective_target_soc_at('${AV041}', now()));`).at(-1), "90");
-    const ledger = psql(DB, "SELECT tool || '|' || transport FROM ottoq_agent_call_ledger ORDER BY call_id DESC LIMIT 2;");
-    assert.deepEqual(ledger, ["set_charge_limit|ask", "handshake|ask"]);
+    const ledger = psql(DB, "SELECT tool || '|' || transport || '|' || coalesce(error_code, '-') FROM ottoq_agent_call_ledger ORDER BY call_id DESC LIMIT 4;");
+    assert.deepEqual(ledger, ["set_charge_limit|confirm|-", "handshake|ask|-", "set_charge_limit|ask|confirm_required", "handshake|ask|-"]);
+    // the same confirm again applies nothing more
+    const again = await callTool(gw, "/account/mcp", signedIn, ASK_TOOL_NAME, { confirm: data.confirm });
+    assert.notEqual(again.result.structuredContent.actions[0].outcome, "applied", JSON.stringify(again));
+    assert.equal(psql(DB, `SELECT count(*) FROM ottoq_owner_commands WHERE sim_run_id = '${run}' AND outcome = 'applied';`).at(-1), "1");
   });
 
   test("a passcode session asking on a production run is told why not and what to do, and nothing changes", async () => {

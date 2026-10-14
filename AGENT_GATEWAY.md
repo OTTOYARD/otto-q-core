@@ -44,9 +44,16 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > in to its owner's account) and to no other; it is answered by the same handler as `POST /v1/ask`, through the caller's
 > own token, ledgered as transport `ask`, and capped at 50 seconds. OTTO-Command also reads `depot_status`,
 > `vehicle_card`, `recent_decisions` and `stall_availability` for the owner. In the database (0721): every owner command
-> records `acting_person` (the signed-in account's email, or none) and `via` (`ottocommand` or `direct`); a
+> records `acting_person` (the signed-in account's email, or none), `via` (`ottocommand` when an OTTO-Command model
+> called the tool, `confirm` exactly when the row confirms a recorded preview, `direct` when the agent made the call
+> itself; set by the database from the transport and the binding, never from an argument) and, on a confirm, the
+> preview it confirmed (`confirms_command_id`); a
 > **production** run accepts owner commands from an agent signed in to its owner's account and from nothing else; there,
-> a lower charge limit takes a preview and its plan hash. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11.
+> a lower charge limit (or an undo that puts one back) applies only as the confirm of a preview the same principal
+> recorded in the last 15 minutes, once, and an unbound one is recorded as a preview and answered `confirm_required`.
+> OTTO-Q enforces that order; it cannot see the person's yes, which the person's own agent relays (a person-only confirm
+> in the OTTOYARD account session is not built). `ask_ottocommand` is annotated `destructiveHint: true`.
+> [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11.
 
 ---
 
@@ -239,7 +246,10 @@ or `{"error": {"code","message","hint?","details?"}, "meta": {…}}`. `call_id` 
 - **`ask_ottocommand` (0721)** is answered by the gateway, never by the database as a tool of its own: a handshake
   authenticates (an unknown token learns nothing, not even whether the door is on), then the same handler `POST /v1/ask`
   uses runs with the caller's own call bound to transport `ask`, so every engine call it makes is the caller's and is
-  ledgered as the door's. Over the no-key endpoint it takes the `session` argument like every other tool. The door's own
+  ledgered as the door's; a `confirm` sent to it goes out on the same token bound to transport `confirm`, with no model,
+  and an apply it confirms is recorded `via = 'confirm'` (one that binds to no preview is recorded as a new preview, the
+  agent's own: `direct`). Over the no-key endpoint it takes the `session` argument like every other tool. It
+  is annotated `destructiveHint: true`: one call can hold cars, order or withdraw services and undo commands. The door's own
   failures (no model configured, a model error, a token not bound to a fleet, its 50-second budget spent) are tool
   results with `isError: true`, so an agent can fall back to the typed tools; only 401 and the rate limit are transport
   errors, as for every tool. In `/v1/openapi.json` it is the operation `ask_ottocommand` at `POST /v1/ask`.

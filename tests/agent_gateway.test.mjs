@@ -302,7 +302,9 @@ test("no tool changes the world: two write the request ledger, and the owner's s
   for (const t of TOOLS) {
     const writes = t.effect !== "read";
     assert.equal(t.annotations.readOnlyHint, !writes, t.name);
-    assert.equal(t.annotations.destructiveHint, false, t.name);
+    // 0721: OTTO-Command's door is marked destructive, so a client that gates destructive tools gates it: one call can
+    // hold cars, order or withdraw services and undo commands with no per-command approval
+    assert.equal(t.annotations.destructiveHint, t.name === "ask_ottocommand", t.name);
     assert.equal(t.annotations.openWorldHint, false, t.name);
   }
   assert.deepEqual(TOOLS.filter((t) => t.effect === "ledger_write").map((t) => t.name), ["send_note", "submit_request"]);

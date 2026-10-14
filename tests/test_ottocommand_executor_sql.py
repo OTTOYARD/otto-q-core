@@ -9,11 +9,19 @@ CLAUDE.md rules 9 and 10 bind hardest. None of what it promises is visible to a 
   * BEFORE it, reproduced: a signed-in owner is refused on a production run (no_live_demo), no command names a person or
     a door, and the dispatcher never passes its transport;
   * AFTER it: production takes an agent signed in to its owner's account, and only one; a passcode session, an issued
-    key and a connection whose account is no longer linked are refused with why and what to do; a lower limit there
-    takes a preview and its plan hash, while raising or clearing takes one call; every command records acting_person
-    and via; the engine reads the confirmed limit; the run's end lifts it; demo runs work as before;
-  * the person and the door are immutable, an applied production command without a person cannot be written by anyone,
-    no client role reaches anything new, and the run-scope registry stays clean.
+    key and a connection whose account is no longer linked are refused with why and what to do; every command records
+    acting_person and via; the engine reads the confirmed limit; the run's end lifts it; demo runs work as before;
+  * THE BINDING (rule 9): on production a lowering (a lower limit, or an undo that puts one back) applies only as the
+    confirm of a preview the same principal recorded on the same run within 15 minutes. Unbound, it is recorded as a
+    preview and answered confirm_required; bound, it applies once (a second confirm, a confirm older than 15 minutes,
+    one by another principal and a hash with no recorded preview all apply nothing); raising, clearing, holds, service
+    orders and cancelling the owner's own unstarted orders stay one call, and cancel never takes an engine-found need;
+  * via is set by the database, never by an argument: 'ottocommand' when a model called the tool, 'confirm' exactly when
+    the row confirms a recorded preview (confirms_command_id, by CHECK, whichever transport sent it), 'direct' otherwise;
+    a model's call never confirms;
+  * the person, the door and the preview are immutable, an applied production command without a person and a confirm
+    of anything but such a preview cannot be written by anyone, no client role reaches anything new, and the run-scope
+    registry stays clean.
 
 Loads the stub engines, 0559, 0560, 0605-0608, tests/fixtures/agent_signin_stub_auth.sql and 0700 from their files, and
 production's world step as 0718 left it (tests/fixtures/world_advance_stub.sql with 0718 applied in a scratch database:
@@ -126,6 +134,22 @@ def command(db, command_id):
                    f"WHERE command_id = '{command_id}'")[0]
 
 
+def confirm(db, token, receipt, transport="confirm"):
+    """Send back the confirm object a receipt carries, as the gateway's confirm door does (transport 'confirm')."""
+    c = receipt["data"]["confirm"]
+    return tcall(db, token, c["tool"], c["args"], transport=transport)
+
+
+def target(db, car=AV041):
+    return db.val(f"SELECT round(ottoq_effective_target_soc_at('{car}', now()))")
+
+
+def age(db, command_id, interval):
+    """Make a recorded command older (its created_at is guarded; the ledger unlock lets a test move it)."""
+    db.run(f"SET ottoq.agent_ledger_unlock = 'on'; UPDATE ottoq_owner_commands SET created_at = now() - interval '{interval}' "
+           f"WHERE command_id = '{command_id}'")
+
+
 # ───────────────────────────────────────────────────────────────────────── the premises: live, byte for byte ──
 
 def test_every_body_0721_reads_is_the_live_one(pre):
@@ -198,53 +222,283 @@ def test_0721_refuses_a_second_apply_and_is_classified_for_no_recert_round(post)
     assert post.rows(f"SELECT forces_recert, forces_dial_restart FROM ottoq_cert_lineage WHERE name = '{LINEAGE}'") == [["f", "f"]]
 
 
-def test_production_takes_a_signed_in_owner_and_a_lower_limit_takes_a_preview_and_its_hash(post):
+def test_production_takes_a_signed_in_owner_and_an_unbound_lowering_is_recorded_as_a_preview(post):
     chase = connect(post)["access_token"]
     run = production_run(post)
     who = tcall(post, chase, "whoami")["data"]["owner"]
     assert who["live_production_run"] == run and who["live_demo_run"] is None
     assert who["changes"]["allowed"] is True and who["changes"]["run_kind"] == "production"
     assert who["changes"]["person"] == EMAIL and who["changes"]["lower_limit_needs_preview"] is True
+    assert who["changes"]["confirm_window_minutes"] == 15
     assert "only an agent signed in to its owner's OTTOYARD account" in who["rules"]
+    assert "applies only as the confirm of a preview the same agent recorded in the last 15 minutes" in who["rules"]
 
-    # one call: refused, recorded under the person, the reason and what to do in the answer
+    # one call that lowers: NOT applied. OTTO-Q records it as a preview under the person and answers confirm_required
     one = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 90})
-    assert one["http_status"] == 422 and one["error"]["code"] == "confirm_required", one
-    assert one["error"]["message"].startswith("This is a production run, so lowering how full a car charges takes two steps")
-    assert one["error"]["hint"] == "Raising a limit, or clearing it back to full, needs no preview."
-    assert command(post, one["data"]["command"]["command_id"]) == ["refused", EMAIL, "direct"]
+    assert one["http_status"] == 422 and one["ok"] is False and one["error"]["code"] == "confirm_required", one
+    assert one["error"]["message"].startswith("This is a production run, so lowering how full a car charges applies only "
+                                              "as the confirm of a preview this agent recorded in the last 15 minutes.")
+    assert "Nothing was applied." in one["error"]["message"]
+    assert one["error"]["hint"].startswith("Show your person the plan.")
+    data = one["data"]
+    pid = data["command"]["command_id"]
+    assert data["outcome"] == "previewed" and data["command"]["mode"] == "preview"
+    assert data["refusal"]["reason"] == "not_named" and data["refusal"]["preview_command_id"] == pid
+    assert data["summary"].startswith("Not applied yet: This is a production run")
+    assert f'confirms_command_id "{pid}"' in data["summary"]
+    assert data["confirm"]["args"]["confirms_command_id"] == pid
+    assert data["confirm"]["args"]["expect_plan_hash"] == data["command"]["plan_hash"]
+    assert command(post, pid) == ["previewed", EMAIL, "direct"]
+    assert post.val(f"SELECT mode = 'preview' AND refusal IS NULL AND idempotency_key IS NULL AND confirms_command_id IS NULL "
+                    f"FROM ottoq_owner_commands WHERE command_id = '{pid}'") == "t"
     assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{run}'") == "0"
+    assert post.rows(f"SELECT http_status, error_code, detail ->> 'outcome' FROM ottoq_agent_call_ledger WHERE call_id = {one['call_id']}") \
+        == [["422", "confirm_required", "previewed"]]
 
-    # previewed through OTTO-Command, then confirmed with the preview's own confirm
-    prev = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 90, "mode": "preview"}, transport="ask")
-    assert prev["data"]["outcome"] == "previewed" and prev["data"]["command"]["via"] == "ottocommand"
-    confirm = prev["data"]["confirm"]
-    assert confirm["args"]["expect_plan_hash"] == prev["data"]["command"]["plan_hash"]
-    done = tcall(post, chase, confirm["tool"], confirm["args"], transport="ask")
+    # its confirm, sent back through the confirm door: applied, bound to that preview, under the person
+    done = confirm(post, chase, one)
     assert done["http_status"] == 201 and done["data"]["outcome"] == "applied", done
     cmd = done["data"]["command"]
-    assert cmd["acting_person"] == EMAIL and cmd["via"] == "ottocommand"
-    assert command(post, cmd["command_id"]) == ["applied", EMAIL, "ottocommand"]
+    assert cmd["acting_person"] == EMAIL and cmd["via"] == "confirm" and cmd["confirms_command_id"] == pid
+    assert command(post, cmd["command_id"]) == ["applied", EMAIL, "confirm"]
+    assert post.val(f"SELECT transport FROM ottoq_agent_call_ledger WHERE call_id = {done['call_id']}") == "confirm"
     assert "This lasts until the production run ends or you undo it." in done["data"]["summary"]
     assert done["data"]["expires"].startswith("Lasts until this production run ends")
     # the engine reads the owner's confirmed limit, and production's tick applies it to the cars
-    assert post.val(f"SELECT round(ottoq_effective_target_soc_at('{AV041}', now()))") == "90"
+    assert target(post) == "90"
     assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{run}' AND kind = 'charge_limit' "
                     "AND status = 'active' AND charge_limit_pct = 90") == "4"
-
-    # a stale hash is still plan_changed; raising (90 -> 95) and clearing take one call
+    # a stale hash is still plan_changed (0605), and is refused rather than recorded as a preview
     stale = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 85, "mode": "apply",
-                                                   "expect_plan_hash": prev["data"]["command"]["plan_hash"]})
-    assert stale["error"]["code"] == "plan_changed", stale
+                                                   "expect_plan_hash": data["command"]["plan_hash"]})
+    assert stale["error"]["code"] == "plan_changed" and stale["data"]["outcome"] == "refused", stale
+
+
+def test_a_preview_confirms_one_apply_and_no_more(post):
+    chase = connect(post)["access_token"]
+    production_run(post)
+    prev = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 90, "mode": "preview"}, transport="ask")
+    assert prev["data"]["outcome"] == "previewed" and prev["data"]["command"]["via"] == "ottocommand"
+    pid = prev["data"]["command"]["command_id"]
+    first = confirm(post, chase, prev)
+    assert first["data"]["outcome"] == "applied" and first["data"]["command"]["confirms_command_id"] == pid, first
+    # undoing the lower limit raises it again: one call, and the same plan is on the table once more
+    back = tcall(post, chase, "undo_command", {"command_id": first["data"]["command"]["command_id"]})
+    assert back["data"]["outcome"] == "applied", back
+    assert target(post) == "100"
+    second = confirm(post, chase, prev)
+    assert second["http_status"] == 422 and second["error"]["code"] == "confirm_required", second
+    assert second["data"]["refusal"]["reason"] == "preview_already_confirmed"
+    assert "That preview was already confirmed once, and a preview confirms one apply." in second["error"]["message"]
+    assert second["data"]["outcome"] == "previewed" and target(post) == "100"
+    # written straight into the table, a second apply naming the same preview is refused by the unique index
+    rc, _, err = post.run(f"""INSERT INTO ottoq_owner_commands (principal_id, principal_name, fleet_operator_id, depot_id,
+                                  sim_run_id, tool, mode, outcome, summary, plan_hash, acting_person, via, confirms_command_id)
+                              SELECT principal_id, principal_name, fleet_operator_id, depot_id, sim_run_id, tool, 'apply',
+                                     'applied', 'x', plan_hash, acting_person, 'confirm', command_id
+                                FROM ottoq_owner_commands WHERE command_id = '{pid}'""", check=False)
+    assert rc != 0 and "ottoq_owner_commands_confirms_idx" in err, err
+    # the preview the refusal recorded is new, and its own confirm applies it
+    third = confirm(post, chase, second)
+    assert third["data"]["outcome"] == "applied", third
+    assert third["data"]["command"]["confirms_command_id"] == second["data"]["command"]["command_id"]
+    assert target(post) == "90"
+
+
+def test_a_confirm_older_than_15_minutes_is_refused(post):
+    chase = connect(post)["access_token"]
+    run = production_run(post)
+    prev = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 85, "mode": "preview"})
+    pid = prev["data"]["command"]["command_id"]
+    age(post, pid, "16 minutes")
+    late = confirm(post, chase, prev)
+    assert late["http_status"] == 422 and late["error"]["code"] == "confirm_required", late
+    assert late["data"]["refusal"]["reason"] == "preview_expired"
+    assert "That preview is more than 15 minutes old." in late["error"]["message"]
+    assert target(post) == "100"
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{run}'") == "0"
+    # the backstop refuses the same binding written straight into the table
+    rc, _, err = post.run(f"""INSERT INTO ottoq_owner_commands (principal_id, principal_name, fleet_operator_id, depot_id,
+                                  sim_run_id, tool, mode, outcome, summary, plan_hash, acting_person, via, confirms_command_id)
+                              SELECT principal_id, principal_name, fleet_operator_id, depot_id, sim_run_id, tool, 'apply',
+                                     'applied', 'x', plan_hash, acting_person, 'confirm', command_id
+                                FROM ottoq_owner_commands WHERE command_id = '{pid}'""", check=False)
+    assert rc != 0 and "is not a preview this apply may confirm" in err, err
+    # inside the window it binds
+    fresh = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 85, "mode": "preview"})
+    age(post, fresh["data"]["command"]["command_id"], "14 minutes")
+    ok = confirm(post, chase, fresh)
+    assert ok["data"]["outcome"] == "applied", ok
+    assert ok["data"]["command"]["confirms_command_id"] == fresh["data"]["command"]["command_id"]
+    assert target(post) == "85"
+
+
+def test_a_confirm_by_another_principal_is_refused(post):
+    # two agents signed in to the same person's account are two principals, and each confirms only its own previews
+    hermes, grok = connect(post)["access_token"], connect(post)["access_token"]
+    production_run(post)
+    prev = tcall(post, hermes, "set_charge_limit", {"vehicles": "all", "percent": 85, "mode": "preview"})
+    pid, plan = prev["data"]["command"]["command_id"], prev["data"]["command"]["plan_hash"]
+    by_hash = tcall(post, grok, "set_charge_limit", {"vehicles": "all", "percent": 85, "expect_plan_hash": plan})
+    assert by_hash["error"]["code"] == "confirm_required" and by_hash["data"]["refusal"]["reason"] == "no_recorded_preview", by_hash
+    by_id = confirm(post, grok, prev)
+    assert by_id["error"]["code"] == "confirm_required" and by_id["data"]["refusal"]["reason"] == "no_recorded_preview", by_id
+    assert "This agent recorded no such preview on this run." in by_id["error"]["message"]
+    assert target(post) == "100"
+    # written straight into the table under the other principal, the backstop refuses it
+    other = post.val(f"SELECT principal_id FROM ottoq_owner_commands WHERE command_id = '{by_id['data']['command']['command_id']}'")
+    rc, _, err = post.run(f"""INSERT INTO ottoq_owner_commands (principal_id, principal_name, fleet_operator_id, depot_id,
+                                  sim_run_id, tool, mode, outcome, summary, plan_hash, acting_person, via, confirms_command_id)
+                              SELECT '{other}', principal_name, fleet_operator_id, depot_id, sim_run_id, tool, 'apply',
+                                     'applied', 'x', plan_hash, acting_person, 'confirm', command_id
+                                FROM ottoq_owner_commands WHERE command_id = '{pid}'""", check=False)
+    assert rc != 0 and "is not a preview this apply may confirm" in err, err
+    # the agent that previewed confirms it
+    mine = confirm(post, hermes, prev)
+    assert mine["data"]["outcome"] == "applied" and mine["data"]["command"]["confirms_command_id"] == pid, mine
+    assert target(post) == "85"
+
+
+def test_a_hash_only_confirm_without_a_recorded_preview_is_refused(post):
+    chase = connect(post)["access_token"]
+    run = production_run(post)
+    # the plan hash is md5 of data the token can read, so an agent could compute it without previewing: stand that in
+    # by recording a preview, keeping its hash, and taking the preview away
+    prev = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 80, "mode": "preview"})
+    plan = prev["data"]["command"]["plan_hash"]
+    post.run(f"SET ottoq.agent_ledger_unlock = 'on'; DELETE FROM ottoq_owner_commands WHERE command_id = '{prev['data']['command']['command_id']}'")
+    r = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 80, "expect_plan_hash": plan})
+    assert r["http_status"] == 422 and r["error"]["code"] == "confirm_required", r
+    assert r["data"]["refusal"]["reason"] == "no_recorded_preview" and r["data"]["outcome"] == "previewed"
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{run}'") == "0"
+    assert r["data"]["command"]["via"] == "direct", "the agent's own call, which confirmed nothing"
+    # the preview that answer recorded is real, so the same hash now binds to it (by hash alone, through the typed tool),
+    # and the row says what happened: the agent confirmed a recorded preview
+    again = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 80, "expect_plan_hash": plan})
+    assert again["http_status"] == 201 and again["data"]["outcome"] == "applied", again
+    assert again["data"]["command"]["confirms_command_id"] == r["data"]["command"]["command_id"]
+    assert again["data"]["command"]["via"] == "confirm"
+    assert post.val(f"SELECT transport FROM ottoq_agent_call_ledger WHERE call_id = {again['call_id']}") == "mcp"
+    assert target(post) == "80"
+
+
+def test_an_undo_that_lowers_is_gated_the_same_way_and_one_that_raises_is_not(post):
+    chase = connect(post)["access_token"]
+    production_run(post)
+    low = confirm(post, chase, tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 85, "mode": "preview"}))
+    assert low["data"]["outcome"] == "applied" and target(post) == "85", low
     up = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 95}, transport="rest")
-    assert up["data"]["outcome"] == "applied" and up["data"]["command"]["via"] == "direct", up
-    # an undo that puts back the 90 the person confirmed is not gated again
+    assert up["http_status"] == 201 and up["data"]["command"]["via"] == "direct" and target(post) == "95", up
+    # undoing the raise puts the 85 back: that lowers the car, so it is a preview until confirmed
     undo = tcall(post, chase, "undo_command", {"command_id": up["data"]["command"]["command_id"]})
-    assert undo["data"]["outcome"] == "applied", undo
-    assert post.val(f"SELECT round(ottoq_effective_target_soc_at('{AV041}', now()))") == "90"
-    clear = tcall(post, chase, "clear_charge_limit", {"vehicles": "all"})
-    assert clear["data"]["outcome"] == "applied" and clear["data"]["command"]["acting_person"] == EMAIL, clear
-    assert post.val(f"SELECT round(ottoq_effective_target_soc_at('{AV041}', now()))") == "100"
+    assert undo["http_status"] == 422 and undo["error"]["code"] == "confirm_required", undo
+    assert undo["data"]["refusal"]["reason"] == "not_named" and undo["data"]["outcome"] == "previewed"
+    assert undo["data"]["command"]["tool"] == "undo_command" and target(post) == "95"
+    assert post.val(f"SELECT undone_at IS NULL FROM ottoq_owner_commands WHERE command_id = '{up['data']['command']['command_id']}'") == "t"
+    done = confirm(post, chase, undo)
+    assert done["data"]["outcome"] == "applied" and done["data"]["command"]["via"] == "confirm", done
+    assert target(post) == "85"
+    # undoing the confirmed lower limit puts the cars back to full: a raise, one call
+    back = tcall(post, chase, "undo_command", {"command_id": low["data"]["command"]["command_id"]})
+    assert back["http_status"] == 201 and back["data"]["outcome"] == "applied", back
+    assert target(post) == "100"
+
+
+def test_everything_but_lowering_stays_one_call_and_cancel_takes_only_the_owners_unstarted_orders(post):
+    """Rule 9: no command can skip, defer or shorten a service OTTO-Q found needed. On production, cancel_service is
+    0605's: an engine-found need stays, a started order finishes, only the owner's own unstarted orders come off."""
+    chase = connect(post)["access_token"]
+    run = production_run(post)
+    one_call = []
+    one_call.append(tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 30}))
+    one_call.append(tcall(post, chase, "release_hold", {"vehicles": ["Tesla 45"]}))
+    one_call.append(tcall(post, chase, "request_service", {"vehicles": "all", "service": "exterior_wash", "when": "every_return"}))
+    post.tick(run, "2026-09-27 12:21+00")
+    cancel = tcall(post, chase, "cancel_service", {"vehicles": "all", "service": "exterior_wash"})
+    one_call.append(cancel)
+    assert "3 have it taken off their plans" in cancel["data"]["summary"]
+    assert "1 keeps it on this visit because OTTO-Q found it needed" in cancel["data"]["summary"]
+    post.tick(run, "2026-09-27 12:22+00")
+    left = post.rows(f"""SELECT n.vehicle_id, a::text FROM ottoq_visit_needs n CROSS JOIN LATERAL jsonb_array_elements(n.atoms) a
+                         WHERE n.sim_run_id = '{run}' AND a->>'svc' = 'exterior_wash'""")
+    assert [r[0] for r in left] == [AV045] and "owner_setting_ids" not in left[0][1]
+    # an owner's order already under way finishes when cancelled
+    one_call.append(tcall(post, chase, "request_service", {"vehicles": ["RT-3"], "service": "software update"}))
+    post.tick(run, "2026-09-27 12:23+00")
+    post.run(f"""UPDATE ottoq_visit_needs SET atoms = (SELECT jsonb_agg(CASE WHEN a->>'svc' = 'software_update' THEN a || '{{"status":"in_progress"}}' ELSE a END)
+                                                        FROM jsonb_array_elements(atoms) a)
+                 WHERE vehicle_id = '{RT003}' AND sim_run_id = '{run}'""")
+    started = tcall(post, chase, "cancel_service", {"vehicles": ["RT-3"]})
+    one_call.append(started)
+    assert "is under way and finishes" in started["data"]["summary"]
+    post.tick(run, "2026-09-27 12:24+00")
+    assert post.val(f"""SELECT a->>'status' FROM ottoq_visit_needs n CROSS JOIN LATERAL jsonb_array_elements(n.atoms) a
+                        WHERE n.vehicle_id = '{RT003}' AND n.sim_run_id = '{run}' AND a->>'svc' = 'software_update'""") == "in_progress"
+    # raising a confirmed limit and clearing it are one call each
+    low = confirm(post, chase, tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 85, "mode": "preview"}))
+    assert low["data"]["outcome"] == "applied", low
+    one_call.append(tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 95}))
+    one_call.append(tcall(post, chase, "clear_charge_limit", {"vehicles": "all"}))
+    for r in one_call:
+        assert r["http_status"] == 201 and r["data"]["outcome"] == "applied", r
+        assert r["data"]["command"]["via"] == "direct" and r["data"]["command"]["acting_person"] == EMAIL
+        assert "confirms_command_id" not in r["data"]["command"]
+    assert target(post) == "100"
+
+
+def test_via_comes_from_the_door_and_never_from_the_arguments(post):
+    chase = connect(post)["access_token"]
+    fresh_run(post)                # a demo run: every door applies there
+    got = {}
+    for i, transport in enumerate(("ask", "mcp", "rest", "smoke-signal")):
+        r = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 30 + i, "via": "ottocommand"},
+                  transport=transport)
+        assert r["data"]["outcome"] == "applied", r
+        got[transport] = (command(post, r["data"]["command"]["command_id"])[2],
+                          post.val(f"SELECT transport FROM ottoq_agent_call_ledger WHERE call_id = {r['call_id']}"))
+    assert got == {"ask": ("ottocommand", "ask"), "mcp": ("direct", "mcp"), "rest": ("direct", "rest"),
+                   "smoke-signal": ("direct", "other")}
+    # the confirm door applies only a recorded preview, on a demo run too: unnamed, it records a preview, and that row is
+    # the agent's own ('direct'), because it confirmed nothing; the ledger keeps the transport
+    bare = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 45}, transport="confirm")
+    assert bare["error"]["code"] == "confirm_required" and bare["data"]["refusal"]["reason"] == "not_named", bare
+    assert command(post, bare["data"]["command"]["command_id"]) == ["previewed", EMAIL, "direct"]
+    assert post.val(f"SELECT transport FROM ottoq_agent_call_ledger WHERE call_id = {bare['call_id']}") == "confirm"
+    ok = confirm(post, chase, bare)
+    assert ok["data"]["outcome"] == "applied" and ok["data"]["command"]["via"] == "confirm", ok
+    assert ok["data"]["command"]["confirms_command_id"] == bare["data"]["command"]["command_id"]
+    # a typed tool that names a recorded preview is a confirm too, and is recorded as one
+    typed_prev = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 40, "mode": "preview"}, transport="rest")
+    assert command(post, typed_prev["data"]["command"]["command_id"]) == ["previewed", EMAIL, "direct"]
+    typed = confirm(post, chase, typed_prev, transport="rest")
+    assert typed["data"]["outcome"] == "applied" and typed["data"]["command"]["via"] == "confirm", typed
+    assert typed["data"]["command"]["confirms_command_id"] == typed_prev["data"]["command"]["command_id"]
+    # an OTTO-Command model never confirms: a call through 'ask' that names a preview is refused
+    prev = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 50, "mode": "preview"})
+    for extra in ({"expect_plan_hash": prev["data"]["command"]["plan_hash"]},
+                  {"confirms_command_id": prev["data"]["command"]["command_id"]}):
+        r = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "until": prev["data"]["confirm"]["args"]["until"], **extra},
+                  transport="ask")
+        assert r["http_status"] == 422 and r["error"]["code"] == "confirm_not_through_ottocommand", r
+        assert command(post, r["data"]["command"]["command_id"]) == ["refused", EMAIL, "ottocommand"]
+    bad = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 50, "mode": "preview",
+                                              "confirms_command_id": prev["data"]["command"]["command_id"]})
+    assert bad["http_status"] == 400 and "confirms_command_id is for mode apply" in bad["error"]["message"], bad
+    # the two CHECKs make via 'confirm' and confirms_command_id one fact: a confirm row names its preview, and a row
+    # that names a preview is a confirm (never a model's, never 'direct')
+    pid = prev["data"]["command"]["command_id"]
+    insert = f"""INSERT INTO ottoq_owner_commands (principal_id, principal_name, fleet_operator_id, depot_id, sim_run_id, tool,
+                     mode, outcome, summary, plan_hash, acting_person, via, confirms_command_id)
+                 SELECT principal_id, principal_name, fleet_operator_id, depot_id, sim_run_id, tool, 'apply', 'applied', 'x',
+                        plan_hash, acting_person, %s FROM ottoq_owner_commands WHERE command_id = '{pid}'"""
+    rc, _, err = post.run(insert % "'confirm', NULL", check=False)
+    assert rc != 0 and "ottoq_owner_commands_confirm_is_bound_check" in err, err
+    for door in ("'ottocommand'", "'direct'"):
+        rc, _, err = post.run(insert % f"{door}, command_id", check=False)
+        assert rc != 0 and "ottoq_owner_commands_confirms_check" in err, (door, err)
+    # and so it is on every row the doors wrote
+    assert post.val("SELECT count(*) FROM ottoq_owner_commands WHERE (via = 'confirm') IS DISTINCT FROM (confirms_command_id IS NOT NULL) "
+                    "AND via IS NOT NULL") == "0"
 
 
 def test_production_refuses_a_passcode_an_issued_key_and_an_unlinked_account_with_why(post):
@@ -306,8 +560,8 @@ def test_the_run_end_lifts_a_production_setting_and_puts_the_car_back(post):
     chase = connect(post)["access_token"]
     run = production_run(post)
     prev = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80, "mode": "preview"}, transport="ask")
-    done = tcall(post, chase, prev["data"]["confirm"]["tool"], prev["data"]["confirm"]["args"], transport="ask")
-    assert done["data"]["outcome"] == "applied", done
+    done = confirm(post, chase, prev)
+    assert done["data"]["outcome"] == "applied" and done["data"]["command"]["via"] == "confirm", done
     post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")
     assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{run}' AND status = 'active'") == "0"
     assert post.val(f"SELECT round(ottoq_effective_target_soc_at('{AV041}', now()))") == "100"
@@ -321,7 +575,8 @@ def test_the_person_and_the_door_are_immutable_and_no_applied_production_row_lac
     r = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 30}, transport="ask")
     assert r["data"]["outcome"] == "applied", r
     cid = r["data"]["command"]["command_id"]
-    for col, val in (("acting_person", "'someone@else.com'"), ("via", "'direct'"), ("acting_person", "NULL")):
+    for col, val in (("acting_person", "'someone@else.com'"), ("via", "'direct'"), ("acting_person", "NULL"),
+                     ("confirms_command_id", f"'{cid}'")):
         rc, _, err = post.run(f"UPDATE ottoq_owner_commands SET {col} = {val} WHERE command_id = '{cid}'", check=False)
         assert rc != 0 and "immutable" in err, (col, err)
     pid = post.val(f"SELECT principal_id FROM ottoq_owner_commands WHERE command_id = '{cid}'")
@@ -360,7 +615,8 @@ def test_no_client_role_reaches_anything_new(post):
                "public.ottoq_owner_command(ottoq_agent_principals,text,jsonb)",
                "public.ottoq_owner_write_gate(ottoq_agent_principals,jsonb)",
                "public.ottoq_owner_acting_person(ottoq_agent_principals)",
-               "public.ottoq_owner_commands_production_person()"):
+               "public.ottoq_owner_confirm_binding(ottoq_agent_principals,uuid,text,jsonb,text,text,uuid,boolean)",
+               "public.ottoq_owner_commands_backstop()"):
         for role in ("anon", "authenticated", "service_role"):
             assert post.val(f"SELECT has_function_privilege('{role}', '{fn}', 'EXECUTE')") == "f", (fn, role)
     assert post.val("SELECT has_function_privilege('service_role', 'public.ottoq_agent_call(text,text,jsonb,text,jsonb)', 'EXECUTE')") == "t"
