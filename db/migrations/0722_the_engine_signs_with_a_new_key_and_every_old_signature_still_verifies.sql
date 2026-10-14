@@ -1,15 +1,19 @@
 -- migration-version: PENDING
 -- migration-name:    the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies
 --
--- 0722  **The key that signs every event, SDR and audit bundle is rotated. 'system:v2', a new 32-byte Vault secret that
---        no session and no browser role has ever been able to read, signs from now on; 'system:v1' stays active, so
---        every row it signed still verifies.** (FINDINGS G428, its rotation half; follows 0701, which closed the old
---        key to the browser roles, and refuses to run before it.) Written against the live catalog read-only on
+-- 0722  **The key that signs every event, SDR and audit bundle is rotated, and every row the old key signed still verifies.
+--        'system:v2', a new 32-byte Vault secret made inside the database and never selected by this file, signs from
+--        now on. No browser role can read it; service_role and postgres can, as they can 'system:v1'. 'system:v1' stays
+--        active, which is what keeps its rows verifying.** (FINDINGS G428, its rotation half; follows 0701, which closed
+--        the old key to the browser roles, and refuses to run before it.) Written against the live catalog read-only on
 --        2026-10-14 from 15:08:34 UTC (10:08 AM CT, the first query's own now()) to 15:21:19 UTC (10:21 AM CT, read from
 --        the clock after the last query). No query in that window called the resolver, a signer or a verifier, or read a
 --        secret: before 0701 the resolver caches the key for the whole pooled session, and db/checks/0438 forbids it. So
 --        P2's premise (the newest v1 rows verify) is first measured inside this file's own transaction, after 0701.
---        ottoq_certification_in_flight(true) read 1 at 15:16:35 UTC; P0 refuses until it reads 0.
+--        ottoq_certification_in_flight(true) read 1 at 15:16:35 UTC; P0 refuses until it reads 0. Re-read read-only for
+--        the review's fixes from 16:46:29 UTC (11:46 AM CT) to 16:47:57 UTC (11:47 AM CT), each the query's own now(),
+--        again calling no resolver, signer or verifier and reading no secret: the object_kind values in
+--        ottoq_schema_snapshots, the one audit bundle's signature shape (§1(c)), and who may read Vault (§2(a)).
 --
 -- ══ §0 CHASE'S GO-AHEAD: NOT YET GIVEN. THIS FILE REFUSES TO APPLY UNTIL IT IS. ══════════════════════════════════════
 --
@@ -47,15 +51,25 @@
 --       definition. 0701 changes these five's grants, not their definitions, and pg_get_functiondef carries no grant,
 --       so the pins hold across it.) Searched live: no other function and no view names 'system:v1' except the resolver,
 --       whose 0701 body drops it. Searched in the repo: no edge function (otto-twin-control, ottoq-ottocommand,
---       ottoq-agent-gateway, ottoq-depot-v2, ottoq-ingest among them) and no app code names a key or passes one; the
---       only caller that passes a key explicitly is that trigger.
+--       ottoq-agent-gateway, ottoq-depot-v2, ottoq-ingest among them) and no app code names a key or passes one. The
+--       only caller that passes a key as a LITERAL is that trigger. ottoq_emit_sdr also passes a key to
+--       ottoq_record_event (p_signing_key_id => p_key_id), but it is its own parameter, not a literal: the sdr_issued
+--       event signs with whatever key the SDR did, which is emit_sdr's default unless its own caller names one.
 --
 --   (c) HOW A ROW IS VERIFIED. ottoq_verify_event_signature and ottoq_verify_audit_bundle re-sign the stored fields
 --       with the row's own signature_key_id, through the resolver, which returns a secret only for an ACTIVE key. So v1
---       stays active: deactivate it and every one of its rows (2,613,582 events, 145,888 SDRs and 1 audit bundle at the
---       count in db/checks/0438's window) verifies as NULL. There is no "retired, verify-only" state, and this file does
---       not invent one. The registry's UNIQUE (scope, scope_id, is_active) is DEFERRABLE and scope_id is NULL for system
+--       stays active: deactivate it and every one of its events and SDRs (2,613,582 and 145,888 at the count in
+--       db/checks/0438's window) verifies as NULL. There is no "retired, verify-only" state, and this file does not
+--       invent one. The registry's UNIQUE (scope, scope_id, is_active) is DEFERRABLE and scope_id is NULL for system
 --       keys, so a second active system key is allowed (NULLs are distinct).
+--       THE ONE AUDIT BUNDLE DOES NOT VERIFY TODAY, AND NOTHING HERE SAYS IT DOES. Live holds a single bundle, generated
+--       2026-05-14 20:02:11 UTC with signature_key_id 'system:v1', and its signature is 36 characters, not the 64-hex
+--       HMAC-SHA-256 that ottoq_sign_bundle returns (read 16:46:29 UTC, its length and shape only). ottoq_verify_audit_
+--       bundle (live md5 40afdf34) sets out_valid to `v_recomputed IS NOT NULL AND v_recomputed = v_bundle.signature`,
+--       and a 64-character recomputation never equals 36 characters: out_valid is false today and stays false after
+--       this file. That is read from the verifier's source; the verifier was not called. So P2 and V4 ask only about a
+--       v1 bundle whose signature is 64 hex. On live there is none, so both report the bundle as 'none' and say how many
+--       v1 bundles they did not ask about and why (1 on live; 0 on the stub, whose bundle is signed by the live writer).
 --
 -- ══ §2 WHAT THIS CHANGES ════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -64,6 +78,14 @@
 --       no log line, no NOTICE and no result. This file never selects a secret, never calls the resolver, and never reads
 --       vault.decrypted_secrets; the only reads of the new secret are the signers' own, inside blocks that roll back
 --       (and 0701's resolver caches for one transaction only). It reads vault.secrets by name, never its secret column.
+--       WHO CAN READ IT. No browser role: anon and authenticated hold no SELECT on vault.decrypted_secrets (live, read
+--       16:47:12 UTC), and after 0701 neither may execute the resolver, a signer or ottoq_oem_deliver_live (which reads
+--       any Vault secret by a name its caller passes); P1 asserts all of it. service_role and postgres CAN, exactly as
+--       they can read v1: both hold SELECT on vault.decrypted_secrets, and 0701 keeps service_role's EXECUTE on the
+--       resolver, so anything holding the service key (an edge function, a POST to /rest/v1/rpc/ottoq_resolve_signing_
+--       secret) can fetch v2 in plaintext the moment this commits. "Never selected" is a claim about this file, not about
+--       the database. G428's exposure was the browser roles; this file rotates away from that, and does not narrow the
+--       service roles.
 --   (b) A NEW REGISTRY ROW: ('system:v2', 'system', NULL, 'HMAC-SHA-256', 'vault:ottoq_signing_key_system_v2', active,
 --       created_by 'migration:0722_...').
 --   (c) v1 IS MARKED, NOT RETIRED: rotated_at = now() and a rotation_reason naming G428. is_active stays TRUE, so v1
@@ -76,7 +98,9 @@
 --       asserts both: each definition md5 is the one this file computes, and each ACL is what it was.
 --   A caller already planned under the old default signs with v1 until it re-plans; that row verifies, because v1 is
 --   still active. Nothing is re-signed and ottoq_events is not touched: V4's probe event is written and rolled back in
---   one block (one ottoq_events_event_seq_seq value is spent, which nothing reads as contiguous).
+--   one block (one ottoq_events_event_seq_seq value is spent, which nothing reads as contiguous). The two probe functions
+--   (pg_temp.p0722_sigs and pg_temp.p0722_old_rows) are dropped before COMMIT and the temp tables are ON COMMIT DROP, so
+--   nothing this file made is left in the session that applied it.
 --   NOT CHANGED: the verifiers, the signers, the resolver, any grant, and Auth's sign-up setting (G428's other founder
 --   action, a dashboard switch). A forger who read v1 before 0701 can still make a v1 signature that verifies; §5 is the
 --   follow-up that closes it, and it is not in this file.
@@ -91,10 +115,26 @@
 --
 -- ══ §4 ROLLBACK ══════════════════════════════════════════════════════════════════════════════════════════════════
 --
---   EXECUTE every definition in ottoq_schema_snapshots WHERE label = '0722_pre', in snapshot_id order: the five functions
---   with their v1 defaults, and v1's rotated_at and rotation_reason as they were. Leave 'system:v2' (its row and its
---   Vault secret) active: rows signed with it between the apply and the rollback verify only while it resolves. Never
---   overwrite or delete either Vault secret. Rolling back puts new rows back on a key that may have been read.
+--   (a) THIS FILE. EXECUTE every definition in ottoq_schema_snapshots WHERE label = '0722_pre' AND object_kind =
+--       'function', in snapshot_id order: the five functions with their v1 defaults. Then put v1's rotated_at and
+--       rotation_reason back from the 'table_row' snapshot, a jsonb array of {key_id, rotated_at, rotation_reason} (the
+--       convention 0573 and 0574 use for a row's fields):
+--         UPDATE public.ottoq_signing_keys k
+--            SET rotated_at = (r->>'rotated_at')::timestamptz, rotation_reason = r->>'rotation_reason'
+--           FROM public.ottoq_schema_snapshots s CROSS JOIN LATERAL jsonb_array_elements(s.definition::jsonb) r
+--          WHERE s.label = '0722_pre' AND s.object_kind = 'table_row' AND s.object_name = 'ottoq_signing_keys'
+--            AND k.key_id = r->>'key_id';
+--       Leave 'system:v2' (its row and its Vault secret) active: rows signed with it between the apply and the rollback
+--       verify only while it resolves. Never overwrite or delete either Vault secret. Rolling back puts new rows back on
+--       a key that may have been read. This file cannot then be applied again (P1 refuses on the v2 row it leaves); a
+--       second rotation is a new file with a new key id.
+--   (b) ROLLING BACK 0701 AFTER THIS FILE EXPOSES 'system:v2' TO EVERY SIGNED-IN USER. 0701 §4 restores the resolver as
+--       it was and gives back every grant 0701 took from the browser roles and PUBLIC, authenticated's EXECUTE on the
+--       resolver among them. The resolver returns the secret of any ACTIVE key, and v2 is active; it stays active even
+--       if (a) runs first, so rolling this file back does not protect it. A 0701 rollback therefore hands v2 to every
+--       signed-in caller, exactly as v1 was handed out from 0198 until 0701. Before any such rollback, rotate again (a
+--       new key id and a new Vault secret, in a new file), and if 0701 is ever rolled back regardless, treat v2 as read
+--       from the moment that rollback commits.
 --
 -- ══ §5 FOLLOW-UP, NOT IN THIS FILE AND NOT EXECUTED BY IT: refuse a v1 signature on a row recorded after the rotation ══
 --
@@ -187,13 +227,20 @@ BEGIN
     FROM unnest(ARRAY['public.ottoq_resolve_signing_secret(text)',
                       'public.ottoq_sign_event(uuid,timestamptz,text,text,text,uuid,text,text)',
                       'public.ottoq_sign_sdr(uuid,timestamptz,uuid,text,text,text)',
-                      'public.ottoq_sign_bundle(uuid,timestamptz,timestamptz,text,text)']) s
+                      'public.ottoq_sign_bundle(uuid,timestamptz,timestamptz,text,text)',
+                      -- reads any Vault secret by a name its caller passes, and signs with it (0701 §1(b))
+                      'public.ottoq_oem_deliver_live(uuid,uuid,uuid,uuid,text,text,jsonb,text,timestamptz)']) s
    WHERE to_regprocedure(s) IS NULL
       OR has_function_privilege('anon', to_regprocedure(s), 'EXECUTE')
       OR has_function_privilege('authenticated', to_regprocedure(s), 'EXECUTE')
       OR EXISTS (SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a WHERE p.oid = to_regprocedure(s) AND a.grantee = 0);
   IF v_bad IS NOT NULL THEN
     RAISE EXCEPTION '0722 P1: a browser role or PUBLIC may still execute %; 0701''s revoke is not in force', v_bad;
+  END IF;
+  -- and no browser role reads Vault directly (a privilege check on the view; nothing is selected from it)
+  IF has_table_privilege('anon', 'vault.decrypted_secrets', 'SELECT')
+     OR has_table_privilege('authenticated', 'vault.decrypted_secrets', 'SELECT') THEN
+    RAISE EXCEPTION '0722 P1: a browser role may SELECT vault.decrypted_secrets; it would read the new key directly';
   END IF;
   IF EXISTS (SELECT 1 FROM public.ottoq_cert_lineage WHERE name LIKE '0722\_%')
      OR EXISTS (SELECT 1 FROM public.ottoq_schema_snapshots WHERE label = '0722_pre') THEN
@@ -277,7 +324,9 @@ BEGIN
   RETURN v_msg;
 END $fn$;
 
--- the stored rows a verifier is asked about: does each still verify (booleans only; 'none' when there is no such row)
+-- the stored rows a verifier is asked about: does each still verify (booleans only). 'none' means none was asked about:
+-- there is no such row, or, for a bundle, no v1 bundle whose signature is a 64-hex HMAC (live's one bundle is not, §1(c);
+-- P2 counts the bundles it does not ask about and both P2 and V4 say so)
 CREATE FUNCTION pg_temp.p0722_old_rows(p_event uuid, p_sdr uuid, p_bundle uuid) RETURNS text LANGUAGE plpgsql AS $fn$
 DECLARE v_msg text;
 BEGIN
@@ -309,7 +358,7 @@ CREATE TEMP TABLE p0722 (phase text PRIMARY KEY, r text, event_id uuid, sdr_id u
 -- ── P2: before anything changes, the newest row v1 signed of each kind verifies, and v1's synthetic signatures ──
 DO $before$
 DECLARE
-  v_event uuid; v_sdr uuid; v_bundle uuid; v_old text; v_sigs text;
+  v_event uuid; v_sdr uuid; v_bundle uuid; v_old text; v_sigs text; v_not_asked int;
 BEGIN
   SELECT e.event_id INTO v_event FROM public.ottoq_events e
    WHERE e.signature_key_id = 'system:v1' AND e.signature IS NOT NULL
@@ -323,6 +372,9 @@ BEGIN
   SELECT b.bundle_id INTO v_bundle FROM public.ottoq_audit_bundles b
    WHERE b.signature_key_id = 'system:v1' AND b.signature ~ '^[0-9a-f]{64}$'
    ORDER BY b.generated_at DESC, b.bundle_id LIMIT 1;
+  -- the v1 bundles not asked about: no 64-hex HMAC signature, so no key verifies them (live: 1, 36 characters, §1(c))
+  SELECT count(*) INTO v_not_asked FROM public.ottoq_audit_bundles b
+   WHERE b.signature_key_id = 'system:v1' AND (b.signature IS NULL OR b.signature !~ '^[0-9a-f]{64}$');
   v_old := pg_temp.p0722_old_rows(v_event, v_sdr, v_bundle);
   IF v_old !~ '^OLD\|event true\|sdr (true|none)\|bundle (true|none)$' THEN
     RAISE EXCEPTION '0722 P2: the newest v1 rows do not verify before this file changes anything: %', v_old;
@@ -335,8 +387,10 @@ BEGIN
     RAISE EXCEPTION '0722 P2: system:v2 already resolves to a secret';
   END IF;
   INSERT INTO p0722 (phase, r, event_id, sdr_id, bundle_id) VALUES ('old_before', v_old, v_event, v_sdr, v_bundle),
-                                                                   ('v1_sigs_before', v_sigs, NULL, NULL, NULL);
-  RAISE NOTICE '0722 P2: before: newest v1 rows %; v1 signs (md5s only kept)', v_old;
+                                                                   ('v1_sigs_before', v_sigs, NULL, NULL, NULL),
+                                                                   ('bundles_not_asked', v_not_asked::text, NULL, NULL, NULL);
+  RAISE NOTICE '0722 P2: before: newest v1 rows %; v1 signs (md5s only kept); % v1 audit bundle(s) not asked about: their '
+               'signature is not a 64-hex HMAC, so they verify under no key, before this file or after it', v_old, v_not_asked;
 END $before$;
 
 -- ── snapshot: the five definitions, and v1's registry fields this file sets ──
@@ -345,12 +399,13 @@ SELECT '0722_pre', 'function', n.nspname, p.oid::regprocedure::text, pg_get_func
   FROM p0722_fns f JOIN pg_proc p ON p.oid = to_regprocedure(f.sig) JOIN pg_namespace n ON n.oid = p.pronamespace
  ORDER BY f.ord;
 
+-- v1's two fields this file sets, as 'table_row' data (0573's and 0574's convention: a jsonb array, not a statement);
+-- §4(a) has the UPDATE that puts them back
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
-SELECT '0722_pre', 'registry_row', 'public', 'ottoq_signing_keys::' || s.key_id, s.stmt, md5(s.stmt)
-  FROM (SELECT k.key_id,
-               format('UPDATE public.ottoq_signing_keys SET rotated_at = %L, rotation_reason = %L WHERE key_id = %L;',
-                      k.rotated_at, k.rotation_reason, k.key_id) AS stmt
-          FROM public.ottoq_signing_keys k WHERE k.key_id = 'system:v1') s;
+SELECT '0722_pre', 'table_row', 'public', 'ottoq_signing_keys', d::text, md5(d::text)
+  FROM (SELECT jsonb_agg(jsonb_build_object('key_id', k.key_id, 'rotated_at', k.rotated_at,
+                                            'rotation_reason', k.rotation_reason) ORDER BY k.key_id) AS d
+          FROM public.ottoq_signing_keys k WHERE k.key_id = 'system:v1') x;
 
 -- ── (a) the new secret, made inside the database and handed straight to Vault; nothing reads it back here ──
 DO $secret$
@@ -501,7 +556,9 @@ BEGIN
   IF v_msg IS DISTINCT FROM 'PROBE|system:v2|true|true' THEN
     RAISE EXCEPTION '0722 V4 FAILED: a new event: %', v_msg;
   END IF;
-  RAISE NOTICE '0722 V4 PASSED: the newest v1 rows still verify (%); a new event signs with system:v2 and verifies; rolled back', v_old;
+  RAISE NOTICE '0722 V4 PASSED: the newest v1 rows still verify (%; % v1 audit bundle(s) not asked about, not HMAC-signed); '
+               'a new event signs with system:v2 and verifies; rolled back',
+               v_old, (SELECT r FROM p0722 WHERE phase = 'bundles_not_asked');
 END $verify_rows$;
 
 -- ── V5: the probes rolled back, and with them the resolver's cache: nothing of either key is left in this transaction ──
@@ -516,10 +573,16 @@ BEGIN
   RAISE NOTICE '0722 V5 PASSED: no signing cache left in this transaction';
 END $verify_cache$;
 
+-- the two probe functions go with the transaction, as the temp tables do ON COMMIT DROP: nothing of this file is left
+-- in the applying session after it
+DROP FUNCTION pg_temp.p0722_sigs(text);
+DROP FUNCTION pg_temp.p0722_old_rows(uuid, uuid, uuid);
+
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies', false, false,
   'G428, the rotation half (after 0701): a new Vault secret ottoq_signing_key_system_v2 (32 random bytes, made in the '
-  'database, never selected) and an active system:v2 registry row; system:v1 marked rotated_at/rotation_reason and kept '
+  'database and never selected by this file; no browser role can read it, service_role and postgres can, as for v1) '
+  'and an active system:v2 registry row; system:v1 marked rotated_at/rotation_reason and kept '
   'ACTIVE so every v1 row still verifies (V4); the five defaults (record_event, emit_sdr, generate_audit_bundle, '
   'complete_audit_report, trg_attribution_attach) now system:v2, grants unchanged (V1). No atom reads a signature or a '
   'key id (h_evt, ottoq_hash_sdrs and the decision frame name neither), and no dial moves: FALSE/FALSE. Still open: a '

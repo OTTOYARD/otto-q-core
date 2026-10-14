@@ -13,11 +13,15 @@ definitions byte for byte (md5-asserted first), with a Vault stand-in that repor
   * no secret is ever selected: the file's code names no decrypted secret and never calls the resolver, every Vault read
     during the apply came through the resolver inside a signer, and neither secret appears in anything the apply printed,
     wrote, or left in its session;
-  * the five functions keep their grants, the browser roles still cannot read the new key, and ottoq_events was only
-    appended to by the test itself (the probe event rolled back);
+  * the five functions keep their grants, the browser roles still cannot read or sign with the new key (service_role and
+    postgres can, as they can v1; the file says so rather than claiming otherwise), and ottoq_events was only appended
+    to by the test itself (the probe event rolled back);
+  * a v1 audit bundle whose signature is not a 64-hex HMAC (live's only bundle, 2026-05-14, carries 36 characters) is
+    not asked about, verifies under no key before or after, and P2 and V4 say so instead of reporting it verified;
   * it refuses a hotfixed function, an existing v2 row or Vault secret, another function naming v1, a v1 that is not the
-    active Vault-backed unrotated key, a certification in flight and a second run; its restore statements put the v1
-    defaults back while v2's rows keep verifying.
+    active Vault-backed unrotated key, a browser role left able to read Vault or call ottoq_oem_deliver_live, a
+    certification in flight and a second run; its §4 restore (the function snapshots and the 'table_row' UPDATE, read out
+    of the file) puts the v1 defaults back while v2's rows keep verifying.
 
 Loads tests/fixtures/signing_grants_stub.sql, then tests/fixtures/signing_rotation_stub.sql. SKIPS where no scratch
 PostgreSQL is reachable.
@@ -198,7 +202,10 @@ def db():
         }
         rc, out, err = _apply(d, M0722_OK, after_sql=(
             "SELECT 'AFTER|' || coalesce(current_setting('ottoq.sigcache_' || md5('system:v1'), true), '') || '|'"
-            " || coalesce(current_setting('ottoq.sigcache_' || md5('system:v2'), true), '');"))
+            " || coalesce(current_setting('ottoq.sigcache_' || md5('system:v2'), true), '');\n"
+            # what of the file is left in the session that applied it: its probe functions and temp tables
+            "SELECT 'LEFT|' || count(*) FROM pg_class c WHERE c.relnamespace = pg_my_temp_schema() AND c.relname ~ '^p0722';\n"
+            "SELECT 'LEFT|' || count(*) FROM pg_proc p WHERE p.pronamespace = pg_my_temp_schema() AND p.proname ~ '^p0722';"))
         assert rc == 0, f"0722 did not apply on the stub: {err}"
         d.out, d.err = out, err
         d.v2_secret = d.val("SELECT secret FROM vault.secrets WHERE name = 'ottoq_signing_key_system_v2'")
@@ -228,6 +235,9 @@ def test_the_file_reports_each_verification(db):
         assert tag in db.err, db.err
     # P2 read every kind of v1 row the seed made, and each verified before anything changed
     assert "newest v1 rows OLD|event true|sdr true|bundle true" in db.err, db.err
+    # and it says how many v1 bundles it did not ask about (none here: the stub's bundle is signed by the live writer)
+    assert "0 v1 audit bundle(s) not asked about" in db.err, db.err
+    assert "(OLD|event true|sdr true|bundle true; 0 v1 audit bundle(s) not asked about" in db.err, db.err
 
 
 def test_it_refuses_before_0701():
@@ -334,9 +344,14 @@ def test_the_registry_and_vault(db):
     assert db.val("SELECT secret FROM vault.secrets WHERE name = 'ottoq_signing_key_system_v1'") == V1_SECRET   # untouched
     desc = db.val("SELECT description FROM vault.secrets WHERE name = 'ottoq_signing_key_system_v2'")
     assert "key_id=system:v2" in desc and "do NOT overwrite this one" in desc
-    snaps = db.val("SELECT string_agg(object_kind, ',' ORDER BY snapshot_id) FROM public.ottoq_schema_snapshots "
-                   "WHERE label = '0722_pre'")
-    assert snaps == "function,function,function,function,function,registry_row"
+    snaps = db.val("SELECT string_agg(object_kind, ',' ORDER BY snapshot_id) || '|' || "
+                   "string_agg(object_name, ',' ORDER BY snapshot_id) FILTER (WHERE object_kind = 'table_row') "
+                   "FROM public.ottoq_schema_snapshots WHERE label = '0722_pre'")
+    # the repo's convention for a row's fields (0573, 0574; 'table_row' is what live holds): jsonb data, not a statement
+    assert snaps == "function,function,function,function,function,table_row|ottoq_signing_keys", snaps
+    row = db.val("SELECT definition::jsonb::text || '|' || (def_md5 = md5(definition))::text FROM public.ottoq_schema_snapshots "
+                 "WHERE label = '0722_pre' AND object_kind = 'table_row'")
+    assert row == '[{"key_id": "system:v1", "rotated_at": null, "rotation_reason": null}]|true', row
 
 
 def _code(path):
@@ -349,8 +364,11 @@ def test_no_secret_is_ever_selected(db):
     code = _code(M0722)
     # with its string literals emptied, so a quoted signature (P1's to_regprocedure lookups) is not taken for a call
     calls_only = re.sub(r"'(?:[^']|'')*'", "''", code)
-    # the file names no decrypted secret, never calls the resolver, and never reads a secret column
-    assert "decrypted" not in code
+    # the file reads no decrypted secret (P1 names the view only inside has_table_privilege's string literal, which
+    # selects nothing), never calls the resolver, and never reads a secret column
+    assert "decrypted" not in calls_only
+    assert re.findall(r"'vault\.decrypted_secrets'", code) == ["'vault.decrypted_secrets'"] * 2
+    assert all("has_table_privilege(" in ln or "RAISE EXCEPTION" in ln for ln in code.splitlines() if "decrypted" in ln)
     assert not re.search(r"ottoq_resolve_signing_secret\s*\(", calls_only)
     assert not re.search(r"\.secret\b", code)
     # the new secret is made in the database: one call, its value an expression, never a literal
@@ -368,6 +386,8 @@ def test_no_secret_is_ever_selected(db):
         assert db.val(f"SELECT count(*) FROM public.ottoq_signing_keys k WHERE k::text LIKE '%{secret}%'") == "0"
         assert db.val(f"SELECT count(*) FROM public.ottoq_events e WHERE e::text LIKE '%{secret}%'") == "0"
     assert "AFTER||" in db.out, db.out                                          # no signing cache outlived the apply
+    # and nothing the file made is left in the session that applied it: its temp tables and its two probe functions
+    assert db.out.count("LEFT|0") == 2, db.out
 
 
 def test_the_read_instrument_sees_a_direct_select():
@@ -397,6 +417,14 @@ def test_the_browser_roles_cannot_read_or_use_the_new_key(db):
         for sql in ("SELECT public.ottoq_resolve_signing_secret('system:v2')", "SELECT " + SIGN_EVENT.format(key="system:v2")):
             ok, _, msg = _as(db, role, sql)
             assert not ok and "permission denied for function" in msg, (role, sql, msg)
+        ok, _, msg = _as(db, role, "SELECT decrypted_secret FROM vault.decrypted_secrets "
+                                   "WHERE name = 'ottoq_signing_key_system_v2'")
+        assert not ok and "permission denied" in msg, (role, msg)
+        assert db.val(f"SELECT has_function_privilege('{role}', 'public.ottoq_oem_deliver_live(uuid,uuid,uuid,uuid,text,"
+                      f"text,jsonb,text,timestamptz)'::regprocedure, 'EXECUTE')") == "f"
+    # the file does not claim more: service_role may still fetch it, as it may fetch v1 (§2(a))
+    ok, out, _ = _as(db, "service_role", "SELECT length(public.ottoq_resolve_signing_secret('system:v2'))")
+    assert ok and out == "64", out
 
 
 def test_the_event_log_was_only_appended(db):
@@ -420,6 +448,20 @@ def test_it_refuses_a_second_run(db):
     assert db.val("SELECT count(*) FROM vault.secrets WHERE name = 'ottoq_signing_key_system_v2'") == "1"
 
 
+def _rollback_update():
+    """§4(a)'s UPDATE, read out of the file's comment, so the statement Chase would run is the one tested."""
+    src = open(M0722, encoding="utf-8").read()
+    sec = src[src.index("══ §4 ROLLBACK"):src.index("══ §5 ")]
+    lines = [ln[2:].strip() for ln in sec.splitlines() if ln.startswith("--")]
+    start = next(i for i, ln in enumerate(lines) if ln.startswith("UPDATE public.ottoq_signing_keys k"))
+    stmt = []
+    for ln in lines[start:]:
+        stmt.append(ln)
+        if ln.endswith(";"):
+            break
+    return " ".join(stmt)
+
+
 def test_the_restore_statements_put_the_v1_defaults_back():
     d = _load()
     try:
@@ -427,9 +469,13 @@ def test_the_restore_statements_put_the_v1_defaults_back():
         assert rc == 0, err
         _seed(d, "v2", 2)                                                       # rows signed while v2 was the default
         d.run("""DO $restore$ DECLARE r record; BEGIN
-                   FOR r IN SELECT definition FROM public.ottoq_schema_snapshots WHERE label = '0722_pre' ORDER BY snapshot_id LOOP
+                   FOR r IN SELECT definition FROM public.ottoq_schema_snapshots
+                             WHERE label = '0722_pre' AND object_kind = 'function' ORDER BY snapshot_id LOOP
                      EXECUTE r.definition;
                    END LOOP; END $restore$""")
+        upd = _rollback_update()
+        assert "object_kind = 'table_row'" in upd, upd
+        d.run(upd)
         assert _md5s(d, FIVE) == {s: LIVE_MD5[s] for s in FIVE}
         assert d.val("SELECT coalesce(rotated_at::text, '-') || coalesce(rotation_reason, '-') FROM public.ottoq_signing_keys "
                      "WHERE key_id = 'system:v1'") == "--"
@@ -441,6 +487,25 @@ def test_the_restore_statements_put_the_v1_defaults_back():
                          FROM public.ottoq_events e CROSS JOIN LATERAL public.ottoq_verify_event_signature(e.event_id) v
                         WHERE e.signature_key_id = 'system:v2'""")
         assert got == "5/5", got
+    finally:
+        _drop(d)
+
+
+def test_a_bundle_signed_with_no_hmac_is_not_asked_about_and_is_said_to_be_so():
+    # live's only audit bundle (2026-05-14) carries a 36-character signature, not an HMAC: the same shape here
+    d = _load(extra_sql="UPDATE public.ottoq_audit_bundles SET signature = gen_random_uuid()::text "
+                        "WHERE bundle_code = 'bundle-v1'")
+    try:
+        verify = ("SELECT length(b.signature) || '|' || v.out_valid::text FROM public.ottoq_audit_bundles b "
+                  "CROSS JOIN LATERAL public.ottoq_verify_audit_bundle(b.bundle_id) v WHERE b.bundle_code = 'bundle-v1'")
+        assert d.val(verify) == "36|false"                                      # it does not verify today
+        rc, _, err = _apply(d, M0722_OK)
+        assert rc == 0, err
+        assert "newest v1 rows OLD|event true|sdr true|bundle none; v1 signs (md5s only kept); 1 v1 audit bundle(s) " \
+               "not asked about" in err, err
+        assert "0722 V4 PASSED: the newest v1 rows still verify (OLD|event true|sdr true|bundle none; 1 v1 audit " \
+               "bundle(s) not asked about" in err, err
+        assert d.val(verify) == "36|false"                                      # and it does not verify after either
     finally:
         _drop(d)
 
@@ -464,6 +529,12 @@ def test_the_restore_statements_put_the_v1_defaults_back():
      "0722 P1: system:v1 is not the active, Vault-backed, unrotated system key"),
     ("UPDATE public.ottoq_signing_keys SET rotated_at = now() WHERE key_id = 'system:v1'",
      "0722 P1: system:v1 is not the active, Vault-backed, unrotated system key"),
+    # a browser role left able to sign with any Vault secret by name, or to read Vault directly
+    ("GRANT EXECUTE ON FUNCTION public.ottoq_oem_deliver_live(uuid,uuid,uuid,uuid,text,text,jsonb,text,timestamptz) "
+     "TO authenticated",
+     "0722 P1: a browser role or PUBLIC may still execute public.ottoq_oem_deliver_live"),
+    ("GRANT SELECT ON vault.decrypted_secrets TO authenticated",
+     "0722 P1: a browser role may SELECT vault.decrypted_secrets"),
     # a certification in flight
     ("UPDATE public.stub_in_flight SET n = 1", "0722 P0: a pair, the recert runner"),
 ])
