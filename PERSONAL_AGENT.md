@@ -476,16 +476,16 @@ and finished *"Authenticated — 20 tool(s) available"*; it renewed its token th
 said the hour was up; the MCP SDK's client then called `whoami` ("signed in", chase@ottoyard.com) and `my_fleet`. A
 browser sign-in with PKCE came back with its code, state and issuer and exchanged for tokens.
 
-**Not verified yet:** see "Live" below for what was checked on the live project; the real Hermes on the cloud host
-connects when Chase runs step 2.
+**On the live project:** see "Live" below, including the site's half and Chase's own Hermes, connected on 2026-10-10.
 
 ### Live
 
-*Went live on the engine 2026-10-10, 2:06–6:17 AM CT. The site's half waits on OTTOYARD-SITE #1.*
+*Went live on the engine 2026-10-10, 2:06–6:17 AM CT, and on www.ottoyard.com at 10:09 AM CT. Chase's own Hermes
+connected at 12:04 PM CT.*
 
 - **Chase's account:** created at 2:06 AM CT on live Supabase Auth ("Your account" above). Checked live the same minute:
   the right password signs in, a wrong one is refused (`invalid_credentials`).
-- **The gateway:** `ottoq-agent-gateway` v2, deployed at 2:23 AM CT (`edge-functions/_MANIFEST.md` footnote 10). Read
+- **The gateway:** `ottoq-agent-gateway` v2, deployed at 2:23 AM CT (`edge-functions/_MANIFEST.md` footnote 13). Read
   back from the API: all five files byte-identical to the repository. The passcode door and agent keys answered as before.
 - **The migration:** 0700 applied at 6:14 AM CT, version `20261010111411`. The stored statement is the committed file,
   byte for byte (md5 `8ea4dea3`, 131,578 characters). P0-P2, V1 and V2 passed inside the apply.
@@ -502,9 +502,17 @@ connects when Chase runs step 2.
 
   Every step is a row in the call ledger (`oauth.*` and `web` transports). The test connection stays in "Your agents" as
   disconnected, because connections are kept as evidence.
-- **Not yet:** www.ottoyard.com serves the sign-in metadata and `/connect` only once OTTOYARD-SITE #1 merges. Until then
-  `/.well-known/oauth-authorization-server` answers 404 there, and Hermes's discovery needs it. After the merge: the
-  smoke without `SKIP_SITE` (it also checks that the site's metadata is exactly the gateway's), then Chase's own Hermes.
+- **The site:** OTTOYARD-SITE #1 merged at 10:08 AM CT. www.ottoyard.com answered 404 on both
+  `/.well-known/oauth-authorization-server` and `/connect` at 10:09:13 AM CT and 200 on both at 10:09:30 AM CT.
+- **The live smoke with the site** (no `SKIP_SITE`), 10:09:35-10:09:45 AM CT, **16 of 16**: the 14 above, plus the
+  issuer serving the authorization server's metadata with no redirect (200), and the site's metadata exactly the
+  gateway's.
+- **Chase's own Hermes:** connected by device code at 12:04 PM CT, as "Hermes Agent", and still connected. From then to
+  7:01 PM CT on 2026-10-13 the call ledger holds 1,659 calls from it, every one OK:
+  - 79 at the token endpoint: the sign-in that connected it, then a renewal about once an hour;
+  - 1,571 MCP pings, about one every three minutes;
+  - 3 connections (initialize, notifications/initialized, tools/list each time);
+  - no tool calls yet: it is connected and has not yet asked about the cars.
 
 ## Sources (external facts; read 2026-10-03 unless marked)
 
