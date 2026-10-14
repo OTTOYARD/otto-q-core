@@ -553,6 +553,20 @@ jobs:
             tests/test_asset_depth_sql.py tests/test_world_advance_parity_sql.py tests/test_production_start_world_sql.py \
             tests/test_certification_probe_sql.py tests/test_run_end_dispatch_sql.py
 
+      # 0701, G428: the signing key, the three signers, the purge and the audit writers closed to the browser roles,
+      # executed on a stub carrying the live resolver and signers and asked as each role what it can do; service_role
+      # and a SECURITY DEFINER engine caller still sign byte for byte. It had no executed step and skipped in the pytest
+      # step like the thirteen above.
+      - name: The signing key and the engine's destructive doors are closed to the browser roles, executed (0701 against the live bodies)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_signing_grants_sql.py
+
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.
       #
