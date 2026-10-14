@@ -277,7 +277,7 @@ INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, obje
 SELECT '0720_pre', 'function', 'public', f.sig, d.def, md5(d.def)
   FROM (VALUES ('ottoq_run_blackbox(uuid)'), ('ottoq_run_blackbox_meta(uuid)')) AS f(sig)
   CROSS JOIN LATERAL (SELECT pg_get_functiondef(('public.' || f.sig)::regprocedure) AS def) d
- ORDER BY f.sig;
+ ORDER BY f.sig COLLATE "C";
 
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
 SELECT '0720_pre', 'grant', 'public', g.sig || '::' || g.grantee, g.stmt, md5(g.stmt)
@@ -288,8 +288,8 @@ SELECT '0720_pre', 'grant', 'public', g.sig || '::' || g.grantee, g.stmt, md5(g.
           FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a
          WHERE p.oid IN ('public.ottoq_run_blackbox(uuid)'::regprocedure, 'public.ottoq_run_blackbox_meta(uuid)'::regprocedure)
            AND a.privilege_type = 'EXECUTE'
-           AND (a.grantee = 0 OR a.grantee IN ('anon'::regrole, 'authenticated'::regrole))
-         ORDER BY 1, 2) g;
+           AND (a.grantee = 0 OR a.grantee IN ('anon'::regrole, 'authenticated'::regrole))) g
+ ORDER BY g.sig COLLATE "C", g.grantee COLLATE "C";   -- byte order: the snapshot_id order is the same on every cluster
 
 -- ── the change: closed to PUBLIC and the browser roles, kept for the platform ──
 REVOKE EXECUTE ON FUNCTION public.ottoq_run_blackbox(uuid), public.ottoq_run_blackbox_meta(uuid) FROM PUBLIC, anon, authenticated;
