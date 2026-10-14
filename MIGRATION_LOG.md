@@ -780,8 +780,9 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0718](db/migrations/0718_production_runs_the_world_phases_the_twin_certifies.sql) | `20261013210801` | yes — ledger | **Production's world step runs the three phases the certified world runs and it never did.** (G436; the |
 | [0719](db/migrations/0719_production_start_takes_the_world_as_the_operator_door_does.sql) | `20261013211005` | yes — ledger | **A production start takes the world from research work, as the operator door does.** (G437; the study's |
 | [0720](db/migrations/0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql) | `PENDING` | no — pending | **A signed-in user can no longer call the two Black Box export functions through /rest/v1/rpc; the same user |
+| [0722](db/migrations/0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql) | `PENDING` | no — pending | **The key that signs every event, SDR and audit bundle is rotated, and every row the old key signed still verifies |
 | [0723](db/migrations/0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql) | `PENDING` | no — pending | **A charge's closing frames name the charger that sent them, so the charger back end can hear a charge end.** |
 
-543 migrations indexed.
+544 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
