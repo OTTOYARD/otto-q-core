@@ -1,17 +1,22 @@
-"""db/migrations/0720, the Black Box's second door closed to the browser roles, EXECUTED on a stub.
+"""db/migrations/0720, the Black Box export functions closed to the browser roles, EXECUTED on a stub.
 
 WHY THIS EXISTS. G435 (b), db/checks/0446 §5 (a): public.ottoq_run_blackbox(uuid) and ottoq_run_blackbox_meta(uuid) are
 SECURITY DEFINER and executable by `authenticated`, and sign-up is open, so anyone who signs up could pull a whole run and
-the engine's source through /rest/v1/rpc without the edge function PR #243 locks. A grant change cannot be proved by
-reading it, so this suite runs the file on a stub carrying both LIVE definitions (md5-pinned) and both LIVE ACLs, and asks
-the database, as each role, what it can do:
+the engine's source in one call through /rest/v1/rpc without the edge function PR #243 locks. A grant change cannot be
+proved by reading it, so this suite runs the file on a stub carrying both LIVE definitions (md5-pinned), both LIVE ACLs,
+and the LIVE grants and row-security policies of the relations the stub holds, and asks the database, as each role, what
+it can do:
 
   * before: a signed-in caller gets the whole bundle of a run (the defect, reproduced); the public key does not;
   * after: authenticated and anon are refused both with SQLSTATE 42501, and service_role, the edge function's role,
     still gets the bundle, byte for byte the same data; neither definition moved;
   * the file refuses a second run, a hotfixed definition, a moved ACL, a function or a view that calls the export, and
     a certification in flight; a mention in a comment is not a call;
-  * its restore statements put both ACLs back exactly; the lineage row is FALSE/FALSE.
+  * its restore statements put both ACLs back exactly; the lineage row is FALSE/FALSE;
+  * WHAT IT LEAVES OPEN, recorded rather than assumed away (G438): the same signed-in caller reads ottoq_decisions,
+    ottoq_sim_runs, stalls and ottoq_schema_snapshots as tables, before the file and after it, as on live. What the file
+    takes is what only the RPC gave: ottoq_owner_commands (no table grant), vehicles and ocpp_sessions (row security
+    gives that caller none) and the current engine source.
 
 Loads tests/fixtures/blackbox_rpc_grants_stub.sql. SKIPS where no scratch PostgreSQL is reachable.
 """
@@ -27,7 +32,8 @@ sys.path.insert(0, os.path.join(ROOT, "tests"))
 from test_v2_door_sql import _conn_args, _drop, _new_db, _server_up  # noqa: E402
 
 STUB = os.path.join(ROOT, "tests", "fixtures", "blackbox_rpc_grants_stub.sql")
-MIG = os.path.join(ROOT, "db", "migrations", "0720_a_signed_in_user_cannot_pull_a_runs_black_box_through_the_api.sql")
+MIG = os.path.join(ROOT, "db", "migrations", "0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql")
+NAME = "0720_a_signed_in_user_cannot_call_the_black_box_export_functions"
 
 pytestmark = pytest.mark.skipif(not _server_up(), reason="no scratch PostgreSQL reachable (PGHOST or /var/tmp:55432)")
 
@@ -65,6 +71,35 @@ def _refused(db, role, sql):
     return (not ok) and "42501" in err and "permission denied for function" in err
 
 
+#: the claims PostgREST sets for a person who has just signed up: role authenticated, a user id no staff, fleet or
+#: retail row names
+SIGNED_IN = 'SET LOCAL request.jwt.claims TO \'{"role": "authenticated", "sub": "e0000000-0000-4000-8000-000000000720"}\''
+#: what a caller reads through /rest/v1/<relation>, one count per relation the stub holds
+TABLE_DOOR = {
+    "ottoq_decisions": "SELECT count(*) FROM public.ottoq_decisions",
+    "ottoq_sim_runs": "SELECT count(*) FROM public.ottoq_sim_runs",
+    "stalls": "SELECT count(*) FROM public.stalls",
+    "vehicles": "SELECT count(*) FROM public.vehicles",
+    "ocpp_sessions": "SELECT count(*) FROM public.ocpp_sessions",
+    "ottoq_owner_commands": "SELECT count(*) FROM public.ottoq_owner_commands",
+    "ottoq_schema_snapshots(0720_pre functions)":
+        "SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0720_pre' AND object_kind = 'function'",
+}
+
+
+def _table_door(db, role, claims=""):
+    """{relation: row count, or 'refused' on 42501} as a role, with the JWT claims PostgREST would set."""
+    seen = {}
+    for rel, sql in TABLE_DOOR.items():
+        ok, out, err = _as(db, role, f"{claims}; {sql}" if claims else sql)
+        if ok:
+            seen[rel] = int(out)
+        else:
+            assert "42501" in err and "permission denied for table" in err, err
+            seen[rel] = "refused"
+    return seen
+
+
 def _load(extra_sql=None):
     d = _new_db()
     rc, err = d.file(STUB)
@@ -84,6 +119,8 @@ def db():
         d.before["anon_bundle"] = _refused(d, "anon", BUNDLE)
         d.before["anon_meta"] = _refused(d, "anon", META)
         d.before["svc_bundle"] = _as(d, "service_role", BUNDLE)
+        d.before["door_signed_in"] = _table_door(d, "authenticated", SIGNED_IN)
+        d.before["door_anon"] = _table_door(d, "anon")
         rc, err = d.file(MIG)
         assert rc == 0, f"0720 did not apply on the stub: {err}"
         d.notices = err
@@ -108,13 +145,18 @@ def test_before_a_signed_in_caller_pulls_the_whole_run(db):
     assert bundle["sim_run_id"] == RUN and bundle["run"]["depot_id"] == "11111111-1111-1111-1111-111111111111"
     assert len(bundle["data"]["ottoq_decisions"]) == 2 and len(bundle["data"]["vehicles"]) == 2
     assert len(bundle["data"]["stalls"]) == 1 and len(bundle["data"]["ocpp_sessions"]) == 1
-    assert "ottoq_run_blackbox" in bundle["executed_code"]              # and the engine's source with it
+    assert len(bundle["data"]["ottoq_owner_commands"]) == 1
+    assert "ottoq_run_blackbox" in bundle["executed_code"]              # and the engine's current source with it
     ok, out, err = db.before["auth_meta"]
     assert ok, err
     meta = json.loads(out)
     assert meta["run"]["sim_run_id"] == RUN and "ottoq_decisions" in meta["data_tables"]
-    # the same caller holds no table privilege: the functions are the whole door
-    assert _as(db, "authenticated", "SELECT count(*) FROM public.ottoq_decisions")[0] is False
+    # part of that the same caller cannot get as a table: the RPC was the only door to these, as on live
+    door = db.before["door_signed_in"]
+    assert door["ottoq_owner_commands"] == "refused"                    # no table grant
+    assert door["vehicles"] == 0 and door["ocpp_sessions"] == 0         # row security gives a new sign-up none
+    # and part it can: the functions were NOT the whole door (G438), so the file is not quoted as closing run data
+    assert door["ottoq_decisions"] == 2 and door["ottoq_sim_runs"] == 1 and door["stalls"] == 1
     # the public key was already refused before the file, as live
     assert db.before["anon_bundle"] and db.before["anon_meta"]
 
@@ -133,6 +175,26 @@ def test_after_the_browser_roles_are_refused_42501(db):
     for role in ("anon", "authenticated"):
         assert db.val(f"SELECT has_function_privilege('{role}', 'public.ottoq_run_blackbox(uuid)', 'EXECUTE')::text || "
                       f"has_function_privilege('{role}', 'public.ottoq_run_blackbox_meta(uuid)', 'EXECUTE')::text") == "falsefalse"
+
+
+def test_after_the_table_door_stays_open_exactly_as_before_g438(db):
+    """What 0720 does NOT close, as on live: a signed-in caller still reads these relations through /rest/v1/<relation>.
+
+    Every count is the same before the file and after it, except that the file's own '0720_pre' snapshot rows, both
+    export definitions, become readable to that caller through ottoq_schema_snapshots (row security off on live)."""
+    after = _table_door(db, "authenticated", SIGNED_IN)
+    before = dict(db.before["door_signed_in"])
+    assert before.pop("ottoq_schema_snapshots(0720_pre functions)") == 0
+    assert after.pop("ottoq_schema_snapshots(0720_pre functions)") == 2
+    assert after == before == {"ottoq_decisions": 2, "ottoq_sim_runs": 1, "stalls": 1, "vehicles": 0,
+                               "ocpp_sessions": 0, "ottoq_owner_commands": "refused"}
+    # the public key reads only 0658's allowlist entry, before and after
+    anon = _table_door(db, "anon")
+    assert anon == db.before["door_anon"]
+    assert anon["ottoq_decisions"] == 2 and anon["ottoq_sim_runs"] == "refused" and anon["stalls"] == "refused"
+    # without the claims (no JWT), auth.role() is NULL, so the role-keyed policy on ottoq_sim_runs returns nothing:
+    # the table door depends on the claims PostgREST sets, which is why the suite sets them
+    assert _table_door(db, "authenticated")["ottoq_sim_runs"] == 0
 
 
 def test_after_service_role_still_gets_the_same_bundle(db):
@@ -158,7 +220,7 @@ def test_it_refuses_a_second_run_and_classifies_itself_false_false(db):
     rc, err = db.file(MIG)
     assert rc != 0 and "0720 P1: 0720 has run already" in err, err
     assert db.val("SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage "
-                  "WHERE name = '0720_a_signed_in_user_cannot_pull_a_runs_black_box_through_the_api'") == "falsefalse"
+                  f"WHERE name = '{NAME}'") == "falsefalse"
     assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0720_pre'") == "4"
 
 

@@ -553,10 +553,11 @@ jobs:
             tests/test_asset_depth_sql.py tests/test_world_advance_parity_sql.py tests/test_production_start_world_sql.py \
             tests/test_certification_probe_sql.py tests/test_run_end_dispatch_sql.py
 
-      # 0720, G435 (b): the Black Box's second door. ottoq_run_blackbox(uuid) and ottoq_run_blackbox_meta(uuid) closed to
+      # 0720, G435 (b): the Black Box's RPC door. ottoq_run_blackbox(uuid) and ottoq_run_blackbox_meta(uuid) closed to
       # PUBLIC, anon and authenticated, kept for service_role (the edge function's role). Executed on a stub carrying both
-      # live definitions (md5-pinned) and both live ACLs, then asked as each role: a signed-in caller gets the whole run
-      # before and 42501 after; service_role gets the same bundle after; the restore statements put both ACLs back.
+      # live definitions (md5-pinned), both live ACLs and the live grants and policies of its relations, then asked as each
+      # role: a signed-in caller gets the whole run before and 42501 after; service_role gets the same bundle after; the
+      # restore statements put both ACLs back; and the table door 0720 leaves open (G438) reads the same before and after.
       - name: The Black Box export functions are closed to the browser roles, executed (0720 against the live bodies and ACLs)
         env:
           PGHOST: localhost

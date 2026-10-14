@@ -1,20 +1,33 @@
 -- migration-version: PENDING
--- migration-name:    a_signed_in_user_cannot_pull_a_runs_black_box_through_the_api
+-- migration-name:    a_signed_in_user_cannot_call_the_black_box_export_functions
 --
--- 0720  **The Black Box's second door is closed: a signed-in user can no longer pull a whole run, or the engine's source,
---        through /rest/v1/rpc.** public.ottoq_run_blackbox(uuid) and public.ottoq_run_blackbox_meta(uuid) are SECURITY
---        DEFINER and executable by `authenticated`, and public sign-up is open (FINDINGS G428), so anyone who signs up can
---        read every run through PostgREST without going near the edge function that PR #243 locks. This file takes
---        EXECUTE on both from PUBLIC, anon and authenticated. service_role keeps both, and service_role is how the edge
---        function calls the meta read. (FINDINGS G435 (b); db/checks/0446 §5 (a).)
+-- 0720  **A signed-in user can no longer call the two Black Box export functions through /rest/v1/rpc; the same user
+--        still reads most of a run, table by table, through /rest/v1/<relation> (§2 NOT CHANGED, FINDINGS G438).**
+--        public.ottoq_run_blackbox(uuid) and public.ottoq_run_blackbox_meta(uuid) are SECURITY DEFINER and executable by
+--        `authenticated`, and public sign-up is open (FINDINGS G428), so anyone who signs up can pull a whole run in one
+--        call, with the engine's source, through PostgREST without going near the edge function that PR #243 locks.
+--        This file takes EXECUTE on both from PUBLIC, anon and authenticated. service_role keeps both, and service_role
+--        is how the edge function calls the meta read. (FINDINGS G435 (b); db/checks/0446 §5 (a).)
 --        Measured read-only on the live catalog on 2026-10-14, from 14:49:46 UTC (9:49 AM CT, the first query's own
---        now()) to 14:59:52 UTC (9:59 AM CT, the last query's own now()). The P0/P1 dry run is in §5.
+--        now()) to 14:59:52 UTC (9:59 AM CT, the last query's own now()); §2's table door from 16:34:47 UTC (11:34 AM
+--        CT) to 16:37:57 UTC (11:37 AM CT), the same way. The P0/P1 dry run is in §5.
 --
 -- ══ §0 STATUS: WRITTEN AND EXECUTED ON A STUB; NOT APPLIED ══════════════════════════════════════════════════════════
 --
---   tests/test_blackbox_rpc_grants_sql.py runs this file on a stub that carries both live bodies (md5-pinned) and both
---   live ACLs. Before the file, a signed-in caller gets the whole bundle. After it, both functions refuse authenticated
---   and anon with 42501, and service_role still gets the bundle.
+--   tests/test_blackbox_rpc_grants_sql.py runs this file on a stub that carries both live bodies (md5-pinned), both
+--   live ACLs, and the live grants and row-security policies of the five relations the stub holds. Before the file, a
+--   signed-in caller gets the whole bundle. After it, both functions refuse authenticated and anon with 42501, and
+--   service_role still gets the bundle. The suite also records what the file does not close: after it, the same
+--   signed-in caller still reads ottoq_decisions, ottoq_sim_runs and stalls as tables, exactly as before it.
+--   WHAT THIS FILE CLOSES, and nothing wider: the RPC door. Through it a signed-in caller got, in one call, (i) the
+--   current source of the 49 engine functions in `executed_code`, (ii) the depot's vehicles and charge sessions, which
+--   row security withholds as tables from a caller with no staff, fleet or retail row (§2), (iii) the 17 run-scoped
+--   relations it cannot read as tables at all (§2), and (iv) the rest of the run in a single request that first sets a
+--   150 s statement timeout.
+--   WHAT IT DOES NOT CLOSE: the table door. 76 of the 93 run-scoped relations the export reads stay open to a
+--   signed-in caller through /rest/v1/<relation>, ottoq_sim_runs and ottoq_telemetry_packets among them, and
+--   ottoq_schema_snapshots holds earlier versions of 45 of the 49 function sources (§2). Do not quote this file as
+--   closing signed-in read access to run data. That is G438, OPEN.
 --   Applying it is a step of G435's deploy, which FINDINGS leaves to Chase. Its order against the deploy does not matter:
 --   the deployed v7 (index.ts:32,42 before #243) and #243's handler (_shared/run_blackbox.ts:150,160) both call
 --   ottoq_run_blackbox_meta with a client built from SUPABASE_SERVICE_ROLE_KEY, which is the service_role this file
@@ -33,8 +46,11 @@
 --         the run's row, its depot, the same 49 function sources, and the list of relations the export reads.
 --   (b) WHO MAY CALL THEM, AS READ. Both carry ACL {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}.
 --       anon: no (no grant and no PUBLIC entry). authenticated: yes. ottoq_sim_runs holds production_live runs beside
---       the twin's (9, 8 of them at the twin depot, read in the window), so this door would serve real vehicle
---       data once telemetry flows. Sign-up is open per G428 (the study read the Auth setting on 2026-10-13; no
+--       the twin's (9, 8 of them at the twin depot, read in the window), so once telemetry flows this door would hand a
+--       signed-in caller a production run whole, in one call, with the engine's current source. It is not the only
+--       door to that data: most of the same rows stay readable to the same caller through /rest/v1/<relation> (§2 NOT
+--       CHANGED, G438), so what this file removes is the one-call export and the parts §0 (i)-(iii) name, not
+--       signed-in read access to run data. Sign-up is open per G428 (the study read the Auth setting on 2026-10-13; no
 --       SQL path reads it, so it is not re-measured here), and the field-ops demo logins share one password in a public
 --       repo (G393/G394).
 --   (c) WHO CALLS THEM, MEASURED.
@@ -65,6 +81,38 @@
 --     - The 124 VOLATILE SECURITY DEFINER functions a browser role may still execute (db/checks/0438 (4)). These two
 --       are STABLE, so they are not in that census. 0701 (pending) neither touches them nor counts them, and in either
 --       apply order neither file's verification sees the other's change.
+--     - THE TABLE DOOR (FINDINGS G438, OPEN). Measured read-only on live, 2026-10-14 16:34:47-16:37:57 UTC (11:34-11:37
+--       AM CT), each query's own now(). The export reads 93 relations: those in public named ottoq% with a sim_run_id
+--       column (72 tables, 21 views). authenticated holds SELECT on 78 of them; on 2 of those row security has no
+--       policy for it, so 76 are open to a signed-in caller:
+--         * 67 return every row to anyone signed in: 31 tables with row security off (ottoq_stall_bookings,
+--           ottoq_visit_needs, ottoq_vehicle_itineraries, ottoq_recall_decisions, ottoq_comms_messages,
+--           ottoq_model_call_ledger and 25 more; about 4.30 million rows by reltuples), 13 views owned by postgres
+--           without security_invoker (postgres has BYPASSRLS), 18 tables under a SELECT policy USING (true)
+--           (ottoq_decisions, ottoq_decision_snapshots, ottoq_events, ottoq_agent_charge_orders, ...), and 5 under a
+--           policy every signed-in caller passes, auth.role() IN ('authenticated', 'service_role'): ottoq_sim_runs,
+--           ottoq_telemetry_packets, ottoq_ocpp_messages, ottoq_vehicle_dispatches, ottoq_vehicle_incidents;
+--         * 9 depend on the caller or on the tables beneath them: 7 security_invoker views read through their
+--           tables' row security; ottoq_rule_evaluations returns the rows with no fleet operator plus the caller's own;
+--           ottoq_vehicle_commands returns the caller's depot only (none to a caller with no staff_users row).
+--       The other 17 return nothing to a signed-in caller, which is what this file's REVOKE takes from the RPC: 15 with
+--       no grant (among them ottoq_owner_commands, ottoq_owner_settings, ottoq_agent_requests, ottoq_v2_inbox,
+--       ottoq_run_archives and ottoq_vehicle_wear) and 2 with row security on and no policy for authenticated
+--       (ottoq_service_detail_records, ottoq_rider_cleaning_flags). Of the depot's three, stalls is readable whole
+--       (policy "client keys read only" TO anon, authenticated USING (true)); vehicles returns only the caller's
+--       fleet's, retail membership's or depot's (none to someone who just signed up); ocpp_sessions has no policy for
+--       authenticated, so none.
+--       The engine's source: ottoq_schema_snapshots (row security off, SELECT to authenticated, none to anon) holds
+--       7,654 rows, 1,404 of them function definitions as they stood before a migration changed them, 625 function
+--       names in all and 45 of the 49 the export's executed_code returns. Those are earlier versions, not necessarily the
+--       current ones; the RPC handed over the current 49 in one call. This file's own 0720_pre rows (both export
+--       definitions and its GRANT statements) will be readable there too.
+--       How the door is used: PostgREST serves public (the twin app reads its tables through /rest/v1, 0658 §1), and
+--       the authenticator role carries statement_timeout 8s, so the table door reads a run one bounded request per
+--       relation at a time rather than in one call.
+--       The remedy is the authenticated-role census 0701 §2 defers ("the next file, after the signed-in UIs that use
+--       any of them are named"), carried to relations as 0658 did for anon: name every signed-in reader, then REVOKE
+--       the rest and default-deny new tables to authenticated.
 --
 -- ══ §3 forces_recert FALSE; forces_dial_restart FALSE ══════════════════════════════════════════════════════════════
 --
@@ -290,12 +338,13 @@ BEGIN
 END $vthree$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
-VALUES ('0720_a_signed_in_user_cannot_pull_a_runs_black_box_through_the_api', false, false,
+VALUES ('0720_a_signed_in_user_cannot_call_the_black_box_export_functions', false, false,
   'G435 (b), db/checks/0446 §5 (a): REVOKE EXECUTE FROM PUBLIC, anon and authenticated on ottoq_run_blackbox(uuid) and '
-  'ottoq_run_blackbox_meta(uuid), both SECURITY DEFINER, which gave anyone who signs up every run''s export and the '
-  'engine''s source through /rest/v1/rpc. service_role keeps both (the ottoq-run-blackbox edge function calls the meta '
-  'read as service_role). Privileges only; neither definition changes (V3); no tick, certification or cron path calls '
-  'either: FALSE/FALSE.',
+  'ottoq_run_blackbox_meta(uuid), both SECURITY DEFINER, which gave anyone who signs up a whole run and the engine''s '
+  'current source in one call through /rest/v1/rpc. Closes the RPC door only: 76 of the 93 run-scoped relations the '
+  'export reads stay open to a signed-in caller through /rest/v1/<relation> (§2, G438, OPEN). service_role keeps both '
+  '(the ottoq-run-blackbox edge function calls the meta read as service_role). Privileges only; neither definition '
+  'changes (V3); no tick, certification or cron path calls either: FALSE/FALSE.',
   now());
 
 COMMIT;

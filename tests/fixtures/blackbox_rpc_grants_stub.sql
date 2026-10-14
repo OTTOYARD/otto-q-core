@@ -5,10 +5,17 @@
 --     byte (decoded from base64 of pg_get_functiondef; md5 4f96d37ef15bcf3fac9a79023f99c729 and
 --     06ec6069b1f08a5ce51a18e2e2764123), and their LIVE ACLs, both
 --     {postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres};
---   * the relations their bodies read, cut down to the columns they name plus a few: ottoq_sim_runs, one run-scoped
---     table (ottoq_decisions), vehicles, stalls, ocpp_sessions; one stopped run at the twin depot with rows in each;
+--   * the relations their bodies read, cut down to the columns they name plus a few: ottoq_sim_runs, two run-scoped
+--     tables (ottoq_decisions, which a signed-in caller can read as a table, and ottoq_owner_commands, which it cannot),
+--     vehicles, stalls, ocpp_sessions; one stopped run at the twin depot with rows in each. Each carries its LIVE SELECT
+--     grants, row security and SELECT policies (read 2026-10-14 16:35:52 UTC, 11:35 AM CT; db/migrations/0720 §2), with
+--     auth.role(), auth.uid() and the three get_*_id() helpers the policies call, bodies as live. Live grants
+--     authenticated more than SELECT on some of them (rxtm, rDxtm on stalls); the stub mirrors SELECT, the privilege a
+--     read through /rest/v1/<relation> needs. So the stub has the table door 0720 leaves open (G438) as well as the RPC
+--     door it closes;
 --   * ottoq_blackbox_latest_run() with its live ACL (anon may execute it), which 0720 leaves alone;
---   * the bookkeeping 0720 writes (ottoq_schema_snapshots, ottoq_cert_lineage) and a settable in-flight probe.
+--   * the bookkeeping 0720 writes (ottoq_schema_snapshots, with its live SELECT grant to authenticated, and
+--     ottoq_cert_lineage) and a settable in-flight probe.
 -- Loads on a plain PostgreSQL 16 or 17 as a superuser named postgres.
 
 DO $roles$
@@ -28,6 +35,10 @@ CREATE TABLE public.ottoq_schema_snapshots (
   snapshot_id bigserial PRIMARY KEY, taken_at timestamptz NOT NULL DEFAULT now(), label text NOT NULL,
   object_kind text NOT NULL, schema_name text NOT NULL, object_name text NOT NULL, definition text NOT NULL,
   def_md5 text NOT NULL);
+-- live: row security off, SELECT to authenticated, none to anon (read 2026-10-14 16:35:26 UTC). It holds earlier
+-- versions of most engine functions' source, and 0720's own '0720_pre' rows land there.
+REVOKE ALL ON public.ottoq_schema_snapshots FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.ottoq_schema_snapshots TO authenticated;
 CREATE TABLE public.ottoq_cert_lineage (
   name text PRIMARY KEY, forces_recert boolean NOT NULL, forces_dial_restart boolean, note text NOT NULL,
   classified_at timestamptz NOT NULL);
@@ -36,19 +47,83 @@ INSERT INTO public.stub_in_flight VALUES (0);
 CREATE FUNCTION public.ottoq_certification_in_flight(p_include_dial boolean DEFAULT true)
 RETURNS integer LANGUAGE sql STABLE AS $f$ SELECT n FROM public.stub_in_flight LIMIT 1 $f$;
 
--- what the two bodies read. The browser roles hold no table privilege here, as live (0658 took them): whatever a
--- caller gets, it gets through the SECURITY DEFINER functions.
+-- the Supabase auth helpers the policies below call, bodies as live (auth.role() read 2026-10-14 16:35:52 UTC)
+CREATE SCHEMA IF NOT EXISTS auth;
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $f$
+  select
+  coalesce(
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role')
+  )::text
+$f$;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $f$
+  select
+  coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), ''),
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+  )::uuid
+$f$;
+-- who a signed-in caller is to the policies: live, each helper reads one table by auth.uid(). Someone who has just
+-- signed up has no row in any of the three, so each answers NULL for them.
+CREATE TABLE public.staff_users (auth_user_id uuid, depot_id uuid);
+CREATE TABLE public.fleet_operators (id uuid, auth_user_id uuid);
+CREATE TABLE public.retail_members (id uuid, auth_user_id uuid);
+CREATE FUNCTION public.get_staff_depot_id() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS
+  $f$ SELECT depot_id FROM staff_users WHERE auth_user_id = auth.uid() LIMIT 1; $f$;
+CREATE FUNCTION public.get_fleet_operator_id() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS
+  $f$ SELECT id FROM fleet_operators WHERE auth_user_id = auth.uid() LIMIT 1; $f$;
+CREATE FUNCTION public.get_retail_member_id() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS
+  $f$ SELECT id FROM retail_members WHERE auth_user_id = auth.uid() LIMIT 1; $f$;
+
+-- what the two bodies read, with each relation's LIVE SELECT grants, row security and SELECT policies (read 2026-10-14
+-- 16:35:52 UTC). 0658 took anon's table privileges except an allowlist (ottoq_decisions is on it); it did not touch
+-- authenticated's, so a signed-in caller reads most of these as tables whatever 0720 does to the functions.
 CREATE TABLE public.ottoq_sim_runs (
   sim_run_id uuid PRIMARY KEY, depot_id uuid NOT NULL, run_by text NOT NULL, status text NOT NULL,
   scenario_code text, started_at timestamptz NOT NULL, ended_at timestamptz, tick_count integer, demo_speed_x numeric);
 CREATE TABLE public.ottoq_decisions (
   decision_id bigserial PRIMARY KEY, sim_run_id uuid NOT NULL, vehicle_id uuid, decision_kind text NOT NULL);
+-- one of the 17 run-scoped relations a signed-in caller cannot read as a table (live ACL {postgres=arwdDxtm/postgres},
+-- row security on, no policy); before 0720 the bundle served it to that caller anyway
+CREATE TABLE public.ottoq_owner_commands (
+  command_id bigserial PRIMARY KEY, sim_run_id uuid NOT NULL, vehicle_id uuid, command text NOT NULL);
 CREATE TABLE public.vehicles (
-  id uuid PRIMARY KEY, name text NOT NULL, owning_sim_run_id uuid, current_depot_id uuid);
+  id uuid PRIMARY KEY, name text NOT NULL, owning_sim_run_id uuid, current_depot_id uuid, home_depot_id uuid,
+  fleet_operator_id uuid, retail_member_id uuid);
 CREATE TABLE public.stalls (id uuid PRIMARY KEY, depot_id uuid NOT NULL, stall_type text NOT NULL);
 CREATE TABLE public.ocpp_sessions (id uuid PRIMARY KEY, depot_id uuid NOT NULL, started_at timestamptz NOT NULL);
-REVOKE ALL ON public.ottoq_sim_runs, public.ottoq_decisions, public.vehicles, public.stalls, public.ocpp_sessions
-  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON public.ottoq_sim_runs, public.ottoq_decisions, public.ottoq_owner_commands, public.vehicles, public.stalls,
+  public.ocpp_sessions FROM PUBLIC, anon, authenticated;
+ALTER TABLE public.ottoq_sim_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ottoq_decisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ottoq_owner_commands ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stalls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ocpp_sessions ENABLE ROW LEVEL SECURITY;
+-- ottoq_sim_runs: authenticated=rxtm; "sim_runs_read" every signed-in caller passes
+GRANT SELECT ON public.ottoq_sim_runs TO authenticated;
+CREATE POLICY sim_runs_read ON public.ottoq_sim_runs FOR SELECT
+  USING (auth.role() = ANY (ARRAY['authenticated'::text, 'service_role'::text]));
+-- ottoq_decisions: authenticated=rxtm, anon=r (0658's allowlist); "p_decisions_read" USING (true)
+GRANT SELECT ON public.ottoq_decisions TO authenticated, anon;
+CREATE POLICY p_decisions_read ON public.ottoq_decisions FOR SELECT USING (true);
+-- stalls: authenticated=rDxtm; "client keys read only" TO anon, authenticated USING (true) (anon holds no grant)
+GRANT SELECT ON public.stalls TO authenticated;
+CREATE POLICY "Staff see own depot stalls" ON public.stalls FOR SELECT USING (depot_id = get_staff_depot_id());
+CREATE POLICY "client keys read only" ON public.stalls FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "service_role writes world state" ON public.stalls TO service_role USING (true);
+-- vehicles: authenticated=rm; only the caller's fleet's, retail membership's or depot's rows
+GRANT SELECT ON public.vehicles TO authenticated;
+CREATE POLICY "Fleet operators see own vehicles" ON public.vehicles FOR SELECT TO authenticated
+  USING (fleet_operator_id = ( SELECT get_fleet_operator_id() AS get_fleet_operator_id));
+CREATE POLICY "Retail members see own vehicles" ON public.vehicles FOR SELECT USING (retail_member_id = get_retail_member_id());
+CREATE POLICY "Staff see own depot vehicles" ON public.vehicles FOR SELECT
+  USING ((current_depot_id = get_staff_depot_id()) OR (home_depot_id = get_staff_depot_id()));
+CREATE POLICY "service_role writes world state" ON public.vehicles TO service_role USING (true);
+-- ocpp_sessions: authenticated=rxtm; the one policy is service_role's, so a signed-in caller reads no row
+GRANT SELECT ON public.ocpp_sessions TO authenticated;
+CREATE POLICY "Service role full access" ON public.ocpp_sessions TO service_role USING (true);
 
 INSERT INTO public.ottoq_sim_runs VALUES
   ('d0000000-0000-4000-8000-000000000720', '11111111-1111-1111-1111-111111111111', 'operator_demo', 'completed',
@@ -56,7 +131,9 @@ INSERT INTO public.ottoq_sim_runs VALUES
 INSERT INTO public.ottoq_decisions (sim_run_id, vehicle_id, decision_kind) VALUES
   ('d0000000-0000-4000-8000-000000000720', 'c0000000-0000-4000-8000-000000000001', 'stall_assignment'),
   ('d0000000-0000-4000-8000-000000000720', 'c0000000-0000-4000-8000-000000000002', 'charge_start');
-INSERT INTO public.vehicles VALUES
+INSERT INTO public.ottoq_owner_commands (sim_run_id, vehicle_id, command) VALUES
+  ('d0000000-0000-4000-8000-000000000720', 'c0000000-0000-4000-8000-000000000001', 'return_to_base');
+INSERT INTO public.vehicles (id, name, owning_sim_run_id, current_depot_id) VALUES
   ('c0000000-0000-4000-8000-000000000001', 'Waymo-AV-001', NULL, '11111111-1111-1111-1111-111111111111'),
   ('c0000000-0000-4000-8000-000000000002', 'Zoox-AV-002', NULL, '11111111-1111-1111-1111-111111111111');
 INSERT INTO public.stalls VALUES

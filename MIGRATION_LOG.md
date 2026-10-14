@@ -779,7 +779,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0717](db/migrations/0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql) | `20261013201139` | yes — ledger | **The agent's board calls a car's 80% a priority band, not a ready floor.** (G434; CLAUDE.md rule 9.) |
 | [0718](db/migrations/0718_production_runs_the_world_phases_the_twin_certifies.sql) | `20261013210801` | yes — ledger | **Production's world step runs the three phases the certified world runs and it never did.** (G436; the |
 | [0719](db/migrations/0719_production_start_takes_the_world_as_the_operator_door_does.sql) | `20261013211005` | yes — ledger | **A production start takes the world from research work, as the operator door does.** (G437; the study's |
-| [0720](db/migrations/0720_a_signed_in_user_cannot_pull_a_runs_black_box_through_the_api.sql) | `PENDING` | no — pending | **The Black Box's second door is closed: a signed-in user can no longer pull a whole run, or the engine's source, |
+| [0720](db/migrations/0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql) | `PENDING` | no — pending | **A signed-in user can no longer call the two Black Box export functions through /rest/v1/rpc; the same user |
 
 542 migrations indexed.
 
