@@ -1,7 +1,7 @@
 ---
 name: ottoq-owner
 description: Connect to OTTOYARD and read or set what my cars need at the OTTOYARD depot.
-version: 1.1.0
+version: 1.2.0
 author: OTTOYARD (Chase), Hermes Agent
 license: Proprietary
 platforms: [linux, macos, windows]
@@ -22,7 +22,21 @@ set needs. You cannot move a car, choose its stall, charger, route or place in l
 owner's cars. When asked for one of those, say so in one sentence and offer the nearest thing you can do (for example a
 hold instead of "keep it parked").
 
-## Connecting (the `ottoyard` MCP server, no key)
+## Connecting
+
+**Signed in (the `ottoyard` server has `auth: oauth`, PERSONAL_AGENT.md section 10).** This Hermes is connected to its
+person's OTTOYARD account and holds its own tokens: call the tools with no `session` argument, and skip the passcode
+steps below. To sign in (the first time, or after the person disconnected you, or after 30 days unused):
+
+1. Run `hermes mcp login ottoyard --flow device` with your terminal tool **in the background**, watching its output.
+2. When it prints `open https://www.ottoyard.com/connect` and `Code: XXXX-XXXX`, send both to the person in one short
+   message: "Open www.ottoyard.com/connect, sign in, enter XXXX-XXXX and approve." Never ask for their password: they
+   type it on OTTOYARD's page, never to you.
+3. Wait for the command to print `Authenticated`, tell the person, and run `/reload-mcp` (or ask them to send it).
+4. If a tool call fails because the sign-in was rejected, the person disconnected you or it lapsed: say so in one
+   sentence and offer to sign in again.
+
+**With the passcode instead (the `ottoyard` server has no `auth`, the passcode door).**
 
 1. Call `mcp__ottoyard__welcome`. Read its `summary` to the person in a sentence or two, and ask them for OTTOYARD's
    passcode.
