@@ -782,7 +782,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0720](db/migrations/0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql) | `PENDING` | no — pending | **A signed-in user can no longer call the two Black Box export functions through /rest/v1/rpc; the same user |
 | [0722](db/migrations/0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql) | `PENDING` | no — pending | **The key that signs every event, SDR and audit bundle is rotated, and every row the old key signed still verifies |
 | [0723](db/migrations/0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql) | `PENDING` | no — pending | **A charge's closing frames name the charger that sent them, so the charger back end can hear a charge end.** |
-| [0724](db/migrations/0724_the_runs_row_is_locked_without_its_key_and_taken_first_by_the_stop_door.sql) | `PENDING` | no — pending | **The live run's row is locked without its key, so a foreign-key check no longer waits for a tick; and the stop |
+| [0724](db/migrations/0724_the_stop_door_takes_the_runs_row_before_the_proposals.sql) | `PENDING` | no — pending | **The stop door takes the live run's row before the run's proposals, the order the metronome's beat takes them |
 
 545 migrations indexed.
 

@@ -1,22 +1,29 @@
--- tests/fixtures/tick_lock_stub.sql -- what 0724 meets. Seven definitions are the live ones of 2026-10-14
+-- tests/fixtures/tick_lock_stub.sql -- what 0724 meets. Eleven definitions are the live ones of 2026-10-14
 -- (pg_get_functiondef, byte for byte; tests/test_tick_lock_sql.py asserts each md5):
---   public.ottoq_sim_advance_tick_world(uuid)                              3e0ddbb1b097587bc2c0e9135d7895aa  (0724 patches)
---   public.ottoq_twin_inject_charger_fault(uuid,uuid,numeric,text)         0cd92ef247e8959fda68b2e6087bd944  (0724 patches)
---   twin.ottoq_report_charger_fault(uuid,text,text,text)                   a4339948b3520016e9979dc13faac605  (0724 patches)
+--   public.ottoq_sim_advance_tick_world(uuid)                              3e0ddbb1b097587bc2c0e9135d7895aa
+--   public.ottoq_twin_inject_charger_fault(uuid,uuid,numeric,text)         0cd92ef247e8959fda68b2e6087bd944
+--   twin.ottoq_report_charger_fault(uuid,text,text,text)                   a4339948b3520016e9979dc13faac605
 --   public.ottoq_sim_stop_and_reset(uuid,text)                             bc8ee182436dfcd6bd53f62547ad5d5e  (0724 patches)
 --   public.ottoq_sim_mark_stopped(uuid,text)                               d3325a7e94bc2791c5ebad11ae61a85d
 --   public.ottoq_dispose_external_proposals(uuid,bigint,timestamptz,boolean) 5ed4b74688e95d22736f3e4c6123e6a6
 --   public.ottoq_demo_metronome(integer)  (a procedure)                    d02b6af9e3fa622267247f7277ef7057
+--   public.ottoq_caller_identity()                                         9fc609c3613e62a79e40c2399b3f893d
+--   public.ottoq_submit_external_proposal(uuid,uuid,text,text,uuid,jsonb,text,integer)
+--                                                                          d19f166c1e280cb9bdc186f936f28d7c
+--   public.ottoq_proposer_submit_batch(uuid,uuid,text,jsonb,jsonb,integer) 8c78997969489b3c8e097eba41fadc13
+--   public.ottoq_capture_proposal_disposition()  (with its trigger, as live) 2d16c05a77ab1ad9b81780105fbfd78b
 -- Every function they call is a stub that writes its name to t_calls. The tables carry the columns those bodies read and
 -- write, and every run-scoped one carries its live foreign key to ottoq_sim_runs, which carries its live keys: the primary
 -- key sim_run_id, the unique sim_run_seq, and the partial unique index on a running run per depot (partial, so not a key
--- a row lock can see).
+-- a row lock can see). ottoq_proposer_fire_log and ottoq_proposal_disposition_ledger carry no foreign key, as live.
 --
--- public.ottoq_sim_decide_and_dispatch is NOT the live body. It stands in for the metronome's decide step at the moment
--- the database's log caught it on 2026-10-14 16:42:42 UTC: ottoq_decide_tick line 1228, UPDATE ottoq_external_proposals
--- SET status='enacted' for the run's pending proposals. When t_decide.door names an application, it first waits (at most
--- 20 s) until a backend of that name is waiting on a lock, so a test can put the door's wait inside the metronome's beat.
--- Used by tests/test_tick_lock_sql.py.
+-- public.ottoq_sim_decide_and_dispatch is NOT the live body. It stands in for the metronome's decide step: the kernel
+-- takes each car's newest pending proposal (read unlocked, as the live chooser ottoq_l2_external_proposal reads it) and
+-- writes an enacted decision of this tick, then runs ottoq_decide_tick lines 1226-1244 (A3) VERBATIM, line 1228 being the
+-- UPDATE the database's log caught at 16:42:42 UTC on 2026-10-14. Before A3: when t_decide.door names an application, it
+-- waits (at most 20 s) until a backend of that name is waiting on a lock, so a test can put the door's wait inside the
+-- beat; when t_decide.agent names one, it waits once per session until that agent has committed a newer proposal or is
+-- waiting on a lock, so a test can put a proposal batch inside the beat. Used by tests/test_tick_lock_sql.py.
 SET check_function_bodies = off;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
@@ -67,17 +74,36 @@ CREATE TABLE public.ottoq_tick_clock_log (sim_run_id uuid REFERENCES public.otto
 -- the agent's decision row, written through PostgREST: the insert c5f4ff34's 36 waits were measured on
 CREATE TABLE public.ottoq_decisions (decision_id bigserial PRIMARY KEY,
   sim_run_id uuid CONSTRAINT fk_ottoq_decisions_sim_run REFERENCES public.ottoq_sim_runs (sim_run_id),
-  resolved_action_context text, created_at timestamptz NOT NULL DEFAULT now());
+  resolved_action_context text, created_at timestamptz NOT NULL DEFAULT now(), tick_seq integer, entity_id uuid,
+  outcome_status text, enacted_action jsonb, action_context text);
 CREATE TABLE public.ottoq_external_proposals (proposal_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   sim_run_id uuid CONSTRAINT fk_ottoq_external_proposals_sim_run REFERENCES public.ottoq_sim_runs (sim_run_id),
   action_context text DEFAULT 'stall_assignment', entity_type text DEFAULT 'vehicle', entity_id uuid, source text,
   proposal jsonb DEFAULT '{}'::jsonb, status text DEFAULT 'pending', expires_at timestamptz,
-  created_at timestamptz DEFAULT now(), disposition_reason text, disposed_at timestamptz, disposed_tick bigint);
+  created_at timestamptz DEFAULT now(), disposition_reason text, disposed_at timestamptz, disposed_tick bigint,
+  depot_id uuid, declared_source text, submitted_by_role text, submitted_by uuid, tick_seq integer);
+-- the proposal path's other tables, with no foreign key to the run, as live
+CREATE TABLE public.ottoq_certified_proposers (source text PRIMARY KEY);
+CREATE TABLE public.ottoq_proposer_precedence (source text PRIMARY KEY, rank integer);
+CREATE TABLE public.ottoq_proposer_fire_log (fire_id bigserial PRIMARY KEY, sim_run_id uuid, depot_id uuid,
+  declared_source text, effective_source text, tick_seq integer, fired_at timestamptz DEFAULT now(), status text,
+  frame_hash text, n_vehicles integer, n_in_serviceable_state integer, n_rows integer, n_planned integer,
+  n_abstained integer, n_deferred integer, n_submitted integer, proposal_ids uuid[], solver jsonb, fire jsonb, error text);
+CREATE TABLE public.ottoq_proposal_disposition_ledger (disposition_id bigserial PRIMARY KEY, sim_run_id uuid,
+  proposal_id uuid, depot_id uuid, action_context text, entity_type text, entity_id uuid, source text,
+  proposer_rank integer, status text, disposition_reason text, abstained boolean, promotion_count integer,
+  promoted_from uuid, stall_id uuid, requested_kw numeric, proposal_created_at timestamptz, disposed_at timestamptz,
+  disposed_tick bigint, captured_at timestamptz DEFAULT now(), source_kind text);
+-- what ottoq_caller_identity reads: no JWT, so a psql session as postgres is 'system', as pg_cron's is live
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE
+  AS 'SELECT NULLIF(current_setting(''request.jwt.claim.role'', true), '''')';
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS 'SELECT NULL::uuid';
 
 CREATE TABLE public.t_calls (seq bigserial PRIMARY KEY, fn text NOT NULL, note text);
 CREATE TABLE public.t_tick_failures (seq bigserial PRIMARY KEY, sim_run_id uuid, phase text, message text, sqlstate text);
-CREATE TABLE public.t_decide (door text);
-INSERT INTO public.t_decide VALUES (NULL);
+CREATE TABLE public.t_decide (door text, agent text);
+INSERT INTO public.t_decide VALUES (NULL, NULL);
 
 CREATE FUNCTION public.ottoq_policy_get(uuid, text, numeric) RETURNS numeric LANGUAGE sql AS 'SELECT $3';
 CREATE FUNCTION public.ottoq_sim_advance_visit_atoms(uuid, timestamptz) RETURNS void LANGUAGE plpgsql AS $s$BEGIN INSERT INTO public.t_calls (fn) VALUES ('ottoq_sim_advance_visit_atoms'); END$s$;
@@ -136,13 +162,24 @@ CREATE FUNCTION public.ottoq_record_tick_failure(p_run uuid, p_phase text, p_mes
   VALUES (p_run, p_phase, p_message, p_sqlstate); END$s$;
 CREATE FUNCTION public.ottoq_cuopt_refresh(uuid) RETURNS bigint LANGUAGE plpgsql AS $s$
 BEGIN INSERT INTO public.t_calls (fn) VALUES ('ottoq_cuopt_refresh'); RETURN NULL; END$s$;
--- NOT the live body: the decide step's write the 16:42:42 UTC deadlock caught (ottoq_decide_tick line 1228)
+-- NOT the live body: the kernel's choice, the two waits, and then ottoq_decide_tick lines 1226-1244 VERBATIM (A3)
 CREATE FUNCTION public.ottoq_sim_decide_and_dispatch(p_sim_run_id uuid) RETURNS void LANGUAGE plpgsql AS $s$
-DECLARE v_door text := (SELECT door FROM public.t_decide); v_t0 timestamptz := clock_timestamp();
+DECLARE v_door text := (SELECT door FROM public.t_decide); v_agent text := (SELECT agent FROM public.t_decide);
+        v_t0 timestamptz := clock_timestamp(); v_tick integer; v_clock timestamptz; r record;
 BEGIN
   INSERT INTO public.t_calls (fn) VALUES ('ottoq_sim_decide_and_dispatch');
+  SELECT tick_count, sim_clock_current INTO v_tick, v_clock FROM ottoq_sim_runs WHERE sim_run_id = p_sim_run_id;
+  FOR r IN SELECT DISTINCT ON (p.entity_id) p.entity_id, p.source, p.proposal
+             FROM ottoq_external_proposals p
+            WHERE p.sim_run_id = p_sim_run_id AND p.status = 'pending'
+            ORDER BY p.entity_id, p.created_at DESC LOOP
+    INSERT INTO ottoq_decisions (sim_run_id, tick_seq, entity_id, outcome_status, enacted_action, action_context,
+                                 resolved_action_context)
+    VALUES (p_sim_run_id, v_tick, r.entity_id, 'enacted', r.proposal || jsonb_build_object('source', r.source),
+            'stall_assignment', 'stall_assignment');
+  END LOOP;
+  PERFORM set_config('application_name', 'ottoq_0724_metronome_in_decide', false);
   IF v_door IS NOT NULL THEN
-    PERFORM set_config('application_name', 'ottoq_0724_metronome_in_decide', false);
     WHILE NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = v_door AND wait_event_type = 'Lock') LOOP
       IF clock_timestamp() > v_t0 + interval '20 seconds' THEN
         RAISE EXCEPTION 'decide stub: no backend named % ever waited on a lock', v_door;
@@ -151,9 +188,39 @@ BEGIN
       PERFORM pg_stat_clear_snapshot();   -- pg_stat_activity is read once per transaction otherwise
     END LOOP;
   END IF;
-  UPDATE public.ottoq_external_proposals p
-     SET status = 'enacted', disposition_reason = 'enacted_by_kernel', disposed_at = clock_timestamp()
-   WHERE p.sim_run_id = p_sim_run_id AND p.status = 'pending';
+  IF v_agent IS NOT NULL AND current_setting('ottoq_test.agent_waited', true) IS DISTINCT FROM 'yes' THEN
+    PERFORM set_config('ottoq_test.agent_waited', 'yes', false);
+    LOOP
+      EXIT WHEN EXISTS (SELECT 1 FROM ottoq_external_proposals p
+                         WHERE p.sim_run_id = p_sim_run_id AND p.created_at > v_t0);
+      EXIT WHEN EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = v_agent AND wait_event_type = 'Lock');
+      IF clock_timestamp() > v_t0 + interval '20 seconds' THEN
+        RAISE EXCEPTION 'decide stub: the agent % never arrived', v_agent;
+      END IF;
+      PERFORM pg_sleep(0.05);
+      PERFORM pg_stat_clear_snapshot();
+    END LOOP;
+  END IF;
+
+  -- A3: close the external-proposal lifecycle for this tick — consumed
+  -- (entity got an enacted decision) → 'enacted'; past-freshness → 'expired'.
+  UPDATE ottoq_external_proposals p
+     SET status='enacted', disposition_reason='enacted_by_kernel',
+         disposed_at=clock_timestamp(), disposed_tick=v_tick
+   WHERE p.sim_run_id=p_sim_run_id AND p.status='pending'
+     AND EXISTS (SELECT 1 FROM ottoq_decisions d
+                  WHERE d.sim_run_id=p_sim_run_id AND d.tick_seq=v_tick
+                    AND d.entity_id=p.entity_id AND d.outcome_status='enacted'
+                    AND d.enacted_action->>'source' = p.source);
+  -- honest pre-emption: the entity was decided this tick, but NOT by this proposal
+  UPDATE ottoq_external_proposals p
+     SET status='superseded', disposition_reason='entity_decided_by_other_proposal',
+         disposed_at=clock_timestamp(), disposed_tick=v_tick
+   WHERE p.sim_run_id=p_sim_run_id AND p.status='pending'
+     AND EXISTS (SELECT 1 FROM ottoq_decisions d
+                  WHERE d.sim_run_id=p_sim_run_id AND d.tick_seq=v_tick
+                    AND d.entity_id=p.entity_id AND d.outcome_status='enacted');
+  PERFORM public.ottoq_dispose_external_proposals(p_sim_run_id, v_tick, v_clock, false);
 END$s$;
 
 -- NOT live bodies: the two shapes 0724's P2 reads in them. ottoq_decide_tick enacts the run's proposals by the UPDATE its
@@ -839,3 +906,242 @@ BEGIN
   END LOOP;
 END;
 $procedure$;
+
+-- the proposal path, live: who is calling, a proposal and a batch of them, and the evidence ledger's capture
+
+CREATE OR REPLACE FUNCTION public.ottoq_caller_identity()
+ RETURNS TABLE(trust text, jwt_role text, auth_uid uuid, db_session_user text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
+AS $function$
+  -- 0198. Who is calling, decided by the SERVER from what PostgREST or the
+  -- session actually established -- never from an argument.
+  --   system    : no JWT at all (pg_cron, a migration, psql as postgres) or
+  --               the service_role key (edge functions). Trusted to name
+  --               itself, and recorded as having done so.
+  --   operator  : the authenticated role with a real auth.uid().
+  --   anonymous : the anon key, or an authenticated JWT with no subject.
+  SELECT CASE
+           WHEN auth.role() IS NULL                                   THEN 'system'
+           WHEN auth.role() = 'service_role'                          THEN 'system'
+           WHEN auth.role() = 'authenticated' AND auth.uid() IS NOT NULL THEN 'operator'
+           ELSE 'anonymous'
+         END,
+         auth.role(),
+         auth.uid(),
+         session_user::text;
+$function$
+;
+CREATE OR REPLACE FUNCTION public.ottoq_submit_external_proposal(p_sim_run_id uuid, p_depot_id uuid, p_action_context text, p_entity_type text, p_entity_id uuid, p_proposal jsonb, p_source text DEFAULT 'external'::text, p_ttl_seconds integer DEFAULT 120)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
+AS $function$
+DECLARE
+  v_id uuid;
+  v_who RECORD;
+  v_source text;
+  v_role text;
+BEGIN
+  SELECT * INTO v_who FROM public.ottoq_caller_identity();
+
+  -- 0198. Identity is the server's to assign.
+  IF v_who.trust = 'anonymous' THEN
+    RAISE EXCEPTION 'OTTOQ_PROPOSAL_UNAUTHENTICATED: an anonymous caller cannot propose'
+      USING ERRCODE = '42501';
+  ELSIF v_who.trust = 'system' THEN
+    -- cron (postgres), a migration, or an edge function (service_role): the
+    -- declared source names the proposer (cuopt, ottoq_service_priority, ...).
+    v_source := COALESCE(NULLIF(p_source, ''), 'external');
+    v_role   := 'system:' || COALESCE(v_who.jwt_role, 'db:' || v_who.db_session_user);
+  ELSE
+    -- an operator: the source IS the operator, whatever the client typed.
+    v_source := 'operator:' || v_who.auth_uid::text;
+    v_role   := 'operator:authenticated';
+  END IF;
+
+  -- 0241 / POSTURE A (SOLVER_STATE.md 8.2; step 2 of the 8.3 sequence).
+  -- A certification arm hears only the proposers it was certified with.
+  -- 0105 and 0152 quiesce the proposers this repository owns; nothing
+  -- stopped an agent proposing into a cert run through this door, and if
+  -- one did the pair would report "failed" over fourteen hashes with no
+  -- hint that a stranger was in the room.
+  --
+  -- Checked on v_source, the SERVER-derived source, not on p_source: an
+  -- operator is 'operator:<uuid>' and can never be registered.
+  --
+  -- Refused BEFORE the supersede below, so a refused proposal cannot even
+  -- displace a pending one on its way out.
+  --
+  -- A REPLAY is unaffected and deliberately not on the registry:
+  -- ottoq_proposal_replay_inject (0237) writes the table directly and never
+  -- comes through here. Being a replay is its own admission, which keeps
+  -- Posture A and Posture B independent of each other.
+  IF EXISTS (SELECT 1 FROM public.ottoq_sim_runs r
+              WHERE r.sim_run_id = p_sim_run_id AND r.run_by = 'cert_harness')
+     AND NOT EXISTS (SELECT 1 FROM public.ottoq_certified_proposers cp
+                      WHERE cp.source = v_source) THEN
+    RAISE EXCEPTION 'OTTOQ_PROPOSAL_REFUSED_CERT: proposer % is not a certified proposer and run % is a certification arm (Posture A). Register it in ottoq_certified_proposers, or record the stream and replay it -- ottoq_proposal_replay_capture then ottoq_determinism_pair_replay.', v_source, p_sim_run_id
+      USING ERRCODE = '42501';
+  END IF;
+
+  UPDATE public.ottoq_external_proposals
+     SET status='superseded',
+         disposition_reason='newer_proposal_same_entity',
+         disposed_at=clock_timestamp(),
+         disposed_tick=(SELECT r.tick_count FROM public.ottoq_sim_runs r
+                         WHERE r.sim_run_id=p_sim_run_id)
+   WHERE sim_run_id=p_sim_run_id AND action_context=p_action_context
+     AND entity_type=p_entity_type AND entity_id=p_entity_id AND status='pending'
+     AND NOT (
+           public.ottoq_policy_get(p_sim_run_id, 'proposer_rank_protects_supersede', 0) >= 1
+       AND COALESCE((SELECT pp.rank FROM public.ottoq_proposer_precedence pp
+                      WHERE pp.source = public.ottoq_external_proposals.source), 2147483647)
+         < COALESCE((SELECT pp.rank FROM public.ottoq_proposer_precedence pp
+                      WHERE pp.source = v_source), 2147483647));
+  INSERT INTO public.ottoq_external_proposals
+    (sim_run_id,depot_id,action_context,entity_type,entity_id,proposal,source,status,expires_at,
+     declared_source, submitted_by_role, submitted_by, tick_seq)
+  VALUES (p_sim_run_id,p_depot_id,p_action_context,p_entity_type,p_entity_id,p_proposal,v_source,'pending',
+          now() + (p_ttl_seconds || ' seconds')::interval,
+          p_source, v_role, v_who.auth_uid,
+          -- 0236: the tick is the run's to state, not the caller's.
+          (SELECT r.tick_count FROM public.ottoq_sim_runs r
+            WHERE r.sim_run_id = p_sim_run_id))
+  RETURNING proposal_id INTO v_id;
+  RETURN v_id;
+END; $function$
+;
+CREATE OR REPLACE FUNCTION public.ottoq_proposer_submit_batch(p_sim_run_id uuid, p_depot_id uuid, p_source text, p_rows jsonb, p_fire jsonb, p_ttl_seconds integer DEFAULT 60)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
+AS $function$
+DECLARE
+  v_row     jsonb;
+  v_id      uuid;
+  v_ids     uuid[] := ARRAY[]::uuid[];
+  v_n       integer := 0;
+  v_status  text;
+  v_err     text;
+  v_tick    integer;
+  v_fire_id bigint;
+  v_eff     text;
+  v_fire    jsonb := COALESCE(p_fire, '{}'::jsonb);
+BEGIN
+  IF p_sim_run_id IS NULL OR p_depot_id IS NULL OR NULLIF(p_source, '') IS NULL THEN
+    RAISE EXCEPTION 'ottoq_proposer_submit_batch: sim_run_id, depot_id and source are all required'
+      USING ERRCODE = '22023';
+  END IF;
+  IF jsonb_typeof(COALESCE(p_rows, '[]'::jsonb)) <> 'array' THEN
+    RAISE EXCEPTION 'ottoq_proposer_submit_batch: p_rows must be a jsonb array, got %',
+                    jsonb_typeof(p_rows) USING ERRCODE = '22023';
+  END IF;
+  IF COALESCE(p_ttl_seconds, 0) < 1 THEN
+    RAISE EXCEPTION 'ottoq_proposer_submit_batch: p_ttl_seconds must be >= 1' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT r.tick_count INTO v_tick FROM public.ottoq_sim_runs r WHERE r.sim_run_id = p_sim_run_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'ottoq_proposer_submit_batch: run % does not exist', p_sim_run_id
+      USING ERRCODE = '22023';
+  END IF;
+
+  -- THE BATCH IS ONE SUB-TRANSACTION. A refusal on row k rolls back rows 1..k-1
+  -- too: a half-submitted plan is not a plan, and the ledger row says exactly
+  -- what happened instead of raising past the caller.
+  BEGIN
+    FOR v_row IN SELECT value FROM jsonb_array_elements(COALESCE(p_rows, '[]'::jsonb)) LOOP
+      v_id := public.ottoq_submit_external_proposal(
+                p_sim_run_id, p_depot_id,
+                v_row->>'action_context', v_row->>'entity_type',
+                (v_row->>'entity_id')::uuid, v_row->'proposal',
+                p_source, p_ttl_seconds);
+      v_ids := v_ids || v_id;
+      v_n := v_n + 1;
+    END LOOP;
+    v_status := CASE WHEN v_n = 0 THEN 'empty' ELSE 'submitted' END;
+  EXCEPTION WHEN OTHERS THEN
+    v_ids := ARRAY[]::uuid[];
+    v_n := 0;
+    v_err := SQLSTATE || ': ' || SQLERRM;
+    v_status := CASE WHEN SQLERRM LIKE 'OTTOQ_PROPOSAL_REFUSED_CERT%'
+                       OR SQLERRM LIKE 'OTTOQ_PROPOSAL_UNAUTHENTICATED%'
+                     THEN 'refused' ELSE 'error' END;
+  END;
+
+  -- The SERVER-derived source (0198), read back from the first receipt.
+  IF v_n > 0 THEN
+    SELECT p.source INTO v_eff FROM public.ottoq_external_proposals p WHERE p.proposal_id = v_ids[1];
+  END IF;
+
+  INSERT INTO public.ottoq_proposer_fire_log
+    (sim_run_id, depot_id, declared_source, effective_source, tick_seq, status,
+     frame_hash, n_vehicles, n_in_serviceable_state, n_rows, n_planned, n_abstained,
+     n_deferred, n_submitted, proposal_ids, solver, fire, error)
+  VALUES
+    (p_sim_run_id, p_depot_id, p_source, v_eff, v_tick, v_status,
+     v_fire->>'frame_hash',
+     (v_fire->>'n_vehicles')::int, (v_fire->>'n_in_serviceable_state')::int,
+     jsonb_array_length(COALESCE(p_rows, '[]'::jsonb)),
+     (v_fire->>'n_planned')::int, (v_fire->>'n_abstained')::int, (v_fire->>'n_deferred')::int,
+     v_n, v_ids, v_fire->'solver', v_fire, v_err)
+  RETURNING fire_id INTO v_fire_id;
+
+  RETURN jsonb_build_object(
+    'fire_id', v_fire_id, 'status', v_status, 'submitted', v_n,
+    'proposal_ids', to_jsonb(v_ids), 'tick_seq', v_tick,
+    'effective_source', v_eff, 'error', v_err);
+END
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.ottoq_capture_proposal_disposition()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  --: Only a transition INTO a terminal status is an outcome. A pending row that
+  --: is rewritten by promotion (0358) is not a disposition and must not be
+  --: counted as one.
+  IF NEW.status IS NOT DISTINCT FROM OLD.status
+     OR NEW.status = 'pending' THEN
+    RETURN NEW;
+  END IF;
+
+  INSERT INTO public.ottoq_proposal_disposition_ledger
+    (sim_run_id, proposal_id, depot_id, action_context, entity_type, entity_id,
+     source, proposer_rank, status, disposition_reason, abstained,
+     promotion_count, promoted_from, stall_id, requested_kw,
+     proposal_created_at, disposed_at, disposed_tick, source_kind)
+  VALUES
+    (NEW.sim_run_id, NEW.proposal_id, NEW.depot_id, NEW.action_context,
+     NEW.entity_type, NEW.entity_id, NEW.source,
+     --: frozen at capture, on purpose -- see the table comment
+     (SELECT pp.rank FROM public.ottoq_proposer_precedence pp WHERE pp.source = NEW.source),
+     NEW.status, NEW.disposition_reason,
+     COALESCE(NEW.proposal->>'abstain', '') IN ('true','t','1'),
+     NULLIF(NEW.proposal->>'promotion_count','')::integer,
+     NULLIF(NEW.proposal->>'promoted_from','')::uuid,
+     NULLIF(NEW.proposal->>'stall_id','')::uuid,
+     CASE WHEN (NEW.proposal->>'requested_kw') ~ '^[0-9]+(\.[0-9]+)?$'
+          THEN (NEW.proposal->>'requested_kw')::numeric END,
+     NEW.created_at, NEW.disposed_at, NEW.disposed_tick, 'live');
+
+  RETURN NEW;
+
+--: SWALLOWED ON PURPOSE. This fires on the disposition path, which runs inside
+--: decide_tick. APPLYING.md: a failure there must never abort the tick, because a
+--: rolled-back tick reads as "succeeded" in cron and produces zero stall
+--: assignments. A missing evidence row is a gap; a rolled-back tick is an outage.
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING '0364 capture_proposal_disposition: % %', SQLSTATE, SQLERRM;
+  RETURN NEW;
+END $function$
+;
+CREATE TRIGGER ottoq_capture_proposal_disposition_trg AFTER UPDATE OF status ON public.ottoq_external_proposals FOR EACH ROW EXECUTE FUNCTION ottoq_capture_proposal_disposition();
