@@ -10,7 +10,8 @@
 --        is how the edge function calls the meta read. (FINDINGS G435 (b); db/checks/0446 §5 (a).)
 --        Measured read-only on the live catalog on 2026-10-14, from 14:49:46 UTC (9:49 AM CT, the first query's own
 --        now()) to 14:59:52 UTC (9:59 AM CT, the last query's own now()); §2's table door from 16:34:47 UTC (11:34 AM
---        CT) to 16:37:57 UTC (11:37 AM CT), the same way. The P0/P1 dry run is in §5.
+--        CT) to 16:37:57 UTC (11:37 AM CT), the same way, and re-read unchanged at 17:34 UTC (12:34 PM CT). The P0/P1
+--        dry run is in §5.
 --
 -- ══ §0 STATUS: WRITTEN AND EXECUTED ON A STUB; NOT APPLIED ══════════════════════════════════════════════════════════
 --
@@ -113,6 +114,11 @@
 --       The remedy is the authenticated-role census 0701 §2 defers ("the next file, after the signed-in UIs that use
 --       any of them are named"), carried to relations as 0658 did for anon: name every signed-in reader, then REVOKE
 --       the rest and default-deny new tables to authenticated.
+--       RE-READ 2026-10-14 17:34:00-17:34:36 UTC (12:34 PM CT), each query's own now(), the same way: every count above
+--       unchanged (93 = 72 + 21; 78 granted; 31 + 13 + 18 + 5 every row, 7 + 2 caller-dependent, 2 with no policy, 15
+--       with no grant; 7,654 snapshot rows, 1,404 function definitions, 625 schema-qualified names, 45 of 49 sources;
+--       stalls, vehicles and ocpp_sessions policies as stated), except reltuples on the 31 tables, now about 4.31
+--       million. Both md5s and both ACLs still read as P1 pins them.
 --
 -- ══ §3 forces_recert FALSE; forces_dial_restart FALSE ══════════════════════════════════════════════════════════════
 --
