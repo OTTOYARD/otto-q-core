@@ -91,7 +91,7 @@ END $premises$;
 DO $ctx$
 BEGIN
   PERFORM set_config('ottoq.sim_run_id', 'none', true);
-  PERFORM set_config('ottoq.actor_type', 'migration', true);
+  PERFORM set_config('ottoq.actor_type', 'migration_script', true);   -- ottoq_events_actor_type_check's word (0561)
   PERFORM set_config('ottoq.actor_id', '0603', true);
 END $ctx$;
 

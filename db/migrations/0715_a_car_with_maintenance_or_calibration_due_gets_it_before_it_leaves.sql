@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261014144327
 -- migration-name:    a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves
 --
 -- 0715  **A car with preventive maintenance or calibration due gets it before it leaves.** CLAUDE.md rule 9 (Chase,
@@ -8,9 +8,10 @@
 --        test (which reads the visit's atoms), and leave with the interval still due. G218 / G181; the study's VF-1;
 --        measured by 0704's scouts on two runs today (db/checks/0440 §13).
 --
---        NOT APPLIED. It forces recertification, and on the twin's busy_day scenario, whose intervals are compressed
---        about a hundredfold, it makes the two service bays the depot's wall. Applying it is Chase's decision, beside the
---        scenario's intervals (§4).
+--        APPLIED 2026-10-14 14:43:27 UTC (9:43 AM CT), version 20261014144327, on Chase's decision that morning: "All
+--        services must be completed before vehicle leaves depot." It forces recertification, and on the twin's busy_day
+--        scenario, whose intervals are compressed about a hundredfold, it makes the two service bays the depot's wall.
+--        The compression is kept for now (the default §4 names); no owner exemption, per the same sentence.
 --
 -- ══ §1 WHY ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --

@@ -95,7 +95,7 @@ def test_hw005_passes_the_zoox_after_0603_and_still_refuses_a_real_second_task(d
     assert db.val("SELECT count(*) FROM public.schedule_tasks WHERE status = 'completed'") == "1"   # untouched
     # the change is on the record under no run and the migration's name
     assert db.val("""SELECT string_agg(DISTINCT run_ctx || '/' || actor_type || '/' || actor_id || '/' || new_status, ',')
-                       FROM public.stub_task_events""") == "none/migration/0603/cancelled"
+                       FROM public.stub_task_events""") == "none/migration_script/0603/cancelled"
     # a genuine pair of active tasks is still refused: the rule is untouched
     db.val(f"""INSERT INTO public.schedule_tasks (id, vehicle_id, status) VALUES
                  (gen_random_uuid(), '{ZOOX}', 'in_progress'), (gen_random_uuid(), '{ZOOX}', 'vehicle_en_route')""")
