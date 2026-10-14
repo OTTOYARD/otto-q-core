@@ -759,6 +759,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0697](db/migrations/0697_the_charger_back_end_hears_the_twins_chargers_through_a_relay.sql) | `PENDING` | no — pending | **OTTO-Q's charger back end gets its own credential, made on the machine it runs on, and through it reads the |
 | [0698](db/migrations/0698_a_new_visit_carries_the_work_the_visit_it_replaces_still_owes.sql) | `20261010113923` | yes — ledger | **A new visit carries the required work the visit it replaces still owes the car; nothing found is dropped.** |
 | [0699](db/migrations/0699_the_twin_apps_determinism_canon_card_reads_again.sql) | `20261010110724` | yes — ledger | **The twin app's determinism canon card reads again: the public key may call the one-timestamp function the |
+| [0700](db/migrations/0700_an_owner_signs_in_and_connects_their_own_agent.sql) | `20261010111411` | yes — ledger | **An owner signs in, and connects their own agent.** An OTTOYARD account (a Supabase Auth user of this |
 | [0701](db/migrations/0701_a_signed_in_user_cannot_read_the_signing_key_or_call_the_signers_or_purge.sql) | `PENDING` | no — pending | **Anyone who signs up could read the key that signs every event, SDR and audit bundle, sign anything with it, |
 | [0703](db/migrations/0703_every_agent_pass_keeps_what_it_saw_and_what_it_changed.sql) | `20261013150710` | yes — ledger | **Every agent pass keeps what it saw and what it changed.** An append-only evidence record per pass of the |
 | [0704](db/migrations/0704_every_car_has_a_deterministic_scout_and_the_agent_reads_what_they_find.sql) | `20261013151002` | yes — ledger | **Every car has a deterministic scout, and the agent reads what they find.** Six SQL scouts check each car's |
@@ -778,6 +779,6 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0718](db/migrations/0718_production_runs_the_world_phases_the_twin_certifies.sql) | `20261013210801` | yes — ledger | **Production's world step runs the three phases the certified world runs and it never did.** (G436; the |
 | [0719](db/migrations/0719_production_start_takes_the_world_as_the_operator_door_does.sql) | `20261013211005` | yes — ledger | **A production start takes the world from research work, as the operator door does.** (G437; the study's |
 
-539 migrations indexed.
+540 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
