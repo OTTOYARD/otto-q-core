@@ -10,7 +10,8 @@
 //                   over REST and MCP; only a fleet-bound token is offered the owner's tools.
 //   4. openapi      one public document, generated from the same catalog MCP serves, every $ref resolving.
 //   5. the door     POST /v1/ask with a scripted model: the owner's token is the only way in, dry_run is enforced in
-//                   code, the answer cannot claim what the receipts deny, failures are honest, confirm needs no model.
+//                   code, the answer ends with the changes block built from the receipts (0721: the only record of
+//                   what changed; the model's text is never screened), failures are honest, confirm needs no model.
 //   6. the model    the Anthropic call's shape (cached system prompt, tools) and every failure it can meet.
 //   7. hygiene      the door reaches OTTO-Q only through the gateway's call, and no model name is written in the repo.
 //   8. end to end   (skips without a server) the HTTP handler over the REAL 0559 + 0605 SQL against the stub engine.
@@ -479,7 +480,7 @@ test("the door: OTTO-Command calls the owner's tool with the owner's token, and 
   assert.equal(JSON.parse(result.content).outcome, "applied");
 });
 
-test("dry_run is enforced in code: every command goes out as a preview, and the answer cannot say it was done", async () => {
+test("dry_run is enforced in code: every command goes out as a preview, and the changes block says nothing changed", async () => {
   const { engine, calls } = ownerEngine();
   const { model, requests } = scriptedModel([use(["set_charge_limit", { vehicles: "all", percent: 90, mode: "apply" }]), say("Done. Your Teslas now charge to 90%.")]);
   const gw = gateway(engine, ownerAskHandler({ model }));
@@ -489,25 +490,38 @@ test("dry_run is enforced in code: every command goes out as a preview, and the 
   assert.ok(!("mode" in requests[0].tools.find((t) => t.name === "set_charge_limit").input_schema.properties));
   assert.match(requests[0].messages[0].content, /DRY RUN/);
   assert.equal(out.data.dry_run, true);
-  assert.match(out.data.answer, /^Preview only, nothing has changed/, out.data.answer);
+  // 0721 (the review, round 1): the model's text is never screened; what changed is the changes block, from the receipts
+  assert.equal(out.data.changes.made, false);
+  assert.deepEqual(out.data.changes.items.map((c) => [c.tool, c.outcome, c.command_id]), [["set_charge_limit", "previewed", out.data.actions[0].command_id]]);
+  assert.ok(out.data.answer.endsWith(`\n\n${out.data.changes.text}`), out.data.answer);
+  assert.match(out.data.changes.text, /^Changes: nothing was changed by this ask\. OTTO-Q's own receipts:\n- Preview only, nothing changed: set charge limit, 36 cars, command \S+\. A dry run applies nothing\.$/);
   assert.equal(out.data.actions[0].outcome, "previewed");
   assert.deepEqual(out.data.actions[0].confirm, { tool: "set_charge_limit", args: { vehicles: "all", percent: 90, mode: "apply", expect_plan_hash: HASH, note: WORDS } });
 });
 
-test("the answer cannot claim a change OTTO-Q refused, and an applied change always carries its link", async () => {
+test("a change OTTO-Q refused is refused in the changes block, whatever the model says; an applied change always carries its link", async () => {
   const { engine } = ownerEngine({ set_charge_limit: (args, n) => receipt("set_charge_limit", args, n, "refused") });
   const { model } = scriptedModel([use(["set_charge_limit", { vehicles: "all", percent: 50 }]), say("Done! Your cars are capped at 50%.")]);
   const out = await bodyOf(await ask(gateway(engine, ownerAskHandler({ model })), { text: "cap everything at 50%" }));
-  assert.match(out.data.answer, /^Not done: 50% is below the 80% minimum/);
+  // 0721 (the review, round 1): the model's text is shown as written, never screened by pattern; the changes block, built
+  // from OTTO-Q's receipts, is the only record of what changed, and here it says nothing did and why
+  assert.ok(out.data.answer.startsWith("Done! Your cars are capped at 50%."), out.data.answer);
+  assert.equal(out.data.changes.made, false);
+  assert.deepEqual(out.data.changes.items, [{ tool: "set_charge_limit", outcome: "refused", sent_to_ottoq: true,
+    command_id: out.data.actions[0].command_id, confirmation_code: null, cars: 36,
+    reason: "50% is below the 80% minimum in your contract. Choose 80% to 100%." }]);
+  assert.ok(out.data.answer.endsWith("\n\nChanges: nothing was changed by this ask. OTTO-Q's own receipts:\n" +
+    `- Refused, nothing changed: set charge limit, 36 cars, command ${out.data.actions[0].command_id}: 50% is below the 80% minimum in your contract. Choose 80% to 100%.`), out.data.answer);
   assert.equal(out.data.actions[0].ok, false);
   assert.equal(out.data.actions[0].error.code, "below_contract_minimum");
-  // unit: the same guard, and the link rule
+  // unit: the model's text stands as written, and the link rule
   const applied = [{ tool: "request_service", outcome: "applied", summary: "Done. x", link: `${LINK}&command=1` }];
   assert.equal(settleAnswer("Sorted, it is booked.", applied, false), `Sorted, it is booked.\nSee it in OrchestrAV: ${LINK}&command=1`);
   assert.equal(settleAnswer(`Done. ${LINK}&command=1`, applied, false), `Done. ${LINK}&command=1`);
-  assert.equal(settleAnswer("All set!", [{ ...applied[0], outcome: "previewed", summary: "Preview only." }], false), "Preview only.");
+  assert.equal(settleAnswer("All set!", [{ ...applied[0], outcome: "previewed", summary: "Preview only." }], false), "All set!",
+    "never screened: a preview adds no link, and the changes block says it was only a preview");
   assert.equal(settleAnswer("Done. All capped.", [{ ...applied[0], outcome: "previewed", summary: "Preview only, nothing has changed." }], true),
-    "Preview only, nothing has changed.", "in a dry run nothing is done, whatever the model says");
+    "Done. All capped.", "never screened in a dry run either: the changes block says nothing changed");
   assert.equal(settleAnswer("", [], false), "OTTO-Command has no answer to give.");
   assert.equal(receiptsText([{ tool: "hold_vehicle", summary: null, error: { message: "OTTO-Q did not answer." } }]), "Not done (hold vehicle): OTTO-Q did not answer.");
 });

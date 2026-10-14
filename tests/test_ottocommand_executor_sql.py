@@ -39,6 +39,14 @@ CLAUDE.md rules 9 and 10 bind hardest. None of what it promises is visible to a 
     person and outcome 'saved' (held by CHECK), and carried onto the next demo and production run as any saved row; a
     hold, a one-time order and an undo are refused needs_a_live_run, and a passcode session or an issued key no_live_demo
     with why (it names no person).
+  * the review, round 1 (the evening of 2026-10-14): the owner tables refuse every write that does not come from the
+    functions that make owner settings (each named for its own call by ottoq.owner_settings_writer): a plain INSERT,
+    UPDATE, DELETE or TRUNCATE on either table, as postgres and as service_role, and a write right after an owner command
+    in its own transaction; with the writer setting forged, each move is still refused unless it is that writer's own
+    (G1-G5); a one-time order never ends a saved every-return order (a new demo and a new production run carry it, and on
+    the run it is back once the one-time order is done); and the anon-readable cockpit boards show no production run's
+    settings or commands, no person's command made with no run live, no person's note, and no such command's id on a
+    demo run's carried setting.
 
 Loads the stub engines, 0559, 0560, 0605-0608, tests/fixtures/agent_signin_stub_auth.sql, 0700 and
 tests/fixtures/model_call_ledger_stub.sql (the live model ledger's bodies, md5-asserted) from their files, and
@@ -93,6 +101,11 @@ LIVE_MD5 = {
         "482dcde3ae386e07da3e8ebcf5188373",
     "public.ottoq_model_call_ledger_append_only()": "43eeb790fe779fb15bd06158f5e1ea16",
     "public.ottoq_model_call_outcome_class(text)": "05ce85781fc4c45a6cc991b9cea9dc25",
+    # §15 (the review, round 1; read 2026-10-14 21:03:34 UTC): the two cockpit boards, EXECUTE for anon
+    "public.ottoq_owner_board(uuid,uuid,uuid)": "84e756310bb785ea99bd434662fba37d",
+    "public.ottoq_depot_owner_board(uuid,integer)": "deb3c6e8b686ac79a6419099314fb3ae",
+    # §10 (the review, round 1; read 2026-10-14 23:09:53 UTC): the tick, named a writer of the owner tables, body unchanged
+    "ottoq.ottoq_owner_orders_tick(uuid,timestamp with time zone)": "5f01d0881bd65d80b155dba04033e09f",
 }
 
 
@@ -727,7 +740,9 @@ def test_the_registry_stays_clean_and_the_columns_are_evidence(post):
 def test_the_snapshot_holds_every_body_0721_replaced(post):
     rows = post.rows("SELECT object_name, def_md5 FROM ottoq_schema_snapshots WHERE label = '0721_pre' ORDER BY object_name")
     replaced = list(LIVE_MD5.items())[:5] + [(k, v) for k, v in LIVE_MD5.items()
-                                             if k.startswith(("public.ottoq_tg_lift_owner_settings_on_terminal", "public.ottoq_agent_public_call"))]
+                                             if k.startswith(("public.ottoq_tg_lift_owner_settings_on_terminal", "public.ottoq_agent_public_call",
+                                                              "public.ottoq_owner_board", "public.ottoq_depot_owner_board",
+                                                              "ottoq.ottoq_owner_orders_tick"))]
     assert rows == sorted([[k.split("(")[0].split(".")[1], v] for k, v in replaced])
 
 
@@ -1021,6 +1036,21 @@ def test_a_passcode_session_reads_no_saved_settings_and_no_persons_email(post):
     assert "Saved to your cars for every run, production included: 1 car charges to at most 85%." in own["summary"]
 
 
+def _refused(db, sql, why):
+    rc, _, err = db.run(sql, check=False)
+    assert rc != 0 and why in err, (sql, err)
+
+
+PLAIN_WRITE = "never by a plain write"
+
+
+def _refused_both(db, sql, why, writer="owner_command"):
+    """Refused twice over (§10): as a plain write, by the writer rule; and with the writer setting forged in the session, as
+    a writer function would carry it (a bug in a writer, or a session that sets it by hand), still by the per-move check."""
+    _refused(db, sql, PLAIN_WRITE)
+    _refused(db, f"SET ottoq.owner_settings_writer = '{writer}';\n{sql}", why)
+
+
 def test_the_settings_guard_refuses_what_no_applied_command_set(post):
     """Re-review item 10: below the door, whoever writes (the SQL editor and the Management API are postgres)."""
     chase = connect(post)["access_token"]
@@ -1037,23 +1067,27 @@ def test_the_settings_guard_refuses_what_no_applied_command_set(post):
             (TWIN, TESLA, AV041, 85, rid, "a refused command"),
             (TWIN, "22222222-2222-2222-2222-222222222222", AV041, 85, cid, "another fleet"),
             (TWIN, TESLA, AV041, 85, "00000000-0000-0000-0000-00000000c0de", "no command at all")):
-        rc, _, err = post.run(ins.format(run=run, depot=depot, fleet=fleet, car=car, pct=pct, cmd=cmd), check=False)
+        sql = ins.format(run=run, depot=depot, fleet=fleet, car=car, pct=pct, cmd=cmd)
+        _refused(post, sql, PLAIN_WRITE)
+        rc, _, err = post.run(f"SET ottoq.owner_settings_writer = 'owner_command';\n{sql}", check=False)
         assert rc != 0 and ("is not what an applied owner command set" in err or "violates foreign key" in err), (why, err)
     # on another run, only as the carry of a saved row this very command made
     other = fresh_run(post, keep_saved=True)
-    rc, _, err = post.run(f"INSERT INTO ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, "
-                          f"charge_limit_pct, command_id, set_at_sim) VALUES ('{other}', '{TWIN}', '{TESLA}', '{AV041}', "
-                          f"'charge_limit', 85, '{cid}', now())", check=False)
-    assert rc != 0 and "is not what an applied owner command set" in err, err
+    for writer in ("owner_command", "carry"):
+        _refused_both(post, f"INSERT INTO ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, "
+                            f"charge_limit_pct, command_id, set_at_sim) VALUES ('{other}', '{TWIN}', '{TESLA}', '{AV041}', "
+                            f"'charge_limit', 85, '{cid}', now())", "is not what an applied owner command set", writer)
     sid = post.val(f"SELECT setting_id FROM ottoq_owner_settings WHERE sim_run_id = '{other}' AND vehicle_id = '{AV041}' AND kind = 'charge_limit'")
     for sql, why in ((f"UPDATE ottoq_owner_settings SET charge_limit_pct = 50 WHERE setting_id = '{sid}'", "what was set is immutable"),
                      (f"UPDATE ottoq_owner_settings SET status = 'withdrawn', closed_at = now(), closed_reason = 'x' WHERE setting_id = '{sid}'",
-                      "replaced or withdrawn only by an applied owner command"),
+                      "replaced or withdrawn only by the applied owner command"),
                      (f"DELETE FROM ottoq_owner_settings WHERE setting_id = '{sid}'", "DELETE refused")):
-        rc, _, err = post.run(sql, check=False)
-        assert rc != 0 and why in err, (sql, err)
-    rc, _, err = post.run(f"UPDATE ottoq_owner_settings SET status = 'active' WHERE status = 'lifted' AND sim_run_id = '{run}'", check=False)
-    assert rc != 0 and "is not a change an owner command, the tick or the run's end makes" in err, err
+        if sql.startswith("DELETE"):
+            _refused(post, sql, why)
+        else:
+            _refused_both(post, sql, why)
+    _refused_both(post, f"UPDATE ottoq_owner_settings SET status = 'active' WHERE status = 'lifted' AND sim_run_id = '{run}'",
+                  "is not a change an owner command, the tick or the run's end makes")
     # the purge (ottoq.retention) still clears a run's settings, as ottoq_purge_prior_runs does
     rc, _, err = post.run(f"SET ottoq.retention = 'on'; DELETE FROM ottoq_owner_settings WHERE sim_run_id = '{run}'", check=False)
     assert rc == 0, err
@@ -1070,8 +1104,10 @@ def test_the_settings_guard_refuses_what_no_applied_command_set(post):
              "ended only by an applied owner command recorded under a person"),
             (f"DELETE FROM ottoq_owner_saved_settings WHERE command_id = '{cid}'", "DELETE refused"),
             ("TRUNCATE ottoq_owner_saved_settings CASCADE", "TRUNCATE")):
-        rc, _, err = post.run(sql, check=False)
-        assert rc != 0 and why in err, (sql, err)
+        if sql.startswith(("DELETE", "TRUNCATE")):
+            _refused(post, sql, why)
+        else:
+            _refused_both(post, sql, why)
     assert saved(post, AV041) == [(AV041, "charge_limit", "85")]
 
 
@@ -1361,14 +1397,323 @@ def test_the_saved_outcome_is_held_by_its_checks_and_the_guards_admit_it_only_wh
                      "('ottoq_owner_commands_mode_outcome_check', 'ottoq_owner_commands_saved_check')")
     assert "'saved'::text" in defs and "sim_run_id IS NULL" in defs, defs
     # the saved table refuses a row a 'saved' command did not set (another car, another value)
-    rc, _, err = post.run(f"INSERT INTO ottoq_owner_saved_settings (depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct, "
-                          f"command_id, acting_person) VALUES ('{TWIN}', '{TESLA}', '{AV041}', 'charge_limit', 86, '{cid}', '{EMAIL}')",
-                          check=False)
-    assert rc != 0 and "not what an applied command recorded under a person set" in err, err
+    _refused_both(post, f"INSERT INTO ottoq_owner_saved_settings (depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct, "
+                        f"command_id, acting_person) VALUES ('{TWIN}', '{TESLA}', '{AV041}', 'charge_limit', 86, '{cid}', '{EMAIL}')",
+                  "not what an applied command recorded under a person set")
     # and the run's settings refuse a row a 'saved' command names on a run other than as the carry of its saved row
-    rc, _, err = post.run(f"INSERT INTO ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, "
-                          f"charge_limit_pct, command_id, set_at_sim) VALUES ('{run}', '{TWIN}', '{TESLA}', '{AV045}', "
-                          f"'charge_limit', 86, '{cid}', now())", check=False)
-    assert rc != 0 and "not what an applied owner command set" in err, err
+    for writer in ("owner_command", "carry"):
+        _refused_both(post, f"INSERT INTO ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, "
+                            f"charge_limit_pct, command_id, set_at_sim) VALUES ('{run}', '{TWIN}', '{TESLA}', '{AV045}', "
+                            f"'charge_limit', 86, '{cid}', now())", "not what an applied owner command set", writer)
     assert carried(post, run) == [(AV045, "charge_limit", "86")]
     post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")
+
+
+# ───────────────────────────────────── the review, round 1: each owner-table move only from the writer that makes it ──
+
+def test_no_plain_write_reaches_the_owner_tables_as_postgres_or_service_role(post):
+    """The review, round 1, guidance (b): every write to the owner tables comes from a function that makes owner settings,
+    named for its own call (ottoq.owner_settings_writer, a function-level setting). A plain INSERT, UPDATE, DELETE or
+    TRUNCATE is refused on both tables as postgres (the SQL editor, the Management API) and as service_role, and the
+    setting is not left on after an owner command returns: a write in the same transaction, right after the command, is
+    refused too, though it names that very command (which every per-move check alone would have admitted)."""
+    no_run(post)
+    chase = sign_in(post)
+    saved_cmd = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "every_return"})
+    assert saved_cmd["data"]["outcome"] == "saved", saved_cmd
+    run = production_run(post, keep_saved=True)
+    lim = lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 95})
+    assert lim["data"]["outcome"] == "applied", lim
+    cid = lim["data"]["command"]["command_id"]
+    sid = post.val(f"SELECT setting_id FROM ottoq_owner_settings WHERE sim_run_id = '{run}' AND vehicle_id = '{AV045}' "
+                   f"AND kind = 'charge_limit' AND status = 'active'")
+    svid = post.val(f"SELECT saved_id FROM ottoq_owner_saved_settings WHERE vehicle_id = '{AV045}' AND status = 'active'")
+    assert sid and svid
+    # the writers name themselves, and nothing else does
+    assert sorted(tuple(r) for r in post.rows(
+        "SELECT p.oid::regprocedure::text, c FROM pg_proc p CROSS JOIN LATERAL unnest(p.proconfig) c "
+        "WHERE c LIKE 'ottoq.owner_settings_writer=%'")) == sorted([
+            ("ottoq.ottoq_owner_orders_tick(uuid,timestamp with time zone)", "ottoq.owner_settings_writer=tick"),
+            ("ottoq_owner_command(ottoq_agent_principals,text,jsonb,text)", "ottoq.owner_settings_writer=owner_command"),
+            ("ottoq_owner_saved_carry(uuid)", "ottoq.owner_settings_writer=carry"),
+            ("ottoq_tg_lift_owner_settings_on_terminal()", "ottoq.owner_settings_writer=run_end")])
+    settings = {
+        "INSERT": (f"INSERT INTO ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct, "
+                   f"command_id, set_at_sim) VALUES ('{run}', '{TWIN}', '{TESLA}', '{AV045}', 'charge_limit', 95, '{cid}', now())"),
+        "UPDATE": f"UPDATE ottoq_owner_settings SET pending_reconcile = true WHERE setting_id = '{sid}'",
+        "UPDATE status": (f"UPDATE ottoq_owner_settings SET status = 'withdrawn', closed_at = now(), closed_reason = 'x', "
+                          f"closed_by_command_id = '{cid}' WHERE setting_id = '{sid}'"),
+        "DELETE": f"DELETE FROM ottoq_owner_settings WHERE setting_id = '{sid}'",
+        "TRUNCATE": "TRUNCATE ottoq_owner_settings",
+    }
+    saved_t = {
+        "INSERT": (f"INSERT INTO ottoq_owner_saved_settings (depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct, "
+                   f"command_id, acting_person) VALUES ('{TWIN}', '{TESLA}', '{AV045}', 'charge_limit', 95, '{cid}', '{EMAIL}')"),
+        "UPDATE": (f"UPDATE ottoq_owner_saved_settings SET status = 'ended', ended_at = now(), ended_reason = 'x', "
+                   f"ended_by_command_id = '{cid}' WHERE saved_id = '{svid}'"),
+        "DELETE": f"DELETE FROM ottoq_owner_saved_settings WHERE saved_id = '{svid}'",
+        # a plain TRUNCATE of the saved table stops at the run settings' foreign key first; CASCADE reaches both triggers
+        "TRUNCATE": "TRUNCATE ottoq_owner_saved_settings CASCADE",
+    }
+    want = {"INSERT": "never by a plain write", "UPDATE": "never by a plain write", "UPDATE status": "never by a plain write",
+            "DELETE": "DELETE refused", "TRUNCATE": "TRUNCATE refused"}
+    refused = 0
+    for table, stmts in (("ottoq_owner_settings", settings), ("ottoq_owner_saved_settings", saved_t)):
+        for op, sql in stmts.items():
+            _refused(post, sql, want[op])
+            rc, _, err = post.run(sql, role="service_role", check=False)
+            assert rc != 0 and "permission denied" in err, (table, op, err)
+            refused += 2
+    assert refused == 18
+    _refused(post, "TRUNCATE ottoq_owner_saved_settings", "cannot truncate a table referenced in a foreign key constraint")
+    # the setting is the command's own call only: right after an owner command, in the same transaction, a write naming
+    # that very command (which the per-move checks admit: applied, in this transaction, names the car, a tool that
+    # withdraws a limit) is refused
+    rc, _, err = post.run(f"""DO $t$ DECLARE r jsonb; BEGIN
+        r := ottoq_agent_call({q(sha(chase))}, 'set_charge_limit', '{{"vehicles": ["Tesla 45"], "percent": 96}}'::jsonb, 'mcp', '{{}}'::jsonb);
+        IF r #>> '{{data,outcome}}' IS DISTINCT FROM 'applied' THEN RAISE EXCEPTION 'setup: %', r; END IF;
+        UPDATE ottoq_owner_settings SET status = 'withdrawn', closed_at = now(), closed_reason = 'x',
+               closed_by_command_id = (r #>> '{{data,command,command_id}}')::uuid
+         WHERE sim_run_id = '{run}' AND vehicle_id = '{AV045}' AND kind = 'charge_limit' AND status = 'active';
+      END $t$""", check=False)
+    assert rc != 0 and "never by a plain write" in err, err
+    assert post.val("SELECT current_setting('ottoq.owner_settings_writer', true)") in (None, "", "None")
+    # nothing moved: the limit, what is saved, and the carried order all stand
+    assert post.val(f"SELECT charge_limit_pct FROM ottoq_owner_settings WHERE setting_id = '{sid}' AND status = 'active'") == "95"
+    assert saved(post, AV045) == [(AV045, "charge_limit", "95")] and target(post, AV045) == "95"
+    assert [c for c in carried(post, run) if c[0] == AV041] == [(AV041, "service", "exterior_wash")]
+    # and the writers still write: the tick reconciles, a command withdraws, the run's end lifts
+    post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{run}', '2026-09-27 12:01+00')")
+    clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 45"]})
+    assert clr["data"]["outcome"] == "applied" and target(post, AV045) == "100", clr
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{run}' AND status = 'active'") == "0"
+
+
+def test_the_run_settings_guard_admits_each_move_only_from_the_writer_that_makes_it(post):
+    """The review, round 1 (G4, G5, G3), with no unlock, as postgres (the SQL editor and the Management API): a person's
+    raise cannot be undone by two bare UPDATEs that put the lower limit back (the next production run would carry it, rule
+    9); an every-return order cannot be marked fulfilled; a one-time order only once its service is done, a hold only once
+    its time has come, a lift only at the run's end; and TRUNCATE is refused."""
+    chase = sign_in(post)
+    run = production_run(post)
+    lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 82})
+    up = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 45"], "percent": 95})
+    assert up["data"]["outcome"] == "applied" and saved(post, AV045) == [(AV045, "charge_limit", "95")], up
+    wash = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "every_return"})
+    unrelated = wash["data"]["command"]["command_id"]
+    r95 = post.val(f"SELECT setting_id FROM ottoq_owner_settings WHERE sim_run_id = '{run}' AND vehicle_id = '{AV045}' "
+                   f"AND kind = 'charge_limit' AND status = 'active'")
+    r82 = post.val(f"SELECT setting_id FROM ottoq_owner_settings WHERE sim_run_id = '{run}' AND vehicle_id = '{AV045}' "
+                   f"AND kind = 'charge_limit' AND status = 'replaced'")
+    withdraw = ("UPDATE ottoq_owner_settings SET status = 'withdrawn', closed_at = now(), closed_reason = 'x', "
+                "closed_by_command_id = '{cmd}' WHERE setting_id = '{sid}'")
+    # G4: withdrawn "by" an unrelated command of the fleet, and "by" the raise itself (it names the car, but recorded in an
+    # earlier transaction); then the replaced 82 put back with no undo
+    _refused_both(post, withdraw.format(cmd=unrelated, sid=r95), "replaced or withdrawn only by the applied owner command")
+    _refused_both(post, withdraw.format(cmd=up["data"]["command"]["command_id"], sid=r95), "replaced or withdrawn only by the applied owner command")
+    for writer in ("owner_command", "tick"):
+        _refused_both(post, f"UPDATE ottoq_owner_settings SET status = 'active', closed_at = NULL, closed_reason = NULL, "
+                            f"closed_by_command_id = NULL WHERE setting_id = '{r82}'", "put back only by an undo", writer)
+    assert saved(post, AV045) == [(AV045, "charge_limit", "95")] and target(post, AV045) == "95"
+    assert post.val("SELECT count(*) FROM ottoq_owner_commands WHERE tool = 'undo_command' AND outcome = 'applied' "
+                    f"AND undoes_command_id = '{up['data']['command']['command_id']}'") == "0"
+    # G3: TRUNCATE is refused, plain and cascading
+    for sql in ("TRUNCATE ottoq_owner_settings", "TRUNCATE ottoq_owner_settings CASCADE"):
+        _refused(post, sql, "TRUNCATE refused")
+    nxt = production_run(post, keep_saved=True)
+    assert [c for c in carried(post, nxt) if c[0] == AV045] == [(AV045, "charge_limit", "95")] and target(post, AV045) == "95"
+    # G5: an every-return order is never fulfilled; a one-time order only once its service is done; a hold only once its
+    # time has come; a lift only at the run's end
+    every = post.val(f"SELECT setting_id FROM ottoq_owner_settings WHERE sim_run_id = '{nxt}' AND vehicle_id = '{AV041}' "
+                     f"AND kind = 'service' AND status = 'active'")
+    _refused_both(post, f"UPDATE ottoq_owner_settings SET status = 'fulfilled', closed_at = now() WHERE setting_id = '{every}'",
+                  "fulfilled only by the tick", "tick")
+    once = tcall(post, chase, "request_service", {"vehicles": ["Tesla 45"], "service": "interior_tidy", "when": "now"})
+    hold = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 60})
+    assert once["data"]["outcome"] == "applied" and hold["data"]["outcome"] == "applied", (once, hold)
+    oid = post.val(f"SELECT setting_id FROM ottoq_owner_settings WHERE sim_run_id = '{nxt}' AND vehicle_id = '{AV045}' "
+                   f"AND kind = 'service' AND service = 'interior_tidy' AND status = 'active'")
+    hid = post.val(f"SELECT setting_id FROM ottoq_owner_settings WHERE sim_run_id = '{nxt}' AND vehicle_id = '{AV045}' "
+                   f"AND kind = 'hold' AND status = 'active'")
+    _refused_both(post, f"UPDATE ottoq_owner_settings SET status = 'fulfilled', closed_at = now() WHERE setting_id = '{oid}'",
+                  "fulfilled only by the tick", "tick")
+    _refused_both(post, f"UPDATE ottoq_owner_settings SET status = 'fulfilled', closed_at = now(), closed_at_sim = set_at_sim "
+                        f"WHERE setting_id = '{hid}'", "fulfilled only by the tick", "tick")
+    _refused_both(post, f"UPDATE ottoq_owner_settings SET status = 'lifted', closed_at = now() WHERE setting_id = '{every}'",
+                  "lifted only when its run ends", "run_end")
+    # and each move only from its own writer: the owner command cannot fulfil or lift, the tick cannot withdraw
+    _refused(post, f"SET ottoq.owner_settings_writer = 'owner_command'; UPDATE ottoq_owner_settings SET status = 'fulfilled', "
+                   f"closed_at = now(), closed_at_sim = hold_until_sim WHERE setting_id = '{hid}'", "fulfilled only by the tick")
+    _refused(post, f"SET ottoq.owner_settings_writer = 'tick'; UPDATE ottoq_owner_settings SET status = 'withdrawn', closed_at = now(), "
+                   f"closed_reason = 'x', closed_by_command_id = '{hold['data']['command']['command_id']}' WHERE setting_id = '{hid}'",
+             "replaced or withdrawn only by the applied owner command")
+    # the tick still does both: the order goes onto the visit, its service is done, and the hold's time comes
+    assert int(post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{nxt}', '2026-09-27 12:01+00')")) >= 1
+    post.run(f"""UPDATE ottoq_visit_needs SET atoms = (SELECT jsonb_agg(CASE WHEN a->>'svc' = 'interior_tidy' THEN a || '{{"status":"done"}}' ELSE a END)
+                                                        FROM jsonb_array_elements(atoms) a)
+                 WHERE vehicle_id = '{AV045}' AND sim_run_id = '{nxt}'""")
+    post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{nxt}', '2026-09-27 13:01+00')")
+    assert post.rows(f"SELECT status FROM ottoq_owner_settings WHERE setting_id IN ('{oid}', '{hid}')") == [["fulfilled"], ["fulfilled"]]
+    # and the run's end lifts the rest
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{nxt}'")
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{nxt}' AND status = 'active'") == "0"
+    assert post.val(f"SELECT status FROM ottoq_owner_settings WHERE setting_id = '{every}'") == "lifted"
+
+
+def test_a_saved_row_comes_back_only_by_an_undo_and_is_never_written_again_from_an_old_command(post):
+    """The review, round 1 (G1, G2): a person saved 82 with no run live and then cleared it. A bare UPDATE that ends the
+    end, or an INSERT naming the old command, would put 82 back on the next production run (rule 9). Both are refused, and
+    how a saved row ended is immutable."""
+    no_run(post)
+    chase = sign_in(post)
+    ok = save_lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 82})
+    clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 45"]})
+    assert clr["data"]["outcome"] == "saved" and saved(post, AV045) == [], clr
+    sid = post.val(f"SELECT saved_id FROM ottoq_owner_saved_settings WHERE command_id = '{ok['data']['command']['command_id']}'")
+    _refused_both(post, f"UPDATE ottoq_owner_saved_settings SET status = 'active', ended_at = NULL, ended_reason = NULL, "
+                        f"ended_by_command_id = NULL WHERE saved_id = '{sid}'", "put back only by an undo")
+    _refused_both(post, f"UPDATE ottoq_owner_saved_settings SET ended_reason = 'x' WHERE saved_id = '{sid}'", "how it ended is immutable")
+    _refused_both(post, f"INSERT INTO ottoq_owner_saved_settings (depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct, "
+                   f"command_id, acting_person) VALUES ('{TWIN}', '{TESLA}', '{AV045}', 'charge_limit', 82, "
+                        f"'{ok['data']['command']['command_id']}', '{EMAIL}')", "not what an applied command recorded under a person set")
+    # nor on a run: the command that set 82 cannot write it onto a run outside its own transaction
+    prod = production_run(post, keep_saved=True)
+    for writer in ("owner_command", "carry"):
+        _refused_both(post, f"INSERT INTO ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct, "
+                            f"command_id, set_at_sim) VALUES ('{prod}', '{TWIN}', '{TESLA}', '{AV045}', 'charge_limit', 82, "
+                            f"'{ok['data']['command']['command_id']}', now())", "not what an applied owner command set", writer)
+    assert saved(post, AV045) == [] and carried(post, prod) == [] and target(post, AV045) == "100"
+    # the one way back is the undo the guard admits, which the owner door makes: on a run, a person's raise and its undo
+    lim = lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 85})
+    up = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 45"], "percent": 95})
+    undo = tcall(post, chase, "undo_command", {"command_id": up["data"]["command"]["command_id"]})
+    back = confirm(post, chase, undo)
+    assert back["data"]["outcome"] == "applied" and target(post, AV045) == "85", back
+    assert saved(post, AV045) == [(AV045, "charge_limit", "85")]
+    assert post.val(f"SELECT status FROM ottoq_owner_saved_settings WHERE command_id = '{lim['data']['command']['command_id']}'") == "active"
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{prod}'")
+
+
+def test_a_one_time_order_is_an_extra_service_and_never_ends_a_saved_every_return_order(post):
+    """The review, round 1 (rule 9 and 11): a person's every-return wash is saved to the car. On a later run they ask for a
+    wash now, and for a tidy on the next return over a saved every-return tidy. Neither ends what is saved: a new demo run
+    and a new production run carry both, the receipt says so, and on the run itself each every-return order is back once
+    the one-time order is done. A passcode session doing the same leaves it saved too (unchanged)."""
+    no_run(post)
+    chase = sign_in(post)
+    for svc in ("exterior_wash", "interior_tidy"):
+        s = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": svc, "when": "every_return"})
+        assert s["data"]["outcome"] == "saved", s
+    want = [(AV041, "service", "exterior_wash"), (AV041, "service", "interior_tidy")]
+    run = fresh_run(post, keep_saved=True)
+    assert carried(post, run) == want
+    now = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "now"})
+    nxt = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "next_return"})
+    for r, svc in ((now, "exterior wash"), (nxt, "interior tidy")):
+        assert r["data"]["outcome"] == "applied", r
+        assert (f"The every-return order for {svc} stays: on this run it is back on the car once this one is done, and it stays "
+                "saved to the car for every run.") in r["data"]["summary"], r["data"]["summary"]
+        assert "This lasts until the demo run ends or you undo it." in r["data"]["summary"]
+    assert saved(post, AV041) == want, "a one-time order does not end what is saved"
+    # on the run: the wash done, the tick fulfils the one-time order and the every-return order is in force again
+    post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{run}', '2026-09-27 12:01+00')")
+    post.run(f"""UPDATE ottoq_visit_needs SET atoms = (SELECT jsonb_agg(CASE WHEN a->>'svc' = 'exterior_wash' THEN a || '{{"status":"done"}}' ELSE a END)
+                                                        FROM jsonb_array_elements(atoms) a)
+                 WHERE vehicle_id = '{AV041}' AND sim_run_id = '{run}'""")
+    post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{run}', '2026-09-27 12:02+00')")
+    active = sorted(tuple(r) for r in post.rows(f"SELECT service, service_when FROM ottoq_owner_settings WHERE sim_run_id = '{run}' "
+                                                 f"AND vehicle_id = '{AV041}' AND kind = 'service' AND status = 'active'"))
+    assert active == [("exterior_wash", "every_return"), ("interior_tidy", "next_return")], active
+    # and the done wash is tagged with the every-return order, not done twice: one wash atom on the visit
+    assert post.val(f"""SELECT count(*) FROM ottoq_visit_needs n CROSS JOIN LATERAL jsonb_array_elements(n.atoms) a
+                        WHERE n.sim_run_id = '{run}' AND n.vehicle_id = '{AV041}' AND a ->> 'svc' = 'exterior_wash'""") == "1"
+    # an undo of the next-return order puts the every-return tidy back at once (0605's undo, unchanged)
+    u = tcall(post, chase, "undo_command", {"command_id": nxt["data"]["command"]["command_id"]})
+    assert u["data"]["outcome"] == "applied", u
+    assert post.val(f"SELECT service_when FROM ottoq_owner_settings WHERE sim_run_id = '{run}' AND vehicle_id = '{AV041}' "
+                    f"AND service = 'interior_tidy' AND status = 'active'") == "every_return"
+    # a passcode session's one-time order over the carried order leaves what is saved as it is
+    session = unlock(post, agent="Visitor", ip="192.0.2.131")["data"]["session"]
+    assert tcall(post, session, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "now"})["data"]["outcome"] == "applied"
+    assert saved(post, AV041) == want
+    # the next demo run and the next production run carry both every-return orders
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")
+    demo = fresh_run(post, keep_saved=True)
+    assert carried(post, demo) == want
+    prod = production_run(post, keep_saved=True)
+    assert carried(post, prod) == want
+    # in production, the same: a person's wash now does not end the saved order
+    again = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "now"})
+    assert again["data"]["outcome"] == "applied" and "This lasts until the production run ends or you undo it." in again["data"]["summary"], again
+    assert saved(post, AV041) == want
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{prod}'")
+    third = fresh_run(post, keep_saved=True)
+    assert carried(post, third) == want
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{third}'")
+
+
+def test_the_cockpit_boards_show_no_production_owner_data_and_no_persons_words_to_anon(post):
+    """The review, round 1: the two cockpit boards are EXECUTE for anon (0606, 0608, read live 2026-10-14). They show a
+    demo run's settings and commands as before, but never a production run's settings, a production command, a person's
+    command made with no run live, or the note (the person's own words) of any command recorded under a person."""
+    no_run(post)
+    chase = sign_in(post)
+    saved_cmd = tcall(post, chase, "request_service", {"vehicles": ["Tesla 45"], "service": "exterior_wash", "when": "every_return",
+                                                        "note": "PRIVATE saved note"})
+    assert saved_cmd["data"]["outcome"] == "saved", saved_cmd
+    # a demo run: a person's command and a passcode session's both listed; the person's note is not shown, the session's is
+    demo = fresh_run(post, keep_saved=True)
+    mine = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "now",
+                                                   "note": "PRIVATE demo note: my kids ride at 7"}, transport="ask")
+    session = unlock(post, agent="Visitor", ip="192.0.2.132")["data"]["session"]
+    theirs = tcall(post, session, "hold_vehicle", {"vehicles": ["Tesla 41"], "for_minutes": 30, "note": "session note"})
+    for r in (mine, theirs):
+        assert r["data"]["outcome"] == "applied", r
+    mid, tid = mine["data"]["command"]["command_id"], theirs["data"]["command"]["command_id"]
+    board = post.json(f"SELECT ottoq_owner_board('{TESLA}', '{TWIN}', NULL)", role="anon")
+    listed = [c["command_id"] for c in board["commands"]]
+    assert mid in listed and tid in listed and saved_cmd["data"]["command"]["command_id"] not in listed, listed
+    assert {s["kind"] for s in board["in_force"]} >= {"service", "hold"}
+    assert "saved to the car and carried onto every run" in board["resets"]
+    hl_mine = post.json(f"SELECT ottoq_owner_board('{TESLA}', '{TWIN}', '{mid}')", role="anon")["highlight"]
+    hl_theirs = post.json(f"SELECT ottoq_owner_board('{TESLA}', '{TWIN}', '{tid}')", role="anon")["highlight"]
+    assert "note" not in hl_mine["args"] and hl_mine["args"]["service"] == "interior_tidy", hl_mine
+    assert hl_theirs["args"]["note"] == "session note"
+    assert post.json(f"SELECT ottoq_owner_board('{TESLA}', '{TWIN}', '{saved_cmd['data']['command']['command_id']}')",
+                     role="anon").get("highlight") is None
+    depot = post.json(f"SELECT ottoq_depot_owner_board('{TWIN}', 30)", role="anon")
+    assert mid in [c["command_id"] for c in depot["commands"]] and depot["in_force"], depot
+    # a production run: its settings, its commands and the person's words are on neither board
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{demo}'")
+    prod = production_run(post, keep_saved=True)
+    pc = tcall(post, chase, "request_service", {"vehicles": ["Tesla 45"], "service": "interior_tidy", "when": "now",
+                                                 "note": "PRIVATE prod note: bag left in Tesla 45, it has my passport"}, transport="ask")
+    assert pc["data"]["outcome"] == "applied", pc
+    pid = pc["data"]["command"]["command_id"]
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{prod}' AND status = 'active'") != "0"
+    blobs = [post.json(f"SELECT ottoq_owner_board('{TESLA}', '{TWIN}', NULL)", role="anon"),
+             post.json(f"SELECT ottoq_owner_board('{TESLA}', '{TWIN}', '{pid}')", role="anon"),
+             post.json(f"SELECT ottoq_depot_owner_board('{TWIN}', 30)", role="anon")]
+    blob = json.dumps(blobs)
+    assert pid not in blob and "my passport" not in blob and "PRIVATE" not in blob and EMAIL not in blob.lower(), blob[:2000]
+    assert blobs[0]["in_force"] == [] and blobs[2]["in_force"] == [] and blobs[1].get("highlight") is None
+    # the owner still reads it all through their own signed-in agent
+    own = tcall(post, chase, "my_settings")["data"]
+    assert any(x.get("service") == "interior_tidy" for x in own["settings"]), own
+    # what the person saves in production is carried onto the next demo run, where it shows, but never names the
+    # production command that made it (its id or its confirmation code)
+    keep = lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 90, "note": "PRIVATE limit note"}, transport="ask")
+    assert keep["data"]["outcome"] == "applied", keep
+    kid = keep["data"]["command"]["command_id"]
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{prod}'")
+    demo2 = fresh_run(post, keep_saved=True)
+    assert (AV041, "charge_limit", "90") in carried(post, demo2)
+    seen = [post.json(f"SELECT ottoq_owner_board('{TESLA}', '{TWIN}', NULL)", role="anon"),
+            post.json(f"SELECT ottoq_depot_owner_board('{TWIN}', 30)", role="anon")]
+    for b in seen:
+        rows = [x for x in b["in_force"] if x.get("vehicle_id") == AV041 and x.get("kind") == "charge_limit"]
+        assert len(rows) == 1 and "command_id" not in rows[0] and "confirmation_code" not in rows[0], rows
+    blob = json.dumps(seen)
+    assert kid not in blob and pid not in blob and "PRIVATE" not in blob, blob[:2000]
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{demo2}'")

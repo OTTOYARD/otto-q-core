@@ -28,15 +28,18 @@
  *   * THE WEB IS UNTRUSTED (0721, Chase 2026-10-14: "Search should cover OTTO-Q and web"): once any web search result
  *     has entered an ask's conversation, every later call to anything but a read is refused here, before the engine
  *     is asked, and the answer tells the owner to ask for the change again on its own. An ask that read the web returns
- *     no confirm objects, so nothing it previewed can be applied from it. What the model tried after reading the web is
- *     never handed back as something to send: `blocked_after_web` names the tools only, never the arguments a page may
- *     have chosen, and the agent is told to relay to its person and send a change only as that person's own new words.
- *     When a change was refused that way, the answer leads with what really happened, and the model's text is dropped
- *     if it describes a change (it was written after reading the page that asked for one);
- *   * the answer never claims a change that did not happen: "Done" with nothing applied is replaced by the receipts
- *     (or, with no receipts at all, by "Nothing was changed"), and an applied change always carries its OrchestrAV link;
- *     a web fact always travels with its URL. A page's title is the page's own words: it goes back only in `sources`,
- *     cleaned and capped, never into the answer;
+ *     no confirm objects (at the top or inside a receipt), so nothing it previewed can be applied from it. What the model
+ *     tried after reading the web is never handed back as something to send: `blocked_after_web` names the tools only,
+ *     never the arguments a page may have chosen, and the agent is told to relay to its person and send a change only as
+ *     that person's own new words. When a change was refused that way, the answer OPENS with what really happened;
+ *   * WHAT CHANGED IS THE CHANGES BLOCK, never the model's words (0721, the review, round 1): the model's text is shown as
+ *     it wrote it, never screened or dropped by pattern (a screen dropped 35% of plain reads and still let claims through),
+ *     and every ask and every search ends with `changes`, built in code from OTTO-Q's receipts only: none, or each change
+ *     asked for, applied, saved, previewed, no change, refused (with OTTO-Q's reason, or unsent because the ask read the
+ *     web) or unknown, with its command id. A search's is always none. The agent is told it is the only record of what
+ *     changed. An applied change always carries its confirmation code and its OrchestrAV link; a web fact always travels
+ *     with its URL. A page's title is the page's own words: it goes back only in `sources`, cleaned and capped, never
+ *     into the answer;
  *   * confirm: a previewed plan is applied from its confirm objects with NO model involved, through the confirm door
  *     (transport 'confirm', recorded as via 'confirm'), never as OTTO-Command's own call (0721).
  *
@@ -384,7 +387,7 @@ export const SYSTEM_PROMPT = [
   "",
   "How to answer:",
   "1. Facts come only from tool results. Never invent a car, a number, a time or a setting. If the owner names a car that does not exist, the tool refuses and lists the real names: say so. Anything about the owner's cars, their settings or the depot comes from OTTO-Q's own tools, never from the web.",
-  "2. A change is done only when its tool returns outcome \"applied\" or \"saved\". \"applied\": begin with \"Done.\", give OTTO-Q's own summary from the receipt (shorten it, never contradict it), and end with the receipt's confirmation code and its OrchestrAV link. \"saved\" (no run was live, so it changed only what is saved to the cars): the same, without a confirmation code (it has none), and say it applies from the next run. \"refused\": say it was not done, why (the refusal's own reason), and what is allowed instead (its hint, when it has one). \"no_change\": it was already so. \"previewed\": nothing has changed yet.",
+  "2. A change is done only when its tool returns outcome \"applied\" or \"saved\". \"applied\": begin with \"Done.\", give OTTO-Q's own summary from the receipt (shorten it, never contradict it), and end with the receipt's confirmation code and its OrchestrAV link. \"saved\" (no run was live, so it changed only what is saved to the cars): the same, without a confirmation code (it has none), and say it applies from the next run. \"refused\": say it was not done, why (the refusal's own reason), and what is allowed instead (its hint, when it has one). \"no_change\": it was already so. \"previewed\": nothing has changed yet. After your reply, OTTO-Command adds the changes block, built from OTTO-Q's receipts: it is the only record of what changed, so never say a change was made that a receipt does not show.",
   "3. When the owner's words clearly name a change, make it; do not ask for confirmation. If they ask to see it first (\"what would happen if\", \"preview\", \"before you do it\"), send mode \"preview\" and say nothing has changed. When the context says a lower limit needs a preview (a production run, or an owner signed in to their OTTOYARD account, whose charge limits are saved to the car), OTTO-Q applies a lower charge limit, or an undo that puts a lower one back, only as the confirm of a recorded preview: when you make one, it comes back with error code confirm_required and outcome \"previewed\", and NOTHING has changed. Then tell the owner exactly what they would be confirming, from that receipt (which cars, and from what limit to what), that nothing changes until they say yes, and that once they do their agent sends the confirm back within 15 minutes. A previewed change is applied only by that confirm; you cannot apply it yourself and must never say it was done.",
   "4. What lasts: a charge limit or an every-return service set by an owner signed in to their OTTOYARD account is saved to the car and stays from run to run, production included, until the owner changes it; with no run live, that is all such an owner can change, and it applies from the next run. A hold, a one-time service order, and anything set through a passcode session or an issued key last until the run ends. Say which, from the receipt.",
   "5. When a request is truly ambiguous (which service, which car, until when), ask one short question instead of guessing.",
@@ -475,14 +478,13 @@ export const WEB_WRITE_NOTE =
   "Ask again for the change on its own.";
 /** 0721: the same, when a change was applied earlier in the ask, before any web text arrived (its receipt follows). */
 export const WEB_WRITE_NOTE_AFTER_CHANGE =
-  "Only what OTTO-Q's receipts below say was done, before this ask searched the web; the change asked for after the " +
-  "search was not made, because OTTO-Command never changes a car once an ask has read the web. Ask again for it on its own.";
-/** 0721: said instead of the model's reply when that reply, written after reading the web, described a change. */
-export const WEB_REPLY_WITHHELD =
-  "OTTO-Command's reply described a change that was not made, so it is not shown. Ask your question again on its own " +
-  "(ottocommand_search answers questions and changes nothing).";
-/** 0721: an answer that claims a change while OTTO-Q made none, and has no receipt to say instead. */
-export const NOTHING_CHANGED = "Nothing was changed in this ask.";
+  "Only what the changes below (OTTO-Q's own receipts) say was done, before this ask searched the web; the change asked " +
+  "for after the search was not made, because OTTO-Command never changes a car once an ask has read the web. Ask again " +
+  "for it on its own.";
+/** 0721 (the review, round 1): the changes block of an ask that changed nothing and sent nothing. */
+export const NO_CHANGES_ASK = "Changes: none. This ask changed nothing.";
+/** 0721 (the review, round 1): every search's changes block. A search is offered no tool that changes anything. */
+export const NO_CHANGES_SEARCH = "Changes: none. A search changes nothing: it only reads OTTO-Q and the web.";
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────── the input ──
 
@@ -563,6 +565,8 @@ export type AskAction = {
 };
 export type AskResult = {
   answer: string;
+  /** 0721 (the review, round 1): what this ask changed, from OTTO-Q's receipts only: the only record of what changed */
+  changes: Changes;
   answered_by: string;
   dry_run: boolean;
   actions: AskAction[];
@@ -582,6 +586,8 @@ export type AskResult = {
 };
 export type SearchResult = {
   answer: string;
+  /** 0721 (the review, round 1): always none: a search changes nothing */
+  changes: Changes;
   answered_by: string;
   scope: SearchScope;
   sources: WebSource[];
@@ -632,37 +638,19 @@ export function receiptsText(actions: readonly AskAction[]): string {
   return actions.map((a) => a.summary ?? `Not done (${a.tool.replace(/_/g, " ")}): ${a.error?.message ?? "OTTO-Q did not answer."}`).join("\n\n");
 }
 
-const CLAIMS_DONE = /^\s*(done\b|all set\b|it'?s done\b|completed\b|finished\b)/i;
-const CHANGE_VERB = "(?:set|held|released|cancell?ed|ordered|requested|scheduled|lowered|raised|changed|updated|applied|capped|limited|undone|undid|booked|placed|withdrawn|cleared)";
-/** Text that tells the owner a change was made: a "Done"-style opening on any sentence or line, a car that "now" charges
- *  to or is held at something, something that "has been" changed, or "I've set ...". A screen, not a parser: it is used
- *  only where a change was just refused after the web was read, and a false match drops the model's text, which is the
- *  safe side. */
-const CLAIMS_A_CHANGE: readonly RegExp[] = [
-  /(?:^|[.!?]\s+|\n\s*)(?:done|all set|it'?s done|completed|finished)\b/i,
-  /\b(?:now|already)\s+(?:charges?|charging|held|holds?|limited|capped|set|scheduled|booked|ordered)\b/i,
-  new RegExp(`\\b(?:has|have|had|is|are|was|were)\\s+(?:now\\s+)?(?:been\\s+)?${CHANGE_VERB}\\b`, "i"),
-  new RegExp(`\\bI(?:'ve|\\s+have)?\\s+(?:just\\s+|now\\s+)?${CHANGE_VERB}\\b`, "i"),
-  /\bcharges?\s+to\s+(?:at\s+most\s+)?\d{1,3}\s?%/i,
-];
-export function claimsAChange(text: string): boolean {
-  return CLAIMS_A_CHANGE.some((r) => r.test(text));
-}
-
 /** The outcomes that mean a change was made: "applied" on a run, and (0721 §14) "saved", made with no run live, which
  *  changed only what is saved to the cars and carries no confirmation code. */
 export const DONE_OUTCOMES: ReadonlySet<string> = new Set(["applied", "saved"]);
 const isDone = (a: AskAction) => a.outcome !== null && DONE_OUTCOMES.has(a.outcome);
 
-/** The model's answer, held to the receipts: it may not claim a change nothing made, and a change made always carries
- *  its confirmation code when it has one (0607: an applied one) and its OrchestrAV link. */
+/** The model's answer as it wrote it, never screened or cut by pattern (0721, the review, round 1: what changed is said
+ *  by the changes block, from OTTO-Q's receipts, not by guessing at the model's words). An empty answer is OTTO-Q's
+ *  receipts; a change made always carries its confirmation code when it has one (0607: an applied one) and its OrchestrAV
+ *  link. */
 export function settleAnswer(answer: string, actions: readonly AskAction[], dryRun: boolean): string {
   const applied = actions.filter(isDone);
   let out = answer.trim();
   if (out === "") out = actions.length ? receiptsText(actions) : "OTTO-Command has no answer to give.";
-  // a claim of a change nothing applied: OTTO-Q's own receipts instead, or, with none, that nothing was changed (the
-  // claiming text is dropped whole, never patched a word at a time)
-  if (CLAIMS_DONE.test(out) && (applied.length === 0 || dryRun)) out = receiptsText(actions) || NOTHING_CHANGED;
   if (!dryRun) {
     const missing = applied.map((a) => a.confirmation_code).filter((c): c is string => !!c && !out.includes(c));
     if (missing.length) out = `${out}\nConfirmation code${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}.`;
@@ -670,6 +658,82 @@ export function settleAnswer(answer: string, actions: readonly AskAction[], dryR
   const link = [...applied].reverse().find((a) => a.link)?.link;
   if (link && !out.includes(link)) out = `${out}\nSee it in OrchestrAV: ${link}`;
   return out;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────────────── what changed ──
+
+/** 0721 (the review, round 1): one change an ask asked OTTO-Q for, as OTTO-Q's receipt says it went. `refused` with
+ *  sent_to_ottoq false is a change the door refused unsent because the ask had read the web; `unknown` is a call OTTO-Q
+ *  did not answer in time (check my_commands before asking again). */
+export type ChangeOutcome = "applied" | "saved" | "previewed" | "no_change" | "refused" | "unknown";
+export type Change = {
+  tool: string;
+  outcome: ChangeOutcome;
+  sent_to_ottoq: boolean;
+  /** the command OTTO-Q recorded, or null when none was */
+  command_id: string | null;
+  confirmation_code: string | null;
+  cars: number | null;
+  /** why it was not applied: OTTO-Q's own refusal, or the door's reason for not sending it */
+  reason: string | null;
+};
+/** What an ask or a search changed, built in code from OTTO-Q's receipts only, never from the model's words: the ONLY
+ *  record of what changed. `made` is true only when OTTO-Q applied or saved something; `text` is the same, in words, and
+ *  ends every answer. */
+export type Changes = { made: boolean; items: Change[]; text: string };
+
+const KNOWN_OUTCOMES: ReadonlySet<string> = new Set(["applied", "saved", "previewed", "no_change", "refused"]);
+const CHANGE_LABEL: Readonly<Record<ChangeOutcome, string>> = {
+  applied: "Applied",
+  saved: "Saved to the cars (no run was live, so it applies from the next run)",
+  previewed: "Preview only, nothing changed",
+  no_change: "No change (it was already so)",
+  refused: "Refused, nothing changed",
+  unknown: "Outcome unknown (OTTO-Q did not answer in time; check my_commands before asking again)",
+};
+
+function changeOf(a: AskAction): Change {
+  const outcome: ChangeOutcome = a.outcome !== null && KNOWN_OUTCOMES.has(a.outcome) ? a.outcome as ChangeOutcome
+    : !a.ok && a.http_status >= 502 ? "unknown" : "refused";
+  const reason = outcome === "refused" || outcome === "unknown" ? (a.error?.message ?? null) : null;
+  return { tool: a.tool, outcome, sent_to_ottoq: true, command_id: a.command_id, confirmation_code: a.confirmation_code,
+           cars: a.cars, reason };
+}
+
+/** The changes block of an ask: one line per change asked for, in the order asked, from the receipts. */
+export function changesOf(actions: readonly AskAction[], blocked: readonly string[],
+                          o: { dryRun: boolean; readWeb: boolean; confirmOffered: boolean }): Changes {
+  const items: Change[] = [
+    ...actions.map(changeOf),
+    ...blocked.map((tool): Change => ({ tool, outcome: "refused", sent_to_ottoq: false, command_id: null,
+      confirmation_code: null, cars: null,
+      reason: "this ask read the web, and OTTO-Command never changes a car in an ask that read the web; nothing was sent to OTTO-Q" })),
+  ];
+  const made = !o.dryRun && items.some((c) => c.outcome === "applied" || c.outcome === "saved");
+  if (items.length === 0) return { made, items, text: NO_CHANGES_ASK };
+  const lines = items.map((c, i) => {
+    const parts = [c.tool.replace(/_/g, " ")];
+    if (c.cars !== null) parts.push(`${c.cars} car${c.cars === 1 ? "" : "s"}`);
+    if (c.command_id) parts.push(`command ${c.command_id}`);
+    if (c.confirmation_code) parts.push(`confirmation code ${c.confirmation_code}`);
+    let line = `- ${c.sent_to_ottoq ? CHANGE_LABEL[c.outcome] : "Refused, not sent to OTTO-Q"}: ${parts.join(", ")}`;
+    if (c.reason) line += `: ${c.reason.replace(/[.\s]+$/, "")}`;
+    if (c.outcome === "previewed") {
+      line += o.dryRun ? ". A dry run applies nothing"
+        : o.readWeb ? ". This ask read the web, so it offers nothing to confirm: ask for the change again on its own"
+        : actions[i]?.error?.code === "confirm_required" ? ". Lowering how full a car charges applies only when you confirm it, within 15 minutes"
+        : o.confirmOffered ? ". Nothing changes until it is confirmed, within 15 minutes" : "";
+    }
+    return `${line}.`;
+  });
+  const head = made ? "Changes (OTTO-Q's own receipts, the only record of what this ask changed):"
+    : "Changes: nothing was changed by this ask. OTTO-Q's own receipts:";
+  return { made, items, text: [head, ...lines].join("\n") };
+}
+
+/** A search's changes block: none, always. */
+export function searchChanges(): Changes {
+  return { made: false, items: [], text: NO_CHANGES_SEARCH };
 }
 
 /** 0721: every web source travels with the answer: the URLs its text does not already name are listed after it. A
@@ -762,10 +826,11 @@ async function applyConfirms(input: AskInput, deps: AskDeps, tools: readonly Too
     actions.push(actionOf(tool.name, v.value, outcome));
     if (isTransportFailure(outcome)) break;
   }
-  const answer = settleAnswer(receiptsText(actions), actions, false);
   const confirm = confirmsOf(actions);
-  return { answer, answered_by: ANSWERED_BY, dry_run: false, actions, reads: [], link: primaryLink(actions, null), incomplete, rounds: 0,
-    ...(confirm ? { confirm } : {}) };
+  const changes = changesOf(actions, [], { dryRun: false, readWeb: false, confirmOffered: confirm !== undefined });
+  const answer = `${settleAnswer(receiptsText(actions), actions, false)}\n\n${changes.text}`;
+  return { answer, changes, answered_by: ANSWERED_BY, dry_run: false, actions, reads: [], link: primaryLink(actions, null), incomplete,
+    rounds: 0, ...(confirm ? { confirm } : {}) };
 }
 
 type LoopSpec = {
@@ -969,35 +1034,27 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
       : loop.lastText)
     : loop.lastText;
   let answer = settleAnswer(draft, actions, input.dry_run);
-  // 0721: an ask that read the web hands back nothing to confirm: a change goes through an ask of its own
+  // 0721: an ask that read the web hands back nothing to confirm, at the top or in a receipt: a change goes through an
+  // ask of its own
   const confirm = loop.readWeb ? undefined : confirmsOf(actions);
-  if (confirm && actions.some((a) => a.error?.code === "confirm_required")) {
-    // 0721: the model asked to apply, and OTTO-Q recorded a preview instead (a lower limit takes a confirm): an answer
-    // that does not say so is replaced by OTTO-Q's own receipts, and the answer always says why nothing has changed
-    if (!/\bpreview|nothing has changed|not applied/i.test(answer)) answer = receiptsText(actions);
-    if (!/within 15 minutes/i.test(answer)) {
-      answer = `${answer}\nNothing has changed yet: lowering how full a car charges applies only when you confirm it, within 15 minutes.`;
-    }
-  }
-  let sources = sourcesOf(loop);
+  const shown = loop.readWeb ? actions.map(({ confirm: _withheld, ...a }) => a) : actions;
   if (loop.blocked.length) {
-    // 0721: a change was asked for after the web was read, and refused. The answer leads with what really happened; the
-    // model's text, written after reading the page, is kept only if it describes no change (a page that talked the model
-    // into a change can talk it into saying the change was made), and OTTO-Q's own receipts say what was applied before.
+    // 0721: a change was asked for after the web was read, and refused unsent: the answer OPENS with that fact. The model's
+    // text follows as it wrote it (never screened: the review, round 1); the changes block says what really changed
     const applied = actions.some((a) => isDone(a) && !input.dry_run);
-    const keep = !claimsAChange(draft);
-    const body = keep ? answer : (actions.length ? settleAnswer(receiptsText(actions), actions, input.dry_run) : "");
-    answer = [applied ? WEB_WRITE_NOTE_AFTER_CHANGE : WEB_WRITE_NOTE, body, keep ? "" : WEB_REPLY_WITHHELD]
-      .filter((x) => x.trim() !== "").join("\n");
-    // the sources the withheld text cited are not sources of this answer
-    if (!keep) sources = [];
+    answer = `${applied ? WEB_WRITE_NOTE_AFTER_CHANGE : WEB_WRITE_NOTE}\n${answer}`;
   }
+  const sources = sourcesOf(loop);
   if (sources.length) answer = withSources(answer, sources);
+  // 0721 (the review, round 1): what changed, from OTTO-Q's receipts only, ends every answer and is its own field
+  const changes = changesOf(actions, loop.blocked, { dryRun: input.dry_run, readWeb: loop.readWeb, confirmOffered: confirm !== undefined });
+  answer = `${answer}\n\n${changes.text}`;
   return {
     answer,
+    changes,
     answered_by: ANSWERED_BY,
     dry_run: input.dry_run,
-    actions,
+    actions: shown,
     reads: loop.reads,
     link: primaryLink(actions, loop.readLink),
     incomplete,
@@ -1028,8 +1085,10 @@ export async function runOwnerSearch(input: SearchInput, deps: AskDeps): Promise
   const loop = await runLoop({ kind: "search", allowed, dryRun: false, words: "", messages, web }, deps, deps.model);
   if (loop.stopped && !loop.lastText) return { status: failureStatus(loop.stopped.code), error: loop.stopped };
   const sources = sourcesOf(loop);
-  const answer = withSources(loop.lastText.trim() || "OTTO-Command has no answer to give.", sources);
-  return { answer, answered_by: ANSWERED_BY, scope: input.scope, sources, ottoq_reads: loop.reads, web_searches: loop.webSearches,
+  // 0721 (the review, round 1): the model's answer as it wrote it, then, always, that a search changes nothing
+  const changes = searchChanges();
+  const answer = `${withSources(loop.lastText.trim() || "OTTO-Command has no answer to give.", sources)}\n\n${changes.text}`;
+  return { answer, changes, answered_by: ANSWERED_BY, scope: input.scope, sources, ottoq_reads: loop.reads, web_searches: loop.webSearches,
            incomplete: loop.stopped !== null, rounds: loop.rounds };
 }
 

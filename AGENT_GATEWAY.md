@@ -58,21 +58,30 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > **2026-10-14, afternoon — OTTO-Command searches OTTO-Q and the web (same `0721`, same gateway; built and tested on
 > scratch, NOT yet applied or deployed).** Chase (read 12:35 PM CT): *"Search should cover OTTO-Q and web. It can be ask
 > and tools as well."* A second door, the MCP tool **`ottocommand_search`** and **`POST /v1/search`**
-> (`{question, scope: "ottoq" | "web" | "both"}`), answers `{answer, sources: [{url, title}], ottoq_reads,
+> (`{question, scope: "ottoq" | "web" | "both"}`), answers `{answer, changes, sources: [{url, title}], ottoq_reads,
 > web_searches}`, is offered to the same tokens as `ask_ottocommand`, and is read-only by construction: it is given no
 > tool that changes anything (annotated `readOnlyHint: true`, `openWorldHint: true`). `ask_ottocommand` may search the
 > web too (now `openWorldHint: true`) and returns `sources` and `web_searches` when it does. **Once any web result has
-> entered an ask, the gateway refuses every write tool for the rest of it**, before OTTO-Q is called, and the answer says
-> to ask for the change again; an ask that searched returns no `confirm`, names refused tools without their arguments
-> (`blocked_after_web: ["set_charge_limit"]`), drops a model reply that describes a change it did not make, and keeps a
-> page's title out of the answer (cleaned and capped in `sources` only). Web searches are capped per model call
-> (`max_uses`, the API's per-request cap; an ask makes at most 9). Every model call is one row in
+> entered an ask, the gateway refuses every write tool for the rest of it**, before OTTO-Q is called, and the answer
+> OPENS with that fact; an ask that searched returns no `confirm` (at the top or inside a receipt), names refused tools
+> without their arguments (`blocked_after_web: ["set_charge_limit"]`), and keeps a page's title out of the answer
+> (cleaned and capped in `sources` only). **The model's text is never screened or dropped by pattern** (the review, round
+> 1: a pattern screen dropped 35% of realistic read-only answers and still let claims through): instead every ask and
+> every search answers with **`changes`**, a block built in code from OTTO-Q's receipts only (`{made, items: [{tool,
+> outcome: applied | saved | previewed | no_change | refused | unknown, sent_to_ottoq, command_id, confirmation_code,
+> cars, reason}], text}`), which also ends `answer`; it is the ONLY record of what changed, and the MCP instructions, the
+> tool descriptions, the OpenAPI and the Hermes skill (1.6.0) say so. A search's is always none, and says a search
+> changes nothing. Web searches are capped per model call (`max_uses`, the API's per-request cap); an ask makes at most
+> 9 model calls, so at most 27 searches at the default of 3, and `web_searches` counts them across the ask. Every model call is one row in
 > `ottoq_model_call_ledger` (provider `anthropic_ottocommand`; ids and counts only) through a service-role-only function,
 > fire-and-forget. In the database: a signed-in owner's charge limit and every-return services are saved to the cars
 > and carried onto each new demo and production run (their clear, a limit at 100% and a cancel end what is saved whatever
 > a passcode session did on the run, and only a signed-in agent reads `saved`), and with no run live a signed-in owner
-> can still save them (outcome `saved`, the saved table only, carried onto the next run); a guard trigger stops any role from writing an owner setting no
-> applied command made; and a passcode session (and `enter_passcode`) is refused `403 production_live` while a
+> can still save them (outcome `saved`, the saved table only, carried onto the next run); a guard trigger refuses every
+> write to the owner tables that does not come from the functions that make owner settings (each named for its own call
+> by a function-level `ottoq.owner_settings_writer`), plain INSERT, UPDATE, DELETE and TRUNCATE included, as postgres or
+> any role; a one-time order never ends a saved every-return order; the two anon-readable cockpit boards leave out
+> production, a person's no-run commands and a person's words; and a passcode session (and `enter_passcode`) is refused `403 production_live` while a
 > production run is live. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11, "Search, the web, and what lasts".
 
 ---
@@ -481,9 +490,11 @@ A token's scope cannot be edited (the guard refuses it): issue a new principal a
 `tests/agent_gateway.test.mjs` 39 passed (the two OTTO-Command doors listed and annotated, `/v1/search` routed, the
 shell posting only to the engine and the ledger function); `tests/ottocommand_executor.test.mjs` 34 passed with a
 scratch PostgreSQL (31 without); `tests/test_ottocommand_executor_sql.py` 35 passed (after the review fixes of the same
-afternoon: refused changes named without arguments, page titles kept out of the answer, a claimed change with no
-receipt dropped, searches capped per model call, a person's clear and cancel ending what is saved whatever the run
-holds, and no `saved` block for a passcode session). The gateway, its shared modules
+afternoon: refused changes named without arguments, page titles kept out of the answer, searches capped per model
+call, a person's clear and cancel ending what is saved whatever the run holds, and no `saved` block for a passcode
+session). **After the review, round 1 (the evening of 2026-10-14):** the claim screen replaced by the `changes` block,
+the owner tables' writer rule, the one-time order that ends nothing saved, and the cockpit boards; the counts are in
+PERSONAL_AGENT.md §11. The gateway, its shared modules
 and the shell type-check under `tsc --strict` with a Deno shim, except the `jsr:` edge-runtime type import, which only
 Deno resolves. **Not verified:** a real call to the Anthropic API (every test drives a fake fetch), web search enabled
 for this organization, a fallback actually taken, `EdgeRuntime.waitUntil` keeping the ledger write alive after the
