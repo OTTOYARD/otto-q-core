@@ -772,7 +772,8 @@ repo_manifest(version, name, file) AS (
     ('20261013184608'::text, 'the_feed_agents_propose_the_twins_world_and_a_person_promotes_it'::text, '0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql'::text),
     ('20261013201139'::text, 'the_board_calls_eighty_percent_a_priority_band_not_a_floor'::text, '0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql'::text),
     ('20261013210801'::text, 'production_runs_the_world_phases_the_twin_certifies'::text, '0718_production_runs_the_world_phases_the_twin_certifies.sql'::text),
-    ('20261013211005'::text, 'production_start_takes_the_world_as_the_operator_door_does'::text, '0719_production_start_takes_the_world_as_the_operator_door_does.sql'::text)
+    ('20261013211005'::text, 'production_start_takes_the_world_as_the_operator_door_does'::text, '0719_production_start_takes_the_world_as_the_operator_door_does.sql'::text),
+    ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
