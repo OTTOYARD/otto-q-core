@@ -70,7 +70,8 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > `ottoq_model_call_ledger` (provider `anthropic_ottocommand`; ids and counts only) through a service-role-only function,
 > fire-and-forget. In the database: a signed-in owner's charge limit and every-return services are saved to the cars
 > and carried onto each new demo and production run (their clear, a limit at 100% and a cancel end what is saved whatever
-> a passcode session did on the run, and only a signed-in agent reads `saved`); a guard trigger stops any role from writing an owner setting no
+> a passcode session did on the run, and only a signed-in agent reads `saved`), and with no run live a signed-in owner
+> can still save them (outcome `saved`, the saved table only, carried onto the next run); a guard trigger stops any role from writing an owner setting no
 > applied command made; and a passcode session (and `enter_passcode`) is refused `403 production_live` while a
 > production run is live. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11, "Search, the web, and what lasts".
 
@@ -277,9 +278,11 @@ or `{"error": {"code","message","hint?","details?"}, "meta": {…}}`. `call_id` 
   fleet's reads only (none for `scope: "web"`), the web search server tool unless `scope: "ottoq"`, and no confirm door.
   In `/v1/openapi.json` it is the operation `ottocommand_search` at `POST /v1/search`.
 - **The model behind both doors** is configured by the function's environment: `ANTHROPIC_API_KEY` (required),
-  `OTTOCOMMAND_OWNER_MODEL` (default `claude-opus-5-5`), `OTTOCOMMAND_EFFORT` (default `low`), `OTTOCOMMAND_WEB_SEARCH`
+  `OTTOCOMMAND_OWNER_MODEL` (else `ANTHROPIC_MODEL`, else `claude-opus-5-5`), `OTTOCOMMAND_EFFORT` (default `low`), `OTTOCOMMAND_WEB_SEARCH`
   (`on`/`off`) and `OTTOCOMMAND_WEB_MAX_USES` (default 3, clamped 1-5). A value the gateway cannot read is answered
-  `ask_misconfigured` (503), never guessed around. `ANTHROPIC_MODEL` is no longer read.
+  `ask_misconfigured` (503), never guessed around. The model is the first of `OTTOCOMMAND_OWNER_MODEL` and
+  `ANTHROPIC_MODEL` that is set and not blank (the gateway deployed on 2026-10-04 reads `ANTHROPIC_MODEL`, so a
+  deployment that sets only it keeps its model), else `claude-opus-5-5`; validated whichever it came from.
 
 **A2A** (1.0.0): `GET /.well-known/agent-card.json` (also `/.well-known/agent.json`) is a public **discovery** card —
 `supportedInterfaces` points at `/mcp` and `/v1` as custom bindings, `securitySchemes` declares the Bearer token, and

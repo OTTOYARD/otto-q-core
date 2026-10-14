@@ -1,7 +1,7 @@
 ---
 name: ottoq-owner
 description: Connect to OTTOYARD, read or set what my cars need at the OTTOYARD depot, and search OTTO-Q and the web about them.
-version: 1.4.1
+version: 1.5.0
 author: OTTOYARD (Chase), Hermes Agent
 license: Proprietary
 platforms: [linux, macos, windows]
@@ -149,16 +149,19 @@ words.
    confirmation code and the link. With the typed tools, use OTTO-Q's `summary` the same way.
 2. **Facts only from tool results.** Never invent a car, a number, a time or a setting. If a car does not exist, the
    refusal lists the real names: say so and offer them.
-3. **A change is done only when `outcome` is `applied`.** `refused`: say it was not done, why, in OTTO-Q's plain words,
-   and what is allowed (a charge limit outside the contract's range, 80-100% for this fleet, is refused with the range).
-   `no_change`: it was already so. `previewed`: nothing has changed yet.
+3. **A change is done only when `outcome` is `applied`, or `saved`** (made while no run was live: it changed only what
+   is saved to the cars, applies from the next run, and has a link but no confirmation code). `refused`: say it was not
+   done, why, in OTTO-Q's plain words, and what is allowed (a charge limit outside the contract's range, 80-100% for this
+   fleet, is refused with the range). `no_change`: it was already so. `previewed`: nothing has changed yet.
 4. **Ask one short question** only when it is truly ambiguous (which service? which car? until when?). Do not ask "are
    you sure?" for a clear command, except where OTTO-Command returns a `confirm`.
 5. **Times:** OTTO-Q writes "7:00 AM sim time" (the simulation's clock) and "9:24 PM CT" (real time). Keep the label.
 6. **What resets** when the run ends (a stop or reset in OTTO-TWIN, or the end of a production run): holds, one-time
    service orders and everything set through the passcode. A signed-in person's charge limit and "every time it comes
    back" services are saved to the cars and come back on the next run (`my_settings` says which are saved). With no run
-   that accepts changes, OTTO-Q refuses and says why.
+   live, a signed-in person can still save a charge limit or an "every time it comes back" service (outcome `saved`);
+   a hold, a one-time service or an undo needs a live run, and a passcode session changes nothing until one starts.
+   OTTO-Q refuses anything else and says why.
 7. Short and plain: two to five sentences, no tables, no JSON, no command ids unless asked.
 
 ## If MCP is not available

@@ -32,9 +32,11 @@
 //   AGENT_GATEWAY_ALLOWED_ORIGINS  comma-separated browser origins; unset = no browser may call it (agents are servers)
 //   ANTHROPIC_API_KEY              the key OTTO-Command already uses; without it, POST /v1/ask and /v1/search answer
 //                                  503 to a plain-English ask (a previewed plan's confirm still applies: it needs no model)
-//   OTTOCOMMAND_OWNER_MODEL        0721: the model the owner door uses. Unset: the door's default model
-//                                  (DEFAULT_OWNER_MODEL in ../_shared/ottocommand_owner.ts). ANTHROPIC_MODEL, the cockpit
-//                                  seat's own setting, is no longer read here.
+//   OTTOCOMMAND_OWNER_MODEL        0721: the model the owner door uses. Unset or blank: ANTHROPIC_MODEL, which the gateway
+//                                  deployed on 2026-10-04 reads (also the cockpit seat's setting), so a deployment that
+//                                  sets only it keeps its model; neither set: the door's default model (DEFAULT_OWNER_MODEL
+//                                  in ../_shared/ottocommand_owner.ts). Validated whichever variable it came from; the
+//                                  startup log names which one was used.
 //   OTTOCOMMAND_EFFORT             0721: low (the default) | medium | high | xhigh | max. Low, because the whole ask must
 //                                  end inside Hermes's 60-second MCP timeout.
 //   OTTOCOMMAND_WEB_SEARCH         0721: on (the default) | off. Off: no web search in any ask or search.
@@ -75,12 +77,13 @@ const signin = {
   rpc: SUPABASE_URL && SERVICE_KEY ? postgrestOAuth({ supabaseUrl: SUPABASE_URL, serviceKey: SERVICE_KEY }) : null,
 };
 
-// The owner door's model (0721): OTTOCOMMAND_OWNER_MODEL, or the door's default; its effort and web search from the
-// environment, validated (ownerAskConfig). Every model call is recorded in the evidence ledger, fire-and-forget; the
-// platform keeps the isolate alive for the write (EdgeRuntime.waitUntil) where it can.
+// The owner door's model (0721): OTTOCOMMAND_OWNER_MODEL, else ANTHROPIC_MODEL, else the door's default; its effort and
+// web search from the environment, validated (ownerAskConfig). Every model call is recorded in the evidence ledger,
+// fire-and-forget; the platform keeps the isolate alive for the write (EdgeRuntime.waitUntil) where it can.
 const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const CONFIG = ownerAskConfig((name) => Deno.env.get(name));
 if (!CONFIG.ok) console.error(`${GATEWAY_NAME}: OTTO-Command is misconfigured: ${CONFIG.errors.join("; ")}`);
+else console.info(`${GATEWAY_NAME}: OTTO-Command's model is from ${CONFIG.value.model_from}`);
 const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
 const ask = ownerAskHandler({
   model: ANTHROPIC_KEY ? anthropicModel({ apiKey: ANTHROPIC_KEY, model: CONFIG.value.model, effort: CONFIG.value.effort }) : null,

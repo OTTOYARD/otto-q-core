@@ -33,6 +33,12 @@ CLAUDE.md rules 9 and 10 bind hardest. None of what it promises is visible to a 
     the run holds (a passcode session's, or none because the carry skipped it), as an applied change of its own, so the
     next production run carries nothing back; a person's limit is saved even when the run already held that value; and a
     passcode session or an issued key reads no `saved` block and no person's email.
+  * §14: with no run live a signed-in owner still saves to the cars: a charge limit (set, raised, at the ceiling,
+    cleared; a lowering only as the bound confirm of its own preview made with no run, which a run starting in between
+    invalidates) and every-return orders (saved, withdrawn), written to the saved table only, recorded with no run, the
+    person and outcome 'saved' (held by CHECK), and carried onto the next demo and production run as any saved row; a
+    hold, a one-time order and an undo are refused needs_a_live_run, and a passcode session or an issued key no_live_demo
+    with why (it names no person).
 
 Loads the stub engines, 0559, 0560, 0605-0608, tests/fixtures/agent_signin_stub_auth.sql, 0700 and
 tests/fixtures/model_call_ledger_stub.sql (the live model ledger's bodies, md5-asserted) from their files, and
@@ -616,11 +622,16 @@ def test_a_demo_run_works_as_before_and_records_the_door_and_any_person(post):
 
 
 def test_no_run_and_any_other_run_keep_0605s_words(post):
+    """With no run live a session without a person keeps 0605's no_live_demo (§14 adds only a hint: it names no person, so
+    it cannot save to the cars); a signed-in owner is the one who may save then (tested below). Any other run: 0605's words."""
     chase = connect(post)["access_token"]
     post.run("UPDATE ottoq_sim_runs SET status = 'completed' WHERE status IN ('running', 'paused')")
-    none = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 90, "mode": "preview"})
+    session = unlock(post, agent="Grok", ip="192.0.2.73")["data"]["session"]
+    none = tcall(post, session, "set_charge_limit", {"vehicles": "all", "percent": 90, "mode": "preview"})
     assert none["error"]["code"] == "no_live_demo"
-    assert none["error"]["message"].startswith("No demo run is live at the twin depot.")
+    assert none["error"]["message"] == ("No demo run is live at the twin depot. Start one in OTTO-TWIN; what you set applies "
+                                        "to that run and resets when it ends.")
+    assert none["error"]["hint"].startswith("A passcode session names no person, so it cannot save a setting to your cars")
     run = fresh_run(post)
     post.run(f"UPDATE ottoq_sim_runs SET run_by = 'ab_harness' WHERE sim_run_id = '{run}'")
     other = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 90, "mode": "preview"})
@@ -1102,3 +1113,262 @@ def test_the_model_ledger_door_records_ids_and_counts_and_refuses_text(post):
     # the ledger is append-only, as 0340 made it
     rc, _, err = post.run("DELETE FROM ottoq_model_call_ledger WHERE provider = 'anthropic_ottocommand'", check=False)
     assert rc != 0 and "append-only" in err, err
+
+
+# ─────────────────────────────────── §14: with no run live, a signed-in owner still saves to the cars (outcome 'saved') ──
+
+_SIGNIN_IPS = iter(range(1, 60000))
+
+
+def sign_in(db):
+    """test_agent_signin_sql's connect, each device request from its own address: the suite signs in more than the
+    30-an-hour per-caller throttle allows from one."""
+    from test_agent_signin_sql import RESOURCE, device_token, oauth, person, register, unthrottle
+    n = next(_SIGNIN_IPS)
+    client = register(db)
+    dev = oauth(db, "device_authorize", {"client_id": client, "resource": RESOURCE}, ip=f"10.77.{n // 256}.{n % 256}")["body"]
+    assert person(db, CHASE, f"SELECT ottoq_oauth_device_decide({q(dev['user_code'])}, 'approve')")["outcome"] == "approved"
+    unthrottle(db, dev["user_code"])
+    t = device_token(db, client, dev["device_code"])
+    assert t["http_status"] == 200, t
+    return t["body"]["access_token"]
+
+
+def no_run(db):
+    """End whatever run is live (its owner settings lift with it) and start from nothing saved."""
+    db.run("UPDATE ottoq_sim_runs SET status = 'completed' WHERE status IN ('running', 'paused')")
+    forget_saved(db)
+
+
+def save_lower(db, token, args):
+    """A lower limit saved with no run live: the preview OTTO-Q records (with no run), then its confirm ('saved')."""
+    prev = tcall(db, token, "set_charge_limit", {**args, "mode": "preview"})
+    assert prev["data"]["outcome"] == "previewed", prev
+    assert db.val(f"SELECT sim_run_id IS NULL FROM ottoq_owner_commands WHERE command_id = '{prev['data']['command']['command_id']}'") == "t"
+    done = confirm(db, token, prev)
+    assert done["data"]["outcome"] == "saved" and done["http_status"] == 201, done
+    return done
+
+
+def settings_rows(db):
+    return db.val("SELECT count(*) FROM ottoq_owner_settings")
+
+
+def ended(db, command_id):
+    """The saved rows a command ended: (vehicle, kind, value, ended_reason)."""
+    return sorted((r[0], r[1], r[2], r[3]) for r in db.rows(
+        "SELECT vehicle_id, kind, coalesce(charge_limit_pct::text, service), ended_reason FROM ottoq_owner_saved_settings "
+        f"WHERE ended_by_command_id = '{command_id}'"))
+
+
+def test_with_no_run_live_a_signed_in_owner_saves_a_charge_limit_set_raised_at_the_ceiling_and_cleared(post):
+    no_run(post)
+    chase = sign_in(post)
+    rows_before = settings_rows(post)
+    who = tcall(post, chase, "whoami")["data"]["owner"]
+    assert who["live_demo_run"] is None and who["live_production_run"] is None
+    ch = who["changes"]
+    assert ch["allowed"] is True and ch["run_kind"] == "none" and ch["saved_only"] is True and ch["person"] == EMAIL
+    assert ch["lower_limit_needs_preview"] is True and ch["confirm_window_minutes"] == 15
+    assert ch["message"].startswith(f"No run is live at the twin depot. You are signed in as {EMAIL}, so you can still save")
+    # a lower limit in one call is recorded as a preview, with no run, and answered confirm_required: nothing is saved
+    low = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 85})
+    assert low["http_status"] == 422 and low["error"]["code"] == "confirm_required", low
+    assert low["data"]["refusal"]["reason"] == "not_named" and low["data"]["outcome"] == "previewed"
+    prev_id = low["data"]["command"]["command_id"]
+    assert post.rows(f"SELECT outcome, coalesce(sim_run_id::text, '-'), acting_person, via FROM ottoq_owner_commands "
+                     f"WHERE command_id = '{prev_id}'") == [["previewed", "-", EMAIL, "direct"]]
+    assert saved(post, AV041) == []
+    # its confirm, from the same agent, saves 85% to the car and writes no run's settings
+    done = confirm(post, chase, low)
+    assert done["http_status"] == 201 and done["data"]["outcome"] == "saved", done
+    cmd = done["data"]["command"]
+    assert cmd["via"] == "confirm" and cmd["confirms_command_id"] == prev_id and cmd["acting_person"] == EMAIL
+    assert post.rows(f"SELECT outcome, coalesce(sim_run_id::text, '-'), mode FROM ottoq_owner_commands "
+                     f"WHERE command_id = '{cmd['command_id']}'") == [["saved", "-", "apply"]]
+    assert saved(post, AV041) == [(AV041, "charge_limit", "85")]
+    assert settings_rows(post) == rows_before, "a command with no run live writes the saved table only"
+    assert done["data"]["summary"].startswith("Done. Tesla-AV-041: 85% is saved to it for every run.")
+    assert "No run is live: this is saved to your cars, applies from the next demo or production run" in done["data"]["summary"]
+    assert done["data"]["expires"].startswith("Made while no run was live: it changes what is saved to the cars")
+    assert "confirmation_code" not in done["data"] and "undo" not in done["data"]
+    assert post.rows(f"SELECT http_status, transport FROM ottoq_agent_call_ledger WHERE call_id = {done['call_id']}") == [["201", "confirm"]]
+    # the same confirm again saves nothing more
+    again = confirm(post, chase, low)
+    assert again["data"]["outcome"] != "saved" and saved(post, AV041) == [(AV041, "charge_limit", "85")], again
+    # a raise is one call and replaces what is saved; the same value again changes nothing
+    up = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 95})
+    assert up["http_status"] == 201 and up["data"]["outcome"] == "saved" and up["data"]["command"]["via"] == "direct", up
+    assert saved(post, AV041) == [(AV041, "charge_limit", "95")]
+    assert ended(post, up["data"]["command"]["command_id"]) == [(AV041, "charge_limit", "85", "replaced by a new setting")]
+    same = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 95})
+    assert same["http_status"] == 200 and same["data"]["outcome"] == "no_change", same
+    assert same["data"]["summary"] == "Nothing to change. Tesla-AV-041 already has 95% saved to it for every run; nothing changes."
+    # a limit at the ceiling is one call and clears what is saved: the car charges full on every run
+    full = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 100})
+    assert full["http_status"] == 201 and full["data"]["outcome"] == "saved", full
+    assert saved(post, AV041) == []
+    assert ended(post, full["data"]["command"]["command_id"]) == [(AV041, "charge_limit", "95", "cleared by the owner")]
+    # clearing with nothing saved changes nothing; a lower limit again, then clear_charge_limit, ends it
+    nothing = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+    assert nothing["data"]["outcome"] == "no_change", nothing
+    both = save_lower(post, chase, {"vehicles": ["Tesla 41", "Tesla 45"], "percent": 88})
+    assert both["data"]["command"]["cars"] == 2
+    assert saved(post) == [(AV041, "charge_limit", "88"), (AV045, "charge_limit", "88")]
+    clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+    assert clr["data"]["outcome"] == "saved" and saved(post) == [(AV045, "charge_limit", "88")], clr
+    assert ended(post, clr["data"]["command"]["command_id"]) == [(AV041, "charge_limit", "88", "cleared by the owner")]
+    # what is saved reads in my_settings with no run live
+    ms = tcall(post, chase, "my_settings")["data"]
+    assert ms["summary"] == ("No run is live, so nothing is in force now. Saved to your cars for every run, production "
+                             "included: 1 car charges to at most 88%.")
+    assert settings_rows(post) == rows_before
+
+
+def test_with_no_run_live_a_lowering_binds_only_its_own_recent_preview_and_a_run_starting_in_between_changes_the_plan(post):
+    no_run(post)
+    chase = sign_in(post)
+    other = sign_in(post)
+    p = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80, "mode": "preview"})
+    # another agent signed in to the same account cannot confirm it
+    o = confirm(post, other, p)
+    assert o["error"]["code"] == "confirm_required" and o["data"]["refusal"]["reason"] == "no_recorded_preview", o
+    assert o["error"]["message"].startswith("A lower charge limit you set while signed in is saved to your cars")
+    assert "This agent recorded no such preview while no run was live." in o["error"]["message"]
+    # older than 15 minutes, it binds nothing
+    age(post, p["data"]["command"]["command_id"], "16 minutes")
+    old = confirm(post, chase, p)
+    assert old["error"]["code"] == "confirm_required" and old["data"]["refusal"]["reason"] == "preview_expired", old
+    assert saved(post, AV041) == []
+    # a preview made with no run, confirmed once a run is live, is a different plan (the run is in its hash)
+    p2 = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80, "mode": "preview"})
+    run = fresh_run(post)
+    late = confirm(post, chase, p2)
+    assert late["data"]["outcome"] == "refused" and late["error"]["code"] == "plan_changed", late
+    assert saved(post, AV041) == [] and target(post) == "100"
+    # and one made on a run, confirmed after it ended, likewise
+    p3 = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80, "mode": "preview"})
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")
+    after = confirm(post, chase, p3)
+    assert after["data"]["outcome"] == "refused" and after["error"]["code"] == "plan_changed", after
+    assert saved(post, AV041) == []
+
+
+def test_with_no_run_live_an_every_return_order_is_saved_and_withdrawn_and_nothing_else_is_a_change(post):
+    no_run(post)
+    chase = sign_in(post)
+    rows_before = settings_rows(post)
+    wash = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41", "Tesla 45"], "service": "exterior_wash",
+                                                  "when": "every_return"})
+    assert wash["http_status"] == 201 and wash["data"]["outcome"] == "saved", wash
+    assert saved(post) == [(AV041, "service", "exterior_wash"), (AV045, "service", "exterior_wash")]
+    assert "on every return, from the next demo or production run on" in wash["data"]["summary"]
+    again = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "every_return"})
+    assert again["http_status"] == 200 and again["data"]["outcome"] == "no_change", again
+    # a hold, a one-time order and an undo belong to a run
+    for tool, args in [("hold_vehicle", {"vehicles": ["Tesla 41"], "for_minutes": 30}),
+                       ("request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "next_return"}),
+                       ("request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy"}),
+                       ("release_hold", {"vehicles": ["Tesla 41"]}),
+                       ("undo_command", {"command_id": wash["data"]["command"]["command_id"]})]:
+        r = tcall(post, chase, tool, args)
+        assert r["http_status"] == 422 and r["error"]["code"] == "needs_a_live_run", (tool, r)
+        assert r["error"]["message"].startswith("No run is live at the twin depot, and ")
+        assert r["data"]["outcome"] == "refused"
+    # withdrawing one car's saved order is one call, and ends only that row
+    cnc = tcall(post, chase, "cancel_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash"})
+    assert cnc["http_status"] == 201 and cnc["data"]["outcome"] == "saved", cnc
+    assert saved(post) == [(AV045, "service", "exterior_wash")]
+    assert ended(post, cnc["data"]["command"]["command_id"]) == [(AV041, "service", "exterior_wash", "cancelled by the owner")]
+    none_left = tcall(post, chase, "cancel_service", {"vehicles": ["Tesla 41"]})
+    assert none_left["data"]["outcome"] == "no_change", none_left
+    assert settings_rows(post) == rows_before
+    assert post.val("SELECT count(*) FROM ottoq_owner_commands WHERE outcome = 'saved' AND (sim_run_id IS NOT NULL OR acting_person IS NULL)") == "0"
+
+
+def test_with_no_run_live_a_passcode_session_and_an_issued_key_name_no_person_and_save_nothing(post):
+    no_run(post)
+    session = unlock(post, agent="Grok", ip="192.0.2.74")["data"]["session"]
+    key = post.json(f"SELECT ottoq_agent_issue_token('fleet-bot-14', 'personal', ARRAY['read','note','owner_settings'], "
+                    f"'{TESLA}', '{TWIN}', NULL, 600, 20)")["token"]
+    for token, hint in [(session, "A passcode session names no person, so it cannot save a setting to your cars while no run is live."),
+                        (key, "An issued key names no person, so it cannot save a setting to your cars while no run is live.")]:
+        who = tcall(post, token, "whoami")["data"]["owner"]["changes"]
+        assert who["allowed"] is False and who["code"] == "no_live_demo" and who["hint"].startswith(hint), who
+        for tool, args in [("set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 90}),
+                           ("request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "every_return"}),
+                           ("clear_charge_limit", {"vehicles": ["Tesla 41"]})]:
+            r = tcall(post, token, tool, args)
+            assert r["http_status"] == 422 and r["error"]["code"] == "no_live_demo" and r["error"]["hint"].startswith(hint), r
+            assert command(post, r["data"]["command"]["command_id"]) == ["refused", "-", "direct"]
+    assert saved(post) == []
+
+
+def test_what_is_saved_with_no_run_live_is_carried_onto_the_next_demo_and_production_run(post):
+    """The next operator_demo or production_live run carries a 'saved' command's rows exactly as it carries any saved row
+    (§9): the engine reads the limit, the visit gets the order, the run's end lifts them from the run and not from the car."""
+    no_run(post)
+    chase = sign_in(post)
+    lim = save_lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    wash = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "every_return"})
+    assert wash["data"]["outcome"] == "saved", wash
+    want = [(AV041, "charge_limit", "85"), (AV041, "service", "exterior_wash")]
+    assert saved(post, AV041) == want
+    demo = fresh_run(post, keep_saved=True)
+    assert carried(post, demo) == want and target(post) == "85"
+    assert post.val(f"""SELECT count(*) FROM ottoq_visit_needs n CROSS JOIN LATERAL jsonb_array_elements(n.atoms) a
+                        WHERE n.sim_run_id = '{demo}' AND n.vehicle_id = '{AV041}' AND a ->> 'svc' = 'exterior_wash'
+                          AND (a ->> 'owner_requested')::boolean""") == "1"
+    # each carried row names the 'saved' command that set it
+    assert sorted(post.rows(f"SELECT c.outcome, coalesce(c.sim_run_id::text, '-') FROM ottoq_owner_settings o "
+                            f"JOIN ottoq_owner_commands c ON c.command_id = o.command_id "
+                            f"WHERE o.sim_run_id = '{demo}' AND o.saved_id IS NOT NULL")) == [["saved", "-"], ["saved", "-"]]
+    # an undo of a 'saved' command on a run says it was made with no run live, and what to do instead
+    u = tcall(post, chase, "undo_command", {"command_id": wash["data"]["command"]["command_id"]})
+    assert u["data"]["outcome"] == "refused" and u["error"]["code"] == "made_with_no_run_live", u
+    assert "clear_charge_limit" in u["error"]["message"] and "cancel_service" in u["error"]["message"]
+    # the run ends: lifted from the run, not from the car, and the 'saved' commands are not stamped lifted
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{demo}'")
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{demo}' AND status = 'active'") == "0"
+    assert post.rows(f"SELECT coalesce(lifted_reason, '-') FROM ottoq_owner_commands WHERE command_id IN "
+                     f"('{lim['data']['command']['command_id']}', '{wash['data']['command']['command_id']}')") == [["-"], ["-"]]
+    assert saved(post, AV041) == want
+    # production carries it too, and a person's raise there ends the saved 85 (the carried row's command was 'saved')
+    prod = production_run(post, keep_saved=True)
+    assert carried(post, prod) == want and target(post) == "85"
+    up = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 92})
+    assert up["data"]["outcome"] == "applied" and target(post) == "92", up
+    assert saved(post, AV041) == [(AV041, "charge_limit", "92"), (AV041, "service", "exterior_wash")]
+    assert ended(post, up["data"]["command"]["command_id"]) == [(AV041, "charge_limit", "85", "replaced by a new setting")]
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{prod}'")
+
+
+def test_the_saved_outcome_is_held_by_its_checks_and_the_guards_admit_it_only_where_they_admit_an_applied_one(post):
+    no_run(post)
+    chase = sign_in(post)
+    s = save_lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 86})
+    cid = s["data"]["command"]["command_id"]
+    pid = post.val(f"SELECT principal_id FROM ottoq_owner_commands WHERE command_id = '{cid}'")
+    run = fresh_run(post, keep_saved=True)
+    base = (f"INSERT INTO ottoq_owner_commands (principal_id, principal_name, fleet_operator_id, depot_id, sim_run_id, tool, "
+            f"mode, outcome, summary, acting_person) VALUES ('{pid}', 'probe', '{TESLA}', '{TWIN}', ")
+    # 'saved' is an apply with no run and a person, and nothing else
+    for run_id, mode, person in [(f"'{run}'", "apply", f"'{EMAIL}'"), ("NULL", "apply", "NULL"), ("NULL", "preview", f"'{EMAIL}'")]:
+        rc, _, err = post.run(base + f"{run_id}, 'set_charge_limit', '{mode}', 'saved', 'probe', {person})", check=False)
+        assert rc != 0 and "violates check constraint" in err, (run_id, mode, person, err)
+    defs = post.text("SELECT string_agg(pg_get_constraintdef(oid), ' | ' ORDER BY conname) FROM pg_constraint "
+                     "WHERE conrelid = 'ottoq_owner_commands'::regclass AND conname IN "
+                     "('ottoq_owner_commands_mode_outcome_check', 'ottoq_owner_commands_saved_check')")
+    assert "'saved'::text" in defs and "sim_run_id IS NULL" in defs, defs
+    # the saved table refuses a row a 'saved' command did not set (another car, another value)
+    rc, _, err = post.run(f"INSERT INTO ottoq_owner_saved_settings (depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct, "
+                          f"command_id, acting_person) VALUES ('{TWIN}', '{TESLA}', '{AV041}', 'charge_limit', 86, '{cid}', '{EMAIL}')",
+                          check=False)
+    assert rc != 0 and "not what an applied command recorded under a person set" in err, err
+    # and the run's settings refuse a row a 'saved' command names on a run other than as the carry of its saved row
+    rc, _, err = post.run(f"INSERT INTO ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, "
+                          f"charge_limit_pct, command_id, set_at_sim) VALUES ('{run}', '{TWIN}', '{TESLA}', '{AV045}', "
+                          f"'charge_limit', 86, '{cid}', now())", check=False)
+    assert rc != 0 and "not what an applied owner command set" in err, err
+    assert carried(post, run) == [(AV045, "charge_limit", "86")]
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")

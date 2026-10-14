@@ -113,7 +113,12 @@ test("services, when, outcomes and the capability are the ones 0605's SQL declar
   assert.deepEqual(list(requestable), [...OWNER_SERVICES]);
   assert.deepEqual(list(/service_when IN \(([^)]+)\)/.exec(M0605)[1]), [...SERVICE_WHEN]);
   const outcomes = [...M0605.matchAll(/outcome IN \(([^)]+)\)/g)].flatMap((m) => list(m[1]));
-  assert.deepEqual(sorted(new Set(outcomes)), sorted(OWNER_OUTCOMES));
+  //: 0721 §14 replaces 0605's mode/outcome CHECK by the same one admitting 'saved' (an apply made with no run live)
+  const M0721 = read("db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql");
+  const check0721 = /ADD CONSTRAINT ottoq_owner_commands_mode_outcome_check CHECK \(([\s\S]*?)\)\),/.exec(M0721)[1];
+  const outcomes0721 = [...check0721.matchAll(/outcome IN \(([^)]+)\)/g)].flatMap((m) => list(m[1]));
+  assert.deepEqual(sorted(new Set(outcomes0721)), sorted([...new Set(outcomes), "saved"]));
+  assert.deepEqual(sorted(new Set(outcomes0721)), sorted(OWNER_OUTCOMES));
   // 0559's capabilities CHECK admits the capability (0605's P1 asserts it); 0605 adds that it needs a fleet
   assert.match(read(M0559_PATH), /capabilities <@ ARRAY\[[^\]]*'owner_settings'[^\]]*\]/);
   assert.match(M0605, /ADD CONSTRAINT ottoq_agent_principals_owner_scope_check CHECK \(\s*NOT \('owner_settings' = ANY \(capabilities\)\) OR fleet_operator_id IS NOT NULL\)/);
@@ -723,7 +728,9 @@ test("model names live in one place: the door's default and its capability table
   for (const l of lines) assert.match(l, allowed, l);
   const shell = stripTsComments(SHELL_SRC);
   assert.match(shell, /ownerAskConfig\(\(name\) => Deno\.env\.get\(name\)\)/);
-  assert.doesNotMatch(shell, /ANTHROPIC_MODEL/, "the cockpit seat's model setting is not the owner door's");
+  //: the shell reads no model variable itself: ownerAskConfig does (OTTOCOMMAND_OWNER_MODEL, else ANTHROPIC_MODEL, which
+  //: the deployed gateway reads, else the default), so the order is in one place and tested there
+  assert.doesNotMatch(shell, /OTTOCOMMAND_OWNER_MODEL|ANTHROPIC_MODEL/, "the shell does not read a model variable itself");
   assert.match(shell, /ownerAskHandler\(/);
   //: 0700: and the sign-in endpoints beside it
   assert.match(shell, /allowedOrigins: ALLOWED_ORIGINS, engine, ask, signin \}/);

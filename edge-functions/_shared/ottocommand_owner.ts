@@ -53,7 +53,8 @@
  *
  * THE ANTHROPIC MESSAGES API (raw HTTP, anthropic-version 2023-06-01; the bundled claude-api reference, cached
  * 2026-10-06, read 2026-10-14):
- *   * the default model is DEFAULT_OWNER_MODEL when the deployment names none (OTTOCOMMAND_OWNER_MODEL overrides). On
+ *   * the default model is DEFAULT_OWNER_MODEL when the deployment names none (OTTOCOMMAND_OWNER_MODEL overrides, and
+ *     else ANTHROPIC_MODEL, which the gateway deployed on 2026-10-04 reads, so a deployment that sets only it keeps it). On
  *     it thinking is always on (the `thinking` parameter is omitted: disabling it or naming a budget is a 400), effort
  *     is output_config.effort and is set explicitly (it defaults to medium there; OTTOCOMMAND_EFFORT, default low,
  *     because the whole ask must end inside Hermes's 60 s), forced tool_choice is a 400 (it is left at auto), and
@@ -135,8 +136,12 @@ export const ANTHROPIC_VERSION = "2023-06-01";
 
 // ───────────────────────────────────────────────────────────────────────────── the model and its configuration ──
 
-/** The model the owner door uses when the deployment names none (OTTOCOMMAND_OWNER_MODEL overrides it). */
+/** The model the owner door uses when the deployment names none (OTTOCOMMAND_OWNER_MODEL, else ANTHROPIC_MODEL, overrides it). */
 export const DEFAULT_OWNER_MODEL = "claude-opus-5-5";
+/** Where the door's model comes from, first set wins: OTTOCOMMAND_OWNER_MODEL (the door's own), then ANTHROPIC_MODEL (what
+ *  the gateway deployed on 2026-10-04 reads, kept so a deployment that sets only it keeps its model), then the default. */
+export const OWNER_MODEL_ENV = ["OTTOCOMMAND_OWNER_MODEL", "ANTHROPIC_MODEL"] as const;
+export type OwnerModelSource = (typeof OWNER_MODEL_ENV)[number] | "default";
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export type Effort = (typeof EFFORTS)[number];
 /** low: the whole ask must end inside Hermes's 60-second MCP timeout. */
@@ -160,15 +165,22 @@ export const EFFORT_MODELS: ReadonlySet<string> = new Set([
   ...DYNAMIC_WEB_SEARCH_MODELS, "claude-fable-5", "claude-fable-5-1", "claude-haiku-5-5",
 ]);
 
-export type OwnerAskConfig = { model: string; effort: Effort; web: { max_uses: number } | null };
+export type OwnerAskConfig = { model: string; model_from: OwnerModelSource; effort: Effort; web: { max_uses: number } | null };
 
 /** The door's configuration from the deployment's environment, validated. A value it cannot read is an error the door
  *  answers with (503 ask_misconfigured), never a silent default. */
 export function ownerAskConfig(get: (name: string) => string | undefined):
     { ok: true; value: OwnerAskConfig } | { ok: false; errors: string[]; value: OwnerAskConfig } {
   const errors: string[] = [];
-  const model = (get("OTTOCOMMAND_OWNER_MODEL") ?? "").trim() || DEFAULT_OWNER_MODEL;
-  if (!/^[A-Za-z0-9][A-Za-z0-9._:@\[\]-]{0,99}$/.test(model)) errors.push("OTTOCOMMAND_OWNER_MODEL is not a model id");
+  //: the first of OTTOCOMMAND_OWNER_MODEL and ANTHROPIC_MODEL that is set and not blank, else the default; the value is
+  //: validated whichever variable it came from, and an error names that variable
+  let model: string = DEFAULT_OWNER_MODEL;
+  let model_from: OwnerModelSource = "default";
+  for (const name of OWNER_MODEL_ENV) {
+    const v = (get(name) ?? "").trim();
+    if (v !== "") { model = v; model_from = name; break; }
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:@\[\]-]{0,99}$/.test(model)) errors.push(`${model_from} is not a model id`);
   const effortRaw = (get("OTTOCOMMAND_EFFORT") ?? "").trim().toLowerCase();
   let effort: Effort = DEFAULT_EFFORT;
   if (effortRaw !== "") {
@@ -185,7 +197,7 @@ export function ownerAskConfig(get: (name: string) => string | undefined):
     if (/^\d{1,3}$/.test(usesRaw)) uses = Math.min(WEB_MAX_USES_MAX, Math.max(WEB_MAX_USES_MIN, Number(usesRaw)));
     else errors.push(`OTTOCOMMAND_WEB_MAX_USES is a whole number (clamped to ${WEB_MAX_USES_MIN}..${WEB_MAX_USES_MAX})`);
   }
-  const value: OwnerAskConfig = { model, effort, web: webOn ? { max_uses: uses } : null };
+  const value: OwnerAskConfig = { model, model_from, effort, web: webOn ? { max_uses: uses } : null };
   return errors.length ? { ok: false, errors, value } : { ok: true, value };
 }
 
@@ -292,7 +304,8 @@ export function readContent(content: readonly unknown[]): ParsedContent {
   return out;
 }
 
-/** The Anthropic Messages API as a ModelCall. The model is the deployment's (OTTOCOMMAND_OWNER_MODEL), or the default. */
+/** The Anthropic Messages API as a ModelCall. The model is the deployment's (OTTOCOMMAND_OWNER_MODEL, else
+ *  ANTHROPIC_MODEL), or the default. */
 export function anthropicModel(o: { apiKey: string; model: string; effort?: Effort; fetchImpl?: typeof fetch; timeoutMs?: number }): ModelCall {
   const doFetch = o.fetchImpl ?? fetch;
   const effort = o.effort ?? DEFAULT_EFFORT;
@@ -371,9 +384,9 @@ export const SYSTEM_PROMPT = [
   "",
   "How to answer:",
   "1. Facts come only from tool results. Never invent a car, a number, a time or a setting. If the owner names a car that does not exist, the tool refuses and lists the real names: say so. Anything about the owner's cars, their settings or the depot comes from OTTO-Q's own tools, never from the web.",
-  "2. A change is done only when its tool returns outcome \"applied\". Then begin with \"Done.\", give OTTO-Q's own summary from the receipt (shorten it, never contradict it), and end with the receipt's confirmation code and its OrchestrAV link. \"refused\": say it was not done, why (the refusal's own reason), and what is allowed instead (its hint, when it has one). \"no_change\": it was already so. \"previewed\": nothing has changed yet.",
+  "2. A change is done only when its tool returns outcome \"applied\" or \"saved\". \"applied\": begin with \"Done.\", give OTTO-Q's own summary from the receipt (shorten it, never contradict it), and end with the receipt's confirmation code and its OrchestrAV link. \"saved\" (no run was live, so it changed only what is saved to the cars): the same, without a confirmation code (it has none), and say it applies from the next run. \"refused\": say it was not done, why (the refusal's own reason), and what is allowed instead (its hint, when it has one). \"no_change\": it was already so. \"previewed\": nothing has changed yet.",
   "3. When the owner's words clearly name a change, make it; do not ask for confirmation. If they ask to see it first (\"what would happen if\", \"preview\", \"before you do it\"), send mode \"preview\" and say nothing has changed. When the context says a lower limit needs a preview (a production run, or an owner signed in to their OTTOYARD account, whose charge limits are saved to the car), OTTO-Q applies a lower charge limit, or an undo that puts a lower one back, only as the confirm of a recorded preview: when you make one, it comes back with error code confirm_required and outcome \"previewed\", and NOTHING has changed. Then tell the owner exactly what they would be confirming, from that receipt (which cars, and from what limit to what), that nothing changes until they say yes, and that once they do their agent sends the confirm back within 15 minutes. A previewed change is applied only by that confirm; you cannot apply it yourself and must never say it was done.",
-  "4. What lasts: a charge limit or an every-return service set by an owner signed in to their OTTOYARD account is saved to the car and stays from run to run, production included, until the owner changes it. A hold, a one-time service order, and anything set through a passcode session or an issued key last until the run ends. Say which, from the receipt.",
+  "4. What lasts: a charge limit or an every-return service set by an owner signed in to their OTTOYARD account is saved to the car and stays from run to run, production included, until the owner changes it; with no run live, that is all such an owner can change, and it applies from the next run. A hold, a one-time service order, and anything set through a passcode session or an issued key last until the run ends. Say which, from the receipt.",
   "5. When a request is truly ambiguous (which service, which car, until when), ask one short question instead of guessing.",
   "6. Words to tools: \"service bay\", \"maintenance\", \"have a tech look at it\" -> mechanical_pm. \"wash\", \"external cleaning\", \"exterior cleaning\" -> exterior_wash. \"detail\", \"deep clean\" -> interior_deep_clean. \"quick clean\", \"tidy\" -> interior_tidy. \"lost item\", \"left my bag\" -> item_retrieval. \"update\" -> software_update. \"clean the sensors or cameras\" -> sensor_clean. \"calibrate\" -> sensor_calibration. \"after charging\": OTTO-Q always plans bay work after the charge, so request the service with when \"now\". \"every time it comes back\", \"always\", \"from now on\" -> when \"every_return\". \"next time\" -> \"next_return\". \"all my cars\", \"the fleet\", \"all Teslas\" -> vehicles \"all\". \"Tesla 45\" is fine as a name.",
   "7. Times: tools give times in Nashville local time, marked \"sim time\" (the simulation's clock) or \"CT\" (real time). Keep the mark. A hold time you send is on the sim clock.",
@@ -395,6 +408,14 @@ export function ownerContext(who: EngineOutcome, dryRun: boolean): string {
     const changes = isObject(owner.changes) ? owner.changes : null;
     if (!changes) {
       lines.push(`Cars: ${String(owner.cars ?? "unknown")}. Demo run live: ${owner.live_demo_run ? "yes" : "no (no change can be made until one starts)"}.`);
+    } else if (changes.allowed === true && changes.run_kind === "none") {
+      // 0721 §14: no run is live; a signed-in owner may still save a charge limit or an every-return order to the cars
+      lines.push(`Cars: ${String(owner.cars ?? "unknown")}. Live: no run. Only what is saved to the cars can change now ` +
+        `(a charge limit, or an every-return service order), recorded under ${String(changes.person ?? "the owner")} and ` +
+        "carried onto the next demo or production run; a hold, a one-time order and an undo need a live run.");
+      if (changes.lower_limit_needs_preview === true) {
+        lines.push("RULE: OTTO-Q applies a lower charge limit only as the confirm of a preview recorded in the last 15 minutes. Asked to make one, it records a preview and answers confirm_required: tell the owner what they would confirm.");
+      }
     } else if (changes.allowed === true) {
       const run = changes.run_kind === "production" ? "a PRODUCTION run" : "a demo run";
       lines.push(`Cars: ${String(owner.cars ?? "unknown")}. Live: ${run}. Changes are allowed now` +
@@ -628,10 +649,15 @@ export function claimsAChange(text: string): boolean {
   return CLAIMS_A_CHANGE.some((r) => r.test(text));
 }
 
-/** The model's answer, held to the receipts: it may not claim a change nothing applied, and an applied change always
- *  carries its confirmation code (0607) and its OrchestrAV link. */
+/** The outcomes that mean a change was made: "applied" on a run, and (0721 §14) "saved", made with no run live, which
+ *  changed only what is saved to the cars and carries no confirmation code. */
+export const DONE_OUTCOMES: ReadonlySet<string> = new Set(["applied", "saved"]);
+const isDone = (a: AskAction) => a.outcome !== null && DONE_OUTCOMES.has(a.outcome);
+
+/** The model's answer, held to the receipts: it may not claim a change nothing made, and a change made always carries
+ *  its confirmation code when it has one (0607: an applied one) and its OrchestrAV link. */
 export function settleAnswer(answer: string, actions: readonly AskAction[], dryRun: boolean): string {
-  const applied = actions.filter((a) => a.outcome === "applied");
+  const applied = actions.filter(isDone);
   let out = answer.trim();
   if (out === "") out = actions.length ? receiptsText(actions) : "OTTO-Command has no answer to give.";
   // a claim of a change nothing applied: OTTO-Q's own receipts instead, or, with none, that nothing was changed (the
@@ -661,7 +687,7 @@ function confirmsOf(actions: readonly AskAction[]): AskConfirm[] | undefined {
 }
 
 function primaryLink(actions: readonly AskAction[], readLink: string | null): string | null {
-  const withLink = [...actions].reverse().find((a) => a.link && (a.outcome === "applied" || a.outcome === "previewed"));
+  const withLink = [...actions].reverse().find((a) => a.link && (isDone(a) || a.outcome === "previewed"));
   return withLink?.link ?? readLink;
 }
 
@@ -958,7 +984,7 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
     // 0721: a change was asked for after the web was read, and refused. The answer leads with what really happened; the
     // model's text, written after reading the page, is kept only if it describes no change (a page that talked the model
     // into a change can talk it into saying the change was made), and OTTO-Q's own receipts say what was applied before.
-    const applied = actions.some((a) => a.outcome === "applied" && !input.dry_run);
+    const applied = actions.some((a) => isDone(a) && !input.dry_run);
     const keep = !claimsAChange(draft);
     const body = keep ? answer : (actions.length ? settleAnswer(receiptsText(actions), actions, input.dry_run) : "");
     answer = [applied ? WEB_WRITE_NOTE_AFTER_CHANGE : WEB_WRITE_NOTE, body, keep ? "" : WEB_REPLY_WITHHELD]

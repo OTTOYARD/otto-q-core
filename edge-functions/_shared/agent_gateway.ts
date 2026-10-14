@@ -91,7 +91,7 @@ export const OWNER_SERVICES = [
 ] as const;
 export const SERVICE_WHEN = ["now", "next_return", "every_return"] as const;
 /** ottoq_owner_commands.outcome */
-export const OWNER_OUTCOMES = ["applied", "previewed", "no_change", "refused"] as const;
+export const OWNER_OUTCOMES = ["applied", "previewed", "no_change", "refused", "saved"] as const;
 
 /** ottoq_apply_ops_action's whitelist, action -> the dial it sets. The database (0559's submit function) is the
  *  authority and refuses the two whose dial is not agent_writable; this copy only shapes the schema. */
@@ -294,10 +294,12 @@ const COMMAND_OPTIONS: Record<string, JsonSchema> = {
   note: OWNER_NOTE,
 };
 const RECEIPT =
-  " Answers with a receipt: outcome (applied, previewed, no_change or refused), a plain-English summary, and an " +
+  " Answers with a receipt: outcome (applied, saved, previewed, no_change or refused), a plain-English summary, and an " +
   "OrchestrAV link to see it. Relay the summary and the link to your person; a change is done only when outcome is " +
-  "applied. A charge limit or an every-return service set by an owner signed in to their OTTOYARD account is saved to " +
-  "the cars and stays from run to run until they change it; anything else lasts until the run ends or you undo it.";
+  "applied, or saved (made while no run was live: it changed only what is saved to the cars, and applies from the next " +
+  "run). A charge limit or an every-return service set by an owner signed in to their OTTOYARD account is saved to " +
+  "the cars and stays from run to run until they change it, and with no run live that is the only change such an owner " +
+  "can make; anything else lasts until the run ends or you undo it.";
 const serviceProp = (description: string): JsonSchema => ({ type: "string", enum: OWNER_SERVICES, description });
 const SERVICE_GUIDE =
   "exterior_wash (external cleaning, a wash bay), interior_deep_clean (a full detail), interior_tidy (a quick clean), " +
@@ -359,7 +361,8 @@ export const TOOLS: readonly ToolDef[] = [
       "OTTO-Command, OTTO-Q's own agent, reads your cars, answers, and makes the changes your person asks for (how full " +
       "they charge, services, holds, undo) with YOUR token, so it can do nothing your token could not. It answers with " +
       "`answer` (plain English, ready to forward), `actions` (OTTO-Q's receipt for each change; a change is done only when " +
-      "its outcome is applied, and then it carries a confirmation code and an OrchestrAV link) and, when it only previewed " +
+      "its outcome is applied, and then it carries a confirmation code and an OrchestrAV link, or saved, made while no run " +
+      "was live, which changed only what is saved to the cars and carries a link) and, when it only previewed " +
       "a change, `confirm`: once your person says yes, call this tool again with `confirm` set to that array, unchanged, " +
       "to apply exactly the plan shown (it is sent through the confirm door, with no model involved). A refusal says why " +
       "and what is allowed. dry_run makes every change a preview. In a production run OTTO-Q applies a lower charge limit " +
