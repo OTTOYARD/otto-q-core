@@ -567,6 +567,20 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_stop_charge_frames_sql.py
 
+      # 0724, G442 and G440: the live run's row is locked without its key, and the stop door takes it first. Executed with
+      # concurrent sessions on a stub carrying the seven live definitions involved (md5-pinned): before, a key check waits
+      # while the world step or either fault door holds the row, and the live metronome and stop door deadlock; after,
+      # the key check passes at once, ticks, doors, updates and deletes still wait, and the door waits for the beat.
+      - name: The live run's row is locked without its key and taken first by the stop door, executed (0724, concurrent sessions)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_tick_lock_sql.py
+
       # 0720, G435 (b): the Black Box's RPC door. ottoq_run_blackbox(uuid) and ottoq_run_blackbox_meta(uuid) closed to
       # PUBLIC, anon and authenticated, kept for service_role (the edge function's role). Executed on a stub carrying both
       # live definitions (md5-pinned), both live ACLs and the live grants and policies of its relations, then asked as each

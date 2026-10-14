@@ -775,7 +775,8 @@ repo_manifest(version, name, file) AS (
     ('20261013211005'::text, 'production_start_takes_the_world_as_the_operator_door_does'::text, '0719_production_start_takes_the_world_as_the_operator_door_does.sql'::text),
     ('PENDING'::text, 'a_signed_in_user_cannot_call_the_black_box_export_functions'::text, '0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql'::text),
     ('PENDING'::text, 'the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies'::text, '0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql'::text),
-    ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text)
+    ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text),
+    ('PENDING'::text, 'the_runs_row_is_locked_without_its_key_and_taken_first_by_the_stop_door'::text, '0724_the_runs_row_is_locked_without_its_key_and_taken_first_by_the_stop_door.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
