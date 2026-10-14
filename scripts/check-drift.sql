@@ -773,6 +773,7 @@ repo_manifest(version, name, file) AS (
     ('20261013201139'::text, 'the_board_calls_eighty_percent_a_priority_band_not_a_floor'::text, '0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql'::text),
     ('20261013210801'::text, 'production_runs_the_world_phases_the_twin_certifies'::text, '0718_production_runs_the_world_phases_the_twin_certifies.sql'::text),
     ('20261013211005'::text, 'production_start_takes_the_world_as_the_operator_door_does'::text, '0719_production_start_takes_the_world_as_the_operator_door_does.sql'::text),
+    ('PENDING'::text, 'a_signed_in_user_cannot_call_the_black_box_export_functions'::text, '0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql'::text),
     ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
