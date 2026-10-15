@@ -567,13 +567,15 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_stop_charge_frames_sql.py
 
-      # 0724, G440 (and G443 left open): the stop door takes a running run's row before the run's proposals. Executed with
-      # concurrent sessions on a stub carrying the eleven live definitions involved (md5-pinned) and decide_tick's A3
-      # verbatim: before, the live metronome and stop door deadlock; after, the door waits for the beat and a proposal
-      # writer still finishes beside it; a stop on a run that is not running keeps its old order, so the prior-run purge
-      # (which deletes a run's rows by dynamic SQL and its row last) finishes beside it. G443: a key check still waits for
-      # the tick's FOR UPDATE; under it a mid-beat resubmission deadlocks and whichever side loses the evidence ledger
-      # stays right (each victim forced by deadlock_timeout); the weaker lock (throwaway database only) mislabels it.
+      # 0724, G440 (G443, G444 and G445 left open): the stop door takes a running run's row before the run's proposals.
+      # Executed with concurrent sessions on a stub carrying the eleven live definitions involved (md5-pinned) and
+      # decide_tick's A3 verbatim: before, the live metronome and stop door deadlock; after, the door waits for the beat
+      # and a proposal writer still finishes beside it; a stop on a run that is not running keeps its old order, so the
+      # prior-run purge (which deletes a run's rows by dynamic SQL and its row last) finishes beside it, except on a run
+      # the purge chose paused and that is resumed before its last statement: the purge deletes it running, and since
+      # 0724 a stop on it deadlocks with a lone purge (G444, pinned both ways). G443: a key check still waits for the
+      # tick's FOR UPDATE; under it a constructed mid-beat resubmission deadlocks and whichever side loses the evidence
+      # ledger stays right (each victim forced by deadlock_timeout); the weaker lock (throwaway database only) mislabels it.
       - name: The stop door takes the run's row before the proposals, executed (0724, concurrent sessions)
         env:
           PGHOST: localhost

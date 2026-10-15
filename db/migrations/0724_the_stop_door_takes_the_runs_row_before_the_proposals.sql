@@ -6,6 +6,9 @@
 --        The foreign-key wait behind 0450 §5's 7.35-second decision insert (G443) is measured here and NOT changed: the
 --        first draft of this file weakened the tick's own row lock to fix it, and two refuters showed that lets a proposal
 --        commit in the middle of a beat, after which the decide step records the wrong proposal as enacted (§1 (b)).
+--        Two defects its review found are recorded and NOT changed here (§3, §5): the prior-run purge never locks the runs
+--        it chooses, so a run resumed mid-purge is deleted while running, and a stop on that run inside the window now
+--        deadlocks with a lone purge (G444); and ottoq_pause_run and ottoq_resume_run rewrite a stopped run's status (G445).
 --
 -- ══ §1 WHY (measured 2026-10-14, read-only: the catalog, c5f4ff34's tables and the database's log) ═══════════════════
 --
@@ -49,16 +52,16 @@
 --   is ottoq_decide_tick line 1228 (A3), which marks enacted every pending proposal of the run whose (entity, source)
 --   matches an enacted decision of this tick, with no reference to the proposal the kernel took; and
 --   ottoq_submit_external_proposal supersedes a car's pending proposal by UPDATE and then INSERTs the new one, with no
---   lock on the run's row. So with the weaker lock, an agent batch that resubmits for a car the beat has just enacted
---   commits mid-beat, and line 1228 marks the NEW proposal enacted while the one the kernel took reads
+--   lock on the run's row. So with the weaker lock, a proposer's batch that resubmits for a car the beat has just
+--   enacted commits mid-beat, and line 1228 marks the NEW proposal enacted while the one the kernel took reads
 --   'superseded / newer_proposal_same_entity'; ottoq_proposal_disposition_ledger (class evidence, survives the purge,
 --   captures stall_id) keeps the stall the kernel never chose. Two refuters reproduced it on scratch, 3 of 3 runs
 --   each way, and tests/test_tick_lock_sql.py now carries it on the eleven live bodies (md5-pinned) with decide_tick's
 --   A3 verbatim (md5-pinned too; the withdrawn half is applied by the test to a throwaway database only). Under FOR
---   UPDATE the same interleaving is a deadlock, the 17:34:06 UTC one in the log: the batch's insert waits on the run's
---   row and line 1228 waits on the row the batch superseded. One side loses with 40P01: the batch at 17:34:06, and
---   otherwise the beat's decide, with every enactment of that tick. PostgreSQL does not fix which ("Exactly which
---   transaction will be aborted is difficult to predict and should not be relied upon", PostgreSQL 16, 13.3.4,
+--   UPDATE the same interleaving is a deadlock: the batch's insert waits on the run's row, which the beat holds, and
+--   line 1228 waits on the row the batch superseded. One side loses with 40P01: the batch, or the beat's decide with
+--   every enactment of that tick. PostgreSQL does not fix which ("Exactly which transaction will be aborted is
+--   difficult to predict and should not be relied upon", PostgreSQL 16, 13.3.4,
 --   https://www.postgresql.org/docs/16/explicit-locking.html#LOCKING-DEADLOCKS, read 2026-10-15 UTC). A waiter looks
 --   for a deadlock when it has waited deadlock_timeout (1 s on live, read 2026-10-14 23:59:36 UTC), and the first
 --   waiter to look after the cycle has closed is the one aborted: usually the batch, which began waiting first, and the
@@ -68,13 +71,26 @@
 --   back, nothing is enacted, the old proposal reads 'superseded / newer_proposal_same_entity' and the new one waits
 --   pending for the next beat (the test forces each side by deadlock_timeout and also runs the race at 1 s). The weaker
 --   lock would have turned a visible, retried deadlock into a silent mislabel of evidence.
+--   That interleaving is constructed by the test. The 17:34:06 UTC deadlock in the log is of the same class and is not
+--   that case. What can be read of it (read 2026-10-15 between 01:25:14 and 01:34:42 UTC, 8:25-8:34 PM CT on 10-14):
+--   the one log line is PostgREST's pid 3655901, ottoq_proposer_submit_batch line 37 -> ottoq_submit_external_proposal
+--   line 64 (its INSERT's key check), "detected deadlock while waiting for ShareLock on transaction 33105693 after
+--   1000.105 ms", at 17:34:06.298 on c5f4ff34's row (1,24) of ottoq_sim_runs, "Process holding the lock: 3658494", which
+--   cron.job_run_details names as job 12, CALL public.ottoq_demo_metronome(50), started 17:34:00.282999. So the batch's
+--   key check waited on the run's row held by the beat, from about 17:34:05.298. The batch was forward_lex's, the CP-SAT
+--   proposer's (ottoq_proposer_fire_log fire 15859: begun 17:34:05.295311, 13 rows, status error, '40P01: deadlock
+--   detected'). The beat's edge was not logged, and it was not line 1228: in ottoq_proposal_disposition_ledger, for
+--   c5f4ff34's tick 594 (the beat's transaction began 17:34:01.781348, the rows' captured_at; its world step 03.786757,
+--   ottoq_tick_clock_log), line 1228 enacted c57852e7 at 17:34:05.829024 and line 1237 superseded 4 rows at
+--   05.830803-05.831284, both while the batch was already waiting, and the dispose was entered at 06.300286 (the 11
+--   rows it refused carry its v_wall), after the batch had been aborted.
 --   G443's fix therefore needs, before the tick's lock is weakened: one lock order for proposal writers
 --   (ottoq_submit_external_proposal taking the run's row FOR SHARE before its supersede, which a refuter tested correct
 --   on scratch for this interleaving) or line 1228 scoped to the proposal the kernel took; AND an audit of every
 --   set-based statement in the beat over rows that reference the run, since the log shows other sessions writing such
---   rows during beats (the agent's decisions and proposal batches through PostgREST; ottoq_cron_tick's
---   cuopt_invocation_log and ottoq_cuopt_deferrals through pg_cron) and the deferral arm and hold-or-spend and the
---   dispose were all written against the frozen view. Not this file.
+--   rows during beats (the agent's decisions, and proposers' batches such as forward_lex's, through PostgREST;
+--   ottoq_cron_tick's cuopt_invocation_log and ottoq_cuopt_deferrals through pg_cron) and the deferral arm and
+--   hold-or-spend and the dispose were all written against the frozen view. Not this file.
 --
 -- ══ §2 WHAT THIS CHANGES ══════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -88,10 +104,13 @@
 --   it: the operator start (through ottoq_sim_run_scenario), the cockpit's Stop, the governor, the metronome's own
 --   ceiling stop, and the harness arms that stop their own runs. The world step and both fault doors are not touched
 --   (§1 (b)). Only a running run: the statement carries status = 'running', and a stop on a run in any other status
---   (paused, completed, aborted) takes no lock before its dispose, exactly as before (§3 says why). Nothing else in the
---   function moves (V1 reverses both patches and compares the whole definition, header included, with the snapshot). A
---   lock wait that runs out raises where the same row's lock already raised before (mark_stopped's UPDATE), now before
---   the door has touched anything.
+--   (paused, completed, aborted) takes no lock before its dispose, exactly as before (§3 says why). That keeps the door
+--   out of the prior-run purge's way on every run the purge chooses and that stays not running, but not on a run the
+--   purge chose while it was paused and that is resumed before the purge deletes it: the door reads that run as running
+--   and takes its row first, and a lone purge then deadlocks with it (§3, G444, open; before this file both finish, and
+--   the purge deletes the running run). Nothing else in the function moves (V1 reverses both patches and compares the
+--   whole definition, header included, with the snapshot). A lock wait that runs out raises where the same row's lock
+--   already raised before (mark_stopped's UPDATE), now before the door has touched anything.
 --
 -- ══ §3 WHY FOR NO KEY UPDATE, AND NOT FOR UPDATE; AND WHY ONLY A RUNNING RUN ═════════════════════════════════════════
 --
@@ -123,20 +142,38 @@
 --   runs: ottoq_cron_tick's hygiene sweep expired 3 on runs no longer running, 2026-09-27 to 09-29 (the evidence
 --   ledger, read 2026-10-15 00:03:30 UTC). So the door takes the row first only while the run is running, the one
 --   status a beat ticks, and the purge chooses its runs once with status <> 'running' (read live 00:13:28 UTC; P2
---   asserts that statement and that the purge deletes the rows of those runs and no others). Of 28 plpgsql functions
---   with dynamic SQL, 3 read the run-scope registry (read 00:13:49 and 00:13:56 UTC): the purge;
+--   asserts that statement and that the purge deletes the rows of those runs and no others).
+--   That keeps a running run out of the purge's choice. It does not keep the purge off a run that is running when the
+--   purge deletes it: the purge never locks the runs it chooses and never re-checks their status, and its last
+--   statement deletes them by sim_run_id = ANY(v_doomed) alone (live md5 46f1f29f, read 2026-10-15 01:25:14 UTC, 8:25 PM
+--   CT on 10-14). A paused run it chose and that is resumed before that DELETE (ottoq_resume_run's UPDATE, or the twin
+--   app's PATCH in edge-functions/otto-twin-control, each of which goes straight through on the unlocked row) is
+--   deleted while running, before this file as after it. And a stop on that run inside the window now reads it as
+--   running and takes its row first; its dispose then waits on a proposal the purge deleted, and the purge's DELETE
+--   waits on the door: a deadlock with a lone purge that this file adds (the test runs it: before 0724 both finish, the
+--   running run is deleted and the door marks nothing; after, one of them gets 40P01, on scratch the door in 13 of 13
+--   draws, 10 with the PATCH and 3 with the live ottoq_resume_run, and the purge then deletes the running run all the
+--   same). Only a direct call of the purge reaches it: its one caller in the database, ottoq_start_demo_run, marks
+--   running and paused runs aborted before it purges, so a resume waits behind that UPDATE and then finds the run
+--   deleted (on scratch, the PATCH and the live ottoq_resume_run both); no cron job and no client in this repo calls the
+--   purge; and on live authenticated and service_role may EXECUTE it (read 01:25:14 UTC, unchanged at 2026-10-15
+--   12:39:02 UTC, 7:39 AM CT), authenticated until pending 0701 revokes it. The fix is the purge's, not the door's
+--   (G444, §5).
+--   Of 28 plpgsql functions with dynamic SQL, 3 read the run-scope registry (read 00:13:49 and 00:13:56 UTC): the purge;
 --   ottoq_evidence_join_loss, which neither names the proposals nor writes or locks the run's row; and the nightly
---   ottoq_retention_purge_runs, which chooses its runs the same way as the purge and whose allowlist (7 tables, read
---   00:14:08 UTC) does not hold the proposals.
+--   ottoq_retention_purge_runs, which chooses its runs the same way as the purge, whose allowlist (7 tables, read
+--   00:14:08 UTC) does not hold the proposals, and which never deletes a run's row (it refuses an allow-listed table
+--   that is the parent of a NO ACTION foreign key, and its source deletes no ottoq_sim_runs row; md5 890d2de1, read
+--   01:36:24 UTC).
 --   Not mark_stopped's predicate (running or paused): the purge takes paused runs too, so taking a paused run's row
 --   first adds the same deadlock for a paused run (the test runs it). For a paused run this file changes nothing, and
 --   that includes a deadlock it leaves where it was. ottoq_start_demo_run first marks every running and paused run
 --   aborted (an UPDATE of their rows) and purges them afterwards, the opposite order to the purge called on its own
 --   (md5 45c9519e, read 00:16:48 UTC), so a stop on a paused run deadlocks with the demo start before and after 0724,
---   and finishes beside a lone purge before and after. No door order is safe against both while those two take a paused
---   run in opposite orders; that needs the purge to take its runs' rows first, not this file. A stop on a running run
---   and the demo start now take the row in the same order: they deadlocked before 0724 and serialize after (the test
---   runs all of it).
+--   and finishes beside a lone purge before and after while it stays paused. No door order is safe against both while
+--   those two take a paused run in opposite orders; that needs the purge to take its runs' rows first (G444), not this
+--   file. A stop on a running run and the demo start now take the row in the same order: they deadlocked before 0724
+--   and serialize after (the test runs all of it).
 --   The mode promises the holder will not delete the row or change a key column. The key columns, for a row lock, are
 --   those under a unique index a foreign key can use, partial and expression indexes excluded (the page above):
 --   sim_run_id (the primary key) and sim_run_seq (unique); ottoq_one_running_run_per_depot is partial (P2 asserts the
@@ -167,8 +204,20 @@
 -- ══ §5 NOT IN THIS FILE ══════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   - G443, the foreign-key wait: §1 (b). An insert that references the live run still waits for the beat's commit.
---   - A stop on a paused run still deadlocks with ottoq_start_demo_run's abort-then-purge, as before (§3). Closing it
---     needs the prior-run purge to take its runs' rows before it deletes their rows in the run-scoped tables.
+--   - G444, OPEN: the prior-run purge chooses its runs without locking them and deletes them without re-checking their
+--     status (§3). A run it chose while paused and that is resumed before it deletes the runs' rows is deleted while
+--     running, before this file as after it; a stop on that run inside the window deadlocks with a lone purge since
+--     this file (before it, both finish); and a stop on a paused run still deadlocks with ottoq_start_demo_run's
+--     abort-then-purge, as before. Closing it needs the purge to take its doomed runs' rows first, with their status
+--     re-checked under the lock (on scratch, against the stub purge so changed, a resume mid-purge then waits and
+--     updates nothing); then the door's early lock widened to a paused run, which with the first ends the paused run's
+--     deadlock with the demo start too (on scratch; the first alone does not); and pending 0701's revoke of
+--     authenticated's EXECUTE on the purge.
+--   - G445, OPEN: ottoq_pause_run (live md5 1e3ec33a) and ottoq_resume_run (b693dc33) read the run's status without a
+--     lock and update its row by sim_run_id alone, so one that waited behind a stop writes paused, or running, over the
+--     stopped run (on scratch, with both live bodies, before and after this file; the resume is refused with 23505 only
+--     when the stop's transaction started another run at the depot). Closing it needs their UPDATEs to carry the status
+--     they read, as the twin app's PATCH does.
 --   - G441 (a two-step start races the first tick) is untouched.
 --   - The doors outside the stop that write into a live run (vehicle commands, approvals) are not swept (0552 §4).
 --
@@ -230,8 +279,10 @@ BEGIN
     RAISE EXCEPTION '0724 P2: the functions that delete ottoq_sim_runs rows are %, not the prior-run purge alone', v_fns;
   END IF;
   -- §3's other order, which the census below cannot read: the purge deletes a run's rows by dynamic SQL and the run's
-  -- row last. The door takes the row first only on a running run, so the purge must never delete one: it chooses its
-  -- runs once, with status <> 'running' and no OR, and deletes the rows of those runs and of no others
+  -- row last. The door takes the row first only on a running run, so the purge must not choose one: it chooses its
+  -- runs once, with status <> 'running' and no OR, and deletes the rows of those runs and of no others. It neither locks
+  -- them nor re-checks their status, so a run resumed after the choice is deleted while running, and a stop on it in
+  -- that window deadlocks with a lone purge (G444, open; this asserts the choice, which is all the purge has today)
   SELECT regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') INTO v_src
     FROM pg_proc p WHERE p.oid = 'public.ottoq_purge_prior_runs(uuid)'::regprocedure;
   v_doomed := substring(v_src from '(?i)INTO\s+v_doomed\s+FROM\s+public\.ottoq_sim_runs\s+WHERE\s[^;]*;');
@@ -239,7 +290,7 @@ BEGIN
      OR (SELECT count(*) FROM regexp_matches(v_src, '\mINTO\s+v_doomed\M', 'gi')) <> 1 OR v_src ~* '\mv_doomed\s*:='
      OR (SELECT count(*) FROM regexp_matches(v_src, 'DELETE\s+FROM\s+(public\.)?ottoq_sim_runs\M', 'gi')) <> 1
      OR v_src !~* 'DELETE\s+FROM\s+public\.ottoq_sim_runs\s+WHERE\s+sim_run_id\s*=\s*ANY\s*\(\s*v_doomed\s*\)\s*;' THEN
-    RAISE EXCEPTION '0724 P2: the prior-run purge no longer deletes only runs that are not running (it chooses: %)',
+    RAISE EXCEPTION '0724 P2: the prior-run purge no longer chooses only runs that are not running (it chooses: %)',
       COALESCE(v_doomed, 'no runs by the statement this file read');
   END IF;
   IF EXISTS (SELECT 1 FROM pg_proc p
@@ -328,8 +379,9 @@ $a$;
   -- ottoq_sim_mark_stopped, so a stop during a beat deadlocked with it (2026-10-14 16:40:04 and 16:42:42 UTC). FOR NO KEY
   -- UPDATE, the mode mark_stopped's UPDATE takes: it waits for a beat, and a key check (a proposal's insert) does not wait
   -- for it. Only while the run is running, the one status a beat ticks: the prior-run purge deletes a run's proposals
-  -- and then its row, and only runs that are not running, so a stop on any other run keeps its old order. Under the 8 s
-  -- mark_stopped gives the same row; the caller's lock_timeout is back for the rest of the teardown.
+  -- and then its row, on runs it chose while they were not running, so a stop on any other run keeps its old order (a
+  -- run resumed after the purge chose it is not covered: G444). Under the 8 s mark_stopped gives the same row; the
+  -- caller's lock_timeout is back for the rest of the teardown.
   PERFORM set_config('lock_timeout', '8000', true);
   PERFORM 1 FROM ottoq_sim_runs WHERE sim_run_id = p_sim_run_id AND status = 'running' FOR NO KEY UPDATE;
   PERFORM set_config('lock_timeout', v_lock_prev, true);
@@ -356,8 +408,9 @@ $n$, ''),
   -- ottoq_sim_mark_stopped, so a stop during a beat deadlocked with it (2026-10-14 16:40:04 and 16:42:42 UTC). FOR NO KEY
   -- UPDATE, the mode mark_stopped's UPDATE takes: it waits for a beat, and a key check (a proposal's insert) does not wait
   -- for it. Only while the run is running, the one status a beat ticks: the prior-run purge deletes a run's proposals
-  -- and then its row, and only runs that are not running, so a stop on any other run keeps its old order. Under the 8 s
-  -- mark_stopped gives the same row; the caller's lock_timeout is back for the rest of the teardown.
+  -- and then its row, on runs it chose while they were not running, so a stop on any other run keeps its old order (a
+  -- run resumed after the purge chose it is not covered: G444). Under the 8 s mark_stopped gives the same row; the
+  -- caller's lock_timeout is back for the rest of the teardown.
   PERFORM set_config('lock_timeout', '8000', true);
   PERFORM 1 FROM ottoq_sim_runs WHERE sim_run_id = p_sim_run_id AND status = 'running' FOR NO KEY UPDATE;
   PERFORM set_config('lock_timeout', v_lock_prev, true);
@@ -398,17 +451,22 @@ $n$, '')
   IF NOT (0 < v_set8 AND v_set8 < v_lock AND v_lock < v_restore AND v_restore < v_dispose AND v_dispose < v_mark) THEN
     RAISE EXCEPTION '0724 V3 FAILED: the stop door does not take the run''s row first under 8 s and then dispose';
   END IF;
-  --: and only a running run's (§3): a stop on any other run keeps the order it had, which the prior-run purge relies on
+  --: and only a running run's (§3): a stop on any other run keeps the order it had, which keeps it out of the prior-run
+  --: purge's way on a run that stays not running (not on one resumed after the purge chose it: G444)
   IF v_src !~* 'ottoq_sim_runs\s+WHERE\s+sim_run_id\s*=\s*p_sim_run_id\s+AND\s+status\s*=\s*''running''\s+FOR\s+NO\s+KEY\s+UPDATE\s*;' THEN
     RAISE EXCEPTION '0724 V3 FAILED: the stop door''s early lock is not limited to a running run';
   END IF;
   RAISE NOTICE '0724 V1-V3 PASSED: the stop door takes a running run''s row before the proposals, the tick''s own lock is unchanged, and nothing else moved';
 END $v$;
 
--- ── V4: the patched door runs (a run that does not exist, in a subtransaction rolled back) and gives the caller's
---    lock_timeout back ──
+-- ── V4: the patched door runs (a run that does not exist, in a subtransaction rolled back) and marks nothing ──
+--    It does not check that the door gives the caller's lock_timeout back, and cannot from here: rolling the
+--    subtransaction back reverts every set_config(..., true) made inside it, and by the time the door returns
+--    mark_stopped has set 8 s whether the door restored the caller's value or not. V3 asserts the restore's place;
+--    tests/test_tick_lock_sql.py::test_0724_the_teardown_runs_under_the_lock_timeout_it_ran_under_before asserts its
+--    effect (the rescue step runs under the caller's 15 s), and a door without the restore fails it.
 DO $vrun$
-DECLARE v_res jsonb; v_before text := current_setting('lock_timeout'); v_after text;
+DECLARE v_res jsonb;
         v_none constant uuid := '00000000-0000-0000-0000-000000000724';
 BEGIN
   BEGIN
@@ -417,9 +475,8 @@ BEGIN
   EXCEPTION WHEN SQLSTATE 'P0724' THEN
     v_res := SQLERRM::jsonb;
   END;
-  v_after := current_setting('lock_timeout');
-  IF v_res ->> 'marked_stopped' IS DISTINCT FROM 'false' OR v_after IS DISTINCT FROM v_before THEN
-    RAISE EXCEPTION '0724 V4 FAILED: the stop door answered % for a run that does not exist, lock_timeout % -> %', v_res, v_before, v_after;
+  IF v_res ->> 'marked_stopped' IS DISTINCT FROM 'false' THEN
+    RAISE EXCEPTION '0724 V4 FAILED: the stop door answered % for a run that does not exist', v_res;
   END IF;
   RAISE NOTICE '0724 V4 PASSED: the patched stop door runs, marks nothing for a run that does not exist, and is rolled back';
 END $vrun$;
@@ -430,7 +487,9 @@ VALUES ('0724_the_stop_door_takes_the_runs_row_before_the_proposals', false, fal
   'of the metronome beat''s order, and deadlocked with it (2026-10-14 16:40:04, 16:42:42 UTC); it now takes a running '
   'run''s row first, FOR NO KEY UPDATE (mark_stopped''s own mode, which a proposal''s key check does not wait on) under '
   'mark_stopped''s 8 s, caller''s lock_timeout restored. Only a running run''s: the prior-run purge writes a run''s rows '
-  'before its row, on runs that are not running (P2), so a stop on any other run keeps its old order. '
+  'before its row, on runs it chose while they were not running (P2), so a stop on any other run keeps its old order. '
+  'The purge never locks the runs it chose, so one resumed mid-purge is deleted while running, and a stop on it in that '
+  'window now deadlocks with a lone purge (G444, open, not changed here; before 0724 both finish). '
   'Anchored and md5-guarded (bc8ee182), nothing else moved (V1). '
   'The tick''s FOR UPDATE is unchanged: weakening it (G443) lets a proposal commit mid-beat and decide_tick line 1228 '
   'mark the wrong one enacted. Every certified output is computed inside one transaction, where the added lock waits '

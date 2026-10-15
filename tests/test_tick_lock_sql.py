@@ -20,15 +20,20 @@ byte (md5-pinned) and decide_tick's A3 verbatim (tests/fixtures/tick_lock_stub.s
     where locking any run's row (0724's first version) or mark_stopped's running-or-paused deadlocks with it; a stop on
     a running run and the demo start's abort-then-purge deadlock before 0724 and serialize after; a stop on a paused
     run and that demo start deadlock before and after (0724 leaves a paused run as it was);
+  - and where that is not enough (G444, open): the purge chooses its runs once and never locks them, so a run it chose
+    while paused and that is resumed before it deletes the runs' rows is deleted while running. A stop on that run
+    finishes beside a lone purge before 0724, the run deleted and nothing marked, and deadlocks with it after;
   - G443 is unchanged: a key check still waits while the world step or either fault door holds the row, before and after;
-  - and why: with the tick's FOR UPDATE, the agent's live batch resubmitting for a car the beat has just enacted
-    deadlocks, and whichever side PostgreSQL aborts, the evidence ledger records no proposal the kernel did not take
-    (each side is forced by deadlock_timeout, and the race is also run at the server's 1 s, as live); with the withdrawn
-    FOR NO KEY UPDATE (applied here to a throwaway database only), the batch commits mid-beat and the ledger records the
-    stall the kernel never chose;
+  - and why: with the tick's FOR UPDATE, a proposer's batch through the live submit door, resubmitting for a car the
+    beat has just enacted, deadlocks, and whichever side PostgreSQL aborts, the evidence ledger records no proposal the
+    kernel did not take (each side is forced by deadlock_timeout, and the race is also run at the server's 1 s, as
+    live); with the withdrawn FOR NO KEY UPDATE (applied here to a throwaway database only), the batch commits mid-beat
+    and the ledger records the stall the kernel never chose. The interleaving is constructed: it is of the class of the
+    17:34:06 UTC deadlock in the log (forward_lex's batch, its key check waiting on the beat), not that event, whose
+    beat-side edge was not logged and was not decide_tick line 1228 (0724 §1 (b));
   - one session gets the same rows with and without 0724 (the lineage's FALSE/FALSE);
   - 0724 refuses a second apply, a pair in flight, a key-column UPDATE in the catalog, a writer of the proposals that also
-    takes the run's row, a prior-run purge that would delete a running run, a metronome that commits between its world
+    takes the run's row, a prior-run purge that would choose a running run, a metronome that commits between its world
     and decide steps, and a patch that changes more than it says, and a refusal rolls the whole file back.
 A deadlock test never names the side PostgreSQL aborts unless it forces it: the documentation says which one "is
 difficult to predict and should not be relied upon" (PostgreSQL 16, 13.3.4). It SKIPS where no scratch PostgreSQL is
@@ -391,16 +396,25 @@ REMOVERS = {
                    f"SELECT public.ottoq_purge_prior_runs('{KEEP}'); COMMIT;"),
 }
 REMOVER_APP = "ottoq_0724_remover"
+# the twin app's resume (edge-functions/otto-twin-control resumeRun: .update({status: 'running', next_tick_due_at})
+# .eq('sim_run_id', id).eq('status', 'paused')). The purge has not locked the run, so it goes straight through, and so
+# does ottoq_resume_run's UPDATE (live md5 b693dc33), which carries no status predicate at all (G445)
+RESUME = (f"UPDATE public.ottoq_sim_runs SET status = 'running', next_tick_due_at = now() "
+          f"WHERE sim_run_id = '{RUN}' AND status = 'paused' RETURNING status")
 
 
 def _prior_run_and_door(d, status, remover):
     """A stop door on a run in `status` arrives while `remover` is between its first write and its next: the remover waits
-    (t_hold_for_door) until the door waits on a lock, then goes on."""
-    d.val(f"UPDATE public.ottoq_sim_runs SET status = '{status}' WHERE sim_run_id = '{RUN}'")
+    (t_hold_for_door) until the door waits on a lock, then goes on. 'resumed' is a run that is paused when the remover
+    chooses its runs and is resumed while the remover is at the hook, before the door is called (G444)."""
+    d.val(f"UPDATE public.ottoq_sim_runs SET status = '{'paused' if status == 'resumed' else status}' "
+          f"WHERE sim_run_id = '{RUN}'")
     d.val(f"UPDATE public.t_decide SET door = '{DOOR_APP}'")
     r = d.background(REMOVERS[remover], REMOVER_APP)
     d.wait_for(f"SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = '{REMOVER_APP}_holding')",
                "the remover to reach the hook")
+    if status == "resumed":
+        assert d.val(RESUME) == "running"     # chosen while paused, running now: the purge never looks at it again
     door = d.background(f"SET lock_timeout = '15s'; SELECT public.ottoq_sim_stop_and_reset('{RUN}', 'operator_stop')",
                         DOOR_APP)
     r_out, r_err = r.communicate(timeout=60)
@@ -416,6 +430,11 @@ PRIOR_RUN_CASES = [
     ("paused", "purge", "before", False),
     ("paused", "purge", "after", False),
     ("paused", "purge", "mark_stopped", True),        # why not mark_stopped's predicate: the purge takes paused runs
+    # G444, OPEN: the purge chooses its runs once and never locks them, so a run it chose while paused and that is
+    # resumed before its last statement is deleted while running. Before 0724 the door finishes beside it and marks
+    # nothing; after it the door takes the now-running run's row first, and that is a cycle with a lone purge
+    ("resumed", "purge", "before", False),
+    ("resumed", "purge", "after", True),
     ("running", "demo_start", "before", True),
     ("running", "demo_start", "after", False),        # the demo start takes the run's row first, the beat's order
     ("paused", "demo_start", "before", True),
@@ -439,7 +458,8 @@ def test_0724_the_door_takes_the_row_first_only_on_a_running_run(db, status, rem
         assert "deadlock detected" in (r_err if lost == ["remover"] else door_err), (r_err, door_err)
     else:
         assert lost == [], (r_err, door_err)
-        # the remover took the run, so the door marked nothing (and the release is the stub's)
+        # the remover took the run, so the door marked nothing (and the release is the stub's); for 'resumed' that is a
+        # running run deleted (G444)
         assert json.loads(door_out.splitlines()[-1]) == {"released": True, "marked_stopped": False}
         assert db.val("SELECT count(*) FROM public.ottoq_sim_runs") == "0"
 
@@ -470,9 +490,10 @@ def _ab(col):
 
 
 def _mid_beat(d, batch_deadlock_timeout=None, beat_deadlock_timeout=None):
-    """The live metronome's beat enacts the car from its pending proposal P_old (stall A, llm_advisor); the agent's live
-    batch then resubmits P_new (stall B) for the same car while the beat is in flight; then the beat's A3 runs. Each
-    session's deadlock_timeout is the server's (1 s, as live) unless one is given."""
+    """The live metronome's beat enacts the car from its pending proposal P_old (stall A, llm_advisor); a proposer's
+    batch, through the live ottoq_proposer_submit_batch, then resubmits P_new (stall B) for the same car while the beat
+    is in flight; then the beat's A3 runs. A constructed interleaving (0724 §1 (b)). Each session's deadlock_timeout is
+    the server's (1 s, as live) unless one is given."""
     d.val(f"""INSERT INTO public.ottoq_external_proposals (sim_run_id, depot_id, action_context, entity_type, entity_id,
                                                            source, proposal, status, expires_at)
               VALUES ('{RUN}', '{DEPOT}', 'stall_assignment', 'vehicle', '{CAR}', 'llm_advisor',
@@ -508,9 +529,10 @@ def _mid_beat(d, batch_deadlock_timeout=None, beat_deadlock_timeout=None):
 
 # which side's deadlock check runs first after the cycle closes: (the batch's deadlock_timeout, the beat's). "either" is
 # the server's 1 s on both, as live (read 2026-10-14 23:59:36 UTC), where the batch, which begins waiting first, usually
-# looks first and loses, and a beat whose wait begins over a second later turns it round (the race the 17:34:06 UTC
-# deadlock was one draw of). "batch" and "beat" force each side, with room to spare: the side given the shorter timeout
-# looks first, after the other is already waiting.
+# looks first and loses, and a beat whose wait begins over a second later turns it round. "batch" and "beat" force each
+# side, with room to spare: the side given the shorter timeout looks first, after the other is already waiting. (At
+# 17:34:06 UTC on live the batch, forward_lex's, looked first and lost; that deadlock's beat-side edge is not known, so
+# it is of this class, not this interleaving: 0724 §1 (b).)
 VICTIMS = {"either": (None, None), "batch": ("2s", "5s"), "beat": ("5s", None)}
 
 
@@ -519,7 +541,7 @@ VICTIMS = {"either": (None, None), "batch": ("2s", "5s"), "beat": ("5s", None)}
 def test_0724_with_the_ticks_for_update_a_mid_beat_resubmission_deadlocks_and_the_ledger_stays_right(db, phase, victim):
     _phase(db, phase)
     r = _mid_beat(db, *VICTIMS[victim])
-    # the 17:34:06 UTC shape: the batch's insert waits on the run's row and A3 waits on the row the batch superseded
+    # the constructed cycle: the batch's insert waits on the run's row and A3 waits on the row the batch superseded
     batch_lost = r["batch"]["status"] == "error" and (r["batch"]["error"] or "").startswith("40P01")
     beat_lost = r["failures"] == [["decide", "deadlock detected", "40P01"]]
     assert batch_lost != beat_lost, r                       # exactly one side is aborted
@@ -645,16 +667,18 @@ def test_0724_refuses_when_a_proposal_writer_also_takes_the_runs_row(db):
     _unchanged(db)
 
 
-def test_0724_refuses_when_the_prior_run_purge_would_delete_a_running_run(db):
+def test_0724_refuses_when_the_prior_run_purge_would_choose_a_running_run(db):
     """The purge writes a run's rows and then deletes the run's row, the reverse of the door's order on a running run, so
-    the door's early lock is safe only while the purge never chooses a running run."""
+    the door's early lock needs the purge never to choose a running run. That is not sufficient: the purge does not lock
+    the runs it chose, and a run resumed after the choice still meets the door in the reverse order (G444, pinned by
+    the 'resumed' cases above)."""
     db.val("""DO $x$ DECLARE v text := pg_get_functiondef('public.ottoq_purge_prior_runs(uuid)'::regprocedure);
               BEGIN
                 IF strpos(v, E'\\n     AND status <> ''running'';') = 0 THEN RAISE EXCEPTION 'anchor not found'; END IF;
                 EXECUTE replace(v, E'\\n     AND status <> ''running'';', ';');
               END $x$""")
     rc, err = _apply(db)
-    assert rc != 0 and "0724 P2: the prior-run purge no longer deletes only runs that are not running" in err, err
+    assert rc != 0 and "0724 P2: the prior-run purge no longer chooses only runs that are not running" in err, err
     _unchanged(db)
 
 
