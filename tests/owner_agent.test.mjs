@@ -10,7 +10,8 @@
 //                   over REST and MCP; only a fleet-bound token is offered the owner's tools.
 //   4. openapi      one public document, generated from the same catalog MCP serves, every $ref resolving.
 //   5. the door     POST /v1/ask with a scripted model: the owner's token is the only way in, dry_run is enforced in
-//                   code, the answer cannot claim what the receipts deny, failures are honest, confirm needs no model.
+//                   code, the answer ends with the changes block built from the receipts (0721: the only record of
+//                   what changed; the model's text is never screened), failures are honest, confirm needs no model.
 //   6. the model    the Anthropic call's shape (cached system prompt, tools) and every failure it can meet.
 //   7. hygiene      the door reaches OTTO-Q only through the gateway's call, and no model name is written in the repo.
 //   8. end to end   (skips without a server) the HTTP handler over the REAL 0559 + 0605 SQL against the stub engine.
@@ -53,6 +54,7 @@ import {
   modelTools,
   ownerAskHandler,
   ownerContext,
+  OTTOCOMMAND_READS,
   parseAskBody,
   receiptsText,
   settleAnswer,
@@ -112,7 +114,12 @@ test("services, when, outcomes and the capability are the ones 0605's SQL declar
   assert.deepEqual(list(requestable), [...OWNER_SERVICES]);
   assert.deepEqual(list(/service_when IN \(([^)]+)\)/.exec(M0605)[1]), [...SERVICE_WHEN]);
   const outcomes = [...M0605.matchAll(/outcome IN \(([^)]+)\)/g)].flatMap((m) => list(m[1]));
-  assert.deepEqual(sorted(new Set(outcomes)), sorted(OWNER_OUTCOMES));
+  //: 0721 §14 replaces 0605's mode/outcome CHECK by the same one admitting 'saved' (an apply made with no run live)
+  const M0721 = read("db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql");
+  const check0721 = /ADD CONSTRAINT ottoq_owner_commands_mode_outcome_check CHECK \(([\s\S]*?)\)\),/.exec(M0721)[1];
+  const outcomes0721 = [...check0721.matchAll(/outcome IN \(([^)]+)\)/g)].flatMap((m) => list(m[1]));
+  assert.deepEqual(sorted(new Set(outcomes0721)), sorted([...new Set(outcomes), "saved"]));
+  assert.deepEqual(sorted(new Set(outcomes0721)), sorted(OWNER_OUTCOMES));
   // 0559's capabilities CHECK admits the capability (0605's P1 asserts it); 0605 adds that it needs a fleet
   assert.match(read(M0559_PATH), /capabilities <@ ARRAY\[[^\]]*'owner_settings'[^\]]*\]/);
   assert.match(M0605, /ADD CONSTRAINT ottoq_agent_principals_owner_scope_check CHECK \(\s*NOT \('owner_settings' = ANY \(capabilities\)\) OR fleet_operator_id IS NOT NULL\)/);
@@ -131,6 +138,12 @@ const propsOf = (names) => new Set(names.flatMap((n) => Object.keys(findTool(n).
 
 test("every argument the commands' SQL reads is in a tool schema, and every schema argument is one it reads", () => {
   const sql = argKeys(F0605.get("ottoq_owner_command"));
+  // 0721 patches that body by anchored substitution, so the reads it adds sit inside quoted SQL (quotes doubled): the
+  // preview an apply confirms, and nothing else
+  const m0721 = read("db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql");
+  const added = [...m0721.matchAll(/ottoq_agent_arg_(?:int|uuid|text|bool)\(v_args, ''([a-z_]+)''\)/g)].map((m) => m[1]);
+  assert.deepEqual(added, ["confirms_command_id"]);
+  for (const k of added) sql.add(k);
   assert.deepEqual(sorted(propsOf(OWNER_COMMANDS)), sorted(sql));
 });
 
@@ -455,7 +468,7 @@ test("the door: OTTO-Command calls the owner's tool with the owner's token, and 
   assert.deepEqual(calls[1].args, { vehicles: "all", percent: 90, note: WORDS }, "the owner's words ride as the note; no key without one");
   // the model: the cached prompt, the owner's tools only, without the arguments the door decides
   assert.equal(requests[0].system, SYSTEM_PROMPT);
-  assert.deepEqual(sorted(requests[0].tools.map((t) => t.name)), sorted([...OWNER_READS, ...OWNER_COMMANDS]));
+  assert.deepEqual(sorted(requests[0].tools.map((t) => t.name)), sorted([...OWNER_READS, ...OTTOCOMMAND_READS, ...OWNER_COMMANDS]));
   for (const t of requests[0].tools) for (const k of ["note", "idempotency_key", "expect_plan_hash"]) assert.ok(!(k in (t.input_schema.properties ?? {})), `${t.name} offers ${k}`);
   assert.ok("mode" in requests[0].tools.find((t) => t.name === "set_charge_limit").input_schema.properties);
   const first = requests[0].messages[0].content;
@@ -467,7 +480,7 @@ test("the door: OTTO-Command calls the owner's tool with the owner's token, and 
   assert.equal(JSON.parse(result.content).outcome, "applied");
 });
 
-test("dry_run is enforced in code: every command goes out as a preview, and the answer cannot say it was done", async () => {
+test("dry_run is enforced in code: every command goes out as a preview, and the changes block says nothing changed", async () => {
   const { engine, calls } = ownerEngine();
   const { model, requests } = scriptedModel([use(["set_charge_limit", { vehicles: "all", percent: 90, mode: "apply" }]), say("Done. Your Teslas now charge to 90%.")]);
   const gw = gateway(engine, ownerAskHandler({ model }));
@@ -477,25 +490,38 @@ test("dry_run is enforced in code: every command goes out as a preview, and the 
   assert.ok(!("mode" in requests[0].tools.find((t) => t.name === "set_charge_limit").input_schema.properties));
   assert.match(requests[0].messages[0].content, /DRY RUN/);
   assert.equal(out.data.dry_run, true);
-  assert.match(out.data.answer, /^Preview only, nothing has changed/, out.data.answer);
+  // 0721 (the review, round 1): the model's text is never screened; what changed is the changes block, from the receipts
+  assert.equal(out.data.changes.made, false);
+  assert.deepEqual(out.data.changes.items.map((c) => [c.tool, c.outcome, c.command_id]), [["set_charge_limit", "previewed", out.data.actions[0].command_id]]);
+  assert.ok(out.data.answer.endsWith(`\n\n${out.data.changes.text}`), out.data.answer);
+  assert.match(out.data.changes.text, /^Changes: nothing was changed by this ask\. OTTO-Q's own receipts:\n- Preview only, nothing changed: set charge limit, 36 cars, command \S+\. A dry run applies nothing\.$/);
   assert.equal(out.data.actions[0].outcome, "previewed");
   assert.deepEqual(out.data.actions[0].confirm, { tool: "set_charge_limit", args: { vehicles: "all", percent: 90, mode: "apply", expect_plan_hash: HASH, note: WORDS } });
 });
 
-test("the answer cannot claim a change OTTO-Q refused, and an applied change always carries its link", async () => {
+test("a change OTTO-Q refused is refused in the changes block, whatever the model says; an applied change always carries its link", async () => {
   const { engine } = ownerEngine({ set_charge_limit: (args, n) => receipt("set_charge_limit", args, n, "refused") });
   const { model } = scriptedModel([use(["set_charge_limit", { vehicles: "all", percent: 50 }]), say("Done! Your cars are capped at 50%.")]);
   const out = await bodyOf(await ask(gateway(engine, ownerAskHandler({ model })), { text: "cap everything at 50%" }));
-  assert.match(out.data.answer, /^Not done: 50% is below the 80% minimum/);
+  // 0721 (the review, round 1): the model's text is shown as written, never screened by pattern; the changes block, built
+  // from OTTO-Q's receipts, is the only record of what changed, and here it says nothing did and why
+  assert.ok(out.data.answer.startsWith("Done! Your cars are capped at 50%."), out.data.answer);
+  assert.equal(out.data.changes.made, false);
+  assert.deepEqual(out.data.changes.items, [{ tool: "set_charge_limit", outcome: "refused", sent_to_ottoq: true,
+    command_id: out.data.actions[0].command_id, confirmation_code: null, cars: 36,
+    reason: "50% is below the 80% minimum in your contract. Choose 80% to 100%." }]);
+  assert.ok(out.data.answer.endsWith("\n\nChanges: nothing was changed by this ask. OTTO-Q's own receipts:\n" +
+    `- Refused, nothing changed: set charge limit, 36 cars, command ${out.data.actions[0].command_id}: 50% is below the 80% minimum in your contract. Choose 80% to 100%.`), out.data.answer);
   assert.equal(out.data.actions[0].ok, false);
   assert.equal(out.data.actions[0].error.code, "below_contract_minimum");
-  // unit: the same guard, and the link rule
+  // unit: the model's text stands as written, and the link rule
   const applied = [{ tool: "request_service", outcome: "applied", summary: "Done. x", link: `${LINK}&command=1` }];
   assert.equal(settleAnswer("Sorted, it is booked.", applied, false), `Sorted, it is booked.\nSee it in OrchestrAV: ${LINK}&command=1`);
   assert.equal(settleAnswer(`Done. ${LINK}&command=1`, applied, false), `Done. ${LINK}&command=1`);
-  assert.equal(settleAnswer("All set!", [{ ...applied[0], outcome: "previewed", summary: "Preview only." }], false), "Preview only.");
+  assert.equal(settleAnswer("All set!", [{ ...applied[0], outcome: "previewed", summary: "Preview only." }], false), "All set!",
+    "never screened: a preview adds no link, and the changes block says it was only a preview");
   assert.equal(settleAnswer("Done. All capped.", [{ ...applied[0], outcome: "previewed", summary: "Preview only, nothing has changed." }], true),
-    "Preview only, nothing has changed.", "in a dry run nothing is done, whatever the model says");
+    "Done. All capped.", "never screened in a dry run either: the changes block says nothing changed");
   assert.equal(settleAnswer("", [], false), "OTTO-Command has no answer to give.");
   assert.equal(receiptsText([{ tool: "hold_vehicle", summary: null, error: { message: "OTTO-Q did not answer." } }]), "Not done (hold vehicle): OTTO-Q did not answer.");
 });
@@ -527,7 +553,7 @@ test("only an owner's token may use the door; a fleet reader may ask questions b
   assert.equal(requests.length, 0, "no model call for a token that is not an owner's");
   const reader = await ask(gw, { text: "how are my cars?" }, T_FLEET_READ);
   assert.equal(reader.status, 200);
-  assert.deepEqual(sorted(requests[0].tools.map((t) => t.name)), sorted(OWNER_READS));
+  assert.deepEqual(sorted(requests[0].tools.map((t) => t.name)), sorted([...OWNER_READS, ...OTTOCOMMAND_READS]));
   assert.match(requests[0].messages[0].content, /This token cannot change anything/);
   const stranger = await ask(gw, { text: "hi" }, "oqa_" + "9".repeat(64));
   assert.equal(stranger.status, 401);
@@ -551,7 +577,9 @@ test("the door fails honestly: no model, a model error, the step limit -- and wo
   const halfway = scriptedModel([use(["set_charge_limit", { vehicles: "all", percent: 90 }]), { ok: false, status: 529, message: "overloaded" }]);
   const partial = await bodyOf(await ask(gateway(engine, ownerAskHandler({ model: halfway.model })), { text: WORDS }));
   assert.equal(partial.data.incomplete, true);
-  assert.match(partial.data.answer, /^OTTO-Command could not finish its answer, but here is what OTTO-Q did:\n\nDone\. set_charge_limit/);
+  // 0721 (the review, round 2): it opens with why it stopped, and says it in `stopped` too
+  assert.match(partial.data.answer, /^OTTO-Command could not finish its answer: overloaded\. Here is what OTTO-Q did before it stopped:\n\nDone\. set_charge_limit/);
+  assert.deepEqual(partial.data.stopped, { code: "ask_model_failed", message: "overloaded" });
   const looping = scriptedModel(Array.from({ length: 20 }, () => use(["my_fleet", {}])));
   const limited = await ask(gateway(engine, ownerAskHandler({ model: looping.model })), { text: "how are my cars?" });
   assert.equal(limited.status, 504);
@@ -630,7 +658,7 @@ test("the owner's context and tools as the model sees them", () => {
   const off = ownerContext({ ...who, data: { ...who.data, owner: { ...OWNER_DATA, live_demo_run: null } } }, true);
   assert.match(off, /Demo run live: no/);
   assert.match(off, /DRY RUN/);
-  const tools = modelTools(toolsFor(["read", "owner_settings"], { fleetBound: true }).filter((t) => t.scope === "fleet"), false);
+  const tools = modelTools(toolsFor(["read", "owner_settings"], { fleetBound: true }).filter((t) => t.scope === "fleet" && !t.gateway), false);
   assert.equal(tools.length, OWNER_READS.length + OWNER_COMMANDS.length);
   for (const t of tools) {
     assert.match(t.name, /^[a-zA-Z0-9_-]{1,64}$/);
@@ -657,22 +685,33 @@ test("the model call: one Messages request, the system prompt cached, the key an
   ], stop_reason: "tool_use" }));
   const call = anthropicModel({ apiKey: "sk-test", model: "the-deployments-model", fetchImpl: f });
   const reply = await call({ system: "S", tools: [{ name: "my_fleet", description: "d", input_schema: { type: "object" } }], messages: [{ role: "user", content: "hi" }], max_tokens: 100 });
-  assert.deepEqual(reply, { ok: true, stop_reason: "tool_use", content: [{ type: "text", text: "Checking." }, { type: "tool_use", id: "tu_1", name: "my_fleet", input: {} }] });
+  // 0721: every block comes back as received (the thinking block too: it is replayed, never dropped), with the runner's
+  // reading of it beside it
+  assert.equal(reply.ok, true);
+  assert.equal(reply.stop_reason, "tool_use");
+  assert.deepEqual(reply.content, [{ type: "thinking", thinking: "..." }, { type: "text", text: "Checking." }, { type: "tool_use", id: "tu_1", name: "my_fleet", input: {} }]);
+  assert.equal(reply.parsed.text, "Checking.");
+  assert.deepEqual(reply.parsed.tool_uses, [{ id: "tu_1", name: "my_fleet", input: {} }]);
   assert.equal(seen[0].url, ANTHROPIC_MESSAGES_URL);
   assert.equal(seen[0].init.method, "POST");
   assert.equal(seen[0].init.headers["x-api-key"], "sk-test");
   assert.equal(seen[0].init.headers["anthropic-version"], ANTHROPIC_VERSION);
+  // a model this door does not know gets the plainest request: no effort field, no fallback, no web unless asked
   assert.deepEqual(seen[0].body, {
     model: "the-deployments-model", max_tokens: 100,
     system: [{ type: "text", text: "S", cache_control: { type: "ephemeral" } }],
     tools: [{ name: "my_fleet", description: "d", input_schema: { type: "object" } }],
     messages: [{ role: "user", content: "hi" }],
   });
+  assert.equal(seen[0].init.headers["anthropic-beta"], undefined);
 });
 
 test("the model call's failures are named, never thrown", async () => {
   const refused = await anthropicModel({ apiKey: "k", model: "m", fetchImpl: async () => json(400, { type: "error", error: { type: "invalid_request_error", message: "bad tools" } }) })({ system: "", tools: [], messages: [], max_tokens: 1 });
-  assert.deepEqual(refused, { ok: false, status: 400, message: "The language model refused the request: bad tools" });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.status, 400);
+  assert.equal(refused.code, "model_error");
+  assert.equal(refused.message, "The language model refused the request: bad tools");
   const down = await anthropicModel({ apiKey: "k", model: "m", fetchImpl: async () => { throw new TypeError("fetch failed"); } })({ system: "", tools: [], messages: [], max_tokens: 1 });
   assert.equal(down.ok, false);
   assert.equal(down.status, 503);
@@ -692,12 +731,22 @@ test("the door reaches OTTO-Q only through the gateway's call: no database clien
   assert.match(door, /deps\.call\(tool\.name, v\.value, \{\}\)/);
 });
 
-test("no model name is written in the repository: the deployment chooses it", () => {
-  for (const [file, src] of [["ottocommand_owner.ts", DOOR_SRC], ["agent_gateway.ts", SHARED_SRC], ["ottoq-agent-gateway/index.ts", SHELL_SRC]]) {
+test("model names live in one place: the door's default and its capability tables; the deployment may override", () => {
+  // 0721: the default model is one constant (DEFAULT_OWNER_MODEL), and the tables that pick the web search tool's
+  // version, the fallback and the effort field name models; no other file names one
+  for (const [file, src] of [["agent_gateway.ts", SHARED_SRC], ["ottoq-agent-gateway/index.ts", SHELL_SRC]]) {
     assert.doesNotMatch(src, /\bclaude-(?:opus|sonnet|haiku|fable|mythos|instant|\d)/i, file);
   }
+  const door = stripTsComments(DOOR_SRC);
+  const lines = door.split("\n").filter((l) => /\bclaude-(?:opus|sonnet|haiku|fable|mythos|instant|\d)/i.test(l));
+  assert.ok(lines.length > 0);
+  const allowed = /^(export const DEFAULT_OWNER_MODEL = "claude-opus-5-5";|\s+"claude-[a-z0-9-]+"(, "claude-[a-z0-9-]+")*,?|export const FALLBACK_MODELS: ReadonlySet<string> = new Set\(\["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-1"\]\);|\s+\.\.\.DYNAMIC_WEB_SEARCH_MODELS, "claude-fable-5", "claude-fable-5-1", "claude-haiku-5-5",)$/;
+  for (const l of lines) assert.match(l, allowed, l);
   const shell = stripTsComments(SHELL_SRC);
-  assert.match(shell, /Deno\.env\.get\("OTTOCOMMAND_OWNER_MODEL"\) \?\? Deno\.env\.get\("ANTHROPIC_MODEL"\)/);
+  assert.match(shell, /ownerAskConfig\(\(name\) => Deno\.env\.get\(name\)\)/);
+  //: the shell reads no model variable itself: ownerAskConfig does (OTTOCOMMAND_OWNER_MODEL, else ANTHROPIC_MODEL, which
+  //: the deployed gateway reads, else the default), so the order is in one place and tested there
+  assert.doesNotMatch(shell, /OTTOCOMMAND_OWNER_MODEL|ANTHROPIC_MODEL/, "the shell does not read a model variable itself");
   assert.match(shell, /ownerAskHandler\(/);
   //: 0700: and the sign-in endpoints beside it
   assert.match(shell, /allowedOrigins: ALLOWED_ORIGINS, engine, ask, signin \}/);
