@@ -63,14 +63,15 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > tool that changes anything (annotated `readOnlyHint: true`, `openWorldHint: true`). `ask_ottocommand` may search the
 > web too (now `openWorldHint: true`) and returns `sources` and `web_searches` when it does. **Once any web result has
 > entered an ask, the gateway refuses every write tool for the rest of it**, before OTTO-Q is called, and the answer
-> OPENS with that fact; an ask that searched returns no `confirm` (at the top or inside a receipt), names refused tools
+> OPENS with that fact; an ask that searched returns no `confirm` (at the top or inside a receipt) and none of the words
+> in a receipt that say how to send one (the plan hash, the preview's id), names refused tools
 > without their arguments (`blocked_after_web: ["set_charge_limit"]`), and keeps a page's title out of the answer
 > (cleaned and capped in `sources` only). **The model's text is never screened or dropped by pattern** (the review, round
 > 1: a pattern screen dropped 35% of realistic read-only answers and still let claims through): instead every ask and
 > every search answers with **`changes`**, a block built in code from OTTO-Q's receipts only (`{made, items: [{tool,
 > outcome: applied | saved | previewed | no_change | refused | unknown, sent_to_ottoq, command_id, confirmation_code,
 > cars, reason}], text}`), which also ends `answer`; it is the ONLY record of what changed, and the MCP instructions, the
-> tool descriptions, the OpenAPI and the Hermes skill (1.6.0) say so. A search's is always none, and says a search
+> tool descriptions, the OpenAPI and the Hermes skill (1.6.1) say so. A search's is always none, and says a search
 > changes nothing. Web searches are capped per model call (`max_uses`, the API's per-request cap); an ask makes at most
 > 9 model calls, so at most 27 searches at the default of 3, and `web_searches` counts them across the ask. Every model call is one row in
 > `ottoq_model_call_ledger` (provider `anthropic_ottocommand`; ids and counts only) through a service-role-only function,
@@ -80,9 +81,25 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > can still save them (outcome `saved`, the saved table only, carried onto the next run); a guard trigger refuses every
 > write to the owner tables that does not come from the functions that make owner settings (each named for its own call
 > by a function-level `ottoq.owner_settings_writer`), plain INSERT, UPDATE, DELETE and TRUNCATE included, as postgres or
-> any role; a one-time order never ends a saved every-return order; the two anon-readable cockpit boards leave out
+> any role; a one-time order never ends a saved every-return order (and one that an every-return order already covers
+> changes nothing: the service stays on the car's visit); the two anon-readable cockpit boards leave out
 > production, a person's no-run commands and a person's words; and a passcode session (and `enter_passcode`) is refused `403 production_live` while a
 > production run is live. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11, "Search, the web, and what lasts".
+
+> **2026-10-14, night CT — the review, round 2 (same `0721`, same gateway; built and tested on scratch, NOT yet applied
+> or deployed).** Each finding was reproduced on scratch before it was fixed. `my_settings`, `my_fleet` and `my_vehicle`
+> name a setting's `command_id` only to the agent that made the command or to the person it is recorded under (a passcode
+> session or an issued key read a person's carried production and no-run command ids). An ask that read the web hands
+> back none of the words that confirm a preview (the plan hash and preview id rode in each receipt's summary and in an
+> answer built from the receipts), and the model is never shown them. Only the text of the turn that ends the model's
+> reply is an answer: an ask or a search stopped after a note beside a tool call, with nothing changed, is the door's
+> failure (`isError: true` over MCP, with its code and a refusal's category); an ask stopped after a change answers
+> `incomplete: true` with `stopped` and an answer that opens with why. The text written before a `pause_turn` is kept.
+> In the database: a passcode session's undo never puts back a saved row a person's later command ended (it answered
+> 500, and with the guard's unlock on it brought back a lower limit for every later run); a one-time order an
+> every-return order already covers is `no_change`, so the service stays on the car's visit and the car does not leave
+> without it (rule 9); and a production run that starts, resumes or pauses lifts every other live run's owner settings at
+> its depot and puts those cars back to their target (a paused demo run's passcode 80% stayed in force in production).
 
 ---
 
@@ -280,9 +297,12 @@ or `{"error": {"code","message","hint?","details?"}, "meta": {…}}`. `call_id` 
   and an apply it confirms is recorded `via = 'confirm'` (one that binds to no preview is recorded as a new preview, the
   agent's own: `direct`). Over the no-key endpoint it takes the `session` argument like every other tool. It
   is annotated `destructiveHint: true`: one call can hold cars, order or withdraw services and undo commands. The door's own
-  failures (no model configured, a model error, a token not bound to a fleet, its 50-second budget spent) are tool
-  results with `isError: true`, so an agent can fall back to the typed tools; only 401 and the rate limit are transport
-  errors, as for every tool. In `/v1/openapi.json` it is the operation `ask_ottocommand` at `POST /v1/ask`.
+  failures (no model configured, a model error, a refusal by the model with its category, a token not bound to a fleet,
+  its 50-second budget spent, its step limit) are tool results with `isError: true`, so an agent can fall back to the
+  typed tools; that holds when the model wrote a note beside a tool call before it stopped, since only the text of the
+  turn that ends the model's reply is an answer (the review, round 2). An ask that stops after a change was made answers
+  with `incomplete: true`, `stopped: {code, message}` and an answer that opens with why it stopped, then OTTO-Q's receipts
+  and the changes block. Only 401 and the rate limit are transport errors, as for every tool. In `/v1/openapi.json` it is the operation `ask_ottocommand` at `POST /v1/ask`.
 - **`ottocommand_search` (0721)** is answered by the same handler in search mode: the same handshake and token, the
   fleet's reads only (none for `scope: "web"`), the web search server tool unless `scope: "ottoq"`, and no confirm door.
   In `/v1/openapi.json` it is the operation `ottocommand_search` at `POST /v1/search`.
@@ -494,7 +514,9 @@ afternoon: refused changes named without arguments, page titles kept out of the 
 call, a person's clear and cancel ending what is saved whatever the run holds, and no `saved` block for a passcode
 session). **After the review, round 1 (the evening of 2026-10-14):** the claim screen replaced by the `changes` block,
 the owner tables' writer rule, the one-time order that ends nothing saved, and the cockpit boards; the counts are in
-PERSONAL_AGENT.md §11. The gateway, its shared modules
+PERSONAL_AGENT.md §11. **After the review, round 2 (the night of 2026-10-14 CT):** the command-id mask, the web-read
+receipts without confirm words, the stopped ask and search, the paused turn's text, the passcode undo, the one-time order
+an every-return order covers, and the production takeover; the counts are in the commit that made them. The gateway, its shared modules
 and the shell type-check under `tsc --strict` with a Deno shim, except the `jsr:` edge-runtime type import, which only
 Deno resolves. **Not verified:** a real call to the Anthropic API (every test drives a fake fetch), web search enabled
 for this organization, a fallback actually taken, `EdgeRuntime.waitUntil` keeping the ledger write alive after the

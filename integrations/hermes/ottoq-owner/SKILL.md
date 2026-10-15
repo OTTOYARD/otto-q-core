@@ -1,7 +1,7 @@
 ---
 name: ottoq-owner
 description: Connect to OTTOYARD, read or set what my cars need at the OTTOYARD depot, and search OTTO-Q and the web about them.
-version: 1.6.0
+version: 1.6.1
 author: OTTOYARD (Chase), Hermes Agent
 license: Proprietary
 platforms: [linux, macos, windows]
@@ -81,7 +81,9 @@ so it can do nothing your token could not. What comes back:
   `mcp__ottoyard__ask_ottocommand {confirm: <that array, unchanged>}` and forward the new `answer`. Never change it,
   never send it without their yes. OTTO-Q cannot see their yes: it checks only that the confirm comes from you, for a
   preview you made in the last 15 minutes, once. Asking them is your job, and the record says you confirmed it.
-- `incomplete: true`: OTTO-Command ran out of time; `actions` still says what was done. Say so and offer to try again.
+- `incomplete: true`: OTTO-Command stopped after it had made a change (`stopped` says why: a model error, a refusal,
+  its time); the answer opens with that, and `changes` still says what was done. Say so and offer to try the rest
+  again. If it stops before changing anything, the call is an error instead (below), and nothing was changed.
 
 Pass the person's earlier turns as `history` (`[{role, text}]`, oldest first, at most 12) when a request depends on them
 ("do the same for RT-3"), and `idempotency_key` (the chat message id) so a resend after a timeout replays instead of
@@ -97,12 +99,14 @@ the `confirm` above within 15 minutes. Everything else is one call.
 they stay from run to run, production included, until the person changes them (the answer says so). Their clear, a
 limit of 100% and a cancel end what is saved too, whatever a passcode session did on the run. A hold, a "now" or "next
 time" service, and anything set through the passcode end with the run, and a passcode session does not see what is
-saved.
+saved. A "now" or "next time" service over an "every time it comes back" order of the same service that already covers
+it is already ordered: OTTO-Q answers `no_change`, and the car still gets the service before it leaves.
 
 ### Only if OTTO-Command is not available
 
-If `ask_ottocommand` answers with an error (`ask_not_configured`: it is not switched on; `ask_model_failed`; or the tool
-is missing from the list), use the typed tools directly. They are the same database filter:
+If `ask_ottocommand` answers with an error (`ask_not_configured`: it is not switched on; `ask_model_failed`;
+`ask_model_refused`, with the category in its message; `ask_budget_spent` or `ask_round_limit`; or the tool is missing
+from the list), nothing was changed by that ask: use the typed tools directly. They are the same database filter:
 
 | When the person says | Call (each with `session` when you have one) |
 |---|---|

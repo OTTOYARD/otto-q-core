@@ -28,10 +28,15 @@
  *   * THE WEB IS UNTRUSTED (0721, Chase 2026-10-14: "Search should cover OTTO-Q and web"): once any web search result
  *     has entered an ask's conversation, every later call to anything but a read is refused here, before the engine
  *     is asked, and the answer tells the owner to ask for the change again on its own. An ask that read the web returns
- *     no confirm objects (at the top or inside a receipt), so nothing it previewed can be applied from it. What the model
- *     tried after reading the web is never handed back as something to send: `blocked_after_web` names the tools only,
- *     never the arguments a page may have chosen, and the agent is told to relay to its person and send a change only as
- *     that person's own new words. When a change was refused that way, the answer OPENS with what really happened;
+ *     no confirm objects (at the top or inside a receipt), and (the review, round 2) none of the words in a receipt that
+ *     say how to send one: the "To confirm, send ..." line with its plan hash and preview id is taken out of every
+ *     action's summary and of the answer built from them, and the receipt says the ask offers nothing to confirm. The
+ *     model is never shown how to confirm in the first place (it never confirms): the tool results it reads carry no
+ *     confirm object, plan hash or preview id, and no such line, so no answer it writes can hand one back either. What
+ *     the model tried after reading the web is never handed back as something to send: `blocked_after_web` names the
+ *     tools only, never the arguments a page may have chosen, and the agent is told to relay to its person and send a
+ *     change only as that person's own new words. When a change was refused that way, the answer OPENS with what really
+ *     happened;
  *   * WHAT CHANGED IS THE CHANGES BLOCK, never the model's words (0721, the review, round 1): the model's text is shown as
  *     it wrote it, never screened or dropped by pattern (a screen dropped 35% of plain reads and still let claims through),
  *     and every ask and every search ends with `changes`, built in code from OTTO-Q's receipts only: none, or each change
@@ -82,7 +87,14 @@
  *     read 2026-10-14, see PERSONAL_AGENT.md's sources);
  *   * stop_reason pause_turn: the server-side loop paused; the same messages are sent again with the paused assistant
  *     content appended verbatim as a new assistant message and no extra user message, as the bundled reference's
- *     manual loop does (capped at ASK_MAX_PAUSES, inside the budget);
+ *     manual loop does (capped at ASK_MAX_PAUSES, inside the budget). The paused reply and its continuation are ONE
+ *     assistant turn (the review, round 2): the answer is read from all of that turn's blocks, as if it had come in one
+ *     reply, so the text written before the pause is never dropped;
+ *   * WHAT IS AN ANSWER (the review, round 2): only the text of the turn that ended the model's reply (any stop reason
+ *     but tool_use and pause_turn). A note written beside a tool call ("Let me check your fleet.") is not one: an ask or a
+ *     search stopped after it (a model error, a refusal, the budget, the step limit) with nothing done is the door's
+ *     failure, with its code and message (isError over MCP), and one stopped after a change was made opens with why it
+ *     stopped, then OTTO-Q's receipts;
  *   * stop_reason refusal: checked before content is read; stop_details carries the category; no tool runs. On the
  *     models that take it, the server-side fallback is asked for (header server-side-fallback-2026-07-01, body
  *     "fallbacks": "default"), and a `fallback` block that comes back is replayed verbatim like any other;
@@ -481,10 +493,42 @@ export const WEB_WRITE_NOTE_AFTER_CHANGE =
   "Only what the changes below (OTTO-Q's own receipts) say was done, before this ask searched the web; the change asked " +
   "for after the search was not made, because OTTO-Command never changes a car once an ask has read the web. Ask again " +
   "for it on its own.";
+/** 0721 (the review, round 2): what a previewed change's receipt says, in an ask that read the web, in place of how to
+ *  confirm it. */
+export const WEB_NO_CONFIRM =
+  "This ask read the web, so it offers nothing to confirm: to make this change, ask for it again on its own.";
 /** 0721 (the review, round 1): the changes block of an ask that changed nothing and sent nothing. */
 export const NO_CHANGES_ASK = "Changes: none. This ask changed nothing.";
 /** 0721 (the review, round 1): every search's changes block. A search is offered no tool that changes anything. */
 export const NO_CHANGES_SEARCH = "Changes: none. A search changes nothing: it only reads OTTO-Q and the web.";
+
+/** 0721 (the review, round 2): the words in OTTO-Q's text that tell an agent how to confirm a preview. A preview's
+ *  receipt ends "To confirm, send the same command with mode "apply" and expect_plan_hash "<hash>"" (0605), or, for a
+ *  preview OTTO-Q recorded in place of an apply, "... expect_plan_hash "<hash>" and confirms_command_id "<id>"" (0721),
+ *  and a binding's refusal names the two arguments. With the hash and the id, an agent could rebuild the exact confirm
+ *  this door withholds. The two names in a refusal are taken out of its sentence; a line that still names either
+ *  argument, or says how to confirm, goes whole (OTTO-Q's text carries a plan hash only on such a line). */
+const CONFIRM_ARG_NAMES = /\s*\((?:expect_plan_hash|confirms_command_id)(?:\s+(?:or|and)\s+(?:expect_plan_hash|confirms_command_id))?\)/g;
+const CONFIRM_LINE = /To confirm, send|expect_plan_hash|confirms_command_id/i;
+export function withoutConfirmWords(text: string): string {
+  return text.replace(CONFIRM_ARG_NAMES, "").split("\n").filter((line) => !CONFIRM_LINE.test(line)).join("\n").trimEnd();
+}
+
+/** 0721 (the review, round 2): what the model is shown of a tool's answer: all of it but how to confirm a preview. The
+ *  model never confirms (the arguments that name a preview are stripped from what it may send), so a confirm object, a
+ *  plan hash, a preview's id and the words that say how to send them are of no use to it, and an answer it wrote from
+ *  them could hand a ready-made confirm back past this door's web rule. */
+const MODEL_HIDDEN_KEYS: ReadonlySet<string> = new Set(["confirm", "plan_hash", "expect_plan_hash", "confirms_command_id",
+                                                        "preview_command_id"]);
+export function forModel(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(forModel);
+  if (isObject(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) if (!MODEL_HIDDEN_KEYS.has(k)) out[k] = forModel(v);
+    return out;
+  }
+  return typeof value === "string" ? withoutConfirmWords(value) : value;
+}
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────── the input ──
 
@@ -573,6 +617,9 @@ export type AskResult = {
   reads: string[];
   link: string | null;
   incomplete: boolean;
+  /** 0721 (the review, round 2): when incomplete, why the ask stopped (a model error, a refusal and its category, the
+   *  budget, the step limit), as its code and message; the answer opens with the same. */
+  stopped?: { code: string; message: string };
   rounds: number;
   /** 0721: the confirm objects of every change that was only previewed, ready to send back as `confirm`. Never present
    *  on an ask that read the web. */
@@ -750,6 +797,28 @@ function confirmsOf(actions: readonly AskAction[]): AskConfirm[] | undefined {
   return out.length ? out : undefined;
 }
 
+/** 0721 (the review, round 2): a command as an ask that read the web hands it back: no confirm object, and its receipt
+ *  and error without the words that say how to confirm it (withoutConfirmWords); a preview's receipt says the ask offers
+ *  nothing to confirm. Its tool, arguments (chosen before any web text arrived), outcome and command id stay: they are the
+ *  record of what was asked and what OTTO-Q recorded. */
+export function withoutConfirm(a: AskAction): AskAction {
+  const { confirm: _withheld, ...rest } = a;
+  const summary = a.summary === null ? null : withoutConfirmWords(a.summary);
+  return {
+    ...rest,
+    summary: a.outcome === "previewed" ? `${summary ? `${summary}\n` : ""}${WEB_NO_CONFIRM}` : summary,
+    ...(a.error ? { error: { code: a.error.code, message: withoutConfirmWords(a.error.message) } } : {}),
+  };
+}
+
+/** 0721 (the review, round 2): why an ask stopped, opening the answer it still gives after a change was made: the stop's
+ *  own message (a refusal's names its category), then OTTO-Q's receipts. */
+export function stopNote(stopped: { code: string; message: string }): string {
+  const why = stopped.message.trim();
+  return `OTTO-Command could not finish its answer: ${why === "" ? stopped.code : why}${/[.!?]$/.test(why) ? "" : "."} ` +
+    "Here is what OTTO-Q did before it stopped:";
+}
+
 function primaryLink(actions: readonly AskAction[], readLink: string | null): string | null {
   const withLink = [...actions].reverse().find((a) => a.link && (isDone(a) || a.outcome === "previewed"));
   return withLink?.link ?? readLink;
@@ -848,6 +917,9 @@ type LoopOut = {
   actions: AskAction[];
   reads: string[];
   readLink: string | null;
+  /** 0721 (the review, round 2): the answer: the text of the turn that ended the model's reply, read from all of that
+   *  turn's blocks (a paused reply and its continuations are one turn). Empty unless finished: a note written beside a
+   *  tool call is not an answer. */
   lastText: string;
   finished: boolean;
   stopped: { code: string; message: string } | null;
@@ -900,6 +972,9 @@ async function runLoop(spec: LoopSpec, deps: AskDeps, model: ModelCall): Promise
   const spent = { code: "ask_budget_spent", message: "OTTO-Command ran out of time." };
   let turns = 0;
   let pauses = 0;
+  //: 0721 (the review, round 2): every block of the assistant turn under way, across a pause_turn and its continuations;
+  //: emptied when the turn's tool calls are answered
+  let turnBlocks: RawBlock[] = [];
 
   while (turns < maxRounds) {
     if (left() < ASK_MIN_MODEL_MS) { out.stopped = spent; break; }
@@ -933,7 +1008,7 @@ async function runLoop(spec: LoopSpec, deps: AskDeps, model: ModelCall): Promise
     if (p.read_web) out.readWeb = true;
     for (const s of p.citations) addSource(out.citations, s.url, s.title);
     for (const s of p.web_results) addSource(out.webResults, s.url, s.title);
-    if (p.text) out.lastText = p.text;
+    turnBlocks = [...turnBlocks, ...reply.content];
 
     if (reply.stop_reason === "pause_turn") {
       // the server-side loop paused: send the same messages again with the paused turn appended, verbatim, and no
@@ -944,7 +1019,12 @@ async function runLoop(spec: LoopSpec, deps: AskDeps, model: ModelCall): Promise
       continue;
     }
     turns += 1;
-    if (reply.stop_reason !== "tool_use" || p.tool_uses.length === 0) { out.finished = true; break; }
+    if (reply.stop_reason !== "tool_use" || p.tool_uses.length === 0) {
+      // the answer: the whole turn's text, the part written before a pause included, read as one reply would be
+      out.lastText = readContent(turnBlocks).text;
+      out.finished = true;
+      break;
+    }
 
     spec.messages.push({ role: "assistant", content: reply.content });
     const results: ToolResultBlock[] = [];
@@ -988,10 +1068,14 @@ async function runLoop(spec: LoopSpec, deps: AskDeps, model: ModelCall): Promise
         break;
       }
       const shown = outcome.ok ? outcome.data : { error: outcome.error, ...(outcome.data !== undefined ? { data: outcome.data } : {}) };
-      results.push({ type: "tool_result", tool_use_id: use.id, ...(outcome.ok ? {} : { is_error: true }), content: capped(JSON.stringify(shown ?? null)) });
+      // 0721 (the review, round 2): the model reads all of OTTO-Q's answer but how to confirm a preview (forModel)
+      results.push({ type: "tool_result", tool_use_id: use.id, ...(outcome.ok ? {} : { is_error: true }),
+                     content: capped(JSON.stringify(forModel(shown ?? null))) });
     }
     if (out.stopped) break;
     spec.messages.push({ role: "user", content: results });
+    // the turn is answered: its notes beside the tool calls were not an answer, and the next reply starts a new turn
+    turnBlocks = [];
   }
   if (!out.finished && !out.stopped) out.stopped = { code: "ask_round_limit", message: "OTTO-Command reached its step limit." };
   return out;
@@ -1023,21 +1107,20 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
                                messages, web: deps.web ?? null }, deps, deps.model);
   const { actions, stopped } = loop;
 
-  if (stopped && actions.length === 0 && !loop.lastText) {
-    // nothing was done and nothing can be said: an honest failure, not an invented answer
+  if (stopped && actions.length === 0) {
+    // nothing was done, and no reply ended with an answer (a note beside a tool call is not one: the review, round 2): an
+    // honest failure, with why, not a note passed off as the answer
     return { status: failureStatus(stopped.code), error: stopped };
   }
+  // 0721: an ask that read the web hands back nothing to confirm: no confirm object at the top or in a receipt, and (the
+  // review, round 2) none of the words in a receipt that say how to send one. A change goes through an ask of its own, and
+  // everything below is built from what is handed back
+  const shown = loop.readWeb ? actions.map(withoutConfirm) : actions;
   const incomplete = stopped !== null;
-  const draft = incomplete
-    ? (actions.length
-      ? `OTTO-Command could not finish its answer, but here is what OTTO-Q did:\n\n${receiptsText(actions)}`
-      : loop.lastText)
-    : loop.lastText;
-  let answer = settleAnswer(draft, actions, input.dry_run);
-  // 0721: an ask that read the web hands back nothing to confirm, at the top or in a receipt: a change goes through an
-  // ask of its own
+  // stopped after a change was made: why it stopped (its refusal category included), then OTTO-Q's receipts
+  const draft = stopped ? `${stopNote(stopped)}\n\n${receiptsText(shown)}` : loop.lastText;
+  let answer = settleAnswer(draft, shown, input.dry_run);
   const confirm = loop.readWeb ? undefined : confirmsOf(actions);
-  const shown = loop.readWeb ? actions.map(({ confirm: _withheld, ...a }) => a) : actions;
   if (loop.blocked.length) {
     // 0721: a change was asked for after the web was read, and refused unsent: the answer OPENS with that fact. The model's
     // text follows as it wrote it (never screened: the review, round 1); the changes block says what really changed
@@ -1047,7 +1130,7 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
   const sources = sourcesOf(loop);
   if (sources.length) answer = withSources(answer, sources);
   // 0721 (the review, round 1): what changed, from OTTO-Q's receipts only, ends every answer and is its own field
-  const changes = changesOf(actions, loop.blocked, { dryRun: input.dry_run, readWeb: loop.readWeb, confirmOffered: confirm !== undefined });
+  const changes = changesOf(shown, loop.blocked, { dryRun: input.dry_run, readWeb: loop.readWeb, confirmOffered: confirm !== undefined });
   answer = `${answer}\n\n${changes.text}`;
   return {
     answer,
@@ -1058,6 +1141,7 @@ export async function runOwnerAsk(input: AskInput, deps: AskDeps): Promise<AskRe
     reads: loop.reads,
     link: primaryLink(actions, loop.readLink),
     incomplete,
+    ...(stopped ? { stopped } : {}),
     rounds: loop.rounds,
     ...(confirm ? { confirm } : {}),
     ...(loop.readWeb || loop.webSearches > 0 ? { sources, web_searches: loop.webSearches } : {}),
@@ -1083,13 +1167,16 @@ export async function runOwnerSearch(input: SearchInput, deps: AskDeps): Promise
   const question = input.question.slice(0, ASK_MAX_TEXT);
   const messages = conversation([], `<context>\n${ownerContext(deps.who, false)}\nThis is a SEARCH: read and answer; nothing can be changed here. Look in ${where}.\n</context>\n\n<search_request>\n${question}\n</search_request>`);
   const loop = await runLoop({ kind: "search", allowed, dryRun: false, words: "", messages, web }, deps, deps.model);
-  if (loop.stopped && !loop.lastText) return { status: failureStatus(loop.stopped.code), error: loop.stopped };
+  // 0721 (the review, round 2): a search changes nothing, so one stopped before a reply ended with an answer (a model
+  // error, a refusal, the budget, the step limit) has nothing to report but why: the door's failure, never a note
+  // written beside a tool call passed off as the answer
+  if (loop.stopped) return { status: failureStatus(loop.stopped.code), error: loop.stopped };
   const sources = sourcesOf(loop);
   // 0721 (the review, round 1): the model's answer as it wrote it, then, always, that a search changes nothing
   const changes = searchChanges();
   const answer = `${withSources(loop.lastText.trim() || "OTTO-Command has no answer to give.", sources)}\n\n${changes.text}`;
   return { answer, changes, answered_by: ANSWERED_BY, scope: input.scope, sources, ottoq_reads: loop.reads, web_searches: loop.webSearches,
-           incomplete: loop.stopped !== null, rounds: loop.rounds };
+           incomplete: false, rounds: loop.rounds };
 }
 
 /** The door as the gateway mounts it, for both forms: an ask (POST /v1/ask, ask_ottocommand) and a search (POST

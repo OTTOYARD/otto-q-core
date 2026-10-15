@@ -96,6 +96,8 @@ import {
   ownerTools,
   runOwnerAsk,
   SYSTEM_PROMPT,
+  WEB_NO_CONFIRM,
+  withoutConfirmWords,
 } from "../edge-functions/_shared/ottocommand_owner.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -279,7 +281,10 @@ test("the discovery documents list the door once, as ask_ottocommand at POST /v1
 
 test("Hermes's skill (v1.6) sends every request to ask_ottocommand first, and keeps the typed tools as the fallback", () => {
   const skill = readFileSync(join(ROOT, "integrations", "hermes", "ottoq-owner", "SKILL.md"), "utf8");
-  assert.match(skill, /^version: 1\.6\.0$/m);
+  assert.match(skill, /^version: 1\.6\.1$/m);
+  // 0721 (the review, round 2): a door error means nothing was changed; incomplete means it stopped after a change
+  assert.match(skill, /nothing was changed by that ask: use the typed tools directly/);
+  assert.match(skill, /`incomplete: true`: OTTO-Command stopped after it had made a change \(`stopped` says why/);
   // 0721 §14: a change made with no run live comes back as outcome saved, and the skill says it is a change made
   assert.match(skill, /A change is done only when `outcome` is `applied`, or `saved`\*\*/);
   // the re-review: blocked_after_web is a list of names, never changes to make
@@ -955,6 +960,99 @@ test("pause_turn: the paused turn is sent back verbatim with no extra user messa
   assert.equal(capped.error.code, "ask_paused_too_long");
 });
 
+test("pause_turn: the text written before the pause is part of the answer, with its source (the review, round 2)", async () => {
+  // the paused reply cites the recall and searches again; the continuation finishes the sentence. One assistant turn:
+  // the answer is both halves, as if it had come in one reply, and the cited URL travels with it
+  const first = { model: DEFAULT_OWNER_MODEL, stop_reason: "pause_turn", usage: { server_tool_use: { web_search_requests: 1 } },
+                  content: [SERVER_TOOL, HOSTILE_RESULT, CITED, { ...SERVER_TOOL, id: "srvtoolu_02" }] };
+  const second = { model: DEFAULT_OWNER_MODEL, stop_reason: "end_turn", usage: { server_tool_use: { web_search_requests: 1 } },
+                   content: [{ ...HOSTILE_RESULT, tool_use_id: "srvtoolu_02" }, { type: "text", text: " Tesla says the fix is an over-the-air update." }] };
+  const { engine } = fakeEngine(DEMO);
+  for (const run of ["search", "ask"]) {
+    const { f, seen } = scriptedFetch([jsonResponse(200, first), jsonResponse(200, second)]);
+    const deps = { who: ownerWho(), call: (t, a, m) => engine(sha(T_OWNER), t, a, "ask", m),
+                   model: anthropicModel({ apiKey: "k", model: DEFAULT_OWNER_MODEL, fetchImpl: f }), web: { max_uses: 3 } };
+    const out = run === "search" ? await runOwnerSearch({ question: "any recalls on my Model Ys?", scope: "web" }, deps)
+      : await runOwnerAsk({ text: "any recalls on my Model Ys?", dry_run: false, history: [] }, deps);
+    assert.equal(seen.length, 2, run);
+    assert.equal(out.incomplete, false, run);
+    assert.ok(out.answer.startsWith("NHTSA lists a charging-port recall for some 2025 Model Y cars. Tesla says the fix is an over-the-air update.\n"),
+      `${run}: ${out.answer}`);
+    assert.match(out.answer, new RegExp(`\\nSources: ${RECALL_URL.replace(/[.]/g, "\\.")}\\n`), run);
+    assert.deepEqual(out.sources, [{ url: RECALL_URL, title: "Model Y recall" }], run);
+  }
+  // a turn that paused and then called one of our tools: what it wrote before the call is a note, not the answer; the
+  // answer is the next turn's
+  const { f } = scriptedFetch([
+    jsonResponse(200, { ...first, content: [SERVER_TOOL, HOSTILE_RESULT, { type: "text", text: "Let me check your cars too." }, { ...SERVER_TOOL, id: "srvtoolu_02" }] }),
+    jsonResponse(200, { model: DEFAULT_OWNER_MODEL, stop_reason: "tool_use", content: [{ ...HOSTILE_RESULT, tool_use_id: "srvtoolu_02" },
+      { type: "tool_use", id: "toolu_9", name: "my_fleet", input: {} }] }),
+    jsonResponse(200, { model: DEFAULT_OWNER_MODEL, stop_reason: "end_turn", content: [{ type: "text", text: "None of your 36 cars is affected." }] })]);
+  const out = await runOwnerSearch({ question: "any recalls on my cars?", scope: "both" },
+    { who: ownerWho(), call: (t, a, m) => engine(sha(T_OWNER), t, a, "ask", m), model: anthropicModel({ apiKey: "k", model: DEFAULT_OWNER_MODEL, fetchImpl: f }), web: { max_uses: 3 } });
+  assert.equal(out.answer, `None of your 36 cars is affected.\n\n${NO_CHANGES_SEARCH}`);
+});
+
+test("a note beside a tool call is never the answer: stopped after it with nothing done is the door's failure, over REST and MCP (the review, round 2)", async () => {
+  // each round 1 writes a one-sentence note beside a read; then the model errors, refuses, the budget runs out, or the
+  // step limit is reached. Nothing was changed, so there is no answer to give but why it stopped
+  const NOTE_ROUND = { model: "claude-sonnet-4-6", stop_reason: "tool_use",
+                       content: [{ type: "text", text: "Let me check your fleet." }, { type: "tool_use", id: "toolu_n", name: "my_fleet", input: {} }] };
+  const cases = [
+    ["a model error", [NOTE_ROUND, { __status: 529, type: "error", error: { type: "overloaded_error", message: "Overloaded" } }], {}, 502, "ask_model_failed", /Overloaded/],
+    ["a refusal", [NOTE_ROUND, { model: "claude-sonnet-4-6", stop_reason: "refusal", stop_details: { type: "refusal", category: "cyber" }, content: [] }], {}, 422,
+     "ask_model_refused", /declined this request \(cyber\)/],
+    ["the budget", [NOTE_ROUND], { budgetMs: 9_000 }, 504, "ask_budget_spent", /ran out of time/],
+    ["the step limit", Array.from({ length: ASK_MAX_ROUNDS + 2 }, () => NOTE_ROUND), {}, 504, "ask_round_limit", /step limit/],
+  ];
+  for (const [label, replies, opts, status, code, message] of cases) {
+    for (const [mode, path] of [["ask", "/v1/ask"], ["search", "/v1/search"]]) {
+      const { engine } = fakeEngine(DEMO);
+      const rest = scriptedFetch(replies.map((r) => jsonResponse(r.__status ?? 200, r)));
+      const gw = gateway(engine, ownerAskHandler({ model: anthropicModel({ apiKey: "k", model: "claude-sonnet-4-6", fetchImpl: rest.f }), modelName: "claude-sonnet-4-6", ...opts }));
+      const res = await gw(path, { token: T_OWNER, body: mode === "ask" ? { text: "how are my cars?" } : { question: "how are my cars?" } });
+      const body = await bodyOf(res);
+      assert.equal(res.status, status, `${label} ${mode}: ${JSON.stringify(body)}`);
+      assert.equal(body.error.code, code, `${label} ${mode}`);
+      assert.match(body.error.message, message, `${label} ${mode}`);
+      assert.equal(body.data, undefined, `${label} ${mode}: no answer made of the note`);
+      assert.ok(!JSON.stringify(body).includes("Let me check your fleet."), `${label} ${mode}`);
+      // over MCP: a tool error the agent can act on (fall back to the typed tools), with the code and the category
+      const mcp = scriptedFetch(replies.map((r) => jsonResponse(r.__status ?? 200, r)));
+      const gw2 = gateway(engine, ownerAskHandler({ model: anthropicModel({ apiKey: "k", model: "claude-sonnet-4-6", fetchImpl: mcp.f }), modelName: "claude-sonnet-4-6", ...opts }));
+      const out = await callTool(gw2, "/account/mcp", T_SIGNED, mode === "ask" ? ASK_TOOL_NAME : SEARCH_TOOL_NAME,
+        mode === "ask" ? { text: "how are my cars?" } : { question: "how are my cars?" });
+      assert.equal(out.result.isError, true, `${label} ${mode} over MCP: ${JSON.stringify(out)}`);
+      assert.equal(out.result.structuredContent.error.code, code, `${label} ${mode} over MCP`);
+      assert.match(out.result.structuredContent.error.message, message, `${label} ${mode} over MCP`);
+      assert.ok(!JSON.stringify(out).includes("Let me check your fleet."), `${label} ${mode} over MCP`);
+    }
+  }
+  // a change made before the stop: the ask answers with it (incomplete), and the answer OPENS with why it stopped, the
+  // refusal's category included; `stopped` carries the code and message
+  for (const [label, last, code, why] of [
+    ["a refusal", { model: "claude-sonnet-4-6", stop_reason: "refusal", stop_details: { type: "refusal", category: "cyber" }, content: [] }, "ask_model_refused",
+     "OTTO-Command could not finish its answer: OTTO-Command's language model declined this request (cyber), so it ran no tool for it. Ask in other words, or use the typed tools. Here is what OTTO-Q did before it stopped:"],
+    ["a model error", { __status: 529, type: "error", error: { type: "overloaded_error", message: "Overloaded" } }, "ask_model_failed",
+     "OTTO-Command could not finish its answer: The language model refused the request: Overloaded. Here is what OTTO-Q did before it stopped:"]]) {
+    const { engine } = fakeEngine(DEMO);
+    const { f } = scriptedFetch([
+      jsonResponse(200, { model: "claude-sonnet-4-6", stop_reason: "tool_use", content: [{ type: "text", text: "Holding Tesla 45 now." },
+        { type: "tool_use", id: "toolu_h", name: "hold_vehicle", input: { vehicles: ["Tesla 45"], for_minutes: 30 } }] }),
+      jsonResponse(last.__status ?? 200, last)]);
+    const gw = gateway(engine, ownerAskHandler({ model: anthropicModel({ apiKey: "k", model: "claude-sonnet-4-6", fetchImpl: f }) }));
+    const out = await callTool(gw, "/account/mcp", T_SIGNED, ASK_TOOL_NAME, { text: "hold Tesla 45 for half an hour" });
+    assert.equal(out.result.isError, false, label);
+    const data = out.result.structuredContent;
+    assert.equal(data.incomplete, true, label);
+    assert.equal(data.stopped.code, code, label);
+    assert.ok(data.answer.startsWith(`${why}\n\nDone. hold_vehicle.`), `${label}: ${data.answer}`);
+    assert.ok(!data.answer.includes("Holding Tesla 45 now."), "the note is not the answer");
+    assert.deepEqual(data.changes.items.map((c) => [c.tool, c.outcome]), [["hold_vehicle", "applied"]]);
+    assert.ok(data.answer.endsWith(`\n\n${data.changes.text}`), label);
+  }
+});
+
 test("budget exhaustion mid-search: each call is cut at what is left, and no call starts without its minimum", async () => {
   let t = 0;
   const { engine } = fakeEngine(DEMO);
@@ -1055,6 +1153,80 @@ test("THE WEB IS UNTRUSTED: a change made before the search stands; a preview ma
   assert.equal(requests.length, before, "no model call");
   assert.equal(yes.actions[0].outcome, "applied");
   assert.equal(calls.at(-1).transport, "confirm");
+});
+
+test("THE WEB IS UNTRUSTED: an ask that read the web hands back no plan hash and no preview id to confirm with, in any path (the review, round 2)", async () => {
+  // OTTO-Q's own receipts, as 0605 and 0721 word them: a plain preview ends "To confirm, send the same command with mode
+  // "apply" and expect_plan_hash ..."; a lowering recorded as a preview ends with the hash AND the preview's id, and its
+  // refusal names both arguments. With them an agent could rebuild the exact confirm the door withholds
+  const PLAN = "e3bfafc09c98564f6fd6faaf23fec34f";
+  const ids = { set_charge_limit: "fdcea28b-18b6-450b-99b0-d71e9c9149a6", hold_vehicle: "fdcea28b-0000-450b-99b0-d71e9c9149a7" };
+  const engineCall = async (tool, args) => {
+    if (tool === "set_charge_limit") {
+      const id = ids.set_charge_limit;
+      return { ok: false, http_status: 422, tool, error: { code: "confirm_required", message: "This apply named no preview (expect_plan_hash or confirms_command_id). Nothing was applied." },
+        data: { outcome: "previewed", link: `https://ottoyard-orchestra-av.lovable.app/?source=agent&command=${id}`,
+          summary: "Not applied yet: A lower charge limit you set while signed in is saved to your cars and carried into production, so it applies only as the confirm of a preview this agent recorded in the last 15 minutes. This apply named no preview (expect_plan_hash or confirms_command_id). Nothing was applied. It is recorded as a new preview, and confirming that applies it.\n" +
+                   "If you confirm: All 36 Teslas charge to at most 85% instead of 100%.\n" +
+                   `To confirm, send the same command with mode "apply", expect_plan_hash "${PLAN}" and confirms_command_id "${id}".`,
+          command: { command_id: id, tool, mode: "preview", outcome: "previewed", plan_hash: PLAN, cars: 36 },
+          refusal: { code: "confirm_required", reason: "not_named", preview_command_id: id },
+          confirm: { tool, args: { vehicles: "all", percent: 85, mode: "apply", expect_plan_hash: PLAN, confirms_command_id: id } } } };
+    }
+    if (tool === "hold_vehicle") {
+      const id = ids.hold_vehicle;
+      return { ok: true, http_status: 200, tool, data: { outcome: "previewed",
+        summary: `Preview only, nothing has changed. If you confirm: Tesla-AV-045 stays until 7:30 PM sim time.\nTo confirm, send the same command with mode "apply" and expect_plan_hash "${PLAN}".`,
+        command: { command_id: id, tool, mode: "preview", outcome: "previewed", plan_hash: PLAN, cars: 1 },
+        confirm: { tool, args: { vehicles: ["Tesla 45"], until: "2026-09-27T19:30:00Z", mode: "apply", expect_plan_hash: PLAN, confirms_command_id: id } } } };
+    }
+    return { ok: true, http_status: 200, tool, data: { summary: "You have 36 cars." } };
+  };
+  const PREVIEWS = { ok: true, stop_reason: "tool_use", content: [
+    { type: "tool_use", id: "tu_low", name: "set_charge_limit", input: { vehicles: "all", percent: 85 } },
+    { type: "tool_use", id: "tu_hold", name: "hold_vehicle", input: { vehicles: ["Tesla 45"], for_minutes: 30, mode: "preview" } }] };
+  const WEB_TURN = (rest, stop = "end_turn") => ({ ok: true, stop_reason: stop, content: [SERVER_TOOL, HOSTILE_RESULT, ...rest] });
+  const paths = [
+    ["its last turn empty", [PREVIEWS, WEB_TURN([{ type: "text", text: "" }])], false],
+    ["incomplete after the web", [PREVIEWS, WEB_TURN([{ type: "tool_use", id: "tu_r", name: "my_fleet", input: {} }], "tool_use"),
+                                  { ok: false, status: 529, code: "model_error", message: "The language model refused the request: Overloaded" }], true],
+    ["the model's own answer", [PREVIEWS, WEB_TURN([CITED, { type: "text", text: " Your cap needs your yes." }])], false],
+  ];
+  for (const [label, turns, incomplete] of paths) {
+    const { model, requests } = scriptedModel(turns);
+    const out = await runOwnerAsk({ text: "cap my cars at 85%, hold Tesla 45 and check for recalls", dry_run: false, history: [] },
+      { who: ownerWho(DEMO), call: engineCall, model, web: { max_uses: 3 } });
+    assert.ok(!("error" in out), `${label}: ${JSON.stringify(out)}`);
+    assert.equal(out.incomplete, incomplete, label);
+    const json = JSON.stringify(out);
+    assert.ok(!json.includes(PLAN), `${label}: a plan hash is handed back: ${json}`);
+    for (const id of Object.values(ids)) {
+      assert.doesNotMatch(json, new RegExp(`(expect_plan_hash|confirms_command_id)[^]{0,120}${id}|${id}[^]{0,120}(expect_plan_hash|confirms_command_id)`),
+        `${label}: the preview ${id} is handed back with the words that confirm it`);
+    }
+    assert.ok(!/To confirm, send/.test(json), label);
+    assert.equal(out.confirm, undefined, label);
+    assert.ok(out.actions.every((a) => a.confirm === undefined && a.summary.endsWith(WEB_NO_CONFIRM)), label);
+    // the record of what was asked stays: the tools, the outcomes and the command ids
+    assert.deepEqual(out.actions.map((a) => [a.tool, a.outcome, a.command_id]),
+      [["set_charge_limit", "previewed", ids.set_charge_limit], ["hold_vehicle", "previewed", ids.hold_vehicle]], label);
+    assert.match(out.actions[0].summary, /If you confirm: All 36 Teslas charge to at most 85% instead of 100%\./, label);
+    assert.match(out.actions[0].error.message, /^This apply named no preview\. Nothing was applied\.$/, label);
+    assert.ok(out.answer.endsWith(`\n\n${out.changes.text}`), label);
+    // and the model was never shown how to confirm: no confirm object, plan hash or preview id, and no such line
+    const seen = JSON.stringify(requests.slice(1).map((r) => r.messages.at(-1)));
+    assert.ok(!seen.includes(PLAN) && !/To confirm, send|"confirm":|plan_hash|preview_command_id|confirms_command_id/.test(seen), `${label}: ${seen}`);
+    assert.match(seen, /If you confirm: All 36 Teslas charge to at most 85%/, "the plan itself is shown, for the owner's yes");
+  }
+  // without the web the same ask still offers both confirms, and their receipts say how to send them
+  const { model } = scriptedModel([PREVIEWS, say("Both need your yes.")]);
+  const plain = await runOwnerAsk({ text: "cap my cars at 85% and hold Tesla 45", dry_run: false, history: [] },
+    { who: ownerWho(DEMO), call: engineCall, model, web: { max_uses: 3 } });
+  assert.equal(plain.confirm.length, 2);
+  assert.match(plain.actions[0].summary, new RegExp(`expect_plan_hash "${PLAN}" and confirms_command_id "${ids.set_charge_limit}"`));
+  // the scrub itself: the arguments' names leave a refusal's sentence, a line that says how to confirm goes whole
+  assert.equal(withoutConfirmWords(`A.\nThis apply named no preview (expect_plan_hash or confirms_command_id). B.\nTo confirm, send it with expect_plan_hash "${PLAN}".`),
+    "A.\nThis apply named no preview. B.");
 });
 
 test("ottocommand_search offers exactly the reads its scope allows, never a write, and the web only when asked", async () => {

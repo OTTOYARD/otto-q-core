@@ -577,7 +577,9 @@ test("the door fails honestly: no model, a model error, the step limit -- and wo
   const halfway = scriptedModel([use(["set_charge_limit", { vehicles: "all", percent: 90 }]), { ok: false, status: 529, message: "overloaded" }]);
   const partial = await bodyOf(await ask(gateway(engine, ownerAskHandler({ model: halfway.model })), { text: WORDS }));
   assert.equal(partial.data.incomplete, true);
-  assert.match(partial.data.answer, /^OTTO-Command could not finish its answer, but here is what OTTO-Q did:\n\nDone\. set_charge_limit/);
+  // 0721 (the review, round 2): it opens with why it stopped, and says it in `stopped` too
+  assert.match(partial.data.answer, /^OTTO-Command could not finish its answer: overloaded\. Here is what OTTO-Q did before it stopped:\n\nDone\. set_charge_limit/);
+  assert.deepEqual(partial.data.stopped, { code: "ask_model_failed", message: "overloaded" });
   const looping = scriptedModel(Array.from({ length: 20 }, () => use(["my_fleet", {}])));
   const limited = await ask(gateway(engine, ownerAskHandler({ model: looping.model })), { text: "how are my cars?" });
   assert.equal(limited.status, 504);

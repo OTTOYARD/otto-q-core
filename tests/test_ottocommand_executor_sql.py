@@ -1436,6 +1436,7 @@ def test_no_plain_write_reaches_the_owner_tables_as_postgres_or_service_role(pos
             ("ottoq.ottoq_owner_orders_tick(uuid,timestamp with time zone)", "ottoq.owner_settings_writer=tick"),
             ("ottoq_owner_command(ottoq_agent_principals,text,jsonb,text)", "ottoq.owner_settings_writer=owner_command"),
             ("ottoq_owner_saved_carry(uuid)", "ottoq.owner_settings_writer=carry"),
+            ("ottoq_owner_settings_yield_to_production(uuid)", "ottoq.owner_settings_writer=production_start"),
             ("ottoq_tg_lift_owner_settings_on_terminal()", "ottoq.owner_settings_writer=run_end")])
     settings = {
         "INSERT": (f"INSERT INTO ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct, "
@@ -1542,6 +1543,12 @@ def test_the_run_settings_guard_admits_each_move_only_from_the_writer_that_makes
                         f"WHERE setting_id = '{hid}'", "fulfilled only by the tick", "tick")
     _refused_both(post, f"UPDATE ottoq_owner_settings SET status = 'lifted', closed_at = now() WHERE setting_id = '{every}'",
                   "lifted only when its run ends", "run_end")
+    # (the review, round 2) a production run's start lifts only OTHER runs' settings, never a production run's own
+    _refused_both(post, f"UPDATE ottoq_owner_settings SET status = 'lifted', closed_at = now() WHERE setting_id = '{every}'",
+                  "lifted only when its run ends, or when a production run takes over its depot", "production_start")
+    _refused(post, f"SET ottoq.owner_settings_writer = 'production_start'; UPDATE ottoq_owner_settings SET status = 'withdrawn', "
+                   f"closed_at = now(), closed_reason = 'x', closed_by_command_id = '{hold['data']['command']['command_id']}' "
+                   f"WHERE setting_id = '{hid}'", "replaced or withdrawn only by the applied owner command")
     # and each move only from its own writer: the owner command cannot fulfil or lift, the tick cannot withdraw
     _refused(post, f"SET ottoq.owner_settings_writer = 'owner_command'; UPDATE ottoq_owner_settings SET status = 'fulfilled', "
                    f"closed_at = now(), closed_at_sim = hold_until_sim WHERE setting_id = '{hid}'", "fulfilled only by the tick")
@@ -1595,62 +1602,129 @@ def test_a_saved_row_comes_back_only_by_an_undo_and_is_never_written_again_from_
     post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{prod}'")
 
 
-def test_a_one_time_order_is_an_extra_service_and_never_ends_a_saved_every_return_order(post):
-    """The review, round 1 (rule 9 and 11): a person's every-return wash is saved to the car. On a later run they ask for a
-    wash now, and for a tidy on the next return over a saved every-return tidy. Neither ends what is saved: a new demo run
-    and a new production run carry both, the receipt says so, and on the run itself each every-return order is back once
-    the one-time order is done. A passcode session doing the same leaves it saved too (unchanged)."""
+def visit_atoms(db, run, car):
+    """The services on the car's open visit on the run, as (svc, status)."""
+    return sorted((r[0], r[1]) for r in db.rows(
+        f"SELECT a ->> 'svc', coalesce(a ->> 'status', 'pending') FROM ottoq_visit_needs n CROSS JOIN LATERAL jsonb_array_elements(n.atoms) a "
+        f"WHERE n.sim_run_id = '{run}' AND n.vehicle_id = '{car}' AND n.status IN ('open', 'in_progress')"))
+
+
+def finish(db, run, car, svcs):
+    db.run(f"""UPDATE ottoq_visit_needs SET atoms = (SELECT jsonb_agg(CASE WHEN a->>'svc' = ANY (ARRAY{list(svcs)}::text[]) THEN a || '{{"status":"done"}}' ELSE a END)
+                                                    FROM jsonb_array_elements(atoms) a)
+               WHERE vehicle_id = '{car}' AND sim_run_id = '{run}'""")
+
+
+def leaves(db, run, car, clock="2026-09-27 12:05+00"):
+    return db.val(f"SELECT ottoq_departure_clear('{car}', '{run}', '{clock}', true)") == "t"
+
+
+def test_a_one_time_order_an_every_return_order_covers_changes_nothing_and_the_car_never_leaves_without_it(post):
+    """The review, round 2 (rule 9): a person's every-return tidy and wash are saved to the car and carried onto a production
+    run, where they are on the car's current visit. A tidy on the next return and a wash now, over them, used to take their
+    place: the tidy's atom came off the current visit at the next tick and the next_return order waited for the car to leave,
+    so the car could leave without the tidy while the receipt said no car leaves with it undone. Now an every-return order
+    that covers what a one-time order asks for is already that order: no change, the visit keeps both services, the car
+    does not leave until they are done, the receipt says so, and what is saved is untouched (as before, round 1)."""
     no_run(post)
     chase = sign_in(post)
     for svc in ("exterior_wash", "interior_tidy"):
-        s = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": svc, "when": "every_return"})
-        assert s["data"]["outcome"] == "saved", s
+        assert tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": svc, "when": "every_return"})["data"]["outcome"] == "saved"
     want = [(AV041, "service", "exterior_wash"), (AV041, "service", "interior_tidy")]
-    run = fresh_run(post, keep_saved=True)
+    run = production_run(post, keep_saved=True)
     assert carried(post, run) == want
-    now = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "now"})
-    nxt = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "next_return"})
-    for r, svc in ((now, "exterior wash"), (nxt, "interior tidy")):
-        assert r["data"]["outcome"] == "applied", r
-        assert (f"The every-return order for {svc} stays: on this run it is back on the car once this one is done, and it stays "
-                "saved to the car for every run.") in r["data"]["summary"], r["data"]["summary"]
-        assert "This lasts until the demo run ends or you undo it." in r["data"]["summary"]
-    assert saved(post, AV041) == want, "a one-time order does not end what is saved"
-    # on the run: the wash done, the tick fulfils the one-time order and the every-return order is in force again
     post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{run}', '2026-09-27 12:01+00')")
-    post.run(f"""UPDATE ottoq_visit_needs SET atoms = (SELECT jsonb_agg(CASE WHEN a->>'svc' = 'exterior_wash' THEN a || '{{"status":"done"}}' ELSE a END)
-                                                        FROM jsonb_array_elements(atoms) a)
-                 WHERE vehicle_id = '{AV041}' AND sim_run_id = '{run}'""")
+    on_visit = visit_atoms(post, run, AV041)
+    assert ("interior_tidy", "pending") in on_visit and ("exterior_wash", "pending") in on_visit, on_visit
+    nxt = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "next_return"})
+    now = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "now"})
+    for r, svc, covers in ((nxt, "interior tidy", "its next return"), (now, "exterior wash", "this visit")):
+        assert r["http_status"] == 200 and r["data"]["outcome"] == "no_change", r
+        assert r["data"]["summary"] == (f"Nothing to change. Tesla-AV-041 already gets {svc} on every return (an every-return "
+                                        f"order), {covers} included, so nothing changes."), r["data"]["summary"]
+        assert "back on the car once this one is done" not in r["data"]["summary"]
+        assert [(e["before"], e["after"], e["change"]) for e in r["data"]["command"]["effects"]] == [("every_return", "every_return", False)]
+    # after the tick: the every-return orders stand, untouched, and their services are still on the visit
     post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{run}', '2026-09-27 12:02+00')")
-    active = sorted(tuple(r) for r in post.rows(f"SELECT service, service_when FROM ottoq_owner_settings WHERE sim_run_id = '{run}' "
-                                                 f"AND vehicle_id = '{AV041}' AND kind = 'service' AND status = 'active'"))
-    assert active == [("exterior_wash", "every_return"), ("interior_tidy", "next_return")], active
-    # and the done wash is tagged with the every-return order, not done twice: one wash atom on the visit
-    assert post.val(f"""SELECT count(*) FROM ottoq_visit_needs n CROSS JOIN LATERAL jsonb_array_elements(n.atoms) a
-                        WHERE n.sim_run_id = '{run}' AND n.vehicle_id = '{AV041}' AND a ->> 'svc' = 'exterior_wash'""") == "1"
-    # an undo of the next-return order puts the every-return tidy back at once (0605's undo, unchanged)
-    u = tcall(post, chase, "undo_command", {"command_id": nxt["data"]["command"]["command_id"]})
-    assert u["data"]["outcome"] == "applied", u
-    assert post.val(f"SELECT service_when FROM ottoq_owner_settings WHERE sim_run_id = '{run}' AND vehicle_id = '{AV041}' "
-                    f"AND service = 'interior_tidy' AND status = 'active'") == "every_return"
-    # a passcode session's one-time order over the carried order leaves what is saved as it is
-    session = unlock(post, agent="Visitor", ip="192.0.2.131")["data"]["session"]
-    assert tcall(post, session, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "now"})["data"]["outcome"] == "applied"
-    assert saved(post, AV041) == want
-    # the next demo run and the next production run carry both every-return orders
+    assert sorted(tuple(r) for r in post.rows(f"SELECT service, service_when, status FROM ottoq_owner_settings WHERE sim_run_id = '{run}' "
+                                               f"AND vehicle_id = '{AV041}' AND kind = 'service' ORDER BY 1")) == \
+        [("exterior_wash", "every_return", "active"), ("interior_tidy", "every_return", "active")]
+    assert visit_atoms(post, run, AV041) == on_visit
+    # the car does not leave until both are done: charged and checked, it still waits for the tidy and the wash
+    post.run(f"UPDATE vehicles SET current_soc = 100 WHERE id = '{AV041}'")
+    finish(post, run, AV041, ["charge", "readiness_check"])
+    assert not leaves(post, run, AV041)
+    finish(post, run, AV041, ["interior_tidy"])
+    assert not leaves(post, run, AV041), "the wash is still to do"
+    finish(post, run, AV041, ["exterior_wash"])
+    assert leaves(post, run, AV041)
+    assert saved(post, AV041) == want, "a one-time order never ends what is saved"
+    # a passcode session's one-time order over them is no change too, on a demo run (passcodes open nothing in production)
     post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")
     demo = fresh_run(post, keep_saved=True)
     assert carried(post, demo) == want
+    session = unlock(post, agent="Visitor", ip="192.0.2.131")["data"]["session"]
+    for when in ("now", "next_return"):
+        r = tcall(post, session, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": when})
+        assert r["data"]["outcome"] == "no_change", r
+    assert saved(post, AV041) == want and carried(post, demo) == want
+    # and a car without the every-return order gets the one-time order as before: an extra service, applied
+    extra = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41", "Tesla 45"], "service": "interior_tidy", "when": "now"})
+    assert extra["data"]["outcome"] == "applied", extra
+    assert [(e["vehicle"], e["change"]) for e in extra["data"]["command"]["effects"]] == [("Tesla-AV-041", False), ("Tesla-AV-045", True)]
+    assert "back on the car once this one is done" not in extra["data"]["summary"]
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{demo}'")
     prod = production_run(post, keep_saved=True)
     assert carried(post, prod) == want
-    # in production, the same: a person's wash now does not end the saved order
-    again = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "now"})
-    assert again["data"]["outcome"] == "applied" and "This lasts until the production run ends or you undo it." in again["data"]["summary"], again
-    assert saved(post, AV041) == want
     post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{prod}'")
-    third = fresh_run(post, keep_saved=True)
-    assert carried(post, third) == want
-    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{third}'")
+
+
+def test_a_one_time_order_over_an_every_return_order_that_skips_this_visit_is_an_extra_service_and_never_ends_what_is_saved(post):
+    """The review, round 1 (rule 9 and 11), where it still applies: an every-return order that does not include this visit
+    (include_current_visit false) leaves this visit without the service, so a wash now is an extra service for this visit.
+    It takes the every-return order's place on the run only until it is done, the receipt says so, and nothing saved ends:
+    the next demo and production runs carry the order."""
+    no_run(post)
+    chase = sign_in(post)
+    run = fresh_run(post)
+    later = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "every_return",
+                                                    "include_current_visit": False})
+    assert later["data"]["outcome"] == "applied", later
+    want = [(AV041, "service", "exterior_wash")]
+    assert saved(post, AV041) == want
+    post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{run}', '2026-09-27 12:01+00')")
+    assert ("exterior_wash", "pending") not in visit_atoms(post, run, AV041), "not on this visit"
+    now = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "now"})
+    assert now["data"]["outcome"] == "applied", now
+    assert ("The every-return order for exterior wash stays: on this run it is back on the car once this one is done, and it "
+            "stays saved to the car for every run.") in now["data"]["summary"], now["data"]["summary"]
+    assert saved(post, AV041) == want
+    post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{run}', '2026-09-27 12:02+00')")
+    assert ("exterior_wash", "pending") in visit_atoms(post, run, AV041)
+    post.run(f"UPDATE vehicles SET current_soc = 100 WHERE id = '{AV041}'")
+    finish(post, run, AV041, ["charge", "readiness_check"])
+    assert not leaves(post, run, AV041), "the wash asked for now is still to do"
+    finish(post, run, AV041, ["exterior_wash"])
+    post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{run}', '2026-09-27 12:03+00')")
+    assert post.rows(f"SELECT service_when, coalesce(include_current_visit::text, '-') FROM ottoq_owner_settings WHERE sim_run_id = '{run}' "
+                     f"AND vehicle_id = '{AV041}' AND kind = 'service' AND status = 'active'") == [["every_return", "false"]]
+    assert leaves(post, run, AV041)
+    # an undo of the one-time order puts the every-return order back at once (0605's undo, unchanged)
+    again = tcall(post, chase, "request_service", {"vehicles": ["Tesla 45"], "service": "interior_tidy", "when": "every_return",
+                                                   "include_current_visit": False})
+    once = tcall(post, chase, "request_service", {"vehicles": ["Tesla 45"], "service": "interior_tidy", "when": "now"})
+    assert again["data"]["outcome"] == "applied" and once["data"]["outcome"] == "applied", (again, once)
+    u = tcall(post, chase, "undo_command", {"command_id": once["data"]["command"]["command_id"]})
+    assert u["data"]["outcome"] == "applied", u
+    assert post.val(f"SELECT service_when FROM ottoq_owner_settings WHERE sim_run_id = '{run}' AND vehicle_id = '{AV045}' "
+                    f"AND service = 'interior_tidy' AND status = 'active'") == "every_return"
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")
+    demo = fresh_run(post, keep_saved=True)
+    assert carried(post, demo) == [(AV041, "service", "exterior_wash"), (AV045, "service", "interior_tidy")]
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{demo}'")
+    prod = production_run(post, keep_saved=True)
+    assert carried(post, prod) == [(AV041, "service", "exterior_wash"), (AV045, "service", "interior_tidy")]
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{prod}'")
 
 
 def test_the_cockpit_boards_show_no_production_owner_data_and_no_persons_words_to_anon(post):
@@ -1717,3 +1791,191 @@ def test_the_cockpit_boards_show_no_production_owner_data_and_no_persons_words_t
     blob = json.dumps(seen)
     assert kid not in blob and pid not in blob and "PRIVATE" not in blob, blob[:2000]
     post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{demo2}'")
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────── the review, round 2 ──
+
+def test_a_command_id_is_shown_only_to_the_agent_that_made_it_or_to_its_person(post):
+    """The review, round 2 (security): 0605's reads list every setting of the fleet on the run with its command_id, whoever
+    made it, and §9 carries a person's production and no-run commands onto demo runs, so a passcode session and an issued
+    key on the same fleet read the ids of a person's commands that §15 keeps off the cockpit boards. Now my_settings,
+    my_fleet and my_vehicle name a command only to the agent that made it, or to the person it is recorded under (through
+    any agent signed in to the account); the settings themselves are still shown to every reader of the fleet."""
+    no_run(post)
+    chase = sign_in(post)
+    norun = tcall(post, chase, "request_service", {"vehicles": ["Tesla-RT-003"], "service": "interior_tidy", "when": "every_return"})
+    assert norun["data"]["outcome"] == "saved", norun
+    prod = production_run(post, keep_saved=True)
+    made = lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 90})
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{prod}'")
+    demo = fresh_run(post, keep_saved=True)
+    assert carried(post, demo) == sorted([(AV045, "charge_limit", "90"), (RT003, "service", "interior_tidy")])
+    hold = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 41"], "for_minutes": 30})
+    assert hold["data"]["outcome"] == "applied", hold
+    person_ids = [x["data"]["command"]["command_id"] for x in (norun, made, hold)]
+    session = unlock(post, agent="Visitor", ip="192.0.2.141")["data"]["session"]
+    own = tcall(post, session, "request_service", {"vehicles": ["Tesla 45"], "service": "exterior_wash", "when": "next_return"})
+    assert own["data"]["outcome"] == "applied", own
+    own_id = own["data"]["command"]["command_id"]
+    key = post.issue("tesla-key-r2", "personal", ["read", "note", "owner_settings"], TESLA)
+    reads = [("my_settings", {}), ("my_fleet", {}), ("my_vehicle", {"vehicle": "Tesla-RT-003"}), ("my_vehicle", {"vehicle": "Tesla-AV-045"})]
+
+    def read(token_hash):
+        out = [pcall(post, token_hash, t, a) for t, a in reads]
+        assert all(o["http_status"] == 200 for o in out), out
+        return [o["data"] for o in out]
+
+    s_reads, k_reads = read(sha(session)), read(key)
+    for label, got, mine in (("passcode session", s_reads, [own_id]), ("issued key", k_reads, [])):
+        blob = json.dumps(got)
+        assert not [i for i in person_ids if i in blob], (label, blob[:3000])
+        assert [i for i in [own_id] if i in blob] == mine, label
+        # the settings are still all there; only the commands that are not the reader's are unnamed
+        rows = {(x["vehicle"], x["kind"]): x["command_id"] for x in got[0]["settings"]}
+        assert rows[("Tesla-AV-045", "charge_limit")] is None and rows[("Tesla-RT-003", "service")] is None, (label, rows)
+        assert rows[("Tesla-AV-041", "hold")] is None, (label, rows)
+        orders = [o for c in got[1]["cars"] for o in (c.get("yours") or {}).get("orders", [])]
+        assert {o["service"] for o in orders} == {"interior_tidy", "exterior_wash"}, (label, orders)
+        assert all(o["command_id"] is None for o in orders if o["service"] == "interior_tidy"), (label, orders)
+        assert got[2]["car"]["yours"]["orders"][0]["command_id"] is None, label
+    # the person reads every one of their own, through this agent or another signed in to the same account, and not the
+    # session's
+    chase2 = sign_in(post)
+    for token in (chase, chase2):
+        blob = json.dumps(read(sha(token)))
+        assert all(i in blob for i in person_ids) and own_id not in blob, blob[:3000]
+    # and on the next run that carries them, the same
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{demo}'")
+    nxt = fresh_run(post, keep_saved=True)
+    session2 = unlock(post, agent="Visitor2", ip="192.0.2.142")["data"]["session"]
+    for token_hash in (sha(session2), key):
+        blob = json.dumps(read(token_hash))
+        assert not [i for i in person_ids if i in blob], blob[:3000]
+    assert all(i in json.dumps(read(sha(chase))) for i in person_ids[:2])
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{nxt}'")
+
+
+def _passcode_undo_over_a_persons_ended_save(post, unlock_on):
+    """A person's 85 (saved), a passcode session's 90 over it, the person's 88 (the saved 85 ends, 88 is saved), the
+    person's undo of the 88 (the saved 88 ends; the run is back at the session's 90), then the session's undo of its own
+    90, which restores the run's 85 row: the review's scenario H."""
+    no_run(post)
+    chase = sign_in(post)
+    demo = fresh_run(post)
+    p85 = lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    session = unlock(post, agent="Visitor", ip="192.0.2.151" if unlock_on else "192.0.2.152")["data"]["session"]
+    x90 = tcall(post, session, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 90})
+    assert x90["data"]["outcome"] == "applied", x90
+    p88 = lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 88})
+    u1 = tcall(post, chase, "undo_command", {"command_id": p88["data"]["command"]["command_id"]})
+    assert u1["data"]["outcome"] == "applied" and target(post) == "90", u1
+    assert saved(post, AV041) == []
+    pre = "SET ottoq.agent_ledger_unlock = 'on';\n" if unlock_on else ""
+    rc, out, err = post.run(f"{pre}SELECT ottoq_agent_call({q(sha(session))}, 'undo_command', "
+                            f"{q(json.dumps({'command_id': x90['data']['command']['command_id']}))}::jsonb, 'mcp', '{{}}'::jsonb)",
+                            role="service_role" if unlock_on else None)
+    return demo, json.loads(out), x90["data"]["command"]["command_id"], [p85["data"]["command"]["command_id"], p88["data"]["command"]["command_id"]]
+
+
+def test_a_passcode_undo_never_puts_back_what_a_persons_later_command_ended(post):
+    """The review, round 2 (rule 9): a passcode session's undo of its own command restored the run row it had replaced,
+    and the follow tried to put back the person's saved 85 that the person's own later 88 had ended. With the saved guard
+    on it answered 500 and undid nothing; with the guard's unlock on (or before round 1) it put back a lower limit with no
+    person and no preview, and every next run, production included, carried it. Now the follow puts a saved row back only
+    on the saved guard's own condition (a person's undo of the command that ended it), unlock or not: the undo applies, the
+    run's own 85 row is in force on this demo run, and nothing is saved, so the next demo and production runs charge full."""
+    for unlock_on in (False, True):
+        demo, u, x90, persons = _passcode_undo_over_a_persons_ended_save(post, unlock_on)
+        assert u["http_status"] == 201 and u["data"]["outcome"] == "applied", (unlock_on, u)
+        assert post.val(f"SELECT undone_at IS NOT NULL FROM ottoq_owner_commands WHERE command_id = '{x90}'") == "t"
+        assert target(post) == "85", "on this demo run, the undo puts back the row the session's 90 replaced"
+        assert saved(post, AV041) == [], (unlock_on, "nothing is saved: the person's 85 stays ended")
+        assert post.rows(f"SELECT charge_limit_pct, status, ended_reason FROM ottoq_owner_saved_settings "
+                         f"WHERE command_id IN ('{persons[0]}', '{persons[1]}') ORDER BY charge_limit_pct") == \
+            [["85", "ended", "replaced by a new setting"], ["88", "ended", "undone by the owner"]], unlock_on
+        post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{demo}'")
+        nxt = fresh_run(post, keep_saved=True)
+        assert carried(post, nxt) == [] and target(post) == "100", unlock_on
+        prod = production_run(post, keep_saved=True)
+        assert carried(post, prod) == [] and target(post) == "100", unlock_on
+        post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{prod}'")
+    # a person's undo of the command that ended a saved row still puts it back (the one way back, round 1)
+    no_run(post)
+    chase = sign_in(post)
+    run = fresh_run(post)
+    first = lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    up = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 95})
+    assert saved(post, AV041) == [(AV041, "charge_limit", "95")]
+    back = confirm(post, chase, tcall(post, chase, "undo_command", {"command_id": up["data"]["command"]["command_id"]}))
+    assert back["data"]["outcome"] == "applied" and saved(post, AV041) == [(AV041, "charge_limit", "85")], back
+    assert post.val(f"SELECT status FROM ottoq_owner_saved_settings WHERE command_id = '{first['data']['command']['command_id']}'") == "active"
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = '{run}'")
+
+
+def test_a_production_run_lifts_a_paused_demo_runs_owner_settings_and_puts_the_cars_back(post):
+    """The review, round 2 (rule 9): ottoq_production_start refuses only a RUNNING run (read live), so production can start
+    while a demo run is paused, and nothing ended the demo's owner settings. A passcode session's 80 there stayed in force
+    in production: the demo's tick had stamped it on the car, the reads with no run pinned returned it, the car could leave
+    production at 80%, and OTTO-Q told the signed-in owner it charges to 100%. Now a production run that starts (or
+    resumes) lifts every other run's owner settings at its depot and puts the cars back; what a person saved is still
+    carried onto production, and its commands are not stamped lifted."""
+    no_run(post)
+    chase = sign_in(post)
+    assert tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "every_return"})["data"]["outcome"] == "saved"
+    keep = save_lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 85})
+    demo = fresh_run(post, keep_saved=True)
+    session = unlock(post, agent="Visitor", ip="192.0.2.161")["data"]["session"]
+    x80 = tcall(post, session, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80})
+    assert x80["data"]["outcome"] == "applied", x80
+    post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{demo}', '2026-09-27 12:01+00')")
+    assert post.val(f"SELECT target_soc FROM vehicles WHERE id = '{AV041}'") == "80"
+    demo_rows = post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{demo}' AND status = 'active'")
+    assert int(demo_rows) == 3, demo_rows
+    # with no production run live, the production writer lifts nothing
+    sid = post.val(f"SELECT setting_id FROM ottoq_owner_settings WHERE sim_run_id = '{demo}' AND vehicle_id = '{AV041}' "
+                   f"AND kind = 'charge_limit' AND status = 'active'")
+    _refused_both(post, f"UPDATE ottoq_owner_settings SET status = 'lifted', closed_at = now() WHERE setting_id = '{sid}'",
+                  "lifted only when its run ends, or when a production run takes over its depot", "production_start")
+    # the demo is paused, and production starts the way ottoq_production_start inserts its run
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'paused' WHERE sim_run_id = '{demo}'")
+    prod = str(__import__("uuid").uuid4())
+    post.run(f"""INSERT INTO ottoq_sim_runs (sim_run_id, depot_id, status, started_at, sim_clock_current, sim_clock_end, run_by)
+                 VALUES ('{prod}', '{TWIN}', 'running', clock_timestamp(), now(), now() + interval '100 years', 'production_live')""")
+    assert post.rows(f"SELECT DISTINCT status, closed_reason FROM ottoq_owner_settings WHERE sim_run_id = '{demo}'") == \
+        [["lifted", "a production run started at the depot"]]
+    assert post.val(f"SELECT target_soc FROM vehicles WHERE id = '{AV041}'") == "100"
+    assert target(post) == "100"
+    assert post.val(f"SELECT lifted_reason FROM ottoq_owner_commands WHERE command_id = '{x80['data']['command']['command_id']}'") == \
+        "a production run started at the depot"
+    assert post.val(f"SELECT lifted_at IS NULL FROM ottoq_owner_commands WHERE command_id = '{keep['data']['command']['command_id']}'") == "t"
+    # what the person saved is carried onto production
+    assert carried(post, prod) == sorted([(AV041, "service", "interior_tidy"), (AV045, "charge_limit", "85")])
+    # the car at 80%, charged and checked on production: it does not leave, whether or not a run is pinned
+    post.run(f"""INSERT INTO ottoq_visit_needs (vehicle_id, sim_run_id, depot_id, arrived_at, visit_key, atoms, target_soc) VALUES
+      ('{AV041}', '{prod}', '{TWIN}', now(), 'av041:{prod[:8]}', '[{{"svc":"charge","status":"done"}},{{"svc":"readiness_check","status":"done"}},{{"svc":"interior_tidy","status":"done"}}]', 100)""")
+    post.run(f"UPDATE vehicles SET current_soc = 80 WHERE id = '{AV041}'")
+    assert post.val(f"SELECT ottoq_departure_clear('{AV041}', '{prod}', now(), true)") == "f"
+    assert post.val(f"SELECT set_config('ottoq.sim_run_id', '{prod}', false) IS NOT NULL; "
+                    f"SELECT ottoq_departure_clear('{AV041}', '{prod}', now(), true)") == "f"
+    # and what OTTO-Q tells the signed-in owner is true: the car charges full
+    full = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 100})
+    assert full["data"]["outcome"] == "no_change" and "already charges to 100%" in full["data"]["summary"], full
+    # production paused, a demo started meanwhile takes an issued key's 80% (the passcode stays closed); production cannot
+    # run again until that demo is paused, and resuming it lifts the demo's settings and puts the car back too
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'paused' WHERE sim_run_id = '{prod}'")
+    demo2 = str(__import__("uuid").uuid4())
+    post.run(f"""INSERT INTO ottoq_sim_runs (sim_run_id, depot_id, status, started_at, sim_clock_current, sim_clock_end, run_by)
+                 VALUES ('{demo2}', '{TWIN}', 'running', clock_timestamp(), '2026-09-27 12:00+00', '2026-09-28 08:00+00', 'operator_demo')""")
+    key = post.issue("tesla-key-yield", "personal", ["read", "note", "owner_settings"], TESLA)
+    k80 = pcall(post, key, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80})
+    assert k80["data"]["outcome"] == "applied" and k80["data"]["command"]["sim_run_id"] == demo2, k80
+    post.val(f"SELECT ottoq.ottoq_owner_orders_tick('{demo2}', '2026-09-27 12:01+00')")
+    assert post.val(f"SELECT target_soc FROM vehicles WHERE id = '{AV041}'") == "80"
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'paused' WHERE sim_run_id = '{demo2}'")
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'running' WHERE sim_run_id = '{prod}'")
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{demo2}' AND status = 'active'") == "0"
+    assert post.val(f"SELECT target_soc FROM vehicles WHERE id = '{AV041}'") == "100" and target(post) == "100"
+    # and production's own settings were never touched by its pause and resume
+    assert sorted(r[0] for r in post.rows(f"SELECT status FROM ottoq_owner_settings WHERE sim_run_id = '{prod}'")) == ["active", "active"]
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id IN ('{prod}', '{demo}', '{demo2}')")
+    assert saved(post) == sorted([(AV041, "service", "interior_tidy"), (AV045, "charge_limit", "85")])

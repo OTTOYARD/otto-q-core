@@ -660,7 +660,15 @@ has entered an ask (a result or an error, and with dynamic filtering any result 
 pages), the gateway refuses every tool that changes something for the rest of that ask: the model gets an `is_error`
 tool result, **OTTO-Q is never called**, and the answer tells you to ask for the change again on its own. Reads stay
 allowed; a change made earlier in the same ask, before any web text arrived, stands; and an ask that searched never
-returns a `confirm`, so a page cannot steer a preview you might later say yes to. What the model tried after reading
+returns a `confirm`, so a page cannot steer a preview you might later say yes to. Nor does it return the words that say
+how to send one (the review, round 2, the night of 2026-10-14 CT): a preview's receipt ends "To confirm, send the same command with mode
+"apply", expect_plan_hash ... and confirms_command_id ...", and an answer built from the receipts (when the model's last
+turn was empty, or the ask stopped) carried that line too, so an agent could rebuild the exact confirm the door withholds.
+In an ask that read the web that line, and the two argument names in a refusal, are taken out of every receipt and of
+the answer, and each previewed receipt says the ask offers nothing to confirm; the tool, arguments (chosen before any
+web text arrived), outcome and command id stay as the record. The model is never shown how to confirm at all (it never
+confirms): the tool results it reads carry no confirm object, plan hash or preview id and no such line, so no answer it
+writes can hand one back either. What the model tried after reading
 the web is never handed back as something to send: `blocked_after_web` names the tools only, never the arguments a page
 may have chosen, and the agent is told to relay that to its person and send a change only as the person's own new words.
 When a change was refused this way the answer OPENS with what really happened. **What changed is the `changes` block,
@@ -683,8 +691,15 @@ validated whichever variable it came from (an error names that variable, and the
 and the gateway logs at start which one it used. Effort is set explicitly, `low` by default (`OTTOCOMMAND_EFFORT`, one of low,
 medium, high, xhigh, max), because the whole ask must end inside Hermes's 60 seconds; `max_tokens` is 8,000, since
 thinking counts against it. Every assistant turn is replayed to the model exactly as it came back (thinking, searches,
-results, citations, tool calls); a paused server turn (`pause_turn`) is resumed at most 3 times inside the budget; a
-refusal by the model is a plain failure that runs no tool (`model_refused`, with its category); and on the models that
+results, citations, tool calls); a paused server turn (`pause_turn`) is resumed at most 3 times inside the budget, and
+the paused reply and its continuation are one turn, so the text written before the pause is part of the answer, with its
+sources (the review, round 2: it was dropped); a refusal by the model is a plain failure that runs no tool
+(`model_refused`, with its category); only the text of the turn that ends the model's reply is an answer, so a note
+written beside a tool call ("Let me check your fleet.") never is: an ask or a search stopped after one with nothing
+changed (a model error, a refusal, the 50-second budget, the step limit, the pause cap) is the door's plain failure with
+its code and message, `isError: true` over MCP, and an ask stopped after a change was made answers with `incomplete:
+true`, `stopped: {code, message}` and an answer that opens with why it stopped, then OTTO-Q's receipts (the review,
+round 2: such a note used to come back as a 200 answer, the stop and its category dropped); and on the models that
 take it, the request asks for the server-side fallback, so a refusal can be answered by the model Anthropic recommends
 for it. A setting the gateway cannot read (an effort it does not know, a use count that is not a number) is answered as
 `ask_misconfigured`, never silently defaulted; confirms still apply then, since they need no model.
@@ -713,14 +728,18 @@ and no start function carried anything forward; 0605 §4 chose per-run. The tabl
 | a charge limit, set or cleared by an agent **signed in to your account** | **saved to the cars**: from run to run, production included, until you change it | `public.ottoq_owner_saved_settings` (one active row per car and kind, not run-scoped, append-only in substance, its own guard); a new operator demo run (`run_by='operator_demo'`) or production run gets it carried on as a setting of that run once (a certification or research run does not), inside your contract, only on your cars, recorded as the carry of the command that saved it |
 | an "every time it comes back" service, signed in | saved, the same way | the same |
 | a hold | until the run ends | per-run by design: a hold names a time on that run's clock |
-| a "now" or "next time" service | until it is served, or the run ends | per-run by design: a one-time order |
+| a "now" or "next time" service | until it is served, or the run ends | per-run by design: a one-time order; over an every-return order of the same service that already covers it (this visit, or the next return), it is already ordered and changes nothing |
 | anything set through a passcode session or an issued key | until the run ends | per-run by design: no person is recorded, so nothing is saved under one |
 
 The car's effective charge target reads the carried row through `ottoq_owner_charge_limit`, unchanged: the engine does
 not learn that a setting was saved. The answer and `my_settings` say which settings are saved, **to an agent signed in
 to the account only**: a demo passcode session or an issued key gets no `saved` block and no line about it (a passcode
 session used to read the account holder's email there; found in review on 2026-10-14), and who saved a row and the
-command that saved it are shown only to that same person. Because a saved lower limit outlives the run, a signed-in
+command that saved it are shown only to that same person. **A command's id goes only to the agent that made it, or to
+the person it is recorded under** (the review, round 2): `my_settings`, `my_fleet` and `my_vehicle` list every setting
+of the fleet on the run, whoever made it, and a carried row names a person's production or no-run command, so a passcode
+session or an issued key used to read those ids; now each such `command_id` is null for any reader but that agent and
+that person (through any agent signed in to the account), and the setting itself is still shown. Because a saved lower limit outlives the run, a signed-in
 person's lower limit is preview-then-confirm on **every** run, not only production (rule 9: *"set verified and
 confirmed"*); a raise or a clear is one call.
 
@@ -753,8 +772,21 @@ refusal made with no run).
 has RLS with no policies, and its writers are the owner command, the run-end lift, the order trigger on a new visit and
 the run purge. But `postgres` is also what the SQL editor and the Management API run as, so 0721 adds a guard trigger:
 a setting is inserted only as what an applied owner command set (on its run, or as the carry of a saved one), what was
-set is immutable, a status moves only as a command, the tick or the run's end moves it, and a row is deleted only by the
-purge (`ottoq.retention`). The saved table has the same guard and refuses DELETE and TRUNCATE.
+set is immutable, a status moves only as a command, the tick or the run's end moves it (or a production run taking over
+the depot, below), and a row is deleted only by the purge (`ottoq.retention`). The saved table has the same guard and
+refuses DELETE and TRUNCATE. A saved row is put back only by a person's undo of the command that ended it; an undo by a
+passcode session or an issued key restores its run's row and leaves what is saved alone (the review, round 2: such an
+undo answered 500, and with the guard's unlock on it put back a person's ended lower limit for every later run).
+
+**Production takes over the depot's cars** (the review, round 2, rule 9). `ottoq_production_start` refuses only a
+RUNNING run (read on the live database, SELECT only, 2026-10-15 00:22 UTC, 7:22 PM CT on the 14th), so production can
+start while a demo run is paused,
+and before this nothing ended that demo's owner settings: a passcode session's 80% there stayed stamped on the car and
+in the engine's reads with no run pinned, so the car could leave production at 80% while OTTO-Q told the signed-in
+owner it charges to 100%. Now a production run that starts, resumes or pauses lifts every owner setting of any other run
+still live at the depot, puts the cars that carried a limit back to their target, and stamps those commands lifted
+(unless what they set is saved, which production carries as usual). A demo run resumed later keeps nothing of what was
+lifted from it: its cars charge full.
 
 **The passcode does not open production.** While a production run is running or paused at the depot,
 `enter_passcode` is refused and every existing passcode session is answered `403 production_live` (and ledgered), for
@@ -764,7 +796,8 @@ does not yet say that production is live.
 **Time.** The whole ask (or search) is capped at **50 seconds** (Hermes's MCP tool timeout is 60): each model call is
 cut at what is left and never runs past 45 seconds, a paused search is resumed only inside what is left, and no engine
 call starts with less than 10 seconds left, so an engine call that takes its full 15 still ends inside 60. A cut-short
-ask says what OTTO-Q did (`incomplete: true`).
+ask that changed something says why it stopped and what OTTO-Q did (`incomplete: true`, `stopped`); one that changed
+nothing is answered as the door's failure, with its code.
 
 **To go live** (in this order; times in CT when done):
 1. **Deploy `ottoq-agent-gateway`** with JWT verification off, these five files: `ottoq-agent-gateway/index.ts`,
@@ -829,6 +862,14 @@ never a withdrawal: what is saved stays for every later run, production included
 is back once the one-time order is done; and the two cockpit boards the publishable key reads (0606, 0608) leave out a
 production run's settings and commands, a person's commands made with no run live, a person's note, and such a command's
 id on a demo run's carried setting. Counts in the commit that made these.
+**After the review, round 2 (the night of 2026-10-14 CT):** a command's id only to the agent that made it or its person (`my_settings`,
+`my_fleet`, `my_vehicle`); an ask that read the web hands back no plan hash or preview id with the words that confirm
+it, in any path, and the model never sees them; a note beside a tool call is never the answer (stopped with nothing
+done: the door's failure, `isError` over MCP; after a change: `incomplete`, `stopped`, and why first); the text before a
+`pause_turn` kept; a passcode undo never puts back what a person's later command ended (unlock or not); a one-time order
+an every-return order already covers is already ordered (no change), so the service stays on the car's visit and the car
+does not leave without it; and a production run lifts every other live run's owner settings at the depot as it starts.
+Counts in the commit that made these.
 **Not verified:** a real call to the Anthropic API (every test uses a fake fetch), web search on this organization's
 account, the fallback actually taken, `EdgeRuntime.waitUntil` in the deployed function, and any of it applied or
 deployed.
