@@ -23,7 +23,8 @@
 -- UPDATE the database's log caught at 16:42:42 UTC on 2026-10-14. Before A3: when t_decide.door names an application, it
 -- waits (at most 20 s) until a backend of that name is waiting on a lock, so a test can put the door's wait inside the
 -- beat; when t_decide.agent names one, it waits once per session until that agent has committed a newer proposal or is
--- waiting on a lock, so a test can put a proposal batch inside the beat. Used by tests/test_tick_lock_sql.py.
+-- waiting on a lock, so a test can put a proposal batch inside the beat. ottoq_purge_prior_runs is NOT the live body
+-- either: it keeps the live order and statements on the run's row (see it below). Used by tests/test_tick_lock_sql.py.
 SET check_function_bodies = off;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
@@ -223,16 +224,61 @@ BEGIN
   PERFORM public.ottoq_dispose_external_proposals(p_sim_run_id, v_tick, v_clock, false);
 END$s$;
 
--- NOT live bodies: the two shapes 0724's P2 reads in them. ottoq_decide_tick enacts the run's proposals by the UPDATE its
--- line 1228 carries; ottoq_purge_prior_runs is the one function that deletes ottoq_sim_runs rows.
+-- NOT live bodies: the shapes 0724's P2 reads in them. ottoq_decide_tick enacts the run's proposals by the UPDATE its
+-- line 1228 carries. ottoq_purge_prior_runs is the one function that deletes ottoq_sim_runs rows, and it is kept in the
+-- live body's order with its two statements on ottoq_sim_runs verbatim (live md5 46f1f29f, read 2026-10-15 00:16:48
+-- UTC): it chooses its runs once, deletes their rows in the run-scoped tables by dynamic SQL, children first (the
+-- proposals among them; live reads the tables from the run-scope registry, here they are this stub's), and deletes the
+-- runs' rows last. Between the two, t_hold_for_door() lets a test put a stop door inside it.
 CREATE FUNCTION public.ottoq_decide_tick(p_sim_run_id uuid) RETURNS void LANGUAGE plpgsql AS $s$
 BEGIN
   UPDATE ottoq_external_proposals p
      SET status='enacted', disposition_reason='enacted_by_kernel', disposed_at=clock_timestamp()
    WHERE p.sim_run_id=p_sim_run_id AND p.status='pending';
 END$s$;
-CREATE FUNCTION public.ottoq_purge_prior_runs(p_keep uuid) RETURNS integer LANGUAGE plpgsql AS $s$
-BEGIN DELETE FROM public.ottoq_sim_runs WHERE sim_run_id <> p_keep AND status <> 'running'; RETURN 0; END$s$;
+-- test hook: when t_decide.door names an application, wait (at most 20 s) until a backend of that name waits on a lock,
+-- so the statement after the hook runs while that backend is blocked. Renames this backend '<name>_holding' first, so a
+-- test can see it has reached the hook before it starts the door. Holds once per session: a demo start holds after its
+-- first statement, and the purge it then calls goes straight on (the door may have lost a deadlock by then).
+CREATE FUNCTION public.t_hold_for_door() RETURNS void LANGUAGE plpgsql AS $s$
+DECLARE v_door text := (SELECT door FROM public.t_decide); v_t0 timestamptz := clock_timestamp();
+BEGIN
+  IF v_door IS NULL OR current_setting('ottoq_test.held_for_door', true) IS NOT DISTINCT FROM 'yes' THEN RETURN; END IF;
+  PERFORM set_config('ottoq_test.held_for_door', 'yes', false);
+  PERFORM set_config('application_name', current_setting('application_name') || '_holding', false);
+  WHILE NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = v_door AND wait_event_type = 'Lock') LOOP
+    IF clock_timestamp() > v_t0 + interval '20 seconds' THEN
+      RAISE EXCEPTION 'test hook: no backend named % ever waited on a lock', v_door;
+    END IF;
+    PERFORM pg_sleep(0.05);
+    PERFORM pg_stat_clear_snapshot();   -- pg_stat_activity is read once per transaction otherwise
+  END LOOP;
+END$s$;
+CREATE FUNCTION public.ottoq_purge_prior_runs(p_keep_run uuid) RETURNS jsonb LANGUAGE plpgsql AS $s$
+DECLARE r record; v_doomed uuid[]; v_runs int;
+BEGIN
+  SELECT array_agg(sim_run_id) INTO v_doomed
+    FROM public.ottoq_sim_runs
+   WHERE sim_run_id <> p_keep_run
+     AND COALESCE(run_by,'') <> 'production_live'
+     AND status <> 'running';
+  IF v_doomed IS NULL OR cardinality(v_doomed) = 0 THEN
+    RETURN jsonb_build_object('ok', true, 'kept', p_keep_run, 'prior_runs_deleted', 0);
+  END IF;
+  FOR r IN SELECT x.s, x.t, x.c
+             FROM (VALUES (1, 'public', 'ottoq_external_proposals', 'sim_run_id'), (2, 'public', 'ottoq_decisions', 'sim_run_id'),
+                          (3, 'public', 'ocpp_sessions', 'sim_run_id'), (4, 'public', 'ottoq_vehicle_dispatches', 'sim_run_id'),
+                          (5, 'public', 'ottoq_wear_tick_status', 'sim_run_id'), (6, 'public', 'ottoq_tick_clock_log', 'sim_run_id'))
+                  AS x(n, s, t, c)
+            ORDER BY x.n LOOP
+    EXECUTE format('DELETE FROM %1$I.%2$I WHERE %3$I = ANY($1)', r.s, r.t, r.c)
+      USING v_doomed;
+  END LOOP;
+  PERFORM public.t_hold_for_door();
+  DELETE FROM public.ottoq_sim_runs WHERE sim_run_id = ANY(v_doomed);
+  GET DIAGNOSTICS v_runs = ROW_COUNT;
+  RETURN jsonb_build_object('ok', true, 'kept', p_keep_run, 'prior_runs_deleted', v_runs);
+END$s$;
 
 -- ══ the live definitions, byte for byte ══
 
