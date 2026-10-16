@@ -115,10 +115,16 @@ test("the tool catalog is exactly the dispatcher's vocabulary, with the same cap
   delete need.handshake;
   // 0607: enter_passcode is answered before any key is resolved, so it is not in the capability map, but in the public block
   assert.match(LATEST.get("ottoq_agent_call"), /IF v_tool IN \('welcome', 'enter_passcode'\) THEN/);
-  assert.deepEqual(Object.keys(need).sort(), TOOLS.map((t) => t.name).filter((n) => n !== "enter_passcode").sort());
+  // 0721: ask_ottocommand and ottocommand_search are answered by the gateway's OTTO-Command door, never asked of the
+  // database as tools
+  assert.deepEqual(TOOLS.filter((t) => t.gateway).map((t) => t.name), ["ask_ottocommand", "ottocommand_search"]);
+  assert.ok(!("ask_ottocommand" in need), "the dispatcher must not learn the door's name: it would answer it as a tool");
+  assert.ok(!("ottocommand_search" in need), "nor the search's");
+  assert.deepEqual(Object.keys(need).sort(), TOOLS.filter((t) => !t.gateway).map((t) => t.name).filter((n) => n !== "enter_passcode").sort());
   const asTs = { "": null, read: "read", note: "note", per_kind: "any_request", owner_settings: "owner_settings" };
   for (const t of TOOLS) {
     if (t.name === "enter_passcode") assert.ok(t.capability === null && t.public === true);
+    else if (t.gateway) assert.ok(t.capability === "read" && t.scope === "fleet", "the door asks what a fleet reader may ask");
     else assert.equal(t.capability, asTs[need[t.name]], t.name);
   }
 });
@@ -194,6 +200,9 @@ const MINIMAL = {
   request_service: { vehicles: ["Tesla-AV-045"], service: "mechanical_pm" }, cancel_service: { vehicles: "all" },
   hold_vehicle: { vehicles: ["RT-003"], until: "6:00 AM" }, release_hold: { vehicles: "all" },
   undo_command: { command_id: "ee000000-0000-0000-0000-0000000000c9" },
+  // 0721
+  ask_ottocommand: { text: "How are my cars?" },
+  ottocommand_search: { question: "Is there a recall on the Model Y?" },
 };
 
 function closedEverywhere(schema, path) {
@@ -216,6 +225,13 @@ test("no tool accepts a scope from the caller: the database derives it from the 
     "token", "token_hash", "sim_run_id", "auth_user_id", "decided_by", "operator", "scope"];
   for (const t of TOOLS) {
     for (const key of smuggled) {
+      // 0721: ottocommand_search's `scope` is where to look (ottoq | web | both), an enum: a token scope is refused by it
+      if (t.name === "ottocommand_search" && key === "scope") {
+        const v = validateToolArgs(t, { ...MINIMAL[t.name], scope: "22222222-2222-2222-2222-222222222222" });
+        assert.equal(v.ok, false);
+        assert.deepEqual(t.inputSchema.properties.scope.enum, ["ottoq", "web", "both"]);
+        continue;
+      }
       const v = validateToolArgs(t, { ...MINIMAL[t.name], [key]: "22222222-2222-2222-2222-222222222222" });
       assert.equal(v.ok, false, `${t.name} accepted ${key}`);
       assert.ok(v.errors.some((e) => e.path === `$.${key}` && /not a known argument/.test(e.message)), `${t.name}/${key}`);
@@ -296,8 +312,11 @@ test("no tool changes the world: two write the request ledger, and the owner's s
   for (const t of TOOLS) {
     const writes = t.effect !== "read";
     assert.equal(t.annotations.readOnlyHint, !writes, t.name);
-    assert.equal(t.annotations.destructiveHint, false, t.name);
-    assert.equal(t.annotations.openWorldHint, false, t.name);
+    // 0721: OTTO-Command's door is marked destructive, so a client that gates destructive tools gates it: one call can
+    // hold cars, order or withdraw services and undo commands with no per-command approval
+    assert.equal(t.annotations.destructiveHint, t.name === "ask_ottocommand", t.name);
+    // 0721: OTTO-Command's two doors may read the web; no other tool reaches outside OTTO-Q
+    assert.equal(t.annotations.openWorldHint, t.name === "ask_ottocommand" || t.name === "ottocommand_search", t.name);
   }
   assert.deepEqual(TOOLS.filter((t) => t.effect === "ledger_write").map((t) => t.name), ["send_note", "submit_request"]);
   const owner = TOOLS.filter((t) => t.effect === "owner_setting");
@@ -310,7 +329,7 @@ test("no tool changes the world: two write the request ledger, and the owner's s
     assert.equal(t.annotations.idempotentHint, t.name !== "hold_vehicle", t.name);
   }
   assert.deepEqual(TOOLS.filter((t) => t.effect === "read" && t.scope === "fleet").map((t) => t.name),
-    ["my_fleet", "my_vehicle", "my_settings", "my_commands"]);
+    ["ottocommand_search", "my_fleet", "my_vehicle", "my_settings", "my_commands"]);
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════ 3. http ══
@@ -797,7 +816,10 @@ test("the edge function reaches the database through ottoq_agent_call and nothin
   assert.match(shell, /postgrestEngine\(/);
   const shared = stripTsComments(SHARED);
   const restUrls = [...shared.matchAll(/\/rest\/v1\/[^`"'\s]*/g)].map((m) => m[0]);
-  assert.deepEqual(restUrls, ["/rest/v1/rpc/${ENGINE_RPC}"]);
+  // 0721: and the one function that records an OTTO-Command model call in the evidence ledger (service role only)
+  assert.deepEqual(restUrls, ["/rest/v1/rpc/${ENGINE_RPC}", "/rest/v1/rpc/${MODEL_LEDGER_RPC}"]);
+  assert.match(shared, /export const MODEL_LEDGER_RPC = "ottoq_ottocommand_record_model_call";/);
+  assert.match(shell, /postgrestModelLedger\(/);
   assert.doesNotMatch(shared, /\.from\(\s*["'`]|\.rpc\(|createClient|\/storage\/v1|\/auth\/v1/);
   // imports: the dial-discipline module only (no network client, no Deno API)
   assert.deepEqual([...shared.matchAll(/^import .* from "([^"]+)";$/gm)].map((m) => m[1]), ["./agent_dial_discipline.ts"]);

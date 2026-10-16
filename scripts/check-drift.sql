@@ -768,11 +768,15 @@ repo_manifest(version, name, file) AS (
     ('20261013181932'::text, 'the_checks_futures_are_drawn_from_the_world_not_from_the_runs_minted_id'::text, '0712_the_checks_futures_are_drawn_from_the_world_not_from_the_runs_minted_id.sql'::text),
     ('20261013182717'::text, 'one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take'::text, '0713_one_agent_pass_holds_its_claim_for_as_long_as_a_pass_can_take.sql'::text),
     ('PENDING'::text, 'the_lease_catalog_row_says_what_the_claim_does'::text, '0714_the_lease_catalog_row_says_what_the_claim_does.sql'::text),
-    ('PENDING'::text, 'a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves'::text, '0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql'::text),
+    ('20261014144327'::text, 'a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves'::text, '0715_a_car_with_maintenance_or_calibration_due_gets_it_before_it_leaves.sql'::text),
     ('20261013184608'::text, 'the_feed_agents_propose_the_twins_world_and_a_person_promotes_it'::text, '0716_the_feed_agents_propose_the_twins_world_and_a_person_promotes_it.sql'::text),
     ('20261013201139'::text, 'the_board_calls_eighty_percent_a_priority_band_not_a_floor'::text, '0717_the_board_calls_eighty_percent_a_priority_band_not_a_floor.sql'::text),
     ('20261013210801'::text, 'production_runs_the_world_phases_the_twin_certifies'::text, '0718_production_runs_the_world_phases_the_twin_certifies.sql'::text),
-    ('20261013211005'::text, 'production_start_takes_the_world_as_the_operator_door_does'::text, '0719_production_start_takes_the_world_as_the_operator_door_does.sql'::text)
+    ('20261013211005'::text, 'production_start_takes_the_world_as_the_operator_door_does'::text, '0719_production_start_takes_the_world_as_the_operator_door_does.sql'::text),
+    ('PENDING'::text, 'a_signed_in_user_cannot_call_the_black_box_export_functions'::text, '0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql'::text),
+    ('PENDING'::text, 'a_signed_in_owner_changes_production_under_their_own_name'::text, '0721_a_signed_in_owner_changes_production_under_their_own_name.sql'::text),
+    ('PENDING'::text, 'the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies'::text, '0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql'::text),
+    ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

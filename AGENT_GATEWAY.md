@@ -37,6 +37,70 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > confirmation code (`OQ-XXXX-XXXX`); `ottoq_depot_owner_board` (0608) shows OTTO-PULSE and the twin every owner's
 > settings with their codes. A stop or reset of the twin ends every passcode session. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §0.
 
+> **2026-10-14 — OTTO-Command is the filter and executor (migration `0721` and this gateway's code; built and tested on
+> scratch, NOT yet applied or deployed).** Chase: *"request comes in from personal agents, OTTOCommand processes and acts
+> and returns info back. So it will act as the filter and executor there."* The plain-English door is now also the MCP
+> tool **`ask_ottocommand`**, offered to every token bound to a fleet (an owner key, a passcode session, an agent signed
+> in to its owner's account) and to no other; it is answered by the same handler as `POST /v1/ask`, through the caller's
+> own token, ledgered as transport `ask`, and capped at 50 seconds. OTTO-Command also reads `depot_status`,
+> `vehicle_card`, `recent_decisions` and `stall_availability` for the owner. In the database (0721): every owner command
+> records `acting_person` (the signed-in account's email, or none), `via` (`ottocommand` when an OTTO-Command model
+> called the tool, `confirm` exactly when the row confirms a recorded preview, `direct` when the agent made the call
+> itself; set by the database from the transport and the binding, never from an argument) and, on a confirm, the
+> preview it confirmed (`confirms_command_id`); a
+> **production** run accepts owner commands from an agent signed in to its owner's account and from nothing else; there,
+> a lower charge limit (or an undo that puts one back) applies only as the confirm of a preview the same principal
+> recorded in the last 15 minutes, once, and an unbound one is recorded as a preview and answered `confirm_required`.
+> OTTO-Q enforces that order; it cannot see the person's yes, which the person's own agent relays (a person-only confirm
+> in the OTTOYARD account session is not built). `ask_ottocommand` is annotated `destructiveHint: true`.
+> [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11.
+
+> **2026-10-14, afternoon — OTTO-Command searches OTTO-Q and the web (same `0721`, same gateway; built and tested on
+> scratch, NOT yet applied or deployed).** Chase (read 12:35 PM CT): *"Search should cover OTTO-Q and web. It can be ask
+> and tools as well."* A second door, the MCP tool **`ottocommand_search`** and **`POST /v1/search`**
+> (`{question, scope: "ottoq" | "web" | "both"}`), answers `{answer, changes, sources: [{url, title}], ottoq_reads,
+> web_searches}`, is offered to the same tokens as `ask_ottocommand`, and is read-only by construction: it is given no
+> tool that changes anything (annotated `readOnlyHint: true`, `openWorldHint: true`). `ask_ottocommand` may search the
+> web too (now `openWorldHint: true`) and returns `sources` and `web_searches` when it does. **Once any web result has
+> entered an ask, the gateway refuses every write tool for the rest of it**, before OTTO-Q is called, and the answer
+> OPENS with that fact; an ask that searched returns no `confirm` (at the top or inside a receipt) and none of the words
+> in a receipt that say how to send one (the plan hash, the preview's id), names refused tools
+> without their arguments (`blocked_after_web: ["set_charge_limit"]`), and keeps a page's title out of the answer
+> (cleaned and capped in `sources` only). **The model's text is never screened or dropped by pattern** (the review, round
+> 1: a pattern screen dropped 35% of realistic read-only answers and still let claims through): instead every ask and
+> every search answers with **`changes`**, a block built in code from OTTO-Q's receipts only (`{made, items: [{tool,
+> outcome: applied | saved | previewed | no_change | refused | unknown, sent_to_ottoq, command_id, confirmation_code,
+> cars, reason}], text}`), which also ends `answer`; it is the ONLY record of what changed, and the MCP instructions, the
+> tool descriptions, the OpenAPI and the Hermes skill (1.6.1) say so. A search's is always none, and says a search
+> changes nothing. Web searches are capped per model call (`max_uses`, the API's per-request cap); an ask makes at most
+> 9 model calls, so at most 27 searches at the default of 3, and `web_searches` counts them across the ask. Every model call is one row in
+> `ottoq_model_call_ledger` (provider `anthropic_ottocommand`; ids and counts only) through a service-role-only function,
+> fire-and-forget. In the database: a signed-in owner's charge limit and every-return services are saved to the cars
+> and carried onto each new demo and production run (their clear, a limit at 100% and a cancel end what is saved whatever
+> a passcode session did on the run, and only a signed-in agent reads `saved`), and with no run live a signed-in owner
+> can still save them (outcome `saved`, the saved table only, carried onto the next run); a guard trigger refuses every
+> write to the owner tables that does not come from the functions that make owner settings (each named for its own call
+> by a function-level `ottoq.owner_settings_writer`), plain INSERT, UPDATE, DELETE and TRUNCATE included, as postgres or
+> any role; a one-time order never ends a saved every-return order (and one that an every-return order already covers
+> changes nothing: the service stays on the car's visit); the two anon-readable cockpit boards leave out
+> production, a person's no-run commands and a person's words; and a passcode session (and `enter_passcode`) is refused `403 production_live` while a
+> production run is live. [PERSONAL_AGENT.md](PERSONAL_AGENT.md) §11, "Search, the web, and what lasts".
+
+> **2026-10-14, night CT — the review, round 2 (same `0721`, same gateway; built and tested on scratch, NOT yet applied
+> or deployed).** Each finding was reproduced on scratch before it was fixed. `my_settings`, `my_fleet` and `my_vehicle`
+> name a setting's `command_id` only to the agent that made the command or to the person it is recorded under (a passcode
+> session or an issued key read a person's carried production and no-run command ids). An ask that read the web hands
+> back none of the words that confirm a preview (the plan hash and preview id rode in each receipt's summary and in an
+> answer built from the receipts), and the model is never shown them. Only the text of the turn that ends the model's
+> reply is an answer: an ask or a search stopped after a note beside a tool call, with nothing changed, is the door's
+> failure (`isError: true` over MCP, with its code and a refusal's category); an ask stopped after a change answers
+> `incomplete: true` with `stopped` and an answer that opens with why. The text written before a `pause_turn` is kept.
+> In the database: a passcode session's undo never puts back a saved row a person's later command ended (it answered
+> 500, and with the guard's unlock on it brought back a lower limit for every later run); a one-time order an
+> every-return order already covers is `no_change`, so the service stays on the car's visit and the car does not leave
+> without it (rule 9); and a production run that starts, resumes or pauses lifts every other live run's owner settings at
+> its depot and puts those cars back to their target (a paused demo run's passcode 80% stayed in force in production).
+
 ---
 
 ## 1. Architecture
@@ -171,7 +235,8 @@ Every tool is available over REST and MCP. `sim_*` and `at_sim` fields are **sim
 | `request_service` · `cancel_service` | `POST /v1/me/services` · `/cancel` | `owner_settings` | order (now, next return, every return) or withdraw an owner's service |
 | `hold_vehicle` · `release_hold` | `POST /v1/me/holds` · `/release` | `owner_settings` | "not before" a sim time, at most 24 sim hours |
 | `undo_command` | `POST /v1/me/undo` | `owner_settings` | reverse one applied command |
-| *(plain English)* | `POST /v1/ask` | an owner's token | OTTO-Command reads the owner's words and calls the tools above with that token |
+| `ask_ottocommand` | `POST /v1/ask` | `read`, fleet-bound (0721) | **the first door**: OTTO-Command reads the person's words, calls the tools above and the fleet's reads with that token (and the web, when needed), and answers in plain English with the receipts; a preview comes back with a `confirm` to send back once the person says yes; an ask that read the web changes nothing |
+| `ottocommand_search` | `POST /v1/search` | `read`, fleet-bound (0721) | read-only: OTTO-Command answers a question from the fleet's reads (`scope` `ottoq`), the web (`web`) or both (the default), with the web sources it cited |
 
 `GET /v1/tools` lists the tools **your** token may use with their JSON Schemas; `GET /v1` lists every endpoint;
 `GET /v1/openapi.json` is the OpenAPI 3.1 document, generated from the same catalog (public).
@@ -225,6 +290,28 @@ or `{"error": {"code","message","hint?","details?"}, "meta": {…}}`. `call_id` 
   transport errors.
 - **Authorization:** a static Bearer token in the `Authorization` header. OAuth / protected-resource-metadata
   discovery is **not** implemented; configure the client with the header directly.
+- **`ask_ottocommand` (0721)** is answered by the gateway, never by the database as a tool of its own: a handshake
+  authenticates (an unknown token learns nothing, not even whether the door is on), then the same handler `POST /v1/ask`
+  uses runs with the caller's own call bound to transport `ask`, so every engine call it makes is the caller's and is
+  ledgered as the door's; a `confirm` sent to it goes out on the same token bound to transport `confirm`, with no model,
+  and an apply it confirms is recorded `via = 'confirm'` (one that binds to no preview is recorded as a new preview, the
+  agent's own: `direct`). Over the no-key endpoint it takes the `session` argument like every other tool. It
+  is annotated `destructiveHint: true`: one call can hold cars, order or withdraw services and undo commands. The door's own
+  failures (no model configured, a model error, a refusal by the model with its category, a token not bound to a fleet,
+  its 50-second budget spent, its step limit) are tool results with `isError: true`, so an agent can fall back to the
+  typed tools; that holds when the model wrote a note beside a tool call before it stopped, since only the text of the
+  turn that ends the model's reply is an answer (the review, round 2). An ask that stops after a change was made answers
+  with `incomplete: true`, `stopped: {code, message}` and an answer that opens with why it stopped, then OTTO-Q's receipts
+  and the changes block. Only 401 and the rate limit are transport errors, as for every tool. In `/v1/openapi.json` it is the operation `ask_ottocommand` at `POST /v1/ask`.
+- **`ottocommand_search` (0721)** is answered by the same handler in search mode: the same handshake and token, the
+  fleet's reads only (none for `scope: "web"`), the web search server tool unless `scope: "ottoq"`, and no confirm door.
+  In `/v1/openapi.json` it is the operation `ottocommand_search` at `POST /v1/search`.
+- **The model behind both doors** is configured by the function's environment: `ANTHROPIC_API_KEY` (required),
+  `OTTOCOMMAND_OWNER_MODEL` (else `ANTHROPIC_MODEL`, else `claude-opus-5-5`), `OTTOCOMMAND_EFFORT` (default `low`), `OTTOCOMMAND_WEB_SEARCH`
+  (`on`/`off`) and `OTTOCOMMAND_WEB_MAX_USES` (default 3, clamped 1-5). A value the gateway cannot read is answered
+  `ask_misconfigured` (503), never guessed around. The model is the first of `OTTOCOMMAND_OWNER_MODEL` and
+  `ANTHROPIC_MODEL` that is set and not blank (the gateway deployed on 2026-10-04 reads `ANTHROPIC_MODEL`, so a
+  deployment that sets only it keeps its model), else `claude-opus-5-5`; validated whichever it came from.
 
 **A2A** (1.0.0): `GET /.well-known/agent-card.json` (also `/.well-known/agent.json`) is a public **discovery** card —
 `supportedInterfaces` points at `/mcp` and `/v1` as custom bindings, `securitySchemes` declares the Bearer token, and
@@ -418,3 +505,19 @@ A token's scope cannot be edited (the guard refuses it): issue a new principal a
 - Deno's own type checker (none available here; `tsc` with a shim is the substitute).
 - The recall door's downstream effect (§6 item 2), and the ops door against a live run.
 - Real MCP clients (Claude Code, Hermes) — the protocol behaviour is tested against the spec text, not a client.
+
+**Verified for `ottocommand_search`, the web and the model ledger (2026-10-14, afternoon CT, scratch only):**
+`tests/agent_gateway.test.mjs` 39 passed (the two OTTO-Command doors listed and annotated, `/v1/search` routed, the
+shell posting only to the engine and the ledger function); `tests/ottocommand_executor.test.mjs` 34 passed with a
+scratch PostgreSQL (31 without); `tests/test_ottocommand_executor_sql.py` 35 passed (after the review fixes of the same
+afternoon: refused changes named without arguments, page titles kept out of the answer, searches capped per model
+call, a person's clear and cancel ending what is saved whatever the run holds, and no `saved` block for a passcode
+session). **After the review, round 1 (the evening of 2026-10-14):** the claim screen replaced by the `changes` block,
+the owner tables' writer rule, the one-time order that ends nothing saved, and the cockpit boards; the counts are in
+PERSONAL_AGENT.md §11. **After the review, round 2 (the night of 2026-10-14 CT):** the command-id mask, the web-read
+receipts without confirm words, the stopped ask and search, the paused turn's text, the passcode undo, the one-time order
+an every-return order covers, and the production takeover; the counts are in the commit that made them. The gateway, its shared modules
+and the shell type-check under `tsc --strict` with a Deno shim, except the `jsr:` edge-runtime type import, which only
+Deno resolves. **Not verified:** a real call to the Anthropic API (every test drives a fake fetch), web search enabled
+for this organization, a fallback actually taken, `EdgeRuntime.waitUntil` keeping the ledger write alive after the
+response in the deployed function, and the deploy itself.

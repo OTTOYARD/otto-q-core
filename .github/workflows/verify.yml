@@ -553,6 +553,57 @@ jobs:
             tests/test_asset_depth_sql.py tests/test_world_advance_parity_sql.py tests/test_production_start_world_sql.py \
             tests/test_certification_probe_sql.py tests/test_run_end_dispatch_sql.py
 
+      # 0723, the 0697 follow-up: the stop step sent TransactionEvent Ended and the closing StatusNotification with
+      # charger_id NULL, so 0697's relay (an inner join on the charger) could never deliver a charge's end. Executed on
+      # the live stop and emit bodies (md5-pinned): NULL on every close path before, the Started frame's charger after,
+      # and the same script with and without 0723 leaves every table the same apart from those frames' charger.
+      - name: A charge's closing frames name the charger that sent them, executed (0723 against the live stop step)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_stop_charge_frames_sql.py
+
+      # 0720, G435 (b): the Black Box's RPC door. ottoq_run_blackbox(uuid) and ottoq_run_blackbox_meta(uuid) closed to
+      # PUBLIC, anon and authenticated, kept for service_role (the edge function's role). Executed on a stub carrying both
+      # live definitions (md5-pinned), both live ACLs and the live grants and policies of its relations, then asked as each
+      # role: a signed-in caller gets the whole run before and 42501 after; service_role gets the same bundle after; the
+      # restore statements put both ACLs back; and the table door 0720 leaves open (G438) reads the same before and after.
+      - name: The Black Box export functions are closed to the browser roles, executed (0720 against the live bodies and ACLs)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_blackbox_rpc_grants_sql.py
+
+      # 0721, OTTO-Command as the one filter and executor between personal agents and OTTO-Q (Chase 2026-10-14): the
+      # owner door's live bodies (md5-pinned) before and after 0721 -- a signed-in agent may change a production run, a
+      # passcode or a key may not, a lower limit there applies only as the one confirm of a preview the same principal
+      # recorded within 15 minutes, every command records its person, its door and the preview it confirmed -- and the
+      # gateway's ask_ottocommand over HTTP against the same SQL with 0721 applied. OTTO-Q enforces preview-then-confirm
+      # by the same principal; it cannot see a person's yes, which the person's own agent relays. And (the afternoon of
+      # 2026-10-14) a signed-in owner's charge limit and every-return orders saved to the cars and carried onto each new
+      # demo and production run, the owner-settings guard, the passcode refused while production is live, the model
+      # ledger door (over tests/fixtures/model_call_ledger_stub.sql, the live ledger's bodies), and in node the model
+      # request, verbatim replay, pause_turn, refusal and fallback, the web-injection rule and ottocommand_search, all
+      # against a fake fetch: no call reaches the Anthropic API from CI.
+      - name: OTTO-Command is the door; production changes carry a signed-in principal, a lowering is the one confirm of its own preview, saved settings carry across runs, and an ask that read the web changes nothing (0721 against the live bodies; HTTP end to end)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_ottocommand_executor_sql.py
+          node --test --test-concurrency=1 tests/ottocommand_executor.test.mjs
+
       # 0701, G428: the signing key, the three signers, the purge and the audit writers closed to the browser roles,
       # executed on a stub carrying the live resolver and signers and asked as each role what it can do; service_role
       # and a SECURITY DEFINER engine caller still sign byte for byte. It had no executed step and skipped in the pytest
@@ -566,6 +617,21 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_signing_grants_sql.py
+
+      # 0722, G428's rotation half: system:v2, a new Vault secret no browser role can read (service_role and postgres
+      # can, as for v1), signs every new event, SDR and audit bundle, and system:v1 stays active so every row it signed
+      # still verifies. Executed after 0701 on a stub carrying the five signing writers, both verifiers and the payload
+      # hash with their live bodies, and a Vault stand-in that reports every read of a secret: it refuses before 0701 and
+      # without Chase's go-ahead, signs new rows with v2, verifies old v1 rows, and never selects a secret.
+      - name: The signing key is rotated and every old signature still verifies, executed (0722 after 0701 against the live bodies)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_signing_rotation_sql.py
 
       # G12, first rung: the only step in this file that talks to a database.
       # Read-only, and it SOFT-SKIPS without the secret so secretless PRs still pass.

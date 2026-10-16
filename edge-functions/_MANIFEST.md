@@ -131,7 +131,7 @@ against this table without trusting any metadata column.
 | ottoq-orchestrator-agent | 40 | true | 2026-10-09 12:38 | yes⁹ | `540a2062618508f81c9610118dca53255e9b514811d77684a872eb639bce982e` |
 | ottoq-ottocommand | 8 | true | 2026-06-27 18:47 | yes | `dac7eca5d514286ddebb97c9ba096b22adff09d97f08ec485dcfc91f49e5761a` |
 | ottoq-progress | 9 | true | 2026-06-18 04:05 | yes | `eaced82147a69688e977ddede528272370c8facbe60de6787e525731090db0aa` |
-| ottoq-run-blackbox | 5 | false | 2026-07-18 00:23 | yes | `0f63f9cff1bb3e2c10ab7874b80648bbf2848da9a971dbc1d163ad198a18317e` |
+| ottoq-run-blackbox | 8 | false | 2026-10-14 16:35 | yes¹⁴ | `63656ff3aa443cf87b2e4197afe5c18b87279bb9580a12655fa892a91b2baee5` (repo file) |
 | ottoq-sequence-optimize | 9 | true | 2026-06-18 18:19 | yes | `eadbc4e1770a0bead8bdeb34fff2fee38d00ad1bb7089aa5d87497930860cbf7` |
 | ottoq-twin-ingest | 6 | true | 2026-06-27 19:03 | yes | `569e620b37ecbf22ba9e07d042b3a97337bff58965a9f50db0233e880f393cdb` |
 | ottoq-wave-admit | 5 | true | 2026-06-19 13:17 | yes | `5f0c765116c29b00340b15a46387489e350f133455cde3ed71a0f78f24d4d2f2` |
@@ -250,6 +250,19 @@ the protected-resource metadata, and the signed-in MCP address `/account/mcp`. P
 minute: `/account/mcp` answers 401 with the RFC 9728 challenge; the protected-resource metadata names
 `https://www.ottoyard.com`; `/oauth/register` answers 503 `temporarily_unavailable` until 0700 is applied; the passcode
 door's initialize, tools/list (16 tools) and welcome answer as before; a made-up key is refused 401 by the database.
+
+¹⁴ **`ottoq-run-blackbox` v8, 2026-10-14 at 11:35 AM CT (16:35:03 UTC), the flight recorder requires a credential and
+pages by size (PR #243, G435, db/checks/0446; Chase: "That's your call on protocol there").** Three files through the
+Supabase MCP deploy tool, JWT verification off as v7 (the function checks the credential itself): `ottoq-run-blackbox/
+index.ts` (repo sha256 `63656ff3`, 2,475 bytes), `_shared/blackbox_auth.ts` (`3b71f124`, 6,542 bytes) and
+`_shared/run_blackbox.ts` (`ec51556c`, 15,721 bytes), from `main` 172a360. Read back with `get_edge_function`: version
+8, the same three files, entrypoint `ottoq-run-blackbox/index.ts`. The readback came inline, so the deployed bytes were
+compared by reading, not hashed. Probed live with no secret the same minute (0446 §6): no headers with a bad run, no
+headers with no run, the twin app's public key, and a 64-character wrong token each answer 401 `unauthorized`, where v7
+answered a bad run with 500 from Postgres; OPTIONS allows `x-ottoq-export-token` and exposes `X-OTTOQ-Next-Cursor`.
+Until the edge secret `OTTOQ_BLACKBOX_TOKEN` is set (64 random characters, by a person), only the service-role key opens
+it, and the twin app's Black Box button answers 401 until its branch `claude/blackbox-export-token` (ottoyarddepot-sim)
+merges.
 
 ## Committed, not deployed
 

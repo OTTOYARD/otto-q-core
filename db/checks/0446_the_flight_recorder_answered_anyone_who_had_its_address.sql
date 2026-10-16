@@ -150,6 +150,14 @@
 --       repo here (the edge function calls only the second, with the service role), so revoking EXECUTE on both from
 --       authenticated should break nothing; it is a migration, one concern, and not this item. Reproduce (1).
 --   OPEN-ITEM: ottoq_run_blackbox(uuid) and ottoq_run_blackbox_meta(uuid) are EXECUTE-able by authenticated, a second door to the whole export (§5 a)
+--   (a') ADDED 2026-10-14 (db/migrations/0720 §2; FINDINGS G438): the two functions are not the only door. 0720
+--       (pending) revokes EXECUTE on both, and that closes the RPC door only: measured read-only 16:34:47-16:37:57 UTC
+--       (11:34-11:37 AM CT), authenticated holds SELECT on 78 of the 93 run-scoped relations the export reads, 76 of
+--       them open to a signed-in caller under their row security (67 every row, ottoq_sim_runs and
+--       ottoq_telemetry_packets among them), and ottoq_schema_snapshots (row security off) holds earlier versions of
+--       45 of the 49 function sources. What 0720 takes is the one-call export, the current sources, and what row
+--       security or a missing grant withholds as tables (17 run-scoped relations, vehicles, ocpp_sessions).
+--   OPEN-ITEM: G438 - after 0720 a signed-in user (sign-up is open) still reads 76 of the 93 run-scoped relations through /rest/v1/<relation>; the remedy is the authenticated-role census 0701 §2 defers (§5 a')
 --   (b) The four tables 0658 left readable by the public key stay readable (its own §3 names them as next).
 --   (c) A keyset cursor needs each relation's key from ottoq_run_blackbox_meta: a migration, if offset paging bites.
 --       Deep offsets cost little today: the heaviest view, ottoq_rule_evaluation_effect, read 1,000 rows at offset

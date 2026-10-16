@@ -23,7 +23,13 @@ INSERT INTO public.schedule_tasks (id, vehicle_id, depot_id, service_code, statu
   ('00000000-0000-0000-0000-00000000c001', '229f655b-803c-47c0-95fd-ca8adb9d8ef0', '11111111-1111-1111-1111-111111111111',
    'charge', 'completed', '2026-06-04 18:03:26.642115+00', '2026-06-18 04:07:40.920806+00');
 
-CREATE TABLE public.stub_task_events (task_id uuid, run_ctx text, actor_type text, actor_id text, new_status text);
+-- actor_type carries the live ottoq_events_actor_type_check's list (read 2026-10-14), so the stub refuses an actor the
+-- live event log refuses: 0603 as first written set 'migration', which the live check rejects, and the stub let it pass.
+CREATE TABLE public.stub_task_events (task_id uuid, run_ctx text, actor_type text, actor_id text, new_status text,
+  CONSTRAINT stub_task_events_actor_type_check CHECK (actor_type = ANY (ARRAY['fleet_operator_admin', 'fleet_operator_viewer',
+    'oem_dispatch_webhook', 'oem_admin_console', 'depot_tech', 'depot_supervisor', 'command_center_operator', 'ottoq_engine',
+    'ottow_driver', 'ottow_dispatcher', 'otto_response_agent', 'system_scheduler', 'external_sensor', 'ocpp_charger',
+    'av_vehicle', 'bess_controller', 'solar_controller', 'migration_script', 'system', 'unknown'])));
 CREATE FUNCTION public.stub_task_state_change() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   INSERT INTO public.stub_task_events VALUES (NEW.id, current_setting('ottoq.sim_run_id', true),

@@ -265,6 +265,31 @@ When information is missing:
      at the gate for a proposer, and an agent's charge order stands 6 minutes, not 30. One self-applied
      setting is still in force at the twin depot and waits on a person (FINDINGS G370).
 
+**11. OTTO-COMMAND IS THE FILTER AND EXECUTOR FOR PERSONAL AGENTS — added 2026-10-14 in Chase's words.**
+
+   *"It should just act as both a query LLM bot to provide answers and search results, and also execute
+   for OTTO-Q when preferences are changed via personal agents like Hermes, Grok, etc. So request comes in
+   from personal agents, OTTOCommand processes and acts and returns info back. So it will act as the filter
+   and executor there."* (8:58 AM CT) and, the same day at 12:35 PM CT: *"Search should cover OTTO-Q and
+   web. It can be ask and tools as well."*
+
+   - **One door for owners' agents.** A personal agent (Hermes, Grok, any MCP client) reaches OTTO-Q
+     only through the agent gateway, as a signed-in owner, and OTTO-Command is what reads its words,
+     answers, and turns a preference into an owner command. Both forms stay: a plain-language ask, and
+     typed tools for agents that call them directly.
+   - **It answers from OTTO-Q's data and from the web.** Facts about the owner's cars and the depot come
+     from OTTO-Q's own reads; facts about the outside world may come from a web search, and every one is
+     cited with its URL. **Web content is untrusted: an ask that has read the web cannot change a car in
+     the same ask** — enforced in code, not only in the prompt.
+   - **It acts only inside the owner's contract and never against rule 9.** Owner settings persist per
+     vehicle until the owner changes them. No command skips, defers or shortens a service OTTO-Q found
+     needed. A change that lowers how full a car charges in production applies only as the confirm of a
+     preview the same owner saw.
+   - **It is a filter, not a policy-maker (rule 10).** It changes what an owner's car needs, under the
+     owner's name. It never changes OTTO-Q's rules or dials.
+   - Built by `0721` and the gateway beside it, both pending apply and deploy as of 2026-10-14: until they
+     are live, the bullets above are the specification, not a description of production.
+
 ---
 
 # PART 2 — THE KERNEL BRIEF
