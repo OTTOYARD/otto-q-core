@@ -415,6 +415,14 @@
 --   queue: two biases from one lag, in opposite directions. 0735 (dial twin_answer_in_tick, applied 16:16 UTC) carries a
 --   command out in the tick it is given. Its arms run in the next window after 0734's: the same morning, then the
 --   normal day at 10, 20 and 40 posts, paired with arms 83, 86 and 84. Query (12) reads both costs on any run.
+--
+--   The promise itself (G383, 0736, applied 16:38 UTC). When a car arrives, OTTO-Q now estimates when it will be ready.
+--   The estimate is its own plan of the charge line, simulated in 16 sampled futures, with every charge to 100% on the
+--   charge clock. It adds what the run's earlier cars needed after their charge. It gives a median and a 90th
+--   percentile, which the twin records once per visit and grades against the readiness check. In the dry run a 62%
+--   immediate dispatch due in 45 minutes was promised a median 61 minutes and a 90th percentile 69. The grade decides
+--   whether the 90th percentile holds 90% of cars. Its arm (0735's dcfc10 cell plus the recorder) runs in the next window,
+--   and must agree with its partner on every outcome, because the recorder decides nothing. Query (13) grades it.
 
 -- ══ QUERIES ══
 
@@ -658,3 +666,12 @@ SELECT 'bay seat', c.command_type, count(*),
  WHERE c.command_type IN ('enter_wash', 'enter_service')
  GROUP BY c.command_type
  ORDER BY 1, 2;
+
+-- (13) the promises on a run, graded (G383, 0736): the share ready by the median and by the 90th percentile, overall, by
+--      situation, by bay work and by whether the after-charge part came from the run's own cars or the prior; and for
+--      visits with an owner's due, the share ready by the due against the share ready by the promise. Run it on the
+--      promise arm (sweep promise_normal_2026_10_17) once it has run.
+SELECT public.ottoq_ready_promise_grade(a.sim_run_id) AS grade
+  FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+ WHERE s.sweep_code = 'promise_normal_2026_10_17'
+ ORDER BY a.ran_at DESC LIMIT 1;
