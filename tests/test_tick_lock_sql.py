@@ -5,10 +5,11 @@ WHY THIS EXISTS. (G440) ottoq_sim_stop_and_reset disposed the run's proposals an
 reverse of the beat's order, and deadlocked with CALL ottoq_demo_metronome(50) twice on 2026-10-14. (G490) The world step
 and both charger-fault doors take the live run's row FOR UPDATE, the one row lock a foreign-key check (FOR KEY SHARE)
 waits on, so an insert from another session that references the live run waits for the beat to commit (on c5f4ff34, 36 of
-239 agent decision inserts waited a mean 4.14 s). The first draft of 0790 weakened that lock too; it is withdrawn,
-because the wait is what keeps ottoq_decide_tick's A3 close (its line 1228) right. Both claims are about concurrent
-sessions, so they are tested with concurrent sessions, on a stub carrying the eleven live definitions involved byte for
-byte (md5-pinned) and decide_tick's A3 verbatim (tests/fixtures/tick_lock_stub.sql):
+239 agent decision inserts waited a mean of at most 4.14 s: measured from created_at to the pass's evidence row, an upper
+bound, 0450 §8). The first draft of 0790 weakened that lock too; it is withdrawn,
+because the wait is what keeps ottoq_decide_tick's A3 close (its enact UPDATE, line 1228 on 2026-10-14) right. Both
+claims are about concurrent sessions, so they are tested with concurrent sessions, on a stub carrying the twelve live
+definitions involved byte for byte (md5-pinned) and decide_tick's A3 verbatim (tests/fixtures/tick_lock_stub.sql):
   - before 0790 the live metronome and the live stop door deadlock (one of them gets 40P01), and after it the door waits
     for the beat and finishes, and the beat's enactments stand;
   - after it the stop door gives up on the row at the 8 s mark_stopped always gave it, having touched nothing, and every
@@ -30,14 +31,23 @@ byte (md5-pinned) and decide_tick's A3 verbatim (tests/fixtures/tick_lock_stub.s
     live); with the withdrawn FOR NO KEY UPDATE (applied here to a throwaway database only), the batch commits mid-beat
     and the ledger records the stall the kernel never chose. The interleaving is constructed: it is of the class of the
     17:34:06 UTC deadlock in the log (forward_lex's batch, its key check waiting on the beat), not that event, whose
-    beat-side edge was not logged and was not decide_tick line 1228 (0790 §1 (b));
+    beat-side edge was not logged and was not decide_tick's enact UPDATE (line 1228 that day) (0790 §1 (b));
+  - a beat that starts while a stop on a running run is held inside its dispose: before 0790 the two deadlock; after
+    it the beat waits, its world step finds the run completed, no decide runs, the proposals expire as run_finalized
+    and the tick count does not move. On a run that was paused when the stop came and is resumed during its dispose,
+    the two deadlock before and after (G440's residual: the door takes no early lock on a paused run);
+  - and what 0790 widens (G492, which 0791 closes): the live ottoq_pause_run called while a stop on a running run is
+    held inside its dispose commits first before 0790, and the stop then completes the run; after it the pause waits
+    behind the door's early lock and writes 'paused' over 'completed';
   - one session gets the same rows with and without 0790 (the lineage's FALSE/FALSE);
   - 0790 refuses a second apply, a pair in flight, a key-column UPDATE in the catalog, a writer of the proposals that also
     takes the run's row, a prior-run purge that would choose a running run, a metronome that commits between its world
     and decide steps, and a patch that changes more than it says, and a refusal rolls the whole file back.
 A deadlock test never names the side PostgreSQL aborts unless it forces it: the documentation says which one "is
-difficult to predict and should not be relied upon" (PostgreSQL 16, 13.3.4). It SKIPS where no scratch PostgreSQL is
-reachable.
+difficult to predict and should not be relied upon" (PostgreSQL 17, 13.3.4, the version live runs, 17.6; these tests
+run on the scratch server's 16, whose page says the same). Every wait on pg_stat_activity here and in the stub matches
+only this test's own database, so two suites on one server cannot release each other's hooks. It SKIPS where no
+scratch PostgreSQL is reachable.
 """
 import json
 import os
@@ -68,8 +78,11 @@ LIVE = {
         "d19f166c1e280cb9bdc186f936f28d7c",
     "public.ottoq_proposer_submit_batch(uuid,uuid,text,jsonb,jsonb,integer)": "8c78997969489b3c8e097eba41fadc13",
     "public.ottoq_capture_proposal_disposition()": "2d16c05a77ab1ad9b81780105fbfd78b",
+    "public.ottoq_pause_run(uuid,text)": "1e3ec33aca6f4f3b008a0d83bff08c51",   # G492, read 2026-10-15
 }
-# ottoq_decide_tick's A3 (pg_get_functiondef lines 1231-1248, its PL/pgSQL lines 1226-1243), read live 2026-10-14
+# ottoq_decide_tick's A3: the span from its '  -- A3: close' anchor to its dispose call, read live 2026-10-14 and
+# unchanged 2026-10-17. Its PL/pgSQL lines were 1226-1243 (the enact UPDATE at 1228, the dispose at 1244) until 0727
+# (applied 2026-10-17 07:29 UTC) moved them to 1236-1253 (1238, 1254); the anchor and the md5 are what this pins
 A3_MD5 = "7bef452bd6193d52db9a57ef018e25df"
 STOP = "public.ottoq_sim_stop_and_reset(uuid,text)"
 # the door's early lock as 0790 writes it: a running run's row only (§3)
@@ -109,13 +122,17 @@ class Db(base.Db):
             time.sleep(0.05)
         raise AssertionError(f"timed out waiting for {what}")
 
+    def wait_active(self, where, what):
+        """Wait until a backend of THIS database matches `where`: the scratch server is shared, and an unscoped match
+        could be another suite's backend of the same name."""
+        self.wait_for(f"SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND {where})",
+                      what)
+
     def wait_sleeping(self, app):
-        self.wait_for(f"SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = '{app}' "
-                      f"AND wait_event = 'PgSleep')", f"{app} to hold its locks and sleep")
+        self.wait_active(f"application_name = '{app}' AND wait_event = 'PgSleep'", f"{app} to hold its locks and sleep")
 
     def wait_locked(self, app):
-        self.wait_for(f"SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = '{app}' "
-                      f"AND wait_event_type = 'Lock')", f"{app} to wait on a lock")
+        self.wait_active(f"application_name = '{app}' AND wait_event_type = 'Lock'", f"{app} to wait on a lock")
 
 
 def _new(tag):
@@ -217,7 +234,7 @@ def test_0790_the_stub_carries_the_live_bodies(db):
     assert db.val("SELECT pg_get_triggerdef(oid) FROM pg_trigger WHERE tgname = 'ottoq_capture_proposal_disposition_trg'") \
         == ("CREATE TRIGGER ottoq_capture_proposal_disposition_trg AFTER UPDATE OF status ON public.ottoq_external_proposals "
             "FOR EACH ROW EXECUTE FUNCTION ottoq_capture_proposal_disposition()")
-    # the decide stand-in carries decide_tick's A3 verbatim, and its dispose call (line 1244) after it
+    # the decide stand-in carries decide_tick's A3 verbatim, and its dispose call (line 1244 on 2026-10-14) after it
     a3 = ("WITH s AS (SELECT prosrc FROM pg_proc WHERE oid = 'public.ottoq_sim_decide_and_dispatch(uuid)'::regprocedure), "
           "b AS (SELECT strpos(prosrc, '  -- A3: close') a, strpos(prosrc, '  PERFORM public.ottoq_dispose_external_proposals("
           "p_sim_run_id, v_tick, v_clock, false);') z, prosrc FROM s) SELECT md5(substr(prosrc, a, z - a - 1)) FROM b "
@@ -238,8 +255,7 @@ def _metronome_and_door(d):
     operator start calls it; the decide step then writes the run's proposals once the door is waiting on a lock."""
     d.val(f"UPDATE public.t_decide SET door = '{DOOR_APP}'")
     m = d.background("CALL public.ottoq_demo_metronome(4)", "ottoq_0790_metronome")
-    d.wait_for("SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
-               "WHERE application_name = 'ottoq_0790_metronome_in_decide')", "the metronome to reach its decide step")
+    d.wait_active("application_name = 'ottoq_0790_metronome_in_decide'", "the metronome to reach its decide step")
     door = d.background(f"SET lock_timeout = '15s'; "
                         f"SELECT public.ottoq_sim_stop_and_reset('{RUN}', 'superseded by busy_day')", DOOR_APP)
     door_out, door_err = door.communicate(timeout=60)
@@ -411,8 +427,7 @@ def _prior_run_and_door(d, status, remover):
           f"WHERE sim_run_id = '{RUN}'")
     d.val(f"UPDATE public.t_decide SET door = '{DOOR_APP}'")
     r = d.background(REMOVERS[remover], REMOVER_APP)
-    d.wait_for(f"SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = '{REMOVER_APP}_holding')",
-               "the remover to reach the hook")
+    d.wait_active(f"application_name = '{REMOVER_APP}_holding'", "the remover to reach the hook")
     if status == "resumed":
         assert d.val(RESUME) == "running"     # chosen while paused, running now: the purge never looks at it again
     door = d.background(f"SET lock_timeout = '15s'; SELECT public.ottoq_sim_stop_and_reset('{RUN}', 'operator_stop')",
@@ -464,6 +479,101 @@ def test_0790_the_door_takes_the_row_first_only_on_a_running_run(db, status, rem
         assert db.val("SELECT count(*) FROM public.ottoq_sim_runs") == "0"
 
 
+# ── what arrives while the stop is held inside its dispose: a beat, and the operator's pause ──
+
+HOLDER_APP = "ottoq_0790_holder"
+PAUSE_APP = "ottoq_0790_pause"
+
+
+def _hold_a_proposal(d, until_sql):
+    """A writer holds the run's physically last pending proposal (so a dispose that reaches it has taken the others) until
+    `until_sql` returns, which keeps a stop door that starts now inside its dispose until then."""
+    return d.background(f"BEGIN; UPDATE public.ottoq_external_proposals SET disposition_reason = disposition_reason "
+                        f"WHERE proposal_id = (SELECT proposal_id FROM public.ottoq_external_proposals "
+                        f"WHERE sim_run_id = '{RUN}' AND status = 'pending' ORDER BY ctid DESC LIMIT 1); "
+                        f"{until_sql}; COMMIT;", HOLDER_APP)
+
+
+def _stop_held_in_its_dispose(d, until_sql):
+    h = _hold_a_proposal(d, until_sql)
+    d.wait_sleeping(HOLDER_APP)              # past its UPDATE (both holders sleep: pg_sleep, or the hook's 50 ms polls)
+    door = d.background(f"SET lock_timeout = '15s'; SELECT public.ottoq_sim_stop_and_reset('{RUN}', 'operator_stop')",
+                        DOOR_APP)
+    d.wait_locked(DOOR_APP)                  # in its dispose, on the held proposal
+    return h, door
+
+
+# (the run's status when the stop comes, phase) -> do the stop and a beat that starts during its dispose deadlock?
+BEAT_CASES = [
+    ("running", "before", True),             # the beat takes the row at once and its decide meets the door's proposals
+    ("running", "after", False),             # the beat waits behind the door's early lock and finds the run completed
+    # G440's residual: the door takes no early lock on a paused run, so a resume during its dispose lets a beat in
+    ("resumed", "before", True),
+    ("resumed", "after", True),
+]
+
+
+@pytest.mark.parametrize("status,phase,deadlock", BEAT_CASES, ids=[f"{s}-{p}" for s, p, _ in BEAT_CASES])
+def test_0790_a_beat_that_starts_during_a_stops_dispose(db, status, phase, deadlock):
+    _phase(db, phase)
+    if status == "resumed":
+        db.val(f"UPDATE public.ottoq_sim_runs SET status = 'paused' WHERE sim_run_id = '{RUN}'")
+    # the holder lets go only once the beat is waiting on a lock, wherever it waits
+    h, door = _stop_held_in_its_dispose(db, "SELECT public.t_wait_for_waiter('ottoq_0790_metronome%')")
+    if status == "resumed":
+        assert db.val(RESUME) == "running"   # nothing holds a paused run's row, so the resume goes straight through
+    m = db.background("CALL public.ottoq_demo_metronome(4)", "ottoq_0790_metronome")
+    h_out, h_err = h.communicate(timeout=60)
+    door_out, door_err = door.communicate(timeout=60)
+    m_out, m_err = m.communicate(timeout=60)
+    assert h.returncode == 0, h_err          # the beat did wait on a lock before the holder let go
+    assert m.returncode == 0, m_err
+    failures = db.json("SELECT COALESCE(jsonb_agg(jsonb_build_array(phase, message, sqlstate) ORDER BY seq), '[]') "
+                       "FROM public.t_tick_failures")
+    door_lost = door.returncode != 0 and "deadlock detected" in door_err
+    beat_lost = any(f[1] == "deadlock detected" and f[2] == "40P01" for f in failures)
+    if deadlock:
+        assert door_lost != beat_lost, (door_err, failures)      # one side gets 40P01, and which is PostgreSQL's
+        return
+    assert door.returncode == 0 and failures == [], (door_err, failures)
+    assert json.loads(door_out.splitlines()[-1]) == {"released": True, "marked_stopped": True}
+    # the world step read the row after its lock, answered completed, and no decide ran
+    assert db.val("SELECT count(*) FROM public.t_calls WHERE fn = 'ottoq_sim_decide_and_dispatch'") == "0"
+    assert db.json(f"SELECT jsonb_build_object('status', status, 'ticks', tick_count) FROM public.ottoq_sim_runs "
+                   f"WHERE sim_run_id = '{RUN}'") == {"status": "completed", "ticks": 1}
+    assert db.json("SELECT jsonb_agg(jsonb_build_array(status, disposition_reason)) "
+                   "FROM public.ottoq_external_proposals") == [["expired", "run_finalized"]] * 3
+
+
+@pytest.mark.parametrize("phase", ["before", "after"])
+def test_0790_widens_g492_a_pause_during_the_stops_dispose_writes_paused_over_completed(db, phase):
+    """G492, OPEN, and closed by 0791: the live ottoq_pause_run reads the status without a lock and updates by sim_run_id
+    alone. Before 0790 nothing holds a running run's row during the stop's dispose, so the pause commits first and
+    mark_stopped then completes the paused run. After it the door holds that row from its first statement, so the pause
+    waits, and then writes 'paused' over the 'completed' the stop committed."""
+    _phase(db, phase)
+    h, door = _stop_held_in_its_dispose(db, "SELECT pg_sleep(3)")
+    pause = db.background(f"SET lock_timeout = '15s'; SELECT public.ottoq_pause_run('{RUN}')", PAUSE_APP)
+    if phase == "after":
+        db.wait_locked(PAUSE_APP)            # behind the door's early lock on the run's row
+    else:
+        pause.wait(timeout=10)               # straight through ...
+        assert door.poll() is None           # ... while the door still waits in its dispose
+    p_out, p_err = pause.communicate(timeout=60)
+    door_out, door_err = door.communicate(timeout=60)
+    h.communicate(timeout=60)
+    assert pause.returncode == 0 and door.returncode == 0, (p_err, door_err)
+    answer = json.loads(p_out.splitlines()[-1])
+    assert answer["ok"] is True and answer["status"] == "paused", answer   # it read 'running' either way
+    assert json.loads(door_out.splitlines()[-1]) == {"released": True, "marked_stopped": True}
+    run = db.json(f"SELECT jsonb_build_object('status', status, 'ended', ended_at IS NOT NULL, 'reason', failure_reason) "
+                  f"FROM public.ottoq_sim_runs WHERE sim_run_id = '{RUN}'")
+    if phase == "before":
+        assert run == {"status": "completed", "ended": True, "reason": "operator_stop"}, run
+    else:
+        assert run == {"status": "paused", "ended": True, "reason": "operator_stop"}, run
+
+
 # ── G490: the tick's FOR UPDATE is unchanged, and the reason ──
 
 @pytest.mark.parametrize("phase", ["before", "after"])
@@ -500,8 +610,7 @@ def _mid_beat(d, batch_deadlock_timeout=None, beat_deadlock_timeout=None):
                       '{{"stall_id": "{STALL}"}}', 'pending', now() + interval '1 hour')""")
     d.val(f"UPDATE public.t_decide SET agent = '{AGENT_APP}'")
     m = d.background("CALL public.ottoq_demo_metronome(4)", "ottoq_0790_metronome", beat_deadlock_timeout)
-    d.wait_for("SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
-               "WHERE application_name = 'ottoq_0790_metronome_in_decide')", "the metronome to enact")
+    d.wait_active("application_name = 'ottoq_0790_metronome_in_decide'", "the metronome to enact")
     rows = json.dumps([{"action_context": "stall_assignment", "entity_type": "vehicle", "entity_id": CAR,
                         "proposal": {"stall_id": STALL_B}}])
     a = d.background(f"SELECT public.ottoq_proposer_submit_batch('{RUN}', '{DEPOT}', 'llm_advisor', '{rows}'::jsonb, "

@@ -1,5 +1,6 @@
--- tests/fixtures/tick_lock_stub.sql -- what 0790 meets. Eleven definitions are the live ones of 2026-10-14
--- (pg_get_functiondef, byte for byte; tests/test_tick_lock_sql.py asserts each md5):
+-- tests/fixtures/tick_lock_stub.sql -- what 0790 meets. Twelve definitions are the live ones (pg_get_functiondef, byte
+-- for byte; tests/test_tick_lock_sql.py asserts each md5), the first eleven read 2026-10-14 and the pause 2026-10-15, all
+-- twelve re-read unchanged 2026-10-17:
 --   public.ottoq_sim_advance_tick_world(uuid)                              3e0ddbb1b097587bc2c0e9135d7895aa
 --   public.ottoq_twin_inject_charger_fault(uuid,uuid,numeric,text)         0cd92ef247e8959fda68b2e6087bd944
 --   twin.ottoq_report_charger_fault(uuid,text,text,text)                   a4339948b3520016e9979dc13faac605
@@ -12,6 +13,7 @@
 --                                                                          d19f166c1e280cb9bdc186f936f28d7c
 --   public.ottoq_proposer_submit_batch(uuid,uuid,text,jsonb,jsonb,integer) 8c78997969489b3c8e097eba41fadc13
 --   public.ottoq_capture_proposal_disposition()  (with its trigger, as live) 2d16c05a77ab1ad9b81780105fbfd78b
+--   public.ottoq_pause_run(uuid,text)                                      1e3ec33aca6f4f3b008a0d83bff08c51  (G492)
 -- Every function they call is a stub that writes its name to t_calls. The tables carry the columns those bodies read and
 -- write, and every run-scoped one carries its live foreign key to ottoq_sim_runs, which carries its live keys: the primary
 -- key sim_run_id, the unique sim_run_seq, and the partial unique index on a running run per depot (partial, so not a key
@@ -19,12 +21,22 @@
 --
 -- public.ottoq_sim_decide_and_dispatch is NOT the live body. It stands in for the metronome's decide step: the kernel
 -- takes each car's newest pending proposal (read unlocked, as the live chooser ottoq_l2_external_proposal reads it) and
--- writes an enacted decision of this tick, then runs ottoq_decide_tick lines 1226-1244 (A3) VERBATIM, line 1228 being the
--- UPDATE the database's log caught at 16:42:42 UTC on 2026-10-14. Before A3: when t_decide.door names an application, it
+-- writes an enacted decision of this tick, then runs ottoq_decide_tick's A3 VERBATIM: the span from its '  -- A3: close'
+-- anchor to its dispose call (md5 7bef452b, unchanged on live 2026-10-17), whose first UPDATE is the one the database's log
+-- caught at 16:42:42 UTC on 2026-10-14. Line numbers, which are the live function's PL/pgSQL lines: A3 was lines 1226-1243
+-- with that UPDATE at 1228 and the dispose at 1244 until 0727 (applied 2026-10-17 07:29 UTC) moved them to 1236-1253,
+-- 1238 and 1254. Before A3: when t_decide.door names an application, it
 -- waits (at most 20 s) until a backend of that name is waiting on a lock, so a test can put the door's wait inside the
 -- beat; when t_decide.agent names one, it waits once per session until that agent has committed a newer proposal or is
--- waiting on a lock, so a test can put a proposal batch inside the beat. ottoq_purge_prior_runs is NOT the live body
--- either: it keeps the live order and statements on the run's row (see it below). Used by tests/test_tick_lock_sql.py.
+-- waiting on a lock, so a test can put a proposal batch inside the beat. Every such wait, here and in the hooks below,
+-- matches only backends of this database (datname = current_database()), so two suites on one server cannot release
+-- each other's hooks. ottoq_purge_prior_runs is NOT the live body either: it keeps the live order and statements on the
+-- run's row (see it below), and it leaves out the live body's per-table BEGIN ... EXCEPTION around each run-scoped DELETE
+-- and its bounded retry (at most 3 passes, then RAISE 'purge refused: ...', SQLSTATE P0001; live md5 46f1f29f). So where
+-- the live purge loses a deadlock inside a run-scoped DELETE, it parks the table, retries, and if the table never clears
+-- ends in 'purge refused' rather than 40P01; a deadlock it loses at its last statement, the runs' DELETE, is not caught on
+-- live either. The tests name no losing side, so this changes which error a losing purge shows, not whether one side
+-- loses. Used by tests/test_tick_lock_sql.py.
 SET check_function_bodies = off;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
@@ -148,6 +160,14 @@ CREATE FUNCTION public.ottoq_replan_after_charger_fault(uuid, uuid, uuid, text, 
 CREATE FUNCTION public.ottoq_record_event(p_actor_type text, p_actor_id text, p_event_type text, p_entity_type text,
   p_payload jsonb, p_severity text, p_ingest_source text, p_data_source text, p_sim_run_id uuid) RETURNS void
   LANGUAGE plpgsql AS $s$BEGIN INSERT INTO public.t_calls (fn, note) VALUES ('ottoq_record_event', p_event_type); END$s$;
+-- the pause's call names p_entity_id and p_depot_id too (live, one ottoq_record_event takes all of these by name). Like
+-- the overload above, it writes no ottoq_events row, so it cannot model live's fk_ottoq_events_sim_run (NOT VALID, but
+-- checked on every new row), under which an event naming a deleted run fails with 23503. No test here records an event
+-- for a run that is gone; a resume behind the demo start would, and on live it fails there (G492).
+CREATE FUNCTION public.ottoq_record_event(p_actor_type text, p_actor_id text, p_event_type text, p_entity_type text,
+  p_entity_id uuid, p_depot_id uuid, p_payload jsonb, p_severity text, p_ingest_source text, p_data_source text,
+  p_sim_run_id uuid) RETURNS void
+  LANGUAGE plpgsql AS $s$BEGIN INSERT INTO public.t_calls (fn, note) VALUES ('ottoq_record_event', p_event_type); END$s$;
 -- the stop door's callees: the proposals' rescue step, and the depot's release (records the lock_timeout it ran under)
 CREATE FUNCTION public.ottoq_promote_proposal_candidates(uuid, bigint, timestamptz) RETURNS integer LANGUAGE plpgsql AS $s$
 BEGIN INSERT INTO public.t_calls (fn, note) VALUES ('ottoq_promote_proposal_candidates', current_setting('lock_timeout'));
@@ -163,7 +183,8 @@ CREATE FUNCTION public.ottoq_record_tick_failure(p_run uuid, p_phase text, p_mes
   VALUES (p_run, p_phase, p_message, p_sqlstate); END$s$;
 CREATE FUNCTION public.ottoq_cuopt_refresh(uuid) RETURNS bigint LANGUAGE plpgsql AS $s$
 BEGIN INSERT INTO public.t_calls (fn) VALUES ('ottoq_cuopt_refresh'); RETURN NULL; END$s$;
--- NOT the live body: the kernel's choice, the two waits, and then ottoq_decide_tick lines 1226-1244 VERBATIM (A3)
+-- NOT the live body: the kernel's choice, the two waits, and then ottoq_decide_tick's A3 VERBATIM, from its anchor to
+-- its dispose call (lines 1226-1244 on 2026-10-14, 1236-1254 since 0727; md5 7bef452b either way)
 CREATE FUNCTION public.ottoq_sim_decide_and_dispatch(p_sim_run_id uuid) RETURNS void LANGUAGE plpgsql AS $s$
 DECLARE v_door text := (SELECT door FROM public.t_decide); v_agent text := (SELECT agent FROM public.t_decide);
         v_t0 timestamptz := clock_timestamp(); v_tick integer; v_clock timestamptz; r record;
@@ -181,7 +202,8 @@ BEGIN
   END LOOP;
   PERFORM set_config('application_name', 'ottoq_0790_metronome_in_decide', false);
   IF v_door IS NOT NULL THEN
-    WHILE NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = v_door AND wait_event_type = 'Lock') LOOP
+    WHILE NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND application_name = v_door
+                         AND wait_event_type = 'Lock') LOOP
       IF clock_timestamp() > v_t0 + interval '20 seconds' THEN
         RAISE EXCEPTION 'decide stub: no backend named % ever waited on a lock', v_door;
       END IF;
@@ -194,7 +216,8 @@ BEGIN
     LOOP
       EXIT WHEN EXISTS (SELECT 1 FROM ottoq_external_proposals p
                          WHERE p.sim_run_id = p_sim_run_id AND p.created_at > v_t0);
-      EXIT WHEN EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = v_agent AND wait_event_type = 'Lock');
+      EXIT WHEN EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND application_name = v_agent
+                           AND wait_event_type = 'Lock');
       IF clock_timestamp() > v_t0 + interval '20 seconds' THEN
         RAISE EXCEPTION 'decide stub: the agent % never arrived', v_agent;
       END IF;
@@ -225,7 +248,7 @@ BEGIN
 END$s$;
 
 -- NOT live bodies: the shapes 0790's P2 reads in them. ottoq_decide_tick enacts the run's proposals by the UPDATE its
--- line 1228 carries. ottoq_purge_prior_runs is the one function that deletes ottoq_sim_runs rows, and it is kept in the
+-- A3 opens with (line 1228 on 2026-10-14, 1238 since 0727). ottoq_purge_prior_runs is the one function that deletes ottoq_sim_runs rows, and it is kept in the
 -- live body's order with its two statements on ottoq_sim_runs verbatim (live md5 46f1f29f, read 2026-10-15 00:16:48
 -- UTC): it chooses its runs once, deletes their rows in the run-scoped tables by dynamic SQL, children first (the
 -- proposals among them; live reads the tables from the run-scope registry, here they are this stub's), and deletes the
@@ -246,9 +269,26 @@ BEGIN
   IF v_door IS NULL OR current_setting('ottoq_test.held_for_door', true) IS NOT DISTINCT FROM 'yes' THEN RETURN; END IF;
   PERFORM set_config('ottoq_test.held_for_door', 'yes', false);
   PERFORM set_config('application_name', current_setting('application_name') || '_holding', false);
-  WHILE NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = v_door AND wait_event_type = 'Lock') LOOP
+  WHILE NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND application_name = v_door
+                       AND wait_event_type = 'Lock') LOOP
     IF clock_timestamp() > v_t0 + interval '20 seconds' THEN
       RAISE EXCEPTION 'test hook: no backend named % ever waited on a lock', v_door;
+    END IF;
+    PERFORM pg_sleep(0.05);
+    PERFORM pg_stat_clear_snapshot();   -- pg_stat_activity is read once per transaction otherwise
+  END LOOP;
+END$s$;
+-- test hook: wait (at most p_timeout_s) until a backend of this database whose application_name is LIKE p_app_like
+-- waits on a lock, so the statement after it (in a test, the COMMIT that lets everything go) runs only once that backend
+-- has queued. Used by the beat-during-a-stop tests, whose holder must not let go before the beat is waiting.
+CREATE FUNCTION public.t_wait_for_waiter(p_app_like text, p_timeout_s numeric DEFAULT 20) RETURNS void LANGUAGE plpgsql
+AS $s$
+DECLARE v_t0 timestamptz := clock_timestamp();
+BEGIN
+  WHILE NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND application_name LIKE p_app_like
+                       AND wait_event_type = 'Lock') LOOP
+    IF clock_timestamp() > v_t0 + make_interval(secs => p_timeout_s::double precision) THEN
+      RAISE EXCEPTION 'test hook: no backend like % ever waited on a lock', p_app_like;
     END IF;
     PERFORM pg_sleep(0.05);
     PERFORM pg_stat_clear_snapshot();   -- pg_stat_activity is read once per transaction otherwise
@@ -1191,3 +1231,39 @@ EXCEPTION WHEN OTHERS THEN
 END $function$
 ;
 CREATE TRIGGER ottoq_capture_proposal_disposition_trg AFTER UPDATE OF status ON public.ottoq_external_proposals FOR EACH ROW EXECUTE FUNCTION ottoq_capture_proposal_disposition();
+
+-- G492: the operator's pause, live (read 2026-10-15, re-read unchanged 2026-10-17)
+CREATE OR REPLACE FUNCTION public.ottoq_pause_run(p_sim_run_id uuid, p_reason text DEFAULT 'operator_pause'::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
+AS $function$
+DECLARE v_run ottoq_sim_runs%ROWTYPE;
+BEGIN
+  SELECT * INTO v_run FROM ottoq_sim_runs WHERE sim_run_id = p_sim_run_id;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'run not found'); END IF;
+  IF v_run.status <> 'running' THEN
+    RETURN jsonb_build_object('ok', true, 'noop', true, 'status', v_run.status,
+                              'note', 'run was not running');
+  END IF;
+
+  UPDATE ottoq_sim_runs
+     SET status = 'paused',
+         next_tick_due_at = NULL,
+         payload = COALESCE(payload,'{}'::jsonb)
+                   || jsonb_build_object('paused_at', clock_timestamp(), 'pause_reason', p_reason)
+   WHERE sim_run_id = p_sim_run_id;
+
+  PERFORM ottoq_record_event(
+    p_actor_type := 'ottoq_engine', p_actor_id := 'otto_twin',
+    p_event_type := 'twin.sim_run_paused', p_entity_type := 'sim_run',
+    p_entity_id := p_sim_run_id, p_depot_id := v_run.depot_id,
+    p_payload := jsonb_build_object('reason', p_reason, 'tick_count', v_run.tick_count),
+    p_severity := 'info', p_ingest_source := 'twin', p_data_source := 'twin',
+    p_sim_run_id := p_sim_run_id);
+
+  RETURN jsonb_build_object('ok', true, 'sim_run_id', p_sim_run_id, 'status', 'paused',
+    'frozen_at_sim_clock', v_run.sim_clock_current, 'tick_count', v_run.tick_count);
+END;
+$function$;
