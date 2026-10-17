@@ -81,29 +81,30 @@
 --   first measure of how far one reading can move. "after 3 h" is the 30-minute peak from 180 minutes into the day,
 --   past the opening plug-in, which is what ottoq_value_summary bills (0577); "whole day" includes the opening. Every
 --   battery planned against the whole day (G447, §11), so the demand charges are its conceding the afternoon.
---   Arms read 08:18 UTC (82-84), 09:01 UTC (85) and 09:33 UTC (86).
+--   Arms read 08:18 UTC (82-84), 09:01 UTC (85), 09:33 UTC (86) and 10:07 UTC (87).
 --
---   normal_day                           dcfc10        dcfc20        dcfc40        dcfc40_cab2400
---                                        as built      20 fast,      power to      .managed: today's 2,500 kW
---                                                      20 L2, grown  spare         service, held at 2,160 kW (0729)
---     arm / sim run                      83 e7d5824c   86 0b0d45c2   84 b54f6de5   85 fe6d540e
---     visits / served / in depot at end  202/148/54    222/175/47    252/215/37    248/207/41
---     door p50 / p95, min                130 / 428     105 / 305     95 / 248      90 / 270
---     due cars on time (G383)            6 of 54       5 of 59       8 of 72       4 of 66
---     charge wait p50 / p95 floor / max  10/125/190    10/105/140    10/82.5/110   10/90/110
---     fast-charge sessions / L2          97 / 126      168 / 87      278 / 0       264 / 0
---     fast chargers busy, mean kW        69.4%, 39.4   51.8%, 42.3   40.9%, 39.5   41.0%, 38.9
---     car-hours met of 1,114 asked       821.4         879.8         942.7         941.8
---     30-min peak kW, whole day          973.8         1,693.1       2,369.5       1,643.7
---     30-min peak kW, after 3 h          713.6         932.5         1,006.8       1,050.6
---     instantaneous EV kW / grid kW max  1,586/1,210   2,779/2,190   3,874/3,287   2,201/1,777
---     grid import kWh                    6,723         7,912         9,193         9,050
---     demand $/month, whole day          20,839        36,496        51,228        35,419
---     demand $/month, after 3 h          15,271        19,956        21,547        22,501
---     EN.001 refused starts              3             0             0             85 (84 of them 6-7 AM)
---     DC pool bound (twin.dc_pool_shared)  -           -             -             1 tick
---     must-do service done               83.7%         88.6%         90.9%         90.0%
---     rule 9: left below target / open   0 / 0         0 / 0         0 / 0         0 / 0
+--   normal_day                           dcfc10        dcfc20        dcfc40        dcfc40_cab2400 on today's 2,500 kW
+--                                        as built      20 fast,      power to      .managed      .shared
+--                                                      20 L2, grown  spare         (0729, held   (0726 alone,
+--                                                                                  at 2,160)     2,400 cabinets)
+--     arm / sim run                      83 e7d5824c   86 0b0d45c2   84 b54f6de5   85 fe6d540e   87 dc4fd199
+--     visits / served / in depot at end  202/148/54    222/175/47    252/215/37    248/207/41    252/214/38
+--     door p50 / p95, min                130 / 428     105 / 305     95 / 248      90 / 270      90 / 249
+--     due cars on time (G383)            6 of 54       5 of 59       8 of 72       4 of 66       8 of 70
+--     charge wait p50 / p95 floor / max  10/125/190    10/105/140    10/82.5/110   10/90/110     10/100/110
+--     fast-charge sessions / L2          97 / 126      168 / 87      278 / 0       264 / 0       267 / 0
+--     fast chargers busy, mean kW        69.4%, 39.4   51.8%, 42.3   40.9%, 39.5   41.0%, 38.9   40.7%, 38.6
+--     car-hours met of 1,114 asked       821.4         879.8         942.7         941.8         948.3
+--     30-min peak kW, whole day          973.8         1,693.1       2,369.5       1,643.7       1,558.6
+--     30-min peak kW, after 3 h          713.6         932.5         1,006.8       1,050.6       1,062.1
+--     instantaneous EV kW / grid kW max  1,586/1,210   2,779/2,190   3,874/3,287   2,201/1,777   2,136/1,685
+--     grid import kWh                    6,723         7,912         9,193         9,050         9,002
+--     demand $/month, whole day          20,839        36,496        51,228        35,419        33,567
+--     demand $/month, after 3 h          15,271        19,956        21,547        22,501        22,752
+--     EN.001 refused starts              3             0             0             85 (84 6 AM)  84 (all 6 AM)
+--     DC pool bound (twin.dc_pool_shared)  -           -             -             1 tick        0 ticks
+--     must-do service done               83.7%         88.6%         90.9%         90.0%         91.1%
+--     rule 9: left below target / open   0 / 0         0 / 0         0 / 0         0 / 0         0 / 0
 --
 --   busy_day, dcfc10 as built (arm 82, 43301561): 212 visits, 103 served, 109 in the depot at the end; door p50/p95
 --   305/584; 0 of 36 due cars on time; charge wait p50/p95/max 80/355/435; car-hours met 96.0 of 1,114; 30-min peak
@@ -130,6 +131,14 @@
 --   8 of 72 to 4 of 66, a single reading on one seed, and the cars an owner needs back first are exactly the ones a
 --   held site should give its power to first (§10). Past 9 AM the two arms draw alike (1,006.8 and 1,050.6 kW). So the
 --   conversion does not need a bigger grid connection; it needs the site held at a limit, and OTTO-Q to own it.
+--
+--   And the two readings of a shared site came out alike. Arm 87 (0726's sharing alone, the shield counting each new
+--   car's whole rating, 2,400 kW of cabinets) met 948.3 car-hours, served 214 and refused 84 starts, all at 6 AM;
+--   arm 85 (0729's managed reading) met 941.8, served 207 and refused 85. Single readings, inside one reading's noise
+--   of each other and of arm 84 (942.7 with an 8 MW grid). So on this day forty robotic posts behind 2.4 MW of shared
+--   cabinets on TODAY'S service did what forty did on a grown grid, and 0729's change to the shield did not bind:
+--   both arms' refusals came while the meter itself read over the cap, which is the next paragraph's artefact, not
+--   the request the shield adds.
 --
 --   Read the managed arm's 85 refusals for what they are: every one came while the site meter already read above the
 --   held limit (mean 2,225 kW against 2,137-2,160), 84 in the opening hour. A session the twin starts is metered at its
@@ -259,8 +268,8 @@
 --
 -- ══ §10 THE RECOMMENDATION ════════════════════════════════════════════════════════════════════════════════════════════
 --
---   To Chase, from the research wing (rule 10: a recommendation, shipped only as certified changes). The shared and
---   gated arms of 0728 land after this was written; they test the cabinets without 0729's managed reading.
+--   To Chase, from the research wing (rule 10: a recommendation, shipped only as certified changes). Written on arms
+--   82-87; 0728's gated arm and 0731's bill-window pairs land after it.
 --
 --   1. LEAN IN. Robotic fast charging is the edge, and the evidence is the slow tail and the car-hours, not the median.
 --      On the normal day forty robotic posts served 45% more cars in 12 hours than the depot as built, cut the slowest
@@ -279,9 +288,10 @@
 --      twenty now and the rest as measured demand fills them, buys the same answer with half the capital at risk.
 --
 --   3. DO NOT SIZE THE GRID TO THE NAMEPLATE. Forty posts with nothing holding them drew 3.9 MW for the 6 AM plug-in.
---      Held at 2.16 MW on the existing 2.5 MW service they met 941.8 car-hours against 942.7. The megawatt worry is a
---      control question, and its answer is a site controller holding a limit that OTTO-Q sets: shared cabinets (the
---      Kempower and ABB units 0567 and 0728 cite) with OTTO-Q deciding the split.
+--      On the existing 2.5 MW service, behind 2.4 MW of shared cabinets, they met 948.3 car-hours (0726's sharing
+--      alone) and 941.8 (held at 2.16 MW, 0729) against 942.7 on a grid grown to 8 MW. The megawatt worry is a control
+--      question, and its answer is a site controller holding a limit that OTTO-Q sets: shared cabinets (the Kempower and
+--      ABB units 0567 and 0728 cite) with OTTO-Q deciding the split. No utility upgrade is needed for this day's load.
 --
 --   4. THE BILL TO MANAGE IS THE DEMAND CHARGE, AND THE TARIFF IS A YEARLY DECISION. At GSA-3's $21.40-21.78 per kW
 --      of the month's highest half hour, the unmanaged forty cost $51,228 a month in demand on the whole day against
@@ -290,9 +300,11 @@
 --      one-year term and 90 days' notice back (§4). A held site keeps its load factor up and stays on GSA-3.
 --
 --   5. WHAT THE ENGINE NEEDS BEFORE A REAL CONVERSION, as certified changes, each already measured in the twin:
---      (a) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
+--      (a) a new session is metered at its share from its first reading. Tonight every refusal on a shared site (84 and
+--          85) came while the meter read over the cap because fresh sessions count at full rate (§3); until this is
+--          fixed the shield's reading of a held limit, (b), cannot bind, and it did not;
+--      (b) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
 --          site controller's limit in the charge start's context, and the controller itself);
---      (b) a new session is metered at its share from its first reading (arm 85's 85 refusals, §3);
 --      (c) the battery plans for the bill that is charged, and is ready for the surges OTTO-Q itself schedules: it
 --          charged at 425 kW in the tick the fleet plugged in, shaved one tick late, and idled all afternoon (G447);
 --      (d) one answer for how much power a car can take (G443: twelve cars, four answers);
