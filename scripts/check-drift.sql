@@ -789,7 +789,8 @@ repo_manifest(version, name, file) AS (
     ('20261017110658'::text, 'a_shared_pool_gives_a_new_car_what_it_has_spare'::text, '0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql'::text),
     ('20261017111846'::text, 'the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs'::text, '0734_the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs.sql'::text),
     ('20261017161641'::text, 'a_car_answers_a_command_in_the_tick_it_is_given'::text, '0735_a_car_answers_a_command_in_the_tick_it_is_given.sql'::text),
-    ('20261017163802'::text, 'a_realistic_promise_at_arrival_and_its_grade'::text, '0736_a_realistic_promise_at_arrival_and_its_grade.sql'::text)
+    ('20261017163802'::text, 'a_realistic_promise_at_arrival_and_its_grade'::text, '0736_a_realistic_promise_at_arrival_and_its_grade.sql'::text),
+    ('20261017164907'::text, 'a_held_site_powers_the_cars_due_first'::text, '0737_a_held_site_powers_the_cars_due_first.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

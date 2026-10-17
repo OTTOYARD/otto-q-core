@@ -348,6 +348,11 @@
 --      power boundary 2.5 draws. That is the next build to measure
 --      against max-min fair on the same seeds. Its target is the immediate dispatches whose charge fits their 45-minute
 --      due (35 of 66 with power to spare, §12), not all due cars: 8 of 72 were on time free and 4 of 66 held (§3).
+--      BUILT IN ITS SIMPLEST FORM, 2026-10-17 11:49 AM CT (0737, dial dc_power_by_need): a bound pool gives every car
+--      with a due its full demand, earliest due first, and shares the rest evenly. That is broader than the target above,
+--      on purpose: earliest due first is the textbook rule for the latest a car can be on one shared resource, and its
+--      arm (arm 85's cell plus the dial) shows what it buys the due cars and costs the rest. Only if it costs the rest
+--      more than it buys is the narrower rule worth its own arm. The arm runs after 0732's seeds.
 --
 --   7. WHAT IS NOT KNOWN YET. One seed per cell, so every gap above is a single reading. The repeats of arms 84 and 86
 --      that 0725's sweep holds run the same seed again: they test whether a reading repeats from one night to the next,
