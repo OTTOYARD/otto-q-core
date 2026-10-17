@@ -24,7 +24,13 @@ live pre-image, md5 asserted) and the two sweeps 0736 reads:
     run, a second apply is refused and its rollback restores both bodies; the recorder records, beside each promise, the
     time the owner app says the car will be ready, exactly as the app's own function answers it, and the promise is
     otherwise what 0739 records; a failing owner app leaves the promises written; and the grade scores the app's time
-    beside the promise on the same cars, by hand.
+    beside the promise on the same cars, by hand;
+  - 0742 applies after 0741 and 0740 (tests/fixtures/ready_promise_refresh_stub.sql), refuses a second apply and an arm
+    that has already run, sets tonight's two promise cells' refresh, and its rollback restores both bodies; a car whose
+    charge is done is drawn from what follows given how long it has waited, by arithmetic, where 0739 told it "ready now";
+    a car already ready is ready now and a car past its history has no estimate; arrivals are unchanged; the recorder
+    re-estimates each promised car every refresh, with the owner app's time, and only under the dial; a failing refresh
+    leaves the promises made; and the update grade reads the re-estimates by hand.
 A module template carries the miniature depot through 0642 and the stub, and each test clones it.
 It SKIPS where no scratch PostgreSQL is reachable.
 """
@@ -50,6 +56,10 @@ M0736 = os.path.join(ROOT, "db", "migrations", "0736_a_realistic_promise_at_arri
 M0739 = os.path.join(ROOT, "db", "migrations", "0739_a_promise_counts_the_cars_still_waiting.sql")
 M0741 = os.path.join(ROOT, "db", "migrations", "0741_the_promise_is_graded_beside_what_the_owner_app_says.sql")
 OWNER_STUB = os.path.join(ROOT, "tests", "fixtures", "owner_ready_by_stub.sql")
+M0740 = os.path.join(ROOT, "db", "migrations", "0740_a_promise_on_the_busy_day.sql")
+M0742 = os.path.join(ROOT, "db", "migrations", "0742_a_promise_stays_honest_while_the_car_waits.sql")
+REFRESH_STUB = os.path.join(ROOT, "tests", "fixtures", "ready_promise_refresh_stub.sql")
+UGRADE = "public.ottoq_ready_promise_update_grade(uuid)"
 DEPOT, RUN, T = base.DEPOT, base.RUN, base.T
 RUN2 = "a0000000-0000-0000-0000-000000000736"                    # a second run on the same world
 _vid = base._vid
@@ -83,6 +93,9 @@ OWNER_LIVE = {
     "public.ottoq_owner_state_group(text)": "ce2af49062888cf4ef99c3e43c8a80f4",
 }
 AFTER_0741 = {REC: "a5cd09d49ae31a6adebc875b7a329cfd", GRADE: "9058f3a5e684fcc52bc9e50bb1984a99", EST: AFTER_0739[EST], KM: AFTER_0739[KM], TICK: AFTER_0739[TICK]}
+AFTER_0742 = {EST: "2bf2e3edbd31ba34ca9695cc31923fd6", REC: "7bda931b8aad8d069e75138e0c2214e0",
+              UGRADE: "8494a98a7f77877d6a7fda5afae1b0b9", GRADE: AFTER_0741[GRADE], KM: AFTER_0739[KM],
+              TICK: AFTER_0739[TICK]}
 PRIOR = {"after_no_bay": (10, 20), "after_bay": (45, 130), "door_chg_no_bay": (105, 330), "door_chg_bay": (150, 400),
          "door_nochg_no_bay": (40, 55), "door_nochg_bay": (75, 95)}
 
@@ -646,4 +659,267 @@ def test_0741_the_grade_scores_the_owner_app_beside_the_promise_on_the_same_cars
     assert g["by_bundle"]["bay"]["owner_in_past"] == 1, g["by_bundle"]
     # the grade of the promise itself is what 0736's grade says
     assert g["graded_p50"] == 7 and g["ready"] == 2, g
+
+
+# ── 0742: a promise stays honest while the car waits ─────────────────────────────────────────────────────────────────
+
+def _through_0742(d):
+    _through_0741(d)
+    rc, err = d.file(REFRESH_STUB)
+    assert rc == 0, f"ready_promise_refresh_stub.sql did not load: {err}"
+    _apply(d, M0740)
+    _apply(d, M0742)
+
+
+def _hash_uniform(key):
+    """ottoq_hash_uniform, in Python: the first 32 bits of md5(key), centred in (0, 1)."""
+    return (int(hashlib.md5(key.encode()).hexdigest()[:8], 16) + 0.5) / 4294967296.0
+
+
+def _after_history(d, minutes):
+    """Earlier cars with bay work whose readiness check passed `m` minutes after their charge closed, for each m."""
+    for i, m in enumerate(minutes):
+        chg = f"'{T}'::timestamptz - interval '{300 + 10 * i} minutes'"
+        d.val(f"""INSERT INTO public.ottoq_visit_needs (vehicle_id, sim_run_id, depot_id, arrived_at, visit_key, status, atoms, created_at)
+                  VALUES ('{uuid.uuid4()}', '{RUN}', '{DEPOT}', {chg} - interval '60 minutes', 'h{i}', 'complete',
+                          jsonb_build_array(
+                            jsonb_build_object('svc', 'charge', 'status', 'done', 'closed_at', {chg}),
+                            jsonb_build_object('svc', 'exterior_wash', 'status', 'done', 'concurrency', 'bay'),
+                            jsonb_build_object('svc', 'readiness_check', 'status', 'done',
+                                               'done_at', {chg} + interval '{m} minutes')),
+                          {chg} - interval '60 minutes')""")
+
+
+def _charge_done(d, name, closed_min_ago, arrived_min_ago):
+    """Car `name` arrived `arrived_min_ago` minutes before T, its charge closed `closed_min_ago` minutes before T, and its
+    wash is still to do."""
+    d.val(f"""UPDATE public.ottoq_visit_needs
+                 SET arrived_at = '{T}'::timestamptz - interval '{arrived_min_ago} minutes',
+                     atoms = jsonb_build_array(
+                       jsonb_build_object('svc', 'charge', 'status', 'done',
+                                          'closed_at', '{T}'::timestamptz - interval '{closed_min_ago} minutes'),
+                       jsonb_build_object('svc', 'exterior_wash', 'status', 'pending', 'concurrency', 'bay'))
+               WHERE sim_run_id = '{RUN}' AND vehicle_id = '{_vid(name)}'""")
+
+
+def _refresh_dial(d, minutes):
+    d.val(f"""INSERT INTO public.ottoq_policy_params (scope_type, scope_id, param_key, param_value, updated_by)
+              VALUES ('run', '{RUN}', 'ready_promise_refresh_min', {minutes}, 'test')""")
+
+
+def _at(minutes):
+    return f"'{T}'::timestamptz + interval '{minutes} minutes'"
+
+
+def test_0742_applies_after_0741_and_0740_and_refuses_a_second_apply(db):
+    _through_0741(db)
+    rc, err = db.file(REFRESH_STUB)
+    assert rc == 0, err
+    _apply(db, M0740)                                         # 0740 is rows only; executed here as it ran on live
+    assert db.val("SELECT count(*) FROM public.ottoq_throughput_sweeps WHERE sweep_code = 'promise_busy_2026_10_17'") == "1"
+    _apply(db, M0742)
+    for fn, want in AFTER_0742.items():
+        assert _md5(db, fn) == want, fn
+    for fn, want in OWNER_LIVE.items():
+        assert _md5(db, fn) == want, fn                       # the owner app is still called, not changed
+    assert db.val("SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage "
+                  "WHERE name = '0742_a_promise_stays_honest_while_the_car_waits'") == "falsefalse"
+    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0742_pre'") == "2"
+    cells = db.json("""SELECT jsonb_object_agg(c.cell_code, c.fixed_params) FROM public.ottoq_throughput_sweep_cells c
+                         JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+                        WHERE s.sweep_code IN ('promise_normal_2026_10_17', 'promise_busy_2026_10_17')""")
+    assert cells == {"dcfc10.otto_q.answer_in_tick.promise": {"twin_answer_in_tick": 1, "deploy_peak_fraction": 0.90,
+                                                              "ready_promise_record": 1, "ready_promise_refresh_min": 30},
+                     "dcfc10.otto_q.promise": {"deploy_peak_fraction": 0.90, "ready_promise_record": 1,
+                                               "ready_promise_refresh_min": 30}}, cells
+    rc, err = db.file(M0742)
+    assert rc != 0 and "0742 P1" in err, err
+    # the rollback restores 0739's estimator and 0741's recorder exactly
+    db.val("DO $r$ DECLARE s record; BEGIN FOR s IN SELECT definition FROM public.ottoq_schema_snapshots "
+           "WHERE label = '0742_pre' LOOP EXECUTE s.definition; END LOOP; END $r$")
+    assert _md5(db, EST) == AFTER_0739[EST] and _md5(db, REC) == AFTER_0741[REC]
+
+
+def test_0742_refuses_to_change_a_promise_cell_that_has_already_run(db):
+    _through_0741(db)
+    rc, err = db.file(REFRESH_STUB)
+    assert rc == 0, err
+    _apply(db, M0740)
+    db.val("""INSERT INTO public.ottoq_throughput_sweep_arms (sweep_id, cell_id, seed)
+              SELECT s.sweep_id, c.cell_id, s.seeds[1] FROM public.ottoq_throughput_sweeps s
+                JOIN public.ottoq_throughput_sweep_cells c USING (sweep_id) WHERE s.sweep_code = 'promise_busy_2026_10_17'""")
+    rc, err = db.file(M0742)
+    assert rc != 0 and "0742 P1: a promise arm has already run" in err, err
+    assert _md5(db, EST) == AFTER_0739[EST]                   # and nothing of it was left behind
+    assert db.val("SELECT to_regclass('public.ottoq_ready_promise_updates') IS NULL") == "t"
+
+
+def test_0742_a_car_whose_charge_is_done_is_drawn_from_what_follows_given_its_wait(db):
+    _through_0741(db)
+    _after_history(db, [20, 30, 40, 50, 60, 70, 80, 90, 100, 110])
+    _charge_done(db, "A", closed_min_ago=40, arrived_min_ago=120)
+    before = _promise(db)["A"]
+    # 0739: a car whose charge is done is a visit that never charged, timed from its arrival two hours ago, so every
+    # draw of the no-charge allowance (a median 75 minutes) less 120 is zero: "ready now"
+    assert before["situation"] == "no_charge" and before["detail"]["after"] == "door_nochg_bay", before
+    assert float(before["ready_p50_min"]) == 0 and float(before["ready_p90_min"]) == 0, before
+    rc, err = db.file(REFRESH_STUB)
+    assert rc == 0, err
+    _apply(db, M0740)
+    _apply(db, M0742)
+    a = _promise(db)["A"]
+    d = a["detail"]
+    assert a["situation"] == "after_charge" and d["after"] == "after_bay" and d["after_src"] == "run", a
+    assert float(d["elapsed_min"]) == 40.0 and d["after_n"] == 11 and d["after_waiting"] == 1 and d["after_lb"] == 0, d
+    # by hand: the run's after-charge allowance is Kaplan-Meier over the ten that finished and A, still waiting at 40;
+    # A has waited a quarter of it, so each of the 128 draws is the allowance above that quarter, less the 40 minutes
+    xs = sorted([20.0, 30, 40, 50, 60, 70, 80, 90, 100, 110] + [40.0])
+    ended = [True] * 11
+    ended[xs.index(40.0)] = False                            # A sorts before the car that ended at 40
+    q = _km_py(xs, ended, [i / 20 for i in range(21)])
+    fe = next((i - 1) / 20 + (40 - q[i - 1]) / (q[i] - q[i - 1]) / 20
+              for i in range(20, 0, -1) if q[i - 1] <= 40 < q[i])
+    assert fe == pytest.approx(0.25) and float(d["waited_share"]) == pytest.approx(fe, abs=0.0005)
+    seed = f"world:{RUN}:promise:{_epoch(db)}"
+    sums = []
+    for s_ in range(1, 17):
+        for k in range(1, 9):
+            u2 = fe + _hash_uniform(f"{seed}:{s_}:{k}:{_vid('A')}:after") * (1 - fe)
+            i = min(int(u2 * 20), 19)
+            sums.append(max(q[i] + (q[i + 1] - q[i]) * (u2 * 20 - i) - 40, 0))
+    assert float(a["ready_p50_min"]) == pytest.approx(_pct(sums, 0.5), abs=0.011), a
+    assert float(a["ready_p90_min"]) == pytest.approx(max(_pct(sums, 0.9), _pct(sums, 0.5)), abs=0.011), a
+    assert float(a["ready_p50_min"]) > 20                     # where 0739 said zero
+    # the cars still in the line are promised exactly as before
+    for name in ("B", "C", "D", "I", "P"):
+        assert _promise(db)[name]["situation"] == "in_line"
+
+
+def test_0742_a_car_already_ready_is_ready_now_and_one_past_its_history_has_no_estimate(db):
+    _through_0742(db)
+    _after_history(db, [20, 30, 40, 50, 60, 70, 80, 90, 100, 110])
+    _charge_done(db, "A", closed_min_ago=500, arrived_min_ago=560)       # longer than any car the run has seen
+    db.val(f"""UPDATE public.ottoq_visit_needs
+                  SET atoms = atoms || jsonb_build_array(jsonb_build_object('svc', 'readiness_check', 'status', 'done',
+                                                                            'done_at', {_at(-5)}))
+                WHERE sim_run_id = '{RUN}' AND vehicle_id = '{_vid('B')}'""")
+    p = _promise(db)
+    assert p["B"]["situation"] == "ready" and float(p["B"]["ready_p50_min"]) == 0 == float(p["B"]["ready_p90_min"]), p["B"]
+    a = p["A"]
+    assert a["situation"] == "after_charge" and a["ready_p50_min"] is None and a["ready_p90_min"] is None, a
+    assert a["detail"]["beyond_history"] is True and float(a["detail"]["waited_share"]) == 1, a["detail"]
+    # a car past its history gets no promise at all: a promise is a time
+    n = int(db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', '{T}')"))
+    assert n == len(p) - 1
+    assert db.val(f"SELECT count(*) FROM public.ottoq_ready_promises WHERE vehicle_id = '{_vid('A')}'") == "0"
+    assert db.val(f"SELECT situation FROM public.ottoq_ready_promises WHERE vehicle_id = '{_vid('B')}'") == "ready"
+
+
+def test_0742_arrivals_are_promised_as_0739_promised_them(db):
+    _through_0741(db)
+    before = _promise(db)
+    rc, err = db.file(REFRESH_STUB)
+    assert rc == 0, err
+    _apply(db, M0740)
+    _apply(db, M0742)
+    after = _promise(db)
+    assert set(before) == set(after)
+    for name, b in before.items():
+        a = after[name]
+        for k in ("situation", "bundle", "plan_charge_min", "charge_p50_min", "charge_p90_min", "ready_p50_min",
+                  "ready_p90_min"):
+            assert a[k] == b[k], (name, k, b[k], a[k])
+        assert {k: v for k, v in a["detail"].items() if k != "models"} == \
+               {k: v for k, v in b["detail"].items() if k != "models"}, name
+
+
+def test_0742_the_recorder_re_estimates_each_promised_car_every_refresh(db):
+    _through_0742(db)
+    _owner_legs(db)
+    assert db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', '{T}')") == "7"
+    assert db.val("SELECT count(*) FROM public.ottoq_ready_promise_updates") == "0"
+    # without the dial: never again
+    db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', {_at(60)})")
+    assert db.val("SELECT count(*) FROM public.ottoq_ready_promise_updates") == "0"
+    _refresh_dial(db, 30)
+    db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', {_at(20)})")
+    assert db.val("SELECT count(*) FROM public.ottoq_ready_promise_updates") == "0"    # not due yet
+    db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', {_at(30)})")
+    rows = {base.NAMES[r["vehicle_id"]]: r for r in db.json(
+        "SELECT jsonb_agg(to_jsonb(u)) FROM public.ottoq_ready_promise_updates u")}
+    assert len(rows) == 7
+    direct = {base.NAMES[r["vehicle_id"]]: r for r in db.json(
+        f"""SELECT jsonb_agg(to_jsonb(rp)) FROM public.ottoq_ready_promise('{RUN}', '{DEPOT}', {_at(30)},
+                   (SELECT array_agg(vehicle_id ORDER BY vehicle_id) FROM public.ottoq_ready_promises), 16) rp""")}
+    for name, u in rows.items():
+        assert u["estimated_at"].startswith("2026-10-07T15:10:00"), u
+        assert u["owner_read"] is True, u
+        for k in ("situation", "bundle", "ready_p50_min", "ready_p90_min"):
+            assert u[k] == direct[name][k], (name, k)
+        assert u["detail"] == direct[name]["detail"], name
+    owner = {n: db.val(f"""SELECT extract(epoch FROM (owner_ready_by_sim - '{T}'::timestamptz)) / 60
+                             FROM public.ottoq_ready_promise_updates WHERE vehicle_id = '{_vid(n)}'""") for n in ("A", "B", "C")}
+    assert float(owner["A"]) == 130 and float(owner["B"]) == 75 and owner["C"] == ""
+    db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', {_at(45)})")
+    assert db.val("SELECT count(*) FROM public.ottoq_ready_promise_updates") == "7"    # 15 minutes after the last
+    db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', {_at(60)})")
+    assert db.val("SELECT count(*) FROM public.ottoq_ready_promise_updates") == "14"
+    assert db.val("SELECT count(DISTINCT estimated_at) FROM public.ottoq_ready_promise_updates") == "2"
+    # a new car is promised in the same call that estimates the others again, and is not itself estimated again yet
+    db.val(f"""INSERT INTO public.ottoq_visit_needs (vehicle_id, sim_run_id, depot_id, arrived_at, visit_key, status, atoms, created_at)
+               VALUES ('{_vid('X')}', '{RUN}', '{DEPOT}', {_at(90)}, 'X2', 'open', '[{{"svc":"charge"}}]', {_at(90)})""")
+    assert db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', {_at(90)})") == "1"
+    assert db.val("SELECT count(*) FROM public.ottoq_ready_promise_updates") == "20"   # the six others
+    rc, _, err = db.run("UPDATE public.ottoq_ready_promise_updates SET ready_p50_min = 0")
+    assert rc != 0 and "append-only" in err, err
+    rc, _, err = db.run("DELETE FROM public.ottoq_ready_promise_updates")
+    assert rc != 0 and "append-only" in err, err
+
+
+def test_0742_a_failing_refresh_leaves_the_promises_made(db):
+    _through_0742(db)
+    _refresh_dial(db, 30)
+    assert db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', '{T}')") == "7"
+    db.val("DROP TABLE public.ottoq_ready_promise_updates")    # the re-estimate now fails
+    db.val(f"""INSERT INTO public.ottoq_visit_needs (vehicle_id, sim_run_id, depot_id, arrived_at, visit_key, status, atoms, created_at)
+               VALUES ('{_vid('X')}', '{RUN}', '{DEPOT}', {_at(30)}, 'X2', 'open', '[{{"svc":"charge"}}]', {_at(30)})""")
+    rc, out, err = db.run(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', {_at(30)})")
+    assert rc == 0 and out[-1] == "1" and "0742 ready promise refresh" in err, (out, err)
+    assert db.val("SELECT count(*) FROM public.ottoq_ready_promises") == "8"
+
+
+def test_0742_the_update_grade_reads_each_re_estimate_against_the_check(db):
+    _through_0742(db)
+    _owner_legs(db)
+    _refresh_dial(db, 30)
+    db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', '{T}')")
+    db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', {_at(30)})")
+    u = {base.NAMES[r["vehicle_id"]]: r for r in db.json(
+        "SELECT jsonb_agg(to_jsonb(u)) FROM public.ottoq_ready_promise_updates u")}
+    # A is ready 1 minute before its re-estimate's median; B between its median and 90th percentile; C after its 90th
+    # percentile; the rest are never ready, and the run ends after every estimate and every owner-app time has passed
+    a50, b50, b90, c90 = (float(u["A"]["ready_p50_min"]), float(u["B"]["ready_p50_min"]),
+                          float(u["B"]["ready_p90_min"]), float(u["C"]["ready_p90_min"]))
+    _ready_at(db, "A", 30 + a50 - 1)
+    _ready_at(db, "B", 30 + (b50 + b90) / 2)
+    _ready_at(db, "C", 30 + c90 + 5)
+    db.val(f"UPDATE public.ottoq_sim_runs SET sim_clock_current = {_at(3000)} WHERE sim_run_id = '{RUN}'")
+    g = db.json(f"SELECT public.ottoq_ready_promise_update_grade('{RUN}')")
+    assert g["updates"] == 7 and g["ready"] == 3 and g["ready_now"] == 0 and g["no_estimate"] == 0, g
+    assert g["graded_p50"] == 7 and g["by_p50"] == pytest.approx(1 / 7, abs=0.0005), g
+    assert g["graded_p90"] == 7 and g["by_p90"] == pytest.approx(2 / 7, abs=0.0005), g
+    exp_mae = (abs(a50 - 1 - a50) + abs((b50 + b90) / 2 - b50) + abs(c90 + 5 - float(u["C"]["ready_p50_min"]))) / 3
+    assert g["mae_p50_min"] == pytest.approx(round(exp_mae, 1), abs=0.051), g
+    # the owner app said A at T+130 and B at T+75, both read at T+30: 100 and 45 minutes on; D's leg had ended before T
+    own_a = (30 + a50 - 1) <= 130
+    own_b = (30 + (b50 + b90) / 2) <= 75
+    assert g["with_owner"] == 3 and g["graded_owner"] == 3 and g["owner_in_past"] == 1, g
+    assert g["by_owner"] == pytest.approx(round((own_a + own_b + 0) / 3, 3), abs=0.0005), g
+    assert g["by_situation"]["in_line"]["updates"] == 6, g["by_situation"]
+    assert sum(v["updates"] for v in g["by_since_arrival"].values()) == 7, g["by_since_arrival"]
+    # once A, B and C are ready, a re-estimate finds them ready now: counted, and not graded
+    later = 30 + max(a50, b90, c90) + 40
+    db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', {_at(later)})")
+    g2 = db.json(f"SELECT public.ottoq_ready_promise_update_grade('{RUN}')")
+    assert g2["ready_now"] == 3 and g2["updates"] == 7 + 4, g2
 

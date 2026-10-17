@@ -495,9 +495,11 @@ jobs:
       # per visit and the append-only ledger, the grade, Kaplan-Meier against a hand computation, two runs of one world
       # alike, a lower bound where the curve does not reach, and the recorder's newest visit. 0741 (G454): beside each
       # promise, the time the owner app says, asked of the app's own functions (live bodies, md5-asserted), a failing app
-      # leaving the promises written, and the grade of both on the same cars by hand. 17 tests, about 40 seconds: one
-      # template database, cloned per test.
-      - name: A realistic promise at arrival counts the cars still waiting and is graded beside what the owner app says, executed (0736, 0739, 0741 against the live charge line and owner app)
+      # leaving the promises written, and the grade of both on the same cars by hand. 0742 (G455): a car part-way through
+      # its visit drawn given how long it has waited, by hand; ready now, and no estimate past its history; arrivals
+      # unchanged; the re-estimate every refresh under its dial, a failing refresh leaving the promises made, and its
+      # grade by hand (0740 executed on the way). 25 tests, about 45 seconds: one template database, cloned per test.
+      - name: A realistic promise counts the cars still waiting, stays honest while a car waits, and is graded beside what the owner app says, executed (0736, 0739, 0741, 0742 against the live charge line and owner app)
         env:
           PGHOST: localhost
           PGPORT: "5432"

@@ -444,6 +444,12 @@
 --   leg, not from the promise, and that time has never been graded: the itinerary is amended in place, so what an owner
 --   was told at arrival cannot be read back. 0741 records the app's time beside each promise on both promise arms and
 --   grades both on the same cars. Query (18) puts them side by side.
+--   And the promise was only right at arrival (G455, 0742, applied 18:55 UTC). Asked again about a car whose charge was
+--   done and that was still waiting, 0739's estimator said "ready now" for nearly every one: 239 of 247 waiting car-hours
+--   on arm 82, 1,692 of 1,710 on arm 81, 50 of 56 on arm 83 (query (19)). 0742 draws such a car given how long it has
+--   waited, which brings the normal days close to honest and leaves the busy days poor, and says it does not know when a
+--   car has waited longer than any its history holds. Both promise arms now re-estimate every promised car every 30
+--   sim-minutes, with the owner app's time beside it; query (20) grades that second look.
 
 -- ══ QUERIES ══
 
@@ -811,3 +817,85 @@ SELECT j ->> 'promises' AS promises, j ->> 'ready' AS ready, j ->> 'with_owner' 
        j ->> 'owner_bias_min' AS app_bias_min, j ->> 'owner_min_median' AS app_said_median_min,
        j ->> 'p50_min_median' AS promise_p50_median_min, j ->> 'actual_min_median' AS took_median_min
   FROM g;
+
+-- (19) G455: the promise asked again part-way through a visit, rehearsed on a run's own records. At every whole hour,
+--      for each car whose charge had closed and that was not yet ready: what 0739's estimator said (a visit that never
+--      charged, timed from arrival, its wait subtracted from each draw) and what drawing it given the minutes since its
+--      charge closed says (0742), each graded against the car's readiness check as the grade does (a car never ready is a
+--      miss once its time has passed before the run's end). The two helpers read the 21-point grid; run all three
+--      statements in one session. On 2026-10-17: arm 82 239 of 247 car-hours "ready now", by p50 0.000 against 0.348
+--      conditional; arm 81 1,692 of 1,710, 0.000 against 0.223; arm 83 50 of 56, 0.036 against 0.625.
+CREATE FUNCTION pg_temp.qat(q float8[], u float8) RETURNS float8 LANGUAGE sql IMMUTABLE AS $f$
+  SELECT CASE WHEN u <= 0 THEN q[1] WHEN u >= 1 THEN q[21]
+              ELSE q[floor(u*20)::int + 1] + (q[LEAST(floor(u*20)::int + 2, 21)] - q[floor(u*20)::int + 1]) * (u*20 - floor(u*20)) END $f$;
+CREATE FUNCTION pg_temp.fat(q float8[], x float8) RETURNS float8 LANGUAGE sql IMMUTABLE AS $f$
+  SELECT CASE WHEN x <= q[1] THEN 0 WHEN x >= q[21] THEN 1 ELSE
+    (SELECT (i - 1) / 20.0 + CASE WHEN q[i+1] > q[i] THEN (x - q[i]) / (q[i+1] - q[i]) / 20.0 ELSE 0 END
+       FROM generate_series(1, 20) i WHERE q[i] <= x AND x < q[i+1] ORDER BY i DESC LIMIT 1) END $f$;
+WITH runs AS (
+  SELECT r.sim_run_id, r.sim_clock_current AS run_end,
+         (SELECT min(vn.arrived_at) FROM ottoq_visit_needs vn WHERE vn.sim_run_id = r.sim_run_id) AS run_start
+    FROM ottoq_sim_runs r WHERE r.sim_run_id IN ('43301561-bce5-46c5-84c3-4235db4e4dd4','96616822-7d95-4b09-9320-48988d60616b','e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd')),
+v AS (
+  SELECT vn.sim_run_id, vn.visit_id, vn.vehicle_id, vn.arrived_at, vn.atoms,
+         (SELECT (x->>'done_at')::timestamptz FROM jsonb_array_elements(vn.atoms) x WHERE x->>'svc'='readiness_check' AND x->>'status'='done' ORDER BY x->>'done_at' LIMIT 1) AS ready_at,
+         (SELECT max(COALESCE((x->>'closed_at')::timestamptz, (x->>'done_at')::timestamptz)) FROM jsonb_array_elements(vn.atoms) x WHERE x->>'svc'='charge' AND x->>'status'='done') AS chg_at,
+         EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x->>'svc'='charge') AS chg,
+         EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x->>'concurrency'='bay') AS bay
+    FROM ottoq_visit_needs vn JOIN runs USING (sim_run_id)),
+t AS (SELECT r.sim_run_id, r.run_end, g AS t FROM runs r, generate_series(r.run_start + interval '1 hour', r.run_end - interval '1 hour', interval '1 hour') g),
+hist AS (
+  SELECT t.sim_run_id, t.t, k.key, k.x, COALESCE(v.ready_at <= t.t, false) AS ended
+    FROM t JOIN v ON v.sim_run_id = t.sim_run_id AND v.arrived_at <= t.t
+    CROSS JOIN LATERAL (VALUES
+      (CASE WHEN v.chg AND v.chg_at <= t.t THEN CASE WHEN v.bay THEN 'after_bay' ELSE 'after_no_bay' END END,
+       GREATEST(extract(epoch FROM (LEAST(COALESCE(v.ready_at, t.t), t.t) - v.chg_at))/60.0, 0)::float8),
+      (CASE WHEN NOT v.chg THEN 'door_nochg_' || CASE WHEN v.bay THEN 'bay' ELSE 'no_bay' END END,
+       GREATEST(extract(epoch FROM (LEAST(COALESCE(v.ready_at, t.t), t.t) - v.arrived_at))/60.0, 0)::float8)) k(key, x)
+   WHERE k.key IS NOT NULL),
+al0 AS (
+  SELECT sim_run_id, t, key, count(*) AS n, max(x) AS xmax,
+         public.ottoq_km_quantiles(array_agg(x ORDER BY x, ended), array_agg(ended ORDER BY x, ended), ARRAY(SELECT g/20.0 FROM generate_series(0,20) g)) AS q
+    FROM hist GROUP BY 1,2,3),
+pr AS (SELECT * FROM (VALUES ('after_no_bay',10.0,20.0),('after_bay',45.0,130.0),('door_nochg_no_bay',40.0,55.0),('door_nochg_bay',75.0,95.0)) p(key,p50,p90)),
+z AS (SELECT ARRAY[-2.326,-1.645,-1.282,-1.036,-0.842,-0.674,-0.524,-0.385,-0.253,-0.126,0,0.126,0.253,0.385,0.524,0.674,0.842,1.036,1.282,1.645,2.326]::float8[] AS c_z),
+al2 AS (SELECT tt.sim_run_id, tt.t, p.key,
+               COALESCE((SELECT CASE WHEN a.n >= 8 THEN ARRAY(SELECT COALESCE(a.q[i], GREATEST(a.xmax, p.p50 * exp(ln(p.p90/p.p50)/1.2816*z.c_z[i]))) FROM generate_series(1,21) i ORDER BY i) END
+                           FROM al0 a WHERE a.sim_run_id = tt.sim_run_id AND a.t = tt.t AND a.key = p.key),
+                        ARRAY(SELECT p.p50 * exp(ln(p.p90/p.p50)/1.2816*z.c_z[i]) FROM generate_series(1,21) i ORDER BY i)) AS q
+          FROM (SELECT DISTINCT sim_run_id, t FROM t) tt CROSS JOIN pr p CROSS JOIN z),
+w AS (
+  SELECT t.sim_run_id, t.t, t.run_end, v.vehicle_id, v.ready_at,
+         extract(epoch FROM (t.t - v.chg_at))/60.0 AS e, extract(epoch FROM (t.t - v.arrived_at))/60.0 AS el_door,
+         CASE WHEN v.bay THEN 'after_bay' ELSE 'after_no_bay' END AS key_after,
+         CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(v.atoms) x WHERE x->>'concurrency'='bay'
+                            AND (x->>'status' IS DISTINCT FROM 'done' OR (x->>'done_at')::timestamptz > t.t)) THEN 'door_nochg_bay' ELSE 'door_nochg_no_bay' END AS key_door
+    FROM t JOIN v ON v.sim_run_id = t.sim_run_id
+   WHERE v.chg AND v.chg_at <= t.t AND (v.ready_at IS NULL OR v.ready_at > t.t)),
+est AS (
+  SELECT w.*, extract(epoch FROM (w.ready_at - w.t))/60.0 AS actual,
+         GREATEST(pg_temp.qat(d.q, 0.5) - w.el_door, 0) AS cur50, GREATEST(pg_temp.qat(d.q, 0.9) - w.el_door, 0) AS cur90,
+         pg_temp.fat(a.q, w.e) AS fe, a.q AS qa
+    FROM w JOIN al2 a ON a.sim_run_id = w.sim_run_id AND a.t = w.t AND a.key = w.key_after
+           JOIN al2 d ON d.sim_run_id = w.sim_run_id AND d.t = w.t AND d.key = w.key_door),
+est2 AS (
+  SELECT est.*, GREATEST(pg_temp.qat(qa, fe + 0.5*(1-fe)) - e, 0) AS cond50, GREATEST(pg_temp.qat(qa, fe + 0.9*(1-fe)) - e, 0) AS cond90,
+         extract(epoch FROM (run_end - t))/60.0 AS left_min
+    FROM est)
+SELECT left(sim_run_id::text, 8) AS run, count(*) AS car_hours_waiting, count(actual) AS later_ready,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY actual)::numeric) AS actual_rest_p50_min,
+       count(*) FILTER (WHERE cur50 = 0) AS before_0742_ready_now,
+       round(avg(CASE WHEN actual IS NOT NULL THEN (actual <= cur50)::int WHEN cur50 < left_min THEN 0 END)::numeric, 3) AS before_by_p50,
+       round(avg(CASE WHEN actual IS NOT NULL THEN (actual <= cur90)::int WHEN cur90 < left_min THEN 0 END)::numeric, 3) AS before_by_p90,
+       round(avg(CASE WHEN actual IS NOT NULL THEN (actual <= cond50)::int WHEN cond50 < left_min THEN 0 END)::numeric, 3) AS cond_by_p50,
+       round(avg(CASE WHEN actual IS NOT NULL THEN (actual <= cond90)::int WHEN cond90 < left_min THEN 0 END)::numeric, 3) AS cond_by_p90,
+       round(avg(abs(actual - cur50))::numeric, 1) AS before_mae, round(avg(abs(actual - cond50))::numeric, 1) AS cond_mae
+  FROM est2 GROUP BY 1 ORDER BY 1;
+
+-- (20) G455: the second look, on a promise arm's run (0742): each re-estimate made every 30 sim-minutes against the
+--      readiness check, overall, by situation and by time since arrival, with the owner app's time at the same moment.
+--      Substitute the sweep code (promise_normal_2026_10_17 or promise_busy_2026_10_17). Before a promise arm has run it
+--      returns no row.
+WITH run AS (SELECT a.sim_run_id FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+              WHERE s.sweep_code = 'promise_normal_2026_10_17' ORDER BY a.ran_at DESC LIMIT 1)
+SELECT public.ottoq_ready_promise_update_grade(run.sim_run_id) FROM run;
