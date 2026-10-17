@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017072652
 -- migration-name:    a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_one
 --
 -- 0726  **A shared power cabinet divides its power, and the twin can now model one.** A test day whose build-out puts
@@ -389,3 +389,18 @@ VALUES ('0726_a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_on
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 07:26:52 UTC (2:26 AM CT), ledger version 20261017072652 ═════════════════════════════════════
+--
+--   Through apply_migration, the documented route: the sweep runner was paused (throughput_sweep_runner_enabled 0,
+--   06:54:49 UTC) and nothing was in flight, so the wrapper's lock on the ledger had nothing to wait behind. Executable
+--   part 17,274 characters, md5 c5f5ea37ed5afd2e8bcecb65b81e2c5e, equal to the ledger's statements[1] read back. The
+--   charge step's prosrc is now 40522526...; V2 proved it less the three insertions is the pre-image.
+--
+--   Dry-run first, on the live catalog, in a rolled-back transaction: every block passed, and the plan ran against a
+--   real test day (normal_day arm 83's stop, sim run e7d5824c, its 36 cancelled sessions reactivated): 7 fast charges
+--   wanting 239.0 kW, 29 L2 wanting 297.6 kW, no bind on the as-built 1,800 kW cabinets. Then, after the apply, the
+--   binding branch, rolled back: dcfc_max_concurrent_kw 120 and the run's own seed. 7 fast charges wanted 222.8 kW; the
+--   four small ones drew their whole demand (8.91, 18.15, 8.23, 18.82) and the three large ones 21.96 each, so the step
+--   metered 119.99 kW, none above its share; L2 metered 293.22 against the plan's 293.2, untouched; and one
+--   `twin.dc_pool_shared` event (integration_event, info) with the pool, the demand and the count.
