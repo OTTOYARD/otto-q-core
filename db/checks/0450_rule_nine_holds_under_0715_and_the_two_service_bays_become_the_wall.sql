@@ -14,8 +14,8 @@
 --        endpoint's own latency, the overlap estimate, the charge-order grades, the start-race census, and a second
 --        deadlock.
 --        ADDED the same day, §8 and (9): §5's 7.35-second decision insert is a foreign-key wait on the tick's FOR UPDATE
---        of the live run's row -> G443 (measured, and NOT changed: the wait keeps the decide step's close of the
---        proposals right), and the deadlock of §6 is traced to the stop door's order -> G440, built in db/migrations/0724
+--        of the live run's row -> G490 (measured, and NOT changed: the wait keeps the decide step's close of the
+--        proposals right), and the deadlock of §6 is traced to the stop door's order -> G440, built in db/migrations/0790
 --        (pending).
 --
 -- ══ §1 THE PAIR, AND WHAT IT CAN AND CANNOT SAY (reproduce: (1)) ══════════════════════════════════════════════════════
@@ -208,7 +208,7 @@
 --
 -- ══ §8 THE 7.35-SECOND DECISION INSERT IS A FOREIGN-KEY WAIT ON THE TICK'S ROW LOCK (reproduce: (9)) ═════════════════
 --
---   Added the same day, read-only, from the reads behind db/migrations/0724 §1 (b); (9) re-read at 20:34:50 UTC
+--   Added the same day, read-only, from the reads behind db/migrations/0790 §1 (b); (9) re-read at 20:34:50 UTC
 --   (3:34 PM CT) and again, unchanged, at 23:09:23 UTC (6:09 PM CT). §5's open question has a mechanism. ottoq_decisions references ottoq_sim_runs; the world step took the
 --   live run's row FOR UPDATE, the one row lock a foreign-key check (FOR KEY SHARE) waits on; and the metronome commits a
 --   beat after its world and decide steps. So an agent decision insert begun during a beat waited for the beat's commit.
@@ -219,12 +219,12 @@
 --     the other 176                                                       mean 0.07 s, max 0.57, none over a second
 --   The world step's logged end came a mean 0.48 s after the 36 began, so they waited for the commit, not the world step.
 --   Pass 797's 7.345 s (trigger tick 359) began 0.78 s after tick 364's world step ended, inside that beat's decide step.
---   The beat's commit is not logged, so the second row's 5-second window is a bound, not a measurement. -> G443.
---   The wait is not removed by 0724: its first draft took the tick's lock FOR NO KEY UPDATE, and two refuters showed that
+--   The beat's commit is not logged, so the second row's 5-second window is a bound, not a measurement. -> G490.
+--   The wait is not removed by 0790: its first draft took the tick's lock FOR NO KEY UPDATE, and two refuters showed that
 --   lets a proposal commit mid-beat, after which ottoq_decide_tick's A3 (line 1228) records the wrong proposal as enacted
---   in the evidence ledger (0724 §1 (b)). The fix needs one lock order for proposal writers or A3 scoped to the proposal
+--   in the evidence ledger (0790 §1 (b)). The fix needs one lock order for proposal writers or A3 scoped to the proposal
 --   the kernel took, and an audit of the beat's set-based statements, first.
---   OPEN-ITEM: an insert that references the live run waits for the tick's FOR UPDATE on its row; the fix is gated on A3 (G443)
+--   OPEN-ITEM: an insert that references the live run waits for the tick's FOR UPDATE on its row; the fix is gated on A3 (G490)
 --
 -- ══ QUERIES ══
 

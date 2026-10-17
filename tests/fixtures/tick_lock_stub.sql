@@ -1,9 +1,9 @@
--- tests/fixtures/tick_lock_stub.sql -- what 0724 meets. Eleven definitions are the live ones of 2026-10-14
+-- tests/fixtures/tick_lock_stub.sql -- what 0790 meets. Eleven definitions are the live ones of 2026-10-14
 -- (pg_get_functiondef, byte for byte; tests/test_tick_lock_sql.py asserts each md5):
 --   public.ottoq_sim_advance_tick_world(uuid)                              3e0ddbb1b097587bc2c0e9135d7895aa
 --   public.ottoq_twin_inject_charger_fault(uuid,uuid,numeric,text)         0cd92ef247e8959fda68b2e6087bd944
 --   twin.ottoq_report_charger_fault(uuid,text,text,text)                   a4339948b3520016e9979dc13faac605
---   public.ottoq_sim_stop_and_reset(uuid,text)                             bc8ee182436dfcd6bd53f62547ad5d5e  (0724 patches)
+--   public.ottoq_sim_stop_and_reset(uuid,text)                             bc8ee182436dfcd6bd53f62547ad5d5e  (0790 patches)
 --   public.ottoq_sim_mark_stopped(uuid,text)                               d3325a7e94bc2791c5ebad11ae61a85d
 --   public.ottoq_dispose_external_proposals(uuid,bigint,timestamptz,boolean) 5ed4b74688e95d22736f3e4c6123e6a6
 --   public.ottoq_demo_metronome(integer)  (a procedure)                    d02b6af9e3fa622267247f7277ef7057
@@ -179,7 +179,7 @@ BEGIN
     VALUES (p_sim_run_id, v_tick, r.entity_id, 'enacted', r.proposal || jsonb_build_object('source', r.source),
             'stall_assignment', 'stall_assignment');
   END LOOP;
-  PERFORM set_config('application_name', 'ottoq_0724_metronome_in_decide', false);
+  PERFORM set_config('application_name', 'ottoq_0790_metronome_in_decide', false);
   IF v_door IS NOT NULL THEN
     WHILE NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = v_door AND wait_event_type = 'Lock') LOOP
       IF clock_timestamp() > v_t0 + interval '20 seconds' THEN
@@ -224,7 +224,7 @@ BEGIN
   PERFORM public.ottoq_dispose_external_proposals(p_sim_run_id, v_tick, v_clock, false);
 END$s$;
 
--- NOT live bodies: the shapes 0724's P2 reads in them. ottoq_decide_tick enacts the run's proposals by the UPDATE its
+-- NOT live bodies: the shapes 0790's P2 reads in them. ottoq_decide_tick enacts the run's proposals by the UPDATE its
 -- line 1228 carries. ottoq_purge_prior_runs is the one function that deletes ottoq_sim_runs rows, and it is kept in the
 -- live body's order with its two statements on ottoq_sim_runs verbatim (live md5 46f1f29f, read 2026-10-15 00:16:48
 -- UTC): it chooses its runs once, deletes their rows in the run-scoped tables by dynamic SQL, children first (the
