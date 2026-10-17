@@ -93,9 +93,13 @@
 --
 --   NES's EV schedule, EVC, has no demand charge: as reported from NES's January 2025 EVC schedule (search result for
 --   https://nespower.com/-/media/project/nes/common/pdfs/commercial-rates/2025/evc-january-2025-retail-rate-schedule.pdf,
---   2026-10-17; the PDF itself answered HTTP 500 to a direct fetch, so CONFIRM before quoting): separately metered EV
---   charging only, demand over 50 kW and up to 5,000 kW, $100 a month, 24.216 c/kWh on and off peak plus TVA's
---   adjustment. ottoq_depot_tariffs' provenance (retrieved 2026-07-09) carries 21.773 c/kWh for the same schedule, an
+--   2026-10-17; the PDF itself answered HTTP 500 to a direct fetch): separately metered EV charging only, demand over
+--   50 kW and up to 5,000 kW, $100 a month, 24.216 c/kWh on and off peak plus TVA's adjustment. CONFIRMED by 07:44 UTC by a
+--   second search, which read the same terms from the PDF's own indexed text ("separately metered charging stations for
+--   electric vehicles ... greater than 50 kW but not more than 5,000 kW"; "Customer Charge: $100.00 per delivery point
+--   per month"; 24.216 c/kWh onpeak and offpeak, all seasons; "The base energy charges shall be increased or decreased
+--   in accordance with the current Adjustment Addendum published by TVA"). That text is page 1 of 2 and the direct fetch
+--   still answers 500, so page 2 is unread: no demand charge appears on page 1, and that is the claim. ottoq_depot_tariffs' provenance (retrieved 2026-07-09) carries 21.773 c/kWh for the same schedule, an
 --   earlier version or a different basis. Crossover, energy-only at EVC against GSA-3's energy plus demand:
 --     at 24.216 c: monthly load factor about 17.5% (21.6 $/kW-month / (16.9 c x 730 h))
 --     at 21.773 c: about 20.4%

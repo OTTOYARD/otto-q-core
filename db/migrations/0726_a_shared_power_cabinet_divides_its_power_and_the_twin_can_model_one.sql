@@ -19,6 +19,11 @@
 --   the metered power (0451 §2 (d)) and outside a demand-response call with no credit for the 3,000 kWh battery. So 0724's
 --   dcfc40_grid_today measures 40 chargers whose cars wait to start, judged by an over-count, while its cabinets may run
 --   past their 1,800 kW. Neither a real shared site nor a bound on one.
+--   CORRECTED 2026-10-17 07:41 UTC (db/checks/0451 §2 (c), G445), a comment only: "reported and never enforced" and
+--   "may run past their 1,800 kW" are wrong. Since 0428 the charge start is an enforcing checkpoint, and the shield's
+--   EN.001.grid_capacity_ceiling refuses a start when the site meter plus the car's rating passes 90% of
+--   dcfc_max_concurrent_kw (3 and 9 refusals in tonight's baseline arms 83 and 82). The limit binds at the start; it is
+--   still never shared, which is what this file adds.
 --
 -- ══ §2 WHAT THIS CHANGES ══════════════════════════════════════════════════════════════════════════════════════════════
 --
