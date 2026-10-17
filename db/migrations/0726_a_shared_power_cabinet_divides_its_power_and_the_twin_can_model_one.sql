@@ -44,6 +44,8 @@
 --       changes. The target, the room in the pack, the fault card and every stop are untouched: a shared charge runs
 --       slower and still runs to its target (rule 9). Sharing is a property of the hardware a test day builds, never a
 --       decision about a car.
+--   (e) `twin.dc_pool_shared` catalogued in ottoq_event_types_catalog (integration_event, info, emitter twin_simulator),
+--       beside the twin's dcfc_cap events, so the event is part of the vocabulary rather than a fallback system_event.
 --   Not changed: the admission gate. A sharing test day sets `enforce_site_charge_cap` 0 (catalogued since 0286) in its
 --   own dials, because a shared cabinet does not refuse a car, it divides its power; the next file's cells do.
 --
@@ -53,7 +55,7 @@
 --   catalogued; no scope row sets it. Pre-image to ottoq_schema_snapshots as '0726_pre'. V1: the water-filling on known
 --   cases, and on a pool larger than the demand. V2: THE DIAL-OFF PATH IS THE OLD PATH: the stored body with the three
 --   0726 insertions removed is byte for byte the pre-image (md5 4ca5ac21...). V3: the dial is catalogued 0..1 default 0,
---   no row sets it, and the helpers carry the charge step's grants (postgres and service_role).
+--   no row sets it, the helpers carry the charge step's grants (postgres and service_role), and the event is catalogued.
 --
 -- ══ §4 RECERT AND DIAL CLASSIFICATION ═════════════════════════════════════════════════════════════════════════════════
 --
@@ -63,6 +65,7 @@
 -- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0726_pre' AND object_kind = 'function';
 --   DROP FUNCTION twin.ottoq_sim_dc_pool_plan(uuid, timestamptz, bigint), twin.ottoq_sim_dc_pool_shares(jsonb, numeric);
 --   DELETE FROM public.ottoq_policy_param_catalog WHERE param_key = 'dc_power_sharing';
+--   DELETE FROM public.ottoq_event_types_catalog WHERE event_type = 'twin.dc_pool_shared' (only while no event carries it);
 --   DELETE FROM public.ottoq_cert_lineage WHERE name = '0726_a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_one'.
 
 BEGIN;
@@ -306,6 +309,14 @@ BEGIN
   END IF;
 END $patch$;
 
+-- ── (e) the event the step records when the pool binds, catalogued with the twin's other power events ──
+INSERT INTO public.ottoq_event_types_catalog (event_type, category, description, emitter, default_severity, introduced_in)
+VALUES ('twin.dc_pool_shared', 'integration_event',
+        '0726: the test day''s fast charges wanted more than the shared DC pool this tick and drew max-min fair shares '
+        'of it (dial dc_power_sharing); payload: pool, demand, L2 demand, cabinet and grid limits, charge count',
+        'twin_simulator', 'info', '0726')
+ON CONFLICT (event_type) DO NOTHING;
+
 -- ── V1: the water-filling ──
 DO $v1$
 DECLARE v jsonb;
@@ -363,6 +374,10 @@ BEGIN
      OR has_function_privilege('authenticated', 'twin.ottoq_sim_dc_pool_shares(jsonb,numeric)', 'EXECUTE')
      OR NOT has_function_privilege('service_role', 'twin.ottoq_sim_dc_pool_plan(uuid,timestamp with time zone,bigint)', 'EXECUTE') THEN
     RAISE EXCEPTION '0726 V3: the helpers'' grants are not postgres and service_role only';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.ottoq_event_types_catalog WHERE event_type = 'twin.dc_pool_shared'
+                  AND category = 'integration_event' AND default_severity = 'info' AND NOT deprecated) THEN
+    RAISE EXCEPTION '0726 V3: twin.dc_pool_shared is not catalogued';
   END IF;
 END $v3$;
 
