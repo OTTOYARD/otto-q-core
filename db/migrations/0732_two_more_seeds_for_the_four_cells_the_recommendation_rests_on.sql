@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017105250
 -- migration-name:    two_more_seeds_for_the_four_cells_the_recommendation_rests_on
 --
 -- 0732  **Two more seeds for the four cells the recommendation rests on.** db/checks/0451 §10 rests on four normal-day
@@ -159,3 +159,11 @@ VALUES ('0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on', fa
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 10:52:50 UTC (5:52 AM CT), ledger version 20261017105250 ═════════════════════════════════════
+--
+--   Through apply_migration, with nothing in flight (no transaction older than 30 seconds, no runner, recert or pair in
+--   pg_stat_activity at 10:51:55 UTC) and the sweep runner unable to start an arm before the window closed at 11:00 UTC.
+--   Executable part 7,510 characters, md5 49870be30600e484d27facd5b4648656, equal to the ledger's statements[1] read
+--   back. Dry-run with a rolled-back read-back of the runner's own selection first: 0731's three cells, then this
+--   sweep's seed 2 across the four cells, then its seed 3, then 0728's busy-day cells.

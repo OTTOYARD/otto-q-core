@@ -346,7 +346,9 @@
 --   7. WHAT IS NOT KNOWN YET. One seed per cell, so every gap above is a single reading. The repeats of arms 84 and 86
 --      that 0725's sweep holds run the same seed again: they test whether a reading repeats from one night to the next,
 --      which it does byte for byte only if nothing the engine reads has changed in between (the charge clock is refit
---      nightly, G387), and they say nothing about how far a reading moves from seed to seed. That needs other seeds.
+--      nightly, G387), and they say nothing about how far a reading moves from seed to seed. That needs other seeds, and
+--      0732 queues them: the four cells this rests on (arms 83, 86, 84, 85) on value_2026_09_30's seeds 2 and 3, next
+--      in the window after 0731's pairs.
 --      A 12-hour day from 6 AM: no night, where L2's slow charge costs least. busy_day's wall is the two service bays
 --      (§5), which more chargers cannot move. The battery's worth on the billed window is 0731's three paired arms.
 --
