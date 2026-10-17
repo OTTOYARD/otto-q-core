@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017073142
 -- migration-name:    forty_robotic_chargers_on_todays_service_through_shared_cabinets
 --
 -- 0728  **Forty robotic chargers on today's service, through shared cabinets.** The build-out a real conversion would
@@ -182,3 +182,20 @@ VALUES ('0728_forty_robotic_chargers_on_todays_service_through_shared_cabinets',
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 07:31:42 UTC (2:31 AM CT), ledger version 20261017073142 ═════════════════════════════════════
+--
+--   Through apply_migration, after 0726 (07:26:52) and 0727 (07:29:28), with the sweep runner paused and nothing in
+--   flight. Executable part 8,292 characters, md5 98c08bf1ae36888fe79f8bdecf87db6c, equal to the ledger's statements[1]
+--   read back. Dry-run first in a rolled-back transaction against the catalog 0726 and 0727 had just made (APPLYING.md
+--   3b(ii): its P1 reads both): every block passed; read back, the build-out at 40 posts on dcfc40's 30 converted L2
+--   spaces, 2,400 / 2,500 kW, with its cabinet source; both sweeps active at 16 and 17; six cells. Before the apply the
+--   dials were checked at the scope an arm writes them: ottoq_decide_tick reads enforce_site_charge_cap and
+--   site_cap_gate_metered through ottoq_policy_get(p_sim_run_id, ...), and the charge step reads dc_power_sharing the
+--   same way, so a cell's run-scoped value is the one each reads. The runner was re-enabled at 07:31:57 UTC
+--   (throughput_sweep_runner_enabled 1, research_wing:resume_after_0726_0728).
+--
+--   One overlap, kept on purpose: dcfc40_normal_2026_10_17 (0725, priority 19) also holds dcfc40.otto_q on normal_day at
+--   the same seed, so when the runner reaches it, it runs this file's first cell again. Two one-transaction arms of one
+--   cell on one engine are a replicate: if they agree byte for byte the comparison carries no run-to-run noise, and if
+--   they do not, their gap is the noise floor every paired claim from these sweeps must clear.
