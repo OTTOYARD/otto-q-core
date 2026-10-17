@@ -720,3 +720,49 @@ SELECT extract(epoch FROM t - t0) / 3600 AS hour, cardinality(xs) AS cars, (SELE
        round((public.ottoq_km_quantiles(xs, evs, ARRAY[0.5]::float8[]))[1]::numeric, 0) AS kaplan_meier_0739,
        round(next_hour::numeric, 0) AS next_hour_took, never_ready
   FROM g ORDER BY 1;
+
+-- (15) a busy day's service bays (G453): bookings by state and release reason, with each booking's lead from booked to
+--      slot, and how many slots fell after the run's end. On arm 82: 25 served (lead 42 minutes on average), 18 released
+--      when the run stopped (lead 488, 16 of them slotted after its end), 12 released replanned_no_window; arm 83 (normal
+--      day) had none of the last kind.
+SELECT left(b.sim_run_id::text, 8) AS run, b.state, b.release_reason, count(*) AS n,
+       round(avg(extract(epoch FROM lower(b.during) - b.booked_at_sim) / 60)::numeric, 0) AS lead_avg_min,
+       round(max(extract(epoch FROM lower(b.during) - b.booked_at_sim) / 60)::numeric, 0) AS lead_max_min,
+       count(*) FILTER (WHERE lower(b.during) > r.sim_clock_current) AS slot_after_run_end
+  FROM ottoq_stall_bookings b JOIN stalls s ON s.id = b.stall_id JOIN ottoq_sim_runs r ON r.sim_run_id = b.sim_run_id
+ WHERE b.sim_run_id IN ('43301561-bce5-46c5-84c3-4235db4e4dd4', '96616822-7d95-4b09-9320-48988d60616b', 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd')
+   AND s.stall_type::text = 'service_bay'
+ GROUP BY 1, 2, 3 ORDER BY 1, 4 DESC;
+
+-- (16) the calendar's own floor for the promise (G452, G453): for each visit with bay work, the end of the car's last bay
+--      booking made in its arrival tick (its original slot, read through the reconcile log where a deferral rewrote it),
+--      against when the car was ready. On the busy arms 28 of 31 and 44 of 49 booked cars that got ready were ready after
+--      it, and none of the 19 booked past the run's end was ready that day; on the normal day 26 of 38.
+WITH bk AS (
+  SELECT b.sim_run_id, b.vehicle_id, b.booked_at_sim,
+         COALESCE((SELECT r.old_to FROM public.bay_reservation_reconcile_2026_08_02 r WHERE r.booking_id = b.booking_id
+                    ORDER BY r.sim_clock, r.defer_seq LIMIT 1), upper(b.during)) AS orig_end
+    FROM ottoq_stall_bookings b JOIN stalls s ON s.id = b.stall_id
+   WHERE b.sim_run_id IN ('43301561-bce5-46c5-84c3-4235db4e4dd4', '96616822-7d95-4b09-9320-48988d60616b', 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd')
+     AND s.stall_type::text IN ('wash_bay', 'service_bay')),
+v AS (
+  SELECT vn.sim_run_id, vn.vehicle_id, vn.arrived_at,
+         (SELECT (x ->> 'done_at')::timestamptz FROM jsonb_array_elements(vn.atoms) x
+           WHERE x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at,
+         (SELECT r.sim_clock_current FROM ottoq_sim_runs r WHERE r.sim_run_id = vn.sim_run_id) AS run_end
+    FROM ottoq_visit_needs vn
+   WHERE vn.sim_run_id IN ('43301561-bce5-46c5-84c3-4235db4e4dd4', '96616822-7d95-4b09-9320-48988d60616b', 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd')
+     AND EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x ->> 'concurrency' = 'bay')),
+j AS (
+  SELECT v.*, (SELECT max(bk.orig_end) FROM bk WHERE bk.sim_run_id = v.sim_run_id AND bk.vehicle_id = v.vehicle_id
+                AND bk.booked_at_sim <= v.arrived_at + interval '5 minutes'
+                AND bk.booked_at_sim >= v.arrived_at - interval '1 minute') AS floor_at_arrival
+    FROM v)
+SELECT left(sim_run_id::text, 8) AS run, count(*) AS bay_visits, count(floor_at_arrival) AS booked_at_arrival,
+       count(*) FILTER (WHERE floor_at_arrival IS NOT NULL AND ready_at IS NOT NULL) AS booked_and_ready,
+       count(*) FILTER (WHERE floor_at_arrival IS NOT NULL AND ready_at IS NOT NULL
+                          AND ready_at >= floor_at_arrival - interval '5 minutes') AS ready_after_floor,
+       count(*) FILTER (WHERE floor_at_arrival > run_end) AS floor_past_run_end,
+       count(*) FILTER (WHERE floor_at_arrival > run_end AND ready_at IS NOT NULL) AS past_end_but_ready
+  FROM j GROUP BY 1 ORDER BY 1;
+
