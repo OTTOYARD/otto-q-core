@@ -601,6 +601,22 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_blackbox_rpc_grants_sql.py
 
+      # 0791, G493 and G492: the run-control doors. Seventeen run-control routines closed to PUBLIC, anon and
+      # authenticated, kept for postgres and service_role, on a stub carrying all seventeen live definitions (md5-pinned)
+      # and live ACLs: a signed-in caller pauses and resumes any run before and gets 42501 after; service_role still
+      # pauses, resumes, starts and stops; the restore statements put every ACL and both patched definitions back. And
+      # from two real sessions, a pause or resume that waited behind a stop: before 0791 it writes over the stopped run
+      # (or fails, 23505 or 23503); after, it updates nothing and answers that the run is no longer running or paused.
+      - name: A signed-in user cannot pause, resume, start or stop a run, and a pause or resume never writes over a stopped run, executed (0791 against the live bodies and ACLs; concurrent sessions)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_run_control_grants_sql.py
+
       # 0721, OTTO-Command as the one filter and executor between personal agents and OTTO-Q (Chase 2026-10-14): the
       # owner door's live bodies (md5-pinned) before and after 0721 -- a signed-in agent may change a production run, a
       # passcode or a key may not, a lower limit there applies only as the one confirm of a preview the same principal
