@@ -43,11 +43,22 @@
 --   (b) THE SITE LIMIT BINDS AT ADMISSION ONLY. ottoq_decide_tick (0132) defers a charge with outcome
 --       `deferred_site_power_cap` when an ESTIMATE of committed EV kW plus the request passes
 --       ottoq_ev_charge_allowance_kw, which is the SERVICE limit (or a demand-response cap), never the DC limit.
---   (c) dcfc_max_concurrent_kw IS REPORTED, NEVER ENFORCED. twin.ottoq_sim_advance_site_energy writes
---       twin.dcfc_cap_exceeded / _approached events; nothing reads the column to limit anything. No such event has ever
---       been recorded (0 rows of 'twin.%cap%' in ottoq_events, read between 06:35 and 06:38 UTC), so at 10 and 20 chargers the cabinet limit
---       was never reached and never mattered. At 40 on today's grid it can be: the admission gate admits up to 2,500 kW
---       of estimated EV load through 1,800 kW of cabinets.
+--   (c) dcfc_max_concurrent_kw IS ENFORCED, AT CHARGE START, BY THE SHIELD. CORRECTED 07:41 UTC: this paragraph's first
+--       draft said "reported, never enforced", which was true before 0428 promoted charge_session_start to an enforcing
+--       checkpoint and missed the shield. twin.ottoq_sim_start_charge_session probes EN.001.grid_capacity_ceiling
+--       (safety_critical, block) and honours it (ottoq_shield_probe_posture: charge_session_start `enforced`, one caller,
+--       honouring). EN.001 refuses a start when the site meter (twin.ottoq_sim_compute_charger_load_kw: every charge,
+--       L2 included) plus the request, LEAST(charger kW, inlet kW), passes dcfc_max_concurrent_kw x (1 - margin), margin
+--       10% by default, or service_max_kw. Read from the baseline arms' own evaluations: normal_day arm 83 refused 3 starts
+--       (largest after_kw 1,836.13 against 1,620), busy_day arm 82 refused 9 (1,953.42 against 1,620); these are the arms'
+--       `safety_critical_refused` 3 and 9. twin.ottoq_sim_advance_site_energy's twin.dcfc_cap_exceeded / _approached
+--       events (0 rows of 'twin.%cap%' in ottoq_events, read between 06:35 and 06:38 UTC) never fire because the shield
+--       keeps admitted load near 1,620. So a power-limited cell is gated twice: by 0132's estimate against the service
+--       allowance in the decide path, and by EN.001's meter against 90% of the cabinets at the charge start. Two
+--       consequences. On a site that DIVIDES power (0726), a new car adds nothing to the aggregate, yet EN.001 counts
+--       its whole request; at 2,400 kW of cabinets it refuses a start whenever the meter plus about 100-350 kW passes
+--       2,160, so 0728's `shared` cell measures sharing behind a shield admission at 90%, not a free-connecting site.
+--       And for a car with no inlet figure (§7) the request is the charger's whole rating: a fourth answer for those 12.
 --   (d) THE ESTIMATE IN (b) OVER-COUNTS. It is LEAST(connector kW, inlet kW or 250) times a SoC band (0.85 under 55%,
 --       0.55 under 75%, else 0.30), summed over cars in a charging state; it does not read a meter. Reconstructed per
 --       tick from the run's own OCPP 2.0.1 TransactionEvent Updated frames (Power.Active.Import and SoC), run 8954bcf7
@@ -55,10 +66,12 @@
 --       (p90 1.96x, mean 672 kW against 446 kW); the busiest tick metered 1,587 kW where the estimate read 1,900. So on
 --       a power-limited site the gate starts deferring charges when the real draw is about two thirds of the limit.
 --   What follows for 0724's and 0725's power-limited cells: dcfc40_grid_today measures 40 chargers whose cars wait to
---   START for power, judged by an estimator that over-counts, while the cabinets in it may run past their 1,800 kW. It
---   is neither a lower nor an upper bound on a real shared-cabinet site; read it as "40 chargers on a 2,500 kW service
---   with today's admission gate". dcfc40 (the grid grown to 8,089 kW) is the clean cell: the gate cannot bind, so its
---   peak is what 40 chargers draw when nothing stops them.
+--   START for power, judged twice, by an estimator that over-counts against the 2,500 kW service and by the shield's
+--   meter against 1,620 kW of the 1,800 kW cabinets (CORRECTED 07:41 UTC: the first draft said the cabinets "may run
+--   past their 1,800 kW"; EN.001 keeps them from it). Read it as "40 chargers on today's grid with today's two
+--   admission gates", a lower bound on a site whose cabinets divide their power. dcfc40 (the grid grown to 8,089 kW,
+--   cabinets 7,200) is the clean cell: neither gate can bind, so its peak is what 40 chargers draw when nothing stops
+--   them.
 --
 -- ══ §3 TONIGHT'S ARMS (reproduce: (3)) ════════════════════════════════════════════════════════════════════════════════
 --
