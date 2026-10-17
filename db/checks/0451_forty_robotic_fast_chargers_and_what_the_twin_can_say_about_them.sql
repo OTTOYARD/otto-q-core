@@ -256,7 +256,57 @@
 --
 -- ══ §10 THE RECOMMENDATION ════════════════════════════════════════════════════════════════════════════════════════════
 --
---   PENDING: written when §3 is.
+--   To Chase, from the research wing (rule 10: a recommendation, shipped only as certified changes). DRAFT until the
+--   dcfc20 and shared arms land tonight; their numbers are marked [pending].
+--
+--   1. LEAN IN. Robotic fast charging is the edge, and the evidence is the slow tail and the car-hours, not the median.
+--      On the normal day forty robotic posts served 45% more cars in 12 hours than the depot as built, cut the slowest
+--      5% from 428 to 248-270 minutes, and met 121 more car-hours of ride demand (15% unmet against 26%), every car at
+--      100% with nothing open. A robot on every post is what makes that possible: no car waits for a person to plug it
+--      in, so the depot's limit stops being connectors and labour and becomes power and time.
+--
+--   2. DO NOT SIZE BY STALLS. Forty posts were busy 41% of the day against the ten's 69%. At about $206,000 installed
+--      per 350 kW charger (ottoq_margin_prices, INL source; before the robot itself), the post count is the expensive
+--      half of the decision. Twenty posts on the same day: [pending]. Size to the knee of that curve, not to the number
+--      of L2 spaces.
+--
+--   3. DO NOT SIZE THE GRID TO THE NAMEPLATE. Forty posts with nothing holding them drew 3.9 MW for the 6 AM plug-in.
+--      Held at 2.16 MW on the existing 2.5 MW service they met 941.8 car-hours against 942.7. The megawatt worry is a
+--      control question, and its answer is a site controller holding a limit that OTTO-Q sets: shared cabinets (the
+--      Kempower and ABB units 0567 and 0728 cite) with OTTO-Q deciding the split.
+--
+--   4. THE BILL TO MANAGE IS THE DEMAND CHARGE, AND THE TARIFF IS A YEARLY DECISION. At GSA-3's $21.40-21.78 per kW
+--      of the month's highest half hour, the unmanaged forty cost $51,228 a month in demand on the whole day against
+--      $35,419 held; past the opening both sit near $22,000 against $15,271 as built. NES's EVC schedule has no demand
+--      charge at 21.773 c/kWh, and beats GSA-3 for the charging meter below a 17.4% monthly load factor; it carries a
+--      one-year term and 90 days' notice back (§4). A held site keeps its load factor up and stays on GSA-3.
+--
+--   5. WHAT THE ENGINE NEEDS BEFORE A REAL CONVERSION, as certified changes, each already measured in the twin:
+--      (a) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
+--          site controller's limit in the charge start's context, and the controller itself);
+--      (b) a new session is metered at its share from its first reading (arm 85's 85 refusals, §3);
+--      (c) the battery plans for the bill that is charged, and is ready for the surges OTTO-Q itself schedules: it
+--          charged at 425 kW in the tick the fleet plugged in, shaved one tick late, and idled all afternoon (G447);
+--      (d) one answer for how much power a car can take (G443: twelve cars, four answers);
+--      (e) the site gate reads the meter, not a band estimate 1.50x high (0727).
+--
+--   6. THE FRONTIER: POWER BY NEED. Once every car is connected on arrival, the decision that matters is how a held
+--      limit is divided, tick by tick, among the cars on it. 0726 divides it max-min fairly, as a cabinet left to itself
+--      does. OTTO-Q knows what the cabinet does not: which car is due back to its owner first, how much each still
+--      needs, and what each contract allows. Giving a held site's power to the cars due first is ordering, never a
+--      shorter charge (rule 9), and it is a cumulative-resource scheduling problem, the construct CP-SAT handles and
+--      cuOpt cannot express (CLAUDE.md 2.5). In production it publishes as per-connector charging profiles (OCPP
+--      SetChargingProfile: OCPP 2.0.1 Part 2's Smart Charging chapter, K, per
+--      https://josev.ecog.io/docs/how-tos/how-to-control-charge-limit-imposed-by-smart-charging-service; its fields,
+--      chargingProfile and evseId, at https://ocpp.hexdocs.pm/ocpp/v2_1/message/set_charging_profile.html, a 2.1
+--      reference, both read 2026-10-17, to be confirmed against the OCA's 2.0.1 document), schedule-shaped, inside the
+--      power boundary 2.5 draws. That is the next build to measure
+--      against max-min fair on the same seeds: the due cars on time (8 of 72 free, 4 of 66 held, §3) are its target.
+--
+--   7. WHAT IS NOT KNOWN YET. One seed per cell, so every gap above is a single reading (the replicate of dcfc40.otto_q
+--      in 0725's sweep is the first measure of how far one moves). A 12-hour day from 6 AM: no night, where L2's slow
+--      charge costs least. busy_day's wall is the two service bays (§5), which more chargers cannot move. The battery's
+--      worth on the billed window is 0731's three paired arms.
 --
 -- ══ §11 THE BATTERY PLANS FOR A BILL THE VALUE VIEW DOES NOT CHARGE (G447; reproduce: (9)) ══════════════════════════
 --
