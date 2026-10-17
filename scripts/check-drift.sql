@@ -792,7 +792,8 @@ repo_manifest(version, name, file) AS (
     ('20261017163802'::text, 'a_realistic_promise_at_arrival_and_its_grade'::text, '0736_a_realistic_promise_at_arrival_and_its_grade.sql'::text),
     ('20261017164907'::text, 'a_held_site_powers_the_cars_due_first'::text, '0737_a_held_site_powers_the_cars_due_first.sql'::text),
     ('PENDING'::text, 'the_nightly_charge_clock_refit_gets_the_time_it_needs'::text, '0738_the_nightly_charge_clock_refit_gets_the_time_it_needs.sql'::text),
-    ('20261017173306'::text, 'a_promise_counts_the_cars_still_waiting'::text, '0739_a_promise_counts_the_cars_still_waiting.sql'::text)
+    ('20261017173306'::text, 'a_promise_counts_the_cars_still_waiting'::text, '0739_a_promise_counts_the_cars_still_waiting.sql'::text),
+    ('20261017174210'::text, 'a_promise_on_the_busy_day'::text, '0740_a_promise_on_the_busy_day.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

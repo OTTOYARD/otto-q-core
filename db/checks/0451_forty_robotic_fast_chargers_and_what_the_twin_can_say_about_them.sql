@@ -435,6 +435,8 @@
 --   Normal days were fine. 0739 counts the cars still waiting (Kaplan-Meier), draws the promise from the world rather
 --   than the run's id, and reads it from 128 draws. Query (14) is the rehearsal, rerunnable on any arm. On a busy day
 --   the honest promise is long: arm 81's three test cars went from a median 140-188 minutes to 470-560.
+--   0740 (applied 17:42 UTC) queues the same promise on arm 82's busy day, right after the normal day's promise arm,
+--   so the grade covers both; it must agree with arm 82 on every outcome. Query (13) reads either arm's grade.
 
 -- ══ QUERIES ══
 
