@@ -428,6 +428,13 @@
 --   immediate dispatch due in 45 minutes was promised a median 61 minutes and a 90th percentile 69. The grade decides
 --   whether the 90th percentile holds 90% of cars. Its arm (0735's dcfc10 cell plus the recorder) runs in the next window,
 --   and must agree with its partner on every outcome, because the recorder decides nothing. Query (13) grades it.
+--
+--   Tested before it ran, and corrected (G452, 0739, applied 17:33 UTC). The part after the charge learned only from the
+--   cars that had finished, so on a day the bays back up it kept saying what the lucky cars took: on arm 81 at hour 8 it
+--   said 33 minutes after the charge while the next hour's cars took 395, and on arm 82 at hour 6, 35 against 110.
+--   Normal days were fine. 0739 counts the cars still waiting (Kaplan-Meier), draws the promise from the world rather
+--   than the run's id, and reads it from 128 draws. Query (14) is the rehearsal, rerunnable on any arm. On a busy day
+--   the honest promise is long: arm 81's three test cars went from a median 140-188 minutes to 470-560.
 
 -- ══ QUERIES ══
 
@@ -680,3 +687,34 @@ SELECT public.ottoq_ready_promise_grade(a.sim_run_id) AS grade
   FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
  WHERE s.sweep_code = 'promise_normal_2026_10_17'
  ORDER BY a.ran_at DESC LIMIT 1;
+
+-- (14) the promise's after-charge part rehearsed on a run's own visits (G452): at each even hour, what 0736 learned
+--      (finished cars only), what 0739 learns (Kaplan-Meier, the cars still waiting counted), and what the cars whose
+--      charge closed in the next hour took (of those ready before the run ended; never_ready says how many were not).
+--      Bay work only, where the difference lives. On arm 81 at hour 8: 33, 255 and 395. Substitute the run.
+WITH r AS (SELECT sim_run_id, sim_clock_start FROM public.ottoq_sim_runs WHERE sim_run_id = '96616822-7d95-4b09-9320-48988d60616b'),
+v AS (
+  SELECT vn.sim_run_id, r.sim_clock_start AS t0,
+         (SELECT (x ->> 'done_at')::timestamptz FROM jsonb_array_elements(vn.atoms) x
+           WHERE x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at,
+         (SELECT max(COALESCE((x ->> 'closed_at')::timestamptz, (x ->> 'done_at')::timestamptz))
+            FROM jsonb_array_elements(vn.atoms) x WHERE x ->> 'svc' = 'charge' AND x ->> 'status' = 'done') AS chg_at
+    FROM public.ottoq_visit_needs vn JOIN r USING (sim_run_id)
+   WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x ->> 'concurrency' = 'bay')),
+t AS (SELECT DISTINCT sim_run_id, t0, t0 + make_interval(hours => h) AS t FROM v CROSS JOIN generate_series(2, 10, 2) h),
+g AS (
+  SELECT t.t0, t.t,
+         array_agg(extract(epoch FROM (LEAST(COALESCE(v.ready_at, 'infinity'), t.t) - v.chg_at)) / 60 ORDER BY v.chg_at)
+           FILTER (WHERE v.chg_at <= t.t) AS xs,
+         array_agg(COALESCE(v.ready_at <= t.t, false) ORDER BY v.chg_at) FILTER (WHERE v.chg_at <= t.t) AS evs,
+         percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (v.ready_at - v.chg_at)) / 60)
+           FILTER (WHERE v.chg_at <= t.t AND v.ready_at <= t.t) AS finished_only,
+         percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (v.ready_at - v.chg_at)) / 60)
+           FILTER (WHERE v.chg_at > t.t AND v.chg_at <= t.t + interval '1 hour' AND v.ready_at IS NOT NULL) AS next_hour,
+         count(*) FILTER (WHERE v.chg_at > t.t AND v.chg_at <= t.t + interval '1 hour' AND v.ready_at IS NULL) AS never_ready
+    FROM t JOIN v ON v.sim_run_id = t.sim_run_id GROUP BY 1, 2)
+SELECT extract(epoch FROM t - t0) / 3600 AS hour, cardinality(xs) AS cars, (SELECT count(*) FROM unnest(evs) e WHERE NOT e) AS waiting,
+       round(finished_only::numeric, 0) AS said_0736,
+       round((public.ottoq_km_quantiles(xs, evs, ARRAY[0.5]::float8[]))[1]::numeric, 0) AS kaplan_meier_0739,
+       round(next_hour::numeric, 0) AS next_hour_took, never_ready
+  FROM g ORDER BY 1;
