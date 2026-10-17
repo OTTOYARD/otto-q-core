@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017063328
 -- migration-name:    forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall
 --
 -- 0725  **Forty fast chargers on a normal day, where the service bays are not the wall.** 0724's question asked again on
@@ -132,3 +132,10 @@ VALUES ('0725_forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 06:33:28 UTC (1:33 AM CT), ledger version 20261017063328 ═════════════════════════════════════
+--
+--   As 0724 was, and for the same reason (its APPLIED note): through execute_sql in one transaction that also wrote the
+--   ledger row, because apply_migration's lock on supabase_migrations.schema_migrations waits behind the running sweep
+--   arm. Executable part 4,828 characters, md5 dbfa4fd62d6cb1a231a230eb5e58ecdc, equal to the ledger's statements[1]
+--   read back. Dry-run with ROLLBACK first; read back: 4 cells.

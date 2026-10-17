@@ -784,7 +784,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0722](db/migrations/0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql) | `PENDING` | no — pending | **The key that signs every event, SDR and audit bundle is rotated, and every row the old key signed still verifies |
 | [0723](db/migrations/0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql) | `PENDING` | no — pending | **A charge's closing frames name the charger that sent them, so the charger back end can hear a charge end.** |
 | [0724](db/migrations/0724_forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot.sql) | `20261017060928` | yes — ledger | **Forty robotic fast chargers are a test day before they are the depot.** Three build-outs that convert every |
-| [0725](db/migrations/0725_forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall.sql) | `PENDING` | no — pending | **Forty fast chargers on a normal day, where the service bays are not the wall.** 0724's question asked again on |
+| [0725](db/migrations/0725_forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall.sql) | `20261017063328` | yes — ledger | **Forty fast chargers on a normal day, where the service bays are not the wall.** 0724's question asked again on |
 
 547 migrations indexed.
 

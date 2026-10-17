@@ -778,7 +778,7 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies'::text, '0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql'::text),
     ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text),
     ('20261017060928'::text, 'forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot'::text, '0724_forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot.sql'::text),
-    ('PENDING'::text, 'forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall'::text, '0725_forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall.sql'::text)
+    ('20261017063328'::text, 'forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall'::text, '0725_forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
