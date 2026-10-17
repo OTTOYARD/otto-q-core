@@ -776,7 +776,9 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'a_signed_in_user_cannot_call_the_black_box_export_functions'::text, '0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql'::text),
     ('PENDING'::text, 'a_signed_in_owner_changes_production_under_their_own_name'::text, '0721_a_signed_in_owner_changes_production_under_their_own_name.sql'::text),
     ('PENDING'::text, 'the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies'::text, '0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql'::text),
-    ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text)
+    ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text),
+    ('PENDING'::text, 'the_stop_door_takes_the_runs_row_before_the_proposals'::text, '0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql'::text),
+    ('PENDING'::text, 'a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run'::text, '0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

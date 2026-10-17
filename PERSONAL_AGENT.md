@@ -127,7 +127,7 @@ still works beside the passcode, for an agent you want connected without one.
 | "Cancel the wash order" | `cancel_service` | Your order comes off. A service OTTO-Q found a car to need stays, and one already under way finishes |
 | "Keep RT-3 here until 6 AM" | `hold_vehicle {until: "6:00 AM"}` | Not before 6:00 AM on the sim clock (or `for_minutes`, up to 24 sim hours). A ready car waits in staging and keeps no charger |
 | "Let it go" | `release_hold` | It may leave as soon as it is ready |
-| "Undo that" | `undo_command` | What the command set is withdrawn, and what it replaced comes back |
+| "Undo that" | `undo_command` | What the command set is withdrawn, and what it replaced comes back. A clear, a limit at 100%, a cancel or a release leaves no setting of its own, so there is nothing to undo (`nothing_to_undo`, saying why and what to send instead); a command whose settings a production run lifted as it took over the depot answers `lifted`; one made on another run that is still live but is not the run commands go to now answers `made_on_an_earlier_run` |
 | "What did I change today?" | `my_commands` / `my_settings` | Every command with its receipt and where it stands now; everything in force |
 
 **Services you can order (11):** exterior wash, interior deep clean, interior tidy, interior inspection, sensor clean,
@@ -264,10 +264,14 @@ curl -sS -X POST "$GATEWAY/v1/ask" -H "$H" -H "Content-Type: application/json" \
 ```
 
 - `dry_run: true` runs every change as a preview, **enforced in code**, and returns each plan's `confirm`. To apply
-  exactly what was shown, send `{"confirm":[<those objects>]}`: no model is involved in a confirm, which goes out as
-  transport `confirm`, and an apply it confirms is recorded `via = 'confirm'` (0721).
+  exactly what was shown, send `{"confirm":[<those objects>]}`, unchanged: no model is involved in a confirm, which goes
+  out as transport `confirm`, and an apply it confirms is recorded `via = 'confirm'` (0721). A confirm is the preview's
+  whole `confirm` object; a preview's command id alone confirms nothing.
 - `history: [{role, text}]` (up to 12 turns) carries the conversation; it is text only, so nothing can be passed off as
-  a tool result.
+  a tool result. Your own earlier words (role `user`) are yours, like `text`. **An earlier answer of OTTO-Command's
+  (role `assistant`) makes the ask read-only** (the review, round 3): an answer that read the web carries a page's
+  words, and a new ask would read them as its own, so an ask whose history holds one answers but refuses every change
+  unsent (`blocked_by_history`), and its answer opens by saying so. For a change, send only your own earlier words.
 - `idempotency_key`: resend the same ask after a timeout and each command it made replays instead of acting twice
   (Telegram's message id is a good key).
 - `answer` is the model's reply as it wrote it, never screened by pattern, and an applied change always carries its
@@ -563,7 +567,8 @@ agents, OTTOCommand processes and acts and returns info back. So it will act as 
 forwards the `answer`. The typed tools are still there (they are the same database filter), for an agent that wants
 them or for when OTTO-Command is not switched on. When OTTO-Command only previews a change, the result carries
 `confirm`; once you say yes, your agent calls `ask_ottocommand` again with `confirm` set to that array, unchanged, and
-OTTO-Q applies exactly the plan you saw. No model is involved in a confirm: the gateway sends it as transport `confirm`,
+OTTO-Q applies exactly the plan you saw (the object as it came is the confirm: a preview's command id alone confirms
+nothing). No model is involved in a confirm: the gateway sends it as transport `confirm`,
 and the record says your agent confirmed it (`via = 'confirm'`), never that OTTO-Command made it. `ask_ottocommand` is
 marked destructive for MCP clients (`destructiveHint: true`): one call can hold cars, order or withdraw services and
 undo commands, so a client that asks before destructive tools asks before this one.
@@ -577,7 +582,16 @@ stops the migration until its scope is read again.
 
 **Production, for a person.** Today an owner command is refused on anything but a demo run. After 0721:
 
-| The live run at the twin depot | An agent signed in to your OTTOYARD account (section 10) | A passcode session, or an issued key |
+**Which run: the owners' run** (the review, round 3; 0721 §17 (a), FINDINGS G495). Every agent read and door answers for
+one run at the depot: the run **running** there (at most one, by the unique index `ottoq_one_running_run_per_depot`),
+else the newest **paused production** run, else the newest **paused demo** run; none when nothing is running or paused.
+The owner commands, `my_settings`, `my_fleet`, `my_vehicle`, the cockpit boards and the engine's unpinned charge-limit
+read answer for it, and so do the depot, stalls, decisions, requests and the welcome. A paused production run outranks a
+paused demo run, even one started after it, so whoami's `live_demo_run` is empty whenever production is the owners' run,
+paused or not (before round 3 the newest-started live run won, and a paused demo started after production took every
+owner command while production ran). "The live run" in this document is that run.
+
+| The owners' run at the twin depot | An agent signed in to your OTTOYARD account (section 10) | A passcode session, or an issued key |
 |---|---|---|
 | a demo run | as before; the change is recorded under your account | as before; no person is recorded |
 | **a production run** | **allowed**, recorded under your account (`acting_person`); a **lower charge limit** (or an undo that puts one back) applies only as the confirm of a preview this same agent recorded in the last 15 minutes; everything else is one call | **refused** (`production_needs_a_person`): it can read your cars but not change them, because in production every change is recorded under the person who made it. The refusal says so and says to sign in |
@@ -589,11 +603,17 @@ stops the migration until its scope is read again.
   one back) only as the **confirm of a recorded preview**: an `ottoq_owner_commands` row with outcome `previewed`, made
   by the **same signed-in agent** (principal), on the same run, of the same tool, arguments and plan hash, **at most 15
   minutes old**, and confirmed **once** (the apply records it as `confirms_command_id`; a unique index refuses a second).
-  The apply names the preview by `expect_plan_hash` and/or `confirms_command_id`; the confirm object a preview returns
-  carries both. An apply that does not bind is **not applied**: OTTO-Q records it as a preview and answers
+  **An agent confirms by sending the preview's `confirm` object back unchanged**: it carries the plan hash
+  (`expect_plan_hash`), which binds the apply to that one preview, and the preview's id beside it
+  (`confirms_command_id`), which must name the same preview. The plan hash is salted per preview, so it cannot be worked
+  out from the plan, and OTTO-Q gives it only inside the confirm object: never in the command, `my_commands`, a
+  receipt's summary or a `plan_changed` refusal. **`confirms_command_id` alone confirms nothing** (the review, round 3:
+  an apply that names a preview only by its id binds nothing and is recorded as a new preview, `confirm_required` with
+  reason `not_named`). An apply that does not bind is **not applied**: OTTO-Q records it as a preview and answers
   `confirm_required` with the reason (`not_named`, `no_recorded_preview`, `preview_already_confirmed`,
   `preview_expired`, `preview_does_not_match`, `not_a_preview`) and that preview's `confirm`, so the next confirm can
-  bind to it. A stale hash is still `plan_changed`. Raising or clearing a limit, holds, service orders and cancelling
+  bind to it. A stale hash is still `plan_changed`, which carries no hash: preview it again, and confirm the new preview
+  with the confirm object it returns. Raising or clearing a limit, holds, service orders and cancelling
   your own orders stay one call. OTTO-Command's model can never confirm: the gateway strips both arguments from what it
   may send, and OTTO-Q refuses a call through its door that carries one. No command can skip, defer or shorten a service
   OTTO-Q found a car to need: `cancel_service` takes off only your own orders, an engine-found need stays, and a started
@@ -606,14 +626,15 @@ stops the migration until its scope is read again.
   Chase.**
 - **Rule 10.** Production never self-tunes: nothing here writes a setting (`ottoq_policy_set`); your changes stay in the
   owner tables and lift when the production run ends, as a demo's do. A trigger refuses any applied production command
-  without a person, and any `confirms_command_id` that is not such a preview, whoever writes the row.
+  without a person, and any `confirms_command_id` that is not such a preview or names a preview recorded without its
+  salt, whoever writes the row.
 - **Who, which door and which preview, on every command.** `ottoq_owner_commands.acting_person` is your account's email
   for a signed-in agent and empty for a passcode or key (it names whose agent sent the command). `via` is set by the
   database from the gateway's transport and the binding, never from an argument: `ottocommand` when an OTTO-Command
   model read your words and called the tool; `confirm` when your agent confirmed a recorded preview, and then the row
   names that preview in `confirms_command_id` (a CHECK makes the two one fact), whether the confirm went back through
-  `ask_ottocommand` / `POST /v1/ask` (transport `confirm`, never as OTTO-Command's own call) or as a typed tool naming the
-  preview; and `direct` when the agent made the call itself (a typed tool, or a confirm that bound to no preview and was
+  `ask_ottocommand` / `POST /v1/ask` (transport `confirm`, never as OTTO-Command's own call) or as a typed tool sending
+  the preview's `confirm` arguments unchanged; and `direct` when the agent made the call itself (a typed tool, or a confirm that bound to no preview and was
   recorded as a new one). All three are immutable, and the receipt shows them.
 - **Every refusal says why and what is allowed**, in OTTO-Q's words; OTTO-Command relays the reason and the hint, and
   every answer ends with the `changes` block, from the receipts: what changed is what it says.
@@ -661,14 +682,22 @@ pages), the gateway refuses every tool that changes something for the rest of th
 tool result, **OTTO-Q is never called**, and the answer tells you to ask for the change again on its own. Reads stay
 allowed; a change made earlier in the same ask, before any web text arrived, stands; and an ask that searched never
 returns a `confirm`, so a page cannot steer a preview you might later say yes to. Nor does it return the words that say
-how to send one (the review, round 2, the night of 2026-10-14 CT): a preview's receipt ends "To confirm, send the same command with mode
-"apply", expect_plan_hash ... and confirms_command_id ...", and an answer built from the receipts (when the model's last
-turn was empty, or the ask stopped) carried that line too, so an agent could rebuild the exact confirm the door withholds.
+how to send one (the review, round 2, the night of 2026-10-14 CT): a preview's receipt ended "To confirm, send the same
+command with mode "apply", expect_plan_hash ... and confirms_command_id ..." (0605's words, the live engine's until 0721
+is applied), and an answer built from the receipts (when the model's last turn was empty, or the ask stopped) carried
+that line too, so an agent could rebuild the exact confirm the door withholds. Since the review's round 3, 0721 gives the
+plan hash only inside the confirm object, and a receipt ends "To confirm, send back the confirm object this answer
+carries, unchanged, from this same agent within 15 minutes.", which names no hash or id; the door takes that line out
+too, because it still says how to confirm.
 In an ask that read the web that line, and the two argument names in a refusal, are taken out of every receipt and of
 the answer, and each previewed receipt says the ask offers nothing to confirm; the tool, arguments (chosen before any
-web text arrived), outcome and command id stay as the record. The model is never shown how to confirm at all (it never
-confirms): the tool results it reads carry no confirm object, plan hash or preview id and no such line, so no answer it
-writes can hand one back either. What the model tried after reading
+web text arrived) and outcome stay as the record. **Nor, since the review's round 3, the preview's id or link**: a
+preview's `command_id` rode in each action, in its OrchestrAV link (`…&command=<id>`), in the top-level link, in the
+changes block and its text, and `confirms_command_id` alone was enough to apply it; now none of them carries it in an
+ask that read the web (a change applied before the search keeps its id, code and link). The model is never shown how to
+confirm at all (it never confirms): the tool results it reads carry no confirm object, plan hash or preview id and no
+such line (round 3: no previewed receipt's `command_id` or link either, `my_commands` included, and any preview id or
+plan hash withheld from every string), so no answer it writes can hand one back either. What the model tried after reading
 the web is never handed back as something to send: `blocked_after_web` names the tools only, never the arguments a page
 may have chosen, and the agent is told to relay that to its person and send a change only as the person's own new words.
 When a change was refused this way the answer OPENS with what really happened. **What changed is the `changes` block,
@@ -695,14 +724,32 @@ results, citations, tool calls); a paused server turn (`pause_turn`) is resumed 
 the paused reply and its continuation are one turn, so the text written before the pause is part of the answer, with its
 sources (the review, round 2: it was dropped); a refusal by the model is a plain failure that runs no tool
 (`model_refused`, with its category); only the text of the turn that ends the model's reply is an answer, so a note
-written beside a tool call ("Let me check your fleet.") never is: an ask or a search stopped after one with nothing
-changed (a model error, a refusal, the 50-second budget, the step limit, the pause cap) is the door's plain failure with
-its code and message, `isError: true` over MCP, and an ask stopped after a change was made answers with `incomplete:
-true`, `stopped: {code, message}` and an answer that opens with why it stopped, then OTTO-Q's receipts (the review,
-round 2: such a note used to come back as a 200 answer, the stop and its category dropped); and on the models that
-take it, the request asks for the server-side fallback, so a refusal can be answered by the model Anthropic recommends
-for it. A setting the gateway cannot read (an effort it does not know, a use count that is not a number) is answered as
-`ask_misconfigured`, never silently defaulted; confirms still apply then, since they need no model.
+written beside a tool call ("Let me check your fleet.") never is: an ask or a search stopped after one before it sent
+OTTO-Q any command (a model error, a refusal, the 50-second budget, the step limit, the pause cap) is the door's plain
+failure with its code and message, `isError: true` over MCP, and **an ask stopped after it sent OTTO-Q a command
+(applied, saved, previewed, refused or unknown) answers with `incomplete: true`; `changes.made` says whether anything
+changed** (the review, round 3: the docs had promised a failure whenever nothing changed, and a stopped ask still hands
+back a preview's `confirm`, so the docs follow the code), with `stopped: {code, message}` and an answer that opens with
+why it stopped, then any note about a change the door refused, then OTTO-Q's receipts (the review, round 2: such a note
+used to come back as a 200 answer, the stop and its category dropped). **A reply cut short is no answer** (round 3): the
+stop reasons page says a `max_tokens` reply may hold "an incomplete tool use block" and to treat a
+`model_context_window_exceeded` one "as truncated", so either is `ask_answer_cut` (the door's failure with nothing sent,
+`incomplete` after a command), a tool call in it never runs, a stop reason the door does not know is not vouched for,
+and an empty last turn with nothing sent is `ask_no_answer`, never a 200 that says there is no answer (unless the door
+refused a change unsent: that refusal, and why, is the answer). A failure keeps
+its own status: OTTO-Q's for an engine failure, 504 for the budget (a model call cut at what was left of it included)
+and for the model not answering in time, 502 for a model error or a cut reply, 422 for a refusal; and an API error is
+named by its status ("The language model is unavailable (HTTP 529)"), never as a refusal. On the models that take it,
+the request asks for the server-side fallback, so a refusal can be answered by the model Anthropic recommends for it,
+and whether a fallback ran is read from `usage.iterations` (a `fallback_message` entry), as the refusals page says to,
+not from the `fallback` block, which a sticky-served turn does not carry. A setting the gateway cannot read is answered
+as `ask_misconfigured`, never silently defaulted: an effort it does not know, a use count that is not a number, a model
+that is not a Claude API id (`claude-` and lowercase parts; an Amazon Bedrock `anthropic.` name, a Google Cloud `@`
+snapshot or a Claude Code `[1m]` setting is refused), and (round 3) an effort the model does not take, checked against
+the effort page (`xhigh` is not on Opus 4.6 or Sonnet 4.6, Opus 4.5 stops at `high`, Haiku 4.5 takes none). Confirms
+still apply then, since they need no model. The web search tool is `web_search_20260209`, with dynamic filtering, on
+every model the web search page names for it ("Claude 4.6 and later models"), Fable 5, Fable 5.1 and Haiku 5.5 among
+them since round 3, and `web_search_20250305` on any other.
 
 **Every model call is in the evidence ledger (rule 6).** Each call OTTO-Command makes to the model is one row in
 `public.ottoq_model_call_ledger` (`class='evidence'`, append-only), provider `anthropic_ottocommand`, role `owner_agent`:
@@ -751,7 +798,9 @@ run, production included, carried back a lower limit the owner had removed. Now 
 (or saves the new limit) whatever row the run holds: where no run row carries it, the saved change is an effect of its
 own in the receipt ("the limit saved to it is cleared: it charges full on every run"), part of the plan's hash, so the
 outcome is applied rather than no_change. One limit remains: undo reverses what a command set on its run, so a saved
-limit that was a command's only change (the run already held that value) is not reversed by undo; set or clear it again.
+limit that was a command's only change (the run already held that value) is not reversed by undo; set or clear it again
+(the undo answers `nothing_to_undo` and says so; since the review's round 3 a clear, a limit at 100%, a cancel and a
+release answer the same way, each with what to send instead).
 
 **Saving with no run live (0721 §14, 2026-10-14).** Before it, a saved setting could be made only while a demo or
 production run was live: the owner command refused everything else `no_live_demo` before it planned anything. Now an
@@ -783,10 +832,18 @@ RUNNING run (read on the live database, SELECT only, 2026-10-15 00:22 UTC, 7:22 
 start while a demo run is paused,
 and before this nothing ended that demo's owner settings: a passcode session's 80% there stayed stamped on the car and
 in the engine's reads with no run pinned, so the car could leave production at 80% while OTTO-Q told the signed-in
-owner it charges to 100%. Now a production run that starts, resumes or pauses lifts every owner setting of any other run
-still live at the depot, puts the cars that carried a limit back to their target, and stamps those commands lifted
-(unless what they set is saved, which production carries as usual). A demo run resumed later keeps nothing of what was
-lifted from it: its cars charge full.
+owner it charges to 100%. Round 2 had a production run that starts, resumes or pauses lift every owner setting of any
+other run still live at the depot. **Since the review's round 3 (0721 §17 (c))** a production run takes over the depot
+when it becomes the running run (it starts, or it resumes), not when it pauses, because a paused production run is still
+the owners' run: every other live run's per-run owner settings at the depot are lifted (a paused production run's too,
+for a pair made before 0721: since round 4 at most one production run is live at a depot, and a second start or a
+resume beside another is refused), and their commands are stamped lifted ("a production run took over the depot"); a row that carries a person's
+saved setting stays, because it is the car's on every run; what is saved is carried onto the production run; and every
+car at the depot is re-stamped to its target on the production run. A demo run resumed later gets what is saved carried
+back, and none of the per-run settings that were lifted: its holds, one-time orders and passcode settings are gone. An
+undo of a command a takeover lifted answers `lifted` ("That command's settings were lifted (a production run took over
+the depot), so there is nothing left of it to undo."), whichever run it is sent on; an undo of a command made on
+another run that is still live but is not the owners' run answers `made_on_an_earlier_run`.
 
 **The passcode does not open production.** While a production run is running or paused at the depot,
 `enter_passcode` is refused and every existing passcode session is answered `403 production_live` (and ledgered), for
@@ -796,8 +853,11 @@ does not yet say that production is live.
 **Time.** The whole ask (or search) is capped at **50 seconds** (Hermes's MCP tool timeout is 60): each model call is
 cut at what is left and never runs past 45 seconds, a paused search is resumed only inside what is left, and no engine
 call starts with less than 10 seconds left, so an engine call that takes its full 15 still ends inside 60. A cut-short
-ask that changed something says why it stopped and what OTTO-Q did (`incomplete: true`, `stopped`); one that changed
-nothing is answered as the door's failure, with its code.
+ask that sent OTTO-Q a command (applied, saved, previewed, refused or unknown) says why it stopped and what OTTO-Q did
+(`incomplete: true`, `stopped`; `changes.made` says whether anything changed); one that sent OTTO-Q nothing is answered
+as the door's failure, with its code. A confirm ask cut short lists each confirm it never sent (`not_sent`) and hands it
+back in `confirm`, to send again; and when OTTO-Q did not answer a command its outcome is `unknown`, never "nothing was
+changed": check `my_commands` before asking again.
 
 **To go live** (in this order; times in CT when done):
 1. **Deploy `ottoq-agent-gateway`** with JWT verification off, these five files: `ottoq-agent-gateway/index.ts`,
@@ -809,10 +869,13 @@ nothing is answered as the door's failure, with its code.
    `confirm` as `other`.
 2. **Apply `db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql`** per `scripts/APPLYING.md`
    (`forces_recert` FALSE: only the agent door changes, and no certification arm can run while any run is live). It
-   refuses while anything is in flight, and its V3 probes a production session end to end in a block that rolls back:
+   refuses while anything is in flight, **and while any run is running at the twin depot** (its P3, the review's round
+   3: V3 probes the owner door on a paused production run of its own, which a running run would outrank): pause or stop
+   the running run first, and stop a production run paused there (`ottoq_sim_mark_stopped`), then apply. Its V3 probes a production session end to end in a block that rolls back:
    an unbound lowering recorded as a preview, its confirm refused to another agent signed in to the same account and
    applied once, bound, for the agent that made it, a second confirm refused, an undo that lowers gated and then
-   confirmed, a raise and a clear in one call.
+   confirmed, a raise and a clear in one call, two previews of one plan given two salts, a second production run
+   refused, and a person's raise reaching a paused demo.
 3. **Switch OTTO-Command on**: the function secret `ANTHROPIC_API_KEY`. Optional: `OTTOCOMMAND_OWNER_MODEL` (default
    `claude-opus-5-5`), `OTTOCOMMAND_EFFORT` (default `low`), `OTTOCOMMAND_WEB_SEARCH` (`on` by default, `off`), and
    `OTTOCOMMAND_WEB_MAX_USES` (default 3, 1-5). The model is `OTTOCOMMAND_OWNER_MODEL`, else `ANTHROPIC_MODEL` (what the
@@ -821,7 +884,7 @@ nothing is answered as the door's failure, with its code.
    `ask_not_configured` as a tool error and every typed tool still works. The organization's web search must be enabled
    in the Claude Console, or every ask with the web on fails with a 400 (set `OTTOCOMMAND_WEB_SEARCH=off` to run without
    it).
-4. **Update Hermes's skill** to `integrations/hermes/ottoq-owner/SKILL.md` v1.4 and `/reload-mcp`.
+4. **Update Hermes's skill** to `integrations/hermes/ottoq-owner/SKILL.md` v1.7.0 and `/reload-mcp`.
 
 **Verified on scratch (2026-10-14, morning).** `tests/test_ottocommand_executor_sql.py` (24 then): the bodies are the live ones by
 md5; before 0721 a signed-in owner is refused in production and nothing names a person or a door; after it, everything
@@ -870,6 +933,22 @@ done: the door's failure, `isError` over MCP; after a change: `incomplete`, `sto
 an every-return order already covers is already ordered (no change), so the service stays on the car's visit and the car
 does not leave without it; and a production run lifts every other live run's owner settings at the depot as it starts.
 Counts in the commit that made these.
+**After the review, round 3 (2026-10-15 to 2026-10-17 CT; the gateway's TypeScript, and 0721's SQL beside it):** in
+the database, one owners' run per depot that every read and door answers for, every re-stamp pinned to its run, the
+production takeover as the run becomes the running run (a paused production run's settings lifted too, what is saved
+kept), what is saved holding on every live run, undo answering `nothing_to_undo` or `lifted` with why, and the plan hash
+a salted credential given only in the confirm object (a command id alone binds nothing); in the gateway, a reply cut at
+`max_tokens` or at the context window is never an answer and a tool call in it never runs; `incomplete` means
+OTTO-Command stopped after it sent OTTO-Q a command, and `changes.made` says whether anything changed;
+OTTO-Q not answering is an unknown outcome in the receipts, the changes block and the web note, never "nothing was
+changed", and an owner command's timeout points at `my_commands`; a confirm ask checks every confirm first, and one cut
+short is `incomplete`, opens with why, and lists and hands back each confirm it never sent; an ask that read the web hands
+back no preview id or link anywhere, and the model never sees a preview's id or plan hash, `my_commands` included; a
+preview is confirmed only by its `confirm` object sent back unchanged; an earlier answer in `history` makes the ask
+read-only; the sources are the pages the answer cites, web URLs are percent-encoded outside RFC 3986 and titles lose the
+words that confirm; text on either side of a search does not run together; failures keep their own status; the model id,
+the effort per model, the web search version per model and the fallback signal are checked against the live docs (read
+2026-10-15, below). Counts in the commit that made these.
 **Not verified:** a real call to the Anthropic API (every test uses a fake fetch), web search on this organization's
 account, the fallback actually taken, `EdgeRuntime.waitUntil` in the deployed function, and any of it applied or
 deployed.
@@ -932,3 +1011,19 @@ deployed.
 - Anthropic, effort (`output_config.effort`) and the default model's always-on thinking: the Claude API reference
   bundled with Claude Code 2.1.299, read 2026-10-14, which cites
   https://platform.claude.com/docs/en/build-with-claude/effort
+- Anthropic, effort, re-read 2026-10-15 for the round-3 review: `max` on every model the page lists but Claude Opus 4.5,
+  `xhigh` on Fable 5.1, Mythos 5.1, Fable 5, Mythos 5, Opus 5.5, Opus 5, Opus 4.8, Opus 4.7, Sonnet 5.5, Sonnet 5 and
+  Haiku 5.5 ("Not every model that supports max supports xhigh"): https://platform.claude.com/docs/en/build-with-claude/effort
+- Anthropic, web search tool, re-read 2026-10-15: "Dynamic filtering is available with Claude 4.6 and later models";
+  three versions (`web_search_20250305`, `web_search_20260209` with dynamic filtering, `web_search_20260318` adding
+  response inclusion); on `_20260209` and later `allowed_callers` defaults to code execution:
+  https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool
+- Anthropic, programmatic tool calling, read 2026-10-15 (its supported models, every one of which the door gives
+  dynamic filtering): https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling
+- Anthropic, stop reasons, read 2026-10-15 (`max_tokens`: a cut reply can hold "an incomplete tool use block";
+  `model_context_window_exceeded`: "Treat the response as truncated"):
+  https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons
+- Anthropic, refusals and fallback, re-read 2026-10-15 ("A fallback_message entry in usage.iterations means a fallback
+  model ran"; `"fallbacks": "default"` sent to claude-fable-5 in its examples; Claude Haiku 5.5 has no server-side
+  fallback): https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback
+- RFC 3986, section 2 (the unreserved and reserved characters), read 2026-10-15: https://www.rfc-editor.org/rfc/rfc3986#section-2
