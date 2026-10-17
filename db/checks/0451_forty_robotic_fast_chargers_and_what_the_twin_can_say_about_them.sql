@@ -499,6 +499,40 @@
 --   without its compression is not a busy day: 88 of arm 82's 164 recalls were service_interval_due, and the other 76
 --   are a lighter day than normal_day's 148. So a realistic busy day needs an assumption about demand, which is Chase's.
 
+-- ══ §14 THE PLAN CHARGES ON A CHARGER THE DEPOT MAY NOT HAVE (G459; G458 traced further; reproduce: (26)-(28)) ═══════
+--
+--   Read 2026-10-17 between 5:42 and 6:07 PM CT from last night's normal-day arms (seed 1, 12 hours) and arm 82.
+--
+--   G458's "empty bay, no booking, cars waiting" ticks are mostly refused walk-ins (query (26)). The waiting cars there
+--   were chiefly waiting for an interior deep clean, which this depot does on its wash bays (it has no detail bay). On arm
+--   84 the needs-card path, decide section (4b), asked for a wash bay 146 times for 25 cars and was told there was no
+--   free space: it needs the bay free for the whole job, [now, now + 25 minutes) for a deep clean. In 96 of the 146 a bay
+--   was held only by reservations whose car never came; in 9 only by the asking car's own reservation, which the walk-in
+--   path cannot use (it honours a hold only through a planned leg with no stall, and a reserved leg has one); in 41 the
+--   final booking rows show no blocker, and in the one traced (7:15 AM CT, NASH-WSH-03) the blockers were two holds the
+--   reconcile moved five minutes later (its log, bay_reservation_reconcile_2026_08_02, keeps the old windows). On arms
+--   86, 83 and 82: 52, 11 and 17 refusals. The lane's staff cap also binds: two wash supervisors for three bays
+--   (ottoq_depot_staffing), so one bay stays empty whenever two are working.
+--
+--   Most of those reservations were booked behind a charge the depot cannot give (query (27), G459). The itinerary
+--   planner (public.ottoq_plan_visit_itinerary) chooses a fast charge at 100 kW below 45% and an L2 at 11 kW above it,
+--   whatever the depot has. On arm 84 (no L2) it planned 127 L2 legs for 93 cars, a mean 232 minutes long; 124 were skipped, and
+--   each ended a mean 219 minutes after the car's real charge (median 232; arms 85, 86 and 83: 224, 237 and 218). The
+--   forward calendar books bay holds from those legs. The reconcile reads an unstarted charge leg as a charge under way
+--   (BLOCKER 1) and deferred the holds of cars standing in staging while such a leg was planned: 3, 5, 6 and 4 holds on
+--   arms 83, 84, 85 and 86, a mean 88, 88, 84 and 95 minutes, and 16 on arm 82 (163 minutes). For 23 of the 34 the leg
+--   was one the depot never served; for the other 11 a real charge came after.
+--
+--   Rehearsed out of sample on every charge to full (query (28); the clock's fit 11 is of 2026-10-14, and the rehearsal
+--   leaves out the run's own charges, which the plan adds). Planning the kind the car can use at the depot, timed on the
+--   learned clock, gets the kind right on all 234 of arm 84's charges (the rule 39.7%) and misses the length by a mean
+--   7.9 minutes (the rule 63.0; p90 19.6 against 172.8); arm 85, 8.1 against 61.2. As built (arm 83, 172 charges) the
+--   kind is the rule's, right 64.5%, and the clock still cuts the miss 69.5 → 52.0 (arm 86: 67.4 → 43.1). The faster
+--   kind on the clock would be right only 48.8% as built, though 69.0% at 20 posts against the rule's 57.5%: which kind
+--   a car gets at a mixed depot depends on the mix and the queue, which a plan made at arrival cannot see. With the kind
+--   known the clock misses by 14.7 minutes as built and 9.8 at 20 posts. 0745 (PENDING) makes the change that holds on
+--   every mix measured, under dial itinerary_charge_on_clock, with arms paired to 84 and 83.
+
 -- ══ QUERIES ══
 
 -- (1) the value sweep's cells since the dial floor
@@ -1079,3 +1113,121 @@ SELECT s.path, count(*) AS seats, round(avg(extract(epoch FROM s.sim_clock - f.t
        round(avg((SELECT max(extract(epoch FROM s.sim_clock - f2.t0) / 60) FROM c c2 JOIN fs f2 ON f2.vid = c2.vid
                    WHERE c2.tick_seq = s.tick_seq AND c2.vid <> s.vid AND NOT c2.seated AND f2.t0 < f.t0))::numeric) AS longest_wait_passed_min_mean
   FROM seats s JOIN fs f ON f.vid = s.vid GROUP BY s.path ORDER BY s.path;
+
+-- (26) G458: the walk-in path's refusals for a wash bay, by what held the bays. For each decide section (4b) refusal
+--      (hold_no_space / no_free_space) at a tick, each wash bay's bookings live at that moment (booked by then, not yet
+--      released) overlapping the job's window ([t, t + 25 min) for a deep clean, [t, t + 9 min) for a wash), classed by
+--      the asking car's own, a seated car's, or a reservation whose car later came or never came. Final booking rows:
+--      a hold the reconcile moved shows where it went, not where it was (its log keeps the old window).
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('43301561-bce5-46c5-84c3-4235db4e4dd4'::uuid, 82)),
+bays AS (SELECT s.id, s.stall_code FROM public.stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'wash_bay'),
+refusals AS (
+  SELECT r.arm, r.run, d.sim_clock AS t, d.entity_id AS vehicle_id, d.proposed_action ->> 'purpose' AS purpose,
+         CASE WHEN d.proposed_action ->> 'purpose' = 'detail' THEN interval '25 min' ELSE interval '9 min' END AS dur
+    FROM runs r JOIN public.ottoq_decisions d ON d.sim_run_id = r.run
+   WHERE d.action_context = 'task_start' AND d.proposed_action ->> 'source' = 'needs_card'
+     AND d.proposed_action ->> 'stall_type' = 'wash_bay' AND d.enacted_action ->> 'verb' = 'hold_no_space'
+     AND d.enacted_action ->> 'reason' = 'no_free_space'),
+blk AS (
+  SELECT f.arm, f.run, f.t, f.vehicle_id, b.id AS bay,
+         array_agg(CASE
+           WHEN bk.vehicle_id = f.vehicle_id THEN 'own'
+           WHEN lower(bk.during) <= f.t AND bk.state IN ('active', 'done', 'interrupted') THEN 'occupied'
+           WHEN bk.state IN ('active', 'done', 'interrupted') THEN 'reserved_showed'
+           ELSE 'reserved_never_showed' END) FILTER (WHERE bk.booking_id IS NOT NULL) AS kinds
+    FROM refusals f CROSS JOIN bays b
+    LEFT JOIN public.ottoq_stall_bookings bk ON bk.sim_run_id = f.run AND bk.stall_id = b.id
+         AND bk.booked_at_sim <= f.t AND COALESCE(bk.released_at, 'infinity') > f.t
+         AND bk.during && tstzrange(f.t, f.t + f.dur, '[)')
+   GROUP BY 1, 2, 3, 4, 5),
+per AS (
+  SELECT arm, run, t, vehicle_id,
+         bool_or(kinds IS NULL) AS a_bay_free,
+         bool_or(kinds IS NOT NULL AND 'occupied' <> ALL (kinds) AND 'reserved_showed' <> ALL (kinds) AND 'own' <> ALL (kinds)) AS a_bay_blocked_only_by_no_shows,
+         bool_or(kinds IS NOT NULL AND 'own' = ANY (kinds) AND 'occupied' <> ALL (kinds) AND 'reserved_showed' <> ALL (kinds)) AS a_bay_blocked_by_own_hold,
+         count(*) FILTER (WHERE kinds IS NOT NULL AND 'occupied' = ANY (kinds)) AS bays_occupied
+    FROM blk GROUP BY 1, 2, 3, 4)
+SELECT arm, count(*) AS refusals, count(DISTINCT vehicle_id) AS cars, count(DISTINCT t) AS ticks,
+       count(*) FILTER (WHERE a_bay_free) AS with_no_blocker_in_the_final_rows,
+       count(*) FILTER (WHERE NOT a_bay_free AND a_bay_blocked_only_by_no_shows) AS bay_blocked_only_by_a_no_show,
+       count(*) FILTER (WHERE NOT a_bay_free AND NOT a_bay_blocked_only_by_no_shows AND a_bay_blocked_by_own_hold) AS bay_blocked_by_own_hold,
+       count(*) FILTER (WHERE bays_occupied = 3) AS all_three_occupied
+  FROM per GROUP BY arm ORDER BY arm;
+
+-- (27) G459: (a) the itinerary's L2 legs on each run, and how far each skipped one ended past the car's real charge;
+--      (b) the reconcile's charging blocks (BLOCKER 1) on cars that were not charging, by the blocking leg's fate.
+WITH runs(run, arm) AS (VALUES ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid, 85),
+                               ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86), ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83)),
+l2 AS (SELECT r.arm, r.run, l.vehicle_id, l.itinerary_id, l.planned_start_sim, l.planned_end_sim, l.status
+         FROM runs r JOIN public.ottoq_itinerary_legs l ON l.sim_run_id = r.run
+        WHERE l.leg_type = 'charge_l2'),
+x AS (SELECT l2.*,
+             (SELECT o.ended_at FROM public.ocpp_sessions o WHERE o.sim_run_id = l2.run AND o.vehicle_id = l2.vehicle_id
+                 AND o.ended_at >= l2.planned_start_sim - interval '3 hours' AND o.started_at <= l2.planned_end_sim
+               ORDER BY o.ended_at DESC LIMIT 1) AS real_charge_end,
+             (SELECT max(ll.planned_end_sim) FROM public.ottoq_itinerary_legs ll
+               WHERE ll.sim_run_id = l2.run AND ll.itinerary_id = l2.itinerary_id) AS itinerary_end
+        FROM l2)
+SELECT arm, count(*) AS l2_legs, count(DISTINCT vehicle_id) AS cars, count(*) FILTER (WHERE status = 'skipped') AS skipped,
+       round(avg(extract(epoch FROM planned_end_sim - planned_start_sim) / 60)) AS mean_len_min,
+       round(avg(extract(epoch FROM planned_end_sim - real_charge_end) / 60) FILTER (WHERE status = 'skipped')) AS skipped_end_past_real_min_mean,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM planned_end_sim - real_charge_end) / 60)
+              FILTER (WHERE status = 'skipped'))::numeric) AS p50_min,
+       count(*) FILTER (WHERE status = 'skipped' AND planned_end_sim >= itinerary_end - interval '20 min') AS skipped_within_20min_of_plan_end
+  FROM x GROUP BY arm ORDER BY arm;
+
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid, 85),
+                               ('43301561-bce5-46c5-84c3-4235db4e4dd4'::uuid, 82)),
+rl AS (SELECT r.arm, r.run, l.* FROM runs r JOIN public.bay_reservation_reconcile_2026_08_02 l ON l.sim_run_id = r.run
+        WHERE l.blocked_by LIKE 'charging%' AND l.action IN ('deferred', 'released')),
+st AS (SELECT rl.*, (SELECT e.payload -> 'diff' -> 'current_state' ->> 'to' FROM public.ottoq_events e
+                      WHERE e.sim_run_id = rl.run AND e.entity_id = rl.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                        AND e.payload -> 'diff' ? 'current_state' AND e.sim_clock_at <= rl.sim_clock
+                      ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS vstate
+       FROM rl),
+lg AS (SELECT st.*, x.leg_type, x.status AS leg_final_status
+         FROM st LEFT JOIN LATERAL (
+              SELECT l.* FROM public.ottoq_itinerary_legs l
+               WHERE l.sim_run_id = st.run AND l.vehicle_id = st.vehicle_id AND l.leg_type IN ('charge_l2', 'charge_dcfc')
+                 AND l.planned_end_sim > st.sim_clock AND (l.actual_end_sim IS NULL OR l.actual_end_sim > st.sim_clock)
+               ORDER BY l.planned_end_sim DESC LIMIT 1) x ON true
+        WHERE st.vstate NOT LIKE 'charging%')
+SELECT arm, count(*) AS blocks_on_cars_not_charging, count(DISTINCT booking_id) AS holds,
+       count(DISTINCT booking_id) FILTER (WHERE leg_final_status = 'skipped') AS holds_behind_a_leg_never_served,
+       round(avg(extract(epoch FROM new_from - old_from) / 60) FILTER (WHERE action = 'deferred')) AS mean_push_min
+  FROM lg GROUP BY arm ORDER BY arm;
+
+-- (28) G459: the rehearsal. Every charge to full on four arms, planned three ways against the real session: the rule
+--      (below 45% a fast charge at 100 kW, else an L2 at 11 kW, physics estimate), and 0745's (the kind the car can use
+--      at the depot, else the rule's kind, on the learned clock). It reads the depot's clock as it stands; after a refit
+--      the numbers move, so pin the fit (ottoq_charge_clock_fits) to reproduce 2026-10-17's reading on fit 11.
+WITH runs(run, arm, has_l2) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83, true), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86, true),
+                                      ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84, false), ('fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid, 85, false)),
+m AS (SELECT public.ottoq_charge_clock_model('11111111-1111-1111-1111-111111111111') AS ct),
+s AS (SELECT r.arm, r.has_l2, o.vehicle_id, o.soc_start, extract(epoch FROM o.ended_at - o.started_at) / 60 AS real_min,
+             CASE WHEN NOT r.has_l2 THEN 'dcfc'
+                  WHEN r.arm = 86 AND st.stall_code IN ('NASH-L2-STALL-01','NASH-L2-STALL-02','NASH-L2-STALL-03','NASH-L2-STALL-04','NASH-L2-STALL-05',
+                                                        'NASH-L2-STALL-06','NASH-L2-STALL-07','NASH-L2-STALL-08','NASH-L2-STALL-09','NASH-L2-STALL-10') THEN 'dcfc'
+                  ELSE st.stall_type::text END AS real_kind,
+             v.battery_capacity_kwh AS batt, v.inlet_max_kw AS inlet, COALESCE(v.inlet_max_kw, 150) AS inlet_p, COALESCE(v.battery_capacity_kwh, 75) AS pack_p,
+             public.ottoq_charge_clock_who(v.id, v.vehicle_class_code, v.make, v.model) AS who
+        FROM runs r JOIN public.ocpp_sessions o ON o.sim_run_id = r.run JOIN public.stalls st ON st.id = o.stall_id JOIN public.vehicles v ON v.id = o.vehicle_id
+       WHERE o.soc_end >= 99 AND o.ended_at IS NOT NULL AND o.soc_start < 99),
+e AS (SELECT s.*,
+             CASE WHEN s.soc_start < 45 THEN 'dcfc' ELSE 'l2' END AS kind_today,
+             public.ottoq_estimate_charge_minutes(s.soc_start, 100, CASE WHEN s.soc_start < 45 THEN 100 ELSE 11 END, s.inlet_p, s.pack_p, 20, 100, 1.0) AS min_today,
+             (public.ottoq_charge_clock((SELECT ct FROM m), 'dcfc', s.who, s.batt, s.soc_start, 100, 350, s.inlet, NULL) ->> 'm')::numeric AS md,
+             (public.ottoq_charge_clock((SELECT ct FROM m), 'l2', s.who, s.batt, s.soc_start, 100, 19.2, s.inlet, NULL) ->> 'm')::numeric AS ml
+        FROM s),
+f AS (SELECT e.*, CASE WHEN NOT e.has_l2 THEN 'dcfc' ELSE e.kind_today END AS kind_a FROM e)
+SELECT arm, count(*) AS charges, round(avg(real_min)::numeric, 1) AS real_mean,
+       round(100.0 * avg((kind_today = real_kind)::int), 1) AS rule_kind_pct, round(avg(abs(min_today - real_min))::numeric, 1) AS rule_mae,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(min_today - real_min)))::numeric, 1) AS rule_p90_abs,
+       round(100.0 * avg((kind_a = real_kind)::int), 1) AS clock_plan_kind_pct,
+       round(avg(abs(CASE WHEN kind_a = 'dcfc' THEN md ELSE ml END - real_min))::numeric, 1) AS clock_plan_mae,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(CASE WHEN kind_a = 'dcfc' THEN md ELSE ml END - real_min)))::numeric, 1) AS clock_plan_p90_abs,
+       round(100.0 * avg(((CASE WHEN md <= ml THEN 'dcfc' ELSE 'l2' END) = real_kind)::int), 1) AS faster_kind_pct,
+       round(avg(abs(CASE WHEN real_kind = 'dcfc' THEN md ELSE ml END - real_min))::numeric, 1) AS clock_mae_if_kind_known
+  FROM f GROUP BY arm ORDER BY arm;

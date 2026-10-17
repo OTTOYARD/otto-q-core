@@ -797,7 +797,8 @@ repo_manifest(version, name, file) AS (
     ('20261017182220'::text, 'the_promise_is_graded_beside_what_the_owner_app_says'::text, '0741_the_promise_is_graded_beside_what_the_owner_app_says.sql'::text),
     ('20261017185512'::text, 'a_promise_stays_honest_while_the_car_waits'::text, '0742_a_promise_stays_honest_while_the_car_waits.sql'::text),
     ('PENDING'::text, 'the_bay_calendar_seats_each_car_on_its_own'::text, '0743_the_bay_calendar_seats_each_car_on_its_own.sql'::text),
-    ('PENDING'::text, 'a_bay_hold_follows_a_charge_that_runs_past_its_plan'::text, '0744_a_bay_hold_follows_a_charge_that_runs_past_its_plan.sql'::text)
+    ('PENDING'::text, 'a_bay_hold_follows_a_charge_that_runs_past_its_plan'::text, '0744_a_bay_hold_follows_a_charge_that_runs_past_its_plan.sql'::text),
+    ('PENDING'::text, 'the_itinerary_plans_each_charge_on_a_charger_the_depot_has'::text, '0745_the_itinerary_plans_each_charge_on_a_charger_the_depot_has.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

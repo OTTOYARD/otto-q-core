@@ -540,6 +540,16 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_bay_activation_per_seat_sql.py tests/test_bay_hold_follows_charge_sql.py
 
+      - name: The itinerary plans each charge on a charger the depot has, on its learned clock, executed (0745)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_itinerary_charge_on_clock_sql.py
+
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
       # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry
