@@ -219,7 +219,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0723 — GENERATED, not a log
+## Index, 0134–0739 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699 — which are indexed below as well as logged above; the log row is
@@ -783,7 +783,23 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0721](db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql) | `PENDING` | no — pending | **A signed-in owner changes production under their own name, and every owner command says which door it came |
 | [0722](db/migrations/0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql) | `PENDING` | no — pending | **The key that signs every event, SDR and audit bundle is rotated, and every row the old key signed still verifies |
 | [0723](db/migrations/0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql) | `PENDING` | no — pending | **A charge's closing frames name the charger that sent them, so the charger back end can hear a charge end.** |
+| [0724](db/migrations/0724_forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot.sql) | `20261017060928` | yes — ledger | **Forty robotic fast chargers are a test day before they are the depot.** Three build-outs that convert every |
+| [0725](db/migrations/0725_forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall.sql) | `20261017063328` | yes — ledger | **Forty fast chargers on a normal day, where the service bays are not the wall.** 0724's question asked again on |
+| [0726](db/migrations/0726_a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_one.sql) | `20261017072652` | yes — ledger | **A shared power cabinet divides its power, and the twin can now model one.** A test day whose build-out puts |
+| [0727](db/migrations/0727_the_site_power_gate_can_read_the_meter_instead_of_guessing.sql) | `20261017072928` | yes — ledger | **The site power gate can read the meter instead of guessing.** With the dial `site_cap_gate_metered` at 1, the |
+| [0728](db/migrations/0728_forty_robotic_chargers_on_todays_service_through_shared_cabinets.sql) | `20261017073142` | yes — ledger | **Forty robotic chargers on today's service, through shared cabinets.** The build-out a real conversion would |
+| [0729](db/migrations/0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds.sql) | `20261017081553` | yes — ledger | **A site that divides its power is judged by the limit it holds.** With `dc_power_managed` at 1 beside 0726's |
+| [0730](db/migrations/0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql) | `20261017082241` | yes — ledger | **Twenty fast chargers on the same normal day, to find the knee.** One arm, run tonight ahead of 0728's last two |
+| [0731](db/migrations/0731_the_battery_plans_for_the_bill_the_value_view_reads.sql) | `20261017083042` | yes — ledger | **The battery plans for the bill the value view reads.** Three paired cells on the seed and day that arms 83, |
+| [0732](db/migrations/0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on.sql) | `20261017105250` | yes — ledger | **Two more seeds for the four cells the recommendation rests on.** db/checks/0451 §10 rests on four normal-day |
+| [0733](db/migrations/0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql) | `20261017110658` | yes — ledger | **A shared pool gives a new car what it has spare (G448).** On a test day whose fast chargers share one DC pool |
+| [0734](db/migrations/0734_the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs.sql) | `20261017111846` | yes — ledger | **The same morning at half the tick, to measure what the tick costs.** The depot as built (dcfc10) on the normal |
+| [0735](db/migrations/0735_a_car_answers_a_command_in_the_tick_it_is_given.sql) | `20261017161641` | yes — ledger | **A car answers a command in the tick it is given (G449, G450).** The twin carries out every command a tick |
+| [0736](db/migrations/0736_a_realistic_promise_at_arrival_and_its_grade.sql) | `20261017163802` | yes — ledger | **A realistic promise at arrival, and its grade (G383).** When a car arrives, OTTO-Q estimates when it will be |
+| [0737](db/migrations/0737_a_held_site_powers_the_cars_due_first.sql) | `20261017164907` | yes — ledger | **A held site powers the cars due first (db/checks/0451 §10 point 5, the frontier).** On a test day whose fast |
+| [0738](db/migrations/0738_the_nightly_charge_clock_refit_gets_the_time_it_needs.sql) | `PENDING` | no — pending | **The nightly charge-clock refit gets the time it needs (G451).** Cron job 789 (ottoq-learn-charge-clock-nightly, |
+| [0739](db/migrations/0739_a_promise_counts_the_cars_still_waiting.sql) | `20261017173306` | yes — ledger | **A promise counts the cars still waiting, is drawn from the world, and reads its spread from enough draws |
 
-545 migrations indexed.
+561 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

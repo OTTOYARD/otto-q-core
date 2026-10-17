@@ -487,6 +487,24 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_charge_order_floor_sql.py
 
+      # 0736 and 0739 (G383, G452): when a car arrives, when it will really be ready, as a median and a 90th percentile,
+      # from the charge line's own simulator plus what the run's cars need after their charge, counting the cars still
+      # waiting (Kaplan-Meier), drawn from the world and read from 128 draws. On the miniature depot taken through 0642,
+      # with the live charge line md5-asserted and a stub of 0735's tick and the two sweeps 0736 reads: each applies and
+      # refuses a second time, each situation, a promise's arithmetic against the simulator's own seats, the recorder once
+      # per visit and the append-only ledger, the grade, Kaplan-Meier against a hand computation, two runs of one world
+      # alike, a lower bound where the curve does not reach, and the recorder's newest visit. 13 tests, about 30 seconds:
+      # one template database, cloned per test.
+      - name: A realistic promise at arrival counts the cars still waiting, executed (0736, 0739 against the live charge line)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_ready_promise_sql.py
+
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
       # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry

@@ -776,7 +776,23 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'a_signed_in_user_cannot_call_the_black_box_export_functions'::text, '0720_a_signed_in_user_cannot_call_the_black_box_export_functions.sql'::text),
     ('PENDING'::text, 'a_signed_in_owner_changes_production_under_their_own_name'::text, '0721_a_signed_in_owner_changes_production_under_their_own_name.sql'::text),
     ('PENDING'::text, 'the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies'::text, '0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql'::text),
-    ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text)
+    ('PENDING'::text, 'a_charges_closing_frames_name_the_charger_that_sent_them'::text, '0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql'::text),
+    ('20261017060928'::text, 'forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot'::text, '0724_forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot.sql'::text),
+    ('20261017063328'::text, 'forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall'::text, '0725_forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall.sql'::text),
+    ('20261017072652'::text, 'a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_one'::text, '0726_a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_one.sql'::text),
+    ('20261017072928'::text, 'the_site_power_gate_can_read_the_meter_instead_of_guessing'::text, '0727_the_site_power_gate_can_read_the_meter_instead_of_guessing.sql'::text),
+    ('20261017073142'::text, 'forty_robotic_chargers_on_todays_service_through_shared_cabinets'::text, '0728_forty_robotic_chargers_on_todays_service_through_shared_cabinets.sql'::text),
+    ('20261017081553'::text, 'a_site_that_divides_its_power_is_judged_by_the_limit_it_holds'::text, '0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds.sql'::text),
+    ('20261017082241'::text, 'twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee'::text, '0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql'::text),
+    ('20261017083042'::text, 'the_battery_plans_for_the_bill_the_value_view_reads'::text, '0731_the_battery_plans_for_the_bill_the_value_view_reads.sql'::text),
+    ('20261017105250'::text, 'two_more_seeds_for_the_four_cells_the_recommendation_rests_on'::text, '0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on.sql'::text),
+    ('20261017110658'::text, 'a_shared_pool_gives_a_new_car_what_it_has_spare'::text, '0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql'::text),
+    ('20261017111846'::text, 'the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs'::text, '0734_the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs.sql'::text),
+    ('20261017161641'::text, 'a_car_answers_a_command_in_the_tick_it_is_given'::text, '0735_a_car_answers_a_command_in_the_tick_it_is_given.sql'::text),
+    ('20261017163802'::text, 'a_realistic_promise_at_arrival_and_its_grade'::text, '0736_a_realistic_promise_at_arrival_and_its_grade.sql'::text),
+    ('20261017164907'::text, 'a_held_site_powers_the_cars_due_first'::text, '0737_a_held_site_powers_the_cars_due_first.sql'::text),
+    ('PENDING'::text, 'the_nightly_charge_clock_refit_gets_the_time_it_needs'::text, '0738_the_nightly_charge_clock_refit_gets_the_time_it_needs.sql'::text),
+    ('20261017173306'::text, 'a_promise_counts_the_cars_still_waiting'::text, '0739_a_promise_counts_the_cars_still_waiting.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
