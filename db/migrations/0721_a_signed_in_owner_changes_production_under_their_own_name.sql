@@ -95,8 +95,11 @@
 --       it, and only postgres may EXECUTE it), the five owner-door ones above and seven more: ottoq_agent_read_depot,
 --       ottoq_agent_read_stalls and ottoq_agent_read_decisions read their run from it, ottoq_agent_submit_request records
 --       a request against it, ottoq_agent_request_decide (md5 1ad1db6e91d7dee2a6b4e3addf959af3) applies an approved ops
---       action only while it is still the run the request was recorded against, and the two welcomes describe it; their
---       own callers are the two dispatchers, which no function and no cron job calls (read 15:02:09 UTC).
+--       action only while it is still the run the request was recorded against, and the two welcomes describe it. Their
+--       own callers (re-read 16:42:55 UTC, comment-stripped): nine of the twelve are called only by the two dispatchers,
+--       which no function and no cron job calls (read 15:02:09 UTC); the two cockpit boards and ottoq_agent_request_decide
+--       have no function caller and no cron job, the boards EXECUTE-able by anon, authenticated and service_role and
+--       ottoq_agent_request_decide by authenticated and service_role (the person who decides a request calls it).
 --   (k) TWO PRODUCTION RUNS LIVE AT ONCE. ottoq_production_start(uuid) (md5 ea2945cbb0435c58ce73b4f5e038c501) refuses
 --       only a RUNNING run at the depot and inserts its run running; ottoq_production_stop(text) (md5
 --       499ea8d51f65cd62463838ba940e075e) completes only the running production run; ottoq_pause_run(uuid,text) (md5
@@ -115,6 +118,34 @@
 --   (n) THE PLAN HASH COULD BE COMPUTED, AND A COMMAND ID ALONE BOUND. A preview's plan_hash was md5 of the plan as 0605
 --       hashes it (tool, run, arguments, effects), every part of which the receipt shows, and an apply that named a
 --       preview by confirms_command_id alone bound to it (S1).
+--
+--   §17 (g)-(j) (the review, round 4; each finding reproduced on the scratch chain at a9faade first, 2026-10-17 11:12-11:13
+--   AM CT, and the live catalog read-only 16:15-16:41 UTC, 11:15-11:41 AM CT, every body this file pins unchanged):
+--   (o) A SECOND PRODUCTION RUN STILL STARTED BESIDE A PAUSED ONE, AND ITS TAKEOVER LIFTED A PERSON'S ORDERS THERE.
+--       ottoq_production_start refuses only a running run ((k)), and round 3's takeover lifts every other live run's
+--       per-run settings, a paused production run's included. So a person's interior deep clean 'now' (the receipt: the
+--       car does not leave until it is done) and a hold until 1:00 PM on paused production run P1 were lifted when P2
+--       started: on P2 the car could leave at 100% without the deep clean and the held car before its hold, my_settings
+--       said nothing was in force, an undo on P2 answered run_ended though P1 had not ended, and resuming P1 left both
+--       lifted (the review's scen_n3b). Nothing in the live catalog keeps two production runs from being live at one depot
+--       (no run was running or paused anywhere at 16:33:40 UTC, so no such pair exists there today).
+--   (p) THE TICK MARKED RECONCILED WHAT IT HAD NOT RECONCILED. ottoq.ottoq_owner_orders_tick re-stamps the cars its first
+--       loop finds with a pending limit, then clears pending_reconcile on EVERY pending limit row of the run in a separate
+--       statement, and clears every pending service row the same way after its order loop. Under READ COMMITTED each
+--       statement sees what committed before it began, so a command that committed while a loop waited on a row lock was
+--       marked reconciled and never applied: a clear and a raise answered with a full-charge receipt while
+--       vehicles.target_soc stayed 85 through three more ticks, and a 'now' interior tidy kept no atom on the visit and
+--       ottoq_departure_clear let the car go (the review's race_tick.py and race_tick_service.py: a third session holding
+--       the car's row, or the visit's).
+--   (q) A CONTRACT CHANGE STAYED OFF THE CARS, IN BOTH DIRECTIONS (FINDINGS G494). ottoq_fleet_operator_slas has no trigger
+--       and no function writes it (read 16:18:09 UTC), so a version written mid-run re-stamped nothing until a takeover, a
+--       run's end or an owner change: a ceiling raised from 90 to 100 left the stamp at 90 under a target of 100, so the
+--       charge stopped at 90 and the car could not leave (rule 9's direction); a minimum raised above a carried 85 left
+--       the target at 85, under the contract's new floor, so the car could leave at 85; and a ceiling lowered under a
+--       saved 95 left the stamp above the ceiling (the review's scen_g494 and scen_r4 n8).
+--   (r) UNDO ANSWERED run_ended FOR RUNS THAT HAD NOT ENDED. An undo of a command a production run's takeover lifted,
+--       sent on any run but the command's own, and an undo of a command made on another run still live but no longer the
+--       owners' run, both answered "That command applied to a run that has ended".
 
 -- ══ §2 WHAT THIS CHANGES ════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -347,8 +378,44 @@
 --     (f) AND THE ANSWERS. A cancel that finds nothing of the owner's to withdraw says why (a service OTTO-Q found needed
 --         stays until it is done and the car does not leave without it; or there is no order of theirs), and a one-time
 --         order an every-return order covers, already done on this visit, says it was done.
---     What stays open: a contract ceiling lowered mid-run is re-stamped only at a takeover, the run's end or an owner
---     change (FINDINGS G494, toward a fuller car). FINDINGS G495 is fixed here (§17 (a)).
+--     The review, round 4 (2026-10-17 CT; §1 (o)-(r), each reproduced first, then fixed and tested, the same file's
+--     round-4 section):
+--     (g) AT MOST ONE LIVE PRODUCTION RUN PER DEPOT. Two BEFORE triggers on ottoq_sim_runs, one function
+--         (public.ottoq_tg_one_live_production_run, under a per-depot transaction advisory lock), refuse with 23505 a
+--         production_live run inserted running or paused while another production_live run is running or paused at its
+--         depot ("a production run is already live at this depot (paused); resume it or stop it first", or "...
+--         (running); stop it first"), and a production run resumed (to running), or a live run turned into a production
+--         one, while another is live there ("another production run is already live at this depot (paused); stop it
+--         first, then resume this one"); the DETAIL names the other run, the HINT the door that stops it. So
+--         ottoq_production_start fails with that error while production is paused (its body is not changed: for a RUNNING
+--         run it still answers depot_already_has_running_run before its insert), and so do ottoq_resume_run and the twin
+--         app's resume PATCH for a second one, and nothing of the first run is lifted. Pausing, stopping and a demo run's
+--         start and resume are untouched. (c)'s lift of a paused production run's per-run settings stays, for a pair
+--         already live before this file (none was, read live 16:33:40 UTC).
+--     (h) THE TICK RECONCILES ONLY WHAT IT RECONCILED. Step (1) takes its pending limit rows and locks them as it starts
+--         (FOR UPDATE SKIP LOCKED: a row a command holds right now is left pending for the next tick, so a tick never
+--         waits on a command), re-stamps their cars and clears exactly those rows, by setting_id; step (3c) locks each
+--         active order as its loop reaches it (the same) and clears that row only, and only while it is still active, as
+--         (3a) already did. A command that commits while a tick runs stays pending, and the next tick applies it: a
+--         limit's car is re-stamped then (the departure test reads the limit from its row at once), and a one-time order
+--         holds its car (ottoq_owner_departure_blocked) until it is on the visit.
+--     (i) A CONTRACT CHANGE FOLLOWS ONTO THE CARS (FINDINGS G494, both directions). A contract version written, changed or
+--         removed re-stamps that operator's cars at each depot that has an owners' run, pinned to it
+--         (public.ottoq_tg_owner_contract_restamp, AFTER INSERT OR UPDATE OR DELETE on ottoq_fleet_operator_slas; not
+--         caught: a re-stamp that fails fails the contract write, since a stamp left under a raised ceiling stops the
+--         car's charge short), and ottoq_effective_target_soc_at reads an owner's
+--         limit only when it is at or above the minimum of the contract in force at p_as_of: below it the car charges to
+--         the ceiling, as the carry already decides for a saved limit outside the contract (§9). A depot with no run live
+--         keeps its stamps until a run starts there (a production start re-stamps every car).
+--     (j) UNDO'S ANSWERS. An undo of a command whose settings a production run's takeover lifted answers lifted, naming the
+--         takeover, whichever run it is sent on and whether or not its own run has ended since; an undo of a command made
+--         on another run that is still live but is not the owners' run answers made_on_an_earlier_run ("That command was
+--         made on another run, still paused at the depot, which is not the run your commands go to now. ..."); run_ended
+--         is left for a command whose run has ended.
+--     What stays open: my_settings, my_fleet and my_vehicle, which read the run's rows, still show an owner's limit that a
+--     raised contract minimum has put out of force ("charges to at most 85%", "target 85% (your limit)") while the engine
+--     charges that car to the ceiling (toward a fuller car; FINDINGS G496). FINDINGS G494 and G495 are fixed here
+--     (§17 (i), (a)).
 --
 --   THE GATEWAY'S HALF (TypeScript, committed beside this file, not deployed): edge-functions/_shared/ottocommand_owner.ts
 --   replays every assistant turn verbatim (thinking, server_tool_use, web_search_tool_result, cited text, tool_use,
@@ -377,9 +444,10 @@
 --   Every body this file replaces is the agent door (ottoq_agent_call, ottoq_owner_command, its receipt, whoami) or a
 --   trigger on ottoq_owner_commands. No certification, dial or sweep arm calls any of them, and the engine's readers of
 --   owner settings (ottoq_effective_target_soc_at, ottoq_departure_clear, ottoq_owner_departure_blocked,
---   ottoq.ottoq_owner_orders_tick, both world steps) are untouched (but for §17's two lines, below). Does changing WHO
+--   ottoq.ottoq_owner_orders_tick, both world steps) are untouched (but for §17's lines in the tick, in the effective
+--   target and in its ottoq_owner_charge_limit, below). Does changing WHO
 --   may write owner settings change a certified run? No: a certification run has no owner commands. Its arms are
---   cert_harness / ab_harness runs that the gate refuses; they run in one uncommitted transaction no agent's session can
+--   benchmark, cert_harness and ab_harness runs that the gate refuses; they run in one uncommitted transaction no agent's session can
 --   see; and every test-day runner refuses to start while ANY run is running or paused, with no run_by predicate (read
 --   live today: cron 746, the recert runner,
 --   "IF EXISTS (SELECT 1 FROM public.ottoq_sim_runs WHERE status IN ('running','paused')) THEN RETURN"; the same guard in
@@ -406,9 +474,25 @@
 --   widened first line finds nothing on an arm (no owner rows of any status), so it returns where it did. The takeover,
 --   the re-stamps and the carry run only from §9's run-start triggers, whose WHEN no arm meets, and the propagation only
 --   from the owner command. A determinism pair's arms carry no owner rows. And (G495) ottoq_agent_live_run is read only
---   by agent doors: its twelve callers' own callers are the two dispatchers, which no function and no cron job calls (read
---   live 2026-10-17 15:02:09 UTC), so no certification, dial or sweep arm reaches it. So the same answer: forces_recert
+--   through agent doors and a person's: nine of its twelve callers are called only by the two dispatchers, which no
+--   function and no cron job calls (read live 2026-10-17 15:02:09 UTC), and the other three (the two cockpit boards, and
+--   ottoq_agent_request_decide, EXECUTE-able by authenticated and service_role) have no function caller and no cron job
+--   (re-read 16:42:55 UTC), so no certification, dial or sweep arm reaches it. So the same answer: forces_recert
 --   FALSE, forces_dial_restart FALSE.
+--   §17 (g)-(j) (the review, round 4) change it nowhere either, and this is how that is known (read live 2026-10-17
+--   16:33-16:41 UTC, every function's code comment-stripped): (g)'s two triggers fire only for a run whose run_by is
+--   'production_live', and every certification, dial and sweep arm inserts its run as 'benchmark' (ottoq_cert_arm,
+--   ottoq_cert_arm_start, ottoq_cert_arm_wave, ottoq_fr1_cert_arm, ottoq_safety_cert_arm), 'cert_harness' (the
+--   determinism pair, its replay and the tick-invariance arm, through twin.ottoq_sim_start_run) or 'ab_harness' (the A/B
+--   pair through twin.ottoq_sim_start_run; the dial pair and the throughput sweep arm through ottoq_sim_run_scenario); the
+--   other writers of a run are ottoq_production_start, which no function and no cron job calls, and ottoq_sim_run_scenario
+--   for the demo start (operator_demo) and the operator's start (its caller's kind); and no function updates a run's
+--   run_by. So no arm starts, resumes or becomes a production run, and the trigger function never executes inside one.
+--   (h)'s changed statements sit inside the tick's loops over owner rows and its clear of them, which meet no row on an
+--   arm (no arm holds owner rows); (i)'s trigger fires only on a write to ottoq_fleet_operator_slas, which no function
+--   makes, and its line in ottoq_effective_target_soc_at is inside the CASE branch taken only for a car with an active
+--   owner limit, which no arm has, so the engine's one answer is unchanged for every car an arm reads; (j) is the owner
+--   command's own refusal text. The same answer: forces_recert FALSE, forces_dial_restart FALSE.
 --
 -- ══ §4 WHAT IT DELIBERATELY DOES NOT DO ═════════════════════════════════════════════════════════════════════════════
 --
@@ -422,9 +506,15 @@
 --     highlight, as 0606 decided for demo runs (the note is the visitor's ask text when OTTO-Command sent it).
 --   * A saved setting made while two runs are live was carried onto the other at its next start; since the review,
 --     round 3 (§17 (d)) a person's change to what is saved reaches every live run at the depot at once.
---   * A contract ceiling lowered mid-run is not re-stamped on the cars until a takeover, the run's end or an owner change
---     (FINDINGS G494). The welcomes' words are 0607's: on a production run they say changes wait for the next demo,
---     which a signed-in owner's agent may now make in production; §17 changes only which run they describe.
+--   * my_settings, my_fleet and my_vehicle read the run's rows, so an owner's limit that a raised contract minimum has put
+--     out of force is still shown there while the engine charges the car to the ceiling (FINDINGS G496, OPEN, toward a
+--     fuller car: measured 2026-10-17 12:01 PM CT). The welcomes' words are 0607's: on a production run they say changes
+--     wait for the next demo, which a signed-in owner's agent may now make in production; §17 changes only which run they
+--     describe.
+--   * ottoq_production_start, ottoq_production_stop, ottoq_pause_run and ottoq_resume_run are not changed (P1 pins three
+--     of them): §17 (g) is a trigger on the run table, so a refused start or resume fails with its 23505 error and
+--     message rather than answering {ok: false}, and a refused ottoq_production_start has already run its world yield
+--     (0719: running checks are cancelled before its insert; a cancelled check re-runs later, as 0719 says).
 --   * No new credential, and passcode sessions and issued keys keep working on demo runs exactly as before (and open
 --     nothing while a production run is live, §12).
 --   * ottoq_log_model_call keeps its live grant to authenticated (§1(f)): narrowing it is a separate decision, recorded as
@@ -471,7 +561,20 @@
 --   paused, for a depot-wide key, a fleet's key and a signed-in owner, and an approval refuses once the run it was made
 --   against stops being the live run (G495); each no-change answer says why; P3
 --   refuses a running twin run; and V1 reads code, not comments. Fifteen mutations, each undoing one §17 fix in a copy
---   of this file (its V blocks silenced, but for the one that mutates V1), each fail a named test.
+--   of this file (its V blocks silenced, but for the one that mutates V1), each fail a named test. And (§17 (g)-(j), the
+--   review, round 4) each of its sequences, reproduced on a9faade first: a second production run refused while one is
+--   paused (inserted, or resumed beside it), with the message an operator reads, nothing of the first run lifted, its
+--   order and hold still in force and its car still held, and the first run resumed; a demo run's start and resume
+--   beside a paused production run not refused; a pair live before this file still taken over; a clear, a raise and a
+--   'now' order committed while the tick waits on a row another session holds (a car's, a visit's) left pending and
+--   applied by the next tick, the car held meanwhile; a contract's ceiling raised and lowered and its minimum raised
+--   mid-run, each followed onto the stamp, the target and the departure test at once; undo's answers for a command a
+--   takeover lifted and for one on another live run; and P3 refusing a paused production run. Eleven more mutations, each
+--   undoing one round-4 fix the same way (no one-live-production guard; the resume unguarded; no advisory lock; step (1)'s
+--   broad clear; step (1)'s rows unlocked; step (3c)'s broad clear; no contract re-stamp; a limit under the minimum read;
+--   lifted only on its own run; another live run answered run_ended; P3 taking a paused production run), each fail a
+--   named test, as do the fifteen above re-run on this file. And the review's own V-block mutations (vmut.py and its
+--   literal variants, eleven) are each refused by a V block as written; with V1 silenced, V3 still refuses seven.
 --
 -- ══ §6 ROLLBACK ══════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -497,12 +600,19 @@
 --   §16: the snapshot's dispatcher routes my_fleet and my_vehicle without the command-id mask again; dropping the two
 --   run-start triggers (above) stops the production takeover with the carry. ottoq_owner_read_shown,
 --   ottoq_owner_mask_command_ids and ottoq_owner_settings_yield_to_production may stay, unread.
---   §17: the snapshot (thirteen bodies) also holds ottoq_owner_charge_limit, ottoq_owner_read and ottoq_agent_live_run, so
+--   §17: the snapshot (fourteen bodies) also holds ottoq_owner_charge_limit, ottoq_owner_read and ottoq_agent_live_run, so
 --   restoring it puts the engine's unpinned limit read, the tick's target and the owner reads back to 0605's, and every
 --   agent door back to the newest-started live run (and the boards, whoami and the command to their pre-0721 runs). ottoq_owner_run_id, ottoq_owner_live_run, ottoq_owner_target_on_run,
 --   ottoq_owner_restamp and ottoq_owner_saved_propagate are then unread and may stay; plan_salt and its CHECK may stay
 --   (NULL is their old meaning: the restored bodies write no salt, and the backstop's salt check fires only on a row that
 --   names a preview, which the restored three-argument body never writes).
+--   §17 (g)-(j) (the review, round 4): the snapshot also holds ottoq_effective_target_soc_at, so restoring it reads an
+--   owner's limit under a contract's minimum again, and its tick clears every pending row again (§1 (p)). Then DROP
+--   TRIGGER ottoq_sim_runs_one_live_production_run and ottoq_sim_runs_one_live_production_run_on_change ON
+--   public.ottoq_sim_runs (two production runs can then be live at a depot together again, and (c)'s takeover lifts the
+--   paused one's per-run settings), and DROP TRIGGER ottoq_fleet_operator_slas_owner_restamp ON
+--   public.ottoq_fleet_operator_slas (a contract change then waits for a takeover, a run's end or an owner change).
+--   ottoq_tg_one_live_production_run and ottoq_tg_owner_contract_restamp may stay, unread.
 --
 -- ══ §7 ORDER: THE GATEWAY FIRST ═════════════════════════════════════════════════════════════════════════════════
 --
@@ -518,7 +628,10 @@
 --   a running run outranks as the owners' run, so this file refuses to apply while a run is running at the twin depot:
 --   pause or stop it (ottoq_pause_run, ottoq_production_stop), then apply. Read 2026-10-17 14:45:14 UTC (9:45 AM CT): no
 --   run was running or paused there. After this file a confirm is the confirm object sent back as it is: its plan hash is
---   given nowhere else, so nothing can rebuild one from a receipt.
+--   given nowhere else, so nothing can rebuild one from a receipt. (The review, round 4) And no production run paused
+--   there either: V3's own paused production run would be a second live one, which §17 (g) refuses, so P3 refuses to
+--   apply while one is paused there; stop it (ottoq_sim_mark_stopped) first. Read 2026-10-17 16:33:40 UTC (11:33 AM CT):
+--   no run was running or paused anywhere.
 
 BEGIN;
 
@@ -619,6 +732,32 @@ BEGIN
   IF v_bad IS NOT NULL THEN
     RAISE EXCEPTION '0721 P1: not the owner-limit read or the live-run read §17 was written against (re-measure before applying): %', v_bad;
   END IF;
+  -- (the review, round 4) the bodies §1 and §3 reason from, read live 2026-10-17 (the effective target and the departure
+  -- test 14:45:27 UTC, the request door 15:01:28, production's start 16:14:54, all six here re-read 16:33:40; identical on
+  -- the scratch chain, the start from tests/fixtures/owner_run_control_stub.sql): the engine's one answer to how full a car
+  -- charges (§17 (i) patches it), the departure test, the decide door G495 reasons about, and the start whose one refusal
+  -- §1 (k) and §17 (g) rest on
+  SELECT string_agg(f, ', ') INTO v_bad FROM (VALUES
+      ('public.ottoq_effective_target_soc_at(uuid,timestamp with time zone)',                   '1fbe1e28294cd87d6f28920b3a68e7e6'),
+      ('public.ottoq_departure_clear(uuid,uuid,timestamp with time zone,boolean)',              '9cc535e83e981ed6deacdc068e9908f6'),
+      ('public.ottoq_agent_request_decide(uuid,text,text)',                                     '1ad1db6e91d7dee2a6b4e3addf959af3'),
+      ('public.ottoq_production_start(uuid)',                                                   'ea2945cbb0435c58ce73b4f5e038c501')) x(f, want)
+   WHERE to_regprocedure(f) IS NULL
+      OR md5(pg_get_functiondef(to_regprocedure(f))) IS DISTINCT FROM want;
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION '0721 P1: not a body §1 and §3 reason from (re-measure before applying): %', v_bad;
+  END IF;
+  -- and pause and resume, which only move a run between running and paused: as live has them (read 14:45 UTC), or as 0791
+  -- leaves them (each UPDATE also re-checks the status it expects; md5 computed from 0791's own anchors on the live
+  -- bodies), since 0791 may be applied first
+  SELECT string_agg(f, ', ') INTO v_bad FROM (VALUES
+      ('public.ottoq_pause_run(uuid,text)', '1e3ec33aca6f4f3b008a0d83bff08c51', '28cba3966f9831f23705fb5c2341e691'),
+      ('public.ottoq_resume_run(uuid)',     'b693dc33284db3914381f89bd7f21724', '3950a271cc07b6374a4fb2db70680e74')) x(f, live, after_0791)
+   WHERE to_regprocedure(f) IS NULL
+      OR md5(pg_get_functiondef(to_regprocedure(f))) NOT IN (live, after_0791);
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION '0721 P1: pause or resume is neither the live body nor the one 0791 leaves (re-measure before applying): %', v_bad;
+  END IF;
   -- §17: the owners' run is "the running run" because at most one run runs at a depot (read live 13:15:42 UTC:
   -- ottoq_one_running_run_per_depot, unique on depot_id WHERE status = 'running')
   IF NOT EXISTS (SELECT 1 FROM pg_index i
@@ -712,19 +851,27 @@ END $fresh$;
 
 -- ── P3 (the review, round 3): nothing runs at the twin depot. §17 makes the owners' run the RUNNING run first, and V3's
 --    probe inserts a paused production run that is the owners' run only while nothing runs there (a run that ran would
---    take the probe's commands). Applying this file needs the depot idle or paused: pause or stop the running run first. ──
+--    take the probe's commands). Applying this file needs the depot idle or paused: pause or stop the running run first.
+--    (The review, round 4) And no production run paused there: the probe's paused production run is then a second live
+--    production run, which §17 (g) refuses. Stop a paused production run (ottoq_sim_mark_stopped) before applying. ──
 DO $idle$
-DECLARE v_running uuid;
+DECLARE v_running uuid; v_prod uuid;
 BEGIN
   SELECT r.sim_run_id INTO v_running FROM public.ottoq_sim_runs r
    WHERE r.depot_id = '11111111-1111-1111-1111-111111111111' AND r.status = 'running' LIMIT 1;
   IF v_running IS NOT NULL THEN
     RAISE EXCEPTION '0721 P3: run % is running at the twin depot; V3 probes the owner door on a paused production run, which a running run outranks. Pause or stop it, then apply', v_running;
   END IF;
+  --: (the review, round 4) and V3's paused production run is the one live production run there (§17 (g))
+  SELECT r.sim_run_id INTO v_prod FROM public.ottoq_sim_runs r
+   WHERE r.depot_id = '11111111-1111-1111-1111-111111111111' AND r.status = 'paused' AND r.run_by = 'production_live' LIMIT 1;
+  IF v_prod IS NOT NULL THEN
+    RAISE EXCEPTION '0721 P3: production run % is paused at the twin depot; V3 probes the owner door on a paused production run of its own, and at most one production run may be live at a depot (§17 (g)). Stop it (ottoq_sim_mark_stopped), then apply', v_prod;
+  END IF;
 END $idle$;
 
--- ── the rollback snapshot of the thirteen bodies this file replaces or re-sets (the tick: its §10 writer setting and
---    §17's one line) ──
+-- ── the rollback snapshot of the fourteen bodies this file replaces or re-sets (the tick: its §10 writer setting and
+--    §17's lines) ──
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
 SELECT '0721_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -741,7 +888,9 @@ SELECT '0721_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), 
                  --: §17 (the review, round 3)
                  'public.ottoq_owner_charge_limit(uuid)'::regprocedure,
                  'public.ottoq_owner_read(public.ottoq_agent_principals,text,jsonb)'::regprocedure,
-                 'public.ottoq_agent_live_run(uuid)'::regprocedure);
+                 'public.ottoq_agent_live_run(uuid)'::regprocedure,
+                 --: (the review, round 4; G494) the engine's one answer to how full a car charges
+                 'public.ottoq_effective_target_soc_at(uuid,timestamp with time zone)'::regprocedure);
 
 -- ══ 1. the three columns ════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -1011,7 +1160,8 @@ REVOKE ALL ON FUNCTION public.ottoq_owner_restamp(uuid, uuid, uuid[]) FROM PUBLI
 --: only): this file moves five of them to ottoq_owner_live_run (above), and the seven others follow it here unchanged:
 --: ottoq_agent_read_depot, ottoq_agent_read_stalls and ottoq_agent_read_decisions (the run they read), ottoq_agent_submit_request
 --: (the run a request is recorded against), ottoq_agent_request_decide (an approved ops action is applied only while the run
---: it was recorded against is still this run, so "no longer the live run" now means no longer the owners' run), and the
+--: it was recorded against is still this run, so "no longer the live run" now means no longer the owners' run; it has no
+--: function caller and is EXECUTE-able by authenticated and service_role: the person who decides a request calls it), and the
 --: two welcomes (the run they describe). With production running and a demo run started after it and paused, each of
 --: them answered for the paused demo. One rule, ottoq_owner_run_id, for every principal: the running run, which is the
 --: run the depot's cars follow, whoever reads; else the newest paused production run; else the newest paused demo run.
@@ -1610,9 +1760,14 @@ DECLARE
       v_refusal := CASE WHEN EXISTS (SELECT 1 FROM public.ottoq_owner_saved_settings s
                                       WHERE s.command_id = v_target.command_id AND s.status = ''active'')
         THEN jsonb_build_object(''code'', ''made_on_an_earlier_run'', ''message'', ''That command was made on an earlier run, and what it set is saved to your cars and still in force: it stays from run to run. Undo works on the run a command was made on; to change it now, set a new charge limit, clear it (clear_charge_limit), or withdraw the order (cancel_service).'')
-        --: (the review, round 3) lifted on this very run, as a production run took over the depot
-        WHEN v_target.sim_run_id IS NOT DISTINCT FROM v_run_id AND v_target.lifted_at IS NOT NULL
+        --: (the review, rounds 3 and 4) lifted by a production run''s takeover: that, not that its run ended, whichever run
+        --: the undo is sent on and whether or not its run has ended since (a run''s end stamps no command already lifted)
+        WHEN v_target.lifted_at IS NOT NULL AND v_target.lifted_reason = ''a production run took over the depot''
         THEN jsonb_build_object(''code'', ''lifted'', ''message'', format(''That command''''s settings were lifted (%s), so there is nothing left of it to undo.'', v_target.lifted_reason))
+        --: (the review, round 4) made on another run that is still live, but not the run the owner''s commands go to now
+        WHEN v_target.lifted_at IS NULL AND v_target.sim_run_id IS DISTINCT FROM v_run_id
+             AND EXISTS (SELECT 1 FROM public.ottoq_sim_runs r WHERE r.sim_run_id = v_target.sim_run_id AND r.status IN (''running'', ''paused''))
+        THEN jsonb_build_object(''code'', ''made_on_an_earlier_run'', ''message'', format(''That command was made on another run, still %s at the depot, which is not the run your commands go to now. Undo works on the run a command was made on: send it again when that run is the one your commands go to, or change what your cars have now (set a new charge limit, clear it with clear_charge_limit, or withdraw the order with cancel_service).'', (SELECT r.status FROM public.ottoq_sim_runs r WHERE r.sim_run_id = v_target.sim_run_id)))
         ELSE jsonb_build_object(''code'', ''run_ended'', ''message'', ''That command applied to a run that has ended; its settings were lifted with it.'') END;
 '],
     -- i2. (§9, the re-review) the run's writes take the run's effects only; a saved change is applied after them, under the
@@ -2122,11 +2277,13 @@ END $fn$;
 --: car leave at 80%, and OTTO-Q told the signed-in owner the car charges to 100%.
 --: (The review, round 3; rule 9) re-measured and widened. A production run takes over when it becomes the RUNNING run at
 --: the depot: at its start (inserted running) and at its resume (paused -> running). Then (1) every OTHER live run's
---: per-run owner settings at the depot are lifted, a paused production run's included (R3/S5: two production runs, and
---: ottoq_production_start and ottoq_production_stop are not changed: start refuses only a running run, stop stops only
---: the running one); a row that carries a person's saved setting (saved_id) stays, because §17's propagation keeps every
---: live run's saved rows in step with what is saved, and it is the car's on every run; (2) the run-start trigger carries
---: what is saved onto the production run; and (3) EVERY car at the depot whose vehicles.target_soc is not the target
+--: per-run owner settings at the depot are lifted, a paused production run's included (R3/S5: ottoq_production_start
+--: refuses only a running run, so two production runs could be live together; since the review, round 4, the database
+--: refuses a second live production run at a depot, ottoq_tg_one_live_production_run below, so that case is left only
+--: for a pair already live before this file); a row that carries a person's saved setting (saved_id) stays, because
+--: §17's propagation keeps every live run's saved rows in step with what is saved, and it is the car's on every run;
+--: (2) the run-start trigger carries what is saved onto the production run; and (3) EVERY car at the depot whose
+--: vehicles.target_soc is not the target
 --: pinned to the production run is re-stamped (ottoq_owner_restamp), so a stamp left by any run's tick, a limit withdrawn
 --: on a paused run that no tick reconciled (R4), or a run's end that found nothing active, cannot outlive the takeover.
 --: Nothing happens as production pauses: the paused production run is still the owners' run (ottoq_owner_run_id ranks a
@@ -2214,6 +2371,78 @@ CREATE TRIGGER ottoq_sim_runs_carry_saved_owner_settings_on_start
         AND new.run_by = ANY (ARRAY['operator_demo'::text, 'production_live'::text])
         AND new.status = ANY (ARRAY['running'::text, 'paused'::text]))
   EXECUTE FUNCTION public.ottoq_tg_owner_saved_on_run_start();
+
+--: (the review, round 4; rule 9) AT MOST ONE LIVE PRODUCTION RUN PER DEPOT. ottoq_production_start (md5 ea2945cb, P1)
+--: refuses only a RUNNING run at the depot, so with production paused it started a second production run, and that run's
+--: takeover lifted the paused one's per-run orders and holds: a person's interior deep clean 'now' (the receipt said the
+--: car does not leave until it is done) and a hold until 1:00 PM came off, the car could leave the new run at 100% without
+--: the deep clean and the held car before its hold, my_settings said nothing was in force, and resuming the first run left
+--: them lifted (the review's scen_n3b, reproduced on the scratch chain 2026-10-17 11:12 AM CT). Now the database refuses
+--: what makes a second one live: a production_live run inserted running or paused while another production_live run is
+--: running or paused at its depot, and a production run resumed (paused -> running, ottoq_resume_run or the twin app's
+--: PATCH), or a live run turned into a production one, while another is live there (23505, the message says which run
+--: and what to do). A demo run's start and resume are untouched, pausing is untouched, and so is the takeover of a
+--: production run that becomes the running run (§17 (c)): it still lifts every OTHER live run's per-run settings, and a
+--: paused production run's too for any pair that was already live before this file. Read live (SELECT only, 2026-10-17
+--: 16:33-16:36 UTC, 11:33-11:36 AM CT): no run was running or paused anywhere, so no depot held such a pair; the
+--: functions that insert a run are the five certification arms (run_by 'benchmark'), twin.ottoq_sim_start_run (its four
+--: callers, the determinism pair and its replay, the tick-invariance arm and the A/B pair, pass cert_harness or
+--: ab_harness), ottoq_sim_run_scenario (the dial pair and the throughput sweep arm pass ab_harness, the demo start
+--: operator_demo, and ottoq_operator_start_run its caller's kind; it stops every running or paused run at the depot before
+--: it inserts) and ottoq_production_start (production_live), which no function and no cron job calls; no function updates
+--: a run's run_by. A transaction-level advisory lock per depot serialises two such writes, so two sessions cannot both see
+--: none and both go live.
+CREATE OR REPLACE FUNCTION public.ottoq_tg_one_live_production_run()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+DECLARE
+  v_other  uuid;
+  v_status text;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('ottoq.one_live_production_run:' || COALESCE(NEW.depot_id::text, ''), 0));
+  SELECT o.sim_run_id, o.status INTO v_other, v_status
+    FROM public.ottoq_sim_runs o
+   WHERE o.depot_id = NEW.depot_id AND o.sim_run_id <> NEW.sim_run_id
+     AND o.run_by = 'production_live' AND o.status IN ('running', 'paused')
+   ORDER BY (o.status = 'running') DESC, o.started_at DESC NULLS LAST, o.sim_run_id
+   LIMIT 1;
+  IF v_other IS NULL THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    RAISE EXCEPTION USING ERRCODE = '23505',
+      MESSAGE = format('a production run is already live at this depot (%s); %s', v_status,
+                       CASE WHEN v_status = 'paused' THEN 'resume it or stop it first' ELSE 'stop it first' END),
+      DETAIL = format('Run %s is a production run %s at depot %s, and at most one production run is live at a depot: a second '
+                      'one would lift its owners'' orders and holds (0721, the review, round 4).', v_other, v_status, NEW.depot_id),
+      HINT = CASE WHEN v_status = 'paused' THEN 'Resume it (ottoq_resume_run), or stop it (ottoq_sim_mark_stopped), then start production again.'
+                  ELSE 'Stop it (ottoq_production_stop), then start production again.' END;
+  END IF;
+  RAISE EXCEPTION USING ERRCODE = '23505',
+    MESSAGE = format('another production run is already live at this depot (%s); stop it first, then resume this one', v_status),
+    DETAIL = format('Run %s is a production run %s at depot %s, and at most one production run is live at a depot (0721, the '
+                    'review, round 4).', v_other, v_status, NEW.depot_id),
+    HINT = CASE WHEN v_status = 'paused' THEN 'Stop it (ottoq_sim_mark_stopped), then resume this one.'
+                ELSE 'Stop it (ottoq_production_stop), then resume this one.' END;
+END $fn$;
+REVOKE ALL ON FUNCTION public.ottoq_tg_one_live_production_run() FROM PUBLIC, anon, authenticated, service_role;
+
+--: no arm is a production run (see above), so these never fire inside a certification, a dial pair or a sweep arm
+CREATE TRIGGER ottoq_sim_runs_one_live_production_run
+  BEFORE INSERT ON public.ottoq_sim_runs
+  FOR EACH ROW
+  WHEN (new.run_by = 'production_live' AND new.status = ANY (ARRAY['running'::text, 'paused'::text]))
+  EXECUTE FUNCTION public.ottoq_tg_one_live_production_run();
+CREATE TRIGGER ottoq_sim_runs_one_live_production_run_on_change
+  BEFORE UPDATE OF status, run_by ON public.ottoq_sim_runs
+  FOR EACH ROW
+  WHEN (new.run_by = 'production_live' AND new.status = ANY (ARRAY['running'::text, 'paused'::text])
+        AND (old.run_by IS DISTINCT FROM new.run_by
+             OR (old.status IS DISTINCT FROM new.status AND new.status = 'running')))
+  EXECUTE FUNCTION public.ottoq_tg_one_live_production_run();
 
 --: the run's end lifts a saved command's settings from the run, and does not stamp the command as lifted. (The review,
 --: round 3; rule 9, R4) It also runs for a run whose only charge-limit rows were withdrawn or replaced and never reconciled
@@ -2303,21 +2532,86 @@ BEGIN
 END $fn$;
 
 --: (the review, round 3) the owner tick computes each car's target with its own run pinned, never unpinned: in production's
---: world step it runs first, before anything pins ottoq.sim_run_id (twin.ottoq_world_advance, read live 2026-10-15). The
---: tick's body is 0605's otherwise (P1 pins it); this one line is the change
+--: world step it runs first, before anything pins ottoq.sim_run_id (twin.ottoq_world_advance, read live 2026-10-15).
+--: (The review, round 4; rule 9) and it marks reconciled only what it reconciled. Step (1) re-stamped the cars its loop
+--: found pending and then, in a separate statement, cleared pending_reconcile on EVERY pending limit row of the run, and
+--: step (3c) did the same for every pending service row after its loop: under READ COMMITTED each statement sees what has
+--: committed by then, so a person's clear, raise or one-time order that committed while the loop ran (here, while it waited
+--: on a car row or a visit row another session held) was marked reconciled and never applied. Reproduced on the scratch
+--: chain (the review's race_tick.py and race_tick_service.py, 2026-10-17 11:13 AM CT): a clear and a raise answered with a
+--: full-charge receipt while the row read withdrawn (or the new 95 active) with pending false and vehicles.target_soc
+--: stayed 85 through three more ticks; a 'now' interior tidy ended active with pending false and no atom on the visit,
+--: so ottoq_departure_clear let the car go right after the raced tick. Now step (1) takes its pending limit rows and locks
+--: them as it starts (SKIP LOCKED: a row a command holds right now is left pending for the next tick, so the tick never
+--: waits on a command) and clears exactly those, by setting_id; step (3c) locks each active order as it reaches it (the
+--: same) and clears that one row, as (3a) already did, and only while it is still active. The tick's body is 0605's
+--: otherwise (P1 pins it); each anchor occurs exactly once
 DO $tick$
 DECLARE
   v_def text := pg_get_functiondef('ottoq.ottoq_owner_orders_tick(uuid,timestamp with time zone)'::regprocedure);
-  c_old constant text := E'    v_tgt := public.ottoq_effective_target_soc_at(r.vehicle_id, p_clock);\n';
-  c_new constant text := E'    --: 0721 (the review, round 3): with this tick''s run pinned (ottoq_owner_target_on_run), never unpinned\n'
-                      || E'    v_tgt := public.ottoq_owner_target_on_run(r.vehicle_id, p_sim_run_id, p_clock);\n';
+  v_new text;
+  v_pair text[];
+  v_pairs text[][] := ARRAY[
+    -- (round 3) the target, with the tick's own run pinned
+    ARRAY[E'    v_tgt := public.ottoq_effective_target_soc_at(r.vehicle_id, p_clock);\n',
+          E'    --: 0721 (the review, round 3): with this tick''s run pinned (ottoq_owner_target_on_run), never unpinned\n'
+       || E'    v_tgt := public.ottoq_owner_target_on_run(r.vehicle_id, p_sim_run_id, p_clock);\n'],
+    -- (round 4) the rows step (1) reconciles
+    ARRAY[E'  v_cars     jsonb := ''[]''::jsonb;\n',
+          E'  v_cars     jsonb := ''[]''::jsonb;\n'
+       || E'  v_lim_ids  uuid[];   --: 0721 (the review, round 4): the pending limit rows step (1) reconciles\n'],
+    ARRAY[E'  FOR r IN SELECT DISTINCT x.vehicle_id FROM public.ottoq_owner_settings x\n'
+       || E'            WHERE x.sim_run_id = p_sim_run_id AND x.kind = ''charge_limit'' AND x.pending_reconcile\n'
+       || E'            ORDER BY x.vehicle_id LOOP\n',
+          E'  --: 0721 (the review, round 4): the pending limit rows this step reconciles, taken and locked as it starts (a row a\n'
+       || E'  --: command holds right now is left pending for the next tick), and the only rows it marks reconciled below\n'
+       || E'  SELECT COALESCE(array_agg(l.setting_id ORDER BY l.setting_id), ARRAY[]::uuid[]) INTO v_lim_ids\n'
+       || E'    FROM (SELECT x.setting_id FROM public.ottoq_owner_settings x\n'
+       || E'           WHERE x.sim_run_id = p_sim_run_id AND x.kind = ''charge_limit'' AND x.pending_reconcile\n'
+       || E'           ORDER BY x.setting_id\n'
+       || E'           FOR UPDATE SKIP LOCKED) l;\n'
+       || E'  FOR r IN SELECT DISTINCT x.vehicle_id FROM public.ottoq_owner_settings x\n'
+       || E'            WHERE x.setting_id = ANY (v_lim_ids)\n'
+       || E'            ORDER BY x.vehicle_id LOOP\n'],
+    ARRAY[E'  UPDATE public.ottoq_owner_settings x\n'
+       || E'     SET pending_reconcile = false, applied = x.applied || jsonb_build_object(''reconciled_at_sim'', p_clock)\n'
+       || E'   WHERE x.sim_run_id = p_sim_run_id AND x.kind = ''charge_limit'' AND x.pending_reconcile;\n',
+          E'  UPDATE public.ottoq_owner_settings x\n'
+       || E'     SET pending_reconcile = false, applied = x.applied || jsonb_build_object(''reconciled_at_sim'', p_clock)\n'
+       || E'   WHERE x.setting_id = ANY (v_lim_ids) AND x.pending_reconcile;   --: 0721 (round 4): only the rows reconciled above\n'],
+    -- (round 4) step (3c): each active order locked as the loop reaches it, and reconciled row by row
+    ARRAY[E'  FOR s IN SELECT * FROM public.ottoq_owner_settings x\n'
+       || E'            WHERE x.sim_run_id = p_sim_run_id AND x.kind = ''service'' AND x.status = ''active''\n'
+       || E'            ORDER BY x.vehicle_id, x.set_at, x.setting_id LOOP\n',
+          E'  FOR s IN SELECT * FROM public.ottoq_owner_settings x\n'
+       || E'            WHERE x.sim_run_id = p_sim_run_id AND x.kind = ''service'' AND x.status = ''active''\n'
+       || E'            ORDER BY x.vehicle_id, x.set_at, x.setting_id LOOP\n'
+       || E'    --: 0721 (the review, round 4): an order a command holds right now, or one no longer active, is left for the next\n'
+       || E'    --: tick, as step (1) leaves a limit\n'
+       || E'    PERFORM 1 FROM public.ottoq_owner_settings x WHERE x.setting_id = s.setting_id AND x.status = ''active''\n'
+       || E'       FOR UPDATE SKIP LOCKED;\n'
+       || E'    CONTINUE WHEN NOT FOUND;\n'],
+    ARRAY[E'    v_visit := NULL;\n'
+       || E'  END LOOP;\n'
+       || E'  UPDATE public.ottoq_owner_settings x SET pending_reconcile = false\n'
+       || E'   WHERE x.sim_run_id = p_sim_run_id AND x.kind = ''service'' AND x.pending_reconcile;\n',
+          E'    --: 0721 (the review, round 4): reconciled here, row by row, as (3a) does: an order a command made, withdrew or\n'
+       || E'    --: replaced while this loop ran stays pending (and holds its car) until a tick has merged or unmerged it\n'
+       || E'    UPDATE public.ottoq_owner_settings x SET pending_reconcile = false\n'
+       || E'     WHERE x.setting_id = s.setting_id AND x.pending_reconcile AND x.status = ''active'';\n'
+       || E'    v_visit := NULL;\n'
+       || E'  END LOOP;\n']];
   v_n int;
 BEGIN
-  v_n := (length(v_def) - length(replace(v_def, c_old, ''))) / length(c_old);
-  IF v_n <> 1 THEN
-    RAISE EXCEPTION '0721: the tick''s anchor occurs % times, expected exactly 1', v_n;
-  END IF;
-  EXECUTE replace(v_def, c_old, c_new);
+  v_new := v_def;
+  FOREACH v_pair SLICE 1 IN ARRAY v_pairs LOOP
+    v_n := (length(v_new) - length(replace(v_new, v_pair[1], ''))) / length(v_pair[1]);
+    IF v_n <> 1 THEN
+      RAISE EXCEPTION '0721: an anchor of the tick occurs % times, expected exactly 1: %', v_n, left(v_pair[1], 120);
+    END IF;
+    v_new := replace(v_new, v_pair[1], v_pair[2]);
+  END LOOP;
+  EXECUTE v_new;
 END $tick$;
 
 --: (the review, round 3; rule 9) the engine's one read of an owner limit with no run pinned takes only the owners' run's
@@ -2340,6 +2634,79 @@ BEGIN
   END IF;
   EXECUTE replace(v_def, c_old, c_new);
 END $climit$;
+
+--: (the review, round 4; G494 in both directions) a contract version changes how full an owner's car may or must charge,
+--: and nothing followed it onto the cars. Reproduced on the scratch chain (the review's scen_g494 and scen_r4 n8,
+--: 2026-10-17): a ceiling RAISED from 90 to 100 mid-run left Tesla 41's stamp at 90 under a target of 100, so its charge
+--: stopped at 90 and the car could not leave; a ceiling lowered under a saved 95 left the stamp at 95 above it; and a
+--: minimum raised above a carried 85 left the target at 85, under the contract's new floor, so the car could leave at 85.
+--: (1) An owner's limit is read only inside the contract in force at p_as_of: below its minimum it is not the owner's
+--: setting any more, and the car charges to the ceiling, as the carry already decides for a saved limit outside the
+--: contract (§9). The engine's one answer otherwise unchanged (P1 pins it; reached only for a car with an active owner
+--: limit, which no arm has). (2) A contract version written, changed or removed re-stamps that operator's cars at every
+--: depot with an owners' run, pinned to it (ottoq_owner_restamp), so the stamp follows at once, in either direction. Read
+--: live 2026-10-17 16:18:09 UTC: ottoq_fleet_operator_slas has no trigger, no function writes it (postgres and
+--: service_role write it directly; authenticated may read it), and it holds one version per owner.
+DO $etarget$
+DECLARE
+  v_def text := pg_get_functiondef('public.ottoq_effective_target_soc_at(uuid,timestamp with time zone)'::regprocedure);
+  c_old constant text := E'         THEN public.ottoq_owner_charge_limit(v.id) END)\n';
+  c_new constant text := E'         --: 0721 (the review, round 4; G494): the owner''s limit only inside the contract in force at p_as_of; below\n'
+                      || E'         --: its minimum the car charges to the ceiling, as the carry of a saved limit decides\n'
+                      || E'         THEN (SELECT l.pct FROM (SELECT public.ottoq_owner_charge_limit(v.id) AS pct) l\n'
+                      || E'                WHERE l.pct >= COALESCE((SELECT s.min_charge_target_pct FROM ottoq_fleet_operator_slas s\n'
+                      || E'                                          WHERE s.fleet_operator_id = v.fleet_operator_id AND s.status=''active''\n'
+                      || E'                                            AND s.effective_from <= p_as_of\n'
+                      || E'                                            AND (s.effective_until IS NULL OR s.effective_until > p_as_of)\n'
+                      || E'                                          ORDER BY s.version DESC LIMIT 1), 0)) END)\n';
+  v_n int;
+BEGIN
+  v_n := (length(v_def) - length(replace(v_def, c_old, ''))) / length(c_old);
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION '0721: the effective target''s anchor occurs % times, expected exactly 1', v_n;
+  END IF;
+  EXECUTE replace(v_def, c_old, c_new);
+END $etarget$;
+
+CREATE OR REPLACE FUNCTION public.ottoq_tg_owner_contract_restamp()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $fn$
+/* 0721 (the review, round 4; G494). A contract version written, changed or removed: that operator's cars are re-stamped
+   to their target pinned to the owners' run at each depot that has one (ottoq_owner_restamp), so vehicles.target_soc
+   follows the contract at once, whichever way it moved. A depot with no run live keeps its stamps until a run starts there
+   (a production start re-stamps every car). Not caught: a contract does not change while a car would keep a stamp the new
+   contract does not allow (a raised ceiling or minimum left under the old stamp stops the car's charge short, rule 9), so
+   a re-stamp that fails fails the contract write, and the writer sends it again. */
+DECLARE
+  v_fleets uuid[];
+  r        record;
+BEGIN
+  v_fleets := ARRAY(SELECT DISTINCT f FROM unnest(ARRAY[CASE WHEN TG_OP <> 'INSERT' THEN OLD.fleet_operator_id END,
+                                                        CASE WHEN TG_OP <> 'DELETE' THEN NEW.fleet_operator_id END]) f
+                     WHERE f IS NOT NULL);
+  FOR r IN SELECT d.depot_id, public.ottoq_owner_run_id(d.depot_id) AS run_id
+             FROM (SELECT DISTINCT x.depot_id
+                     FROM public.vehicles v
+                     CROSS JOIN LATERAL (VALUES (v.home_depot_id), (v.current_depot_id)) x(depot_id)
+                    WHERE v.fleet_operator_id = ANY (v_fleets) AND x.depot_id IS NOT NULL) d
+            ORDER BY d.depot_id LOOP
+    CONTINUE WHEN r.run_id IS NULL;
+    PERFORM public.ottoq_owner_restamp(r.depot_id, r.run_id,
+              ARRAY(SELECT v.id FROM public.vehicles v
+                     WHERE v.fleet_operator_id = ANY (v_fleets)
+                       AND (v.home_depot_id = r.depot_id OR v.current_depot_id = r.depot_id)
+                     ORDER BY v.id));
+  END LOOP;
+  RETURN NULL;
+END $fn$;
+REVOKE ALL ON FUNCTION public.ottoq_tg_owner_contract_restamp() FROM PUBLIC, anon, authenticated, service_role;
+--: no arm writes a contract (no function does), so this never fires inside a certification, a dial pair or a sweep arm
+CREATE TRIGGER ottoq_fleet_operator_slas_owner_restamp
+  AFTER INSERT OR UPDATE OR DELETE ON public.ottoq_fleet_operator_slas
+  FOR EACH ROW EXECUTE FUNCTION public.ottoq_tg_owner_contract_restamp();
 
 --: (the review, round 3; rule 9) my_settings, my_fleet and my_vehicle read the owners' run, the one the owner door sends a
 --: command to (0605's body otherwise, P1 pins it)
@@ -3064,6 +3431,9 @@ DECLARE
   v_runid text := pg_get_functiondef('public.ottoq_owner_run_id(uuid)'::regprocedure);
   v_pin   text := pg_get_functiondef('public.ottoq_owner_target_on_run(uuid,uuid,timestamp with time zone)'::regprocedure);
   v_alr   text := pg_get_functiondef('public.ottoq_agent_live_run(uuid)'::regprocedure);
+  v_etgt  text := pg_get_functiondef('public.ottoq_effective_target_soc_at(uuid,timestamp with time zone)'::regprocedure);
+  v_one   text := pg_get_functiondef('public.ottoq_tg_one_live_production_run()'::regprocedure);
+  v_ctrs  text := pg_get_functiondef('public.ottoq_tg_owner_contract_restamp()'::regprocedure);
   v_bad   text;
 BEGIN
   --: the code of each body, comments taken out
@@ -3093,6 +3463,9 @@ BEGIN
   v_runid := regexp_replace(regexp_replace(v_runid, '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
   v_pin   := regexp_replace(regexp_replace(v_pin,   '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
   v_alr   := regexp_replace(regexp_replace(v_alr,   '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
+  v_etgt  := regexp_replace(regexp_replace(v_etgt,  '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
+  v_one   := regexp_replace(regexp_replace(v_one,   '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
+  v_ctrs  := regexp_replace(regexp_replace(v_ctrs,  '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
   --: and the stripping itself must be what it says: a commented-out branch is gone, and code is kept
   v_src := regexp_replace(regexp_replace(E'a := 1; --: b := 2;\n/* c := 3; */ d := 4;', '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
   IF strpos(v_src, 'b := 2') > 0 OR strpos(v_src, 'c := 3') > 0 OR strpos(v_src, 'a := 1') = 0 OR strpos(v_src, 'd := 4') = 0 THEN
@@ -3268,6 +3641,48 @@ BEGIN
                        AND conname = 'ottoq_owner_commands_plan_salt_check') THEN
     RAISE EXCEPTION '0721 V1 FAILED: the propagation, the carry, the undo or the salted plan hash is not the §17 one';
   END IF;
+  --: (the review, round 4) at most one live production run per depot, refused before the row is written
+  IF strpos(v_one, 'o.run_by = ''production_live'' AND o.status IN (''running'', ''paused'')') = 0
+     OR strpos(v_one, 'pg_advisory_xact_lock(') = 0 OR strpos(v_one, 'ERRCODE = ''23505''') = 0
+     OR NOT EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgname = 'ottoq_sim_runs_one_live_production_run'
+                       AND t.tgrelid = 'public.ottoq_sim_runs'::regclass AND t.tgenabled <> 'D'
+                       AND pg_get_triggerdef(t.oid) LIKE '%BEFORE INSERT ON public.ottoq_sim_runs%'
+                       AND pg_get_triggerdef(t.oid) LIKE '%(new.run_by = ''production_live''::text)%')
+     OR NOT EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgname = 'ottoq_sim_runs_one_live_production_run_on_change'
+                       AND t.tgrelid = 'public.ottoq_sim_runs'::regclass AND t.tgenabled <> 'D'
+                       AND pg_get_triggerdef(t.oid) LIKE '%BEFORE UPDATE OF status, run_by ON public.ottoq_sim_runs%'
+                       AND pg_get_triggerdef(t.oid) LIKE '%(old.run_by IS DISTINCT FROM new.run_by)%'
+                       AND pg_get_triggerdef(t.oid) LIKE '%(new.status = ''running''::text)%') THEN
+    RAISE EXCEPTION '0721 V1 FAILED: a second production run can go live at a depot (round 4)';
+  END IF;
+  --: (the review, round 4) three of round 3's fixes read by their working lines, not only their names: the owner
+  --: command propagates every applied change recorded under a person, the takeover names no other run's kind, and the
+  --: run's end re-stamps every car whose limit there was not reconciled (each passed V1 with its condition turned off)
+  IF strpos(v_cmd, 'IF v_cmd.outcome = ''applied'' AND v_person IS NOT NULL THEN' || chr(10)
+                   || '        PERFORM public.ottoq_owner_saved_propagate(v_cmd.command_id);') = 0
+     OR strpos(v_yield, 'o.run_by') > 0
+     OR strpos(v_lift, 'AND s.pending_reconcile)) x(id)));') = 0 THEN
+    RAISE EXCEPTION '0721 V1 FAILED: the propagation, the takeover or the run''s end re-stamp is not round 3''s working line';
+  END IF;
+  --: the tick marks reconciled only what it reconciled: step (1) its locked rows, step (3c) row by row
+  IF strpos(v_tick, 'FOR UPDATE SKIP LOCKED) l;') = 0
+     OR strpos(v_tick, 'WHERE x.setting_id = ANY (v_lim_ids)') = 0
+     OR strpos(v_tick, 'WHERE x.setting_id = ANY (v_lim_ids) AND x.pending_reconcile;') = 0
+     OR strpos(v_tick, 'WHERE x.setting_id = s.setting_id AND x.pending_reconcile AND x.status = ''active'';') = 0
+     OR strpos(v_tick, 'WHERE x.sim_run_id = p_sim_run_id AND x.kind = ''charge_limit'' AND x.pending_reconcile;') > 0
+     OR strpos(v_tick, 'WHERE x.sim_run_id = p_sim_run_id AND x.kind = ''service'' AND x.pending_reconcile;') > 0 THEN
+    RAISE EXCEPTION '0721 V1 FAILED: the tick still marks rows reconciled that it did not reconcile (round 4)';
+  END IF;
+  --: a contract change follows onto the cars, and an owner's limit under the contract's minimum is not read
+  IF strpos(v_etgt, 'WHERE l.pct >= COALESCE((SELECT s.min_charge_target_pct FROM ottoq_fleet_operator_slas s') = 0
+     OR strpos(v_ctrs, 'PERFORM public.ottoq_owner_restamp(r.depot_id, r.run_id,') = 0 OR strpos(v_ctrs, 'EXCEPTION') > 0
+     OR NOT EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgname = 'ottoq_fleet_operator_slas_owner_restamp'
+                       AND t.tgrelid = 'public.ottoq_fleet_operator_slas'::regclass AND t.tgenabled <> 'D')
+     OR strpos(v_cmd, '''That command was made on another run, still %s at the depot, which is not the run your commands go to now.') = 0
+     OR strpos(v_cmd, 'WHEN v_target.lifted_at IS NOT NULL AND v_target.lifted_reason = ''a production run took over the depot''') = 0
+     OR strpos(v_yield, 'SET lifted_at = now(), lifted_reason = ''a production run took over the depot''') = 0 THEN
+    RAISE EXCEPTION '0721 V1 FAILED: a contract change does not follow onto the cars, or undo''s answers are not the round-4 ones';
+  END IF;
   RAISE NOTICE '0721 V1 PASSED';
 END $v1$;
 
@@ -3294,6 +3709,9 @@ BEGIN
                       'public.ottoq_owner_saved_propagate(uuid)',
                       --: G495: its grants are kept (postgres only)
                       'public.ottoq_agent_live_run(uuid)',
+                      --: (the review, round 4)
+                      'public.ottoq_tg_one_live_production_run()',
+                      'public.ottoq_tg_owner_contract_restamp()',
                       'public.ottoq_owner_read_shown(public.ottoq_agent_principals,jsonb)',
                       'public.ottoq_owner_saved_effect(public.vehicles,text,text,numeric,numeric)',
                       'public.ottoq_tg_owner_saved_on_run_start()',
@@ -3341,7 +3759,10 @@ END $v2$;
 -- object; a confirm by command id alone binds nothing) and the owners' run (a paused demo run started after production
 -- does not take production's commands or whoami). It does not start or resume a production run, so the takeover (which
 -- re-stamps every car at the depot) is proved by the test suite, not here: on live it would hold a row lock on every car
--- for the length of the probe.
+-- for the length of the probe. (The review, round 4) Two previews of one plan get two salts and two hashes; a second
+-- production run inserted while the probe's is live (paused) is refused, 23505, with the message the operator reads
+-- (§17 (g)); and the carry is probed on a paused demo run, since a second production run cannot go live beside the
+-- probe's. A contract change is not probed here: it would re-stamp the owner's cars, a row lock on each for the probe.
 DO $v3$
 DECLARE
   c_twin   constant uuid := '11111111-1111-1111-1111-111111111111';
@@ -3369,9 +3790,15 @@ DECLARE
   r_idonly    jsonb;
   v_t_idonly  numeric;
   r_who2      jsonb;
+  --: (the review, round 4)
+  r_lower2    jsonb;
+  v_salts     int;
+  v_second    text := 'not reached';
+  v_second_msg text;
   v_alr_same  boolean;
   v_alr_run   text;
   v_demo_run  uuid := gen_random_uuid();
+  v_demo_mid  numeric;
   v_hash      text;
   v_t_confirm numeric;
   v_t_undo    numeric;
@@ -3435,11 +3862,6 @@ BEGIN
     v_pid2 := public.ottoq_oauth_connect(v_acct, v_client, 'ottoyard:owner', 'https://probe.invalid/account/mcp', 'device_code');
     INSERT INTO public.ottoq_oauth_tokens (token_hash, kind, principal_id, expires_at)
     VALUES (public.ottoq_oauth_sha256(v_oauth2), 'access', v_pid2, now() + interval '10 minutes');
-    INSERT INTO public.ottoq_agent_principals (name, kind, depot_id, fleet_operator_id, capabilities, token_hash, token_prefix,
-                                              origin, display_name, expires_at, note)
-    VALUES ('v0721-probe-passcode', 'personal', c_twin, v_fleet, ARRAY['note', 'owner_settings', 'read'],
-            public.ottoq_oauth_sha256(v_pass), left(v_pass, 12), 'passcode', '0721 probe', now() + interval '10 minutes',
-            '0721 V3 probe, rolled back');
     v_key := public.ottoq_agent_issue_token('v0721-probe-key', 'personal', ARRAY['read', 'note', 'owner_settings'], v_fleet,
                                             c_twin, '0721 V3 probe, rolled back', 600, 20) ->> 'token';
     SELECT v.id INTO v_car FROM public.vehicles v
@@ -3454,6 +3876,11 @@ BEGIN
                                        'mcp', '{}'::jsonb);
     v_prev := (r_lower #>> '{data,command,command_id}')::uuid;
     v_hash := r_lower #>> '{data,confirm,args,expect_plan_hash}';
+    -- 1c. (the review, round 4) the same call again: a second preview of the same plan, with a salt and a hash of its own
+    r_lower2 := public.ottoq_agent_call(v_th, 'set_charge_limit', jsonb_build_object('vehicles', 'all', 'percent', v_low),
+                                        'mcp', '{}'::jsonb);
+    SELECT count(DISTINCT c.plan_salt) INTO v_salts FROM public.ottoq_owner_commands c
+     WHERE c.command_id IN (v_prev, (r_lower2 #>> '{data,command,command_id}')::uuid) AND c.plan_salt IS NOT NULL;
     -- 1a. (§17) the same preview confirmed by its command id alone, through the confirm door: binds nothing, applies
     --     nothing, and is recorded as a new preview
     r_idonly := public.ottoq_agent_call(v_th, r_lower #>> '{data,confirm,tool}', (r_lower #> '{data,confirm,args}') - 'expect_plan_hash',
@@ -3478,12 +3905,13 @@ BEGIN
     --     and (G495) every other agent door's live run is the same run: ottoq_agent_live_run names production too
     v_alr_run := public.ottoq_agent_live_run(c_twin) ->> 'sim_run_id';
     v_alr_same := public.ottoq_agent_live_run(c_twin) IS NOT DISTINCT FROM public.ottoq_owner_live_run(c_twin);
-    -- 2b. (§9) what the person confirmed is saved to the cars, and carried onto the next production run: a second run,
-    --     started earlier than the probe run so the probe run stays the live one, carries it; ending that run lifts it from
-    --     the run and does not stamp the command as lifted
+    -- 2b. (§9) what the person confirmed is saved to the cars, and carried onto the next run: a second run (a demo run,
+    --     paused: a second production run cannot go live while the probe's is, §17 (g)) carries it; ending that run lifts
+    --     it from the run and does not stamp the command as lifted. (The probe's passcode session is opened after this:
+    --     ending a demo run ends every passcode session, 0607)
     SELECT count(*) INTO v_saved FROM public.ottoq_owner_saved_settings s WHERE s.command_id = v_cmd AND s.status = 'active';
     EXECUTE format('INSERT INTO public.ottoq_sim_runs (sim_run_id, status, started_at, run_by, %1$s) '
-                   'SELECT $1, ''paused'', clock_timestamp() - interval ''1 day'', ''production_live'', %1$s FROM public.ottoq_sim_runs WHERE sim_run_id = $2',
+                   'SELECT $1, ''paused'', clock_timestamp() - interval ''1 day'', ''operator_demo'', %1$s FROM public.ottoq_sim_runs WHERE sim_run_id = $2',
                    v_cols) USING v_run2, v_tpl;
     SELECT count(*) INTO v_carried FROM public.ottoq_owner_settings o
      WHERE o.sim_run_id = v_run2 AND o.saved_id IS NOT NULL AND o.status = 'active' AND o.command_id = v_cmd;
@@ -3493,6 +3921,22 @@ BEGIN
     UPDATE public.ottoq_sim_runs SET status = 'completed' WHERE sim_run_id = v_run2;
     SELECT c.lifted_at INTO v_lifted FROM public.ottoq_owner_commands c WHERE c.command_id = v_cmd;
     SELECT count(*) INTO v_saved_after FROM public.ottoq_owner_saved_settings s WHERE s.command_id = v_cmd AND s.status = 'active';
+    -- 2c. (the review, round 4) a second production run cannot go live at the depot while the probe's is: refused, with why
+    BEGIN
+      EXECUTE format('INSERT INTO public.ottoq_sim_runs (sim_run_id, status, started_at, run_by, %1$s) '
+                     'SELECT gen_random_uuid(), ''paused'', clock_timestamp(), ''production_live'', %1$s FROM public.ottoq_sim_runs WHERE sim_run_id = $1',
+                     v_cols) USING v_tpl;
+      v_second := 'inserted';
+    EXCEPTION WHEN unique_violation THEN
+      v_second := 'refused';
+      GET STACKED DIAGNOSTICS v_second_msg = MESSAGE_TEXT;
+    END;
+    --    the probe's passcode session, opened now (§12 and step 8 use it)
+    INSERT INTO public.ottoq_agent_principals (name, kind, depot_id, fleet_operator_id, capabilities, token_hash, token_prefix,
+                                              origin, display_name, expires_at, note)
+    VALUES ('v0721-probe-passcode', 'personal', c_twin, v_fleet, ARRAY['note', 'owner_settings', 'read'],
+            public.ottoq_oauth_sha256(v_pass), left(v_pass, 12), 'passcode', '0721 probe', now() + interval '10 minutes',
+            '0721 V3 probe, rolled back');
     SELECT l.transport INTO v_ledger FROM public.ottoq_agent_call_ledger l WHERE l.call_id = (r_confirm ->> 'call_id')::bigint;
     -- 3. the same confirm again applies nothing; a second apply naming the preview, written straight into the table, is
     --    refused by the unique index; and a confirm naming a command that is no preview is refused by the backstop
@@ -3517,6 +3961,9 @@ BEGIN
     -- 4. raising is one call; undoing that raise puts the lower limit back, so it is gated like a new lower limit
     r_mid := public.ottoq_agent_call(v_th, 'set_charge_limit', jsonb_build_object('vehicles', 'all', 'percent', v_mid),
                                      'rest', '{}'::jsonb);
+    --    (the review, round 4) and the person's raise holds on the paused demo run too (§17 (d)'s propagation)
+    SELECT o.charge_limit_pct INTO v_demo_mid FROM public.ottoq_owner_settings o
+     WHERE o.sim_run_id = v_demo_run AND o.vehicle_id = v_car AND o.kind = 'charge_limit' AND o.status = 'active';
     r_undo := public.ottoq_agent_call(v_th, 'undo_command', jsonb_build_object('command_id', r_mid #>> '{data,command,command_id}'),
                                       'mcp', '{}'::jsonb);
     v_t_undo := public.ottoq_effective_target_soc_at(v_car, now());
@@ -3606,6 +4053,16 @@ BEGIN
   IF v_hash IS NULL OR v_hash !~ '^[0-9a-f]{32}$' OR r_lower #> '{data,command}' ? 'plan_hash'
      OR strpos(r_lower #>> '{data,summary}', v_hash) > 0 OR strpos(r_lower #>> '{data,summary}', v_prev::text) > 0 THEN
     RAISE EXCEPTION '0721 V3 FAILED: a preview''s receipt carries its plan hash or id outside its confirm object: %', r_lower;
+  END IF;
+  IF r_lower2 #>> '{data,outcome}' IS DISTINCT FROM 'previewed' OR v_salts IS DISTINCT FROM 2
+     OR r_lower2 #>> '{data,confirm,args,expect_plan_hash}' IS NOT DISTINCT FROM v_hash THEN
+    RAISE EXCEPTION '0721 V3 FAILED: two previews of one plan did not get two salts and two hashes (% salts): %', v_salts, r_lower2;
+  END IF;
+  IF v_demo_mid IS DISTINCT FROM v_mid THEN
+    RAISE EXCEPTION '0721 V3 FAILED: the person''s raise to % on production left the paused demo run at %', v_mid, v_demo_mid;
+  END IF;
+  IF v_second IS DISTINCT FROM 'refused' OR strpos(COALESCE(v_second_msg, ''), 'a production run is already live at this depot (paused') = 0 THEN
+    RAISE EXCEPTION '0721 V3 FAILED: a second production run went live at the depot (%: %)', v_second, v_second_msg;
   END IF;
   IF (r_idonly ->> 'http_status')::int <> 422 OR r_idonly #>> '{error,code}' IS DISTINCT FROM 'confirm_required'
      OR r_idonly #>> '{data,refusal,reason}' IS DISTINCT FROM 'not_named' OR r_idonly #>> '{data,outcome}' IS DISTINCT FROM 'previewed'
