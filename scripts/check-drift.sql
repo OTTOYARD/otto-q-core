@@ -793,7 +793,8 @@ repo_manifest(version, name, file) AS (
     ('20261017164907'::text, 'a_held_site_powers_the_cars_due_first'::text, '0737_a_held_site_powers_the_cars_due_first.sql'::text),
     ('PENDING'::text, 'the_nightly_charge_clock_refit_gets_the_time_it_needs'::text, '0738_the_nightly_charge_clock_refit_gets_the_time_it_needs.sql'::text),
     ('20261017173306'::text, 'a_promise_counts_the_cars_still_waiting'::text, '0739_a_promise_counts_the_cars_still_waiting.sql'::text),
-    ('20261017174210'::text, 'a_promise_on_the_busy_day'::text, '0740_a_promise_on_the_busy_day.sql'::text)
+    ('20261017174210'::text, 'a_promise_on_the_busy_day'::text, '0740_a_promise_on_the_busy_day.sql'::text),
+    ('20261017182220'::text, 'the_promise_is_graded_beside_what_the_owner_app_says'::text, '0741_the_promise_is_graded_beside_what_the_owner_app_says.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

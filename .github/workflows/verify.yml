@@ -493,9 +493,11 @@ jobs:
       # with the live charge line md5-asserted and a stub of 0735's tick and the two sweeps 0736 reads: each applies and
       # refuses a second time, each situation, a promise's arithmetic against the simulator's own seats, the recorder once
       # per visit and the append-only ledger, the grade, Kaplan-Meier against a hand computation, two runs of one world
-      # alike, a lower bound where the curve does not reach, and the recorder's newest visit. 13 tests, about 30 seconds:
-      # one template database, cloned per test.
-      - name: A realistic promise at arrival counts the cars still waiting, executed (0736, 0739 against the live charge line)
+      # alike, a lower bound where the curve does not reach, and the recorder's newest visit. 0741 (G454): beside each
+      # promise, the time the owner app says, asked of the app's own functions (live bodies, md5-asserted), a failing app
+      # leaving the promises written, and the grade of both on the same cars by hand. 17 tests, about 40 seconds: one
+      # template database, cloned per test.
+      - name: A realistic promise at arrival counts the cars still waiting and is graded beside what the owner app says, executed (0736, 0739, 0741 against the live charge line and owner app)
         env:
           PGHOST: localhost
           PGPORT: "5432"

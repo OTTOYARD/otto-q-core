@@ -439,6 +439,11 @@
 --   the honest promise is long: arm 81's three test cars went from a median 140-188 minutes to 470-560.
 --   0740 (applied 17:42 UTC) queues the same promise on arm 82's busy day, right after the normal day's promise arm,
 --   so the grade covers both; it must agree with arm 82 on every outcome. Query (13) reads either arm's grade.
+--   What the owner is told today is a different time (G454, 0741, applied 18:22 UTC). The owner app, and a personal
+--   agent through OTTO-Command, says "Planned to be ready around ..." from the end of the car's last planned itinerary
+--   leg, not from the promise, and that time has never been graded: the itinerary is amended in place, so what an owner
+--   was told at arrival cannot be read back. 0741 records the app's time beside each promise on both promise arms and
+--   grades both on the same cars. Query (18) puts them side by side.
 
 -- ══ QUERIES ══
 
@@ -791,3 +796,18 @@ SELECT count(*) AS promises, count(floor_at) AS booked,
        count(*) FILTER (WHERE floor_at IS NULL AND ready_at IS NOT NULL) AS unbooked_and_ready
   FROM p;
 
+-- (18) G454: what the owner app says beside the promise, on a promise arm's run (0741). The grade scores both on the
+--      same cars: by_owner (ready by the app's time) against the promise's by_p50 and by_p90 on those cars, the app's
+--      mean absolute error against the promise median's, the app's bias (positive: cars took longer than it said), and
+--      owner_in_past (the app named a time already gone when it was read). Substitute the sweep code
+--      (promise_normal_2026_10_17 or promise_busy_2026_10_17). Before a promise arm has run it returns no row.
+WITH run AS (SELECT a.sim_run_id FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+              WHERE s.sweep_code = 'promise_busy_2026_10_17' ORDER BY a.ran_at DESC LIMIT 1),
+g AS (SELECT public.ottoq_ready_promise_grade(run.sim_run_id) AS j FROM run)
+SELECT j ->> 'promises' AS promises, j ->> 'ready' AS ready, j ->> 'with_owner' AS app_named_a_time,
+       j ->> 'owner_in_past' AS app_time_already_gone,
+       j ->> 'by_owner' AS ready_by_app_time, j ->> 'by_p50_with_owner' AS ready_by_p50, j ->> 'by_p90_with_owner' AS ready_by_p90,
+       j ->> 'owner_mae_min' AS app_mae_min, j ->> 'mae_p50_min_with_owner' AS promise_mae_min,
+       j ->> 'owner_bias_min' AS app_bias_min, j ->> 'owner_min_median' AS app_said_median_min,
+       j ->> 'p50_min_median' AS promise_p50_median_min, j ->> 'actual_min_median' AS took_median_min
+  FROM g;

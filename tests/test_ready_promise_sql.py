@@ -3,7 +3,8 @@
 WHY THIS EXISTS. 0736 tells an owner, when their car arrives, when it will really be ready, as a median and a 90th
 percentile: its charge on the charge line's own simulator, plus what the run's earlier cars needed after their charge.
 0739 counts the cars still waiting in that second part (Kaplan-Meier), draws the promise from the world instead of the
-run's minted id, and reads it from 128 draws instead of 16. Every claim in the two headers that a test can execute is
+run's minted id, and reads it from 128 draws instead of 16. 0741 records, beside each promise, what the owner app says
+("Planned to be ready around ..."), and grades both on the same cars. Every claim in the two headers that a test can execute is
 executed here, on the scratch PostgreSQL and the miniature depot of tests/test_agent_charge_order_sql.py taken through
 0642 as tests/test_charge_order_floor_sql.py takes it, whose charge-line state, simulator, charge clock and hash draws are
 the live bodies (md5 asserted below as read on 2026-10-17); tests/fixtures/ready_promise_stub.sql adds 0735's tick (the
@@ -18,7 +19,12 @@ live pre-image, md5 asserted) and the two sweeps 0736 reads:
     samples; two runs of one world give a car one promise (0736 gave it two); a run with no random_seed draws from its
     own id; cars still waiting turn the run's allowance into a lower bound where its curve does not reach (0736 ignored
     them); a promise is read from 128 draws, by arithmetic; and the recorder no longer re-estimates a car whose older open
-    visit can never be promised.
+    visit can never be promised;
+  - 0741 applies on the owner app's live functions (tests/fixtures/owner_ready_by_stub.sql, md5 asserted), its checks
+    run, a second apply is refused and its rollback restores both bodies; the recorder records, beside each promise, the
+    time the owner app says the car will be ready, exactly as the app's own function answers it, and the promise is
+    otherwise what 0739 records; a failing owner app leaves the promises written; and the grade scores the app's time
+    beside the promise on the same cars, by hand.
 A module template carries the miniature depot through 0642 and the stub, and each test clones it.
 It SKIPS where no scratch PostgreSQL is reachable.
 """
@@ -42,6 +48,8 @@ ROOT = base.ROOT
 STUB = os.path.join(ROOT, "tests", "fixtures", "ready_promise_stub.sql")
 M0736 = os.path.join(ROOT, "db", "migrations", "0736_a_realistic_promise_at_arrival_and_its_grade.sql")
 M0739 = os.path.join(ROOT, "db", "migrations", "0739_a_promise_counts_the_cars_still_waiting.sql")
+M0741 = os.path.join(ROOT, "db", "migrations", "0741_the_promise_is_graded_beside_what_the_owner_app_says.sql")
+OWNER_STUB = os.path.join(ROOT, "tests", "fixtures", "owner_ready_by_stub.sql")
 DEPOT, RUN, T = base.DEPOT, base.RUN, base.T
 RUN2 = "a0000000-0000-0000-0000-000000000736"                    # a second run on the same world
 _vid = base._vid
@@ -67,6 +75,14 @@ LIVE_0736 = {TICK: "b8f1ea6ddfdd75b64f3a106473e09971", EST: "6806434948562e08719
 AFTER_0739 = {EST: "bc718022c00bd26ae3072f463dcd6ead", REC: "9a733c10d0a553a1f34d54eafcc887e3",
               KM: "836b85ae64802e3b5651d9f6f3e8b9ed", GRADE: "36a7250943264056b352c4b94b7d28f1",
               TICK: "b8f1ea6ddfdd75b64f3a106473e09971"}
+# the owner app's own functions, read from the live catalog on 2026-10-17 (md5 of prosrc), and the two bodies after 0741
+OWNER_LIVE = {
+    "public.ottoq_owner_car(vehicles,uuid,numeric)": "683bf45b15f8e68aa4ae64b67e5263d7",
+    "public.ottoq_owner_clock(timestamp with time zone,boolean,boolean)": "18f217209ef01e60d6583855a2a92f69",
+    "public.ottoq_owner_state_phrase(text)": "0d23bab3def7a5e8ce7c1bc1ee4fa387",
+    "public.ottoq_owner_state_group(text)": "ce2af49062888cf4ef99c3e43c8a80f4",
+}
+AFTER_0741 = {REC: "a5cd09d49ae31a6adebc875b7a329cfd", GRADE: "9058f3a5e684fcc52bc9e50bb1984a99", EST: AFTER_0739[EST], KM: AFTER_0739[KM], TICK: AFTER_0739[TICK]}
 PRIOR = {"after_no_bay": (10, 20), "after_bay": (45, 130), "door_chg_no_bay": (105, 330), "door_chg_bay": (150, 400),
          "door_nochg_no_bay": (40, 55), "door_nochg_bay": (75, 95)}
 
@@ -481,3 +497,153 @@ def test_0739_the_recorder_no_longer_re_estimates_a_car_whose_older_visit_can_ne
     promised = db.json(f"""SELECT jsonb_agg(v.visit_key ORDER BY v.visit_key) FROM public.ottoq_ready_promises p
                              JOIN public.ottoq_visit_needs v ON v.visit_id = p.visit_id WHERE p.vehicle_id = '{_vid('A')}'""")
     assert promised == ["A"]                                   # A's newest visit, as the estimator answers it
+
+
+# ── 0741: the promise beside what the owner app says ──────────────────────────────────────────────────────────────────
+
+def _through_0741(d):
+    _apply(d, M0736)
+    _apply(d, M0739)
+    rc, err = d.file(OWNER_STUB)
+    assert rc == 0, f"owner_ready_by_stub.sql did not load: {err}"
+    _apply(d, M0741)
+
+
+def _leg(d, name, minutes, status="planned", run=RUN):
+    """An itinerary leg of car `name` in `run`, planned to end `minutes` after T."""
+    d.val(f"""INSERT INTO public.ottoq_itinerary_legs (itinerary_id, sim_run_id, vehicle_id, seq, leg_type, status,
+                                                       planned_start_sim, planned_end_sim)
+              VALUES ('{uuid.uuid5(uuid.NAMESPACE_DNS, "0741-" + name)}', '{run}', '{_vid(name)}', 1, 'inspect', '{status}',
+                      '{T}'::timestamptz + make_interval(secs => {minutes} * 60 - 300),
+                      '{T}'::timestamptz + make_interval(secs => {minutes} * 60))""")
+
+
+def _owner_legs(d):
+    """A: planned legs ending at T+50 and T+130, a done leg ending at T+500 and a planned leg of another run ending at
+    T+900, so the app says T+130. B: an active leg ending at T+75. D: a planned leg that ended 30 minutes before T, from a
+    plan that never caught up. The rest: no legs, so the app names no time."""
+    _leg(d, "A", 50)
+    _leg(d, "A", 130)
+    _leg(d, "A", 500, status="done")
+    _leg(d, "A", 900, run=RUN2)
+    _leg(d, "B", 75, status="active")
+    _leg(d, "D", -30)
+
+
+def _owner_min(d, name):
+    """Minutes after T of the time the owner app said, as recorded beside the car's promise (None when it named none)."""
+    v = d.val(f"""SELECT extract(epoch FROM ((p.detail ->> 'owner_ready_by_sim')::timestamptz - '{T}'::timestamptz)) / 60
+                    FROM public.ottoq_ready_promises p WHERE p.sim_run_id = '{RUN}' AND p.vehicle_id = '{_vid(name)}'""")
+    return None if v == "" else float(v)
+
+
+def _ready_at(d, name, minutes):
+    """The car's readiness check passes `minutes` after T."""
+    d.val(f"""UPDATE public.ottoq_visit_needs
+                 SET atoms = atoms || jsonb_build_array(jsonb_build_object('svc', 'readiness_check', 'status', 'done',
+                            'done_at', '{T}'::timestamptz + make_interval(secs => {minutes} * 60)))
+               WHERE sim_run_id = '{RUN}' AND vehicle_id = '{_vid(name)}'""")
+
+
+def test_0741_applies_on_the_live_owner_app_and_refuses_a_second_apply(db):
+    rc, err = db.file(OWNER_STUB)
+    assert rc == 0, err
+    for fn, want in OWNER_LIVE.items():
+        assert _md5(db, fn) == want, fn                       # the owner app's own functions, as live
+    rc, err = db.file(M0741)
+    assert rc != 0 and "0741 P1" in err, err                   # not before 0739
+    _apply(db, M0736)
+    _apply(db, M0739)
+    _apply(db, M0741)
+    for fn, want in AFTER_0741.items():
+        assert _md5(db, fn) == want, fn                       # the estimator, Kaplan-Meier and the tick untouched
+    for fn, want in OWNER_LIVE.items():
+        assert _md5(db, fn) == want, fn                       # and the owner app too: it is called, not changed
+    assert db.val("SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage "
+                  "WHERE name = '0741_the_promise_is_graded_beside_what_the_owner_app_says'") == "falsefalse"
+    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0741_pre'") == "2"
+    rc, err = db.file(M0741)
+    assert rc != 0 and "0741 P1" in err, err
+    # the rollback restores 0739's recorder and 0736's grade exactly
+    db.val("DO $r$ DECLARE s record; BEGIN FOR s IN SELECT definition FROM public.ottoq_schema_snapshots "
+           "WHERE label = '0741_pre' LOOP EXECUTE s.definition; END LOOP; END $r$")
+    assert _md5(db, REC) == AFTER_0739[REC] and _md5(db, GRADE) == AFTER_0739[GRADE]
+
+
+def test_0741_the_recorder_records_what_the_owner_app_says_beside_each_promise(db):
+    _through_0741(db)
+    _owner_legs(db)
+    ids = db.val(f"""SELECT string_agg(quote_literal(vehicle_id::text) || '::uuid', ', ' ORDER BY vehicle_id)
+                       FROM public.ottoq_visit_needs WHERE sim_run_id = '{RUN}' AND status = 'open'""")
+    direct = {base.NAMES[r["vehicle_id"]]: r for r in db.json(
+        f"""SELECT jsonb_agg(to_jsonb(rp)) FROM public.ottoq_ready_promise('{RUN}', '{DEPOT}', '{T}', ARRAY[{ids}], 16) rp""")}
+    assert db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', '{T}')") == "7"
+    rows = {base.NAMES[r["vehicle_id"]]: r for r in db.json(
+        f"SELECT jsonb_agg(to_jsonb(p)) FROM public.ottoq_ready_promises p WHERE p.sim_run_id = '{RUN}'")}
+    assert set(rows) == set(direct) and len(rows) == 7
+    # the latest planned or active leg of the car's own run: done legs and other runs' legs are not what the app says
+    assert _owner_min(db, "A") == pytest.approx(130.0)
+    assert _owner_min(db, "B") == pytest.approx(75.0)
+    assert _owner_min(db, "D") == pytest.approx(-30.0)         # a plan in the past is still what the app says
+    for name, r in rows.items():
+        assert r["detail"]["owner_read"] is True, (name, r["detail"])
+        if name not in ("A", "B", "D"):
+            assert "owner_ready_by_sim" in r["detail"] and r["detail"]["owner_ready_by_sim"] is None, (name, r["detail"])
+        # exactly what the owner app's own function answers for the car now
+        same = db.val(f"""SELECT (p.detail ->> 'owner_ready_by_sim')::timestamptz
+                                   IS NOT DISTINCT FROM (public.ottoq_owner_car(v, '{RUN}', 100) ->> 'ready_by_sim')::timestamptz
+                            FROM public.ottoq_ready_promises p JOIN public.vehicles v ON v.id = p.vehicle_id
+                           WHERE p.sim_run_id = '{RUN}' AND p.vehicle_id = '{r["vehicle_id"]}'""")
+        assert same == "t", name
+        # and the promise is otherwise what 0739's recorder writes: the estimator's answer at that clock
+        d = dict(r["detail"])
+        d.pop("owner_read")
+        d.pop("owner_ready_by_sim")
+        assert d == direct[name]["detail"], name
+        for k in ("situation", "bundle", "plan_charge_min", "charge_p50_min", "charge_p90_min", "ready_p50_min",
+                  "ready_p90_min"):
+            assert r[k] == direct[name][k], (name, k)
+
+
+def test_0741_a_failing_owner_app_leaves_the_promises_written(db):
+    _through_0741(db)
+    db.val("DROP TABLE public.ottoq_itinerary_legs")             # the owner app's read now fails
+    rc, out, err = db.run(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', '{T}')")
+    assert rc == 0 and out[-1] == "7" and "0741 owner ready-by" in err, (out, err)
+    unread = db.json(f"""SELECT jsonb_agg(DISTINCT jsonb_build_object('read', p.detail -> 'owner_read',
+                                                                      'at', p.detail -> 'owner_ready_by_sim'))
+                           FROM public.ottoq_ready_promises p WHERE p.sim_run_id = '{RUN}'""")
+    assert unread == [{"read": False, "at": None}], unread
+    g = db.json(f"SELECT public.ottoq_ready_promise_grade('{RUN}')")
+    assert g["promises"] == 7 and g["with_owner"] == 0 and g["graded_owner"] == 0 and g["by_owner"] is None, g
+
+
+def test_0741_the_grade_scores_the_owner_app_beside_the_promise_on_the_same_cars(db):
+    _through_0741(db)
+    _owner_legs(db)
+    db.val(f"SELECT twin.ottoq_sim_record_ready_promises('{RUN}', '{T}')")
+    pr = {base.NAMES[r["vehicle_id"]]: r for r in db.json(
+        f"SELECT jsonb_agg(to_jsonb(p)) FROM public.ottoq_ready_promises p WHERE p.sim_run_id = '{RUN}'")}
+    # A is ready at T+100, before the app's T+130; B at T+90, after the app's T+75; D is never ready and the app's time
+    # had passed before it was read; the rest are never ready and the app named no time for them
+    _ready_at(db, "A", 100)
+    _ready_at(db, "B", 90)
+    db.val(f"UPDATE public.ottoq_sim_runs SET sim_clock_current = '{T}'::timestamptz + interval '2 days' WHERE sim_run_id = '{RUN}'")
+    g = db.json(f"SELECT public.ottoq_ready_promise_grade('{RUN}')")
+    assert g["promises"] == 7 and g["with_owner"] == 3 and g["graded_owner"] == 3, g
+    assert g["by_owner"] == pytest.approx(1 / 3, abs=0.0005), g
+    assert g["owner_mae_min"] == pytest.approx(22.5, abs=0.05) and g["owner_bias_min"] == pytest.approx(-7.5, abs=0.05), g
+    assert g["owner_min_median"] == pytest.approx(75.0) and g["owner_in_past"] == 1, g
+    # the promise on the same three cars, by hand
+    a50, b50 = float(pr["A"]["ready_p50_min"]), float(pr["B"]["ready_p50_min"])
+    a90, b90 = float(pr["A"]["ready_p90_min"]), float(pr["B"]["ready_p90_min"])
+    assert g["mae_p50_min_with_owner"] == pytest.approx(round((abs(100 - a50) + abs(90 - b50)) / 2, 1), abs=0.051), g
+    assert g["by_p50_with_owner"] == pytest.approx(round(((100 <= a50) + (90 <= b50)) / 3, 3), abs=0.0005), g
+    assert g["by_p90_with_owner"] == pytest.approx(round(((100 <= a90) + (90 <= b90)) / 3, 3), abs=0.0005), g
+    # and in each part: A, B and D are all in the line, with bay work after their charge
+    part = g["by_situation"]["in_line"]
+    assert part["with_owner"] == 3 and part["by_owner"] == pytest.approx(1 / 3, abs=0.0005), part
+    assert g["by_bundle"]["bay"]["owner_in_past"] == 1, g["by_bundle"]
+    # the grade of the promise itself is what 0736's grade says
+    assert g["graded_p50"] == 7 and g["ready"] == 2, g
+
