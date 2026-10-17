@@ -184,8 +184,11 @@
 --   The deadlock (G440), twice in three minutes, from the database's own log (read by a refuter): at 16:40:04.205 UTC
 --   the operator start (ottoq_operator_start_run -> ottoq_sim_run_scenario -> ottoq_sim_stop_and_reset ->
 --   ottoq_sim_mark_stopped, an UPDATE of the live run's ottoq_sim_runs row) and the metronome (CALL
---   ottoq_demo_metronome(50)) each waited on the other, and the start was the victim ("scenario start failed"; the retry
---   succeeded); at 16:42:42.981, at c5f4ff34's own one-statement start, the same cycle made the metronome's decide the
+--   ottoq_demo_metronome(50)) each waited on the other, and the start was the victim, a Management-API call (pid 3652736,
+--   application_name mgmt-api, its statement tagged '-- source: POST /mcp'), not the twin app, so there was no app toast
+--   ("scenario start failed", written here first, is the otto-twin-control edge function's error string; corrected
+--   2026-10-17 from the log); the same call, repeated through the Management API at 16:40:14, waited 1.51 s and
+--   succeeded; at 16:42:42.981, at c5f4ff34's own one-statement start, the same cycle made the metronome's decide the
 --   victim ("metronome decide 1f325969 failed: deadlock detected"). So it is a recurring cycle between the operator door
 --   and the metronome, not a one-off, and either side can lose.
 --   OPEN-ITEM: an operator start and the metronome deadlock on the live run's row (40P01); either side can fail (G440)
