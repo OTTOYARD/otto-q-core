@@ -127,7 +127,7 @@ still works beside the passcode, for an agent you want connected without one.
 | "Cancel the wash order" | `cancel_service` | Your order comes off. A service OTTO-Q found a car to need stays, and one already under way finishes |
 | "Keep RT-3 here until 6 AM" | `hold_vehicle {until: "6:00 AM"}` | Not before 6:00 AM on the sim clock (or `for_minutes`, up to 24 sim hours). A ready car waits in staging and keeps no charger |
 | "Let it go" | `release_hold` | It may leave as soon as it is ready |
-| "Undo that" | `undo_command` | What the command set is withdrawn, and what it replaced comes back. A clear, a limit at 100%, a cancel or a release leaves no setting of its own, so there is nothing to undo (`nothing_to_undo`, saying why and what to send instead); a command whose settings a production run lifted as it took over the depot answers `lifted` |
+| "Undo that" | `undo_command` | What the command set is withdrawn, and what it replaced comes back. A clear, a limit at 100%, a cancel or a release leaves no setting of its own, so there is nothing to undo (`nothing_to_undo`, saying why and what to send instead); a command whose settings a production run lifted as it took over the depot answers `lifted`; one made on another run that is still live but is not the run commands go to now answers `made_on_an_earlier_run` |
 | "What did I change today?" | `my_commands` / `my_settings` | Every command with its receipt and where it stands now; everything in force |
 
 **Services you can order (11):** exterior wash, interior deep clean, interior tidy, interior inspection, sensor clean,
@@ -835,13 +835,15 @@ in the engine's reads with no run pinned, so the car could leave production at 8
 owner it charges to 100%. Round 2 had a production run that starts, resumes or pauses lift every owner setting of any
 other run still live at the depot. **Since the review's round 3 (0721 §17 (c))** a production run takes over the depot
 when it becomes the running run (it starts, or it resumes), not when it pauses, because a paused production run is still
-the owners' run: every other live run's per-run owner settings at the depot are lifted, a paused production run's
-included, and their commands are stamped lifted ("a production run took over the depot"); a row that carries a person's
+the owners' run: every other live run's per-run owner settings at the depot are lifted (a paused production run's too,
+for a pair made before 0721: since round 4 at most one production run is live at a depot, and a second start or a
+resume beside another is refused), and their commands are stamped lifted ("a production run took over the depot"); a row that carries a person's
 saved setting stays, because it is the car's on every run; what is saved is carried onto the production run; and every
 car at the depot is re-stamped to its target on the production run. A demo run resumed later gets what is saved carried
 back, and none of the per-run settings that were lifted: its holds, one-time orders and passcode settings are gone. An
 undo of a command a takeover lifted answers `lifted` ("That command's settings were lifted (a production run took over
-the depot), so there is nothing left of it to undo.").
+the depot), so there is nothing left of it to undo."), whichever run it is sent on; an undo of a command made on
+another run that is still live but is not the owners' run answers `made_on_an_earlier_run`.
 
 **The passcode does not open production.** While a production run is running or paused at the depot,
 `enter_passcode` is refused and every existing passcode session is answered `403 production_live` (and ledgered), for
@@ -869,10 +871,11 @@ changed": check `my_commands` before asking again.
    (`forces_recert` FALSE: only the agent door changes, and no certification arm can run while any run is live). It
    refuses while anything is in flight, **and while any run is running at the twin depot** (its P3, the review's round
    3: V3 probes the owner door on a paused production run of its own, which a running run would outrank): pause or stop
-   the running run first, then apply. Its V3 probes a production session end to end in a block that rolls back:
+   the running run first, and stop a production run paused there (`ottoq_sim_mark_stopped`), then apply. Its V3 probes a production session end to end in a block that rolls back:
    an unbound lowering recorded as a preview, its confirm refused to another agent signed in to the same account and
    applied once, bound, for the agent that made it, a second confirm refused, an undo that lowers gated and then
-   confirmed, a raise and a clear in one call.
+   confirmed, a raise and a clear in one call, two previews of one plan given two salts, a second production run
+   refused, and a person's raise reaching a paused demo.
 3. **Switch OTTO-Command on**: the function secret `ANTHROPIC_API_KEY`. Optional: `OTTOCOMMAND_OWNER_MODEL` (default
    `claude-opus-5-5`), `OTTOCOMMAND_EFFORT` (default `low`), `OTTOCOMMAND_WEB_SEARCH` (`on` by default, `off`), and
    `OTTOCOMMAND_WEB_MAX_USES` (default 3, 1-5). The model is `OTTOCOMMAND_OWNER_MODEL`, else `ANTHROPIC_MODEL` (what the

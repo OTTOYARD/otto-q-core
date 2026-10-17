@@ -601,7 +601,7 @@ describe("end to end: OTTO-Command over the real 0559-0608, 0700 and 0721 SQL", 
     "db/migrations/0608_the_crew_and_the_twin_see_what_every_owners_agent_set_with_its_confirmation_code.sql",
     "tests/fixtures/agent_signin_stub_auth.sql",
     "db/migrations/0700_an_owner_signs_in_and_connects_their_own_agent.sql",
-    "tests/fixtures/model_call_ledger_stub.sql"];
+    "tests/fixtures/model_call_ledger_stub.sql", "tests/fixtures/owner_run_control_stub.sql"];
   const signedIn = "oqt_" + randomBytes(32).toString("hex");
   let session;
   let run;
