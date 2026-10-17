@@ -22,8 +22,9 @@
 --
 --   Two facts make 40 fast chargers cheaper in power than 40 x 350 kW (14 MW) suggests, and they are the reason the
 --   power-limited cells below exist:
---     (a) the cars cannot draw 350 kW. The twin's fleet (read 2026-10-17): 46 I-PACE/Zeekr at 104 kW, 34 Zoox at 100 kW
---         and 36 Tesla at 250 kW (0573, sourced); four other cars carry no charge facts at all (G443 below);
+--     (a) the cars cannot draw 350 kW. The twin's fleet (read 2026-10-17): 44 I-PACE at 104 kW, 34 Zoox at 100 kW and
+--         30 Tesla at 250 kW (0573, sourced); 12 more carry no inlet figure (CORRECTED 2026-10-17 after the apply, from
+--         "four": 6 Tesla, 2 Zeekr and 4 others; db/checks/0451 §7, G443);
 --     (b) rule 9 charges every car to 100%, and the last 20% runs at a fraction of the peak: 0573 §3 measured 80-100%
 --         taking 27.3 min (Model Y), 49.4 (I-PACE) and 21.3 (Zoox) on a 350 kW charger. The sweep's fast chargers
 --         averaged 37.8-43.0 kW while busy in every value_2026_09_30 cell.
