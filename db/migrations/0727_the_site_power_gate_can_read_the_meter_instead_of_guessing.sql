@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017072928
 -- migration-name:    the_site_power_gate_can_read_the_meter_instead_of_guessing
 --
 -- 0727  **The site power gate can read the meter instead of guessing.** With the dial `site_cap_gate_metered` at 1, the
@@ -170,3 +170,13 @@ VALUES ('0727_the_site_power_gate_can_read_the_meter_instead_of_guessing', false
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 07:29:28 UTC (2:29 AM CT), ledger version 20261017072928 ═════════════════════════════════════
+--
+--   Through apply_migration, with the sweep runner still paused and nothing in flight. Executable part 7,114
+--   characters, md5 bc55b6779811be7b93e81440d0238ed2, equal to the ledger's statements[1] read back. ottoq_decide_tick's
+--   prosrc is now 1063735e...; V1 proved it less the replacement is the pre-image (d6e9d26b...). Before the apply: the
+--   parameter the new IF reads is the function's own (`p_sim_run_id uuid`, the body already calls
+--   ottoq_policy_get(p_sim_run_id, ...) eleven times), and the metered SELECT, run standalone on the twin depot, resolves
+--   every column it names (0 kW metered and 0 kW estimated, no car charging at the time). No ocpp_sessions row of any run
+--   was `active` at 07:28 UTC, so no stale session from an ended run can be counted by the join's stall-and-car match.
