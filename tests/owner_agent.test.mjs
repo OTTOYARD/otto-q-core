@@ -711,12 +711,19 @@ test("the model call's failures are named, never thrown", async () => {
   assert.equal(refused.ok, false);
   assert.equal(refused.status, 400);
   assert.equal(refused.code, "model_error");
-  assert.equal(refused.message, "The language model refused the request: bad tools");
+  // the round-3 review: an API error is named by its status; only the model's own stop reason is a refusal
+  assert.equal(refused.message, "The language model rejected the request (HTTP 400): bad tools");
+  const busy = await anthropicModel({ apiKey: "k", model: "m", fetchImpl: async () => json(529, { type: "error", error: { type: "overloaded_error", message: "Overloaded" } }) })({ system: "", tools: [], messages: [], max_tokens: 1 });
+  assert.deepEqual([busy.status, busy.message], [529, "The language model is unavailable (HTTP 529): Overloaded"]);
+  const limited = await anthropicModel({ apiKey: "k", model: "m", fetchImpl: async () => json(429, { type: "error", error: { type: "rate_limit_error", message: "slow down" } }) })({ system: "", tools: [], messages: [], max_tokens: 1 });
+  assert.deepEqual([limited.status, limited.message], [429, "The language model is over its rate limit (HTTP 429): slow down"]);
   const down = await anthropicModel({ apiKey: "k", model: "m", fetchImpl: async () => { throw new TypeError("fetch failed"); } })({ system: "", tools: [], messages: [], max_tokens: 1 });
   assert.equal(down.ok, false);
   assert.equal(down.status, 503);
   const slow = await anthropicModel({ apiKey: "k", model: "m", fetchImpl: async () => { throw Object.assign(new Error("t"), { name: "TimeoutError" }); } })({ system: "", tools: [], messages: [], max_tokens: 1 });
   assert.equal(slow.status, 504);
+  assert.equal(slow.message, "The language model did not answer in time.", "reached, and did not answer: not 'could not be reached'");
+  assert.equal(down.message, "The language model could not be reached.");
   const garbage = await anthropicModel({ apiKey: "k", model: "m", fetchImpl: async () => new Response("<html>", { status: 200 }) })({ system: "", tools: [], messages: [], max_tokens: 1 });
   assert.equal(garbage.ok, false);
 });
@@ -740,7 +747,8 @@ test("model names live in one place: the door's default and its capability table
   const door = stripTsComments(DOOR_SRC);
   const lines = door.split("\n").filter((l) => /\bclaude-(?:opus|sonnet|haiku|fable|mythos|instant|\d)/i.test(l));
   assert.ok(lines.length > 0);
-  const allowed = /^(export const DEFAULT_OWNER_MODEL = "claude-opus-5-5";|\s+"claude-[a-z0-9-]+"(, "claude-[a-z0-9-]+")*,?|export const FALLBACK_MODELS: ReadonlySet<string> = new Set\(\["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-1"\]\);|\s+\.\.\.DYNAMIC_WEB_SEARCH_MODELS, "claude-fable-5", "claude-fable-5-1", "claude-haiku-5-5",)$/;
+  //: the round-3 review: the tables (web search version, fallback, effort per level) are one model name list per line
+  const allowed = /^(export const DEFAULT_OWNER_MODEL = "claude-opus-5-5";|\s+"claude-[a-z0-9-]+"(, "claude-[a-z0-9-]+")*,?)$/;
   for (const l of lines) assert.match(l, allowed, l);
   const shell = stripTsComments(SHELL_SRC);
   assert.match(shell, /ownerAskConfig\(\(name\) => Deno\.env\.get\(name\)\)/);
