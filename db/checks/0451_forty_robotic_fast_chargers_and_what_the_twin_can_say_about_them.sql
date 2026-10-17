@@ -238,6 +238,31 @@
 --
 --   PENDING: written when §3 is.
 --
+-- ══ §11 THE BATTERY PLANS FOR A BILL THE VALUE VIEW DOES NOT CHARGE (G447; reproduce: (9)) ══════════════════════════
+--
+--   ottoq_bess_day_plan (0435, 0600) shaves to a level no lower than the month's billed peak so far, which it counts from
+--   completed 30-minute windows starting bess_plan_bill_from_min minutes into the run. The dial defaults to 0, and no
+--   sweep cell sets it: not tonight's, and not value_2026_09_30's eight. The value view bills demand from 180 minutes in
+--   (ottoq_value_summary's c_open_min; 0576/0577: the opening plug-in is not the depot's peak). So the opening sets the
+--   plan's billed peak, and the plan then concedes the window the value view bills.
+--
+--   Arm 84 (dcfc40.otto_q, normal_day, sim run b54f6de5), from its own ottoq_energy_commands, read by 08:27 UTC:
+--     06:05  mode charge, cheapest_window, setpoint -425 kW, level 949 kW, billed peak 0. The chargers drew 3,874 kW
+--            that tick: the boot seats cars on chargers before the first plan sees them.
+--     06:10  shave, 1,499 kW (the unit's limit), level 2,418.
+--     06:30  hold.
+--     06:50  billed peak 2,370 kW (the opening's first completed half hour), level 2,370, charge (cheapest_window).
+--     13:30  to the end of the day: hold, level 2,370, the battery at 90-91% (bess_snapshots), while the grid peaked at
+--            1,180 kW at 3 PM and the half hours the value view bills peaked at 1,006.8 kW.
+--   Arm 83 (dcfc10, the same seed and day) has the same shape: the battery at 0 kW all afternoon, the grid up to 838 kW,
+--   under a billed peak of 973.8.
+--
+--   What it means here. Every arm in §3 and every arm of the value sweep ran at 0, so the comparisons between cells
+--   stand. The absolute demand charges in §3 and §4 are the battery standing aside after the opening, and they overstate
+--   what a depot with this battery would pay on the window the value view bills. The fix is one dial per cell:
+--   bess_plan_bill_from_min 180, so the plan and the bill read the same window. 0731 queues the paired cells on the same
+--   seed and day. A real depot's month has no test-day opening, and its battery would face each day's real peaks.
+
 -- ══ QUERIES ══
 
 -- (1) the value sweep's cells since the dial floor
@@ -359,3 +384,11 @@ SELECT p.proname, p.prosrc ~* 'target_soc\s*=\s*90' AS sets_90,
   FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
    AND p.proname IN ('ottoq_cert_arm', 'ottoq_cert_arm_wave', 'ottoq_fr1_cert_arm', 'ottoq_cert_arm_start');
 SELECT jobid, jobname, active FROM cron.job WHERE command ILIKE '%ottoq_cert_battery_step%';
+
+-- (9) the battery plan, per tick, on a run (G447)
+SELECT c.tick_seq, to_char(c.issued_at AT TIME ZONE 'America/Chicago', 'HH24:MI') AS sim_ct, round(c.setpoint_kw) AS setpoint_kw,
+       c.reason -> 'day_plan' ->> 'mode' AS mode, round((c.reason -> 'day_plan' ->> 'ratchet_kw')::numeric) AS billed_peak_kw,
+       round((c.reason -> 'day_plan' ->> 'level_kw')::numeric) AS level_kw, c.reason -> 'day_plan' ->> 'charge_reason' AS charge_reason
+  FROM public.ottoq_energy_commands c
+ WHERE c.sim_run_id = 'b54f6de5-7cf3-4d91-a0d1-0010a21fec64' AND c.command_type = 'bess_setpoint_kw'
+ ORDER BY c.tick_seq;
