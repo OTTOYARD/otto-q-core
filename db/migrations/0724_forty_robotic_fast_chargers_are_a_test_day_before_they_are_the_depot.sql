@@ -196,8 +196,8 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM public.stalls s
               WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'l2'
-                AND NOT (s.stall_code = ANY ((SELECT convert_l2 FROM public.ottoq_site_buildouts
-                                               WHERE buildout_code = 'dcfc40')))) THEN
+                AND NOT EXISTS (SELECT 1 FROM public.ottoq_site_buildouts b
+                                 WHERE b.buildout_code = 'dcfc40' AND s.stall_code = ANY (b.convert_l2))) THEN
     RAISE EXCEPTION '0724 V1: an L2 space at the twin depot is not converted by dcfc40';
   END IF;
   IF (SELECT row(dcfc_max_concurrent_kw, service_max_kw) FROM public.ottoq_site_buildouts WHERE buildout_code = 'dcfc40')
