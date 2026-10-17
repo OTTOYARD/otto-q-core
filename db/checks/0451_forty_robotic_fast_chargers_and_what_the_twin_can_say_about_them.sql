@@ -81,29 +81,29 @@
 --   first measure of how far one reading can move. "after 3 h" is the 30-minute peak from 180 minutes into the day,
 --   past the opening plug-in, which is what ottoq_value_summary bills (0577); "whole day" includes the opening. Every
 --   battery planned against the whole day (G447, §11), so the demand charges are its conceding the afternoon.
---   Arms read 08:18 UTC (82-84) and 09:01 UTC (85).
+--   Arms read 08:18 UTC (82-84), 09:01 UTC (85) and 09:33 UTC (86).
 --
---   normal_day                           dcfc10        dcfc40        dcfc40_cab2400
---                                        as built      power to      .managed: today's 2,500 kW
---                                                      spare         service, held at 2,160 kW (0729)
---     arm / sim run                      83 e7d5824c   84 b54f6de5   85 fe6d540e
---     visits / served / in depot at end  202/148/54    252/215/37    248/207/41
---     door p50 / p95, min                130 / 428     95 / 248      90 / 270
---     due cars on time (G383)            6 of 54       8 of 72       4 of 66
---     charge wait p50 / p95 floor / max  10/125/190    10/82.5/110   10/90/110
---     fast-charge sessions / L2          97 / 126      278 / 0       264 / 0
---     fast chargers busy, mean kW        69.4%, 39.4   40.9%, 39.5   41.0%, 38.9
---     car-hours met of 1,114 asked       821.4         942.7         941.8
---     30-min peak kW, whole day          973.8         2,369.5       1,643.7
---     30-min peak kW, after 3 h          713.6         1,006.8       1,050.6
---     instantaneous EV kW / grid kW max  1,586/1,210   3,874/3,287   2,201/1,777
---     grid import kWh                    6,723         9,193         9,050
---     demand $/month, whole day          20,839        51,228        35,419
---     demand $/month, after 3 h          15,271        21,547        22,501
---     EN.001 refused starts              3             0             85 (84 of them 6-7 AM)
---     DC pool bound (twin.dc_pool_shared)  -           -             1 tick
---     must-do service done               83.7%         90.9%         90.0%
---     rule 9: left below target / open   0 / 0         0 / 0         0 / 0
+--   normal_day                           dcfc10        dcfc20        dcfc40        dcfc40_cab2400
+--                                        as built      20 fast,      power to      .managed: today's 2,500 kW
+--                                                      20 L2, grown  spare         service, held at 2,160 kW (0729)
+--     arm / sim run                      83 e7d5824c   86 0b0d45c2   84 b54f6de5   85 fe6d540e
+--     visits / served / in depot at end  202/148/54    222/175/47    252/215/37    248/207/41
+--     door p50 / p95, min                130 / 428     105 / 305     95 / 248      90 / 270
+--     due cars on time (G383)            6 of 54       5 of 59       8 of 72       4 of 66
+--     charge wait p50 / p95 floor / max  10/125/190    10/105/140    10/82.5/110   10/90/110
+--     fast-charge sessions / L2          97 / 126      168 / 87      278 / 0       264 / 0
+--     fast chargers busy, mean kW        69.4%, 39.4   51.8%, 42.3   40.9%, 39.5   41.0%, 38.9
+--     car-hours met of 1,114 asked       821.4         879.8         942.7         941.8
+--     30-min peak kW, whole day          973.8         1,693.1       2,369.5       1,643.7
+--     30-min peak kW, after 3 h          713.6         932.5         1,006.8       1,050.6
+--     instantaneous EV kW / grid kW max  1,586/1,210   2,779/2,190   3,874/3,287   2,201/1,777
+--     grid import kWh                    6,723         7,912         9,193         9,050
+--     demand $/month, whole day          20,839        36,496        51,228        35,419
+--     demand $/month, after 3 h          15,271        19,956        21,547        22,501
+--     EN.001 refused starts              3             0             0             85 (84 of them 6-7 AM)
+--     DC pool bound (twin.dc_pool_shared)  -           -             -             1 tick
+--     must-do service done               83.7%         88.6%         90.9%         90.0%
+--     rule 9: left below target / open   0 / 0         0 / 0         0 / 0         0 / 0
 --
 --   busy_day, dcfc10 as built (arm 82, 43301561): 212 visits, 103 served, 109 in the depot at the end; door p50/p95
 --   305/584; 0 of 36 due cars on time; charge wait p50/p95/max 80/355/435; car-hours met 96.0 of 1,114; 30-min peak
@@ -111,9 +111,12 @@
 --
 --   Read on the normal day, 40 posts with power to spare against the depot as built: 67 more cars served in 12 hours
 --   (+45%), the median car out 35 minutes sooner and the slow tail cut from 428 to 248 minutes, and 121 more car-hours
---   of ride demand met (unmet 26.3% -> 15.4%). The fast chargers are busy 40.9% of the time, so forty are more than this
---   day needs; 0730's dcfc20 arm is the middle point that says how much of this twenty would buy. Every car still
---   leaves at its full target with nothing open.
+--   of ride demand met (unmet 26.3% -> 15.4%). Every car still leaves at its full target with nothing open.
+--
+--   The sizing curve, from 0730's dcfc20 (arm 86, 20 fast posts and 20 L2): car-hours met 821.4 -> 879.8 -> 942.7 at
+--   10, 20 and 40 fast posts; cars served 148 -> 175 -> 215; the slow tail 428 -> 305 -> 248 minutes. Posts 11-20 bought
+--   58.4 car-hours, 5.8 each in a 12-hour day; posts 21-40 bought 62.9, 3.1 each. So the returns fall by about half past
+--   twenty and do not stop: there is no sharp knee on this day, and the post count is a price question (§10).
 --
 --   The power question, answered on this day: the megawatts are the OPENING. With nothing holding it, the fleet's 6 AM
 --   plug-in drew 3,874 kW at the chargers (3,287 kW from the grid after the battery) and set a 2,369.5 kW 30-minute
@@ -256,8 +259,8 @@
 --
 -- ══ §10 THE RECOMMENDATION ════════════════════════════════════════════════════════════════════════════════════════════
 --
---   To Chase, from the research wing (rule 10: a recommendation, shipped only as certified changes). DRAFT until the
---   dcfc20 and shared arms land tonight; their numbers are marked [pending].
+--   To Chase, from the research wing (rule 10: a recommendation, shipped only as certified changes). The shared and
+--   gated arms of 0728 land after this was written; they test the cabinets without 0729's managed reading.
 --
 --   1. LEAN IN. Robotic fast charging is the edge, and the evidence is the slow tail and the car-hours, not the median.
 --      On the normal day forty robotic posts served 45% more cars in 12 hours than the depot as built, cut the slowest
@@ -265,10 +268,15 @@
 --      100% with nothing open. A robot on every post is what makes that possible: no car waits for a person to plug it
 --      in, so the depot's limit stops being connectors and labour and becomes power and time.
 --
---   2. DO NOT SIZE BY STALLS. Forty posts were busy 41% of the day against the ten's 69%. At about $206,000 installed
---      per 350 kW charger (ottoq_margin_prices, INL source; before the robot itself), the post count is the expensive
---      half of the decision. Twenty posts on the same day: [pending]. Size to the knee of that curve, not to the number
---      of L2 spaces.
+--   2. SIZE THE POSTS BY THEIR PRICE, NOT BY THE STALLS. Forty posts were busy 41% of the day against the ten's 69%,
+--      and the curve bends: posts 11-20 met 5.8 car-hours each in the 12-hour day, posts 21-40 met 3.1 each (§3). At the
+--      value sweep's own prices (ottoq_margin_prices: $20 a deployed car-hour, range $16-24, its Waymo-review source;
+--      about $206,000 installed per 350 kW charger, its INL source, before the robot itself), a month of such days is
+--      worth about $3,500 per post for posts 11-20 and $1,900 per post for posts 21-40, against about $1,700 a month
+--      for a post's installed price spread straight over ten years with no financing, robot or upkeep. ASSUMPTIONS, all
+--      of them: one seed, a 12-hour day and nothing for the night. On that reading twenty posts clearly pay, and the
+--      second twenty pay only if the night, the robot's price and more seeds come out in their favour. A staged build,
+--      twenty now and the rest as measured demand fills them, buys the same answer with half the capital at risk.
 --
 --   3. DO NOT SIZE THE GRID TO THE NAMEPLATE. Forty posts with nothing holding them drew 3.9 MW for the 6 AM plug-in.
 --      Held at 2.16 MW on the existing 2.5 MW service they met 941.8 car-hours against 942.7. The megawatt worry is a
