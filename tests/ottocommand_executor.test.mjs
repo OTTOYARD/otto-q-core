@@ -2178,12 +2178,15 @@ test("round 3 (0721 at 543d36e): the descriptions and docs say what the SQL now 
   assert.match(pa, /a production run takes over the depot when it becomes the running run \(it starts, or it resumes\), not when it pauses/);
   assert.match(pa, /\*\*and while any run is running at the twin depot\*\* \(its P3/);
   const ag = flat(readFileSync(join(ROOT, "AGENT_GATEWAY.md"), "utf8"));
-  assert.match(ag, /\*\*0721 applies only with nothing running at the twin depot\*\* \(its P3\)/);
+  assert.match(ag, /\*\*0721 applies only with nothing running at the twin depot and no production run paused there\*\* \(its P3\)/);
+  assert.match(ag, /\*\*At most one production run is live at a depot/);
+  assert.match(ag, /`made_on_an_earlier_run`/);
   assert.match(ag, /one \*\*owners' run\*\* per depot, which every agent read and door answers for/);
   const sk = flat(readFileSync(join(ROOT, "integrations", "hermes", "ottoq-owner", "SKILL.md"), "utf8"));
   assert.match(sk, /\*\*Which run\.\*\* Everything you read and change is on the owners' run at the depot/);
   assert.match(sk, /A production run taking over the depot \(it starts, or it resumes\) lifts the same per-run settings of any other live run there/);
-  assert.match(sk, /refused `nothing_to_undo`[\s\S]{0,120}or `lifted`/);
+  assert.match(sk, /refused `nothing_to_undo`[\s\S]{0,120}`lifted`[\s\S]{0,80}or `made_on_an_earlier_run`/);
+  assert.match(sk, /at most one production run is live at a depot/);
   // and the SQL these sentences describe is the merged file's (so the docs move with it)
   const m0721 = readFileSync(join(ROOT, "db", "migrations", "0721_a_signed_in_owner_changes_production_under_their_own_name.sql"), "utf8");
   for (const said of ["To confirm, send back the confirm object this answer carries, unchanged, from this same agent within 15 minutes.",
