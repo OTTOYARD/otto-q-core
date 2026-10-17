@@ -78,7 +78,7 @@
 --       live one.
 --
 --   §17 (the review, round 3; read-only on the live catalog 2026-10-15 13:15:42-13:23 UTC, 8:15-8:23 AM CT, and re-read
---   2026-10-17 14:45:14-14:47:49 UTC, 9:45-9:47 AM CT, every body this file pins unchanged and 0721 still not applied;
+--   2026-10-17 14:45:14-15:02:33 UTC, 9:45 AM-10:02 AM CT, every body this file pins unchanged and 0721 still not applied;
 --   each finding reproduced on the scratch chain at 2b1678f first, 2026-10-15 from 8:35 AM CT):
 --   (j) THE OWNER DOOR WENT TO THE NEWEST-STARTED LIVE RUN. ottoq_agent_live_run (md5 75c2e8545f7d92fc39215723ddc70aea)
 --       is the run running or paused at the depot with the latest started_at, and the owner command, whoami, 0605's
@@ -90,6 +90,13 @@
 --       stamped it (twin.ottoq_world_advance calls the tick first, before anything pins ottoq.sim_run_id), a car could
 --       leave production at 80%, and whoami named the demo (R1). The live catalog keeps one running run per depot
 --       (ottoq_one_running_run_per_depot: UNIQUE (depot_id) WHERE status = 'running'), so "the running run" is one run.
+--       And every other agent door read the same newest-started run (G495, read 2026-10-17 15:01:59 UTC):
+--       ottoq_agent_live_run has twelve callers and no other reader (no view, policy, column default or cron job names
+--       it, and only postgres may EXECUTE it), the five owner-door ones above and seven more: ottoq_agent_read_depot,
+--       ottoq_agent_read_stalls and ottoq_agent_read_decisions read their run from it, ottoq_agent_submit_request records
+--       a request against it, ottoq_agent_request_decide (md5 1ad1db6e91d7dee2a6b4e3addf959af3) applies an approved ops
+--       action only while it is still the run the request was recorded against, and the two welcomes describe it; their
+--       own callers are the two dispatchers, which no function and no cron job calls (read 15:02:09 UTC).
 --   (k) TWO PRODUCTION RUNS LIVE AT ONCE. ottoq_production_start(uuid) (md5 ea2945cbb0435c58ce73b4f5e038c501) refuses
 --       only a RUNNING run at the depot and inserts its run running; ottoq_production_stop(text) (md5
 --       499ea8d51f65cd62463838ba940e075e) completes only the running production run; ottoq_pause_run(uuid,text) (md5
@@ -298,8 +305,13 @@
 --         write gate), whoami, my_settings, my_fleet, my_vehicle and both cockpit boards read it, and so does
 --         ottoq_owner_charge_limit's unpinned branch (only the owners' run's rows at the setting's depot; a pinned read,
 --         a run or 'none', is 0605's, unchanged), so ottoq_effective_target_soc_at and ottoq_departure_clear with no run
---         pinned answer for the owners' run only. ottoq_agent_live_run itself is unchanged, and so are its seven other
---         callers (FINDINGS G495).
+--         pinned answer for the owners' run only. And (G495) so does every other agent door: ottoq_agent_live_run, read by
+--         the three agent reads, the request door and the two welcomes, keeps its body, signature, security and grants but
+--         for its WHERE, which is now the owners' run (ottoq_owner_run_id; P1 pins the body, the snapshot holds it), so a
+--         depot-wide key, a fleet's key and a signed-in owner all read the run the depot's cars follow, a request is
+--         recorded against it, and an approved ops action is refused as "no longer the live run" exactly when the run it
+--         was recorded against has stopped being the owners' run. (An approved agent request on a production run is still
+--         refused by the setter, production_never_self_tunes, rule 10: nothing here opens a write.)
 --     (b) EVERY RE-STAMP PINNED. public.ottoq_owner_target_on_run(car, run, as_of) computes a car's target with that run
 --         pinned (NULL pins none), and its function-level SET restores the caller's ottoq.sim_run_id as it returns; the
 --         owner tick computes its own run's targets through it, and public.ottoq_owner_restamp(depot, run, cars) re-stamps
@@ -336,7 +348,7 @@
 --         stays until it is done and the car does not leave without it; or there is no order of theirs), and a one-time
 --         order an every-return order covers, already done on this visit, says it was done.
 --     What stays open: a contract ceiling lowered mid-run is re-stamped only at a takeover, the run's end or an owner
---     change (FINDINGS G494, toward a fuller car).
+--     change (FINDINGS G494, toward a fuller car). FINDINGS G495 is fixed here (§17 (a)).
 --
 --   THE GATEWAY'S HALF (TypeScript, committed beside this file, not deployed): edge-functions/_shared/ottocommand_owner.ts
 --   replays every assistant turn verbatim (thinking, server_tool_use, web_search_tool_result, cited text, tool_use,
@@ -393,8 +405,10 @@
 --   over pending owner limits, and the tick returns at its first statement on a run with no owner rows. The run's end's
 --   widened first line finds nothing on an arm (no owner rows of any status), so it returns where it did. The takeover,
 --   the re-stamps and the carry run only from §9's run-start triggers, whose WHEN no arm meets, and the propagation only
---   from the owner command. A determinism pair's arms carry no owner rows. So the same answer: forces_recert FALSE,
---   forces_dial_restart FALSE.
+--   from the owner command. A determinism pair's arms carry no owner rows. And (G495) ottoq_agent_live_run is read only
+--   by agent doors: its twelve callers' own callers are the two dispatchers, which no function and no cron job calls (read
+--   live 2026-10-17 15:02:09 UTC), so no certification, dial or sweep arm reaches it. So the same answer: forces_recert
+--   FALSE, forces_dial_restart FALSE.
 --
 -- ══ §4 WHAT IT DELIBERATELY DOES NOT DO ═════════════════════════════════════════════════════════════════════════════
 --
@@ -408,9 +422,9 @@
 --     highlight, as 0606 decided for demo runs (the note is the visitor's ask text when OTTO-Command sent it).
 --   * A saved setting made while two runs are live was carried onto the other at its next start; since the review,
 --     round 3 (§17 (d)) a person's change to what is saved reaches every live run at the depot at once.
---   * ottoq_agent_live_run and its seven callers that are not the owner door (three agent reads, 0559's request door,
---     the two welcomes) keep the newest-started live run (FINDINGS G495); and a contract ceiling lowered mid-run is not
---     re-stamped on the cars until a takeover, the run's end or an owner change (FINDINGS G494).
+--   * A contract ceiling lowered mid-run is not re-stamped on the cars until a takeover, the run's end or an owner change
+--     (FINDINGS G494). The welcomes' words are 0607's: on a production run they say changes wait for the next demo,
+--     which a signed-in owner's agent may now make in production; §17 changes only which run they describe.
 --   * No new credential, and passcode sessions and issued keys keep working on demo runs exactly as before (and open
 --     nothing while a production run is live, §12).
 --   * ottoq_log_model_call keeps its live grant to authenticated (§1(f)): narrowing it is a separate decision, recorded as
@@ -452,8 +466,11 @@
 --   demo resumed after it has only what is saved; the tick and the re-stamp read the run they are given and leave the
 --   caller's pin; a demo resumed after production gets the saved order and limit back, and a person's undo on production
 --   brings a saved limit back to the demo run it was made on; a confirm binds only by its preview's salted hash (a
---   command id alone, the unsalted fingerprint and a salt-less preview bind nothing); each no-change answer says why; P3
---   refuses a running twin run; and V1 reads code, not comments. Fourteen mutations, each undoing one §17 fix in a copy
+--   command id alone, the unsalted fingerprint and a salt-less preview bind nothing); every agent read and door (depot,
+--   stalls, decisions, both welcomes, a note and an ops-action request) answers for production while a newer demo run is
+--   paused, for a depot-wide key, a fleet's key and a signed-in owner, and an approval refuses once the run it was made
+--   against stops being the live run (G495); each no-change answer says why; P3
+--   refuses a running twin run; and V1 reads code, not comments. Fifteen mutations, each undoing one §17 fix in a copy
 --   of this file (its V blocks silenced, but for the one that mutates V1), each fail a named test.
 --
 -- ══ §6 ROLLBACK ══════════════════════════════════════════════════════════════════════════════════════════════════
@@ -480,9 +497,9 @@
 --   §16: the snapshot's dispatcher routes my_fleet and my_vehicle without the command-id mask again; dropping the two
 --   run-start triggers (above) stops the production takeover with the carry. ottoq_owner_read_shown,
 --   ottoq_owner_mask_command_ids and ottoq_owner_settings_yield_to_production may stay, unread.
---   §17: the snapshot (twelve bodies) also holds ottoq_owner_charge_limit and ottoq_owner_read, so restoring it puts the
---   engine's unpinned limit read, the tick's target and the owner reads back to 0605's (and the boards, whoami and the
---   command to their pre-0721 runs). ottoq_owner_run_id, ottoq_owner_live_run, ottoq_owner_target_on_run,
+--   §17: the snapshot (thirteen bodies) also holds ottoq_owner_charge_limit, ottoq_owner_read and ottoq_agent_live_run, so
+--   restoring it puts the engine's unpinned limit read, the tick's target and the owner reads back to 0605's, and every
+--   agent door back to the newest-started live run (and the boards, whoami and the command to their pre-0721 runs). ottoq_owner_run_id, ottoq_owner_live_run, ottoq_owner_target_on_run,
 --   ottoq_owner_restamp and ottoq_owner_saved_propagate are then unread and may stay; plan_salt and its CHECK may stay
 --   (NULL is their old meaning: the restored bodies write no salt, and the backstop's salt check fires only on a row that
 --   names a preview, which the restored three-argument body never writes).
@@ -591,13 +608,16 @@ BEGIN
   END IF;
   -- §17 (the review, round 3): the engine's one read of an owner limit, whose unpinned branch this file narrows to the
   -- owners' run, read on the live catalog 2026-10-15 13:17:20 UTC (8:17 AM CT) and identical on the scratch chain (0605's
-  -- file); its one caller is ottoq_effective_target_soc_at (read 13:15:42 UTC)
+  -- file); its one caller is ottoq_effective_target_soc_at (read 13:15:42 UTC). And (G495) the agent doors' read of the
+  -- live run, which this file points at the owners' run, read live 2026-10-17 15:01:17 UTC (10:01 AM CT: SQL, STABLE,
+  -- SECURITY DEFINER, EXECUTE for postgres only) and identical on the scratch chain (0559's file)
   SELECT string_agg(f, ', ') INTO v_bad FROM (VALUES
-      ('public.ottoq_owner_charge_limit(uuid)',                                                '9de03ba377929ea4419975cb82aa7279')) x(f, want)
+      ('public.ottoq_owner_charge_limit(uuid)',                                                '9de03ba377929ea4419975cb82aa7279'),
+      ('public.ottoq_agent_live_run(uuid)',                                                    '75c2e8545f7d92fc39215723ddc70aea')) x(f, want)
    WHERE to_regprocedure(f) IS NULL
       OR md5(pg_get_functiondef(to_regprocedure(f))) IS DISTINCT FROM want;
   IF v_bad IS NOT NULL THEN
-    RAISE EXCEPTION '0721 P1: not the owner-limit read §17 was written against (re-measure before applying): %', v_bad;
+    RAISE EXCEPTION '0721 P1: not the owner-limit read or the live-run read §17 was written against (re-measure before applying): %', v_bad;
   END IF;
   -- §17: the owners' run is "the running run" because at most one run runs at a depot (read live 13:15:42 UTC:
   -- ottoq_one_running_run_per_depot, unique on depot_id WHERE status = 'running')
@@ -703,8 +723,8 @@ BEGIN
   END IF;
 END $idle$;
 
--- ── the rollback snapshot of the twelve bodies this file replaces or re-sets (the tick: its §10 writer setting and §17's
---    one line) ──
+-- ── the rollback snapshot of the thirteen bodies this file replaces or re-sets (the tick: its §10 writer setting and
+--    §17's one line) ──
 INSERT INTO public.ottoq_schema_snapshots (label, object_kind, schema_name, object_name, definition, def_md5)
 SELECT '0721_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), md5(pg_get_functiondef(p.oid))
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -720,7 +740,8 @@ SELECT '0721_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), 
                  'ottoq.ottoq_owner_orders_tick(uuid,timestamp with time zone)'::regprocedure,
                  --: §17 (the review, round 3)
                  'public.ottoq_owner_charge_limit(uuid)'::regprocedure,
-                 'public.ottoq_owner_read(public.ottoq_agent_principals,text,jsonb)'::regprocedure);
+                 'public.ottoq_owner_read(public.ottoq_agent_principals,text,jsonb)'::regprocedure,
+                 'public.ottoq_agent_live_run(uuid)'::regprocedure);
 
 -- ══ 1. the three columns ════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -901,8 +922,9 @@ REVOKE ALL ON FUNCTION public.ottoq_owner_saved_effect(public.vehicles, text, te
 -- the two cockpit boards, and the engine's one read of an owner limit with no run pinned (ottoq_owner_charge_limit, so
 -- ottoq_effective_target_soc_at and ottoq_departure_clear read only the owners' run's rows when nothing is pinned). It is
 -- the run RUNNING at the depot (at most one: ottoq_one_running_run_per_depot), else the newest paused production run, else
--- the newest paused demo run. The newest-started live run (ottoq_agent_live_run, unchanged for the reads that are not the
--- owner door's) sent every owner command to a paused demo started after production while production ran (the review's R1).
+-- the newest paused demo run. The newest-started live run (ottoq_agent_live_run as 0559 wrote it) sent every owner command
+-- to a paused demo started after production while production ran (the review's R1); and (G495) ottoq_agent_live_run,
+-- which every other agent door reads, answers for this same run once this section has run (below).
 
 CREATE OR REPLACE FUNCTION public.ottoq_owner_run_id(p_depot_id uuid)
  RETURNS uuid
@@ -982,6 +1004,35 @@ REVOKE ALL ON FUNCTION public.ottoq_owner_run_id(uuid) FROM PUBLIC, anon, authen
 REVOKE ALL ON FUNCTION public.ottoq_owner_live_run(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.ottoq_owner_target_on_run(uuid, uuid, timestamptz) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.ottoq_owner_restamp(uuid, uuid, uuid[]) FROM PUBLIC, anon, authenticated, service_role;
+
+--: (the review, round 3; G495) every other agent read and door answers for the same run. public.ottoq_agent_live_run
+--: (0559) was the newest-started run running or paused at the depot; read live 2026-10-17 15:01:59 UTC (10:01 AM CT), it
+--: has twelve callers and no other reader (no view, policy, column default or cron job names it; EXECUTE is postgres's
+--: only): this file moves five of them to ottoq_owner_live_run (above), and the seven others follow it here unchanged:
+--: ottoq_agent_read_depot, ottoq_agent_read_stalls and ottoq_agent_read_decisions (the run they read), ottoq_agent_submit_request
+--: (the run a request is recorded against), ottoq_agent_request_decide (an approved ops action is applied only while the run
+--: it was recorded against is still this run, so "no longer the live run" now means no longer the owners' run), and the
+--: two welcomes (the run they describe). With production running and a demo run started after it and paused, each of
+--: them answered for the paused demo. One rule, ottoq_owner_run_id, for every principal: the running run, which is the
+--: run the depot's cars follow, whoever reads; else the newest paused production run; else the newest paused demo run.
+--: The body is 0559's but for its WHERE, ORDER BY and LIMIT (P1 pins it); its signature, security and grants are kept
+DO $liverun$
+DECLARE
+  v_def text := pg_get_functiondef('public.ottoq_agent_live_run(uuid)'::regprocedure);
+  c_old constant text := E'   WHERE r.depot_id = p_depot_id AND r.status IN (''running'', ''paused'')\n'
+                      || E'   ORDER BY r.started_at DESC\n'
+                      || E'   LIMIT 1\n';
+  c_new constant text := E'   --: 0721 (the review, round 3; G495): the owners'' run at the depot (public.ottoq_owner_run_id), not the\n'
+                      || E'   --: newest-started live run\n'
+                      || E'   WHERE r.sim_run_id = public.ottoq_owner_run_id(p_depot_id)\n';
+  v_n int;
+BEGIN
+  v_n := (length(v_def) - length(replace(v_def, c_old, ''))) / length(c_old);
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION '0721: the live-run read''s anchor occurs % times, expected exactly 1', v_n;
+  END IF;
+  EXECUTE replace(v_def, c_old, c_new);
+END $liverun$;
 
 -- ══ 2. who the person is, and whether this agent may change settings on this run ═══════════════════════════════════
 
@@ -3012,6 +3063,7 @@ DECLARE
   v_prop  text := pg_get_functiondef('public.ottoq_owner_saved_propagate(uuid)'::regprocedure);
   v_runid text := pg_get_functiondef('public.ottoq_owner_run_id(uuid)'::regprocedure);
   v_pin   text := pg_get_functiondef('public.ottoq_owner_target_on_run(uuid,uuid,timestamp with time zone)'::regprocedure);
+  v_alr   text := pg_get_functiondef('public.ottoq_agent_live_run(uuid)'::regprocedure);
   v_bad   text;
 BEGIN
   --: the code of each body, comments taken out
@@ -3040,6 +3092,7 @@ BEGIN
   v_prop  := regexp_replace(regexp_replace(v_prop,  '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
   v_runid := regexp_replace(regexp_replace(v_runid, '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
   v_pin   := regexp_replace(regexp_replace(v_pin,   '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
+  v_alr   := regexp_replace(regexp_replace(v_alr,   '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
   --: and the stripping itself must be what it says: a commented-out branch is gone, and code is kept
   v_src := regexp_replace(regexp_replace(E'a := 1; --: b := 2;\n/* c := 3; */ d := 4;', '/\*.*?\*/', '', 'g'), c_strip_line, '', 'g');
   IF strpos(v_src, 'b := 2') > 0 OR strpos(v_src, 'c := 3') > 0 OR strpos(v_src, 'a := 1') = 0 OR strpos(v_src, 'd := 4') = 0 THEN
@@ -3171,8 +3224,11 @@ BEGIN
      OR strpos(v_board, 'v_run := public.ottoq_owner_live_run(p_depot_id);') = 0 OR strpos(v_board, 'ottoq_agent_live_run') > 0
      OR strpos(v_dbrd, 'v_run := public.ottoq_owner_live_run(p_depot_id);') = 0 OR strpos(v_dbrd, 'ottoq_agent_live_run') > 0
      OR strpos(v_lim, 'ELSE o.sim_run_id = public.ottoq_owner_run_id(o.depot_id) END') = 0
-     OR strpos(v_lim, 'r.status IN (''running'', ''paused'')') > 0 THEN
-    RAISE EXCEPTION '0721 V1 FAILED: an owner path or the engine''s unpinned limit read does not use the owners'' run (§17)';
+     OR strpos(v_lim, 'r.status IN (''running'', ''paused'')') > 0
+     --: G495: every other agent read and door reads the live run through ottoq_agent_live_run, now the owners' run
+     OR strpos(v_alr, 'WHERE r.sim_run_id = public.ottoq_owner_run_id(p_depot_id)') = 0
+     OR strpos(v_alr, 'ORDER BY') > 0 OR strpos(v_alr, 'started_at DESC') > 0 THEN
+    RAISE EXCEPTION '0721 V1 FAILED: an owner path, an agent door''s live run or the engine''s unpinned limit read does not use the owners'' run (§17)';
   END IF;
   --: §17: every re-stamp pinned to its run; the takeover lifts every other live run's per-run settings, carries, and
   --: re-stamps every car; the run's end re-stamps unreconciled cars too
@@ -3236,6 +3292,8 @@ BEGIN
                       'public.ottoq_owner_target_on_run(uuid,uuid,timestamp with time zone)',
                       'public.ottoq_owner_restamp(uuid,uuid,uuid[])',
                       'public.ottoq_owner_saved_propagate(uuid)',
+                      --: G495: its grants are kept (postgres only)
+                      'public.ottoq_agent_live_run(uuid)',
                       'public.ottoq_owner_read_shown(public.ottoq_agent_principals,jsonb)',
                       'public.ottoq_owner_saved_effect(public.vehicles,text,text,numeric,numeric)',
                       'public.ottoq_tg_owner_saved_on_run_start()',
@@ -3311,6 +3369,8 @@ DECLARE
   r_idonly    jsonb;
   v_t_idonly  numeric;
   r_who2      jsonb;
+  v_alr_same  boolean;
+  v_alr_run   text;
   v_demo_run  uuid := gen_random_uuid();
   v_hash      text;
   v_t_confirm numeric;
@@ -3415,6 +3475,9 @@ BEGIN
                    'SELECT $1, ''paused'', clock_timestamp(), ''operator_demo'', %1$s FROM public.ottoq_sim_runs WHERE sim_run_id = $2',
                    v_cols) USING v_demo_run, v_tpl;
     r_who2 := public.ottoq_agent_call(v_th, 'whoami', '{}'::jsonb, 'mcp', '{}'::jsonb);
+    --     and (G495) every other agent door's live run is the same run: ottoq_agent_live_run names production too
+    v_alr_run := public.ottoq_agent_live_run(c_twin) ->> 'sim_run_id';
+    v_alr_same := public.ottoq_agent_live_run(c_twin) IS NOT DISTINCT FROM public.ottoq_owner_live_run(c_twin);
     -- 2b. (§9) what the person confirmed is saved to the cars, and carried onto the next production run: a second run,
     --     started earlier than the probe run so the probe run stays the live one, carries it; ending that run lifts it from
     --     the run and does not stamp the command as lifted
@@ -3553,6 +3616,9 @@ BEGIN
      OR (r_mid #>> '{data,command,sim_run_id}') IS DISTINCT FROM v_run::text THEN
     RAISE EXCEPTION '0721 V3 FAILED: a paused demo run started after production took the owners'' run: % / %', r_who2 -> 'data' -> 'owner', r_mid;
   END IF;
+  IF v_alr_run IS DISTINCT FROM v_run::text OR NOT COALESCE(v_alr_same, false) THEN
+    RAISE EXCEPTION '0721 V3 FAILED: an agent door''s live run is % (the probe''s production run is %, the newer paused demo %), or not the owners'' run', v_alr_run, v_run, v_demo_run;
+  END IF;
   IF (r_confirm ->> 'http_status')::int <> 201 OR r_confirm #>> '{data,outcome}' IS DISTINCT FROM 'applied'
      OR r_confirm #>> '{data,command,acting_person}' IS DISTINCT FROM c_email
      OR r_confirm #>> '{data,command,via}' IS DISTINCT FROM 'confirm'
@@ -3660,7 +3726,9 @@ VALUES ('0721_a_signed_in_owner_changes_production_under_their_own_name', false,
   'the engine''s unpinned owner-limit read; every re-stamp pinned to its run; a production run that becomes the running '
   'run lifts every other live run''s per-run settings and re-stamps every car; a person''s change to what is saved holds '
   'on every live run; a plan hash salted and binding only by itself. The two engine readers touched (the unpinned branch '
-  'of ottoq_owner_charge_limit, the tick''s target line) are reached only with owner rows, which no arm has: FALSE/FALSE.',
+  'of ottoq_owner_charge_limit, the tick''s target line) are reached only with owner rows, which no arm has: FALSE/FALSE. '
+  'And (G495) ottoq_agent_live_run, read by every other agent door, answers for the same owners'' run; only the two '
+  'dispatchers reach its callers, and no function or cron job calls them, so no arm reads it.',
   now());
 
 COMMIT;
