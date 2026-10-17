@@ -694,7 +694,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "undo_command",
     title: "Undo one of my commands",
-    description: "Reverse one of your applied commands by its command_id (from its receipt or my_commands): what it set is withdrawn, and anything it replaced comes back. It acts on the run it is sent on. A command that left no setting of its own there (a clear, a limit set to 100%, a cancel or a release) has nothing to undo (refused nothing_to_undo, saying why and what to send instead); one whose settings a production run lifted as it took over the depot is refused lifted; one whose run has ended was already lifted with it (run_ended)." + RECEIPT,
+    description: "Reverse one of your applied commands by its command_id (from its receipt or my_commands): what it set is withdrawn, and anything it replaced comes back. It acts on the run it is sent on. A command that left no setting of its own there (a clear, a limit set to 100%, a cancel or a release) has nothing to undo (refused nothing_to_undo, saying why and what to send instead); one whose settings a production run lifted as it took over the depot is refused lifted; one made on another run still live but not the one your commands go to now (and whose setting is not saved) is refused made_on_an_earlier_run; one whose run has ended was already lifted with it (run_ended)." + RECEIPT,
     capability: "owner_settings", effect: "owner_setting", scope: "fleet",
     inputSchema: {
       type: "object", additionalProperties: false, required: ["command_id"],

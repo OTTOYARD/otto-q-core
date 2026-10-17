@@ -127,10 +127,16 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > dynamic filtering), and a fallback is read from `usage.iterations`. In the database (0721 §17): one **owners' run**
 > per depot, which every agent read and door answers for: the run running there, else the newest paused production run,
 > else the newest paused demo run (FINDINGS G495); a production run takes over the depot as it becomes the running run
-> (it starts, or it resumes), not as it pauses, lifting every other live run's per-run settings, a paused production
-> run's included, while what a person saved stays, and re-stamping every car at the depot pinned to it; what is saved
-> holds on every live run; and undo answers `nothing_to_undo` or `lifted`, with why. **0721 applies only with nothing
-> running at the twin depot** (its P3): pause or stop the running run first, then apply.
+> (it starts, or it resumes), not as it pauses, lifting every other live run's per-run settings, while what a person
+> saved stays, and re-stamping every car at the depot pinned to it. **At most one production run is live at a depot
+> (0721 round 4):** a second production start, or a resume of a production run while another is live there, is refused
+> (23505, "a production run is already live at this depot (paused); resume it or stop it first"), so a paused
+> production run's settings are lifted only for a pair made before 0721. What is saved holds on every live run; a
+> contract change follows onto the cars at once (G494); and undo answers `nothing_to_undo`, `lifted` or
+> `made_on_an_earlier_run` (a command made on another run still live, not the one commands go to now), with why. The
+> owner reads can still show a limit a raised contract minimum put out of force (G496, open). **0721 applies only with
+> nothing running at the twin depot and no production run paused there** (its P3): pause or stop the running run, and
+> stop a paused production run (`ottoq_sim_mark_stopped`), then apply.
 ---
 
 ## 1. Architecture
