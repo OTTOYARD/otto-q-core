@@ -420,6 +420,8 @@
 --   queue: two biases from one lag, in opposite directions. 0735 (dial twin_answer_in_tick, applied 16:16 UTC) carries a
 --   command out in the tick it is given. Its arms run in the next window after 0734's: the same morning, then the
 --   normal day at 10, 20 and 40 posts, paired with arms 83, 86 and 84. Query (12) reads both costs on any run.
+--   The handover's first tick remains (the twin stamps a charge's end at the tick boundary). Its candidate fix, stamping
+--   the moment the pack filled, is in G449; it waits on 0734's pair, because if half the tick changes little it buys little.
 --
 --   The promise itself (G383, 0736, applied 16:38 UTC). When a car arrives, OTTO-Q now estimates when it will be ready.
 --   The estimate is its own plan of the charge line, simulated in 16 sampled futures, with every charge to 100% on the
@@ -765,4 +767,27 @@ SELECT left(sim_run_id::text, 8) AS run, count(*) AS bay_visits, count(floor_at_
        count(*) FILTER (WHERE floor_at_arrival > run_end) AS floor_past_run_end,
        count(*) FILTER (WHERE floor_at_arrival > run_end AND ready_at IS NOT NULL) AS past_end_but_ready
   FROM j GROUP BY 1 ORDER BY 1;
+
+-- (17) G453's test of the promise, on a promise arm's run: for each promised car with a bay booking made in its arrival
+--      tick, its promise's p90 against that booking's original end (the calendar's floor) and against when it was ready.
+--      If many booked cars were ready after the floor while their p90 sat before it, the p90 under-covers them and a
+--      floor on the p90 is the next build. Substitute the sweep code (promise_normal_2026_10_17 or promise_busy_2026_10_17).
+WITH run AS (SELECT a.sim_run_id FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+              WHERE s.sweep_code = 'promise_busy_2026_10_17' ORDER BY a.ran_at DESC LIMIT 1),
+p AS (SELECT pr.*, (SELECT (x ->> 'done_at')::timestamptz FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+                     WHERE vn.visit_id = pr.visit_id AND x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at,
+             (SELECT max(COALESCE((SELECT r.old_to FROM public.bay_reservation_reconcile_2026_08_02 r WHERE r.booking_id = b.booking_id
+                                    ORDER BY r.sim_clock, r.defer_seq LIMIT 1), upper(b.during)))
+                FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id
+               WHERE b.sim_run_id = pr.sim_run_id AND b.vehicle_id = pr.vehicle_id AND s.stall_type::text IN ('wash_bay', 'service_bay')
+                 AND b.booked_at_sim BETWEEN pr.arrived_at - interval '1 minute' AND pr.arrived_at + interval '5 minutes') AS floor_at
+        FROM public.ottoq_ready_promises pr JOIN run USING (sim_run_id))
+SELECT count(*) AS promises, count(floor_at) AS booked,
+       count(*) FILTER (WHERE floor_at IS NOT NULL AND ready_at IS NOT NULL) AS booked_and_ready,
+       count(*) FILTER (WHERE floor_at IS NOT NULL AND ready_at IS NOT NULL AND ready_at <= ready_p90_at) AS booked_ready_by_p90,
+       count(*) FILTER (WHERE floor_at IS NOT NULL AND ready_at IS NOT NULL AND ready_at >= floor_at - interval '5 minutes'
+                          AND ready_p90_at < floor_at) AS p90_before_floor_but_ready_after_it,
+       count(*) FILTER (WHERE floor_at IS NULL AND ready_at IS NOT NULL AND ready_at <= ready_p90_at) AS unbooked_ready_by_p90,
+       count(*) FILTER (WHERE floor_at IS NULL AND ready_at IS NOT NULL) AS unbooked_and_ready
+  FROM p;
 
