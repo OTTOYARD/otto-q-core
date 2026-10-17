@@ -780,7 +780,8 @@ repo_manifest(version, name, file) AS (
     ('20261017060928'::text, 'forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot'::text, '0724_forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot.sql'::text),
     ('20261017063328'::text, 'forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall'::text, '0725_forty_fast_chargers_on_a_normal_day_where_the_service_bays_are_not_the_wall.sql'::text),
     ('PENDING'::text, 'a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_one'::text, '0726_a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_one.sql'::text),
-    ('PENDING'::text, 'forty_robotic_chargers_on_todays_service_through_shared_cabinets'::text, '0727_forty_robotic_chargers_on_todays_service_through_shared_cabinets.sql'::text)
+    ('PENDING'::text, 'the_site_power_gate_can_read_the_meter_instead_of_guessing'::text, '0727_the_site_power_gate_can_read_the_meter_instead_of_guessing.sql'::text),
+    ('PENDING'::text, 'forty_robotic_chargers_on_todays_service_through_shared_cabinets'::text, '0728_forty_robotic_chargers_on_todays_service_through_shared_cabinets.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
