@@ -784,7 +784,8 @@ repo_manifest(version, name, file) AS (
     ('20261017073142'::text, 'forty_robotic_chargers_on_todays_service_through_shared_cabinets'::text, '0728_forty_robotic_chargers_on_todays_service_through_shared_cabinets.sql'::text),
     ('20261017081553'::text, 'a_site_that_divides_its_power_is_judged_by_the_limit_it_holds'::text, '0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds.sql'::text),
     ('20261017082241'::text, 'twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee'::text, '0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql'::text),
-    ('20261017083042'::text, 'the_battery_plans_for_the_bill_the_value_view_reads'::text, '0731_the_battery_plans_for_the_bill_the_value_view_reads.sql'::text)
+    ('20261017083042'::text, 'the_battery_plans_for_the_bill_the_value_view_reads'::text, '0731_the_battery_plans_for_the_bill_the_value_view_reads.sql'::text),
+    ('PENDING'::text, 'two_more_seeds_for_the_four_cells_the_recommendation_rests_on'::text, '0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

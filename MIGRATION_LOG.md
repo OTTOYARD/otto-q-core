@@ -219,7 +219,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0731 — GENERATED, not a log
+## Index, 0134–0732 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699 — which are indexed below as well as logged above; the log row is
@@ -791,7 +791,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0729](db/migrations/0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds.sql) | `20261017081553` | yes — ledger | **A site that divides its power is judged by the limit it holds.** With `dc_power_managed` at 1 beside 0726's |
 | [0730](db/migrations/0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql) | `20261017082241` | yes — ledger | **Twenty fast chargers on the same normal day, to find the knee.** One arm, run tonight ahead of 0728's last two |
 | [0731](db/migrations/0731_the_battery_plans_for_the_bill_the_value_view_reads.sql) | `20261017083042` | yes — ledger | **The battery plans for the bill the value view reads.** Three paired cells on the seed and day that arms 83, |
+| [0732](db/migrations/0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on.sql) | `PENDING` | no — pending | **Two more seeds for the four cells the recommendation rests on.** db/checks/0451 §10 rests on four normal-day |
 
-553 migrations indexed.
+554 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
