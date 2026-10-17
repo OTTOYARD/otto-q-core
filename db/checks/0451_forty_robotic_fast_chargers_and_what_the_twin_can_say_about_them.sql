@@ -511,8 +511,13 @@
 --   path cannot use (it honours a hold only through a planned leg with no stall, and a reserved leg has one); in 41 the
 --   final booking rows show no blocker, and in the one traced (7:15 AM CT, NASH-WSH-03) the blockers were two holds the
 --   reconcile moved five minutes later (its log, bay_reservation_reconcile_2026_08_02, keeps the old windows). On arms
---   86, 83 and 82: 52, 11 and 17 refusals. The lane's staff cap also binds: two wash supervisors for three bays
---   (ottoq_depot_staffing), so one bay stays empty whenever two are working.
+--   86, 83 and 82: 52, 11 and 17 refusals. The lane's staff cap also binds (query (29)): section (4b) admits to the wash
+--   lane only up to LEAST(the bays, the depot's wash supervisors) and passes over every candidate silently once that is
+--   reached, and this depot has two supervisors for three bays (ottoq_depot_staffing). On arm 84, in 51 five-minute
+--   ticks (about 4 h 15 min of the 12-hour day, 7:30 AM to 5:40 PM CT) two bays were washing, a mean 3.5 cars stood
+--   staged waiting for a wash or deep clean, and no walk-in was tried; as built (arm 83) 26 ticks and 1.6 cars. What a
+--   third supervisor buys is a staffing question for Chase, and the twin can answer it with a run-scoped override of the
+--   lane's headcount (proposed, not built: the decide reads the depot's staffing table, which no run can change).
 --
 --   Most of those reservations were booked behind a charge the depot cannot give (query (27), G459). The itinerary
 --   planner (public.ottoq_plan_visit_itinerary) chooses a fast charge at 100 kW below 45% and an L2 at 11 kW above it,
@@ -1231,3 +1236,43 @@ SELECT arm, count(*) AS charges, round(avg(real_min)::numeric, 1) AS real_mean,
        round(100.0 * avg(((CASE WHEN md <= ml THEN 'dcfc' ELSE 'l2' END) = real_kind)::int), 1) AS faster_kind_pct,
        round(avg(abs(CASE WHEN real_kind = 'dcfc' THEN md ELSE ml END - real_min))::numeric, 1) AS clock_mae_if_kind_known
   FROM f GROUP BY arm ORDER BY arm;
+
+-- (29) G458: the wash lane's staff cap. Each five minutes, the wash bays with a seated car, the cars staged and waiting
+--      for a wash or deep clean (their charge ended, their wash seat later), and whether section (4b) tried a walk-in at
+--      that tick. With two bays washing and no attempt, the lane's headroom (LEAST(bays, wash supervisors) less the cars
+--      in a wash or detail bay) was zero.
+WITH runs(run, arm) AS (VALUES ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83)),
+bays AS (SELECT s.id FROM public.stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'wash_bay'),
+ticks AS (SELECT r.arm, r.run, g AS t FROM runs r CROSS JOIN generate_series('2026-09-01 11:00+00'::timestamptz, '2026-09-01 22:55+00', interval '5 min') g),
+occ AS (SELECT k.arm, k.run, k.t,
+               (SELECT count(DISTINCT b.stall_id) FROM public.ottoq_stall_bookings b
+                 WHERE b.sim_run_id = k.run AND b.stall_id IN (SELECT id FROM bays) AND b.state IN ('active', 'done', 'interrupted')
+                   AND b.during @> k.t) AS washing
+          FROM ticks k),
+att AS (SELECT r.arm, d.sim_clock AS t, count(*) AS attempts
+          FROM runs r JOIN public.ottoq_decisions d ON d.sim_run_id = r.run
+         WHERE d.action_context = 'task_start' AND d.proposed_action ->> 'source' = 'needs_card'
+           AND d.proposed_action ->> 'stall_type' = 'wash_bay'
+         GROUP BY 1, 2),
+w AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS seat_at
+        FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run
+       WHERE b.stall_id IN (SELECT id FROM bays) AND b.state IN ('done', 'active', 'interrupted') AND b.booked_by LIKE 'otto_q%'),
+wq AS (SELECT w.*, (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                     WHERE o.vehicle_id = w.vehicle_id AND o.sim_run_id = w.run AND o.ended_at <= w.seat_at
+                       AND o.ended_at >= w.seat_at - interval '6 hours') AS charge_end FROM w),
+cand AS (SELECT k.arm, k.t, wq.vehicle_id,
+                (SELECT e.payload -> 'diff' -> 'current_state' ->> 'to' FROM public.ottoq_events e
+                  WHERE e.sim_run_id = k.run AND e.entity_id = wq.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                    AND e.payload -> 'diff' ? 'current_state' AND e.sim_clock_at <= k.t
+                  ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS st
+           FROM occ k JOIN wq ON wq.arm = k.arm AND wq.charge_end <= k.t AND wq.seat_at > k.t
+          WHERE k.washing = 2),
+staged AS (SELECT arm, t, count(DISTINCT vehicle_id) AS staged_waiting FROM cand WHERE st = 'staged_awaiting_service' GROUP BY 1, 2)
+SELECT o.arm,
+       count(*) FILTER (WHERE o.washing = 2 AND s.staged_waiting > 0) AS two_washing_staged_cars_waiting,
+       count(*) FILTER (WHERE o.washing = 2 AND s.staged_waiting > 0 AND a.attempts IS NULL) AS of_which_no_walk_in_tried,
+       round(avg(s.staged_waiting) FILTER (WHERE o.washing = 2 AND a.attempts IS NULL), 1) AS staged_waiting_mean_then,
+       min(o.t) FILTER (WHERE o.washing = 2 AND s.staged_waiting > 0 AND a.attempts IS NULL) - interval '5 hours' AS first_ct,
+       max(o.t) FILTER (WHERE o.washing = 2 AND s.staged_waiting > 0 AND a.attempts IS NULL) - interval '5 hours' AS last_ct
+  FROM occ o LEFT JOIN staged s ON s.arm = o.arm AND s.t = o.t LEFT JOIN att a ON a.arm = o.arm AND a.t = o.t
+ GROUP BY o.arm ORDER BY o.arm;
