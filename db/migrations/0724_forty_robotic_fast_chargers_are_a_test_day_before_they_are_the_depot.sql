@@ -84,6 +84,8 @@
 
 BEGIN;
 
+SET LOCAL lock_timeout = '5s';
+
 -- ── P1: the machinery, the controls, night 2's seeds, the depot as built ──
 DO $premises$
 DECLARE v_dcfc int; v_l2 int;
