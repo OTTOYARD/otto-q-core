@@ -297,7 +297,8 @@
 --
 --   2. SIZE THE POSTS BY THEIR PRICE, NOT BY THE STALLS. Forty posts were busy 41% of the day against the ten's 69%,
 --      and the curve bends: posts 11-20 met 5.8 car-hours each in the 12-hour day (an upper bound until 0734 measures
---      what the 5-minute tick costs the depot as built, G449, §12), posts 21-40 met 3.1 each (§3). At the
+--      what the 5-minute tick costs the depot as built and 0735's arms read the curve with the twin's command lag
+--      removed, G449, G450, §12), posts 21-40 met 3.1 each (§3). At the
 --      value sweep's own prices (ottoq_margin_prices: $20 a deployed car-hour, range $16-24, its Waymo-review source;
 --      about $206,000 installed per 350 kW charger, its INL source, before the robot itself), a month of such days is
 --      worth about $3,500 per post for posts 11-20 and $1,900 per post for posts 21-40, against about $1,700 a month
@@ -403,6 +404,17 @@
 --   median 45-minute charge from a median 63.5%. No order, power or post count makes those on time while each charges
 --   to 100% (rule 9). So "due cars on time" measures the promise as much as the depot, and power by need (§10 point 6)
 --   can reach only the immediate dispatches whose charge fits their due: 35 of the 66.
+--
+--   One cause under the handover, and a second cost it hides (G450, 2026-10-17 afternoon). The twin carries out every
+--   command a tick after the decide gives it: on arm 83 all 507 executed commands were confirmed exactly 5.00
+--   sim-minutes after issue. That lag is the handover's second tick. It also cuts every bay seat short. The decide books
+--   a bay from its own clock for the leg's planned length, and the car, seated a tick later, still leaves at the
+--   booking's end. On arms 82-88, 470 of 472 bay seats began exactly one tick after their booking: washes sat a mean
+--   11.9-13.1 of 16.9-18.1 booked minutes, services 35.0-44.6 of 40.4-49.6. So the twin's bays turn faster than their
+--   own plan. That flatters busy_day, whose wall is the two service bays (§5), while the handover penalizes a charger
+--   queue: two biases from one lag, in opposite directions. 0735 (dial twin_answer_in_tick, applied 16:16 UTC) carries a
+--   command out in the tick it is given. Its arms run in the next window after 0734's: the same morning, then the
+--   normal day at 10, 20 and 40 posts, paired with arms 83, 86 and 84. Query (12) reads both costs on any run.
 
 -- ══ QUERIES ══
 
@@ -625,3 +637,24 @@ SELECT urgency, count(*) AS served, count(*) FILTER (WHERE on_time) AS on_time, 
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY soc_start)::numeric, 1) AS soc_at_plug_p50,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY wait_min)::numeric, 1) AS wait_p50_min
   FROM d GROUP BY urgency;
+
+-- (12) the twin's command lag on a run, and what it does to bay seats (G449, G450). On arm 83: every command 5.00
+--      minutes late; washes seated 12.64 of 17.64 booked minutes, services 37.86 of 42.86. Under 0735's dial both
+--      lags should read 0.00 and a seat its booking.
+WITH c AS (
+  SELECT c.command_type, c.issued_at, c.confirmed_at, c.payload
+    FROM public.ottoq_vehicle_commands c
+   WHERE c.sim_run_id = 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd' AND c.status = 'executed')
+SELECT 'command lag' AS what, c.command_type AS k, count(*) AS n,
+       round(avg(extract(epoch FROM c.confirmed_at - c.issued_at) / 60.0), 2) AS mean_late_min,
+       NULL::numeric AS booked_min, NULL::numeric AS seated_min
+  FROM c GROUP BY c.command_type
+UNION ALL
+SELECT 'bay seat', c.command_type, count(*),
+       round(avg(extract(epoch FROM c.confirmed_at - lower(b.during)) / 60.0), 2),
+       round(avg(extract(epoch FROM upper(b.during) - lower(b.during)) / 60.0), 2),
+       round(avg(extract(epoch FROM upper(b.during) - c.confirmed_at) / 60.0), 2)
+  FROM c JOIN public.ottoq_stall_bookings b ON b.booking_id = NULLIF(c.payload ->> 'booking_id', '')::uuid
+ WHERE c.command_type IN ('enter_wash', 'enter_service')
+ GROUP BY c.command_type
+ ORDER BY 1, 2;

@@ -787,7 +787,8 @@ repo_manifest(version, name, file) AS (
     ('20261017083042'::text, 'the_battery_plans_for_the_bill_the_value_view_reads'::text, '0731_the_battery_plans_for_the_bill_the_value_view_reads.sql'::text),
     ('20261017105250'::text, 'two_more_seeds_for_the_four_cells_the_recommendation_rests_on'::text, '0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on.sql'::text),
     ('20261017110658'::text, 'a_shared_pool_gives_a_new_car_what_it_has_spare'::text, '0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql'::text),
-    ('20261017111846'::text, 'the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs'::text, '0734_the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs.sql'::text)
+    ('20261017111846'::text, 'the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs'::text, '0734_the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs.sql'::text),
+    ('20261017161641'::text, 'a_car_answers_a_command_in_the_tick_it_is_given'::text, '0735_a_car_answers_a_command_in_the_tick_it_is_given.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
