@@ -133,18 +133,24 @@
 --   conversion does not need a bigger grid connection; it needs the site held at a limit, and OTTO-Q to own it.
 --
 --   And the two readings of a shared site came out alike. Arm 87 (0726's sharing alone, the shield counting each new
---   car's whole rating, 2,400 kW of cabinets) met 948.3 car-hours, served 214 and refused 84 starts, all at 6 AM;
+--   car's whole rating, 2,400 kW of cabinets) met 948.3 car-hours, served 214 and refused 84 starts, all before 7 AM;
 --   arm 85 (0729's managed reading) met 941.8, served 207 and refused 85. Single readings, inside one reading's noise
 --   of each other and of arm 84 (942.7 with an 8 MW grid). So on this day forty robotic posts behind 2.4 MW of shared
---   cabinets on TODAY'S service did what forty did on a grown grid, and 0729's change to the shield did not bind:
---   both arms' refusals came while the meter itself read over the cap, which is the next paragraph's artefact, not
---   the request the shield adds.
+--   cabinets on TODAY'S service did what forty did on a grown grid.
 --
---   Read the managed arm's 85 refusals for what they are: every one came while the site meter already read above the
---   held limit (mean 2,225 kW against 2,137-2,160), 84 in the opening hour. A session the twin starts is metered at its
---   full initial rate until the next charge step meters it at its share, so in the opening tick the cars started first
---   read at full power and the later ones are refused. A real managed site assigns the share at connection. Those cars
---   waited a tick or two; the throughput above already carries that wait.
+--   The two arms' refusals are of different kinds, and the difference is 0729 doing what it was built for. CORRECTED:
+--   this paragraph's first draft, and G448 as first written, said both arms' refusals came with the meter over the
+--   cap; query (3b) shows that is true of arm 85 only. On arm 87 every one of the 84 came with the meter UNDER the
+--   2,160 kW cap (1,841-2,142 kW) and the car's full rating on top (a mean 221 kW). On arm 85 none did: every one of
+--   its 85 came with the meter itself over the cap (2,182-2,285 kW, mean 2,224), 84 of them before 7 AM. That is G448.
+--   A session the twin starts is metered at its full unshared rate, and each tick judges its charge starts before its
+--   charge step meters the running sessions, so a car started in one tick is still on the meter at full rate when the
+--   next tick's starts are judged. On arm 85 the 24 sessions started in the opening tick (06:10) put the meter at
+--   2,200.8 kW and the 16 starts judged after them were refused; at 06:15, 16 more were refused against the same
+--   2,200.8 kW, and only then did the charge step meter those 24 at their pool shares, which sum to exactly 2,160.0 kW
+--   (their OCPP TransactionEvent frames, query (3c)). So 0729 removed every refusal of arm 87's kind and G448 put the
+--   same number back. A real managed site assigns the share at connection. The refused cars waited a tick or two; the
+--   throughput above already carries that wait.
 --
 -- ══ §4 THE BILL: DEMAND CHARGES, AND THE TARIFF A FAST-CHARGING SITE SHOULD BE ON (reproduce: (4)) ════════════════════
 --
@@ -300,9 +306,10 @@
 --      one-year term and 90 days' notice back (§4). A held site keeps its load factor up and stays on GSA-3.
 --
 --   5. WHAT THE ENGINE NEEDS BEFORE A REAL CONVERSION, as certified changes, each already measured in the twin:
---      (a) a new session is metered at its share from its first reading. Tonight every refusal on a shared site (84 and
---          85) came while the meter read over the cap because fresh sessions count at full rate (§3); until this is
---          fixed the shield's reading of a held limit, (b), cannot bind, and it did not;
+--      (a) a new session is metered at its share from its first reading (G448). On the managed arm all 85 refusals
+--          came with the meter itself over the held cap, from cars started a tick earlier still metered at full rate
+--          (§3). (b)'s reading removed every refusal of the other kind (the meter under the cap and the car's full
+--          rating on top: all 84 on the shared arm), and until (a) is fixed the meter puts them back;
 --      (b) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
 --          site controller's limit in the charge start's context, and the controller itself);
 --      (c) the battery plans for the bill that is charged, and is ready for the surges OTTO-Q itself schedules: it
@@ -404,8 +411,54 @@ SELECT s.sweep_code, c.cell_code, a.arm_id, a.sim_run_id, a.complete, a.wall_s, 
        a.arm_metrics -> 'demand_charge_usd_month' AS demand_usd_month, a.arm_metrics -> 'unmet_demand_pct' AS unmet_pct
   FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
   JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
- WHERE s.sweep_code IN ('dcfc40_2026_10_17', 'dcfc40_normal_2026_10_17')
+ WHERE s.sweep_code IN ('dcfc40_2026_10_17', 'dcfc40_normal_2026_10_17', 'dcfc40_power_normal_2026_10_17',
+                        'dcfc40_power_busy_2026_10_17', 'dcfc40_managed_normal_2026_10_17', 'dcfc20_normal_2026_10_17',
+                        'billwindow_normal_2026_10_17')
  ORDER BY a.ran_at;
+
+-- (3b) EN.001's refused starts per arm, the meter and request they were judged on, and the ticks the DC pool bound
+WITH arms AS (
+  SELECT a.arm_id, a.sim_run_id, c.cell_code
+    FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+    JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
+   WHERE s.sweep_code IN ('dcfc40_2026_10_17', 'dcfc40_normal_2026_10_17', 'dcfc40_power_normal_2026_10_17',
+                          'dcfc40_power_busy_2026_10_17', 'dcfc40_managed_normal_2026_10_17', 'dcfc20_normal_2026_10_17',
+                          'billwindow_normal_2026_10_17')),
+refused AS (
+  SELECT a.arm_id, count(*) AS refused_starts,
+         count(*) FILTER (WHERE extract(hour FROM (e.context ->> 'now_ts')::timestamptz AT TIME ZONE 'America/Chicago') < 7)
+           AS before_7am_ct,
+         count(*) FILTER (WHERE (e.result_payload ->> 'current_kw')::numeric
+                                 <= (e.result_payload ->> 'engineering_cap_kw')::numeric) AS meter_under_cap,
+         round(min((e.result_payload ->> 'current_kw')::numeric), 1) AS meter_min_kw,
+         round(max((e.result_payload ->> 'current_kw')::numeric), 1) AS meter_max_kw,
+         round(avg((e.result_payload ->> 'requested_kw')::numeric)) AS mean_request_kw,
+         max((e.result_payload ->> 'engineering_cap_kw')::numeric) AS cap_kw
+    FROM arms a JOIN public.ottoq_rule_evaluations e ON e.sim_run_id = a.sim_run_id
+   WHERE e.rule_code = 'EN.001.grid_capacity_ceiling' AND e.action_context = 'charge_session_start' AND NOT e.passed
+   GROUP BY 1),
+pool AS (
+  SELECT a.arm_id, count(DISTINCT v.sim_clock_at) AS pool_bound_ticks
+    FROM arms a JOIN public.ottoq_events v ON v.sim_run_id = a.sim_run_id AND v.event_type = 'twin.dc_pool_shared'
+   GROUP BY 1)
+SELECT a.arm_id, a.cell_code, COALESCE(r.refused_starts, 0) AS en001_refused_starts, r.before_7am_ct, r.meter_under_cap,
+       r.meter_min_kw, r.meter_max_kw, r.mean_request_kw, r.cap_kw, COALESCE(p.pool_bound_ticks, 0) AS pool_bound_ticks
+  FROM arms a LEFT JOIN refused r USING (arm_id) LEFT JOIN pool p USING (arm_id)
+ ORDER BY a.arm_id;
+
+-- (3c) a shared arm's opening, tick by tick: sessions started, and the metered power of the running ones (G448). Read
+--      the stall type from the frames or the scorecard, not by joining stalls: the build-out is restored when the arm
+--      ends, so a converted post joined afterwards reads as the 19.2 kW L2 it was (18 of these 24 do).
+SELECT to_char(o.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH24:MI') AS sim_ct,
+       count(*) FILTER (WHERE o.payload ->> 'eventType' = 'Started') AS started,
+       count(*) FILTER (WHERE o.payload ->> 'eventType' = 'Updated') AS metered,
+       round(sum((SELECT (x ->> 'value')::numeric FROM jsonb_array_elements(o.payload -> 'meterValue' -> 0 -> 'sampledValue') x
+                   WHERE x ->> 'measurand' = 'Power.Active.Import'))
+             FILTER (WHERE o.payload ->> 'eventType' = 'Updated'), 1) AS metered_kw
+  FROM public.ottoq_ocpp_messages o
+ WHERE o.sim_run_id = 'fe6d540e-860f-4057-8edf-7d6257b94bff' AND o.message_type = 'TransactionEvent'
+   AND (o.sim_clock_at AT TIME ZONE 'America/Chicago')::time < time '07:00'
+ GROUP BY o.sim_clock_at ORDER BY o.sim_clock_at;
 
 -- (4) the depot's tariff rows
 SELECT schedule_code, season, demand_first_block_usd_kw, demand_excess_usd_kw, block_kw, fixed_monthly_usd,
