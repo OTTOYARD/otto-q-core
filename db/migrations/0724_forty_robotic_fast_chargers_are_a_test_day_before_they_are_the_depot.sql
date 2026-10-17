@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017060928
 -- migration-name:    forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot
 --
 -- 0724  **Forty robotic fast chargers are a test day before they are the depot.** Three build-outs that convert every
@@ -241,3 +241,19 @@ VALUES ('0724_forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_dep
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 06:09:28 UTC (1:09 AM CT), ledger version 20261017060928 ═════════════════════════════════════
+--
+--   NOT through apply_migration, and why (APPLYING.md step 4 names it; this is the deviation and its proof). The MCP's
+--   apply_migration opens with DDL on supabase_migrations.schema_migrations that takes an ACCESS EXCLUSIVE lock, and the
+--   overnight sweep's running arm (pid 3951184, ottoq_throughput_sweep_runner, 2 h into one transaction) holds ACCESS
+--   SHARE on that table for its whole life. Measured 06:07 UTC: the apply sat in Lock:relation behind the runner, and a
+--   queued ACCESS EXCLUSIVE request blocks every later reader of the ledger too, so it was cancelled (pg_cancel_backend)
+--   before it could stall anything. The file's executable part (from BEGIN; through COMMIT;, 10,159 characters, md5
+--   765399daa2abfc24de625502a1e17741) ran through execute_sql in one transaction that also wrote the ledger row
+--   (statements[1] = that same text; its md5 read back from the ledger equals the file's). Rows only, so it needed no
+--   lock the arm holds. Read back: 3 build-outs, 7 cells, 1 lineage row.
+--
+--   A lesson for the next apply at night: an apply_migration during the sweep window waits for the running arm, which
+--   can be hours. A file whose P0 refuses while an arm is in flight fails fast; a rows-only file like this one has no
+--   P0, and the wrapper's own lock is what waits.

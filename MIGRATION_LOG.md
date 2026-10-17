@@ -783,7 +783,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0721](db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql) | `PENDING` | no — pending | **A signed-in owner changes production under their own name, and every owner command says which door it came |
 | [0722](db/migrations/0722_the_engine_signs_with_a_new_key_and_every_old_signature_still_verifies.sql) | `PENDING` | no — pending | **The key that signs every event, SDR and audit bundle is rotated, and every row the old key signed still verifies |
 | [0723](db/migrations/0723_a_charges_closing_frames_name_the_charger_that_sent_them.sql) | `PENDING` | no — pending | **A charge's closing frames name the charger that sent them, so the charger back end can hear a charge end.** |
-| [0724](db/migrations/0724_forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot.sql) | `PENDING` | no — pending | **Forty robotic fast chargers are a test day before they are the depot.** Three build-outs that convert every |
+| [0724](db/migrations/0724_forty_robotic_fast_chargers_are_a_test_day_before_they_are_the_depot.sql) | `20261017060928` | yes — ledger | **Forty robotic fast chargers are a test day before they are the depot.** Three build-outs that convert every |
 
 546 migrations indexed.
 
