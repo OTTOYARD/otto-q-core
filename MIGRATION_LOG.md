@@ -793,7 +793,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0731](db/migrations/0731_the_battery_plans_for_the_bill_the_value_view_reads.sql) | `20261017083042` | yes — ledger | **The battery plans for the bill the value view reads.** Three paired cells on the seed and day that arms 83, |
 | [0732](db/migrations/0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on.sql) | `20261017105250` | yes — ledger | **Two more seeds for the four cells the recommendation rests on.** db/checks/0451 §10 rests on four normal-day |
 | [0733](db/migrations/0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql) | `20261017110658` | yes — ledger | **A shared pool gives a new car what it has spare (G448).** On a test day whose fast chargers share one DC pool |
-| [0734](db/migrations/0734_the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs.sql) | `PENDING` | no — pending | **The same morning at half the tick, to measure what the tick costs.** The depot as built (dcfc10) on the normal |
+| [0734](db/migrations/0734_the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs.sql) | `20261017111846` | yes — ledger | **The same morning at half the tick, to measure what the tick costs.** The depot as built (dcfc10) on the normal |
 
 556 migrations indexed.
 

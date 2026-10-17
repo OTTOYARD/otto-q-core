@@ -296,7 +296,8 @@
 --      in, so the depot's limit stops being connectors and labour and becomes power and time.
 --
 --   2. SIZE THE POSTS BY THEIR PRICE, NOT BY THE STALLS. Forty posts were busy 41% of the day against the ten's 69%,
---      and the curve bends: posts 11-20 met 5.8 car-hours each in the 12-hour day, posts 21-40 met 3.1 each (§3). At the
+--      and the curve bends: posts 11-20 met 5.8 car-hours each in the 12-hour day (an upper bound until 0734 measures
+--      what the 5-minute tick costs the depot as built, G449, §12), posts 21-40 met 3.1 each (§3). At the
 --      value sweep's own prices (ottoq_margin_prices: $20 a deployed car-hour, range $16-24, its Waymo-review source;
 --      about $206,000 installed per 350 kW charger, its INL source, before the robot itself), a month of such days is
 --      worth about $3,500 per post for posts 11-20 and $1,900 per post for posts 21-40, against about $1,700 a month
@@ -344,7 +345,8 @@
 --      chargingProfile and evseId, at https://ocpp.hexdocs.pm/ocpp/v2_1/message/set_charging_profile.html, a 2.1
 --      reference, both read 2026-10-17, to be confirmed against the OCA's 2.0.1 document), schedule-shaped, inside the
 --      power boundary 2.5 draws. That is the next build to measure
---      against max-min fair on the same seeds: the due cars on time (8 of 72 free, 4 of 66 held, §3) are its target.
+--      against max-min fair on the same seeds. Its target is the immediate dispatches whose charge fits their 45-minute
+--      due (35 of 66 with power to spare, §12), not all due cars: 8 of 72 were on time free and 4 of 66 held (§3).
 --
 --   7. WHAT IS NOT KNOWN YET. One seed per cell, so every gap above is a single reading. The repeats of arms 84 and 86
 --      that 0725's sweep holds run the same seed again: they test whether a reading repeats from one night to the next,
@@ -379,6 +381,28 @@
 --   what a depot with this battery would pay on the window the value view bills. The fix is one dial per cell:
 --   bess_plan_bill_from_min 180, so the plan and the bill read the same window. 0731 queues the paired cells on the same
 --   seed and day. A real depot's month has no test-day opening, and its battery would face each day's real peaks.
+
+-- ══ §12 WHAT THE 5-MINUTE TICK COSTS, AND WHAT A 45-MINUTE PROMISE CANNOT BUY (G449, G383; reproduce: (10), (11)) ═══
+--
+--   Every sweep on record runs at 5 sim-minutes a tick (15 sweeps, 87 arms), and at that tick a fast-charger handover
+--   takes two ticks. On arm 83 (the depot as built), 67 of 87 fast-charger handovers had a car waiting for a fast
+--   charger: 58 took exactly 10 minutes, none took fewer, and 13.5 charger-hours sat idle with a car waiting, against
+--   89.0 hours of fast charging (13%). Traced on stall 91ebbf41: the charge ends at 8:00 CT, the arm's demate (due 8:02) is cleared at 8:05, the
+--   stall is freed and reserved then, and the next car's charge starts at 8:10. The readiness check has the same shape:
+--   on arms 83 and 84, 190 cars whose charge was their last open work were ready exactly 10 minutes after it closed,
+--   median and p90 alike, for a 3-minute check.
+--
+--   What it means here. A robotic handover is a few minutes of physical work, and production ticks every 120 seconds,
+--   so this is the twin's resolution, not the engine's. It costs a depot with a queue and not one without, so the
+--   sizing curve of §3 (posts 11-20 bought 5.8 car-hours each) may be partly the tick. 0734 runs the depot as built over
+--   the same morning on the same seed at 5 and at 2.5 sim-minutes a tick; until it lands, read §10 point 2's first step
+--   as an upper bound.
+--
+--   And the promise. Every immediate dispatch is due exactly 45 minutes after it arrives (G383). With forty fast
+--   chargers and power to spare (arm 84), 31 of the 66 that charged spent longer than that on the charger alone, at a
+--   median 45-minute charge from a median 63.5%. No order, power or post count makes those on time while each charges
+--   to 100% (rule 9). So "due cars on time" measures the promise as much as the depot, and power by need (§10 point 6)
+--   can reach only the immediate dispatches whose charge fits their due: 35 of the 66.
 
 -- ══ QUERIES ══
 
@@ -555,3 +579,49 @@ SELECT c.tick_seq, to_char(c.issued_at AT TIME ZONE 'America/Chicago', 'HH24:MI'
   FROM public.ottoq_energy_commands c
  WHERE c.sim_run_id = 'b54f6de5-7cf3-4d91-a0d1-0010a21fec64' AND c.command_type = 'bess_setpoint_kw'
  ORDER BY c.tick_seq;
+
+-- (10) fast-charger handovers on a run with a car waiting for a fast charger, and the charger time they left idle (G449)
+WITH s AS (
+  SELECT x.stall_id, x.started_at, x.ended_at,
+         lead(x.started_at) OVER (PARTITION BY x.stall_id ORDER BY x.started_at) AS next_start
+    FROM public.ocpp_sessions x JOIN public.stalls st ON st.id = x.stall_id
+   WHERE x.sim_run_id = 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd' AND st.stall_type::text = 'dcfc'
+     AND x.started_at IS NOT NULL AND x.ended_at IS NOT NULL),
+fc_first AS (
+  SELECT vn.arrived_at, f.started_at AS first_start
+    FROM public.ottoq_visit_needs vn
+    JOIN LATERAL (SELECT y.started_at, sty.stall_type::text AS t FROM public.ocpp_sessions y JOIN public.stalls sty ON sty.id = y.stall_id
+                   WHERE y.sim_run_id = vn.sim_run_id AND y.vehicle_id = vn.vehicle_id AND y.started_at >= vn.arrived_at
+                   ORDER BY y.started_at LIMIT 1) f ON f.t = 'dcfc'
+   WHERE vn.sim_run_id = 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'),
+g AS (SELECT s.*, extract(epoch FROM (s.next_start - s.ended_at)) / 60.0 AS gap_min,
+             (SELECT count(*) FROM fc_first f WHERE f.arrived_at <= s.ended_at AND f.first_start > s.ended_at) AS fc_waiting
+        FROM s WHERE s.next_start IS NOT NULL)
+SELECT count(*) AS handovers, count(*) FILTER (WHERE fc_waiting > 0) AS with_a_car_waiting,
+       count(*) FILTER (WHERE fc_waiting > 0 AND gap_min = 10) AS exactly_10_min,
+       min(gap_min) FILTER (WHERE fc_waiting > 0) AS shortest_min,
+       round(sum(gap_min) FILTER (WHERE fc_waiting > 0)::numeric / 60, 1) AS idle_charger_hours,
+       (SELECT round(sum(extract(epoch FROM (s.ended_at - s.started_at)) / 3600)::numeric, 1) FROM s) AS charging_hours_all
+  FROM g;
+-- Stall types are read from stalls, so run this on an arm whose build-out converts nothing (dcfc10): a converted post
+-- reads as the L2 it is restored to (query (3c)'s note).
+
+-- (11) immediate dispatches on a run: the due, the wait, the charge alone, and how many the charge alone made late (G383)
+WITH o AS (SELECT * FROM public.ottoq_visit_outcomes('b54f6de5-7cf3-4d91-a0d1-0010a21fec64')),
+d AS (
+  SELECT o.on_time, vn.urgency, extract(epoch FROM (vn.dispatch_due_at - vn.arrived_at)) / 60.0 AS due_min,
+         cs.soc_start, extract(epoch FROM (cs.started_at - vn.arrived_at)) / 60.0 AS wait_min,
+         extract(epoch FROM (cs.ended_at - cs.started_at)) / 60.0 AS charge_min
+    FROM o JOIN public.ottoq_visit_needs vn USING (visit_id)
+    LEFT JOIN LATERAL (SELECT x.* FROM public.ocpp_sessions x
+                        WHERE x.sim_run_id = vn.sim_run_id AND x.vehicle_id = vn.vehicle_id AND x.started_at >= vn.arrived_at
+                          AND x.started_at < COALESCE(o.departed_at, vn.arrived_at + interval '1 day')
+                        ORDER BY x.started_at LIMIT 1) cs ON true
+   WHERE vn.dispatch_due_at IS NOT NULL AND o.departed_at IS NOT NULL)
+SELECT urgency, count(*) AS served, count(*) FILTER (WHERE on_time) AS on_time, min(due_min) AS due_min_lo, max(due_min) AS due_min_hi,
+       count(*) FILTER (WHERE charge_min IS NOT NULL) AS charged,
+       count(*) FILTER (WHERE charge_min > due_min) AS charge_alone_over_the_due,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY charge_min)::numeric, 1) AS charge_p50_min,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY soc_start)::numeric, 1) AS soc_at_plug_p50,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY wait_min)::numeric, 1) AS wait_p50_min
+  FROM d GROUP BY urgency;

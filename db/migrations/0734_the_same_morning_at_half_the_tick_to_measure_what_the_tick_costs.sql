@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017111846
 -- migration-name:    the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs
 --
 -- 0734  **The same morning at half the tick, to measure what the tick costs.** The depot as built (dcfc10) on the normal
@@ -10,7 +10,8 @@
 --   Every sweep on record ran at 5 sim-minutes a tick (15 sweeps, 87 arms), and at that tick a fast-charger handover
 --   takes two ticks however short the physical work. On arm 83 (dcfc10, normal day, seed 1), 67 fast-charger handovers
 --   had a car waiting for a fast charger; 58 took exactly 10 minutes and none took fewer, and they left 13.5
---   charger-hours idle against 82.7 hours of charging. Traced on one: the arm's demate is due 2 minutes after the charge
+--   charger-hours idle with a car waiting, against 89.0 hours of fast charging (CORRECTED after apply: 82.7 counted
+--   only the sessions with a successor on the same charger). Traced on one: the arm's demate is due 2 minutes after the charge
 --   ends, the next tick clears it and frees the stall, and the next car is started a tick after that. A robotic handover
 --   (unlatch, drive off, drive in, mate) is a few minutes of physical work, and production ticks every 120 seconds. If
 --   the 5-minute tick inflates the handover, it penalizes a depot with a queue (the depot as built) and not one without
@@ -145,3 +146,10 @@ VALUES ('0734_the_same_morning_at_half_the_tick_to_measure_what_the_tick_costs',
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 11:18:46 UTC (6:18 AM CT), ledger version 20261017111846 ═════════════════════════════════════
+--
+--   Through apply_migration with the sweep window closed. Executable part 6,518 characters, md5
+--   24afee355746a050c0c1fc349eb0691a, equal to the ledger's statements[1] read back. Dry-run with a rolled-back read-back
+--   first: tick5_morning_2026_10_17 72 ticks x 5 and tick25_morning_2026_10_17 144 ticks x 2.5, budget 5,400 s, one cell
+--   each. The header's one figure was corrected after the apply (comments only; the executable part is unchanged).
