@@ -792,7 +792,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0730](db/migrations/0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql) | `20261017082241` | yes — ledger | **Twenty fast chargers on the same normal day, to find the knee.** One arm, run tonight ahead of 0728's last two |
 | [0731](db/migrations/0731_the_battery_plans_for_the_bill_the_value_view_reads.sql) | `20261017083042` | yes — ledger | **The battery plans for the bill the value view reads.** Three paired cells on the seed and day that arms 83, |
 | [0732](db/migrations/0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on.sql) | `20261017105250` | yes — ledger | **Two more seeds for the four cells the recommendation rests on.** db/checks/0451 §10 rests on four normal-day |
-| [0733](db/migrations/0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql) | `PENDING` | no — pending | **A shared pool gives a new car what it has spare (G448).** On a test day whose fast chargers share one DC pool |
+| [0733](db/migrations/0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql) | `20261017110658` | yes — ledger | **A shared pool gives a new car what it has spare (G448).** On a test day whose fast chargers share one DC pool |
 
 555 migrations indexed.
 

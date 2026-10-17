@@ -319,16 +319,19 @@
 --      one-year term and 90 days' notice back (§4). A held site keeps its load factor up and stays on GSA-3.
 --
 --   5. WHAT THE ENGINE NEEDS BEFORE A REAL CONVERSION, as certified changes, each already measured in the twin:
---      (a) a new session is metered at its share from its first reading (G448). On the managed arm all 85 refusals
---          came with the meter itself over the held cap, from cars started a tick earlier still metered at full rate
---          (§3). (b)'s reading removed every refusal of the other kind (the meter under the cap and the car's full
---          rating on top: all 84 on the shared arm), and until (a) is fixed the meter puts them back;
---      (b) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
---          site controller's limit in the charge start's context, and the controller itself);
---      (c) the battery plans for the bill that is charged, and is ready for the surges OTTO-Q itself schedules: it
+--      (a) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
+--          site controller's limit in the charge start's context, and the controller itself). On the managed arm it
+--          removed every refusal of the shared arm's kind (the meter under the cap and each car's full rating on top:
+--          all 84 there);
+--      (b) the battery plans for the bill that is charged, and is ready for the surges OTTO-Q itself schedules: it
 --          charged at 425 kW in the tick the fleet plugged in, shaved one tick late, and idled all afternoon (G447);
---      (d) one answer for how much power a car can take (G443: twelve cars, four answers);
---      (e) the site gate reads the meter, not a band estimate 1.50x high (0727; on arm 88 it cost nothing measurable).
+--      (c) one answer for how much power a car can take (G443: twelve cars, four answers);
+--      (d) the site gate reads the meter, not a band estimate 1.50x high (0727; on arm 88 it cost nothing measurable).
+--      And one fix to the twin itself, which production does not need (G448). A car that had just started was metered
+--      at its full rate, so all 85 of the managed arm's refusals came with the meter itself over the held cap.
+--      CORRECTED: this point first listed that as a certified engine change. In this database only the twin's start
+--      function writes a session's first reading; a real charger reports its own. 0733 fixes it in the twin under a
+--      dial (dc_power_first_reading), and its paired arm runs first in the next window.
 --
 --   6. THE FRONTIER: POWER BY NEED. Once every car is connected on arrival, the decision that matters is how a held
 --      limit is divided, tick by tick, among the cars on it. 0726 divides it max-min fairly, as a cabinet left to itself

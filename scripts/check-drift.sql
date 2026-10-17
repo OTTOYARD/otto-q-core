@@ -786,7 +786,7 @@ repo_manifest(version, name, file) AS (
     ('20261017082241'::text, 'twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee'::text, '0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql'::text),
     ('20261017083042'::text, 'the_battery_plans_for_the_bill_the_value_view_reads'::text, '0731_the_battery_plans_for_the_bill_the_value_view_reads.sql'::text),
     ('20261017105250'::text, 'two_more_seeds_for_the_four_cells_the_recommendation_rests_on'::text, '0732_two_more_seeds_for_the_four_cells_the_recommendation_rests_on.sql'::text),
-    ('PENDING'::text, 'a_shared_pool_gives_a_new_car_what_it_has_spare'::text, '0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql'::text)
+    ('20261017110658'::text, 'a_shared_pool_gives_a_new_car_what_it_has_spare'::text, '0733_a_shared_pool_gives_a_new_car_what_it_has_spare.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

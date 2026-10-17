@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017110658
 -- migration-name:    a_shared_pool_gives_a_new_car_what_it_has_spare
 --
 -- 0733  **A shared pool gives a new car what it has spare (G448).** On a test day whose fast chargers share one DC pool
@@ -343,3 +343,16 @@ VALUES ('0733_a_shared_pool_gives_a_new_car_what_it_has_spare', false, false,
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 11:06:58 UTC (6:06 AM CT), ledger version 20261017110658 ═════════════════════════════════════
+--
+--   Through apply_migration after the sweep window closed at 11:00 UTC, P0 passing. Executable part 17,275 characters,
+--   md5 87c025c91b316c2fb4af4892377089c5, equal to the ledger's statements[1] read back. twin.ottoq_sim_start_charge_session
+--   is now md5 f5e511c6706a55ae8ccf556c982390f6 (prosrc); twin.ottoq_sim_dc_first_reading_kw e918c7d553e46503d9fab488ef7bec1e.
+--
+--   Dry-run first, on live, rolled back by a closing exception: P0-P2, the patch (anchor once), V1-V4, and then an end
+--   to end check through the start function itself, the same car twice in two rolled-back sub-blocks with the shield
+--   not enforcing for that run. Car 02ff42a9 (62%) on fast-charge stall 0c916ac0 at arm 88's last clock (2026-09-01
+--   23:00 UTC), the fast charges already on the meter reading 50.48 kW, the cabinet set to 91 kW so the pool was 91.0 kW:
+--   first reading with the dial off 80.69 kW, the car's own rate; with dc_power_first_reading on, 40.52 kW, which is the
+--   pool's spare (91.0 - 50.48) and exactly what the helper answered for the dial-off rate.
