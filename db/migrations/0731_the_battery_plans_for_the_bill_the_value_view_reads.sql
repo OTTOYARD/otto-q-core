@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017083042
 -- migration-name:    the_battery_plans_for_the_bill_the_value_view_reads
 --
 -- 0731  **The battery plans for the bill the value view reads.** Three paired cells on the seed and day that arms 83,
@@ -135,3 +135,11 @@ VALUES ('0731_the_battery_plans_for_the_bill_the_value_view_reads', false, false
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 08:30:42 UTC (3:30 AM CT), ledger version 20261017083042 ═════════════════════════════════════
+--
+--   Through execute_sql in one transaction that also wrote the ledger row (0729's managed arm in flight; 0730's APPLIED
+--   note gives the reason), the version from the database's clock at the insert. Executable part 5,787 characters, md5
+--   0c80fc1af0e3b89c2128898c754fae3f, equal to the ledger's statements[1] read back. Dry-run with a rolled-back read-back
+--   first: three cells as §2 names; the runner's order is dcfc40_managed_normal, dcfc20_normal (both 15), then
+--   dcfc40_power_normal and this sweep (both 16, oldest first), then dcfc40_power_busy (17).

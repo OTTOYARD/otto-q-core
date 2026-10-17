@@ -790,7 +790,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0728](db/migrations/0728_forty_robotic_chargers_on_todays_service_through_shared_cabinets.sql) | `20261017073142` | yes — ledger | **Forty robotic chargers on today's service, through shared cabinets.** The build-out a real conversion would |
 | [0729](db/migrations/0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds.sql) | `20261017081553` | yes — ledger | **A site that divides its power is judged by the limit it holds.** With `dc_power_managed` at 1 beside 0726's |
 | [0730](db/migrations/0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql) | `20261017082241` | yes — ledger | **Twenty fast chargers on the same normal day, to find the knee.** One arm, run tonight ahead of 0728's last two |
-| [0731](db/migrations/0731_the_battery_plans_for_the_bill_the_value_view_reads.sql) | `PENDING` | no — pending | **The battery plans for the bill the value view reads.** Three paired cells on the seed and day that arms 83, |
+| [0731](db/migrations/0731_the_battery_plans_for_the_bill_the_value_view_reads.sql) | `20261017083042` | yes — ledger | **The battery plans for the bill the value view reads.** Three paired cells on the seed and day that arms 83, |
 
 553 migrations indexed.
 
