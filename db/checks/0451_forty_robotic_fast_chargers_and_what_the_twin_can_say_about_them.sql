@@ -91,23 +91,29 @@
 --   the whole case for OTTO-Q owning the power at an all-fast-charger site: every kW of the month's peak it avoids is
 --   $21.78, and the energy a car needs is the same however fast it is delivered.
 --
---   NES's EV schedule, EVC, has no demand charge: as reported from NES's January 2025 EVC schedule (search result for
---   https://nespower.com/-/media/project/nes/common/pdfs/commercial-rates/2025/evc-january-2025-retail-rate-schedule.pdf,
---   2026-10-17; the PDF itself answered HTTP 500 to a direct fetch): separately metered EV charging only, demand over
---   50 kW and up to 5,000 kW, $100 a month, 24.216 c/kWh on and off peak plus TVA's adjustment. CONFIRMED by 07:44 UTC by a
---   second search, which read the same terms from the PDF's own indexed text ("separately metered charging stations for
---   electric vehicles ... greater than 50 kW but not more than 5,000 kW"; "Customer Charge: $100.00 per delivery point
---   per month"; 24.216 c/kWh onpeak and offpeak, all seasons; "The base energy charges shall be increased or decreased
---   in accordance with the current Adjustment Addendum published by TVA"). That text is page 1 of 2 and the direct fetch
---   still answers 500, so page 2 is unread: no demand charge appears on page 1, and that is the claim. ottoq_depot_tariffs' provenance (retrieved 2026-07-09) carries 21.773 c/kWh for the same schedule, an
---   earlier version or a different basis. Crossover, energy-only at EVC against GSA-3's energy plus demand:
---     at 24.216 c: monthly load factor about 17.5% (21.6 $/kW-month / (16.9 c x 730 h))
---     at 21.773 c: about 20.4%
---   (If TVA's adjustment applies to both schedules alike, it cancels and the EVC premium is 24.216 - 4.785 = 19.4 c, a
---   crossover near 15%; the honest range is 15-20%.)
---   Arm 77's load factor is 12,497 / 24 / 1,697.6 = 30.7%: GSA-3 is cheaper there. A site whose peak doubles with the
---   same energy (load factor ~15%) sits at the crossover or past it. So the tariff is itself an OTTO-Q output: a managed peak keeps
---   GSA-3; an unmanaged 40-charger peak would want EVC (if the chargers are metered apart from the building).
+--   NES's EV schedule, EVC, has no demand charge. READ 2026-10-17 by 07:54 UTC from the schedule itself, both pages
+--   (https://www.nespower.com/-/media/project/nes/common/pdfs/commercial-rates/2025/april/evc.pdf, the source
+--   ottoq_energy_rates already cites, retrieved by it 2026-09-30): "ELECTRIC VEHICLE CHARGING POWER RATE - SCHEDULE EVC
+--   (Effective October 2024)"; "This rate shall exclusively apply to separately metered charging stations for electric
+--   vehicles where the charging station's demand is greater than 50 kW but not more than 5,000 kW"; "Customer Charge:
+--   $100.00 per delivery point per month"; energy 21.773 c/kWh onpeak and offpeak, all seasons; "The base energy charges
+--   shall be increased or decreased in accordance with the current Adjustment Addendum published by TVA". No demand
+--   charge on either page. Two terms that matter for a planner: a contract of "at least 1 year", and a move back to
+--   GSA only "after having received service for at least 1 year ... subject to 90 days prior written notice", at a
+--   contract demand no lower than EVC's. So the tariff is a yearly decision, not a monthly switch.
+--   CORRECTED (the first draft of this paragraph): the January 2025 "retail rate schedule" reads 24.216 c, which the
+--   first draft took for a different base. INFERRED, NOT VERIFIED (its PDF still answers HTTP 500): it is this base
+--   plus that month's TVA adjustment, 24.216 - 21.773 = 2.443 c, beside the 2.515 c September adjustment 0574 records.
+--   The first draft's 20.4% and 15% crossovers each subtracted an adjustment on one side only; its 17.5% was like for
+--   like and agrees with the figure below. Like for like, base against base (the adjustment applies to
+--   both and cancels): EVC's premium over GSA-3's energy is 21.773 - 4.785 = 16.988 c/kWh, and GSA-3's demand charge
+--   is about $21.6 per kW-month, so the crossover monthly load factor is 21.6 / (0.16988 x 730 h) = 17.4%. Below it,
+--   EVC is cheaper for the charging meter; above it, GSA-3. (The comparison leaves out the $2,091.71 GSA-3 and $100
+--   EVC customer charges: under EVC the building keeps its own GSA service, so the fixed charge does not go away.)
+--   Arm 77's load factor is 12,497 / 24 / 1,697.6 = 30.7%: GSA-3 is cheaper there. A site whose peak doubles on the
+--   same energy (load factor about 15%) is past the crossover. So the tariff is itself an OTTO-Q output, and a yearly
+--   one: a managed peak keeps GSA-3; an unmanaged 40-charger peak would want EVC (if the chargers are metered apart
+--   from the building).
 --
 -- ══ §5 busy_day IS A SERVICE STRESS TEST, NOT A CHARGING ONE (reproduce: (5)) ═════════════════════════════════════════
 --
