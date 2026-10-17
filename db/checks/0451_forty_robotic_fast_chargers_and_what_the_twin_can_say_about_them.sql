@@ -81,7 +81,7 @@
 --   first measure of how far one reading can move. "after 3 h" is the 30-minute peak from 180 minutes into the day,
 --   past the opening plug-in, which is what ottoq_value_summary bills (0577); "whole day" includes the opening. Every
 --   battery planned against the whole day (G447, §11), so the demand charges are its conceding the afternoon.
---   Arms read 08:18 UTC (82-84), 09:01 UTC (85), 09:33 UTC (86) and 10:07 UTC (87).
+--   Arms read 08:18 UTC (82-84), 09:01 UTC (85), 09:33 UTC (86), 10:07 UTC (87) and 10:41 UTC (88, below the table).
 --
 --   normal_day                           dcfc10        dcfc20        dcfc40        dcfc40_cab2400 on today's 2,500 kW
 --                                        as built      20 fast,      power to      .managed      .shared
@@ -151,6 +151,18 @@
 --   (their OCPP TransactionEvent frames, query (3c)). So 0729 removed every refusal of arm 87's kind and G448 put the
 --   same number back. A real managed site assigns the share at connection. The refused cars waited a tick or two; the
 --   throughput above already carries that wait.
+--
+--   0728's third normal-day cell, arm 88 (7fe98840): arm 87's cell with 0132's site gate left on (its default) and
+--   counting committed load as metered (0727). 215 served of 255, door p50/p95 90/267, due cars on time 8 of 71,
+--   charge wait p50/p95 floor/max 10/85/110, 271 fast sessions at 40.7% busy and a mean 38.3 kW, 951.2 car-hours met,
+--   30-min peak 1,585.3 kW whole day and 1,139.2 after 3 h ($34,149 and $24,432 a month), instantaneous EV/grid max
+--   2,066/1,679 kW, must-do done 89.7%, rule 9 0/0. EN.001 refused 52 starts (39 before 7 AM, every one with the meter
+--   under the cap and a mean 127 kW on top) and 16 charge-stall assignments in the decide path (all before 7 AM, each
+--   taking the safe default); the pool never bound. Against arm 87, the same cell with the gate off, it came out alike
+--   (951.2 car-hours against 948.3, 215 served against 214), with fewer refusals (68 against 84) and a higher
+--   afternoon peak (1,139.2 against 1,062.1 kW). So a site held at its limit met the grown grid's car-hours all three
+--   ways tried: 941.8 (0729's managed reading), 948.3 (0726's sharing alone) and 951.2 (with the metered gate), against
+--   942.7 with 8 MW to spare. Single readings on one seed.
 --
 -- ══ §4 THE BILL: DEMAND CHARGES, AND THE TARIFF A FAST-CHARGING SITE SHOULD BE ON (reproduce: (4)) ════════════════════
 --
@@ -275,7 +287,7 @@
 -- ══ §10 THE RECOMMENDATION ════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   To Chase, from the research wing (rule 10: a recommendation, shipped only as certified changes). Written on arms
---   82-87; 0728's gated arm and 0731's bill-window pairs land after it.
+--   82-88, the night of 2026-10-17; 0731's bill-window pairs run in the next window.
 --
 --   1. LEAN IN. Robotic fast charging is the edge, and the evidence is the slow tail and the car-hours, not the median.
 --      On the normal day forty robotic posts served 45% more cars in 12 hours than the depot as built, cut the slowest
@@ -294,8 +306,9 @@
 --      twenty now and the rest as measured demand fills them, buys the same answer with half the capital at risk.
 --
 --   3. DO NOT SIZE THE GRID TO THE NAMEPLATE. Forty posts with nothing holding them drew 3.9 MW for the 6 AM plug-in.
---      On the existing 2.5 MW service, behind 2.4 MW of shared cabinets, they met 948.3 car-hours (0726's sharing
---      alone) and 941.8 (held at 2.16 MW, 0729) against 942.7 on a grid grown to 8 MW. The megawatt worry is a control
+--      On the existing 2.5 MW service, behind 2.4 MW of shared cabinets, they met 941.8 car-hours (held at 2.16 MW,
+--      0729), 948.3 (0726's sharing alone) and 951.2 (with the site gate reading the meter, 0727) against 942.7 on a
+--      grid grown to 8 MW. The megawatt worry is a control
 --      question, and its answer is a site controller holding a limit that OTTO-Q sets: shared cabinets (the Kempower and
 --      ABB units 0567 and 0728 cite) with OTTO-Q deciding the split. No utility upgrade is needed for this day's load.
 --
@@ -315,7 +328,7 @@
 --      (c) the battery plans for the bill that is charged, and is ready for the surges OTTO-Q itself schedules: it
 --          charged at 425 kW in the tick the fleet plugged in, shaved one tick late, and idled all afternoon (G447);
 --      (d) one answer for how much power a car can take (G443: twelve cars, four answers);
---      (e) the site gate reads the meter, not a band estimate 1.50x high (0727).
+--      (e) the site gate reads the meter, not a band estimate 1.50x high (0727; on arm 88 it cost nothing measurable).
 --
 --   6. THE FRONTIER: POWER BY NEED. Once every car is connected on arrival, the decision that matters is how a held
 --      limit is divided, tick by tick, among the cars on it. 0726 divides it max-min fairly, as a cabinet left to itself
@@ -330,10 +343,12 @@
 --      power boundary 2.5 draws. That is the next build to measure
 --      against max-min fair on the same seeds: the due cars on time (8 of 72 free, 4 of 66 held, §3) are its target.
 --
---   7. WHAT IS NOT KNOWN YET. One seed per cell, so every gap above is a single reading (the replicate of dcfc40.otto_q
---      in 0725's sweep is the first measure of how far one moves). A 12-hour day from 6 AM: no night, where L2's slow
---      charge costs least. busy_day's wall is the two service bays (§5), which more chargers cannot move. The battery's
---      worth on the billed window is 0731's three paired arms.
+--   7. WHAT IS NOT KNOWN YET. One seed per cell, so every gap above is a single reading. The repeats of arms 84 and 86
+--      that 0725's sweep holds run the same seed again: they test whether a reading repeats from one night to the next,
+--      which it does byte for byte only if nothing the engine reads has changed in between (the charge clock is refit
+--      nightly, G387), and they say nothing about how far a reading moves from seed to seed. That needs other seeds.
+--      A 12-hour day from 6 AM: no night, where L2's slow charge costs least. busy_day's wall is the two service bays
+--      (§5), which more chargers cannot move. The battery's worth on the billed window is 0731's three paired arms.
 --
 -- ══ §11 THE BATTERY PLANS FOR A BILL THE VALUE VIEW DOES NOT CHARGE (G447; reproduce: (9)) ══════════════════════════
 --
