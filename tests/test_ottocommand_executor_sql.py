@@ -48,8 +48,9 @@ CLAUDE.md rules 9 and 10 bind hardest. None of what it promises is visible to a 
     settings or commands, no person's command made with no run live, no person's note, and no such command's id on a
     demo run's carried setting.
   * the review, round 3 (2026-10-15 to 17, rule 9): one owners' run per depot (the running run, else the newest paused
-    production run, else the newest paused demo run) for every owner path and for the engine's unpinned read of an owner
-    limit; every re-stamp pinned to its run; a production run that becomes the running run lifts every other live run's
+    production run, else the newest paused demo run) for every owner path, for every other agent read and door (G495:
+    ottoq_agent_live_run answers for it) and for the engine's unpinned read of an owner limit; every re-stamp pinned to
+    its run; a production run that becomes the running run lifts every other live run's
     per-run settings (a paused production run's too) and re-stamps every car; a person's change to what is saved holds on
     every live run, and comes back to a run where a takeover lifted what stood for it; an undo that puts back a limit below
     what is saved is gated; and a confirm binds only by its preview's salted plan hash, given only in its confirm object.
@@ -73,7 +74,7 @@ from test_owner_agent_sql import (  # noqa: F401  (pytestmark: skip without a sc
 )
 from test_owner_agent_sql import fresh_run as _fresh_run
 from test_passcode_door_sql import M0607, M0608, PASSCODE, pcall, unlock
-from test_agent_signin_sql import CHASE, M0700, STUB_AUTH, connect, sha
+from test_agent_signin_sql import CHASE, M0700, STUB_AUTH, connect, person, sha
 
 M0718 = os.path.join(ROOT, "db", "migrations", "0718_production_runs_the_world_phases_the_twin_certifies.sql")
 M0721 = os.path.join(ROOT, "db", "migrations", "0721_a_signed_in_owner_changes_production_under_their_own_name.sql")
@@ -116,6 +117,8 @@ LIVE_MD5 = {
     "ottoq.ottoq_owner_orders_tick(uuid,timestamp with time zone)": "5f01d0881bd65d80b155dba04033e09f",
     # §17 (the review, round 3; read 2026-10-15 13:17:20 UTC, re-read 2026-10-17): the engine's one read of an owner limit
     "public.ottoq_owner_charge_limit(uuid)": "9de03ba377929ea4419975cb82aa7279",
+    # §17, G495 (read 2026-10-17 15:01:17 UTC): the agent doors' read of the live run
+    "public.ottoq_agent_live_run(uuid)": "75c2e8545f7d92fc39215723ddc70aea",
 }
 
 
@@ -754,7 +757,9 @@ def test_no_client_role_reaches_anything_new(post):
                # §17 (the review, round 3)
                "public.ottoq_owner_run_id(uuid)", "public.ottoq_owner_live_run(uuid)",
                "public.ottoq_owner_target_on_run(uuid,uuid,timestamp with time zone)",
-               "public.ottoq_owner_restamp(uuid,uuid,uuid[])", "public.ottoq_owner_saved_propagate(uuid)"):
+               "public.ottoq_owner_restamp(uuid,uuid,uuid[])", "public.ottoq_owner_saved_propagate(uuid)",
+               # G495: the live-run read keeps its grants (postgres only)
+               "public.ottoq_agent_live_run(uuid)"):
         for role in ("anon", "authenticated", "service_role"):
             assert post.val(f"SELECT has_function_privilege('{role}', '{fn}', 'EXECUTE')") == "f", (fn, role)
     assert post.val("SELECT has_function_privilege('service_role', 'public.ottoq_agent_call(text,text,jsonb,text,jsonb)', 'EXECUTE')") == "t"
@@ -772,7 +777,7 @@ def test_the_snapshot_holds_every_body_0721_replaced(post):
                                              if k.startswith(("public.ottoq_tg_lift_owner_settings_on_terminal", "public.ottoq_agent_public_call",
                                                               "public.ottoq_owner_board", "public.ottoq_depot_owner_board",
                                                               "ottoq.ottoq_owner_orders_tick", "public.ottoq_owner_charge_limit",
-                                                              "public.ottoq_owner_read("))]
+                                                              "public.ottoq_owner_read(", "public.ottoq_agent_live_run("))]
     assert rows == sorted([[k.split("(")[0].split(".")[1], v] for k, v in replaced])
 
 
@@ -2625,6 +2630,58 @@ def test_each_answer_says_why_nothing_changes(post):
     assert (u["http_status"], u["error"]["code"]) == (422, "lifted"), u
     assert u["error"]["message"] == ("That command's settings were lifted (a production run took over the depot), so there "
                                      "is nothing left of it to undo."), u
+    no_run(post)
+
+
+#: the stub engine's yard supervisor at the twin depot (tests/fixtures/agent_gateway_stub_engine.sql), who decides requests
+SUPERVISOR = "a0000000-0000-0000-0000-00000000000a"
+
+
+def test_every_agent_read_and_door_answers_for_the_owners_run(post):
+    """The review, round 3 (G495, fixed): public.ottoq_agent_live_run, through which every agent read and door but the owner
+    door's reads its run, was the newest-started run running or paused at the depot. With production running and a demo
+    run started after it and paused, depot_status, stall_availability and recent_decisions read the paused demo, a note
+    and an ops-action request were recorded against it, and both welcomes described it. Now it is the owners' run
+    (ottoq_owner_run_id) for every principal, a depot-wide key, a fleet's key and a signed-in owner alike: they read
+    production, a request is recorded against production, and an approval still refuses when the run a request was made
+    against is no longer the live run (here, production paused and the demo resumed)."""
+    p = begin(post)
+    set_status(post, p, "paused")
+    d = insert_run(post, "operator_demo")
+    set_status(post, d, "paused")
+    set_status(post, p, "running")
+    assert post.val(f"SELECT sim_run_id FROM ottoq_sim_runs WHERE depot_id = '{TWIN}' AND status IN ('running', 'paused') "
+                    f"ORDER BY started_at DESC LIMIT 1") == d, "the paused demo is the newest-started live run"
+    assert post.json(f"SELECT ottoq_agent_live_run('{TWIN}')")["sim_run_id"] == p
+    assert post.val(f"SELECT ottoq_agent_live_run('{TWIN}') = ottoq_owner_live_run('{TWIN}')") == "t"
+    depot_key = post.issue("tesla-key-r3-g495-depot", "personal", ["read", "note", "request_ops_action"])
+    fleet_key = post.issue("tesla-key-r3-g495-fleet", "personal", ["read", "note"], TESLA)
+    chase = sign_in(post)
+    callers = (("a depot-wide key", lambda tool, args=None: pcall(post, depot_key, tool, args or {})),
+               ("a fleet's key", lambda tool, args=None: pcall(post, fleet_key, tool, args or {})),
+               ("a signed-in owner", lambda tool, args=None: tcall(post, chase, tool, args)))
+    for who, call in callers:
+        dep = call("depot_status")
+        assert dep["http_status"] == 200 and dep["data"]["run"]["sim_run_id"] == p, (who, dep)
+        stalls = call("stall_availability")
+        assert stalls["data"]["live"] is True and stalls["data"]["sim_run_id"] == p, (who, stalls)
+        dec = call("recent_decisions")
+        assert dec["data"]["live"] is True and dec["data"]["sim_run_id"] == p, (who, dec)
+        hello = call("welcome")
+        assert (hello["data"]["run"]["demo"], hello["data"]["run"]["status"]) == (False, "running"), (who, hello)
+    public = pcall(post, None, "welcome", {})
+    assert (public["data"]["run"]["demo"], public["data"]["run"]["status"]) == (False, "running"), public
+    note = pcall(post, depot_key, "send_note", {"title": "r3: which run is this recorded against?"})
+    ops = pcall(post, depot_key, "submit_request", {"kind": "ops_action", "title": "r3: reserve on", "action": "enable_energy_reserve"})
+    ids = [r["data"]["request"]["request_id"] for r in (note, ops)]
+    assert post.rows(f"SELECT sim_run_id FROM ottoq_agent_requests WHERE request_id IN ('{ids[0]}', '{ids[1]}')") == [[p], [p]]
+    # the run it was made against stops being the live run: production paused, the demo resumed
+    set_status(post, p, "paused")
+    set_status(post, d, "running")
+    r = person(post, SUPERVISOR, f"SELECT ottoq_agent_request_decide('{ids[1]}', 'approved', NULL)")
+    assert r["status"] == "approved_not_applied" and r["engine_reply"]["called"] is False, r
+    assert (r["engine_reply"]["requested_on_run"], r["engine_reply"]["live_run"]) == (p, d), r
+    assert r["engine_reply"]["reason"] == "The run this request was made against is no longer the live run.", r
     no_run(post)
 
 
