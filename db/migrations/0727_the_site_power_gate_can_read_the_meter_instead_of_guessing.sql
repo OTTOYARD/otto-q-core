@@ -13,7 +13,7 @@
 --   charge, 0.55 under 75%, else 0.30, over every car in a charging state; no meter is read. Reconstructed per tick from
 --   run 8954bcf7's own OCPP 2.0.1 frames (dcfc10.otto_q.energy_off, 24 h, 283 ticks) the estimate read a median 1.50x the
 --   metered power, p90 1.96x. At ten chargers the gate never binds, so it costs nothing; on a site with more chargers
---   than power (0724's and 0727's forty) it defers a car while a third of the limit is unused. Every active charge
+--   than power (0724's and 0728's forty) it defers a car while a third of the limit is unused. Every active charge
 --   meters its power every tick (twin.ottoq_sim_advance_charge_sessions writes ocpp_sessions.last_meter_value, the same
 --   field the site meter sums, twin.ottoq_sim_compute_charger_load_kw), so the gate can read what the site reads.
 --
