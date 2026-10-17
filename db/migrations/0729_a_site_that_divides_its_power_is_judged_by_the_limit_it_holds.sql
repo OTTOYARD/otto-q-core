@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017081553
 -- migration-name:    a_site_that_divides_its_power_is_judged_by_the_limit_it_holds
 --
 -- 0729  **A site that divides its power is judged by the limit it holds.** With `dc_power_managed` at 1 beside 0726's
@@ -359,3 +359,19 @@ VALUES ('0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds', fa
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 08:15:53 UTC (3:15 AM CT), ledger version 20261017081553 ═════════════════════════════════════
+--
+--   Through apply_migration, with the sweep runner paused (07:52:35 UTC) and nothing in flight, in the gap after arm 84
+--   (dcfc40.otto_q on normal_day) landed. Executable part 17,517 characters, md5 071139b3500bea20e960d9cace0edae6, equal
+--   to the ledger's statements[1] read back, and byte for byte the body dry-run on live first (less P0 and the read-back).
+--   Stored prosrc: EN.001 5dd7bd55..., the charge start bccb8cfa..., the pool plan 6afd8ee2..., as the dry run's.
+--
+--   The managed branch, tested after the apply in a rolled-back transaction on sim run e7d5824c (arm 83's stop, its
+--   cancelled sessions reactivated, both dials set at run scope): the helper answered {"managed_limit_kw": 1620.0,
+--   "managed_by": "twin_dc_pool"}, the as-built 1,800 kW less the 10% margin; EN.001 without the key refused a
+--   1,720 kW request ("would exceed engineering cap: 0.0 + 1720.0 = 1720.0 kW"); and a real start through the patched
+--   twin.ottoq_sim_start_charge_session carried the limit in EN.001's context and passed it ("grid capacity OK: 0.0 +
+--   104.0 = 104.0 kW"), as did EN.002, EN.004 and EN.005. That start was refused by HW.002 because the test clock sat
+--   five minutes past the charger's last heartbeat with no tick to write one: the test's artefact, not this file's.
+--   The runner was re-enabled at 08:17:08 UTC (research_wing:resume_after_0729).

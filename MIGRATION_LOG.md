@@ -788,7 +788,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0726](db/migrations/0726_a_shared_power_cabinet_divides_its_power_and_the_twin_can_model_one.sql) | `20261017072652` | yes — ledger | **A shared power cabinet divides its power, and the twin can now model one.** A test day whose build-out puts |
 | [0727](db/migrations/0727_the_site_power_gate_can_read_the_meter_instead_of_guessing.sql) | `20261017072928` | yes — ledger | **The site power gate can read the meter instead of guessing.** With the dial `site_cap_gate_metered` at 1, the |
 | [0728](db/migrations/0728_forty_robotic_chargers_on_todays_service_through_shared_cabinets.sql) | `20261017073142` | yes — ledger | **Forty robotic chargers on today's service, through shared cabinets.** The build-out a real conversion would |
-| [0729](db/migrations/0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds.sql) | `PENDING` | no — pending | **A site that divides its power is judged by the limit it holds.** With `dc_power_managed` at 1 beside 0726's |
+| [0729](db/migrations/0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds.sql) | `20261017081553` | yes — ledger | **A site that divides its power is judged by the limit it holds.** With `dc_power_managed` at 1 beside 0726's |
 
 551 migrations indexed.
 

@@ -75,7 +75,44 @@
 --
 -- ══ §3 TONIGHT'S ARMS (reproduce: (3)) ════════════════════════════════════════════════════════════════════════════════
 --
---   PENDING: filled in as the arms land.
+--   Every arm: the twin depot, 6 AM CT for 12 hours at 5 sim-minutes a tick (144 ticks), value_2026_09_30's first
+--   seed, OTTO-Q, deploy_peak_fraction 0.90, past the dial floor. ONE SEED PER CELL: each figure is a single reading,
+--   not a range (G153), and the two arms of one cell that the overlapping sweeps will produce (0728's note) are the
+--   first measure of how far one reading can move. "peak, after 3 h" is the 30-minute peak from 180 minutes into the
+--   day, past the opening plug-in, which is what ottoq_value_summary bills (0577); "whole day" includes the opening.
+--   Read 08:18 UTC.
+--
+--                                        normal_day                                   busy_day
+--                                        dcfc10       dcfc40
+--                                        (as built)   (grown)                         dcfc10
+--     arm / sim run                      83 e7d5824c  84 b54f6de5                     82 43301561
+--     visits / served / in depot at end  202/148/54   252/215/37                      212/103/109
+--     door p50 / p95, min                130 / 428    95 / 248                        305 / 584
+--     due cars on time (G383)            6 of 54      8 of 72                         0 of 36
+--     charge wait p50 / p95 floor / max  10/125/190   10/82.5/110                     80/355/435
+--     fast-charge sessions / L2          97 / 126     278 / 0                         120 / 147
+--     fast chargers busy, mean kW        69.4%, 39.4  40.9%, 39.5                     67.0%, 39.7
+--     car-hours met of 1,114 asked       821.4        942.7                           96.0
+--     30-min peak kW, whole day          973.8        2,369.5                         975.9
+--     30-min peak kW, after 3 h          713.6        1,006.8                         861.0
+--     instantaneous EV kW / grid kW max  1,586/1,210  3,874/3,287                     1,603/1,096
+--     grid import kWh                    6,723        9,193                           7,402
+--     demand $/month, whole day / 3 h    20,839 / 15,271   51,228 / 21,547            20,884 / 18,424
+--     EN.001 refused starts              3            0                               9
+--     must-do service done               83.7%        90.9%                           74.1%
+--     rule 9: left below target / open   0 / 0        0 / 0                           0 / 0
+--
+--   Read on the normal day, 40 posts with power to spare against the depot as built: 67 more cars served in 12 hours
+--   (+45%), the median car out 35 minutes sooner and the slow tail cut from 428 to 248 minutes, and 121 more car-hours
+--   of ride demand met (unmet 26.3% -> 15.4%). The fast chargers are busy 40.9% of the time, so forty are more than this
+--   day needs; 0725's dcfc20 cell is the middle point that says how much of this twenty would buy. Every car still
+--   leaves at its full target with nothing open.
+--
+--   And the power question, answered on this day: the megawatts are the OPENING. With nothing holding it, the fleet's
+--   6 AM plug-in drew 3,874 kW at the chargers (3,287 kW from the grid after the battery) and set a 2,369.5 kW
+--   30-minute peak; from 9 AM on, the 30-minute peak was 1,006.8 kW, 293 kW above the depot as built. Billed on the
+--   whole day the demand charge goes from $20,839 to $51,228 a month; billed past the opening, from $15,271 to $21,547.
+--   So the conversion's power cost is almost entirely whether the depot lets the morning plug-in draw what it likes.
 --
 -- ══ §4 THE BILL: DEMAND CHARGES, AND THE TARIFF A FAST-CHARGING SITE SHOULD BE ON (reproduce: (4)) ════════════════════
 --
