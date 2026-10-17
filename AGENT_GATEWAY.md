@@ -103,26 +103,34 @@ door for physical proposals (stall assignments): `ottoq_submit_external_proposal
 > its depot and puts those cars back to their target (a paused demo run's passcode 80% stayed in force in production).
 
 
-> **2026-10-15 to 2026-10-17 CT — the review, round 3 (the gateway's TypeScript; same `0721`; built and tested on
+> **2026-10-15 to 2026-10-17 CT — the review, round 3 (the gateway's TypeScript and `0721`'s SQL; built and tested on
 > scratch, NOT yet applied or deployed).** Each finding was reproduced on scratch before it was fixed. A reply cut at
 > `max_tokens` or at the model's context window is no answer: with nothing sent to OTTO-Q it is the door's failure
-> (`ask_answer_cut`, `isError: true` over MCP), and after a command it answers `incomplete` with `stopped`; a tool call in
-> a cut reply never runs, a stop reason the door does not know is not vouched for, and an empty last turn with nothing
-> sent and nothing refused is `ask_no_answer` (a change the door refused unsent is answered, with why).
-> **`incomplete` means OTTO-Command stopped after it sent OTTO-Q a command (applied, saved,
-> previewed, refused or unknown); `changes.made` says whether anything changed.** OTTO-Q not answering a command is an
-> `unknown` outcome, never "nothing was changed", and an owner command's timeout points at `my_commands`. A confirm ask
-> checks every confirm before it sends any, and one that stops part way answers `incomplete`, opens with why, and lists
-> each confirm it never sent (`not_sent`, handed back in `confirm`). An ask that read the web hands back no preview id or
-> link anywhere (actions, the top-level link, the changes block, the answer), and the model never sees a preview's id or
-> plan hash in any tool result, `my_commands` included. **A preview is confirmed only by sending its `confirm` object back
-> unchanged; `confirms_command_id` alone confirms nothing** (0721's SQL binds on the plan hash). An earlier answer sent
-> back as `history` (role `assistant`) makes the ask read-only (`blocked_by_history`), because an answer can carry a web
-> page's words. Smaller: the sources are the pages the answer cites, web URLs are percent-encoded outside RFC 3986 and
-> titles lose the words that confirm, text on either side of a search no longer runs together, failures carry their own
-> status (a model call cut by the budget is `ask_budget_spent`), the model id must be a Claude API id, the effort is
-> checked against the model, the web search version follows the model (Claude 4.6 and later take dynamic filtering), and
-> a fallback is read from `usage.iterations`.
+> (`ask_answer_cut`, `isError: true` over MCP), and after a command it answers `incomplete` with `stopped`; a tool call
+> in a cut reply never runs, a stop reason the door does not know is not vouched for, and an empty last turn with
+> nothing sent and nothing refused is `ask_no_answer` (a change the door refused unsent is answered, with why).
+> **`incomplete` means OTTO-Command stopped after it sent OTTO-Q a command (applied, saved, previewed, refused or
+> unknown); `changes.made` says whether anything changed.** OTTO-Q not answering a command is an `unknown` outcome,
+> never "nothing was changed", and an owner command's timeout points at `my_commands`. A confirm ask checks every
+> confirm before it sends any, and one that stops part way answers `incomplete`, opens with why, and lists each confirm
+> it never sent (`not_sent`, handed back in `confirm`). An ask that read the web hands back no preview id or link
+> anywhere (actions, the top-level link, the changes block, the answer), and the model never sees a preview's id or plan
+> hash in any tool result, `my_commands` included. **A preview is confirmed only by sending its `confirm` object back
+> unchanged; `confirms_command_id` alone confirms nothing** (0721's SQL binds on the plan hash, salted per preview and
+> given only inside the confirm object: no command, `my_commands` entry, summary or `plan_changed` refusal carries it,
+> and an apply that names a preview only by its id is recorded as a new preview, `confirm_required`, `not_named`). An
+> earlier answer sent back as `history` (role `assistant`) makes the ask read-only (`blocked_by_history`), because an
+> answer can carry a web page's words. Smaller: the sources are the pages the answer cites, web URLs are percent-encoded
+> outside RFC 3986 and titles lose the words that confirm, text on either side of a search no longer runs together,
+> failures carry their own status (a model call cut by the budget is `ask_budget_spent`), the model id must be a Claude
+> API id, the effort is checked against the model, the web search version follows the model (Claude 4.6 and later take
+> dynamic filtering), and a fallback is read from `usage.iterations`. In the database (0721 §17): one **owners' run**
+> per depot, which every agent read and door answers for: the run running there, else the newest paused production run,
+> else the newest paused demo run (FINDINGS G495); a production run takes over the depot as it becomes the running run
+> (it starts, or it resumes), not as it pauses, lifting every other live run's per-run settings, a paused production
+> run's included, while what a person saved stays, and re-stamping every car at the depot pinned to it; what is saved
+> holds on every live run; and undo answers `nothing_to_undo` or `lifted`, with why. **0721 applies only with nothing
+> running at the twin depot** (its P3): pause or stop the running run first, then apply.
 ---
 
 ## 1. Architecture
@@ -230,17 +238,19 @@ Files:
 ## 3. Tool catalog
 
 Every tool is available over REST and MCP. `sim_*` and `at_sim` fields are **simulation time**; `created_at`,
-`expires_at`, `decided_at` are real time (UTC).
+`expires_at`, `decided_at` are real time (UTC). **"The live run"**, here and in every tool, is the owners' run at the
+depot: the running run, else the newest paused production run, else the newest paused demo run (0721 §17 (a), FINDINGS
+G495); every read and door answers for it.
 
 | Tool | REST | Capability | What it does |
 |---|---|---|---|
 | `welcome` | `GET /v1/welcome` | **none** (0607) | no key: what OTTOYARD is, what the demo passcode opens, whether a demo run is live, the next call; a key or session: who you are and until when |
 | `enter_passcode` | `POST /v1/passcode` | **none** (0607; offered only to a caller without a key) | `{passcode, agent?}`: a session key (`oqs_`, shown once) that reads and adjusts the passcode's fleet until the demo run ends; wrong passcodes refused in plain English and throttled (5 per caller per 15 min) |
 | `whoami` | `GET /v1/whoami` | any token | principal, scope, capabilities, limits, and how a change gets decided |
-| `depot_status` | `GET /v1/depot` | `read` | live run (`ottoq_twin_run_context`), sim clock, your vehicles by state |
+| `depot_status` | `GET /v1/depot` | `read` | the owners' run (`ottoq_twin_run_context`: the running run, else the newest paused production run, else the newest paused demo run), sim clock, your vehicles by state |
 | `fleet_summary` | `GET /v1/fleet?state=&limit=` | `read` | your vehicles from `ottoq_depot_cards` (the cockpits' card feed) |
 | `vehicle_card` | `GET /v1/vehicles/{id}` | `read` | one vehicle's work-order card (`ottoq_vehicle_card`), after the scope check |
-| `recent_decisions` | `GET /v1/decisions?vehicle_id=&limit=` | `read` | OTTO-Q's latest decisions on the live run, filtered to your fleet |
+| `recent_decisions` | `GET /v1/decisions?vehicle_id=&limit=` | `read` | OTTO-Q's latest decisions on the owners' run, filtered to your fleet |
 | `stall_availability` | `GET /v1/stalls?stall_type=&horizon_min=` | `read` | the **three-gate** answer: pointer ∩ calendar in **sim** time ∩ charger not `Faulted`, with per-gate counts |
 | `list_requests` | `GET /v1/requests?status=` · `GET /v1/requests/{id}` | any token | your own requests: status, decision, note, the engine's exact reply |
 | `send_note` | `POST /v1/notes` | `note` | a note for the crew's inbox (and the operator's panel when it names their vehicle); changes nothing |

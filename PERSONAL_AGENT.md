@@ -127,7 +127,7 @@ still works beside the passcode, for an agent you want connected without one.
 | "Cancel the wash order" | `cancel_service` | Your order comes off. A service OTTO-Q found a car to need stays, and one already under way finishes |
 | "Keep RT-3 here until 6 AM" | `hold_vehicle {until: "6:00 AM"}` | Not before 6:00 AM on the sim clock (or `for_minutes`, up to 24 sim hours). A ready car waits in staging and keeps no charger |
 | "Let it go" | `release_hold` | It may leave as soon as it is ready |
-| "Undo that" | `undo_command` | What the command set is withdrawn, and what it replaced comes back |
+| "Undo that" | `undo_command` | What the command set is withdrawn, and what it replaced comes back. A clear, a limit at 100%, a cancel or a release leaves no setting of its own, so there is nothing to undo (`nothing_to_undo`, saying why and what to send instead); a command whose settings a production run lifted as it took over the depot answers `lifted` |
 | "What did I change today?" | `my_commands` / `my_settings` | Every command with its receipt and where it stands now; everything in force |
 
 **Services you can order (11):** exterior wash, interior deep clean, interior tidy, interior inspection, sensor clean,
@@ -582,7 +582,16 @@ stops the migration until its scope is read again.
 
 **Production, for a person.** Today an owner command is refused on anything but a demo run. After 0721:
 
-| The live run at the twin depot | An agent signed in to your OTTOYARD account (section 10) | A passcode session, or an issued key |
+**Which run: the owners' run** (the review, round 3; 0721 §17 (a), FINDINGS G495). Every agent read and door answers for
+one run at the depot: the run **running** there (at most one, by the unique index `ottoq_one_running_run_per_depot`),
+else the newest **paused production** run, else the newest **paused demo** run; none when nothing is running or paused.
+The owner commands, `my_settings`, `my_fleet`, `my_vehicle`, the cockpit boards and the engine's unpinned charge-limit
+read answer for it, and so do the depot, stalls, decisions, requests and the welcome. A paused production run outranks a
+paused demo run, even one started after it, so whoami's `live_demo_run` is empty whenever production is the owners' run,
+paused or not (before round 3 the newest-started live run won, and a paused demo started after production took every
+owner command while production ran). "The live run" in this document is that run.
+
+| The owners' run at the twin depot | An agent signed in to your OTTOYARD account (section 10) | A passcode session, or an issued key |
 |---|---|---|
 | a demo run | as before; the change is recorded under your account | as before; no person is recorded |
 | **a production run** | **allowed**, recorded under your account (`acting_person`); a **lower charge limit** (or an undo that puts one back) applies only as the confirm of a preview this same agent recorded in the last 15 minutes; everything else is one call | **refused** (`production_needs_a_person`): it can read your cars but not change them, because in production every change is recorded under the person who made it. The refusal says so and says to sign in |
@@ -594,14 +603,17 @@ stops the migration until its scope is read again.
   one back) only as the **confirm of a recorded preview**: an `ottoq_owner_commands` row with outcome `previewed`, made
   by the **same signed-in agent** (principal), on the same run, of the same tool, arguments and plan hash, **at most 15
   minutes old**, and confirmed **once** (the apply records it as `confirms_command_id`; a unique index refuses a second).
-  **An agent confirms by sending the preview's `confirm` object back unchanged**: it carries the plan hash, which binds
-  the apply to that one preview, and the preview's id beside it. **`confirms_command_id` alone confirms nothing** (the
-  review, round 3: 0721's SQL binds on the plan hash, salted per preview so it cannot be worked out from the plan, and an
-  apply that names a preview only by its id is recorded as a new preview). An apply that does not bind is **not
-  applied**: OTTO-Q records it as a preview and answers
+  **An agent confirms by sending the preview's `confirm` object back unchanged**: it carries the plan hash
+  (`expect_plan_hash`), which binds the apply to that one preview, and the preview's id beside it
+  (`confirms_command_id`), which must name the same preview. The plan hash is salted per preview, so it cannot be worked
+  out from the plan, and OTTO-Q gives it only inside the confirm object: never in the command, `my_commands`, a
+  receipt's summary or a `plan_changed` refusal. **`confirms_command_id` alone confirms nothing** (the review, round 3:
+  an apply that names a preview only by its id binds nothing and is recorded as a new preview, `confirm_required` with
+  reason `not_named`). An apply that does not bind is **not applied**: OTTO-Q records it as a preview and answers
   `confirm_required` with the reason (`not_named`, `no_recorded_preview`, `preview_already_confirmed`,
   `preview_expired`, `preview_does_not_match`, `not_a_preview`) and that preview's `confirm`, so the next confirm can
-  bind to it. A stale hash is still `plan_changed`. Raising or clearing a limit, holds, service orders and cancelling
+  bind to it. A stale hash is still `plan_changed`, which carries no hash: preview it again, and confirm the new preview
+  with the confirm object it returns. Raising or clearing a limit, holds, service orders and cancelling
   your own orders stay one call. OTTO-Command's model can never confirm: the gateway strips both arguments from what it
   may send, and OTTO-Q refuses a call through its door that carries one. No command can skip, defer or shorten a service
   OTTO-Q found a car to need: `cancel_service` takes off only your own orders, an engine-found need stays, and a started
@@ -614,7 +626,8 @@ stops the migration until its scope is read again.
   Chase.**
 - **Rule 10.** Production never self-tunes: nothing here writes a setting (`ottoq_policy_set`); your changes stay in the
   owner tables and lift when the production run ends, as a demo's do. A trigger refuses any applied production command
-  without a person, and any `confirms_command_id` that is not such a preview, whoever writes the row.
+  without a person, and any `confirms_command_id` that is not such a preview or names a preview recorded without its
+  salt, whoever writes the row.
 - **Who, which door and which preview, on every command.** `ottoq_owner_commands.acting_person` is your account's email
   for a signed-in agent and empty for a passcode or key (it names whose agent sent the command). `via` is set by the
   database from the gateway's transport and the binding, never from an argument: `ottocommand` when an OTTO-Command
@@ -669,9 +682,13 @@ pages), the gateway refuses every tool that changes something for the rest of th
 tool result, **OTTO-Q is never called**, and the answer tells you to ask for the change again on its own. Reads stay
 allowed; a change made earlier in the same ask, before any web text arrived, stands; and an ask that searched never
 returns a `confirm`, so a page cannot steer a preview you might later say yes to. Nor does it return the words that say
-how to send one (the review, round 2, the night of 2026-10-14 CT): a preview's receipt ends "To confirm, send the same command with mode
-"apply", expect_plan_hash ... and confirms_command_id ...", and an answer built from the receipts (when the model's last
-turn was empty, or the ask stopped) carried that line too, so an agent could rebuild the exact confirm the door withholds.
+how to send one (the review, round 2, the night of 2026-10-14 CT): a preview's receipt ended "To confirm, send the same
+command with mode "apply", expect_plan_hash ... and confirms_command_id ..." (0605's words, the live engine's until 0721
+is applied), and an answer built from the receipts (when the model's last turn was empty, or the ask stopped) carried
+that line too, so an agent could rebuild the exact confirm the door withholds. Since the review's round 3, 0721 gives the
+plan hash only inside the confirm object, and a receipt ends "To confirm, send back the confirm object this answer
+carries, unchanged, from this same agent within 15 minutes.", which names no hash or id; the door takes that line out
+too, because it still says how to confirm.
 In an ask that read the web that line, and the two argument names in a refusal, are taken out of every receipt and of
 the answer, and each previewed receipt says the ask offers nothing to confirm; the tool, arguments (chosen before any
 web text arrived) and outcome stay as the record. **Nor, since the review's round 3, the preview's id or link**: a
@@ -781,7 +798,9 @@ run, production included, carried back a lower limit the owner had removed. Now 
 (or saves the new limit) whatever row the run holds: where no run row carries it, the saved change is an effect of its
 own in the receipt ("the limit saved to it is cleared: it charges full on every run"), part of the plan's hash, so the
 outcome is applied rather than no_change. One limit remains: undo reverses what a command set on its run, so a saved
-limit that was a command's only change (the run already held that value) is not reversed by undo; set or clear it again.
+limit that was a command's only change (the run already held that value) is not reversed by undo; set or clear it again
+(the undo answers `nothing_to_undo` and says so; since the review's round 3 a clear, a limit at 100%, a cancel and a
+release answer the same way, each with what to send instead).
 
 **Saving with no run live (0721 §14, 2026-10-14).** Before it, a saved setting could be made only while a demo or
 production run was live: the owner command refused everything else `no_live_demo` before it planned anything. Now an
@@ -813,10 +832,16 @@ RUNNING run (read on the live database, SELECT only, 2026-10-15 00:22 UTC, 7:22 
 start while a demo run is paused,
 and before this nothing ended that demo's owner settings: a passcode session's 80% there stayed stamped on the car and
 in the engine's reads with no run pinned, so the car could leave production at 80% while OTTO-Q told the signed-in
-owner it charges to 100%. Now a production run that starts, resumes or pauses lifts every owner setting of any other run
-still live at the depot, puts the cars that carried a limit back to their target, and stamps those commands lifted
-(unless what they set is saved, which production carries as usual). A demo run resumed later keeps nothing of what was
-lifted from it: its cars charge full.
+owner it charges to 100%. Round 2 had a production run that starts, resumes or pauses lift every owner setting of any
+other run still live at the depot. **Since the review's round 3 (0721 §17 (c))** a production run takes over the depot
+when it becomes the running run (it starts, or it resumes), not when it pauses, because a paused production run is still
+the owners' run: every other live run's per-run owner settings at the depot are lifted, a paused production run's
+included, and their commands are stamped lifted ("a production run took over the depot"); a row that carries a person's
+saved setting stays, because it is the car's on every run; what is saved is carried onto the production run; and every
+car at the depot is re-stamped to its target on the production run. A demo run resumed later gets what is saved carried
+back, and none of the per-run settings that were lifted: its holds, one-time orders and passcode settings are gone. An
+undo of a command a takeover lifted answers `lifted` ("That command's settings were lifted (a production run took over
+the depot), so there is nothing left of it to undo.").
 
 **The passcode does not open production.** While a production run is running or paused at the depot,
 `enter_passcode` is refused and every existing passcode session is answered `403 production_live` (and ledgered), for
@@ -842,7 +867,9 @@ changed": check `my_commands` before asking again.
    `confirm` as `other`.
 2. **Apply `db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql`** per `scripts/APPLYING.md`
    (`forces_recert` FALSE: only the agent door changes, and no certification arm can run while any run is live). It
-   refuses while anything is in flight, and its V3 probes a production session end to end in a block that rolls back:
+   refuses while anything is in flight, **and while any run is running at the twin depot** (its P3, the review's round
+   3: V3 probes the owner door on a paused production run of its own, which a running run would outrank): pause or stop
+   the running run first, then apply. Its V3 probes a production session end to end in a block that rolls back:
    an unbound lowering recorded as a preview, its confirm refused to another agent signed in to the same account and
    applied once, bound, for the agent that made it, a second confirm refused, an undo that lowers gated and then
    confirmed, a raise and a clear in one call.
@@ -903,9 +930,13 @@ done: the door's failure, `isError` over MCP; after a change: `incomplete`, `sto
 an every-return order already covers is already ordered (no change), so the service stays on the car's visit and the car
 does not leave without it; and a production run lifts every other live run's owner settings at the depot as it starts.
 Counts in the commit that made these.
-**After the review, round 3 (2026-10-15 to 2026-10-17 CT; the gateway's TypeScript, while 0721's SQL is fixed beside
-it):** a reply cut at `max_tokens` or at the context window is never an answer and a tool call in it never runs;
-`incomplete` means OTTO-Command stopped after it sent OTTO-Q a command, and `changes.made` says whether anything changed;
+**After the review, round 3 (2026-10-15 to 2026-10-17 CT; the gateway's TypeScript, and 0721's SQL beside it):** in
+the database, one owners' run per depot that every read and door answers for, every re-stamp pinned to its run, the
+production takeover as the run becomes the running run (a paused production run's settings lifted too, what is saved
+kept), what is saved holding on every live run, undo answering `nothing_to_undo` or `lifted` with why, and the plan hash
+a salted credential given only in the confirm object (a command id alone binds nothing); in the gateway, a reply cut at
+`max_tokens` or at the context window is never an answer and a tool call in it never runs; `incomplete` means
+OTTO-Command stopped after it sent OTTO-Q a command, and `changes.made` says whether anything changed;
 OTTO-Q not answering is an unknown outcome in the receipts, the changes block and the web note, never "nothing was
 changed", and an owner command's timeout points at `my_commands`; a confirm ask checks every confirm first, and one cut
 short is `incomplete`, opens with why, and lists and hands back each confirm it never sent; an ask that read the web hands

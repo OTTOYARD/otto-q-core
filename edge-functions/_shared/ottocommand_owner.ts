@@ -29,8 +29,8 @@
  *     has entered an ask's conversation, every later call to anything but a read is refused here, before the engine
  *     is asked, and the answer tells the owner to ask for the change again on its own. An ask that read the web returns
  *     no confirm objects (at the top or inside a receipt), and (the review, round 2) none of the words in a receipt that
- *     say how to send one: the "To confirm, send ..." line with its plan hash and preview id is taken out of every
- *     action's summary and of the answer built from them, and the receipt says the ask offers nothing to confirm. The
+ *     say how to send one: the "To confirm, send ..." line (0605's named the plan hash and preview id) is taken out of
+ *     every action's summary and of the answer built from them, and the receipt says the ask offers nothing to confirm. The
  *     model is never shown how to confirm in the first place (it never confirms): the tool results it reads carry no
  *     confirm object, plan hash or preview id, and no such line, so no answer it writes can hand one back either. What
  *     the model tried after reading the web is never handed back as something to send: `blocked_after_web` names the
@@ -659,12 +659,15 @@ export const NO_CHANGES_ASK = "Changes: none. This ask changed nothing.";
 /** 0721 (the review, round 1): every search's changes block. A search is offered no tool that changes anything. */
 export const NO_CHANGES_SEARCH = "Changes: none. A search changes nothing: it only reads OTTO-Q and the web.";
 
-/** 0721 (the review, round 2): the words in OTTO-Q's text that tell an agent how to confirm a preview. A preview's
- *  receipt ends "To confirm, send the same command with mode "apply" and expect_plan_hash "<hash>"" (0605), or, for a
- *  preview OTTO-Q recorded in place of an apply, "... expect_plan_hash "<hash>" and confirms_command_id "<id>"" (0721),
- *  and a binding's refusal names the two arguments. With the hash and the id, an agent could rebuild the exact confirm
- *  this door withholds. The two names in a refusal are taken out of its sentence; a line that still names either
- *  argument, or says how to confirm, goes whole (OTTO-Q's text carries a plan hash only on such a line). */
+/** 0721 (the review, round 2): the words in OTTO-Q's text that tell an agent how to confirm a preview. Before 0721 a
+ *  preview's receipt ends "To confirm, send the same command with mode "apply" and expect_plan_hash "<hash>"" (0605's
+ *  words, the live engine's until 0721 is applied), and round 2's 0721 added "... and confirms_command_id "<id>"" for a
+ *  preview recorded in place of an apply, and a binding's refusal named the two arguments: with the hash and the id, an
+ *  agent could rebuild the exact confirm this door withholds. Since the round-3 review 0721 puts the (salted) plan hash
+ *  only inside the confirm object, and the receipt ends "To confirm, send back the confirm object this answer carries,
+ *  unchanged, from this same agent within 15 minutes.", which names no hash and no id but still says how to confirm. The
+ *  two names in a refusal are taken out of its sentence; a line that still names either argument, or says how to
+ *  confirm, goes whole (OTTO-Q's text carried a plan hash only on such a line), whichever engine wrote it. */
 const CONFIRM_ARG_NAMES = /\s*\((?:expect_plan_hash|confirms_command_id)(?:\s+(?:or|and)\s+(?:expect_plan_hash|confirms_command_id))?\)/g;
 const CONFIRM_LINE = /To confirm, send|expect_plan_hash|confirms_command_id/i;
 export function withoutConfirmWords(text: string): string {
@@ -1211,7 +1214,9 @@ function newAskId(): string {
   return typeof c?.randomUUID === "function" ? c.randomUUID() : `ask-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
-/** The handshake's depot and live run, for the ledger (ids only). */
+/** The handshake's depot and run, for the ledger (ids only): since 0721's round 3, whoami's live_production_run and
+ *  live_demo_run name the owners' run (the running run, else the newest paused production run, else the newest paused
+ *  demo run), so at most one of them is set. */
 function ledgerScope(who: EngineOutcome): { depot_id: string | null; sim_run_id: string | null } {
   const data = isObject(who.data) ? who.data : {};
   const scope = isObject(data.scope) ? data.scope : {};

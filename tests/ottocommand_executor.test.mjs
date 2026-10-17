@@ -619,6 +619,9 @@ describe("end to end: OTTO-Command over the real 0559-0608, 0700 and 0721 SQL", 
     loadFile(WA, "db/migrations/0718_production_runs_the_world_phases_the_twin_certifies.sql");
     const wa = spawnSync("psql", [...pgConn(), "-d", WA, "-X", "-A", "-t", "-c", "SELECT pg_get_functiondef('twin.ottoq_world_advance()'::regprocedure)"], { encoding: "utf8" }).stdout;
     for (const f of CHAIN) loadFile(DB, f);
+    // the round-3 review: the live catalog's one-running-run index (read 2026-10-15 13:15:42 UTC), which 0721's P1
+    // requires ("the running run" at a depot is one run); the stub chain does not make it
+    psql(DB, "CREATE UNIQUE INDEX ottoq_one_running_run_per_depot ON public.ottoq_sim_runs USING btree (depot_id) WHERE (status = 'running'::text);");
     psql(DB, `SET check_function_bodies = off;\n${wa.replace(/\n$/, "")};`);
     assert.equal(psql(DB, "SELECT md5(pg_get_functiondef('twin.ottoq_world_advance()'::regprocedure));").at(-1), "546fa1ab9bedd29f7169ee6b4e7c090b");
     psql(DB, `INSERT INTO vehicles (id, fleet_operator_id, home_depot_id, current_depot_id, make, model, display_name, current_soc, current_state, target_soc, av_api_vehicle_id) VALUES
@@ -626,6 +629,10 @@ describe("end to end: OTTO-Command over the real 0559-0608, 0700 and 0721 SQL", 
       INSERT INTO auth.users (id, email) VALUES ('c4a5e000-0000-4000-8000-00000000c4a5', 'chase@ottoyard.com');
       SELECT ottoq_owner_account_link('chase@ottoyard.com', '${TESLA}', 'the founder');
       SELECT ottoq_agent_set_passcode('harbor-quartz-42');`);
+    // the round-3 review: 0721's P3 applies only with nothing running at the twin depot (V3 probes the owner door on a
+    // paused production run of its own), so the stub's running run is paused first, as an operator would pause it; the
+    // tests below end every run and start their own production run, so it is not resumed
+    psql(DB, `UPDATE ottoq_sim_runs SET status = 'paused' WHERE depot_id = '${TWIN_DEPOT_ID}' AND status = 'running';`);
     loadFile(DB, "db/migrations/0721_a_signed_in_owner_changes_production_under_their_own_name.sql");
     // a connection the way 0700 makes one, with an access token the gateway can be handed
     psql(DB, `INSERT INTO ottoq_oauth_clients (client_id, client_name, grant_types) VALUES ('oqc_${"0".repeat(32)}', 'Hermes Agent', ARRAY['urn:ietf:params:oauth:grant-type:device_code']);
@@ -746,6 +753,15 @@ describe("end to end: OTTO-Command over the real 0559-0608, 0700 and 0721 SQL", 
     const seen = JSON.stringify(requests.map((r) => r.messages));
     for (const s of secrets) assert.ok(!seen.includes(s), `the model saw ${s}`);
     assert.equal(psql(DB, `SELECT count(*) FROM ottoq_owner_commands WHERE args ->> 'note' = '${words}' AND outcome = 'applied';`).at(-1), "0");
+    // the review's own S1 test, now that 0721 binds a confirm only on the salted plan hash its confirm object carries
+    // (543d36e): an apply naming the preview by its id alone (from the database: this answer never named it), with the
+    // tool and arguments the answer did name, binds nothing: confirm_required (not_named), a new preview, nothing applied
+    const typed = await callTool(gw, "/account/mcp", signedIn, "set_charge_limit", { vehicles: "all", percent: 85, mode: "apply", confirms_command_id: pid });
+    const refused = typed.result.structuredContent;
+    assert.equal(typed.result.isError, true, JSON.stringify(typed));
+    assert.deepEqual([refused.error.code, refused.data.refusal.reason, refused.data.outcome], ["confirm_required", "not_named", "previewed"]);
+    assert.notEqual(refused.data.command.command_id, pid, "recorded as a new preview, not as the confirm of this one");
+    assert.equal(psql(DB, `SELECT count(*) FROM ottoq_owner_commands WHERE confirms_command_id = '${pid}' OR (outcome = 'applied' AND args ->> 'percent' = '85');`).at(-1), "0");
   });
 
   test("with no run live a signed-in owner's ask saves a lower limit to the car: a preview with no run, then its confirm, outcome saved (§14)", async () => {
@@ -1330,6 +1346,11 @@ test("THE WEB IS UNTRUSTED: an ask that read the web hands back no plan hash and
   // the scrub itself: the arguments' names leave a refusal's sentence, a line that says how to confirm goes whole
   assert.equal(withoutConfirmWords(`A.\nThis apply named no preview (expect_plan_hash or confirms_command_id). B.\nTo confirm, send it with expect_plan_hash "${PLAN}".`),
     "A.\nThis apply named no preview. B.");
+  // 0721 since the round-3 review (543d36e): the plan hash is only in the confirm object and the receipt's last line names
+  // neither it nor the id, but it still says how to confirm, so it goes whole; the not_named refusal names nothing to send
+  const NOT_NAMED = "This apply named its preview by command id only, and a confirm names its preview by the plan hash its confirm object carries; a command id alone confirms nothing.";
+  assert.equal(withoutConfirmWords(`Not applied yet: ${NOT_NAMED}\nIf you confirm: All 2 Teslas charge to at most 85% instead of 100%.\nTo confirm, send back the confirm object this answer carries, unchanged, from this same agent within 15 minutes.`),
+    `Not applied yet: ${NOT_NAMED}\nIf you confirm: All 2 Teslas charge to at most 85% instead of 100%.`);
 });
 
 test("ottocommand_search offers exactly the reads its scope allows, never a write, and the web only when asked", async () => {
@@ -1536,7 +1557,7 @@ test("the model's text is never screened or dropped by pattern: every ask and se
 });
 
 test("'saved' is a change made wherever 'applied' is explained to an agent (the review, round 1)", () => {
-  assert.match(MCP_INSTRUCTIONS, /done only when its outcome is 'applied' \(on a live run, with a confirmation code\) or 'saved' \(no run was live, so it changed only what is saved to the cars and applies from the next run; it has a link but no confirmation code\)/);
+  assert.match(MCP_INSTRUCTIONS, /done only when its outcome is 'applied' \(on the owners' run, with a confirmation code\) or 'saved' \(no run was live, so it changed only what is saved to the cars and applies from the next run; it has a link but no confirmation code\)/);
   assert.doesNotMatch(MCP_INSTRUCTIONS, /done only when its outcome is 'applied';/);
   for (const t of OWNER_COMMANDS) assert.match(findTool(t).description, /applied \(it carries a confirmation code\), or saved \(made while no run was live/, t);
   assert.match(findTool(ASK_TOOL_NAME).description, /or saved, made while no run was live, which changed only what is saved to the cars, applies from the next run, and carries a link but no confirmation code/);
@@ -2129,6 +2150,47 @@ test("round 3 (round 2's history vector): an earlier answer sent back as history
   assert.match(openApiDocument(BASE).components.schemas.AskResponse.properties.data.properties.blocked_by_history.description, /an earlier answer can carry a web page's words/);
   const skill = readFileSync(join(ROOT, "integrations", "hermes", "ottoq-owner", "SKILL.md"), "utf8");
   assert.match(skill, /\*\*Never send OTTO-Command's earlier answers as history \(role `assistant`\) with a\s+request for a change\*\*/);
+});
+
+test("round 3 (0721 at 543d36e): the descriptions and docs say what the SQL now does: the salted hash only in the confirm, the owners' run, the takeover, undo's answers, the apply order", () => {
+  const flat = (t) => t.replace(/\n>\s?/g, " ").replace(/\s+/g, " ");
+  const props = findTool("set_charge_limit").inputSchema.properties;
+  assert.match(props.expect_plan_hash.description, /only inside that preview's confirm object \(salted per preview/);
+  assert.match(props.expect_plan_hash.description, /plan_changed and applies nothing: preview it again, and confirm the new preview with the confirm object it returns/);
+  assert.doesNotMatch(props.expect_plan_hash.description, /plan_hash a preview returned|and the new plan/);
+  assert.match(props.confirms_command_id.description, /confirm_required \(reason not_named\)/);
+  assert.doesNotMatch(props.mode.description, /plan_hash/);
+  const receipt = openApiDocument(BASE).components.schemas.OwnerReceipt.properties;
+  assert.doesNotMatch(receipt.command.description.split(". No plan hash")[0], /plan_hash/, "the command object carries no plan hash");
+  assert.deepEqual(Object.keys(receipt.confirm.properties), ["tool", "args", "note"]);
+  assert.match(findTool("undo_command").description, /nothing_to_undo[\s\S]*lifted/);
+  for (const t of ["depot_status", "recent_decisions", "stall_availability", "my_settings"]) {
+    assert.match(findTool(t).description, /the owners' run \(the run running at your depot, else its newest paused production run, else its newest paused demo run\)/, t);
+  }
+  assert.match(MCP_INSTRUCTIONS, /'The live run' is the owners' run at your depot: the run running there, else its newest paused production run, else its newest paused demo run; every read and change answers for it\./);
+  assert.match(flat(readFileSync(join(ROOT, "AGENT_GATEWAY.md"), "utf8")), /\*\*"The live run"\*\*, here and in every tool, is the owners' run at the depot: the running run, else the newest paused production run, else the newest paused demo run/);
+  assert.match(flat(readFileSync(join(ROOT, "PERSONAL_AGENT.md"), "utf8")), /"The live run" in this document is that run\./);
+  const pa = flat(readFileSync(join(ROOT, "PERSONAL_AGENT.md"), "utf8"));
+  assert.match(pa, /\*\*Which run: the owners' run\*\*/);
+  assert.match(pa, /whoami's `live_demo_run` is empty whenever production is the owners' run, paused or not/);
+  assert.match(pa, /names a preview recorded without its salt/);
+  assert.match(pa, /a receipt ends "To confirm, send back the confirm object this answer carries, unchanged, from this same agent within 15 minutes\."/);
+  assert.match(pa, /a production run takes over the depot when it becomes the running run \(it starts, or it resumes\), not when it pauses/);
+  assert.match(pa, /\*\*and while any run is running at the twin depot\*\* \(its P3/);
+  const ag = flat(readFileSync(join(ROOT, "AGENT_GATEWAY.md"), "utf8"));
+  assert.match(ag, /\*\*0721 applies only with nothing running at the twin depot\*\* \(its P3\)/);
+  assert.match(ag, /one \*\*owners' run\*\* per depot, which every agent read and door answers for/);
+  const sk = flat(readFileSync(join(ROOT, "integrations", "hermes", "ottoq-owner", "SKILL.md"), "utf8"));
+  assert.match(sk, /\*\*Which run\.\*\* Everything you read and change is on the owners' run at the depot/);
+  assert.match(sk, /A production run taking over the depot \(it starts, or it resumes\) lifts the same per-run settings of any other live run there/);
+  assert.match(sk, /refused `nothing_to_undo`[\s\S]{0,120}or `lifted`/);
+  // and the SQL these sentences describe is the merged file's (so the docs move with it)
+  const m0721 = readFileSync(join(ROOT, "db", "migrations", "0721_a_signed_in_owner_changes_production_under_their_own_name.sql"), "utf8");
+  for (const said of ["To confirm, send back the confirm object this answer carries, unchanged, from this same agent within 15 minutes.",
+    "a command id alone confirms nothing", "a production run took over the depot", "0721 P3: run % is running at the twin depot",
+    "ottoq_one_running_run_per_depot", "Preview it again, and confirm the new preview with the confirm object it returns."]) {
+    assert.ok(m0721.includes(said), said);
+  }
 });
 
 test("round 3: every doc and description says a preview is confirmed only by its confirm object sent back unchanged, and that a command id alone confirms nothing", () => {

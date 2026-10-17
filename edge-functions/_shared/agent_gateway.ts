@@ -272,10 +272,12 @@ const MODE: JsonSchema = {
 };
 const PLAN_HASH: JsonSchema = {
   type: "string", pattern: "^[0-9a-f]{32}$",
-  description: "Optional, with mode apply: the plan_hash a preview returned, which comes inside its confirm object: send " +
-    "that object's arguments back unchanged rather than copying this by hand. OTTO-Q then applies only that plan; if a " +
-    "setting moved in between, it refuses with plan_changed and the new plan. Where a change needs a confirm, the plan " +
-    "hash is what confirms the preview.",
+  description: "Optional, with mode apply: the plan hash of a preview, which OTTO-Q gives only inside that preview's " +
+    "confirm object (salted per preview, so it cannot be worked out from the plan; never in a summary, the command " +
+    "object or my_commands): send that object's arguments back unchanged rather than copying this by hand. It is what binds " +
+    "an apply to its preview: OTTO-Q then applies exactly that plan, once, from this same token, within 15 minutes of " +
+    "the preview. If a setting moved in between, it refuses with plan_changed and applies nothing: preview it again, and " +
+    "confirm the new preview with the confirm object it returns.",
 };
 const OWNER_IDEMPOTENCY: JsonSchema = {
   type: "string", pattern: "^[A-Za-z0-9._:-]{1,100}$",
@@ -286,21 +288,25 @@ const OWNER_NOTE: JsonSchema = {
   type: "string", maxLength: 500,
   description: "Optional: why, in your person's words (at most 500 characters). Shown on the receipt and in OrchestrAV.",
 };
-/** 0721: the preview an apply confirms. A preview's confirm object carries it beside the plan hash; the round-3 review:
- *  the id alone confirms nothing (the plan hash in the same object does), so an agent sends the object back unchanged. */
+/** 0721: the preview an apply confirms. A preview's confirm object carries it beside the plan hash; the round-3 review
+ *  (0721 §16 (e)): the id alone binds nothing (the salted plan hash in the same object binds the apply), and beside the
+ *  hash it must name the same preview, so an agent sends the object back unchanged. */
 const CONFIRMS_COMMAND_ID: JsonSchema = {
   type: "string", format: "uuid",
   description: "Optional, with mode apply: the preview this apply confirms. It comes inside a preview's confirm object, " +
-    "beside the plan hash: send that object back unchanged. On its own it confirms nothing: where a change needs a " +
-    "confirm, an apply that names a preview by its id without the plan hash its confirm object carries applies nothing, " +
-    "and is recorded as a new preview and answered confirm_required. OTTO-Q applies a confirm only from this same " +
-    "token, on this run, within 15 minutes of the preview, and once. In a production run a lower charge limit, or an " +
-    "undo that puts one back, applies only this way.",
+    "beside the plan hash (expect_plan_hash), and names that same preview: send the object back unchanged. On its own " +
+    "it confirms nothing: an apply that names a preview by its id without the plan hash its confirm object carries " +
+    "applies nothing; it is recorded as a new preview and answered confirm_required (reason not_named). OTTO-Q applies " +
+    "a confirm only from this same token, on this run, within 15 minutes of the preview, and once. In a production run " +
+    "a lower charge limit, or an undo that puts one back, applies only this way.",
 };
 const COMMAND_OPTIONS: Record<string, JsonSchema> = {
   mode: MODE, expect_plan_hash: PLAN_HASH, confirms_command_id: CONFIRMS_COMMAND_ID, idempotency_key: OWNER_IDEMPOTENCY,
   note: OWNER_NOTE,
 };
+/** 0721 (the review, round 3; FINDINGS G495): the run every agent read and door answers for at a depot. */
+const OWNERS_RUN = "the owners' run (the run running at your depot, else its newest paused production run, else its " +
+  "newest paused demo run)";
 const RECEIPT =
   " Answers with a receipt: outcome (applied, saved, previewed, no_change or refused), a plain-English summary, and an " +
   "OrchestrAV link to see it. Relay the summary and the link to your person; a change is done only when outcome is " +
@@ -429,7 +435,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "depot_status",
     title: "Depot status",
-    description: "Whether a run is live at your depot, its sim clock, tick, scenario and seed (ottoq_twin_run_context), and your vehicles by state. sim_clock is SIMULATION time.",
+    description: `Whether a run is live at your depot and which: ${OWNERS_RUN}, the run every read and change here answers for. Its sim clock, tick, scenario and seed (ottoq_twin_run_context), and your vehicles by state. sim_clock is SIMULATION time.`,
     capability: "read", effect: "read", inputSchema: EMPTY, annotations: READ,
     rest: { method: "GET", path: "/v1/depot" }, tags: ["depot", "run"], examples: ["Is a run live, and what time is it on the sim clock?"],
   },
@@ -463,7 +469,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "recent_decisions",
     title: "Recent OTTO-Q decisions",
-    description: "OTTO-Q's latest decisions on the live run (the cockpits' decision stream), filtered to your vehicles when you are fleet-scoped. at_sim is SIMULATION time.",
+    description: `OTTO-Q's latest decisions on ${OWNERS_RUN} (the cockpits' decision stream), filtered to your vehicles when you are fleet-scoped. at_sim is SIMULATION time.`,
     capability: "read", effect: "read",
     inputSchema: {
       type: "object", additionalProperties: false,
@@ -478,7 +484,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "stall_availability",
     title: "Stall availability (three gates)",
-    description: "Stalls a vehicle could be offered now: the intersection of three gates -- the stall pointer is clear, the stall calendar is clear for the window on the run's SIM clock, and (dcfc, l2) the charger is not Faulted. Counts per gate are returned so no single gate is mistaken for availability.",
+    description: `Stalls a vehicle could be offered now: the intersection of three gates -- the stall pointer is clear, the stall calendar is clear for the window on the SIM clock of ${OWNERS_RUN}, and (dcfc, l2) the charger is not Faulted. Counts per gate are returned so no single gate is mistaken for availability.`,
     capability: "read", effect: "read",
     inputSchema: {
       type: "object", additionalProperties: false,
@@ -525,7 +531,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "submit_request",
     title: "Ask for a change",
-    description: `Asks for a change. A person approves or declines it; on approval it goes to OTTO-Q's own door and the engine may still refuse. kind=recall_vehicle (needs vehicle_id; the recall door), kind=ops_action (needs action: ${ASKABLE_OPS_ACTIONS.join(" or ")}; depot-wide, applies to the live run), kind=adjustment (needs adjustment, a short snake_case name such as charge_target; OTTO-Q has no door for these yet, so an approval is recorded and nothing in the engine changes). Nothing happens on your say-so alone.`,
+    description: `Asks for a change. A person approves or declines it; on approval it goes to OTTO-Q's own door and the engine may still refuse. kind=recall_vehicle (needs vehicle_id; the recall door), kind=ops_action (needs action: ${ASKABLE_OPS_ACTIONS.join(" or ")}; depot-wide, applies to the owners' run when you ask: the run running at your depot, else its newest paused production run, else its newest paused demo run), kind=adjustment (needs adjustment, a short snake_case name such as charge_target; OTTO-Q has no door for these yet, so an approval is recorded and nothing in the engine changes). Nothing happens on your say-so alone.`,
     capability: "any_request", effect: "ledger_write",
     inputSchema: {
       type: "object", additionalProperties: false, required: ["kind", "title"],
@@ -574,7 +580,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "my_settings",
     title: "My settings in force",
-    description: "Everything you have in force on the live run, car by car: charge limits, holds and service orders, each with the command that set it (its command_id is null unless this agent made that command or it is recorded under the person this agent is signed in as), and (`saved`) what is saved to your cars and carried from run to run: a charge limit or an every-return service set by an owner signed in to their OTTOYARD account stays until the owner changes it; holds, one-time orders and anything set through a passcode session or an issued key lift when the run ends.",
+    description: "Everything you have in force on " + OWNERS_RUN + ", car by car: charge limits, holds and service orders, each with the command that set it (its command_id is null unless this agent made that command or it is recorded under the person this agent is signed in as), and (`saved`) what is saved to your cars and carried from run to run: a charge limit or an every-return service set by an owner signed in to their OTTOYARD account stays until the owner changes it; holds, one-time orders and anything set through a passcode session or an issued key lift when the run ends, or when a production run takes over the depot.",
     capability: "read", effect: "read", scope: "fleet", inputSchema: EMPTY, annotations: READ,
     rest: { method: "GET", path: "/v1/me/settings" }, tags: ["owner", "settings"],
     examples: ["What have I set on my cars?"],
@@ -688,7 +694,7 @@ export const TOOLS: readonly ToolDef[] = [
   {
     name: "undo_command",
     title: "Undo one of my commands",
-    description: "Reverse one of your applied commands by its command_id (from its receipt or my_commands): what it set is withdrawn, and anything it replaced comes back. A command whose run has ended was already lifted with it." + RECEIPT,
+    description: "Reverse one of your applied commands by its command_id (from its receipt or my_commands): what it set is withdrawn, and anything it replaced comes back. It acts on the run it is sent on. A command that left no setting of its own there (a clear, a limit set to 100%, a cancel or a release) has nothing to undo (refused nothing_to_undo, saying why and what to send instead); one whose settings a production run lifted as it took over the depot is refused lifted; one whose run has ended was already lifted with it (run_ended)." + RECEIPT,
     capability: "owner_settings", effect: "owner_setting", scope: "fleet",
     inputSchema: {
       type: "object", additionalProperties: false, required: ["command_id"],
@@ -1142,11 +1148,13 @@ export const MCP_INSTRUCTIONS =
   "(set_charge_limit, clear_charge_limit, request_service, cancel_service, hold_vehicle, release_hold, undo_command) set " +
   "what YOUR cars need: OTTO-Q checks each one against your contract and its own rules, applies it at its next tick, and " +
   "answers with a plain-English summary, an OrchestrAV link and, when applied, a confirmation code, to relay to your " +
-  "person. Such a change is done only when its outcome is 'applied' (on a live run, with a confirmation code) or " +
+  "person. Such a change is done only when its outcome is 'applied' (on the owners' run, with a confirmation code) or " +
   "'saved' (no run was live, so it changed only what is saved to the cars and applies from the next run; it has a link " +
   "but no confirmation code); mode 'preview' shows the plan first, and its confirm object, sent back unchanged, applies " +
-  "it. Nothing you send moves a car: OTTO-Q decides when and " +
-  "where, and the car's own driving system moves it. Times named sim_* or marked 'sim time' are simulation time; " +
+  "it. 'The live run' is the owners' run at your depot: the run running there, else its newest paused production run, " +
+  "else its newest paused demo run; every read and change answers for it. Nothing you send moves a car: OTTO-Q " +
+  "decides when and where, and the car's own driving system moves it. Times named sim_* or marked 'sim time' are " +
+  "simulation time; " +
   "created_at and expires_at are real time (UTC), and *_local times are Nashville time.";
 
 /** What a caller WITHOUT a key is told on connecting (0607): the welcome, and how the passcode and the session work. */
@@ -1737,8 +1745,8 @@ export function openApiDocument(baseUrl: string) {
           summary: { type: "string", description: "OTTO-Q's plain-English account of what changed, or why not. Relay it." },
           link: { type: "string", format: "uri", description: "Where to see it in OrchestrAV." },
           refusal: { type: "object", properties: { code: { type: "string" }, message: { type: "string" }, hint: { type: "string" } } },
-          command: { type: "object", description: "The recorded command: command_id, tool, mode, outcome, cars, vehicles, effects (per car: before, after, now), args, plan_hash, sim_clock, created_at, undone_at, lifted_at." },
-          confirm: { type: "object", description: "After a preview: the exact tool and arguments that apply this plan. Send it back unchanged: its plan hash is what confirms the preview, and the preview's command id alone confirms nothing.", properties: { tool: { type: "string" }, args: { type: "object" } } },
+          command: { type: "object", description: "The recorded command: command_id, tool, mode, outcome, via, acting_person, cars, vehicles, effects (per car: before, after, now), args, sim_clock, created_at, undone_at, lifted_at. No plan hash: a preview's is given only inside its confirm object." },
+          confirm: { type: "object", description: "After a preview: the exact tool and arguments that apply this plan, and a note. Send it back unchanged: its plan hash (args.expect_plan_hash, salted per preview and given nowhere else) is what confirms the preview, and the preview's command id alone confirms nothing.", properties: { tool: { type: "string" }, args: { type: "object" }, note: { type: "string" } } },
           undo: { type: "object", description: "After an apply: the call that reverses it.", properties: { tool: { type: "string" }, args: { type: "object" } } },
           expires: { type: "string" },
         } },
@@ -1750,7 +1758,7 @@ export function openApiDocument(baseUrl: string) {
             items: { type: "array", description: "One per change asked for, in order: OTTO-Q's outcome and command id, or the door's reason for not sending it.", items: {
               type: "object", required: ["tool", "outcome", "sent_to_ottoq", "command_id"], properties: {
                 tool: { type: "string" },
-                outcome: { type: "string", enum: ["applied", "saved", "previewed", "no_change", "refused", "unknown", "not_sent"], description: "applied: made on the live run (with a confirmation code). saved: made with no run live, so only what is saved to the cars changed, from the next run (a link, no confirmation code). previewed: nothing changed. no_change: it was already so. refused: not made (sent_to_ottoq false: refused unsent because the ask had read the web, or because its history held an earlier answer). unknown: OTTO-Q did not answer, so it may have been made; check my_commands before asking again. not_sent: a confirm the ask never sent because it stopped first (sent_to_ottoq false): nothing changed for it, and it comes back in `confirm` to send again." },
+                outcome: { type: "string", enum: ["applied", "saved", "previewed", "no_change", "refused", "unknown", "not_sent"], description: "applied: made on the owners' run (with a confirmation code). saved: made with no run live, so only what is saved to the cars changed, from the next run (a link, no confirmation code). previewed: nothing changed. no_change: it was already so. refused: not made (sent_to_ottoq false: refused unsent because the ask had read the web, or because its history held an earlier answer). unknown: OTTO-Q did not answer, so it may have been made; check my_commands before asking again. not_sent: a confirm the ask never sent because it stopped first (sent_to_ottoq false): nothing changed for it, and it comes back in `confirm` to send again." },
                 sent_to_ottoq: { type: "boolean" },
                 command_id: { type: ["string", "null"] },
                 confirmation_code: { type: ["string", "null"] },

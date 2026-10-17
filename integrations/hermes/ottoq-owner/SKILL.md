@@ -103,6 +103,9 @@ a preview you recorded in the last 15 minutes. Asked for one, it records a previ
 OTTO-Command tells the person what they would confirm: say plainly that nothing has changed until they say yes, then send
 the `confirm` above within 15 minutes. Everything else is one call.
 
+**Which run.** Everything you read and change is on the owners' run at the depot: the run running there, else the newest
+paused production run, else the newest paused demo run. A paused production run outranks a paused demo run.
+
 **What lasts.** Signed in, a charge limit and an "every time it comes back" service are **saved to the person's cars**:
 they stay from run to run, production included, until the person changes them (the answer says so). Their clear, a
 limit of 100% and a cancel end what is saved too, whatever a passcode session did on the run. A hold, a "now" or "next
@@ -178,16 +181,20 @@ words.
 3. **A change is done only when `outcome` is `applied`, or `saved`** (made while no run was live: it changed only what
    is saved to the cars, applies from the next run, and has a link but no confirmation code). `refused`: say it was not
    done, why, in OTTO-Q's plain words, and what is allowed (a charge limit outside the contract's range, 80-100% for this
-   fleet, is refused with the range). `no_change`: it was already so. `previewed`: nothing has changed yet.
+   fleet, is refused with the range). `no_change`: it was already so. `previewed`: nothing has changed yet. An undo
+   with nothing left to take back is refused `nothing_to_undo` (a clear, a full charge, a cancel or a release leaves no
+   setting of its own) or `lifted` (a production run took over the depot), with what to send instead: relay that.
 4. **Ask one short question** only when it is truly ambiguous (which service? which car? until when?). Do not ask "are
    you sure?" for a clear command, except where OTTO-Command returns a `confirm`.
 5. **Times:** OTTO-Q writes "7:00 AM sim time" (the simulation's clock) and "9:24 PM CT" (real time). Keep the label.
 6. **What resets** when the run ends (a stop or reset in OTTO-TWIN, or the end of a production run): holds, one-time
-   service orders and everything set through the passcode. A signed-in person's charge limit and "every time it comes
-   back" services are saved to the cars and come back on the next run (`my_settings` says which are saved). With no run
-   live, a signed-in person can still save a charge limit or an "every time it comes back" service (outcome `saved`);
-   a hold, a one-time service or an undo needs a live run, and a passcode session changes nothing until one starts.
-   OTTO-Q refuses anything else and says why.
+   service orders and everything set through the passcode. A production run taking over the depot (it starts, or it
+   resumes) lifts the same per-run settings of any other live run there, a paused production run's included; what a
+   signed-in person saved stays. A signed-in person's charge limit and "every time it comes back" services are saved to
+   the cars and come back on the next run (`my_settings` says which are saved). With no run live, a signed-in person can
+   still save a charge limit or an "every time it comes back" service (outcome `saved`); a hold, a one-time service or
+   an undo needs a live run, and a passcode session changes nothing until one starts. OTTO-Q refuses anything else and
+   says why.
 7. Short and plain: two to five sentences, no tables, no JSON, no command ids unless asked.
 
 ## If MCP is not available
