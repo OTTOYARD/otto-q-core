@@ -13,6 +13,10 @@
 --        (fiftyfold), the canon's cell count (seven) and its one unmentioned change, the CP-SAT abstentions, the
 --        endpoint's own latency, the overlap estimate, the charge-order grades, the start-race census, and a second
 --        deadlock.
+--        ADDED the same day, §8 and (9): §5's 7.35-second decision insert is a foreign-key wait on the tick's FOR UPDATE
+--        of the live run's row -> G490 (measured, and NOT changed: the wait keeps the decide step's close of the
+--        proposals right), and the deadlock of §6 is traced to the stop door's order -> G440, built in db/migrations/0790
+--        (pending).
 --
 -- ══ §1 THE PAIR, AND WHAT IT CAN AND CANNOT SAY (reproduce: (1)) ══════════════════════════════════════════════════════
 --
@@ -202,6 +206,26 @@
 --   here (corrected: the first draft named the refits as the cause).
 --   OPEN-ITEM: no canon cell exercises the maintenance and calibration departure branch 0715 built (G439)
 --
+-- ══ §8 THE 7.35-SECOND DECISION INSERT IS A FOREIGN-KEY WAIT ON THE TICK'S ROW LOCK (reproduce: (9)) ═════════════════
+--
+--   Added the same day, read-only, from the reads behind db/migrations/0790 §1 (b); (9) re-read at 20:34:50 UTC
+--   (3:34 PM CT) and again, unchanged, at 23:09:23 UTC (6:09 PM CT). §5's open question has a mechanism. ottoq_decisions references ottoq_sim_runs; the world step took the
+--   live run's row FOR UPDATE, the one row lock a foreign-key check (FOR KEY SHARE) waits on; and the metronome commits a
+--   beat after its world and decide steps. So an agent decision insert begun during a beat waited for the beat's commit.
+--   On c5f4ff34, the time from each decision's created_at to its pass's evidence row (an upper bound on the insert),
+--   split by when the insert began:
+--     inside a world step (ottoq_tick_clock_log)                    36   mean 4.14 s, p50 4.26, p90 6.16, max 8.13
+--     in the 5 s after a decide beat's world step ended              27   mean 1.76 s, 12 over a second, max 7.345
+--     the other 176                                                       mean 0.07 s, max 0.57, none over a second
+--   The world step's logged end came a mean 0.48 s after the 36 began, so they waited for the commit, not the world step.
+--   Pass 797's 7.345 s (trigger tick 359) began 0.78 s after tick 364's world step ended, inside that beat's decide step.
+--   The beat's commit is not logged, so the second row's 5-second window is a bound, not a measurement. -> G490.
+--   The wait is not removed by 0790: its first draft took the tick's lock FOR NO KEY UPDATE, and two refuters showed that
+--   lets a proposal commit mid-beat, after which ottoq_decide_tick's A3 (line 1228) records the wrong proposal as enacted
+--   in the evidence ledger (0790 §1 (b)). The fix needs one lock order for proposal writers or A3 scoped to the proposal
+--   the kernel took, and an audit of the beat's set-based statements, first.
+--   OPEN-ITEM: an insert that references the live run waits for the tick's FOR UPDATE on its row; the fix is gated on A3 (G490)
+--
 -- ══ QUERIES ══
 
 -- (1) the pair's identity
@@ -313,3 +337,24 @@ SELECT arms.scenario, arms.seed, arms.ticks, arms.post,
          WHERE vn.sim_run_id = arms.r AND a ->> 'svc' IN ('mechanical_pm', 'sensor_calibration')) AS pm_calib_atoms,
        (SELECT payload ? 'scenario_overrides' FROM public.ottoq_sim_runs s WHERE s.sim_run_id = arms.r) AS has_overrides
   FROM arms ORDER BY 1, 2, 3, 4;
+
+-- (9) the agent's decision inserts by when they began, and how long until their pass's evidence row (one run)
+WITH r(id) AS (VALUES ('c5f4ff34-b7c2-446b-a8c5-13fbdd5cd9cd'::uuid)),
+d AS (SELECT d.created_at,
+             COALESCE(CASE WHEN COALESCE(d.context_frame ->> 'agent_chain_trigger_tick', '') ~ '^[0-9]+$'
+                           THEN (d.context_frame ->> 'agent_chain_trigger_tick')::bigint END, d.tick_seq) AS trig
+        FROM public.ottoq_decisions d
+       WHERE d.sim_run_id = (SELECT id FROM r) AND d.resolved_action_context = 'orchestrator_agent'),
+e AS (SELECT trigger_tick, recorded_at FROM public.ottoq_agent_pass_evidence WHERE sim_run_id = (SELECT id FROM r)),
+j AS (SELECT d.created_at, extract(epoch FROM e.recorded_at - d.created_at) AS gap_s,
+             (SELECT l FROM public.ottoq_tick_clock_log l WHERE l.sim_run_id = (SELECT id FROM r)
+                 AND l.real_started_at <= d.created_at ORDER BY l.real_started_at DESC LIMIT 1) AS prev
+        FROM d JOIN e ON e.trigger_tick = d.trig)
+SELECT CASE WHEN created_at < (prev).real_ended_at THEN 'a inside a world step'
+            WHEN created_at < (prev).real_ended_at + interval '5 s' AND (prev).tick_seq % 2 = 0
+              THEN 'b within 5 s after a decide beat''s world step'
+            ELSE 'c the rest' END AS began,
+       count(*) AS n, round(avg(gap_s)::numeric, 2) AS mean_s,
+       round(percentile_cont(0.9) WITHIN GROUP (ORDER BY gap_s)::numeric, 2) AS p90_s, round(max(gap_s)::numeric, 3) AS max_s,
+       count(*) FILTER (WHERE gap_s > 1) AS over_1s
+  FROM j GROUP BY 1 ORDER BY 1;
