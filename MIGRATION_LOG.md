@@ -789,7 +789,7 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0727](db/migrations/0727_the_site_power_gate_can_read_the_meter_instead_of_guessing.sql) | `20261017072928` | yes — ledger | **The site power gate can read the meter instead of guessing.** With the dial `site_cap_gate_metered` at 1, the |
 | [0728](db/migrations/0728_forty_robotic_chargers_on_todays_service_through_shared_cabinets.sql) | `20261017073142` | yes — ledger | **Forty robotic chargers on today's service, through shared cabinets.** The build-out a real conversion would |
 | [0729](db/migrations/0729_a_site_that_divides_its_power_is_judged_by_the_limit_it_holds.sql) | `20261017081553` | yes — ledger | **A site that divides its power is judged by the limit it holds.** With `dc_power_managed` at 1 beside 0726's |
-| [0730](db/migrations/0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql) | `PENDING` | no — pending | **Twenty fast chargers on the same normal day, to find the knee.** One arm, run tonight ahead of 0728's last two |
+| [0730](db/migrations/0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee.sql) | `20261017082241` | yes — ledger | **Twenty fast chargers on the same normal day, to find the knee.** One arm, run tonight ahead of 0728's last two |
 
 552 migrations indexed.
 

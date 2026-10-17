@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261017082241
 -- migration-name:    twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee
 --
 -- 0730  **Twenty fast chargers on the same normal day, to find the knee.** One arm, run tonight ahead of 0728's last two
@@ -114,3 +114,12 @@ VALUES ('0730_twenty_fast_chargers_on_the_same_normal_day_to_find_the_knee', fal
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-17 08:22:41 UTC (3:22 AM CT), ledger version 20261017082241 ═════════════════════════════════════
+--
+--   Through execute_sql in one transaction that also wrote the ledger row, as 0724 and 0725 were (their APPLIED notes):
+--   0729's managed arm was in flight, and apply_migration's lock on supabase_migrations.schema_migrations waits behind a
+--   running arm. The version is the database's clock at the insert (to_char(clock_timestamp() ...)), not a time typed in.
+--   Executable part 4,669 characters, md5 f919e143c680f1382a9491eb406709f9, equal to the ledger's statements[1] read
+--   back. Dry-run with a rolled-back read-back first: the runner's order is now dcfc40_managed_normal (15, 08:15:53),
+--   this sweep (15, 08:22), then 0728's dcfc40_power_normal (16) and dcfc40_power_busy (17).
