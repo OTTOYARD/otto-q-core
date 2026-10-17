@@ -51,6 +51,12 @@
 --       sim-minutes a tick, value_2026_09_30's first seed, priority 16 after 0743's and 0744's, arm budget 3,000 s.
 --   Not changed: which charger the line seats a car on, how long a car charges, what it needs or when it may leave
 --   (rule 9). The plan is a forecast; the line and the shield decide.
+--   What it may also move, and why the arms are needed: the forward calendar books each planned leg's stall at arrival
+--   (ottoq.ottoq_book_workflow_legs), as it already does for every car below 45%. With the dial, on a depot with only
+--   fast chargers, a car above 45% gets a fast charger held for its planned window where its L2 leg could never be
+--   booked; the line supersedes the hold when it seats the car elsewhere, and while it stands, other cars cannot take
+--   that charger in that window. Whether that helps the line or holds chargers against its own order is the arms' to
+--   show, beside what the plan's accuracy buys the bay holds, the reconcile and the owner app.
 --
 -- ══ §3 CHECKS ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
