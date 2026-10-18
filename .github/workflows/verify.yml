@@ -677,6 +677,22 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_bay_activation_frees_parking_sql.py
 
+      # 0756, G473, EXECUTED on the live disposer and its two readers (tests/fixtures/proposal_ttl_stub.sql, md5 asserted),
+      # 0756 run whole, its live check included: in one transaction, before 0756 the reader keeps a proposal the disposer
+      # has expired on the machine's clock; after it the two agree across the 35th minute, a proposal past its 35 minutes
+      # on both clocks still expires with disposed_at on the machine's clock, a stall proposal naming no stall is still
+      # refused, the finalizer still expires every pending one; the body less its changes is its pre-image; 0756 refuses
+      # a disposer it did not read and a second apply. 11 tests, about 3 seconds.
+      - name: A proposal ages on the clock it was stamped in, executed (0756)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_proposal_ttl_stamp_clock_sql.py
+
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
       # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry

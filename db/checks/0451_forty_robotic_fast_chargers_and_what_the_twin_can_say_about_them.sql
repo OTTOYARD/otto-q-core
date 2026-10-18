@@ -889,11 +889,16 @@
 --   'ttl_elapsed' tick (query (40)). Pairs built on arm 84 (0743's and 0744's) carry its 3 expiries; arm 95 (0755's
 --   baseline) had none.
 --
---   The fix, named: the disposer's three TTL tests read now(), as 0122 wrote them, and disposed_at keeps the machine's
---   clock as 0333's audit stamp. That changes no arm that ended inside 35 minutes and no certification pair, and in
---   production moves an expiry by at most one tick; a long arm then behaves as it would on a fast machine. Ageing a
---   proposal on its run's own clock (the sim clock in the twin, the real one in production), which also ends the
---   never-stale face, changes the decisions of every arm and is a certified change behind a dial.
+--   The fix, built as 0756 (written and tested between 4:01 and 4:07 AM CT; PENDING, it applies after the window, with a
+--   dry run on live first, because a sweep arm calls the disposer every tick): the disposer's three TTL tests read
+--   now(), as 0122 wrote them, and disposed_at keeps the machine's clock as 0333's audit stamp; no dial. That changes no
+--   arm that ended inside 35 minutes and no certification pair, and in production moves an expiry by at most one tick;
+--   a long arm then behaves as it would on a fast machine, and a dial pair's two arms age their proposals alike.
+--   tests/test_proposal_ttl_stamp_clock_sql.py runs 0756 whole on the live bodies: in one transaction the reader kept
+--   four proposals the disposer had expired before it, and after it the two agree on all seven. Once it is applied, no
+--   arm should expire a proposal as 'ttl_elapsed' at all (query (40)). Ageing a proposal on its run's own clock (the sim
+--   clock in the twin, the real one in production), which also ends the never-stale face, changes the decisions of
+--   every arm and is a certified change behind a dial, not built.
 
 -- ══ QUERIES ══
 
