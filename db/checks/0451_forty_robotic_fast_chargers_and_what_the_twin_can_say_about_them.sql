@@ -3,7 +3,7 @@
 --        0724's and 0725's overnight sweeps, beside five things found on the way: the twin's power model (§2), busy_day's
 --        wall (§5), why every overnight arm gets ten times slower as its day goes on (§6), cars with no charge facts
 --        (§7), and two latent rule-9 regressions in dormant certification arms (§8).
---        -> G443-G447.
+--        -> G443-G447; later sections G448-G459, and G468-G469 (§16, §17).
 --        Read-only throughout, against gxdrcyphqjzjsuhxuqtg, 2026-10-17 from 05:51:42 UTC (the first query's now()).
 --        Arms' own rows are cited by arm_id and sim_run_id; every number below names the query that reproduces it.
 --
@@ -294,6 +294,10 @@
 --      5% from 428 to 248-270 minutes, and met 121 more car-hours of ride demand (15% unmet against 26%), every car at
 --      100% with nothing open. A robot on every post is what makes that possible: no car waits for a person to plug it
 --      in, so the depot's limit stops being connectors and labour and becomes power and time.
+--      CORRECTED 2026-10-18 (§15): with the twin's command lag removed (0735), forty posts served 29% more cars than the
+--      depot as built, not 45%: 205 against 159, the slowest 5% at 274 minutes against 378, and 108.4 more car-hours
+--      (15.6% unmet against 25.3%), every car still at 100% with nothing open. The lag had cut every wash seat a tick
+--      short, and forty posts are wash-bound, so it flattered them most.
 --
 --   2. SIZE THE POSTS BY THEIR PRICE, NOT BY THE STALLS. Forty posts were busy 41% of the day against the ten's 69%,
 --      and the curve bends: posts 11-20 met 5.8 car-hours each in the 12-hour day (an upper bound until 0734 measures
@@ -306,6 +310,12 @@
 --      of them: one seed, a 12-hour day and nothing for the night. On that reading twenty posts clearly pay, and the
 --      second twenty pay only if the night, the robot's price and more seeds come out in their favour. A staged build,
 --      twenty now and the rest as measured demand fills them, buys the same answer with half the capital at risk.
+--      CORRECTED 2026-10-18 (§15): 5.8 was not an upper bound. With the lag removed, posts 11-20 bought 7.7 car-hours
+--      each and posts 21-40 bought 1.6: about $4,600 a month per post against $950, at the same prices and on the same
+--      assumptions. The lag had added a tick to every handover in the queue at twenty posts and given forty posts
+--      short wash seats, so it bent the curve the wrong way at both ends. On this reading twenty posts pay clearly and
+--      the second twenty do not, because past twenty the wash is the wall (§13, G458): the second twenty wait on the wash
+--      line's fixes (0743-0747) and their arms. One seed; seeds 2 and 3 have not run.
 --
 --   3. DO NOT SIZE THE GRID TO THE NAMEPLATE. Forty posts with nothing holding them drew 3.9 MW for the 6 AM plug-in.
 --      On the existing 2.5 MW service, behind 2.4 MW of shared cabinets, they met 941.8 car-hours (held at 2.16 MW,
@@ -313,12 +323,19 @@
 --      grid grown to 8 MW. The megawatt worry is a control
 --      question, and its answer is a site controller holding a limit that OTTO-Q sets: shared cabinets (the Kempower and
 --      ABB units 0567 and 0728 cite) with OTTO-Q deciding the split. No utility upgrade is needed for this day's load.
+--      CORRECTED 2026-10-18 (§16): the opening draw is 3.7 MW on the chargers' own readings (3,731 kW on arm 84, 3,749
+--      in tick on arm 95); the site meter's 3,874 counted some new charges' first intervals twice.
 --
 --   4. THE BILL TO MANAGE IS THE DEMAND CHARGE, AND THE TARIFF IS A YEARLY DECISION. At GSA-3's $21.40-21.78 per kW
 --      of the month's highest half hour, the unmanaged forty cost $51,228 a month in demand on the whole day against
 --      $35,419 held; past the opening both sit near $22,000 against $15,271 as built. NES's EVC schedule has no demand
 --      charge at 21.773 c/kWh, and beats GSA-3 for the charging meter below a 17.4% monthly load factor; it carries a
 --      one-year term and 90 days' notice back (§4). A held site keeps its load factor up and stays on GSA-3.
+--      CORRECTED 2026-10-18 (§16, §17): every figure in this point was read on arms with the twin's command lag, whose
+--      site meter counts each new charge's first interval twice (the energy 12-20% high), and arm 84's $21,547 past the
+--      opening is two samples at the day's end billed as a half hour. In tick, over full half hours, past the opening:
+--      $17,125 a month as built (arm 93), $19,780 at twenty posts (arm 94), $20,129 at forty (arm 95, nothing holding
+--      them); on the whole day $18,927, $31,247 and $42,204. The held site has not run in tick.
 --
 --   5. WHAT THE ENGINE NEEDS BEFORE A REAL CONVERSION, as certified changes, each already measured in the twin:
 --      (a) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
@@ -422,6 +439,8 @@
 --   normal day at 10, 20 and 40 posts, paired with arms 83, 86 and 84. Query (12) reads both costs on any run.
 --   The handover's first tick remains (the twin stamps a charge's end at the tick boundary). Its candidate fix, stamping
 --   the moment the pack filled, is in G449; it waits on 0734's pair, because if half the tick changes little it buys little.
+--   MEASURED 2026-10-18 (§15): halving the tick bought about half what answering in the tick did, and the first-tick
+--   candidate is not built.
 --
 --   The promise itself (G383, 0736, applied 16:38 UTC). When a car arrives, OTTO-Q now estimates when it will be ready.
 --   The estimate is its own plan of the charge line, simulated in 16 sampled futures, with every charge to 100% on the
@@ -537,6 +556,133 @@
 --   a car gets at a mixed depot depends on the mix and the queue, which a plan made at arrival cannot see. With the kind
 --   known the clock misses by 14.7 minutes as built and 9.8 at 20 posts. 0745 (PENDING) makes the change that holds on
 --   every mix measured, under dial itinerary_charge_on_clock, with arms paired to 84 and 83.
+
+-- ══ §15 THE NIGHT'S ARMS: THE FIRST READING, THE TICK AND THE COMMAND LAG (G448-G450; reproduce: (3b), (12), (30)) ══
+--
+--   Read 2026-10-18 between 1:38 and 2:01 AM CT from the seven arms the runner finished from 11:38 PM to 1:55 AM CT
+--   (arms 89-95, all complete, none errored). Seed 1 throughout, so each pair is one reading.
+--
+--   0733, the first reading (arm 89 against arm 85: the normal day, forty posts behind 2.4 MW of shared cabinets held at
+--   2.16 MW, 0729's managed reading). EN.001's refused starts fell from 85 to 0 (query (3b) on the sweeps
+--   dcfc40_managed_normal and firstreading_normal). All 85 had come with the meter itself over the held cap, 2,182-2,285
+--   kW against 2,160, and 84 of them before 7 AM CT. The pool bound in 4 ticks against 1. The day barely moved: 211 cars
+--   served against 207, 946.8 deployed car-hours against 941.8, the charge wait's p50 and p95 10 and 90 minutes on both,
+--   7 of 74 due cars on time against 4 of 66, and every car left at 100% with nothing open on both. So every refusal of
+--   G448's kind was the twin's first reading, and a held site loses nothing to the shield once its meter reads what a
+--   site controller gives a car it has just connected.
+--
+--   0734 and 0735 over the same 6-hour morning at ten posts:
+--                                          arm 91          arm 90          arm 92
+--                                          5 min, lag      2.5 min, lag    5 min, in tick
+--     command lag, all executed (min)      5.00            2.50            0.00
+--     wash seat of its booking (min)       12.00 of 17.00  15.39 of 17.89  17.22 of 17.22
+--     service seat of its booking (min)    38.00 of 43.00  31.90 of 34.40  43.00 of 43.00
+--     handovers with a car waiting         28              32              29
+--       taking exactly the lag's gap       27 at 10.0      31 at 5.0       27 at 5.0
+--       charger-hours idle in them         4.8             2.8             2.7
+--     cars served (visits)                 58 (90)         61 (91)         60 (89)
+--     deployed car-hours (of 514)          392.3           403.0           412.9
+--     charge wait p50, p95 floor (min)     30.0, 144.0     17.5, 144.1     5.0, 125.0
+--     wall time (s)                        406.6           1,498.5         404.8
+--   A handover here is a gap of 15 minutes or less between two sessions on one fast charger while a car waits for one
+--   (query (30)). A longer gap is a fault or a car not yet ready, one or two an arm (a connector-cable fault left a
+--   charger idle 3.2 hours on arm 90, an aborted session 3.4 hours on arm 92), and is left out. Halving the tick bought
+--   10.7 car-hours over the morning (+2.7%) for 3.7 times the wall time; answering in the tick bought 20.6 (+5.3%) for
+--   none. Most of the charge wait's median was the lag itself: a car seated on a charger plugged in a tick later.
+--
+--   0735 on the normal day (12 hours), against last night's arms on the same seed:
+--                                          10 posts          20 posts          40 posts
+--                                          83 -> 93          86 -> 94          84 -> 95
+--     command lag (min)                    5.00 -> 0.00      5.00 -> 0.00      5.00 -> 0.00
+--     wash seat of its booking (min)       12.64 -> 16.90    12.67 -> 17.32    13.05 -> 18.14
+--       (booked)                           (17.64 -> 16.90)  (17.67 -> 17.32)  (18.05 -> 18.14)
+--     handovers with a car waiting         63 -> 69          not readable: query (10) reads a converted post as L2
+--       charger-hours idle in them         10.9 -> 6.6
+--     cars served                          148 -> 159        175 -> 177        215 -> 205
+--     deployed car-hours (of 1,114)        821.4 -> 832.1    879.8 -> 909.0    942.7 -> 940.5
+--     unmet ride demand                    26.3% -> 25.3%    21.0% -> 18.4%    15.4% -> 15.6%
+--     door p95 (min)                       428 -> 378        305 -> 325        248 -> 274
+--     charge wait p50 (min)                10 -> 5           10 -> 5           10 -> 5
+--     charge wait p95 floor (min)          125 -> 110.5      105 -> 95         82.5 -> 72.5
+--     due cars on time                     6 of 54 -> 3/42   5 of 59 -> 2/53   8 of 72 -> 4/65
+--   Every car left at 100% with nothing open on all six. On-time is a handful either way (§12), and a bay seat now runs
+--   its booked length, so a due car with bay work leaves later than it did.
+--
+--   What it changes. The lag had two costs in opposite directions (G450), and they fell on different post counts. Ten
+--   and twenty posts queue for chargers and lost each handover's second tick: removing it bought them 10.7 and 29.2
+--   car-hours. Forty posts do not queue (41% busy) and are wash-bound (§13), and the lag gave them wash seats a tick
+--   short: removing it cost them 2.2. So in tick the curve bends harder: posts 11-20 bought 7.7 car-hours each in the
+--   12-hour day, and posts 21-40 bought 1.6 (§10 point 2 had 5.8 and 3.1, and called 5.8 an upper bound; it was not).
+--   Forty posts served 29% more cars than as built, not 45%. One seed, and the seeds that would give these a spread
+--   (0732's) have not run.
+--
+--   And G449's first-tick candidate is not built. With 0735 a handover takes one tick, and at ten posts the normal day
+--   left 6.6 charger-hours idle with a car waiting, against 94.4 hours of fast charging. Stamping the moment a pack
+--   filled would save about 3 of a handover's remaining 7.5 minutes (G449's arithmetic), about 3.5 charger-hours a day
+--   here. Halving the tick saved 2.0 of the morning's such hours, among its other effects, and bought 10.7 car-hours.
+--   It stays the candidate if the seeds show the curve needs it.
+
+-- ══ §16 UNDER THE LAG, THE TWIN'S SITE METER COUNTS EACH NEW CHARGE'S FIRST INTERVAL TWICE (G468; reproduce: (31), (32)) ══
+--
+--   Found reading §15's energy: in tick the depot imported 6.5-17.5% less while its cars took more. The sessions
+--   delivered 7,429 kWh against 7,002 at ten posts, 8,009 against 7,772 at twenty and 8,629 against 8,425 at forty; the
+--   battery's charge and the fleet's end charge moved under 1%; and the grid read 6,284 kWh against 6,723, 6,888 against
+--   7,912 and 7,579 against 9,193. That is the meter, not the cars (query (31)). Integrated as ottoq_dial_arm_metrics
+--   integrates it (each snapshot held until the next), the twin's EV load, site_energy_snapshots.total_ev_charging_kw,
+--   against what the sessions delivered:
+--     5 minutes, lag:     +11.7% (arm 83, ten posts), +12.0% (91, the morning), +15.6% (86, twenty), +20.2% (84, forty),
+--                         +20.1% (85, forty held), +18.0% (89, held, with 0733)
+--     2.5 minutes, lag:   +6.0% (90)
+--     in tick (0735):     -0.6% (92), -0.7% (93), -0.8% (94), -1.5% (95)
+--   The chargers' own readings (OCPP TransactionEvent Updated, Power.Active.Import, one a tick) agree with the sessions to
+--   within 1% on all eleven arms, lagged or not: 7,024 against 7,002 kWh on arm 83, 8,503 against 8,425 on arm 84,
+--   7,457 against 7,429 on arm 93, 8,708 against 8,629 on arm 95. On a tick when no session starts or ends the meter
+--   equals the sum of that tick's readings exactly, on all eleven; all of arm 83's excess, 10,124 kW-ticks or a mean
+--   45.4 kW for each of its 223 starts, falls on ticks when one does.
+--
+--   The order of a tick says why (function sources). ottoq_sim_advance_tick_world carries out the last tick's commands
+--   (ottoq_sim_confirm_commands), starts the sessions of the cars now plugged in (ottoq_sim_reconcile_charge_sessions),
+--   meters each running session's last interval (ottoq_sim_advance_charge_sessions, which skips a session in the tick it
+--   starts) and then snapshots the site (ottoq_sim_advance_all_energy, then twin.ottoq_sim_advance_site_energy), summing
+--   every session's last reading with started_at <= now (twin.ottoq_sim_compute_charger_load_kw). So a session started in
+--   the world is in the snapshot at its first reading, the rate it is about to charge at, and a tick later at its reading
+--   for that same interval: N + 1 snapshots for N intervals. With 0735 the session starts after the decide
+--   (twin.ottoq_sim_answer_in_tick), after the snapshot, so it is in N of them, and the load curve sits a tick late,
+--   which moves no total.
+--
+--   What it changes. Every arm before tonight ran with the lag, so every energy, grid, cost and peak figure in §2-§4, §10
+--   and §11 is read from an over-metered snapshot. Recomputed on the chargers' readings (query (32)), full half hours:
+--                              grid kWh            whole-day half hour (kW)   half hour from 180 min (kW)
+--     ten posts, arm 83        6,669 -> 5,887      973.8 -> 935.8             713.6 -> 658.0
+--     twenty, arm 86           7,840 -> 6,740      1,693.1 -> 1,660.8         932.5 -> 821.3
+--     forty, arm 84            9,111 -> 7,589      2,369.5 -> 2,188.8         941.8 -> 797.1
+--     in tick, arms 93-95      the meter and the readings within 1.8% on every column
+--   The lagged arms' battery planned on the over-metered meter, which no recomputation undoes, so quote the in-tick arms.
+--   On them the depot is busier than the lagged arms' readings: with each handover a tick shorter more cars charge at
+--   once, and the half hour billed from 180 minutes reads 800.2 kW at ten posts, 924.3 at twenty and 940.6 at forty
+--   (§10 point 4's dollars, corrected there). The opening draw at forty is 3.7 MW on the chargers' readings (3,731 kW on
+--   arm 84, 3,749 in tick on arm 95), not §10 point 3's 3.9; the meter's 3,874 counted some first intervals twice.
+--
+--   A twin fidelity defect, not a production one: a real site meter reads the power that flows. Anything in the twin that
+--   reads the snapshot while it decides read the phantom on a lagged arm; which readers those are is not traced here.
+--   Not built: 0735 removes it, so a cell that measures energy, a peak or a bill runs with twin_answer_in_tick on. The
+--   cells queued behind tonight's (billwindow_normal, byneed_normal, seeds23_normal and the older dcfc40 sweeps) run with
+--   the lag: their pairs compare like with like, and their energy and bills carry this.
+
+-- ══ §17 A HALF HOUR AT THE DAY'S END CAN BE ONE TICK (G469; reproduce: (33)) ═══════════════════════════════════════════
+--
+--   ottoq_dial_arm_metrics takes the demand peak as the highest mean over [t, t + 30 minutes) for every snapshot t
+--   (0439: "the NES NCP_30min basis (highest 30-consecutive-minute mean of grid import)"), and at the end of a run that
+--   window holds what is left of it: one, two or three samples. Of the 69 arms that carry peak_after_open, 8 have their
+--   half hour billed from 180 minutes start in the run's last half hour (query (33)): arms 35, 42, 58 and 62
+--   (value_2026_09_30's 24-hour days, starting at minute 1,430-1,435 of 1,440) and arms 84, 89, 94 and 95 (minute 715-720
+--   of 720). Over full half hours the first four read 695.2, 695.2, 688.9 and 694.6 kW against 710.9, 710.9, 694.4 and
+--   699.4 (0.7-2.2% lower), and the last four 941.8, 1,150.8, 924.3 and 940.6 against 1,006.8, 1,241.9, 980.7 and 976.5
+--   (3.7-7.3% lower). The whole-day half hour is never partial: the opening sets it on all 69. So arm 84's $21,547 past
+--   the opening in §10 point 4 is two samples, and $20,155 over full half hours before §16's correction.
+--   A five-minute window is not a 30-consecutive-minute mean. To be built as 0754: a half hour counts only when its
+--   window holds 30 minutes of samples, for every arm scored after it lands; stored arms keep their numbers, and query (33)
+--   recomputes any arm whose run is still on record.
 
 -- ══ QUERIES ══
 
@@ -1276,3 +1422,128 @@ SELECT o.arm,
        max(o.t) FILTER (WHERE o.washing = 2 AND s.staged_waiting > 0 AND a.attempts IS NULL) - interval '5 hours' AS last_ct
   FROM occ o LEFT JOIN staged s ON s.arm = o.arm AND s.t = o.t LEFT JOIN att a ON a.arm = o.arm AND a.t = o.t
  GROUP BY o.arm ORDER BY o.arm;
+
+-- (30) G449, §15: fast-charger handovers with a car waiting on several runs, split by the gap's length. A gap of 15
+--      minutes or less is a handover; a longer one is a fault or a car not yet ready. Stall types are read from stalls,
+--      so only arms whose build-out converts nothing (dcfc10) read right (query (3c)'s note).
+WITH runs(arm, rid) AS (VALUES (83, 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid), (90, '54bc3afc-2634-47f0-bc4b-4fc4c0958c26'::uuid),
+                               (91, 'fdeffed1-b46a-4bd4-96eb-771585fac035'::uuid), (92, '061069f7-9ff2-43d5-9d02-0c5a40225a93'::uuid),
+                               (93, '6768503c-8fd9-4482-8fa5-c144f875219b'::uuid)),
+s AS (
+  SELECT r.arm, x.stall_id, x.started_at, x.ended_at, x.stopped_reason,
+         lead(x.started_at) OVER (PARTITION BY r.arm, x.stall_id ORDER BY x.started_at) AS next_start
+    FROM runs r JOIN public.ocpp_sessions x ON x.sim_run_id = r.rid JOIN public.stalls st ON st.id = x.stall_id
+   WHERE st.stall_type::text = 'dcfc' AND x.started_at IS NOT NULL AND x.ended_at IS NOT NULL),
+fc_first AS (
+  SELECT r.arm, vn.arrived_at, f.started_at AS first_start
+    FROM runs r JOIN public.ottoq_visit_needs vn ON vn.sim_run_id = r.rid
+    JOIN LATERAL (SELECT y.started_at, sty.stall_type::text AS t FROM public.ocpp_sessions y JOIN public.stalls sty ON sty.id = y.stall_id
+                   WHERE y.sim_run_id = vn.sim_run_id AND y.vehicle_id = vn.vehicle_id AND y.started_at >= vn.arrived_at
+                   ORDER BY y.started_at LIMIT 1) f ON f.t = 'dcfc'),
+g AS (SELECT s.*, extract(epoch FROM (s.next_start - s.ended_at)) / 60.0 AS gap_min,
+             (SELECT count(*) FROM fc_first f WHERE f.arm = s.arm AND f.arrived_at <= s.ended_at AND f.first_start > s.ended_at) AS fc_waiting
+        FROM s WHERE s.next_start IS NOT NULL)
+SELECT g.arm, CASE WHEN gap_min <= 15 THEN 'a: handover, <= 15 min' WHEN gap_min <= 60 THEN 'b: 15-60 min' ELSE 'c: > 60 min' END AS gap,
+       count(*) AS n, min(gap_min) AS shortest_min,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY gap_min)::numeric, 2) AS p50_min,
+       round(sum(gap_min)::numeric / 60, 1) AS idle_charger_hours,
+       string_agg(DISTINCT COALESCE(g.stopped_reason, '-'), ', ') AS prior_session_stopped,
+       (SELECT round(sum(extract(epoch FROM (s2.ended_at - s2.started_at)) / 3600)::numeric, 1) FROM s s2 WHERE s2.arm = g.arm) AS charging_hours_all
+  FROM g WHERE fc_waiting > 0 GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- (31) G468, §16: the twin's site meter against what the sessions delivered and against the chargers' own readings, per
+--      run. The meter is integrated as ottoq_dial_arm_metrics integrates it (each snapshot held until the next); the
+--      readings are each tick's TransactionEvent Updated Power.Active.Import over one tick. Arms 83-95.
+WITH runs(arm, rid) AS (VALUES (83, 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid), (84, 'b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid),
+                               (85, 'fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid), (86, '0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid),
+                               (89, '2e0752ff-77b3-4656-9e4f-2b64040ac6b9'::uuid), (90, '54bc3afc-2634-47f0-bc4b-4fc4c0958c26'::uuid),
+                               (91, 'fdeffed1-b46a-4bd4-96eb-771585fac035'::uuid), (92, '061069f7-9ff2-43d5-9d02-0c5a40225a93'::uuid),
+                               (93, '6768503c-8fd9-4482-8fa5-c144f875219b'::uuid), (94, 'e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid),
+                               (95, '12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid)),
+snap AS (
+  SELECT r.arm, e.timestamp AS t, e.total_ev_charging_kw AS ev_kw,
+         EXTRACT(EPOCH FROM (lead(e.timestamp) OVER (PARTITION BY r.arm ORDER BY e.timestamp) - e.timestamp)) / 3600.0 AS dt
+    FROM runs r JOIN public.site_energy_snapshots e ON e.sim_run_id = r.rid AND e.depot_id = '11111111-1111-1111-1111-111111111111'),
+upd AS (
+  SELECT r.arm, o.sim_clock_at AS t,
+         sum((SELECT (v ->> 'value')::numeric FROM jsonb_array_elements(o.payload -> 'meterValue' -> 0 -> 'sampledValue') v
+               WHERE v ->> 'measurand' = 'Power.Active.Import')) AS kw
+    FROM runs r JOIN public.ottoq_ocpp_messages o ON o.sim_run_id = r.rid AND o.message_type = 'TransactionEvent'
+   WHERE o.payload ->> 'eventType' = 'Updated' GROUP BY 1, 2),
+starts AS (SELECT r.arm, x.started_at AS t, count(*) AS n FROM runs r JOIN public.ocpp_sessions x ON x.sim_run_id = r.rid GROUP BY 1, 2),
+ends AS (SELECT r.arm, x.ended_at AS t, count(*) AS n FROM runs r JOIN public.ocpp_sessions x ON x.sim_run_id = r.rid
+          WHERE x.ended_at IS NOT NULL GROUP BY 1, 2),
+sess AS (SELECT r.arm, count(*) AS sessions, sum(x.energy_delivered_kwh) AS delivered FROM runs r
+           JOIN public.ocpp_sessions x ON x.sim_run_id = r.rid GROUP BY 1),
+j AS (
+  SELECT s.arm, s.dt, s.ev_kw, COALESCE(u.kw, 0) AS readings_at_t, (st.n IS NULL AND en.n IS NULL) AS quiet
+    FROM snap s LEFT JOIN upd u ON u.arm = s.arm AND u.t = s.t
+    LEFT JOIN starts st ON st.arm = s.arm AND st.t = s.t LEFT JOIN ends en ON en.arm = s.arm AND en.t = s.t)
+SELECT j.arm, max(ss.sessions) AS sessions, round(max(ss.delivered), 0) AS delivered_kwh,
+       round(sum(j.ev_kw * j.dt) FILTER (WHERE j.dt IS NOT NULL)::numeric, 0) AS meter_kwh,
+       round((sum(j.ev_kw * j.dt) FILTER (WHERE j.dt IS NOT NULL) / NULLIF(max(ss.delivered), 0) - 1)::numeric * 100, 1) AS meter_over_sessions_pct,
+       (SELECT round(sum(u.kw) * max(j2.dt), 0) FROM upd u, LATERAL (SELECT avg(dt) AS dt FROM snap WHERE snap.arm = j.arm) j2
+         WHERE u.arm = j.arm) AS readings_kwh,
+       round(sum(j.ev_kw - j.readings_at_t), 0) AS meter_minus_readings_kw_ticks,
+       round(sum(j.ev_kw - j.readings_at_t) FILTER (WHERE j.quiet), 0) AS of_which_on_quiet_ticks
+  FROM j JOIN sess ss ON ss.arm = j.arm GROUP BY j.arm ORDER BY j.arm;
+
+-- (32) G468, §16: the grid recomputed from the chargers' own readings (the meter's EV load replaced by the readings
+--      stamped at the same tick), against the meter: energy, the whole-day half hour and the half hour billed from 180
+--      minutes, over full half hours only (G469).
+WITH runs(arm, rid) AS (VALUES (83, 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid), (84, 'b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid),
+                               (86, '0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid), (93, '6768503c-8fd9-4482-8fa5-c144f875219b'::uuid),
+                               (94, 'e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid), (95, '12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid)),
+upd AS (
+  SELECT r.arm, o.sim_clock_at AS t,
+         sum((SELECT (v ->> 'value')::numeric FROM jsonb_array_elements(o.payload -> 'meterValue' -> 0 -> 'sampledValue') v
+               WHERE v ->> 'measurand' = 'Power.Active.Import')) AS kw
+    FROM runs r JOIN public.ottoq_ocpp_messages o ON o.sim_run_id = r.rid AND o.message_type = 'TransactionEvent'
+   WHERE o.payload ->> 'eventType' = 'Updated' GROUP BY 1, 2),
+s AS (
+  SELECT r.arm, e.timestamp AS t, e.grid_import_kw - e.grid_export_kw AS net_kw, e.total_ev_charging_kw AS ev_kw,
+         EXTRACT(EPOCH FROM (lead(e.timestamp) OVER (PARTITION BY r.arm ORDER BY e.timestamp) - e.timestamp)) / 3600.0 AS dt
+    FROM runs r JOIN public.site_energy_snapshots e ON e.sim_run_id = r.rid AND e.depot_id = '11111111-1111-1111-1111-111111111111'),
+c AS (
+  SELECT s.arm, s.t, s.dt, GREATEST(s.net_kw, 0) AS g_meter, GREATEST(s.net_kw - s.ev_kw + COALESCE(u.kw, 0), 0) AS g_readings
+    FROM s LEFT JOIN upd u ON u.arm = s.arm AND u.t = s.t),
+w AS (
+  SELECT c.*, min(t) OVER (PARTITION BY arm) AS t0,
+         avg(g_meter) OVER (PARTITION BY arm ORDER BY t RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS m30,
+         avg(g_readings) OVER (PARTITION BY arm ORDER BY t RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS r30,
+         count(*) OVER (PARTITION BY arm ORDER BY t RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS n30
+    FROM c)
+SELECT arm,
+       round(sum(g_meter * dt) FILTER (WHERE dt IS NOT NULL)::numeric, 0) AS grid_kwh_meter,
+       round(sum(g_readings * dt) FILTER (WHERE dt IS NOT NULL)::numeric, 0) AS grid_kwh_readings,
+       round(max(m30) FILTER (WHERE n30 >= 6)::numeric, 1) AS day_half_hour_meter,
+       round(max(r30) FILTER (WHERE n30 >= 6)::numeric, 1) AS day_half_hour_readings,
+       round(max(m30) FILTER (WHERE n30 >= 6 AND t >= t0 + interval '180 minutes')::numeric, 1) AS billed_half_hour_meter,
+       round(max(r30) FILTER (WHERE n30 >= 6 AND t >= t0 + interval '180 minutes')::numeric, 1) AS billed_half_hour_readings
+  FROM w GROUP BY arm ORDER BY arm;
+-- n30 >= 6 assumes a 5-minute tick; at 2.5 minutes ask for 12.
+
+-- (33) G469, §17: the arms whose half hour billed from 180 minutes starts in the run's last half hour, and that half hour
+--      over full windows wherever the arm's run is still on record (its snapshots are run-scoped and the purge takes them).
+WITH a AS (
+  SELECT a.arm_id, a.sim_run_id, s.sweep_code,
+         (a.arm_metrics ->> 'ticks')::numeric * (a.arm_metrics ->> 'sim_min_per_tick')::numeric AS run_min,
+         (a.arm_metrics ->> 'sim_min_per_tick')::numeric AS step_min,
+         (a.arm_metrics #>> '{peak_after_open,starts_min,180}')::numeric AS billed_start_min,
+         (a.arm_metrics #>> '{peak_after_open,peak_30min_kw,180}')::numeric AS billed_kw,
+         (a.arm_metrics #>> '{peak_after_open,demand_charge_usd_month,180}')::numeric AS billed_usd
+    FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
+   WHERE a.complete AND a.arm_metrics ? 'peak_after_open'),
+p AS (SELECT * FROM a WHERE billed_start_min > run_min - 30),
+w AS (
+  SELECT p.arm_id, e.timestamp AS t,
+         avg(GREATEST(COALESCE(e.grid_import_kw, 0), 0)) OVER (PARTITION BY p.arm_id ORDER BY e.timestamp
+             RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS g30,
+         count(*) OVER (PARTITION BY p.arm_id ORDER BY e.timestamp
+             RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS n30,
+         min(e.timestamp) OVER (PARTITION BY p.arm_id) AS t0, p.step_min
+    FROM p JOIN public.site_energy_snapshots e ON e.sim_run_id = p.sim_run_id AND e.depot_id = '11111111-1111-1111-1111-111111111111')
+SELECT (SELECT count(*) FROM a) AS arms_with_after_open, p.arm_id, p.sweep_code, p.run_min, p.billed_start_min, p.billed_kw, p.billed_usd,
+       (SELECT round(max(w.g30)::numeric, 1) FROM w WHERE w.arm_id = p.arm_id AND w.n30 * w.step_min >= 30
+           AND w.t >= w.t0 + interval '180 minutes') AS billed_kw_full_windows
+  FROM p ORDER BY p.arm_id;
