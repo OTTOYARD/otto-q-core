@@ -802,7 +802,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'robotic_wash_lanes_and_bay_work_timed_by_the_work'::text, '0746_robotic_wash_lanes_and_bay_work_timed_by_the_work.sql'::text),
     ('PENDING'::text, 'the_bay_line_serves_the_car_that_rejoins_service_soonest'::text, '0747_the_bay_line_serves_the_car_that_rejoins_service_soonest.sql'::text),
     ('PENDING'::text, 'an_evidence_table_refuses_truncate_and_only_a_migration_says_what_is_evidence'::text, '0748_an_evidence_table_refuses_truncate_and_only_a_migration_says_what_is_evidence.sql'::text),
-    ('PENDING'::text, 'an_evidence_table_is_not_dropped_by_accident'::text, '0749_an_evidence_table_is_not_dropped_by_accident.sql'::text)
+    ('PENDING'::text, 'an_evidence_table_is_not_dropped_by_accident'::text, '0749_an_evidence_table_is_not_dropped_by_accident.sql'::text),
+    ('PENDING'::text, 'every_bay_seat_ends_in_its_leg_and_its_service_record'::text, '0750_every_bay_seat_ends_in_its_leg_and_its_service_record.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
