@@ -3,7 +3,7 @@
 --        0724's and 0725's overnight sweeps, beside five things found on the way: the twin's power model (§2), busy_day's
 --        wall (§5), why every overnight arm gets ten times slower as its day goes on (§6), cars with no charge facts
 --        (§7), and two latent rule-9 regressions in dormant certification arms (§8).
---        -> G443-G447; later sections G448-G459, G468-G469 (§16, §17) and G471-G472 (§18).
+--        -> G443-G447; later sections G448-G459, G468-G469 (§16, §17), G471-G472 (§18) and G473 (§19).
 --        Read-only throughout, against gxdrcyphqjzjsuhxuqtg, 2026-10-17 from 05:51:42 UTC (the first query's now()).
 --        Arms' own rows are cited by arm_id and sim_run_id; every number below names the query that reproduces it.
 --
@@ -789,6 +789,111 @@
 --      from the release, move the car when the arm lets go).
 --   Seen on the way, not traced: on arm 95 a staging stall named a car still en_route_to_depot, its own pointer empty, 157
 --   times for one tick each (98 cars): the arrival's stall is pointed before the car arrives.
+--
+-- ══ §19 A SWEEP ARM'S PROPOSALS EXPIRE BY THE MACHINE'S CLOCK (G473; reproduce: (40), (41)) ═══════════════════════════
+--
+--   Read 2026-10-18 between 3:36 and 3:50 AM CT, from every sweep arm whose proposals survive (86 of 95 at first, 87
+--   once promise_busy's arm landed), the source of the submit, the reader, section (5) of ottoq_decide_tick and the
+--   disposer, pg_stat_activity and cron.job_run_details. The table below was read by 3:44, before arm 97 landed at 3:46.
+--
+--   Why it was looked for. §12's check of promise_normal: arm 96 agreed with arm 93 (the same cell without the promise
+--   recorder, which decides nothing) on every outcome atom and differed on h_dec and h_prop. Something else decided.
+--
+--   The mechanism. A sweep arm runs in one transaction (ottoq_throughput_sweep_runner, cron job 783). The service-order
+--   proposer, ottoq_service_priority_propose, submits through ottoq_submit_external_proposal, which stamps created_at by
+--   the column's default, now(), and expires_at as now() plus 120 seconds. So every proposal of an arm carries the arm's
+--   transaction start (one distinct created_at on each of the 19 arms read from arm 78 on). Section (5) of
+--   ottoq_decide_tick takes a staged car's service order from ottoq_l2_external_proposal, which keeps a pending
+--   proposal while GREATEST(expires_at, created_at + 35 minutes) >= now() (ottoq_cuopt_defer_hold reads the same):
+--   inside one transaction, always. The disposer, ottoq_dispose_external_proposals, called at the end of every decide,
+--   applies the same test to the machine's clock (v_wall := clock_timestamp()) and expires a pending proposal once
+--   GREATEST(expires_at, created_at + 35 minutes) < v_wall, as 'ttl_elapsed'. One TTL, two clocks. So before 35
+--   wall-minutes a proposal lives until a newer one for its car, or a decision on its car, supersedes it; after 35,
+--   each proposal is expired in the tick it is made and section (5) falls back to its own order.
+--
+--   It is a regression. 0122 (2026-08-30, "the sweep reads the clock the stamp was written in") found the decide's
+--   expiry sweep judging the wall-stamped TTL by the SIM clock, which expired every proposal on its birth tick, and
+--   moved it to now(), noting that "within a determinism pair (one transaction) now() is frozen, so proposals no longer
+--   expire mid-pair". 0333 (2026-09-16) moved that sweep into the disposer, as "expired in the selector's real-time TTL
+--   domain", and compared it with clock_timestamp(), the clock it had declared for the new disposed_at audit stamp: a
+--   third clock, neither the stamp's nor the run's. Inside one transaction proposals expire again, once the
+--   transaction is 35 minutes old.
+--
+--                                                        arms   proposals   ttl_elapsed
+--     ended within 35 minutes of the arm's first stamp     33       1,129             0
+--     ran past 35 minutes                                  42       3,645         1,527    (none disposed before 35 min)
+--     ran past 35 minutes, none expired                    11          78             0    (10 arms with 14 between
+--                                                                                           them; arm 95, 35.2 min)
+--
+--   By sweep: value_2026_09_30's 24-hour arms (4,383-8,707 s) lost 1,509 of 3,345 proposals on 36 of 50 arms, from
+--   tick 99 of 288 at the earliest; last night's 40-post power arms 84, 85, 87, 88 and 89 lost one to three each (from
+--   tick 96); the promise arm 96 lost 8 of 45 (one made at tick 108 and still pending at tick 119, then each new one in
+--   its own tick). The smoke and frontier sweeps (under 26 minutes an arm) and arms 82, 83, 86 and 90-95 lost none.
+--
+--   What it changed, on the one pair that can say. Arms 93 and 96 made the same 45 proposals on the same cars at the
+--   same ticks. Of the 8 that arm 96 expired, arm 93 kept 6 until a newer proposal or a decision superseded them, one to
+--   eight ticks later, and 2 (made at ticks 108 and 138) until the run ended. Sixteen decisions differ, all section
+--   (5)'s and all on two cars, at ticks 127-129, 131-137 and 139-144: where arm 93 still held a proposal from an earlier
+--   tick it recorded that proposal's admit_service, refused for want of a bay (noop_no_candidate, hold_no_bay); arm 96,
+--   its proposal expired, recorded the fallback's hold_in_queue (task_start enacted 1,030 -> 1,046, noop_no_candidate
+--   53 -> 37). Either way the car waited. Every other atom agrees: the world fingerprint, the end state, commands,
+--   events, bookings, energy, SDRs, recalls, rules and arrivals. So on that pair it moved the record, not the world.
+--   No two arms of one cell, seed, engine and length straddle 35 minutes (the only such two, arms 3 and 9, both ran
+--   under it), so these observer pairs are the only measure, and the busy day was the case to fear: its two service
+--   bays are the wall (§5), and the proposer's order (must-do work, dwell, urgency, battery) is not the fallback's.
+--   Its pair, below, kept its world too. Two pairs say the expiries have not moved a world; they do not say one never
+--   will.
+--
+--   Who else it reaches. The certification pairs, not today: the recert runner's longest run in the 14 days to now was
+--   13.3 minutes (cron job 746), and no verdict in the ledger has disagreed on proposals or decisions alone. But a pair
+--   runs both arms in one transaction, so a pair longer than 35 minutes would fail on those two atoms with every outcome
+--   equal, its second arm first. Production, barely: each tick is its own transaction, so now() and clock_timestamp()
+--   differ by the tick's own running time, and the only difference is that a proposal whose 35 minutes end while a tick
+--   is running, before its disposer call, expires in that tick today and in the next one under now(). Of the 48
+--   functions in public, ottoq and twin that read clock_timestamp(), the disposer is the only one that lets the
+--   machine's clock into a fixed-tick run's decisions: the rest time latencies, bound an arm by a wall budget it records
+--   as `complete`, wait on or claim an external call (the energy MPC bridge, the agent chain), stamp a record, purge by
+--   age, or pace live playback (ottoq_sim_advance_tick_world's 1:1 mode, the live twin's noise floor in CLAUDE.md 2.5).
+--
+--   The research wing's dial pairs, one-sided. ottoq_dial_pair runs its two arms in one transaction too, the control (the
+--   dial at 0, arm A) first and the treatment (arm B) second, so both arms' proposals carry the pair's start, and the
+--   treatment runs on a clock that already holds the control's whole run. And the second arm is the slow one (§6): on
+--   the 8 pairs since 2026-10-09 the control ran 620-706 s and the treatment 1,586-2,290 s. All 8 ran past 35 minutes
+--   (2,206-2,996 s), on 7 of the 8 active experiments, and in every one the control expired none of its proposals and
+--   the treatment 3 to 18 (68 in all; query (41)). The 26 earlier pairs (2026-09-23 to 09-28) made no proposals. On
+--   pair 138 (fbced6a9, twin_operator_departures) the dial moved nothing: every metric delta reads 0, and the only atoms
+--   that moved are h_dec and h_prop, which is this defect alone. So those 8 pairs' deltas carry the treatment's
+--   expiries; on the observer pairs and on pair 138 the expiries moved no outcome, and on the other 7 pairs that is not
+--   measured. Nothing concludes on them unattended (automatic promotion has been off since 0540, and the dial window
+--   closed since 0485), so whoever reads those experiments' looks should read query (41) first.
+--
+--   The other face. In an arm under 35 minutes a proposal never goes stale: on arm 93 the proposal of tick 108 stayed
+--   pending 36 ticks, three sim-hours, until the run ended, and section (5) recorded the tick-126 and tick-130
+--   proposals' admit_service for 3 and 7 ticks after the proposer had moved on. Production's 35-minute backstop would
+--   have expired the first. 0122 chose this ("proposals no longer expire mid-pair"); 0333 undid it only for long arms.
+--
+--   The busy day, read when promise_busy's arm finished. Its transaction ran from 2:52:08 to 3:46:03 AM CT (arm 97,
+--   3,208 s), began 0.15 s after arm 96 was recorded, and passed 35 minutes at 3:27 AM CT. It expired 9 of its 60
+--   proposals, from tick 116, the first a proposal pending since tick 81; its partner, arm 82, ended 33.5 minutes
+--   after its first stamp and expired none, and kept that tick-81 proposal pending 63 ticks, to the run's end. Every
+--   outcome atom agrees with arm 82: the world fingerprint, end state, commands, events, bookings, energy, SDRs,
+--   recalls, rules and arrivals. The decisions agree through tick 116 and differ after it, on two cars: 49 of arm
+--   82's section (5) decisions recorded the service-priority proposal's admit_service, refused for want of a bay;
+--   arm 97 recorded the fallback's verdicts, 42 promote_ready (enacted; since 0469 that verdict sends no command, and
+--   the service flow's readiness gate is what releases a car) and 7 admit_service refused for want of a bay. Either way
+--   the cars waited. One more atom differs, the end state's calibration digest, and it is the database's, not the
+--   arm's: every arm run on 2026-10-17 (82-88) carries 58524fee and every arm run on 2026-10-18 (89-97) e509eab8. So
+--   the promise recorder is clear on the busy day as on the normal day, and two pairs, normal and busy, show the
+--   expiries moving the record and not the world. Compare promise arms, and any two arms of unequal wall time, on the
+--   outcome atoms, never on h_dec or h_prop; if an outcome differs, read its first differing tick against its first
+--   'ttl_elapsed' tick (query (40)). Pairs built on arm 84 (0743's and 0744's) carry its 3 expiries; arm 95 (0755's
+--   baseline) had none.
+--
+--   The fix, named: the disposer's three TTL tests read now(), as 0122 wrote them, and disposed_at keeps the machine's
+--   clock as 0333's audit stamp. That changes no arm that ended inside 35 minutes and no certification pair, and in
+--   production moves an expiry by at most one tick; a long arm then behaves as it would on a fast machine. Ageing a
+--   proposal on its run's own clock (the sim clock in the twin, the real one in production), which also ends the
+--   never-stale face, changes the decisions of every arm and is a certified change behind a dial.
 
 -- ══ QUERIES ══
 
@@ -1820,3 +1925,59 @@ SELECT x.arm, x.car_state, COALESCE(s2.stall_type::text, 'none') AS car_on, coun
   FROM x LEFT JOIN public.stalls s2 ON s2.id = x.car_stall
  WHERE x.car_state IN ('staged_awaiting_service', 'charge_complete_holding', 'arrived_at_gate', 'service_complete_holding')
  GROUP BY 1, 2, 3 ORDER BY 1, 4 DESC;
+
+-- (40) G473, §19: the arms that ran past 35 minutes of their own transaction, and what the disposer expired as
+--      'ttl_elapsed'; then per arm; then, for two arms of one seed (93 and 96 here; substitute any pair), the decisions
+--      that differ, counted per (tick, car, outcome, verb, engine). ran_at is stamped at the arm's end, and every
+--      proposal of an arm carries its transaction's start, so ran_at - min(created_at) is the arm's age at its end. The
+--      transaction of an arm in flight: select pid, xact_start, now() - xact_start from pg_stat_activity
+--      where query ilike '%ottoq_throughput_sweep_runner%'.
+WITH arm AS (
+  SELECT a.arm_id, a.ran_at, count(p.*) AS props, min(p.created_at) AS c0,
+         count(*) FILTER (WHERE p.disposition_reason = 'ttl_elapsed') AS ttl,
+         count(*) FILTER (WHERE p.disposition_reason = 'ttl_elapsed' AND p.disposed_at - p.created_at < interval '35 minutes') AS ttl_under_35
+    FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_external_proposals p ON p.sim_run_id = a.sim_run_id
+   GROUP BY a.arm_id, a.ran_at)
+SELECT (ran_at - c0 > interval '35 minutes') AS ran_past_35, (ttl > 0) AS expired_some, count(*) AS arms,
+       sum(props) AS proposals, sum(ttl) AS ttl_elapsed, sum(ttl_under_35) AS ttl_under_35,
+       string_agg(arm_id::text, ',' ORDER BY arm_id) FILTER (WHERE ttl = 0 AND ran_at - c0 > interval '35 minutes') AS past_35_none_expired
+  FROM arm GROUP BY 1, 2 ORDER BY 1, 2;
+
+SELECT a.arm_id, s.sweep_code, round(a.wall_s) AS wall_s, count(p.*) AS proposals, count(DISTINCT p.created_at) AS distinct_created_at,
+       round(extract(epoch FROM a.ran_at - min(p.created_at)) / 60.0, 1) AS minutes_first_stamp_to_end,
+       count(*) FILTER (WHERE p.disposition_reason = 'ttl_elapsed') AS ttl_elapsed,
+       min(p.tick_seq) FILTER (WHERE p.disposition_reason = 'ttl_elapsed') AS first_ttl_tick,
+       round(min(extract(epoch FROM p.disposed_at - p.created_at) / 60.0) FILTER (WHERE p.disposition_reason = 'ttl_elapsed'), 1) AS min_wall_min,
+       count(*) FILTER (WHERE p.disposition_reason = 'ttl_elapsed' AND p.disposed_tick = p.tick_seq) AS expired_in_birth_tick
+  FROM public.ottoq_throughput_sweep_arms a
+  JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
+  JOIN public.ottoq_external_proposals p ON p.sim_run_id = a.sim_run_id
+ GROUP BY a.arm_id, s.sweep_code, a.wall_s, a.ran_at
+ ORDER BY a.arm_id;
+
+WITH r AS (SELECT arm_id, sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id IN (93, 96)),
+d AS (SELECT r.arm_id, d.tick_seq, d.entity_id, d.action_context,
+             d.outcome_status || ':' || COALESCE(d.proposed_action ->> 'verb', '-') || '/'
+               || COALESCE(d.proposed_action ->> 'l2_engine', d.proposed_action ->> 'source', '-') || '->'
+               || COALESCE(d.enacted_action ->> 'verb', '-') AS k
+        FROM r JOIN public.ottoq_decisions d ON d.sim_run_id = r.sim_run_id),
+c AS (SELECT tick_seq, entity_id, action_context, k,
+             count(*) FILTER (WHERE arm_id = 93) AS n_first, count(*) FILTER (WHERE arm_id = 96) AS n_second
+        FROM d GROUP BY 1, 2, 3, 4)
+SELECT tick_seq, entity_id, action_context, k, n_first, n_second
+  FROM c WHERE n_first <> n_second ORDER BY tick_seq, entity_id, k;
+
+-- (41) G473, §19: each dial pair's proposals and 'ttl_elapsed' expiries, control (arm A, the dial at 0, run first) against
+--      treatment (arm B, run second in the same transaction), with each arm's own wall seconds and whether both arms'
+--      proposals carry one stamp.
+SELECT l.pair_id, e.experiment_id, e.param_key, e.status, l.ran_at, round(l.wall_s) AS pair_wall_s,
+       l.metrics_a ->> 'dial_value' AS dial_a, l.metrics_b ->> 'dial_value' AS dial_b,
+       l.metrics_a ->> 'wall_s' AS wall_a, l.metrics_b ->> 'wall_s' AS wall_b, l.moved,
+       (SELECT count(*) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_a) AS props_a,
+       (SELECT count(*) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_a AND p.disposition_reason = 'ttl_elapsed') AS ttl_a,
+       (SELECT count(*) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_b) AS props_b,
+       (SELECT count(*) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_b AND p.disposition_reason = 'ttl_elapsed') AS ttl_b,
+       (SELECT min(p.created_at) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_a)
+         = (SELECT min(p.created_at) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_b) AS one_stamp
+  FROM public.ottoq_dial_pair_ledger l JOIN public.ottoq_dial_experiments e ON e.experiment_id = l.experiment_id
+ ORDER BY l.ran_at;
