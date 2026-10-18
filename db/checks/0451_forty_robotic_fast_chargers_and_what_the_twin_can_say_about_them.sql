@@ -780,7 +780,11 @@
 --      at 40 robotic posts no car was seated in a bay in the tick its charge ended (0 of 81 and of 79 bay seats on arms 84
 --      and 95, against 4 of 66 and 7 of 71 at 10 posts, most of whose chargers have no arm), and 20-22 a run one tick
 --      later (37). About 20 charger-to-bay moves a day at 40 posts, 5 minutes each in the twin, 2 at production's
---      120-second tick: an upper bound of 1.7 car-hours of the twin's day. Built: nothing. The record's fix is (4b)
+--      120-second tick: an upper bound of 1.7 car-hours of the twin's day. The charge side meets it too: 30
+--      "confirm_commands: refused begin_charge" lines for 19 cars in the 24 hours to 3:30 AM CT, every one the arm
+--      interlock, a car sent to another post while its arm still held it. The one read in full (2d2c46af on arm 95) had
+--      its post fault (fault.thermal_emergency at 5:25 PM CT sim) and, re-queued as rule 9 asks, finished on the next post
+--      a tick later; the other 29 are not traced. Built: nothing. The record's fix is (4b)
 --      passing over a held car as (4) does; the tick's is the bay-side twin of G449's first-tick candidate (book the bay
 --      from the release, move the car when the arm lets go).
 --   Seen on the way, not traced: on arm 95 a staging stall named a car still en_route_to_depot, its own pointer empty, 157
