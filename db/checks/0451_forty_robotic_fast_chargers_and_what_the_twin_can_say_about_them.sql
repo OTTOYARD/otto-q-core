@@ -560,7 +560,7 @@
 
 -- ══ §15 THE NIGHT'S ARMS: THE FIRST READING, THE TICK AND THE COMMAND LAG (G448-G450; reproduce: (3b), (12), (30)) ══
 --
---   Read 2026-10-18 between 1:38 and 2:25 AM CT from the seven arms the runner finished from 11:38 PM to 1:55 AM CT
+--   Read 2026-10-18 between 1:38 and 2:33 AM CT from the seven arms the runner finished from 11:38 PM to 1:55 AM CT
 --   (arms 89-95, all complete, none errored). Seed 1 throughout, so each pair is one reading.
 --
 --   0733, the first reading (arm 89 against arm 85: the normal day, forty posts behind 2.4 MW of shared cabinets held at
@@ -615,6 +615,10 @@
 --   recalls (J_ota_wave, 65 and 53 of the due visits); about half began on an L2 in both arms (35 of 63 and 26 of 54
 --   on a fast charger, against 41.5% and 42.7% of the others: G277's ordering question, under 0548's test), and in tick
 --   their charge ran a mean 116 minutes against 107 as the fast chargers ran busier (76% against 69%).
+--   And every HW.005 refusal on the 14 arms 82-95 (15-46 an arm) is the one Zoox G313 names, 229f655b, stranded by two
+--   scheduler tasks left in_progress since 2026-06-04: on arm 93 both service bays sat idle from 7:35 AM CT to at least
+--   8:55 while it was refused a service start 21 times. Its fix, 0603, has waited for Chase at the connector since
+--   2026-10-02; every pair here carries the car on both sides, so the comparisons stand.
 --
 --   What it changes. The lag had two costs in opposite directions (G450), and they fell on different post counts. Ten
 --   and twenty posts queue for chargers and lost each handover's second tick: removing it bought them 10.7 and 29.2
