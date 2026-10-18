@@ -3,7 +3,7 @@
 --        0724's and 0725's overnight sweeps, beside five things found on the way: the twin's power model (§2), busy_day's
 --        wall (§5), why every overnight arm gets ten times slower as its day goes on (§6), cars with no charge facts
 --        (§7), and two latent rule-9 regressions in dormant certification arms (§8).
---        -> G443-G447; later sections G448-G459, and G468-G469 (§16, §17).
+--        -> G443-G447; later sections G448-G459, G468-G469 (§16, §17) and G471-G472 (§18).
 --        Read-only throughout, against gxdrcyphqjzjsuhxuqtg, 2026-10-17 from 05:51:42 UTC (the first query's now()).
 --        Arms' own rows are cited by arm_id and sim_run_id; every number below names the query that reproduces it.
 --
@@ -695,6 +695,91 @@
 --   A five-minute window is not a 30-consecutive-minute mean. Built as 0754 (PENDING): a half hour counts only when its
 --   window holds 30 minutes of samples, for every arm scored after it lands; stored arms keep their numbers, and query (33)
 --   recomputes any arm whose run is still on record.
+
+-- ══ §18 THE WASH LINE IN TICK, THE CALENDAR'S PARKED CARS AND THE CARS THE ARM STILL HOLDS (G457, G458, G460, G471,
+--        G472; reproduce: (21), (22), (26), (29), (35)-(39)) ═════════════════════════════════════════════════════════════
+--
+--   Read 2026-10-18 between 2:40 and 3:15 AM CT from §15's six normal-day arms (seed 1, 12 hours, 5-minute tick), 83, 86
+--   and 84 under the lag against 93, 94 and 95 in tick, at 10, 20 and 40 posts, and from the server log (postgres_logs,
+--   the 24 hours to 3:15 AM CT). One seed: single readings, not ranges.
+--
+--                                                 10 posts            20 posts            40 posts
+--                                                 83 -> 93            86 -> 94            84 -> 95
+--     wash seat's timer, p10 = p50 = p90 (min)    4.0 -> 9.0          4.0 -> 9.0          4.0 -> 9.0           (38)
+--     detail seat's timer, p50 (min)              20.0 -> 25.0        20.0 -> 25.0        20.0 -> 25.0
+--     wash seated after its booking began (min)   5.0 -> 0.1          4.9 -> 0.0          4.9 -> 0.0
+--     wash-bay seats (after a charge)             52 (48) -> 56 (54)  57 (52) -> 61 (60)  68 (66) -> 67 (65)   (21)
+--     charge end to wash seat, p50 / p90 (min)    12.5/46.5 -> 15/63.5  15/84.5 -> 20/101.5  22.5/172.5 -> 15/160
+--       longest (min)                             100 -> 102          170 -> 445          421 -> 335
+--     bay-ticks empty while a car waited          144 -> 144          174 -> 165          159 -> 157          (22)
+--       with no booking on the bay                130 -> 132          159 -> 136          130 -> 130
+--     two bays washing, cars staged, no walk-in   26 -> 34            28 -> 53            51 -> 53            (29)
+--     walk-in wash refusals for space (cars)      11 (7) -> 4 (2)     52 (12) -> 74 (15)  146 (25) -> 102 (14) (26)
+--       a bay held only by no-shows               4 -> 2              35 -> 68            96 -> 41
+--
+--   1. G460's half that was the lag, confirmed. In tick every wash seat ran its 9-minute booking (p10 = p90 = 9.0 on all
+--      three arms, against 4.0 under the lag), every detail seat its 25 (p50), and a car was seated within 0.1 minutes of
+--      its booking's start (against 4.9-5.0). So the wash measured at forty posts under the lag (G457, G458) ran about
+--      2.25 times as fast as the twin's crews; in tick it runs at their mean. The other half stands: the timer is the
+--      booking's and nothing varies (p10 = p90), so the crews' 0.7-1.3x draw reaches no seat, which is 0746's to change.
+--      A few seats on every arm run past their booking (3 detail and 1 wash on arm 93, timers to 23 minutes past), with
+--      the seat stamped later than its event; no bay held two cars on any of the six arms (query (38)'s second part, over
+--      the 442 of 468 seats a live booking covers; a first pass that also read superseded bookings found one pair on arm
+--      86, and it was a superseded booking).
+--   2. The line read worse where the chargers queue and better where they do not, against "should read worse". From a
+--      charge's end to its wash seat the p90 rose 17 minutes at 10 and at 20 posts and fell 12.5 at 40; more cars reached
+--      the wash at 10 and 20 posts (54 and 60 after a charge, against 48 and 52), fewer at 40 (65 against 66; §15 has 205
+--      cars served against 215). At 40 posts the refusals for space fell 146 -> 102 and those blocked only by no-shows 96
+--      -> 41; at 20 posts they rose, 52 -> 74 and 35 -> 68. Not traced further.
+--   3. The empty bays were not the walk. G458 guessed part of its 130-159 empty-and-free bay-ticks were "the walk from
+--      charger to bay, a tick a step". In tick that tick is gone and the count did not move (130 -> 132, 159 -> 136, 130
+--      -> 130). Query (35) splits the bay-ticks with nothing booked while a car waited (132 -> 134, 160 -> 141, 132 ->
+--      134) by the lane at that tick: with two bays washing, the staff cap's (two wash supervisors for three bays), 42 ->
+--      60, 50 -> 83, 91 -> 80; with fewer washing and no waiting car staged, 23 -> 13, 35 -> 3, 2 -> 4; with fewer washing
+--      and a waiting car staged, 67 -> 61, 75 -> 55, 39 -> 50. On arm 95 those last 50 fell at 24 ticks: 5 with no walk-in
+--      tried, and 19 with walk-ins refused for space or by the arm interlock (point 5), 5 of them seating a car in another
+--      bay. And the calendar's own door is shut to a parked car (point 4). In tick the cap binds longer
+--      because each seat now holds its supervisor its full booking: two washing with cars staged and no walk-in tried, 26
+--      -> 34, 28 -> 53 and 51 -> 53 five-minute ticks (29).
+--   4. G471: the calendar cannot seat a car parked in staging. ottoq_activate_due_bay_reservations moves a car's stall to
+--      its bay and stamps it in_wash_bay (or in_detail_bay, in_service_bay) in one statement. Freeing its old stall, the
+--      triggers then see a car in a bay leaving a stall: trg_reassignment_guard asks ottoq_indepot_reassignment_guard,
+--      which defers an 'automated_reassignment' at its catch-all, and puts the stall's pointer back, so the bay's claim on
+--      the car trips idx_stalls_one_vehicle_per_stall (23505) and the call ends, every seat that tick with it. A charger
+--      is spared (the guard's 0547 clause frees a charger its car has left for a bay), a staging stall or a service bay
+--      is not. The server log has 235 such calls in the 24 hours to 3:15 AM CT, every one "sqlstate=23505 ...
+--      idx_stalls_one_vehicle_per_stall": 46 on arm 94 (e8b068d2), 30 on arm 95, 27 on arm 87, 19 on arm 88, 18 on arm
+--      85, 15 each on arms 86, 89, 90 and 91, 14 on arm 93 and on the promise arm 96 (eb953ed6), 7 on arm 92. That is
+--      0743 §1's "something else also ended the call". Every wash or service no-show whose car was idle in the depot at its slot had the car
+--      staged_awaiting_service on a staging stall (39): 1 on arm 83, 3 on 84, 6 on 95. The car's own reservation also
+--      bars it from section (4b), which needs the bay free for the whole job, so such a car waits for its reservation to
+--      lapse before any door takes it. The committed record shows none of this: the call rolls back, the gate's pending
+--      approval with it, and the log line names neither car nor booking. Reproduced on the live bodies with the three
+--      live BEFORE UPDATE triggers on stalls and the gate (tests/test_bay_activation_frees_parking_sql.py; 0743's test
+--      world leaves them out, and there the same car is seated; 0743's 5:07 PM CT reproduction on live cleared both cars'
+--      stall pointers and ran with no run live, and the guard consults the gate only while a run is 'running' at the
+--      depot, as a production session's is). Built as 0755 (PENDING, after 0743): under a dial, the
+--      car's stall moves first, while it is still holding, and only then is it stamped in its bay, as (4b)'s door already
+--      does it. That also frees a charger a spent tether still names. Its arm pairs with arm 95.
+--   5. G472: the walk-in path asks for cars the arm still holds. 14-26 wash and 6-24 service walk-ins an arm were refused
+--      with reason 'exception' (36), lagged and in tick alike. Each is the arm interlock: the car's charge stopped in
+--      that tick, the robotic arm is unlatching it (11.5 sim-seconds), section (4b) asks ottoq_enact_space_assignment to
+--      move it, the interlock raises (P0001), and the assignment's catch-all returns 'exception' with the SQLSTATE only;
+--      the message ("arm interlock: vehicle ... is held by the arm at stall ... (... demate/unlatch) — refusing to move
+--      it") reaches only the server log. On arm 95 all 35 were cars whose charge ended that tick. Section (4) passes over
+--      such a car (0011-TETHER); (4b) reads only staged cars, and the twin stages a robotic charger's car in the tick its
+--      charge stops, still on the charger and still held (car 2d2c46af on arm 95: unlatch, charge_complete_holding and
+--      staged_awaiting_service at 6:10:00 AM CT sim; the arm's 'clear' and the car's release from the charger at 6:15:00).
+--      A refusal costs no bay (the lane's headroom is spent only on a seat) and the car could not have moved, so the cost
+--      is the record: a safety interlock doing its job is filed as an exception. And the unlatch costs the car a tick:
+--      at 40 robotic posts no car was seated in a bay in the tick its charge ended (0 of 81 and of 79 bay seats on arms 84
+--      and 95, against 4 of 66 and 7 of 71 at 10 posts, most of whose chargers have no arm), and 20-22 a run one tick
+--      later (37). About 20 charger-to-bay moves a day at 40 posts, 5 minutes each in the twin, 2 at production's
+--      120-second tick: an upper bound of 1.7 car-hours of the twin's day. Built: nothing. The record's fix is (4b)
+--      passing over a held car as (4) does; the tick's is the bay-side twin of G449's first-tick candidate (book the bay
+--      from the release, move the car when the arm lets go).
+--   Seen on the way, not traced: on arm 95 a staging stall named a car still en_route_to_depot, its own pointer empty, 157
+--   times for one tick each (98 cars): the arrival's stall is pointed before the car arrives.
 
 -- ══ QUERIES ══
 
@@ -1579,3 +1664,150 @@ SELECT a.arm_id, a.cell_code, e.action_context, count(*) AS refused,
   FROM arms a JOIN public.ottoq_rule_evaluations e ON e.sim_run_id = a.sim_run_id
  WHERE e.rule_code = 'EN.001.grid_capacity_ceiling' AND NOT e.passed
  GROUP BY 1, 2, 3 ORDER BY 1, 3;
+
+-- (35) G458, §18 point 3: each five minutes on one run (arm 95 here; substitute the run), the wash bays with nothing booked
+--      on them while a car waited (its charge ended, its wash seat later), by the lane at that tick: two bays washing
+--      (the staff cap), fewer washing with no waiting car staged, fewer washing with a waiting car staged. Each waiting
+--      car's state is read from its own state-change events as intervals, so the query reads each car's events once.
+WITH p AS (SELECT '12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid AS run),
+bays AS (SELECT s.id FROM public.stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'wash_bay'),
+bk AS (SELECT b.* FROM public.ottoq_stall_bookings b, p WHERE b.sim_run_id = p.run AND b.stall_id IN (SELECT id FROM bays)),
+wq AS (SELECT b.vehicle_id, lower(b.during) AS seat_at,
+              (SELECT max(o.ended_at) FROM public.ocpp_sessions o, p WHERE o.vehicle_id = b.vehicle_id AND o.sim_run_id = p.run AND o.ended_at <= lower(b.during)) AS charge_end
+         FROM bk b WHERE b.state IN ('done', 'active', 'interrupted') AND b.booked_by LIKE 'otto_q%'),
+ev AS (SELECT e.entity_id AS vehicle_id, e.sim_clock_at AS t0,
+              lead(e.sim_clock_at, 1, 'infinity') OVER (PARTITION BY e.entity_id ORDER BY e.sim_clock_at, e.event_seq) AS t1,
+              e.payload -> 'diff' -> 'current_state' ->> 'to' AS st
+         FROM public.ottoq_events e, p
+        WHERE e.sim_run_id = p.run AND e.event_type = 'vehicle.state_changed' AND e.payload -> 'diff' ? 'current_state'
+          AND e.entity_id IN (SELECT vehicle_id FROM wq)),
+grid AS (SELECT g AS t FROM generate_series('2026-09-01 11:00+00'::timestamptz, '2026-09-01 22:55+00', interval '5 min') g),
+occ AS (SELECT g.t,
+               (SELECT count(DISTINCT bk.stall_id) FROM bk WHERE bk.state IN ('done', 'active', 'interrupted') AND bk.during @> g.t) AS washing,
+               (SELECT count(DISTINCT bk.stall_id) FROM bk WHERE (bk.state IN ('done', 'active', 'interrupted')
+                        OR (bk.state IN ('released', 'superseded') AND COALESCE(bk.released_at, 'infinity') > g.t)) AND bk.during @> g.t) AS held_any
+          FROM grid g),
+wst AS (SELECT o.t, o.washing, o.held_any, wq.vehicle_id, ev.st
+          FROM occ o JOIN wq ON wq.charge_end <= o.t AND wq.seat_at > o.t
+          LEFT JOIN ev ON ev.vehicle_id = wq.vehicle_id AND ev.t0 <= o.t AND ev.t1 > o.t),
+pt AS (SELECT t, max(washing) AS washing, max(held_any) AS held_any,
+              count(DISTINCT vehicle_id) FILTER (WHERE st = 'staged_awaiting_service') AS staged
+         FROM wst GROUP BY t)
+SELECT sum(3 - held_any) AS free_bay_ticks_while_waiting,
+       sum(3 - held_any) FILTER (WHERE washing >= 2) AS two_washing,
+       sum(3 - held_any) FILTER (WHERE washing < 2 AND staged = 0) AS under_two_none_staged,
+       sum(3 - held_any) FILTER (WHERE washing < 2 AND staged > 0) AS under_two_some_staged
+  FROM pt;
+
+-- (36) G472, §18 point 5: section (4b)'s walk-ins refused because the assignment raised, per arm, by SQLSTATE; and whether
+--      the car's charge ended in that very tick. The message is not on the row: ottoq_enact_space_assignment's catch-all
+--      returns the SQLSTATE only, and the message reaches the server log, read there with
+--        select timestamp, event_message from logs where source = 'postgres_logs'
+--         and event_message like '%ottoq_enact_space_assignment: FAILED%' order by timestamp desc
+--      (and, for G471's calendar, '%ottoq_activate_due_bay_reservations: FAILED%'), while the log is retained.
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93),
+                               ('e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid, 94), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95))
+SELECT r.arm, d.proposed_action ->> 'stall_type' AS stall_type, d.enacted_action ->> 'sqlstate' AS sqlstate, count(*) AS refusals,
+       count(DISTINCT d.entity_id) AS cars,
+       count(*) FILTER (WHERE (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                                WHERE o.sim_run_id = r.run AND o.vehicle_id = d.entity_id AND o.ended_at <= d.sim_clock) = d.sim_clock)
+         AS charge_ended_that_tick
+  FROM runs r JOIN public.ottoq_decisions d ON d.sim_run_id = r.run
+ WHERE d.action_context = 'task_start' AND d.proposed_action ->> 'source' = 'needs_card'
+   AND d.enacted_action ->> 'verb' = 'hold_no_space' AND d.enacted_action ->> 'reason' = 'exception'
+ GROUP BY 1, 2, 3 ORDER BY 2, 1;
+
+-- (37) G472, §18 point 5: each wash or service bay seat by the minutes from its car's last charge end: in that tick, one
+--      tick later, two, or more.
+WITH runs(run, arm) AS (VALUES ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95),
+                               ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93)),
+seat AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS seat_at
+           FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run JOIN public.stalls s ON s.id = b.stall_id
+          WHERE s.stall_type IN ('wash_bay', 'service_bay') AND b.state IN ('done', 'active', 'interrupted') AND b.booked_by LIKE 'otto_q%'),
+x AS (SELECT seat.*, (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                       WHERE o.sim_run_id = seat.run AND o.vehicle_id = seat.vehicle_id AND o.ended_at <= seat.seat_at) AS charge_end FROM seat)
+SELECT arm, count(*) AS bay_seats,
+       count(*) FILTER (WHERE seat_at = charge_end) AS in_the_charge_end_tick,
+       count(*) FILTER (WHERE seat_at - charge_end > interval '0' AND seat_at - charge_end <= interval '5 min') AS one_tick_later,
+       count(*) FILTER (WHERE seat_at - charge_end > interval '5 min' AND seat_at - charge_end <= interval '10 min') AS two_ticks_later,
+       count(*) FILTER (WHERE seat_at - charge_end > interval '10 min') AS later,
+       count(*) FILTER (WHERE charge_end IS NULL) AS no_charge_before
+  FROM x GROUP BY arm ORDER BY arm;
+
+-- (38) G460, §18 point 1: each bay seat's timer, from the seat's own state-change event, against the booking that covers
+--      it (db/checks/0452 queries (1) and (2), per arm); then any bay that held two cars at once. A seat whose event
+--      carries no last_state_change is counted in n and timed by neither column.
+WITH runs(sim_run_id, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                                      ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93),
+                                      ('e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid, 94), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95)),
+seats AS (
+  SELECT r.arm, e.sim_run_id, e.entity_id AS vehicle_id, e.payload->'diff'->'current_state'->>'to' AS bay,
+         (e.payload->'diff'->'last_state_change'->>'to')::timestamptz AS seat_at,
+         (e.payload->'diff'->'config'->'to'->>'service_ends_at')::timestamptz AS ends_at
+    FROM ottoq_events e JOIN runs r ON r.sim_run_id = e.sim_run_id
+   WHERE e.event_type = 'vehicle.state_changed'
+     AND e.payload->'diff'->'current_state'->>'to' IN ('in_wash_bay','in_detail_bay','in_service_bay')
+     AND e.payload->'diff'->'config'->'to' ? 'service_ends_at'),
+j AS (SELECT s.*, extract(epoch from s.ends_at - s.seat_at)/60.0 AS timer_min,
+             extract(epoch from s.seat_at - lower(b.during))/60.0 AS seat_after_book_lo,
+             extract(epoch from upper(b.during) - lower(b.during))/60.0 AS booked_min,
+             (upper(b.during) = s.ends_at) AS ends_at_booking_end
+        FROM seats s LEFT JOIN LATERAL (
+          SELECT b.* FROM ottoq_stall_bookings b
+           WHERE b.sim_run_id = s.sim_run_id AND b.vehicle_id = s.vehicle_id AND b.purpose IN ('wash','detail','service')
+             AND b.during @> s.seat_at ORDER BY lower(b.during) DESC LIMIT 1) b ON true)
+SELECT arm, bay, count(*) n,
+  round(avg(timer_min)::numeric,1) timer_mean, round(percentile_cont(0.1) within group (order by timer_min)::numeric,1) p10,
+  round(percentile_cont(0.5) within group (order by timer_min)::numeric,1) p50,
+  round(percentile_cont(0.9) within group (order by timer_min)::numeric,1) p90,
+  round(avg(booked_min)::numeric,1) booked_mean, count(*) FILTER (WHERE ends_at_booking_end) ends_at_booking_end,
+  round(avg(seat_after_book_lo)::numeric,1) mean_seat_after_booking_start
+FROM j GROUP BY 1,2 ORDER BY 2,1;
+
+WITH runs(sim_run_id, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                                      ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93),
+                                      ('e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid, 94), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95)),
+seats AS (
+  SELECT r.arm, e.sim_run_id, e.entity_id AS vehicle_id,
+         COALESCE((e.payload->'diff'->'last_state_change'->>'to')::timestamptz, e.sim_clock_at) AS seat_at
+    FROM ottoq_events e JOIN runs r ON r.sim_run_id = e.sim_run_id
+   WHERE e.event_type = 'vehicle.state_changed'
+     AND e.payload->'diff'->'current_state'->>'to' IN ('in_wash_bay','in_detail_bay','in_service_bay')
+     AND e.payload->'diff'->'config'->'to' ? 'service_ends_at'),
+st AS (
+  SELECT s.*, (SELECT min(e2.sim_clock_at) FROM ottoq_events e2
+                WHERE e2.sim_run_id = s.sim_run_id AND e2.entity_id = s.vehicle_id AND e2.event_type = 'vehicle.state_changed'
+                  AND e2.payload->'diff' ? 'current_state' AND e2.sim_clock_at > s.seat_at) AS left_at, b.stall_id
+    FROM seats s LEFT JOIN LATERAL (
+      SELECT b.stall_id FROM ottoq_stall_bookings b
+       WHERE b.sim_run_id = s.sim_run_id AND b.vehicle_id = s.vehicle_id AND b.purpose IN ('wash','detail','service')
+         AND b.state IN ('active', 'done', 'interrupted') AND b.during @> s.seat_at
+       ORDER BY lower(b.during) DESC LIMIT 1) b ON true)
+SELECT a.arm, count(*) AS bays_holding_two_cars
+  FROM st a JOIN st b ON b.arm = a.arm AND b.stall_id = a.stall_id AND b.vehicle_id <> a.vehicle_id
+       AND b.seat_at > a.seat_at AND b.seat_at < a.left_at
+ GROUP BY a.arm ORDER BY a.arm;
+
+-- (39) G471, §18 point 4: the wash and service no-shows whose car was idle in the depot at its slot, by the car's state
+--      and the kind of stall it was on, both from its own state-change events.
+WITH runs(run, arm) AS (VALUES ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95),
+                               ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93)),
+ns AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS lo
+         FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run JOIN public.stalls s ON s.id = b.stall_id
+        WHERE s.stall_type IN ('wash_bay', 'service_bay') AND b.state = 'released'
+          AND b.release_reason IN ('no_show_grace_elapsed', 'window_elapsed')),
+x AS (SELECT ns.*,
+             (SELECT e.payload -> 'diff' -> 'current_state' ->> 'to' FROM public.ottoq_events e
+               WHERE e.sim_run_id = ns.run AND e.entity_id = ns.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                 AND e.payload -> 'diff' ? 'current_state' AND e.sim_clock_at <= ns.lo
+               ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS car_state,
+             (SELECT (e.payload -> 'diff' -> 'current_stall_id' ->> 'to')::uuid FROM public.ottoq_events e
+               WHERE e.sim_run_id = ns.run AND e.entity_id = ns.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                 AND e.payload -> 'diff' ? 'current_stall_id' AND e.sim_clock_at <= ns.lo
+               ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS car_stall
+        FROM ns)
+SELECT x.arm, x.car_state, COALESCE(s2.stall_type::text, 'none') AS car_on, count(*) AS no_shows
+  FROM x LEFT JOIN public.stalls s2 ON s2.id = x.car_stall
+ WHERE x.car_state IN ('staged_awaiting_service', 'charge_complete_holding', 'arrived_at_gate', 'service_complete_holding')
+ GROUP BY 1, 2, 3 ORDER BY 1, 4 DESC;

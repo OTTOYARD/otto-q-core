@@ -660,6 +660,23 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_arm_half_hour_sql.py
 
+      # 0755, on 0743's body, EXECUTED with the stall triggers a car's move fires, as live (tests/fixtures/
+      # bay_activation_guard_stub.sql, md5 asserted, on top of 0743's fixture): on the live bodies the bay calendar cannot
+      # seat a car parked on a staging stall or leaving a service bay (the reassignment guard keeps its old stall and the
+      # one-stall index refuses the seat, 23505), with or without 0743's dial; 0755 needs 0743 and refuses any other body;
+      # at its dial's default nothing changes; with the dial the parked car is seated, its parking freed and the gate never
+      # asked; the arm interlock still refuses a car the arm holds; a spent tether no longer pins its charger; the guard
+      # still keeps a car mid-work. 16 tests, about 12 seconds.
+      - name: A parked car leaves its stall before the bay calendar seats it, executed (0755 on 0743)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_bay_activation_frees_parking_sql.py
+
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
       # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry
