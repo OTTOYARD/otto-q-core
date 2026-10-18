@@ -798,7 +798,9 @@ repo_manifest(version, name, file) AS (
     ('20261017185512'::text, 'a_promise_stays_honest_while_the_car_waits'::text, '0742_a_promise_stays_honest_while_the_car_waits.sql'::text),
     ('PENDING'::text, 'the_bay_calendar_seats_each_car_on_its_own'::text, '0743_the_bay_calendar_seats_each_car_on_its_own.sql'::text),
     ('PENDING'::text, 'a_bay_hold_follows_a_charge_that_runs_past_its_plan'::text, '0744_a_bay_hold_follows_a_charge_that_runs_past_its_plan.sql'::text),
-    ('PENDING'::text, 'the_itinerary_plans_each_charge_on_a_charger_the_depot_has'::text, '0745_the_itinerary_plans_each_charge_on_a_charger_the_depot_has.sql'::text)
+    ('PENDING'::text, 'the_itinerary_plans_each_charge_on_a_charger_the_depot_has'::text, '0745_the_itinerary_plans_each_charge_on_a_charger_the_depot_has.sql'::text),
+    ('PENDING'::text, 'robotic_wash_lanes_and_bay_work_timed_by_the_work'::text, '0746_robotic_wash_lanes_and_bay_work_timed_by_the_work.sql'::text),
+    ('PENDING'::text, 'the_bay_line_serves_the_car_that_rejoins_service_soonest'::text, '0747_the_bay_line_serves_the_car_that_rejoins_service_soonest.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
