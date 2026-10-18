@@ -559,7 +559,7 @@
 
 -- ══ §15 THE NIGHT'S ARMS: THE FIRST READING, THE TICK AND THE COMMAND LAG (G448-G450; reproduce: (3b), (12), (30)) ══
 --
---   Read 2026-10-18 between 1:38 and 2:01 AM CT from the seven arms the runner finished from 11:38 PM to 1:55 AM CT
+--   Read 2026-10-18 between 1:38 and 2:18 AM CT from the seven arms the runner finished from 11:38 PM to 1:55 AM CT
 --   (arms 89-95, all complete, none errored). Seed 1 throughout, so each pair is one reading.
 --
 --   0733, the first reading (arm 89 against arm 85: the normal day, forty posts behind 2.4 MW of shared cabinets held at
@@ -606,7 +606,10 @@
 --     charge wait p95 floor (min)          125 -> 110.5      105 -> 95         82.5 -> 72.5
 --     due cars on time                     6 of 54 -> 3/42   5 of 59 -> 2/53   8 of 72 -> 4/65
 --   Every car left at 100% with nothing open on all six. On-time is a handful either way (§12), and a bay seat now runs
---   its booked length, so a due car with bay work leaves later than it did.
+--   its booked length, so a due car with bay work leaves later than it did. At ten posts the due cars are the OTA wave's
+--   recalls (J_ota_wave, 65 and 53 of the due visits); about half began on an L2 in both arms (35 of 63 and 26 of 54
+--   on a fast charger, against 41.5% and 42.7% of the others: G277's ordering question, under 0548's test), and in tick
+--   their charge ran a mean 116 minutes against 107 as the fast chargers ran busier (76% against 69%).
 --
 --   What it changes. The lag had two costs in opposite directions (G450), and they fell on different post counts. Ten
 --   and twenty posts queue for chargers and lost each handover's second tick: removing it bought them 10.7 and 29.2
