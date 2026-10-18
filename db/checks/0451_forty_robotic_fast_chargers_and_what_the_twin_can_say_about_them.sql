@@ -470,6 +470,11 @@
 --   waited, which brings the normal days close to honest and leaves the busy days poor, and says it does not know when a
 --   car has waited longer than any its history holds. Both promise arms now re-estimate every promised car every 30
 --   sim-minutes, with the owner app's time beside it; query (20) grades that second look.
+--   CHECKED 2026-10-18 between 3:25 and 3:26 AM CT: promise_normal's arm 96 (eb953ed6) is complete, no error: 208 promises for 208 visits,
+--   all with 128 draws, the world seed and owner_read true (an owner time on 191), and 929 re-estimates, owner_read true on
+--   all (charging 680, after_charge 143, in_line 76, unplanned 23, no_charge 7; 1 beyond history). Its wall time was
+--   3,338 s against its partner arm 93's 1,700 s: the recorder and its re-estimates did not add minutes, they nearly
+--   doubled the arm. promise_busy had no arm yet.
 
 -- ══ §13 THE WASH IS THE NEXT LINE, AND THE BAY CALENDAR SEATS ALL OR NONE (G457, G458, G453; reproduce: (21)-(25)) ════
 --

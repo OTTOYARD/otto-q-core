@@ -43,6 +43,10 @@
 --           the car the bay; the stamp that follows changes no stall, so they do nothing more.
 --       The arm interlock fires on the first statement exactly as it fired on the one before (it watches the stall), so a
 --       car the arm still holds is refused as before, and 0743's dial still passes over it.
+--       The live triggers on vehicles were read (2026-10-18 between 3:26 and 3:27 AM CT): of the seven, only the arm interlock can raise,
+--       and trg_ottoq_vehicles_state_change probes the shield only when current_state changes, so the stall-only
+--       statement adds one signed event per seat and no rule evaluation, and the state's own triggers fire once, on the
+--       second statement, as they fired on the one before.
 --   (c) Sweep bayfree_normal_2026_10_18: arm 95's cell (answer_normal_2026_10_17 / dcfc40.otto_q.answer_in_tick, the
 --       twin answering in the tick) with the dial, its seeds copied by SQL, priority 16, budget 3,000 s.
 --   Not changed: which cars the calendar seats or when, the guard, the in-depot gate, the triggers, sections (4), (4b)
