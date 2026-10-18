@@ -597,6 +597,21 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_bay_exit_closes_its_leg_sql.py
 
+      # 0751, the twin technician's verdict loop patched as the migration patches it and EXECUTED from its live body and
+      # the twin's live seeded draw (tests/fixtures/opportunistic_scan_stub.sql, md5 asserted): at a depot the twin feeds
+      # the draw still decides and enacts; at a depot a real feed drives a question nobody answered stays pending and
+      # nothing moves, and a person's verdict is applied in their name; the expiry sweep runs in both modes. The patch's
+      # replay to its pre-image is its V1, run in the test's setup. 8 tests, about 5 seconds.
+      - name: In production only a person answers a technician's question, executed (0751)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_production_technician_sql.py
+
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
       # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry
