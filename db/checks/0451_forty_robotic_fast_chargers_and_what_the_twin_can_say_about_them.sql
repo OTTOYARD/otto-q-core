@@ -962,7 +962,15 @@
 --   dial an interrupted booking reopens only what no such completion credited, so the wash it had stays done (at the
 --   default it is reopened, as on arm 88). Why the twin washed a car booked for a detail 2.4 minutes before its window,
 --   in the bay the detail held, is noted, not traced. 0757 sets the dial on the robowash and uptimefirst cells, controls
---   included, before their first arm. The fallback's record is named, not built: section (5) files a promote_ready with must-do work
+--   included, before their first arm.
+--
+--   Two notes for whoever counts these later (read between 5:09 and 5:12 AM CT). The booking reads 'released' today, not
+--   'interrupted': at a run's end public.ottoq_sim_release_depot moves every interrupted booking to 'released', keeping
+--   its released_at and release_reason (0459, G192), so after a run count interruptions by release_reason
+--   ('bay_exit_before_planned_end') or by the ottoq.booking_interrupted events, never by state. And the booked-minutes
+--   test has one other caller, ottoq.ottoq_release_expired_bookings, which closes a booking only once its whole window
+--   has passed (upper(during) <= clock), so its actual equals its planned and it can never call a seat short (its own
+--   comment says so, and the predicate proves it); 0757 leaves it as it is. The fallback's record is named, not built: section (5) files a promote_ready with must-do work
 --   deferred as enacted.
 
 -- ══ QUERIES ══
