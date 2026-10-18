@@ -341,7 +341,8 @@
 --      (a) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
 --          site controller's limit in the charge start's context, and the controller itself). On the managed arm it
 --          removed every refusal of the shared arm's kind (the meter under the cap and each car's full rating on top:
---          all 84 there);
+--          all 84 there). CORRECTED 2026-10-18 (§15, G470): the seat assignment needs the same limit in its context, or
+--          it refuses at the cap what the start would share (73 seats in the opening's three ticks on arm 89);
 --      (b) the battery plans for the bill that is charged, and is ready for the surges OTTO-Q itself schedules: it
 --          charged at 425 kW in the tick the fleet plugged in, shaved one tick late, and idled all afternoon (G447);
 --      (c) one answer for how much power a car can take (G443: twelve cars, four answers);
@@ -559,7 +560,7 @@
 
 -- ══ §15 THE NIGHT'S ARMS: THE FIRST READING, THE TICK AND THE COMMAND LAG (G448-G450; reproduce: (3b), (12), (30)) ══
 --
---   Read 2026-10-18 between 1:38 and 2:18 AM CT from the seven arms the runner finished from 11:38 PM to 1:55 AM CT
+--   Read 2026-10-18 between 1:38 and 2:25 AM CT from the seven arms the runner finished from 11:38 PM to 1:55 AM CT
 --   (arms 89-95, all complete, none errored). Seed 1 throughout, so each pair is one reading.
 --
 --   0733, the first reading (arm 89 against arm 85: the normal day, forty posts behind 2.4 MW of shared cabinets held at
@@ -568,8 +569,12 @@
 --   kW against 2,160, and 84 of them before 7 AM CT. The pool bound in 4 ticks against 1. The day barely moved: 211 cars
 --   served against 207, 946.8 deployed car-hours against 941.8, the charge wait's p50 and p95 10 and 90 minutes on both,
 --   7 of 74 due cars on time against 4 of 66, and every car left at 100% with nothing open on both. So every refusal of
---   G448's kind was the twin's first reading, and a held site loses nothing to the shield once its meter reads what a
---   site controller gives a car it has just connected.
+--   G448's kind was the twin's first reading. But the shield's refusals did not all go: they moved to the decide's seat
+--   assignment (EN.001 at stall_assignment, 1 on arm 85, 73 on arm 89, every one between 6:20 and 6:30 AM CT), judged on
+--   the meter plus the car's rating, and 35 of the 73 came with the meter at the held cap or under it (2,159.9 kW against
+--   2,160), which the charge start, under 0729's reading, would have admitted. 0729 put the controller's limit in the
+--   charge start's context only (G470). With the first reading right the meter sits at the cap through the opening, so
+--   the seat refuses what the start would share; here it cost three ticks at the opening and nothing measurable after.
 --
 --   0734 and 0735 over the same 6-hour morning at ten posts:
 --                                          arm 91          arm 90          arm 92
@@ -1550,3 +1555,23 @@ SELECT (SELECT count(*) FROM a) AS arms_with_after_open, p.arm_id, p.sweep_code,
        (SELECT round(max(w.g30)::numeric, 1) FROM w WHERE w.arm_id = p.arm_id AND w.n30 * w.step_min >= 30
            AND w.t >= w.t0 + interval '180 minutes') AS billed_kw_full_windows
   FROM p ORDER BY p.arm_id;
+
+-- (34) G470, §15: EN.001's refusals per arm at both of its probes, the charge start and the decide's seat assignment, with
+--      the meter it judged and whether the meter alone was over the cap. Under 0729 the charge start reads a held
+--      site's limit (managed_limit_kw in its context); the seat assignment's context carries none.
+WITH arms AS (
+  SELECT a.arm_id, a.sim_run_id, c.cell_code
+    FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c ON c.cell_id = a.cell_id
+   WHERE a.arm_id IN (85, 89))
+SELECT a.arm_id, a.cell_code, e.action_context, count(*) AS refused,
+       count(*) FILTER (WHERE (e.result_payload ->> 'current_kw')::numeric <= (e.result_payload ->> 'engineering_cap_kw')::numeric)
+         AS meter_at_or_under_cap,
+       count(*) FILTER (WHERE e.context ? 'managed_limit_kw') AS judged_on_a_held_limit,
+       round(min((e.result_payload ->> 'current_kw')::numeric), 1) AS meter_min_kw,
+       round(max((e.result_payload ->> 'current_kw')::numeric), 1) AS meter_max_kw,
+       round(avg((e.result_payload ->> 'requested_kw')::numeric), 1) AS mean_request_kw,
+       min(to_char((e.context ->> 'now_ts')::timestamptz AT TIME ZONE 'America/Chicago', 'HH24:MI')) AS first_ct,
+       max(to_char((e.context ->> 'now_ts')::timestamptz AT TIME ZONE 'America/Chicago', 'HH24:MI')) AS last_ct
+  FROM arms a JOIN public.ottoq_rule_evaluations e ON e.sim_run_id = a.sim_run_id
+ WHERE e.rule_code = 'EN.001.grid_capacity_ceiling' AND NOT e.passed
+ GROUP BY 1, 2, 3 ORDER BY 1, 3;
