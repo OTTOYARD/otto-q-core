@@ -19,6 +19,9 @@
 --     wash      done 32    skipped 255   (89% of the completed washes)
 --     detail    done 71    skipped 298   (81%)
 --     service   done 81    skipped 183   (69%)
+--   The other skipped bay legs, whose atom is not done (618: mechanical_pm 366, sensor_calibration 132,
+--   interior_deep_clean 52, fault_repair 31, exterior_wash 27, cosmetic_repair 10), all belong to visits since
+--   superseded, whose pending must-do work the next visit carries; they are a re-plan, not work left undone, (7).
 --
 -- ══ §2 WHY (reproduce: (3), (4), (5)) ═══════════════════════════════════════════════════════════════════════════════════
 --
@@ -138,3 +141,15 @@ SELECT count(*) AS amend_plan_decisions,
                                          AND p.vehicle_id = am.vehicle_id AND p.done_at <= am.sim_clock)) AS with_a_phantom_bay_leg,
        count(DISTINCT am.vehicle_id::text || am.sim_run_id::text) AS car_runs
   FROM am;
+
+-- (7) The skipped bay legs whose atom is not done: the visit they belong to, and what the atom says.
+WITH runs AS (SELECT sim_run_id FROM ottoq_sim_runs
+               WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND tick_count >= 144
+                 AND started_at >= '2026-10-16 00:00+00' AND started_at < '2026-10-18 03:50+00')
+SELECT l.duration_basis->>'atom' AS atom, vn.status AS visit_status, x->>'must_do' AS must_do, count(*) AS legs
+  FROM ottoq_itinerary_legs l JOIN ottoq_vehicle_itineraries i USING (itinerary_id)
+  JOIN ottoq_visit_needs vn ON vn.visit_id = i.visit_id
+  CROSS JOIN LATERAL jsonb_array_elements(vn.atoms) x
+ WHERE l.sim_run_id IN (SELECT sim_run_id FROM runs) AND l.leg_type IN ('service','wash','detail') AND l.status = 'skipped'
+   AND x->>'svc' = l.duration_basis->>'atom' AND x->>'status' IS NULL
+ GROUP BY 1, 2, 3 ORDER BY legs DESC;
