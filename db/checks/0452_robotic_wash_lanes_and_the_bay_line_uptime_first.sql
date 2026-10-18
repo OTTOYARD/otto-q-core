@@ -49,6 +49,10 @@
 --   796c5dfb); (4b)'s patched cursor planned (EXPLAIN) and run on run 7fe98840 with both dials on (0 candidates: no car
 --   is staged at that run's end); the key over the depot's 120 cars at the run's end: 0 emergencies, 4 past the floor;
 --   post-images: the decide fc843b9e, the key ec6a2dc9.
+--   0747's key was then extended to the twin's two hazard classes (an HV battery thermal event or a charge-system fault
+--   is an emergency; its other in-depot faults are fitted in). The new key, created as a temporary function and run with
+--   the dial on busy run 96616822 at its end (rolled back), keyed the depot's 120 cars in 67 ms. The executable part is
+--   now md5 298b9337 and the key's body 8d395ffe; the decide's patch, and so its post-image fc843b9e, are unchanged.
 
 -- (1) G460: each bay seat's timer, from the seat's own state-change event.
 WITH runs AS (SELECT sim_run_id, scenario_code FROM ottoq_sim_runs

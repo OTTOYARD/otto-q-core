@@ -8,8 +8,11 @@ first in (4b)'s two orders, public.ottoq_bay_uptime_order_key, NULL at the dial'
 about the key is executed here, on the scratch PostgreSQL, against the key exactly as 0747 writes it, with the live
 service catalog (service_cadence_policy's lanes and default minutes, as read on 2026-10-17):
   - at the dial's default the key is NULL for every car, so (4b)'s order is today's;
-  - with the dial a safety-critical fault goes first, then any car past the wait floor (the longest first), then resumed
-    work, then cars with no open fault repair before cars with one, then the least must-do work left;
+  - with the dial a safety emergency goes first (a severity-1 fault, or the twin's hazard classes, an HV battery
+    thermal event or a charge-system fault), then any car past the wait floor (the longest first), then resumed work,
+    then cars with no open fault repair before cars with one, then the least must-do work left;
+  - the twin's other in-depot faults (a sensor suite fault, an immobilizing steering and brake fault) are urgent repairs,
+    fitted in, not emergencies;
   - the work left counts the car's own visit in this run, only must-do work not done, only the work that holds a space
     (charge, wash, detail, service bay), and a missing estimate takes the catalog's default;
   - the wait floor is a dial, and a repair that has waited past it goes ahead of everything but an emergency;
@@ -187,6 +190,23 @@ def test_the_wait_floor_is_a_dial(db):
     ku, kp = _key(db, urgent, "fault_repair"), _key(db, pm, "mechanical_pm")
     assert [float(x) for x in ku][1:3] == [0, -30]
     assert [float(x) for x in ku] < [float(x) for x in kp]          # past the floor, the repair goes first
+
+
+def test_the_twins_hazard_classes_are_emergencies_and_its_breakdowns_are_not(db):
+    _dial(db, "bay_order_uptime_first", 1)
+    thermal = _car(db, "thermal", 2, [dict(_atom("fault_repair", 76), fault_class="hv_battery_thermal",
+                                           fault_severity="critical", immobilizing=True, raised_in_depot=True)])
+    charge = _car(db, "chargefault", 2, [dict(_atom("fault_repair", 76), fault_class="charge_system_fault",
+                                              fault_severity="critical", immobilizing=True, raised_in_depot=True)])
+    sensor = _car(db, "sensor", 2, [dict(_atom("fault_repair", 76), fault_class="sensor_suite_fault",
+                                         fault_severity="critical", immobilizing=False, raised_in_depot=True)])
+    brake = _car(db, "brake", 2, [dict(_atom("fault_repair", 76), fault_class="steering_brake_fault",
+                                       fault_severity="critical", immobilizing=True, raised_in_depot=True)])
+    assert float(_key(db, thermal, "fault_repair")[0]) == 0
+    assert float(_key(db, charge, "fault_repair")[0]) == 0
+    for vid in (sensor, brake):                  # urgent, home and parked: fitted in like any repair
+        key = _key(db, vid, "fault_repair")
+        assert float(key[0]) == 1 and float(key[4]) == 1
 
 
 def test_a_severity_one_car_is_an_emergency_only_for_its_repair(db):

@@ -553,8 +553,9 @@ jobs:
       # 0746 and 0747, EXECUTED: the twin's new functions as 0746 writes them, on the live bodies of what they call and
       # of the charge-off wash admission (tests/fixtures/robotic_wash_stub.sql, md5-pinned): at the default the wash
       # lane's staff gate is the supervisors and nothing is timed; at 1 a seat is timed by the crews from its own minute,
-      # with STEP 2's card; at 2 the lanes are robotic and the third car is admitted. 0747's key as written: emergency,
-      # the wait floor, resumed work, a repair fitted in around, then the least work left. 14 tests, about 20 seconds.
+      # with STEP 2's card; at 2 the lanes are robotic and the third car is admitted. 0747's key as written: emergency (a
+      # severity-1 fault or a hazard class), the wait floor, resumed work, a repair fitted in around, then the least work
+      # left. 15 tests, about 20 seconds.
       - name: Robotic wash lanes timed by the work, and the bay line uptime first, executed (0746, 0747)
         env:
           PGHOST: localhost

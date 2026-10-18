@@ -35,8 +35,11 @@
 --   (a) Dials, neither agent-writable: bay_order_uptime_first (0..1, default 0) and bay_wait_floor_min (30..480,
 --       default 90, the charge line's floor from 0642).
 --   (b) public.ottoq_bay_uptime_order_key(run, car, need, is_resume, clock): NULL below 1, else an ascending key:
---         1. a safety emergency first: the bay need is a fault repair and the car's fault is severity 1, the card's
---            critical grade (rule 9's exception: routed at once);
+--         1. a safety emergency first: the bay need is a fault repair, and the car's drawn fault is severity 1 (the
+--            card's critical grade) or its open repair is for one of the twin's two hazard classes, an HV battery
+--            thermal event or a charge-system fault (rule 9's exception: routed at once). The other in-depot faults,
+--            a sensor suite or compute fault and the immobilizing drive or steering and brake faults, are urgent but
+--            not hazards: the car is home, offline and parked, and is fitted in like any repair;
 --         2. then any car that has waited the floor or longer since it last changed state, the longest wait first
 --            (no car starves, the urgent repair included);
 --         3. then work the depot already started and took away (resumed bay work, the 0003 key);
@@ -132,8 +135,8 @@ SELECT '0747_pre', 'function', n.nspname, p.proname, pg_get_functiondef(p.oid), 
 INSERT INTO public.ottoq_policy_param_catalog (param_key, description, default_value, min_value, max_value, affects,
                                                agent_writable)
 VALUES ('bay_order_uptime_first',
-        '0747 (G461): 1 = decide section (4b) seats the wash, detail and service bays uptime first: a safety-critical '
-        'fault (severity 1) first, then any car that has waited bay_wait_floor_min or longer (the longest first), then '
+        '0747 (G461): 1 = decide section (4b) seats the wash, detail and service bays uptime first: a safety emergency '
+        '(a severity-1 fault, or an HV battery thermal event or charge-system fault) first, then any car that has waited bay_wait_floor_min or longer (the longest first), then '
         'resumed work, then cars with no open fault repair before cars with one, then the least must-do work left on the '
         'car''s visit; ties fall to the order before 0747. 0 = urgency first, as before 0747. Research days only until '
         'certified.',
@@ -157,7 +160,7 @@ AS $fn$
 -- rejoin service soonest; it does not supersede a car in for standard or timely service. Rule 9's emergency goes first,
 -- and a car past the wait floor goes next, so no car's needs are sacrificed to the order.
 DECLARE
-  v_floor numeric; v_wait numeric; v_sev int; v_fault boolean; v_rem numeric;
+  v_floor numeric; v_wait numeric; v_sev int; v_fault boolean; v_hazard boolean; v_rem numeric;
 BEGIN
   IF COALESCE(public.ottoq_policy_get(p_sim_run_id, 'bay_order_uptime_first', 0), 0) < 1 THEN
     RETURN NULL;
@@ -168,9 +171,11 @@ BEGIN
   SELECT p.worst_fault_severity INTO v_sev FROM public.vehicle_need_profile p WHERE p.vehicle_id = p_vehicle_id;
   -- the car's own visit in this run: must-do work not yet done, counting only the work that holds a space
   SELECT bool_or(a ->> 'svc' = 'fault_repair'),
+         -- the twin's hazard classes (twin.ottoq_sim_vehicle_exception_handler: immobilizing and service-incompatible)
+         bool_or(a ->> 'svc' = 'fault_repair' AND a ->> 'fault_class' IN ('hv_battery_thermal', 'charge_system_fault')),
          COALESCE(sum(COALESCE(CASE WHEN (a ->> 'est_min') ~ '^[0-9]+(\.[0-9]+)?$' THEN (a ->> 'est_min')::numeric END,
                                cp.est_min_default, 0)), 0)
-    INTO v_fault, v_rem
+    INTO v_fault, v_hazard, v_rem
     FROM public.ottoq_visit_needs n
     CROSS JOIN LATERAL jsonb_array_elements(COALESCE(n.atoms, '[]'::jsonb)) a
     JOIN public.service_cadence_policy cp ON cp.svc = a ->> 'svc' AND cp.is_active
@@ -179,7 +184,8 @@ BEGIN
      AND COALESCE((a ->> 'must_do')::boolean, false)
      AND COALESCE(a ->> 'status', 'pending') NOT IN ('done', 'cancelled', 'skipped');
   RETURN ARRAY[
-    CASE WHEN p_svc = 'fault_repair' AND COALESCE(v_sev, 99) = 1 THEN 0 ELSE 1 END,   -- 1. a safety emergency
+    CASE WHEN p_svc = 'fault_repair' AND (COALESCE(v_sev, 99) = 1 OR COALESCE(v_hazard, false))
+         THEN 0 ELSE 1 END,                                                             -- 1. a safety emergency
     CASE WHEN COALESCE(v_wait, 0) >= v_floor THEN 0 ELSE 1 END,                         -- 2. past the wait floor,
     CASE WHEN COALESCE(v_wait, 0) >= v_floor THEN -round(v_wait, 3) ELSE 0 END,         --    the longest wait first
     CASE WHEN COALESCE(p_is_resume, false) THEN 0 ELSE 1 END,                           -- 3. work already started
