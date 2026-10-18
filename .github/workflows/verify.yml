@@ -693,6 +693,25 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_proposal_ttl_stamp_clock_sql.py
 
+      # 0757, G474, EXECUTED on the live bay release and everything it calls (tests/fixtures/bay_release_stub.sql, md5
+      # asserted), 0757 run whole: before it, and after it at the dial's default, 2d2c46af's service seat (48 minutes
+      # booked, 35.5 held, its PM credited) is filed interrupted and its PM reopened; with the dial it is done, its why
+      # says the minutes held against the minutes booked, and nothing is reopened; a robotic wash done in 5 of 9 booked
+      # minutes, the same; a seat with no completion, on a null timer, from a bay that cannot do the booking's work,
+      # completed before the booking began, in another run or recorded before the booking was made is judged by its booked
+      # minutes; a full seat and a no-show are unchanged; the body less its changes is its pre-image; the six cells carry
+      # the dial; 0757 refuses a second apply, a release or service flow it did not read, another function naming the
+      # event, a sweep with an arm run, and a database without 0746 and 0747. 19 tests, about 15 seconds.
+      - name: A bay seat that finished early is done, executed (0757)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_bay_release_reads_the_work_sql.py
+
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
       # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry

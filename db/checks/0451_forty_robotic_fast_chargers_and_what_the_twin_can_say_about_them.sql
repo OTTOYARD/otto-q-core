@@ -3,7 +3,7 @@
 --        0724's and 0725's overnight sweeps, beside five things found on the way: the twin's power model (§2), busy_day's
 --        wall (§5), why every overnight arm gets ten times slower as its day goes on (§6), cars with no charge facts
 --        (§7), and two latent rule-9 regressions in dormant certification arms (§8).
---        -> G443-G447; later sections G448-G459, G468-G469 (§16, §17), G471-G472 (§18) and G473 (§19).
+--        -> G443-G447; later sections G448-G459, G468-G469 (§16, §17), G471-G472 (§18), G473 (§19) and G474 (§20).
 --        Read-only throughout, against gxdrcyphqjzjsuhxuqtg, 2026-10-17 from 05:51:42 UTC (the first query's now()).
 --        Arms' own rows are cited by arm_id and sim_run_id; every number below names the query that reproduces it.
 --
@@ -904,6 +904,64 @@
 --   arm should expire a proposal as 'ttl_elapsed' at all (query (40)). Ageing a proposal on its run's own clock (the sim
 --   clock in the twin, the real one in production), which also ends the never-stale face, changes the decisions of
 --   every arm and is a certified change behind a dial, not built.
+
+--
+-- ══ §20 A BAY SESSION THAT FINISHED EARLY IS FILED AS INTERRUPTED, AND ITS WORK IS DONE AGAIN (G474; reproduce: (42)-(44)) ═
+--
+--   Read 2026-10-18 between 4:15 and 4:27 AM CT, from arms 82-97, while reading why promise_busy's fallback called two
+--   cars in the service queue ready (§19's busy pair).
+--
+--   The fallback. With no proposal in force, section (5) asks ottoq_l2_propose_service, which, once a car with must-do bay
+--   work has waited past service_hold_patience_min (120 sim-minutes) with the bays full, proposes promote_ready and files
+--   the open work as deferred_service, "carried forward to the next visit" (its own comment, of 2026-08-01, older than
+--   rule 9's "no car leaves with a service still needed, EVER"). Since 0469 that verdict sends no command and the
+--   departure test (0543) holds the car, so it is a record only: on the busy day 1,147 such verdicts on 61 cars (arm 82),
+--   each recorded as enacted; none on the normal days (query (44)). Of the 61, 9 staged to leave after one, and each had
+--   its bay work done first (8, minutes before staging) or was sent back by the departure recheck (1). No car left with
+--   the work open. The record still says, 1,147 times, that OTTO-Q promoted a car with must-do work deferred.
+--
+--   The car sent back. 2d2c46af on arm 82, seated in a service bay at 2:00 PM CT sim for its mechanical PM: the service
+--   flow ended the seat at 2:35 and credited the PM (twin.service_completed, credited [mechanical_pm], not on a null
+--   timer). In the same tick ottoq.ottoq_release_vacated_spaces closed its booking (48 minutes planned, 35.5 used) as
+--   interrupted, 'bay_exit_before_planned_end', and ottoq_reopen_visit_atoms set the PM back to open
+--   (atoms_reopened_from_done 1). The departure recheck sent the car back at 2:40, and it waited 3 hours 20 minutes, to
+--   the run's end, for a PM it had had.
+--
+--   Why. The release judges an active bay booking by time alone: ottoq.ottoq_booking_interrupted
+--   (ottoq.ottoq_occupancy_cut_short) calls it interrupted when the car left before 80% of its planned window and at least
+--   2 minutes early, and the release then reopens the purpose's atoms, done ones included. But the service flow's STEP 1
+--   is the only exit that credits work, and it lets a car out only when its timer has elapsed or a completion was
+--   reported (service_done); a bay fault (twin.ottoq_sim_bay_fault_handler) or a vehicle exception
+--   (twin.ottoq_sim_vehicle_exception_handler) moves the car out by its own handler and credits nothing. So an early
+--   STEP 1 exit is a job that finished before its booking said it would, and the release undoes it. On arms 82-97: 10
+--   such reopens, each in the tick the service flow credited the car, none on a null timer: 9 service bookings (57.9
+--   minutes planned and 41.1 used on average, 0.52-0.79 of the window) and 1 detail booking (arm 88, 21 planned, 2.4
+--   used, an exterior wash credited) (query (42)).
+--
+--   And it waits for 0746. Its robotic lanes (wash_lane_physics 2) time a seat by the work and keep the engine's
+--   bookings, 9.0 minutes for a wash and 25.0 for a detail in tick (arm 95's done bookings, query (43)). A robotic wash
+--   takes 4.25-5.75 minutes, so one drawn at or under 5.0 leaves at the next 5-minute tick, at 56% of its booking, and is
+--   reopened; a robotic detail takes 13.2-19.8, so one at or under 15.0 leaves at 60% and is reopened. By the twin's own
+--   deals on arms 82-97 (3,266 wash and 3,278 detail cards, drawn on 0.7-1.3), that is 53% of robotic washes and 25%
+--   of robotic details, each sent back for work it has had, up to the reopen cap of three: the robowash and uptimefirst
+--   arms would have measured robotic lanes doing about half again as many washes as their cars need. 0746's test world
+--   left the release out. At wash_lane_physics 1 (the crews' 9 and 25 minutes) a seat ends at or past 80% of its booking
+--   and is not judged short. Production meets it the day a robot or a technician reports work done before 80% of its
+--   booked window.
+--
+--   Built as 0757 (PENDING, after 0746 and 0747): under the dial bay_release_reads_the_work, a bay booking whose car the
+--   service flow let out since the booking began (a twin.service_completed for the car, recorded no earlier than the
+--   booking was made, not on a null timer, out of a bay whose capability set holds every atom of the booking's purpose)
+--   is done however early it ended, and its why says the minutes it held against the minutes booked; any other early
+--   exit is judged by its booked minutes, as before. Read against the ten on the live rows between 4:31 and 4:45 AM CT
+--   (query (45)): released_at equals the interruption's sim_clock_at in all ten, so the release runs on the clock the
+--   events are stamped with, and the test finds the completion for the 9 service bookings and not for arm 88's detail
+--   booking. That car (a1111111-...-0006) was seated in a wash bay at 11:55 sim, 2.4 minutes before its detail booking's
+--   window began, and let out at 12:00 with an exterior wash credited from a wash bay's set; a wash bay cannot finish a
+--   detail, so 0757 leaves that booking to its booked minutes and its wash is still reopened (a detail booking served from
+--   a wash bay, noted, not built). 0757 sets the dial on the robowash and uptimefirst cells, controls included, before
+--   their first arm. The fallback's record is named, not built: section (5) files a promote_ready with must-do work
+--   deferred as enacted.
 
 -- ══ QUERIES ══
 
@@ -1991,3 +2049,90 @@ SELECT l.pair_id, e.experiment_id, e.param_key, e.status, l.ran_at, round(l.wall
          = (SELECT min(p.created_at) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_b) AS one_stamp
   FROM public.ottoq_dial_pair_ledger l JOIN public.ottoq_dial_experiments e ON e.experiment_id = l.experiment_id
  ORDER BY l.ran_at;
+
+-- (42) G474, §20: the bay bookings the release closed as interrupted, with the service flow's completion of the same car
+--      in the same tick (credited atoms, on a null timer or not), the minutes planned and used, per arm.
+WITH r AS (SELECT arm_id, sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id BETWEEN 82 AND 97),
+bi AS (SELECT r.arm_id, r.sim_run_id, e.entity_id AS car, e.sim_clock_at AS t, e.payload AS p
+         FROM r JOIN public.ottoq_events e ON e.sim_run_id = r.sim_run_id
+        WHERE e.event_type = 'ottoq.booking_interrupted')
+SELECT bi.arm_id, bi.car, bi.t, bi.p ->> 'purpose' AS purpose, bi.p ->> 'source' AS source,
+       (bi.p ->> 'planned_min')::numeric AS planned_min, (bi.p ->> 'actual_min')::numeric AS used_min,
+       (bi.p ->> 'completion_ratio')::numeric AS ratio, bi.p ->> 'atoms_reopened' AS atoms_reopened,
+       sc.payload -> 'credited' AS credited_same_tick, sc.payload ->> 'self_healed' AS null_timer
+  FROM bi LEFT JOIN LATERAL (
+         SELECT s.payload FROM public.ottoq_events s
+          WHERE s.sim_run_id = bi.sim_run_id AND s.entity_id = bi.car AND s.event_type = 'twin.service_completed'
+            AND s.sim_clock_at = bi.t LIMIT 1) sc ON true
+ ORDER BY bi.arm_id, bi.t;
+
+-- (43) G474, §20: what the engine books for a wash, a detail and a service seat in tick (arm 95; the done bookings'
+--      windows are clipped to the car's exit, which in tick is the booking's end), and the twin's deals behind a seat's
+--      minutes: the share of wash deals at or under 1.0 (a robotic wash at or under 5.0 minutes) and of detail deals at
+--      or under 0.8636 (a robotic detail at or under 15.0 minutes).
+WITH r AS (SELECT sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id = 95)
+SELECT b.purpose, count(*) AS done_bookings,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM upper(b.during) - lower(b.during)) / 60)::numeric, 1) AS p50_min
+  FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id, r
+ WHERE b.sim_run_id = r.sim_run_id AND s.stall_type IN ('wash_bay', 'service_bay') AND b.state = 'done'
+ GROUP BY 1 ORDER BY 1;
+
+SELECT c.var_key, count(*) AS cards, round(min(c.value), 3) AS min_v, round(max(c.value), 3) AS max_v,
+       round(avg((c.value <= 1.0)::int)::numeric, 3) AS share_le_1_0,
+       round(avg((c.value <= 0.8636)::int)::numeric, 3) AS share_le_0_864
+  FROM public.ottoq_variability_cards c
+ WHERE c.var_key IN ('wash_time', 'detail_time')
+   AND c.sim_run_id IN (SELECT sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id BETWEEN 82 AND 97)
+ GROUP BY 1;
+
+-- (44) G474, §20: section (5)'s promote_ready verdicts filed with must-do bay work still open, per arm, and, on arm 82, the
+--      cars that staged to leave after one, with the state of the work they were promoted past.
+SELECT a.arm_id,
+       count(*) FILTER (WHERE d.proposed_action ->> 'verb' = 'promote_ready') AS promote_ready,
+       count(*) FILTER (WHERE d.proposed_action ->> 'verb' = 'promote_ready'
+                          AND d.proposed_action -> 'rationale' ->> 'must_do_outstanding' = 'true') AS with_must_do_open,
+       count(DISTINCT d.entity_id) FILTER (WHERE d.proposed_action ->> 'verb' = 'promote_ready'
+                          AND d.proposed_action -> 'rationale' ->> 'must_do_outstanding' = 'true') AS cars
+  FROM public.ottoq_throughput_sweep_arms a
+  JOIN public.ottoq_decisions d ON d.sim_run_id = a.sim_run_id AND d.action_context = 'task_start'
+ WHERE a.arm_id IN (82, 83, 84, 93, 95, 96, 97)
+ GROUP BY 1 ORDER BY 1;
+
+WITH r AS (SELECT sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id = 82),
+v AS (SELECT d.entity_id AS car, min(d.sim_clock) AS first_defer
+        FROM public.ottoq_decisions d, r
+       WHERE d.sim_run_id = r.sim_run_id AND d.action_context = 'task_start'
+         AND d.proposed_action ->> 'verb' = 'promote_ready'
+         AND d.proposed_action -> 'rationale' ->> 'must_do_outstanding' = 'true'
+       GROUP BY 1),
+dep AS (SELECT v.*, (SELECT min(e.sim_clock_at) FROM public.ottoq_events e, r
+                      WHERE e.sim_run_id = r.sim_run_id AND e.entity_id = v.car AND e.event_type = 'vehicle.state_changed'
+                        AND e.payload -> 'diff' -> 'current_state' ->> 'to' IN ('deployed', 'staged_for_departure', 'en_route_to_work')
+                        AND e.sim_clock_at > v.first_defer) AS left_at
+          FROM v)
+SELECT dep.car, dep.first_defer, dep.left_at,
+       (SELECT string_agg(n.visit_key || '=' || n.status || ':' ||
+                (SELECT string_agg(a ->> 'svc' || '/' || COALESCE(a ->> 'status', 'pending') || '/' || COALESCE(a ->> 'done_at', '-'), ';')
+                   FROM jsonb_array_elements(n.atoms) a
+                  WHERE a ->> 'svc' IN ('mechanical_pm', 'sensor_calibration', 'cosmetic_repair', 'fault_repair')), ' | ')
+          FROM public.ottoq_visit_needs n, r WHERE n.sim_run_id = r.sim_run_id AND n.vehicle_id = dep.car) AS bay_work
+  FROM dep WHERE dep.left_at IS NOT NULL ORDER BY dep.left_at;
+
+-- (45) G474, §20: the ten bookings the release filed interrupted on arms 82-97, with whether 0757's test finds their
+--      completion (the car's twin.service_completed in the run since the booking began, recorded no earlier than the
+--      booking was made, not on a null timer, out of a bay that does every atom of the booking's purpose), and whether the
+--      release ran on the events' clock (released_at against the interruption's sim_clock_at).
+WITH r AS (SELECT arm_id, sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id BETWEEN 82 AND 97),
+bi AS (SELECT r.arm_id, e.sim_run_id, e.entity_id AS car, e.sim_clock_at, (e.payload ->> 'booking_id')::uuid AS booking_id
+         FROM r JOIN public.ottoq_events e ON e.sim_run_id = r.sim_run_id
+        WHERE e.event_type = 'ottoq.booking_interrupted')
+SELECT bi.arm_id, left(bi.car::text, 8) AS car, b.purpose, bi.sim_clock_at, (b.released_at = bi.sim_clock_at) AS same_clock,
+       lower(b.during) AS lo,
+       (SELECT count(*) FROM public.ottoq_events s
+         WHERE s.entity_type = 'vehicle' AND s.entity_id = bi.car AND s.occurred_at >= b.booked_at
+           AND s.sim_run_id = bi.sim_run_id AND s.event_type = 'twin.service_completed'
+           AND s.sim_clock_at > lower(b.during) AND s.sim_clock_at <= b.released_at
+           AND NOT COALESCE((s.payload ->> 'self_healed')::boolean, false)
+           AND (s.payload -> 'bay_capable') @> to_jsonb(ottoq.ottoq_bay_purpose_atoms(b.purpose))) AS completions_0757_reads
+  FROM bi JOIN public.ottoq_stall_bookings b ON b.booking_id = bi.booking_id
+ ORDER BY bi.arm_id, bi.sim_clock_at;
