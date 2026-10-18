@@ -475,6 +475,11 @@
 --   all (charging 680, after_charge 143, in_line 76, unplanned 23, no_charge 7; 1 beyond history). Its wall time was
 --   3,338 s against its partner arm 93's 1,700 s: the recorder and its re-estimates did not add minutes, they nearly
 --   doubled the arm. promise_busy had no arm yet.
+--   CHECKED 2026-10-18 at 4:12 AM CT: promise_busy's arm 97 landed at 3:46 AM CT, complete, no error: 212 promises for 212
+--   visits, all with 128 draws, the world seed and owner_read true (an owner time on 197), and 2,173 re-estimates, owner_read
+--   true on all (in_line 793, charging 776, after_charge 547, holds_charger 32, unplanned 23, no_charge 2; 11 beyond
+--   history). Wall time 3,208 s against arm 82's 1,981. Both promise arms agree with their partners on every outcome atom
+--   and differ on h_dec and h_prop, by G473 alone (§19).
 
 -- ══ §13 THE WASH IS THE NEXT LINE, AND THE BAY CALENDAR SEATS ALL OR NONE (G457, G458, G453; reproduce: (21)-(25)) ════
 --
