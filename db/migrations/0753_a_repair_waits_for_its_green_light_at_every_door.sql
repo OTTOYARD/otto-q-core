@@ -21,7 +21,12 @@
 --   held no tech_greenlight row when read before 12:49 AM CT, (3). public.ottoq_departure_clear (ac79f1b4) never names a
 --   green-light, and every other door goes through it: ottoq.ottoq_plan_dispatch_tick, twin.ottoq_sim_dispatch_vehicle,
 --   public.ottoq_refuse_unfinished_departure (0544, the dispatch insert's trigger) and the departure recheck, (4).
---   What it has let through on the twin's runs is counted in db/checks/0457 §5, after the sweep window.
+--   What it has let through on the twin's runs, counted after the window (db/checks/0457 §5 and query (5), at 7:04 AM CT
+--   on 2026-10-18; this paragraph is a comment above BEGIN, so the executable part is unchanged): on the twin depot's 24
+--   completed runs since 2026-10-16, 54 fault repairs were done, every one carrying the flag; 52 of those cars left
+--   after the repair, all 52 by the deploy planner's release and none by the decide's door, a median 36 minutes later
+--   (5 to 445), and none with a green-light, since no tech_greenlight approval exists on any run; 2 were still in the
+--   depot when their run ended.
 --
 -- ══ §2 WHAT THIS CHANGES ═════════════════════════════════════════════════════════════════════════════════════════════
 --

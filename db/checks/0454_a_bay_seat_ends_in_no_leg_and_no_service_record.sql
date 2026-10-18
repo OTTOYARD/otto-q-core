@@ -63,6 +63,16 @@
 --   service it credited, with the seat's start and the work's end, and binds the booking that covered the seat; a seat
 --   with no bay leg at all records one in the car's active itinerary. The existing trigger then issues the SDR. Its arm
 --   (bayexit_normal_2026_10_18) pairs with arm 84 (b54f6de5); this file's queries, re-run on the arm, are its readout.
+--   APPLIED 2026-10-18 at 6:20 AM CT (ledger 20261018112027), after its dry run on live at 6:18 rolled back clean, then
+--   checked end to end on live and rolled back: a car seated in a wash bay 5 minutes before the clock through a needs-card
+--   booking, with a planned wash leg; with bay_exit_closes_its_leg 0 the service flow let it out with its leg planned
+--   and no SDR, and at 1 the leg closed done over the seat's 5 minutes, the booking named it and an SDR (wash) named
+--   both. Read beside it, public.ottoq_bay_seat_record_coverage on arm 84's run (b54f6de5): 2 of 29 wash seats, 7 of 41
+--   detail seats and 1 of 14 service seats carried an SDR (by seat; §1 counts completed work, 10.7%, 17.7% and 31.7%
+--   over the 11 runs).
+--   The queue step at 6:39 AM CT moved its arm into tick: bayexit_normal_2026_10_18 now pairs with arm 95 (12c6fd31),
+--   arm 84's cell in tick, not with arm 84 (db/checks/0451 §15). The promise arms put the phantom bay legs at 10% of the
+--   owner app's error on the normal day (0451 §12).
 
 --
 -- ══ §5 RULE 9 HOLDS ON THE SAME RUNS (reproduce: (8)-(10); read 11:33-11:40 PM CT, by clock) ═════════════════

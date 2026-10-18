@@ -46,6 +46,11 @@
 --   public.ottoq_model_call_ledger as postgres was refused with this file's message. Read at 8:15 PM CT after the
 --   rollback: no trigger, function, pre-image or lineage row of 0748 remains, and the grants and rows are as before
 --   (public.ottoq_model_call_ledger 37,179 rows).
+--   APPLIED 2026-10-18 at 6:16 AM CT (ledger 20261018111650), the executable part unchanged (9e00d2d3), then checked end
+--   to end on live and rolled back: a TRUNCATE of public.p7_band_probe_2026_08_03 was refused with SQLSTATE 42501 and
+--   0748's message; public.ottoq_assert_evidence_truncate_guard() returned no rows; service_role held TRUNCATE on none of
+--   the 100 evidence tables nor on the registry, and still read the registry and inserted into the model-call ledger;
+--   a table created and registered as evidence inside the check was guarded at once. No engine path changed.
 --
 -- ══ §4 THE DROPPED EVIDENCE TABLES, AND 0749 (reproduce: (6), (7), (8)) ════════════════════════════════════════════════
 --
@@ -67,6 +72,9 @@
 --   privileges of the role that issued the statement (Supabase, "PostgreSQL Event Triggers without superuser access",
 --   2025-05-08, https://supabase.com/blog/event-triggers-wo-superuser), so as an ordinary function it refused the DROP
 --   of a role that cannot read the registry, its own tables included. 0749's function is SECURITY DEFINER.
+--   0749 is NOT applied. Its apply prompt at 10:49 PM CT on 2026-10-17 timed out unanswered and nothing ran; on
+--   2026-10-18 it was left for Chase, as the session's own instruction said, because its checks drop probe tables and
+--   the connector holds any DROP for a person. It applies unchanged with a person at the connector.
 
 -- (1) The evidence class: registered tables, those that exist, those that do not.
 WITH ev AS (SELECT DISTINCT table_schema, table_name,

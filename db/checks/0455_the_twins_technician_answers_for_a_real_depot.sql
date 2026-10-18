@@ -68,6 +68,9 @@
 --   pending, and a person's verdict is applied in their name.
 --   Left as it is, and named in G465: the planner's seeded 2-4 minute decide_after, which in production only delays when
 --   a person's verdict is applied; and the crew door's event, which records data_source 'twin' whatever the depot.
+--   APPLIED 2026-10-18 at 6:21 AM CT (ledger 20261018112154), after its dry run on live at 6:21: its V2 switched the twin
+--   depot to an external feed inside a block rolled back by its own raise, and the scan left an unanswered question
+--   pending there while it still answered at the twin-fed depot. No dial: at the twin depot nothing changes.
 
 -- (1) the scan never names a feed mode, draws the verdict, signs it twin_tech_sim and enacts a top-off
 SELECT md5(p.prosrc) AS md5, length(p.prosrc) AS len,

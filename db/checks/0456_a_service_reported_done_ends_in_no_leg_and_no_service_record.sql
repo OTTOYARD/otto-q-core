@@ -51,6 +51,9 @@
 --   the exit, so the exit's credit no longer names it, 0750 records the seat as a leg of its own, and the service's
 --   planned leg stays planned; and a green-light an atom requires is raised by nothing here, nor anywhere for a bay
 --   repair (G467).
+--   APPLIED 2026-10-18 at 6:24 AM CT (ledger 20261018112438), after 0750 and its dry run on live at 6:23, whose V3 put a
+--   probe run at the twin depot inside a block rolled back by its own raise. Under 0750's dial, default 0: in production
+--   it applies once a person sets bay_exit_closes_its_leg (rule 10), and in the twin on bayexit_normal's arm.
 
 -- (1) the seam's list branch names no leg, SDR or probe
 SELECT md5(p.prosrc) AS md5, length(p.prosrc) AS len,

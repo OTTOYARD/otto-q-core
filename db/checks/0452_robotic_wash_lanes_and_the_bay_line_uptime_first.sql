@@ -53,6 +53,18 @@
 --   is an emergency; its other in-depot faults are fitted in). The new key, created as a temporary function and run with
 --   the dial on busy run 96616822 at its end (rolled back), keyed the depot's 120 cars in 67 ms. The executable part is
 --   now md5 298b9337 and the key's body 8d395ffe; the decide's patch, and so its post-image fc843b9e, are unchanged.
+--   APPLIED 2026-10-18: 0746 at 6:14 AM CT (ledger 20261018111429) and 0747 at 6:15 (20261018111537), with the
+--   post-images above, then checked end to end on live and rolled back (their APPLIED notes). 0746, a wash and a detail
+--   seated 3 minutes before the clock: at wash_lane_physics 0 neither timer moved (9.000 and 25.000 minutes, as booked);
+--   at 1 they were retimed from the seat to 10.000 and 22.093 minutes (9 and 25 times the deal), their bay needs moved
+--   with them and the plan's ends kept, the lane's gate reading two supervisors; at 2, 5.278 and 15.221 minutes and the
+--   gate NULL. 0747, three staged cars with open visits: at bay_order_uptime_first 0 the order was today's (the PM car,
+--   the severity-2 repair, the thermal car, every key NULL); at 1 the thermal car came first, then the PM car (24 minutes
+--   of must-do work), then the repair (101). One finding on the way, not a defect of either: the service flow,
+--   twin.ottoq_sim_advance_service_flow, has no search_path of its own, so called outside the world tick (which sets
+--   twin, ottoq, public, extensions) it cannot find twin.ottoq_sim_lane_capacity; the check set the tick's path.
+--   Their arms are robowash_normal (four cells) and uptimefirst_busy (two), in tick, first in the window that opens at
+--   11:00 PM CT on 2026-10-18 (db/checks/0451 §15).
 --
 -- ══ §5 THE CHARGE LINE SEATS A CAR HELD BY A REPAIR AHEAD OF CARS THAT COULD EARN (G461's open question; reproduce: (6)) ══
 --
@@ -77,6 +89,12 @@
 --   three. The candidate, for after those arms: the charge line orders a car by whether its charge is on its own critical
 --   path. A car whose repair or bay work will hold it after the charge anyway can wait for a charger without being
 --   ready any later; a car that leaves when its charge ends cannot.
+--   RE-READ 2026-10-18 at 7:02 AM CT (query (6) on the ten full-day arms landed since: 89, 90 and 93-100; the two
+--   72-tick mornings 91 and 92 are outside its filter). On the nine normal days 2 of 2,191 charge seats (0.09%) went to a
+--   car held by a repair while a clean car for that kind waited (one each on arms 89 and 100), 8 to a repair-held car at
+--   all; on the busy day (arm 97) 6 of 268 (2.2%), 7 to a repair-held car, the same share as §5's busy days. Neither 0746
+--   nor 0747 could have moved it: no arm so far carries their dials (they were applied at 6:14 and 6:15 AM CT, after
+--   the window), and their arms run in the window that opens at 11:00 PM CT on 2026-10-18. Re-run (6) on them.
 
 -- (1) G460: each bay seat's timer, from the seat's own state-change event.
 WITH runs AS (SELECT sim_run_id, scenario_code FROM ottoq_sim_runs
