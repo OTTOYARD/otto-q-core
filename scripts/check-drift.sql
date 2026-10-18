@@ -806,7 +806,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'every_bay_seat_ends_in_its_leg_and_its_service_record'::text, '0750_every_bay_seat_ends_in_its_leg_and_its_service_record.sql'::text),
     ('PENDING'::text, 'in_production_only_a_person_answers_a_technician_question'::text, '0751_in_production_only_a_person_answers_a_technician_question.sql'::text),
     ('PENDING'::text, 'a_service_reported_done_ends_in_its_leg_and_its_service_record'::text, '0752_a_service_reported_done_ends_in_its_leg_and_its_service_record.sql'::text),
-    ('PENDING'::text, 'a_repair_waits_for_its_green_light_at_every_door'::text, '0753_a_repair_waits_for_its_green_light_at_every_door.sql'::text)
+    ('PENDING'::text, 'a_repair_waits_for_its_green_light_at_every_door'::text, '0753_a_repair_waits_for_its_green_light_at_every_door.sql'::text),
+    ('PENDING'::text, 'a_billed_half_hour_holds_thirty_minutes'::text, '0754_a_billed_half_hour_holds_thirty_minutes.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

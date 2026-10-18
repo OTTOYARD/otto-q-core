@@ -680,7 +680,7 @@
 --   699.4 (0.7-2.2% lower), and the last four 941.8, 1,150.8, 924.3 and 940.6 against 1,006.8, 1,241.9, 980.7 and 976.5
 --   (3.7-7.3% lower). The whole-day half hour is never partial: the opening sets it on all 69. So arm 84's $21,547 past
 --   the opening in §10 point 4 is two samples, and $20,155 over full half hours before §16's correction.
---   A five-minute window is not a 30-consecutive-minute mean. To be built as 0754: a half hour counts only when its
+--   A five-minute window is not a 30-consecutive-minute mean. Built as 0754 (PENDING): a half hour counts only when its
 --   window holds 30 minutes of samples, for every arm scored after it lands; stored arms keep their numbers, and query (33)
 --   recomputes any arm whose run is still on record.
 
