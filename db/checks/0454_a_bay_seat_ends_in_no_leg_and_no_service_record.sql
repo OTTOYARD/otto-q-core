@@ -64,6 +64,20 @@
 --   with no bay leg at all records one in the car's active itinerary. The existing trigger then issues the SDR. Its arm
 --   (bayexit_normal_2026_10_18) pairs with arm 84 (b54f6de5); this file's queries, re-run on the arm, are its readout.
 
+--
+-- ══ §5 RULE 9 HOLDS ON THE SAME RUNS (reproduce: (8)-(10); read 11:33-11:40 PM CT, by clock) ═════════════════
+--
+--   Because the defect is in the record of the work, the work itself was audited. The 11 runs hold 2,757 departures to
+--   deployed. 305 of them came at minute 0 of their run, offline -> staged_for_departure -> deployed: the boot's prime
+--   deployment, the cars already out when the day starts (35 on a normal day, 19 on a busy one), at the charge they were
+--   drawn with (86-98% where the stream carries one), as G268 classed them. Every one of the other 2,452 left at 99% or
+--   more, whichever dispatcher sent it, (8): 2,308 sent by the decide's redeployment and 144 by the service flow's. Of
+--   the 2,040 of them with a visit, none left with work open, (9): no atom pending, and none done after the car left.
+--   The 412 with no visit before they left (G268 found such cars to be boot cars placed ready) are among the 2,452. The
+--   only atoms cancelled on these runs are 83 interior tidies and 16 sensor cleans, each cleared by the triage's
+--   inspection with the verdict "clear", a provisional need found not to be one, (10). So G464 costs the record and the
+--   plan; it has not let a car leave short.
+
 -- (1) Completed bay atoms against SDRs, by operation, on the 11 runs.
 WITH runs AS (SELECT sim_run_id FROM ottoq_sim_runs
                WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND tick_count >= 144
@@ -153,3 +167,59 @@ SELECT l.duration_basis->>'atom' AS atom, vn.status AS visit_status, x->>'must_d
  WHERE l.sim_run_id IN (SELECT sim_run_id FROM runs) AND l.leg_type IN ('service','wash','detail') AND l.status = 'skipped'
    AND x->>'svc' = l.duration_basis->>'atom' AND x->>'status' IS NULL
  GROUP BY 1, 2, 3 ORDER BY legs DESC;
+
+-- (8) Each departure's charge: the last current_soc the car's state stream carried before it left, by when and by whom.
+WITH runs AS (SELECT sim_run_id, scenario_code, sim_clock_start FROM ottoq_sim_runs
+               WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND tick_count >= 144
+                 AND started_at >= '2026-10-16 00:00+00' AND started_at < '2026-10-18 03:50+00'),
+ev AS (
+  SELECT e.sim_run_id, e.entity_id AS vehicle_id, e.event_seq, e.sim_clock_at AS at,
+         (e.payload->'diff'->'current_state'->>'to' = 'deployed') AS is_dep,
+         (e.payload->'diff'->'current_soc'->>'to')::numeric AS soc_val
+    FROM ottoq_events e
+   WHERE e.sim_run_id IN (SELECT sim_run_id FROM runs) AND e.event_type = 'vehicle.state_changed'
+     AND (e.payload->'diff' ? 'current_soc' OR e.payload->'diff' ? 'current_state')),
+g AS (SELECT ev.*, count(soc_val) OVER (PARTITION BY sim_run_id, vehicle_id ORDER BY event_seq) AS grp FROM ev),
+l AS (SELECT g.*, max(soc_val) OVER (PARTITION BY sim_run_id, vehicle_id, grp) AS last_soc FROM g),
+d AS (
+  SELECT l.*, r.scenario_code, (l.at = r.sim_clock_start) AS at_boot,
+         EXISTS (SELECT 1 FROM ottoq_decisions dd WHERE dd.sim_run_id = l.sim_run_id AND dd.entity_id = l.vehicle_id
+                   AND dd.resolved_action_context = 'redeployment' AND dd.outcome_status = 'enacted'
+                   AND dd.sim_clock BETWEEN l.at - interval '10 minutes' AND l.at) AS by_decide
+    FROM l JOIN runs r USING (sim_run_id) WHERE l.is_dep)
+SELECT scenario_code, at_boot, by_decide, count(*) AS departures, count(last_soc) AS with_soc,
+       count(*) FILTER (WHERE last_soc < 99) AS below_99, min(last_soc) AS min_soc
+  FROM d GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
+
+-- (9) The departures after the boot minute: the car's latest visit before it left, and any of its atoms not done by then.
+WITH runs AS (SELECT sim_run_id, sim_clock_start FROM ottoq_sim_runs
+               WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND tick_count >= 144
+                 AND started_at >= '2026-10-16 00:00+00' AND started_at < '2026-10-18 03:50+00'),
+dep AS (
+  SELECT e.sim_run_id, e.entity_id AS vehicle_id, e.sim_clock_at AS at
+    FROM ottoq_events e JOIN runs r USING (sim_run_id)
+   WHERE e.event_type = 'vehicle.state_changed' AND e.payload->'diff'->'current_state'->>'to' = 'deployed'
+     AND e.sim_clock_at > r.sim_clock_start),
+v AS (
+  SELECT dep.*, (SELECT vn.visit_id FROM ottoq_visit_needs vn
+                  WHERE vn.sim_run_id = dep.sim_run_id AND vn.vehicle_id = dep.vehicle_id AND vn.arrived_at <= dep.at
+                  ORDER BY vn.arrived_at DESC, vn.visit_key DESC LIMIT 1) AS visit_id
+    FROM dep),
+o AS (
+  SELECT v.*, x->>'svc' AS svc, COALESCE(x->>'status', 'pending') AS st
+    FROM v JOIN ottoq_visit_needs vn ON vn.visit_id = v.visit_id
+    CROSS JOIN LATERAL jsonb_array_elements(vn.atoms) x
+   WHERE COALESCE(x->>'status', 'pending') <> 'cancelled'
+     AND (COALESCE(x->>'status', 'pending') <> 'done' OR (x->>'done_at')::timestamptz > v.at))
+SELECT (SELECT count(*) FROM dep) AS departures_after_boot, (SELECT count(*) FROM v WHERE visit_id IS NULL) AS without_a_visit,
+       count(DISTINCT (o.sim_run_id, o.vehicle_id, o.at)) AS departures_with_open_work
+  FROM o;
+
+-- (10) Every atom cancelled on the runs, and what cancelled it.
+WITH runs AS (SELECT sim_run_id FROM ottoq_sim_runs
+               WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND tick_count >= 144
+                 AND started_at >= '2026-10-16 00:00+00' AND started_at < '2026-10-18 03:50+00')
+SELECT x->>'svc' AS svc, x->>'triage_verdict' AS verdict, (x->>'cleared_by_triage')::boolean AS cleared_by_triage, count(*) AS atoms
+  FROM ottoq_visit_needs vn CROSS JOIN LATERAL jsonb_array_elements(vn.atoms) x
+ WHERE vn.sim_run_id IN (SELECT sim_run_id FROM runs) AND x->>'status' = 'cancelled'
+ GROUP BY 1, 2, 3 ORDER BY atoms DESC;
