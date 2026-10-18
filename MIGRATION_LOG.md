@@ -219,7 +219,7 @@
 
 <!-- >>> BEGIN GENERATED INDEX — do not edit by hand; run scripts/gen-migration-index.py -->
 
-## Index, 0134–0751 — GENERATED, not a log
+## Index, 0134–0752 — GENERATED, not a log
 
 The rows above this marker are hand-written narrative. They run to 0133 (2026-08-31) and then
 resume for 0216, 0217, 0218, 0223, 0224, 0225, 0226, 0227, 0228, 0229, 0230, 0231, 0335, 0431, 0432, 0433, 0434, 0435, 0436, 0437, 0438, 0439, 0440, 0442, 0443, 0444, 0445, 0446, 0447, 0448, 0449, 0450, 0559, 0560, 0561, 0564, 0565, 0566, 0567, 0568, 0569, 0570, 0571, 0572, 0573, 0574, 0575, 0576, 0577, 0578, 0579, 0580, 0581, 0582, 0590, 0591, 0592, 0593, 0600, 0601, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0611, 0612, 0613, 0614, 0615, 0616, 0617, 0618, 0619, 0620, 0621, 0622, 0623, 0624, 0625, 0626, 0627, 0628, 0629, 0630, 0631, 0632, 0633, 0634, 0635, 0636, 0637, 0638, 0639, 0640, 0641, 0642, 0643, 0644, 0647, 0648, 0649, 0650, 0651, 0652, 0653, 0654, 0655, 0656, 0657, 0658, 0659, 0690, 0691, 0692, 0693, 0694, 0695, 0696, 0698, 0699 — which are indexed below as well as logged above; the log row is
@@ -811,7 +811,8 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0749](db/migrations/0749_an_evidence_table_is_not_dropped_by_accident.sql) | `PENDING` | no — pending | **An evidence table is not dropped by accident.** (G463) |
 | [0750](db/migrations/0750_every_bay_seat_ends_in_its_leg_and_its_service_record.sql) | `PENDING` | no — pending | **Every bay seat ends in its itinerary leg and its service record.** (G464) |
 | [0751](db/migrations/0751_in_production_only_a_person_answers_a_technician_question.sql) | `PENDING` | no — pending | **In production only a person answers a technician's question.** (G465) |
+| [0752](db/migrations/0752_a_service_reported_done_ends_in_its_leg_and_its_service_record.sql) | `PENDING` | no — pending | **A service reported done ends in its itinerary leg and its service record.** (G466) |
 
-573 migrations indexed.
+574 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
