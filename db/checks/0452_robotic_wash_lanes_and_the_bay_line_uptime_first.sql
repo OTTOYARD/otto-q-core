@@ -2,7 +2,7 @@
 --        Chase, 2026-10-17 evening CT: the wash bays can be assumed robotic (a pull-through exterior wash; for the
 --        interior, an attendant who opens the doors and a robot arm). An urgent issue brings a car home at once and is
 --        fitted in around the cars that can rejoin service right away. Measured for 0746 and 0747.
---        -> G460, G461.
+--        -> G460, G461 (and §5, its open question about the charge line).
 --        Read-only, against gxdrcyphqjzjsuhxuqtg, 2026-10-17 between 7:10 and 7:37 PM CT (00:10 and 00:37 UTC Oct 18,
 --        bounded by clock reads). The runs: the 11 completed runs at the twin depot since 2026-10-16 with 144 or more ticks
 --        (6 normal days, 5 busy days); every number below names the query that reproduces it.
@@ -53,6 +53,30 @@
 --   is an emergency; its other in-depot faults are fitted in). The new key, created as a temporary function and run with
 --   the dial on busy run 96616822 at its end (rolled back), keyed the depot's 120 cars in 67 ms. The executable part is
 --   now md5 298b9337 and the key's body 8d395ffe; the decide's patch, and so its post-image fc843b9e, are unchanged.
+--
+-- ══ §5 THE CHARGE LINE SEATS A CAR HELD BY A REPAIR AHEAD OF CARS THAT COULD EARN (G461's open question; reproduce: (6)) ══
+--
+--   Read 2026-10-17 between 8:24 and 8:32 PM CT, on the same 11 runs. Each charge seat the decide enacted
+--   (stall_assignment, assign_stall, a fast charger or an L2), with the seated car's visit open at that clock carrying a
+--   must-do fault repair not yet done, and, at the same clock, any other car waiting for a charger (arrived_at_gate or
+--   staged_awaiting_service, its state read from its own state-change events) whose visit needs a charge for that kind
+--   of charger and holds no open repair:
+--                     charge seats   to a car held by a repair   ...while a clean car for that kind waited
+--     busy,   fast        1,120                23                              18
+--     busy,   L2            682                29                              19
+--     normal, fast        1,370                 5                               4
+--     normal, L2            215                 3                               1
+--   So on the busy days 37 of 1,802 seats (2.1%) went to a car whose repair would hold it after its charge while a car
+--   that could have gone back to earning waited, and on the normal days 5 of 1,585 (0.3%). It is an upper bound: whether
+--   the waiting car's inlet, cabinet or own plan allowed that charger is not read. These repairs are the arrival-known
+--   faults of the need profile, which carry no fault class. A car with an in-depot fault is a different case and is
+--   already handled: since 0557 the emission gate refuses its charge until its repair is done, and 0558 releases a charger
+--   held for it, so an HV battery thermal event or a charge-system fault is not put on a charger.
+--   Not built. 0743-0747 change who reaches a charger and when (the bay calendar, the holds, the plan, the bay times and
+--   the bay order), and their arms have not run; a third change to the order before they are read would confound all
+--   three. The candidate, for after those arms: the charge line orders a car by whether its charge is on its own critical
+--   path. A car whose repair or bay work will hold it after the charge anyway can wait for a charger without being
+--   ready any later; a car that leaves when its charge ends cannot.
 
 -- (1) G460: each bay seat's timer, from the seat's own state-change event.
 WITH runs AS (SELECT sim_run_id, scenario_code FROM ottoq_sim_runs
@@ -122,3 +146,46 @@ WITH src AS (SELECT p.proname, p.prosrc FROM pg_proc p JOIN pg_namespace n ON n.
               WHERE n.nspname = 'public' AND p.proname IN ('ottoq_recall_naive_threshold_v1', 'ottoq_recall_interval_scheduled_v1')),
 l AS (SELECT proname, t.ord AS ln, t.line FROM src, LATERAL unnest(string_to_array(src.prosrc, E'\n')) WITH ORDINALITY AS t(line, ord))
 SELECT proname, ln, trim(line) FROM l WHERE line ~ 'RETURN QUERY SELECT true' ORDER BY proname, ln;
+
+-- (6) G461's open question: charge seats given to a car held by an open repair while a clean car waited.
+WITH runs AS (SELECT sim_run_id, scenario_code FROM ottoq_sim_runs
+               WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND started_at >= '2026-10-16 00:00' AND tick_count >= 144),
+seats AS (
+  SELECT d.sim_run_id, r.scenario_code, (d.proposed_action->>'vehicle_id')::uuid AS vid, d.proposed_action->>'stall_type' AS kind,
+         (d.context_frame->>'now_ts')::timestamptz AS t
+    FROM ottoq_decisions d JOIN runs r USING (sim_run_id)
+   WHERE d.action_context = 'stall_assignment' AND d.outcome_status = 'enacted'
+     AND d.proposed_action->>'verb' = 'assign_stall' AND d.proposed_action->>'stall_type' IN ('dcfc', 'l2')),
+flagged AS (   -- each seat, and whether the seated car's visit open at that clock holds a must-do repair not yet done
+  SELECT s.*, EXISTS (SELECT 1 FROM jsonb_array_elements(v.atoms) a
+                       WHERE a->>'svc' = 'fault_repair' AND COALESCE((a->>'must_do')::boolean, false)
+                         AND (a->>'done_at' IS NULL OR (a->>'done_at')::timestamptz > s.t)) AS repair_held
+    FROM seats s
+    LEFT JOIN LATERAL (SELECT n.atoms FROM ottoq_visit_needs n
+                        WHERE n.sim_run_id = s.sim_run_id AND n.vehicle_id = s.vid AND n.arrived_at <= s.t
+                        ORDER BY n.arrived_at DESC LIMIT 1) v ON true),
+states AS (    -- each car's state from each change to the next, from its own state-change events
+  SELECT e.sim_run_id, e.entity_id AS vid, e.sim_clock_at AS from_t,
+         lead(e.sim_clock_at) OVER (PARTITION BY e.sim_run_id, e.entity_id ORDER BY e.sim_clock_at, e.event_seq) AS to_t,
+         e.payload->'diff'->'current_state'->>'to' AS st
+    FROM ottoq_events e JOIN runs r USING (sim_run_id)
+   WHERE e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state'),
+waiting AS (   -- at a repair-held seat's clock, the clean cars waiting that need a charge of that kind
+  SELECT h.sim_run_id, h.vid, h.t, w.vid AS wvid
+    FROM flagged h
+    JOIN states w ON w.sim_run_id = h.sim_run_id AND w.vid <> h.vid AND w.from_t <= h.t AND (w.to_t > h.t OR w.to_t IS NULL)
+                 AND w.st IN ('arrived_at_gate', 'staged_awaiting_service')
+    CROSS JOIN LATERAL (SELECT n.atoms FROM ottoq_visit_needs n
+                         WHERE n.sim_run_id = h.sim_run_id AND n.vehicle_id = w.vid AND n.arrived_at <= h.t
+                         ORDER BY n.arrived_at DESC LIMIT 1) wv
+   WHERE h.repair_held
+     AND EXISTS (SELECT 1 FROM jsonb_array_elements(wv.atoms) a WHERE a->>'svc' = 'charge'
+                   AND (a->>'closed_at' IS NULL OR (a->>'closed_at')::timestamptz > h.t)
+                   AND (a->>'charger_class' IS NULL OR a->>'charger_class' = h.kind))
+     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(wv.atoms) a WHERE a->>'svc' = 'fault_repair'
+                   AND COALESCE((a->>'must_do')::boolean, false)
+                   AND (a->>'done_at' IS NULL OR (a->>'done_at')::timestamptz > h.t)))
+SELECT h.scenario_code, h.kind, count(*) AS seats, count(*) FILTER (WHERE h.repair_held) AS repair_held,
+       count(*) FILTER (WHERE h.repair_held AND EXISTS (SELECT 1 FROM waiting w
+                                                         WHERE (w.sim_run_id, w.vid, w.t) = (h.sim_run_id, h.vid, h.t))) AS while_clean_waited
+  FROM flagged h GROUP BY 1, 2 ORDER BY 1, 2;
