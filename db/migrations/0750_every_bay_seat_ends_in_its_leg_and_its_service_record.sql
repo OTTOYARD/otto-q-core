@@ -476,7 +476,7 @@ BEGIN
     END IF;
 
     -- the dial off: a planned leg stays planned
-    DELETE FROM public.ottoq_policy_params
+    UPDATE public.ottoq_policy_params SET param_value = 0
      WHERE scope_type = 'run' AND scope_id = v_run AND param_key = 'bay_exit_closes_its_leg';
     INSERT INTO public.ottoq_itinerary_legs (itinerary_id, sim_run_id, vehicle_id, seq, leg_type, planned_start_sim,
                                              planned_end_sim, planned_duration_s, duration_basis, status)
