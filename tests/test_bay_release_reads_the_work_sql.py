@@ -11,9 +11,10 @@ on it. Executed here, on the scratch PostgreSQL, against the live release and ev
     filed interrupted, its PM reopened, and the interruption emitted, exactly as on arm 82;
   - with the dial the same seat is done, its why says the minutes it held against the minutes booked, its PM stays done
     and nothing is reopened or emitted; a robotic wash done in 5 of its 9 booked minutes, the same;
-  - with the dial, a seat with no completion (a bay fault), on a null timer, from a bay that cannot do the booking's work
-    (arm 88's detail booking left from a wash bay), completed before the booking began, completed in another run, or
-    recorded before the booking was made, is judged by its booked minutes as before;
+  - with the dial, a seat with no completion (a bay fault), on a null timer, completed before the booking began, completed
+    in another run, or recorded before the booking was made, is judged by its booked minutes and reopened as before;
+  - arm 88's detail booking, left from a wash bay with its wash credited: at the default its wash is reopened, as on arm
+    88; with the dial the booking stays interrupted, its interior work stays due, and its wash stays done;
   - a seat that ran its full window is done with no note, and a no-show is released, with or without the dial;
   - 0757 applies, leaves the body it was written to leave (the body less its changes is its pre-image), stores the
     pre-image, catalogues the dial and sets it on the six cells, and refuses a second apply, a release it did not read, a
@@ -60,7 +61,7 @@ LIVE = {
     "ottoq.ottoq_activate_due_bay_reservations(uuid,uuid,timestamp with time zone)": "4fb04e0a5f2d5d16b24fda2f9990f2d1",
 }
 LIVE_DEF = "362e66f84bf215ca68e5113a77fb367b"   # the release's pg_get_functiondef
-AFTER_0757 = "865e45ad22ca6024e289c1b37a1f483f"
+AFTER_0757 = "0f666b832925fd0cd53c5fab1c827883"
 # what STEP 1 says a bay can do, by the state the car leaves
 CAPS = {"in_wash_bay": ["exterior_wash", "sensor_clean"],
         "in_detail_bay": ["interior_deep_clean", "exterior_wash", "interior_tidy"],
@@ -322,22 +323,50 @@ def test_with_the_dial_a_completion_recorded_before_the_booking_was_made_does_no
                                                           occurred="now() - interval '2 hours'"))
 
 
-def test_with_the_dial_a_bay_that_cannot_do_the_booking_is_judged_by_its_minutes(db):
+DT_T, DT_LO, DT_HI = "2026-09-01 12:00:00+00", "2026-09-01 11:57:36+00", "2026-09-01 12:18:36+00"
+
+
+def _detail_from_a_wash_bay(d):
     """Arm 88: a detail booked from 11:57:36 for 21 minutes; the twin seated the car in a wash bay at 11:55 and let it
     out at 12:00 with an exterior wash credited. A wash bay cannot finish a detail."""
-    t, lo, hi = "2026-09-01 12:00:00+00", "2026-09-01 11:57:36+00", "2026-09-01 12:18:36+00"
-    _apply(db)
-    _world(db, t)
-    car = _left_bay(db, "car-DT", "WSH-1", t)
-    _visit(db, car, [{"svc": "exterior_wash", "status": "done", "done_at": t, "must_do": True},
-                     {"svc": "interior_deep_clean", "status": "pending", "must_do": True}])
-    bid = _booking(db, car, "WSH-1", "detail", lo, hi)
-    _completion(db, car, t, "in_wash_bay", ["exterior_wash"])
+    _apply(d)
+    _world(d, DT_T)
+    car = _left_bay(d, "car-DT", "WSH-1", DT_T)
+    _visit(d, car, [{"svc": "exterior_wash", "status": "done", "done_at": DT_T, "must_do": True},
+                    {"svc": "interior_deep_clean", "status": "pending", "must_do": True}])
+    bid = _booking(d, car, "WSH-1", "detail", DT_LO, DT_HI)
+    _completion(d, car, DT_T, "in_wash_bay", ["exterior_wash"])
+    return car, bid
+
+
+def _interrupted_payload(d):
+    return d.json("SELECT payload FROM public.test_bay_events WHERE event_type = 'ottoq.booking_interrupted'")
+
+
+def test_at_the_default_a_detail_booking_left_from_a_wash_bay_reopens_its_wash(db):
+    car, bid = _detail_from_a_wash_bay(db)
+    _release(db, DT_T)
+    _filed_interrupted_and_reopened(db, car, bid, DT_LO, DT_T, "exterior_wash")      # as on arm 88
+    p = _interrupted_payload(db)
+    assert (p["planned_min"], p["actual_min"], p["atoms_reopened"]) == (21.0, 2.4, 1), p
+
+
+def test_with_the_dial_a_detail_booking_left_from_a_wash_bay_stays_interrupted_and_its_wash_stays_done(db):
+    car, bid = _detail_from_a_wash_bay(db)
     _dial(db)
-    _release(db, t)
-    _filed_interrupted_and_reopened(db, car, bid, lo, t, "exterior_wash")
-    payload = db.json("SELECT payload FROM public.test_bay_events WHERE event_type = 'ottoq.booking_interrupted'")
-    assert (payload["planned_min"], payload["actual_min"], payload["atoms_reopened"]) == (21.0, 2.4, 1), payload
+    _release(db, DT_T)
+    got = _booking_row(db, bid)
+    assert got["state"] == "interrupted" and got["reason"] == "bay_exit_before_planned_end" and got["why"] is None, got
+    atoms = _atoms(db, car)
+    assert atoms["exterior_wash"] == {"status": "done", "reopen_reason": None}, atoms    # the wash bay did wash it
+    assert atoms["interior_deep_clean"]["status"] == "pending", atoms                     # the detail's work is still due
+    assert db.val(f"""SELECT a ->> 'cut_short_reason' FROM public.ottoq_visit_needs n, jsonb_array_elements(n.atoms) a
+                      WHERE n.vehicle_id = '{car}' AND a ->> 'svc' = 'interior_deep_clean'""") == "bay_session_interrupted"
+    assert db.val(f"SELECT status || ' ' || (meta ->> 'reopen_reason') FROM public.ottoq_visit_needs WHERE vehicle_id = '{car}'") \
+        == "open bay_session_interrupted"
+    assert _events(db) == "ottoq.visit_reopened,ottoq.booking_interrupted"
+    p = _interrupted_payload(db)
+    assert (p["planned_min"], p["actual_min"], p["atoms_reopened"], p["outstanding_restored"]) == (21.0, 2.4, 0, 1), p
 
 
 def test_a_full_seat_is_done_without_a_note_and_a_no_show_is_released(db):
@@ -367,7 +396,7 @@ def _patch_pairs():
     sql = open(M0757).read()
     olds = dict(re.findall(r"\$o(\d)\$(.*?)\$o\1\$", sql, flags=re.S))
     news = dict(re.findall(r"\$n(\d)\$(.*?)\$n\1\$", sql, flags=re.S))
-    assert sorted(olds) == sorted(news) == ["1", "2", "3", "4", "5"]
+    assert sorted(olds) == sorted(news) == ["1", "2", "3", "4", "5", "6", "7"]
     return [(olds[k], news[k]) for k in sorted(olds)]
 
 

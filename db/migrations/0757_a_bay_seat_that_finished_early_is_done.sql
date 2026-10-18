@@ -8,7 +8,8 @@
 --       when its timer has run out or a completion was reported; a bay fault or a vehicle exception moves a car out by its
 --       own handler and credits nothing. So an early STEP 1 exit is work that took less time than its booking, and the
 --       release undid it: the car was sent back for work it had had. Under a dial, a seat the service flow completed is
---       done however early. The robotic wash cells and the uptime-first cells carry the dial from their first arm.
+--       done however early, and a seat still filed interrupted no longer reopens what the service flow credited. The
+--       robotic wash cells and the uptime-first cells carry the dial from their first arm.
 --
 -- ══ §1 WHY, MEASURED (read-only, 2026-10-18 between 4:15 and 4:27 AM CT and between 4:31 and 4:45 AM CT; db/checks/0451
 --      §20, queries (42)-(45)) ═════════════════════════════════════════════════════════════════════════════════════════
@@ -23,6 +24,8 @@
 --   booking (arm 88) whose car the twin had seated in a wash bay 2.4 minutes before the booking's window began, and which
 --   left it with an exterior wash credited. The test this file adds, read against those ten on the live rows (query (45)),
 --   finds the completion for the 9 service bookings and not for the detail booking, whose wash bay cannot do a detail.
+--   That car was washed, though, and the release reopened the wash it had just had (atoms_reopened 1) while its detail's
+--   interior work was still to do.
 --
 --   And it waits for 0746. Its robotic lanes (wash_lane_physics 2) time a seat by the work and keep the engine's
 --   bookings, 9.0 minutes for a wash and 25.0 for a detail in tick (query (43)). A robotic wash takes 4.25-5.75 minutes,
@@ -44,7 +47,10 @@
 --   ('bay_exit_transition', its window clipped to the exit), and its why says the minutes it held against the minutes
 --   booked. Nothing is reopened and no booking_interrupted is emitted; the seat's legs were closed by STEP 1 at the exit.
 --   A seat with no such completion (a bay fault, a vehicle exception, a null timer, a bay that cannot do the booking's
---   work) is judged by its booked minutes as before. At 0 the read is never run and every booking is judged as before.
+--   work) is judged by its booked minutes as before. And a booking still filed interrupted reopens only the atoms of its
+--   purpose that no such completion credited (the same test, on the event's credited list): arm 88's detail booking
+--   stays interrupted, its interior work stays due and its bound leg is re-planned, and the exterior wash the wash bay did
+--   stays done. At 0 neither read is run and every booking is judged and reopened as before.
 --
 --   Rule 9 holds either way. STEP 1 credits only what its bay can do and the car still had to do, so a seat filed done
 --   here leaves every atom it did not credit open, and the departure test (0543) holds a car with any open: the dial can
@@ -56,8 +62,8 @@
 --   cell: a service seat the twin's own minutes ended early is done there, not reopened. Compare across sweeps with that
 --   in hand.
 --
---   Not changed: the booked-minutes test itself (ottoq.ottoq_booking_interrupted and its other callers), the reopen, a
---   held booking's no-show grace, phases (a) and (b), the activation and the departed-space release. In production
+--   Not changed: the booked-minutes test itself (ottoq.ottoq_booking_interrupted and its other callers), the reopen
+--   itself (0757 changes what the release asks it to reopen, not how), a held booking's no-show grace, phases (a) and (b), the activation and the departed-space release. In production
 --   STEP 1 lets a car out on a reported completion (service_done) and emits the same event, so the dial would read a
 --   reported early finish as done; it is off there, and turning it on is a certified change.
 --
@@ -74,8 +80,9 @@
 --   vehicles and stalls whatever the run. tests/test_bay_release_reads_the_work_sql.py runs this file on the scratch
 --   PostgreSQL against the live release and everything it calls (md5 asserted): 2d2c46af's seat before and after it, at
 --   the default and with the dial; a robotic wash done in 5 of 9 booked minutes; a seat with no completion, on a null
---   timer, from a bay that cannot do the booking's work, before the booking began, in another run, or recorded before the
---   booking was made, each judged by its booked minutes as before; a full seat and a no-show unchanged; V1, P1 and P2.
+--   timer, before the booking began, in another run, or recorded before the booking was made, each judged and reopened
+--   as before; arm 88's detail booking from a wash bay, interrupted with its wash left done and its interior work due
+--   (and at the default, its wash reopened as on arm 88); a full seat and a no-show unchanged; V1, P1 and P2.
 --   The read fails safe: if the event were ever stamped otherwise, it would find nothing and the seat would be judged by
 --   its booked minutes, as today.
 --
@@ -188,7 +195,7 @@ VALUES ('bay_release_reads_the_work',
         'every active bay booking judged by its booked minutes, as before 0757. Research days only until certified.',
         0, 0, 1, 'ottoq.ottoq_release_vacated_spaces (c)', false);
 
--- ── the release: a seat the service flow completed is judged by its work ──
+-- ── the release: a seat the service flow completed is judged by its work, and what it credited stays done ──
 CREATE TEMP TABLE _0757_patch (seq int, c_old text, c_new text) ON COMMIT DROP;
 INSERT INTO _0757_patch VALUES
   -- 1: the dial's variable
@@ -251,7 +258,33 @@ $o5$,
                                           format('0757: the service flow completed the work; held %s of %s booked minutes',
                                                  round(d.actual_s / 60.0, 1), round(d.planned_s / 60.0, 1)))
                                    ELSE b.why END,
-$n5$);
+$n5$),
+  -- 6: the interrupted row carries when its booking was made
+  (6, $o6$      RETURNING b.booking_id, b.vehicle_id, b.stall_id, b.purpose,
+                d.lo, d.planned_s, d.actual_s, d.new_state
+$o6$,
+   $n6$      RETURNING b.booking_id, b.vehicle_id, b.stall_id, b.purpose,
+                d.lo, d.planned_s, d.actual_s, d.new_state,
+                d.booked   -- 0757
+$n6$),
+  -- 7: an interrupted seat reopens only what the service flow did not credit
+  (7, $o7$                    ottoq.ottoq_bay_purpose_atoms(v_rec.purpose),
+$o7$,
+   $n7$                    CASE WHEN v_reads_work
+                         -- 0757 (G474): work the service flow credited since the booking began, not on a null
+                         -- timer, stays done: a wash bay that washed a car booked for a detail did wash it.
+                         THEN ARRAY(SELECT x.svc FROM unnest(ottoq.ottoq_bay_purpose_atoms(v_rec.purpose)) AS x(svc)
+                                     WHERE NOT EXISTS (
+                                       SELECT 1 FROM public.ottoq_events e
+                                        WHERE e.entity_type = 'vehicle' AND e.entity_id = v_rec.vehicle_id
+                                          AND e.occurred_at >= v_rec.booked
+                                          AND e.sim_run_id = p_sim_run_id
+                                          AND e.event_type = 'twin.service_completed'
+                                          AND e.sim_clock_at > v_rec.lo AND e.sim_clock_at <= p_clock
+                                          AND NOT COALESCE((e.payload ->> 'self_healed')::boolean, false)
+                                          AND (e.payload -> 'credited') ? x.svc))
+                         ELSE ottoq.ottoq_bay_purpose_atoms(v_rec.purpose) END,
+$n7$);
 
 DO $patch$
 DECLARE p record; v_def text; n int;
@@ -314,11 +347,12 @@ END $v2$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0757_a_bay_seat_that_finished_early_is_done', false, false,
-        'G474. Dial bay_release_reads_the_work (default 0). ottoq.ottoq_release_vacated_spaces, five anchored changes: '
+        'G474. Dial bay_release_reads_the_work (default 0). ottoq.ottoq_release_vacated_spaces, seven anchored changes: '
         'with the dial, (c) files an active bay booking done, however early its car left, when the car has a '
         'twin.service_completed in the run since the booking began, not on a null timer, out of a bay that does the '
         'booking''s work, and its why notes the minutes held against the minutes booked; any other early exit is judged '
-        'by its booked minutes as before. At 0 the read is not run (V1: body less changes is its pre-image). Cells: '
+        'by its booked minutes as before, and reopens only what the service flow did not credit since the booking began. '
+        'At 0 the read is not run (V1: body less changes is its pre-image). Cells: '
         'robowash_normal_2026_10_18 (4) and uptimefirst_busy_2026_10_18 (2), controls included, before their first arm. '
         'No certification arm, canon cell or dial experiment sets the dial.',
         now());

@@ -697,11 +697,12 @@ jobs:
       # asserted), 0757 run whole: before it, and after it at the dial's default, 2d2c46af's service seat (48 minutes
       # booked, 35.5 held, its PM credited) is filed interrupted and its PM reopened; with the dial it is done, its why
       # says the minutes held against the minutes booked, and nothing is reopened; a robotic wash done in 5 of 9 booked
-      # minutes, the same; a seat with no completion, on a null timer, from a bay that cannot do the booking's work,
-      # completed before the booking began, in another run or recorded before the booking was made is judged by its booked
-      # minutes; a full seat and a no-show are unchanged; the body less its changes is its pre-image; the six cells carry
-      # the dial; 0757 refuses a second apply, a release or service flow it did not read, another function naming the
-      # event, a sweep with an arm run, and a database without 0746 and 0747. 19 tests, about 15 seconds.
+      # minutes, the same; a seat with no completion, on a null timer, completed before the booking began, in another run
+      # or recorded before the booking was made is judged and reopened as before; arm 88's detail booking left from a wash
+      # bay stays interrupted with its wash left done; a full seat and a no-show are unchanged; the body less its changes is
+      # its pre-image; the six cells carry the dial; 0757 refuses a second apply, a release or service flow it did not
+      # read, another function naming the event, a sweep with an arm run, and a database without 0746 and 0747. 20 tests,
+      # about 18 seconds.
       - name: A bay seat that finished early is done, executed (0757)
         env:
           PGHOST: localhost

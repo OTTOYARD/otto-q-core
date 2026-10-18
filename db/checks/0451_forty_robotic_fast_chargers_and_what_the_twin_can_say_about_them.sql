@@ -958,9 +958,11 @@
 --   events are stamped with, and the test finds the completion for the 9 service bookings and not for arm 88's detail
 --   booking. That car (a1111111-...-0006) was seated in a wash bay at 11:55 sim, 2.4 minutes before its detail booking's
 --   window began, and let out at 12:00 with an exterior wash credited from a wash bay's set; a wash bay cannot finish a
---   detail, so 0757 leaves that booking to its booked minutes and its wash is still reopened (a detail booking served from
---   a wash bay, noted, not built). 0757 sets the dial on the robowash and uptimefirst cells, controls included, before
---   their first arm. The fallback's record is named, not built: section (5) files a promote_ready with must-do work
+--   detail, so 0757 leaves that booking interrupted, its interior work due and its bound leg re-planned, but under the
+--   dial an interrupted booking reopens only what no such completion credited, so the wash it had stays done (at the
+--   default it is reopened, as on arm 88). Why the twin washed a car booked for a detail 2.4 minutes before its window,
+--   in the bay the detail held, is noted, not traced. 0757 sets the dial on the robowash and uptimefirst cells, controls
+--   included, before their first arm. The fallback's record is named, not built: section (5) files a promote_ready with must-do work
 --   deferred as enacted.
 
 -- ══ QUERIES ══
