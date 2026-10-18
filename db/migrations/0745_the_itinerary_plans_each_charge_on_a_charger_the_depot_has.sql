@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018111301
 -- migration-name:    the_itinerary_plans_each_charge_on_a_charger_the_depot_has
 --
 -- 0745  **The itinerary plans each charge on a charger the depot has, timed on the depot's learned charge clock.** (G459)
@@ -331,3 +331,22 @@ VALUES ('0745_the_itinerary_plans_each_charge_on_a_charger_the_depot_has', false
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:13:01 UTC (6:13 AM CT), ledger version 20261018111301 ══════════════════════════════════════
+--
+--   Through apply_migration with nothing in flight (no run live and nothing in flight, read before and after; the file's
+--   own P0 at the apply). The text sent, BEGIN through COMMIT and one newline, is 15,679 characters, md5
+--   712ca77098f2689e04d0104afc2fbd04, equal to the ledger's statements[1] read back; its executable part is 15,663
+--   characters, md5 3f382ac975d2eaf0b9ecede7782f4819, equal to this file's. public.ottoq_plan_visit_itinerary is now md5
+--   b18eef1a0b1b9b8f855c939f37cd00b3 (prosrc), the body the dry run of 2026-10-17 at 6:14 PM CT left and
+--   tests/test_itinerary_charge_on_clock_sql.py pins on the scratch PostgreSQL. Sweep itinclock_normal_2026_10_17 is
+--   queued (two cells, priority 16).
+--
+--   End to end on live, rolled back by its own raise at 11:43:47 UTC (6:43 AM CT): a probe run at the twin depot; a car
+--   at 60% with an open visit (charge, and an exterior wash in a wash bay). At the dial's default the planner wrote
+--   charge_l2 for 230.5 minutes on {flow_contract, charger_kw_assumed 11}; with itinerary_charge_on_clock 1, charge_l2
+--   for 154.1 minutes on the charge clock (kind_basis soc_rule, 19.2 kW); and with every L2 stall made a fast charger
+--   inside the same transaction, charge_dcfc for 83.3 minutes on the clock (kind_basis
+--   the_only_kind_the_car_can_use_here, 350 kW), the wash leg starting at that charge's end. The first attempt, at
+--   11:43:04 UTC, put a wash atom with no concurrency on the probe's visit, and the planner, rightly, planned no wash
+--   leg for it; the probe was corrected, not the planner.

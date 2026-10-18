@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018112154
 -- migration-name:    in_production_only_a_person_answers_a_technician_question
 --
 -- 0751  **In production only a person answers a technician's question.** (G465)
@@ -238,3 +238,14 @@ VALUES ('0751_in_production_only_a_person_answers_a_technician_question', false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:21:54 UTC (6:21 AM CT), ledger version 20261018112154 ══════════════════════════════════════
+--
+--   Dry-run first on live, read at 11:21:22 UTC (6:21 AM CT): the executable part in one execute_sql ending in a block
+--   that raises, so it rolled back. Every premise and check passed, V2's switch of the twin depot to an external feed
+--   included (rolled back with it), and the scan after it read 5c991974d364622df215e75c66c6078c. Then through
+--   apply_migration with nothing in flight (the file's own P0 at the apply; no run live, read after). The text sent,
+--   BEGIN through COMMIT and one newline, is 9,048 characters, md5 de25b9d22f398cfd788e5dca13fe9777, equal to the
+--   ledger's statements[1] read back; its executable part is 9,032 characters, md5 e6985bafaae5ea1103acdd08b25e7924,
+--   equal to this file's. twin.ottoq_opportunistic_scan is now md5 5c991974d364622df215e75c66c6078c (prosrc) and carries
+--   'CONTINUE WHEN NOT v_feed_sim AND v_rec.op_verdict IS NULL'; the twin depot still reads feed_mode 'sim'.

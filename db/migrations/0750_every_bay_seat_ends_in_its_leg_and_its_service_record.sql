@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018112027
 -- migration-name:    every_bay_seat_ends_in_its_leg_and_its_service_record
 --
 -- 0750  **Every bay seat ends in its itinerary leg and its service record.** (G464)
@@ -550,3 +550,23 @@ VALUES ('0750_every_bay_seat_ends_in_its_leg_and_its_service_record', false, fal
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:20:27 UTC (6:20 AM CT), ledger version 20261018112027 ══════════════════════════════════════
+--
+--   Dry-run first on live, at 11:18:46 UTC (6:18 AM CT) by the server log: the executable part in one
+--   execute_sql ending in a block that raises, so it rolled back. Every premise and check passed, V3's end-to-end probe
+--   of the leg trigger and the live SDR emitter included, and the service flow after it read
+--   f871ecad1ccb2c9a85d92a2c466de2d6. Then through apply_migration with nothing in flight (the file's own P0 at the
+--   apply; no run live, read after). The text sent, BEGIN through COMMIT and one newline, is 29,661 characters, md5
+--   a12602c3168015953c550945c551f2ff, equal to the ledger's statements[1] read back; its executable part is 29,645
+--   characters, md5 35c0beb783d31e33c2a74a0fda606fc7, equal to this file's. twin.ottoq_sim_advance_service_flow is now
+--   md5 f871ecad1ccb2c9a85d92a2c466de2d6 (prosrc), the dry run's. Sweep bayexit_normal_2026_10_18 is queued (one cell,
+--   priority 16).
+--
+--   End to end on live, rolled back by its own raise at 11:48:17 UTC (6:48 AM CT): a probe run at the twin depot; a car
+--   in_wash_bay on NASH-WSH-01 seated five minutes before the clock through a needs_card wash booking, a planned wash
+--   leg tagged exterior_wash, its timer up at the clock; twin.ottoq_sim_advance_service_flow for the run at the clock.
+--   At the dial's default the car left the bay and its leg stayed planned with no SDR; with bay_exit_closes_its_leg 1
+--   the car left, the leg was done from the seat to the timer's end, the booking named it and an SDR (wash) named both.
+--   public.ottoq_bay_seat_record_coverage on arm 84's run (b54f6de5) read the wash 2 of 29 seats with a done leg and an
+--   SDR (6.9%), the detail 7 of 41 (17.1%) and the service bay 1 of 14 (7.1%).

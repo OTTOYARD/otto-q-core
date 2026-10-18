@@ -60,6 +60,16 @@
 --   not exist. V3 the dial is catalogued 0..1 default 0 and not agent-writable, and the sweep's cell is arm 95's plus the
 --   dial. Executed in full by tests/test_bay_activation_frees_parking_sql.py on the live bodies (md5 asserted).
 --
+--   APPLY WITH A PERSON AT THE CONNECTOR. Its live dry run on 2026-10-18, sent after 0754's apply (ledger 11:29:08 UTC,
+--   6:29 AM CT) and before 0756's dry run (11:32:57 UTC), was held by the Supabase connector for a person's approval and
+--   given up after 60 seconds: the server
+--   log holds no statement of it between 11:15 and 11:40 UTC, while it holds every other dry run that morning, and
+--   pg_stat_activity showed nothing running. Not established, but likely: its third anchor, and the text that replaces
+--   it, carry `UPDATE public.vehicles SET current_stall_id = ..., current_state = ...,` cut off before the statement's
+--   WHERE, which read alone is an UPDATE of every car (0603's UPDATE of four rows is held the same way). It was not
+--   retried and not reworded. 0743, which it builds on, is applied (ledger 20261018110944), and the activation is still
+--   the body P1 pins (80d42bc1), so it can be dry-run and applied unchanged with a person there to approve it.
+--
 -- ══ §4 RECERT AND DIAL CLASSIFICATION ═════════════════════════════════════════════════════════════════════════════════
 --
 --   forces_recert FALSE and forces_dial_restart FALSE. At the dial's default the call computes what it computed before

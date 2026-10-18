@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018113339
 -- migration-name:    a_proposal_ages_on_the_clock_it_was_stamped_in
 --
 -- 0756  **A proposal ages on the clock it was stamped in.** (G473)
@@ -66,7 +66,6 @@
 --   DELETE FROM public.ottoq_cert_lineage WHERE name = '0756_a_proposal_ages_on_the_clock_it_was_stamped_in'.
 
 BEGIN;
-
 SET LOCAL lock_timeout = '5s';
 
 -- ── P0: nothing in flight ──
@@ -273,3 +272,17 @@ VALUES ('0756_a_proposal_ages_on_the_clock_it_was_stamped_in', false, false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:33:39 UTC (6:33 AM CT), ledger version 20261018113339 ══════════════════════════════════════
+--
+--   Dry-run first on live, read at 11:32:57 UTC (6:32 AM CT): the executable part in one execute_sql ending in a block
+--   that raises, so it rolled back. Every premise and check passed, V2's probe run and its four proposals included, and
+--   the disposer after it read 196b3a19a1453bc89c0cf0e1d61b2243, carrying 'v_ttl_now timestamptz := now();' and no '<
+--   v_wall'. Then through apply_migration with nothing in flight (the file's own P0 at the apply; no run live, read
+--   after). The dry run and the apply both sent the file's text less the blank line after BEGIN, which the copy dropped;
+--   this file was then changed to hold exactly what the ledger holds, by removing that one blank line, so it reads as
+--   applied (before, its executable part was 11,912 characters, md5 294dbb7c). The text sent, BEGIN through COMMIT and
+--   one newline, is 11,927 characters, md5 8a7ed7774148c4df70a7f83cb1ed55c3, equal to the ledger's statements[1] read
+--   back; its executable part is 11,911 characters, md5 0bb93a4ad17984d82dd3edae501e9275, equal to this file's now.
+--   public.ottoq_dispose_external_proposals is now md5 196b3a19a1453bc89c0cf0e1d61b2243 (prosrc), carries 'v_ttl_now
+--   timestamptz := now();' and no '< v_wall'.

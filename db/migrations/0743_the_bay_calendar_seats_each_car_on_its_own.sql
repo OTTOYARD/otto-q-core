@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018110944
 -- migration-name:    the_bay_calendar_seats_each_car_on_its_own
 --
 -- 0743  **The bay calendar seats each car on its own, and waits for a car the robotic arm still holds.** (G457)
@@ -306,3 +306,19 @@ VALUES ('0743_the_bay_calendar_seats_each_car_on_its_own', false, false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:09:44 UTC (6:09 AM CT), ledger version 20261018110944 ══════════════════════════════════════
+--
+--   Through apply_migration with the sweep window closed and nothing in flight (P0 read 0, no run live, no runner, at
+--   11:08:50 UTC, 6:08 AM CT). The text sent, BEGIN through COMMIT and one newline, is 13,921 characters, md5
+--   1dd41c5c08d8df168abcad21f7264381, equal to the ledger's statements[1] read back; its executable part is 13,905
+--   characters, md5 ddd7ce686070928fb01b9873b186a469, equal to this file's. ottoq.ottoq_activate_due_bay_reservations is
+--   now md5 80d42bc1a54521582a14948f6951a891 (prosrc), the body 0755's P1 pins. Sweep bayseat_normal_2026_10_17 is
+--   queued (one cell, priority 16).
+--
+--   End to end on live, rolled back by its own raise at 11:42:03 UTC (6:42 AM CT): a probe run at the twin depot; car A
+--   in charge_complete_holding on NASH-DCFC-STALL-01 with the arm holding it an hour ahead, car B staged on NASH-
+--   STG-B001, each with a held wash reservation in its window on an empty bay (NASH-WSH-01, -02). At the dial's default
+--   the call seated 0 and both cars, both bookings and both bays were as before; with bay_activation_per_seat 1 (run
+--   scope) it seated 1: B in its wash bay with its booking active, A left on its charger with its booking held, and the
+--   staging stall B left named no one.

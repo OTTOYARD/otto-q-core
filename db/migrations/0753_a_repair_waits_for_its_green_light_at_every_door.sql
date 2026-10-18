@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018112725
 -- migration-name:    a_repair_waits_for_its_green_light_at_every_door
 --
 -- 0753  **A repair waits for its technician's green-light at every door.** (G467)
@@ -491,3 +491,15 @@ VALUES ('0753_a_repair_waits_for_its_green_light_at_every_door', false, false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:27:25 UTC (6:27 AM CT), ledger version 20261018112725 ══════════════════════════════════════
+--
+--   Dry-run first on live, read at 11:26:11 UTC (6:26 AM CT): the executable part in one execute_sql ending in a block
+--   that raises, so it rolled back. Every premise and check passed, V3's probe run, its repair, its question, its
+--   approval and decline and its real-feed question included, and the departure test after it read
+--   d5e4d262f68870a3b8d72e113fe68d45. Then through apply_migration after 0751, with nothing in flight and no run live at
+--   the twin depot (the file's own P0 at the apply; read after). The text sent, BEGIN through COMMIT and one newline, is
+--   25,586 characters, md5 737b2ac591effcad3ac53732c14a2860, equal to the ledger's statements[1] read back; its
+--   executable part is 25,570 characters, md5 8737d09e6668b923c45073a5984a751b, equal to this file's.
+--   public.ottoq_departure_clear is now md5 d5e4d262f68870a3b8d72e113fe68d45 (prosrc) and names
+--   repair_needs_its_green_light. Sweep repairgl_busy_2026_10_18 is queued (one cell, priority 16).

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018112438
 -- migration-name:    a_service_reported_done_ends_in_its_leg_and_its_service_record
 --
 -- 0752  **A service reported done ends in its itinerary leg and its service record.** (G466)
@@ -474,3 +474,14 @@ VALUES ('0752_a_service_reported_done_ends_in_its_leg_and_its_service_record', f
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:24:38 UTC (6:24 AM CT), ledger version 20261018112438 ══════════════════════════════════════
+--
+--   Dry-run first on live, read at 11:23:25 UTC (6:23 AM CT): the executable part in one execute_sql ending in a block
+--   that raises, so it rolled back. Every premise and check passed, V3's probe run and its report through the seam
+--   included, and the seam after it read 7f9dbcbe403914d46986b4216ca9ac4a. Then through apply_migration after 0750, with
+--   nothing in flight and no run live at the twin depot (the file's own P0 at the apply; read after). The text sent,
+--   BEGIN through COMMIT and one newline, is 24,917 characters, md5 ba0cfaad92f0884589a812059df752b6, equal to the
+--   ledger's statements[1] read back; its executable part is 24,901 characters, md5 ecfe4b1637c09aa97315796defefe2b3,
+--   equal to this file's. public.ottoq_ingest_service_complete is now md5 7f9dbcbe403914d46986b4216ca9ac4a (prosrc) and
+--   calls public.ottoq_close_reported_work_legs; the dial's catalog description names 0752.

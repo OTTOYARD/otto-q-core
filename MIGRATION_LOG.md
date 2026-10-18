@@ -802,21 +802,21 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0740](db/migrations/0740_a_promise_on_the_busy_day.sql) | `20261017174210` | yes — ledger | **A promise on the busy day.** The depot as built over the busy day, as arm 82 ran it, with 0736's recorder on, |
 | [0741](db/migrations/0741_the_promise_is_graded_beside_what_the_owner_app_says.sql) | `20261017182220` | yes — ledger | **The promise is graded beside what the owner app says.** When a car arrives, the owner app (and a personal |
 | [0742](db/migrations/0742_a_promise_stays_honest_while_the_car_waits.sql) | `20261017185512` | yes — ledger | **A promise stays honest while the car waits.** OTTO-Q's ready-by estimate was right at arrival and wrong |
-| [0743](db/migrations/0743_the_bay_calendar_seats_each_car_on_its_own.sql) | `PENDING` | no — pending | **The bay calendar seats each car on its own, and waits for a car the robotic arm still holds.** (G457) |
-| [0744](db/migrations/0744_a_bay_hold_follows_a_charge_that_runs_past_its_plan.sql) | `PENDING` | no — pending | **A bay hold follows a charge that runs past its plan, instead of holding an empty bay.** (G458) |
-| [0745](db/migrations/0745_the_itinerary_plans_each_charge_on_a_charger_the_depot_has.sql) | `PENDING` | no — pending | **The itinerary plans each charge on a charger the depot has, timed on the depot's learned charge clock.** (G459) |
-| [0746](db/migrations/0746_robotic_wash_lanes_and_bay_work_timed_by_the_work.sql) | `PENDING` | no — pending | **The twin times a car's work in a wash bay by the work, and can run the wash bays as robotic lanes.** (G460) |
-| [0747](db/migrations/0747_the_bay_line_serves_the_car_that_rejoins_service_soonest.sql) | `PENDING` | no — pending | **The bay line serves first the car that will be back in service soonest. An urgent repair is fitted in around |
-| [0748](db/migrations/0748_an_evidence_table_refuses_truncate_and_only_a_migration_says_what_is_evidence.sql) | `PENDING` | no — pending | **An evidence table refuses TRUNCATE, and only a migration says what is evidence.** (G456) |
+| [0743](db/migrations/0743_the_bay_calendar_seats_each_car_on_its_own.sql) | `20261018110944` | yes — ledger | **The bay calendar seats each car on its own, and waits for a car the robotic arm still holds.** (G457) |
+| [0744](db/migrations/0744_a_bay_hold_follows_a_charge_that_runs_past_its_plan.sql) | `20261018111140` | yes — ledger | **A bay hold follows a charge that runs past its plan, instead of holding an empty bay.** (G458) |
+| [0745](db/migrations/0745_the_itinerary_plans_each_charge_on_a_charger_the_depot_has.sql) | `20261018111301` | yes — ledger | **The itinerary plans each charge on a charger the depot has, timed on the depot's learned charge clock.** (G459) |
+| [0746](db/migrations/0746_robotic_wash_lanes_and_bay_work_timed_by_the_work.sql) | `20261018111429` | yes — ledger | **The twin times a car's work in a wash bay by the work, and can run the wash bays as robotic lanes.** (G460) |
+| [0747](db/migrations/0747_the_bay_line_serves_the_car_that_rejoins_service_soonest.sql) | `20261018111537` | yes — ledger | **The bay line serves first the car that will be back in service soonest. An urgent repair is fitted in around |
+| [0748](db/migrations/0748_an_evidence_table_refuses_truncate_and_only_a_migration_says_what_is_evidence.sql) | `20261018111650` | yes — ledger | **An evidence table refuses TRUNCATE, and only a migration says what is evidence.** (G456) |
 | [0749](db/migrations/0749_an_evidence_table_is_not_dropped_by_accident.sql) | `PENDING` | no — pending | **An evidence table is not dropped by accident.** (G463) |
-| [0750](db/migrations/0750_every_bay_seat_ends_in_its_leg_and_its_service_record.sql) | `PENDING` | no — pending | **Every bay seat ends in its itinerary leg and its service record.** (G464) |
-| [0751](db/migrations/0751_in_production_only_a_person_answers_a_technician_question.sql) | `PENDING` | no — pending | **In production only a person answers a technician's question.** (G465) |
-| [0752](db/migrations/0752_a_service_reported_done_ends_in_its_leg_and_its_service_record.sql) | `PENDING` | no — pending | **A service reported done ends in its itinerary leg and its service record.** (G466) |
-| [0753](db/migrations/0753_a_repair_waits_for_its_green_light_at_every_door.sql) | `PENDING` | no — pending | **A repair waits for its technician's green-light at every door.** (G467) |
-| [0754](db/migrations/0754_a_billed_half_hour_holds_thirty_minutes.sql) | `PENDING` | no — pending | **A billed half hour holds thirty minutes.** (G469) |
+| [0750](db/migrations/0750_every_bay_seat_ends_in_its_leg_and_its_service_record.sql) | `20261018112027` | yes — ledger | **Every bay seat ends in its itinerary leg and its service record.** (G464) |
+| [0751](db/migrations/0751_in_production_only_a_person_answers_a_technician_question.sql) | `20261018112154` | yes — ledger | **In production only a person answers a technician's question.** (G465) |
+| [0752](db/migrations/0752_a_service_reported_done_ends_in_its_leg_and_its_service_record.sql) | `20261018112438` | yes — ledger | **A service reported done ends in its itinerary leg and its service record.** (G466) |
+| [0753](db/migrations/0753_a_repair_waits_for_its_green_light_at_every_door.sql) | `20261018112725` | yes — ledger | **A repair waits for its technician's green-light at every door.** (G467) |
+| [0754](db/migrations/0754_a_billed_half_hour_holds_thirty_minutes.sql) | `20261018112908` | yes — ledger | **A billed half hour holds thirty minutes.** (G469) |
 | [0755](db/migrations/0755_a_parked_car_leaves_its_stall_before_the_calendar_seats_it.sql) | `PENDING` | no — pending | **A parked car leaves its stall before the bay calendar seats it.** (G471) |
-| [0756](db/migrations/0756_a_proposal_ages_on_the_clock_it_was_stamped_in.sql) | `PENDING` | no — pending | **A proposal ages on the clock it was stamped in.** (G473) |
-| [0757](db/migrations/0757_a_bay_seat_that_finished_early_is_done.sql) | `PENDING` | no — pending | **A bay seat that finished early is done.** (G474) |
+| [0756](db/migrations/0756_a_proposal_ages_on_the_clock_it_was_stamped_in.sql) | `20261018113339` | yes — ledger | **A proposal ages on the clock it was stamped in.** (G473) |
+| [0757](db/migrations/0757_a_bay_seat_that_finished_early_is_done.sql) | `20261018113640` | yes — ledger | **A bay seat that finished early is done.** (G474) |
 
 579 migrations indexed.
 

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018111537
 -- migration-name:    the_bay_line_serves_the_car_that_rejoins_service_soonest
 --
 -- 0747  **The bay line serves first the car that will be back in service soonest. An urgent repair is fitted in around
@@ -322,3 +322,22 @@ VALUES ('0747_the_bay_line_serves_the_car_that_rejoins_service_soonest', false, 
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:15:37 UTC (6:15 AM CT), ledger version 20261018111537 ══════════════════════════════════════
+--
+--   Through apply_migration after 0746 (its P1 read 0746's decide, b90378b7), with nothing in flight (no run live and
+--   nothing in flight, read before and after; the file's own P0 at the apply). The text sent, BEGIN through COMMIT and
+--   one newline, is 15,279 characters, md5 48e802dd10e2b46693afa04c6f941ebd, equal to the ledger's statements[1] read
+--   back; its executable part is 15,263 characters, md5 298b933759473f804779b3ea0c0e5a54, equal to this file's.
+--   public.ottoq_decide_tick is now md5 fc843b9e0d50ec33325ef32ac296759a and public.ottoq_bay_uptime_order_key
+--   8d395ffe7d79d5d4149f08755dff4078 (prosrc), the bodies the dry run and the key's hazard-class probe of 2026-10-17
+--   evening left. robowash_normal_2026_10_18 now has its four cells and uptimefirst_busy_2026_10_18 its two, priority
+--   14.
+--
+--   End to end on live, rolled back by its own raise at 11:47:26 UTC (6:47 AM CT): a probe run at the twin depot; three
+--   staged cars at 100% with every other need fresh, one needing mechanical_pm (24 minutes, the needs card's urgency
+--   critical), one fault_repair (101 minutes, severity 2, overdue) and one fault_repair whose atom carries fault_class
+--   hv_battery_thermal (severity 2, overdue). Section (4b)'s patched cursor, taken from the decide's prosrc between 'FOR
+--   v_need IN' and the first newline-LOOP with the run, depot and clock substituted: at bay_order_uptime_first 0 the
+--   order was the PM car, the repair, the thermal car, every upf_key NULL (urgency first); at 1 the thermal car first
+--   [0,1,0,1,1,101], the PM car second [1,1,0,1,0,24] and the severity-2 repair third [1,1,0,1,1,101].

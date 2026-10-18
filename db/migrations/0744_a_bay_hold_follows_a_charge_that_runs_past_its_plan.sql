@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018111140
 -- migration-name:    a_bay_hold_follows_a_charge_that_runs_past_its_plan
 --
 -- 0744  **A bay hold follows a charge that runs past its plan, instead of holding an empty bay.** (G458)
@@ -232,3 +232,18 @@ VALUES ('0744_a_bay_hold_follows_a_charge_that_runs_past_its_plan', false, false
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:11:40 UTC (6:11 AM CT), ledger version 20261018111140 ══════════════════════════════════════
+--
+--   Through apply_migration with nothing in flight (P0 read 0, no run live, at 11:08:50 UTC, and the file's own P0 at
+--   the apply). The text sent, BEGIN through COMMIT and one newline, is 10,473 characters, md5
+--   5946a93a223aabe253a01fce58765917, equal to the ledger's statements[1] read back; its executable part is 10,457
+--   characters, md5 d3e19fb5dd71e36c1790e5b343df8781, equal to this file's. ottoq.ottoq_reconcile_bay_reservations is
+--   now md5 75485e67a20dbb022fe23f817743d213 (prosrc), the body tests/test_bay_hold_follows_charge_sql.py pins on the
+--   scratch PostgreSQL. Sweep bayhold_normal_2026_10_17 is queued (one cell, priority 16).
+--
+--   End to end on live, rolled back by its own raise at 11:42:25 UTC (6:42 AM CT): a probe run at the twin depot; a car
+--   charging_dcfc on NASH-DCFC-STALL-01 whose charge leg was planned to end ten minutes before the clock, with a wash
+--   hold on NASH-WSH-01 due now. At the dial's default the reconcile moved nothing (the hold -1..17 minutes, held,
+--   nothing logged); with bay_hold_follows_charge 1 it moved the hold to 21..39 minutes, one 18-minute service length
+--   and the 3-minute taxi ahead, logged deferred / vehicle_not_yet_releasable / charging_past_plan, defer_seq 1.

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018112908
 -- migration-name:    a_billed_half_hour_holds_thirty_minutes
 --
 -- 0754  **A billed half hour holds thirty minutes.** (G469)
@@ -231,3 +231,16 @@ VALUES ('0754_a_billed_half_hour_holds_thirty_minutes', false, false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:29:08 UTC (6:29 AM CT), ledger version 20261018112908 ══════════════════════════════════════
+--
+--   Dry-run first on live, read at 11:28:28 UTC (6:28 AM CT): the executable part in one execute_sql ending in a block
+--   that raises, so it rolled back. Every premise and check passed. V2 proved on arm 100 (run e9794779): the whole day's
+--   half hour 1643.7 kW, equal to the arm's stored peak_30min_kw, and the half hour from 180 minutes 895.4 kW starting
+--   at minute 435. The profile after it read dac6333a916965f1b59717f7e10e8523 and the scorer
+--   d2e60bdd16b10735189834e7f5fe7e86. Then through apply_migration with nothing in flight (the file's own P0 at the
+--   apply; no run live, read after). The text sent, BEGIN through COMMIT and one newline, is 9,691 characters, md5
+--   ef6d3b86fb7afb78b609027d30fe75ab, equal to the ledger's statements[1] read back; its executable part is 9,675
+--   characters, md5 d4e263e1cbecc99722a6a45de1ea9ff6, equal to this file's. public.ottoq_arm_peak_profile is now md5
+--   dac6333a916965f1b59717f7e10e8523 and public.ottoq_dial_arm_metrics d2e60bdd16b10735189834e7f5fe7e86 (prosrc), the
+--   dry run's.

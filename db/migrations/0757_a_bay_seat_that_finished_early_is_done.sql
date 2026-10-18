@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018113640
 -- migration-name:    a_bay_seat_that_finished_early_is_done
 --
 -- 0757  **A bay seat that finished early is done.** (G474)
@@ -358,3 +358,16 @@ VALUES ('0757_a_bay_seat_that_finished_early_is_done', false, false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:36:40 UTC (6:36 AM CT), ledger version 20261018113640 ══════════════════════════════════════
+--
+--   Dry-run first on live, read at 11:35:53 UTC (6:35 AM CT): the executable part in one execute_sql ending in a block
+--   that raises, so it rolled back. Every premise and check passed; the release after it read
+--   0f666b832925fd0cd53c5fab1c827883 and the six cells carried the dial. Then through apply_migration after 0746, 0747
+--   and 0756, with no arm of either sweep run and nothing in flight (the file's own P0 at the apply; no run live, read
+--   at 11:36:47 UTC). The text sent, BEGIN through COMMIT and one newline, is 16,105 characters, md5
+--   8cb724bb63122d6ed8f44634eb46264f, equal to the ledger's statements[1] read back; its executable part is 16,089
+--   characters, md5 0449e02e8cb864d76a10e307f0a44abe, equal to this file's. ottoq.ottoq_release_vacated_spaces is now
+--   md5 0f666b832925fd0cd53c5fab1c827883 (prosrc), the body tests/test_bay_release_reads_the_work_sql.py pins in its
+--   test world, and carries v_reads_work; the four cells of robowash_normal_2026_10_18 and the two of
+--   uptimefirst_busy_2026_10_18 carry bay_release_reads_the_work 1. Nothing here or after it called the release on live.

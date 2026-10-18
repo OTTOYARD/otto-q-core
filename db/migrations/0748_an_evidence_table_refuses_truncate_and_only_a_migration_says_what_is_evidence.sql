@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018111650
 -- migration-name:    an_evidence_table_refuses_truncate_and_only_a_migration_says_what_is_evidence
 --
 -- 0748  **An evidence table refuses TRUNCATE, and only a migration says what is evidence.** (G456)
@@ -394,3 +394,18 @@ VALUES ('0748_an_evidence_table_refuses_truncate_and_only_a_migration_says_what_
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:16:50 UTC (6:16 AM CT), ledger version 20261018111650 ══════════════════════════════════════
+--
+--   Through apply_migration after 0743-0747, with no run initializing or running and nothing in flight (read before; the
+--   file's own P0 at the apply), on the first try: no lock timeout. The text sent, BEGIN through COMMIT and one newline,
+--   is 15,837 characters, md5 6d8a3931dc2b8a60142d00a67c1f0a53, equal to the ledger's statements[1] read back; its
+--   executable part is 15,821 characters, md5 9e00d2d31c5a2c0d56e0d7e020bd86c9, equal to this file's. Read back at
+--   11:16:57 UTC: 98 tables carry ottoq_evidence_no_truncate_trg and public.ottoq_assert_evidence_truncate_guard()
+--   returns no rows.
+--
+--   End to end on live, rolled back by its own raise at 11:47:48 UTC (6:47 AM CT): TRUNCATE
+--   public.p7_band_probe_2026_08_03 was refused with 42501 and this file's message;
+--   public.ottoq_assert_evidence_truncate_guard() returned no rows; service_role held TRUNCATE on none of the 100
+--   evidence tables or the registry, read the registry and inserted into public.ottoq_model_call_ledger; and a table
+--   created and registered as evidence inside the check was guarded at once.

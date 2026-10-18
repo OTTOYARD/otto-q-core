@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261018111429
 -- migration-name:    robotic_wash_lanes_and_bay_work_timed_by_the_work
 --
 -- 0746  **The twin times a car's work in a wash bay by the work, and can run the wash bays as robotic lanes.** (G460)
@@ -426,3 +426,24 @@ VALUES ('0746_robotic_wash_lanes_and_bay_work_timed_by_the_work', false, false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-18 11:14:29 UTC (6:14 AM CT), ledger version 20261018111429 ══════════════════════════════════════
+--
+--   Through apply_migration with nothing in flight (no run live and nothing in flight, read before and after; the file's
+--   own P0 at the apply). The text sent, BEGIN through COMMIT and one newline, is 21,485 characters, md5
+--   b8b1df531390f13494789806031f0ed4, equal to the ledger's statements[1] read back; its executable part is 21,469
+--   characters, md5 2627e8ba20b39833b5a67dbf3bc86b47, equal to this file's. The post-images are the dry run's of
+--   2026-10-17 between 7:20 and 7:37 PM CT (prosrc): twin.ottoq_sim_advance_service_flow
+--   d7f2ee279455242f966492869305adb1, public.ottoq_decide_tick b90378b7b46b7adcfa4ef938a791d395,
+--   public.ottoq_l2_propose_charge_disposition 7b56721a38ccd720d2919cffd5fca495. Sweep robowash_normal_2026_10_18 is
+--   queued (three cells here, priority 14; 0747 adds its fourth).
+--
+--   End to end on live, rolled back by its own raise at 11:45:17 UTC (6:45 AM CT): a probe run at the twin depot; one
+--   car in_wash_bay and one in_detail_bay (NASH-WSH-01, -02) seated three minutes before the clock, each timed to its
+--   booking's end with its bay need bound; twin.ottoq_sim_advance_service_flow for the run at the clock. At
+--   wash_lane_physics 0 neither timer moved (9 and 25 minutes from the seat) and the staff gate read 2; at 1 each was
+--   retimed from its seat, the wash to 10.000 and the detail to 22.093 minutes (9 and 25 times the deal), the bay needs
+--   moved with them, bay_plan_ends_at kept the old ends and the gate read the two supervisors; at 2 the wash took 5.278
+--   and the detail 15.221 minutes and the gate was NULL. The service flow sets no search_path of its own, so a direct
+--   call needs the world tick's (twin, ottoq, public, extensions); the first attempt, without it, could not find
+--   twin.ottoq_sim_lane_capacity.
