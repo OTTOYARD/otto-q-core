@@ -3,7 +3,8 @@
 --        0724's and 0725's overnight sweeps, beside five things found on the way: the twin's power model (§2), busy_day's
 --        wall (§5), why every overnight arm gets ten times slower as its day goes on (§6), cars with no charge facts
 --        (§7), and two latent rule-9 regressions in dormant certification arms (§8).
---        -> G443-G447; later sections G448-G459, G468-G469 (§16, §17), G471-G472 (§18), G473 (§19) and G474 (§20).
+--        -> G443-G447; later sections G448-G459, G468-G469 (§16, §17), G471-G472 (§18), G473 (§19) and G474 (§20);
+--        the third night's arms (§21), the service clock rehearsed, G475 (§22), and the queue (§23).
 --        Read-only throughout, against gxdrcyphqjzjsuhxuqtg, 2026-10-17 from 05:51:42 UTC (the first query's now()).
 --        Arms' own rows are cited by arm_id and sim_run_id; every number below names the query that reproduces it.
 --
@@ -305,6 +306,9 @@
 --      depot as built, not 45%: 205 against 159, the slowest 5% at 274 minutes against 378, and 108.4 more car-hours
 --      (15.6% unmet against 25.3%), every car still at 100% with nothing open. The lag had cut every wash seat a tick
 --      short, and forty posts are wash-bound, so it flattered them most.
+--      READ 2026-10-19 (§21): on a second seed, in tick, forty posts served 202 cars against 135 as built, met 132.8
+--      more car-hours (12.6% unmet against 24.5%) and cut the slowest 5% from 410 to 274 minutes, every car at 100% with
+--      nothing open. Two readings now: 29-50% more cars and 108-133 more car-hours in the 12-hour day.
 --
 --   2. SIZE THE POSTS BY THEIR PRICE, NOT BY THE STALLS. Forty posts were busy 41% of the day against the ten's 69%,
 --      and the curve bends: posts 11-20 met 5.8 car-hours each in the 12-hour day (an upper bound until 0734 measures
@@ -323,6 +327,13 @@
 --      short wash seats, so it bent the curve the wrong way at both ends. On this reading twenty posts pay clearly and
 --      the second twenty do not, because past twenty the wash is the wall (§13, G458): the second twenty wait on the wash
 --      line's fixes (0743-0747) and their arms. One seed; seeds 2 and 3 have not run.
+--      READ 2026-10-19 (§21, db/checks/0452 §6): on the second seed posts 11-20 bought 6.8 car-hours each and posts
+--      21-40 bought 3.2. Two readings: 6.8-7.7 and 1.6-3.2, about $4,100-4,600 and $950-1,900 a month per post at the
+--      same prices, against about $1,700. The second twenty pay on one seed and not on the other. Robotic wash lanes at
+--      forty posts met 22.0 more car-hours (about $13,200 a month at $20, one seed), what 7-14 more posts past twenty
+--      buy, and moved the wash's wall from the bays to the calendar: the bays sat about half idle while walk-ins were
+--      refused behind reservations whose cars never came. So the staged build stands: twenty posts now; the second
+--      twenty wait on seed 3 (tonight) and on robotic lanes with the calendar's fixes (robofix, Tuesday night, §23).
 --
 --   3. DO NOT SIZE THE GRID TO THE NAMEPLATE. Forty posts with nothing holding them drew 3.9 MW for the 6 AM plug-in.
 --      On the existing 2.5 MW service, behind 2.4 MW of shared cabinets, they met 941.8 car-hours (held at 2.16 MW,
@@ -332,6 +343,11 @@
 --      ABB units 0567 and 0728 cite) with OTTO-Q deciding the split. No utility upgrade is needed for this day's load.
 --      CORRECTED 2026-10-18 (§16): the opening draw is 3.7 MW on the chargers' own readings (3,731 kW on arm 84, 3,749
 --      in tick on arm 95); the site meter's 3,874 counted some new charges' first intervals twice.
+--      READ 2026-10-19 (§21): in tick, holding forty posts at 2.16 MW on today's service cost 25.2 car-hours on seed 1
+--      and 21.5 on seed 2 against a grid with power to spare (2.3-2.7%); with the lag it had cost 0.9. Every refused
+--      start (130 and 118) came at the opening with the meter itself over the held cap, the twin's first reading
+--      (G448), and the in-tick held cells ran without 0733's dial. Its arm runs tonight (heldtick, §23); until it lands,
+--      the 22 car-hours include the twin's own first-reading error.
 --
 --   4. THE BILL TO MANAGE IS THE DEMAND CHARGE, AND THE TARIFF IS A YEARLY DECISION. At GSA-3's $21.40-21.78 per kW
 --      of the month's highest half hour, the unmanaged forty cost $51,228 a month in demand on the whole day against
@@ -347,6 +363,12 @@
 --      the opening fell 13.9% at ten posts, 11.7% at forty and 14.8% at forty held, and every car's outcome was the
 --      same. Those three pairs ran with the lag on both sides, so quote the shares, not the dollars. The held site's
 --      first in-tick arm (answer_normal's fourth cell) runs in the window that opens at 11:00 PM CT on 2026-10-18.
+--      READ 2026-10-19 (§21): the held site's first in-tick arms. Past the opening its billed half hour was 786.9 kW
+--      against 940.6 unheld on seed 1 ($16,840 a month against $20,129) and 889.4 against 764.3 on seed 2: the starts it
+--      refused at the opening ran later, into the billed window. On the whole day, 1,552.8 against 1,955.2 and 1,579.6
+--      against 1,813.8. So holding the site cuts the opening, which the value view does not bill, and does not reliably
+--      cut the half hour it does. The battery planning for the billed window cut that half hour 11.7-14.8% with the
+--      lag (above); it has not run in tick.
 --
 --   5. WHAT THE ENGINE NEEDS BEFORE A REAL CONVERSION, as certified changes, each already measured in the twin:
 --      (a) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
@@ -385,6 +407,8 @@
 --      0737's arm did not run in the window that closed at 6:00 AM CT on 2026-10-18: the runner does not start a new
 --      sweep's first arm, estimated at its 5,400-second budget, with less than that left (§15). It runs with the lag,
 --      against arm 85, in the window that opens at 11:00 PM CT on 2026-10-19 by §15's schedule.
+--      CHANGED 2026-10-19 at 6:36 AM CT (§23): it runs in tick, against arm 107 (the held site in tick), in that window,
+--      beside 0733's first reading in tick (heldtick).
 --
 --   7. WHAT IS NOT KNOWN YET. One seed per cell, so every gap above is a single reading. The repeats of arms 84 and 86
 --      that 0725's sweep holds run the same seed again: they test whether a reading repeats from one night to the next,
@@ -398,6 +422,8 @@
 --      in tick, against arms 93, 94 and 95 and answer_normal's held-site cell: by §15's schedule three of the eight in
 --      the window that opens at 11:00 PM CT on 2026-10-18 and the other five a night later. Until they land, every
 --      figure above is one seed.
+--      READ 2026-10-19 (§21): all four seed-2 arms landed (108-111). Each sizing figure now has two readings, a range
+--      and not a spread; seed 3's four arms run in the window that opens at 11:00 PM CT on 2026-10-19 (§23).
 --
 -- ══ §11 THE BATTERY PLANS FOR A BILL THE VALUE VIEW DOES NOT CHARGE (G447; reproduce: (9)) ══════════════════════════
 --
@@ -1209,6 +1235,167 @@
 --   and uptimefirst_busy carry bay_release_reads_the_work 1, which the queue step kept when it added the tick dial (§15).
 --   Nothing called the release on live. The robotic arms run first in the window that opens at 11:00 PM CT on
 --   2026-10-18; query (42) on them should find no seat the service flow credited filed interrupted.
+
+-- ══ §21 THE THIRD NIGHT: 0756 AND 0757 HOLD, THE HELD SITE IN TICK, AND A SECOND SEED (G448, G468, G470, G473, G474;
+--        reproduce: (3b), (31), (33), (34), (40), (42), (50), (56)) ════════════════════════════════════════════════════
+--
+--   Read 2026-10-19 between 6:11 and 6:38 AM CT, from the eleven arms the runner finished overnight, 101-111. The
+--   robotic lanes and uptime first (arms 101-106) are read in db/checks/0452 §6 and §7, the service clock in §22 here.
+--
+--   The runner (cron.job_run_details for job 783 from 04:00 UTC). Eleven arms back to back from 11:02 PM CT, all
+--   complete, none errored: robowash_normal's four landed at 11:38 PM, 12:12, 12:49 and 1:26 AM CT (arms 101-104),
+--   uptimefirst_busy's two at 2:08 and 2:49 (105, 106), answer_normal's held-site cell at 3:26 (107) and seeds23's four
+--   seed-2 arms at 3:58, 4:32, 5:08 and 5:44 (108-111). From 5:44 every firing took 0 seconds: the next arm, seeds23's
+--   seed-3 arm at ten posts, is estimated at its cell's longest wall (1,892 s) and would have ended past 6:00. Against
+--   §15's schedule (robowash to about 1:30, uptimefirst to about 3:15, the held site to about 3:50, three seed-2 arms to
+--   about 5:30) every arm landed early. The normal days in tick took 32-36 minutes, the busy days 40-41, and the fourth
+--   seed-2 arm fit.
+--
+--   G473 after 0756 (query (40)). No arm of the eleven expired a proposal as 'ttl_elapsed', and eight of them ran past
+--   35 minutes of their own transaction (36.1-41.8 minutes). Before 0756, 42 arms past 35 minutes had expired 1,527
+--   proposals between them (§19). The disposer reads the TTL on the clock the proposal was stamped in.
+--
+--   G474 after 0757 (query (42) on the six robowash and uptimefirst runs, counted by release_reason and by the
+--   ottoq.booking_interrupted events, never by state). No booking was closed as 'bay_exit_before_planned_end' and no
+--   interruption event was written, against 4 on arm 95, the same cell without the dial. No seat completed on a null
+--   timer. On the robotic arms most seats end before their booking does (77 of 121 robotic washes in 5 minutes, §22),
+--   and none was reopened.
+--
+--   The held site in tick: arm 107 (answer_normal's fourth cell) against arm 95 on seed 1, and arm 111 (seeds23's held
+--   cell) against arm 110 on seed 2. Forty posts behind 2.4 MW of shared cabinets held at 2.16 MW on today's 2.5 MW
+--   service (0729's managed reading), against forty with power to spare (outcomes from query (56)):
+--                                          seed 1: 95 -> 107        seed 2: 110 -> 111
+--     cars served (visits)                 205 (250) -> 209 (257)   202 (230) -> 195 (233)
+--     deployed car-hours                   940.5 -> 915.3           973.8 -> 952.3
+--     unmet ride demand                    15.6% -> 17.8%           12.6% -> 14.5%
+--     door p95 (min)                       274 -> 263               274 -> 275
+--     EN.001 refused starts (3b)           0 -> 130                 0 -> 118
+--       refused seats (34)                 0 -> 0                   0 -> 0
+--     billed half hour, from 180 min (kW)  940.6 -> 786.9           764.3 -> 889.4
+--     whole-day half hour (kW)             1,955.2 -> 1,552.8       1,813.8 -> 1,579.6
+--   Every car left at 100% with nothing open on all four. Every refused start came at the opening (6:05-6:35 AM CT sim
+--   on arm 107, 6:05-7:20 on arm 111), with the meter itself over the held 2,160 kW (2,164.7-2,282.0 and 2,161.3-2,308.0)
+--   and judged on the held limit (query (34)): G448's first reading, a new session metered at its full rate. The in-tick
+--   held cells ran without 0733's dial; with the lag, arm 85 refused 85 and arm 89, with the dial, none. None of the
+--   refusals moved to the seat assignment (G470's kind did not appear in tick), and on arm 107 the DC pool bound in one
+--   tick (query (3b)). So in tick the held site cost 25.2 car-hours on seed 1 and 21.5 on seed 2 (2.3-2.7%), where with
+--   the lag it cost 0.9 (arm 85 against arm 84), and part of that is the twin's own first-reading error. On the bill:
+--   the first in-tick figures for a held site at forty posts. Holding cut the whole day's half hour by 402 and 234 kW,
+--   the opening, which the value view does not bill (0577), and moved the billed half hour by -154 kW on seed 1 and +125
+--   kW on seed 2: the starts refused at the opening ran later, into the billed window. Holding the site does not
+--   reliably cut the half hour that is billed.
+--
+--   The meter in tick (query (31)). On all eleven arms the twin's site meter is within -1.4% to +0.4% of what the
+--   sessions delivered (arm 101: 277 sessions, 8,605 kWh; arm 107: 274, 8,432; arm 110: 260, 8,470). G468's
+--   over-count was the lag's; in tick the meter is honest.
+--
+--   The sizing curve on a second seed: seeds23's seed-2 arms (value_2026_09_30's seed 305838298283560562) against arms
+--   93-95 on seed 1, all in tick, OTTO-Q, the normal day (query (56)):
+--                                          10 posts          20 posts          40 posts
+--     seed 1, arms 93, 94, 95
+--       deployed car-hours                 832.1             909.0             940.5
+--       cars served (visits)               159 (208)         177 (219)         205 (250)
+--       door p95 (min)                     378               325               274
+--       unmet ride demand                  25.3%             18.4%             15.6%
+--       must-do work done                  87.2%             88.6%             89.5%
+--     seed 2, arms 108, 109, 110
+--       deployed car-hours                 841.0             909.3             973.8
+--       cars served (visits)               135 (192)         163 (210)         202 (230)
+--       door p95 (min)                     410               304               274
+--       unmet ride demand                  24.5%             18.4%             12.6%
+--       must-do work done                  80.9%             85.1%             91.0%
+--   Posts 11-20 bought 7.69 car-hours each on seed 1 and 6.83 on seed 2; posts 21-40 bought 1.58 and 3.23. So 7.7 holds
+--   roughly and 1.6 does not: two readings put the first ten extra posts at 6.8-7.7 car-hours each in the 12-hour day
+--   and the second twenty at 1.6-3.2. Two seeds give a range, not a spread. Every car left at 100% with nothing open on
+--   all four seed-2 arms. 0452 query (6) on every new arm: 1 seat each on the seed-2 arms (4 of 972) went to a car held
+--   by a repair while a clean car for that kind waited.
+--   And every HW.005 refusal on arms 101-111 (13-93 an arm, 81-93 on seed 2) is again the Zoox 229f655b of G313 (query
+--   (50) on 101-111), so each pair carries it on both sides. Its fix, 0603, still waits for Chase at the connector.
+--
+-- ══ §22 THE SERVICE CLOCK, REHEARSED ON THE ROBOTIC ARMS: NOT EARNED THERE, AND WHERE IT WOULD BE (G475; reproduce:
+--        (51)-(55)) ═══════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   Read 2026-10-19 between 6:21 and 6:31 AM CT. The clock (§20, and the plan of 2026-10-18's 11:05 prompt, item (7)) is
+--   OTTO-Q's own estimate of how long a bay seat takes at this depot, learned from closed seats, keyed on the world the
+--   bays were timed in, and read by the planner's wash and detail legs (the median seat) and by decide section (4b)'s
+--   walk-in window (a high quantile). It was to be built only if a rehearsal out of sample on the robotic arms earned it.
+--
+--   The key. All thirty arms 82-111 ran on the twin depot at 5 sim-minutes a tick (arm 90 at 2.5), and every robotic
+--   arm at the robotic dials' defaults (robotic_wash_min 5.0, robotic_detail_min 16.5). So the robotic key holds four
+--   arms, all in tick: 103 and 104 on the normal day, 105 and 106 on the busy day. The crews timed by the work
+--   (wash_lane_physics 1) hold one, arm 102. At wash_lane_physics 0 a seat lasts its booking, so those seats teach
+--   nothing.
+--
+--   The seats, each from its car's own state-change events (entering in_wash_bay or in_detail_bay, to its next state;
+--   query (51)), never from a booking. Robotic washes took 5 minutes (77 of 121) or 10 (44); robotic details 15 (65 of
+--   185) or 20 (118), and two left early. The 5-minute tick rounds each exit up. Leave one robotic arm out and learn from
+--   the other three, for each of the four: a wash's median is 5 and its 90th percentile 10, a detail's 20 and 20. The
+--   crews' seats on arm 102: washes 5-15 minutes (mean 10.89), details 20-35 (mean 29.41).
+--
+--   What the engine plans today. A wash or detail leg lasts its atom's est_min, which the manifest prices around
+--   service_cadence_policy's est_min_default: 10 minutes for exterior_wash and 20 for interior_deep_clean (on arm 103 the
+--   detail legs ran 13-30 minutes, mean 20.2; the wash legs 8-10, mean 8.8). Section (4b) asks for a bay for the car's
+--   planned leg of that kind, else for ottoq_sim_service_minutes' base, 9 and 25 (query (52)):
+--                                          robotic, arms 103 / 104      crews timed, arm 102
+--     detail seat, mean (min)              18.00 / 17.93                29.41
+--     detail leg, mean (min)               20.1 / 20.2                  20.1
+--     leg's mean absolute error (min)      4.73 / 4.71                  9.41
+--     details that outran their booking    1 of 45 / 1 of 41            27 of 34
+--       and ran into the bay's next one    1 / 1                        17
+--     wash seat, leg, mean (min)           6.72, 8.8 / 6.85, 8.8        10.89, 8.8
+--     leg's mean absolute error (min)      2.89 / 2.84                  2.58
+--     washes that outran, into the next    10, 0 / 10, 0                26, 1
+--   On the robotic arms the clock's median would cut the leg's error to about 1.9 minutes for a detail and 1.8 for a
+--   wash, and its 90th percentile, 20 minutes for a detail, covers every robotic detail seat. A robotic wash that outran
+--   a 9-minute booking left at the next tick, 10 minutes, and never reached the bay's next booking.
+--
+--   The decision it was to change, rehearsed (query (54), arm 103). Section (4b) was refused a wash bay 259 times for 26
+--   cars. Re-scored on the final booking rows with each of three windows, a bay was free for the whole job on 57 of the
+--   244 detail refusals at 25 minutes, 76 at the car's own leg (mean 20.7 minutes) and 75 at the clock's 20: the clock
+--   frees 6 that the legs did not, and the legs 7 that the clock did not. On the 15 wash refusals: 1, 2 and 1. A bay was
+--   free for the next five minutes on 155 of the 244, so what blocked them was a hold ahead, not the job's length. The
+--   holds that never came (query (55)): of the 9 wash-bay no-shows on arm 103 (and the 9 on arm 104), 5 were cars parked
+--   in staging at their slot, which the calendar cannot seat (G471; 0755, held at the connector for Chase), and 4 were
+--   cars still on their charger (0744's bay_hold_follows_charge, not on these cells). So on the robotic arms the clock
+--   changes no walk-in. Its gain there is a smaller error on legs that already average near the robotic seat, by the
+--   coincidence that the catalog's 20 minutes for a deep clean is a 16.5-minute robotic cycle rounded up to the tick.
+--
+--   Where it would earn it is the crews' world: the depot as staffed today, with its crews' own times honoured (G475).
+--   There the catalog's 20 minutes is short of the crews' 25 (drawn 0.7-1.3 times, ottoq_variability_catalog's
+--   detail_time): 27 of 34 deep cleans outran their booking, and 17 ran into the bay's next one. Rehearsed in time on arm
+--   102 (query (53): learn from the seats that ended by the median exit, 12:40 PM CT sim, and judge the 15 details that
+--   began after it), the clock's median of 30 minutes misses by 3.33 minutes on average against 11.15 for the legs, and
+--   its 90th percentile, 35, holds all 15, against 1 of 15 within its leg. The washes gain nothing (1.92 against 1.71).
+--   One arm and one seed, and no arm has run with an honest leg, so what it buys in cars and car-hours is not measured.
+--
+--   VERDICT: 0758 is not built. The robotic arms do not earn it. The crews' world might, and production would learn
+--   from its own seats, not from either of the twin's two numbers for one deep clean. It is built after the calendar's
+--   own fixes are read (0743, 0744, 0745 and 0750 run tonight, §23), since they move the same holds, with its own arm
+--   on the crews' world against arm 102.
+--
+-- ══ §23 THE QUEUE FOR THE NIGHT OF 2026-10-19/20, AND THE SCHEDULE ═══════════════════════════════════════════════════
+--
+--   Changed at 6:36 AM CT (11:36:07 UTC) in one block that refused if an arm was in flight:
+--     byneed_normal_2026_10_17 (0737): its cell now carries twin_answer_in_tick 1, so it pairs with arm 107 (the held
+--       site in tick) instead of arm 85 (with the lag).
+--     heldtick_normal_2026_10_19 (0733; new, priority 15): arm 107's cell plus dc_power_first_reading 1, against arm 107.
+--       It measures how much of the held site's 25.2 car-hours in tick is the twin's first reading (§21).
+--     robofix_normal_2026_10_19 (G458, G460; new, priority 16): robowash's control plus the calendar's four fixes (0743
+--       bay_activation_per_seat, 0744 bay_hold_follows_charge, 0745 itinerary_charge_on_clock, 0750
+--       bay_exit_closes_its_leg), and the same plus wash_lane_physics 2. With arms 101 and 103, a two-by-two: robotic
+--       lanes with and without the calendar's fixes. If tonight's single-fix arms show one of the four doing harm, it
+--       comes out of both cells before they run.
+--
+--   THE SCHEDULE, realistic, from last night's walls (a normal day in tick: forty posts 2,055-2,184 s, held 2,091-2,152,
+--   ten posts 1,892, twenty 2,002; a busy day at forty posts 2,427-2,485). The runner starts nothing whose estimate (its
+--   cell's longest wall, else its sweep's, else the sweep's budget) would end past 6:00 AM CT.
+--     The window opening at 11:00 PM CT on Monday 2026-10-19: heldtick (about 36 minutes) to about 11:40 PM; seeds23's
+--       four seed-3 arms (32-36 minutes each) to about 2:00 AM CT; byneed to about 2:35; bayseat, bayhold, itinclock's two
+--       and bayexit (about 30-37 minutes each) to about 5:35. repairgl's control, estimated at its sweep's 3,000-second
+--       budget, would then end past 6:00 and waits, so repairgl's two arms run on one night.
+--     The window opening at 11:00 PM CT on Tuesday 2026-10-20: repairgl's two busy-day arms (perhaps 35-42 minutes
+--       each), robofix's two (about 36), then dcfc40_power_busy's three (with the lag), to about 4:00 AM CT, then the
+--       older priority-19 and -20 cells.
 
 -- ══ QUERIES ══
 
@@ -2515,3 +2702,167 @@ SELECT a.arm_id, count(*) FILTER (WHERE NOT e.passed) AS hw005_failures,
   FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_rule_evaluations e ON e.sim_run_id = a.sim_run_id
  WHERE a.arm_id BETWEEN 82 AND 100 AND e.rule_code LIKE 'HW.005%'
  GROUP BY 1 ORDER BY 1;
+
+-- (51) G460, G475, §22: each wash and detail seat from its car's own state-change events (entering the bay, to its next
+--      state), never from a booking, per arm and by five-minute bucket.
+WITH runs(run, arm, phys) AS (VALUES
+   ('c6c13b8b-ce14-471c-963c-86606e73f499'::uuid, 101, 0), ('1972b9ae-bd93-4859-bb01-66ac45f6fcd2'::uuid, 102, 1),
+   ('d4af72ed-7021-42d2-ac93-dd8ce967b109'::uuid, 103, 2), ('24de96a8-279c-4f9b-baf4-d5ff0e55367f'::uuid, 104, 2),
+   ('5a14f274-ef58-45ab-9625-b34edff6b92f'::uuid, 105, 2), ('ab79a5c6-6aef-4196-ae4e-c9c4015254c0'::uuid, 106, 2)),
+ch AS (
+  SELECT r.arm, r.phys, e.entity_id AS vehicle_id, e.sim_clock_at AS t, e.payload->'diff'->'current_state'->>'to' AS st,
+         lead(e.sim_clock_at) OVER (PARTITION BY e.sim_run_id, e.entity_id ORDER BY e.sim_clock_at, e.event_seq) AS next_t
+    FROM runs r JOIN public.ottoq_events e ON e.sim_run_id = r.run
+   WHERE e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state'),
+seats AS (SELECT arm, phys, st AS bay, next_t, extract(epoch FROM next_t - t)/60.0 AS m
+            FROM ch WHERE st IN ('in_wash_bay','in_detail_bay'))
+SELECT arm, phys, bay, count(*) AS seats, count(*) FILTER (WHERE next_t IS NULL) AS open_at_end,
+       round(avg(m)::numeric, 2) AS mean_min,
+       count(*) FILTER (WHERE m <= 5) AS le5, count(*) FILTER (WHERE m > 5 AND m <= 10) AS le10,
+       count(*) FILTER (WHERE m > 10 AND m <= 15) AS le15, count(*) FILTER (WHERE m > 15 AND m <= 20) AS le20,
+       count(*) FILTER (WHERE m > 20 AND m <= 25) AS le25, count(*) FILTER (WHERE m > 25 AND m <= 30) AS le30,
+       count(*) FILTER (WHERE m > 30) AS gt30, round(max(m)::numeric, 1) AS max_min
+  FROM seats GROUP BY 1, 2, 3 ORDER BY 3, 1;
+
+-- (52) G475, §22: each wash and detail seat against its car's leg of that kind (the one planned nearest the seat) and
+--      the booking that covers it: the leg's error, the seats that outran their booking, and those that ran into the
+--      bay's next booking.
+WITH runs(run, arm, phys) AS (VALUES
+   ('1972b9ae-bd93-4859-bb01-66ac45f6fcd2'::uuid, 102, 1), ('d4af72ed-7021-42d2-ac93-dd8ce967b109'::uuid, 103, 2),
+   ('24de96a8-279c-4f9b-baf4-d5ff0e55367f'::uuid, 104, 2)),
+ch AS (
+  SELECT r.arm, r.phys, r.run, e.entity_id AS vehicle_id, e.sim_clock_at AS t, e.payload->'diff'->'current_state'->>'to' AS st,
+         lead(e.sim_clock_at) OVER (PARTITION BY e.sim_run_id, e.entity_id ORDER BY e.sim_clock_at, e.event_seq) AS next_t
+    FROM runs r JOIN public.ottoq_events e ON e.sim_run_id = r.run
+   WHERE e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state'),
+seats AS (SELECT arm, phys, run, vehicle_id, CASE st WHEN 'in_detail_bay' THEN 'detail' ELSE 'wash' END AS kind,
+                 t AS seat_at, next_t AS left_at, extract(epoch FROM next_t - t)/60.0 AS m
+            FROM ch WHERE st IN ('in_wash_bay','in_detail_bay') AND next_t IS NOT NULL),
+j AS (
+  SELECT s.*,
+         (SELECT round(l.planned_duration_s / 60.0, 1) FROM public.ottoq_itinerary_legs l
+           WHERE l.sim_run_id = s.run AND l.vehicle_id = s.vehicle_id AND l.leg_type = s.kind
+           ORDER BY abs(extract(epoch FROM l.planned_start_sim - s.seat_at)) LIMIT 1) AS leg_min,
+         b.booking_id, b.stall_id, upper(b.during) AS bk_end, extract(epoch FROM upper(b.during) - lower(b.during))/60.0 AS bk_min
+    FROM seats s LEFT JOIN LATERAL (
+      SELECT b.* FROM public.ottoq_stall_bookings b
+       WHERE b.sim_run_id = s.run AND b.vehicle_id = s.vehicle_id AND b.purpose IN ('wash','detail')
+         AND b.during @> s.seat_at ORDER BY lower(b.during) DESC LIMIT 1) b ON true)
+SELECT arm, kind, count(*) AS seats, round(avg(m)::numeric, 2) AS seat_mean, round(avg(leg_min)::numeric, 1) AS leg_mean,
+       round(avg(abs(leg_min - m))::numeric, 2) AS leg_mae, count(*) FILTER (WHERE leg_min IS NULL) AS no_leg,
+       round(avg(bk_min)::numeric, 1) AS booked_mean, count(*) FILTER (WHERE booking_id IS NULL) AS no_booking,
+       count(*) FILTER (WHERE left_at > bk_end) AS outran_booking,
+       count(*) FILTER (WHERE left_at > bk_end AND EXISTS (
+          SELECT 1 FROM public.ottoq_stall_bookings b2 WHERE b2.sim_run_id = j.run AND b2.stall_id = j.stall_id
+             AND b2.booking_id <> j.booking_id AND lower(b2.during) >= j.bk_end AND lower(b2.during) < j.left_at)) AS outran_into_next_booking
+  FROM j GROUP BY 1, 2 ORDER BY 2, 1;
+
+-- (53) G475, §22: the clock rehearsed in time on one run (arm 102, the crews timed by the work): learn the median and
+--      90th percentile seat from the seats that ended by the run's median exit, and judge the seats that began after it
+--      against the clock and against the car's own leg.
+WITH runs(run, arm) AS (VALUES ('1972b9ae-bd93-4859-bb01-66ac45f6fcd2'::uuid, 102)),
+ch AS (
+  SELECT r.arm, r.run, e.entity_id AS vehicle_id, e.sim_clock_at AS t, e.payload->'diff'->'current_state'->>'to' AS st,
+         lead(e.sim_clock_at) OVER (PARTITION BY e.sim_run_id, e.entity_id ORDER BY e.sim_clock_at, e.event_seq) AS next_t
+    FROM runs r JOIN public.ottoq_events e ON e.sim_run_id = r.run
+   WHERE e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state'),
+seats AS (SELECT arm, run, vehicle_id, CASE st WHEN 'in_detail_bay' THEN 'detail' ELSE 'wash' END AS kind, t AS seat_at,
+                 next_t AS left_at, extract(epoch FROM next_t - t)/60.0 AS m
+            FROM ch WHERE st IN ('in_wash_bay','in_detail_bay') AND next_t IS NOT NULL),
+cut AS (SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY left_at) AS c FROM seats),
+train AS (SELECT kind, percentile_disc(0.5) WITHIN GROUP (ORDER BY m) AS p50, percentile_disc(0.9) WITHIN GROUP (ORDER BY m) AS p90,
+                 count(*) AS n
+            FROM seats, cut WHERE left_at <= cut.c GROUP BY kind),
+test AS (
+  SELECT s.*, (SELECT round(l.planned_duration_s / 60.0, 1) FROM public.ottoq_itinerary_legs l
+                WHERE l.sim_run_id = s.run AND l.vehicle_id = s.vehicle_id AND l.leg_type = s.kind
+                ORDER BY abs(extract(epoch FROM l.planned_start_sim - s.seat_at)) LIMIT 1) AS leg_min
+    FROM seats s, cut WHERE s.seat_at > cut.c)
+SELECT t.kind, tr.n AS train_n, tr.p50 AS clock_p50, tr.p90 AS clock_p90, count(*) AS test_n,
+       round(avg(t.m)::numeric, 2) AS test_seat_mean, round(avg(t.leg_min)::numeric, 1) AS test_leg_mean,
+       round(avg(abs(t.leg_min - t.m))::numeric, 2) AS leg_mae, round(avg(t.leg_min - t.m)::numeric, 2) AS leg_bias,
+       round(avg(abs(tr.p50 - t.m))::numeric, 2) AS clock_mae, round(avg(tr.p50 - t.m)::numeric, 2) AS clock_bias,
+       count(*) FILTER (WHERE t.m <= t.leg_min) AS within_leg, count(*) FILTER (WHERE t.m <= tr.p90) AS within_clock_p90,
+       (SELECT c FROM cut) AS cut_sim
+  FROM test t JOIN train tr USING (kind) GROUP BY t.kind, tr.n, tr.p50, tr.p90 ORDER BY 1;
+
+-- (54) G475, §22: decide section (4b)'s walk-in refusals for a wash bay (no_free_space) re-scored with three windows
+--      from the refusal's tick: today's base (25 minutes for a detail, 9 for a wash), the car's own leg of that kind,
+--      and the clock's 90th percentile (20 and 10 on the robotic key); and whether a bay was free for the next five
+--      minutes at all. Final booking rows, as in query (26).
+WITH runs(run, arm) AS (VALUES ('d4af72ed-7021-42d2-ac93-dd8ce967b109'::uuid, 103)),
+bays AS (SELECT s.id FROM public.stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'wash_bay'),
+refusals AS (
+  SELECT r.arm, r.run, d.sim_clock AS t, d.entity_id AS vehicle_id, d.proposed_action ->> 'purpose' AS purpose
+    FROM runs r JOIN public.ottoq_decisions d ON d.sim_run_id = r.run
+   WHERE d.action_context = 'task_start' AND d.proposed_action ->> 'source' = 'needs_card'
+     AND d.proposed_action ->> 'stall_type' = 'wash_bay' AND d.enacted_action ->> 'verb' = 'hold_no_space'
+     AND d.enacted_action ->> 'reason' = 'no_free_space'),
+w AS (
+  SELECT f.*, CASE WHEN f.purpose = 'detail' THEN 25 ELSE 9 END AS w_fixed,
+         (SELECT round(l.planned_duration_s / 60.0) FROM public.ottoq_itinerary_legs l
+           WHERE l.sim_run_id = f.run AND l.vehicle_id = f.vehicle_id AND l.leg_type = f.purpose
+           ORDER BY abs(extract(epoch FROM l.planned_start_sim - f.t)) LIMIT 1) AS w_leg,
+         CASE WHEN f.purpose = 'detail' THEN 20 ELSE 10 END AS w_clock
+    FROM refusals f),
+fr AS (
+  SELECT w.*, b.id AS bay,
+         NOT EXISTS (SELECT 1 FROM public.ottoq_stall_bookings bk WHERE bk.sim_run_id = w.run AND bk.stall_id = b.id
+                        AND bk.booked_at_sim <= w.t AND COALESCE(bk.released_at, 'infinity') > w.t
+                        AND bk.during && tstzrange(w.t, w.t + make_interval(mins => w.w_fixed), '[)')) AS free_fixed,
+         NOT EXISTS (SELECT 1 FROM public.ottoq_stall_bookings bk WHERE bk.sim_run_id = w.run AND bk.stall_id = b.id
+                        AND bk.booked_at_sim <= w.t AND COALESCE(bk.released_at, 'infinity') > w.t
+                        AND bk.during && tstzrange(w.t, w.t + make_interval(mins => COALESCE(w.w_leg, w.w_fixed)::int), '[)')) AS free_leg,
+         NOT EXISTS (SELECT 1 FROM public.ottoq_stall_bookings bk WHERE bk.sim_run_id = w.run AND bk.stall_id = b.id
+                        AND bk.booked_at_sim <= w.t AND COALESCE(bk.released_at, 'infinity') > w.t
+                        AND bk.during && tstzrange(w.t, w.t + make_interval(mins => w.w_clock), '[)')) AS free_clock,
+         NOT EXISTS (SELECT 1 FROM public.ottoq_stall_bookings bk WHERE bk.sim_run_id = w.run AND bk.stall_id = b.id
+                        AND bk.booked_at_sim <= w.t AND COALESCE(bk.released_at, 'infinity') > w.t
+                        AND bk.during && tstzrange(w.t, w.t + interval '5 min', '[)')) AS free_now
+    FROM w CROSS JOIN bays b),
+per AS (SELECT arm, t, vehicle_id, purpose, max(w_leg) AS w_leg, bool_or(free_fixed) AS f_fixed, bool_or(free_leg) AS f_leg,
+               bool_or(free_clock) AS f_clock, bool_or(free_now) AS f_now
+          FROM fr GROUP BY 1, 2, 3, 4)
+SELECT arm, purpose, count(*) AS refusals, count(DISTINCT vehicle_id) AS cars,
+       round(avg(w_leg), 1) AS mean_leg_window, count(*) FILTER (WHERE w_leg IS NULL) AS no_leg,
+       count(*) FILTER (WHERE f_fixed) AS free_at_fixed, count(*) FILTER (WHERE f_leg) AS free_at_leg,
+       count(*) FILTER (WHERE f_clock) AS free_at_clock,
+       count(*) FILTER (WHERE f_clock AND NOT f_leg) AS clock_frees_over_leg,
+       count(*) FILTER (WHERE f_leg AND NOT f_clock) AS leg_frees_over_clock,
+       count(*) FILTER (WHERE f_now) AS a_bay_free_this_tick
+  FROM per GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- (55) G458, G471, §22: every wash- and service-bay booking released as a no-show, by its car's state and the kind of
+--      stall it was on at the slot, both from its own state-change events (query (39) without its state filter).
+WITH runs(run, arm) AS (VALUES ('d4af72ed-7021-42d2-ac93-dd8ce967b109'::uuid, 103), ('24de96a8-279c-4f9b-baf4-d5ff0e55367f'::uuid, 104),
+                               ('c6c13b8b-ce14-471c-963c-86606e73f499'::uuid, 101)),
+ns AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS lo, s.stall_type::text AS bay_type, b.purpose
+         FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run JOIN public.stalls s ON s.id = b.stall_id
+        WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type IN ('wash_bay', 'service_bay')
+          AND b.state = 'released' AND b.release_reason IN ('no_show_grace_elapsed', 'window_elapsed')),
+x AS (SELECT ns.*,
+             (SELECT e.payload -> 'diff' -> 'current_state' ->> 'to' FROM public.ottoq_events e
+               WHERE e.sim_run_id = ns.run AND e.entity_id = ns.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                 AND e.payload -> 'diff' ? 'current_state' AND e.sim_clock_at <= ns.lo
+               ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS car_state,
+             (SELECT (e.payload -> 'diff' -> 'current_stall_id' ->> 'to')::uuid FROM public.ottoq_events e
+               WHERE e.sim_run_id = ns.run AND e.entity_id = ns.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                 AND e.payload -> 'diff' ? 'current_stall_id' AND e.sim_clock_at <= ns.lo
+               ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS car_stall
+        FROM ns)
+SELECT x.arm, x.bay_type, x.purpose, x.car_state, COALESCE(s2.stall_type::text, 'none') AS car_on, count(*) AS no_shows
+  FROM x LEFT JOIN public.stalls s2 ON s2.id = x.car_stall
+ GROUP BY 1, 2, 3, 4, 5 ORDER BY 1, 2, 6 DESC;
+
+-- (56) §21, db/checks/0452 §6-§7: the scorecards of the in-tick arms 93-95 and the third night's 101-111.
+SELECT a.arm_id, s.sweep_code, c.cell_code, a.seed, round(a.wall_s) AS wall_s,
+       (a.scorecard #>> '{throughput,visits_served}')::int AS served, (a.scorecard #>> '{throughput,visits}')::int AS visits,
+       (a.scorecard #>> '{timeliness,door_p50_min}')::numeric AS door_p50, (a.scorecard #>> '{timeliness,door_p95_min}')::numeric AS door_p95,
+       (a.arm_metrics ->> 'deployed_car_hours')::numeric AS car_hours, (a.arm_metrics ->> 'unmet_demand_pct')::numeric AS unmet_pct,
+       (a.scorecard #>> '{service_completion,pct}')::numeric AS must_do_done_pct,
+       (a.scorecard #>> '{rule9,left_below_target}')::int AS left_below_target,
+       (a.scorecard #>> '{rule9,left_with_needed_work_open}')::int AS left_with_work_open
+  FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+  JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
+ WHERE a.arm_id IN (93, 94, 95) OR a.arm_id BETWEEN 101 AND 111
+ ORDER BY a.arm_id;

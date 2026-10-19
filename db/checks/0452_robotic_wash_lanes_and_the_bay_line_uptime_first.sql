@@ -2,7 +2,8 @@
 --        Chase, 2026-10-17 evening CT: the wash bays can be assumed robotic (a pull-through exterior wash; for the
 --        interior, an attendant who opens the doors and a robot arm). An urgent issue brings a car home at once and is
 --        fitted in around the cars that can rejoin service right away. Measured for 0746 and 0747.
---        -> G460, G461 (and §5, its open question about the charge line).
+--        -> G460, G461 (and §5, its open question about the charge line). §6 and §7 read the arms of the night of
+--        2026-10-18/19 (robowash_normal, uptimefirst_busy), on 2026-10-19 between 6:11 and 6:44 AM CT.
 --        Read-only, against gxdrcyphqjzjsuhxuqtg, 2026-10-17 between 7:10 and 7:37 PM CT (00:10 and 00:37 UTC Oct 18,
 --        bounded by clock reads). The runs: the 11 completed runs at the twin depot since 2026-10-16 with 144 or more ticks
 --        (6 normal days, 5 busy days); every number below names the query that reproduces it.
@@ -95,6 +96,99 @@
 --   all; on the busy day (arm 97) 6 of 268 (2.2%), 7 to a repair-held car, the same share as §5's busy days. Neither 0746
 --   nor 0747 could have moved it: no arm so far carries their dials (they were applied at 6:14 and 6:15 AM CT, after
 --   the window), and their arms run in the window that opens at 11:00 PM CT on 2026-10-18. Re-run (6) on them.
+--   RE-READ 2026-10-19 at 6:30 AM CT (query (6) on the eleven arms landed overnight, 101-111). Normal days: none of the
+--   1,400 charge seats on robowash's four arms and the held site in tick (101-104, 107) went to a car held by a repair
+--   while a clean car for that kind waited, and 4 of 972 on seeds23's seed-2 arms (one each on 108-111). Busy days: 4
+--   of 315 on arm 105 (1.3%, 7 seats to a repair-held car) and 3 of 293 on arm 106 (1.0%, 6), against arm 97's 6 of 268
+--   (2.2%) and the earlier busy days' 37 of 1,802 (2.1%). Robotic lanes (0746) and uptime first (0747) about halved it on
+--   the busy day, on one seed, and it was already near zero on the normal day. The critical-path charge order stays a
+--   candidate and is not built: it would move about one seat in a hundred on the day it matters.
+--
+-- ══ §6 ROBOTIC LANES AT FORTY POSTS, READ (G460; reproduce: db/checks/0451 (21), (22), (26), (29), (51), (55), (56)) ══
+--
+--   Read 2026-10-19 between 6:11 and 6:38 AM CT, from robowash_normal's four arms (101-104) and uptimefirst_busy's two
+--   (105, 106), all on seed 1, forty robotic posts, in tick, with 0757's bay_release_reads_the_work. Arm 95 is the
+--   control's cell without 0757's dial, read the night before. The normal day:
+--                                          95          101         102           103          104
+--                                          control     control     crews timed   robotic      robotic, uptime
+--                                          (no 0757)               (physics 1)   (physics 2)  first (0747)
+--     cars served (visits)                 205 (250)   217 (257)   211 (257)     210 (251)    210 (253)
+--     deployed car-hours                   940.5       944.3       928.3         966.3        970.2
+--     unmet ride demand                    15.6%       15.2%       16.7%         13.3%        12.9%
+--     door p50 / p95 (min)                 90 / 274    85 / 271    85 / 278      85 / 268     85 / 268
+--     must-do work done                    89.5%       90.6%       88.9%         90.2%        89.1%
+--     wash seat, mean (min, from events)   10.00       10.00       10.89         6.72         6.85
+--     detail seat, mean (min)              -           23.66       29.41         18.00        17.93
+--     wash, detail bay-hours used          -           4.7, 16.2   5.1, 16.7     3.3, 13.5    3.1, 12.3
+--     wash line p50 / p90 / longest (21)   15/160/335  15/158/310  25/208/305    10/138/210   5/77.5/190
+--     idle bay-ticks, cars waiting (22)    157 (130)   156 (133)   180 (156)     191 (159)    147 (118)
+--     walk-in refusals for a bay (26)      102         101         76            259          189
+--     staff cap binding (29)               -           89 / 53     81 / 47       28 / 1       18 / 1
+--   (22): five-minute bay-ticks with the bay empty while a car whose charge had ended waited for a wash seat; in
+--   brackets, those with nothing booked on the bay at all. (29): ticks with two cars washing and a staged car waiting,
+--   then those in which no walk-in was even tried. A dash is not read. The busy day, robotic lanes, arms 105 and 106:
+--   127 (243) and 116 (231) cars served, 144.9 and 142.8 car-hours, 87.0% and 87.2% of ride demand unmet, door p50/p95
+--   115/509 and 128/460, must-do work 78.5% and 78.6%; robotic wash seats 6.72 and 6.97 minutes, details 18.40 and 18.06.
+--   Every car left at 100% with nothing open on all seven arms (rule 9). The seat timers of query (38) read the
+--   timer written as the car entered the bay, which 0746 rewrites a tick later, so on the robotic arms seat lengths come
+--   from the cars' state-change events (0451 (51)).
+--
+--   What robotic lanes buy at forty posts (103 against 101, the same cell otherwise; one seed): 22.0 more deployed
+--   car-hours (944.3 to 966.3), unmet ride demand 15.2% to 13.3%, and the wash line's 90th percentile from 158 to 138
+--   minutes and its longest wait from 310 to 210. Cars served fell from 217 to 210, on 251 visits against 257. That is
+--   about what seven (at seed 2's 3.2 car-hours a post) to fourteen (at seed 1's 1.6) more fast chargers past twenty buy
+--   (0451 §21). With uptime first on top (104): 970.2 car-hours, and the wash line's 90th percentile 77.5. The crews
+--   timed by their own times (102) are the depot as staffed today honestly timed: 16.0 car-hours under the control.
+--
+--   Whether the wash is still the wall past twenty posts. Its bays, no: with robotic lanes the three bays held cars for
+--   3.3 hours of washing and 13.5 of detailing in the 12-hour day (16.8 of 36 bay-hours), and the staff cap stopped
+--   binding (28 ticks with two cars washing and one waiting, against 89; in 1 of them no walk-in was tried, against 53).
+--   But the line did not shrink as the bays freed: walk-in refusals rose from 101 to 259 (for 26 cars) and idle
+--   bay-ticks with a car waiting from 156 to 191. What holds it now is the calendar. 161 of the 259 refusals met a bay
+--   held only by a reservation whose car never came (0451 (26)); of the 9 wash-bay no-shows on arm 103 (and the 9 on arm
+--   104), 5 were cars parked in staging at their slot, which the calendar cannot seat (G471; 0755, held at the
+--   connector), and 4 were cars still on their charger (0744's bay_hold_follows_charge, not on these cells) (0451 (55)).
+--   A shorter window would not have helped (0451 §22). So past twenty posts the wash is still the line, but its wall is
+--   the calendar's, not the bays'. 0451 §10 point 2 keeps its staged build: robofix (0451 §23) measures robotic lanes
+--   with the calendar's four fixes on Tuesday night, and 0755 needs Chase.
+--
+-- ══ §7 UPTIME FIRST, READ (G461; reproduce: (3), (6), (7), (8)) ═════════════════════════════════════════════════════════
+--
+--   The same arms: robowash's wash_robotic.uptime_first (104) against its wash_robotic (103) on the normal day, and
+--   uptimefirst_busy's two (106 against 105) on the busy day. Both pairs carry robotic lanes, so the bay order is judged
+--   where the bays are fastest. One seed.
+--                                          normal: 103 -> 104          busy: 105 -> 106
+--     cars served (visits)                 210 (251) -> 210 (253)      127 (243) -> 116 (231)
+--     deployed car-hours                   966.3 -> 970.2              144.9 -> 142.8
+--     arrival to done, p50 / p90 (min), each need's atoms done of all (query (7)):
+--       exterior wash                      84/151 -> 84/163            112/190 -> 111/271
+--       interior deep clean                101/248 -> 106/235          257/548 -> 309/444
+--       fault repair                       84/107 -> 104/143 (2 of 4)  282/466 (4 of 6) -> 212/266 (3 of 5)
+--       mechanical PM                      49 -> 49 (1 of 2)           165/424 (21 of 112) -> 403/494 (19 of 110)
+--       sensor calibration                 110 -> 115 (1 of 2)         125/301 (4 of 34) -> 95/310 (3 of 35)
+--   On all four, every car that left did so at 100% with nothing open (rule 9): an atom not done never left with its
+--   car.
+--
+--   Whether emergencies went first (query (8), from the key each decision recorded): on arm 104, 4 cars with an emergency
+--   (14 decisions) and 3 seated; on arm 106, 4 cars (21 decisions), all 4 seated. On neither arm was a car without an
+--   emergency seated in a service bay in a tick in which an emergency was refused. So the key's first term holds.
+--
+--   How often the 90-minute floor bound. On the normal day, 58 of arm 104's 386 decisions were past the floor and 5 of
+--   its 69 seats went to a car past it. On the busy day, 937 of 1,434 decisions were past the floor and 66 of 93 seats
+--   went to one: the floor is the order there, and the line is longest wait first. Twelve wash-bay seats on arm 104 and
+--   13 on arm 106 went to a car under the floor in a tick in which a car past it was refused. In 17 of the 25 the seat
+--   was a wash and the refused car needed a deep clean, a different job. The other 8, on arm 104, were deep cleans
+--   seated past the Zoox 229f655b, which the shield refuses every time (G313). It never happened at a service bay.
+--
+--   What it bought (query (3), (4b)'s decisions by need). On the normal day, little: 3.9 car-hours, the same cars
+--   served, the wash line's 90th percentile 138 to 77.5 minutes (§6), and a deep clean's 90th percentile 13 minutes
+--   sooner, against a repair 20 minutes later at the median (2 of 4 done on both). On the busy day it cost: 11 fewer
+--   cars served and 2.1 car-hours, a PM's median from arrival to done 165 to 403 minutes and a deep clean's 257 to 309,
+--   for a repair's 282 to 212. The busy day's service bays are the wall (2 bays against 112 PMs and 34 calibrations),
+--   and longest-wait-first spends them on the cars that have waited longest rather than on the cars that would leave
+--   soonest, which is what the key's last terms were for. One seed, and the busy day's demand is G453's open question.
+--   bay_order_uptime_first stays off. The 90-minute floor is the term to look at before another arm: on the busy day
+--   nearly every car is past it.
 
 -- (1) G460: each bay seat's timer, from the seat's own state-change event.
 WITH runs AS (SELECT sim_run_id, scenario_code FROM ottoq_sim_runs
@@ -207,3 +301,40 @@ SELECT h.scenario_code, h.kind, count(*) AS seats, count(*) FILTER (WHERE h.repa
        count(*) FILTER (WHERE h.repair_held AND EXISTS (SELECT 1 FROM waiting w
                                                          WHERE (w.sim_run_id, w.vid, w.t) = (h.sim_run_id, h.vid, h.t))) AS while_clean_waited
   FROM flagged h GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- (7) G461, §7: each bay need's atoms from the visit's arrival to the atom's done, per arm.
+WITH runs(sim_run_id, arm) AS (VALUES ('d4af72ed-7021-42d2-ac93-dd8ce967b109'::uuid, 103), ('24de96a8-279c-4f9b-baf4-d5ff0e55367f'::uuid, 104),
+                                      ('5a14f274-ef58-45ab-9625-b34edff6b92f'::uuid, 105), ('ab79a5c6-6aef-4196-ae4e-c9c4015254c0'::uuid, 106)),
+a AS (
+  SELECT r.arm, x ->> 'svc' AS svc, x ->> 'status' AS st,
+         extract(epoch FROM ((x ->> 'done_at')::timestamptz - n.arrived_at)) / 60.0 AS m
+    FROM runs r JOIN public.ottoq_visit_needs n ON n.sim_run_id = r.sim_run_id
+    CROSS JOIN LATERAL jsonb_array_elements(n.atoms) x
+   WHERE x ->> 'svc' IN ('exterior_wash', 'interior_deep_clean', 'mechanical_pm', 'fault_repair', 'sensor_calibration'))
+SELECT arm, svc, count(*) AS atoms, count(*) FILTER (WHERE st = 'done') AS done,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY m) FILTER (WHERE st = 'done')::numeric) AS p50_arrival_to_done,
+       round(percentile_cont(0.9) WITHIN GROUP (ORDER BY m) FILTER (WHERE st = 'done')::numeric) AS p90_arrival_to_done
+  FROM a GROUP BY 1, 2 ORDER BY 2, 1;
+
+-- (8) G461, §7: 0747's key on each of (4b)'s decisions (context_frame.uptime_key, ascending: its first term is 0 for a
+--     safety emergency, its second 0 for a car past the wait floor): emergencies seated, and seats that went past a car
+--     the key put ahead, in the same tick and at the same kind of bay.
+WITH runs(sim_run_id, arm) AS (VALUES ('24de96a8-279c-4f9b-baf4-d5ff0e55367f'::uuid, 104), ('ab79a5c6-6aef-4196-ae4e-c9c4015254c0'::uuid, 106)),
+d AS (
+  SELECT r.arm, x.sim_clock AS t, x.entity_id AS vid, x.proposed_action->>'stall_type' AS bay_type, x.context_frame->>'need' AS need,
+         ((x.context_frame->'uptime_key'->>0)::numeric = 0) AS emergency, ((x.context_frame->'uptime_key'->>1)::numeric = 0) AS past_floor,
+         (x.outcome_status = 'enacted' AND x.enacted_action->>'verb' = 'assign_stall') AS seated,
+         x.enacted_action->>'reason' AS reason
+    FROM ottoq_decisions x JOIN runs r USING (sim_run_id)
+   WHERE x.action_context = 'task_start' AND x.resolved_action_context = 'stall_assignment'
+     AND x.proposed_action->>'source' = 'needs_card' AND x.context_frame ? 'uptime_key')
+SELECT a.arm, a.bay_type, count(*) AS decisions,
+       count(*) FILTER (WHERE a.emergency) AS emergency_decisions, count(DISTINCT a.vid) FILTER (WHERE a.emergency) AS emergency_cars,
+       count(*) FILTER (WHERE a.emergency AND a.seated) AS emergency_seated,
+       count(*) FILTER (WHERE a.past_floor) AS past_floor_decisions, count(*) FILTER (WHERE a.past_floor AND a.seated) AS past_floor_seated,
+       count(*) FILTER (WHERE a.seated AND NOT a.emergency) AS other_seats,
+       count(*) FILTER (WHERE a.seated AND NOT a.emergency AND EXISTS (
+          SELECT 1 FROM d b WHERE b.arm = a.arm AND b.t = a.t AND b.bay_type = a.bay_type AND b.emergency AND NOT b.seated)) AS seated_past_a_refused_emergency,
+       count(*) FILTER (WHERE a.seated AND NOT a.emergency AND NOT a.past_floor AND EXISTS (
+          SELECT 1 FROM d b WHERE b.arm = a.arm AND b.t = a.t AND b.bay_type = a.bay_type AND b.past_floor AND NOT b.seated)) AS under_floor_seated_past_a_refused_one
+  FROM d a GROUP BY 1, 2 ORDER BY 1, 2;
