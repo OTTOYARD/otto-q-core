@@ -1385,6 +1385,10 @@
 --       bay_exit_closes_its_leg), and the same plus wash_lane_physics 2. With arms 101 and 103, a two-by-two: robotic
 --       lanes with and without the calendar's fixes. If tonight's single-fix arms show one of the four doing harm, it
 --       comes out of both cells before they run.
+--   A second block, sent just before 6:52 AM CT, would have moved dcfc40_power_busy's three unrun cells into tick as well.
+--   The connector held it for a person's approval and gave up after 60 seconds; read back unchanged at 6:52 AM CT, and
+--   not retried or reworded. So those three still run with the lag, after robofix on Tuesday night, unless Chase sends
+--   it from the connector.
 --
 --   THE SCHEDULE, realistic, from last night's walls (a normal day in tick: forty posts 2,055-2,184 s, held 2,091-2,152,
 --   ten posts 1,892, twenty 2,002; a busy day at forty posts 2,427-2,485). The runner starts nothing whose estimate (its
