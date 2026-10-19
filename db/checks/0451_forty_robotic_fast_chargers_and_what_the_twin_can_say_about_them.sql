@@ -1368,10 +1368,11 @@
 --   its 90th percentile, 35, holds all 15, against 1 of 15 within its leg. The washes gain nothing (1.92 against 1.71).
 --   One arm and one seed, and no arm has run with an honest leg, so what it buys in cars and car-hours is not measured.
 --
---   VERDICT: 0758 is not built. The robotic arms do not earn it. The crews' world might, and production would learn
---   from its own seats, not from either of the twin's two numbers for one deep clean. It is built after the calendar's
---   own fixes are read (0743, 0744, 0745 and 0750 run tonight, §23), since they move the same holds, with its own arm
---   on the crews' world against arm 102.
+--   VERDICT: the service clock is not built (this verdict first called it 0758; that number went to the fast chargers'
+--   cleaning arm, G476, applied at 8:46 AM CT on 2026-10-19, so the clock takes the next free number when it is built).
+--   The robotic arms do not earn it. The crews' world might, and production would learn from its own seats, not from
+--   either of the twin's two numbers for one deep clean. It is built after the calendar's own fixes are read (0743, 0744,
+--   0745 and 0750 run tonight, §23), since they move the same holds, with its own arm on the crews' world against arm 102.
 --
 -- ══ §23 THE QUEUE FOR THE NIGHT OF 2026-10-19/20, AND THE SCHEDULE ═══════════════════════════════════════════════════
 --
