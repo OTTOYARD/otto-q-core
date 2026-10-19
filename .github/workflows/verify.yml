@@ -11,8 +11,9 @@ jobs:
     # 20 until 2026-10-09, when the job's own steps outgrew it: the agent SQL suites (0614-0628) take ~10 minutes and the
     # job reached the limit with the 0630-0631 step 36 seconds in (run 37888824528, cancelled, not failed). The limit
     # catches a hang; it is not a budget for the tests, so it sits well above the job's own length: 40 until the 0632-0638
-    # suites took the job to 32 minutes (run 37904376715, 0637's head), then 60.
-    timeout-minutes: 60
+    # suites took the job to 32 minutes (run 37904376715, 0637's head), then 60. 90 from 2026-10-19, when the job took 55
+    # minutes on fff1a77 (run 39264204293) before the 0758 and 0759 suites were added.
+    timeout-minutes: 90
     # G12, second rung. A scratch PostgreSQL that holds NOTHING -- no engine
     # schema, no data. It exists so plpgsql can be compiled, which is all the
     # compile-check step needs and all it claims.
@@ -712,6 +713,24 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_bay_release_reads_the_work_sql.py
+
+      # 0758, G476, EXECUTED on the live bodies (tests/fixtures/stall_cabin_robot_stub.sql, md5 asserted): at the dial's
+      # default the visits are byte-identical; with stall_cabin_robot a fast-charging car's must-do tidy starts at once on
+      # the stall's arm, takes no technician, runs the two dials' cycle, holds the car until the arm is home, and a car
+      # moved off mid-cycle has it put back to pending with nothing credited. 19 tests.
+      # 0759 (PENDING, Chase's call), G477, EXECUTED on the live build-out, scorecard and stall-trigger bodies and the twin
+      # depot's rows as read on 2026-10-19 (tests/fixtures/twenty_post_base_stub.sql, md5 asserted): canopy B re-striped as
+      # canopy A, every build-out round-trips and the old ones reproduce their days, a stored day scores the same before and
+      # after, and its P0 and P1 refuse what they say. 29 tests. The two files take about 80 seconds.
+      - name: A fast charger's cleaning arm cleans the cabin, and canopy B re-striped for ten more robotic fast chargers, executed (0758, 0759)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_stall_cabin_robot_sql.py tests/test_twenty_post_base_sql.py
 
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
