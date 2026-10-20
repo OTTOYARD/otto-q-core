@@ -81,8 +81,8 @@
 --   4:16 PM CT, tick 127, sim 9:06 AM CT: 2 arm cleans done, 44 service records issued. The live view (the app's own code
 --   on a dev server, pinned to the run) filmed DCFC-08's cycle: doors open at sim 8:55, the arm cleaning side A at 8:58,
 --   home after (ottoyarddepot-sim docs/pr-shots/clean-arm-live, scripts/liveCleanShots.mjs).
---   (8)-(11), read between 5:51 and 5:53 PM CT (22:51:19-22:53:07 UTC; tick 1,125, sim 2:33 PM CT). The run's day is not
---   done: the governor ends it at 240 real minutes.
+--   (8)-(11), read between 5:51 and 5:53 PM CT (22:51:19-22:53:07 UTC; tick 1,125, sim 2:33 PM CT), mid-run. (The run
+--   was said here to end at 240 real minutes; its governor ended it at its 540 sim-minute ceiling instead, below.)
 --     - Rule 9 at departure: 37 departures, 0 below target, 0 with needed work open.
 --     - Work: 322 of 665 must-do atoms done; 144 visits, 37 served, 394 service records.
 --     - The bay seats: no seat was filed interrupted. Wash bays: 29 done, 26 of them on their own bay exit
@@ -98,6 +98,19 @@
 --       next car, 4b179b26, was refused there at 2:58.
 --     - The server log, 4:05-6:01 PM CT: no errors. The only warnings are those seat refusals and the 12
 --       interlock refusals below.
+--   The full day, (8)-(12), read 6:51-6:52 PM CT (23:51:37-23:52:24 UTC). The run governor ended the run at 6:36 PM CT
+--   (23:36:00 UTC, tick 1,557), on reaching its 540 sim-minute ceiling: sim 8:00 AM to 5:01 PM CT.
+--     - Rule 9 at departure: 54 departures, 0 below target, 0 with needed work open.
+--     - Work: 446 of 756 must-do atoms done; 163 visits, 54 served (50 cars), 109 still in the depot at the end;
+--       533 service records.
+--     - The cleaning arm: 10 cleans done, on 7 fast chargers. 1 was thrown away, ca2624fc's, before 0760 and 0761.
+--       Every one of the 10 finished before its car's charge did, so neither fix met its case on this run.
+--     - The bay seats: none filed interrupted. Wash bays: 47 done on their own bay exit. Service bays: 15 done on
+--       their own bay exit. At the stop, 10 wash and 25 service bookings were released (run_stopped).
+--     - Refused moves filed as an exception: the 12 before 0761's dial, none after it (ticks 1,101-1,557).
+--     - G471: 210 refused seat attempts over 20 bookings and 17 cars (136 at the service bays, 74 at the wash bays).
+--     - Charging, busy day at 10 fast chargers: from arrival to first charge, a median 144.1 minutes, p95 246.7 and
+--       the longest 250.3; 10 cars still waiting at the end. That queue is what 0759's twenty posts are for (§5).
 --   One defect surfaced on the run's fourth arm clean, at 4:28 PM CT (G479). Car ca2624fc's charge ended while the arm
 --   was still in its cabin, and the tether sweep freed its stall 15 seconds early. Decide section (4b), the walk-in
 --   door, then took the car. This section first said the bay calendar took it; the decision rows and the booking,
