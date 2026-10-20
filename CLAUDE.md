@@ -290,6 +290,24 @@ When information is missing:
    - Built by `0721` and the gateway beside it, both pending apply and deploy as of 2026-10-14: until they
      are live, the bullets above are the specification, not a description of production.
 
+**12. NO OVERNIGHT TESTING OR CERTIFICATION WHILE WE ARE STILL BUILDING — added 2026-10-20 in Chase's words.**
+
+   *"Stop overnight testing. We are still building. No need to certify and test until everything is finished and we are
+   not there. Go and build and implement!"*
+
+   - **The research wing's test program is off until Chase says the build is finished.** Since 3:59 PM CT on 2026-10-20
+     the sweep window's opener (cron 784), the recert runner (746) and the dial window's yearly opener (763) are inactive
+     (`db/checks/0459` §2). Do not turn them back on, queue sweep arms or dial experiments, or run certification pairs.
+     Every migration still classifies `forces_recert` and `forces_dial_restart` honestly; nothing acts on them until
+     testing resumes.
+   - **A finished change goes ON at the twin depot, not into a test queue.** Built behind a dial, it is switched on at
+     depot scope under the name of the person who decided it, and a demo run is checked to show it working. "Applied" is
+     not "on": G478 is seventeen changes the demo never ran.
+   - **Rule 9 still gates every switch.** A change the twin's past arms showed costs cars stays off and is named with its
+     numbers (`db/checks/0459` §4).
+   - **Checking a change in one demo run is part of building it**, not testing in rule 10's sense: no hypothesis, no
+     sweep, no pairs.
+
 ---
 
 # PART 2 — THE KERNEL BRIEF
