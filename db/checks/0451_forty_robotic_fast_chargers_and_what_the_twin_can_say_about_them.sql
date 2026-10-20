@@ -1,0 +1,2873 @@
+-- 0451  **Forty robotic fast chargers: what the twin can say about them, and what it costs to ask.** Chase's question of
+--        2026-10-17 12:49 AM CT (convert every L2 space to a robotic fast charger?), measured on the twin depot by
+--        0724's and 0725's overnight sweeps, beside five things found on the way: the twin's power model (§2), busy_day's
+--        wall (§5), why every overnight arm gets ten times slower as its day goes on (§6), cars with no charge facts
+--        (§7), and two latent rule-9 regressions in dormant certification arms (§8).
+--        -> G443-G447; later sections G448-G459, G468-G469 (§16, §17), G471-G472 (§18), G473 (§19) and G474 (§20);
+--        the third night's arms (§21), the service clock rehearsed, G475 (§22), and the queue (§23).
+--        Read-only throughout, against gxdrcyphqjzjsuhxuqtg, 2026-10-17 from 05:51:42 UTC (the first query's now()).
+--        Arms' own rows are cited by arm_id and sim_run_id; every number below names the query that reproduces it.
+--
+-- ══ §1 THE QUESTION, AND WHAT WAS ALREADY MEASURED (reproduce: (1)) ═══════════════════════════════════════════════════
+--
+--   The twin depot as built (read 05:51 UTC): 10 dcfc stalls on ABB Terra HP 350 kW, 30 L2 stalls on ChargePoint CT4000
+--   19.2 kW, 113 staging, 3 wash bays, 2 service bays; service_max_kw 2,500, dcfc_max_concurrent_kw 1,800, 480 V.
+--   120 cars: 44 I-PACE (104 kW inlet), 34 Zoox (100 kW), 36 Tesla (30 at 250 kW, 6 with no inlet figure), 2 Zeekr RT
+--   and 4 others with no inlet figure either (§7).
+--
+--   0567 already built the conversion as data (build-outs dcfc10, dcfc15, dcfc20, dcfc20_grid_today), and
+--   value_2026_09_30 has measured 10 against 20 on 24-hour busy days. Since the dial floor (2026-10-14 14:43:27 UTC),
+--   per cell, means over the arms on record. CAUTION: two seeds per cell at most, and arms of the same seed are
+--   repetitions, not replications (G153), so these are directions:
+--
+--                                            dcfc10.otto_q   dcfc20.otto_q   dcfc10.fifo.energy_off  dcfc20.fifo.energy_off
+--     visits served per day                  326.8           351.7           277.6                   316.9
+--     door p50 (gate to leaving), min        271             167             337                     249
+--     charge wait p95 (floor), min           497             279             451                     245
+--     fast chargers busy                     61.1%           51.3%           66.9%                   53.0%
+--     fast-charger mean kW while busy        38.2            38.6            43.0                    39.4
+--     full-day site peak kW (max over arms)  1,013           1,806           1,868                   2,384
+--
+--   The mean kW is the first fact behind the power question: a 350 kW charger delivers about 40 kW averaged over the time
+--   it is busy, because the cars cannot take 350 kW (the I-PACE and the Zoox take about 100) and rule 9 charges every
+--   car to 100%, where the last 20% runs at a fraction of the peak (0573 §3: 80-100% takes 27.3 min on a Model Y,
+--   49.4 on an I-PACE, 21.3 on a Zoox, at 350 kW).
+--
+-- ══ §2 HOW THE TWIN ENFORCES POWER, AND WHAT A POWER-LIMITED CELL CAN SAY (reproduce: (2)) ═════════════════════════════
+--
+--   (a) NO POWER SHARING. twin.ottoq_sim_advance_charge_sessions charges every session at the lowest of the charger's,
+--       the car's and the battery's limit, with the comment "VEHICLE-FIRST DOCTRINE: charging is NEVER held back. Every
+--       active session charges at its full physical rate; peak shaving is the BESS's job". A shared power cabinet (the
+--       ABB pair 0567 sources: "two vehicles simultaneously at up to 175kW"; Kempower's power unit, 200-600 kW shared
+--       dynamically across up to 12 satellites, https://kempower.com/solution/kempower-power-unit/, read 2026-10-17)
+--       divides its power between the cars on it. The twin never does.
+--   (b) THE SITE LIMIT BINDS AT ADMISSION ONLY. ottoq_decide_tick (0132) defers a charge with outcome
+--       `deferred_site_power_cap` when an ESTIMATE of committed EV kW plus the request passes
+--       ottoq_ev_charge_allowance_kw, which is the SERVICE limit (or a demand-response cap), never the DC limit.
+--   (c) dcfc_max_concurrent_kw IS ENFORCED, AT CHARGE START, BY THE SHIELD. CORRECTED 07:41 UTC: this paragraph's first
+--       draft said "reported, never enforced", which was true before 0428 promoted charge_session_start to an enforcing
+--       checkpoint and missed the shield. twin.ottoq_sim_start_charge_session probes EN.001.grid_capacity_ceiling
+--       (safety_critical, block) and honours it (ottoq_shield_probe_posture: charge_session_start `enforced`, one caller,
+--       honouring). EN.001 refuses a start when the site meter (twin.ottoq_sim_compute_charger_load_kw: every charge,
+--       L2 included) plus the request, LEAST(charger kW, inlet kW), passes dcfc_max_concurrent_kw x (1 - margin), margin
+--       10% by default, or service_max_kw. Read from the baseline arms' own evaluations: normal_day arm 83 refused 3 starts
+--       (largest after_kw 1,836.13 against 1,620), busy_day arm 82 refused 9 (1,953.42 against 1,620); these are the arms'
+--       `safety_critical_refused` 3 and 9. twin.ottoq_sim_advance_site_energy's twin.dcfc_cap_exceeded / _approached
+--       events (0 rows of 'twin.%cap%' in ottoq_events, read between 06:35 and 06:38 UTC) never fire because the shield
+--       keeps admitted load near 1,620. So a power-limited cell is gated twice: by 0132's estimate against the service
+--       allowance in the decide path, and by EN.001's meter against 90% of the cabinets at the charge start. Two
+--       consequences. On a site that DIVIDES power (0726), a new car adds nothing to the aggregate, yet EN.001 counts
+--       its whole request; at 2,400 kW of cabinets it refuses a start whenever the meter plus about 100-350 kW passes
+--       2,160, so 0728's `shared` cell measures sharing behind a shield admission at 90%, not a free-connecting site.
+--       And for a car with no inlet figure (§7) the request is the charger's whole rating: a fourth answer for those 12.
+--   (d) THE ESTIMATE IN (b) OVER-COUNTS. It is LEAST(connector kW, inlet kW or 250) times a SoC band (0.85 under 55%,
+--       0.55 under 75%, else 0.30), summed over cars in a charging state; it does not read a meter. Reconstructed per
+--       tick from the run's own OCPP 2.0.1 TransactionEvent Updated frames (Power.Active.Import and SoC), run 8954bcf7
+--       (dcfc10.otto_q.energy_off, 24 h, seed ...009433), 283 ticks: the estimate is a median 1.50x the metered power
+--       (p90 1.96x, mean 672 kW against 446 kW); the busiest tick metered 1,587 kW where the estimate read 1,900. So on
+--       a power-limited site the gate starts deferring charges when the real draw is about two thirds of the limit.
+--   What follows for 0724's and 0725's power-limited cells: dcfc40_grid_today measures 40 chargers whose cars wait to
+--   START for power, judged twice, by an estimator that over-counts against the 2,500 kW service and by the shield's
+--   meter against 1,620 kW of the 1,800 kW cabinets (CORRECTED 07:41 UTC: the first draft said the cabinets "may run
+--   past their 1,800 kW"; EN.001 keeps them from it). Read it as "40 chargers on today's grid with today's two
+--   admission gates", a lower bound on a site whose cabinets divide their power. dcfc40 (the grid grown to 8,089 kW,
+--   cabinets 7,200) is the clean cell: neither gate can bind, so its peak is what 40 chargers draw when nothing stops
+--   them.
+--
+-- ══ §3 TONIGHT'S ARMS (reproduce: (3)) ════════════════════════════════════════════════════════════════════════════════
+--
+--   Every arm: the twin depot, 6 AM CT for 12 hours at 5 sim-minutes a tick (144 ticks), value_2026_09_30's first
+--   seed, OTTO-Q, deploy_peak_fraction 0.90, past the dial floor. ONE SEED PER CELL: each figure is a single reading,
+--   not a range (G153), and the two arms of one cell that the overlapping sweeps will produce (0728's note) are the
+--   first measure of how far one reading can move. "after 3 h" is the 30-minute peak from 180 minutes into the day,
+--   past the opening plug-in, which is what ottoq_value_summary bills (0577); "whole day" includes the opening. Every
+--   battery planned against the whole day (G447, §11), so the demand charges are its conceding the afternoon.
+--   Arms read 08:18 UTC (82-84), 09:01 UTC (85), 09:33 UTC (86), 10:07 UTC (87) and 10:41 UTC (88, below the table).
+--
+--   normal_day                           dcfc10        dcfc20        dcfc40        dcfc40_cab2400 on today's 2,500 kW
+--                                        as built      20 fast,      power to      .managed      .shared
+--                                                      20 L2, grown  spare         (0729, held   (0726 alone,
+--                                                                                  at 2,160)     2,400 cabinets)
+--     arm / sim run                      83 e7d5824c   86 0b0d45c2   84 b54f6de5   85 fe6d540e   87 dc4fd199
+--     visits / served / in depot at end  202/148/54    222/175/47    252/215/37    248/207/41    252/214/38
+--     door p50 / p95, min                130 / 428     105 / 305     95 / 248      90 / 270      90 / 249
+--     due cars on time (G383)            6 of 54       5 of 59       8 of 72       4 of 66       8 of 70
+--     charge wait p50 / p95 floor / max  10/125/190    10/105/140    10/82.5/110   10/90/110     10/100/110
+--     fast-charge sessions / L2          97 / 126      168 / 87      278 / 0       264 / 0       267 / 0
+--     fast chargers busy, mean kW        69.4%, 39.4   51.8%, 42.3   40.9%, 39.5   41.0%, 38.9   40.7%, 38.6
+--     car-hours met of 1,114 asked       821.4         879.8         942.7         941.8         948.3
+--     30-min peak kW, whole day          973.8         1,693.1       2,369.5       1,643.7       1,558.6
+--     30-min peak kW, after 3 h          713.6         932.5         1,006.8       1,050.6       1,062.1
+--     instantaneous EV kW / grid kW max  1,586/1,210   2,779/2,190   3,874/3,287   2,201/1,777   2,136/1,685
+--     grid import kWh                    6,723         7,912         9,193         9,050         9,002
+--     demand $/month, whole day          20,839        36,496        51,228        35,419        33,567
+--     demand $/month, after 3 h          15,271        19,956        21,547        22,501        22,752
+--     EN.001 refused starts              3             0             0             85 (84 6 AM)  84 (all 6 AM)
+--     DC pool bound (twin.dc_pool_shared)  -           -             -             1 tick        0 ticks
+--     must-do service done               83.7%         88.6%         90.9%         90.0%         91.1%
+--     rule 9: left below target / open   0 / 0         0 / 0         0 / 0         0 / 0         0 / 0
+--
+--   busy_day, dcfc10 as built (arm 82, 43301561): 212 visits, 103 served, 109 in the depot at the end; door p50/p95
+--   305/584; 0 of 36 due cars on time; charge wait p50/p95/max 80/355/435; car-hours met 96.0 of 1,114; 30-min peak
+--   975.9 whole day, 861.0 after 3 h; EN.001 refused 9; rule 9 0/0. The two service bays are this day's wall (§5).
+--
+--   Read on the normal day, 40 posts with power to spare against the depot as built: 67 more cars served in 12 hours
+--   (+45%), the median car out 35 minutes sooner and the slow tail cut from 428 to 248 minutes, and 121 more car-hours
+--   of ride demand met (unmet 26.3% -> 15.4%). Every car still leaves at its full target with nothing open.
+--
+--   The sizing curve, from 0730's dcfc20 (arm 86, 20 fast posts and 20 L2): car-hours met 821.4 -> 879.8 -> 942.7 at
+--   10, 20 and 40 fast posts; cars served 148 -> 175 -> 215; the slow tail 428 -> 305 -> 248 minutes. Posts 11-20 bought
+--   58.4 car-hours, 5.8 each in a 12-hour day; posts 21-40 bought 62.9, 3.1 each. So the returns fall by about half past
+--   twenty and do not stop: there is no sharp knee on this day, and the post count is a price question (§10).
+--
+--   The power question, answered on this day: the megawatts are the OPENING. With nothing holding it, the fleet's 6 AM
+--   plug-in drew 3,874 kW at the chargers (3,287 kW from the grid after the battery) and set a 2,369.5 kW 30-minute
+--   peak; from 9 AM on, the 30-minute peak was 1,006.8 kW, 293 kW above the depot as built.
+--
+--   And holding it costs almost nothing. Behind a site controller at 2,160 kW on TODAY'S 2,500 kW service (arm 85),
+--   the forty met 941.8 car-hours against 942.7 with power to spare, served 207 cars against 215, and kept the slow
+--   tail at 270 minutes against 248, while the whole-day 30-minute peak fell from 2,369.5 to 1,643.7 kW ($51,228 to
+--   $35,419 a month billed on the whole day). Most of what a 6 AM plug-in wants is power for cars that are not yet due,
+--   so spreading it over the morning cost 8 served cars and 0.9 car-hours. It is not free: due cars on time went from
+--   8 of 72 to 4 of 66, a single reading on one seed, and the cars an owner needs back first are exactly the ones a
+--   held site should give its power to first (§10). Past 9 AM the two arms draw alike (1,006.8 and 1,050.6 kW). So the
+--   conversion does not need a bigger grid connection; it needs the site held at a limit, and OTTO-Q to own it.
+--
+--   And the two readings of a shared site came out alike. Arm 87 (0726's sharing alone, the shield counting each new
+--   car's whole rating, 2,400 kW of cabinets) met 948.3 car-hours, served 214 and refused 84 starts, all before 7 AM;
+--   arm 85 (0729's managed reading) met 941.8, served 207 and refused 85. Single readings, inside one reading's noise
+--   of each other and of arm 84 (942.7 with an 8 MW grid). So on this day forty robotic posts behind 2.4 MW of shared
+--   cabinets on TODAY'S service did what forty did on a grown grid.
+--
+--   The two arms' refusals are of different kinds, and the difference is 0729 doing what it was built for. CORRECTED:
+--   this paragraph's first draft, and G448 as first written, said both arms' refusals came with the meter over the
+--   cap; query (3b) shows that is true of arm 85 only. On arm 87 every one of the 84 came with the meter UNDER the
+--   2,160 kW cap (1,841-2,142 kW) and the car's full rating on top (a mean 221 kW). On arm 85 none did: every one of
+--   its 85 came with the meter itself over the cap (2,182-2,285 kW, mean 2,224), 84 of them before 7 AM. That is G448.
+--   A session the twin starts is metered at its full unshared rate, and each tick judges its charge starts before its
+--   charge step meters the running sessions, so a car started in one tick is still on the meter at full rate when the
+--   next tick's starts are judged. On arm 85 the 24 sessions started in the opening tick (06:10) put the meter at
+--   2,200.8 kW and the 16 starts judged after them were refused; at 06:15, 16 more were refused against the same
+--   2,200.8 kW, and only then did the charge step meter those 24 at their pool shares, which sum to exactly 2,160.0 kW
+--   (their OCPP TransactionEvent frames, query (3c)). So 0729 removed every refusal of arm 87's kind and G448 put the
+--   same number back. A real managed site assigns the share at connection. The refused cars waited a tick or two; the
+--   throughput above already carries that wait.
+--
+--   0728's third normal-day cell, arm 88 (7fe98840): arm 87's cell with 0132's site gate left on (its default) and
+--   counting committed load as metered (0727). 215 served of 255, door p50/p95 90/267, due cars on time 8 of 71,
+--   charge wait p50/p95 floor/max 10/85/110, 271 fast sessions at 40.7% busy and a mean 38.3 kW, 951.2 car-hours met,
+--   30-min peak 1,585.3 kW whole day and 1,139.2 after 3 h ($34,149 and $24,432 a month), instantaneous EV/grid max
+--   2,066/1,679 kW, must-do done 89.7%, rule 9 0/0. EN.001 refused 52 starts (39 before 7 AM, every one with the meter
+--   under the cap and a mean 127 kW on top) and 16 charge-stall assignments in the decide path (all before 7 AM, each
+--   taking the safe default); the pool never bound. Against arm 87, the same cell with the gate off, it came out alike
+--   (951.2 car-hours against 948.3, 215 served against 214), with fewer refusals (68 against 84) and a higher
+--   afternoon peak (1,139.2 against 1,062.1 kW). So a site held at its limit met the grown grid's car-hours all three
+--   ways tried: 941.8 (0729's managed reading), 948.3 (0726's sharing alone) and 951.2 (with the metered gate), against
+--   942.7 with 8 MW to spare. Single readings on one seed.
+--
+--   CORRECTED 2026-10-18 (§16, §17): this table's energy, peak and dollar rows were read under the twin's command lag,
+--   whose site meter counts each new charge's first interval twice (12-20% high, G468), and arm 84's "after 3 h" row is
+--   two samples at the day's end (G469): over full half hours it is 941.8 kW ($20,155), not 1,006.8. Quote the in-tick
+--   arms (93-95, §15, §16) for energy and bills. Read after the second night's window, on 2026-10-18: 0731's three
+--   bill-window pairs (arms 98-100) in §11, the two promise arms (96, 97) in §12, and the night's runner and the queue
+--   in §15.
+--
+-- ══ §4 THE BILL: DEMAND CHARGES, AND THE TARIFF A FAST-CHARGING SITE SHOULD BE ON (reproduce: (4)) ════════════════════
+--
+--   The twin prices power at NES GSA Part 3 / TGSA Part 3 (ottoq_depot_tariffs, source the NES PDF
+--   https://www.nespower.com/-/media/project/nes/common/pdfs/commercial-rates/2025/april/gsa-123.pdf, retrieved
+--   2026-07-09; 0574): demand $21.40/kW (first 1,000 kW) and $21.78/kW (excess), summer, on the month's highest
+--   30-consecutive-minute kW (non-coincident peak); energy 4.785 c/kWh base plus TVA's fuel cost adjustment
+--   (2.515 c in September, 0574 §2); $2,091.71 a month fixed; contract demand above 1,000 and up to 5,000 kW.
+--   Above 5,000 kW the site leaves GSA-3 for another schedule; this file does not price that.
+--
+--   Measured on arm 77 (dcfc20.otto_q, 24 h): grid import 12,497 kWh, 30-minute peak 1,697.6 kW, so a demand charge of
+--   $36,592.64 a month ($1,219.75 a day) against $880.73 a day of energy: the peak costs more than the energy. That is
+--   the whole case for OTTO-Q owning the power at an all-fast-charger site: every kW of the month's peak it avoids is
+--   $21.78, and the energy a car needs is the same however fast it is delivered.
+--
+--   NES's EV schedule, EVC, has no demand charge. READ 2026-10-17 by 07:54 UTC from the schedule itself, both pages
+--   (https://www.nespower.com/-/media/project/nes/common/pdfs/commercial-rates/2025/april/evc.pdf, the source
+--   ottoq_energy_rates already cites, retrieved by it 2026-09-30): "ELECTRIC VEHICLE CHARGING POWER RATE - SCHEDULE EVC
+--   (Effective October 2024)"; "This rate shall exclusively apply to separately metered charging stations for electric
+--   vehicles where the charging station's demand is greater than 50 kW but not more than 5,000 kW"; "Customer Charge:
+--   $100.00 per delivery point per month"; energy 21.773 c/kWh onpeak and offpeak, all seasons; "The base energy charges
+--   shall be increased or decreased in accordance with the current Adjustment Addendum published by TVA". No demand
+--   charge on either page. Two terms that matter for a planner: a contract of "at least 1 year", and a move back to
+--   GSA only "after having received service for at least 1 year ... subject to 90 days prior written notice", at a
+--   contract demand no lower than EVC's. So the tariff is a yearly decision, not a monthly switch.
+--   CORRECTED (the first draft of this paragraph): the January 2025 "retail rate schedule" reads 24.216 c, which the
+--   first draft took for a different base. INFERRED, NOT VERIFIED (its PDF still answers HTTP 500): it is this base
+--   plus that month's TVA adjustment, 24.216 - 21.773 = 2.443 c, beside the 2.515 c September adjustment 0574 records.
+--   The first draft's 20.4% and 15% crossovers each subtracted an adjustment on one side only; its 17.5% was like for
+--   like and agrees with the figure below. Like for like, base against base (the adjustment applies to
+--   both and cancels): EVC's premium over GSA-3's energy is 21.773 - 4.785 = 16.988 c/kWh, and GSA-3's demand charge
+--   is about $21.6 per kW-month, so the crossover monthly load factor is 21.6 / (0.16988 x 730 h) = 17.4%. Below it,
+--   EVC is cheaper for the charging meter; above it, GSA-3. (The comparison leaves out the $2,091.71 GSA-3 and $100
+--   EVC customer charges: under EVC the building keeps its own GSA service, so the fixed charge does not go away.)
+--   Arm 77's load factor is 12,497 / 24 / 1,697.6 = 30.7%: GSA-3 is cheaper there. A site whose peak doubles on the
+--   same energy (load factor about 15%) is past the crossover. So the tariff is itself an OTTO-Q output, and a yearly
+--   one: a managed peak keeps GSA-3; an unmanaged 40-charger peak would want EVC (if the chargers are metered apart
+--   from the building).
+--
+-- ══ §5 busy_day IS A SERVICE STRESS TEST, NOT A CHARGING ONE (reproduce: (5)) ═════════════════════════════════════════
+--
+--   ottoq_sim_scenarios.busy_day: pm_interval_km_scale 0.010, compressed calibration, dtc_rate_multiplier 7.0, an 85%
+--   soiled wear phase. Since 0715 no car leaves with that work open (rule 9), and 0450 measured the two service bays
+--   becoming the wall. Arm 77 (dcfc20.otto_q, 24 h) met 129.3 of the 1,551 car-hours the work side asked for: unmet
+--   demand 91.7%, with its fast chargers busy 51% of the time and 84.6% of must-do atoms done. A charger comparison on
+--   busy_day measures chargers behind a closed door, which is why 0725 asks the same question on normal_day (dispatch
+--   1.0, deployed target 0.90, no compression, no fault multiplier).
+--
+-- ══ §6 EVERY OVERNIGHT ARM GETS TEN TIMES SLOWER AS ITS DAY GOES ON, AND PRODUCTION DOES NOT (reproduce: (6)) ═════════
+--
+--   ottoq_tick_clock_log, per 48-tick bucket of a 288-tick arm (arm 78, dcfc20.fifo.energy_off): the world step's
+--   compute 1,616 / 2,507 / 3,542 / 4,716 / 5,497 / 5,935 ms a tick, and the gap between ticks (release reservations
+--   and the decide path) 3,338 / 9,780 / 16,124 / 23,730 / 29,933 / 31,094 ms. Over fourteen 288-tick arms the first
+--   30 ticks average 1.2-4.1 s of world compute and the last 30 6.4-12.9 s; the gap goes from 2-5 s to 33-56 s. The
+--   decisions say the same thing from inside: per decision the shield takes 10 -> 40 ms and a stall assignment's
+--   enactment 12 -> 118 ms across the day (run 97661eef), while the decisions per tick FALL from 88 to 69.
+--   Live runs do not grow. The longest operator runs, a tick per pg_cron transaction: ab534960 (2,668 ticks) 686 ms of
+--   world compute over its first 20 ticks and 440 over its last 20; ae8a4908 (2,599) 686 -> 944; 816bd28c (2,564)
+--   806 -> 893; and ab534960's per-decision shield latency stays at 8.4-10.8 ms and enactment at 0.5-2.8 ms in every
+--   500-tick bucket.
+--   The mechanism: an arm (ottoq_throughput_sweep_arm) and a determinism pair run a whole test day inside ONE
+--   transaction, by design (a build-out exists only inside its arm's transaction; a deferred trigger refuses to commit
+--   one). A row version the transaction itself superseded cannot be pruned until it commits, and the hot rows are
+--   updated every tick: vehicles holds 226 rows against 38,061,430 lifetime updates, 20% of them HOT; stalls 10,191,857
+--   updates and 15.8 heap fetches per index scan; ocpp_sessions 60.3; ottoq_stall_bookings 17.8 (pg_stat_user_tables,
+--   lifetime). So every lookup walks a longer chain each tick. Measured directly, the zero-uuid run idiom
+--   COALESCE(sim_run_id, nil) = COALESCE($run, nil) on ottoq_stall_bookings took 72.6 ms against 0.68 ms for
+--   sim_run_id = $run (4,057 heap fetches against 0) while an arm was in flight: the idiom cannot use the index on
+--   sim_run_id, so it walked every entry of the held/active partial index, and with no held/active booking committed
+--   at the time, every entry it walked was the in-flight arm's own uncommitted row or a dead version vacuum could not
+--   remove. That last part is database-wide: while an arm's transaction is open it holds back the xmin horizon, so
+--   vacuum removes no dead row anywhere, live tables included, for its 1.7-2.4 hours.
+--   What it costs: a 288-tick arm takes 1.7-2.4 hours; the first 48 ticks of the same arm take 4-5 s each. A sweep
+--   window (7 hours) fits about three 24-hour arms. And for as long as an arm runs, pg_cron starts no other job (G141),
+--   which is what made a production start wait behind research (G437). Production is unaffected.
+--   The fix's shape, not built here: an arm that commits each tick (a procedure), with the build-out committed for the
+--   arm's life and a crash-safe restore (a startup check that restores any build-out whose arm is not running), and
+--   the world lock taken at session level. Estimated from the live runs' flat 0.4-1.5 s, a 288-tick arm would take
+--   minutes rather than hours. The certification pair keeps its one transaction (both arms must see one world).
+--
+-- ══ §7 TWELVE CARS WITH NO INLET POWER, AND THREE ANSWERS FOR HOW FAST THEY CHARGE (reproduce: (7)) ═══════════════════
+--
+--   At the twin depot, inlet_max_kw is NULL on 12 cars: Tesla Cybercab 4, Tesla Model Y (82 kWh) 2, Zeekr RT AV 2, and
+--   Chevrolet Bolt EUV, Ford Mustang Mach-E, Rivian R1S, Hyundai Ioniq 5 one each (8 autonomous). Three readers fill the
+--   gap three ways: the admission gate counts such a car at 250 kW (COALESCE(vv.inlet_max_kw, 250)); the booking
+--   window and the charge-duration ledger use 150 (COALESCE(v.inlet_max_kw, v.max_charge_rate_kw, 150)); and the charge
+--   physics passes NULL to ottoq_sim_compute_charge_rate, where LEAST ignores it, so the car takes up to the charger's
+--   350 kW on the median acceptance curve. The same car is a 250 kW load to the gate, a 150 kW charge to the calendar,
+--   and whatever its battery's curve allows on the charger. Separately, max_charge_rate_kw still says 200 on the 30 Zoox
+--   Robotaxis that 0573 moved to a 100 kW inlet (and 100 on the I-PACEs at 104); every reader prefers inlet_max_kw, so
+--   it changes nothing today and misleads anyone who reads the column.
+--   ADDED 07:58 UTC, the facts those cars should carry, from narrow searches (rule 3: claim, date, URL; all THIRD-PARTY,
+--   none from the maker, and each varies by variant, so the twin car's own pack picks the row). Chevrolet Bolt EUV
+--   (65 kWh here): 55 kW peak DC (https://evkx.net/models/chevrolet/bolt/bolt_euv/charging/, read 2026-10-17, "estimated,
+--   derived from manufacturer data"). Ford Mustang Mach-E (91 kWh, the extended-range pack): 150 kW
+--   (https://www.evspecs.org/tech-specs/ford/mustang-mach-e/extended-range-rwd, read 2026-10-17; three other listings
+--   agree). Rivian R1S (135 kWh, the large pack): 220 kW (https://www.evspecs.org/tech-specs/rivian/r1s/dual-motor-awd-large-pack,
+--   read 2026-10-17), against 207-210 kW per variant at https://evkx.net/de/models/rivian/r1/r1s_quad-motor_awd/charging/.
+--   Hyundai Ioniq 5 (77.4 kWh): no listing for this pack was found; the 84 kWh packs read 263 kW and the 63 kWh 195 kW
+--   (https://www.fleetnews.co.uk/electric-fleet/electric-car-and-van-data/hyundai/ioniq-5-2237, read 2026-10-17), and
+--   one guide gives 220 kW for the line (https://zecar.com/reviews/hyundai-ioniq-5-charging-guide). Tesla Cybercab and
+--   Zeekr RT: no published DC rating was found, so they need one explicit default that every reader shares, not three.
+--   The defect is the disagreement more than the gaps: one function answering "how much can this car take" for the
+--   gate, the calendar, the physics and the shield is the fix, and filling a car's facts changes the world the charge
+--   clock learns from, so it is recorded in ottoq_evidence_regimes in the same file (0625's standing rule).
+--
+-- ══ §8 THE DORMANT CERTIFICATION ARMS STILL CHARGE TO 90% (reproduce: (8)) ═════════════════════════════════════════════
+--
+--   public.ottoq_cert_arm and public.ottoq_cert_arm_wave set target_soc = 90 on every autonomous car; their only caller
+--   is public.ottoq_cert_battery_step, whose cron job (13, ottoq-cert-battery) is inactive. public.ottoq_fr1_cert_arm
+--   does the same and has no caller. ottoq_cert_arm_start, beside them, was moved to 100 by 0539. Rule 9 says 100% across
+--   the board; re-enabling job 13 would certify a fleet charged to 90. Latent, not live.
+--
+-- ══ §9 A PROCEDURAL NOTE: apply_migration WAITS BEHIND A SWEEP ARM ════════════════════════════════════════════════════
+--
+--   The MCP's apply_migration opens with DDL on supabase_migrations.schema_migrations that takes an ACCESS EXCLUSIVE
+--   lock; a running arm holds ACCESS SHARE on that table for its whole transaction. 0724's first apply sat in
+--   Lock:relation behind the runner (pid 3951184) at 06:07 UTC and was cancelled before its queued lock could block the
+--   ledger's other readers. 0724 and 0725 were applied through execute_sql with the ledger row in the same transaction
+--   (their APPLIED notes carry the digest proof).
+--
+-- ══ §10 THE RECOMMENDATION ════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   To Chase, from the research wing (rule 10: a recommendation, shipped only as certified changes). Written on arms
+--   82-88, the night of 2026-10-17; 0731's bill-window pairs run in the next window.
+--
+--   1. LEAN IN. Robotic fast charging is the edge, and the evidence is the slow tail and the car-hours, not the median.
+--      On the normal day forty robotic posts served 45% more cars in 12 hours than the depot as built, cut the slowest
+--      5% from 428 to 248-270 minutes, and met 121 more car-hours of ride demand (15% unmet against 26%), every car at
+--      100% with nothing open. A robot on every post is what makes that possible: no car waits for a person to plug it
+--      in, so the depot's limit stops being connectors and labour and becomes power and time.
+--      CORRECTED 2026-10-18 (§15): with the twin's command lag removed (0735), forty posts served 29% more cars than the
+--      depot as built, not 45%: 205 against 159, the slowest 5% at 274 minutes against 378, and 108.4 more car-hours
+--      (15.6% unmet against 25.3%), every car still at 100% with nothing open. The lag had cut every wash seat a tick
+--      short, and forty posts are wash-bound, so it flattered them most.
+--      READ 2026-10-19 (§21): on a second seed, in tick, forty posts served 202 cars against 135 as built, met 132.8
+--      more car-hours (12.6% unmet against 24.5%) and cut the slowest 5% from 410 to 274 minutes, every car at 100% with
+--      nothing open. Two readings now: 29-50% more cars and 108-133 more car-hours in the 12-hour day.
+--
+--   2. SIZE THE POSTS BY THEIR PRICE, NOT BY THE STALLS. Forty posts were busy 41% of the day against the ten's 69%,
+--      and the curve bends: posts 11-20 met 5.8 car-hours each in the 12-hour day (an upper bound until 0734 measures
+--      what the 5-minute tick costs the depot as built and 0735's arms read the curve with the twin's command lag
+--      removed, G449, G450, §12), posts 21-40 met 3.1 each (§3). At the
+--      value sweep's own prices (ottoq_margin_prices: $20 a deployed car-hour, range $16-24, its Waymo-review source;
+--      about $206,000 installed per 350 kW charger, its INL source, before the robot itself), a month of such days is
+--      worth about $3,500 per post for posts 11-20 and $1,900 per post for posts 21-40, against about $1,700 a month
+--      for a post's installed price spread straight over ten years with no financing, robot or upkeep. ASSUMPTIONS, all
+--      of them: one seed, a 12-hour day and nothing for the night. On that reading twenty posts clearly pay, and the
+--      second twenty pay only if the night, the robot's price and more seeds come out in their favour. A staged build,
+--      twenty now and the rest as measured demand fills them, buys the same answer with half the capital at risk.
+--      CORRECTED 2026-10-18 (§15): 5.8 was not an upper bound. With the lag removed, posts 11-20 bought 7.7 car-hours
+--      each and posts 21-40 bought 1.6: about $4,600 a month per post against $950, at the same prices and on the same
+--      assumptions. The lag had added a tick to every handover in the queue at twenty posts and given forty posts
+--      short wash seats, so it bent the curve the wrong way at both ends. On this reading twenty posts pay clearly and
+--      the second twenty do not, because past twenty the wash is the wall (§13, G458): the second twenty wait on the wash
+--      line's fixes (0743-0747) and their arms. One seed; seeds 2 and 3 have not run.
+--      READ 2026-10-19 (§21, db/checks/0452 §6): on the second seed posts 11-20 bought 6.8 car-hours each and posts
+--      21-40 bought 3.2. Two readings: 6.8-7.7 and 1.6-3.2, about $4,100-4,600 and $950-1,900 a month per post at the
+--      same prices, against about $1,700. The second twenty pay on one seed and not on the other. Robotic wash lanes at
+--      forty posts met 22.0 more car-hours (about $13,200 a month at $20, one seed), what 7-14 more posts past twenty
+--      buy, and moved the wash's wall from the bays to the calendar: the bays sat about half idle while walk-ins were
+--      refused behind reservations whose cars never came. So the staged build stands: twenty posts now; the second
+--      twenty wait on seed 3 (tonight) and on robotic lanes with the calendar's fixes (robofix, Tuesday night, §23).
+--
+--   3. DO NOT SIZE THE GRID TO THE NAMEPLATE. Forty posts with nothing holding them drew 3.9 MW for the 6 AM plug-in.
+--      On the existing 2.5 MW service, behind 2.4 MW of shared cabinets, they met 941.8 car-hours (held at 2.16 MW,
+--      0729), 948.3 (0726's sharing alone) and 951.2 (with the site gate reading the meter, 0727) against 942.7 on a
+--      grid grown to 8 MW. The megawatt worry is a control
+--      question, and its answer is a site controller holding a limit that OTTO-Q sets: shared cabinets (the Kempower and
+--      ABB units 0567 and 0728 cite) with OTTO-Q deciding the split. No utility upgrade is needed for this day's load.
+--      CORRECTED 2026-10-18 (§16): the opening draw is 3.7 MW on the chargers' own readings (3,731 kW on arm 84, 3,749
+--      in tick on arm 95); the site meter's 3,874 counted some new charges' first intervals twice.
+--      READ 2026-10-19 (§21): in tick, holding forty posts at 2.16 MW on today's service cost 25.2 car-hours on seed 1
+--      and 21.5 on seed 2 against a grid with power to spare (2.3-2.7%); with the lag it had cost 0.9. Every refused
+--      start (130 and 118) came at the opening with the meter itself over the held cap, the twin's first reading
+--      (G448), and the in-tick held cells ran without 0733's dial. Its arm runs tonight (heldtick, §23); until it lands,
+--      the 22 car-hours include the twin's own first-reading error.
+--
+--   4. THE BILL TO MANAGE IS THE DEMAND CHARGE, AND THE TARIFF IS A YEARLY DECISION. At GSA-3's $21.40-21.78 per kW
+--      of the month's highest half hour, the unmanaged forty cost $51,228 a month in demand on the whole day against
+--      $35,419 held; past the opening both sit near $22,000 against $15,271 as built. NES's EVC schedule has no demand
+--      charge at 21.773 c/kWh, and beats GSA-3 for the charging meter below a 17.4% monthly load factor; it carries a
+--      one-year term and 90 days' notice back (§4). A held site keeps its load factor up and stays on GSA-3.
+--      CORRECTED 2026-10-18 (§16, §17): every figure in this point was read on arms with the twin's command lag, whose
+--      site meter counts each new charge's first interval twice (the energy 12-20% high), and arm 84's $21,547 past the
+--      opening is two samples at the day's end billed as a half hour. In tick, over full half hours, past the opening:
+--      $17,125 a month as built (arm 93), $19,780 at twenty posts (arm 94), $20,129 at forty (arm 95, nothing holding
+--      them); on the whole day $18,927, $31,247 and $42,204. The held site has not run in tick.
+--      READ 2026-10-18 (§11, G447): with the battery planning for the window the bill charges, the billed half hour past
+--      the opening fell 13.9% at ten posts, 11.7% at forty and 14.8% at forty held, and every car's outcome was the
+--      same. Those three pairs ran with the lag on both sides, so quote the shares, not the dollars. The held site's
+--      first in-tick arm (answer_normal's fourth cell) runs in the window that opens at 11:00 PM CT on 2026-10-18.
+--      READ 2026-10-19 (§21): the held site's first in-tick arms. Past the opening its billed half hour was 786.9 kW
+--      against 940.6 unheld on seed 1 ($16,840 a month against $20,129) and 889.4 against 764.3 on seed 2: the starts it
+--      refused at the opening ran later, into the billed window. On the whole day, 1,552.8 against 1,955.2 and 1,579.6
+--      against 1,813.8. So holding the site cuts the opening, which the value view does not bill, and does not reliably
+--      cut the half hour it does. The battery planning for the billed window cut that half hour 11.7-14.8% with the
+--      lag (above); it has not run in tick.
+--
+--   5. WHAT THE ENGINE NEEDS BEFORE A REAL CONVERSION, as certified changes, each already measured in the twin:
+--      (a) the shield judges a site that divides its power by the limit it holds (0729 models it; production needs the
+--          site controller's limit in the charge start's context, and the controller itself). On the managed arm it
+--          removed every refusal of the shared arm's kind (the meter under the cap and each car's full rating on top:
+--          all 84 there). CORRECTED 2026-10-18 (§15, G470): the seat assignment needs the same limit in its context, or
+--          it refuses at the cap what the start would share (73 seats in the opening's three ticks on arm 89);
+--      (b) the battery plans for the bill that is charged, and is ready for the surges OTTO-Q itself schedules: it
+--          charged at 425 kW in the tick the fleet plugged in, shaved one tick late, and idled all afternoon (G447);
+--      (c) one answer for how much power a car can take (G443: twelve cars, four answers);
+--      (d) the site gate reads the meter, not a band estimate 1.50x high (0727; on arm 88 it cost nothing measurable).
+--      And one fix to the twin itself, which production does not need (G448). A car that had just started was metered
+--      at its full rate, so all 85 of the managed arm's refusals came with the meter itself over the held cap.
+--      CORRECTED: this point first listed that as a certified engine change. In this database only the twin's start
+--      function writes a session's first reading; a real charger reports its own. 0733 fixes it in the twin under a
+--      dial (dc_power_first_reading), and its paired arm runs first in the next window.
+--
+--   6. THE FRONTIER: POWER BY NEED. Once every car is connected on arrival, the decision that matters is how a held
+--      limit is divided, tick by tick, among the cars on it. 0726 divides it max-min fairly, as a cabinet left to itself
+--      does. OTTO-Q knows what the cabinet does not: which car is due back to its owner first, how much each still
+--      needs, and what each contract allows. Giving a held site's power to the cars due first is ordering, never a
+--      shorter charge (rule 9), and it is a cumulative-resource scheduling problem, the construct CP-SAT handles and
+--      cuOpt cannot express (CLAUDE.md 2.5). In production it publishes as per-connector charging profiles (OCPP
+--      SetChargingProfile: OCPP 2.0.1 Part 2's Smart Charging chapter, K, per
+--      https://josev.ecog.io/docs/how-tos/how-to-control-charge-limit-imposed-by-smart-charging-service; its fields,
+--      chargingProfile and evseId, at https://ocpp.hexdocs.pm/ocpp/v2_1/message/set_charging_profile.html, a 2.1
+--      reference, both read 2026-10-17, to be confirmed against the OCA's 2.0.1 document), schedule-shaped, inside the
+--      power boundary 2.5 draws. That is the next build to measure
+--      against max-min fair on the same seeds. Its target is the immediate dispatches whose charge fits their 45-minute
+--      due (35 of 66 with power to spare, §12), not all due cars: 8 of 72 were on time free and 4 of 66 held (§3).
+--      BUILT IN ITS SIMPLEST FORM, 2026-10-17 11:49 AM CT (0737, dial dc_power_by_need): a bound pool gives every car
+--      with a due its full demand, earliest due first, and shares the rest evenly. That is broader than the target above,
+--      on purpose: earliest due first is the textbook rule for the latest a car can be on one shared resource, and its
+--      arm (arm 85's cell plus the dial) shows what it buys the due cars and costs the rest. Only if it costs the rest
+--      more than it buys is the narrower rule worth its own arm. The arm runs after 0732's seeds.
+--      0737's arm did not run in the window that closed at 6:00 AM CT on 2026-10-18: the runner does not start a new
+--      sweep's first arm, estimated at its 5,400-second budget, with less than that left (§15). It runs with the lag,
+--      against arm 85, in the window that opens at 11:00 PM CT on 2026-10-19 by §15's schedule.
+--      CHANGED 2026-10-19 at 6:36 AM CT (§23): it runs in tick, against arm 107 (the held site in tick), in that window,
+--      beside 0733's first reading in tick (heldtick).
+--
+--   7. WHAT IS NOT KNOWN YET. One seed per cell, so every gap above is a single reading. The repeats of arms 84 and 86
+--      that 0725's sweep holds run the same seed again: they test whether a reading repeats from one night to the next,
+--      which it does byte for byte only if nothing the engine reads has changed in between (the charge clock is refit
+--      nightly, G387), and they say nothing about how far a reading moves from seed to seed. That needs other seeds, and
+--      0732 queues them: the four cells this rests on (arms 83, 86, 84, 85) on value_2026_09_30's seeds 2 and 3, next
+--      in the window after 0731's pairs.
+--      A 12-hour day from 6 AM: no night, where L2's slow charge costs least. busy_day's wall is the two service bays
+--      (§5), which more chargers cannot move. The battery's worth on the billed window is 0731's three paired arms.
+--      0732's seeds did not start in that window either (§15). Since the queue step of 6:39 AM CT on 2026-10-18 they run
+--      in tick, against arms 93, 94 and 95 and answer_normal's held-site cell: by §15's schedule three of the eight in
+--      the window that opens at 11:00 PM CT on 2026-10-18 and the other five a night later. Until they land, every
+--      figure above is one seed.
+--      READ 2026-10-19 (§21): all four seed-2 arms landed (108-111). Each sizing figure now has two readings, a range
+--      and not a spread; seed 3's four arms run in the window that opens at 11:00 PM CT on 2026-10-19 (§23).
+--
+-- ══ §11 THE BATTERY PLANS FOR A BILL THE VALUE VIEW DOES NOT CHARGE (G447; reproduce: (9)) ══════════════════════════
+--
+--   ottoq_bess_day_plan (0435, 0600) shaves to a level no lower than the month's billed peak so far, which it counts from
+--   completed 30-minute windows starting bess_plan_bill_from_min minutes into the run. The dial defaults to 0, and no
+--   sweep cell sets it: not tonight's, and not value_2026_09_30's eight. The value view bills demand from 180 minutes in
+--   (ottoq_value_summary's c_open_min; 0576/0577: the opening plug-in is not the depot's peak). So the opening sets the
+--   plan's billed peak, and the plan then concedes the window the value view bills.
+--
+--   Arm 84 (dcfc40.otto_q, normal_day, sim run b54f6de5), from its own ottoq_energy_commands, read by 08:27 UTC:
+--     06:05  mode charge, cheapest_window, setpoint -425 kW, level 949 kW, billed peak 0. The chargers drew 3,874 kW
+--            that tick: the boot seats cars on chargers before the first plan sees them.
+--     06:10  shave, 1,499 kW (the unit's limit), level 2,418.
+--     06:30  hold.
+--     06:50  billed peak 2,370 kW (the opening's first completed half hour), level 2,370, charge (cheapest_window).
+--     13:30  to the end of the day: hold, level 2,370, the battery at 90-91% (bess_snapshots), while the grid peaked at
+--            1,180 kW at 3 PM and the half hours the value view bills peaked at 1,006.8 kW.
+--   Arm 83 (dcfc10, the same seed and day) has the same shape: the battery at 0 kW all afternoon, the grid up to 838 kW,
+--   under a billed peak of 973.8.
+--
+--   What it means here. Every arm in §3 and every arm of the value sweep ran at 0, so the comparisons between cells
+--   stand. The absolute demand charges in §3 and §4 are the battery standing aside after the opening, and they overstate
+--   what a depot with this battery would pay on the window the value view bills. The fix is one dial per cell:
+--   bess_plan_bill_from_min 180, so the plan and the bill read the same window. 0731 queues the paired cells on the same
+--   seed and day. A real depot's month has no test-day opening, and its battery would face each day's real peaks.
+--
+--   READ 2026-10-18 between 6:52 and 6:54 AM CT: 0731's three paired cells, each on its partner's seed and day with
+--   bess_plan_bill_from_min 180, both sides under the twin's command lag. The half hours are read through
+--   ottoq_arm_peak_profile as 0754 left it (full half hours only, §17); the energy as query (31) integrates it.
+--                                     ten posts            forty posts           forty held (managed)
+--                                     83 -> 98             84 -> 99              85 -> 100
+--     half hour from 180 min (kW)     713.6 -> 614.4       941.8 -> 831.9        1,050.6 -> 895.4
+--       change                        -13.9%               -11.7%                -14.8%
+--     whole-day half hour (kW)        973.8 both           2,369.5 both          1,643.7 both
+--     grid import (kWh)               6,669 -> 5,518       9,111 -> 7,892        8,976 -> 7,939
+--     battery out / in (kWh)          204/1,101 -> 650/396 222/1,125 -> 974/746  455/1,369 -> 857/697
+--     sessions, energy delivered      223, 7,002 kWh both  278, 8,425 kWh both   264, 8,416 kWh both
+--     site meter over the sessions    +11.7% both          +20.2% both           +20.1% both
+--   Every car's outcome matched its partner's (the scorecards' throughput, door times, charge waits and rule 9 0/0, and
+--   the same sessions delivering the same energy), and each bill-window arm expired as many proposals as its partner,
+--   from the same tick (none on 98 and 83, 3 from tick 96 on 99 and 84, 2 from tick 143 on 100 and 85; query (40)'s
+--   second statement), so each pair compares like with like. Three things follow.
+--   (a) Planning for the billed window held the half hour past the opening down by 99-155 kW. The opening is untouched:
+--       it is the boot's plug-in, before the first plan sees the cars (above), so the whole-day half hour is identical.
+--   (b) The grid import fell 11.6-17.3%, and that is not energy saved: the battery ended the day emptier. Its net
+--       discharge rose by 1,151, 1,131 and 1,074 kWh against its partner's, 100%, 93% and 104% of the grid difference
+--       (1,151, 1,219 and 1,037 kWh). A real depot buys that energy back the next night.
+--   (c) No dollar is quoted: both arms of each pair carry G468's over-metered site meter, and the battery planned on it.
+--       The shares stand because both sides carry the same excess. One seed.
+--   What it changes: the dial does what the paragraph above said, a billed half hour 12-15% lower past the opening on
+--   this day at no cost to any car, and it remains a certified change to make (G447). An in-tick bill-window reading,
+--   which would give a demand charge worth quoting, is not queued.
+
+-- ══ §12 WHAT THE 5-MINUTE TICK COSTS, AND WHAT A 45-MINUTE PROMISE CANNOT BUY (G449, G383; reproduce: (10), (11)) ═══
+--
+--   Every sweep on record runs at 5 sim-minutes a tick (15 sweeps, 87 arms), and at that tick a fast-charger handover
+--   takes two ticks. On arm 83 (the depot as built), 67 of 87 fast-charger handovers had a car waiting for a fast
+--   charger: 58 took exactly 10 minutes, none took fewer, and 13.5 charger-hours sat idle with a car waiting, against
+--   89.0 hours of fast charging (13%). Traced on stall 91ebbf41: the charge ends at 8:00 CT, the arm's demate (due 8:02) is cleared at 8:05, the
+--   stall is freed and reserved then, and the next car's charge starts at 8:10. The readiness check has the same shape:
+--   on arms 83 and 84, 190 cars whose charge was their last open work were ready exactly 10 minutes after it closed,
+--   median and p90 alike, for a 3-minute check.
+--
+--   What it means here. A robotic handover is a few minutes of physical work, and production ticks every 120 seconds,
+--   so this is the twin's resolution, not the engine's. It costs a depot with a queue and not one without, so the
+--   sizing curve of §3 (posts 11-20 bought 5.8 car-hours each) may be partly the tick. 0734 runs the depot as built over
+--   the same morning on the same seed at 5 and at 2.5 sim-minutes a tick; until it lands, read §10 point 2's first step
+--   as an upper bound.
+--
+--   And the promise. Every immediate dispatch is due exactly 45 minutes after it arrives (G383). With forty fast
+--   chargers and power to spare (arm 84), 31 of the 66 that charged spent longer than that on the charger alone, at a
+--   median 45-minute charge from a median 63.5%. No order, power or post count makes those on time while each charges
+--   to 100% (rule 9). So "due cars on time" measures the promise as much as the depot, and power by need (§10 point 6)
+--   can reach only the immediate dispatches whose charge fits their due: 35 of the 66.
+--
+--   One cause under the handover, and a second cost it hides (G450, 2026-10-17 afternoon). The twin carries out every
+--   command a tick after the decide gives it: on arm 83 all 507 executed commands were confirmed exactly 5.00
+--   sim-minutes after issue. That lag is the handover's second tick. It also cuts every bay seat short. The decide books
+--   a bay from its own clock for the leg's planned length, and the car, seated a tick later, still leaves at the
+--   booking's end. On arms 82-88, 470 of 472 bay seats began exactly one tick after their booking: washes sat a mean
+--   11.9-13.1 of 16.9-18.1 booked minutes, services 35.0-44.6 of 40.4-49.6. So the twin's bays turn faster than their
+--   own plan. That flatters busy_day, whose wall is the two service bays (§5), while the handover penalizes a charger
+--   queue: two biases from one lag, in opposite directions. 0735 (dial twin_answer_in_tick, applied 16:16 UTC) carries a
+--   command out in the tick it is given. Its arms run in the next window after 0734's: the same morning, then the
+--   normal day at 10, 20 and 40 posts, paired with arms 83, 86 and 84. Query (12) reads both costs on any run.
+--   The handover's first tick remains (the twin stamps a charge's end at the tick boundary). Its candidate fix, stamping
+--   the moment the pack filled, is in G449; it waits on 0734's pair, because if half the tick changes little it buys little.
+--   MEASURED 2026-10-18 (§15): halving the tick bought about half what answering in the tick did, and the first-tick
+--   candidate is not built.
+--
+--   The promise itself (G383, 0736, applied 16:38 UTC). When a car arrives, OTTO-Q now estimates when it will be ready.
+--   The estimate is its own plan of the charge line, simulated in 16 sampled futures, with every charge to 100% on the
+--   charge clock. It adds what the run's earlier cars needed after their charge. It gives a median and a 90th
+--   percentile, which the twin records once per visit and grades against the readiness check. In the dry run a 62%
+--   immediate dispatch due in 45 minutes was promised a median 61 minutes and a 90th percentile 69. The grade decides
+--   whether the 90th percentile holds 90% of cars. Its arm (0735's dcfc10 cell plus the recorder) runs in the next window,
+--   and must agree with its partner on every outcome, because the recorder decides nothing. Query (13) grades it.
+--
+--   Tested before it ran, and corrected (G452, 0739, applied 17:33 UTC). The part after the charge learned only from the
+--   cars that had finished, so on a day the bays back up it kept saying what the lucky cars took: on arm 81 at hour 8 it
+--   said 33 minutes after the charge while the next hour's cars took 395, and on arm 82 at hour 6, 35 against 110.
+--   Normal days were fine. 0739 counts the cars still waiting (Kaplan-Meier), draws the promise from the world rather
+--   than the run's id, and reads it from 128 draws. Query (14) is the rehearsal, rerunnable on any arm. On a busy day
+--   the honest promise is long: arm 81's three test cars went from a median 140-188 minutes to 470-560.
+--   0740 (applied 17:42 UTC) queues the same promise on arm 82's busy day, right after the normal day's promise arm,
+--   so the grade covers both; it must agree with arm 82 on every outcome. Query (13) reads either arm's grade.
+--   What the owner is told today is a different time (G454, 0741, applied 18:22 UTC). The owner app, and a personal
+--   agent through OTTO-Command, says "Planned to be ready around ..." from the end of the car's last planned itinerary
+--   leg, not from the promise, and that time has never been graded: the itinerary is amended in place, so what an owner
+--   was told at arrival cannot be read back. 0741 records the app's time beside each promise on both promise arms and
+--   grades both on the same cars. Query (18) puts them side by side.
+--   And the promise was only right at arrival (G455, 0742, applied 18:55 UTC). Asked again about a car whose charge was
+--   done and that was still waiting, 0739's estimator said "ready now" for nearly every one: 239 of 247 waiting car-hours
+--   on arm 82, 1,692 of 1,710 on arm 81, 50 of 56 on arm 83 (query (19)). 0742 draws such a car given how long it has
+--   waited, which brings the normal days close to honest and leaves the busy days poor, and says it does not know when a
+--   car has waited longer than any its history holds. Both promise arms now re-estimate every promised car every 30
+--   sim-minutes, with the owner app's time beside it; query (20) grades that second look.
+--   CHECKED 2026-10-18 between 3:25 and 3:26 AM CT: promise_normal's arm 96 (eb953ed6) is complete, no error: 208 promises for 208 visits,
+--   all with 128 draws, the world seed and owner_read true (an owner time on 191), and 929 re-estimates, owner_read true on
+--   all (charging 680, after_charge 143, in_line 76, unplanned 23, no_charge 7; 1 beyond history). Its wall time was
+--   3,338 s against its partner arm 93's 1,700 s: the recorder and its re-estimates did not add minutes, they nearly
+--   doubled the arm. promise_busy had no arm yet.
+--   CHECKED 2026-10-18 at 4:12 AM CT: promise_busy's arm 97 landed at 3:46 AM CT, complete, no error: 212 promises for 212
+--   visits, all with 128 draws, the world seed and owner_read true (an owner time on 197), and 2,173 re-estimates, owner_read
+--   true on all (in_line 793, charging 776, after_charge 547, holds_charger 32, unplanned 23, no_charge 2; 11 beyond
+--   history). Wall time 3,208 s against arm 82's 1,981. Both promise arms agree with their partners on every outcome atom
+--   and differ on h_dec and h_prop, by G473 alone (§19).
+--
+--   GRADED 2026-10-18 between 6:53 and 7:02 AM CT (queries (13), (14), (17), (18), (20) and (46)-(49)). Arm 96
+--   (promise_normal, eb953ed6: the normal day at ten posts, in tick) and arm 97 (promise_busy, e02aa048: arm 82's busy
+--   day at ten posts, with the lag); one seed each. A promise is graded against the car's readiness check; a car never
+--   ready is a miss once its time passed before the run's end, and is otherwise left out.
+--
+--   At arrival (query (13)):
+--                                            normal day (96)          busy day (97)
+--     promises / cars ready by the run's end 208 / 159                212 / 103
+--     ready by the median (target 0.5)       0.465 (172 graded)       0.222 (158 graded)
+--     ready by the p90 (target 0.9)          0.888 (161)              0.411 (151)
+--     the median's bias / mean abs error     +2.0 / 55.9 min          +75.6 / 136.0 min
+--     with bay work: by p50, by p90          0.434, 0.958 (63)        0.134, 0.286 (134)
+--     no bay work: by p50, by p90            0.479, 0.858 (145)       0.361, 0.600 (78)
+--     after-charge part from the run         0.561, 0.971 (146)       0.190, 0.339 (170)
+--     after-charge part from the prior       0.276, 0.741 (62)        0.310, 0.595 (42)
+--     immediate dispatches: by due / by p90  0.057 / 0.907 (55)       0 / 0.646 (62)
+--   On the normal day the promise is calibrated: about half the cars by its median, 89% by its 90th percentile, no bias.
+--   Its weak part is the prior, used until the run has 8 cars of a kind, whose after-charge allowance is short (bias
+--   +16.3 minutes, by p90 0.741). On the busy day it is late by 76 minutes on average and its 90th percentile holds 41%
+--   of cars, 29% of those with bay work, where the two service bays face about 3.6 times the work they can do (G453).
+--   And the immediate dispatches show again that the 45-minute due is not a time (G383): 3 of 55 and 0 of 62 met it,
+--   while the promise's p90 held 91% and 65% of the same cars.
+--
+--   The busy day's promise mostly knew it did not know (query (46)). 168 of its 212 promises carried a lower bound in
+--   their after-charge allowance (detail after_lb > 0), and on 115 the median itself was a bound: the run's cars had not
+--   yet finished after their charge often enough to put a median on it. Those 115 were ready by their p90 26.6% of the
+--   time; the 25 that got ready after it were a median 72 minutes past it (at most 274), and the 44 never ready were at
+--   least a median 128 minutes past it when the run ended. With no bound (44 promises) it was 0.595. On the normal day
+--   bounds were rarer (94 of 208, the median a bound on 25) and generous (by p90 0.96-1.00), because a bound takes the
+--   prior's value where that is greater, and the prior is longer than a normal day's waits. So a bound is honest and it
+--   is not a forecast: on the busy day the cars ran an hour or more past it.
+--
+--   Why the run's own cars are not enough on a busy day (queries (14), (49)). At each even hour, what 0739's
+--   Kaplan-Meier said a car with bay work takes after its charge, against what the next hour's cars took (counted to the
+--   run's end when never ready), in minutes:
+--     busy day (97)     hour 2: 35 against 95 · hour 4: 65 against 85 · hour 6: 85 against more than the rest of the
+--                       run (5 of 9 never ready) · hour 8: 135 against 135 · hour 10: 195 against more than the rest of
+--                       the run (15 of 17 never ready)
+--     normal day (96)   40 against 20 · 25 against 35 · 35 against 70 · 40 against 65 · 40 against 55 (2-7 cars an hour)
+--   On the busy day the line grows all day, so anything learned from the cars before is short for the car now. The
+--   honest number is the line ahead of the car, which the promise simulates for the charge (0736's futures) and not for
+--   the bays. That is its next build only if a busy day like this one is realistic, which is G453's question to Chase:
+--   busy_day without its compression is lighter than normal_day.
+--
+--   G453's test, the calendar's floor (queries (17), (47)). Of the busy day's 66 promises with a bay booking made at
+--   arrival, 31 got ready, 19 by their p90, and 5 were ready after the booking's end while their p90 sat before it; on
+--   the normal day 40 of 40 were ready by their p90 and none was such a case. Rehearsed, the p50 and p90 floored at the
+--   booking's end plus 5 minutes (the 3-minute check, to the tick): on the busy day the floor moves 23 p90s and 39
+--   medians, the booked cars' by-p90 goes 0.352 -> 0.373 and their median's error 166.2 -> 117.2 minutes, and all
+--   promises' by-p90 0.411 -> 0.419. On the normal day it moves 6 p90s and 32 medians, leaves the by-p90s at 0.976 and
+--   0.888, and raises the booked cars' median error 63.8 -> 72.5 minutes (their by-p50 0.457 -> 0.619, past its target).
+--   So the floor is not the next build: it barely moves the p90 where the p90 is wrong and spoils the median where the
+--   median is right, as 0742 §1 found on arm 82 (0.398 -> 0.421). Not built.
+--
+--   Beside what the owner app says (G454, query (18)): the app's time, "Planned to be ready around ...", the end of the
+--   car's last planned leg, read when the promise was made, on the same cars.
+--                                            normal day (96)          busy day (97)
+--     cars with an app time / graded         191 / 149                197 / 152
+--     ready by the app's time                0.389                    0.151
+--     ready by the promise's p50 / p90       0.471 / 0.903            0.203 / 0.397
+--     mean abs error, app / promise median   76.7 / 49.8 min          148.3 / 139.8 min
+--     app's bias (+: the car took longer)    -23.3 min                +65.9 min
+--     app named a time already gone          0                        0
+--   Where the app's error comes from, on the cars that got ready, by how the legs of their plan ended (query (48); the
+--   legs are amended in place, so 168 of 197 and 84 of 191 app times match no leg's final end, and the group is read
+--   from how each leg ended, not from the leg that set the time):
+--     normal day   a skipped L2 leg alone (28 cars): app off by 141.8 min, bias -137.7, promise 42.0 · with a phantom
+--                  bay leg too (12): app 143.5, promise 79.5 · a phantom bay leg alone (17): app 62.5, promise 47.5 ·
+--                  neither (85): app 48.6, promise 48.7
+--     busy day     a skipped L2 leg alone (18): app 151.6, bias -111.0, promise 111.5 · both (8): app 233.4, promise
+--                  187.8 · a phantom bay leg alone (21): app 164.1, bias +135.4, promise 198.5 · neither (43): app
+--                  123.3, promise 114.1
+--   On the normal day, on cars whose plan held neither phantom, the app and the promise are equally good (48.6 and 48.7
+--   minutes). The app's extra error is the phantom L2 leg (G459): the 40 cars whose plan carried an L2 charge leg later
+--   skipped carry 52% of the app's absolute error, and the app told their owners they would be ready about 2 hours 18
+--   minutes after they were. Phantom bay legs alone (G464) carry 10%. On the busy day 40% of the app's error is on cars
+--   with neither phantom: both estimates are late there, because the bay line is. 0745 (the plan's charge on a charger
+--   the depot has, timed on the clock) and 0750 (a bay seat closes its leg) remove the two phantoms; their arms are queued
+--   (§15), and the owner app's time can be graded again on them.
+--
+--   The second look (G455, query (20)): every promised car re-estimated every 30 sim-minutes, the app's time read at the
+--   same moment.
+--                                            normal day (96)          busy day (97)
+--     re-estimates / graded at the median    929 / 809                2,173 / 1,410
+--     ready by the median / p90              0.540 / 0.895            0.317 / 0.603
+--     the median's bias / mean abs error     -1.2 / 26.2 min          +17.0 / 69.5 min
+--     after the charge, waiting (p50/p90)    0.617 / 0.890, 13.4 min  0.400 / 0.472, 108.1 min
+--     charging                               0.555 / 0.905, 20.0 min  0.481 / 0.772, 36.3 min
+--     in the charge line                     0.447 / 0.816, 75.7 min  0.121 / 0.487, 94.2 min
+--     no estimate (waited past its history)  1                        11
+--     app: ready by its time / abs error     0.373 / 74.0 min         0.236 / 104.1 min
+--     app named a time already gone          80 of 879 reads (9.1%)   80 of 2,056 (3.9%)
+--   Against query (19)'s rehearsal, after the charge: the normal day's 0.617 and 0.890 against 0.63 and 0.88 rehearsed,
+--   and the busy day's 0.400 at the top of the rehearsed 0.22-0.40. On the normal day the median tightens as the visit
+--   goes on (mean error 36.0 minutes 30-60 minutes in, 17.0 at two to four hours) and the app's does not (72.3 and
+--   66.9). On the busy day the cars waiting after their charge were told a median 240 more minutes; those that got ready
+--   took a median 30, and 136 of the 260 graded were never ready: the estimate spans two populations, the cars that got
+--   a bay and the cars that did not, and its median speaks for the second.
+--
+--   Which estimate an owner should be told. On a normal day, the promise. At arrival its 90th percentile holds 90% of
+--   cars (0.903 on the cars the app also timed) where the app's one time holds 39%, and its median misses by 50 minutes
+--   on average where the app misses by 77. On a second look its median misses by 26 minutes against the app's 74, it
+--   never names a time already gone, and the app did on 9% of second looks. Say the 90th percentile as "ready by" and
+--   the median as "likely around". On the busy day neither is honest: the promise's p90 holds 41% at arrival and 60%
+--   later, the app's time 15% and 24%. There the honest phrasing is the promise's p90 as "not before", with a time to
+--   look again, whenever the promise's detail says its allowance is a bound (after_lb 3 or more: 154 of the busy day's
+--   212), which is when the cars ran an hour or more past it. The proposed change to ottoq_owner_car, for Chase and the
+--   session that holds the owner functions (nothing is patched): docs/OWNER_READY_BY_PROPOSAL.md. One seed each, on one
+--   normal and one busy day.
+
+-- ══ §13 THE WASH IS THE NEXT LINE, AND THE BAY CALENDAR SEATS ALL OR NONE (G457, G458, G453; reproduce: (21)-(25)) ════
+--
+--   Read 2026-10-17 4:55-5:50 PM CT from last night's normal-day arms (seed 1, 12 hours) and arm 82.
+--
+--   With more chargers the next line is the wash (query (21)). From each car's charge end to its wash-bay seat:
+--     10 posts, arm 83   p50 12.5, p90 46.5, longest 100 minutes   (48 washes after a charge)
+--     20 posts, arm 86   p50 15.0, p90 84.5, longest 170           (52)
+--     40 posts, arm 84   p50 22.5, p90 172.5, longest 421          (66)
+--     40 managed, arm 85 p50 20.0, p90 177.5, longest 421          (66)
+--   Booked washes run 17.1-18.2 minutes. The line is a morning one, and the bays are not full when it is long: on arm 84
+--   at 8 and 9 AM CT 11 and 12 cars waited while one of the three bays washed; on arm 86 at 7-8 AM 4-5 waited and none
+--   washed.
+--
+--   Read every five minutes (query (22)), a wash bay sat empty while cars waited, with no booking on it at all, for 130,
+--   159 and 130 bay-ticks on arms 83, 86 and 84 (131 on arm 82), flat from 10 to 40 posts. That is not traced here; part
+--   is the walk from charger to bay, a tick a step (G449, G450), which tonight's 0735 arms shorten. And for 12, 15 and 26
+--   bay-ticks (18 on arm 82) a bay sat empty behind a reservation for a car that did not come. Two causes are measured.
+--
+--   (a) A reservation for a car still charging holds its empty bay (query (23), G458). Of the 34 wash no-shows on arms 82,
+--       83, 84 and 86, 24 had their car still charging at the slot, and every one had a charge leg planned to end before
+--       it: the charges ran a mean 42, 36, 17 and 22 minutes past their plan, and each hold kept its empty bay a mean 13-15
+--       minutes until the no-show grace freed it. The reconcile (ottoq_reconcile_bay_reservations) defers a hold only while
+--       the car's charge leg is planned to end later, so a charge past its plan is invisible to it. 0744 (PENDING) blocks
+--       such a hold one service length ahead under dial bay_hold_follows_charge.
+--   (b) The calendar seats all or none (query (24), G457). ottoq_activate_due_bay_reservations seats the due reservations
+--       in one block whose handler returns 0 on any error. A car just off its charger is ready for its bay while the arm
+--       still holds it, and moving it trips the arm interlock. Reproduced on live at 5:07 PM CT in a transaction rolled
+--       back: car A held by the arm and car B staged and ready, each with a wash reservation in its window and its bay
+--       empty; the call seated 0; with A's arm released it seated both (tests/test_bay_activation_per_seat_sql.py repeats it
+--       on the live bodies). A car whose charge ended at a tick held a live bay booking in 36, 38, 50 and 45 of 144 ticks
+--       on arms 83, 86, 84 and 85, and on arms 84 and 85 no calendar seat fell in any of them. 9 of the 34 no-shows had
+--       their car idle in the depot at its slot, but most of their ticks had no held car, so other errors also end the
+--       call, and the server log is all they leave. 0743 (PENDING) seats each car on its own under dial
+--       bay_activation_per_seat and records each refusal, so its arm will say what they are.
+--   The calendar seats few cars at all (3-10 a run; the staged path seats most), so expect (b) to matter less than (a).
+--
+--   What it means for the conversion (§10 point 2). Posts 21-40 earned about half what posts 11-20 did, and the wash line
+--   is part of why. Both measured causes are engine fixes, not capacity. A fourth wash bay is a build-out the twin cannot
+--   yet express: ottoq_site_buildout_apply converts L2 spaces to fast chargers and nothing else.
+--
+--   And the bay line's order, corrected (query (25), G453). On arm 82 (busy day) the staged needs-card path, decide
+--   section (4b), made 10 service-bay seats, and each passed over a car that had waited longer: a mean 18.8 such cars,
+--   the longest a mean 292 minutes. It ranks by urgency, then time to deploy, then shortest open work, with no term for
+--   time waited, and on busy_day's compressed intervals the critical and overdue cars alone fill the two bays. The
+--   first-come path, section (5), seated 13, 5 of them over a longer wait. Normal days: 0-1 such seats in 6-8. busy_day
+--   without its compression is not a busy day: 88 of arm 82's 164 recalls were service_interval_due, and the other 76
+--   are a lighter day than normal_day's 148. So a realistic busy day needs an assumption about demand, which is Chase's.
+--
+--   APPLIED 2026-10-18: 0743 at 6:09 AM CT (ledger 20261018110944) and 0744 at 6:11 (20261018111140), each then checked
+--   end to end on live in a transaction rolled back (their APPLIED notes). With bay_activation_per_seat 1 the calendar
+--   seated the staged car and left the one the arm still held, where with the dial off it seated neither; with
+--   bay_hold_follows_charge 1 a wash hold whose car was charging past its plan moved one service length ahead, deferred
+--   as charging_past_plan. Their arms, bayseat_normal and bayhold_normal (forty posts, in tick, against arm 95), are
+--   queued (§15). G471's fix for the calendar's parked cars, 0755, waits for a person at the connector (§18).
+
+-- ══ §14 THE PLAN CHARGES ON A CHARGER THE DEPOT MAY NOT HAVE (G459; G458 traced further; reproduce: (26)-(28)) ═══════
+--
+--   Read 2026-10-17 between 5:42 and 6:07 PM CT from last night's normal-day arms (seed 1, 12 hours) and arm 82.
+--
+--   G458's "empty bay, no booking, cars waiting" ticks are mostly refused walk-ins (query (26)). The waiting cars there
+--   were chiefly waiting for an interior deep clean, which this depot does on its wash bays (it has no detail bay). On arm
+--   84 the needs-card path, decide section (4b), asked for a wash bay 146 times for 25 cars and was told there was no
+--   free space: it needs the bay free for the whole job, [now, now + 25 minutes) for a deep clean. In 96 of the 146 a bay
+--   was held only by reservations whose car never came; in 9 only by the asking car's own reservation, which the walk-in
+--   path cannot use (it honours a hold only through a planned leg with no stall, and a reserved leg has one); in 41 the
+--   final booking rows show no blocker, and in the one traced (7:15 AM CT, NASH-WSH-03) the blockers were two holds the
+--   reconcile moved five minutes later (its log, bay_reservation_reconcile_2026_08_02, keeps the old windows). On arms
+--   86, 83 and 82: 52, 11 and 17 refusals. The lane's staff cap also binds (query (29)): section (4b) admits to the wash
+--   lane only up to LEAST(the bays, the depot's wash supervisors) and passes over every candidate silently once that is
+--   reached, and this depot has two supervisors for three bays (ottoq_depot_staffing). On arm 84, in 51 five-minute
+--   ticks (about 4 h 15 min of the 12-hour day, 7:30 AM to 5:40 PM CT) two bays were washing, a mean 3.5 cars stood
+--   staged waiting for a wash or deep clean, and no walk-in was tried; as built (arm 83) 26 ticks and 1.6 cars. What a
+--   third supervisor buys is a staffing question for Chase, and the twin can answer it with a run-scoped override of the
+--   lane's headcount (proposed, not built: the decide reads the depot's staffing table, which no run can change).
+--
+--   Most of those reservations were booked behind a charge the depot cannot give (query (27), G459). The itinerary
+--   planner (public.ottoq_plan_visit_itinerary) chooses a fast charge at 100 kW below 45% and an L2 at 11 kW above it,
+--   whatever the depot has. On arm 84 (no L2) it planned 127 L2 legs for 93 cars, a mean 232 minutes long; 124 were skipped, and
+--   each ended a mean 219 minutes after the car's real charge (median 232; arms 85, 86 and 83: 224, 237 and 218). The
+--   forward calendar books bay holds from those legs. The reconcile reads an unstarted charge leg as a charge under way
+--   (BLOCKER 1) and deferred the holds of cars standing in staging while such a leg was planned: 3, 5, 6 and 4 holds on
+--   arms 83, 84, 85 and 86, a mean 88, 88, 84 and 95 minutes, and 16 on arm 82 (163 minutes). For 23 of the 34 the leg
+--   was one the depot never served; for the other 11 a real charge came after.
+--
+--   Rehearsed out of sample on every charge to full (query (28); the clock's fit 11 is of 2026-10-14, and the rehearsal
+--   leaves out the run's own charges, which the plan adds). Planning the kind the car can use at the depot, timed on the
+--   learned clock, gets the kind right on all 234 of arm 84's charges (the rule 39.7%) and misses the length by a mean
+--   7.9 minutes (the rule 63.0; p90 19.6 against 172.8); arm 85, 8.1 against 61.2. As built (arm 83, 172 charges) the
+--   kind is the rule's, right 64.5%, and the clock still cuts the miss 69.5 → 52.0 (arm 86: 67.4 → 43.1). The faster
+--   kind on the clock would be right only 48.8% as built, though 69.0% at 20 posts against the rule's 57.5%: which kind
+--   a car gets at a mixed depot depends on the mix and the queue, which a plan made at arrival cannot see. With the kind
+--   known the clock misses by 14.7 minutes as built and 9.8 at 20 posts. 0745 (PENDING) makes the change that holds on
+--   every mix measured, under dial itinerary_charge_on_clock, with arms paired to 84 and 83.
+--
+--   APPLIED 2026-10-18 at 6:13 AM CT (ledger 20261018111301), then checked end to end on live and rolled back: for a
+--   car at 60% the plan wrote an L2 leg of 230.5 minutes at an assumed 11 kW with the dial off; with
+--   itinerary_charge_on_clock 1, an L2 leg of 154.1 minutes on the clock (19.2 kW, the car's own); and with every L2
+--   stall made a fast charger in the same transaction, a fast-charge leg of 83.3 minutes, with the wash leg starting at
+--   its end. Its arms, itinclock_normal at forty posts against arm 95 and at ten against arm 93, in tick, are queued
+--   (§15). What the phantom L2 leg costs an owner today is in §12: on the normal day, 52% of the owner app's error.
+
+-- ══ §15 THE NIGHT'S ARMS: THE FIRST READING, THE TICK AND THE COMMAND LAG (G448-G450; reproduce: (3b), (12), (30)) ══
+--
+--   Read 2026-10-18 between 1:38 and 2:33 AM CT from the seven arms the runner finished from 11:38 PM to 1:55 AM CT
+--   (arms 89-95, all complete, none errored). Seed 1 throughout, so each pair is one reading.
+--
+--   0733, the first reading (arm 89 against arm 85: the normal day, forty posts behind 2.4 MW of shared cabinets held at
+--   2.16 MW, 0729's managed reading). EN.001's refused starts fell from 85 to 0 (query (3b) on the sweeps
+--   dcfc40_managed_normal and firstreading_normal). All 85 had come with the meter itself over the held cap, 2,182-2,285
+--   kW against 2,160, and 84 of them before 7 AM CT. The pool bound in 4 ticks against 1. The day barely moved: 211 cars
+--   served against 207, 946.8 deployed car-hours against 941.8, the charge wait's p50 and p95 10 and 90 minutes on both,
+--   7 of 74 due cars on time against 4 of 66, and every car left at 100% with nothing open on both. So every refusal of
+--   G448's kind was the twin's first reading. But the shield's refusals did not all go: they moved to the decide's seat
+--   assignment (EN.001 at stall_assignment, 1 on arm 85, 73 on arm 89, every one between 6:20 and 6:30 AM CT), judged on
+--   the meter plus the car's rating, and 35 of the 73 came with the meter at the held cap or under it (2,159.9 kW against
+--   2,160), which the charge start, under 0729's reading, would have admitted. 0729 put the controller's limit in the
+--   charge start's context only (G470). With the first reading right the meter sits at the cap through the opening, so
+--   the seat refuses what the start would share; here it cost three ticks at the opening and nothing measurable after.
+--
+--   0734 and 0735 over the same 6-hour morning at ten posts:
+--                                          arm 91          arm 90          arm 92
+--                                          5 min, lag      2.5 min, lag    5 min, in tick
+--     command lag, all executed (min)      5.00            2.50            0.00
+--     wash seat of its booking (min)       12.00 of 17.00  15.39 of 17.89  17.22 of 17.22
+--     service seat of its booking (min)    38.00 of 43.00  31.90 of 34.40  43.00 of 43.00
+--     handovers with a car waiting         28              32              29
+--       taking exactly the lag's gap       27 at 10.0      31 at 5.0       27 at 5.0
+--       charger-hours idle in them         4.8             2.8             2.7
+--     cars served (visits)                 58 (90)         61 (91)         60 (89)
+--     deployed car-hours (of 514)          392.3           403.0           412.9
+--     charge wait p50, p95 floor (min)     30.0, 144.0     17.5, 144.1     5.0, 125.0
+--     wall time (s)                        406.6           1,498.5         404.8
+--   A handover here is a gap of 15 minutes or less between two sessions on one fast charger while a car waits for one
+--   (query (30)). A longer gap is a fault or a car not yet ready, one or two an arm (a connector-cable fault left a
+--   charger idle 3.2 hours on arm 90, an aborted session 3.4 hours on arm 92), and is left out. Halving the tick bought
+--   10.7 car-hours over the morning (+2.7%) for 3.7 times the wall time; answering in the tick bought 20.6 (+5.3%) for
+--   none. Most of the charge wait's median was the lag itself: a car seated on a charger plugged in a tick later.
+--
+--   0735 on the normal day (12 hours), against last night's arms on the same seed:
+--                                          10 posts          20 posts          40 posts
+--                                          83 -> 93          86 -> 94          84 -> 95
+--     command lag (min)                    5.00 -> 0.00      5.00 -> 0.00      5.00 -> 0.00
+--     wash seat of its booking (min)       12.64 -> 16.90    12.67 -> 17.32    13.05 -> 18.14
+--       (booked)                           (17.64 -> 16.90)  (17.67 -> 17.32)  (18.05 -> 18.14)
+--     handovers with a car waiting         63 -> 69          not readable: query (10) reads a converted post as L2
+--       charger-hours idle in them         10.9 -> 6.6
+--     cars served                          148 -> 159        175 -> 177        215 -> 205
+--     deployed car-hours (of 1,114)        821.4 -> 832.1    879.8 -> 909.0    942.7 -> 940.5
+--     unmet ride demand                    26.3% -> 25.3%    21.0% -> 18.4%    15.4% -> 15.6%
+--     door p95 (min)                       428 -> 378        305 -> 325        248 -> 274
+--     charge wait p50 (min)                10 -> 5           10 -> 5           10 -> 5
+--     charge wait p95 floor (min)          125 -> 110.5      105 -> 95         82.5 -> 72.5
+--     due cars on time                     6 of 54 -> 3/42   5 of 59 -> 2/53   8 of 72 -> 4/65
+--   Every car left at 100% with nothing open on all six. On-time is a handful either way (§12), and a bay seat now runs
+--   its booked length, so a due car with bay work leaves later than it did. At ten posts the due cars are the OTA wave's
+--   recalls (J_ota_wave, 65 and 53 of the due visits); about half began on an L2 in both arms (35 of 63 and 26 of 54
+--   on a fast charger, against 41.5% and 42.7% of the others: G277's ordering question, under 0548's test), and in tick
+--   their charge ran a mean 116 minutes against 107 as the fast chargers ran busier (76% against 69%).
+--   And every HW.005 refusal on the 14 arms 82-95 (15-46 an arm) is the one Zoox G313 names, 229f655b, stranded by two
+--   scheduler tasks left in_progress since 2026-06-04: on arm 93 both service bays sat idle from 7:35 AM CT to at least
+--   8:55 while it was refused a service start 21 times. Its fix, 0603, has waited for Chase at the connector since
+--   2026-10-02; every pair here carries the car on both sides, so the comparisons stand.
+--
+--   What it changes. The lag had two costs in opposite directions (G450), and they fell on different post counts. Ten
+--   and twenty posts queue for chargers and lost each handover's second tick: removing it bought them 10.7 and 29.2
+--   car-hours. Forty posts do not queue (41% busy) and are wash-bound (§13), and the lag gave them wash seats a tick
+--   short: removing it cost them 2.2. So in tick the curve bends harder: posts 11-20 bought 7.7 car-hours each in the
+--   12-hour day, and posts 21-40 bought 1.6 (§10 point 2 had 5.8 and 3.1, and called 5.8 an upper bound; it was not).
+--   Forty posts served 29% more cars than as built, not 45%. One seed, and the seeds that would give these a spread
+--   (0732's) have not run.
+--
+--   And G449's first-tick candidate is not built. With 0735 a handover takes one tick, and at ten posts the normal day
+--   left 6.6 charger-hours idle with a car waiting, against 94.4 hours of fast charging. Stamping the moment a pack
+--   filled would save about 3 of a handover's remaining 7.5 minutes (G449's arithmetic), about 3.5 charger-hours a day
+--   here. Halving the tick saved 2.0 of the morning's such hours, among its other effects, and bought 10.7 car-hours.
+--   It stays the candidate if the seeds show the curve needs it.
+--
+--   THE SECOND NIGHT, read 2026-10-18 between 6:50 and 6:52 AM CT (cron.job_run_details for job 783, and the arms'
+--   rows). The runner ran twelve arms back to back from 11:02 PM CT (04:02 UTC): 89-95 (above), the promise arms 96
+--   and 97 (1:56-3:46 AM CT, §12) and 0731's bill-window arms 98, 99 and 100 (landed 4:15, 4:53 and 5:30 AM CT, §11),
+--   all complete, none errored. From 5:30 AM CT every firing took 0-1 seconds: the next arm was seeds23's first, which
+--   the runner estimates at its sweep's 5,400-second budget (no arm of the sweep has run), and 5:30 plus 90 minutes is
+--   past the window's close at 6:00. Against the projection made on 2026-10-17 (the nine priority-15 arms by about
+--   3:10-4:20 AM CT, then two or three bill-window arms, and no seed or power-by-need arm): the nine landed by 3:46, all
+--   three bill-window arms ran, and neither seeds23 nor byneed started.
+--
+--   THE QUEUE, changed at 6:39 AM CT (11:39:22 UTC), after every apply of the morning, one UPDATE per sweep inside a
+--   guard that refused if anything was in flight: every cell with no arm yet now carries twin_answer_in_tick 1, so what
+--   is still to run measures the twin without the command lag (G449, G450, G468). Sweep by sweep, with each cell's
+--   partner (the runner's order):
+--     robowash_normal_2026_10_18 (0746, 0747; priority 14): dcfc40.otto_q (the internal control), .wash_timed
+--       (wash_lane_physics 1), .wash_robotic (2) and .wash_robotic.uptime_first (2 and bay_order_uptime_first 1). Every
+--       cell also carries 0757's bay_release_reads_the_work 1. The control's own partner on the day is arm 95.
+--     uptimefirst_busy_2026_10_18 (0747; 14): .wash_robotic (the internal control) and .wash_robotic.uptime_first, at
+--       forty posts on the busy day, both with 0757's dial.
+--     answer_normal_2026_10_17 (0735; 15): a fourth cell, dcfc40_cab2400.managed.answer_in_tick, seeds23's managed cell
+--       plus the dial, so the held site has an in-tick reading on seed 1; its partner on the lag is arm 85.
+--     seeds23_normal_2026_10_17 (0732; 16): its four cells on seeds 2 and 3, against arms 93, 94 and 95 and
+--       answer_normal's fourth cell.
+--     byneed_normal_2026_10_17 (0737; 16): not in the step's list and left as it was; it runs with the lag against arm 85.
+--     bayseat_normal_2026_10_17 (0743), bayhold_normal_2026_10_17 (0744) and bayexit_normal_2026_10_18 (0750) (16): one
+--       cell each, against arm 95 instead of arm 84.
+--     itinclock_normal_2026_10_17 (0745; 16): forty posts against arm 95 and ten against arm 93, instead of 84 and 83.
+--     repairgl_busy_2026_10_18 (0753; 16): no in-tick busy day had run, so a new internal control,
+--       dcfc10.otto_q.answer_in_tick (ord 0), and the repair cell (repair_needs_its_green_light 1) set against it.
+--     bayfree_normal_2026_10_18 (0755) does not exist, since 0755 is not applied.
+--   The two arms the step added are answer_normal's fourth cell and repairgl's control.
+--
+--   THE SCHEDULE, realistic, from the walls measured: a normal day in tick at ten, twenty and forty posts 1,700, 1,871
+--   and 2,082 s; forty held with the lag 2,166 s; a busy day at ten posts with the lag 1,981 s (3,208 with the promise
+--   recorder). The robotic and uptime-first cells have no wall yet, so their times are guesses from these. The runner
+--   starts nothing whose estimate (the cell's longest wall, else its sweep's, else the sweep's budget) would end past
+--   6:00 AM CT.
+--     The window opening at 11:00 PM CT on Sunday 2026-10-18: robowash's four arms (perhaps 35-40 minutes each; the
+--       runner's estimate is 50) to about 1:30 AM CT; uptimefirst_busy's two (perhaps 45-55 minutes each) to about 3:15;
+--       answer_normal's held-site cell (about 36 minutes) to about 3:50; then seeds23's seed-2 arms at ten, twenty and
+--       forty posts to about 5:30. Its fourth, estimated at 2,082 s, would end past 6:00 and waits.
+--     The window opening at 11:00 PM CT on Monday 2026-10-19: seeds23's other five to about 1:50 AM CT, byneed (about 36
+--       minutes), then bayseat, bayhold, itinclock's two and bayexit (about 30-37 minutes each) to about 5:20; repairgl's
+--       control, estimated at its 3,000-second budget, would end past 6:00 and waits.
+--     The window opening at 11:00 PM CT on Tuesday 2026-10-20: repairgl's two busy-day arms, then dcfc40_power_busy's
+--       three.
+--   Every time in this schedule is an estimate from walls, not a reading, and one long arm moves everything behind it.
+--
+--   And one standing fact, re-read (query (50), between 7:10 and 7:11 AM CT): every HW.005 refusal on all 19 arms
+--   82-100 is the Zoox 229f655b (15-46 an arm), stranded by G313's two tasks; 0603 still waits for Chase.
+
+-- ══ §16 UNDER THE LAG, THE TWIN'S SITE METER COUNTS EACH NEW CHARGE'S FIRST INTERVAL TWICE (G468; reproduce: (31), (32)) ══
+--
+--   Found reading §15's energy: in tick the depot imported 6.5-17.5% less while its cars took more. The sessions
+--   delivered 7,429 kWh against 7,002 at ten posts, 8,009 against 7,772 at twenty and 8,629 against 8,425 at forty; the
+--   battery's charge and the fleet's end charge moved under 1%; and the grid read 6,284 kWh against 6,723, 6,888 against
+--   7,912 and 7,579 against 9,193. That is the meter, not the cars (query (31)). Integrated as ottoq_dial_arm_metrics
+--   integrates it (each snapshot held until the next), the twin's EV load, site_energy_snapshots.total_ev_charging_kw,
+--   against what the sessions delivered:
+--     5 minutes, lag:     +11.7% (arm 83, ten posts), +12.0% (91, the morning), +15.6% (86, twenty), +20.2% (84, forty),
+--                         +20.1% (85, forty held), +18.0% (89, held, with 0733)
+--     2.5 minutes, lag:   +6.0% (90)
+--     in tick (0735):     -0.6% (92), -0.7% (93), -0.8% (94), -1.5% (95)
+--   The chargers' own readings (OCPP TransactionEvent Updated, Power.Active.Import, one a tick) agree with the sessions to
+--   within 1% on all eleven arms, lagged or not: 7,024 against 7,002 kWh on arm 83, 8,503 against 8,425 on arm 84,
+--   7,457 against 7,429 on arm 93, 8,708 against 8,629 on arm 95. On a tick when no session starts or ends the meter
+--   equals the sum of that tick's readings exactly, on all eleven; all of arm 83's excess, 10,124 kW-ticks or a mean
+--   45.4 kW for each of its 223 starts, falls on ticks when one does.
+--
+--   The order of a tick says why (function sources). ottoq_sim_advance_tick_world carries out the last tick's commands
+--   (ottoq_sim_confirm_commands), starts the sessions of the cars now plugged in (ottoq_sim_reconcile_charge_sessions),
+--   meters each running session's last interval (ottoq_sim_advance_charge_sessions, which skips a session in the tick it
+--   starts) and then snapshots the site (ottoq_sim_advance_all_energy, then twin.ottoq_sim_advance_site_energy), summing
+--   every session's last reading with started_at <= now (twin.ottoq_sim_compute_charger_load_kw). So a session started in
+--   the world is in the snapshot at its first reading, the rate it is about to charge at, and a tick later at its reading
+--   for that same interval: N + 1 snapshots for N intervals. With 0735 the session starts after the decide
+--   (twin.ottoq_sim_answer_in_tick), after the snapshot, so it is in N of them, and the load curve sits a tick late,
+--   which moves no total.
+--
+--   What it changes. Every arm before tonight ran with the lag, so every energy, grid, cost and peak figure in §2-§4, §10
+--   and §11 is read from an over-metered snapshot. Recomputed on the chargers' readings (query (32)), full half hours:
+--                              grid kWh            whole-day half hour (kW)   half hour from 180 min (kW)
+--     ten posts, arm 83        6,669 -> 5,887      973.8 -> 935.8             713.6 -> 658.0
+--     twenty, arm 86           7,840 -> 6,740      1,693.1 -> 1,660.8         932.5 -> 821.3
+--     forty, arm 84            9,111 -> 7,589      2,369.5 -> 2,188.8         941.8 -> 797.1
+--     in tick, arms 93-95      the meter and the readings within 1.8% on every column
+--   The lagged arms' battery planned on the over-metered meter, which no recomputation undoes, so quote the in-tick arms.
+--   On them the depot is busier than the lagged arms' readings: with each handover a tick shorter more cars charge at
+--   once, and the half hour billed from 180 minutes reads 800.2 kW at ten posts, 924.3 at twenty and 940.6 at forty
+--   (§10 point 4's dollars, corrected there). The opening draw at forty is 3.7 MW on the chargers' readings (3,731 kW on
+--   arm 84, 3,749 in tick on arm 95), not §10 point 3's 3.9; the meter's 3,874 counted some first intervals twice.
+--
+--   A twin fidelity defect, not a production one: a real site meter reads the power that flows. Anything in the twin that
+--   reads the snapshot while it decides read the phantom on a lagged arm; which readers those are is not traced here.
+--   Not built: 0735 removes it, so a cell that measures energy, a peak or a bill runs with twin_answer_in_tick on. The
+--   cells queued behind tonight's (billwindow_normal, byneed_normal, seeds23_normal and the older dcfc40 sweeps) run with
+--   the lag: their pairs compare like with like, and their energy and bills carry this.
+
+-- ══ §17 A HALF HOUR AT THE DAY'S END CAN BE ONE TICK (G469; reproduce: (33)) ═══════════════════════════════════════════
+--
+--   ottoq_dial_arm_metrics takes the demand peak as the highest mean over [t, t + 30 minutes) for every snapshot t
+--   (0439: "the NES NCP_30min basis (highest 30-consecutive-minute mean of grid import)"), and at the end of a run that
+--   window holds what is left of it: one, two or three samples. Of the 69 arms that carry peak_after_open, 8 have their
+--   half hour billed from 180 minutes start in the run's last half hour (query (33)): arms 35, 42, 58 and 62
+--   (value_2026_09_30's 24-hour days, starting at minute 1,430-1,435 of 1,440) and arms 84, 89, 94 and 95 (minute 715-720
+--   of 720). Over full half hours the first four read 695.2, 695.2, 688.9 and 694.6 kW against 710.9, 710.9, 694.4 and
+--   699.4 (0.7-2.2% lower), and the last four 941.8, 1,150.8, 924.3 and 940.6 against 1,006.8, 1,241.9, 980.7 and 976.5
+--   (3.7-7.3% lower). The whole-day half hour is never partial: the opening sets it on all 69. So arm 84's $21,547 past
+--   the opening in §10 point 4 is two samples, and $20,155 over full half hours before §16's correction.
+--   A five-minute window is not a 30-consecutive-minute mean. Built as 0754 (PENDING): a half hour counts only when its
+--   window holds 30 minutes of samples, for every arm scored after it lands; stored arms keep their numbers, and query (33)
+--   recomputes any arm whose run is still on record.
+--
+--   APPLIED 2026-10-18 at 6:29 AM CT (0754, ledger 20261018112908): every arm scored after it bills full half hours
+--   only. 0731's three arms were scored before it and stored their half hour from 180 minutes at minute 715 as well (arms
+--   98, 99 and 100); read through the scorer as 0754 left it they are 614.4, 831.9 and 895.4 kW, from minutes 615, 435
+--   and 435 (§11).
+
+-- ══ §18 THE WASH LINE IN TICK, THE CALENDAR'S PARKED CARS AND THE CARS THE ARM STILL HOLDS (G457, G458, G460, G471,
+--        G472; reproduce: (21), (22), (26), (29), (35)-(39)) ═════════════════════════════════════════════════════════════
+--
+--   Read 2026-10-18 between 2:40 and 3:15 AM CT from §15's six normal-day arms (seed 1, 12 hours, 5-minute tick), 83, 86
+--   and 84 under the lag against 93, 94 and 95 in tick, at 10, 20 and 40 posts, and from the server log (postgres_logs,
+--   the 24 hours to 3:15 AM CT). One seed: single readings, not ranges.
+--
+--                                                 10 posts            20 posts            40 posts
+--                                                 83 -> 93            86 -> 94            84 -> 95
+--     wash seat's timer, p10 = p50 = p90 (min)    4.0 -> 9.0          4.0 -> 9.0          4.0 -> 9.0           (38)
+--     detail seat's timer, p50 (min)              20.0 -> 25.0        20.0 -> 25.0        20.0 -> 25.0
+--     wash seated after its booking began (min)   5.0 -> 0.1          4.9 -> 0.0          4.9 -> 0.0
+--     wash-bay seats (after a charge)             52 (48) -> 56 (54)  57 (52) -> 61 (60)  68 (66) -> 67 (65)   (21)
+--     charge end to wash seat, p50 / p90 (min)    12.5/46.5 -> 15/63.5  15/84.5 -> 20/101.5  22.5/172.5 -> 15/160
+--       longest (min)                             100 -> 102          170 -> 445          421 -> 335
+--     bay-ticks empty while a car waited          144 -> 144          174 -> 165          159 -> 157          (22)
+--       with no booking on the bay                130 -> 132          159 -> 136          130 -> 130
+--     two bays washing, cars staged, no walk-in   26 -> 34            28 -> 53            51 -> 53            (29)
+--     walk-in wash refusals for space (cars)      11 (7) -> 4 (2)     52 (12) -> 74 (15)  146 (25) -> 102 (14) (26)
+--       a bay held only by no-shows               4 -> 2              35 -> 68            96 -> 41
+--
+--   1. G460's half that was the lag, confirmed. In tick every wash seat ran its 9-minute booking (p10 = p90 = 9.0 on all
+--      three arms, against 4.0 under the lag), every detail seat its 25 (p50), and a car was seated within 0.1 minutes of
+--      its booking's start (against 4.9-5.0). So the wash measured at forty posts under the lag (G457, G458) ran about
+--      2.25 times as fast as the twin's crews; in tick it runs at their mean. The other half stands: the timer is the
+--      booking's and nothing varies (p10 = p90), so the crews' 0.7-1.3x draw reaches no seat, which is 0746's to change.
+--      A few seats on every arm run past their booking (3 detail and 1 wash on arm 93, timers to 23 minutes past), with
+--      the seat stamped later than its event; no bay held two cars on any of the six arms (query (38)'s second part, over
+--      the 442 of 468 seats a live booking covers; a first pass that also read superseded bookings found one pair on arm
+--      86, and it was a superseded booking).
+--   2. The line read worse where the chargers queue and better where they do not, against "should read worse". From a
+--      charge's end to its wash seat the p90 rose 17 minutes at 10 and at 20 posts and fell 12.5 at 40; more cars reached
+--      the wash at 10 and 20 posts (54 and 60 after a charge, against 48 and 52), fewer at 40 (65 against 66; §15 has 205
+--      cars served against 215). At 40 posts the refusals for space fell 146 -> 102 and those blocked only by no-shows 96
+--      -> 41; at 20 posts they rose, 52 -> 74 and 35 -> 68. Not traced further.
+--   3. The empty bays were not the walk. G458 guessed part of its 130-159 empty-and-free bay-ticks were "the walk from
+--      charger to bay, a tick a step". In tick that tick is gone and the count did not move (130 -> 132, 159 -> 136, 130
+--      -> 130). Query (35) splits the bay-ticks with nothing booked while a car waited (132 -> 134, 160 -> 141, 132 ->
+--      134) by the lane at that tick: with two bays washing, the staff cap's (two wash supervisors for three bays), 42 ->
+--      60, 50 -> 83, 91 -> 80; with fewer washing and no waiting car staged, 23 -> 13, 35 -> 3, 2 -> 4; with fewer washing
+--      and a waiting car staged, 67 -> 61, 75 -> 55, 39 -> 50. On arm 95 those last 50 fell at 24 ticks: 5 with no walk-in
+--      tried, and 19 with walk-ins refused for space or by the arm interlock (point 5), 5 of them seating a car in another
+--      bay. And the calendar's own door is shut to a parked car (point 4). In tick the cap binds longer
+--      because each seat now holds its supervisor its full booking: two washing with cars staged and no walk-in tried, 26
+--      -> 34, 28 -> 53 and 51 -> 53 five-minute ticks (29).
+--   4. G471: the calendar cannot seat a car parked in staging. ottoq_activate_due_bay_reservations moves a car's stall to
+--      its bay and stamps it in_wash_bay (or in_detail_bay, in_service_bay) in one statement. Freeing its old stall, the
+--      triggers then see a car in a bay leaving a stall: trg_reassignment_guard asks ottoq_indepot_reassignment_guard,
+--      which defers an 'automated_reassignment' at its catch-all, and puts the stall's pointer back, so the bay's claim on
+--      the car trips idx_stalls_one_vehicle_per_stall (23505) and the call ends, every seat that tick with it. A charger
+--      is spared (the guard's 0547 clause frees a charger its car has left for a bay), a staging stall or a service bay
+--      is not. The server log has 235 such calls in the 24 hours to 3:15 AM CT, every one "sqlstate=23505 ...
+--      idx_stalls_one_vehicle_per_stall": 46 on arm 94 (e8b068d2), 30 on arm 95, 27 on arm 87, 19 on arm 88, 18 on arm
+--      85, 15 each on arms 86, 89, 90 and 91, 14 on arm 93 and on the promise arm 96 (eb953ed6), 7 on arm 92. That is
+--      0743 §1's "something else also ended the call". Every wash or service no-show whose car was idle in the depot at its slot had the car
+--      staged_awaiting_service on a staging stall (39): 1 on arm 83, 3 on 84, 6 on 95. The car's own reservation also
+--      bars it from section (4b), which needs the bay free for the whole job, so such a car waits for its reservation to
+--      lapse before any door takes it. The committed record shows none of this: the call rolls back, the gate's pending
+--      approval with it, and the log line names neither car nor booking. Reproduced on the live bodies with the three
+--      live BEFORE UPDATE triggers on stalls and the gate (tests/test_bay_activation_frees_parking_sql.py; 0743's test
+--      world leaves them out, and there the same car is seated; 0743's 5:07 PM CT reproduction on live cleared both cars'
+--      stall pointers and ran with no run live, and the guard consults the gate only while a run is 'running' at the
+--      depot, as a production session's is). Built as 0755 (PENDING, after 0743): under a dial, the
+--      car's stall moves first, while it is still holding, and only then is it stamped in its bay, as (4b)'s door already
+--      does it. That also frees a charger a spent tether still names. Its arm pairs with arm 95.
+--   5. G472: the walk-in path asks for cars the arm still holds. 14-26 wash and 6-24 service walk-ins an arm were refused
+--      with reason 'exception' (36), lagged and in tick alike. Each is the arm interlock: the car's charge stopped in
+--      that tick, the robotic arm is unlatching it (11.5 sim-seconds), section (4b) asks ottoq_enact_space_assignment to
+--      move it, the interlock raises (P0001), and the assignment's catch-all returns 'exception' with the SQLSTATE only;
+--      the message ("arm interlock: vehicle ... is held by the arm at stall ... (... demate/unlatch) — refusing to move
+--      it") reaches only the server log. On arm 95 all 35 were cars whose charge ended that tick. Section (4) passes over
+--      such a car (0011-TETHER); (4b) reads only staged cars, and the twin stages a robotic charger's car in the tick its
+--      charge stops, still on the charger and still held (car 2d2c46af on arm 95: unlatch, charge_complete_holding and
+--      staged_awaiting_service at 6:10:00 AM CT sim; the arm's 'clear' and the car's release from the charger at 6:15:00).
+--      A refusal costs no bay (the lane's headroom is spent only on a seat) and the car could not have moved, so the cost
+--      is the record: a safety interlock doing its job is filed as an exception. And the unlatch costs the car a tick:
+--      at 40 robotic posts no car was seated in a bay in the tick its charge ended (0 of 81 and of 79 bay seats on arms 84
+--      and 95, against 4 of 66 and 7 of 71 at 10 posts, most of whose chargers have no arm), and 20-22 a run one tick
+--      later (37). About 20 charger-to-bay moves a day at 40 posts, 5 minutes each in the twin, 2 at production's
+--      120-second tick: an upper bound of 1.7 car-hours of the twin's day. The charge side meets it too: 30
+--      "confirm_commands: refused begin_charge" lines for 19 cars in the 24 hours to 3:30 AM CT, every one the arm
+--      interlock, a car sent to another post while its arm still held it. The one read in full (2d2c46af on arm 95) had
+--      its post fault (fault.thermal_emergency at 5:25 PM CT sim) and, re-queued as rule 9 asks, finished on the next post
+--      a tick later; the other 29 are not traced. Built: nothing. The record's fix is (4b)
+--      passing over a held car as (4) does; the tick's is the bay-side twin of G449's first-tick candidate (book the bay
+--      from the release, move the car when the arm lets go).
+--   Seen on the way, not traced: on arm 95 a staging stall named a car still en_route_to_depot, its own pointer empty, 157
+--   times for one tick each (98 cars): the arrival's stall is pointed before the car arrives.
+--
+-- ══ §19 A SWEEP ARM'S PROPOSALS EXPIRE BY THE MACHINE'S CLOCK (G473; reproduce: (40), (41)) ═══════════════════════════
+--
+--   Read 2026-10-18 between 3:36 and 3:50 AM CT, from every sweep arm whose proposals survive (86 of 95 at first, 87
+--   once promise_busy's arm landed), the source of the submit, the reader, section (5) of ottoq_decide_tick and the
+--   disposer, pg_stat_activity and cron.job_run_details. The table below was read by 3:44, before arm 97 landed at 3:46.
+--
+--   Why it was looked for. §12's check of promise_normal: arm 96 agreed with arm 93 (the same cell without the promise
+--   recorder, which decides nothing) on every outcome atom and differed on h_dec and h_prop. Something else decided.
+--
+--   The mechanism. A sweep arm runs in one transaction (ottoq_throughput_sweep_runner, cron job 783). The service-order
+--   proposer, ottoq_service_priority_propose, submits through ottoq_submit_external_proposal, which stamps created_at by
+--   the column's default, now(), and expires_at as now() plus 120 seconds. So every proposal of an arm carries the arm's
+--   transaction start (one distinct created_at on each of the 19 arms read from arm 78 on). Section (5) of
+--   ottoq_decide_tick takes a staged car's service order from ottoq_l2_external_proposal, which keeps a pending
+--   proposal while GREATEST(expires_at, created_at + 35 minutes) >= now() (ottoq_cuopt_defer_hold reads the same):
+--   inside one transaction, always. The disposer, ottoq_dispose_external_proposals, called at the end of every decide,
+--   applies the same test to the machine's clock (v_wall := clock_timestamp()) and expires a pending proposal once
+--   GREATEST(expires_at, created_at + 35 minutes) < v_wall, as 'ttl_elapsed'. One TTL, two clocks. So before 35
+--   wall-minutes a proposal lives until a newer one for its car, or a decision on its car, supersedes it; after 35,
+--   each proposal is expired in the tick it is made and section (5) falls back to its own order.
+--
+--   It is a regression. 0122 (2026-08-30, "the sweep reads the clock the stamp was written in") found the decide's
+--   expiry sweep judging the wall-stamped TTL by the SIM clock, which expired every proposal on its birth tick, and
+--   moved it to now(), noting that "within a determinism pair (one transaction) now() is frozen, so proposals no longer
+--   expire mid-pair". 0333 (2026-09-16) moved that sweep into the disposer, as "expired in the selector's real-time TTL
+--   domain", and compared it with clock_timestamp(), the clock it had declared for the new disposed_at audit stamp: a
+--   third clock, neither the stamp's nor the run's. Inside one transaction proposals expire again, once the
+--   transaction is 35 minutes old.
+--
+--                                                        arms   proposals   ttl_elapsed
+--     ended within 35 minutes of the arm's first stamp     33       1,129             0
+--     ran past 35 minutes                                  42       3,645         1,527    (none disposed before 35 min)
+--     ran past 35 minutes, none expired                    11          78             0    (10 arms with 14 between
+--                                                                                           them; arm 95, 35.2 min)
+--
+--   By sweep: value_2026_09_30's 24-hour arms (4,383-8,707 s) lost 1,509 of 3,345 proposals on 36 of 50 arms, from
+--   tick 99 of 288 at the earliest; last night's 40-post power arms 84, 85, 87, 88 and 89 lost one to three each (from
+--   tick 96); the promise arm 96 lost 8 of 45 (one made at tick 108 and still pending at tick 119, then each new one in
+--   its own tick). The smoke and frontier sweeps (under 26 minutes an arm) and arms 82, 83, 86 and 90-95 lost none.
+--
+--   What it changed, on the one pair that can say. Arms 93 and 96 made the same 45 proposals on the same cars at the
+--   same ticks. Of the 8 that arm 96 expired, arm 93 kept 6 until a newer proposal or a decision superseded them, one to
+--   eight ticks later, and 2 (made at ticks 108 and 138) until the run ended. Sixteen decisions differ, all section
+--   (5)'s and all on two cars, at ticks 127-129, 131-137 and 139-144: where arm 93 still held a proposal from an earlier
+--   tick it recorded that proposal's admit_service, refused for want of a bay (noop_no_candidate, hold_no_bay); arm 96,
+--   its proposal expired, recorded the fallback's hold_in_queue (task_start enacted 1,030 -> 1,046, noop_no_candidate
+--   53 -> 37). Either way the car waited. Every other atom agrees: the world fingerprint, the end state, commands,
+--   events, bookings, energy, SDRs, recalls, rules and arrivals. So on that pair it moved the record, not the world.
+--   No two arms of one cell, seed, engine and length straddle 35 minutes (the only such two, arms 3 and 9, both ran
+--   under it), so these observer pairs are the only measure, and the busy day was the case to fear: its two service
+--   bays are the wall (§5), and the proposer's order (must-do work, dwell, urgency, battery) is not the fallback's.
+--   Its pair, below, kept its world too. Two pairs say the expiries have not moved a world; they do not say one never
+--   will.
+--
+--   Who else it reaches. The certification pairs, not today: the recert runner's longest run in the 14 days to now was
+--   13.3 minutes (cron job 746), and no verdict in the ledger has disagreed on proposals or decisions alone. But a pair
+--   runs both arms in one transaction, so a pair longer than 35 minutes would fail on those two atoms with every outcome
+--   equal, its second arm first. Production, barely: each tick is its own transaction, so now() and clock_timestamp()
+--   differ by the tick's own running time, and the only difference is that a proposal whose 35 minutes end while a tick
+--   is running, before its disposer call, expires in that tick today and in the next one under now(). Of the 48
+--   functions in public, ottoq and twin that read clock_timestamp(), the disposer is the only one that lets the
+--   machine's clock into a fixed-tick run's decisions: the rest time latencies, bound an arm by a wall budget it records
+--   as `complete`, wait on or claim an external call (the energy MPC bridge, the agent chain), stamp a record, purge by
+--   age, or pace live playback (ottoq_sim_advance_tick_world's 1:1 mode, the live twin's noise floor in CLAUDE.md 2.5).
+--
+--   The research wing's dial pairs, one-sided. ottoq_dial_pair runs its two arms in one transaction too, the control (the
+--   dial at 0, arm A) first and the treatment (arm B) second, so both arms' proposals carry the pair's start, and the
+--   treatment runs on a clock that already holds the control's whole run. And the second arm is the slow one (§6): on
+--   the 8 pairs since 2026-10-09 the control ran 620-706 s and the treatment 1,586-2,290 s. All 8 ran past 35 minutes
+--   (2,206-2,996 s), on 7 of the 8 active experiments, and in every one the control expired none of its proposals and
+--   the treatment 3 to 18 (68 in all; query (41)). The 26 earlier pairs (2026-09-23 to 09-28) made no proposals. On
+--   pair 138 (fbced6a9, twin_operator_departures) the dial moved nothing: every metric delta reads 0, and the only atoms
+--   that moved are h_dec and h_prop, which is this defect alone. So those 8 pairs' deltas carry the treatment's
+--   expiries; on the observer pairs and on pair 138 the expiries moved no outcome, and on the other 7 pairs that is not
+--   measured. Nothing concludes on them unattended (automatic promotion has been off since 0540, and the dial window
+--   closed since 0485), so whoever reads those experiments' looks should read query (41) first.
+--
+--   The other face. In an arm under 35 minutes a proposal never goes stale: on arm 93 the proposal of tick 108 stayed
+--   pending 36 ticks, three sim-hours, until the run ended, and section (5) recorded the tick-126 and tick-130
+--   proposals' admit_service for 3 and 7 ticks after the proposer had moved on. Production's 35-minute backstop would
+--   have expired the first. 0122 chose this ("proposals no longer expire mid-pair"); 0333 undid it only for long arms.
+--
+--   The busy day, read when promise_busy's arm finished. Its transaction ran from 2:52:08 to 3:46:03 AM CT (arm 97,
+--   3,208 s), began 0.15 s after arm 96 was recorded, and passed 35 minutes at 3:27 AM CT. It expired 9 of its 60
+--   proposals, from tick 116, the first a proposal pending since tick 81; its partner, arm 82, ended 33.5 minutes
+--   after its first stamp and expired none, and kept that tick-81 proposal pending 63 ticks, to the run's end. Every
+--   outcome atom agrees with arm 82: the world fingerprint, end state, commands, events, bookings, energy, SDRs,
+--   recalls, rules and arrivals. The decisions agree through tick 116 and differ after it, on two cars: 49 of arm
+--   82's section (5) decisions recorded the service-priority proposal's admit_service, refused for want of a bay;
+--   arm 97 recorded the fallback's verdicts, 42 promote_ready (enacted; since 0469 that verdict sends no command, and
+--   the service flow's readiness gate is what releases a car) and 7 admit_service refused for want of a bay. Either way
+--   the cars waited. One more atom differs, the end state's calibration digest, and it is the database's, not the
+--   arm's: every arm run on 2026-10-17 (82-88) carries 58524fee and every arm run on 2026-10-18 (89-97) e509eab8. So
+--   the promise recorder is clear on the busy day as on the normal day, and two pairs, normal and busy, show the
+--   expiries moving the record and not the world. Compare promise arms, and any two arms of unequal wall time, on the
+--   outcome atoms, never on h_dec or h_prop; if an outcome differs, read its first differing tick against its first
+--   'ttl_elapsed' tick (query (40)). Pairs built on arm 84 (0743's and 0744's) carry its 3 expiries; arm 95 (0755's
+--   baseline) had none.
+--
+--   The fix, built as 0756 (written and tested between 4:01 and 4:07 AM CT; PENDING, it applies after the window, with a
+--   dry run on live first, because a sweep arm calls the disposer every tick): the disposer's three TTL tests read
+--   now(), as 0122 wrote them, and disposed_at keeps the machine's clock as 0333's audit stamp; no dial. That changes no
+--   arm that ended inside 35 minutes and no certification pair, and in production moves an expiry by at most one tick;
+--   a long arm then behaves as it would on a fast machine, and a dial pair's two arms age their proposals alike.
+--   tests/test_proposal_ttl_stamp_clock_sql.py runs 0756 whole on the live bodies: in one transaction the reader kept
+--   four proposals the disposer had expired before it, and after it the two agree on all seven. Once it is applied, no
+--   arm should expire a proposal as 'ttl_elapsed' at all (query (40)). Ageing a proposal on its run's own clock (the sim
+--   clock in the twin, the real one in production), which also ends the never-stale face, changes the decisions of
+--   every arm and is a certified change behind a dial, not built.
+--
+--   APPLIED 2026-10-18 at 6:33 AM CT (ledger 20261018113339), after its dry run on live at 6:32 rolled back clean (its
+--   APPLIED note). The disposer's prosrc carries 'v_ttl_now timestamptz := now();' and no '< v_wall' (md5 196b3a19). No
+--   arm has run since, so query (40) has nothing new to say yet; from the window that opens at 11:00 PM CT on
+--   2026-10-18 no arm should expire a proposal as 'ttl_elapsed'. The bill-window arms ran before it, and arms 99 and 100
+--   expired 3 and 2 proposals (from ticks 96 and 143) and arm 98 none, exactly as their partners 84, 85 and 83 had, so
+--   §11's pairs compare like with like.
+
+--
+-- ══ §20 A BAY SESSION THAT FINISHED EARLY IS FILED AS INTERRUPTED, AND ITS WORK IS DONE AGAIN (G474; reproduce: (42)-(44)) ═
+--
+--   Read 2026-10-18 between 4:15 and 4:27 AM CT, from arms 82-97, while reading why promise_busy's fallback called two
+--   cars in the service queue ready (§19's busy pair).
+--
+--   The fallback. With no proposal in force, section (5) asks ottoq_l2_propose_service, which, once a car with must-do bay
+--   work has waited past service_hold_patience_min (120 sim-minutes) with the bays full, proposes promote_ready and files
+--   the open work as deferred_service, "carried forward to the next visit" (its own comment, of 2026-08-01, older than
+--   rule 9's "no car leaves with a service still needed, EVER"). Since 0469 that verdict sends no command and the
+--   departure test (0543) holds the car, so it is a record only: on the busy day 1,147 such verdicts on 61 cars (arm 82),
+--   each recorded as enacted; none on the normal days (query (44)). Of the 61, 9 staged to leave after one, and each had
+--   its bay work done first (8, minutes before staging) or was sent back by the departure recheck (1). No car left with
+--   the work open. The record still says, 1,147 times, that OTTO-Q promoted a car with must-do work deferred.
+--
+--   The car sent back. 2d2c46af on arm 82, seated in a service bay at 2:00 PM CT sim for its mechanical PM: the service
+--   flow ended the seat at 2:35 and credited the PM (twin.service_completed, credited [mechanical_pm], not on a null
+--   timer). In the same tick ottoq.ottoq_release_vacated_spaces closed its booking (48 minutes planned, 35.5 used) as
+--   interrupted, 'bay_exit_before_planned_end', and ottoq_reopen_visit_atoms set the PM back to open
+--   (atoms_reopened_from_done 1). The departure recheck sent the car back at 2:40, and it waited 3 hours 20 minutes, to
+--   the run's end, for a PM it had had.
+--
+--   Why. The release judges an active bay booking by time alone: ottoq.ottoq_booking_interrupted
+--   (ottoq.ottoq_occupancy_cut_short) calls it interrupted when the car left before 80% of its planned window and at least
+--   2 minutes early, and the release then reopens the purpose's atoms, done ones included. But the service flow's STEP 1
+--   is the only exit that credits work, and it lets a car out only when its timer has elapsed or a completion was
+--   reported (service_done); a bay fault (twin.ottoq_sim_bay_fault_handler) or a vehicle exception
+--   (twin.ottoq_sim_vehicle_exception_handler) moves the car out by its own handler and credits nothing. So an early
+--   STEP 1 exit is a job that finished before its booking said it would, and the release undoes it. On arms 82-97: 10
+--   such reopens, each in the tick the service flow credited the car, none on a null timer: 9 service bookings (57.9
+--   minutes planned and 41.1 used on average, 0.52-0.79 of the window) and 1 detail booking (arm 88, 21 planned, 2.4
+--   used, an exterior wash credited) (query (42)).
+--
+--   And it waits for 0746. Its robotic lanes (wash_lane_physics 2) time a seat by the work and keep the engine's
+--   bookings, 9.0 minutes for a wash and 25.0 for a detail in tick (arm 95's done bookings, query (43)). A robotic wash
+--   takes 4.25-5.75 minutes, so one drawn at or under 5.0 leaves at the next 5-minute tick, at 56% of its booking, and is
+--   reopened; a robotic detail takes 13.2-19.8, so one at or under 15.0 leaves at 60% and is reopened. By the twin's own
+--   deals on arms 82-97 (3,266 wash and 3,278 detail cards, drawn on 0.7-1.3), that is 53% of robotic washes and 25%
+--   of robotic details, each sent back for work it has had, up to the reopen cap of three: the robowash and uptimefirst
+--   arms would have measured robotic lanes doing about half again as many washes as their cars need. 0746's test world
+--   left the release out. At wash_lane_physics 1 (the crews' 9 and 25 minutes) a seat ends at or past 80% of its booking
+--   and is not judged short. Production meets it the day a robot or a technician reports work done before 80% of its
+--   booked window.
+--
+--   Built as 0757 (PENDING, after 0746 and 0747): under the dial bay_release_reads_the_work, a bay booking whose car the
+--   service flow let out since the booking began (a twin.service_completed for the car, recorded no earlier than the
+--   booking was made, not on a null timer, out of a bay whose capability set holds every atom of the booking's purpose)
+--   is done however early it ended, and its why says the minutes it held against the minutes booked; any other early
+--   exit is judged by its booked minutes, as before. Read against the ten on the live rows between 4:31 and 4:45 AM CT
+--   (query (45)): released_at equals the interruption's sim_clock_at in all ten, so the release runs on the clock the
+--   events are stamped with, and the test finds the completion for the 9 service bookings and not for arm 88's detail
+--   booking. That car (a1111111-...-0006) was seated in a wash bay at 11:55 sim, 2.4 minutes before its detail booking's
+--   window began, and let out at 12:00 with an exterior wash credited from a wash bay's set; a wash bay cannot finish a
+--   detail, so 0757 leaves that booking interrupted, its interior work due and its bound leg re-planned, but under the
+--   dial an interrupted booking reopens only what no such completion credited, so the wash it had stays done (at the
+--   default it is reopened, as on arm 88). Why the twin washed a car booked for a detail 2.4 minutes before its window,
+--   in the bay the detail held, is noted, not traced. 0757 sets the dial on the robowash and uptimefirst cells, controls
+--   included, before their first arm.
+--
+--   Two notes for whoever counts these later (read between 5:09 and 5:12 AM CT). The booking reads 'released' today, not
+--   'interrupted': at a run's end public.ottoq_sim_release_depot moves every interrupted booking to 'released', keeping
+--   its released_at and release_reason (0459, G192), so after a run count interruptions by release_reason
+--   ('bay_exit_before_planned_end') or by the ottoq.booking_interrupted events, never by state. And the booked-minutes
+--   test has one other caller, ottoq.ottoq_release_expired_bookings, which closes a booking only once its whole window
+--   has passed (upper(during) <= clock), so its actual equals its planned and it can never call a seat short (its own
+--   comment says so, and the predicate proves it); 0757 leaves it as it is. The fallback's record is named, not built: section (5) files a promote_ready with must-do work
+--   deferred as enacted.
+--
+--   APPLIED 2026-10-18 at 6:36 AM CT (ledger 20261018113640), after its dry run on live at 6:35 rolled back clean. The
+--   release's prosrc md5 is 0f666b83, as in its test world, and carries 'v_reads_work'; the six cells of robowash_normal
+--   and uptimefirst_busy carry bay_release_reads_the_work 1, which the queue step kept when it added the tick dial (§15).
+--   Nothing called the release on live. The robotic arms run first in the window that opens at 11:00 PM CT on
+--   2026-10-18; query (42) on them should find no seat the service flow credited filed interrupted.
+
+-- ══ §21 THE THIRD NIGHT: 0756 AND 0757 HOLD, THE HELD SITE IN TICK, AND A SECOND SEED (G448, G468, G470, G473, G474;
+--        reproduce: (3b), (31), (33), (34), (40), (42), (50), (56)) ════════════════════════════════════════════════════
+--
+--   Read 2026-10-19 between 6:11 and 6:38 AM CT, from the eleven arms the runner finished overnight, 101-111. The
+--   robotic lanes and uptime first (arms 101-106) are read in db/checks/0452 §6 and §7, the service clock in §22 here.
+--
+--   The runner (cron.job_run_details for job 783 from 04:00 UTC). Eleven arms back to back from 11:02 PM CT, all
+--   complete, none errored: robowash_normal's four landed at 11:38 PM, 12:12, 12:49 and 1:26 AM CT (arms 101-104),
+--   uptimefirst_busy's two at 2:08 and 2:49 (105, 106), answer_normal's held-site cell at 3:26 (107) and seeds23's four
+--   seed-2 arms at 3:58, 4:32, 5:08 and 5:44 (108-111). From 5:44 every firing took 0 seconds: the next arm, seeds23's
+--   seed-3 arm at ten posts, is estimated at its cell's longest wall (1,892 s) and would have ended past 6:00. Against
+--   §15's schedule (robowash to about 1:30, uptimefirst to about 3:15, the held site to about 3:50, three seed-2 arms to
+--   about 5:30) every arm landed early. The normal days in tick took 32-36 minutes, the busy days 40-41, and the fourth
+--   seed-2 arm fit.
+--
+--   G473 after 0756 (query (40)). No arm of the eleven expired a proposal as 'ttl_elapsed', and eight of them ran past
+--   35 minutes of their own transaction (36.1-41.8 minutes). Before 0756, 42 arms past 35 minutes had expired 1,527
+--   proposals between them (§19). The disposer reads the TTL on the clock the proposal was stamped in.
+--
+--   G474 after 0757 (query (42) on the six robowash and uptimefirst runs, counted by release_reason and by the
+--   ottoq.booking_interrupted events, never by state). No booking was closed as 'bay_exit_before_planned_end' and no
+--   interruption event was written, against 4 on arm 95, the same cell without the dial. No seat completed on a null
+--   timer. On the robotic arms most seats end before their booking does (77 of 121 robotic washes in 5 minutes, §22),
+--   and none was reopened.
+--
+--   The held site in tick: arm 107 (answer_normal's fourth cell) against arm 95 on seed 1, and arm 111 (seeds23's held
+--   cell) against arm 110 on seed 2. Forty posts behind 2.4 MW of shared cabinets held at 2.16 MW on today's 2.5 MW
+--   service (0729's managed reading), against forty with power to spare (outcomes from query (56)):
+--                                          seed 1: 95 -> 107        seed 2: 110 -> 111
+--     cars served (visits)                 205 (250) -> 209 (257)   202 (230) -> 195 (233)
+--     deployed car-hours                   940.5 -> 915.3           973.8 -> 952.3
+--     unmet ride demand                    15.6% -> 17.8%           12.6% -> 14.5%
+--     door p95 (min)                       274 -> 263               274 -> 275
+--     EN.001 refused starts (3b)           0 -> 130                 0 -> 118
+--       refused seats (34)                 0 -> 0                   0 -> 0
+--     billed half hour, from 180 min (kW)  940.6 -> 786.9           764.3 -> 889.4
+--     whole-day half hour (kW)             1,955.2 -> 1,552.8       1,813.8 -> 1,579.6
+--   Every car left at 100% with nothing open on all four. Every refused start came at the opening (6:05-6:35 AM CT sim
+--   on arm 107, 6:05-7:20 on arm 111), with the meter itself over the held 2,160 kW (2,164.7-2,282.0 and 2,161.3-2,308.0)
+--   and judged on the held limit (query (34)): G448's first reading, a new session metered at its full rate. The in-tick
+--   held cells ran without 0733's dial; with the lag, arm 85 refused 85 and arm 89, with the dial, none. None of the
+--   refusals moved to the seat assignment (G470's kind did not appear in tick), and on arm 107 the DC pool bound in one
+--   tick (query (3b)). So in tick the held site cost 25.2 car-hours on seed 1 and 21.5 on seed 2 (2.3-2.7%), where with
+--   the lag it cost 0.9 (arm 85 against arm 84), and part of that is the twin's own first-reading error. On the bill:
+--   the first in-tick figures for a held site at forty posts. Holding cut the whole day's half hour by 402 and 234 kW,
+--   the opening, which the value view does not bill (0577), and moved the billed half hour by -154 kW on seed 1 and +125
+--   kW on seed 2: the starts refused at the opening ran later, into the billed window. Holding the site does not
+--   reliably cut the half hour that is billed.
+--
+--   The meter in tick (query (31)). On all eleven arms the twin's site meter is within -1.4% to +0.4% of what the
+--   sessions delivered (arm 101: 277 sessions, 8,605 kWh; arm 107: 274, 8,432; arm 110: 260, 8,470). G468's
+--   over-count was the lag's; in tick the meter is honest.
+--
+--   The sizing curve on a second seed: seeds23's seed-2 arms (value_2026_09_30's seed 305838298283560562) against arms
+--   93-95 on seed 1, all in tick, OTTO-Q, the normal day (query (56)):
+--                                          10 posts          20 posts          40 posts
+--     seed 1, arms 93, 94, 95
+--       deployed car-hours                 832.1             909.0             940.5
+--       cars served (visits)               159 (208)         177 (219)         205 (250)
+--       door p95 (min)                     378               325               274
+--       unmet ride demand                  25.3%             18.4%             15.6%
+--       must-do work done                  87.2%             88.6%             89.5%
+--     seed 2, arms 108, 109, 110
+--       deployed car-hours                 841.0             909.3             973.8
+--       cars served (visits)               135 (192)         163 (210)         202 (230)
+--       door p95 (min)                     410               304               274
+--       unmet ride demand                  24.5%             18.4%             12.6%
+--       must-do work done                  80.9%             85.1%             91.0%
+--   Posts 11-20 bought 7.69 car-hours each on seed 1 and 6.83 on seed 2; posts 21-40 bought 1.58 and 3.23. So 7.7 holds
+--   roughly and 1.6 does not: two readings put the first ten extra posts at 6.8-7.7 car-hours each in the 12-hour day
+--   and the second twenty at 1.6-3.2. Two seeds give a range, not a spread. Every car left at 100% with nothing open on
+--   all four seed-2 arms. 0452 query (6) on every new arm: 1 seat each on the seed-2 arms (4 of 972) went to a car held
+--   by a repair while a clean car for that kind waited.
+--   And every HW.005 refusal on arms 101-111 (13-93 an arm, 81-93 on seed 2) is again the Zoox 229f655b of G313 (query
+--   (50) on 101-111), so each pair carries it on both sides. Its fix, 0603, still waits for Chase at the connector.
+--
+-- ══ §22 THE SERVICE CLOCK, REHEARSED ON THE ROBOTIC ARMS: NOT EARNED THERE, AND WHERE IT WOULD BE (G475; reproduce:
+--        (51)-(55)) ═══════════════════════════════════════════════════════════════════════════════════════════════
+--
+--   Read 2026-10-19 between 6:21 and 6:31 AM CT. The clock (§20, and the plan of 2026-10-18's 11:05 prompt, item (7)) is
+--   OTTO-Q's own estimate of how long a bay seat takes at this depot, learned from closed seats, keyed on the world the
+--   bays were timed in, and read by the planner's wash and detail legs (the median seat) and by decide section (4b)'s
+--   walk-in window (a high quantile). It was to be built only if a rehearsal out of sample on the robotic arms earned it.
+--
+--   The key. All thirty arms 82-111 ran on the twin depot at 5 sim-minutes a tick (arm 90 at 2.5), and every robotic
+--   arm at the robotic dials' defaults (robotic_wash_min 5.0, robotic_detail_min 16.5). So the robotic key holds four
+--   arms, all in tick: 103 and 104 on the normal day, 105 and 106 on the busy day. The crews timed by the work
+--   (wash_lane_physics 1) hold one, arm 102. At wash_lane_physics 0 a seat lasts its booking, so those seats teach
+--   nothing.
+--
+--   The seats, each from its car's own state-change events (entering in_wash_bay or in_detail_bay, to its next state;
+--   query (51)), never from a booking. Robotic washes took 5 minutes (77 of 121) or 10 (44); robotic details 15 (65 of
+--   185) or 20 (118), and two left early. The 5-minute tick rounds each exit up. Leave one robotic arm out and learn from
+--   the other three, for each of the four: a wash's median is 5 and its 90th percentile 10, a detail's 20 and 20. The
+--   crews' seats on arm 102: washes 5-15 minutes (mean 10.89), details 20-35 (mean 29.41).
+--
+--   What the engine plans today. A wash or detail leg lasts its atom's est_min, which the manifest prices around
+--   service_cadence_policy's est_min_default: 10 minutes for exterior_wash and 20 for interior_deep_clean (on arm 103 the
+--   detail legs ran 13-30 minutes, mean 20.2; the wash legs 8-10, mean 8.8). Section (4b) asks for a bay for the car's
+--   planned leg of that kind, else for ottoq_sim_service_minutes' base, 9 and 25 (query (52)):
+--                                          robotic, arms 103 / 104      crews timed, arm 102
+--     detail seat, mean (min)              18.00 / 17.93                29.41
+--     detail leg, mean (min)               20.1 / 20.2                  20.1
+--     leg's mean absolute error (min)      4.73 / 4.71                  9.41
+--     details that outran their booking    1 of 45 / 1 of 41            27 of 34
+--       and ran into the bay's next one    1 / 1                        17
+--     wash seat, leg, mean (min)           6.72, 8.8 / 6.85, 8.8        10.89, 8.8
+--     leg's mean absolute error (min)      2.89 / 2.84                  2.58
+--     washes that outran, into the next    10, 0 / 10, 0                26, 1
+--   On the robotic arms the clock's median would cut the leg's error to about 1.9 minutes for a detail and 1.8 for a
+--   wash, and its 90th percentile, 20 minutes for a detail, covers every robotic detail seat. A robotic wash that outran
+--   a 9-minute booking left at the next tick, 10 minutes, and never reached the bay's next booking.
+--
+--   The decision it was to change, rehearsed (query (54), arm 103). Section (4b) was refused a wash bay 259 times for 26
+--   cars. Re-scored on the final booking rows with each of three windows, a bay was free for the whole job on 57 of the
+--   244 detail refusals at 25 minutes, 76 at the car's own leg (mean 20.7 minutes) and 75 at the clock's 20: the clock
+--   frees 6 that the legs did not, and the legs 7 that the clock did not. On the 15 wash refusals: 1, 2 and 1. A bay was
+--   free for the next five minutes on 155 of the 244, so what blocked them was a hold ahead, not the job's length. The
+--   holds that never came (query (55)): of the 9 wash-bay no-shows on arm 103 (and the 9 on arm 104), 5 were cars parked
+--   in staging at their slot, which the calendar cannot seat (G471; 0755, held at the connector for Chase), and 4 were
+--   cars still on their charger (0744's bay_hold_follows_charge, not on these cells). So on the robotic arms the clock
+--   changes no walk-in. Its gain there is a smaller error on legs that already average near the robotic seat, by the
+--   coincidence that the catalog's 20 minutes for a deep clean is a 16.5-minute robotic cycle rounded up to the tick.
+--
+--   Where it would earn it is the crews' world: the depot as staffed today, with its crews' own times honoured (G475).
+--   There the catalog's 20 minutes is short of the crews' 25 (drawn 0.7-1.3 times, ottoq_variability_catalog's
+--   detail_time): 27 of 34 deep cleans outran their booking, and 17 ran into the bay's next one. Rehearsed in time on arm
+--   102 (query (53): learn from the seats that ended by the median exit, 12:40 PM CT sim, and judge the 15 details that
+--   began after it), the clock's median of 30 minutes misses by 3.33 minutes on average against 11.15 for the legs, and
+--   its 90th percentile, 35, holds all 15, against 1 of 15 within its leg. The washes gain nothing (1.92 against 1.71).
+--   One arm and one seed, and no arm has run with an honest leg, so what it buys in cars and car-hours is not measured.
+--
+--   VERDICT: the service clock is not built (this verdict first called it 0758; that number went to the fast chargers'
+--   cleaning arm, G476, applied at 8:46 AM CT on 2026-10-19, so the clock takes the next free number when it is built).
+--   The robotic arms do not earn it. The crews' world might, and production would learn from its own seats, not from
+--   either of the twin's two numbers for one deep clean. It is built after the calendar's own fixes are read (0743, 0744,
+--   0745 and 0750 run tonight, §23), since they move the same holds, with its own arm on the crews' world against arm 102.
+--
+-- ══ §23 THE QUEUE FOR THE NIGHT OF 2026-10-19/20, AND THE SCHEDULE ═══════════════════════════════════════════════════
+--
+--   Changed at 6:36 AM CT (11:36:07 UTC) in one block that refused if an arm was in flight:
+--     byneed_normal_2026_10_17 (0737): its cell now carries twin_answer_in_tick 1, so it pairs with arm 107 (the held
+--       site in tick) instead of arm 85 (with the lag).
+--     heldtick_normal_2026_10_19 (0733; new, priority 15): arm 107's cell plus dc_power_first_reading 1, against arm 107.
+--       It measures how much of the held site's 25.2 car-hours in tick is the twin's first reading (§21).
+--     robofix_normal_2026_10_19 (G458, G460; new, priority 16): robowash's control plus the calendar's four fixes (0743
+--       bay_activation_per_seat, 0744 bay_hold_follows_charge, 0745 itinerary_charge_on_clock, 0750
+--       bay_exit_closes_its_leg), and the same plus wash_lane_physics 2. With arms 101 and 103, a two-by-two: robotic
+--       lanes with and without the calendar's fixes. If tonight's single-fix arms show one of the four doing harm, it
+--       comes out of both cells before they run.
+--   A second block, sent just before 6:52 AM CT, would have moved dcfc40_power_busy's three unrun cells into tick as well.
+--   The connector held it for a person's approval and gave up after 60 seconds; read back unchanged at 6:52 AM CT, and
+--   not retried or reworded. So those three still run with the lag, after robofix on Tuesday night, unless Chase sends
+--   it from the connector.
+--
+--   THE SCHEDULE, realistic, from last night's walls (a normal day in tick: forty posts 2,055-2,184 s, held 2,091-2,152,
+--   ten posts 1,892, twenty 2,002; a busy day at forty posts 2,427-2,485). The runner starts nothing whose estimate (its
+--   cell's longest wall, else its sweep's, else the sweep's budget) would end past 6:00 AM CT.
+--     The window opening at 11:00 PM CT on Monday 2026-10-19: heldtick (about 36 minutes) to about 11:40 PM; seeds23's
+--       four seed-3 arms (32-36 minutes each) to about 2:00 AM CT; byneed to about 2:35; bayseat, bayhold, itinclock's two
+--       and bayexit (about 30-37 minutes each) to about 5:35. repairgl's control, estimated at its sweep's 3,000-second
+--       budget, would then end past 6:00 and waits, so repairgl's two arms run on one night.
+--     The window opening at 11:00 PM CT on Tuesday 2026-10-20: repairgl's two busy-day arms (perhaps 35-42 minutes
+--       each), robofix's two (about 36), then dcfc40_power_busy's three (with the lag), to about 4:00 AM CT, then the
+--       older priority-19 and -20 cells.
+
+-- ══ QUERIES ══
+
+-- (1) the value sweep's cells since the dial floor
+SELECT c.cell_code, count(*) AS arms, count(DISTINCT a.seed) AS seeds,
+       round(avg((a.scorecard #>> '{throughput,served_per_day}')::numeric), 1)        AS served_per_day,
+       round(avg((a.scorecard #>> '{timeliness,door_p50_min}')::numeric))              AS door_p50_min,
+       round(avg((a.scorecard #>> '{charge_wait,p95_wait_floor_min}')::numeric))       AS charge_wait_p95_floor,
+       round(avg((a.scorecard #>> '{fast_chargers,busy_pct}')::numeric), 1)            AS fc_busy_pct,
+       round(avg((a.scorecard #>> '{fast_chargers,mean_kw}')::numeric), 1)             AS fc_mean_kw,
+       max((a.scorecard #>> '{kpi,peak_site_kw}')::numeric)                            AS peak_site_kw
+  FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+ WHERE a.sweep_id = (SELECT sweep_id FROM public.ottoq_throughput_sweeps WHERE sweep_code = 'value_2026_09_30')
+   AND a.complete
+ GROUP BY 1 ORDER BY 1;
+
+-- (2a) no DC-cabinet event has ever been recorded
+SELECT event_type, count(*) FROM public.ottoq_events WHERE event_type LIKE 'twin.%cap%' GROUP BY 1;
+
+-- (2b) the admission estimate against the meter, per tick, from the run's own OCPP 2.0.1 frames
+WITH m AS (
+  SELECT o.sim_clock_at AS t, COALESCE(st.connector_max_kw, 50) AS ckw, v.inlet_max_kw AS ikw,
+         (SELECT (x->>'value')::numeric FROM jsonb_array_elements(o.payload->'meterValue'->0->'sampledValue') x
+           WHERE x->>'measurand' = 'Power.Active.Import') AS kw,
+         (SELECT (x->>'value')::numeric FROM jsonb_array_elements(o.payload->'meterValue'->0->'sampledValue') x
+           WHERE x->>'measurand' = 'SoC') AS soc
+    FROM public.ottoq_ocpp_messages o
+    JOIN public.ocpp_sessions s ON s.id = o.ocpp_session_id
+    JOIN public.stalls st ON st.id = s.stall_id
+    JOIN public.vehicles v ON v.id = o.vehicle_id
+   WHERE o.sim_run_id = '8954bcf7-f084-42a4-99f2-ba9e9c67795c' AND o.message_type = 'TransactionEvent'
+     AND o.payload->>'eventType' = 'Updated'),
+per_tick AS (
+  SELECT t, sum(kw) AS actual_kw,
+         sum(LEAST(ckw, COALESCE(ikw, 250))
+             * CASE WHEN ckw <= 50 THEN 1.0 WHEN soc < 55 THEN 0.85 WHEN soc < 75 THEN 0.55 ELSE 0.30 END) AS est_kw
+    FROM m GROUP BY t)
+SELECT count(*) AS ticks, round(avg(actual_kw)) AS avg_metered_kw, round(avg(est_kw)) AS avg_estimated_kw,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY est_kw / NULLIF(actual_kw, 0))::numeric, 2) AS p50_ratio,
+       round(percentile_cont(0.9) WITHIN GROUP (ORDER BY est_kw / NULLIF(actual_kw, 0))::numeric, 2) AS p90_ratio,
+       round(max(actual_kw)) AS max_metered_kw, round(max(est_kw)) AS max_estimated_kw
+  FROM per_tick;
+
+-- (3) tonight's arms
+SELECT s.sweep_code, c.cell_code, a.arm_id, a.sim_run_id, a.complete, a.wall_s, a.arm_error IS NOT NULL AS errored,
+       a.scorecard -> 'throughput' AS throughput, a.scorecard -> 'timeliness' AS timeliness,
+       a.scorecard -> 'charge_wait' AS charge_wait, a.scorecard -> 'fast_chargers' AS fast_chargers,
+       a.scorecard -> 'rule9' AS rule9,
+       a.arm_metrics -> 'peak_30min_kw' AS peak_30min_kw, a.arm_metrics -> 'grid_import_kwh' AS grid_import_kwh,
+       a.arm_metrics -> 'demand_charge_usd_month' AS demand_usd_month, a.arm_metrics -> 'unmet_demand_pct' AS unmet_pct
+  FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+  JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
+ WHERE s.sweep_code IN ('dcfc40_2026_10_17', 'dcfc40_normal_2026_10_17', 'dcfc40_power_normal_2026_10_17',
+                        'dcfc40_power_busy_2026_10_17', 'dcfc40_managed_normal_2026_10_17', 'dcfc20_normal_2026_10_17',
+                        'billwindow_normal_2026_10_17')
+ ORDER BY a.ran_at;
+
+-- (3b) EN.001's refused starts per arm, the meter and request they were judged on, and the ticks the DC pool bound
+WITH arms AS (
+  SELECT a.arm_id, a.sim_run_id, c.cell_code
+    FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+    JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
+   WHERE s.sweep_code IN ('dcfc40_2026_10_17', 'dcfc40_normal_2026_10_17', 'dcfc40_power_normal_2026_10_17',
+                          'dcfc40_power_busy_2026_10_17', 'dcfc40_managed_normal_2026_10_17', 'dcfc20_normal_2026_10_17',
+                          'billwindow_normal_2026_10_17')),
+refused AS (
+  SELECT a.arm_id, count(*) AS refused_starts,
+         count(*) FILTER (WHERE extract(hour FROM (e.context ->> 'now_ts')::timestamptz AT TIME ZONE 'America/Chicago') < 7)
+           AS before_7am_ct,
+         count(*) FILTER (WHERE (e.result_payload ->> 'current_kw')::numeric
+                                 <= (e.result_payload ->> 'engineering_cap_kw')::numeric) AS meter_under_cap,
+         round(min((e.result_payload ->> 'current_kw')::numeric), 1) AS meter_min_kw,
+         round(max((e.result_payload ->> 'current_kw')::numeric), 1) AS meter_max_kw,
+         round(avg((e.result_payload ->> 'requested_kw')::numeric)) AS mean_request_kw,
+         max((e.result_payload ->> 'engineering_cap_kw')::numeric) AS cap_kw
+    FROM arms a JOIN public.ottoq_rule_evaluations e ON e.sim_run_id = a.sim_run_id
+   WHERE e.rule_code = 'EN.001.grid_capacity_ceiling' AND e.action_context = 'charge_session_start' AND NOT e.passed
+   GROUP BY 1),
+pool AS (
+  SELECT a.arm_id, count(DISTINCT v.sim_clock_at) AS pool_bound_ticks
+    FROM arms a JOIN public.ottoq_events v ON v.sim_run_id = a.sim_run_id AND v.event_type = 'twin.dc_pool_shared'
+   GROUP BY 1)
+SELECT a.arm_id, a.cell_code, COALESCE(r.refused_starts, 0) AS en001_refused_starts, r.before_7am_ct, r.meter_under_cap,
+       r.meter_min_kw, r.meter_max_kw, r.mean_request_kw, r.cap_kw, COALESCE(p.pool_bound_ticks, 0) AS pool_bound_ticks
+  FROM arms a LEFT JOIN refused r USING (arm_id) LEFT JOIN pool p USING (arm_id)
+ ORDER BY a.arm_id;
+
+-- (3c) a shared arm's opening, tick by tick: sessions started, and the metered power of the running ones (G448). Read
+--      the stall type from the frames or the scorecard, not by joining stalls: the build-out is restored when the arm
+--      ends, so a converted post joined afterwards reads as the 19.2 kW L2 it was (18 of these 24 do).
+SELECT to_char(o.sim_clock_at AT TIME ZONE 'America/Chicago', 'HH24:MI') AS sim_ct,
+       count(*) FILTER (WHERE o.payload ->> 'eventType' = 'Started') AS started,
+       count(*) FILTER (WHERE o.payload ->> 'eventType' = 'Updated') AS metered,
+       round(sum((SELECT (x ->> 'value')::numeric FROM jsonb_array_elements(o.payload -> 'meterValue' -> 0 -> 'sampledValue') x
+                   WHERE x ->> 'measurand' = 'Power.Active.Import'))
+             FILTER (WHERE o.payload ->> 'eventType' = 'Updated'), 1) AS metered_kw
+  FROM public.ottoq_ocpp_messages o
+ WHERE o.sim_run_id = 'fe6d540e-860f-4057-8edf-7d6257b94bff' AND o.message_type = 'TransactionEvent'
+   AND (o.sim_clock_at AT TIME ZONE 'America/Chicago')::time < time '07:00'
+ GROUP BY o.sim_clock_at ORDER BY o.sim_clock_at;
+
+-- (4) the depot's tariff rows
+SELECT schedule_code, season, demand_first_block_usd_kw, demand_excess_usd_kw, block_kw, fixed_monthly_usd,
+       energy_base_cents_kwh, demand_basis, provenance->>'source_url' AS source, provenance->'alternatives'->>'EVC' AS evc
+  FROM public.ottoq_depot_tariffs WHERE depot_id = '11111111-1111-1111-1111-111111111111';
+
+-- (5) arm 77's demand met, and busy_day's overrides
+SELECT a.arm_metrics -> 'demand_car_hours' AS demanded, a.arm_metrics -> 'deployed_car_hours' AS deployed,
+       a.arm_metrics -> 'unmet_demand_pct' AS unmet_pct, a.scorecard #> '{fast_chargers,busy_pct}' AS fc_busy_pct,
+       a.scorecard -> 'service_completion' AS must_do
+  FROM public.ottoq_throughput_sweep_arms a WHERE a.arm_id = 77;
+SELECT scenario_code, fleet_overrides, fault_injection FROM public.ottoq_sim_scenarios
+ WHERE scenario_code IN ('busy_day', 'normal_day');
+
+-- (6a) an arm's tick cost by time of day
+WITH t AS (
+  SELECT l.tick_seq, l.tick_compute_ms,
+         extract(epoch FROM (l.real_started_at - lag(l.real_ended_at) OVER (ORDER BY l.tick_seq))) * 1000 AS gap_ms
+    FROM public.ottoq_tick_clock_log l
+   WHERE l.sim_run_id = (SELECT sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id = 78))
+SELECT (tick_seq - 1) / 48 AS bucket, round(avg(tick_compute_ms)) AS world_ms, round(avg(gap_ms)) AS gap_ms
+  FROM t GROUP BY 1 ORDER BY 1;
+
+-- (6b) the long live runs, first and last 20 ticks
+WITH runs AS (
+  SELECT l.sim_run_id, count(*) AS n FROM public.ottoq_tick_clock_log l JOIN public.ottoq_sim_runs r USING (sim_run_id)
+   WHERE r.run_by <> 'ab_harness' GROUP BY 1 HAVING count(*) >= 900)
+SELECT r.sim_run_id, r.n,
+       (SELECT round(avg(tick_compute_ms)) FROM public.ottoq_tick_clock_log x
+         WHERE x.sim_run_id = r.sim_run_id AND x.tick_seq BETWEEN 2 AND 20) AS first20_ms,
+       (SELECT round(avg(tick_compute_ms)) FROM public.ottoq_tick_clock_log x
+         WHERE x.sim_run_id = r.sim_run_id AND x.tick_seq BETWEEN r.n - 19 AND r.n) AS last20_ms
+  FROM runs r ORDER BY r.n DESC;
+
+-- (6c) decision latency by time of day, an arm (48-tick buckets) against a live run (500-tick buckets)
+SELECT left(sim_run_id::text, 8) AS run,
+       (tick_seq - 1) / CASE WHEN sim_run_id = '97661eef-957f-4cb9-8a32-e5410034f757' THEN 48 ELSE 500 END AS bucket,
+       count(*) AS decisions, round(avg(shield_latency_ms), 1) AS shield_ms, round(avg(enact_latency_ms), 1) AS enact_ms
+  FROM public.ottoq_decisions
+ WHERE sim_run_id = '97661eef-957f-4cb9-8a32-e5410034f757' OR sim_run_id::text LIKE 'ab534960%'
+ GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- (6d) the hot rows
+SELECT relname, n_live_tup, n_tup_upd, n_tup_hot_upd, idx_scan, idx_tup_fetch,
+       round(idx_tup_fetch::numeric / GREATEST(idx_scan, 1), 2) AS fetch_per_scan
+  FROM pg_stat_user_tables WHERE relname IN ('vehicles', 'stalls', 'ocpp_sessions', 'ottoq_stall_bookings', 'ottoq_sim_runs');
+
+-- (6e) the zero-uuid idiom against a sargable predicate (run while an arm is in flight to see the walk)
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT count(*) FROM public.ottoq_stall_bookings b
+ WHERE COALESCE(b.sim_run_id, '00000000-0000-0000-0000-000000000000'::uuid)
+     = COALESCE('97661eef-957f-4cb9-8a32-e5410034f757'::uuid, '00000000-0000-0000-0000-000000000000'::uuid)
+   AND b.state IN ('held', 'active');
+
+-- (7) cars at the twin depot whose charge facts are missing or disagree
+SELECT make, model, count(*) AS cars, max(inlet_max_kw) AS inlet_kw, max(max_charge_rate_kw) AS max_rate_kw,
+       max(battery_capacity_kwh) AS battery_kwh
+  FROM public.vehicles WHERE home_depot_id = '11111111-1111-1111-1111-111111111111'
+   AND (inlet_max_kw IS NULL OR max_charge_rate_kw IS DISTINCT FROM inlet_max_kw)
+ GROUP BY 1, 2 ORDER BY 3 DESC;
+
+-- (8) who still sets a 90% target, and whether anything calls it
+SELECT p.proname, p.prosrc ~* 'target_soc\s*=\s*90' AS sets_90,
+       (SELECT count(*) FROM pg_proc q WHERE q.oid <> p.oid
+          AND regexp_replace(q.prosrc, '--[^\n]*', '', 'g') ~ ('\m' || p.proname || '\s*\(')) AS callers
+  FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
+   AND p.proname IN ('ottoq_cert_arm', 'ottoq_cert_arm_wave', 'ottoq_fr1_cert_arm', 'ottoq_cert_arm_start');
+SELECT jobid, jobname, active FROM cron.job WHERE command ILIKE '%ottoq_cert_battery_step%';
+
+-- (9) the battery plan, per tick, on a run (G447)
+SELECT c.tick_seq, to_char(c.issued_at AT TIME ZONE 'America/Chicago', 'HH24:MI') AS sim_ct, round(c.setpoint_kw) AS setpoint_kw,
+       c.reason -> 'day_plan' ->> 'mode' AS mode, round((c.reason -> 'day_plan' ->> 'ratchet_kw')::numeric) AS billed_peak_kw,
+       round((c.reason -> 'day_plan' ->> 'level_kw')::numeric) AS level_kw, c.reason -> 'day_plan' ->> 'charge_reason' AS charge_reason
+  FROM public.ottoq_energy_commands c
+ WHERE c.sim_run_id = 'b54f6de5-7cf3-4d91-a0d1-0010a21fec64' AND c.command_type = 'bess_setpoint_kw'
+ ORDER BY c.tick_seq;
+
+-- (10) fast-charger handovers on a run with a car waiting for a fast charger, and the charger time they left idle (G449)
+WITH s AS (
+  SELECT x.stall_id, x.started_at, x.ended_at,
+         lead(x.started_at) OVER (PARTITION BY x.stall_id ORDER BY x.started_at) AS next_start
+    FROM public.ocpp_sessions x JOIN public.stalls st ON st.id = x.stall_id
+   WHERE x.sim_run_id = 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd' AND st.stall_type::text = 'dcfc'
+     AND x.started_at IS NOT NULL AND x.ended_at IS NOT NULL),
+fc_first AS (
+  SELECT vn.arrived_at, f.started_at AS first_start
+    FROM public.ottoq_visit_needs vn
+    JOIN LATERAL (SELECT y.started_at, sty.stall_type::text AS t FROM public.ocpp_sessions y JOIN public.stalls sty ON sty.id = y.stall_id
+                   WHERE y.sim_run_id = vn.sim_run_id AND y.vehicle_id = vn.vehicle_id AND y.started_at >= vn.arrived_at
+                   ORDER BY y.started_at LIMIT 1) f ON f.t = 'dcfc'
+   WHERE vn.sim_run_id = 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'),
+g AS (SELECT s.*, extract(epoch FROM (s.next_start - s.ended_at)) / 60.0 AS gap_min,
+             (SELECT count(*) FROM fc_first f WHERE f.arrived_at <= s.ended_at AND f.first_start > s.ended_at) AS fc_waiting
+        FROM s WHERE s.next_start IS NOT NULL)
+SELECT count(*) AS handovers, count(*) FILTER (WHERE fc_waiting > 0) AS with_a_car_waiting,
+       count(*) FILTER (WHERE fc_waiting > 0 AND gap_min = 10) AS exactly_10_min,
+       min(gap_min) FILTER (WHERE fc_waiting > 0) AS shortest_min,
+       round(sum(gap_min) FILTER (WHERE fc_waiting > 0)::numeric / 60, 1) AS idle_charger_hours,
+       (SELECT round(sum(extract(epoch FROM (s.ended_at - s.started_at)) / 3600)::numeric, 1) FROM s) AS charging_hours_all
+  FROM g;
+-- Stall types are read from stalls, so run this on an arm whose build-out converts nothing (dcfc10): a converted post
+-- reads as the L2 it is restored to (query (3c)'s note).
+
+-- (11) immediate dispatches on a run: the due, the wait, the charge alone, and how many the charge alone made late (G383)
+WITH o AS (SELECT * FROM public.ottoq_visit_outcomes('b54f6de5-7cf3-4d91-a0d1-0010a21fec64')),
+d AS (
+  SELECT o.on_time, vn.urgency, extract(epoch FROM (vn.dispatch_due_at - vn.arrived_at)) / 60.0 AS due_min,
+         cs.soc_start, extract(epoch FROM (cs.started_at - vn.arrived_at)) / 60.0 AS wait_min,
+         extract(epoch FROM (cs.ended_at - cs.started_at)) / 60.0 AS charge_min
+    FROM o JOIN public.ottoq_visit_needs vn USING (visit_id)
+    LEFT JOIN LATERAL (SELECT x.* FROM public.ocpp_sessions x
+                        WHERE x.sim_run_id = vn.sim_run_id AND x.vehicle_id = vn.vehicle_id AND x.started_at >= vn.arrived_at
+                          AND x.started_at < COALESCE(o.departed_at, vn.arrived_at + interval '1 day')
+                        ORDER BY x.started_at LIMIT 1) cs ON true
+   WHERE vn.dispatch_due_at IS NOT NULL AND o.departed_at IS NOT NULL)
+SELECT urgency, count(*) AS served, count(*) FILTER (WHERE on_time) AS on_time, min(due_min) AS due_min_lo, max(due_min) AS due_min_hi,
+       count(*) FILTER (WHERE charge_min IS NOT NULL) AS charged,
+       count(*) FILTER (WHERE charge_min > due_min) AS charge_alone_over_the_due,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY charge_min)::numeric, 1) AS charge_p50_min,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY soc_start)::numeric, 1) AS soc_at_plug_p50,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY wait_min)::numeric, 1) AS wait_p50_min
+  FROM d GROUP BY urgency;
+
+-- (12) the twin's command lag on a run, and what it does to bay seats (G449, G450). On arm 83: every command 5.00
+--      minutes late; washes seated 12.64 of 17.64 booked minutes, services 37.86 of 42.86. Under 0735's dial both
+--      lags should read 0.00 and a seat its booking.
+WITH c AS (
+  SELECT c.command_type, c.issued_at, c.confirmed_at, c.payload
+    FROM public.ottoq_vehicle_commands c
+   WHERE c.sim_run_id = 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd' AND c.status = 'executed')
+SELECT 'command lag' AS what, c.command_type AS k, count(*) AS n,
+       round(avg(extract(epoch FROM c.confirmed_at - c.issued_at) / 60.0), 2) AS mean_late_min,
+       NULL::numeric AS booked_min, NULL::numeric AS seated_min
+  FROM c GROUP BY c.command_type
+UNION ALL
+SELECT 'bay seat', c.command_type, count(*),
+       round(avg(extract(epoch FROM c.confirmed_at - lower(b.during)) / 60.0), 2),
+       round(avg(extract(epoch FROM upper(b.during) - lower(b.during)) / 60.0), 2),
+       round(avg(extract(epoch FROM upper(b.during) - c.confirmed_at) / 60.0), 2)
+  FROM c JOIN public.ottoq_stall_bookings b ON b.booking_id = NULLIF(c.payload ->> 'booking_id', '')::uuid
+ WHERE c.command_type IN ('enter_wash', 'enter_service')
+ GROUP BY c.command_type
+ ORDER BY 1, 2;
+
+-- (13) the promises on a run, graded (G383, 0736): the share ready by the median and by the 90th percentile, overall, by
+--      situation, by bay work and by whether the after-charge part came from the run's own cars or the prior; and for
+--      visits with an owner's due, the share ready by the due against the share ready by the promise. Run it on the
+--      promise arm (sweep promise_normal_2026_10_17) once it has run.
+SELECT public.ottoq_ready_promise_grade(a.sim_run_id) AS grade
+  FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+ WHERE s.sweep_code = 'promise_normal_2026_10_17'
+ ORDER BY a.ran_at DESC LIMIT 1;
+
+-- (14) the promise's after-charge part rehearsed on a run's own visits (G452): at each even hour, what 0736 learned
+--      (finished cars only), what 0739 learns (Kaplan-Meier, the cars still waiting counted), and what the cars whose
+--      charge closed in the next hour took (of those ready before the run ended; never_ready says how many were not).
+--      Bay work only, where the difference lives. On arm 81 at hour 8: 33, 255 and 395. Substitute the run.
+WITH r AS (SELECT sim_run_id, sim_clock_start FROM public.ottoq_sim_runs WHERE sim_run_id = '96616822-7d95-4b09-9320-48988d60616b'),
+v AS (
+  SELECT vn.sim_run_id, r.sim_clock_start AS t0,
+         (SELECT (x ->> 'done_at')::timestamptz FROM jsonb_array_elements(vn.atoms) x
+           WHERE x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at,
+         (SELECT max(COALESCE((x ->> 'closed_at')::timestamptz, (x ->> 'done_at')::timestamptz))
+            FROM jsonb_array_elements(vn.atoms) x WHERE x ->> 'svc' = 'charge' AND x ->> 'status' = 'done') AS chg_at
+    FROM public.ottoq_visit_needs vn JOIN r USING (sim_run_id)
+   WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x ->> 'concurrency' = 'bay')),
+t AS (SELECT DISTINCT sim_run_id, t0, t0 + make_interval(hours => h) AS t FROM v CROSS JOIN generate_series(2, 10, 2) h),
+g AS (
+  SELECT t.t0, t.t,
+         array_agg(extract(epoch FROM (LEAST(COALESCE(v.ready_at, 'infinity'), t.t) - v.chg_at)) / 60 ORDER BY v.chg_at)
+           FILTER (WHERE v.chg_at <= t.t) AS xs,
+         array_agg(COALESCE(v.ready_at <= t.t, false) ORDER BY v.chg_at) FILTER (WHERE v.chg_at <= t.t) AS evs,
+         percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (v.ready_at - v.chg_at)) / 60)
+           FILTER (WHERE v.chg_at <= t.t AND v.ready_at <= t.t) AS finished_only,
+         percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM (v.ready_at - v.chg_at)) / 60)
+           FILTER (WHERE v.chg_at > t.t AND v.chg_at <= t.t + interval '1 hour' AND v.ready_at IS NOT NULL) AS next_hour,
+         count(*) FILTER (WHERE v.chg_at > t.t AND v.chg_at <= t.t + interval '1 hour' AND v.ready_at IS NULL) AS never_ready
+    FROM t JOIN v ON v.sim_run_id = t.sim_run_id GROUP BY 1, 2)
+SELECT extract(epoch FROM t - t0) / 3600 AS hour, cardinality(xs) AS cars, (SELECT count(*) FROM unnest(evs) e WHERE NOT e) AS waiting,
+       round(finished_only::numeric, 0) AS said_0736,
+       round((public.ottoq_km_quantiles(xs, evs, ARRAY[0.5]::float8[]))[1]::numeric, 0) AS kaplan_meier_0739,
+       round(next_hour::numeric, 0) AS next_hour_took, never_ready
+  FROM g ORDER BY 1;
+
+-- (15) a busy day's service bays (G453): bookings by state and release reason, with each booking's lead from booked to
+--      slot, and how many slots fell after the run's end. On arm 82: 25 served (lead 42 minutes on average), 18 released
+--      when the run stopped (lead 488, 16 of them slotted after its end), 12 released replanned_no_window; arm 83 (normal
+--      day) had none of the last kind.
+SELECT left(b.sim_run_id::text, 8) AS run, b.state, b.release_reason, count(*) AS n,
+       round(avg(extract(epoch FROM lower(b.during) - b.booked_at_sim) / 60)::numeric, 0) AS lead_avg_min,
+       round(max(extract(epoch FROM lower(b.during) - b.booked_at_sim) / 60)::numeric, 0) AS lead_max_min,
+       count(*) FILTER (WHERE lower(b.during) > r.sim_clock_current) AS slot_after_run_end
+  FROM ottoq_stall_bookings b JOIN stalls s ON s.id = b.stall_id JOIN ottoq_sim_runs r ON r.sim_run_id = b.sim_run_id
+ WHERE b.sim_run_id IN ('43301561-bce5-46c5-84c3-4235db4e4dd4', '96616822-7d95-4b09-9320-48988d60616b', 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd')
+   AND s.stall_type::text = 'service_bay'
+ GROUP BY 1, 2, 3 ORDER BY 1, 4 DESC;
+
+-- (16) the calendar's own floor for the promise (G452, G453): for each visit with bay work, the end of the car's last bay
+--      booking made in its arrival tick (its original slot, read through the reconcile log where a deferral rewrote it),
+--      against when the car was ready. On the busy arms 28 of 31 and 44 of 49 booked cars that got ready were ready after
+--      it, and none of the 19 booked past the run's end was ready that day; on the normal day 26 of 38.
+WITH bk AS (
+  SELECT b.sim_run_id, b.vehicle_id, b.booked_at_sim,
+         COALESCE((SELECT r.old_to FROM public.bay_reservation_reconcile_2026_08_02 r WHERE r.booking_id = b.booking_id
+                    ORDER BY r.sim_clock, r.defer_seq LIMIT 1), upper(b.during)) AS orig_end
+    FROM ottoq_stall_bookings b JOIN stalls s ON s.id = b.stall_id
+   WHERE b.sim_run_id IN ('43301561-bce5-46c5-84c3-4235db4e4dd4', '96616822-7d95-4b09-9320-48988d60616b', 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd')
+     AND s.stall_type::text IN ('wash_bay', 'service_bay')),
+v AS (
+  SELECT vn.sim_run_id, vn.vehicle_id, vn.arrived_at,
+         (SELECT (x ->> 'done_at')::timestamptz FROM jsonb_array_elements(vn.atoms) x
+           WHERE x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at,
+         (SELECT r.sim_clock_current FROM ottoq_sim_runs r WHERE r.sim_run_id = vn.sim_run_id) AS run_end
+    FROM ottoq_visit_needs vn
+   WHERE vn.sim_run_id IN ('43301561-bce5-46c5-84c3-4235db4e4dd4', '96616822-7d95-4b09-9320-48988d60616b', 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd')
+     AND EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x ->> 'concurrency' = 'bay')),
+j AS (
+  SELECT v.*, (SELECT max(bk.orig_end) FROM bk WHERE bk.sim_run_id = v.sim_run_id AND bk.vehicle_id = v.vehicle_id
+                AND bk.booked_at_sim <= v.arrived_at + interval '5 minutes'
+                AND bk.booked_at_sim >= v.arrived_at - interval '1 minute') AS floor_at_arrival
+    FROM v)
+SELECT left(sim_run_id::text, 8) AS run, count(*) AS bay_visits, count(floor_at_arrival) AS booked_at_arrival,
+       count(*) FILTER (WHERE floor_at_arrival IS NOT NULL AND ready_at IS NOT NULL) AS booked_and_ready,
+       count(*) FILTER (WHERE floor_at_arrival IS NOT NULL AND ready_at IS NOT NULL
+                          AND ready_at >= floor_at_arrival - interval '5 minutes') AS ready_after_floor,
+       count(*) FILTER (WHERE floor_at_arrival > run_end) AS floor_past_run_end,
+       count(*) FILTER (WHERE floor_at_arrival > run_end AND ready_at IS NOT NULL) AS past_end_but_ready
+  FROM j GROUP BY 1 ORDER BY 1;
+
+-- (17) G453's test of the promise, on a promise arm's run: for each promised car with a bay booking made in its arrival
+--      tick, its promise's p90 against that booking's original end (the calendar's floor) and against when it was ready.
+--      If many booked cars were ready after the floor while their p90 sat before it, the p90 under-covers them and a
+--      floor on the p90 is the next build. Substitute the sweep code (promise_normal_2026_10_17 or promise_busy_2026_10_17).
+WITH run AS (SELECT a.sim_run_id FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+              WHERE s.sweep_code = 'promise_busy_2026_10_17' ORDER BY a.ran_at DESC LIMIT 1),
+p AS (SELECT pr.*, (SELECT (x ->> 'done_at')::timestamptz FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+                     WHERE vn.visit_id = pr.visit_id AND x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at,
+             (SELECT max(COALESCE((SELECT r.old_to FROM public.bay_reservation_reconcile_2026_08_02 r WHERE r.booking_id = b.booking_id
+                                    ORDER BY r.sim_clock, r.defer_seq LIMIT 1), upper(b.during)))
+                FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id
+               WHERE b.sim_run_id = pr.sim_run_id AND b.vehicle_id = pr.vehicle_id AND s.stall_type::text IN ('wash_bay', 'service_bay')
+                 AND b.booked_at_sim BETWEEN pr.arrived_at - interval '1 minute' AND pr.arrived_at + interval '5 minutes') AS floor_at
+        FROM public.ottoq_ready_promises pr JOIN run USING (sim_run_id))
+SELECT count(*) AS promises, count(floor_at) AS booked,
+       count(*) FILTER (WHERE floor_at IS NOT NULL AND ready_at IS NOT NULL) AS booked_and_ready,
+       count(*) FILTER (WHERE floor_at IS NOT NULL AND ready_at IS NOT NULL AND ready_at <= ready_p90_at) AS booked_ready_by_p90,
+       count(*) FILTER (WHERE floor_at IS NOT NULL AND ready_at IS NOT NULL AND ready_at >= floor_at - interval '5 minutes'
+                          AND ready_p90_at < floor_at) AS p90_before_floor_but_ready_after_it,
+       count(*) FILTER (WHERE floor_at IS NULL AND ready_at IS NOT NULL AND ready_at <= ready_p90_at) AS unbooked_ready_by_p90,
+       count(*) FILTER (WHERE floor_at IS NULL AND ready_at IS NOT NULL) AS unbooked_and_ready
+  FROM p;
+
+-- (18) G454: what the owner app says beside the promise, on a promise arm's run (0741). The grade scores both on the
+--      same cars: by_owner (ready by the app's time) against the promise's by_p50 and by_p90 on those cars, the app's
+--      mean absolute error against the promise median's, the app's bias (positive: cars took longer than it said), and
+--      owner_in_past (the app named a time already gone when it was read). Substitute the sweep code
+--      (promise_normal_2026_10_17 or promise_busy_2026_10_17). Before a promise arm has run it returns no row.
+WITH run AS (SELECT a.sim_run_id FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+              WHERE s.sweep_code = 'promise_busy_2026_10_17' ORDER BY a.ran_at DESC LIMIT 1),
+g AS (SELECT public.ottoq_ready_promise_grade(run.sim_run_id) AS j FROM run)
+SELECT j ->> 'promises' AS promises, j ->> 'ready' AS ready, j ->> 'with_owner' AS app_named_a_time,
+       j ->> 'owner_in_past' AS app_time_already_gone,
+       j ->> 'by_owner' AS ready_by_app_time, j ->> 'by_p50_with_owner' AS ready_by_p50, j ->> 'by_p90_with_owner' AS ready_by_p90,
+       j ->> 'owner_mae_min' AS app_mae_min, j ->> 'mae_p50_min_with_owner' AS promise_mae_min,
+       j ->> 'owner_bias_min' AS app_bias_min, j ->> 'owner_min_median' AS app_said_median_min,
+       j ->> 'p50_min_median' AS promise_p50_median_min, j ->> 'actual_min_median' AS took_median_min
+  FROM g;
+
+-- (19) G455: the promise asked again part-way through a visit, rehearsed on a run's own records. At every whole hour,
+--      for each car whose charge had closed and that was not yet ready: what 0739's estimator said (a visit that never
+--      charged, timed from arrival, its wait subtracted from each draw) and what drawing it given the minutes since its
+--      charge closed says (0742), each graded against the car's readiness check as the grade does (a car never ready is a
+--      miss once its time has passed before the run's end). The two helpers read the 21-point grid; run all three
+--      statements in one session. On 2026-10-17: arm 82 239 of 247 car-hours "ready now", by p50 0.000 against 0.348
+--      conditional; arm 81 1,692 of 1,710, 0.000 against 0.223; arm 83 50 of 56, 0.036 against 0.625.
+CREATE FUNCTION pg_temp.qat(q float8[], u float8) RETURNS float8 LANGUAGE sql IMMUTABLE AS $f$
+  SELECT CASE WHEN u <= 0 THEN q[1] WHEN u >= 1 THEN q[21]
+              ELSE q[floor(u*20)::int + 1] + (q[LEAST(floor(u*20)::int + 2, 21)] - q[floor(u*20)::int + 1]) * (u*20 - floor(u*20)) END $f$;
+CREATE FUNCTION pg_temp.fat(q float8[], x float8) RETURNS float8 LANGUAGE sql IMMUTABLE AS $f$
+  SELECT CASE WHEN x <= q[1] THEN 0 WHEN x >= q[21] THEN 1 ELSE
+    (SELECT (i - 1) / 20.0 + CASE WHEN q[i+1] > q[i] THEN (x - q[i]) / (q[i+1] - q[i]) / 20.0 ELSE 0 END
+       FROM generate_series(1, 20) i WHERE q[i] <= x AND x < q[i+1] ORDER BY i DESC LIMIT 1) END $f$;
+WITH runs AS (
+  SELECT r.sim_run_id, r.sim_clock_current AS run_end,
+         (SELECT min(vn.arrived_at) FROM ottoq_visit_needs vn WHERE vn.sim_run_id = r.sim_run_id) AS run_start
+    FROM ottoq_sim_runs r WHERE r.sim_run_id IN ('43301561-bce5-46c5-84c3-4235db4e4dd4','96616822-7d95-4b09-9320-48988d60616b','e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd')),
+v AS (
+  SELECT vn.sim_run_id, vn.visit_id, vn.vehicle_id, vn.arrived_at, vn.atoms,
+         (SELECT (x->>'done_at')::timestamptz FROM jsonb_array_elements(vn.atoms) x WHERE x->>'svc'='readiness_check' AND x->>'status'='done' ORDER BY x->>'done_at' LIMIT 1) AS ready_at,
+         (SELECT max(COALESCE((x->>'closed_at')::timestamptz, (x->>'done_at')::timestamptz)) FROM jsonb_array_elements(vn.atoms) x WHERE x->>'svc'='charge' AND x->>'status'='done') AS chg_at,
+         EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x->>'svc'='charge') AS chg,
+         EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x->>'concurrency'='bay') AS bay
+    FROM ottoq_visit_needs vn JOIN runs USING (sim_run_id)),
+t AS (SELECT r.sim_run_id, r.run_end, g AS t FROM runs r, generate_series(r.run_start + interval '1 hour', r.run_end - interval '1 hour', interval '1 hour') g),
+hist AS (
+  SELECT t.sim_run_id, t.t, k.key, k.x, COALESCE(v.ready_at <= t.t, false) AS ended
+    FROM t JOIN v ON v.sim_run_id = t.sim_run_id AND v.arrived_at <= t.t
+    CROSS JOIN LATERAL (VALUES
+      (CASE WHEN v.chg AND v.chg_at <= t.t THEN CASE WHEN v.bay THEN 'after_bay' ELSE 'after_no_bay' END END,
+       GREATEST(extract(epoch FROM (LEAST(COALESCE(v.ready_at, t.t), t.t) - v.chg_at))/60.0, 0)::float8),
+      (CASE WHEN NOT v.chg THEN 'door_nochg_' || CASE WHEN v.bay THEN 'bay' ELSE 'no_bay' END END,
+       GREATEST(extract(epoch FROM (LEAST(COALESCE(v.ready_at, t.t), t.t) - v.arrived_at))/60.0, 0)::float8)) k(key, x)
+   WHERE k.key IS NOT NULL),
+al0 AS (
+  SELECT sim_run_id, t, key, count(*) AS n, max(x) AS xmax,
+         public.ottoq_km_quantiles(array_agg(x ORDER BY x, ended), array_agg(ended ORDER BY x, ended), ARRAY(SELECT g/20.0 FROM generate_series(0,20) g)) AS q
+    FROM hist GROUP BY 1,2,3),
+pr AS (SELECT * FROM (VALUES ('after_no_bay',10.0,20.0),('after_bay',45.0,130.0),('door_nochg_no_bay',40.0,55.0),('door_nochg_bay',75.0,95.0)) p(key,p50,p90)),
+z AS (SELECT ARRAY[-2.326,-1.645,-1.282,-1.036,-0.842,-0.674,-0.524,-0.385,-0.253,-0.126,0,0.126,0.253,0.385,0.524,0.674,0.842,1.036,1.282,1.645,2.326]::float8[] AS c_z),
+al2 AS (SELECT tt.sim_run_id, tt.t, p.key,
+               COALESCE((SELECT CASE WHEN a.n >= 8 THEN ARRAY(SELECT COALESCE(a.q[i], GREATEST(a.xmax, p.p50 * exp(ln(p.p90/p.p50)/1.2816*z.c_z[i]))) FROM generate_series(1,21) i ORDER BY i) END
+                           FROM al0 a WHERE a.sim_run_id = tt.sim_run_id AND a.t = tt.t AND a.key = p.key),
+                        ARRAY(SELECT p.p50 * exp(ln(p.p90/p.p50)/1.2816*z.c_z[i]) FROM generate_series(1,21) i ORDER BY i)) AS q
+          FROM (SELECT DISTINCT sim_run_id, t FROM t) tt CROSS JOIN pr p CROSS JOIN z),
+w AS (
+  SELECT t.sim_run_id, t.t, t.run_end, v.vehicle_id, v.ready_at,
+         extract(epoch FROM (t.t - v.chg_at))/60.0 AS e, extract(epoch FROM (t.t - v.arrived_at))/60.0 AS el_door,
+         CASE WHEN v.bay THEN 'after_bay' ELSE 'after_no_bay' END AS key_after,
+         CASE WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(v.atoms) x WHERE x->>'concurrency'='bay'
+                            AND (x->>'status' IS DISTINCT FROM 'done' OR (x->>'done_at')::timestamptz > t.t)) THEN 'door_nochg_bay' ELSE 'door_nochg_no_bay' END AS key_door
+    FROM t JOIN v ON v.sim_run_id = t.sim_run_id
+   WHERE v.chg AND v.chg_at <= t.t AND (v.ready_at IS NULL OR v.ready_at > t.t)),
+est AS (
+  SELECT w.*, extract(epoch FROM (w.ready_at - w.t))/60.0 AS actual,
+         GREATEST(pg_temp.qat(d.q, 0.5) - w.el_door, 0) AS cur50, GREATEST(pg_temp.qat(d.q, 0.9) - w.el_door, 0) AS cur90,
+         pg_temp.fat(a.q, w.e) AS fe, a.q AS qa
+    FROM w JOIN al2 a ON a.sim_run_id = w.sim_run_id AND a.t = w.t AND a.key = w.key_after
+           JOIN al2 d ON d.sim_run_id = w.sim_run_id AND d.t = w.t AND d.key = w.key_door),
+est2 AS (
+  SELECT est.*, GREATEST(pg_temp.qat(qa, fe + 0.5*(1-fe)) - e, 0) AS cond50, GREATEST(pg_temp.qat(qa, fe + 0.9*(1-fe)) - e, 0) AS cond90,
+         extract(epoch FROM (run_end - t))/60.0 AS left_min
+    FROM est)
+SELECT left(sim_run_id::text, 8) AS run, count(*) AS car_hours_waiting, count(actual) AS later_ready,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY actual)::numeric) AS actual_rest_p50_min,
+       count(*) FILTER (WHERE cur50 = 0) AS before_0742_ready_now,
+       round(avg(CASE WHEN actual IS NOT NULL THEN (actual <= cur50)::int WHEN cur50 < left_min THEN 0 END)::numeric, 3) AS before_by_p50,
+       round(avg(CASE WHEN actual IS NOT NULL THEN (actual <= cur90)::int WHEN cur90 < left_min THEN 0 END)::numeric, 3) AS before_by_p90,
+       round(avg(CASE WHEN actual IS NOT NULL THEN (actual <= cond50)::int WHEN cond50 < left_min THEN 0 END)::numeric, 3) AS cond_by_p50,
+       round(avg(CASE WHEN actual IS NOT NULL THEN (actual <= cond90)::int WHEN cond90 < left_min THEN 0 END)::numeric, 3) AS cond_by_p90,
+       round(avg(abs(actual - cur50))::numeric, 1) AS before_mae, round(avg(abs(actual - cond50))::numeric, 1) AS cond_mae
+  FROM est2 GROUP BY 1 ORDER BY 1;
+
+-- (20) G455: the second look, on a promise arm's run (0742): each re-estimate made every 30 sim-minutes against the
+--      readiness check, overall, by situation and by time since arrival, with the owner app's time at the same moment.
+--      Substitute the sweep code (promise_normal_2026_10_17 or promise_busy_2026_10_17). Before a promise arm has run it
+--      returns no row.
+WITH run AS (SELECT a.sim_run_id FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+              WHERE s.sweep_code = 'promise_normal_2026_10_17' ORDER BY a.ran_at DESC LIMIT 1)
+SELECT public.ottoq_ready_promise_update_grade(run.sim_run_id) FROM run;
+
+-- (21) G458: the wash line at 10, 20 and 40 posts. For each wash seat after a charge, the minutes from the charge's end to
+--      the seat; then, every hour CT, the cars waiting (charge ended, not yet seated) beside the cars washing.
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid, 85)),
+w AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS seat_at, upper(b.during) AS seat_end
+        FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run JOIN public.stalls s ON s.id = b.stall_id
+       WHERE s.stall_type = 'wash_bay' AND b.state IN ('done', 'active', 'interrupted') AND b.booked_by LIKE 'otto_q%'),
+x AS (SELECT w.*, (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                    WHERE o.vehicle_id = w.vehicle_id AND o.sim_run_id = w.run AND o.ended_at <= w.seat_at) AS charge_end
+        FROM w)
+SELECT arm, count(*) AS wash_seats, count(charge_end) AS after_charge,
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM seat_at - charge_end) / 60) AS p50_min,
+       percentile_cont(0.9) WITHIN GROUP (ORDER BY extract(epoch FROM seat_at - charge_end) / 60) AS p90_min,
+       round(max(extract(epoch FROM seat_at - charge_end) / 60)::numeric, 1) AS longest_min,
+       round(avg(extract(epoch FROM seat_end - seat_at) / 60)::numeric, 1) AS booked_wash_min
+  FROM x GROUP BY arm ORDER BY arm;
+
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84)),
+w AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS seat_at, upper(b.during) AS seat_end
+        FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run JOIN public.stalls s ON s.id = b.stall_id
+       WHERE s.stall_type = 'wash_bay' AND b.state IN ('done', 'active', 'interrupted') AND b.booked_by LIKE 'otto_q%'),
+x AS (SELECT w.*, (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                    WHERE o.vehicle_id = w.vehicle_id AND o.sim_run_id = w.run AND o.ended_at <= w.seat_at) AS charge_end
+        FROM w),
+ticks AS (SELECT r.arm, g AS t FROM runs r, generate_series('2026-09-01 11:00+00'::timestamptz, '2026-09-01 23:00+00', interval '1 hour') g)
+SELECT t.arm, to_char(t.t - interval '5 hours', 'HH24:MI') AS ct,
+       (SELECT count(*) FROM x WHERE x.arm = t.arm AND x.charge_end <= t.t AND x.seat_at > t.t) AS waiting,
+       (SELECT count(*) FROM x WHERE x.arm = t.arm AND x.seat_at <= t.t AND x.seat_end > t.t) AS washing
+  FROM ticks t ORDER BY t.arm, t.t;
+
+-- (22) G458: each wash bay every five minutes, idle while a car waited (charge ended, not yet seated), by what was on it:
+--      a reservation that lapsed as a no-show, another reservation, or nothing at all.
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('43301561-bce5-46c5-84c3-4235db4e4dd4'::uuid, 82)),
+bays AS (SELECT s.id FROM public.stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'wash_bay'),
+bk AS (SELECT r.arm, b.* FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run WHERE b.stall_id IN (SELECT id FROM bays)),
+w AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS seat_at FROM runs r JOIN bk b ON b.arm = r.arm
+       WHERE b.state IN ('done', 'active', 'interrupted') AND b.booked_by LIKE 'otto_q%'),
+wq AS (SELECT w.arm, w.vehicle_id, w.seat_at,
+              (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                WHERE o.vehicle_id = w.vehicle_id AND o.sim_run_id = w.run AND o.ended_at <= w.seat_at) AS charge_end FROM w),
+grid AS (SELECT r.arm, bays.id AS bay, g AS t FROM runs r CROSS JOIN bays
+          CROSS JOIN generate_series('2026-09-01 11:00+00'::timestamptz, '2026-09-01 22:55+00', interval '5 min') g),
+f AS (SELECT g.*,
+             EXISTS (SELECT 1 FROM bk WHERE bk.arm = g.arm AND bk.stall_id = g.bay AND bk.state IN ('done', 'active', 'interrupted')
+                        AND bk.during @> g.t) AS occ,
+             EXISTS (SELECT 1 FROM bk WHERE bk.arm = g.arm AND bk.stall_id = g.bay AND bk.state = 'released'
+                        AND bk.release_reason IN ('no_show_grace_elapsed', 'window_elapsed') AND bk.during @> g.t) AS noshow,
+             EXISTS (SELECT 1 FROM bk WHERE bk.arm = g.arm AND bk.stall_id = g.bay AND bk.state IN ('released', 'superseded')
+                        AND bk.during @> g.t AND COALESCE(bk.released_at, 'infinity') > g.t) AS held_other,
+             (SELECT count(*) FROM wq WHERE wq.arm = g.arm AND wq.charge_end <= g.t AND wq.seat_at > g.t) AS waiting
+        FROM grid g)
+SELECT arm, count(*) FILTER (WHERE NOT occ) AS idle_bay_ticks,
+       count(*) FILTER (WHERE NOT occ AND noshow AND waiting > 0) AS idle_behind_a_no_show_while_cars_waited,
+       count(*) FILTER (WHERE NOT occ AND NOT noshow AND held_other AND waiting > 0) AS idle_behind_another_hold_while_cars_waited,
+       count(*) FILTER (WHERE NOT occ AND NOT noshow AND NOT held_other AND waiting > 0) AS idle_and_free_while_cars_waited
+  FROM f GROUP BY arm ORDER BY arm;
+
+-- (23) G458: the wash no-shows, by the car's state at its slot; and for those still charging, the charge leg's planned
+--      end against the slot, how far the charge ran past it, and how long the hold kept its bay.
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('43301561-bce5-46c5-84c3-4235db4e4dd4'::uuid, 82)),
+ns AS (SELECT r.arm, r.run, b.booking_id, b.vehicle_id, lower(b.during) AS lo, b.released_at AS rel
+         FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run JOIN public.stalls s ON s.id = b.stall_id
+        WHERE s.stall_type = 'wash_bay' AND b.state = 'released' AND b.release_reason IN ('no_show_grace_elapsed', 'window_elapsed')),
+st AS (SELECT ns.*, vs.state,
+              (SELECT max(l.planned_end_sim) FROM public.ottoq_itinerary_legs l
+                WHERE l.sim_run_id = ns.run AND l.vehicle_id = ns.vehicle_id AND l.leg_type IN ('charge_l2', 'charge_dcfc')
+                  AND l.planned_start_sim <= ns.lo + interval '3 min') AS leg_planned_end,
+              (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                WHERE o.sim_run_id = ns.run AND o.vehicle_id = ns.vehicle_id AND o.started_at <= ns.lo) AS session_end
+         FROM ns CROSS JOIN LATERAL (
+              SELECT e.payload -> 'diff' -> 'current_state' ->> 'to' AS state FROM public.ottoq_events e
+               WHERE e.sim_run_id = ns.run AND e.entity_id = ns.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                 AND e.payload -> 'diff' ? 'current_state' AND e.sim_clock_at <= ns.lo
+               ORDER BY e.sim_clock_at DESC, e.event_id DESC LIMIT 1) vs)
+SELECT arm, count(*) AS no_shows,
+       count(*) FILTER (WHERE state LIKE 'charging%') AS car_charging,
+       count(*) FILTER (WHERE state LIKE 'charging%' AND leg_planned_end <= lo) AS charging_past_the_legs_plan,
+       count(*) FILTER (WHERE state IN ('staged_awaiting_service', 'charge_complete_holding', 'arrived_at_gate',
+                                        'service_complete_holding')) AS car_idle_in_the_depot,
+       count(*) FILTER (WHERE state LIKE 'in_%bay') AS car_in_another_bay,
+       round(avg(extract(epoch FROM session_end - leg_planned_end) / 60) FILTER (WHERE state LIKE 'charging%')::numeric) AS overrun_min_mean,
+       round(avg(extract(epoch FROM rel - lo) / 60) FILTER (WHERE state LIKE 'charging%')::numeric) AS held_min_mean
+  FROM st GROUP BY arm ORDER BY arm;
+
+-- (24) G457: the calendar against a car the arm holds. Per run, the ticks at which a car's charge ended while it held a
+--      live bay booking (it is mated through that tick's decide), and the calendar's own seats inside and outside them.
+--      The reproduction itself writes, so it is not here: it ran on live at 5:07 PM CT inside a transaction rolled back,
+--      and tests/test_bay_activation_per_seat_sql.py repeats it on the live bodies.
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('43301561-bce5-46c5-84c3-4235db4e4dd4'::uuid, 82),
+                               ('fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid, 85)),
+ticks AS (SELECT r.arm, r.run, g AS t FROM runs r, generate_series('2026-09-01 11:05+00'::timestamptz, '2026-09-01 23:00+00', interval '5 min') g),
+held AS (SELECT DISTINCT t.arm, t.t FROM ticks t
+           JOIN public.ocpp_sessions o ON o.sim_run_id = t.run AND o.ended_at = t.t
+           JOIN public.ottoq_stall_bookings b ON b.sim_run_id = t.run AND b.vehicle_id = o.vehicle_id
+                AND b.purpose IN ('wash', 'detail', 'service') AND b.booked_at_sim <= t.t
+                AND COALESCE(b.released_at, 'infinity') > t.t AND upper(b.during) > t.t),
+act AS (SELECT r.arm, lower(b.during) AS t, count(*) AS n FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run
+         WHERE b.source IN ('bay_reservation_activated', 'bay_reservation_activated_early') GROUP BY 1, 2)
+SELECT t.arm, count(*) AS ticks, count(h.t) AS ticks_with_a_held_car_booked,
+       COALESCE(sum(a.n) FILTER (WHERE h.t IS NULL), 0) AS calendar_seats_other_ticks,
+       COALESCE(sum(a.n) FILTER (WHERE h.t IS NOT NULL), 0) AS calendar_seats_in_those_ticks
+  FROM ticks t LEFT JOIN held h ON h.arm = t.arm AND h.t = t.t LEFT JOIN act a ON a.arm = t.arm AND a.t = t.t
+ GROUP BY t.arm ORDER BY t.arm;
+
+-- (25) G453: the bay line's order on a run. Each service-bay seat by the path that made it (decide section (4b), the
+--      ranked needs-card path, or section (5), first come first served), against the cars that had waited longer at that
+--      tick and were not seated. Substitute the run (arm 82's busy day here).
+WITH c AS (
+  SELECT d.tick_seq, d.sim_clock, d.entity_id AS vid,
+         CASE WHEN d.resolved_action_context = 'stall_assignment' THEN '4b' ELSE '5' END AS path,
+         (d.outcome_status = 'enacted' AND (d.resolved_action_context = 'stall_assignment'
+                                            OR d.enacted_action ->> 'verb' = 'admit_service')) AS seated
+    FROM public.ottoq_decisions d
+   WHERE d.sim_run_id = '43301561-bce5-46c5-84c3-4235db4e4dd4' AND d.action_context = 'task_start'
+     AND ((d.resolved_action_context = 'stall_assignment' AND d.context_frame ->> 'stall_type' = 'service_bay')
+       OR (d.resolved_action_context IS DISTINCT FROM 'stall_assignment' AND d.context_frame ->> 'service' = 'service'
+           AND d.proposed_action ->> 'verb' IN ('admit_service', 'hold_in_queue')))),
+fs AS (SELECT vid, min(sim_clock) AS t0 FROM c GROUP BY vid),
+seats AS (SELECT DISTINCT ON (c.vid, c.tick_seq) c.* FROM c WHERE c.seated)
+SELECT s.path, count(*) AS seats, round(avg(extract(epoch FROM s.sim_clock - f.t0) / 60)::numeric) AS seated_after_min_mean,
+       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM c c2 JOIN fs f2 ON f2.vid = c2.vid
+                                       WHERE c2.tick_seq = s.tick_seq AND c2.vid <> s.vid AND NOT c2.seated AND f2.t0 < f.t0)) AS over_a_longer_wait,
+       round(avg((SELECT count(DISTINCT c2.vid) FROM c c2 JOIN fs f2 ON f2.vid = c2.vid
+                   WHERE c2.tick_seq = s.tick_seq AND c2.vid <> s.vid AND NOT c2.seated AND f2.t0 < f.t0)), 1) AS longer_waits_passed_mean,
+       round(avg((SELECT max(extract(epoch FROM s.sim_clock - f2.t0) / 60) FROM c c2 JOIN fs f2 ON f2.vid = c2.vid
+                   WHERE c2.tick_seq = s.tick_seq AND c2.vid <> s.vid AND NOT c2.seated AND f2.t0 < f.t0))::numeric) AS longest_wait_passed_min_mean
+  FROM seats s JOIN fs f ON f.vid = s.vid GROUP BY s.path ORDER BY s.path;
+
+-- (26) G458: the walk-in path's refusals for a wash bay, by what held the bays. For each decide section (4b) refusal
+--      (hold_no_space / no_free_space) at a tick, each wash bay's bookings live at that moment (booked by then, not yet
+--      released) overlapping the job's window ([t, t + 25 min) for a deep clean, [t, t + 9 min) for a wash), classed by
+--      the asking car's own, a seated car's, or a reservation whose car later came or never came. Final booking rows:
+--      a hold the reconcile moved shows where it went, not where it was (its log keeps the old window).
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('43301561-bce5-46c5-84c3-4235db4e4dd4'::uuid, 82)),
+bays AS (SELECT s.id, s.stall_code FROM public.stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'wash_bay'),
+refusals AS (
+  SELECT r.arm, r.run, d.sim_clock AS t, d.entity_id AS vehicle_id, d.proposed_action ->> 'purpose' AS purpose,
+         CASE WHEN d.proposed_action ->> 'purpose' = 'detail' THEN interval '25 min' ELSE interval '9 min' END AS dur
+    FROM runs r JOIN public.ottoq_decisions d ON d.sim_run_id = r.run
+   WHERE d.action_context = 'task_start' AND d.proposed_action ->> 'source' = 'needs_card'
+     AND d.proposed_action ->> 'stall_type' = 'wash_bay' AND d.enacted_action ->> 'verb' = 'hold_no_space'
+     AND d.enacted_action ->> 'reason' = 'no_free_space'),
+blk AS (
+  SELECT f.arm, f.run, f.t, f.vehicle_id, b.id AS bay,
+         array_agg(CASE
+           WHEN bk.vehicle_id = f.vehicle_id THEN 'own'
+           WHEN lower(bk.during) <= f.t AND bk.state IN ('active', 'done', 'interrupted') THEN 'occupied'
+           WHEN bk.state IN ('active', 'done', 'interrupted') THEN 'reserved_showed'
+           ELSE 'reserved_never_showed' END) FILTER (WHERE bk.booking_id IS NOT NULL) AS kinds
+    FROM refusals f CROSS JOIN bays b
+    LEFT JOIN public.ottoq_stall_bookings bk ON bk.sim_run_id = f.run AND bk.stall_id = b.id
+         AND bk.booked_at_sim <= f.t AND COALESCE(bk.released_at, 'infinity') > f.t
+         AND bk.during && tstzrange(f.t, f.t + f.dur, '[)')
+   GROUP BY 1, 2, 3, 4, 5),
+per AS (
+  SELECT arm, run, t, vehicle_id,
+         bool_or(kinds IS NULL) AS a_bay_free,
+         bool_or(kinds IS NOT NULL AND 'occupied' <> ALL (kinds) AND 'reserved_showed' <> ALL (kinds) AND 'own' <> ALL (kinds)) AS a_bay_blocked_only_by_no_shows,
+         bool_or(kinds IS NOT NULL AND 'own' = ANY (kinds) AND 'occupied' <> ALL (kinds) AND 'reserved_showed' <> ALL (kinds)) AS a_bay_blocked_by_own_hold,
+         count(*) FILTER (WHERE kinds IS NOT NULL AND 'occupied' = ANY (kinds)) AS bays_occupied
+    FROM blk GROUP BY 1, 2, 3, 4)
+SELECT arm, count(*) AS refusals, count(DISTINCT vehicle_id) AS cars, count(DISTINCT t) AS ticks,
+       count(*) FILTER (WHERE a_bay_free) AS with_no_blocker_in_the_final_rows,
+       count(*) FILTER (WHERE NOT a_bay_free AND a_bay_blocked_only_by_no_shows) AS bay_blocked_only_by_a_no_show,
+       count(*) FILTER (WHERE NOT a_bay_free AND NOT a_bay_blocked_only_by_no_shows AND a_bay_blocked_by_own_hold) AS bay_blocked_by_own_hold,
+       count(*) FILTER (WHERE bays_occupied = 3) AS all_three_occupied
+  FROM per GROUP BY arm ORDER BY arm;
+
+-- (27) G459: (a) the itinerary's L2 legs on each run, and how far each skipped one ended past the car's real charge;
+--      (b) the reconcile's charging blocks (BLOCKER 1) on cars that were not charging, by the blocking leg's fate.
+WITH runs(run, arm) AS (VALUES ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid, 85),
+                               ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86), ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83)),
+l2 AS (SELECT r.arm, r.run, l.vehicle_id, l.itinerary_id, l.planned_start_sim, l.planned_end_sim, l.status
+         FROM runs r JOIN public.ottoq_itinerary_legs l ON l.sim_run_id = r.run
+        WHERE l.leg_type = 'charge_l2'),
+x AS (SELECT l2.*,
+             (SELECT o.ended_at FROM public.ocpp_sessions o WHERE o.sim_run_id = l2.run AND o.vehicle_id = l2.vehicle_id
+                 AND o.ended_at >= l2.planned_start_sim - interval '3 hours' AND o.started_at <= l2.planned_end_sim
+               ORDER BY o.ended_at DESC LIMIT 1) AS real_charge_end,
+             (SELECT max(ll.planned_end_sim) FROM public.ottoq_itinerary_legs ll
+               WHERE ll.sim_run_id = l2.run AND ll.itinerary_id = l2.itinerary_id) AS itinerary_end
+        FROM l2)
+SELECT arm, count(*) AS l2_legs, count(DISTINCT vehicle_id) AS cars, count(*) FILTER (WHERE status = 'skipped') AS skipped,
+       round(avg(extract(epoch FROM planned_end_sim - planned_start_sim) / 60)) AS mean_len_min,
+       round(avg(extract(epoch FROM planned_end_sim - real_charge_end) / 60) FILTER (WHERE status = 'skipped')) AS skipped_end_past_real_min_mean,
+       round((percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM planned_end_sim - real_charge_end) / 60)
+              FILTER (WHERE status = 'skipped'))::numeric) AS p50_min,
+       count(*) FILTER (WHERE status = 'skipped' AND planned_end_sim >= itinerary_end - interval '20 min') AS skipped_within_20min_of_plan_end
+  FROM x GROUP BY arm ORDER BY arm;
+
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid, 85),
+                               ('43301561-bce5-46c5-84c3-4235db4e4dd4'::uuid, 82)),
+rl AS (SELECT r.arm, r.run, l.* FROM runs r JOIN public.bay_reservation_reconcile_2026_08_02 l ON l.sim_run_id = r.run
+        WHERE l.blocked_by LIKE 'charging%' AND l.action IN ('deferred', 'released')),
+st AS (SELECT rl.*, (SELECT e.payload -> 'diff' -> 'current_state' ->> 'to' FROM public.ottoq_events e
+                      WHERE e.sim_run_id = rl.run AND e.entity_id = rl.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                        AND e.payload -> 'diff' ? 'current_state' AND e.sim_clock_at <= rl.sim_clock
+                      ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS vstate
+       FROM rl),
+lg AS (SELECT st.*, x.leg_type, x.status AS leg_final_status
+         FROM st LEFT JOIN LATERAL (
+              SELECT l.* FROM public.ottoq_itinerary_legs l
+               WHERE l.sim_run_id = st.run AND l.vehicle_id = st.vehicle_id AND l.leg_type IN ('charge_l2', 'charge_dcfc')
+                 AND l.planned_end_sim > st.sim_clock AND (l.actual_end_sim IS NULL OR l.actual_end_sim > st.sim_clock)
+               ORDER BY l.planned_end_sim DESC LIMIT 1) x ON true
+        WHERE st.vstate NOT LIKE 'charging%')
+SELECT arm, count(*) AS blocks_on_cars_not_charging, count(DISTINCT booking_id) AS holds,
+       count(DISTINCT booking_id) FILTER (WHERE leg_final_status = 'skipped') AS holds_behind_a_leg_never_served,
+       round(avg(extract(epoch FROM new_from - old_from) / 60) FILTER (WHERE action = 'deferred')) AS mean_push_min
+  FROM lg GROUP BY arm ORDER BY arm;
+
+-- (28) G459: the rehearsal. Every charge to full on four arms, planned three ways against the real session: the rule
+--      (below 45% a fast charge at 100 kW, else an L2 at 11 kW, physics estimate), and 0745's (the kind the car can use
+--      at the depot, else the rule's kind, on the learned clock). It reads the depot's clock as it stands; after a refit
+--      the numbers move, so pin the fit (ottoq_charge_clock_fits) to reproduce 2026-10-17's reading on fit 11.
+WITH runs(run, arm, has_l2) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83, true), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86, true),
+                                      ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84, false), ('fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid, 85, false)),
+m AS (SELECT public.ottoq_charge_clock_model('11111111-1111-1111-1111-111111111111') AS ct),
+s AS (SELECT r.arm, r.has_l2, o.vehicle_id, o.soc_start, extract(epoch FROM o.ended_at - o.started_at) / 60 AS real_min,
+             CASE WHEN NOT r.has_l2 THEN 'dcfc'
+                  WHEN r.arm = 86 AND st.stall_code IN ('NASH-L2-STALL-01','NASH-L2-STALL-02','NASH-L2-STALL-03','NASH-L2-STALL-04','NASH-L2-STALL-05',
+                                                        'NASH-L2-STALL-06','NASH-L2-STALL-07','NASH-L2-STALL-08','NASH-L2-STALL-09','NASH-L2-STALL-10') THEN 'dcfc'
+                  ELSE st.stall_type::text END AS real_kind,
+             v.battery_capacity_kwh AS batt, v.inlet_max_kw AS inlet, COALESCE(v.inlet_max_kw, 150) AS inlet_p, COALESCE(v.battery_capacity_kwh, 75) AS pack_p,
+             public.ottoq_charge_clock_who(v.id, v.vehicle_class_code, v.make, v.model) AS who
+        FROM runs r JOIN public.ocpp_sessions o ON o.sim_run_id = r.run JOIN public.stalls st ON st.id = o.stall_id JOIN public.vehicles v ON v.id = o.vehicle_id
+       WHERE o.soc_end >= 99 AND o.ended_at IS NOT NULL AND o.soc_start < 99),
+e AS (SELECT s.*,
+             CASE WHEN s.soc_start < 45 THEN 'dcfc' ELSE 'l2' END AS kind_today,
+             public.ottoq_estimate_charge_minutes(s.soc_start, 100, CASE WHEN s.soc_start < 45 THEN 100 ELSE 11 END, s.inlet_p, s.pack_p, 20, 100, 1.0) AS min_today,
+             (public.ottoq_charge_clock((SELECT ct FROM m), 'dcfc', s.who, s.batt, s.soc_start, 100, 350, s.inlet, NULL) ->> 'm')::numeric AS md,
+             (public.ottoq_charge_clock((SELECT ct FROM m), 'l2', s.who, s.batt, s.soc_start, 100, 19.2, s.inlet, NULL) ->> 'm')::numeric AS ml
+        FROM s),
+f AS (SELECT e.*, CASE WHEN NOT e.has_l2 THEN 'dcfc' ELSE e.kind_today END AS kind_a FROM e)
+SELECT arm, count(*) AS charges, round(avg(real_min)::numeric, 1) AS real_mean,
+       round(100.0 * avg((kind_today = real_kind)::int), 1) AS rule_kind_pct, round(avg(abs(min_today - real_min))::numeric, 1) AS rule_mae,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(min_today - real_min)))::numeric, 1) AS rule_p90_abs,
+       round(100.0 * avg((kind_a = real_kind)::int), 1) AS clock_plan_kind_pct,
+       round(avg(abs(CASE WHEN kind_a = 'dcfc' THEN md ELSE ml END - real_min))::numeric, 1) AS clock_plan_mae,
+       round((percentile_cont(0.9) WITHIN GROUP (ORDER BY abs(CASE WHEN kind_a = 'dcfc' THEN md ELSE ml END - real_min)))::numeric, 1) AS clock_plan_p90_abs,
+       round(100.0 * avg(((CASE WHEN md <= ml THEN 'dcfc' ELSE 'l2' END) = real_kind)::int), 1) AS faster_kind_pct,
+       round(avg(abs(CASE WHEN real_kind = 'dcfc' THEN md ELSE ml END - real_min))::numeric, 1) AS clock_mae_if_kind_known
+  FROM f GROUP BY arm ORDER BY arm;
+
+-- (29) G458: the wash lane's staff cap. Each five minutes, the wash bays with a seated car, the cars staged and waiting
+--      for a wash or deep clean (their charge ended, their wash seat later), and whether section (4b) tried a walk-in at
+--      that tick. With two bays washing and no attempt, the lane's headroom (LEAST(bays, wash supervisors) less the cars
+--      in a wash or detail bay) was zero.
+WITH runs(run, arm) AS (VALUES ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83)),
+bays AS (SELECT s.id FROM public.stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'wash_bay'),
+ticks AS (SELECT r.arm, r.run, g AS t FROM runs r CROSS JOIN generate_series('2026-09-01 11:00+00'::timestamptz, '2026-09-01 22:55+00', interval '5 min') g),
+occ AS (SELECT k.arm, k.run, k.t,
+               (SELECT count(DISTINCT b.stall_id) FROM public.ottoq_stall_bookings b
+                 WHERE b.sim_run_id = k.run AND b.stall_id IN (SELECT id FROM bays) AND b.state IN ('active', 'done', 'interrupted')
+                   AND b.during @> k.t) AS washing
+          FROM ticks k),
+att AS (SELECT r.arm, d.sim_clock AS t, count(*) AS attempts
+          FROM runs r JOIN public.ottoq_decisions d ON d.sim_run_id = r.run
+         WHERE d.action_context = 'task_start' AND d.proposed_action ->> 'source' = 'needs_card'
+           AND d.proposed_action ->> 'stall_type' = 'wash_bay'
+         GROUP BY 1, 2),
+w AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS seat_at
+        FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run
+       WHERE b.stall_id IN (SELECT id FROM bays) AND b.state IN ('done', 'active', 'interrupted') AND b.booked_by LIKE 'otto_q%'),
+wq AS (SELECT w.*, (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                     WHERE o.vehicle_id = w.vehicle_id AND o.sim_run_id = w.run AND o.ended_at <= w.seat_at
+                       AND o.ended_at >= w.seat_at - interval '6 hours') AS charge_end FROM w),
+cand AS (SELECT k.arm, k.t, wq.vehicle_id,
+                (SELECT e.payload -> 'diff' -> 'current_state' ->> 'to' FROM public.ottoq_events e
+                  WHERE e.sim_run_id = k.run AND e.entity_id = wq.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                    AND e.payload -> 'diff' ? 'current_state' AND e.sim_clock_at <= k.t
+                  ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS st
+           FROM occ k JOIN wq ON wq.arm = k.arm AND wq.charge_end <= k.t AND wq.seat_at > k.t
+          WHERE k.washing = 2),
+staged AS (SELECT arm, t, count(DISTINCT vehicle_id) AS staged_waiting FROM cand WHERE st = 'staged_awaiting_service' GROUP BY 1, 2)
+SELECT o.arm,
+       count(*) FILTER (WHERE o.washing = 2 AND s.staged_waiting > 0) AS two_washing_staged_cars_waiting,
+       count(*) FILTER (WHERE o.washing = 2 AND s.staged_waiting > 0 AND a.attempts IS NULL) AS of_which_no_walk_in_tried,
+       round(avg(s.staged_waiting) FILTER (WHERE o.washing = 2 AND a.attempts IS NULL), 1) AS staged_waiting_mean_then,
+       min(o.t) FILTER (WHERE o.washing = 2 AND s.staged_waiting > 0 AND a.attempts IS NULL) - interval '5 hours' AS first_ct,
+       max(o.t) FILTER (WHERE o.washing = 2 AND s.staged_waiting > 0 AND a.attempts IS NULL) - interval '5 hours' AS last_ct
+  FROM occ o LEFT JOIN staged s ON s.arm = o.arm AND s.t = o.t LEFT JOIN att a ON a.arm = o.arm AND a.t = o.t
+ GROUP BY o.arm ORDER BY o.arm;
+
+-- (30) G449, §15: fast-charger handovers with a car waiting on several runs, split by the gap's length. A gap of 15
+--      minutes or less is a handover; a longer one is a fault or a car not yet ready. Stall types are read from stalls,
+--      so only arms whose build-out converts nothing (dcfc10) read right (query (3c)'s note).
+WITH runs(arm, rid) AS (VALUES (83, 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid), (90, '54bc3afc-2634-47f0-bc4b-4fc4c0958c26'::uuid),
+                               (91, 'fdeffed1-b46a-4bd4-96eb-771585fac035'::uuid), (92, '061069f7-9ff2-43d5-9d02-0c5a40225a93'::uuid),
+                               (93, '6768503c-8fd9-4482-8fa5-c144f875219b'::uuid)),
+s AS (
+  SELECT r.arm, x.stall_id, x.started_at, x.ended_at, x.stopped_reason,
+         lead(x.started_at) OVER (PARTITION BY r.arm, x.stall_id ORDER BY x.started_at) AS next_start
+    FROM runs r JOIN public.ocpp_sessions x ON x.sim_run_id = r.rid JOIN public.stalls st ON st.id = x.stall_id
+   WHERE st.stall_type::text = 'dcfc' AND x.started_at IS NOT NULL AND x.ended_at IS NOT NULL),
+fc_first AS (
+  SELECT r.arm, vn.arrived_at, f.started_at AS first_start
+    FROM runs r JOIN public.ottoq_visit_needs vn ON vn.sim_run_id = r.rid
+    JOIN LATERAL (SELECT y.started_at, sty.stall_type::text AS t FROM public.ocpp_sessions y JOIN public.stalls sty ON sty.id = y.stall_id
+                   WHERE y.sim_run_id = vn.sim_run_id AND y.vehicle_id = vn.vehicle_id AND y.started_at >= vn.arrived_at
+                   ORDER BY y.started_at LIMIT 1) f ON f.t = 'dcfc'),
+g AS (SELECT s.*, extract(epoch FROM (s.next_start - s.ended_at)) / 60.0 AS gap_min,
+             (SELECT count(*) FROM fc_first f WHERE f.arm = s.arm AND f.arrived_at <= s.ended_at AND f.first_start > s.ended_at) AS fc_waiting
+        FROM s WHERE s.next_start IS NOT NULL)
+SELECT g.arm, CASE WHEN gap_min <= 15 THEN 'a: handover, <= 15 min' WHEN gap_min <= 60 THEN 'b: 15-60 min' ELSE 'c: > 60 min' END AS gap,
+       count(*) AS n, min(gap_min) AS shortest_min,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY gap_min)::numeric, 2) AS p50_min,
+       round(sum(gap_min)::numeric / 60, 1) AS idle_charger_hours,
+       string_agg(DISTINCT COALESCE(g.stopped_reason, '-'), ', ') AS prior_session_stopped,
+       (SELECT round(sum(extract(epoch FROM (s2.ended_at - s2.started_at)) / 3600)::numeric, 1) FROM s s2 WHERE s2.arm = g.arm) AS charging_hours_all
+  FROM g WHERE fc_waiting > 0 GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- (31) G468, §16: the twin's site meter against what the sessions delivered and against the chargers' own readings, per
+--      run. The meter is integrated as ottoq_dial_arm_metrics integrates it (each snapshot held until the next); the
+--      readings are each tick's TransactionEvent Updated Power.Active.Import over one tick. Arms 83-95.
+WITH runs(arm, rid) AS (VALUES (83, 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid), (84, 'b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid),
+                               (85, 'fe6d540e-860f-4057-8edf-7d6257b94bff'::uuid), (86, '0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid),
+                               (89, '2e0752ff-77b3-4656-9e4f-2b64040ac6b9'::uuid), (90, '54bc3afc-2634-47f0-bc4b-4fc4c0958c26'::uuid),
+                               (91, 'fdeffed1-b46a-4bd4-96eb-771585fac035'::uuid), (92, '061069f7-9ff2-43d5-9d02-0c5a40225a93'::uuid),
+                               (93, '6768503c-8fd9-4482-8fa5-c144f875219b'::uuid), (94, 'e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid),
+                               (95, '12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid)),
+snap AS (
+  SELECT r.arm, e.timestamp AS t, e.total_ev_charging_kw AS ev_kw,
+         EXTRACT(EPOCH FROM (lead(e.timestamp) OVER (PARTITION BY r.arm ORDER BY e.timestamp) - e.timestamp)) / 3600.0 AS dt
+    FROM runs r JOIN public.site_energy_snapshots e ON e.sim_run_id = r.rid AND e.depot_id = '11111111-1111-1111-1111-111111111111'),
+upd AS (
+  SELECT r.arm, o.sim_clock_at AS t,
+         sum((SELECT (v ->> 'value')::numeric FROM jsonb_array_elements(o.payload -> 'meterValue' -> 0 -> 'sampledValue') v
+               WHERE v ->> 'measurand' = 'Power.Active.Import')) AS kw
+    FROM runs r JOIN public.ottoq_ocpp_messages o ON o.sim_run_id = r.rid AND o.message_type = 'TransactionEvent'
+   WHERE o.payload ->> 'eventType' = 'Updated' GROUP BY 1, 2),
+starts AS (SELECT r.arm, x.started_at AS t, count(*) AS n FROM runs r JOIN public.ocpp_sessions x ON x.sim_run_id = r.rid GROUP BY 1, 2),
+ends AS (SELECT r.arm, x.ended_at AS t, count(*) AS n FROM runs r JOIN public.ocpp_sessions x ON x.sim_run_id = r.rid
+          WHERE x.ended_at IS NOT NULL GROUP BY 1, 2),
+sess AS (SELECT r.arm, count(*) AS sessions, sum(x.energy_delivered_kwh) AS delivered FROM runs r
+           JOIN public.ocpp_sessions x ON x.sim_run_id = r.rid GROUP BY 1),
+j AS (
+  SELECT s.arm, s.dt, s.ev_kw, COALESCE(u.kw, 0) AS readings_at_t, (st.n IS NULL AND en.n IS NULL) AS quiet
+    FROM snap s LEFT JOIN upd u ON u.arm = s.arm AND u.t = s.t
+    LEFT JOIN starts st ON st.arm = s.arm AND st.t = s.t LEFT JOIN ends en ON en.arm = s.arm AND en.t = s.t)
+SELECT j.arm, max(ss.sessions) AS sessions, round(max(ss.delivered), 0) AS delivered_kwh,
+       round(sum(j.ev_kw * j.dt) FILTER (WHERE j.dt IS NOT NULL)::numeric, 0) AS meter_kwh,
+       round((sum(j.ev_kw * j.dt) FILTER (WHERE j.dt IS NOT NULL) / NULLIF(max(ss.delivered), 0) - 1)::numeric * 100, 1) AS meter_over_sessions_pct,
+       (SELECT round(sum(u.kw) * max(j2.dt), 0) FROM upd u, LATERAL (SELECT avg(dt) AS dt FROM snap WHERE snap.arm = j.arm) j2
+         WHERE u.arm = j.arm) AS readings_kwh,
+       round(sum(j.ev_kw - j.readings_at_t), 0) AS meter_minus_readings_kw_ticks,
+       round(sum(j.ev_kw - j.readings_at_t) FILTER (WHERE j.quiet), 0) AS of_which_on_quiet_ticks
+  FROM j JOIN sess ss ON ss.arm = j.arm GROUP BY j.arm ORDER BY j.arm;
+
+-- (32) G468, §16: the grid recomputed from the chargers' own readings (the meter's EV load replaced by the readings
+--      stamped at the same tick), against the meter: energy, the whole-day half hour and the half hour billed from 180
+--      minutes, over full half hours only (G469).
+WITH runs(arm, rid) AS (VALUES (83, 'e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid), (84, 'b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid),
+                               (86, '0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid), (93, '6768503c-8fd9-4482-8fa5-c144f875219b'::uuid),
+                               (94, 'e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid), (95, '12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid)),
+upd AS (
+  SELECT r.arm, o.sim_clock_at AS t,
+         sum((SELECT (v ->> 'value')::numeric FROM jsonb_array_elements(o.payload -> 'meterValue' -> 0 -> 'sampledValue') v
+               WHERE v ->> 'measurand' = 'Power.Active.Import')) AS kw
+    FROM runs r JOIN public.ottoq_ocpp_messages o ON o.sim_run_id = r.rid AND o.message_type = 'TransactionEvent'
+   WHERE o.payload ->> 'eventType' = 'Updated' GROUP BY 1, 2),
+s AS (
+  SELECT r.arm, e.timestamp AS t, e.grid_import_kw - e.grid_export_kw AS net_kw, e.total_ev_charging_kw AS ev_kw,
+         EXTRACT(EPOCH FROM (lead(e.timestamp) OVER (PARTITION BY r.arm ORDER BY e.timestamp) - e.timestamp)) / 3600.0 AS dt
+    FROM runs r JOIN public.site_energy_snapshots e ON e.sim_run_id = r.rid AND e.depot_id = '11111111-1111-1111-1111-111111111111'),
+c AS (
+  SELECT s.arm, s.t, s.dt, GREATEST(s.net_kw, 0) AS g_meter, GREATEST(s.net_kw - s.ev_kw + COALESCE(u.kw, 0), 0) AS g_readings
+    FROM s LEFT JOIN upd u ON u.arm = s.arm AND u.t = s.t),
+w AS (
+  SELECT c.*, min(t) OVER (PARTITION BY arm) AS t0,
+         avg(g_meter) OVER (PARTITION BY arm ORDER BY t RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS m30,
+         avg(g_readings) OVER (PARTITION BY arm ORDER BY t RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS r30,
+         count(*) OVER (PARTITION BY arm ORDER BY t RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS n30
+    FROM c)
+SELECT arm,
+       round(sum(g_meter * dt) FILTER (WHERE dt IS NOT NULL)::numeric, 0) AS grid_kwh_meter,
+       round(sum(g_readings * dt) FILTER (WHERE dt IS NOT NULL)::numeric, 0) AS grid_kwh_readings,
+       round(max(m30) FILTER (WHERE n30 >= 6)::numeric, 1) AS day_half_hour_meter,
+       round(max(r30) FILTER (WHERE n30 >= 6)::numeric, 1) AS day_half_hour_readings,
+       round(max(m30) FILTER (WHERE n30 >= 6 AND t >= t0 + interval '180 minutes')::numeric, 1) AS billed_half_hour_meter,
+       round(max(r30) FILTER (WHERE n30 >= 6 AND t >= t0 + interval '180 minutes')::numeric, 1) AS billed_half_hour_readings
+  FROM w GROUP BY arm ORDER BY arm;
+-- n30 >= 6 assumes a 5-minute tick; at 2.5 minutes ask for 12.
+
+-- (33) G469, §17: the arms whose half hour billed from 180 minutes starts in the run's last half hour, and that half hour
+--      over full windows wherever the arm's run is still on record (its snapshots are run-scoped and the purge takes them).
+WITH a AS (
+  SELECT a.arm_id, a.sim_run_id, s.sweep_code,
+         (a.arm_metrics ->> 'ticks')::numeric * (a.arm_metrics ->> 'sim_min_per_tick')::numeric AS run_min,
+         (a.arm_metrics ->> 'sim_min_per_tick')::numeric AS step_min,
+         (a.arm_metrics #>> '{peak_after_open,starts_min,180}')::numeric AS billed_start_min,
+         (a.arm_metrics #>> '{peak_after_open,peak_30min_kw,180}')::numeric AS billed_kw,
+         (a.arm_metrics #>> '{peak_after_open,demand_charge_usd_month,180}')::numeric AS billed_usd
+    FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
+   WHERE a.complete AND a.arm_metrics ? 'peak_after_open'),
+p AS (SELECT * FROM a WHERE billed_start_min > run_min - 30),
+w AS (
+  SELECT p.arm_id, e.timestamp AS t,
+         avg(GREATEST(COALESCE(e.grid_import_kw, 0), 0)) OVER (PARTITION BY p.arm_id ORDER BY e.timestamp
+             RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS g30,
+         count(*) OVER (PARTITION BY p.arm_id ORDER BY e.timestamp
+             RANGE BETWEEN CURRENT ROW AND interval '29 minutes 59 seconds' FOLLOWING) AS n30,
+         min(e.timestamp) OVER (PARTITION BY p.arm_id) AS t0, p.step_min
+    FROM p JOIN public.site_energy_snapshots e ON e.sim_run_id = p.sim_run_id AND e.depot_id = '11111111-1111-1111-1111-111111111111')
+SELECT (SELECT count(*) FROM a) AS arms_with_after_open, p.arm_id, p.sweep_code, p.run_min, p.billed_start_min, p.billed_kw, p.billed_usd,
+       (SELECT round(max(w.g30)::numeric, 1) FROM w WHERE w.arm_id = p.arm_id AND w.n30 * w.step_min >= 30
+           AND w.t >= w.t0 + interval '180 minutes') AS billed_kw_full_windows
+  FROM p ORDER BY p.arm_id;
+
+-- (34) G470, §15: EN.001's refusals per arm at both of its probes, the charge start and the decide's seat assignment, with
+--      the meter it judged and whether the meter alone was over the cap. Under 0729 the charge start reads a held
+--      site's limit (managed_limit_kw in its context); the seat assignment's context carries none.
+WITH arms AS (
+  SELECT a.arm_id, a.sim_run_id, c.cell_code
+    FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c ON c.cell_id = a.cell_id
+   WHERE a.arm_id IN (85, 89))
+SELECT a.arm_id, a.cell_code, e.action_context, count(*) AS refused,
+       count(*) FILTER (WHERE (e.result_payload ->> 'current_kw')::numeric <= (e.result_payload ->> 'engineering_cap_kw')::numeric)
+         AS meter_at_or_under_cap,
+       count(*) FILTER (WHERE e.context ? 'managed_limit_kw') AS judged_on_a_held_limit,
+       round(min((e.result_payload ->> 'current_kw')::numeric), 1) AS meter_min_kw,
+       round(max((e.result_payload ->> 'current_kw')::numeric), 1) AS meter_max_kw,
+       round(avg((e.result_payload ->> 'requested_kw')::numeric), 1) AS mean_request_kw,
+       min(to_char((e.context ->> 'now_ts')::timestamptz AT TIME ZONE 'America/Chicago', 'HH24:MI')) AS first_ct,
+       max(to_char((e.context ->> 'now_ts')::timestamptz AT TIME ZONE 'America/Chicago', 'HH24:MI')) AS last_ct
+  FROM arms a JOIN public.ottoq_rule_evaluations e ON e.sim_run_id = a.sim_run_id
+ WHERE e.rule_code = 'EN.001.grid_capacity_ceiling' AND NOT e.passed
+ GROUP BY 1, 2, 3 ORDER BY 1, 3;
+
+-- (35) G458, §18 point 3: each five minutes on one run (arm 95 here; substitute the run), the wash bays with nothing booked
+--      on them while a car waited (its charge ended, its wash seat later), by the lane at that tick: two bays washing
+--      (the staff cap), fewer washing with no waiting car staged, fewer washing with a waiting car staged. Each waiting
+--      car's state is read from its own state-change events as intervals, so the query reads each car's events once.
+WITH p AS (SELECT '12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid AS run),
+bays AS (SELECT s.id FROM public.stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'wash_bay'),
+bk AS (SELECT b.* FROM public.ottoq_stall_bookings b, p WHERE b.sim_run_id = p.run AND b.stall_id IN (SELECT id FROM bays)),
+wq AS (SELECT b.vehicle_id, lower(b.during) AS seat_at,
+              (SELECT max(o.ended_at) FROM public.ocpp_sessions o, p WHERE o.vehicle_id = b.vehicle_id AND o.sim_run_id = p.run AND o.ended_at <= lower(b.during)) AS charge_end
+         FROM bk b WHERE b.state IN ('done', 'active', 'interrupted') AND b.booked_by LIKE 'otto_q%'),
+ev AS (SELECT e.entity_id AS vehicle_id, e.sim_clock_at AS t0,
+              lead(e.sim_clock_at, 1, 'infinity') OVER (PARTITION BY e.entity_id ORDER BY e.sim_clock_at, e.event_seq) AS t1,
+              e.payload -> 'diff' -> 'current_state' ->> 'to' AS st
+         FROM public.ottoq_events e, p
+        WHERE e.sim_run_id = p.run AND e.event_type = 'vehicle.state_changed' AND e.payload -> 'diff' ? 'current_state'
+          AND e.entity_id IN (SELECT vehicle_id FROM wq)),
+grid AS (SELECT g AS t FROM generate_series('2026-09-01 11:00+00'::timestamptz, '2026-09-01 22:55+00', interval '5 min') g),
+occ AS (SELECT g.t,
+               (SELECT count(DISTINCT bk.stall_id) FROM bk WHERE bk.state IN ('done', 'active', 'interrupted') AND bk.during @> g.t) AS washing,
+               (SELECT count(DISTINCT bk.stall_id) FROM bk WHERE (bk.state IN ('done', 'active', 'interrupted')
+                        OR (bk.state IN ('released', 'superseded') AND COALESCE(bk.released_at, 'infinity') > g.t)) AND bk.during @> g.t) AS held_any
+          FROM grid g),
+wst AS (SELECT o.t, o.washing, o.held_any, wq.vehicle_id, ev.st
+          FROM occ o JOIN wq ON wq.charge_end <= o.t AND wq.seat_at > o.t
+          LEFT JOIN ev ON ev.vehicle_id = wq.vehicle_id AND ev.t0 <= o.t AND ev.t1 > o.t),
+pt AS (SELECT t, max(washing) AS washing, max(held_any) AS held_any,
+              count(DISTINCT vehicle_id) FILTER (WHERE st = 'staged_awaiting_service') AS staged
+         FROM wst GROUP BY t)
+SELECT sum(3 - held_any) AS free_bay_ticks_while_waiting,
+       sum(3 - held_any) FILTER (WHERE washing >= 2) AS two_washing,
+       sum(3 - held_any) FILTER (WHERE washing < 2 AND staged = 0) AS under_two_none_staged,
+       sum(3 - held_any) FILTER (WHERE washing < 2 AND staged > 0) AS under_two_some_staged
+  FROM pt;
+
+-- (36) G472, §18 point 5: section (4b)'s walk-ins refused because the assignment raised, per arm, by SQLSTATE; and whether
+--      the car's charge ended in that very tick. The message is not on the row: ottoq_enact_space_assignment's catch-all
+--      returns the SQLSTATE only, and the message reaches the server log, read there with
+--        select timestamp, event_message from logs where source = 'postgres_logs'
+--         and event_message like '%ottoq_enact_space_assignment: FAILED%' order by timestamp desc
+--      (and, for G471's calendar, '%ottoq_activate_due_bay_reservations: FAILED%'), while the log is retained.
+WITH runs(run, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                               ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93),
+                               ('e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid, 94), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95))
+SELECT r.arm, d.proposed_action ->> 'stall_type' AS stall_type, d.enacted_action ->> 'sqlstate' AS sqlstate, count(*) AS refusals,
+       count(DISTINCT d.entity_id) AS cars,
+       count(*) FILTER (WHERE (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                                WHERE o.sim_run_id = r.run AND o.vehicle_id = d.entity_id AND o.ended_at <= d.sim_clock) = d.sim_clock)
+         AS charge_ended_that_tick
+  FROM runs r JOIN public.ottoq_decisions d ON d.sim_run_id = r.run
+ WHERE d.action_context = 'task_start' AND d.proposed_action ->> 'source' = 'needs_card'
+   AND d.enacted_action ->> 'verb' = 'hold_no_space' AND d.enacted_action ->> 'reason' = 'exception'
+ GROUP BY 1, 2, 3 ORDER BY 2, 1;
+
+-- (37) G472, §18 point 5: each wash or service bay seat by the minutes from its car's last charge end: in that tick, one
+--      tick later, two, or more.
+WITH runs(run, arm) AS (VALUES ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95),
+                               ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93)),
+seat AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS seat_at
+           FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run JOIN public.stalls s ON s.id = b.stall_id
+          WHERE s.stall_type IN ('wash_bay', 'service_bay') AND b.state IN ('done', 'active', 'interrupted') AND b.booked_by LIKE 'otto_q%'),
+x AS (SELECT seat.*, (SELECT max(o.ended_at) FROM public.ocpp_sessions o
+                       WHERE o.sim_run_id = seat.run AND o.vehicle_id = seat.vehicle_id AND o.ended_at <= seat.seat_at) AS charge_end FROM seat)
+SELECT arm, count(*) AS bay_seats,
+       count(*) FILTER (WHERE seat_at = charge_end) AS in_the_charge_end_tick,
+       count(*) FILTER (WHERE seat_at - charge_end > interval '0' AND seat_at - charge_end <= interval '5 min') AS one_tick_later,
+       count(*) FILTER (WHERE seat_at - charge_end > interval '5 min' AND seat_at - charge_end <= interval '10 min') AS two_ticks_later,
+       count(*) FILTER (WHERE seat_at - charge_end > interval '10 min') AS later,
+       count(*) FILTER (WHERE charge_end IS NULL) AS no_charge_before
+  FROM x GROUP BY arm ORDER BY arm;
+
+-- (38) G460, §18 point 1: each bay seat's timer, from the seat's own state-change event, against the booking that covers
+--      it (db/checks/0452 queries (1) and (2), per arm); then any bay that held two cars at once. A seat whose event
+--      carries no last_state_change is counted in n and timed by neither column.
+WITH runs(sim_run_id, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                                      ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93),
+                                      ('e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid, 94), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95)),
+seats AS (
+  SELECT r.arm, e.sim_run_id, e.entity_id AS vehicle_id, e.payload->'diff'->'current_state'->>'to' AS bay,
+         (e.payload->'diff'->'last_state_change'->>'to')::timestamptz AS seat_at,
+         (e.payload->'diff'->'config'->'to'->>'service_ends_at')::timestamptz AS ends_at
+    FROM ottoq_events e JOIN runs r ON r.sim_run_id = e.sim_run_id
+   WHERE e.event_type = 'vehicle.state_changed'
+     AND e.payload->'diff'->'current_state'->>'to' IN ('in_wash_bay','in_detail_bay','in_service_bay')
+     AND e.payload->'diff'->'config'->'to' ? 'service_ends_at'),
+j AS (SELECT s.*, extract(epoch from s.ends_at - s.seat_at)/60.0 AS timer_min,
+             extract(epoch from s.seat_at - lower(b.during))/60.0 AS seat_after_book_lo,
+             extract(epoch from upper(b.during) - lower(b.during))/60.0 AS booked_min,
+             (upper(b.during) = s.ends_at) AS ends_at_booking_end
+        FROM seats s LEFT JOIN LATERAL (
+          SELECT b.* FROM ottoq_stall_bookings b
+           WHERE b.sim_run_id = s.sim_run_id AND b.vehicle_id = s.vehicle_id AND b.purpose IN ('wash','detail','service')
+             AND b.during @> s.seat_at ORDER BY lower(b.during) DESC LIMIT 1) b ON true)
+SELECT arm, bay, count(*) n,
+  round(avg(timer_min)::numeric,1) timer_mean, round(percentile_cont(0.1) within group (order by timer_min)::numeric,1) p10,
+  round(percentile_cont(0.5) within group (order by timer_min)::numeric,1) p50,
+  round(percentile_cont(0.9) within group (order by timer_min)::numeric,1) p90,
+  round(avg(booked_min)::numeric,1) booked_mean, count(*) FILTER (WHERE ends_at_booking_end) ends_at_booking_end,
+  round(avg(seat_after_book_lo)::numeric,1) mean_seat_after_booking_start
+FROM j GROUP BY 1,2 ORDER BY 2,1;
+
+WITH runs(sim_run_id, arm) AS (VALUES ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('0b0d45c2-b777-410c-b4b2-d6bce5a502bd'::uuid, 86),
+                                      ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93),
+                                      ('e8b068d2-6dda-4643-a59a-9c2ff37d784e'::uuid, 94), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95)),
+seats AS (
+  SELECT r.arm, e.sim_run_id, e.entity_id AS vehicle_id,
+         COALESCE((e.payload->'diff'->'last_state_change'->>'to')::timestamptz, e.sim_clock_at) AS seat_at
+    FROM ottoq_events e JOIN runs r ON r.sim_run_id = e.sim_run_id
+   WHERE e.event_type = 'vehicle.state_changed'
+     AND e.payload->'diff'->'current_state'->>'to' IN ('in_wash_bay','in_detail_bay','in_service_bay')
+     AND e.payload->'diff'->'config'->'to' ? 'service_ends_at'),
+st AS (
+  SELECT s.*, (SELECT min(e2.sim_clock_at) FROM ottoq_events e2
+                WHERE e2.sim_run_id = s.sim_run_id AND e2.entity_id = s.vehicle_id AND e2.event_type = 'vehicle.state_changed'
+                  AND e2.payload->'diff' ? 'current_state' AND e2.sim_clock_at > s.seat_at) AS left_at, b.stall_id
+    FROM seats s LEFT JOIN LATERAL (
+      SELECT b.stall_id FROM ottoq_stall_bookings b
+       WHERE b.sim_run_id = s.sim_run_id AND b.vehicle_id = s.vehicle_id AND b.purpose IN ('wash','detail','service')
+         AND b.state IN ('active', 'done', 'interrupted') AND b.during @> s.seat_at
+       ORDER BY lower(b.during) DESC LIMIT 1) b ON true)
+SELECT a.arm, count(*) AS bays_holding_two_cars
+  FROM st a JOIN st b ON b.arm = a.arm AND b.stall_id = a.stall_id AND b.vehicle_id <> a.vehicle_id
+       AND b.seat_at > a.seat_at AND b.seat_at < a.left_at
+ GROUP BY a.arm ORDER BY a.arm;
+
+-- (39) G471, §18 point 4: the wash and service no-shows whose car was idle in the depot at its slot, by the car's state
+--      and the kind of stall it was on, both from its own state-change events.
+WITH runs(run, arm) AS (VALUES ('b54f6de5-7cf3-4d91-a0d1-0010a21fec64'::uuid, 84), ('12c6fd31-1b1c-4fa9-9ce8-c4d6103d955b'::uuid, 95),
+                               ('e7d5824c-2186-4e2c-a2aa-99ba7d89c3bd'::uuid, 83), ('6768503c-8fd9-4482-8fa5-c144f875219b'::uuid, 93)),
+ns AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS lo
+         FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run JOIN public.stalls s ON s.id = b.stall_id
+        WHERE s.stall_type IN ('wash_bay', 'service_bay') AND b.state = 'released'
+          AND b.release_reason IN ('no_show_grace_elapsed', 'window_elapsed')),
+x AS (SELECT ns.*,
+             (SELECT e.payload -> 'diff' -> 'current_state' ->> 'to' FROM public.ottoq_events e
+               WHERE e.sim_run_id = ns.run AND e.entity_id = ns.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                 AND e.payload -> 'diff' ? 'current_state' AND e.sim_clock_at <= ns.lo
+               ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS car_state,
+             (SELECT (e.payload -> 'diff' -> 'current_stall_id' ->> 'to')::uuid FROM public.ottoq_events e
+               WHERE e.sim_run_id = ns.run AND e.entity_id = ns.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                 AND e.payload -> 'diff' ? 'current_stall_id' AND e.sim_clock_at <= ns.lo
+               ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS car_stall
+        FROM ns)
+SELECT x.arm, x.car_state, COALESCE(s2.stall_type::text, 'none') AS car_on, count(*) AS no_shows
+  FROM x LEFT JOIN public.stalls s2 ON s2.id = x.car_stall
+ WHERE x.car_state IN ('staged_awaiting_service', 'charge_complete_holding', 'arrived_at_gate', 'service_complete_holding')
+ GROUP BY 1, 2, 3 ORDER BY 1, 4 DESC;
+
+-- (40) G473, §19: the arms that ran past 35 minutes of their own transaction, and what the disposer expired as
+--      'ttl_elapsed'; then per arm; then, for two arms of one seed (93 and 96 here; substitute any pair), the decisions
+--      that differ, counted per (tick, car, outcome, verb, engine). ran_at is stamped at the arm's end, and every
+--      proposal of an arm carries its transaction's start, so ran_at - min(created_at) is the arm's age at its end. The
+--      transaction of an arm in flight: select pid, xact_start, now() - xact_start from pg_stat_activity
+--      where query ilike '%ottoq_throughput_sweep_runner%'.
+WITH arm AS (
+  SELECT a.arm_id, a.ran_at, count(p.*) AS props, min(p.created_at) AS c0,
+         count(*) FILTER (WHERE p.disposition_reason = 'ttl_elapsed') AS ttl,
+         count(*) FILTER (WHERE p.disposition_reason = 'ttl_elapsed' AND p.disposed_at - p.created_at < interval '35 minutes') AS ttl_under_35
+    FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_external_proposals p ON p.sim_run_id = a.sim_run_id
+   GROUP BY a.arm_id, a.ran_at)
+SELECT (ran_at - c0 > interval '35 minutes') AS ran_past_35, (ttl > 0) AS expired_some, count(*) AS arms,
+       sum(props) AS proposals, sum(ttl) AS ttl_elapsed, sum(ttl_under_35) AS ttl_under_35,
+       string_agg(arm_id::text, ',' ORDER BY arm_id) FILTER (WHERE ttl = 0 AND ran_at - c0 > interval '35 minutes') AS past_35_none_expired
+  FROM arm GROUP BY 1, 2 ORDER BY 1, 2;
+
+SELECT a.arm_id, s.sweep_code, round(a.wall_s) AS wall_s, count(p.*) AS proposals, count(DISTINCT p.created_at) AS distinct_created_at,
+       round(extract(epoch FROM a.ran_at - min(p.created_at)) / 60.0, 1) AS minutes_first_stamp_to_end,
+       count(*) FILTER (WHERE p.disposition_reason = 'ttl_elapsed') AS ttl_elapsed,
+       min(p.tick_seq) FILTER (WHERE p.disposition_reason = 'ttl_elapsed') AS first_ttl_tick,
+       round(min(extract(epoch FROM p.disposed_at - p.created_at) / 60.0) FILTER (WHERE p.disposition_reason = 'ttl_elapsed'), 1) AS min_wall_min,
+       count(*) FILTER (WHERE p.disposition_reason = 'ttl_elapsed' AND p.disposed_tick = p.tick_seq) AS expired_in_birth_tick
+  FROM public.ottoq_throughput_sweep_arms a
+  JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
+  JOIN public.ottoq_external_proposals p ON p.sim_run_id = a.sim_run_id
+ GROUP BY a.arm_id, s.sweep_code, a.wall_s, a.ran_at
+ ORDER BY a.arm_id;
+
+WITH r AS (SELECT arm_id, sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id IN (93, 96)),
+d AS (SELECT r.arm_id, d.tick_seq, d.entity_id, d.action_context,
+             d.outcome_status || ':' || COALESCE(d.proposed_action ->> 'verb', '-') || '/'
+               || COALESCE(d.proposed_action ->> 'l2_engine', d.proposed_action ->> 'source', '-') || '->'
+               || COALESCE(d.enacted_action ->> 'verb', '-') AS k
+        FROM r JOIN public.ottoq_decisions d ON d.sim_run_id = r.sim_run_id),
+c AS (SELECT tick_seq, entity_id, action_context, k,
+             count(*) FILTER (WHERE arm_id = 93) AS n_first, count(*) FILTER (WHERE arm_id = 96) AS n_second
+        FROM d GROUP BY 1, 2, 3, 4)
+SELECT tick_seq, entity_id, action_context, k, n_first, n_second
+  FROM c WHERE n_first <> n_second ORDER BY tick_seq, entity_id, k;
+
+-- (41) G473, §19: each dial pair's proposals and 'ttl_elapsed' expiries, control (arm A, the dial at 0, run first) against
+--      treatment (arm B, run second in the same transaction), with each arm's own wall seconds and whether both arms'
+--      proposals carry one stamp.
+SELECT l.pair_id, e.experiment_id, e.param_key, e.status, l.ran_at, round(l.wall_s) AS pair_wall_s,
+       l.metrics_a ->> 'dial_value' AS dial_a, l.metrics_b ->> 'dial_value' AS dial_b,
+       l.metrics_a ->> 'wall_s' AS wall_a, l.metrics_b ->> 'wall_s' AS wall_b, l.moved,
+       (SELECT count(*) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_a) AS props_a,
+       (SELECT count(*) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_a AND p.disposition_reason = 'ttl_elapsed') AS ttl_a,
+       (SELECT count(*) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_b) AS props_b,
+       (SELECT count(*) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_b AND p.disposition_reason = 'ttl_elapsed') AS ttl_b,
+       (SELECT min(p.created_at) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_a)
+         = (SELECT min(p.created_at) FROM public.ottoq_external_proposals p WHERE p.sim_run_id = l.run_b) AS one_stamp
+  FROM public.ottoq_dial_pair_ledger l JOIN public.ottoq_dial_experiments e ON e.experiment_id = l.experiment_id
+ ORDER BY l.ran_at;
+
+-- (42) G474, §20: the bay bookings the release closed as interrupted, with the service flow's completion of the same car
+--      in the same tick (credited atoms, on a null timer or not), the minutes planned and used, per arm.
+WITH r AS (SELECT arm_id, sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id BETWEEN 82 AND 97),
+bi AS (SELECT r.arm_id, r.sim_run_id, e.entity_id AS car, e.sim_clock_at AS t, e.payload AS p
+         FROM r JOIN public.ottoq_events e ON e.sim_run_id = r.sim_run_id
+        WHERE e.event_type = 'ottoq.booking_interrupted')
+SELECT bi.arm_id, bi.car, bi.t, bi.p ->> 'purpose' AS purpose, bi.p ->> 'source' AS source,
+       (bi.p ->> 'planned_min')::numeric AS planned_min, (bi.p ->> 'actual_min')::numeric AS used_min,
+       (bi.p ->> 'completion_ratio')::numeric AS ratio, bi.p ->> 'atoms_reopened' AS atoms_reopened,
+       sc.payload -> 'credited' AS credited_same_tick, sc.payload ->> 'self_healed' AS null_timer
+  FROM bi LEFT JOIN LATERAL (
+         SELECT s.payload FROM public.ottoq_events s
+          WHERE s.sim_run_id = bi.sim_run_id AND s.entity_id = bi.car AND s.event_type = 'twin.service_completed'
+            AND s.sim_clock_at = bi.t LIMIT 1) sc ON true
+ ORDER BY bi.arm_id, bi.t;
+
+-- (43) G474, §20: what the engine books for a wash, a detail and a service seat in tick (arm 95; the done bookings'
+--      windows are clipped to the car's exit, which in tick is the booking's end), and the twin's deals behind a seat's
+--      minutes: the share of wash deals at or under 1.0 (a robotic wash at or under 5.0 minutes) and of detail deals at
+--      or under 0.8636 (a robotic detail at or under 15.0 minutes).
+WITH r AS (SELECT sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id = 95)
+SELECT b.purpose, count(*) AS done_bookings,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM upper(b.during) - lower(b.during)) / 60)::numeric, 1) AS p50_min
+  FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id, r
+ WHERE b.sim_run_id = r.sim_run_id AND s.stall_type IN ('wash_bay', 'service_bay') AND b.state = 'done'
+ GROUP BY 1 ORDER BY 1;
+
+SELECT c.var_key, count(*) AS cards, round(min(c.value), 3) AS min_v, round(max(c.value), 3) AS max_v,
+       round(avg((c.value <= 1.0)::int)::numeric, 3) AS share_le_1_0,
+       round(avg((c.value <= 0.8636)::int)::numeric, 3) AS share_le_0_864
+  FROM public.ottoq_variability_cards c
+ WHERE c.var_key IN ('wash_time', 'detail_time')
+   AND c.sim_run_id IN (SELECT sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id BETWEEN 82 AND 97)
+ GROUP BY 1;
+
+-- (44) G474, §20: section (5)'s promote_ready verdicts filed with must-do bay work still open, per arm, and, on arm 82, the
+--      cars that staged to leave after one, with the state of the work they were promoted past.
+SELECT a.arm_id,
+       count(*) FILTER (WHERE d.proposed_action ->> 'verb' = 'promote_ready') AS promote_ready,
+       count(*) FILTER (WHERE d.proposed_action ->> 'verb' = 'promote_ready'
+                          AND d.proposed_action -> 'rationale' ->> 'must_do_outstanding' = 'true') AS with_must_do_open,
+       count(DISTINCT d.entity_id) FILTER (WHERE d.proposed_action ->> 'verb' = 'promote_ready'
+                          AND d.proposed_action -> 'rationale' ->> 'must_do_outstanding' = 'true') AS cars
+  FROM public.ottoq_throughput_sweep_arms a
+  JOIN public.ottoq_decisions d ON d.sim_run_id = a.sim_run_id AND d.action_context = 'task_start'
+ WHERE a.arm_id IN (82, 83, 84, 93, 95, 96, 97)
+ GROUP BY 1 ORDER BY 1;
+
+WITH r AS (SELECT sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id = 82),
+v AS (SELECT d.entity_id AS car, min(d.sim_clock) AS first_defer
+        FROM public.ottoq_decisions d, r
+       WHERE d.sim_run_id = r.sim_run_id AND d.action_context = 'task_start'
+         AND d.proposed_action ->> 'verb' = 'promote_ready'
+         AND d.proposed_action -> 'rationale' ->> 'must_do_outstanding' = 'true'
+       GROUP BY 1),
+dep AS (SELECT v.*, (SELECT min(e.sim_clock_at) FROM public.ottoq_events e, r
+                      WHERE e.sim_run_id = r.sim_run_id AND e.entity_id = v.car AND e.event_type = 'vehicle.state_changed'
+                        AND e.payload -> 'diff' -> 'current_state' ->> 'to' IN ('deployed', 'staged_for_departure', 'en_route_to_work')
+                        AND e.sim_clock_at > v.first_defer) AS left_at
+          FROM v)
+SELECT dep.car, dep.first_defer, dep.left_at,
+       (SELECT string_agg(n.visit_key || '=' || n.status || ':' ||
+                (SELECT string_agg(a ->> 'svc' || '/' || COALESCE(a ->> 'status', 'pending') || '/' || COALESCE(a ->> 'done_at', '-'), ';')
+                   FROM jsonb_array_elements(n.atoms) a
+                  WHERE a ->> 'svc' IN ('mechanical_pm', 'sensor_calibration', 'cosmetic_repair', 'fault_repair')), ' | ')
+          FROM public.ottoq_visit_needs n, r WHERE n.sim_run_id = r.sim_run_id AND n.vehicle_id = dep.car) AS bay_work
+  FROM dep WHERE dep.left_at IS NOT NULL ORDER BY dep.left_at;
+
+-- (45) G474, §20: the ten bookings the release filed interrupted on arms 82-97, with whether 0757's test finds their
+--      completion (the car's twin.service_completed in the run since the booking began, recorded no earlier than the
+--      booking was made, not on a null timer, out of a bay that does every atom of the booking's purpose), and whether the
+--      release ran on the events' clock (released_at against the interruption's sim_clock_at).
+WITH r AS (SELECT arm_id, sim_run_id FROM public.ottoq_throughput_sweep_arms WHERE arm_id BETWEEN 82 AND 97),
+bi AS (SELECT r.arm_id, e.sim_run_id, e.entity_id AS car, e.sim_clock_at, (e.payload ->> 'booking_id')::uuid AS booking_id
+         FROM r JOIN public.ottoq_events e ON e.sim_run_id = r.sim_run_id
+        WHERE e.event_type = 'ottoq.booking_interrupted')
+SELECT bi.arm_id, left(bi.car::text, 8) AS car, b.purpose, bi.sim_clock_at, (b.released_at = bi.sim_clock_at) AS same_clock,
+       lower(b.during) AS lo,
+       (SELECT count(*) FROM public.ottoq_events s
+         WHERE s.entity_type = 'vehicle' AND s.entity_id = bi.car AND s.occurred_at >= b.booked_at
+           AND s.sim_run_id = bi.sim_run_id AND s.event_type = 'twin.service_completed'
+           AND s.sim_clock_at > lower(b.during) AND s.sim_clock_at <= b.released_at
+           AND NOT COALESCE((s.payload ->> 'self_healed')::boolean, false)
+           AND (s.payload -> 'bay_capable') @> to_jsonb(ottoq.ottoq_bay_purpose_atoms(b.purpose))) AS completions_0757_reads
+  FROM bi JOIN public.ottoq_stall_bookings b ON b.booking_id = bi.booking_id
+ ORDER BY bi.arm_id, bi.sim_clock_at;
+
+-- (46) G452, G453, §12: each promise arm's promises split by how much of their after-charge allowance was a lower
+--      bound (detail after_lb: the allowance's 21 grid points the Kaplan-Meier curve did not reach; 3 or more and the
+--      p90 is a bound, 11 or more and the median is), graded as the grade does (a car never ready is a miss once its
+--      time passed before the run's end), with how far past its p90 a late car was and, for a car never ready, how far
+--      past it the run ended.
+WITH run AS (SELECT s.sweep_code, a.sim_run_id, r.sim_clock_current AS run_end
+               FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+               JOIN public.ottoq_sim_runs r ON r.sim_run_id = a.sim_run_id
+              WHERE s.sweep_code IN ('promise_busy_2026_10_17', 'promise_normal_2026_10_17')),
+p AS (SELECT run.sweep_code, run.run_end, pr.*, COALESCE((pr.detail ->> 'after_lb')::int, 0) AS lb,
+             (SELECT (x ->> 'done_at')::timestamptz FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+               WHERE vn.visit_id = pr.visit_id AND x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at
+        FROM public.ottoq_ready_promises pr JOIN run USING (sim_run_id)),
+q AS (SELECT p.*, CASE WHEN lb = 0 THEN '0 none' WHEN lb < 3 THEN '1-2 above p90' WHEN lb < 11 THEN '3-10 p90 is a bound'
+                       ELSE '11-21 p50 is a bound' END AS lb_group FROM p)
+SELECT sweep_code, lb_group, count(*) AS promises, count(ready_at) AS ready,
+       round(avg(CASE WHEN ready_at IS NOT NULL THEN (ready_at <= ready_p50_at)::int WHEN ready_p50_at < run_end THEN 0 END)::numeric, 3) AS by_p50,
+       round(avg(CASE WHEN ready_at IS NOT NULL THEN (ready_at <= ready_p90_at)::int WHEN ready_p90_at < run_end THEN 0 END)::numeric, 3) AS by_p90,
+       count(*) FILTER (WHERE ready_at > ready_p90_at) AS ready_late_p90,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM ready_at - ready_p90_at) / 60)
+             FILTER (WHERE ready_at > ready_p90_at)::numeric, 0) AS late_p90_median_min,
+       round(max(extract(epoch FROM ready_at - ready_p90_at) / 60) FILTER (WHERE ready_at > ready_p90_at)::numeric, 0) AS late_p90_max_min,
+       count(*) FILTER (WHERE ready_at IS NULL AND ready_p90_at < run_end) AS never_ready_p90_passed,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM run_end - ready_p90_at) / 60)
+             FILTER (WHERE ready_at IS NULL AND ready_p90_at < run_end)::numeric, 0) AS never_ready_at_least_late_median_min
+  FROM q GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- (47) G453, §12: the calendar's floor on the promise rehearsed on the promise arms. For each promise whose car had a
+--      bay booking made in its arrival tick (the booking's original end, read through the reconcile log), the p50 and
+--      p90 floored at that end plus 5 minutes (the 3-minute readiness check, to the tick), graded as the grade does.
+WITH run AS (SELECT s.sweep_code, a.sim_run_id, r.sim_clock_current AS run_end
+               FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+               JOIN public.ottoq_sim_runs r ON r.sim_run_id = a.sim_run_id
+              WHERE s.sweep_code IN ('promise_busy_2026_10_17', 'promise_normal_2026_10_17')),
+p AS (SELECT run.sweep_code, run.run_end, pr.*,
+             (SELECT (x ->> 'done_at')::timestamptz FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+               WHERE vn.visit_id = pr.visit_id AND x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at,
+             (SELECT max(COALESCE((SELECT r.old_to FROM public.bay_reservation_reconcile_2026_08_02 r WHERE r.booking_id = b.booking_id
+                                    ORDER BY r.sim_clock, r.defer_seq LIMIT 1), upper(b.during)))
+                FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id
+               WHERE b.sim_run_id = pr.sim_run_id AND b.vehicle_id = pr.vehicle_id AND s.stall_type::text IN ('wash_bay', 'service_bay')
+                 AND b.booked_at_sim BETWEEN pr.arrived_at - interval '1 minute' AND pr.arrived_at + interval '5 minutes') AS floor_at
+        FROM public.ottoq_ready_promises pr JOIN run USING (sim_run_id)),
+f AS (SELECT p.*, GREATEST(ready_p90_at, floor_at + interval '5 minutes') AS p90_floored,
+             GREATEST(ready_p50_at, floor_at + interval '5 minutes') AS p50_floored FROM p)
+SELECT sweep_code, count(*) FILTER (WHERE floor_at IS NOT NULL) AS booked,
+       count(*) FILTER (WHERE floor_at IS NOT NULL AND ready_p90_at < floor_at + interval '5 minutes') AS floor_moves_p90,
+       count(*) FILTER (WHERE floor_at IS NOT NULL AND ready_p50_at < floor_at + interval '5 minutes') AS floor_moves_p50,
+       round(avg(CASE WHEN ready_at IS NOT NULL THEN (ready_at <= ready_p90_at)::int WHEN ready_p90_at < run_end THEN 0 END)
+             FILTER (WHERE floor_at IS NOT NULL)::numeric, 3) AS booked_by_p90,
+       round(avg(CASE WHEN ready_at IS NOT NULL THEN (ready_at <= p90_floored)::int WHEN p90_floored < run_end THEN 0 END)
+             FILTER (WHERE floor_at IS NOT NULL)::numeric, 3) AS booked_by_p90_floored,
+       round(avg(CASE WHEN ready_at IS NOT NULL THEN (ready_at <= ready_p50_at)::int WHEN ready_p50_at < run_end THEN 0 END)
+             FILTER (WHERE floor_at IS NOT NULL)::numeric, 3) AS booked_by_p50,
+       round(avg(CASE WHEN ready_at IS NOT NULL THEN (ready_at <= p50_floored)::int WHEN p50_floored < run_end THEN 0 END)
+             FILTER (WHERE floor_at IS NOT NULL)::numeric, 3) AS booked_by_p50_floored,
+       round(avg(abs(extract(epoch FROM ready_at - ready_p50_at) / 60)) FILTER (WHERE floor_at IS NOT NULL AND ready_at IS NOT NULL)::numeric, 1) AS booked_mae_p50,
+       round(avg(abs(extract(epoch FROM ready_at - p50_floored) / 60)) FILTER (WHERE floor_at IS NOT NULL AND ready_at IS NOT NULL)::numeric, 1) AS booked_mae_p50_floored,
+       round(avg(CASE WHEN ready_at IS NOT NULL THEN (ready_at <= ready_p90_at)::int WHEN ready_p90_at < run_end THEN 0 END)::numeric, 3) AS all_by_p90,
+       round(avg(CASE WHEN ready_at IS NOT NULL THEN (ready_at <= COALESCE(p90_floored, ready_p90_at))::int
+                      WHEN COALESCE(p90_floored, ready_p90_at) < run_end THEN 0 END)::numeric, 3) AS all_by_p90_floored
+  FROM f GROUP BY 1 ORDER BY 1;
+
+-- (48) G454, G459, G464, §12: the owner app's time against the promise on the cars that got ready, by whether the
+--      car's plan carried a phantom L2 leg (a charge_l2 leg of the visit's itinerary that ended skipped) or a phantom bay
+--      leg (a wash, detail or service leg that ended skipped while every bay atom of the visit was done). The app's time
+--      is max(planned_end_sim) over the car's planned or active legs (ottoq_owner_car, md5 683bf45b); the legs are
+--      amended in place, so the group is read from how each leg ended, not from the leg that set the app's time.
+WITH run AS (SELECT s.sweep_code, a.sim_run_id
+               FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
+              WHERE s.sweep_code IN ('promise_busy_2026_10_17', 'promise_normal_2026_10_17')),
+p AS (SELECT run.sweep_code, pr.visit_id, pr.ready_p50_at, pr.ready_p90_at,
+             (pr.detail ->> 'owner_ready_by_sim')::timestamptz AS app_at,
+             (SELECT (x ->> 'done_at')::timestamptz FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+               WHERE vn.visit_id = pr.visit_id AND x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at,
+             EXISTS (SELECT 1 FROM public.ottoq_vehicle_itineraries i JOIN public.ottoq_itinerary_legs l USING (itinerary_id)
+                      WHERE i.visit_id = pr.visit_id AND l.leg_type = 'charge_l2' AND l.status = 'skipped') AS ph_l2,
+             EXISTS (SELECT 1 FROM public.ottoq_vehicle_itineraries i JOIN public.ottoq_itinerary_legs l USING (itinerary_id)
+                      WHERE i.visit_id = pr.visit_id AND l.leg_type IN ('wash', 'detail', 'service') AND l.status = 'skipped')
+               AND NOT EXISTS (SELECT 1 FROM public.ottoq_visit_needs vn, jsonb_array_elements(vn.atoms) x
+                                WHERE vn.visit_id = pr.visit_id AND x ->> 'concurrency' = 'bay'
+                                  AND x ->> 'status' IS DISTINCT FROM 'done') AS ph_bay
+        FROM public.ottoq_ready_promises pr JOIN run USING (sim_run_id)
+       WHERE pr.detail ->> 'owner_ready_by_sim' IS NOT NULL),
+g AS (SELECT p.*, CASE WHEN ph_l2 AND ph_bay THEN 'both' WHEN ph_l2 THEN 'phantom_l2' WHEN ph_bay THEN 'phantom_bay' ELSE 'neither' END AS grp,
+             extract(epoch FROM ready_at - app_at) / 60 AS app_err, extract(epoch FROM ready_at - ready_p50_at) / 60 AS p50_err
+        FROM p WHERE ready_at IS NOT NULL)
+SELECT sweep_code, grp, count(*) AS ready_with_app_time,
+       round(avg(abs(app_err))::numeric, 1) AS app_mae, round(avg(app_err)::numeric, 1) AS app_bias,
+       round((sum(abs(app_err)) / sum(sum(abs(app_err))) OVER (PARTITION BY sweep_code))::numeric, 3) AS share_of_app_abs_error,
+       round(avg(abs(p50_err))::numeric, 1) AS promise_mae, round(avg(p50_err)::numeric, 1) AS promise_bias,
+       round(avg((ready_at <= app_at)::int)::numeric, 3) AS by_app, round(avg((ready_at <= ready_p50_at)::int)::numeric, 3) AS by_p50,
+       round(avg((ready_at <= ready_p90_at)::int)::numeric, 3) AS by_p90
+  FROM g GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- (49) G452, §12: query (14)'s estimate beside what the next hour's cars took, the cars never ready counted as waiting
+--      to the run's end (Kaplan-Meier), on both promise arms.
+WITH r AS (SELECT sim_run_id, sim_clock_start, sim_clock_current AS run_end FROM public.ottoq_sim_runs
+            WHERE sim_run_id IN ('e02aa048-dd6f-4c9b-8d23-7da6046f47ae', 'eb953ed6-7923-464a-8796-a98f25b0656d')),
+v AS (
+  SELECT vn.sim_run_id, r.sim_clock_start AS t0, r.run_end,
+         (SELECT (x ->> 'done_at')::timestamptz FROM jsonb_array_elements(vn.atoms) x
+           WHERE x ->> 'svc' = 'readiness_check' AND x ->> 'status' = 'done' LIMIT 1) AS ready_at,
+         (SELECT max(COALESCE((x ->> 'closed_at')::timestamptz, (x ->> 'done_at')::timestamptz))
+            FROM jsonb_array_elements(vn.atoms) x WHERE x ->> 'svc' = 'charge' AND x ->> 'status' = 'done') AS chg_at
+    FROM public.ottoq_visit_needs vn JOIN r USING (sim_run_id)
+   WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(vn.atoms) x WHERE x ->> 'concurrency' = 'bay')),
+t AS (SELECT DISTINCT sim_run_id, t0, t0 + make_interval(hours => h) AS t FROM v CROSS JOIN generate_series(2, 10, 2) h),
+g AS (
+  SELECT t.sim_run_id, t.t0, t.t,
+         array_agg(extract(epoch FROM (LEAST(COALESCE(v.ready_at, 'infinity'), t.t) - v.chg_at)) / 60 ORDER BY v.chg_at)
+           FILTER (WHERE v.chg_at <= t.t) AS xs,
+         array_agg(COALESCE(v.ready_at <= t.t, false) ORDER BY v.chg_at) FILTER (WHERE v.chg_at <= t.t) AS evs,
+         array_agg(extract(epoch FROM (COALESCE(v.ready_at, v.run_end) - v.chg_at)) / 60 ORDER BY v.chg_at)
+           FILTER (WHERE v.chg_at > t.t AND v.chg_at <= t.t + interval '1 hour') AS nx,
+         array_agg(v.ready_at IS NOT NULL ORDER BY v.chg_at) FILTER (WHERE v.chg_at > t.t AND v.chg_at <= t.t + interval '1 hour') AS nev,
+         count(*) FILTER (WHERE v.chg_at > t.t AND v.chg_at <= t.t + interval '1 hour' AND v.ready_at IS NOT NULL) AS next_ready,
+         count(*) FILTER (WHERE v.chg_at > t.t AND v.chg_at <= t.t + interval '1 hour' AND v.ready_at IS NULL) AS never_ready
+    FROM t JOIN v ON v.sim_run_id = t.sim_run_id GROUP BY 1, 2, 3)
+SELECT left(sim_run_id::text, 8) AS run, extract(epoch FROM t - t0) / 3600 AS hour,
+       round((public.ottoq_km_quantiles(xs, evs, ARRAY[0.5]::float8[]))[1]::numeric, 0) AS kaplan_meier_0739,
+       next_ready, never_ready, round((public.ottoq_km_quantiles(nx, nev, ARRAY[0.5]::float8[]))[1]::numeric, 0) AS next_hour_km_median
+  FROM g ORDER BY 1, 2;
+
+-- (50) G313, §15: HW.005's refusals per arm and the cars they name (every one on arms 82-100 the Zoox 229f655b).
+SELECT a.arm_id, count(*) FILTER (WHERE NOT e.passed) AS hw005_failures,
+       count(DISTINCT e.entity_id) FILTER (WHERE NOT e.passed) AS cars,
+       bool_and(e.entity_id::text LIKE '229f655b%') FILTER (WHERE NOT e.passed) AS all_the_zoox
+  FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_rule_evaluations e ON e.sim_run_id = a.sim_run_id
+ WHERE a.arm_id BETWEEN 82 AND 100 AND e.rule_code LIKE 'HW.005%'
+ GROUP BY 1 ORDER BY 1;
+
+-- (51) G460, G475, §22: each wash and detail seat from its car's own state-change events (entering the bay, to its next
+--      state), never from a booking, per arm and by five-minute bucket.
+WITH runs(run, arm, phys) AS (VALUES
+   ('c6c13b8b-ce14-471c-963c-86606e73f499'::uuid, 101, 0), ('1972b9ae-bd93-4859-bb01-66ac45f6fcd2'::uuid, 102, 1),
+   ('d4af72ed-7021-42d2-ac93-dd8ce967b109'::uuid, 103, 2), ('24de96a8-279c-4f9b-baf4-d5ff0e55367f'::uuid, 104, 2),
+   ('5a14f274-ef58-45ab-9625-b34edff6b92f'::uuid, 105, 2), ('ab79a5c6-6aef-4196-ae4e-c9c4015254c0'::uuid, 106, 2)),
+ch AS (
+  SELECT r.arm, r.phys, e.entity_id AS vehicle_id, e.sim_clock_at AS t, e.payload->'diff'->'current_state'->>'to' AS st,
+         lead(e.sim_clock_at) OVER (PARTITION BY e.sim_run_id, e.entity_id ORDER BY e.sim_clock_at, e.event_seq) AS next_t
+    FROM runs r JOIN public.ottoq_events e ON e.sim_run_id = r.run
+   WHERE e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state'),
+seats AS (SELECT arm, phys, st AS bay, next_t, extract(epoch FROM next_t - t)/60.0 AS m
+            FROM ch WHERE st IN ('in_wash_bay','in_detail_bay'))
+SELECT arm, phys, bay, count(*) AS seats, count(*) FILTER (WHERE next_t IS NULL) AS open_at_end,
+       round(avg(m)::numeric, 2) AS mean_min,
+       count(*) FILTER (WHERE m <= 5) AS le5, count(*) FILTER (WHERE m > 5 AND m <= 10) AS le10,
+       count(*) FILTER (WHERE m > 10 AND m <= 15) AS le15, count(*) FILTER (WHERE m > 15 AND m <= 20) AS le20,
+       count(*) FILTER (WHERE m > 20 AND m <= 25) AS le25, count(*) FILTER (WHERE m > 25 AND m <= 30) AS le30,
+       count(*) FILTER (WHERE m > 30) AS gt30, round(max(m)::numeric, 1) AS max_min
+  FROM seats GROUP BY 1, 2, 3 ORDER BY 3, 1;
+
+-- (52) G475, §22: each wash and detail seat against its car's leg of that kind (the one planned nearest the seat) and
+--      the booking that covers it: the leg's error, the seats that outran their booking, and those that ran into the
+--      bay's next booking.
+WITH runs(run, arm, phys) AS (VALUES
+   ('1972b9ae-bd93-4859-bb01-66ac45f6fcd2'::uuid, 102, 1), ('d4af72ed-7021-42d2-ac93-dd8ce967b109'::uuid, 103, 2),
+   ('24de96a8-279c-4f9b-baf4-d5ff0e55367f'::uuid, 104, 2)),
+ch AS (
+  SELECT r.arm, r.phys, r.run, e.entity_id AS vehicle_id, e.sim_clock_at AS t, e.payload->'diff'->'current_state'->>'to' AS st,
+         lead(e.sim_clock_at) OVER (PARTITION BY e.sim_run_id, e.entity_id ORDER BY e.sim_clock_at, e.event_seq) AS next_t
+    FROM runs r JOIN public.ottoq_events e ON e.sim_run_id = r.run
+   WHERE e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state'),
+seats AS (SELECT arm, phys, run, vehicle_id, CASE st WHEN 'in_detail_bay' THEN 'detail' ELSE 'wash' END AS kind,
+                 t AS seat_at, next_t AS left_at, extract(epoch FROM next_t - t)/60.0 AS m
+            FROM ch WHERE st IN ('in_wash_bay','in_detail_bay') AND next_t IS NOT NULL),
+j AS (
+  SELECT s.*,
+         (SELECT round(l.planned_duration_s / 60.0, 1) FROM public.ottoq_itinerary_legs l
+           WHERE l.sim_run_id = s.run AND l.vehicle_id = s.vehicle_id AND l.leg_type = s.kind
+           ORDER BY abs(extract(epoch FROM l.planned_start_sim - s.seat_at)) LIMIT 1) AS leg_min,
+         b.booking_id, b.stall_id, upper(b.during) AS bk_end, extract(epoch FROM upper(b.during) - lower(b.during))/60.0 AS bk_min
+    FROM seats s LEFT JOIN LATERAL (
+      SELECT b.* FROM public.ottoq_stall_bookings b
+       WHERE b.sim_run_id = s.run AND b.vehicle_id = s.vehicle_id AND b.purpose IN ('wash','detail')
+         AND b.during @> s.seat_at ORDER BY lower(b.during) DESC LIMIT 1) b ON true)
+SELECT arm, kind, count(*) AS seats, round(avg(m)::numeric, 2) AS seat_mean, round(avg(leg_min)::numeric, 1) AS leg_mean,
+       round(avg(abs(leg_min - m))::numeric, 2) AS leg_mae, count(*) FILTER (WHERE leg_min IS NULL) AS no_leg,
+       round(avg(bk_min)::numeric, 1) AS booked_mean, count(*) FILTER (WHERE booking_id IS NULL) AS no_booking,
+       count(*) FILTER (WHERE left_at > bk_end) AS outran_booking,
+       count(*) FILTER (WHERE left_at > bk_end AND EXISTS (
+          SELECT 1 FROM public.ottoq_stall_bookings b2 WHERE b2.sim_run_id = j.run AND b2.stall_id = j.stall_id
+             AND b2.booking_id <> j.booking_id AND lower(b2.during) >= j.bk_end AND lower(b2.during) < j.left_at)) AS outran_into_next_booking
+  FROM j GROUP BY 1, 2 ORDER BY 2, 1;
+
+-- (53) G475, §22: the clock rehearsed in time on one run (arm 102, the crews timed by the work): learn the median and
+--      90th percentile seat from the seats that ended by the run's median exit, and judge the seats that began after it
+--      against the clock and against the car's own leg.
+WITH runs(run, arm) AS (VALUES ('1972b9ae-bd93-4859-bb01-66ac45f6fcd2'::uuid, 102)),
+ch AS (
+  SELECT r.arm, r.run, e.entity_id AS vehicle_id, e.sim_clock_at AS t, e.payload->'diff'->'current_state'->>'to' AS st,
+         lead(e.sim_clock_at) OVER (PARTITION BY e.sim_run_id, e.entity_id ORDER BY e.sim_clock_at, e.event_seq) AS next_t
+    FROM runs r JOIN public.ottoq_events e ON e.sim_run_id = r.run
+   WHERE e.event_type = 'vehicle.state_changed' AND e.payload->'diff' ? 'current_state'),
+seats AS (SELECT arm, run, vehicle_id, CASE st WHEN 'in_detail_bay' THEN 'detail' ELSE 'wash' END AS kind, t AS seat_at,
+                 next_t AS left_at, extract(epoch FROM next_t - t)/60.0 AS m
+            FROM ch WHERE st IN ('in_wash_bay','in_detail_bay') AND next_t IS NOT NULL),
+cut AS (SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY left_at) AS c FROM seats),
+train AS (SELECT kind, percentile_disc(0.5) WITHIN GROUP (ORDER BY m) AS p50, percentile_disc(0.9) WITHIN GROUP (ORDER BY m) AS p90,
+                 count(*) AS n
+            FROM seats, cut WHERE left_at <= cut.c GROUP BY kind),
+test AS (
+  SELECT s.*, (SELECT round(l.planned_duration_s / 60.0, 1) FROM public.ottoq_itinerary_legs l
+                WHERE l.sim_run_id = s.run AND l.vehicle_id = s.vehicle_id AND l.leg_type = s.kind
+                ORDER BY abs(extract(epoch FROM l.planned_start_sim - s.seat_at)) LIMIT 1) AS leg_min
+    FROM seats s, cut WHERE s.seat_at > cut.c)
+SELECT t.kind, tr.n AS train_n, tr.p50 AS clock_p50, tr.p90 AS clock_p90, count(*) AS test_n,
+       round(avg(t.m)::numeric, 2) AS test_seat_mean, round(avg(t.leg_min)::numeric, 1) AS test_leg_mean,
+       round(avg(abs(t.leg_min - t.m))::numeric, 2) AS leg_mae, round(avg(t.leg_min - t.m)::numeric, 2) AS leg_bias,
+       round(avg(abs(tr.p50 - t.m))::numeric, 2) AS clock_mae, round(avg(tr.p50 - t.m)::numeric, 2) AS clock_bias,
+       count(*) FILTER (WHERE t.m <= t.leg_min) AS within_leg, count(*) FILTER (WHERE t.m <= tr.p90) AS within_clock_p90,
+       (SELECT c FROM cut) AS cut_sim
+  FROM test t JOIN train tr USING (kind) GROUP BY t.kind, tr.n, tr.p50, tr.p90 ORDER BY 1;
+
+-- (54) G475, §22: decide section (4b)'s walk-in refusals for a wash bay (no_free_space) re-scored with three windows
+--      from the refusal's tick: today's base (25 minutes for a detail, 9 for a wash), the car's own leg of that kind,
+--      and the clock's 90th percentile (20 and 10 on the robotic key); and whether a bay was free for the next five
+--      minutes at all. Final booking rows, as in query (26).
+WITH runs(run, arm) AS (VALUES ('d4af72ed-7021-42d2-ac93-dd8ce967b109'::uuid, 103)),
+bays AS (SELECT s.id FROM public.stalls s WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type = 'wash_bay'),
+refusals AS (
+  SELECT r.arm, r.run, d.sim_clock AS t, d.entity_id AS vehicle_id, d.proposed_action ->> 'purpose' AS purpose
+    FROM runs r JOIN public.ottoq_decisions d ON d.sim_run_id = r.run
+   WHERE d.action_context = 'task_start' AND d.proposed_action ->> 'source' = 'needs_card'
+     AND d.proposed_action ->> 'stall_type' = 'wash_bay' AND d.enacted_action ->> 'verb' = 'hold_no_space'
+     AND d.enacted_action ->> 'reason' = 'no_free_space'),
+w AS (
+  SELECT f.*, CASE WHEN f.purpose = 'detail' THEN 25 ELSE 9 END AS w_fixed,
+         (SELECT round(l.planned_duration_s / 60.0) FROM public.ottoq_itinerary_legs l
+           WHERE l.sim_run_id = f.run AND l.vehicle_id = f.vehicle_id AND l.leg_type = f.purpose
+           ORDER BY abs(extract(epoch FROM l.planned_start_sim - f.t)) LIMIT 1) AS w_leg,
+         CASE WHEN f.purpose = 'detail' THEN 20 ELSE 10 END AS w_clock
+    FROM refusals f),
+fr AS (
+  SELECT w.*, b.id AS bay,
+         NOT EXISTS (SELECT 1 FROM public.ottoq_stall_bookings bk WHERE bk.sim_run_id = w.run AND bk.stall_id = b.id
+                        AND bk.booked_at_sim <= w.t AND COALESCE(bk.released_at, 'infinity') > w.t
+                        AND bk.during && tstzrange(w.t, w.t + make_interval(mins => w.w_fixed), '[)')) AS free_fixed,
+         NOT EXISTS (SELECT 1 FROM public.ottoq_stall_bookings bk WHERE bk.sim_run_id = w.run AND bk.stall_id = b.id
+                        AND bk.booked_at_sim <= w.t AND COALESCE(bk.released_at, 'infinity') > w.t
+                        AND bk.during && tstzrange(w.t, w.t + make_interval(mins => COALESCE(w.w_leg, w.w_fixed)::int), '[)')) AS free_leg,
+         NOT EXISTS (SELECT 1 FROM public.ottoq_stall_bookings bk WHERE bk.sim_run_id = w.run AND bk.stall_id = b.id
+                        AND bk.booked_at_sim <= w.t AND COALESCE(bk.released_at, 'infinity') > w.t
+                        AND bk.during && tstzrange(w.t, w.t + make_interval(mins => w.w_clock), '[)')) AS free_clock,
+         NOT EXISTS (SELECT 1 FROM public.ottoq_stall_bookings bk WHERE bk.sim_run_id = w.run AND bk.stall_id = b.id
+                        AND bk.booked_at_sim <= w.t AND COALESCE(bk.released_at, 'infinity') > w.t
+                        AND bk.during && tstzrange(w.t, w.t + interval '5 min', '[)')) AS free_now
+    FROM w CROSS JOIN bays b),
+per AS (SELECT arm, t, vehicle_id, purpose, max(w_leg) AS w_leg, bool_or(free_fixed) AS f_fixed, bool_or(free_leg) AS f_leg,
+               bool_or(free_clock) AS f_clock, bool_or(free_now) AS f_now
+          FROM fr GROUP BY 1, 2, 3, 4)
+SELECT arm, purpose, count(*) AS refusals, count(DISTINCT vehicle_id) AS cars,
+       round(avg(w_leg), 1) AS mean_leg_window, count(*) FILTER (WHERE w_leg IS NULL) AS no_leg,
+       count(*) FILTER (WHERE f_fixed) AS free_at_fixed, count(*) FILTER (WHERE f_leg) AS free_at_leg,
+       count(*) FILTER (WHERE f_clock) AS free_at_clock,
+       count(*) FILTER (WHERE f_clock AND NOT f_leg) AS clock_frees_over_leg,
+       count(*) FILTER (WHERE f_leg AND NOT f_clock) AS leg_frees_over_clock,
+       count(*) FILTER (WHERE f_now) AS a_bay_free_this_tick
+  FROM per GROUP BY 1, 2 ORDER BY 1, 2;
+
+-- (55) G458, G471, §22: every wash- and service-bay booking released as a no-show, by its car's state and the kind of
+--      stall it was on at the slot, both from its own state-change events (query (39) without its state filter).
+WITH runs(run, arm) AS (VALUES ('d4af72ed-7021-42d2-ac93-dd8ce967b109'::uuid, 103), ('24de96a8-279c-4f9b-baf4-d5ff0e55367f'::uuid, 104),
+                               ('c6c13b8b-ce14-471c-963c-86606e73f499'::uuid, 101)),
+ns AS (SELECT r.arm, r.run, b.vehicle_id, lower(b.during) AS lo, s.stall_type::text AS bay_type, b.purpose
+         FROM runs r JOIN public.ottoq_stall_bookings b ON b.sim_run_id = r.run JOIN public.stalls s ON s.id = b.stall_id
+        WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND s.stall_type IN ('wash_bay', 'service_bay')
+          AND b.state = 'released' AND b.release_reason IN ('no_show_grace_elapsed', 'window_elapsed')),
+x AS (SELECT ns.*,
+             (SELECT e.payload -> 'diff' -> 'current_state' ->> 'to' FROM public.ottoq_events e
+               WHERE e.sim_run_id = ns.run AND e.entity_id = ns.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                 AND e.payload -> 'diff' ? 'current_state' AND e.sim_clock_at <= ns.lo
+               ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS car_state,
+             (SELECT (e.payload -> 'diff' -> 'current_stall_id' ->> 'to')::uuid FROM public.ottoq_events e
+               WHERE e.sim_run_id = ns.run AND e.entity_id = ns.vehicle_id AND e.event_type = 'vehicle.state_changed'
+                 AND e.payload -> 'diff' ? 'current_stall_id' AND e.sim_clock_at <= ns.lo
+               ORDER BY e.sim_clock_at DESC, e.event_seq DESC LIMIT 1) AS car_stall
+        FROM ns)
+SELECT x.arm, x.bay_type, x.purpose, x.car_state, COALESCE(s2.stall_type::text, 'none') AS car_on, count(*) AS no_shows
+  FROM x LEFT JOIN public.stalls s2 ON s2.id = x.car_stall
+ GROUP BY 1, 2, 3, 4, 5 ORDER BY 1, 2, 6 DESC;
+
+-- (56) §21, db/checks/0452 §6-§7: the scorecards of the in-tick arms 93-95 and the third night's 101-111.
+SELECT a.arm_id, s.sweep_code, c.cell_code, a.seed, round(a.wall_s) AS wall_s,
+       (a.scorecard #>> '{throughput,visits_served}')::int AS served, (a.scorecard #>> '{throughput,visits}')::int AS visits,
+       (a.scorecard #>> '{timeliness,door_p50_min}')::numeric AS door_p50, (a.scorecard #>> '{timeliness,door_p95_min}')::numeric AS door_p95,
+       (a.arm_metrics ->> 'deployed_car_hours')::numeric AS car_hours, (a.arm_metrics ->> 'unmet_demand_pct')::numeric AS unmet_pct,
+       (a.scorecard #>> '{service_completion,pct}')::numeric AS must_do_done_pct,
+       (a.scorecard #>> '{rule9,left_below_target}')::int AS left_below_target,
+       (a.scorecard #>> '{rule9,left_with_needed_work_open}')::int AS left_with_work_open
+  FROM public.ottoq_throughput_sweep_arms a JOIN public.ottoq_throughput_sweep_cells c USING (cell_id)
+  JOIN public.ottoq_throughput_sweeps s ON s.sweep_id = a.sweep_id
+ WHERE a.arm_id IN (93, 94, 95) OR a.arm_id BETWEEN 101 AND 111
+ ORDER BY a.arm_id;
