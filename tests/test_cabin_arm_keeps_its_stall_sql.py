@@ -3,8 +3,9 @@
 WHY THIS EXISTS. On the live run c6ec017d (2026-10-20, the twin depot, stall_cabin_robot on) car ca2624fc's charge reached
 100% while the fast charger's cleaning arm was still in its cabin. The charge arm demated, and the tether sweep
 (public.ottoq_release_expired_tethers) cleared the car's stall and freed the stall in the same tick, 15 seconds before the
-arm was home. With the car on no stall, 0758's hold no longer applied: the bay calendar took the car, and the tidy was put
-back to pending, nothing credited (G479). 0760 keeps an expired demate tether while its stall's arm is at work in the car.
+arm was home. With the car on no stall, 0758's hold no longer applied: decide section (4b) took the car (first written
+here as the bay calendar; the run's decision rows say (4b)), and the tidy was put back to pending, nothing credited
+(G479). (4b) never read the hold either; 0761 closes that door (tests/test_held_car_is_passed_over_sql.py). 0760 keeps an expired demate tether while its stall's arm is at work in the car.
 Executed here, on the scratch PostgreSQL, against the sweep as live (tests/fixtures/release_expired_tethers_stub.sql,
 prosrc md5 asserted as read on 2026-10-20), with 0760 run whole:
   - before 0760 the sweep takes the car off the stall mid-clean (the defect, reproduced);
