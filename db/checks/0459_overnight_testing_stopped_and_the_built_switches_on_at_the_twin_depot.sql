@@ -89,6 +89,15 @@
 --       (bay_exit_closes_its_leg, bay_release_reads_the_work); service bays: 12 done, 10 on their bay exit.
 --     - Repairs: no fault repair is done yet (4 pending), so no green-light has been asked.
 --     - The cleaning arm: 8 cleans done, on DCFC-05 to -09; 1 thrown away, ca2624fc's, below.
+--     - Service records issued at bay exit: 19 wash, 13 detail and 19 service, of 417 records in all.
+--     - The bay calendar's seats (12), read 5:59-6:01 PM CT: 140 refused attempts, every one a 23505 on
+--       idx_stalls_one_vehicle_per_stall, between sim 11:50 AM and 2:58 PM CT. 78 were for 8 cars' service-bay
+--       bookings and 62 for 6 cars' wash-bay bookings. Each is G471: the car still holds its staging stall when the
+--       calendar stamps it into its bay. 0755 fixes it and waits on Chase at the connector (§5). Meanwhile a
+--       reserved bay can sit empty while its car waits in staging: NASH-SVC-02 was free at sim 2:53 PM, and its
+--       next car, 4b179b26, was refused there at 2:58.
+--     - The server log, 4:05-6:01 PM CT: no errors. The only warnings are those seat refusals and the 12
+--       interlock refusals below.
 --   One defect surfaced on the run's fourth arm clean, at 4:28 PM CT (G479). Car ca2624fc's charge ended while the arm
 --   was still in its cabin, and the tether sweep freed its stall 15 seconds early. Decide section (4b), the walk-in
 --   door, then took the car. This section first said the bay calendar took it; the decision rows and the booking,
@@ -164,3 +173,14 @@ SELECT count(*) FILTER (WHERE d.tick_seq <= 1100) AS before_the_dial, count(*) F
        count(*) FILTER (WHERE d.tick_seq > 1100 AND d.enacted_action ? 'message') AS after_with_their_message
   FROM public.ottoq_decisions d
  WHERE d.sim_run_id = 'c6ec017d-ec07-4762-8774-4129de1f4ad6' AND d.enacted_action ->> 'reason' = 'exception';
+
+-- (12) the bay calendar's refused seats (G471), per bay type: attempts, bookings, cars
+WITH ref AS (
+  SELECT e.sim_clock_at, x->>'booking_id' AS booking_id, x->>'vehicle_id' AS vehicle_id, x->>'stall_id' AS stall_id,
+         x->>'sqlstate' AS sqlstate
+    FROM public.ottoq_events e CROSS JOIN LATERAL jsonb_array_elements(e.payload->'refused') x
+   WHERE e.sim_run_id = 'c6ec017d-ec07-4762-8774-4129de1f4ad6' AND e.event_type = 'ottoq.bay_reservation_seat_refused')
+SELECT s.stall_type::text AS bay, ref.sqlstate, count(*) AS attempts, count(DISTINCT ref.booking_id) AS bookings,
+       count(DISTINCT ref.vehicle_id) AS cars, min(ref.sim_clock_at) AS first_at, max(ref.sim_clock_at) AS last_at
+  FROM ref JOIN public.stalls s ON s.id::text = ref.stall_id
+ GROUP BY 1, 2 ORDER BY 1;
