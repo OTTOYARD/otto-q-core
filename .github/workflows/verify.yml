@@ -732,6 +732,20 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_stall_cabin_robot_sql.py tests/test_twenty_post_base_sql.py
 
+      # 0760, G479, EXECUTED on the live tether sweep (tests/fixtures/release_expired_tethers_stub.sql, md5 asserted): before
+      # it the sweep takes a car off its stall while the stall's cleaning arm is in the cabin; after it the car keeps its
+      # stall until the arm's work is done, then is released as before, every other tether sweeps as before, and a
+      # malformed visit cannot stop the sweep. 19 tests, about 7 seconds.
+      - name: A car the cleaning arm is cleaning keeps its stall when the charge arm lets go, executed (0760)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_cabin_arm_keeps_its_stall_sql.py
+
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
       # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry
