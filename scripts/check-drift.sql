@@ -812,7 +812,8 @@ repo_manifest(version, name, file) AS (
     ('20261018113339'::text, 'a_proposal_ages_on_the_clock_it_was_stamped_in'::text, '0756_a_proposal_ages_on_the_clock_it_was_stamped_in.sql'::text),
     ('20261018113640'::text, 'a_bay_seat_that_finished_early_is_done'::text, '0757_a_bay_seat_that_finished_early_is_done.sql'::text),
     ('20261019134637'::text, 'a_fast_chargers_cleaning_arm_cleans_the_cabin_while_the_car_charges'::text, '0758_a_fast_chargers_cleaning_arm_cleans_the_cabin_while_the_car_charges.sql'::text),
-    ('PENDING'::text, 'canopy_b_is_restriped_for_ten_more_robotic_fast_chargers'::text, '0759_canopy_b_is_restriped_for_ten_more_robotic_fast_chargers.sql'::text)
+    ('PENDING'::text, 'canopy_b_is_restriped_for_ten_more_robotic_fast_chargers'::text, '0759_canopy_b_is_restriped_for_ten_more_robotic_fast_chargers.sql'::text),
+    ('20261020213742'::text, 'a_car_the_cleaning_arm_is_cleaning_keeps_its_stall_when_the_charge_arm_lets_go'::text, '0760_a_car_the_cleaning_arm_is_cleaning_keeps_its_stall_when_the_charge_arm_lets_go.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

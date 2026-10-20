@@ -81,6 +81,9 @@
 --   on a dev server, pinned to the run) filmed DCFC-08's cycle: doors open at sim 8:55, the arm cleaning side A at 8:58,
 --   home after (ottoyarddepot-sim docs/pr-shots/clean-arm-live, scripts/liveCleanShots.mjs). (8): rule 9 and the bay
 --   switches are read when the run's day is done.
+--   One defect surfaced on the run's fourth arm clean, at 4:28 PM CT. Car ca2624fc's charge ended while the arm was still
+--   in its cabin, and the tether sweep freed its stall 15 seconds early, so the bay calendar took the car (G479). Fixed
+--   by db/migrations/0760, applied at 4:37 PM CT.
 --
 -- ══ QUERIES ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 
