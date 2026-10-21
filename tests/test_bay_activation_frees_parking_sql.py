@@ -62,7 +62,7 @@ def template():
         for path in (base.STUB, t43.FIXTURE, GUARD):
             rc, err = d.file(path)
             assert rc == 0, f"{os.path.basename(path)} did not load: {err}"
-        # arm 95's sweep and cell, as live (0755's P1 reads them and V3 copies their seed)
+        # arm 95's sweep and cell, as live (0755 no longer reads or copies them: its sweep was taken out, rule 12)
         d.val(f"""INSERT INTO public.ottoq_throughput_sweeps (sweep_code, title, depot_id, scenario, sim_start, ticks,
                                                               sim_min_per_tick, seeds, replicates, priority, arm_budget_s, status)
                   VALUES ('answer_normal_2026_10_17', 'answer in tick', '{DEPOT}', 'normal_day', '2026-09-01 11:00:00+00',
@@ -191,14 +191,9 @@ def test_0755_applies_after_0743_and_a_second_apply_is_refused(db):
                       WHERE name = '0755_a_parked_car_leaves_its_stall_before_the_calendar_seats_it'""") == "falsefalse"
     assert db.val("""SELECT default_value || '/' || min_value || '/' || max_value || '/' || COALESCE(agent_writable, false)
                        FROM public.ottoq_policy_param_catalog WHERE param_key = 'bay_activation_frees_parking'""") == "0/0/1/false"
-    cell = db.json("""SELECT jsonb_build_object('cell', c.cell_code, 'buildout', c.buildout_code, 'seat', c.seat,
-                                                 'params', c.fixed_params, 'priority', s.priority, 'scenario', s.scenario,
-                                                 'ticks', s.ticks, 'seed', s.seeds[1]::text)
-                        FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
-                       WHERE s.sweep_code = 'bayfree_normal_2026_10_18'""")
-    assert cell == {"cell": "dcfc40.otto_q.answer_in_tick.bay_frees_parking", "buildout": "dcfc40", "seat": "otto_q",
-                    "priority": 16, "scenario": "normal_day", "ticks": 144, "seed": str(SEED),
-                    "params": {"deploy_peak_fraction": 0.90, "twin_answer_in_tick": 1, "bay_activation_frees_parking": 1}}
+    # no sweep is queued: CLAUDE.md rule 12 stops the test program while the build goes on (0755 §2(c))
+    assert db.val("SELECT count(*) FROM public.ottoq_throughput_sweeps WHERE sweep_code = 'bayfree_normal_2026_10_18'") == "0"
+    assert db.val("SELECT count(*) FROM public.ottoq_throughput_sweep_cells WHERE fixed_params ? 'bay_activation_frees_parking'") == "0"
     rc, err = db.file(M0755)
     assert rc != 0 and "0755 P" in err
 

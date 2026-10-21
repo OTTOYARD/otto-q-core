@@ -47,18 +47,20 @@
 --       and trg_ottoq_vehicles_state_change probes the shield only when current_state changes, so the stall-only
 --       statement adds one signed event per seat and no rule evaluation, and the state's own triggers fire once, on the
 --       second statement, as they fired on the one before.
---   (c) Sweep bayfree_normal_2026_10_18: arm 95's cell (answer_normal_2026_10_17 / dcfc40.otto_q.answer_in_tick, the
---       twin answering in the tick) with the dial, its seeds copied by SQL, priority 16, budget 3,000 s.
+--   (c) No sweep. As first written this file also queued sweep bayfree_normal_2026_10_18 (arm 95's cell with the dial).
+--       CLAUDE.md rule 12 (Chase, 2026-10-20) stops the test program while the build goes on, so that part was taken out
+--       before the apply (edited 2026-10-20 9:05 PM CT). The dial goes on at the twin depot under a person's name, and a
+--       demo run shows it working.
 --   Not changed: which cars the calendar seats or when, the guard, the in-depot gate, the triggers, sections (4), (4b)
 --   and (5), how long a car charges or what it needs (rule 9).
 --
 -- ══ §3 CHECKS ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 --
---   P0 nothing in flight. P1 0743 is applied and the activation is the body it leaves (prosrc md5 80d42bc1); the dial and
---   the sweep are absent; arm 95's cell is as read. P2 not already applied. Pre-image to ottoq_schema_snapshots as
---   '0755_pre'. Each anchor matches once. V1 the body less its insertions is its pre-image. V2 nothing for a run that does
---   not exist. V3 the dial is catalogued 0..1 default 0 and not agent-writable, and the sweep's cell is arm 95's plus the
---   dial. Executed in full by tests/test_bay_activation_frees_parking_sql.py on the live bodies (md5 asserted).
+--   P0 nothing in flight. P1 0743 is applied and the activation is the body it leaves (prosrc md5 80d42bc1); the dial is
+--   absent. P2 not already applied. Pre-image to ottoq_schema_snapshots as '0755_pre'. Each anchor matches once. V1 the
+--   body less its insertions is its pre-image. V2 nothing for a run that does not exist. V3 the dial is catalogued 0..1
+--   default 0 and not agent-writable. Executed in full by tests/test_bay_activation_frees_parking_sql.py on the live
+--   bodies (md5 asserted).
 --
 --   APPLY WITH A PERSON AT THE CONNECTOR. Its live dry run on 2026-10-18, sent after 0754's apply (ledger 11:29:08 UTC,
 --   6:29 AM CT) and before 0756's dry run (11:32:57 UTC), was held by the Supabase connector for a person's approval and
@@ -75,8 +77,8 @@
 --   forces_recert FALSE and forces_dial_restart FALSE. At the dial's default the call computes what it computed before
 --   (V1, and the insertion is skipped at 0), and no certification arm, canon cell or dial experiment sets the dial.
 --
--- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0755_pre'; if no arm has run, DELETE the
---   sweep bayfree_normal_2026_10_18 and its cell and the dial's catalog row;
+-- ROLLBACK: EXECUTE the `definition` in ottoq_schema_snapshots WHERE label = '0755_pre'; DELETE the dial's catalog row and
+--   any parameter row that sets it;
 --   DELETE FROM public.ottoq_cert_lineage WHERE name = '0755_a_parked_car_leaves_its_stall_before_the_calendar_seats_it'.
 
 BEGIN;
@@ -91,7 +93,7 @@ BEGIN
   END IF;
 END $inflight$;
 
--- ── P1: 0743 applied and its body, nothing of this file, arm 95's cell ──
+-- ── P1: 0743 applied and its body, nothing of this file ──
 DO $premises$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.ottoq_cert_lineage WHERE name = '0743_the_bay_calendar_seats_each_car_on_its_own') THEN
@@ -102,16 +104,8 @@ BEGIN
      IS DISTINCT FROM '80d42bc1a54521582a14948f6951a891' THEN
     RAISE EXCEPTION '0755 P1: ottoq.ottoq_activate_due_bay_reservations is not the body 0743 leaves (md5 80d42bc1)';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.ottoq_policy_param_catalog WHERE param_key = 'bay_activation_frees_parking')
-     OR EXISTS (SELECT 1 FROM public.ottoq_throughput_sweeps WHERE sweep_code = 'bayfree_normal_2026_10_18') THEN
-    RAISE EXCEPTION '0755 P1: the dial or the sweep already exists';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
-                  WHERE s.sweep_code = 'answer_normal_2026_10_17' AND c.cell_code = 'dcfc40.otto_q.answer_in_tick'
-                    AND c.buildout_code = 'dcfc40' AND c.seat = 'otto_q' AND s.scenario = 'normal_day'
-                    AND s.sim_start = '2026-09-01 11:00:00+00' AND s.ticks = 144 AND s.sim_min_per_tick = 5
-                    AND c.fixed_params = '{"deploy_peak_fraction": 0.9, "twin_answer_in_tick": 1}'::jsonb) THEN
-    RAISE EXCEPTION '0755 P1: arm 95''s cell (answer_normal_2026_10_17 / dcfc40.otto_q.answer_in_tick) is not as read';
+  IF EXISTS (SELECT 1 FROM public.ottoq_policy_param_catalog WHERE param_key = 'bay_activation_frees_parking') THEN
+    RAISE EXCEPTION '0755 P1: the dial already exists';
   END IF;
 END $premises$;
 
@@ -223,42 +217,13 @@ BEGIN
   END IF;
 END $v2$;
 
--- ── (c) the pair: arm 95's cell with the dial, its seeds copied by SQL ──
-INSERT INTO public.ottoq_throughput_sweeps (sweep_code, title, depot_id, scenario, sim_start, ticks, sim_min_per_tick,
-                                            seeds, replicates, priority, arm_budget_s, status, notes)
-SELECT 'bayfree_normal_2026_10_18',
-       'A parked car leaves its stall before the bay calendar seats it: arm 95''s 40 robotic fast chargers, the twin '
-       'answering in the tick, with bay_activation_frees_parking',
-       s.depot_id, s.scenario, s.sim_start, s.ticks, s.sim_min_per_tick, s.seeds, 0, 16, 3000, 'active',
-       '0755 (G471). Pairs with arm 95 (answer_normal_2026_10_17 / dcfc40.otto_q.answer_in_tick) on its seed; it differs '
-       'only by the dial.'
-  FROM public.ottoq_throughput_sweeps s WHERE s.sweep_code = 'answer_normal_2026_10_17';
-INSERT INTO public.ottoq_throughput_sweep_cells (sweep_id, cell_code, ord, seat, buildout_code, fixed_params)
-SELECT s.sweep_id, 'dcfc40.otto_q.answer_in_tick.bay_frees_parking', 1, 'otto_q', 'dcfc40',
-       '{"deploy_peak_fraction": 0.90, "twin_answer_in_tick": 1, "bay_activation_frees_parking": 1}'::jsonb
-  FROM public.ottoq_throughput_sweeps s WHERE s.sweep_code = 'bayfree_normal_2026_10_18';
-
--- ── V3: the dial, the cell ──
+-- ── V3: the dial ──
 DO $v3$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.ottoq_policy_param_catalog
                   WHERE param_key = 'bay_activation_frees_parking' AND default_value = 0 AND min_value = 0 AND max_value = 1
                     AND NOT COALESCE(agent_writable, false)) THEN
     RAISE EXCEPTION '0755 V3: the dial is not catalogued 0..1, default 0, not agent-writable';
-  END IF;
-  IF (SELECT count(*) FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
-       WHERE s.sweep_code = 'bayfree_normal_2026_10_18') <> 1
-     OR NOT EXISTS (SELECT 1 FROM public.ottoq_throughput_sweep_cells c JOIN public.ottoq_throughput_sweeps s USING (sweep_id)
-                     JOIN public.ottoq_throughput_sweep_cells c95 ON c95.cell_code = 'dcfc40.otto_q.answer_in_tick'
-                     JOIN public.ottoq_throughput_sweeps s95 ON s95.sweep_id = c95.sweep_id
-                                                            AND s95.sweep_code = 'answer_normal_2026_10_17'
-                     WHERE s.sweep_code = 'bayfree_normal_2026_10_18'
-                       AND c.buildout_code = c95.buildout_code AND c.seat = c95.seat
-                       AND (s.depot_id, s.scenario, s.sim_start, s.ticks, s.sim_min_per_tick, s.seeds)
-                         = (s95.depot_id, s95.scenario, s95.sim_start, s95.ticks, s95.sim_min_per_tick, s95.seeds)
-                       AND c.fixed_params - 'bay_activation_frees_parking' = c95.fixed_params
-                       AND c.fixed_params ->> 'bay_activation_frees_parking' = '1') THEN
-    RAISE EXCEPTION '0755 V3: the sweep''s cell is not arm 95''s plus the dial';
   END IF;
 END $v3$;
 
@@ -267,8 +232,7 @@ VALUES ('0755_a_parked_car_leaves_its_stall_before_the_calendar_seats_it', false
         'Dial bay_activation_frees_parking (default 0); three anchored insertions in '
         'ottoq.ottoq_activate_due_bay_reservations, on 0743''s body, that act only at 1: the car''s stall moves alone '
         'before it is stamped in its bay, so the triggers free the stall it was parked on (V1: body less insertions is its '
-        'pre-image). Sweep bayfree_normal_2026_10_18 (arm 95''s cell plus the dial, its seed, priority 16). No '
-        'certification arm, canon cell or dial experiment sets the dial.',
+        'pre-image). No sweep (CLAUDE.md rule 12). No certification arm, canon cell or dial experiment sets the dial.',
         now());
 
 COMMIT;
