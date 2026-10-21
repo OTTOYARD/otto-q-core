@@ -44,6 +44,15 @@
 --   worked on the operator's side (the battery, the tariff), never on a vehicle (CLAUDE.md rule 13). The held site stays
 --   the build-out dcfc30_cab2400 (2,400/2,500) for that work; the build-out dcfc30 is the depot as built.
 --
+--   And the one rule that reads those limits cannot refuse a charge on the thirty posts (reproduce: (10), read at 8:28
+--   AM CT). EN.001 judges every charge start at the depot's dcfc_max_concurrent_kw less its safety margin (10%), so
+--   10,500 kW reads as a 9,450 kW engineering cap, and each start asks for the lower of the post's rating (350 kW) and
+--   the car's inlet. The twin depot's 120 cars: 30 at 250 kW, 44 at 104, 34 at 100, and 12 with no inlet recorded,
+--   which ask for the post's 350. Thirty posts all charging the thirty hungriest cars draw 12 x 350 + 18 x 250 =
+--   8,700 kW, 750 kW under the cap. The margin binds only on a fleet whose cars average more than 315 kW at the inlet
+--   across all thirty posts. If such cars come, the depot's figure moves with what is installed (rule 13), never the
+--   cars.
+--
 -- ══ §4 THE WRITES, IN ORDER ═══════════════════════════════════════════════════════════════════════════════════════════
 --
 --   (W1) The research pause, (W1) below: the 32 active sweeps at the twin depot to 'paused' (a sweep has no other state
@@ -167,6 +176,16 @@ SELECT r.sim_run_id, max(e.total_ev_charging_kw) AS peak_ev_kw, max(e.peak_deman
          WHERE v.sim_run_id = r.sim_run_id AND v.rule_code LIKE 'EN.001%' AND NOT v.passed) AS en001_failed
   FROM r LEFT JOIN public.site_energy_snapshots e ON e.sim_run_id = r.sim_run_id
  GROUP BY r.sim_run_id;
+
+-- (10) EN.001 on the thirty posts: the most the depot's cars can ask of thirty posts at once, against its cap after the
+--      margin (each start asks for LEAST(the post's max_kw, the car's inlet_max_kw), twin.ottoq_sim_start_charge_session)
+WITH asks AS (
+  SELECT LEAST(350::numeric, v.inlet_max_kw) AS ask_kw
+    FROM public.vehicles v WHERE v.home_depot_id = '11111111-1111-1111-1111-111111111111'),
+top30 AS (SELECT ask_kw FROM asks ORDER BY ask_kw DESC LIMIT 30)
+SELECT (SELECT count(*) FROM asks) AS cars, (SELECT sum(ask_kw) FROM top30) AS worst_30_posts_kw,
+       (SELECT 10500 * (1 - dcfc_safety_margin_pct / 100.0) FROM public.depots
+         WHERE id = '11111111-1111-1111-1111-111111111111') AS en001_cap_after_0763_kw;
 
 -- (W1) the research pause
 UPDATE public.ottoq_throughput_sweeps
