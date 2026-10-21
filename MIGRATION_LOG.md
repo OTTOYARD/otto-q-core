@@ -825,9 +825,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0760](db/migrations/0760_a_car_the_cleaning_arm_is_cleaning_keeps_its_stall_when_the_charge_arm_lets_go.sql) | `20261020213742` | yes — ledger | **A car the cleaning arm is cleaning keeps its stall when the charge arm lets go.** (G479) |
 | [0761](db/migrations/0761_a_car_held_at_its_charger_is_passed_over_by_the_bay_doors.sql) | `20261020225005` | yes — ledger | **A car held at its charger is passed over by the bay doors.** (G479, G472) |
 | [0762](db/migrations/0762_the_snapshot_says_when_each_cars_bay_work_started_and_ends.sql) | `20261021022543` | yes — ledger | **The snapshot says when each car's bay work started and when it ends.** (G480) |
+| [0763](db/migrations/0763_canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers.sql) | `PENDING` | no — pending | **Canopy C is re-striped as canopies A and B: the twin depot is built with thirty robotic fast chargers and no |
 | [0790](db/migrations/0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql) | `PENDING` | no — pending | **The stop door takes the live run's row before the run's proposals, the order the metronome's beat takes them |
 | [0791](db/migrations/0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql) | `PENDING` | no — pending | **A signed-in user can no longer pause, resume, start, reset or fast-forward a run through /rest/v1/rpc, and a |
 
-586 migrations indexed.
+587 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
