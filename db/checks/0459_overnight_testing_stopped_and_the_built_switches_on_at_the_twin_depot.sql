@@ -3,8 +3,9 @@
 --        Chase, 2026-10-20, after seeing no cleaning arm and no doors in his 3:09 PM CT demo: "Stop overnight testing. We
 --        are still building. No need to certify and test until everything is finished and we are not there. Go and build
 --        and implement!" Writes and reads against gxdrcyphqjzjsuhxuqtg on 2026-10-20 between 3:46 and 4:16 PM CT (20:46:57
---        UTC, the first query's clock, to 21:16:42 UTC, the last's). No migration was applied; every write is named below
---        with the statement that undoes it.
+--        UTC, the first query's clock, to 21:16:42 UTC, the last's), and the live check's reads to 5:53 PM CT (22:53:07
+--        UTC). This check applies no migration; every write is named below with the statement that undoes it. The two
+--        migrations the live check led to, 0760 and 0761, carry their own.
 --
 -- ══ §1 WHY THE DEMO SHOWED NONE OF IT (reproduce: (1), (2)) ════════════════════════════════════════════════════════════
 --
@@ -79,11 +80,48 @@
 --   (performed_by stall_cabin_robot, robot_stall_id the stall, ends_at started_at + 5.8 minutes), no technician. (7): by
 --   4:16 PM CT, tick 127, sim 9:06 AM CT: 2 arm cleans done, 44 service records issued. The live view (the app's own code
 --   on a dev server, pinned to the run) filmed DCFC-08's cycle: doors open at sim 8:55, the arm cleaning side A at 8:58,
---   home after (ottoyarddepot-sim docs/pr-shots/clean-arm-live, scripts/liveCleanShots.mjs). (8): rule 9 and the bay
---   switches are read when the run's day is done.
---   One defect surfaced on the run's fourth arm clean, at 4:28 PM CT. Car ca2624fc's charge ended while the arm was still
---   in its cabin, and the tether sweep freed its stall 15 seconds early, so the bay calendar took the car (G479). Fixed
---   by db/migrations/0760, applied at 4:37 PM CT.
+--   home after (ottoyarddepot-sim docs/pr-shots/clean-arm-live, scripts/liveCleanShots.mjs).
+--   (8)-(11), read between 5:51 and 5:53 PM CT (22:51:19-22:53:07 UTC; tick 1,125, sim 2:33 PM CT), mid-run. (The run
+--   was said here to end at 240 real minutes; its governor ended it at its 540 sim-minute ceiling instead, below.)
+--     - Rule 9 at departure: 37 departures, 0 below target, 0 with needed work open.
+--     - Work: 322 of 665 must-do atoms done; 144 visits, 37 served, 394 service records.
+--     - The bay seats: no seat was filed interrupted. Wash bays: 29 done, 26 of them on their own bay exit
+--       (bay_exit_closes_its_leg, bay_release_reads_the_work); service bays: 12 done, 10 on their bay exit.
+--     - Repairs: no fault repair is done yet (4 pending), so no green-light has been asked.
+--     - The cleaning arm: 8 cleans done, on DCFC-05 to -09; 1 thrown away, ca2624fc's, below.
+--     - Service records issued at bay exit: 19 wash, 13 detail and 19 service, of 417 records in all.
+--     - The bay calendar's seats (12), read 5:59-6:01 PM CT: 140 refused attempts, every one a 23505 on
+--       idx_stalls_one_vehicle_per_stall, between sim 11:50 AM and 2:58 PM CT. 78 were for 8 cars' service-bay
+--       bookings and 62 for 6 cars' wash-bay bookings. Each is G471: the car still holds its staging stall when the
+--       calendar stamps it into its bay. 0755 fixes it and waits on Chase at the connector (§5). Meanwhile a
+--       reserved bay can sit empty while its car waits in staging: NASH-SVC-02 was free at sim 2:53 PM, and its
+--       next car, 4b179b26, was refused there at 2:58.
+--     - The server log, 4:05-6:01 PM CT: no errors. The only warnings are those seat refusals and the 12
+--       interlock refusals below.
+--   The full day, (8)-(12), read 6:51-6:52 PM CT (23:51:37-23:52:24 UTC). The run governor ended the run at 6:36 PM CT
+--   (23:36:00 UTC, tick 1,557), on reaching its 540 sim-minute ceiling: sim 8:00 AM to 5:01 PM CT.
+--     - Rule 9 at departure: 54 departures, 0 below target, 0 with needed work open.
+--     - Work: 446 of 756 must-do atoms done; 163 visits, 54 served (50 cars), 109 still in the depot at the end;
+--       533 service records.
+--     - The cleaning arm: 10 cleans done, on 7 fast chargers. 1 was thrown away, ca2624fc's, before 0760 and 0761.
+--       Every one of the 10 finished before its car's charge did, so neither fix met its case on this run.
+--     - The bay seats: none filed interrupted. Wash bays: 47 done on their own bay exit. Service bays: 15 done on
+--       their own bay exit. At the stop, 10 wash and 25 service bookings were released (run_stopped).
+--     - Refused moves filed as an exception: the 12 before 0761's dial, none after it (ticks 1,101-1,557).
+--     - G471: 210 refused seat attempts over 20 bookings and 17 cars (136 at the service bays, 74 at the wash bays).
+--     - Charging, busy day at 10 fast chargers: from arrival to first charge, a median 144.1 minutes, p95 246.7 and
+--       the longest 250.3; 10 cars still waiting at the end. That queue is what 0759's twenty posts are for (§5).
+--   One defect surfaced on the run's fourth arm clean, at 4:28 PM CT (G479). Car ca2624fc's charge ended while the arm
+--   was still in its cabin, and the tether sweep freed its stall 15 seconds early. Decide section (4b), the walk-in
+--   door, then took the car. This section first said the bay calendar took it; the decision rows and the booking,
+--   read at 5:36-5:39 PM CT, say (4b).
+--     - db/migrations/0760, applied at 4:37 PM CT, keeps the stall.
+--     - db/migrations/0761, applied at 5:50 PM CT, has (4b) and (5) read the arm's hold. 0760 alone did not make them.
+--     - 0761 also stops filing the charge arm's interlock as an engine exception (G472). Its dial
+--       bay_walkin_waits_for_the_arm was switched on at the twin depot under Chase's name at 5:50 PM CT, by
+--       public.ottoq_policy_set('depot', '11111111-1111-1111-1111-111111111111', 'bay_walkin_waits_for_the_arm', 1, 'Chase')
+--       (undo with 0 and a person's name). Before it, all 12 of the run's refused moves were that interlock, the last
+--       at tick 558; in its first 14 ticks, none.
 --
 -- ══ QUERIES ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -123,5 +161,39 @@ SELECT left(vn.vehicle_id::text, 8) AS car, a->>'status' AS status, s.stall_code
  WHERE vn.sim_run_id = 'c6ec017d-ec07-4762-8774-4129de1f4ad6' AND a->>'performed_by' = 'stall_cabin_robot'
  ORDER BY a->>'started_at';
 
--- (8) rule 9 at departure and the bay switches, once the day is done
-SELECT public.ottoq_throughput_scorecard('c6ec017d-ec07-4762-8774-4129de1f4ad6'::uuid) -> 'rule9' AS rule9;
+-- (8) rule 9 at departure, the work done and the service records
+SELECT sc.j -> 'rule9' AS rule9, sc.j -> 'service_completion' AS service_completion, sc.j -> 'throughput' AS throughput,
+       (SELECT count(*) FROM public.ottoq_service_detail_records s
+         WHERE s.sim_run_id = 'c6ec017d-ec07-4762-8774-4129de1f4ad6') AS sdrs
+  FROM (SELECT public.ottoq_throughput_scorecard('c6ec017d-ec07-4762-8774-4129de1f4ad6'::uuid) AS j) sc;
+
+-- (9) how the bay seats closed
+SELECT s.stall_type::text AS bay, b.state, COALESCE(b.release_reason, '-') AS why, count(*) AS bookings
+  FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id
+ WHERE b.sim_run_id = 'c6ec017d-ec07-4762-8774-4129de1f4ad6' AND s.stall_type::text IN ('wash_bay', 'service_bay')
+   AND b.booked_by LIKE 'otto_q%'
+ GROUP BY 1, 2, 3 ORDER BY 1, 2, 3;
+
+-- (10) the cleaning arm's cleans: done, at work, and thrown away (an interruption 'left_the_cabin_robot')
+SELECT count(*) FILTER (WHERE a->>'performed_by' = 'stall_cabin_robot' AND a->>'status' = 'done') AS done,
+       count(*) FILTER (WHERE a->>'performed_by' = 'stall_cabin_robot' AND a->>'status' = 'in_progress') AS at_work,
+       count(*) FILTER (WHERE a::text LIKE '%left_the_cabin_robot%') AS thrown_away
+  FROM public.ottoq_visit_needs vn CROSS JOIN LATERAL jsonb_array_elements(vn.atoms) a
+ WHERE vn.sim_run_id = 'c6ec017d-ec07-4762-8774-4129de1f4ad6';
+
+-- (11) refused moves filed as an exception, before and after 0761's dial (on from tick 1,101)
+SELECT count(*) FILTER (WHERE d.tick_seq <= 1100) AS before_the_dial, count(*) FILTER (WHERE d.tick_seq > 1100) AS after,
+       count(*) FILTER (WHERE d.tick_seq > 1100 AND d.enacted_action ? 'message') AS after_with_their_message
+  FROM public.ottoq_decisions d
+ WHERE d.sim_run_id = 'c6ec017d-ec07-4762-8774-4129de1f4ad6' AND d.enacted_action ->> 'reason' = 'exception';
+
+-- (12) the bay calendar's refused seats (G471), per bay type: attempts, bookings, cars
+WITH ref AS (
+  SELECT e.sim_clock_at, x->>'booking_id' AS booking_id, x->>'vehicle_id' AS vehicle_id, x->>'stall_id' AS stall_id,
+         x->>'sqlstate' AS sqlstate
+    FROM public.ottoq_events e CROSS JOIN LATERAL jsonb_array_elements(e.payload->'refused') x
+   WHERE e.sim_run_id = 'c6ec017d-ec07-4762-8774-4129de1f4ad6' AND e.event_type = 'ottoq.bay_reservation_seat_refused')
+SELECT s.stall_type::text AS bay, ref.sqlstate, count(*) AS attempts, count(DISTINCT ref.booking_id) AS bookings,
+       count(DISTINCT ref.vehicle_id) AS cars, min(ref.sim_clock_at) AS first_at, max(ref.sim_clock_at) AS last_at
+  FROM ref JOIN public.stalls s ON s.id::text = ref.stall_id
+ GROUP BY 1, 2 ORDER BY 1;

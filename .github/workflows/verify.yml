@@ -746,6 +746,21 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_cabin_arm_keeps_its_stall_sql.py
 
+      # 0761, G479 and G472, EXECUTED on the live assignment, hold, tether test, interlock and dial reader
+      # (tests/fixtures/held_car_passed_over_stub.sql, md5 asserted): the two bay doors' insertions, taken from the
+      # migration, pass over a car its stall's cleaning arm or a data transfer holds, and with the dial a car the charge
+      # arm holds, by the interlock's own test, and read every other car as before; the assignment's patch puts a
+      # refusal's message on the record with the dial and changes nothing without it. 25 tests, about 20 seconds.
+      - name: A car held at its charger is passed over by the bay doors, executed (0761)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_held_car_is_passed_over_sql.py
+
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
       # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry
