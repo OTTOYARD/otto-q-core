@@ -56,6 +56,23 @@ def _clear_record(d):
     d.val("BEGIN; SET LOCAL ottoq.evidence_regimes_unlock = 'on'; DELETE FROM public.ottoq_evidence_regimes; COMMIT;")
 
 
+def _keep_0622s_params(d):
+    """0622's params, kept under another name before 0625 replaces them, so that a test can apply 0625 first and plant
+    its fleet after (G482). 0625's V3 asserts that the fit at apply honours its record of 0573, which a fit through now()
+    over 21 days does only until 2026-10-21 11:53:08 UTC; after that 0625 raises when applied over planted charges (the
+    fit at apply is usable and carries no regimes). 0625 replaces only this function and the fit, which it does not
+    call, so the copy answers as 0622's own does."""
+    d.val(r"""DO $k$ BEGIN
+                EXECUTE replace(pg_get_functiondef(
+                  'public.ottoq_charge_time_v2_params(uuid,timestamp with time zone,interval,numeric)'::regprocedure),
+                  'public.ottoq_charge_time_v2_params(', 'public._t0622_charge_time_v2_params(');
+              END $k$""")
+
+
+def _params_0622(d, through):
+    return d.json(f"SELECT public._t0622_charge_time_v2_params('{DEPOT}', '{through}', interval '21 days', 3)")
+
+
 def _through_0625(d, clear=True):
     dw._through_0624(d)
     err = _apply(d)
@@ -224,11 +241,12 @@ def test_0625_the_cuts_are_the_latest_change_per_scope_inside_the_window(db):
 
 def test_0625_with_nothing_recorded_inside_the_window_the_params_are_0622s(db):
     dw._through_0624(db)
+    _keep_0622s_params(db)
+    _apply(db)                                                # before the fleet (G482)
+    _clear_record(db)
     arb._fleet(db, RUNS)
     t = _now(db)
-    before = _params(db, t)                                   # 0622's own function
-    _apply(db)
-    _clear_record(db)
+    before = _params_0622(db, t)                              # 0622's own body
     assert _params(db, t) == before                           # the record read, nothing inside the window
     assert _params(db, t, {}) == before                       # no cuts
     assert "regimes" not in before

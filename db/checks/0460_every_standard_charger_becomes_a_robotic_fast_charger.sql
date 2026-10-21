@@ -58,6 +58,23 @@
 --   charging on canopy B and canopy C posts with an arm cycle each; the cleaning arm's tidies there; rule 9 at departure.
 --   Checking a change in one demo run is part of building it (rule 12), not testing.
 --
+-- ══ §5 THE DEMO-RUN CHECK (reproduce: (5)-(9), each on the twin depot's latest run) ═════════════════════════════════
+--
+--   (5) the base the run ran on (census and power) and the switches it read; (6) its charges by canopy, A = DCFC-01..10,
+--   B = 11..20, C = 21..30 (a charge session is one cycle of the post's OTTO-CHARGE ARM: it mates, and lets go at the end);
+--   (7) the OTTO-CLEAN ARM's cleans by canopy (0758: every dcfc stall carries one); (8) rule 9 at departure and the
+--   throughput; (9) the power the posts drew against the depot's limits, and EN.001's failures (expected 0: nothing
+--   installed can reach 10,500 kW).
+--
+--   The as-built baseline, read on 2026-10-21 at 8:23 AM CT on the depot's latest run, 96371023 (busy_day, 1,605 ticks,
+--   10 + 30 chargers, 1,800/2,500 kW, stall_cabin_robot 1, wash_lane_physics 2, the DC power settings off):
+--     (6) canopy A 100 charges on its 10 posts for 73 cars, 3,780.6 kWh, the highest post draw 157.83 kW; the 30 L2s 136
+--         charges for 96 cars, 3,722.8 kWh.
+--     (7) 22 cabin cleans by the cleaning arm, on 9 of canopy A's 10 arms.
+--     (8) 96 departures, none below its charge target and none with needed work open; 96 of 210 visits served, 88 cars,
+--         114 in the depot at the horizon.
+--     (9) the EV draw peaked at 1,247.3 kW and the 15-minute demand at 965.4 kW; EN.001 failed 0 times.
+--
 -- ══ QUERIES ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 -- (1) the twin depot's census, power and research state
@@ -91,6 +108,65 @@ SELECT (SELECT jsonb_object_agg(max_kw, n) FROM (SELECT max_kw, count(*) n FROM 
        (SELECT max_charge_kw FROM public.ottoq_bess_units WHERE depot_id = '11111111-1111-1111-1111-111111111111') AS bess_charge_kw,
        (SELECT max(building_load_kw) FROM public.site_energy_snapshots
          WHERE depot_id = '11111111-1111-1111-1111-111111111111') AS building_max_kw;
+
+-- (5) the twin depot's latest run: the base it ran on and the switches it read
+WITH r AS (SELECT sim_run_id, scenario_code, status, started_at, tick_count FROM public.ottoq_sim_runs
+            WHERE depot_id = '11111111-1111-1111-1111-111111111111' ORDER BY started_at DESC LIMIT 1)
+SELECT r.sim_run_id, r.scenario_code, r.status, r.started_at, r.tick_count,
+       (SELECT jsonb_object_agg(stall_type::text, n) FROM (SELECT stall_type, count(*) n FROM public.stalls
+          WHERE depot_id = '11111111-1111-1111-1111-111111111111' GROUP BY 1) x) AS census,
+       (SELECT dcfc_max_concurrent_kw || '/' || service_max_kw FROM public.depots
+         WHERE id = '11111111-1111-1111-1111-111111111111') AS power,
+       (SELECT jsonb_object_agg(k, public.ottoq_policy_get(r.sim_run_id, k, 0))
+          FROM unnest(ARRAY['stall_cabin_robot', 'wash_lane_physics', 'dc_power_sharing', 'dc_power_managed',
+                            'dc_power_first_reading', 'enforce_site_charge_cap', 'twin_answer_in_tick']) k) AS switches
+  FROM r;
+
+-- (6) its charges by canopy: sessions (one charge-arm cycle each), posts used, cars, energy, the highest post draw
+WITH r AS (SELECT sim_run_id FROM public.ottoq_sim_runs
+            WHERE depot_id = '11111111-1111-1111-1111-111111111111' ORDER BY started_at DESC LIMIT 1)
+SELECT CASE WHEN s.stall_code ~ '^NASH-DCFC-STALL-(0[1-9]|10)$' THEN 'A (DCFC-01..10)'
+            WHEN s.stall_code ~ '^NASH-DCFC-STALL-(1[1-9]|20)$' THEN 'B (DCFC-11..20)'
+            WHEN s.stall_code ~ '^NASH-DCFC-STALL-(2[1-9]|30)$' THEN 'C (DCFC-21..30)'
+            ELSE s.stall_type::text END AS canopy,
+       count(*) AS sessions, count(DISTINCT o.stall_id) AS posts, count(DISTINCT o.vehicle_id) AS cars,
+       round(sum(o.energy_delivered_kwh), 1) AS kwh, max(o.peak_power_kw) AS peak_post_kw,
+       count(*) FILTER (WHERE o.ended_at IS NULL) AS charging_now
+  FROM r JOIN public.ocpp_sessions o ON o.sim_run_id = r.sim_run_id JOIN public.stalls s ON s.id = o.stall_id
+ GROUP BY 1 ORDER BY 1;
+
+-- (7) the cleaning arm's cleans by canopy: done, at work, and the arms that worked
+WITH r AS (SELECT sim_run_id FROM public.ottoq_sim_runs
+            WHERE depot_id = '11111111-1111-1111-1111-111111111111' ORDER BY started_at DESC LIMIT 1)
+SELECT CASE WHEN s.stall_code ~ '^NASH-DCFC-STALL-(0[1-9]|10)$' THEN 'A (DCFC-01..10)'
+            WHEN s.stall_code ~ '^NASH-DCFC-STALL-(1[1-9]|20)$' THEN 'B (DCFC-11..20)'
+            WHEN s.stall_code ~ '^NASH-DCFC-STALL-(2[1-9]|30)$' THEN 'C (DCFC-21..30)'
+            ELSE COALESCE(s.stall_code, 'no stall') END AS canopy,
+       count(*) FILTER (WHERE a->>'status' = 'done') AS done, count(*) FILTER (WHERE a->>'status' = 'in_progress') AS at_work,
+       count(DISTINCT s.stall_code) AS arms
+  FROM r JOIN public.ottoq_visit_needs vn ON vn.sim_run_id = r.sim_run_id
+  CROSS JOIN LATERAL jsonb_array_elements(vn.atoms) a
+  LEFT JOIN public.stalls s ON s.id::text = a->>'robot_stall_id'
+ WHERE a->>'performed_by' = 'stall_cabin_robot'
+ GROUP BY 1 ORDER BY 1;
+
+-- (8) rule 9 at departure, and the throughput
+WITH r AS (SELECT sim_run_id FROM public.ottoq_sim_runs
+            WHERE depot_id = '11111111-1111-1111-1111-111111111111' ORDER BY started_at DESC LIMIT 1)
+SELECT r.sim_run_id, sc.j -> 'rule9' AS rule9, sc.j -> 'throughput' AS throughput
+  FROM r CROSS JOIN LATERAL (SELECT public.ottoq_throughput_scorecard(r.sim_run_id) AS j) sc;
+
+-- (9) the power the posts drew against the depot's limits, and EN.001's failures
+WITH r AS (SELECT sim_run_id FROM public.ottoq_sim_runs
+            WHERE depot_id = '11111111-1111-1111-1111-111111111111' ORDER BY started_at DESC LIMIT 1)
+SELECT r.sim_run_id, max(e.total_ev_charging_kw) AS peak_ev_kw, max(e.peak_demand_kw_15min) AS peak_15min_kw,
+       max(e.grid_import_kw) AS peak_grid_kw,
+       (SELECT dcfc_max_concurrent_kw || '/' || service_max_kw FROM public.depots
+         WHERE id = '11111111-1111-1111-1111-111111111111') AS limits,
+       (SELECT count(*) FROM public.ottoq_rule_evaluations v
+         WHERE v.sim_run_id = r.sim_run_id AND v.rule_code LIKE 'EN.001%' AND NOT v.passed) AS en001_failed
+  FROM r LEFT JOIN public.site_energy_snapshots e ON e.sim_run_id = r.sim_run_id
+ GROUP BY r.sim_run_id;
 
 -- (W1) the research pause
 UPDATE public.ottoq_throughput_sweeps
