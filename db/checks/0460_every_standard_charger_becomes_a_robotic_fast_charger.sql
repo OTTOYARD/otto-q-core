@@ -51,7 +51,9 @@
 --   which ask for the post's 350. Thirty posts all charging the thirty hungriest cars draw 12 x 350 + 18 x 250 =
 --   8,700 kW, 750 kW under the cap. The margin binds only on a fleet whose cars average more than 315 kW at the inlet
 --   across all thirty posts. If such cars come, the depot's figure moves with what is installed (rule 13), never the
---   cars.
+--   cars. What the posts have drawn is lower still: on every run started since 2026-10-01 (0573 rebuilt the fast-charge
+--   physics on 09-30) no session on a 350 kW post went over its rating and the highest draw was 220.2 kW (11): thirty
+--   posts at that draw are 6,606 kW. The three sessions over 350 kW are on runs started 09-29 and 09-30.
 --
 -- ══ §4 THE WRITES, IN ORDER ═══════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -186,6 +188,16 @@ top30 AS (SELECT ask_kw FROM asks ORDER BY ask_kw DESC LIMIT 30)
 SELECT (SELECT count(*) FROM asks) AS cars, (SELECT sum(ask_kw) FROM top30) AS worst_30_posts_kw,
        (SELECT 10500 * (1 - dcfc_safety_margin_pct / 100.0) FROM public.depots
          WHERE id = '11111111-1111-1111-1111-111111111111') AS en001_cap_after_0763_kw;
+
+-- (11) what the 350 kW posts have drawn, by the day their runs started: sessions, those over the rating, the highest draw
+SELECT date_trunc('day', r.started_at) AS run_day, count(*) AS sessions,
+       count(*) FILTER (WHERE o.peak_power_kw > c.max_kw) AS over_rating, round(max(o.peak_power_kw), 2) AS max_peak_kw
+  FROM public.ocpp_sessions o
+  JOIN public.stalls s ON s.id = o.stall_id
+  JOIN public.ottoq_ocpp_chargers c ON c.ocpp_identifier = o.charge_point_id
+  LEFT JOIN public.ottoq_sim_runs r ON r.sim_run_id = o.sim_run_id
+ WHERE s.depot_id = '11111111-1111-1111-1111-111111111111' AND c.max_kw = 350
+ GROUP BY 1 ORDER BY 1;
 
 -- (W1) the research pause
 UPDATE public.ottoq_throughput_sweeps
