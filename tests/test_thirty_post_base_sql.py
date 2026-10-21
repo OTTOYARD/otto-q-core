@@ -2,25 +2,22 @@
 
 WHY THIS EXISTS. Chase, 2026-10-21: swap out all of the L2s for robotic fast chargers, each with its charging arm and
 overhead robovac. 0759 re-stripes canopy B; 0763 re-stripes canopy C, so the depot holds thirty robotic posts (the site's
-ceiling at this arm design) and no standard charger, on today's 2.5 MW service with the posts sharing 2.4 MW of DC
-cabinets (arm 112's cell). Executed here, on the scratch PostgreSQL, over 0759's fixture (the live bodies and the depot's
-rows as read on 2026-10-19, tests/fixtures/twenty_post_base_stub.sql), with 0759 applied first and 0763 run whole:
+ceiling at this arm design) and no standard charger, with power limits no car can reach (CLAUDE.md rule 13: no ceiling on
+the front end while we build). Executed here, on the scratch PostgreSQL, over 0759's fixture (the live bodies and the
+depot's rows as read on 2026-10-19, tests/fixtures/twenty_post_base_stub.sql), with 0759 applied first and 0763 run whole:
   - 0763 lays canopy C out at the layout seed's points (NASH-DCFC-STALL-21..30, west x 288.8583 at heading 60, east x
     310.8366 at heading 300, canopy A's rows), re-rates and renames their chargers, flips their capabilities, retires
-    NASH-L2-STALL-31..35, sets the depot's power, layout counts and canopy C's structure, writes the four settings under
-    Chase's name, moves nothing else, passes the geometry checks, and signs one event per moved space as
-    migration_script 0763, to no run;
+    NASH-L2-STALL-31..35, sets the depot's power to what is installed, its layout counts and canopy C's structure, writes
+    no setting, moves nothing else, passes the geometry checks, and signs one event per moved space as migration_script
+    0763, to no run;
   - after 0763 every build-out round-trips to the new depot exactly; every old one is the day it was, column by column;
-    dcfc10 is the depot as built before 0759 row for row, dcfc20 the 20-post depot 0759 built row for row, and dcfc30
-    and dcfc30_cab2400 the new depot on their grids;
+    dcfc10 is the depot as built before 0759 row for row, dcfc20 the 20-post depot 0759 built row for row, dcfc30 the new
+    depot exactly and dcfc30_cab2400 the new depot held to 2,400/2,500;
   - the scorecard reads a run as it ran: days before 0759 and a day on the 20-post depot score the same after 0763;
   - ottoq_stall_type_at answers the type a space had across both base changes;
   - 0763 refuses before 0759, while a sweep or a dial experiment is active, a run is live or a rig is in flight; refuses a
     body 0759 does not leave, a car or an open booking on canopy C, a run that named dcfc30, and a second apply.
-STAND-INS, beyond 0759's fixture: the policy catalog and params tables, and public.ottoq_policy_set as the live door's
-write alone (no shield probe, no clamp): enough to test that 0763 writes the four settings through the door and checks
-them, not the door itself. A module template carries the fixture, and each test clones it. It SKIPS where no scratch
-PostgreSQL is reachable.
+A module template carries the fixture, and each test clones it. It SKIPS where no scratch PostgreSQL is reachable.
 """
 import json
 import os
@@ -38,35 +35,9 @@ M0763 = os.path.join(ROOT, "db", "migrations", "0763_canopy_c_is_restriped_and_t
 DEPOT = base.DEPOT
 WEST_X, EAST_X = 288.8583, 310.8366
 ROWS_Y = tp.ROWS_Y
-SETTINGS = {"dc_power_sharing": "1", "dc_power_managed": "1", "dc_power_first_reading": "1", "enforce_site_charge_cap": "0"}
 
 pytestmark = pytest.mark.skipif(not base._server_up(),
                                 reason="no scratch PostgreSQL reachable (PGHOST or /var/tmp:55432)")
-
-POLICY_STANDIN = """
-CREATE TABLE public.ottoq_policy_param_catalog (param_key text PRIMARY KEY, default_value numeric, min_value numeric,
-  max_value numeric);
-INSERT INTO public.ottoq_policy_param_catalog VALUES
-  ('dc_power_sharing', 0, 0, 1), ('dc_power_managed', 0, 0, 1), ('dc_power_first_reading', 0, 0, 1),
-  ('enforce_site_charge_cap', 1, 0, 1), ('dc_power_by_need', 0, 0, 1), ('site_cap_gate_metered', 0, 0, 1);
-CREATE TABLE public.ottoq_policy_params (scope_type text NOT NULL, scope_id uuid NOT NULL, param_key text NOT NULL,
-  param_value numeric NOT NULL, updated_by text, updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (scope_type, scope_id, param_key));
--- the live door's write alone: refuse an unknown key, write the row under the name given, say what was applied
-CREATE FUNCTION public.ottoq_policy_set(p_scope_type text, p_scope_id uuid, p_param_key text, p_param_value numeric,
-                                        p_by text) RETURNS jsonb LANGUAGE plpgsql AS $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM public.ottoq_policy_param_catalog WHERE param_key = p_param_key) THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'unknown_param', 'param', p_param_key);
-  END IF;
-  INSERT INTO public.ottoq_policy_params (scope_type, scope_id, param_key, param_value, updated_by)
-  VALUES (p_scope_type, p_scope_id, p_param_key, p_param_value, p_by)
-  ON CONFLICT (scope_type, scope_id, param_key) DO UPDATE SET param_value = EXCLUDED.param_value, updated_at = now(),
-     updated_by = EXCLUDED.updated_by;
-  RETURN jsonb_build_object('ok', true, 'param', p_param_key, 'requested', p_param_value, 'applied', p_param_value);
-END $$;
-"""
-
 
 @pytest.fixture(scope="module")
 def template():
@@ -79,8 +50,6 @@ def template():
         d.val("""INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
                  VALUES ('0758_a_fast_chargers_cleaning_arm_cleans_the_cabin_while_the_car_charges', false, false,
                          'test premise', now())""")
-        rc, _, err = tp._script(d, POLICY_STANDIN)
-        assert rc == 0, err
         yield name
     finally:
         tp._admin(f"DROP DATABASE IF EXISTS {name} WITH (FORCE)")
@@ -159,18 +128,12 @@ def test_0763_lays_canopy_c_out_as_canopies_a_and_b_and_leaves_no_standard_charg
                        + [[f"NASH-L2-STALL-{n}", "parking", "t", "t", "retired", "t", "t", "f", "0", "t", "Unavailable", "0763"]
                           for n in range(31, 36)])
     assert db.val(f"""SELECT dcfc_max_concurrent_kw || '/' || service_max_kw || '/' || (site_layout->>'dcfc_count') || '/'
-                             || (site_layout->>'l2_count') FROM public.depots WHERE id = '{DEPOT}'""") == "2400/2500/30/0"
+                             || (site_layout->>'l2_count') FROM public.depots WHERE id = '{DEPOT}'""") == "10500/12250/30/0"
     assert db.val(f"""SELECT title || '|' || (properties->'chargers')::text || '|' || (properties->>'stall_capacity')
                         FROM public.ottoq_site_structures
                        WHERE depot_id = '{DEPOT}' AND structure_code = 'CANOPY-03'""") == 'Solar Canopy C (DCFC)|{"dcfc": 10}|10'
     assert db.val(f"SELECT public.ottoq_check_stall_overlap('{DEPOT}')->>'passed'") == "true"
     assert db.val(f"SELECT public.ottoq_check_fence_containment('{DEPOT}')->>'passed'") == "true"
-    # the four settings, under Chase's name, and nothing else at the depot
-    got = dict(tuple(r.split("|")[:2]) for r in db.run(f"""
-        SELECT param_key, param_value::int, updated_by FROM public.ottoq_policy_params
-         WHERE scope_type = 'depot' AND scope_id = '{DEPOT}' AND updated_by = 'Chase'""")[1])
-    assert got == SETTINGS
-    assert db.val("SELECT count(*) FROM public.ottoq_policy_params") == "4"
     # nothing else moved: the other 143 spaces, their capabilities and the other chargers, row for row
     after = tp._image(db)
     moved = {tp._sid(db, f"NASH-DCFC-STALL-{n}") for n in range(21, 31)} | {tp._sid(db, f"NASH-L2-STALL-{n}") for n in range(31, 36)}
@@ -189,7 +152,7 @@ def test_0763_lays_canopy_c_out_as_canopies_a_and_b_and_leaves_no_standard_charg
             assert after["caps"][key] == active, key
     assert db.val("""SELECT forces_recert || '/' || forces_dial_restart FROM public.ottoq_cert_lineage
                       WHERE name = '0763_canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers'""") == "true/true"
-    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0763_pre' AND object_kind = 'rows'") == "4"
+    assert db.val("SELECT count(*) FROM public.ottoq_schema_snapshots WHERE label = '0763_pre' AND object_kind = 'rows'") == "3"
 
 
 def test_0763_signs_one_event_per_moved_space_as_the_migration_to_no_run(db):
@@ -221,7 +184,7 @@ def test_after_0763_every_buildout_round_trips_and_the_old_ones_are_the_days_the
         if code in ("dcfc30", "dcfc30_cab2400"):
             assert {k: v for k, v in applied.items() if k != "power"} == {k: v for k, v in thirty.items() if k != "power"}, code
             assert receipt["stall_set"] == [] and receipt["converted_stall_ids"] == [] and receipt["buildable"] is True, code
-            assert applied["power"] == ([5400, 6226] if code == "dcfc30" else [2400, 2500]), code
+            assert applied["power"] == ([10500, 12250] if code == "dcfc30" else [2400, 2500]), code
             continue
         old_receipt, old_applied, _ = old[code]
         assert applied == old_applied, code
@@ -234,8 +197,9 @@ def test_after_0763_every_buildout_round_trips_and_the_old_ones_are_the_days_the
     # dcfc10 is the depot as it stood before 0759, row for row; dcfc20 the 20-post depot 0759 built, row for row
     assert tp._applied_image(db, "dcfc10")[1] == as_built
     assert tp._applied_image(db, "dcfc20")[1] == twenty
-    # and the base is dcfc30_cab2400 exactly
-    assert thirty["power"] == [2400, 2500]
+    # and the base is what is installed: dcfc30 exactly
+    assert thirty["power"] == [10500, 12250]
+    assert tp._applied_image(db, "dcfc30")[1] == thirty
 
 
 # ── the past ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -309,7 +273,6 @@ def test_0763_refuses_before_0759(db):
     (f"""INSERT INTO public.ottoq_sim_runs (sim_run_id, depot_id, status, started_at, payload)
          VALUES (gen_random_uuid(), '{DEPOT}', 'completed', now(), '{{"site_buildout": {{"buildout_code": "dcfc30"}}}}')""",
      "a run has named dcfc30"),
-    ("DELETE FROM public.ottoq_policy_param_catalog WHERE param_key = 'dc_power_managed'", "the four settings are not all catalogued"),
 ])
 def test_0763_refuses_a_world_it_was_not_written_against(db, setup, needle):
     _apply_0759(db)

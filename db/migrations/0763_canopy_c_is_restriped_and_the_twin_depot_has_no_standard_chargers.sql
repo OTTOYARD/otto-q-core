@@ -2,8 +2,8 @@
 -- migration-name:    canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers
 --
 -- 0763  **Canopy C is re-striped as canopies A and B: the twin depot is built with thirty robotic fast chargers and no
---       standard charger, on today's 2.5 MW service, with the thirty posts sharing 2.4 MW of DC cabinets that OTTO-Q
---       holds.** (G481)
+--       standard charger, and its power limits are what its hardware can draw, so the cars take what they need and the
+--       depot's ceiling is set later from what they drew.** (G481)
 --
 -- ══ §0 CHASE'S CALL, AND HOW IT IS APPLIED ════════════════════════════════════════════════════════════════════════════
 --
@@ -16,9 +16,8 @@
 --
 --   It changes the depot every demo reads, so it is applied as 0759 is: after 0759, between runs, with no research sweep
 --   or dial experiment active at the twin depot (P0), through the connector, which asks (this UPDATEs stalls, chargers,
---   the depot and the build-outs, writes four depot settings, and DROPs its own temporary function), and once the
---   renderer draws the 30-post depot (ottoyarddepot-sim #152, build dcfc30; live only after Lovable's Publish, then
---   Update). Until then the app keeps drawing canopy C as standard chargers.
+--   the depot and the build-outs, and DROPs its own temporary function), and once the renderer draws the 30-post depot
+--   (ottoyarddepot-sim #152, build dcfc30, merged and published 2026-10-21).
 --
 -- ══ §1 THIRTY POSTS, AND THE POWER THEY NEED ══════════════════════════════════════════════════════════════════════════
 --
@@ -28,16 +27,21 @@
 --   thirty: rule 10 makes the research a recommendation and the build his call, and this file builds his call. Past twenty
 --   posts the wash line was the wall (0451 §13); the depot's wash lanes have been robotic since 2026-10-20 (G460).
 --
---   THE POWER, AND WHY NOT THE NAMEPLATE. Thirty 350 kW posts are 10.5 MW of nameplate. The research wing's answer to the
---   megawatt question (0451 §10 point 3) is a site controller holding a limit OTTO-Q sets, not a utility upgrade, and the
---   arm that answers it best is arm 112 (sweep heldtick_normal_2026_10_19, run aeb6d541, read 2026-10-21): forty posts on
---   today's 2,500 kW service behind 2,400 kW of shared DC cabinets held at the shield's engineering cap, with the twin
---   answering in the tick and a new charge's first reading fixed (0733). Against arm 95, the same forty posts and seed
---   with power to spare (7,200 kW DC, 8,089 kW service), it met 939.8 deployed car-hours against 940.5, served 215 visits
---   against 205, and peaked at 1,750.4 kW against 2,128.4, every car leaving at 100% with nothing open. One seed. So this
---   depot keeps today's service and its thirty posts share 2,400 kW of cabinets. A slower charge is queueing, never a
---   shorter charge (rule 9): every car still charges to its owner's target. The nameplate grid stays a build-out (dcfc30,
---   5,400 kW DC and 6,226 kW service) for the research wing, and making it the base is one statement (§7).
+--   THE POWER: NO CEILING ON THE FRONT END (CLAUDE.md rule 13). Chase, 2026-10-21, on reading the held-site design this
+--   file first carried: "never base variable allocation of resources or throughput or up time or energy consumption
+--   based on a hard ceiling until we have everything built out ... The vehicles needs take absolute precedence, and any
+--   energy needed is consumed, and we have to fit around that ... once we run test and see what their consumption is like
+--   with additional vehicles and everything considered, then we can raise that ceiling ... Once we get that idea, we can
+--   set the new benchmarks and then try to work down that margin with battery energy storage or any other methods." So
+--   the depot's limits are what is installed, and no limit below it: dcfc_max_concurrent_kw 10,500, thirty posts at their
+--   350 kW rating at once; service_max_kw 12,250, those posts plus the battery charging at its rating (NASH-BESS-01, a
+--   Megapack 2 XL, max_charge_kw 1,500) plus 250 kW of building (the most the depot's energy snapshots have read is
+--   228.2 kW). No car can be refused, slowed or held for power: a car charges at what it and its post can take. What the
+--   thirty posts then draw is the measurement a ceiling is set from, when testing resumes (rule 12), and the margin under
+--   it is then worked down on the operator's side (the battery, the tariff), never by a vehicle. The held site the
+--   research wing measured (0451 §10 point 3; arm 112, sweep heldtick_normal_2026_10_19: forty posts on 2,400 kW of
+--   shared cabinets met 939.8 car-hours against 940.5 with power to spare, one seed) stays the build-out
+--   dcfc30_cab2400, for that later work and not as the base.
 --
 -- ══ §2 WHAT THIS CHANGES ═════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -58,22 +62,12 @@
 --   (d) NASH-L2-STALL-31..35 are retired as 0759 retires 11..15: stall_type parking, no position, no charger, no zone,
 --       stall_kind retired, no canopy, not covered, every capability inactive, the row kept because history references it.
 --       Their chargers NASH-L2-31..35 are decommissioned at the apply.
---   (e) The depot: dcfc_max_concurrent_kw 3,600 -> 2,400 (the shared cabinets) and service_max_kw 4,363 -> 2,500 (today's
---       service, the depot's as built until 0759); site_layout dcfc_count 30 and l2_count 0.
+--   (e) The depot: dcfc_max_concurrent_kw 3,600 -> 10,500 and service_max_kw 4,363 -> 12,250, what is installed (§1);
+--       site_layout dcfc_count 30 and l2_count 0.
 --   (f) CANOPY-03 reads 'Solar Canopy C (DCFC)', chargers {dcfc: 10}, stall_capacity 10, as CANOPY-01 and CANOPY-02 do.
 --       Its panels and solar are unchanged.
---   (g) Four settings at the twin depot, arm 112's cell as measured (§1), written through public.ottoq_policy_set under
---       Chase's name, as every depot setting turned on since 0459 has been:
---         dc_power_sharing 1        0726: the fast chargers share one DC pool, max-min fairly, as a shared-cabinet site's do;
---         dc_power_managed 1        0729: the pool is held at the shield's engineering cap, and the charge start's probe
---                                   tells EN.001 that limit, so a new car is judged as taking a share of it;
---         dc_power_first_reading 1  0733 (G448): a new charge's first reading is what the pool has spare;
---         enforce_site_charge_cap 0 0286: the decide does not refuse a seat on 0132's band estimate of the site's load,
---                                   which reads a median 1.50x the metered power (0727); the cabinets hold the limit.
---       Not turned on, because arm 112 did not run them: dc_power_by_need (0737; its one arm, 117, ran without the first
---       reading and read the same as its control) and site_cap_gate_metered (0727; measured only with the command lag).
---       Undo any one with public.ottoq_policy_set('depot', '11111111-1111-1111-1111-111111111111', <key>, <old value>,
---       '<a person>').
+--   (g) No setting changes. The held-site settings (dc_power_sharing, dc_power_managed, dc_power_first_reading, 0726-0733)
+--       stay off at the twin depot: they divide a held limit, and the depot holds none.
 --   (h) The renderer draws canopy C from these rows (§0).
 --   Not changed: canopies A and B, the 113 staging spaces, the bays, and every engine function. No function body is
 --   replaced; the base history and ottoq_stall_type_at (0759) carry the past (§4).
@@ -87,10 +81,12 @@
 --     dcfc20, dcfc20_grid_today
 --                          canopy C back: the 20-post depot 0759 built, on its grid (3,600/4,363) or today's (1,800/2,500).
 --   and two describe the new depot:
---     dcfc30               the depot as built from this file on the nameplate grid 0759 gave it (5,400/6,226): no set.
---                          Until this file it converted canopy C for the day; 0759 defined it and P1 asserts no run, cell
---                          or arm has named it, so no day changes meaning.
---     dcfc30_cab2400       new: the depot as built from this file on its own limits (2,400/2,500): no set.
+--     dcfc30               the depot as built from this file, on its limits (10,500/12,250): no set. Until this file it
+--                          converted canopy C for the day on 5,400/6,226; 0759 defined it and P1 asserts no run, cell or
+--                          arm has named it, so no day changes meaning.
+--     dcfc30_cab2400       new: the same depot on today's service through 2,400 kW of shared cabinets (2,400/2,500), the
+--                          held site the research wing measured at forty posts, kept for the margin work after a ceiling
+--                          is set (§1). Not the base.
 --   V4 proves the table: every build-out applied and restored leaves the depot exactly as built, each old one reproduces,
 --   column by column, the depot it built before this file (read here before anything moves), and the two new ones are the
 --   depot as built on their grids.
@@ -111,14 +107,12 @@
 --   this file's plan names them, each with 35 capability rows, all active, 7 of them charge_l2; the dcfc30 build-out's
 --   stall set equal to this file's plan; no car, reservation or open booking on canopy C; the new codes, identifiers,
 --   build-out and history rows free; no run, sweep cell or sweep arm naming dcfc30 or dcfc30_cab2400; no function naming a
---   charger space, the parking type or stall_kind but those 0759 read; and the four settings in the catalog with the
---   values this file writes in range. P2 once. Pre-images under '0763_pre'.
+--   charger space, the parking type or stall_kind but those 0759 read. P2 once. Pre-images under '0763_pre'.
 --   V1 the census and the layout as declared; everything else unchanged; ottoq_check_stall_overlap and
 --   ottoq_check_fence_containment pass; each canopy C post on canopy A's row, 14 units from its neighbour. V3 the stall
 --   trigger signed one event per moved space, as migration_script 0763, to no run. V4 the build-outs (§3). V5 the stored
---   days (§4). V6 the history and ottoq_stall_type_at. V7 the four settings read as written at the twin depot, under
---   Chase's name. tests/test_thirty_post_base_sql.py runs 0759 and then this file on the scratch PostgreSQL against the
---   live bodies and the depot's rows as read on 2026-10-19.
+--   days (§4). V6 the history and ottoq_stall_type_at. tests/test_thirty_post_base_sql.py runs 0759 and then this file on
+--   the scratch PostgreSQL against the live bodies and the depot's rows as read on 2026-10-19.
 --
 -- ══ §6 RECERT AND DIAL CLASSIFICATION ════════════════════════════════════════════════════════════════════════════════
 --
@@ -128,15 +122,14 @@
 -- ══ §7 WHAT IT NEEDS ═════════════════════════════════════════════════════════════════════════════════════════════════
 --
 --   0759 applied; every sweep at the twin depot paused and every dial experiment concluded or abandoned (P0); the
---   renderer's 30-post layout live first; the connector's approval. To put the thirty posts on the nameplate grid instead
---   of the held one, after this file: UPDATE public.depots SET dcfc_max_concurrent_kw = 5400, service_max_kw = 6226
---   WHERE id = '11111111-1111-1111-1111-111111111111', and the four settings back as §2 (g) says.
+--   renderer's 30-post layout live first; the connector's approval. A ceiling below what is installed is set later, as
+--   its own certified change, from what the thirty posts are measured to draw (rule 13).
 --
 -- ROLLBACK is a base change of its own, filed as its own migration with both flags TRUE, with no run live and nothing in
 --   flight, and this file's lineage row kept. As migration_script, to no run, it puts each space, charger and capability
 --   back from the before images in public.ottoq_site_base_history WHERE change_code = '0763' and records that change there
---   as its own; it puts the depot's power limits and site_layout, CANOPY-03's title and properties, the build-out rows and
---   the four settings back from the '0763_pre' rows snapshots, and DELETEs dcfc30_cab2400 if no cell names it.
+--   as its own; it puts the depot's power limits and site_layout, CANOPY-03's title and properties and the build-out rows
+--   back from the '0763_pre' rows snapshots, and DELETEs dcfc30_cab2400 if no cell names it.
 
 BEGIN;
 
@@ -276,14 +269,6 @@ BEGIN
      AND regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g') ~ 'stall_kind';
   IF v_bad IS NOT NULL THEN
     RAISE EXCEPTION '0763 P1: these functions read stall_kind and were not read for a retired space: %', v_bad;
-  END IF;
-  -- the four settings §2 (g) writes: catalogued, and the values in range
-  IF (SELECT count(*)
-        FROM (VALUES ('dc_power_sharing', 1::numeric), ('dc_power_managed', 1), ('dc_power_first_reading', 1),
-                     ('enforce_site_charge_cap', 0)) AS z(param_key, val)
-        JOIN public.ottoq_policy_param_catalog k ON k.param_key = z.param_key
-       WHERE z.val BETWEEN COALESCE(k.min_value, z.val) AND COALESCE(k.max_value, z.val)) <> 4 THEN
-    RAISE EXCEPTION '0763 P1: the four settings are not all catalogued with the values this file writes in range';
   END IF;
 END $p1$;
 
@@ -466,13 +451,7 @@ SELECT '0763_pre', 'rows', 'public', t.object_name, t.def::text, md5(t.def::text
                (SELECT jsonb_agg(to_jsonb(x)) FROM public.ottoq_site_structures x
                  WHERE x.depot_id = '11111111-1111-1111-1111-111111111111' AND x.structure_code = 'CANOPY-03')
         UNION ALL
-        SELECT 'ottoq_site_buildouts', (SELECT jsonb_agg(to_jsonb(b) ORDER BY b.buildout_code) FROM public.ottoq_site_buildouts b)
-        UNION ALL
-        SELECT 'ottoq_policy_params',
-               COALESCE((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.param_key) FROM public.ottoq_policy_params p
-                          WHERE p.scope_type = 'depot' AND p.scope_id = '11111111-1111-1111-1111-111111111111'
-                            AND p.param_key IN ('dc_power_sharing', 'dc_power_managed', 'dc_power_first_reading',
-                                                'enforce_site_charge_cap')), '[]'::jsonb)) t;
+        SELECT 'ottoq_site_buildouts', (SELECT jsonb_agg(to_jsonb(b) ORDER BY b.buildout_code) FROM public.ottoq_site_buildouts b)) t;
 
 -- ── 1. the base change: canopy C re-striped (§2) ──
 -- Who is acting, and filed to no run (0421's doctrine): the stall trigger signs one event per moved space.
@@ -559,7 +538,7 @@ UPDATE public.ottoq_service_point_capabilities k
 
 -- (e) the depot, (f) canopy C
 UPDATE public.depots
-   SET dcfc_max_concurrent_kw = 2400, service_max_kw = 2500,
+   SET dcfc_max_concurrent_kw = 10500, service_max_kw = 12250,
        site_layout = COALESCE(site_layout, '{}'::jsonb) || jsonb_build_object('dcfc_count', 30, 'l2_count', 0)
  WHERE id = '11111111-1111-1111-1111-111111111111';
 UPDATE public.ottoq_site_structures
@@ -582,19 +561,6 @@ SELECT '0763', '11111111-1111-1111-1111-111111111111', b.stall_id, now(), b.stal
                                                       FROM public.ottoq_service_point_capabilities k WHERE k.stall_id = s.id),
                                                    '[]'::jsonb))
   FROM _0763_before b JOIN public.stalls s ON s.id = b.stall_id;
-
--- (g) the four settings: arm 112's cell (§1), under Chase's name
-DO $settings$
-DECLARE r record; v jsonb;
-BEGIN
-  FOR r IN SELECT * FROM (VALUES ('dc_power_sharing', 1::numeric), ('dc_power_managed', 1), ('dc_power_first_reading', 1),
-                                 ('enforce_site_charge_cap', 0)) AS z(k, val) LOOP
-    v := public.ottoq_policy_set('depot', '11111111-1111-1111-1111-111111111111', r.k, r.val, 'Chase');
-    IF NOT COALESCE((v->>'ok')::boolean, false) OR (v->>'applied')::numeric IS DISTINCT FROM r.val THEN
-      RAISE EXCEPTION '0763: the setting % was not written as %: %', r.k, r.val, v;
-    END IF;
-  END LOOP;
-END $settings$;
 
 -- ── 2. the build-outs (§3) ──
 -- canopy C as it stood until this file: the history's before images, the columns that moved
@@ -639,18 +605,20 @@ UPDATE public.ottoq_site_buildouts b
    SET stall_set  = '[]'::jsonb,
        convert_l2 = '{}'::text[],
        buildable  = true,
-       title      = '30 robotic fast chargers on the nameplate grid: the twin depot as built from 0763, on 5,400 kW DC and 6,226 kW service',
-       basis      = b.basis || jsonb_build_object('0763', 'From 0763 the depot itself, every standard charger gone, on the grid 0759 sized for thirty posts at their rating. Until 0763 this code converted canopy C for the day; no run, cell or arm had named it (0763 P1).')
+       dcfc_max_concurrent_kw = 10500,
+       service_max_kw         = 12250,
+       title      = '30 robotic fast chargers: the twin depot as built from 0763, on what is installed (10,500 kW DC, 12,250 kW service)',
+       basis      = b.basis || jsonb_build_object('0763', 'From 0763 the depot itself, every standard charger gone, on limits no car can reach (CLAUDE.md rule 13): thirty posts at their 350 kW rating, plus the battery charging at its 1,500 kW rating and 250 kW of building on the service. Until 0763 this code converted canopy C for the day on 5,400/6,226 kW; no run, cell or arm had named it (0763 P1).')
  WHERE b.buildout_code = 'dcfc30';
 
 INSERT INTO public.ottoq_site_buildouts
   (buildout_code, depot_id, title, dcfc_posts, convert_l2, dcfc_max_concurrent_kw, service_max_kw, basis, stall_set, buildable)
 SELECT 'dcfc30_cab2400', b.depot_id,
-       '30 robotic fast chargers on today''s service through 2,400 kW of shared cabinets: the twin depot as built from 0763',
+       '30 robotic fast chargers on today''s service through 2,400 kW of shared cabinets: a held site, for after a ceiling is set',
        30, '{}'::text[], 2400, 2500,
        (b.basis - 'note' - '0759' - '0763') || jsonb_build_object(
          'note', 'today''s 2,500 kW service; the thirty posts share 2,400 kW of DC cabinets (as dcfc40_cab2400 does for forty)',
-         '0763', 'The depot as built from 0763 on its own limits. Its settings (dc_power_sharing, dc_power_managed, dc_power_first_reading 1, enforce_site_charge_cap 0) are the depot''s since 0763, arm 112''s cell.'),
+         '0763', 'The depot as built from 0763 held to 2,400/2,500 kW, the held site the research wing measured at forty posts (arm 112, with dc_power_sharing, dc_power_managed and dc_power_first_reading 1 and enforce_site_charge_cap 0 in the cell). Not the base: the depot holds no ceiling until one is set from what its thirty posts draw (CLAUDE.md rule 13).'),
        '[]'::jsonb, true
   FROM public.ottoq_site_buildouts b WHERE b.buildout_code = 'dcfc30';
 
@@ -723,7 +691,7 @@ BEGIN
                            AND s.id NOT IN (SELECT stall_id FROM _0763_restripe UNION ALL SELECT stall_id FROM _0763_retire))) THEN
     RAISE EXCEPTION '0763 V1: a space, charger or capability this file does not move moved';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.depots WHERE id = c_depot AND dcfc_max_concurrent_kw = 2400 AND service_max_kw = 2500
+  IF NOT EXISTS (SELECT 1 FROM public.depots WHERE id = c_depot AND dcfc_max_concurrent_kw = 10500 AND service_max_kw = 12250
                     AND site_layout->'dcfc_count' = '30'::jsonb AND site_layout->'l2_count' = '0'::jsonb)
      OR NOT EXISTS (SELECT 1 FROM public.ottoq_site_structures WHERE depot_id = c_depot AND structure_code = 'CANOPY-03'
                        AND title = 'Solar Canopy C (DCFC)' AND properties->'chargers' = '{"dcfc": 10}'::jsonb
@@ -782,10 +750,16 @@ BEGIN
        OR (v_receipt->>'dcfc_posts')::int <> r.dcfc_posts OR (v_receipt->>'buildable')::boolean IS DISTINCT FROM r.buildable THEN
       RAISE EXCEPTION '0763 V4: % applied reads %', r.buildout_code, v_depot;
     END IF;
-    IF r.buildout_code IN ('dcfc30', 'dcfc30_cab2400') THEN
-      -- the depot as built, on the build-out's grid
-      IF (v_depot - 'power') IS DISTINCT FROM (v_base - 'power') THEN
-        RAISE EXCEPTION '0763 V4: % is not the depot as built', r.buildout_code;
+    IF r.buildout_code = 'dcfc30' THEN
+      -- the depot as built, exactly
+      IF v_depot IS DISTINCT FROM v_base THEN
+        RAISE EXCEPTION '0763 V4: dcfc30 is not the depot as built';
+      END IF;
+    ELSIF r.buildout_code = 'dcfc30_cab2400' THEN
+      -- the depot as built, on the held site's grid
+      IF (v_depot - 'power') IS DISTINCT FROM (v_base - 'power')
+         OR v_depot->'power' IS DISTINCT FROM '{"dcfc_max_concurrent_kw": 2400, "service_max_kw": 2500}'::jsonb THEN
+        RAISE EXCEPTION '0763 V4: dcfc30_cab2400 is not the depot as built on 2,400/2,500';
       END IF;
     ELSE
       -- an old build-out reproduces, column by column, the depot it built before this file
@@ -796,8 +770,8 @@ BEGIN
       END IF;
     END IF;
   END LOOP;
-  -- and the base is dcfc30_cab2400's grid exactly
-  IF v_base->'power' IS DISTINCT FROM '{"dcfc_max_concurrent_kw": 2400, "service_max_kw": 2500}'::jsonb THEN
+  -- and the base is what is installed
+  IF v_base->'power' IS DISTINCT FROM '{"dcfc_max_concurrent_kw": 10500, "service_max_kw": 12250}'::jsonb THEN
     RAISE EXCEPTION '0763 V4: the depot''s power reads %', v_base->'power';
   END IF;
 END $v4$;
@@ -830,17 +804,6 @@ BEGIN
   END IF;
 END $v6$;
 
--- ── V7: the four settings, as written ──
-DO $v7$
-BEGIN
-  IF (SELECT count(*) FROM public.ottoq_policy_params p
-       WHERE p.scope_type = 'depot' AND p.scope_id = '11111111-1111-1111-1111-111111111111' AND p.updated_by = 'Chase'
-         AND (p.param_key, p.param_value) IN (SELECT * FROM (VALUES ('dc_power_sharing', 1::numeric), ('dc_power_managed', 1),
-                                                                   ('dc_power_first_reading', 1), ('enforce_site_charge_cap', 0)) z)) <> 4 THEN
-    RAISE EXCEPTION '0763 V7: the four settings do not read as written at the twin depot';
-  END IF;
-END $v7$;
-
 DROP FUNCTION pg_temp.f_0763_depot(uuid);
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
@@ -849,12 +812,11 @@ VALUES ('0763_canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers'
         'NASH-L2-STALL-16..20 and 26..30 become robotic fast chargers NASH-DCFC-STALL-21..30 on the 14-unit pitch (chargers '
         'NASH-DCFC-21..30, ABB Terra HP 350, 350 kW; charge_l2 -> charge_dcfc), NASH-L2-STALL-31..35 are retired (stall_type '
         'parking, no position, no charger, capabilities inactive, chargers decommissioned), and the depot''s limits go to '
-        '2,400 kW DC (shared cabinets) and 2,500 kW service (today''s), with dc_power_sharing, dc_power_managed and '
-        'dc_power_first_reading 1 and enforce_site_charge_cap 0 at the twin depot (arm 112''s cell): 30 fast chargers and '
-        'no standard charger. forces_recert TRUE: every canon column runs on this depot. forces_dial_restart TRUE: every '
-        'dial pair and sweep arm before it ran on another depot. Every old build-out reproduces the depot it built (V4); '
-        'dcfc30 is now the depot as built on the nameplate grid, dcfc30_cab2400 the depot as built on its own. The base '
-        'history keeps the past, and the latest stored day of each kind scores the same (V5).',
+        'what is installed, 10,500 kW DC and 12,250 kW service, so no car is refused, slowed or held for power (CLAUDE.md '
+        'rule 13): 30 fast chargers and no standard charger. forces_recert TRUE: every canon column runs on this depot. '
+        'forces_dial_restart TRUE: every dial pair and sweep arm before it ran on another depot. Every old build-out '
+        'reproduces the depot it built (V4); dcfc30 is now the depot as built, dcfc30_cab2400 the held site for after a '
+        'ceiling is set. The base history keeps the past, and the latest stored day of each kind scores the same (V5).',
         now());
 
 COMMIT;
