@@ -47,8 +47,24 @@ CLAUDE.md rules 9 and 10 bind hardest. None of what it promises is visible to a 
     the run it is back once the one-time order is done); and the anon-readable cockpit boards show no production run's
     settings or commands, no person's command made with no run live, no person's note, and no such command's id on a
     demo run's carried setting.
+  * the review, round 3 (2026-10-15 to 17, rule 9): one owners' run per depot (the running run, else the newest paused
+    production run, else the newest paused demo run) for every owner path, for every other agent read and door (G495:
+    ottoq_agent_live_run answers for it) and for the engine's unpinned read of an owner limit; every re-stamp pinned to
+    its run; a production run that becomes the running run lifts every other live run's
+    per-run settings (a paused production run's too) and re-stamps every car; a person's change to what is saved holds on
+    every live run, and comes back to a run where a takeover lifted what stood for it; an undo that puts back a limit below
+    what is saved is gated; and a confirm binds only by its preview's salted plan hash, given only in its confirm object.
+    Each sequence the review gave is reproduced here, and each fix was mutation-checked against these tests.
+  * the review, round 4 (2026-10-17, rule 9): at most one live production run per depot (a second one's start, a resume
+    beside another and two starts at once are refused, nothing of the first run is lifted, and a demo run starts and
+    resumes as before); the tick marks reconciled only what it reconciled (a clear, a raise and a one-time order committed
+    while the tick waits on a row another session holds stay pending, hold the car, and are applied by the next tick; a
+    clear of the car the tick is stamping waits for it); a contract change mid-run follows onto the stamp, the target and
+    the departure test at once, whichever way it moves (G494); and undo answers lifted for a takeover's lift and
+    made_on_an_earlier_run for another live run.
 
-Loads the stub engines, 0559, 0560, 0605-0608, tests/fixtures/agent_signin_stub_auth.sql, 0700 and
+Loads the stub engines, tests/fixtures/owner_run_control_stub.sql (production's start, pause and resume, md5-asserted),
+0559, 0560, 0605-0608, tests/fixtures/agent_signin_stub_auth.sql, 0700 and
 tests/fixtures/model_call_ledger_stub.sql (the live model ledger's bodies, md5-asserted) from their files, and
 production's world step as 0718 left it (tests/fixtures/world_advance_stub.sql with 0718 applied in a scratch database:
 md5 546fa1ab9bedd29f7169ee6b4e7c090b, the live definition). SKIPS where no scratch PostgreSQL is reachable.
@@ -56,23 +72,27 @@ md5 546fa1ab9bedd29f7169ee6b4e7c090b, the live definition). SKIPS where no scrat
 import json
 import os
 import subprocess
+import time
+import uuid
 
 import pytest
 
 from test_owner_agent_sql import (  # noqa: F401  (pytestmark: skip without a scratch server)
-    AV041, AV045, M0559, M0560, M0605, M0606, ROOT, RT003, SEED, STUB_0559, STUB_0605, TESLA, TWIN,
+    AV001, AV041, AV045, M0559, M0560, M0605, M0606, ROOT, RT003, SEED, STUB_0559, STUB_0605, TESLA, TWIN,
     _conn_args, _drop, _new_db, pytestmark, q,
 )
 from test_owner_agent_sql import fresh_run as _fresh_run
 from test_passcode_door_sql import M0607, M0608, PASSCODE, pcall, unlock
-from test_agent_signin_sql import CHASE, M0700, STUB_AUTH, connect, sha
+from test_agent_signin_sql import CHASE, M0700, STUB_AUTH, connect, person, sha
 
 M0718 = os.path.join(ROOT, "db", "migrations", "0718_production_runs_the_world_phases_the_twin_certifies.sql")
 M0721 = os.path.join(ROOT, "db", "migrations", "0721_a_signed_in_owner_changes_production_under_their_own_name.sql")
 WORLD_STUB = os.path.join(ROOT, "tests", "fixtures", "world_advance_stub.sql")
 #: the live evidence ledger of model calls (0340/0341/0415), which 0721 §13 writes OTTO-Command's calls into
 LEDGER_STUB = os.path.join(ROOT, "tests", "fixtures", "model_call_ledger_stub.sql")
-CHAIN = (STUB_0559, STUB_0605, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0700, LEDGER_STUB)
+#: (the review, round 4) production's start, pause and resume as live has them, which 0721's P1 pins (md5-asserted)
+RUN_CONTROL_STUB = os.path.join(ROOT, "tests", "fixtures", "owner_run_control_stub.sql")
+CHAIN = (STUB_0559, STUB_0605, RUN_CONTROL_STUB, M0559, M0560, M0605, M0606, M0607, M0608, STUB_AUTH, M0700, LEDGER_STUB)
 LINEAGE = "0721_a_signed_in_owner_changes_production_under_their_own_name"
 EMAIL = "chase@ottoyard.com"
 
@@ -106,6 +126,19 @@ LIVE_MD5 = {
     "public.ottoq_depot_owner_board(uuid,integer)": "deb3c6e8b686ac79a6419099314fb3ae",
     # §10 (the review, round 1; read 2026-10-14 23:09:53 UTC): the tick, named a writer of the owner tables, body unchanged
     "ottoq.ottoq_owner_orders_tick(uuid,timestamp with time zone)": "5f01d0881bd65d80b155dba04033e09f",
+    # §17 (the review, round 3; read 2026-10-15 13:17:20 UTC, re-read 2026-10-17): the engine's one read of an owner limit
+    "public.ottoq_owner_charge_limit(uuid)": "9de03ba377929ea4419975cb82aa7279",
+    # §17, G495 (read 2026-10-17 15:01:17 UTC): the agent doors' read of the live run
+    "public.ottoq_agent_live_run(uuid)": "75c2e8545f7d92fc39215723ddc70aea",
+    # §17 (g)-(j) (the review, round 4; read 2026-10-17 16:33:40 UTC): the engine's one answer to how full a car charges
+    # (0721 now patches it) and its departure test, the decide door, and production's start, pause and resume
+    # (tests/fixtures/owner_run_control_stub.sql)
+    "public.ottoq_effective_target_soc_at(uuid,timestamp with time zone)": "1fbe1e28294cd87d6f28920b3a68e7e6",
+    "public.ottoq_departure_clear(uuid,uuid,timestamp with time zone,boolean)": "9cc535e83e981ed6deacdc068e9908f6",
+    "public.ottoq_agent_request_decide(uuid,text,text)": "1ad1db6e91d7dee2a6b4e3addf959af3",
+    "public.ottoq_production_start(uuid)": "ea2945cbb0435c58ce73b4f5e038c501",
+    "public.ottoq_pause_run(uuid,text)": "1e3ec33aca6f4f3b008a0d83bff08c51",
+    "public.ottoq_resume_run(uuid)": "b693dc33284db3914381f89bd7f21724",
 }
 
 
@@ -134,10 +167,17 @@ def build(apply_0721):
     p = _psql(d.name, "-c", "SET check_function_bodies = off;\n" + world_advance_def() + ";")
     assert p.returncode == 0, p.stderr
     d.run(SEED)
+    #: (the review, round 3) the live catalog's one-running-run index (read 2026-10-15 13:15:42 UTC), which 0721's P1 now
+    #: requires: "the running run" at a depot is one run
+    d.run("CREATE UNIQUE INDEX ottoq_one_running_run_per_depot ON public.ottoq_sim_runs USING btree (depot_id) "
+          "WHERE (status = 'running'::text)")
     d.run(f"INSERT INTO auth.users (id, email) VALUES ('{CHASE}', 'Chase@OTTOYARD.com')")
     assert d.json(f"SELECT ottoq_owner_account_link({q(EMAIL)}, '{TESLA}', 'the founder')")["ok"]
     assert d.json(f"SELECT ottoq_agent_set_passcode({q(PASSCODE)})")["ok"]
     if apply_0721:
+        #: (the review, round 3) 0721's P3: nothing runs at the twin depot while it is applied (V3's probe needs the owners'
+        #: run to be its own paused production run); the stub's first run is paused for it, as an operator would pause one
+        d.run(f"UPDATE ottoq_sim_runs SET status = 'paused' WHERE depot_id = '{TWIN}' AND status = 'running'")
         rc, err = d.file(M0721)
         assert rc == 0, f"0721 did not apply: {err}"
     return d
@@ -304,9 +344,12 @@ def test_production_takes_a_signed_in_owner_and_an_unbound_lowering_is_recorded_
     assert data["outcome"] == "previewed" and data["command"]["mode"] == "preview"
     assert data["refusal"]["reason"] == "not_named" and data["refusal"]["preview_command_id"] == pid
     assert data["summary"].startswith("Not applied yet: This is a production run")
-    assert f'confirms_command_id "{pid}"' in data["summary"]
+    # (the review, round 3; S1) the summary says how to confirm without the hash or the id; only the confirm object has them
+    plan = data["confirm"]["args"]["expect_plan_hash"]
+    assert data["summary"].endswith("To confirm, send back the confirm object this answer carries, unchanged, from this same "
+                                    "agent within 15 minutes.")
+    assert plan not in data["summary"] and pid not in data["summary"] and "plan_hash" not in data["command"]
     assert data["confirm"]["args"]["confirms_command_id"] == pid
-    assert data["confirm"]["args"]["expect_plan_hash"] == data["command"]["plan_hash"]
     assert command(post, pid) == ["previewed", EMAIL, "direct"]
     assert post.val(f"SELECT mode = 'preview' AND refusal IS NULL AND idempotency_key IS NULL AND confirms_command_id IS NULL "
                     f"FROM ottoq_owner_commands WHERE command_id = '{pid}'") == "t"
@@ -330,8 +373,10 @@ def test_production_takes_a_signed_in_owner_and_an_unbound_lowering_is_recorded_
                     "AND status = 'active' AND charge_limit_pct = 90") == "4"
     # a stale hash is still plan_changed (0605), and is refused rather than recorded as a preview
     stale = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 85, "mode": "apply",
-                                                   "expect_plan_hash": data["command"]["plan_hash"]})
+                                                   "expect_plan_hash": plan})
     assert stale["error"]["code"] == "plan_changed" and stale["data"]["outcome"] == "refused", stale
+    # (the review, round 3) and the refusal hands back no hash: a new preview is how to see the new plan
+    assert "plan_hash" not in stale["data"]["refusal"] and "Preview it again" in stale["error"]["message"], stale
 
 
 def test_a_preview_confirms_one_apply_and_no_more(post):
@@ -398,7 +443,7 @@ def test_a_confirm_by_another_principal_is_refused(post):
     hermes, grok = connect(post)["access_token"], connect(post)["access_token"]
     production_run(post)
     prev = tcall(post, hermes, "set_charge_limit", {"vehicles": "all", "percent": 85, "mode": "preview"})
-    pid, plan = prev["data"]["command"]["command_id"], prev["data"]["command"]["plan_hash"]
+    pid, plan = prev["data"]["command"]["command_id"], prev["data"]["confirm"]["args"]["expect_plan_hash"]
     by_hash = tcall(post, grok, "set_charge_limit", {"vehicles": "all", "percent": 85, "expect_plan_hash": plan})
     assert by_hash["error"]["code"] == "confirm_required" and by_hash["data"]["refusal"]["reason"] == "no_recorded_preview", by_hash
     by_id = confirm(post, grok, prev)
@@ -422,23 +467,26 @@ def test_a_confirm_by_another_principal_is_refused(post):
 def test_a_hash_only_confirm_without_a_recorded_preview_is_refused(post):
     chase = connect(post)["access_token"]
     run = production_run(post)
-    # the plan hash is md5 of data the token can read, so an agent could compute it without previewing: stand that in
-    # by recording a preview, keeping its hash, and taking the preview away
+    # a hash that names no recorded preview of this agent (its preview taken away) binds nothing
     prev = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 80, "mode": "preview"})
-    plan = prev["data"]["command"]["plan_hash"]
+    plan = prev["data"]["confirm"]["args"]["expect_plan_hash"]
     post.run(f"SET ottoq.agent_ledger_unlock = 'on'; DELETE FROM ottoq_owner_commands WHERE command_id = '{prev['data']['command']['command_id']}'")
     r = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 80, "expect_plan_hash": plan})
     assert r["http_status"] == 422 and r["error"]["code"] == "confirm_required", r
     assert r["data"]["refusal"]["reason"] == "no_recorded_preview" and r["data"]["outcome"] == "previewed"
     assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{run}'") == "0"
     assert r["data"]["command"]["via"] == "direct", "the agent's own call, which confirmed nothing"
-    # the preview that answer recorded is real, so the same hash now binds to it (by hash alone, through the typed tool),
-    # and the row says what happened: the agent confirmed a recorded preview
+    # (the review, round 3; S1) each preview has its own salted hash: the old hash still names nothing, and the new
+    # preview's own hash, sent alone through the typed tool, binds to it, and the row says the agent confirmed a preview
     again = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 80, "expect_plan_hash": plan})
-    assert again["http_status"] == 201 and again["data"]["outcome"] == "applied", again
-    assert again["data"]["command"]["confirms_command_id"] == r["data"]["command"]["command_id"]
-    assert again["data"]["command"]["via"] == "confirm"
-    assert post.val(f"SELECT transport FROM ottoq_agent_call_ledger WHERE call_id = {again['call_id']}") == "mcp"
+    assert again["error"]["code"] == "confirm_required" and again["data"]["refusal"]["reason"] == "no_recorded_preview", again
+    fresh = r["data"]["confirm"]["args"]["expect_plan_hash"]
+    assert fresh != plan
+    ok = tcall(post, chase, "set_charge_limit", {"vehicles": "all", "percent": 80, "expect_plan_hash": fresh})
+    assert ok["http_status"] == 201 and ok["data"]["outcome"] == "applied", ok
+    assert ok["data"]["command"]["confirms_command_id"] == r["data"]["command"]["command_id"]
+    assert ok["data"]["command"]["via"] == "confirm"
+    assert post.val(f"SELECT transport FROM ottoq_agent_call_ledger WHERE call_id = {ok['call_id']}") == "mcp"
     assert target(post) == "80"
 
 
@@ -535,7 +583,7 @@ def test_via_comes_from_the_door_and_never_from_the_arguments(post):
     assert typed["data"]["command"]["confirms_command_id"] == typed_prev["data"]["command"]["command_id"]
     # an OTTO-Command model never confirms: a call through 'ask' that names a preview is refused
     prev = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 50, "mode": "preview"})
-    for extra in ({"expect_plan_hash": prev["data"]["command"]["plan_hash"]},
+    for extra in ({"expect_plan_hash": prev["data"]["confirm"]["args"]["expect_plan_hash"]},
                   {"confirms_command_id": prev["data"]["command"]["command_id"]}):
         r = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "until": prev["data"]["confirm"]["args"]["until"], **extra},
                   transport="ask")
@@ -725,7 +773,15 @@ def test_no_client_role_reaches_anything_new(post):
                "public.ottoq_owner_saved_carry(uuid)", "public.ottoq_tg_owner_saved_on_run_start()",
                "public.ottoq_owner_settings_guard()", "public.ottoq_owner_saved_settings_guard()",
                "public.ottoq_owner_settings_read(ottoq_agent_principals,jsonb)",
-               "public.ottoq_owner_saved_effect(vehicles,text,text,numeric,numeric)"):
+               "public.ottoq_owner_saved_effect(vehicles,text,text,numeric,numeric)",
+               # §17 (the review, round 3)
+               "public.ottoq_owner_run_id(uuid)", "public.ottoq_owner_live_run(uuid)",
+               "public.ottoq_owner_target_on_run(uuid,uuid,timestamp with time zone)",
+               "public.ottoq_owner_restamp(uuid,uuid,uuid[])", "public.ottoq_owner_saved_propagate(uuid)",
+               # G495: the live-run read keeps its grants (postgres only)
+               "public.ottoq_agent_live_run(uuid)",
+               # the review, round 4: the two trigger functions
+               "public.ottoq_tg_one_live_production_run()", "public.ottoq_tg_owner_contract_restamp()"):
         for role in ("anon", "authenticated", "service_role"):
             assert post.val(f"SELECT has_function_privilege('{role}', '{fn}', 'EXECUTE')") == "f", (fn, role)
     assert post.val("SELECT has_function_privilege('service_role', 'public.ottoq_agent_call(text,text,jsonb,text,jsonb)', 'EXECUTE')") == "t"
@@ -742,7 +798,10 @@ def test_the_snapshot_holds_every_body_0721_replaced(post):
     replaced = list(LIVE_MD5.items())[:5] + [(k, v) for k, v in LIVE_MD5.items()
                                              if k.startswith(("public.ottoq_tg_lift_owner_settings_on_terminal", "public.ottoq_agent_public_call",
                                                               "public.ottoq_owner_board", "public.ottoq_depot_owner_board",
-                                                              "ottoq.ottoq_owner_orders_tick"))]
+                                                              "ottoq.ottoq_owner_orders_tick", "public.ottoq_owner_charge_limit",
+                                                              "public.ottoq_owner_read(", "public.ottoq_agent_live_run(",
+                                                              "public.ottoq_effective_target_soc_at("))]
+    assert len(replaced) == 14
     assert rows == sorted([[k.split("(")[0].split(".")[1], v] for k, v in replaced])
 
 
@@ -1917,8 +1976,9 @@ def test_a_production_run_lifts_a_paused_demo_runs_owner_settings_and_puts_the_c
     while a demo run is paused, and nothing ended the demo's owner settings. A passcode session's 80 there stayed in force
     in production: the demo's tick had stamped it on the car, the reads with no run pinned returned it, the car could leave
     production at 80%, and OTTO-Q told the signed-in owner it charges to 100%. Now a production run that starts (or
-    resumes) lifts every other run's owner settings at its depot and puts the cars back; what a person saved is still
-    carried onto production, and its commands are not stamped lifted."""
+    resumes) lifts every other live run's per-run owner settings at its depot and puts the cars back; what a person saved
+    is still carried onto production, stays on the paused demo (the review, round 3: what is saved is the car's on every
+    run, kept in step by §17's propagation), and its commands are not stamped lifted."""
     no_run(post)
     chase = sign_in(post)
     assert tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "every_return"})["data"]["outcome"] == "saved"
@@ -1941,12 +2001,15 @@ def test_a_production_run_lifts_a_paused_demo_runs_owner_settings_and_puts_the_c
     prod = str(__import__("uuid").uuid4())
     post.run(f"""INSERT INTO ottoq_sim_runs (sim_run_id, depot_id, status, started_at, sim_clock_current, sim_clock_end, run_by)
                  VALUES ('{prod}', '{TWIN}', 'running', clock_timestamp(), now(), now() + interval '100 years', 'production_live')""")
-    assert post.rows(f"SELECT DISTINCT status, closed_reason FROM ottoq_owner_settings WHERE sim_run_id = '{demo}'") == \
-        [["lifted", "a production run started at the depot"]]
+    assert sorted(tuple(r) for r in post.rows(
+        f"SELECT vehicle_id, kind, status, coalesce(closed_reason, '-'), saved_id IS NOT NULL FROM ottoq_owner_settings "
+        f"WHERE sim_run_id = '{demo}'")) == sorted([
+            (AV041, "charge_limit", "lifted", "a production run took over the depot", "f"),
+            (AV041, "service", "active", "-", "t"), (AV045, "charge_limit", "active", "-", "t")])
     assert post.val(f"SELECT target_soc FROM vehicles WHERE id = '{AV041}'") == "100"
     assert target(post) == "100"
     assert post.val(f"SELECT lifted_reason FROM ottoq_owner_commands WHERE command_id = '{x80['data']['command']['command_id']}'") == \
-        "a production run started at the depot"
+        "a production run took over the depot"
     assert post.val(f"SELECT lifted_at IS NULL FROM ottoq_owner_commands WHERE command_id = '{keep['data']['command']['command_id']}'") == "t"
     # what the person saved is carried onto production
     assert carried(post, prod) == sorted([(AV041, "service", "interior_tidy"), (AV045, "charge_limit", "85")])
@@ -1973,9 +2036,1116 @@ def test_a_production_run_lifts_a_paused_demo_runs_owner_settings_and_puts_the_c
     assert post.val(f"SELECT target_soc FROM vehicles WHERE id = '{AV041}'") == "80"
     post.run(f"UPDATE ottoq_sim_runs SET status = 'paused' WHERE sim_run_id = '{demo2}'")
     post.run(f"UPDATE ottoq_sim_runs SET status = 'running' WHERE sim_run_id = '{prod}'")
-    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{demo2}' AND status = 'active'") == "0"
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{demo2}' AND status = 'active' "
+                    f"AND saved_id IS NULL") == "0"
     assert post.val(f"SELECT target_soc FROM vehicles WHERE id = '{AV041}'") == "100" and target(post) == "100"
     # and production's own settings were never touched by its pause and resume
     assert sorted(r[0] for r in post.rows(f"SELECT status FROM ottoq_owner_settings WHERE sim_run_id = '{prod}'")) == ["active", "active"]
     post.run(f"UPDATE ottoq_sim_runs SET status = 'completed' WHERE sim_run_id IN ('{prod}', '{demo}', '{demo2}')")
     assert saved(post) == sorted([(AV041, "service", "interior_tidy"), (AV045, "charge_limit", "85")])
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────── the review, round 3 ──
+#
+# §17: one run is the owners' run at a depot (ottoq_owner_run_id): the running run, else the newest paused production run,
+# else the newest paused demo run. The owner door, whoami, my_settings, my_fleet and the cockpit boards use it; the
+# engine's read of an owner limit with no run pinned takes only its rows; every re-stamp of vehicles.target_soc an owner
+# change causes is pinned to its run; a production run that becomes the running run takes over every car; and a person's
+# change to what is saved holds on every live run. Each test is a sequence the review gave, reproduced on 2b1678f first
+# (the scratchpad repro, 2026-10-15, 8:35 AM CT), with the cars as fresh_run leaves them.
+
+def reset_cars(db):
+    """The Tesla cars as test_owner_agent_sql.fresh_run leaves them: AV041 charging at 72%, AV045 staged at 99%, RT003
+    charging at 93%, AV001 out at 35%, every stamp at 100."""
+    db.run(f"""UPDATE vehicles SET current_state = CASE id WHEN '{AV041}' THEN 'charging_dcfc' WHEN '{AV045}' THEN 'staged_for_departure'
+                                                         WHEN '{RT003}' THEN 'charging_l2' WHEN '{AV001}' THEN 'deployed' ELSE current_state END::vehicle_state,
+                                 current_soc = CASE id WHEN '{AV041}' THEN 72 WHEN '{AV045}' THEN 99 WHEN '{RT003}' THEN 93 WHEN '{AV001}' THEN 35 ELSE current_soc END,
+                                 target_soc = 100
+                WHERE fleet_operator_id = '{TESLA}'""")
+
+
+def insert_run(db, run_by, status="running", clock="2026-09-27 12:00:00+00"):
+    """A NEW run at the twin depot, inserted with its kind and status from the start as ottoq_production_start and the demo
+    start insert one (so the run-start triggers see it as they do live), WITHOUT ending any other run, with the cars' visits
+    fresh_run gives."""
+    run = str(uuid.uuid4())
+    db.run(f"""INSERT INTO ottoq_sim_runs (sim_run_id, depot_id, status, started_at, sim_clock_current, sim_clock_end, run_by)
+               VALUES ('{run}', '{TWIN}', '{status}', clock_timestamp(), '{clock}', '{clock}'::timestamptz + interval '20 hours',
+                       '{run_by}')""")
+    db.run(f"""INSERT INTO ottoq_visit_needs (vehicle_id, sim_run_id, depot_id, arrived_at, visit_key, atoms, target_soc) VALUES
+      ('{AV041}', '{run}', '{TWIN}', '2026-09-27 11:30+00', 'av041:{run[:8]}', '[{{"svc":"charge","status":"in_progress","target_soc":100,"concurrency":"anchor"}},{{"svc":"readiness_check","concurrency":"gate"}}]', 100),
+      ('{AV045}', '{run}', '{TWIN}', '2026-09-27 10:30+00', 'av045:{run[:8]}', '[{{"svc":"charge","status":"done","target_soc":100}},{{"svc":"exterior_wash","status":"pending","concurrency":"bay","requires_bay":"wash_bay"}},{{"svc":"readiness_check","status":"done"}}]', 100),
+      ('{RT003}', '{run}', '{TWIN}', '2026-09-27 11:00+00', 'rt003:{run[:8]}', '[{{"svc":"charge","status":"in_progress","target_soc":100}},{{"svc":"readiness_check"}}]', 100)""")
+    return run
+
+
+def insert_run_beside(db, run_by, status="running", clock="2026-09-27 12:00:00+00"):
+    """insert_run with 0721's one-live-production-run guard (§17 (g), the review, round 4) off for the one insert: a second
+    production run live beside another, as only a pair made before 0721 is applied can be. The run-start triggers (the
+    takeover, the carry and the re-stamp) fire as for any insert."""
+    db.run("ALTER TABLE ottoq_sim_runs DISABLE TRIGGER ottoq_sim_runs_one_live_production_run")
+    try:
+        return insert_run(db, run_by, status, clock)
+    finally:
+        db.run("ALTER TABLE ottoq_sim_runs ENABLE TRIGGER ottoq_sim_runs_one_live_production_run")
+
+
+def begin(db, run_by="production_live"):
+    """Nothing live and nothing saved, the cars as fresh_run leaves them, then a new running run of that kind."""
+    no_run(db)
+    reset_cars(db)
+    return insert_run(db, run_by)
+
+
+def set_status(db, run, status):
+    db.run(f"UPDATE ottoq_sim_runs SET status = '{status}' WHERE sim_run_id = '{run}'")
+
+
+def tick(db, run, clock="2026-09-27 12:01+00"):
+    """The run's owner tick as production's world step runs it: first, with no run pinned."""
+    return int(db.val(f"SELECT ottoq.ottoq_owner_orders_tick('{run}', '{clock}')"))
+
+
+def stamp(db, car=AV041):
+    """vehicles.target_soc, the stamp production's gate disposition reads."""
+    return db.val(f"SELECT target_soc FROM vehicles WHERE id = '{car}'")
+
+
+def pinned(db, run, sql):
+    """sql with ottoq.sim_run_id pinned to run, as a tick, a pair arm or a stop pins it."""
+    return db.val(f"SELECT set_config('ottoq.sim_run_id', '{run}', false) IS NOT NULL; {sql}")
+
+
+def target_on(db, run, car=AV041):
+    return pinned(db, run, f"SELECT round(ottoq_effective_target_soc_at('{car}', now()))")
+
+
+def leaves_at(db, run, car, soc, pin=None):
+    """ottoq_departure_clear for the car at soc% with its charge and readiness done, with no run pinned (or pin pinned)."""
+    finish(db, run, car, ["charge", "readiness_check"])
+    db.run(f"UPDATE vehicles SET current_soc = {soc} WHERE id = '{car}'")
+    sql = f"SELECT ottoq_departure_clear('{car}', '{run}', '2026-09-27 12:05+00', true)"
+    return (pinned(db, pin, sql) if pin else db.val(sql)) == "t"
+
+
+def live_active(db):
+    """Every active owner setting on a live run at the twin depot: (kind:status of the run, car, kind, value, run|saved)."""
+    return sorted(tuple(r) for r in db.rows(
+        "SELECT r.run_by || ':' || r.status, o.vehicle_id, o.kind, "
+        "coalesce(o.charge_limit_pct::text, o.service || ':' || o.service_when, 'hold'), "
+        "CASE WHEN o.saved_id IS NULL THEN 'run' ELSE 'saved' END "
+        "FROM ottoq_owner_settings o JOIN ottoq_sim_runs r USING (sim_run_id) "
+        f"WHERE o.status = 'active' AND r.status IN ('running', 'paused') AND r.depot_id = '{TWIN}'"))
+
+
+def cid(r):
+    return r["data"]["command"]["command_id"]
+
+
+def run_of(r):
+    return r["data"]["command"]["sim_run_id"]
+
+
+NOTHING_IN_FORCE = "Nothing is in force on this run: every car charges to 100% and gets what OTTO-Q finds it needs."
+
+
+def test_the_owners_run_is_the_running_run_and_a_paused_demo_started_after_production_is_not(post):
+    """The review, round 3 (R1; rule 9). The owner door sent every command to the newest-started live run, so with
+    production running and a demo run started after it (and paused), an issued key's 80% went to the paused demo; the
+    engine's reads with no run pinned took it (the most recent active limit on any live run), production's owner tick
+    stamped it, Tesla 41 could leave production at 80%, and whoami named the demo. Now the owners' run is the running run:
+    the key is refused on production with why; the reads, the stamps and the departure test are production's, pinned or
+    not; and whoami, my_settings and my_fleet name production."""
+    chase = sign_in(post)
+    p = begin(post)
+    tick(post, p)
+    set_status(post, p, "paused")
+    d2 = insert_run(post, "operator_demo")
+    # while the demo runs it is the owners' run: the person's 90 for Tesla 45 is made there, saved, and carried to production
+    low = lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 90})
+    assert run_of(low) == d2
+    set_status(post, d2, "paused")
+    set_status(post, p, "running")
+    assert live_active(post) == sorted([("operator_demo:paused", AV045, "charge_limit", "90", "saved"),
+                                        ("production_live:running", AV045, "charge_limit", "90", "saved")])
+    who = tcall(post, chase, "whoami")["data"]["owner"]
+    assert (who["live_production_run"], who["live_demo_run"], who["changes"]["run_kind"]) == (p, None, "production"), who
+    assert tcall(post, chase, "my_settings")["data"]["run"] == p
+    assert tcall(post, chase, "my_fleet")["data"]["run"]["sim_run_id"] == p
+    key = post.issue("tesla-key-r3-owners-run", "personal", ["read", "note", "owner_settings"], TESLA)
+    k80 = pcall(post, key, "set_charge_limit", {"vehicles": ["Tesla 45", "Tesla 41"], "percent": 80})
+    assert k80["http_status"] == 422 and k80["error"]["code"] == "production_needs_a_person" and run_of(k80) == p, k80
+    assert [target(post, AV045), target(post, AV041)] == ["90", "100"]
+    assert [target_on(post, p, AV045), target_on(post, p, AV041)] == ["90", "100"]
+    tick(post, p, "2026-09-27 12:06+00")
+    assert [stamp(post, AV045), stamp(post, AV041)] == ["90", "100"]
+    assert not leaves_at(post, p, AV041, 80) and not leaves_at(post, p, AV041, 80, pin=p)
+    no_run(post)
+
+
+def test_the_engines_unpinned_owner_limit_read_takes_only_the_owners_runs_rows(post):
+    """The review, round 3 (R1, S5; rule 9): ottoq_owner_charge_limit with no run pinned took the most recently set active
+    limit on ANY running or paused run, so whatever another live run still held reached ottoq_effective_target_soc_at and
+    ottoq_departure_clear while production ran. A takeover lifts such rows, but the read must not depend on it (a row set
+    before 0721 is applied was never seen by a takeover). An active 80% on a paused demo run, and on a paused production
+    run, set after production's own rows (written here under the ledger unlock) is read by neither unless that run is
+    pinned. (A paused production run beside a running one is a pair made before 0721: since the review, round 4, none can
+    be made, §17 (g).)"""
+    chase = sign_in(post)
+    for kind in ("operator_demo", "production_live"):
+        p = begin(post)
+        other = (insert_run_beside if kind == "production_live" else insert_run)(post, kind, status="paused")
+        prev = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 85, "mode": "preview"})
+        assert prev["data"]["outcome"] == "previewed", prev
+        post.run(f"""SET ottoq.agent_ledger_unlock = 'on';
+                     INSERT INTO ottoq_owner_settings (sim_run_id, depot_id, fleet_operator_id, vehicle_id, kind, charge_limit_pct,
+                                                       command_id, set_at_sim)
+                     VALUES ('{other}', '{TWIN}', '{TESLA}', '{AV041}', 'charge_limit', 80, '{cid(prev)}', '2026-09-27 12:00+00')""")
+        assert post.val(f"SELECT coalesce(ottoq_owner_charge_limit('{AV041}')::text, 'none')") == "none", kind
+        assert pinned(post, other, f"SELECT ottoq_owner_charge_limit('{AV041}')") == "80", kind
+        assert (target(post), target_on(post, p), target_on(post, other)) == ("100", "100", "80"), kind
+        assert not leaves_at(post, p, AV041, 80) and not leaves_at(post, p, AV041, 80, pin=p), kind
+    no_run(post)
+
+
+def test_a_persons_clear_on_a_demo_run_holds_on_the_paused_production_run_it_resumes(post):
+    """The review, round 3 (R2; rule 9). A person's 85 on production is carried to a demo run started while production is
+    paused, and the person clears it there. The clear ended what is saved but left production holding the 85 it had
+    carried: production resumed with it, the car could leave at 84%, and a second clear answered no_change. Now the clear
+    withdraws every live run's row that carries what it ended (§17's propagation), whether the demo then ends or is
+    paused: production resumes with nothing in force, the car is at 100, and it does not leave below it."""
+    chase = sign_in(post)
+    for demo_end in ("aborted", "paused"):
+        p = begin(post)
+        lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+        tick(post, p)
+        assert stamp(post) == "85"
+        set_status(post, p, "paused")
+        d = insert_run(post, "operator_demo")
+        assert carried(post, d) == [(AV041, "charge_limit", "85")]
+        clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+        assert clr["data"]["outcome"] == "applied" and run_of(clr) == d, clr
+        assert saved(post, AV041) == []
+        assert post.rows(f"SELECT status, closed_reason, closed_by_command_id = '{cid(clr)}', pending_reconcile "
+                         f"FROM ottoq_owner_settings WHERE sim_run_id = '{p}' AND vehicle_id = '{AV041}'") == \
+            [["withdrawn", "what is saved to the car changed on another run", "t", "t"]], demo_end
+        set_status(post, d, demo_end)
+        set_status(post, p, "running")
+        assert live_active(post) == [] and stamp(post) == "100", demo_end
+        tick(post, p, "2026-09-27 12:05+00")
+        assert (stamp(post), target(post), target_on(post, p)) == ("100", "100", "100"), demo_end
+        assert not leaves_at(post, p, AV041, 84) and not leaves_at(post, p, AV041, 84, pin=p), demo_end
+        ms = tcall(post, chase, "my_settings")["data"]
+        assert ms["run"] == p and ms["summary"] == NOTHING_IN_FORCE, ms
+        again = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+        assert again["data"]["outcome"] == "no_change" and again["data"]["summary"] == \
+            "Nothing to change. Tesla-AV-041 already charges to 100%; nothing changes.", again
+        no_run(post)
+
+
+def test_a_persons_raise_on_a_demo_run_holds_on_the_paused_production_run_it_resumes(post):
+    """The review, round 3 (R2; rule 9): as above, but the person raises the 85 to 95 on the demo run. Production resumed
+    holding the 85, below what the person had just saved. Now the raise takes its place there too: production holds the 95,
+    stamps it, and the car does not leave below it."""
+    chase = sign_in(post)
+    p = begin(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    tick(post, p)
+    set_status(post, p, "paused")
+    d = insert_run(post, "operator_demo")
+    up = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 95})
+    assert up["data"]["outcome"] == "applied" and run_of(up) == d, up
+    assert saved(post, AV041) == [(AV041, "charge_limit", "95")]
+    set_status(post, d, "paused")
+    set_status(post, p, "running")
+    assert live_active(post) == sorted([("operator_demo:paused", AV041, "charge_limit", "95", "saved"),
+                                        ("production_live:running", AV041, "charge_limit", "95", "saved")])
+    tick(post, p, "2026-09-27 12:05+00")
+    assert (stamp(post), target(post), target_on(post, p)) == ("95", "95", "95")
+    assert not leaves_at(post, p, AV041, 84) and not leaves_at(post, p, AV041, 84, pin=p)
+    assert leaves_at(post, p, AV041, 99)
+    no_run(post)
+
+
+def test_an_undo_never_saves_a_lower_limit_back_without_its_preview(post):
+    """The review, round 3 (R2; rule 9). Production: the person sets 95, then 85 (X), each bound. Production is paused, a
+    demo run carries the 85, and the person clears it there (what is saved ends). The demo ends and production resumed
+    still holding the 85, so undoing X there was a raise on the run (85 back to 95), one call, and it saved the 95 back:
+    below the full charge the person had just chosen, with no preview. Now production resumes with the clear in force, so
+    the undo finds nothing of X's left and says so, nothing is saved, and the next production run charges full. And where
+    the run's row and what is saved disagree (drift, written here under the ledger unlock), an undo that puts back a limit
+    below what is saved is a lowering, gated like one: confirm_required, then its confirm."""
+    chase = sign_in(post)
+    p = begin(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 95})
+    x = lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    set_status(post, p, "paused")
+    d = insert_run(post, "operator_demo")
+    clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+    assert clr["data"]["outcome"] == "applied" and run_of(clr) == d and saved(post, AV041) == [], clr
+    set_status(post, d, "aborted")
+    set_status(post, p, "running")
+    assert live_active(post) == []
+    u = tcall(post, chase, "undo_command", {"command_id": cid(x)})
+    assert u["http_status"] == 200 and u["data"]["outcome"] == "no_change" and run_of(u) == p, u
+    assert u["data"]["summary"] == ("Nothing to change. Tesla-AV-041: already changed since (what is saved to the car changed "
+                                    "on another run), so nothing is undone for it."), u
+    assert saved(post, AV041) == [] and (target(post), target_on(post, p)) == ("100", "100")
+    set_status(post, p, "completed")
+    nxt = insert_run(post, "production_live")
+    assert carried(post, nxt) == [] and (stamp(post), target(post)) == ("100", "100")
+    # the saved comparison on its own: what is saved is 95, the run's row drifted to 88, and undoing the 95 puts back the
+    # 90 it replaced: above the run's row, below what is saved
+    p2 = begin(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 90})
+    b = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 95})
+    assert b["data"]["outcome"] == "applied" and saved(post, AV041) == [(AV041, "charge_limit", "95")], b
+    post.run(f"SET ottoq.agent_ledger_unlock = 'on'; UPDATE ottoq_owner_settings SET charge_limit_pct = 88 "
+             f"WHERE command_id = '{cid(b)}' AND sim_run_id = '{p2}' AND status = 'active'")
+    ub = tcall(post, chase, "undo_command", {"command_id": cid(b)})
+    assert ub["http_status"] == 422 and ub["error"]["code"] == "confirm_required", ub
+    assert post.val(f"SELECT undone_at IS NULL FROM ottoq_owner_commands WHERE command_id = '{cid(b)}'") == "t"
+    assert saved(post, AV041) == [(AV041, "charge_limit", "95")]
+    back = confirm(post, chase, ub)
+    assert back["data"]["outcome"] == "applied", back
+    assert saved(post, AV041) == [(AV041, "charge_limit", "90")] and target(post) == "90"
+    no_run(post)
+
+
+def test_a_second_production_run_takes_over_from_a_paused_one_and_a_clear_there_holds_on_both(post):
+    """The review, round 3 (R3, S5; rule 9). ottoq_production_start refuses only a RUNNING run, so production starts again
+    while a production run is paused, and the takeover lifted only demo runs' settings: the paused production run kept the
+    person's 85 in force. The person's clear on the new run then left it there; the engine's reads with no run pinned took
+    it, the car could leave production at 85%, and stopping the new run made the old one's 85 the answer again. Now the
+    takeover lifts every other live run's per-run settings (a hold on the paused production run here), keeps the rows that
+    carry what is saved (it is the car's on every run), and re-stamps every car pinned to the new run; the clear withdraws
+    the paused run's copy too; and the new run's stop and the old run's resume keep the car at 100. (Since the review,
+    round 4, the second production run's start is refused, §17 (g); this is the pair as one made before 0721 stands, which
+    the takeover still handles.)"""
+    chase = sign_in(post)
+    p1 = begin(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    hold = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 30})
+    assert hold["data"]["outcome"] == "applied", hold
+    tick(post, p1)
+    assert stamp(post) == "85"
+    set_status(post, p1, "paused")
+    p2 = insert_run_beside(post, "production_live")
+    assert live_active(post) == sorted([("production_live:paused", AV041, "charge_limit", "85", "saved"),
+                                        ("production_live:running", AV041, "charge_limit", "85", "saved")])
+    assert post.rows(f"SELECT status, closed_reason FROM ottoq_owner_settings WHERE sim_run_id = '{p1}' AND kind = 'hold'") == \
+        [["lifted", "a production run took over the depot"]]
+    assert post.val(f"SELECT lifted_reason FROM ottoq_owner_commands WHERE command_id = '{cid(hold)}'") == \
+        "a production run took over the depot"
+    assert stamp(post) == "85" and tcall(post, chase, "whoami")["data"]["owner"]["live_production_run"] == p2
+    clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+    assert (clr["http_status"], clr["data"]["outcome"], run_of(clr)) == (201, "applied", p2), clr
+    assert live_active(post) == [] and saved(post, AV041) == []
+    assert (target(post), target_on(post, p2)) == ("100", "100"), "no run pinned, the paused run's 85 is not the answer"
+    tick(post, p2, "2026-09-27 12:03+00")
+    assert stamp(post) == "100"
+    assert not leaves_at(post, p2, AV041, 85) and not leaves_at(post, p2, AV041, 85, pin=p2)
+    assert tcall(post, chase, "my_settings")["data"]["run"] == p2
+    full = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 100})
+    assert full["data"]["outcome"] == "no_change" and "already charges to 100%" in full["data"]["summary"], full
+    # the new run stops (ottoq_production_stop stops the running one): the paused run is the owners' run again, at 100
+    set_status(post, p2, "completed")
+    assert tcall(post, chase, "whoami")["data"]["owner"]["live_production_run"] == p1
+    assert (stamp(post), target(post)) == ("100", "100")
+    set_status(post, p1, "running")
+    assert live_active(post) == [] and (stamp(post), target_on(post, p1)) == ("100", "100")
+    no_run(post)
+
+
+def test_an_undo_on_the_paused_production_run_after_a_clear_on_the_new_one_saves_nothing_back(post):
+    """The review, round 3 (R3; rule 9): production P1, the person's 95 then 85 (X); P1 paused, P2 started, and the person
+    clears on P2 (what is saved ends). P2 stops: P1, paused, is the owners' run again and still held the 85, so undoing X
+    there was a raise (85 to 95), one call, and saved the 95 back below the full charge the person had chosen. Now the
+    clear withdrew P1's copy, the undo finds nothing of X's left there, nothing is saved, and the next production run
+    charges full. (P1 and P2 as a pair made before 0721: since the review, round 4, P2's start is refused, §17 (g).)"""
+    chase = sign_in(post)
+    p1 = begin(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 95})
+    x = lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    set_status(post, p1, "paused")
+    p2 = insert_run_beside(post, "production_live")
+    clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+    assert clr["data"]["outcome"] == "applied" and run_of(clr) == p2 and saved(post, AV041) == [], clr
+    set_status(post, p2, "completed")
+    u = tcall(post, chase, "undo_command", {"command_id": cid(x)})
+    assert u["data"]["outcome"] == "no_change" and run_of(u) == p1, u
+    assert "already changed since (what is saved to the car changed on another run)" in u["data"]["summary"], u
+    assert saved(post, AV041) == []
+    set_status(post, p1, "completed")
+    p3 = insert_run(post, "production_live")
+    assert carried(post, p3) == [] and (stamp(post), target(post)) == ("100", "100")
+    no_run(post)
+
+
+def test_a_limit_withdrawn_on_a_paused_run_never_stays_stamped_on_the_car(post):
+    """The review, round 3 (R4; rule 9). A passcode session's 80% on a demo run is stamped by the run's tick; the demo is
+    paused and the session withdraws the 80 there (a clear, or an undo), which no tick reconciles while the run is paused.
+    Production then started with the car stamped 80, and the run's end found nothing active and re-stamped nothing. Now a
+    production run that takes over re-stamps every car pinned to itself, and a run's end re-stamps the cars whose limit
+    there was withdrawn and not reconciled: the car is at 100 either way, and does not leave production at 80%."""
+    chase = sign_in(post)
+    for how, ip in (("clear", "192.0.2.171"), ("undo", "192.0.2.172"), ("end", "192.0.2.173")):
+        d = begin(post, "operator_demo")
+        session = unlock(post, agent="Visitor", ip=ip)["data"]["session"]
+        x80 = tcall(post, session, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80})
+        assert x80["data"]["outcome"] == "applied", x80
+        tick(post, d)
+        assert stamp(post) == "80", how
+        set_status(post, d, "paused")
+        w = (tcall(post, session, "undo_command", {"command_id": cid(x80)}) if how == "undo"
+             else tcall(post, session, "clear_charge_limit", {"vehicles": ["Tesla 41"]}))
+        assert w["data"]["outcome"] == "applied", (how, w)
+        assert post.rows(f"SELECT status, pending_reconcile FROM ottoq_owner_settings WHERE sim_run_id = '{d}' "
+                         f"AND vehicle_id = '{AV041}'") == [["withdrawn", "t"]], how
+        assert stamp(post) == "80", "nothing re-stamps the car while its run is paused"
+        if how == "end":
+            set_status(post, d, "aborted")
+            assert stamp(post) == "100", "the run's end re-stamps a car whose limit there was not reconciled"
+        p = insert_run(post, "production_live")
+        assert stamp(post) == "100" and tick(post, p, "2026-09-27 12:02+00") == 0, how
+        assert (target(post), target_on(post, p)) == ("100", "100"), how
+        assert not leaves_at(post, p, AV041, 80) and not leaves_at(post, p, AV041, 80, pin=p), how
+        full = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 100})
+        assert full["data"]["outcome"] == "no_change" and "already charges to 100%" in full["data"]["summary"], (how, full)
+        no_run(post)
+
+
+def test_a_paused_production_run_stays_the_owners_run_and_a_demo_resumed_after_it_has_only_what_is_saved(post):
+    """The review, round 3 (M7): a paused production run is still the owners' run, ahead of a paused demo run: whoami names
+    it, an issued key is refused there (production_needs_a_person), and the demo's per-run settings its takeover lifted
+    stay lifted. When the demo run is resumed (production still paused) it is the owners' run: what the person saved is in
+    force there and stamped, and nothing the takeover lifted comes back."""
+    no_run(post)
+    chase = sign_in(post)
+    save_lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 85})
+    reset_cars(post)
+    d = insert_run(post, "operator_demo")
+    key = post.issue("tesla-key-r3-pause", "personal", ["read", "note", "owner_settings"], TESLA)
+    k80 = pcall(post, key, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80})
+    assert k80["data"]["outcome"] == "applied" and run_of(k80) == d, k80
+    tick(post, d)
+    assert (stamp(post, AV041), stamp(post, AV045)) == ("80", "85")
+    set_status(post, d, "paused")
+    p = insert_run(post, "production_live")
+    assert (stamp(post, AV041), stamp(post, AV045)) == ("100", "85")
+    set_status(post, p, "paused")
+    who = tcall(post, chase, "whoami")["data"]["owner"]
+    assert (who["live_production_run"], who["live_demo_run"]) == (p, None), who
+    again = pcall(post, key, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80})
+    assert again["http_status"] == 422 and again["error"]["code"] == "production_needs_a_person" and run_of(again) == p, again
+    assert post.rows(f"SELECT status, closed_reason FROM ottoq_owner_settings WHERE command_id = '{cid(k80)}'") == \
+        [["lifted", "a production run took over the depot"]]
+    assert (target(post, AV041), target(post, AV045)) == ("100", "85")
+    # the demo resumed while production stays paused: the owners' run is the demo; what is saved is in force, the key's 80 is not
+    set_status(post, d, "running")
+    who = tcall(post, chase, "whoami")["data"]["owner"]
+    assert (who["live_production_run"], who["live_demo_run"]) == (None, d), who
+    assert live_active(post) == sorted([("operator_demo:running", AV045, "charge_limit", "85", "saved"),
+                                        ("production_live:paused", AV045, "charge_limit", "85", "saved")])
+    tick(post, d, "2026-09-27 12:03+00")
+    assert (stamp(post, AV041), stamp(post, AV045), target(post, AV041), target(post, AV045)) == ("100", "85", "100", "85")
+    no_run(post)
+
+
+def test_a_restamp_and_the_tick_read_the_run_they_are_given_and_leave_the_callers_pin_alone(post):
+    """The review, round 3: every re-stamp an owner change causes is computed with its own run pinned
+    (ottoq_owner_target_on_run), never with no run pinned and never with whatever the caller pinned. The tick of one demo
+    run, called while ottoq.sim_run_id is pinned to another run that holds a lower limit, used to stamp the other run's
+    value; now it stamps its own, and the caller's pin is as it was afterwards."""
+    no_run(post)
+    reset_cars(post)
+    d1 = insert_run(post, "operator_demo")
+    key = post.issue("tesla-key-r3-pin", "personal", ["read", "note", "owner_settings"], TESLA)
+    k80 = pcall(post, key, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80})
+    assert k80["data"]["outcome"] == "applied" and run_of(k80) == d1, k80
+    set_status(post, d1, "paused")
+    d2 = insert_run(post, "operator_demo")
+    out = post.rows(f"SELECT set_config('ottoq.sim_run_id', '{d1}', false) IS NOT NULL; "
+                    f"SELECT round(ottoq_owner_target_on_run('{AV041}', '{d2}', now())), "
+                    f"round(ottoq_owner_target_on_run('{AV041}', NULL, now())), "
+                    f"round(ottoq_owner_target_on_run('{AV041}', '{d1}', now())), current_setting('ottoq.sim_run_id')")
+    assert out[-1] == ["100", "100", "80", d1], out
+    k90 = pcall(post, key, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 90})
+    assert k90["data"]["outcome"] == "applied" and run_of(k90) == d2, k90
+    out = post.rows(f"SELECT set_config('ottoq.sim_run_id', '{d1}', false) IS NOT NULL; "
+                    f"SELECT ottoq.ottoq_owner_orders_tick('{d2}', '2026-09-27 12:01+00'); "
+                    f"SELECT target_soc, current_setting('ottoq.sim_run_id') FROM vehicles WHERE id = '{AV041}'")
+    assert out[-1] == ["90", d1], out
+    for run, want in ((None, "100"), (d1, "80"), (d2, "90")):
+        arg = "NULL" if run is None else f"'{run}'"
+        out = post.rows(f"SELECT set_config('ottoq.sim_run_id', '{d2 if run != d2 else d1}', false) IS NOT NULL; "
+                        f"SELECT ottoq_owner_restamp('{TWIN}', {arg}, ARRAY['{AV041}']::uuid[]); "
+                        f"SELECT target_soc, current_setting('ottoq.sim_run_id') FROM vehicles WHERE id = '{AV041}'")
+        assert out[-1] == [want, d2 if run != d2 else d1], (run, out)
+    no_run(post)
+
+
+def test_a_demo_run_resumed_after_production_gets_what_is_saved_back(post):
+    """The review, round 3 (rule 9): a person's every-return wash (from the next return on) and 85% are made on a demo run;
+    a passcode session's one-time wash and 90% take their places there. Production takes over (lifting the session's
+    per-run settings) and is paused, and the demo is resumed. The carry's once-per-run rule stood in the way, so the demo
+    kept neither the person's order nor the limit for the rest of the run, and the settings guard refused a carry of a
+    command's own saved row onto the run it was made on. Now what is saved is carried again wherever nothing of it stands."""
+    no_run(post)
+    chase = sign_in(post)
+    reset_cars(post)
+    d = insert_run(post, "operator_demo")
+    er = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "every_return",
+                                                "include_current_visit": False})
+    assert er["data"]["outcome"] == "applied", er
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    tick(post, d)
+    session = unlock(post, agent="Visitor", ip="192.0.2.181")["data"]["session"]
+    for args in ({"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "now"},):
+        r = tcall(post, session, "request_service", args)
+        assert r["data"]["outcome"] == "applied", r
+    r = tcall(post, session, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 90})
+    assert r["data"]["outcome"] == "applied", r
+    assert live_active(post) == sorted([("operator_demo:running", AV041, "charge_limit", "90", "run"),
+                                        ("operator_demo:running", AV041, "service", "exterior_wash:now", "run")])
+    set_status(post, d, "paused")
+    p = insert_run(post, "production_live")
+    assert sorted(tuple(x) for x in post.rows(
+        f"SELECT kind, coalesce(charge_limit_pct::text, service_when), status, saved_id IS NOT NULL FROM ottoq_owner_settings "
+        f"WHERE sim_run_id = '{d}'")) == sorted([("charge_limit", "85", "replaced", "t"), ("charge_limit", "90", "lifted", "f"),
+                                                 ("service", "every_return", "replaced", "t"), ("service", "now", "lifted", "f")])
+    assert carried(post, p) == sorted([(AV041, "charge_limit", "85"), (AV041, "service", "exterior_wash")])
+    set_status(post, p, "paused")
+    set_status(post, d, "running")
+    assert carried(post, d) == sorted([(AV041, "charge_limit", "85"), (AV041, "service", "exterior_wash")])
+    assert target(post) == "85"
+    no_run(post)
+
+
+def test_a_persons_undo_on_production_brings_a_saved_limit_back_to_the_demo_run_it_was_made_on(post):
+    """The review, round 3 (rule 9): the person's 85 is made on a demo run; the demo is paused and production carries it;
+    on production the person raises it to 95 (the demo's copy follows). Undoing the 95 is a lowering, so it is previewed
+    and confirmed; its confirm brings the saved 85 back, and §17's propagation carries it back onto the demo run, where
+    its command was made. That carry was refused by the settings guard, so the person's confirm failed with 500."""
+    chase = sign_in(post)
+    d = begin(post, "operator_demo")
+    a = lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    set_status(post, d, "paused")
+    p = insert_run(post, "production_live")
+    b = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 95})
+    assert b["data"]["outcome"] == "applied" and run_of(b) == p, b
+    assert live_active(post) == sorted([("operator_demo:paused", AV041, "charge_limit", "95", "saved"),
+                                        ("production_live:running", AV041, "charge_limit", "95", "saved")])
+    u = tcall(post, chase, "undo_command", {"command_id": cid(b)})
+    assert u["http_status"] == 422 and u["error"]["code"] == "confirm_required", u
+    back = confirm(post, chase, u)
+    assert back["http_status"] == 201 and back["data"]["outcome"] == "applied", back
+    assert saved(post, AV041) == [(AV041, "charge_limit", "85")]
+    assert live_active(post) == sorted([("operator_demo:paused", AV041, "charge_limit", "85", "saved"),
+                                        ("production_live:running", AV041, "charge_limit", "85", "saved")])
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{d}' AND command_id = '{cid(a)}' "
+                    f"AND status = 'active'") == "1"
+    no_run(post)
+
+
+def test_a_confirm_binds_only_by_its_previews_salted_plan_hash(post):
+    """The review, round 3 (S1; rule 9). A preview's plan hash was md5 of the plan as 0605 hashes it, which an agent can
+    compute from what it is shown (the tool, the run, the arguments and the effects), and an apply that named a preview by
+    its command id alone bound to it. Now the hash is md5 of a random salt kept with the preview and that plan, so it cannot
+    be computed and two previews of one plan differ; it is given only inside the preview's confirm object (not in the
+    command, my_commands or the summary); a command id alone binds nothing; and the unsalted fingerprint binds nothing."""
+    chase = sign_in(post)
+    p = begin(post)
+    prev = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 85, "mode": "preview"})
+    assert prev["data"]["outcome"] == "previewed", prev
+    pid, h1, cmd = cid(prev), prev["data"]["confirm"]["args"]["expect_plan_hash"], prev["data"]["command"]
+    assert "plan_hash" not in cmd and h1 not in prev["data"]["summary"] and pid not in prev["data"]["summary"]
+    assert prev["data"]["confirm"]["args"]["confirms_command_id"] == pid
+    salt, stored = post.rows(f"SELECT plan_salt, plan_hash FROM ottoq_owner_commands WHERE command_id = '{pid}'")[0]
+    assert stored == h1 and len(salt) == 32 and set(salt) <= set("0123456789abcdef")
+    # the plan as 0605 hashes it, from what the receipt shows: its md5 is not the hash; the hash is md5(salt || plan)
+    args = {k: v for k, v in cmd["args"].items()
+            if k not in ("mode", "note", "vehicles", "expect_plan_hash", "idempotency_key", "until", "for_minutes")}
+    plan = sorted([[e["vehicle_id"], e["key"], e["before"], e["after"], e["change"]] for e in cmd["effects"]],
+                  key=lambda x: (x[0], x[1]))
+    text = post.text(f"SELECT jsonb_build_object('tool', {q(cmd['tool'])}, 'run', {q(cmd['sim_run_id'])}::uuid, "
+                     f"'args', {q(json.dumps(args))}::jsonb, 'plan', {q(json.dumps(plan))}::jsonb)::text")
+    finger = post.val(f"SELECT md5({q(text)})")
+    assert finger != h1 and post.val(f"SELECT md5({q(salt + text)})") == h1
+    # a command id alone binds nothing, through the confirm door or the typed tool: a new preview, nothing applied
+    for transport in ("confirm", "mcp"):
+        idonly = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 85, "mode": "apply",
+                                                         "confirms_command_id": pid}, transport=transport)
+        assert idonly["http_status"] == 422 and idonly["error"]["code"] == "confirm_required", (transport, idonly)
+        assert idonly["data"]["refusal"]["reason"] == "not_named" and idonly["data"]["outcome"] == "previewed", idonly
+        assert "a command id alone confirms nothing." in idonly["error"]["message"], idonly
+        assert target(post) == "100", transport
+    # the unsalted fingerprint names no preview
+    fp = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 85, "expect_plan_hash": finger})
+    assert fp["http_status"] == 422 and fp["data"]["refusal"]["reason"] == "no_recorded_preview" and target(post) == "100", fp
+    # two previews of one plan: two salts, two hashes
+    again = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 85, "mode": "preview"})
+    h2 = again["data"]["confirm"]["args"]["expect_plan_hash"]
+    assert h2 != h1 and post.val(f"SELECT count(DISTINCT plan_salt) FROM ottoq_owner_commands "
+                                 f"WHERE command_id IN ('{pid}', '{cid(again)}')") == "2"
+    # the confirm object applies its own preview, once
+    done = confirm(post, chase, prev)
+    assert done["data"]["outcome"] == "applied" and target(post) == "85", done
+    assert post.val(f"SELECT confirms_command_id FROM ottoq_owner_commands WHERE command_id = '{cid(done)}'") == pid
+    # no read gives a preview's hash: not my_commands, and no stored summary
+    blob = json.dumps(tcall(post, chase, "my_commands", {"limit": 50}))
+    assert h2 not in blob and '"plan_hash"' not in blob, blob[:2000]
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_commands WHERE plan_salt IS NOT NULL AND sim_run_id = '{p}' "
+                    f"AND (strpos(summary, plan_hash) > 0 OR strpos(summary, command_id::text) > 0)") == "0"
+    # the salt is held by its CHECK: only a preview carries one, of 32 hex characters
+    for sql in (f"UPDATE ottoq_owner_commands SET plan_salt = 'abc' WHERE command_id = '{cid(again)}'",
+                f"UPDATE ottoq_owner_commands SET plan_salt = '{salt}' WHERE command_id = '{cid(done)}'"):
+        rc, _, err = post.run("SET ottoq.agent_ledger_unlock = 'on'; " + sql, check=False)
+        assert rc != 0 and "ottoq_owner_commands_plan_salt_check" in err, err
+    # and the backstop, whoever writes the row, refuses a confirm of a preview that carries no salt
+    ins = ("INSERT INTO ottoq_owner_commands (principal_id, principal_name, fleet_operator_id, depot_id, sim_run_id, tool, mode, "
+           "outcome, summary, plan_hash, acting_person, via, confirms_command_id) "
+           "SELECT principal_id, principal_name, fleet_operator_id, depot_id, sim_run_id, tool, 'apply', 'applied', 'r3 probe', "
+           f"plan_hash, acting_person, 'confirm', command_id FROM ottoq_owner_commands WHERE command_id = '{cid(again)}'")
+    assert post.run(f"BEGIN; {ins}; ROLLBACK;", check=False)[0] == 0, "with its salt, the row is one the backstop admits"
+    post.run(f"SET ottoq.agent_ledger_unlock = 'on'; UPDATE ottoq_owner_commands SET plan_salt = NULL WHERE command_id = '{cid(again)}'")
+    rc, _, err = post.run(ins, check=False)
+    assert rc != 0 and "is not a preview this apply may confirm" in err, err
+    no_run(post)
+
+
+def test_each_answer_says_why_nothing_changes(post):
+    """The review, round 3 (S8 and the answers): a cancel of a service OTTO-Q found needed says it stays and why; an undo of
+    a clear or of the full charge says there is nothing to undo and how to put a limit back; a one-time wash an every-return
+    order covers, already done on this visit, says so; and an undo of a command whose settings a production run's takeover
+    lifted says that, not that its run ended."""
+    chase = sign_in(post)
+    p = begin(post)
+    tick(post, p)
+    c1 = tcall(post, chase, "cancel_service", {"vehicles": ["Tesla 45"], "service": "exterior_wash"})
+    assert c1["data"]["outcome"] == "no_change" and c1["data"]["summary"] == (
+        "Nothing to change. Tesla-AV-045 has no order of yours for exterior wash to withdraw: OTTO-Q found it needed on this "
+        "visit, so it stays until it is done, and the car does not leave without it."), c1
+    c_all = tcall(post, chase, "cancel_service", {"vehicles": ["Tesla 45"]})
+    assert c_all["data"]["summary"] == \
+        "Nothing to change. Tesla-AV-045 has no service order of yours to withdraw, so nothing changes.", c_all
+    assert ("exterior_wash", "pending") in visit_atoms(post, p, AV045) and not leaves_at(post, p, AV045, 100)
+    # an undo of a clear, and of the full charge: nothing to undo, and how to put a limit back
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    clr = tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]})
+    u = tcall(post, chase, "undo_command", {"command_id": cid(clr)})
+    assert (u["http_status"], u["error"]["code"]) == (422, "nothing_to_undo"), u
+    assert u["error"]["message"] == ("That command cleared a charge limit. A clear takes a setting away and leaves none of its "
+                                     "own, so there is nothing to undo; to put a limit back, set it again (set_charge_limit)."), u
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    full = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 100})
+    assert full["data"]["outcome"] == "applied", full
+    u = tcall(post, chase, "undo_command", {"command_id": cid(full)})
+    assert (u["http_status"], u["error"]["code"]) == (422, "nothing_to_undo"), u
+    assert u["error"]["message"].startswith("That command set the full charge, which clears a limit"), u
+    assert target(post) == "100" and saved(post, AV041) == []
+    # a one-time wash over an every-return wash already done on this visit: no change, and the answer says it was done
+    er = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "every_return"})
+    assert er["data"]["outcome"] == "applied", er
+    tick(post, p, "2026-09-27 12:02+00")
+    finish(post, p, AV041, ["exterior_wash"])
+    tick(post, p, "2026-09-27 12:03+00")
+    now = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "exterior_wash", "when": "now"})
+    assert now["data"]["outcome"] == "no_change" and now["data"]["summary"] == (
+        "Nothing to change. Tesla-AV-041 already gets exterior wash on every return (an every-return order) and had it on this "
+        "visit, so nothing changes."), now
+    # an undo of a command a production run's takeover lifted
+    no_run(post)
+    reset_cars(post)
+    d = insert_run(post, "operator_demo")
+    key = post.issue("tesla-key-r3-lifted", "personal", ["read", "note", "owner_settings"], TESLA)
+    k80 = pcall(post, key, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 80})
+    assert k80["data"]["outcome"] == "applied", k80
+    set_status(post, d, "paused")
+    p2 = insert_run(post, "production_live")
+    set_status(post, p2, "completed")
+    u = pcall(post, key, "undo_command", {"command_id": cid(k80)})
+    assert (u["http_status"], u["error"]["code"]) == (422, "lifted"), u
+    assert u["error"]["message"] == ("That command's settings were lifted (a production run took over the depot), so there "
+                                     "is nothing left of it to undo."), u
+    no_run(post)
+
+
+#: the stub engine's yard supervisor at the twin depot (tests/fixtures/agent_gateway_stub_engine.sql), who decides requests
+SUPERVISOR = "a0000000-0000-0000-0000-00000000000a"
+
+
+def test_every_agent_read_and_door_answers_for_the_owners_run(post):
+    """The review, round 3 (G495, fixed): public.ottoq_agent_live_run, through which every agent read and door but the owner
+    door's reads its run, was the newest-started run running or paused at the depot. With production running and a demo
+    run started after it and paused, depot_status, stall_availability and recent_decisions read the paused demo, a note
+    and an ops-action request were recorded against it, and both welcomes described it. Now it is the owners' run
+    (ottoq_owner_run_id) for every principal, a depot-wide key, a fleet's key and a signed-in owner alike: they read
+    production, a request is recorded against production, and an approval still refuses when the run a request was made
+    against is no longer the live run (here, production paused and the demo resumed)."""
+    p = begin(post)
+    set_status(post, p, "paused")
+    d = insert_run(post, "operator_demo")
+    set_status(post, d, "paused")
+    set_status(post, p, "running")
+    assert post.val(f"SELECT sim_run_id FROM ottoq_sim_runs WHERE depot_id = '{TWIN}' AND status IN ('running', 'paused') "
+                    f"ORDER BY started_at DESC LIMIT 1") == d, "the paused demo is the newest-started live run"
+    assert post.json(f"SELECT ottoq_agent_live_run('{TWIN}')")["sim_run_id"] == p
+    assert post.val(f"SELECT ottoq_agent_live_run('{TWIN}') = ottoq_owner_live_run('{TWIN}')") == "t"
+    depot_key = post.issue("tesla-key-r3-g495-depot", "personal", ["read", "note", "request_ops_action"])
+    fleet_key = post.issue("tesla-key-r3-g495-fleet", "personal", ["read", "note"], TESLA)
+    chase = sign_in(post)
+    callers = (("a depot-wide key", lambda tool, args=None: pcall(post, depot_key, tool, args or {})),
+               ("a fleet's key", lambda tool, args=None: pcall(post, fleet_key, tool, args or {})),
+               ("a signed-in owner", lambda tool, args=None: tcall(post, chase, tool, args)))
+    for who, call in callers:
+        dep = call("depot_status")
+        assert dep["http_status"] == 200 and dep["data"]["run"]["sim_run_id"] == p, (who, dep)
+        stalls = call("stall_availability")
+        assert stalls["data"]["live"] is True and stalls["data"]["sim_run_id"] == p, (who, stalls)
+        dec = call("recent_decisions")
+        assert dec["data"]["live"] is True and dec["data"]["sim_run_id"] == p, (who, dec)
+        hello = call("welcome")
+        assert (hello["data"]["run"]["demo"], hello["data"]["run"]["status"]) == (False, "running"), (who, hello)
+    public = pcall(post, None, "welcome", {})
+    assert (public["data"]["run"]["demo"], public["data"]["run"]["status"]) == (False, "running"), public
+    note = pcall(post, depot_key, "send_note", {"title": "r3: which run is this recorded against?"})
+    ops = pcall(post, depot_key, "submit_request", {"kind": "ops_action", "title": "r3: reserve on", "action": "enable_energy_reserve"})
+    ids = [r["data"]["request"]["request_id"] for r in (note, ops)]
+    assert post.rows(f"SELECT sim_run_id FROM ottoq_agent_requests WHERE request_id IN ('{ids[0]}', '{ids[1]}')") == [[p], [p]]
+    # the run it was made against stops being the live run: production paused, the demo resumed
+    set_status(post, p, "paused")
+    set_status(post, d, "running")
+    r = person(post, SUPERVISOR, f"SELECT ottoq_agent_request_decide('{ids[1]}', 'approved', NULL)")
+    assert r["status"] == "approved_not_applied" and r["engine_reply"]["called"] is False, r
+    assert (r["engine_reply"]["requested_on_run"], r["engine_reply"]["live_run"]) == (p, d), r
+    assert r["engine_reply"]["reason"] == "The run this request was made against is no longer the live run.", r
+    no_run(post)
+
+
+def test_0721_refuses_a_running_twin_run_and_v1_reads_code_not_comments(tmp_path):
+    """The review, round 3. P3: V3 probes the owner door on a paused production run of its own, which a running run at the
+    depot outranks, so 0721 does not apply while one runs there. And V1 looked for its anchors in bodies that still had
+    their comments, so a fix inside a comment passed it; V1 now strips the comments first, so the takeover's lift
+    commented out (here, in a block comment) fails it. (The review, round 4) and no production run may be paused there
+    either: V3's paused production run would be a second live one, which §17 (g) refuses, so P3 says so first."""
+    d = build(False)
+    try:
+        rc, err = d.file(M0721)
+        assert rc != 0 and "0721 P3: run" in err and "is running at the twin depot" in err, err
+        d.run(f"UPDATE ottoq_sim_runs SET status = 'paused' WHERE depot_id = '{TWIN}' AND status = 'running'")
+        d.run(f"UPDATE ottoq_sim_runs SET run_by = 'production_live' WHERE depot_id = '{TWIN}' AND status = 'paused'")
+        rc, err = d.file(M0721)
+        assert rc != 0 and "0721 P3: production run" in err and "is paused at the twin depot" in err, err
+        assert "at most one production run may be live at a depot" in err, err
+        d.run(f"UPDATE ottoq_sim_runs SET run_by = 'operator_demo' WHERE depot_id = '{TWIN}' AND status = 'paused'")
+        src = open(M0721).read()
+        fix = ("  IF NEW.run_by = 'production_live' AND NEW.status = 'running' THEN\n"
+               "    PERFORM public.ottoq_owner_settings_yield_to_production(NEW.sim_run_id);\n  END IF;\n")
+        assert src.count(fix) == 1
+        cut = tmp_path / "0721_v1_comment.sql"
+        cut.write_text(src.replace(fix, "  /*\n" + fix + "  */\n"))
+        rc, err = d.file(str(cut))
+        assert rc != 0 and "0721 V1 FAILED: a fix of the review, round 2 is not in its body" in err, err
+        assert d.val("SELECT to_regprocedure('public.ottoq_owner_run_id(uuid)') IS NULL") == "t", "and nothing of it stays"
+    finally:
+        _drop(d)
+
+
+# ──────────────────────────────────────────────────────────────────────────────────────────── the review, round 4 ──
+#
+# §17 (g)-(j): at most one live production run per depot; the tick marks reconciled only what it reconciled; a contract
+# change follows onto the cars; undo's answers. Each test is a sequence the review gave (scen_n3b, race_tick,
+# race_tick_service, scen_g494, scen_r4 n8), reproduced on a9faade first (2026-10-17, 11:12-11:13 AM CT). The race tests
+# use real sessions of their own: one holds a row lock, one runs the tick, and the command is sent between them.
+
+class Session:
+    """A psql session of its own (its own backend, named by application_name), fed statements on stdin."""
+
+    def __init__(self, db, name):
+        self.db, self.name = db, name
+        self.p = subprocess.Popen(["psql", *_conn_args(), "-d", db.name, "-X", "-q", "-At", "-v", "ON_ERROR_STOP=1"],
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                  env=dict(os.environ, PGAPPNAME=name))
+
+    def send(self, sql):
+        self.p.stdin.write(sql + "\n")
+        self.p.stdin.flush()
+
+    def close(self, timeout=60):
+        if self.p.returncode is None:
+            out, err = self.p.communicate(timeout=timeout)
+        else:
+            out, err = "", ""
+        return self.p.returncode, out, err
+
+    def state(self):
+        """(state, wait_event_type, wait_event) of this session's backend, or None before it connects."""
+        r = self.db.rows(f"SELECT state, coalesce(wait_event_type, '-'), coalesce(wait_event, '-') FROM pg_stat_activity "
+                         f"WHERE datname = current_database() AND application_name = {q(self.name)}")
+        return tuple(r[0]) if r else None
+
+    def wait_until(self, ok, what, timeout=20):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            st = self.state()
+            if st and ok(st):
+                return st
+            if self.p.poll() is not None:
+                raise AssertionError(f"{self.name} ended before it was {what}: {self.p.communicate()}")
+            time.sleep(0.05)
+        raise AssertionError(f"{self.name} was not {what} within {timeout} s (last {self.state()})")
+
+
+def holding(st):
+    return st[0] == "idle in transaction"
+
+
+def waiting_on_a_lock(st):
+    return st[0] == "active" and st[1] == "Lock"
+
+
+def production_insert(run, status):
+    """ottoq_production_start's insert (or a paused one), at the twin depot."""
+    return (f"INSERT INTO ottoq_sim_runs (sim_run_id, depot_id, status, started_at, sim_clock_current, sim_clock_end, run_by) "
+            f"VALUES ('{run}', '{TWIN}', '{status}', clock_timestamp(), '2026-09-27 12:03+00', '2026-09-28 08:00+00', "
+            f"'production_live')")
+
+
+def test_a_second_production_run_is_refused_while_one_is_paused_and_nothing_of_the_first_is_lifted(post):
+    """The review, round 4 (scen_n3b; rule 9). ottoq_production_start refuses only a RUNNING run, so with production P1
+    paused a second production run P2 started, and its takeover lifted P1's per-run settings: a person's interior deep
+    clean 'now' (the receipt: the car does not leave until it is done) and a hold until 1:00 PM. On P2 the car could leave
+    at 100% without the deep clean and the held car before its hold, my_settings said nothing was in force, and resuming P1
+    did not bring them back. Now P2's start is refused (running or paused, 23505, with the message the operator reads and
+    the run named), nothing of P1 is lifted, the car stays held on P1 and my_settings lists both; P1 resumes with them."""
+    chase = sign_in(post)
+    p1 = begin(post)
+    w = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_deep_clean", "when": "now"})
+    h = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "until": "2026-09-27T18:00:00Z"})
+    assert (w["data"]["outcome"], h["data"]["outcome"]) == ("applied", "applied"), (w, h)
+    tick(post, p1)
+    assert ("interior_deep_clean", "pending") in visit_atoms(post, p1, AV041)
+    set_status(post, p1, "paused")
+    for status in ("running", "paused"):
+        p2 = str(uuid.uuid4())
+        rc, _, err = post.run(production_insert(p2, status), check=False)
+        assert rc != 0 and "a production run is already live at this depot (paused); resume it or stop it first" in err, err
+        assert f"Run {p1} is a production run paused at depot {TWIN}" in err and "ottoq_resume_run" in err, err
+        assert post.val(f"SELECT count(*) FROM ottoq_sim_runs WHERE sim_run_id = '{p2}'") == "0"
+    assert sorted(tuple(r) for r in post.rows(
+        f"SELECT kind, coalesce(service || ':' || service_when, 'hold'), status FROM ottoq_owner_settings WHERE sim_run_id = '{p1}'")) == \
+        [("hold", "hold", "active"), ("service", "interior_deep_clean:now", "active")]
+    assert post.val(f"SELECT count(*) FROM ottoq_owner_commands WHERE command_id IN ('{cid(w)}', '{cid(h)}') "
+                    f"AND lifted_at IS NULL") == "2"
+    # the car does not leave without the deep clean, nor the held car before 1:00 PM, pinned or not
+    assert not leaves_at(post, p1, AV041, 100) and not leaves_at(post, p1, AV041, 100, pin=p1)
+    finish(post, p1, AV045, ["exterior_wash"])
+    assert not leaves_at(post, p1, AV045, 100) and not leaves_at(post, p1, AV045, 100, pin=p1)
+    ms = tcall(post, chase, "my_settings")["data"]
+    assert ms["run"] == p1 and "interior deep clean" in ms["summary"] and "held until 1:00 PM" in ms["summary"], ms
+    # P1 resumes: the one live production run, with what it held
+    set_status(post, p1, "running")
+    tick(post, p1, "2026-09-27 12:03+00")
+    assert live_active(post) == sorted([("production_live:running", AV041, "service", "interior_deep_clean:now", "run"),
+                                        ("production_live:running", AV045, "hold", "hold", "run")])
+    assert ("interior_deep_clean", "pending") in visit_atoms(post, p1, AV041)
+    no_run(post)
+
+
+def test_a_production_run_is_not_resumed_beside_another_and_a_demo_run_starts_and_resumes_as_before(post):
+    """The review, round 4 (rule 9): a production run resumed (paused -> running), or a live run turned into a production
+    one, while another production run is live at the depot is refused too, whichever of a pair made before 0721 is
+    resumed; stopping one lets the other resume. A demo run's start and resume beside a paused production run, and pausing,
+    are never refused, and neither is the real resume door for a demo run."""
+    p1 = begin(post)
+    set_status(post, p1, "paused")
+    d = insert_run(post, "operator_demo")
+    for status in ("paused", "running", "paused"):
+        set_status(post, d, status)
+    p2 = insert_run_beside(post, "production_live", status="paused")
+    for run, other in ((p1, p2), (p2, p1)):
+        rc, _, err = post.run(f"UPDATE ottoq_sim_runs SET status = 'running' WHERE sim_run_id = '{run}'", check=False)
+        assert rc != 0 and "another production run is already live at this depot (paused); stop it first, then resume this one" in err, err
+        assert f"Run {other} is a production run paused" in err and "ottoq_sim_mark_stopped" in err, err
+        assert post.val(f"SELECT status FROM ottoq_sim_runs WHERE sim_run_id = '{run}'") == "paused"
+    # through the live resume door (tests/fixtures/owner_run_control_stub.sql): the same refusal, nothing written
+    rc, _, err = post.run(f"SELECT ottoq_resume_run('{p1}')", check=False)
+    assert rc != 0 and "another production run is already live at this depot (paused)" in err, err
+    # a live demo run turned into a production one beside them: refused
+    rc, _, err = post.run(f"UPDATE ottoq_sim_runs SET run_by = 'production_live' WHERE sim_run_id = '{d}'", check=False)
+    assert rc != 0 and "another production run is already live at this depot (paused)" in err, err
+    assert post.val(f"SELECT run_by FROM ottoq_sim_runs WHERE sim_run_id = '{d}'") == "operator_demo"
+    # P2 stopped (as ottoq_sim_mark_stopped stops a paused run): P1 resumes
+    post.run(f"UPDATE ottoq_sim_runs SET status = 'completed', ended_at = now() WHERE sim_run_id = '{p2}'")
+    set_status(post, p1, "running")
+    assert post.val(f"SELECT status FROM ottoq_sim_runs WHERE sim_run_id = '{p1}'") == "running"
+    set_status(post, p1, "paused")
+    no_run(post)
+
+
+def test_two_production_starts_at_once_go_live_one_at_a_time(post):
+    """The review, round 4: the guard reads the other runs under a per-depot advisory lock, so two sessions starting
+    production at once cannot both see none: the second waits for the first to commit, then is refused."""
+    no_run(post)
+    pa, pb = str(uuid.uuid4()), str(uuid.uuid4())
+    a, b = Session(post, f"r4_start_a_{pa[:8]}"), Session(post, f"r4_start_b_{pb[:8]}")
+    try:
+        a.send("BEGIN;")
+        a.send(production_insert(pa, "paused") + ";")
+        a.wait_until(holding, "holding its insert open")
+        b.send(production_insert(pb, "paused") + ";")
+        b.wait_until(lambda st: st[0] == "active" and st[1:] == ("Lock", "advisory"), "waiting on the depot's advisory lock")
+        a.send("COMMIT;")
+    finally:
+        rc_a, _, err_a = a.close()
+        rc_b, _, err_b = b.close()
+    assert rc_a == 0, err_a
+    assert rc_b != 0 and "a production run is already live at this depot (paused)" in err_b, err_b
+    assert post.rows(f"SELECT sim_run_id FROM ottoq_sim_runs WHERE sim_run_id IN ('{pa}', '{pb}')") == [[pa]]
+    no_run(post)
+
+
+def test_a_limit_changed_while_the_tick_waits_on_a_car_stays_pending_and_the_next_tick_stamps_it(post):
+    """The review, round 4 (race_tick.py; rule 9). The tick re-stamped the cars its first loop found pending, then cleared
+    pending_reconcile on EVERY pending limit row of the run in a separate statement: a person's clear (or raise) of Tesla
+    45, committed while the tick's loop waited on Tesla 41's car row (held here by a third session), was marked reconciled
+    and never stamped, so Tesla 45's charge stopped at its old 85% through every later tick. Now the tick clears only the
+    rows it took as it started: Tesla 45's change stays pending and the next tick stamps it."""
+    chase = sign_in(post)
+    for how in ("clear", "raise"):
+        p = begin(post)
+        lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+        lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 85})
+        tick(post, p)
+        assert (stamp(post, AV041), stamp(post, AV045)) == ("85", "85"), how
+        up = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 90})
+        assert up["data"]["outcome"] == "applied", up
+        hold, tk = Session(post, f"r4_hold_car_{how}"), Session(post, f"r4_tick_car_{how}")
+        try:
+            hold.send(f"BEGIN; SELECT 1 FROM vehicles WHERE id = '{AV041}' FOR UPDATE;")
+            hold.wait_until(holding, "holding Tesla 41's row")
+            tk.send(f"SELECT ottoq.ottoq_owner_orders_tick('{p}', '2026-09-27 12:03+00');")
+            tk.wait_until(waiting_on_a_lock, "waiting on Tesla 41's row")
+            c = (tcall(post, chase, "clear_charge_limit", {"vehicles": ["Tesla 45"]}) if how == "clear"
+                 else tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 45"], "percent": 95}))
+            assert c["data"]["outcome"] == "applied", (how, c)
+            assert tk.state()[1] == "Lock", "the command did not wait for the tick, nor the tick for it"
+            hold.send("COMMIT;")
+        finally:
+            hold.close()
+            rc, _, err = tk.close()
+        assert rc == 0, err
+        rows = post.rows(f"SELECT vehicle_id, status, pending_reconcile FROM ottoq_owner_settings WHERE sim_run_id = '{p}' "
+                         f"AND kind = 'charge_limit' ORDER BY vehicle_id, set_at")
+        assert {r[2] for r in rows if r[0] == AV041} == {"f"}, (how, rows)
+        assert {r[2] for r in rows if r[0] == AV045} == {"t"}, (how, rows)
+        assert (stamp(post, AV041), stamp(post, AV045)) == ("90", "85"), how
+        tick(post, p, "2026-09-27 12:05+00")
+        want = "100" if how == "clear" else "95"
+        assert (stamp(post, AV045), target(post, AV045), target_on(post, p, AV045)) == (want, want, want), how
+        assert post.val(f"SELECT count(*) FROM ottoq_owner_settings WHERE sim_run_id = '{p}' AND kind = 'charge_limit' "
+                        f"AND pending_reconcile") == "0", how
+        finish(post, p, AV045, ["exterior_wash"])
+        assert not leaves_at(post, p, AV045, 85) and not leaves_at(post, p, AV045, 85, pin=p), how
+        no_run(post)
+
+
+def agent_call_sql(token, tool, args):
+    """The SQL tcall sends, for a session of its own."""
+    meta = json.dumps({"ip": "203.0.113.7", "http_method": "POST", "path": "/mcp"})
+    return (f"SELECT ottoq_agent_call('{sha(token)}', '{tool}', {q(json.dumps(args))}::jsonb, 'mcp', {q(meta)}::jsonb);")
+
+
+def test_a_clear_of_the_car_the_tick_is_stamping_waits_for_the_tick_and_the_next_tick_stamps_it(post):
+    """The review, round 4 (rule 9): the same race on the car the tick is re-stamping. The person clears Tesla 41 while
+    the tick, having taken Tesla 41's pending limit rows, waits on Tesla 41's car row. Had the tick not locked the rows it
+    took, the clear would have withdrawn the very row the tick then marked reconciled, and Tesla 41 would have stayed
+    stamped 90 for good. The tick holds them, so the clear waits for the tick (it never deadlocks: the tick waits on no
+    command, SKIP LOCKED), is applied after it, and the next tick stamps 100."""
+    chase = sign_in(post)
+    p = begin(post)
+    lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 85})
+    tick(post, p)
+    up = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 41"], "percent": 90})
+    assert up["data"]["outcome"] == "applied" and stamp(post) == "85", up
+    hold, tk, cmd = (Session(post, "r4_hold_same"), Session(post, "r4_tick_same"), Session(post, "r4_cmd_same"))
+    try:
+        hold.send(f"BEGIN; SELECT 1 FROM vehicles WHERE id = '{AV041}' FOR UPDATE;")
+        hold.wait_until(holding, "holding Tesla 41's row")
+        tk.send(f"SELECT ottoq.ottoq_owner_orders_tick('{p}', '2026-09-27 12:03+00');")
+        tk.wait_until(waiting_on_a_lock, "waiting on Tesla 41's row")
+        cmd.send(agent_call_sql(chase, "clear_charge_limit", {"vehicles": ["Tesla 41"]}))
+        cmd.wait_until(waiting_on_a_lock, "waiting on the limit row the tick holds")
+        hold.send("COMMIT;")
+    finally:
+        hold.close()
+        rc_t, _, err_t = tk.close()
+        rc_c, out_c, err_c = cmd.close()
+    assert rc_t == 0 and rc_c == 0, (err_t, err_c)
+    clr = json.loads([l for l in out_c.splitlines() if l.strip()][-1])
+    assert clr["data"]["outcome"] == "applied", clr
+    assert post.rows(f"SELECT status, pending_reconcile FROM ottoq_owner_settings WHERE command_id = '{cid(up)}' "
+                     f"AND sim_run_id = '{p}'") == [["withdrawn", "t"]]
+    assert stamp(post) == "90", "the tick stamped what it took; the clear came after it"
+    tick(post, p, "2026-09-27 12:05+00")
+    assert (stamp(post), target(post), target_on(post, p)) == ("100", "100", "100")
+    assert not leaves_at(post, p, AV041, 90) and not leaves_at(post, p, AV041, 90, pin=p)
+    no_run(post)
+
+
+def test_an_order_placed_while_the_tick_waits_on_a_visit_stays_pending_and_holds_the_car(post):
+    """The review, round 4 (race_tick_service.py; rule 9). The tick's step (3c) merged the orders its loop found, then
+    cleared pending_reconcile on EVERY pending order of the run: a person's 'now' interior tidy for Tesla 45, committed
+    while the loop waited on Tesla 41's visit row (held here by a third session), lost its pending flag unmerged, so
+    nothing held the car and ottoq_departure_clear let it leave without the service the receipt promised. Now the loop
+    reconciles its orders row by row: Tesla 45's stays pending and holds the car, and the next tick puts it on the visit."""
+    chase = sign_in(post)
+    p = begin(post)
+    tick(post, p)
+    finish(post, p, AV045, ["charge", "readiness_check", "exterior_wash"])
+    post.run(f"UPDATE vehicles SET current_soc = 100 WHERE id = '{AV045}'")
+    clear = f"SELECT ottoq_departure_clear('{AV045}', '{p}', '2026-09-27 12:03+00', true)"
+    assert post.val(clear) == "t", "only an owner order can hold Tesla 45 now"
+    o41 = tcall(post, chase, "request_service", {"vehicles": ["Tesla 41"], "service": "interior_tidy", "when": "now"})
+    assert o41["data"]["outcome"] == "applied", o41
+    visit41 = post.val(f"SELECT visit_id FROM ottoq_visit_needs WHERE vehicle_id = '{AV041}' AND sim_run_id = '{p}' "
+                       f"AND status IN ('open', 'in_progress')")
+    hold, tk = Session(post, "r4_hold_visit"), Session(post, "r4_tick_visit")
+    try:
+        hold.send(f"BEGIN; SELECT 1 FROM ottoq_visit_needs WHERE visit_id = '{visit41}' FOR UPDATE;")
+        hold.wait_until(holding, "holding Tesla 41's visit")
+        tk.send(f"SELECT ottoq.ottoq_owner_orders_tick('{p}', '2026-09-27 12:03+00');")
+        tk.wait_until(waiting_on_a_lock, "waiting on Tesla 41's visit")
+        o45 = tcall(post, chase, "request_service", {"vehicles": ["Tesla 45"], "service": "interior_tidy", "when": "now"})
+        assert o45["data"]["outcome"] == "applied", o45
+        assert tk.state()[1] == "Lock"
+        assert post.val(clear) == "f", "the order holds the car while it waits for a tick"
+        hold.send("COMMIT;")
+    finally:
+        hold.close()
+        rc, _, err = tk.close()
+    assert rc == 0, err
+    assert sorted(tuple(r) for r in post.rows(
+        f"SELECT vehicle_id, pending_reconcile FROM ottoq_owner_settings WHERE sim_run_id = '{p}' AND kind = 'service'")) == \
+        [(AV041, "f"), (AV045, "t")]
+    assert ("interior_tidy", "pending") in visit_atoms(post, p, AV041)
+    assert ("interior_tidy", "pending") not in visit_atoms(post, p, AV045)
+    assert post.val(clear) == "f" and pinned(post, p, clear) == "f", "the car does not leave right after the raced tick"
+    tick(post, p, "2026-09-27 12:05+00")
+    assert ("interior_tidy", "pending") in visit_atoms(post, p, AV045)
+    assert post.val(f"SELECT pending_reconcile FROM ottoq_owner_settings WHERE command_id = '{cid(o45)}'") == "f"
+    assert post.val(clear.replace("12:03", "12:05")) == "f", "and it does not leave until the tidy is done"
+    no_run(post)
+
+
+def contract(db, version, mx, mn):
+    """A new version of Tesla Robotaxi TN's contract, in force from 2026-09-01 (before every run's sim clock)."""
+    db.run(f"""INSERT INTO ottoq_fleet_operator_slas (fleet_operator_id, contract_reference, effective_from, status, version,
+                 min_soc_at_deployment_pct, preferred_soc_at_deployment_pct, max_charge_target_pct, min_charge_target_pct,
+                 required_services_before_deploy, blocked_services)
+               VALUES ('{TESLA}', 'TESLA-TN-r4-v{version}', '2026-09-01 00:00+00', 'active', {version}, 80, 90, {mx}, {mn},
+                       '{{}}', '{{}}')""")
+
+
+def contract_back(db):
+    db.run(f"DELETE FROM ottoq_fleet_operator_slas WHERE fleet_operator_id = '{TESLA}' AND version > 1")
+
+
+def test_a_contract_change_mid_run_follows_onto_the_cars_whichever_way_it_moves(post):
+    """The review, round 4 (G494, both directions; scen_g494 and scen_r4 n8; rule 9). Nothing re-stamped a car when its
+    owner's contract changed mid-run: a ceiling raised from 90 to 100 left Tesla 41's stamp at 90 under a target of 100, so
+    its charge stopped at 90 and it could not leave; a ceiling lowered to 90 under a saved 95 left the stamp at 95; and a
+    minimum raised to 90 above a carried 85 left the target at 85, so Tesla 45 could leave at 85. Now a contract version
+    written, changed or removed re-stamps that owner's cars at once, pinned to the owners' run, and an owner's limit under
+    the contract's minimum is not read: the car charges to the ceiling, as the carry already decides for a saved one."""
+    chase = sign_in(post)
+    try:
+        # (1) the ceiling raised: written with no run live it re-stamps nothing; production stamps 90, then 100 at once
+        no_run(post)
+        reset_cars(post)
+        contract(post, 2, 90, 80)
+        assert stamp(post, AV041) == "100", "no run live: nothing is re-stamped"
+        p = insert_run(post, "production_live")
+        assert stamp(post, AV041) == "90"
+        contract(post, 3, 100, 80)
+        assert (stamp(post, AV041), target(post, AV041), target_on(post, p, AV041)) == ("100", "100", "100")
+        assert not leaves_at(post, p, AV041, 90) and not leaves_at(post, p, AV041, 90, pin=p)
+        # and removed again (DELETE): back to 90 at once
+        post.run(f"DELETE FROM ottoq_fleet_operator_slas WHERE fleet_operator_id = '{TESLA}' AND version = 3")
+        assert (stamp(post, AV041), target_on(post, p, AV041)) == ("90", "90")
+        contract_back(post)
+        assert stamp(post, AV041) == "100"
+        # (2) the ceiling lowered under a saved 95 (an UPDATE of the version in force): the stamp follows down at once
+        no_run(post)
+        reset_cars(post)
+        save_lower(post, chase, {"vehicles": ["Tesla 41"], "percent": 95})
+        p = insert_run(post, "production_live")
+        assert stamp(post, AV041) == "95"
+        contract(post, 2, 100, 80)
+        post.run(f"UPDATE ottoq_fleet_operator_slas SET max_charge_target_pct = 90 WHERE fleet_operator_id = '{TESLA}' AND version = 2")
+        assert (stamp(post, AV041), target(post, AV041), target_on(post, p, AV041)) == ("90", "90", "90")
+        assert leaves_at(post, p, AV041, 90) and not leaves_at(post, p, AV041, 88)
+        contract_back(post)
+        assert stamp(post, AV041) == "95"
+        # (3) the minimum raised above a carried 85: not the owner's setting any more, so the car charges to the ceiling
+        no_run(post)
+        reset_cars(post)
+        save_lower(post, chase, {"vehicles": ["Tesla 45"], "percent": 85})
+        p = insert_run(post, "production_live")
+        assert stamp(post, AV045) == "85"
+        contract(post, 2, 100, 90)
+        assert (stamp(post, AV045), target(post, AV045), target_on(post, p, AV045)) == ("100", "100", "100")
+        finish(post, p, AV045, ["exterior_wash"])
+        for soc in (85, 90):
+            assert not leaves_at(post, p, AV045, soc) and not leaves_at(post, p, AV045, soc, pin=p), soc
+        assert leaves_at(post, p, AV045, 99)
+        low = tcall(post, chase, "set_charge_limit", {"vehicles": ["Tesla 45"], "percent": 85})
+        assert low["http_status"] == 422 and low["error"]["code"] == "below_contract_minimum", low
+        # the version removed: the owner's 85 is inside the contract again, and in force again
+        contract_back(post)
+        assert (stamp(post, AV045), target_on(post, p, AV045)) == ("85", "85")
+    finally:
+        contract_back(post)
+        no_run(post)
+
+
+def test_undo_says_lifted_for_a_takeovers_lift_and_made_on_an_earlier_run_for_another_live_run(post):
+    """The review, round 4: undo answered run_ended ("That command applied to a run that has ended") for runs that had not
+    ended: for a command a production run's takeover lifted, sent on the production run, and for a command made on another
+    run still live, sent while the owners' run was a different one. Now the first answers lifted, naming the takeover,
+    whether or not its run has ended since, and the second made_on_an_earlier_run, saying the run is still live and is not
+    the one the owner's commands go to; once it is again, the undo applies."""
+    chase = sign_in(post)
+    # (1) a person's hold on a demo run, lifted by a production run's takeover
+    d = begin(post, "operator_demo")
+    hold = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 30})
+    assert hold["data"]["outcome"] == "applied" and run_of(hold) == d, hold
+    set_status(post, d, "paused")
+    p = insert_run(post, "production_live")
+    lifted = ("That command's settings were lifted (a production run took over the depot), so there is nothing left of it "
+              "to undo.")
+    for _ in ("its run paused", "its run ended"):
+        u = tcall(post, chase, "undo_command", {"command_id": cid(hold)})
+        assert (u["http_status"], u["error"]["code"], u["error"]["message"]) == (422, "lifted", lifted), u
+        set_status(post, d, "completed")
+    # (2) a person's hold on production, undone while a demo run is the owners' run (production paused beside it)
+    no_run(post)
+    reset_cars(post)
+    p = insert_run(post, "production_live")
+    x = tcall(post, chase, "hold_vehicle", {"vehicles": ["Tesla 45"], "for_minutes": 30})
+    assert x["data"]["outcome"] == "applied" and run_of(x) == p, x
+    set_status(post, p, "paused")
+    d2 = insert_run(post, "operator_demo")
+    u = tcall(post, chase, "undo_command", {"command_id": cid(x)})
+    assert (u["http_status"], u["error"]["code"]) == (422, "made_on_an_earlier_run") and run_of(u) == d2, u
+    assert u["error"]["message"] == (
+        "That command was made on another run, still paused at the depot, which is not the run your commands go to now. "
+        "Undo works on the run a command was made on: send it again when that run is the one your commands go to, or change "
+        "what your cars have now (set a new charge limit, clear it with clear_charge_limit, or withdraw the order with "
+        "cancel_service)."), u
+    # the demo paused: production, paused, is the owners' run again, and the same undo applies there
+    set_status(post, d2, "paused")
+    back = tcall(post, chase, "undo_command", {"command_id": cid(x)})
+    assert back["data"]["outcome"] == "applied" and run_of(back) == p, back
+    no_run(post)
