@@ -4,8 +4,9 @@
 --        are still building. No need to certify and test until everything is finished and we are not there. Go and build
 --        and implement!" Writes and reads against gxdrcyphqjzjsuhxuqtg on 2026-10-20 between 3:46 and 4:16 PM CT (20:46:57
 --        UTC, the first query's clock, to 21:16:42 UTC, the last's), and the live check's reads to 5:53 PM CT (22:53:07
---        UTC). This check applies no migration; every write is named below with the statement that undoes it. The two
---        migrations the live check led to, 0760 and 0761, carry their own.
+--        UTC). §7's write and reads ran from 9:10 to 10:24 PM CT (02:10:59 to 03:24:39 UTC on 2026-10-21). This check
+--        applies no migration; every write is named below with the statement that undoes it. The migrations the live
+--        checks led to, 0760, 0761 and 0762, carry their own.
 --
 -- ══ §1 WHY THE DEMO SHOWED NONE OF IT (reproduce: (1), (2)) ════════════════════════════════════════════════════════════
 --
@@ -123,6 +124,32 @@
 --       (undo with 0 and a person's name). Before it, all 12 of the run's refused moves were that interlock, the last
 --       at tick 558; in its first 14 ticks, none.
 --
+-- ══ §7 ROBOTIC WASH LANES ON, AND THE WASH BAYS' MACHINE (run 96371023; reproduce: (13), (14)) ═════════════════════
+--
+--   Chase, 2026-10-20 9:05 PM CT: "Wash bays are robotic too. Car pulls in and the machine moves back and forth over it
+--   several times to wash and rinse and blow dry before vehicle leave."
+--     - wash_lane_physics 2 (0746, robotic lanes) on at the twin depot under Chase's name at 9:10 PM CT (02:10:59 UTC on
+--       2026-10-21), by public.ottoq_policy_set('depot', '11111111-1111-1111-1111-111111111111', 'wash_lane_physics', 2,
+--       'Chase') (undo with 0 and a person's name). §4 had held it as Chase's equipment call; this is the call.
+--     - 0762, applied at 9:25 PM CT (G480): the snapshot publishes each bay car's seat, bay_seat {since, ends_at}, so the
+--       renderer plays the bay's machine inside the twin's seat. Read only.
+--     - The renderer (ottoyarddepot-sim PR #148): one rollover gantry per wash bay, six passes over the car (pre-soak, two
+--       brush passes, rinse, two air-dry passes), and on a detail seat two vacuum wands through the open doors first. It
+--       holds the car until it is home. From above, the canopies' solar modules and the halls' roofs now fade: from the
+--       Bird Eye view they hid every arm and machine (seen on this run's live view, 10:09-10:13 PM CT: 03:09:19 to
+--       03:13:24 UTC, the screenshots' own file times).
+--   Run 96371023: busy_day, started at 10:06 PM CT (03:06:30 UTC) as the app's Start does, live at 3x.
+--   (13), read at 10:24 PM CT (03:24:39 UTC; tick 215, sim 9:00 AM CT): every seat timed by the robotic cycle.
+--     - Wash bays: 5 seats, 5 closed, 4.56-5.82 minutes (p50 4.81). The dial draws 5.0 within 15%; the tick rounds up.
+--     - Detail seats: 5, 4 closed, 16.11-19.00 minutes (p50 17.71); the dial draws 16.5 within 20%.
+--     - The two read in their bays at 10:20 PM CT each ended minutes before the engine's booked end (5.587 minutes against
+--       a booking 3 minutes longer; 18.688 against one 6 minutes longer), so the release frees the bay early.
+--   (14), the cleaning arm on the same run, read at 10:21 PM CT (03:21:08-03:21:49 UTC): 2 must-do tidies done by a fast
+--   charger's arm and 8 by technicians. None of the 8 was the arm's to take. The arm takes a must-do tidy only while the
+--   car charges on its stall with a whole cycle of charge left (0758: 5.8 minutes). Car b97789b5's charge lasted 5.6
+--   minutes. Cars 380f0f38, ab7adca4 and aff36072 had their tidy raised after their charge ended (a triage confirm, or a
+--   new visit). The other 4 never charged on a fast charger.
+--
 -- ══ QUERIES ═════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 -- (1) the switches Chase's run read
@@ -197,3 +224,31 @@ SELECT s.stall_type::text AS bay, ref.sqlstate, count(*) AS attempts, count(DIST
        count(DISTINCT ref.vehicle_id) AS cars, min(ref.sim_clock_at) AS first_at, max(ref.sim_clock_at) AS last_at
   FROM ref JOIN public.stalls s ON s.id::text = ref.stall_id
  GROUP BY 1, 2 ORDER BY 1;
+
+-- (13) the wash and detail seats on run 96371023: each from its car's state change into the bay to the one out of it
+WITH seats AS (
+  SELECT e.entity_id AS car, e.sim_clock_at AS at, e.payload->'diff'->'current_state'->>'to' AS new_state,
+         e.payload->'diff'->'current_state'->>'from' AS old_state
+    FROM public.ottoq_events e
+   WHERE e.sim_run_id = '96371023-affc-40f1-9df0-650dc7746389' AND e.event_type = 'vehicle.state_changed'
+     AND (e.payload->'diff'->'current_state'->>'to' IN ('in_wash_bay', 'in_detail_bay')
+          OR e.payload->'diff'->'current_state'->>'from' IN ('in_wash_bay', 'in_detail_bay'))),
+pairs AS (
+  SELECT s.car, s.new_state AS bay, s.at AS seated,
+         (SELECT min(x.at) FROM seats x WHERE x.car = s.car AND x.old_state = s.new_state AND x.at > s.at) AS out_at
+    FROM seats s WHERE s.new_state IN ('in_wash_bay', 'in_detail_bay'))
+SELECT p.bay, count(*) AS seats, count(p.out_at) AS closed,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM p.out_at - p.seated) / 60.0)::numeric, 2) AS p50_min,
+       round(min(extract(epoch FROM p.out_at - p.seated) / 60.0)::numeric, 2) AS min_min,
+       round(max(extract(epoch FROM p.out_at - p.seated) / 60.0)::numeric, 2) AS max_min
+  FROM pairs p GROUP BY p.bay ORDER BY 1;
+
+-- (14) the must-do tidies on run 96371023: who did them, and the car's fast-charger bookings
+SELECT left(n.vehicle_id::text, 8) AS car, COALESCE(a->>'performed_by', 'technician') AS by,
+       (a->>'started_at')::timestamptz AS started, (a->>'ends_at')::timestamptz AS ends,
+       (SELECT jsonb_agg(jsonb_build_object('from', lower(b.during), 'to', upper(b.during)) ORDER BY lower(b.during))
+          FROM public.ottoq_stall_bookings b JOIN public.stalls st ON st.id = b.stall_id
+         WHERE b.vehicle_id = n.vehicle_id AND b.sim_run_id = n.sim_run_id AND st.stall_type::text = 'dcfc') AS dcfc
+  FROM public.ottoq_visit_needs n CROSS JOIN LATERAL jsonb_array_elements(n.atoms) a
+ WHERE n.sim_run_id = '96371023-affc-40f1-9df0-650dc7746389' AND a->>'svc' = 'interior_tidy' AND a->>'status' = 'done'
+ ORDER BY 3;
