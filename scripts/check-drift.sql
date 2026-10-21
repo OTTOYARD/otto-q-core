@@ -814,7 +814,9 @@ repo_manifest(version, name, file) AS (
     ('20261019134637'::text, 'a_fast_chargers_cleaning_arm_cleans_the_cabin_while_the_car_charges'::text, '0758_a_fast_chargers_cleaning_arm_cleans_the_cabin_while_the_car_charges.sql'::text),
     ('PENDING'::text, 'canopy_b_is_restriped_for_ten_more_robotic_fast_chargers'::text, '0759_canopy_b_is_restriped_for_ten_more_robotic_fast_chargers.sql'::text),
     ('20261020213742'::text, 'a_car_the_cleaning_arm_is_cleaning_keeps_its_stall_when_the_charge_arm_lets_go'::text, '0760_a_car_the_cleaning_arm_is_cleaning_keeps_its_stall_when_the_charge_arm_lets_go.sql'::text),
-    ('20261020225005'::text, 'a_car_held_at_its_charger_is_passed_over_by_the_bay_doors'::text, '0761_a_car_held_at_its_charger_is_passed_over_by_the_bay_doors.sql'::text)
+    ('20261020225005'::text, 'a_car_held_at_its_charger_is_passed_over_by_the_bay_doors'::text, '0761_a_car_held_at_its_charger_is_passed_over_by_the_bay_doors.sql'::text),
+    ('PENDING'::text, 'the_stop_door_takes_the_runs_row_before_the_proposals'::text, '0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql'::text),
+    ('PENDING'::text, 'a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run'::text, '0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 
