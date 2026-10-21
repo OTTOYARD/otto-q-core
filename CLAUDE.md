@@ -308,6 +308,37 @@ When information is missing:
    - **Checking a change in one demo run is part of building it**, not testing in rule 10's sense: no hypothesis, no
      sweep, no pairs.
 
+**13. NO CEILING ON THE FRONT END WHILE WE BUILD. THE VEHICLES' NEEDS SET THE NUMBERS, AND A CAP IS SET AFTER, FROM WHAT THEY DREW — added 2026-10-21 in Chase's words.**
+
+   *"never base variable allocation of resources or throughput or up time or energy consumption based on a hard ceiling
+   until we have everything built out. Meaning: now that we have built much more, DC FC and robotic features, our energy
+   consumption should match what that would reflect in a real world scenario. In additionally, if we start adding more
+   vehicles, we shouldn't make them fit within a previous energy cap or any previous constraints. The vehicles needs take
+   absolute precedence, and any energy needed is consumed, and we have to fit around that. Now eventually, we will have our
+   limits and Understand what our cap is, but never restrict on the front end. ... I just don't want anything blocking
+   accurate numbers because of a previous benchmark we had set. While we are building an integrate new things, all
+   benchmark should go out the window until that system is fully built and tested, and then we can see what that cap or
+   ceiling now looks like. Once we get that idea, we can set the new benchmarks and then try to work down that margin with
+   battery energy storage or any other methods."* And: *"I just don't like the expression 'fitting within a certain cap or
+   limit.' ... once we have actual assets, they will take precedence based on their absolute needs, and we will fit all
+   other parameters or variables from energy consumption and servicing and needs around those themselves. Not our specific
+   site ideal scenarios. We serve to keep vehicles up and running, no matter what. Any margin we can save on the backend
+   with energy, arbitrage, or optimizations, is strictly on our operator side or private backend and balance sheet."*
+
+   - **Hardware, robotics, chargers or vehicles added to the twin are integrated with no ceiling below what they can
+     draw.** A depot's power limits are what is installed (the chargers' ratings, the battery's, the building's), never a
+     benchmark carried over from before the build-out, so no car is refused, slowed or held for power. A fleet that grows
+     is never fitted inside the previous fleet's cap or constraints.
+   - **The ceiling comes after, from a measurement.** Once the build is finished and tested (rule 12), what the depot drew
+     is what the new ceiling is set from, as its own certified change; only then is the margin under it worked down, and
+     only on the operator's side (the battery, the tariff, arbitrage), never by a vehicle.
+   - **"Fits within the cap" is not a design goal or a claim.** It is rule 9 extended from a car's charge to the site's
+     capacity: the vehicles' needs set every other number. A charger fault or a vehicle emergency is not a benchmark (rule
+     9 names what may stop a charge).
+   - First applied by `0763`: the 30-post depot on 10,500 kW DC and 12,250 kW service, what is installed, where its first
+     draft had held it to 2,400 kW of shared cabinets (`db/checks/0460` §3). The held site stays a build-out
+     (`dcfc30_cab2400`) for the margin work after a ceiling is set.
+
 ---
 
 # PART 2 — THE KERNEL BRIEF
