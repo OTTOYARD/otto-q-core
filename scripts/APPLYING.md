@@ -185,7 +185,20 @@ supabase db push          # from a linked project
 **c) Dashboard SQL editor — last resort.** It runs the SQL but **does not write a
 ledger row**, so the change becomes invisible to Sections A–C of the drift check.
 If you must use it, say so in `MIGRATION_LOG.md` in the same sitting, and expect
-Section D (routine counts) to be the only automatic evidence it happened.
+Section D (routine counts) to be the only automatic evidence it happened. Set the
+file's version to `APPLIED-NO-LEDGER-ROW` and give it an APPLIED footer saying who
+ran it, when, and the md5 of the text pasted (0759 and 0763 did, on 2026-10-22,
+when the connector held every write for a confirmation the cloud session could not
+show).
+
+The editor also appends `-- Added by Supabase: enable Row Level Security on newly
+created tables` and an `ALTER TABLE … ENABLE ROW LEVEL SECURITY` for each table the
+script creates, **after** the file's own `COMMIT`. On a file whose temporary tables
+are `ON COMMIT DROP` that line fails with `42P01: relation "_NNNN_…" does not
+exist`. The file has already committed, so the red error changes nothing. But the
+appended lines stop at the first error, so a permanent table the file creates must
+set its own row security and grants in the file (0759 does), never rely on the
+editor's line.
 
 ### 5. Record the version the database assigned
 
