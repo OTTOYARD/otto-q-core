@@ -818,7 +818,7 @@ repo_manifest(version, name, file) AS (
     ('20261021022543'::text, 'the_snapshot_says_when_each_cars_bay_work_started_and_ends'::text, '0762_the_snapshot_says_when_each_cars_bay_work_started_and_ends.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers'::text, '0763_canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'every_car_that_charges_gets_the_overhead_arms_cabin_clean'::text, '0764_every_car_that_charges_gets_the_overhead_arms_cabin_clean.sql'::text),
-    ('PENDING'::text, 'every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in'::text, '0765_every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in.sql'::text),
+    ('APPLIED-NO-LEDGER-ROW'::text, 'every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in'::text, '0765_every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in.sql'::text),
     ('PENDING'::text, 'the_stop_door_takes_the_runs_row_before_the_proposals'::text, '0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql'::text),
     ('PENDING'::text, 'a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run'::text, '0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql'::text)
 -- <<< END GENERATED MANIFEST

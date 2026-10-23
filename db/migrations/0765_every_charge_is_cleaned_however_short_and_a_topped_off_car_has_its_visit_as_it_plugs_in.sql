@@ -1,5 +1,7 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in
+-- (applied by Chase in the Supabase dashboard's SQL editor, which writes no supabase_migrations row; the APPLIED footer
+--  at the end of this file is the record. See task G18.)
 --
 -- 0765  **Every car that charges on a robotic post is cleaned by the post's overhead arm, however short the charge and
 --       however the car came to charge.** (G484)
@@ -380,3 +382,21 @@ VALUES ('0765_every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-23 16:27:03 UTC (11:27 AM CT), no ledger row ═══════════════════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor, pasted whole from the step page: the file as committed
+--   at 5423401, header PENDING (md5 ff80737b26d0cfcfeaf392253b40b298); the header's version and note and this footer are
+--   the only text added since. The editor delivered it with Windows line endings (the postgres log's statement line
+--   carries CRLF), which the anchors now read as bare newlines. P0, P1, P2, the anchors, V1, V3 and V2 passed inside the
+--   file's transaction; its lineage row and its two '0765_pre' snapshots carry 16:27:03.127276 UTC. The editor's
+--   appended row-security line then failed with 42P01 on _0765_patch, a temporary table the COMMIT had dropped, which
+--   changed nothing (scripts/APPLYING.md, c). Read back at 16:27:28 UTC (11:27 AM CT): the starter at md5
+--   5b98fb1dbd54fb0baf9f39f77ca2660c and the pre-arrival contracts at 161fff049c1886a8b31794c27faa3c40, as V3 requires;
+--   the completion step unchanged at fb7cde232a1b8311eb2f768c812f4c9a; the dial catalogued 0..2 with this file's
+--   description and still 2 at the twin depot by Chase, so it was on from the next pass of the run then live.
+--   The first attempt: Chase ran the file as committed at e84f788 at 15:26:31 UTC (10:26 AM CT), also with Windows line
+--   endings, and it stopped at its first anchor ("anchor 1 of ottoq.ottoq_sim_prearrival_contracts matches 0 times");
+--   the transaction rolled back, and at 16:18:40 UTC the bodies, lineage, snapshots and catalog read as before.
+--   On the live run, 3389e651 (busy_day), the first routine clean decided after the apply (sim 19:49:21) opened its leg
+--   through public.ottoq_itin_leg_open on the car's active itinerary, at the post (read at 16:28:30 UTC).
