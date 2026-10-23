@@ -1,5 +1,7 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    canopy_b_is_restriped_for_ten_more_robotic_fast_chargers
+-- (applied by Chase in the Supabase dashboard's SQL editor, which writes no supabase_migrations row; the APPLIED footer
+--  at the end of this file is the record. See task G18.)
 --
 -- 0759  **Canopy B is re-striped for ten more robotic fast chargers: the twin depot is built with 20 fast chargers and 15
 --       standard chargers.** (G477)
@@ -1420,3 +1422,21 @@ VALUES ('0759_canopy_b_is_restriped_for_ten_more_robotic_fast_chargers', true, t
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-23 03:05:29 UTC (10:05 PM CT on 2026-10-22), no ledger row ═════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor, pasted whole from a page that copied it as committed at
+--   2f556ae (md5 f2f27642097d38b6e99ef91d1448ea5d, header PENDING; the header's version and note and this footer are the
+--   only text added since). The connector's confirmation, which apply_migration and a writing execute_sql wait on, cannot
+--   be shown in the cloud session that built this file: each write sent through it on 2026-10-22 waited its 60 seconds
+--   and ran nothing. The editor writes no ledger row, hence APPLIED-NO-LEDGER-ROW. The research pause ran first, in the
+--   same editor, at 03:04:17 UTC (db/checks/0460 (W1): 32 sweeps paused and 8 dial experiments abandoned, none active
+--   after). P0, P1, P2 and V1-V7 passed inside the file's transaction, which committed at the time above, the clock its
+--   lineage row and its 15 base-history rows carry. The editor then ran what it appends to every script ("-- Added by
+--   Supabase: enable Row Level Security on newly created tables", an ALTER TABLE for each table the script creates)
+--   after the file's COMMIT, and it failed with 42P01 on _0759_restripe, a temporary table the COMMIT had dropped. It
+--   changed nothing: the one table this file keeps, public.ottoq_site_base_history, has row security on, no anon grant
+--   and SELECT only for authenticated (read at 03:18:59 UTC). 0763's P1 found the depot as this file leaves it at 03:11:18
+--   UTC (census, power, layout, canopy C, bodies, build-outs). The lineage row forces a recert and a dial restart: the
+--   canon recertifies on the new depot, and the paused sweeps run on it, when testing resumes (CLAUDE.md rule 12; the
+--   recert runner, cron 746, stays off).

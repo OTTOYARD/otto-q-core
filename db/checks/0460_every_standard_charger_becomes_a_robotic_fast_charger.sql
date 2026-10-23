@@ -5,8 +5,11 @@
 --        for the rest of the stalls. I see it on the original 10, but we discussed swapping out all of the L2's or 90% of
 --        the L2's for DCFC ever bought charging arm with overhead robovac ." Reads against gxdrcyphqjzjsuhxuqtg on
 --        2026-10-21 between 7:08 and 7:22 AM CT (12:08:42 UTC, the first query's clock, to 12:22:19 UTC, read before the
---        migration was written). The writes in §4 are held by the connector for Chase's confirmation; none is reworded or
---        sent another way. Each is named with the statement that undoes it.
+--        migration was written). The writes in §4 were held by the connector for Chase's confirmation, which the cloud
+--        session that wrote this cannot show (each write sent through it waited 60 seconds and ran nothing), so Chase ran
+--        them himself in the Supabase dashboard's SQL editor on 2026-10-22 between 10:04 and 10:11 PM CT: 0759 and 0763
+--        pasted whole as committed, and (W1) with its date and its name set to what ran (§4). Each is named with the
+--        statement that undoes it.
 --
 -- ══ §1 WHY ONLY TEN (reproduce: (1)) ═══════════════════════════════════════════════════════════════════════════════════
 --
@@ -65,6 +68,16 @@
 --   (W2) 0759, through apply_migration, as written.
 --   (W3) 0763, through apply_migration, once ottoyarddepot-sim #152 is live (Lovable: Publish, then Update). Until then
 --        the app keeps drawing canopy C as standard chargers.
+--   AS RUN, 2026-10-22 CT. The connector held each write for a confirmation the cloud session cannot show, so Chase ran
+--   all three in the Supabase dashboard's SQL editor, pasted from a page that copied the committed text: (W1) at 10:04:17
+--   PM CT (03:04:17 UTC on 10-23, the abandoned experiments' concluded_at), with its date and its 'by' written as what
+--   ran ('Paused 2026-10-22 CT', 'chase_2026_10_22'; the committed text had said 2026-10-21 and claude_code_2026_10_21,
+--   and (W1) below is now what ran, md5 e70516e7): 32 sweeps paused and 8 experiments abandoned, none active after; (W2)
+--   0759 at 10:05:29 PM CT and (W3) 0763 at 10:11:18 PM CT, each the file as committed at 2f556ae, unedited, with
+--   #152 live. The editor writes no ledger row, so both carry APPLIED-NO-LEDGER-ROW and an APPLIED footer, and it
+--   appends a row-security line after each script's COMMIT that failed harmlessly on the files' dropped temporary tables
+--   (42P01). Read back at 10:18 and 10:26 PM CT: 30 dcfc spaces on live 350 kW chargers, no standard charger, 10,500 /
+--   12,250 kW, and the renderer's layout read the same.
 --   Then one demo run on the new depot, the way the app's Start does, read for: the census and the posts it serves; cars
 --   charging on canopy B and canopy C posts with an arm cycle each; the cleaning arm's tidies there; rule 9 at departure.
 --   Checking a change in one demo run is part of building it (rule 12), not testing.
@@ -203,13 +216,13 @@ SELECT date_trunc('day', r.started_at) AS run_day, count(*) AS sessions,
 UPDATE public.ottoq_throughput_sweeps
    SET status = 'paused',
        notes = COALESCE(notes || ' | ', '')
-               || 'Paused 2026-10-21 for the twin depot''s 30-post base change (0759, 0763; db/checks/0460). Testing is off '
+               || 'Paused 2026-10-22 CT for the twin depot''s 30-post base change (0759, 0763; db/checks/0460). Testing is off '
                || 'while we build (CLAUDE.md rule 12). A cell run after it runs on the 30-post depot.'
  WHERE depot_id = '11111111-1111-1111-1111-111111111111' AND status = 'active';
 UPDATE public.ottoq_dial_experiments
    SET status = 'abandoned', concluded_at = now(),
        verdict = jsonb_build_object(
-         'by', 'claude_code_2026_10_21', 'outcome', 'abandoned_base_change', 'check', 'db/checks/0460', 'finding', 'G481',
+         'by', 'chase_2026_10_22', 'outcome', 'abandoned_base_change', 'check', 'db/checks/0460', 'finding', 'G481',
          'why', 'Chase, 2026-10-21: every standard charger at the twin depot becomes a robotic fast charger (0759, 0763). '
                 || 'Every pair of this experiment ran on the depot as built, and a pair read across the base change would '
                 || 'compare two depots (forces_dial_restart). Testing is off while we build (CLAUDE.md rule 12). Its pairs '

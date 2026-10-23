@@ -1,5 +1,7 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers
+-- (applied by Chase in the Supabase dashboard's SQL editor, which writes no supabase_migrations row; the APPLIED footer
+--  at the end of this file is the record. See task G18.)
 --
 -- 0763  **Canopy C is re-striped as canopies A and B: the twin depot is built with thirty robotic fast chargers and no
 --       standard charger, and its power limits are what its hardware can draw, so the cars take what they need and the
@@ -820,3 +822,24 @@ VALUES ('0763_canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers'
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-23 03:11:18 UTC (10:11 PM CT on 2026-10-22), no ledger row ═════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor after 0759, pasted whole from the same page (md5
+--   7c88a725fb2b90ca94616a498dce5eb7, the file as committed at 2f556ae, header PENDING; the header's version and note and
+--   this footer are the only text added since), for the reason 0759's footer gives; ottoyarddepot-sim #152 was live (§0).
+--   P0, P1, P2, V1 and V3-V6 passed inside the file's transaction, which committed at the time above, the clock its
+--   lineage row and its 15 base-history rows carry. The editor's appended row-security line then failed with 42P01 on
+--   _0763_restripe, a temporary table the COMMIT had dropped; this file keeps no table it creates, so that changed
+--   nothing. Read back at 03:18:59 UTC (10:18 PM CT): the twin depot's spaces are dcfc 30, parking 10, staging 113, wash
+--   bay 3 and service bay 2, with no standard charger; each of the 30 fast-charger spaces is on a live 350 kW charger,
+--   NASH-DCFC-01..30, 28 Available and 2 Faulted as the last run, 96371023, left them (it drew both faults, NASH-DCFC-08
+--   at sim 15:54 and -10 at sim 18:03, and stopped at sim 22:06 with both still out); dcfc_max_concurrent_kw 10,500,
+--   service_max_kw 12,250, safety margin 10%; and the renderer's layout read, public.ottoq_twin_depot_layout, returns
+--   30 dcfc spaces at 350 kW on CANOPY-01..03 (read at 03:26:51 UTC). Five standard-charger records, NASH-L2-21..25,
+--   stay Available with no space, as 0010 left them (0759 §2 (d)): no space points at one and no surviving session has
+--   used one. The ten this file and 0759 decommissioned read Unavailable until a run starts, when
+--   twin.ottoq_sim_seed_fleet marks every charger at the depot Available (0759 §2 (d)); with no space on any of the
+--   fifteen, nothing seats a car there. The lineage row forces a recert and a dial restart, as 0759's does (CLAUDE.md
+--   rule 12 holds both).
+--   The demo-run check is db/checks/0460 §5.
