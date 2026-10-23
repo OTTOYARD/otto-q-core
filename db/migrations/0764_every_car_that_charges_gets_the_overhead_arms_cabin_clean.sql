@@ -1,5 +1,7 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    every_car_that_charges_gets_the_overhead_arms_cabin_clean
+-- (applied by Chase in the Supabase dashboard's SQL editor, which writes no supabase_migrations row; the APPLIED footer
+--  at the end of this file is the record. See task G18.)
 --
 -- 0764  **Every car that charges on a robotic post has its cabin cleaned by the post's overhead arm, during the
 --       charge.** (G483)
@@ -384,3 +386,23 @@ VALUES ('0764_every_car_that_charges_gets_the_overhead_arms_cabin_clean', false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-23 14:19:53 UTC (9:19 AM CT), no ledger row ═══════════════════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor, pasted whole from the step page with §5's switch after
+--   it in its own transaction (the text pasted, md5 cceff3d306e3967290c1ebcb9ec6ea6d: this file as committed at
+--   81d6f42, header PENDING, md5 be578f7965768e4309332bfae9e496ca, then BEGIN; SELECT public.ottoq_policy_set('depot',
+--   '11111111-1111-1111-1111-111111111111', 'stall_cabin_robot', 2, 'Chase'); COMMIT;). The header's version and note
+--   and this footer are the only text added since. P0, P1, P2, V1 and V2 passed inside the file's transaction; its
+--   lineage row, its two '0764_pre' snapshots and the dial's depot row (2, by 'Chase') all carry 14:19:53.970934 UTC.
+--   The editor's appended row-security line then failed with 42P01 on _0764_patch, a temporary table the COMMIT had
+--   dropped, which changed nothing (scripts/APPLYING.md, c). Read back at 14:35:58 UTC (9:35 AM CT): the starter at
+--   md5 002247aab125626b56e1424d79cfaa05 and the completion step at fb7cde232a1b8311eb2f768c812f4c9a, as the scratch
+--   PostgreSQL produced from the same text.
+--   The demo run: 3389e651 (busy_day), started at 14:21:10 UTC (9:21 AM CT), the first under the dial. In the cockpit,
+--   served locally against it and polled 23 times between 9:23 and 9:27 AM CT, up to 4 arms were at work at once (2.3
+--   on average) on posts across the canopies. By sim 14:31, 91 sim-minutes in (read at 9:49 AM CT): 31 routine cleans
+--   decided and done or under way, and 11 needed tidies, all by the arms; 27 of 27 finished routine legs done, each
+--   with its service record; 2 cleans outlasted their charge, by up to 5.2 minutes, held their car and finished; 1
+--   routine skipped for a charge shorter than the cycle; and 14 tidies done by technicians, 13 of them on cars that
+--   charged before their visit existed (topped off with no visit). Those two gaps are G484, closed by 0765.
