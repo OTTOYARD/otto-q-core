@@ -780,6 +780,21 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_every_car_cabin_clean_sql.py
 
+      # 0765, G484, EXECUTED over 0764's test world with the live pre-arrival contracts and leg door (md5 asserted): at 0
+      # and 1 the same world is byte-identical with and without it; at 2 a charge however short is cleaned by the arm,
+      # its car held until the arm is home, except a routine on an owner's immediate turnaround; a car topped off with
+      # no visit gets its service list as it charges, once, and is cleaned; the routine's leg opens through the leg door
+      # and binds no booking. 21 tests, about 20 seconds.
+      - name: Every charge is cleaned however short, and a topped-off car has its visit as it plugs in, executed (0765)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_every_charge_is_cleaned_sql.py
+
       # 0649-0651, the v2 operator door (contract/README.md), EXECUTED on a stub engine: a key speaks only for its own
       # fleets' cars at its own depot; an event is taken once and applied in sequence order, timed by itself; an ack
       # moves only its own car's directive through the closed reasons; a directive leaves with its id, version, expiry
