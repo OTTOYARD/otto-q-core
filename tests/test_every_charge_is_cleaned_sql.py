@@ -21,8 +21,9 @@ whole:
     starts), at the post, closed by its id; a car with a list, with a visit, on a standard charger, done charging or
     en route (BACKSTOP 1's, unchanged) is not the backstop's, and nothing happens where the depot's feed is not sim;
   - the routine's leg binds no stall booking;
-  - 0765 applies as declared and refuses a second apply, a body it did not read, a database without 0764 and a dial
-    not as 0764 left it.
+  - 0765 applies as declared, and pasted with Windows line endings (as the SQL editor delivered it on 2026-10-23 at
+    10:26 AM CT, when its first anchor matched nothing) applies to the same bodies; it refuses a second apply, a body it
+    did not read, a database without 0764 and a dial not as 0764 left it.
 It SKIPS where no scratch PostgreSQL is reachable.
 """
 import json
@@ -51,6 +52,8 @@ LEG_OPEN = ("public.ottoq_itin_leg_open(uuid,uuid,uuid,timestamp with time zone,
 # what 0764 left and what the live engine carries, as read on live on 2026-10-23 (0765's premises)
 LIVE = {START: "002247aab125626b56e1424d79cfaa05", ADVANCE: "fb7cde232a1b8311eb2f768c812f4c9a",
         PREARRIVAL: "d612cbeb5cd4f839f988b1451240dd5c", LEG_OPEN: "69effd4b79c76a99b2cb019410172164"}
+# what 0765 leaves: the bodies the live rehearsal produced on 2026-10-23 (9:58 AM CT), which V3 holds the apply to
+AFTER = ("5b98fb1dbd54fb0baf9f39f77ca2660c", "161fff049c1886a8b31794c27faa3c40")
 L0764 = "0764_every_car_that_charges_gets_the_overhead_arms_cabin_clean"
 L0765 = "0765_every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in"
 CHARGE = e764.CHARGE
@@ -227,8 +230,23 @@ def test_it_applies_as_declared(db):
     assert db.val(f"""SELECT forces_recert::text || forces_dial_restart::text FROM public.ottoq_cert_lineage
                       WHERE name = '{L0765}'""") == "falsefalse"
     assert db.val("SELECT count(*) FROM public.ottoq_policy_params WHERE param_key = 'stall_cabin_robot'") == "0"
-    # the completion step and the leg door are as they were
+    # the completion step and the leg door are as they were; the patched bodies are the ones V3 holds them to
     assert arm._md5(db, ADVANCE) == LIVE[ADVANCE] and arm._md5(db, LEG_OPEN) == LIVE[LEG_OPEN]
+    assert (arm._md5(db, START), arm._md5(db, PREARRIVAL)) == AFTER
+
+
+def test_a_paste_with_windows_line_endings_applies_to_the_same_bodies(db, tmp_path):
+    """The SQL editor delivered 0765 with CRLF line endings on 2026-10-23 at 10:26 AM CT and its first anchor matched
+    nothing (the transaction rolled back). The same text with CRLF now applies, to bodies byte for byte as from LF."""
+    with open(M0765, "rb") as f:
+        text = f.read()
+    assert b"\r" not in text
+    crlf = tmp_path / "0765_crlf.sql"
+    crlf.write_bytes(text.replace(b"\n", b"\r\n"))
+    rc, err = db.file(str(crlf))
+    assert rc == 0, f"0765 with CRLF did not apply: {err}"
+    assert (arm._md5(db, START), arm._md5(db, PREARRIVAL)) == AFTER
+    assert db.val(f"SELECT count(*) FROM public.ottoq_cert_lineage WHERE name = '{L0765}'") == "1"
 
 
 # ── at 0 and 1 nothing moves ─────────────────────────────────────────────────────────────────────────────────────────

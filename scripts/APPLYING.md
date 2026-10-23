@@ -200,6 +200,16 @@ appended lines stop at the first error, so a permanent table the file creates mu
 set its own row security and grants in the file (0759 does), never rely on the
 editor's line.
 
+The editor also sends the paste with the line endings of the machine it was copied
+on. On 2026-10-23 0764 arrived with bare newlines and 0765 with Windows line endings
+(CRLF, read in the postgres log's `statement:` line), and 0765's first anchor matched
+nothing, because a stored function body ends its lines in a bare newline; the
+transaction rolled back and nothing changed. A file that matches anchors against
+stored bodies reads them with bare newlines (`replace(c_old, E'\r\n', E'\n')`, and the
+same for the replacement text) and checks each patched body's md5 against the one its
+tests produced, so whatever the paste carried, the engine gets the tested bytes or
+nothing (0765 does both).
+
 ### 5. Record the version the database assigned
 
 ```sql

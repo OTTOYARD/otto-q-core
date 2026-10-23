@@ -61,8 +61,10 @@
 --   P0 nothing in flight. P1 the bodies are those 0764 left and those read on live on 2026-10-23 (prosrc md5s: the
 --   starter and the completion step as 0764 left them, the pre-arrival contracts, the leg door), the generator is
 --   there, 0764 is applied and the dial is catalogued 0..2 as 0764 left it. P2 once. Pre-images to
---   ottoq_schema_snapshots as '0765_pre'. Each anchor matches once in its function. V1 each body less its changes is its
---   pre-image. V2 the dial is catalogued 0..2 with this file's description (this file sets no dial value).
+--   ottoq_schema_snapshots as '0765_pre'. Each anchor matches once in its function, read with bare newlines whatever
+--   line endings the paste carried. V1 each body less its changes is its pre-image. V3 each patched body is byte for
+--   byte the one the tests ran (md5). V2 the dial is catalogued 0..2 with this file's description (this file sets no
+--   dial value).
 --   tests/test_every_charge_is_cleaned_sql.py runs this file on the scratch PostgreSQL over 0764's test world with the
 --   live pre-arrival contracts and leg door (md5 asserted): at 0 and at 1 the same world leaves byte-identical visits,
 --   legs and calls with and without 0765; at 2 a short charge is cleaned by the arm, holds its car and finishes after
@@ -70,8 +72,9 @@
 --   not held, and its needed tidy is still the arm's; a topped-off car gets its list once, from the generator with the
 --   run, no itinerary planned, and is cleaned through the completion step's own pass, its leg on the charge
 --   orchestrator's itinerary (or a new one), closed by its id at the post; a car with a list, with a visit, on a
---   standard charger, en route, or at a depot whose feed is not sim is left alone; the leg binds no booking; and 0765
---   refuses a second apply, a body it did not read, a database without 0764 and a dial not as 0764 left it.
+--   standard charger, en route, or at a depot whose feed is not sim is left alone; the leg binds no booking; 0765
+--   pasted with Windows line endings applies to the same bodies; and it refuses a second apply, a body it did not read,
+--   a database without 0764 and a dial not as 0764 left it.
 --   Rehearsed on live on 2026-10-23 inside transactions rolled back: at 9:58 AM CT this file's text passed every check,
 --   leaving the starter at md5 5b98fb1d and the pre-arrival contracts at 161fff04, as on the scratch PostgreSQL; at
 --   10:00 AM CT the live generator, run with the run on three cars charging on posts (90%, 95% and 71%), wrote each its
@@ -300,6 +303,12 @@ $p2o$,
   -- BACKSTOP 1: en_route car with no workflow (AP-4 books at need-fire; this catches cars that
 $p2n$);
 
+-- The SQL editor delivers a paste with the line endings of the machine it came from: on 2026-10-23 at 10:26 AM CT this
+-- file arrived with Windows line endings and its first anchor matched nothing, because the stored bodies end their lines
+-- in a bare newline. Read with bare newlines, the anchors and their replacements are the file's whatever the paste
+-- carried, and V3 holds the result to the bodies the tests ran.
+UPDATE _0765_patch SET c_old = replace(c_old, E'\r\n', E'\n'), c_new = replace(c_new, E'\r\n', E'\n');
+
 DO $patch$
 DECLARE f text; p record; v_def text; n int;
 BEGIN
@@ -336,6 +345,17 @@ BEGIN
     END IF;
   END LOOP;
 END $v1$;
+
+-- ── V3: the patched bodies are byte for byte the ones the scratch PostgreSQL ran and the live rehearsal produced ──
+DO $v3$
+BEGIN
+  IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.ottoq_start_concurrent_atoms(uuid,timestamp with time zone)'::regprocedure)
+       IS DISTINCT FROM '5b98fb1dbd54fb0baf9f39f77ca2660c'
+     OR (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'ottoq.ottoq_sim_prearrival_contracts(uuid,timestamp with time zone)'::regprocedure)
+       IS DISTINCT FROM '161fff049c1886a8b31794c27faa3c40' THEN
+    RAISE EXCEPTION '0765 V3: a patched body is not the one the tests ran';
+  END IF;
+END $v3$;
 
 -- ── V2: the dial, as declared, and set nowhere by this file ──
 DO $v2$
