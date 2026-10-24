@@ -879,6 +879,19 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_charge_order_exit_first_sql.py
+      # 0782 (G502), EXECUTED on the same world with 0780's helper: it applies on the live decide tick and on 0781's;
+      # the exception's predicate, cut from the patched decide tick and run over a stand-in needs card, admits at the
+      # default exactly the cars it did before and with the dial any car whose energy is not critical when no post is
+      # free; the seat records bay_before_charge only with the dial; the pre-image restores. 7 tests, about 20 seconds.
+      - name: When every post is taken a car takes a free bay first, executed (0782)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_bay_open_shop_sql.py
 
       # scripts/editor_paste.py, the text a person pastes into the Supabase SQL editor, EXECUTED as the editor sends it
       # (the whole paste as one simple query): a file whose anchor spans a line end fails as it is with CRLF (0765's
