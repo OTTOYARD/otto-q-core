@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    the_demo_metronome_ticks_through_the_whole_minute
 --
 -- 0768  **The demo metronome ticks through the whole minute.** (G487)
@@ -89,3 +89,13 @@ VALUES ('0768_the_demo_metronome_ticks_through_the_whole_minute', false, false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-24 12:39:24 UTC (7:39 AM CT), no ledger row ═══════════════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor as the second of three in one paste made by
+--   scripts/editor_paste.py from the files at 81dcaf3 (this file md5 fe27d162, its part of the paste 00f716e9; the paste
+--   a55de610, 41,415 bytes), each file its own transaction once its text's md5 had been checked. The header's version and
+--   this footer are the only text added since. P0, P1, P2 and V1 passed inside the file's transaction; its lineage row
+--   carries 12:39:24.097236 UTC (the three transactions share the paste's start time, as one editor message). Read back
+--   at 12:40:22 UTC (7:40 AM CT): ottoq-demo-metronome every minute, active, `CALL public.ottoq_demo_metronome(57)`. No
+--   run was live; the next demo run is the first on it.

@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due
 --
 -- 0769  **The agent's wake gate also wakes it when a charger is free with a car waiting, or a car in the line's head
@@ -249,3 +249,15 @@ VALUES ('0769_the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due', f
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-24 12:39:24 UTC (7:39 AM CT), no ledger row ═══════════════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor as the third of three in one paste made by
+--   scripts/editor_paste.py from the files at 81dcaf3 (this file md5 d51b6de8, its part of the paste 19397d84; the paste
+--   a55de610, 41,415 bytes), each file its own transaction once its text's md5 had been checked. The header's version and
+--   this footer are the only text added since. P0, P1, P2, the anchors, V1, V2 and V3 passed inside the file's
+--   transaction; its lineage row and its '0769_pre' snapshot carry 12:39:24.097236 UTC (the three transactions share the
+--   paste's start time, as one editor message). Read back at 12:40:22 UTC (7:40 AM CT): the gate at md5
+--   353f108cb90369892c18a72537d2619b, as V3 requires, still SECURITY DEFINER on the same search path; agent_wake_enabled
+--   unset at the twin depot, so the gate is in shadow there and only the record changes. No run was live; not yet seen on
+--   an agent pass.

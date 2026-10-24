@@ -820,9 +820,9 @@ repo_manifest(version, name, file) AS (
     ('APPLIED-NO-LEDGER-ROW'::text, 'every_car_that_charges_gets_the_overhead_arms_cabin_clean'::text, '0764_every_car_that_charges_gets_the_overhead_arms_cabin_clean.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in'::text, '0765_every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in.sql'::text),
     ('20261024044503'::text, 'the_agents_board_reads_the_arrival_forecast_without_writing_it'::text, '0766_the_agents_board_reads_the_arrival_forecast_without_writing_it.sql'::text),
-    ('PENDING'::text, 'a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_post'::text, '0767_a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_post.sql'::text),
-    ('PENDING'::text, 'the_demo_metronome_ticks_through_the_whole_minute'::text, '0768_the_demo_metronome_ticks_through_the_whole_minute.sql'::text),
-    ('PENDING'::text, 'the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due'::text, '0769_the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due.sql'::text),
+    ('APPLIED-NO-LEDGER-ROW'::text, 'a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_post'::text, '0767_a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_post.sql'::text),
+    ('APPLIED-NO-LEDGER-ROW'::text, 'the_demo_metronome_ticks_through_the_whole_minute'::text, '0768_the_demo_metronome_ticks_through_the_whole_minute.sql'::text),
+    ('APPLIED-NO-LEDGER-ROW'::text, 'the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due'::text, '0769_the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due.sql'::text),
     ('PENDING'::text, 'the_stop_door_takes_the_runs_row_before_the_proposals'::text, '0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql'::text),
     ('PENDING'::text, 'a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run'::text, '0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql'::text)
 -- <<< END GENERATED MANIFEST

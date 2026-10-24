@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_post
 --
 -- 0767  **A routine cabin clean that a charger fault cut short is done by the arm at the car's next post.** (G486)
@@ -251,3 +251,15 @@ VALUES ('0767_a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_p
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-24 12:39:24 UTC (7:39 AM CT), no ledger row ═══════════════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor as the first of three in one paste made by
+--   scripts/editor_paste.py from the files at 81dcaf3 (this file md5 3def7c14, its part of the paste 7c71baaf; the paste
+--   a55de610, 41,415 bytes), each file its own transaction once its text's md5 had been checked. The header's version and
+--   this footer are the only text added since. P0, P1, P2, the anchors, V1, V3 and V2 passed inside the file's
+--   transaction; its lineage row and its two '0767_pre' snapshots carry 12:39:24.097236 UTC (the three transactions share
+--   the paste's start time, as one editor message). Read back at 12:40:22 UTC (7:40 AM CT): the starter at md5
+--   25052205e0b6aa2c74504652b840869c and the completion step at 99f6aa09e973fcb914ae67f1328c0d49, as V3 requires; the
+--   dial catalogued 0..2 with this file's description and still 2 at the twin depot by Chase, so it is on there. No run
+--   was live; not yet seen in a demo run.
