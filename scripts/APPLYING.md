@@ -210,6 +210,26 @@ same for the replacement text) and checks each patched body's md5 against the on
 tests produced, so whatever the paste carried, the engine gets the tested bytes or
 nothing (0765 does both).
 
+**So paste what `scripts/editor_paste.py` makes, never the file itself.** It puts
+the file's text, less its own `BEGIN;` and `COMMIT;` lines, inside one dollar-quoted
+string, removes every carriage return, checks the text's md5 against the file's,
+and only then runs it with one `EXECUTE`, between one `BEGIN;` and one `COMMIT;`.
+So the engine gets the file's bytes whatever line endings the computer sends, a
+paste changed in any other way is refused before anything runs, and a file needs
+nothing of its own for line endings. Several files make one paste, each its own
+transaction in the order given, and `--then NNNN=FILE` adds statements (a dial
+switched on under a person's name) after that file commits. The editor's scan for
+created tables blanks dollar-quoted text first (Supabase Studio's
+`apps/studio/lib/sql-event-parser.ts`, read 2026-10-23 at
+https://github.com/supabase/supabase/blob/master/apps/studio/lib/sql-event-parser.ts),
+so a wrapped paste gets none of the appended lines above. Seen on the first one:
+0603, 0714, 0738, 0749 and 0755 in one paste, committed 01:24:45 UTC on 2026-10-24,
+left no error in the server log after its COMMIT. A second run of that paste a minute
+later stopped at 0603's own `P1: already applied` and ran nothing, which is the
+other thing a paste should do. tests/test_editor_paste.py executes all of it as the
+editor sends it, one simple query. The APPLIED footer records the file's md5 and the
+md5 the paste checked (`python3 scripts/editor_paste.py FILE -v` prints both).
+
 ### 5. Record the version the database assigned
 
 ```sql

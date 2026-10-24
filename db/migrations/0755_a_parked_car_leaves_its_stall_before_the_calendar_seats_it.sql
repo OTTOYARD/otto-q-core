@@ -1,5 +1,7 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    a_parked_car_leaves_its_stall_before_the_calendar_seats_it
+-- (applied by Chase in the Supabase dashboard's SQL editor, which writes no supabase_migrations row; the APPLIED footer
+--  at the end of this file is the record. See task G18.)
 --
 -- 0755  **A parked car leaves its stall before the bay calendar seats it.** (G471)
 --       Each tick the decide seats the cars whose bay reservation is due (ottoq.ottoq_activate_due_bay_reservations). It
@@ -236,3 +238,22 @@ VALUES ('0755_a_parked_car_leaves_its_stall_before_the_calendar_seats_it', false
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-24 01:24:45 UTC (8:24 PM CT on 2026-10-23), no ledger row ══════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor, one of five files in one paste that
+--   scripts/editor_paste.py made from the files as they stand at 8403fbc, in this order: 0603, 0714, 0738, 0749, then
+--   0755 with its switch after it (the paste's md5 c77bba758ad00d7c9e3bf4f33fc292b3, 54,662 bytes, from the step page
+--   "Five Ready Fixes"). The paste checked this file's text, less its BEGIN; and COMMIT; lines, at md5
+--   207afbea5746520abdb6038604c6963e before it ran it (the file then, header PENDING: md5
+--   809396f4bb5f5dcb572e9e30175042af); the header's version and note and this footer are the only text added since.
+--   Each file was its own transaction. All five lineage rows carry 01:24:45.340543 UTC, because a transaction begun
+--   inside one query message takes that message's arrival as now(). Read back between 01:27 and 01:30 UTC (8:27 and
+--   8:30 PM CT; the last query's own now() 01:30:12 UTC). P0, P1, P2, the three anchors, V1, V2 and V3 passed. Read
+--   back: the activation at md5 6cd5d62340e49985723335013ea58214, the md5 0743 and then this file leave on the scratch
+--   PostgreSQL over the live bodies; '0755_pre' holds its pre-image; the dial catalogued 0..1, default 0, not
+--   agent-writable. The switch after it, in its own transaction, set bay_activation_frees_parking to 1 at the twin
+--   depot by Chase (01:24:45.340543 UTC), so a run reads it from its next tick. No demo run has started since. On
+--   2026-10-23 before it, 9 cars in holding states on staging stalls were refused their wash or service bay seat 195
+--   times between 7:15 AM and 1:30 PM CT (0743's per-seat refusal, 23505 on idx_stalls_one_vehicle_per_stall), and 4 of
+--   those bookings lapsed as no-shows.

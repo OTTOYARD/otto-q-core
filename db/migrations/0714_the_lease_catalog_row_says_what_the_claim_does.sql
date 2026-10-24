@@ -1,5 +1,7 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    the_lease_catalog_row_says_what_the_claim_does
+-- (applied by Chase in the Supabase dashboard's SQL editor, which writes no supabase_migrations row; the APPLIED footer
+--  at the end of this file is the record. See task G18.)
 --
 -- 0714  **The lease's catalog row says what the claim does.** 0713 raised the agent claim's lease from 45 s to 130 s by
 --        changing the literal inside ottoq_agent_chain_claim, because public.ottoq_policy_get never reads the catalog's
@@ -70,3 +72,16 @@ VALUES ('0714_the_lease_catalog_row_says_what_the_claim_does', false, false,
   now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-24 01:24:45 UTC (8:24 PM CT on 2026-10-23), no ledger row ══════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor, one of five files in one paste that
+--   scripts/editor_paste.py made from the files as they stand at 8403fbc, in this order: 0603, 0714, 0738, 0749, then
+--   0755 with its switch after it (the paste's md5 c77bba758ad00d7c9e3bf4f33fc292b3, 54,662 bytes, from the step page
+--   "Five Ready Fixes"). The paste checked this file's text, less its BEGIN; and COMMIT; lines, at md5
+--   9e38ccc4d0e62889424fda07f45756c7 before it ran it (the file then, header PENDING: md5
+--   d64d0ce5b5a14221716698becb142e05); the header's version and note and this footer are the only text added since.
+--   Each file was its own transaction. All five lineage rows carry 01:24:45.340543 UTC, because a transaction begun
+--   inside one query message takes that message's arrival as now(). Read back between 01:27 and 01:30 UTC (8:27 and
+--   8:30 PM CT; the last query's own now() 01:30:12 UTC). P1 and V1 passed ("0714 V1 PASSED"). Read back:
+--   agent_chain_inflight_timeout_s catalogued default 130, max 180, with this file's description.

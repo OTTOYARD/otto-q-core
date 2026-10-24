@@ -1,5 +1,7 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    an_evidence_table_is_not_dropped_by_accident
+-- (applied by Chase in the Supabase dashboard's SQL editor, which writes no supabase_migrations row; the APPLIED footer
+--  at the end of this file is the record. See task G18.)
 --
 -- 0749  **An evidence table is not dropped by accident.** (G463)
 --       0748 made an evidence table refuse TRUNCATE. A DROP TABLE takes the table and its rows with it, and nothing in
@@ -200,3 +202,20 @@ VALUES ('0749_an_evidence_table_is_not_dropped_by_accident', false, false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-24 01:24:45 UTC (8:24 PM CT on 2026-10-23), no ledger row ══════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor, one of five files in one paste that
+--   scripts/editor_paste.py made from the files as they stand at 8403fbc, in this order: 0603, 0714, 0738, 0749, then
+--   0755 with its switch after it (the paste's md5 c77bba758ad00d7c9e3bf4f33fc292b3, 54,662 bytes, from the step page
+--   "Five Ready Fixes"). The paste checked this file's text, less its BEGIN; and COMMIT; lines, at md5
+--   94d1a6aa1100e47e53c2e0117e5b2870 before it ran it (the file then, header PENDING: md5
+--   602b586d0a9b98c15a49d1a55fa11310); the header's version and note and this footer are the only text added since.
+--   Each file was its own transaction. All five lineage rows carry 01:24:45.340543 UTC, because a transaction begun
+--   inside one query message takes that message's arrival as now(). Read back between 01:27 and 01:30 UTC (8:27 and
+--   8:30 PM CT; the last query's own now() 01:30:12 UTC). P0, P1, P2, V1 and V2 passed inside its transaction, so on
+--   the live database a probe table registered as evidence was refused a DROP with 42501 and named, a DROP of it with
+--   an engine probe was refused whole, the engine probe was dropped, and with the unlock the evidence probe was
+--   dropped, all rolled back in V2's own block. Read back: the event trigger ottoq_evidence_no_drop enabled on
+--   sql_drop, calling public.ottoq_evidence_no_drop(), SECURITY DEFINER, at md5 8c174c34e8697da31112e79c91b0857a (the
+--   body in this file, byte for byte), executable by postgres alone; 204 registry rows classed evidence.
