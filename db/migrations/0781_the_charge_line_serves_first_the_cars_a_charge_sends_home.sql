@@ -1,11 +1,18 @@
 -- migration-version: PENDING
 -- migration-name:    the_charge_line_serves_first_the_cars_a_charge_sends_home
 --
--- 0781  **The charge line serves first the cars a charge sends home. A car whose turn in the bays is hours away yields
---       its place to them until that turn comes within its charge and a margin; a car that has waited 90 minutes is
---       still served first, and an immediate dispatch before every car.** (G501)
+-- 0781  **The charge line serves first the cars a charge sends home, among each owner's own cars only: a car whose turn
+--       in the bays is hours away yields its place to its own owner's cars whose charge is their way out, never to another
+--       owner's, until that turn comes within its charge and a margin. A car that has waited 90 minutes is still served
+--       first, and an immediate dispatch before every car.** (G501)
 --       Chase, 2026-10-24: "Make sure we're not missing any edge in our intelligence ... Study all layers and study what
 --       the ideal outcome is for optimal, autonomous, fleet, orchestration, and logistics. Go find an edge and build."
+--       And on whose car goes first: "all fleet owners will want their vehicle arriving to take precedence over any other
+--       vehicle (unless it is a homogeneous fleet from an OEM or owner/management perspective ... Remember, we don't own
+--       our own vehicles, we manage for others- and ideally multiple OEM's at the same depot eventually. So always base
+--       decisions off of that framing." So no owner's car waits for another owner's car because of this order: each
+--       owner keeps the places its cars hold in the line without it, and only its own cars trade those places, for its
+--       own uptime.
 --       Rule 9 allows queueing and names better ordering of who is served next as the answer to site pressure. Nothing
 --       here shortens a charge, skips or defers a service, or lets a car leave sooner than its needs allow: the cars that
 --       yield are cars the service bays hold in the depot anyway, and each is charged before its turn in the bays comes.
@@ -21,29 +28,35 @@
 --   Replayed on each day's own arrivals, charge minutes and charger repairs, on 30 posts (a rehearsal, not the twin:
 --   §5), with the bay line read as this file reads it (first come, work the depot took away first). Extracted on
 --   2026-10-24 between 12:40 and 12:53 PM CT (17:40:55 and 17:53:58 UTC, the clock read either side) and replayed
---   offline by 1:11 PM CT:
+--   offline by 1:11 PM CT; within each owner, on the engine's owners (read at 5:35 PM CT, 22:35:00 UTC), by 5:36 PM CT
+--   (22:36:24 UTC):
 --
 --     day        order                       exit-bound cars:     bay-held cars:    bay seats reached     minutes past
 --                                            wait / time in the   wait for a post   before the car was    the 30-minute
 --                                            depot, minutes       (mean)            charged (minutes)     queue wait, all
 --     78c0624c   today (floor 90, minutes)      28.9 / 7,536          65.0            5 (192)                6,255
---                this file, margin 30           18.4 / 6,345          78.8            5 (225)                7,143
+--                this file (each owner's own)   23.1 / 6,884          70.2            5 (202)                6,461
+--                across owners (not built)      18.4 / 6,345          78.8            5 (225)                7,143
 --     67290d0a   today                          18.6 / 6,813          30.9            3 (46)                 1,836
---                this file                      10.4 / 5,786          40.0            4 (47)                 2,392
+--                this file                      11.5 / 5,922          39.2            3 (47)                 2,340
+--                across owners                  10.4 / 5,786          40.0            4 (47)                 2,392
 --     3389e651   today                          19.1 / 5,779          65.9            2 (149)                5,817
---                this file                       4.8 / 4,651          73.6            2 (147)                5,929
+--                this file                       7.1 / 4,827          72.4            3 (158)                5,874
+--                across owners                   4.8 / 4,651          73.6            2 (147)                5,929
 --
---   (a) The cars a charge sends home spend 1,027 to 1,191 fewer minutes in the depot a day, 15-20%: 17 to 20 car-hours
---       back on the road, from the same posts and the same charges.
+--   (a) The cars a charge sends home spend 652 to 952 fewer minutes in the depot a day, 9-17%: 11 to 16 car-hours back
+--       on the road, from the same posts and the same charges. Every owner's do, on every day: Tesla's 140-272 minutes,
+--       Waymo's 197-696, Zoox's 55-230. Reordering across owners would add 136-539 more, all of it by putting one
+--       owner's cars ahead of another's: not built.
 --   (b) The bays are fed as before: the count of first service seats a car reached before its charge was done moves by
---       one at most, and with hindsight's own bay times (the best the order could do) it falls on every day (5->3, 3->2,
---       2->1). The bay line read here is an estimate (§2 (b)); the floor and decide section (4b) stand behind it.
---   (c) What it costs, stated rather than left to be found: the cars the bays hold wait 8 to 13 minutes longer for a
---       post, and the minutes past the owners' 30-minute queue wait rise 2-30%, all of it on those cars. Their exit does
---       not move: they wait for the bays either way. A sharper version that also takes the floor away from them
---       (db/checks/0471 §2) gives the exit-bound cars at most 2.5 minutes more and about triples that cost; not built.
---   (d) The margin matters little here: at 60 the exit-bound cars' minutes in the depot read 6,336, 5,826 and 4,651,
---       within 40 of the margin of 30 on every day. 30 is the default.
+--       one at most. The bay line read here is an estimate (§2 (b)); the floor and decide section (4b) stand behind it.
+--   (c) What it costs, stated rather than left to be found: the bay-held cars wait 5 to 8 minutes longer for a post
+--       (3 to 9 by owner), and the minutes past the owners' 30-minute queue wait rise 1-27% in all, on each owner's own
+--       cars, traded for its own uptime. Their exit does not move: they wait for the bays either way.
+--   (d) Owners are the engine's, vehicles.fleet_operator_id: Waymo Nashville 46, Tesla Robotaxi TN 36 and Zoox
+--       Southeast 34 of the depot's 116 cars, car for car the classes of the 2026-08-23 telemetry export.
+--   (e) The margin matters little: at 60 the exit-bound cars' minutes read 6,862, 5,969 and 4,827, within 50 of 30's.
+--       30 is the default.
 --
 -- ══ §2 WHAT CHANGES ═══════════════════════════════════════════════════════════════════════════════════════════════════
 --
@@ -57,21 +70,27 @@
 --       the work ahead over the bays. An estimate: decide section (4b) also ranks by urgency and deploy time, a car
 --       waits for its charge before a bay, and the cars still to come home are not in it. It is also the first piece of
 --       the agent's constraint board (G503).
---   (c) public.ottoq_charge_order_keys gains a third key: with the dial at 1, exit_key 1 for a car whose turn in the
---       bays (bay_eta_min: the latest of its lanes) is its minutes of charge and the margin or more away, 0 for every
---       other car the clock times. With the dial at 0 both are NULL and the function returns 0642's keys exactly. Its
---       columns change, so it is dropped and created, with the same grants.
---   (d) ottoq_decide_tick, OTTO-Q's seat: the cursor sorts by the exit key after the floor and before minutes, reads
---       it in the same statement as the other keys, and records exit_key and bay_eta_min on the seat's 'charge_order'
---       when the key is set. Immediate dispatch, an agent's live order, the baseline seats and the floor are untouched.
---   (e) The same key in the same place in ottoq_charge_queue_kernel_order (the agent's board and the check's line),
+--   (c) public.ottoq_charge_order_keys gains three columns, all NULL with the dial at 0, where it returns 0642's keys
+--       exactly: exit_key, 1 for a car whose turn in the bays (bay_eta_min: the latest of its lanes) is its minutes of
+--       charge and the margin or more away, 0 for every other car the clock times; bay_eta_min; and exit_rank, each car's
+--       place in the line: the kernel's order without the key (immediate dispatch, the floor, minutes, 0545's ratio,
+--       battery, car), with each owner's cars below the floor and not immediate reordered among the places that owner's
+--       cars hold, its cars whose charge is their exit first, each group in that order. An owner is
+--       vehicles.fleet_operator_id. Its columns change, so it is dropped and created, with the same grants.
+--   (d) ottoq_decide_tick, OTTO-Q's seat: the cursor sorts by exit_rank after an agent's live order and before the
+--       floor (the rank holds the floor and minutes already), reads it in the same statement as the other keys, and
+--       records exit_key, bay_eta_min and exit_rank on the seat's 'charge_order' when the rank is set. Immediate dispatch,
+--       an agent's live order, the baseline seats and the floor are untouched.
+--   (e) The same rank in the same place in ottoq_charge_queue_kernel_order (the agent's board and the check's line),
 --       ottoq_depot_queue (the cockpits) and ottoq_run_learning (the board's queue read).
---   (f) The check. ottoq_charge_line_state carries, with the dial at 1, each waiting car's turn in the bays (`bx`) and the
---       state's `exit_first` and `exit_margin_min`; ottoq_charge_line_schedule orders its line as the cursor does, a car
---       yielding while bx - t - om >= the margin at the future's minute t. A car coming home, and a car a future's fault
---       puts back in line, carries no bx and never yields (§5). A state without the key simulates exactly as before.
---   (g) The agent's board: 'kernel_order' says exit_first and the margin, and each car in the line the bays will hold
---       carries bays_in_min and yields, as the kernel orders it.
+--   (f) The check. ottoq_charge_line_state carries, with the dial at 1, each waiting car's turn in the bays (`bx`), the
+--       owner of each of the depot's cars (`owners`), and `exit_first` and `exit_margin_min`; ottoq_charge_line_schedule
+--       ranks its line as the keys do at each minute t of a future: the order without the key, then each owner's cars
+--       below the floor reordered among that owner's places, a car yielding while bx - t - om >= the margin. A car coming
+--       home, and a car a charger's fault at the order puts back in line, carry no bx and never yield. A state without
+--       the key simulates by the statement before 0781, kept verbatim.
+--   (g) The agent's board: 'kernel_order' says exit_first, that a car yields only to its own operator's cars, and the
+--       margin; each car in the line the bays will hold carries bays_in_min and yields, as the kernel orders it.
 --   Not changed: how full a car charges, when it may leave, which charger kind it wants, any service, the departure test
 --   (rule 9), the floor, the agent's order and the check's comparison.
 --
@@ -82,9 +101,10 @@
 --   pre-image with its anchors replaced; the keys are stored as written; their grants are the pre-image's. V2 at the
 --   defaults, on the latest twin-depot run at its last clock, the kernel's order, the cockpits' charge queue, the
 --   learning's queue read, the check's state, its expected future and the board read value for value as before. V3 in a
---   sub-block that rolls back, with the dial at 1 on that run: every timed car carries an exit key; below the floor the
---   kernel's order has no 1 before a 0; the state carries exit_first and the margin, and the expected future runs on
---   it. Executed in full, the future's seats against the kernel's order included, by
+--   sub-block that rolls back, with the dial at 1 on that run: every timed car carries an exit key and every car in the
+--   line a rank; each owner's cars hold the same places as without the dial; within an owner, below the floor, no car
+--   that yields is ahead of one that does not; the state carries exit_first and the margin, and the expected future
+--   runs on it. Executed in full, the future's seats against the kernel's order included, by
 --   tests/test_charge_order_exit_first_sql.py on the miniature depot carried through 0642 (whose charge-line bodies are
 --   the live ones, md5 asserted) and the live decide tick (tests/fixtures/exit_first_decide_live.sql).
 --
@@ -267,11 +287,11 @@ $function$;
 GRANT EXECUTE ON FUNCTION public.ottoq_bay_line(uuid, uuid, timestamp with time zone)
   TO anon, authenticated, service_role;   -- as the keys that call it: invoker's rights, so a caller reads what its policies let it
 
--- ── (c) the keys, with the exit key ──
+-- ── (c) the keys, with the exit key and each owner's places ──
 DROP FUNCTION public.ottoq_charge_order_keys(uuid, uuid, timestamp with time zone);
 CREATE FUNCTION public.ottoq_charge_order_keys(p_sim_run_id uuid, p_depot_id uuid, p_clock timestamp with time zone)
  RETURNS TABLE(vehicle_id uuid, wait_min numeric, minutes numeric, floor_key numeric, minutes_key numeric,
-               exit_key integer, bay_eta_min numeric)
+               exit_key integer, bay_eta_min numeric, exit_rank integer)
  LANGUAGE plpgsql
  STABLE
  SET search_path TO 'twin', 'ottoq', 'public', 'extensions'
@@ -284,11 +304,16 @@ AS $function$
    at 1 (NULL at 0, and for a car the clock cannot time, which then sorts by 0545's ratio). The wait is the cursor's own
    (ottoq_charge_wait_min). ottoq_decide_tick's cursor, ottoq_charge_queue_kernel_order, ottoq_depot_queue and
    ottoq_run_learning all read the keys here; the check's state carries the same dials (ottoq_charge_line_state).
-   0781 (G501): with charge_order_exit_first at 1, a third key between them: exit_key 1 for a car whose turn in the bays
-   (bay_eta_min: ottoq_bay_line's eta_min, the latest of the lanes it owes work in) is its minutes of charge and
-   charge_order_exit_margin_min (30) or more away, 0 for every other car the clock times. A car whose charge is its exit
-   is served before one the bays will hold anyway, and a car rejoins the front once its turn comes within its charge and
-   the margin. Both NULL with the dial at 0, where this returns 0642's keys exactly, and for a car the clock cannot time. */
+   0781 (G501): with charge_order_exit_first at 1, three more. exit_key: 1 for a car whose turn in the bays (bay_eta_min:
+   ottoq_bay_line's eta_min, the latest of the lanes it owes work in) is its minutes of charge and
+   charge_order_exit_margin_min (30) or more away, 0 for every other car the clock times. exit_rank: each car's place in
+   the line, which the readers sort by ahead of the floor: the kernel's order without the key (immediate dispatch, the
+   floor, minutes, 0545's ratio, battery, car), with each owner's cars below the floor and not immediate reordered among
+   the places that owner's cars hold, its cars whose exit_key is 0 first, each group in that order. A car yields only to
+   its own owner's cars, and no owner's car is put behind another owner's car by it: we manage cars for their owners,
+   and every owner wants its own car first (Chase, 2026-10-24). An owner is vehicles.fleet_operator_id; the cars of no
+   operator share one owner's places. All three NULL with the dial at 0, where this returns 0642's keys exactly; a car
+   the clock cannot time carries no exit_key, and a car not in the kernel's line carries no rank. */
 DECLARE
   v_mon boolean := COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_order_minutes', 1), 1) >= 1;
   v_fl numeric := GREATEST(COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_wait_floor_min', 90), 90), 0);
@@ -306,7 +331,7 @@ BEGIN
     SELECT v.id, w.wait_min, m.minutes,
            CASE WHEN v_fl > 0 AND w.wait_min >= v_fl THEN w.wait_min END,
            CASE WHEN v_mon AND m.minutes IS NOT NULL THEN (w.wait_min + m.minutes) / m.minutes END,
-           NULL::integer, NULL::numeric
+           NULL::integer, NULL::numeric, NULL::integer
       FROM vehicles v
       CROSS JOIN LATERAL (SELECT public.ottoq_charge_wait_min(v.config, v.last_state_change, p_clock, p_sim_run_id)::numeric AS wait_min) w
       LEFT JOIN m ON m.vehicle_id = v.id
@@ -314,25 +339,57 @@ BEGIN
        AND v.current_state::text IN ('arrived_at_gate', 'staged_awaiting_service');
     RETURN;
   END IF;
-  -- 0781: the exit key reads every waiting car's minutes, whatever charge_order_minutes says
+  -- 0781: the exit key reads every waiting car's minutes, whatever charge_order_minutes says; the rank reads the line
+  -- as ottoq_charge_queue_kernel_order holds it (not faulted, below its visit target less one) and orders it as that
+  -- does before the key
   RETURN QUERY
   WITH m AS (
     SELECT o.vehicle_id, o.minutes FROM public.ottoq_charge_order_minutes(p_sim_run_id, p_depot_id, p_clock) o
   ), b AS (
     SELECT l.vehicle_id, max(l.eta_min) AS eta
       FROM public.ottoq_bay_line(p_sim_run_id, p_depot_id, p_clock) l GROUP BY l.vehicle_id
+  ), k AS (
+    SELECT v.id, v.fleet_operator_id AS op, v.current_soc AS soc, w.wait_min, m.minutes,
+           CASE WHEN v_fl > 0 AND w.wait_min >= v_fl THEN w.wait_min END AS floor_key,
+           CASE WHEN v_mon AND m.minutes IS NOT NULL THEN (w.wait_min + m.minutes) / m.minutes END AS minutes_key,
+           CASE WHEN m.minutes IS NULL THEN NULL WHEN b.eta - m.minutes >= v_xm THEN 1 ELSE 0 END AS exit_key,
+           CASE WHEN m.minutes IS NOT NULL THEN b.eta END AS bay_eta_min,
+           vn.immediate, vn.visit_target,
+           GREATEST(public.ottoq_effective_target_soc_at(v.id, p_clock) - v.current_soc, 1) AS gap,
+           public.ottoq_vehicle_fault_open(v.config) AS fault_open
+      FROM vehicles v
+      CROSS JOIN LATERAL (SELECT public.ottoq_charge_wait_min(v.config, v.last_state_change, p_clock, p_sim_run_id)::numeric AS wait_min) w
+      LEFT JOIN m ON m.vehicle_id = v.id
+      LEFT JOIN b ON b.vehicle_id = v.id
+      CROSS JOIN LATERAL (
+        SELECT COALESCE((SELECT x.urgency = 'immediate_dispatch' FROM ottoq_visit_needs x
+                          WHERE x.vehicle_id = v.id AND x.status IN ('open', 'in_progress')
+                            AND COALESCE(x.sim_run_id, '00000000-0000-0000-0000-000000000000'::uuid)
+                              = COALESCE(p_sim_run_id, '00000000-0000-0000-0000-000000000000'::uuid)
+                          ORDER BY x.created_at DESC, x.visit_key DESC LIMIT 1), false) AS immediate,
+               COALESCE((SELECT x.target_soc FROM ottoq_visit_needs x
+                          WHERE x.vehicle_id = v.id AND x.status IN ('open', 'in_progress')
+                            AND COALESCE(x.sim_run_id, '00000000-0000-0000-0000-000000000000'::uuid)
+                              = COALESCE(p_sim_run_id, '00000000-0000-0000-0000-000000000000'::uuid)
+                          ORDER BY x.created_at DESC, x.visit_key DESC LIMIT 1), public.ottoq_default_target_soc()) AS visit_target) vn
+     WHERE v.home_depot_id = p_depot_id AND v.category = 'autonomous'
+       AND v.current_state::text IN ('arrived_at_gate', 'staged_awaiting_service')
+  ), r AS (
+    SELECT k.id, k.op, k.exit_key, (NOT k.immediate AND k.floor_key IS NULL) AS xch,
+           row_number() OVER (ORDER BY k.immediate DESC, k.floor_key DESC NULLS LAST, k.minutes_key DESC NULLS LAST,
+                                       (k.wait_min + k.gap) / k.gap DESC NULLS LAST, k.soc ASC, k.id) AS r0
+      FROM k WHERE NOT k.fault_open AND k.soc < k.visit_target - 1
+  ), e AS (
+    SELECT r.id,
+           (CASE WHEN r.xch
+                 THEN (array_agg(r.r0) OVER (PARTITION BY r.xch, r.op ORDER BY r.r0
+                                             ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING))
+                        [row_number() OVER (PARTITION BY r.xch, r.op ORDER BY COALESCE(r.exit_key, 0), r.r0)]
+                 ELSE r.r0 END)::int AS exit_rank
+      FROM r
   )
-  SELECT v.id, w.wait_min, m.minutes,
-         CASE WHEN v_fl > 0 AND w.wait_min >= v_fl THEN w.wait_min END,
-         CASE WHEN v_mon AND m.minutes IS NOT NULL THEN (w.wait_min + m.minutes) / m.minutes END,
-         CASE WHEN m.minutes IS NULL THEN NULL WHEN b.eta - m.minutes >= v_xm THEN 1 ELSE 0 END,
-         CASE WHEN m.minutes IS NOT NULL THEN b.eta END
-    FROM vehicles v
-    CROSS JOIN LATERAL (SELECT public.ottoq_charge_wait_min(v.config, v.last_state_change, p_clock, p_sim_run_id)::numeric AS wait_min) w
-    LEFT JOIN m ON m.vehicle_id = v.id
-    LEFT JOIN b ON b.vehicle_id = v.id
-   WHERE v.home_depot_id = p_depot_id AND v.category = 'autonomous'
-     AND v.current_state::text IN ('arrived_at_gate', 'staged_awaiting_service');
+  SELECT k.id, k.wait_min, k.minutes, k.floor_key, k.minutes_key, k.exit_key, k.bay_eta_min, e.exit_rank
+    FROM k LEFT JOIN e ON e.id = k.id;
 END $function$;
 GRANT EXECUTE ON FUNCTION public.ottoq_charge_order_keys(uuid, uuid, timestamp with time zone)
   TO anon, authenticated, service_role;   -- as 0642 left it (V1 compares)
@@ -340,31 +397,38 @@ GRANT EXECUTE ON FUNCTION public.ottoq_charge_order_keys(uuid, uuid, timestamp w
 -- ── (d)-(g): the anchored replacements ──
 CREATE TEMP TABLE _0781_patch (seq int, fn regprocedure, c_old text, c_new text) ON COMMIT DROP;
 INSERT INTO _0781_patch VALUES
-  -- d1: the decide tick reads the exit key, and the car's turn in the bays, with the other keys
+  -- d1: the decide tick reads each car's place in the line, its exit key and its turn in the bays with the other keys
   (1, 'public.ottoq_decide_tick(uuid)'::regprocedure,
-   $o1$jsonb_build_array(k.floor_key, k.minutes_key)), '{}'::jsonb)
+   $o1$      SELECT COALESCE(jsonb_object_agg(k.vehicle_id::text, jsonb_build_array(k.floor_key, k.minutes_key)), '{}'::jsonb)
         INTO v_ok
         FROM public.ottoq_charge_order_keys(p_sim_run_id, v_depot, v_clock) k
        WHERE k.floor_key IS NOT NULL OR k.minutes_key IS NOT NULL;
 $o1$,
-   $n1$jsonb_build_array(k.floor_key, k.minutes_key, k.exit_key, k.bay_eta_min)), '{}'::jsonb)
+   $n1$      /* 0781 (G501): and, with charge_order_exit_first at 1, each car's exit key, its turn in the bays and its place in
+         the line with its owner's exchange made: {car: [floor_key, minutes_key, exit_key, bay_eta_min, exit_rank]}. At
+         0 every rank is NULL and each car carries 0642's two keys, as before. */
+      SELECT COALESCE(jsonb_object_agg(k.vehicle_id::text,
+               CASE WHEN k.exit_rank IS NULL THEN jsonb_build_array(k.floor_key, k.minutes_key)
+                    ELSE jsonb_build_array(k.floor_key, k.minutes_key, k.exit_key, k.bay_eta_min, k.exit_rank) END),
+               '{}'::jsonb)
         INTO v_ok
         FROM public.ottoq_charge_order_keys(p_sim_run_id, v_depot, v_clock) k
-       WHERE k.floor_key IS NOT NULL OR k.minutes_key IS NOT NULL
-          OR k.exit_key IS NOT NULL;   /* 0781 (G501): and the exit key, and the car's turn in the bays */
+       WHERE k.floor_key IS NOT NULL OR k.minutes_key IS NOT NULL OR k.exit_rank IS NOT NULL;
 $n1$),
-  -- d2: the cursor sorts by it after the floor and before minutes
+  -- d2: the cursor sorts by the place after the agent's keys and before the floor
   (2, 'public.ottoq_decide_tick(uuid)'::regprocedure,
    $o2$              (v_ok -> v.id::text ->> 0)::numeric DESC NULLS LAST,
               (v_ok -> v.id::text ->> 1)::numeric DESC NULLS LAST,
 $o2$,
-   $n2$              (v_ok -> v.id::text ->> 0)::numeric DESC NULLS LAST,
-              /* 0781 (G501): then a car whose charge is its exit (0) before one the bays will hold anyway (1); NULL for
-                 every car with charge_order_exit_first at 0, and the order is 0642's */
-              (v_ok -> v.id::text ->> 2)::numeric ASC NULLS LAST,
+   $n2$              /* 0781 (G501): with charge_order_exit_first at 1, each car's place in the kernel's line
+                 (ottoq_charge_order_keys' exit_rank): the order below, with each owner's cars below the floor and not
+                 immediate reordered among the places that owner's cars hold, its cars whose charge is their exit first.
+                 The floor and minutes after it then sort nothing. NULL for every car at 0: 0642's order. */
+              (v_ok -> v.id::text ->> 4)::numeric ASC NULLS LAST,
+              (v_ok -> v.id::text ->> 0)::numeric DESC NULLS LAST,
               (v_ok -> v.id::text ->> 1)::numeric DESC NULLS LAST,
 $n2$),
-  -- d3: the seat records it when it is set
+  -- d3: the seat records them when the place is set
   (3, 'public.ottoq_decide_tick(uuid)'::regprocedure,
    $o3$      v_ctx := v_ctx || jsonb_build_object('charge_order', jsonb_build_object(
                  'floor_key', v_ok -> v_req.vehicle_id::text -> 0, 'minutes_key', v_ok -> v_req.vehicle_id::text -> 1));
@@ -373,33 +437,33 @@ $o3$,
    $n3$      v_ctx := v_ctx || jsonb_build_object('charge_order', jsonb_build_object(
                  'floor_key', v_ok -> v_req.vehicle_id::text -> 0, 'minutes_key', v_ok -> v_req.vehicle_id::text -> 1));
     END IF;
-    IF v_ok -> v_req.vehicle_id::text ->> 2 IS NOT NULL THEN   /* 0781 (G501): and its exit key and its turn in the bays */
+    IF v_ok -> v_req.vehicle_id::text ->> 4 IS NOT NULL THEN   /* 0781 (G501): its exit key, its turn in the bays, its place */
       v_ctx := jsonb_set(v_ctx, '{charge_order}', (v_ctx -> 'charge_order')
                  || jsonb_build_object('exit_key', v_ok -> v_req.vehicle_id::text -> 2,
-                                       'bay_eta_min', v_ok -> v_req.vehicle_id::text -> 3));
+                                       'bay_eta_min', v_ok -> v_req.vehicle_id::text -> 3,
+                                       'exit_rank', v_ok -> v_req.vehicle_id::text -> 4));
     END IF;
 $n3$),
   -- e1: the kernel's own order
   (4, 'public.ottoq_charge_queue_kernel_order(uuid,uuid,timestamp with time zone)'::regprocedure,
    $o4$                                            ok.floor_key DESC NULLS LAST, ok.minutes_key DESC NULLS LAST,   -- 0642
 $o4$,
-   $n4$                                            ok.floor_key DESC NULLS LAST,
-                                            ok.exit_key ASC NULLS LAST,                                     -- 0781 (G501)
-                                            ok.minutes_key DESC NULLS LAST,   -- 0642
+   $n4$                                            ok.exit_rank ASC NULLS LAST,                                    -- 0781 (G501)
+                                            ok.floor_key DESC NULLS LAST, ok.minutes_key DESC NULLS LAST,   -- 0642
 $n4$),
   -- e2: the cockpits' queue
   (5, 'public.ottoq_depot_queue(uuid,uuid)'::regprocedure,
    $o5$                                        (SELECT k.floor_key FROM ok k WHERE k.vehicle_id = c.id) DESC NULLS LAST,     -- 0642
 $o5$,
-   $n5$                                        (SELECT k.floor_key FROM ok k WHERE k.vehicle_id = c.id) DESC NULLS LAST,     -- 0642
-                                        (SELECT k.exit_key FROM ok k WHERE k.vehicle_id = c.id) ASC NULLS LAST,       -- 0781 (G501)
+   $n5$                                        (SELECT k.exit_rank FROM ok k WHERE k.vehicle_id = c.id) ASC NULLS LAST,      -- 0781 (G501)
+                                        (SELECT k.floor_key FROM ok k WHERE k.vehicle_id = c.id) DESC NULLS LAST,     -- 0642
 $n5$),
   -- e3: the learning's queue read
   (6, 'public.ottoq_run_learning(uuid,integer,boolean)'::regprocedure,
    $o6$                      (SELECT k.floor_key FROM ok k WHERE k.vehicle_id = q.id) DESC NULLS LAST,     -- 0642
 $o6$,
-   $n6$                      (SELECT k.floor_key FROM ok k WHERE k.vehicle_id = q.id) DESC NULLS LAST,     -- 0642
-                      (SELECT k.exit_key FROM ok k WHERE k.vehicle_id = q.id) ASC NULLS LAST,       -- 0781 (G501)
+   $n6$                      (SELECT k.exit_rank FROM ok k WHERE k.vehicle_id = q.id) ASC NULLS LAST,      -- 0781 (G501)
+                      (SELECT k.floor_key FROM ok k WHERE k.vehicle_id = q.id) DESC NULLS LAST,     -- 0642
 $n6$),
   -- f1: the state's dials
   (7, 'public.ottoq_charge_line_state(uuid,uuid,timestamp with time zone)'::regprocedure,
@@ -435,24 +499,30 @@ $o10$,
    $n10$                 public.ottoq_contract_queue_wait_min(v.id, p_clock) AS mw,                                     -- 0642
                  (v_bx ->> v.id::text)::numeric AS bx,                                                           -- 0781
 $n10$),
-  -- f4: the state says the kernel orders by it
+  -- f4: the state says the kernel orders by it, and whose each car is
   (11, 'public.ottoq_charge_line_state(uuid,uuid,timestamp with time zone)'::regprocedure,
    $o11$    'floor_min', GREATEST(COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_wait_floor_min', 90), 90), 0));
 $o11$,
    $n11$    'floor_min', GREATEST(COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_wait_floor_min', 90), 90), 0));
   IF v_xon THEN                                                                                     -- 0781 (G501)
-    v_state := v_state || jsonb_build_object('exit_first', true, 'exit_margin_min', v_xm);
+    -- the exit key, its margin, and each of the depot's cars' owner (vehicles.fleet_operator_id; JSON null for a car of
+    -- none): the futures exchange places only among one owner's cars, as the keys do
+    v_state := v_state || jsonb_build_object('exit_first', true, 'exit_margin_min', v_xm, 'owners',
+                 (SELECT COALESCE(jsonb_object_agg(ov.id::text, ov.fleet_operator_id), '{}'::jsonb)
+                    FROM vehicles ov WHERE ov.home_depot_id = p_depot_id AND ov.category = 'autonomous'));
   END IF;
 $n11$),
-  -- f5: the simulator's exit key and margin
+  -- f5: the simulator's exit key, margin and owners
   (12, 'public.ottoq_charge_line_schedule(jsonb,jsonb,integer,text,boolean)'::regprocedure,
    $o12$  c_om float8[] := '{}'; c_mw float8[] := '{}';
 $o12$,
    $n12$  c_om float8[] := '{}'; c_mw float8[] := '{}';
-  -- 0781 (G501): the kernel's exit key (exit_first, exit_margin_min: ottoq_charge_line_state) and each car's turn in the
-  -- bays, in minutes from the order (bx); a car coming home or put back in line by a fault carries none
+  -- 0781 (G501): the kernel's exit key (exit_first, exit_margin_min: ottoq_charge_line_state), each car's owner (owners)
+  -- and each waiting car's turn in the bays, in minutes from the order (bx); a car coming home, or put back in line by a
+  -- charger that faults at the order, carries no bx and never yields
   v_xon boolean := COALESCE((p_state ->> 'exit_first')::boolean, false);
   v_xm float8 := GREATEST(COALESCE((p_state ->> 'exit_margin_min')::float8, 30), 0);
+  v_own jsonb := COALESCE(p_state -> 'owners', '{}'::jsonb);
   c_bx float8[] := '{}';
 $n12$),
   (13, 'public.ottoq_charge_line_schedule(jsonb,jsonb,integer,text,boolean)'::regprocedure,
@@ -461,48 +531,129 @@ $o13$,
    $n13$      c_om[n] := (e ->> 'om')::float8; c_mw[n] := (e ->> 'mw')::float8;                          -- 0642
       c_bx[n] := (e ->> 'bx')::float8;                                                             -- 0781
 $n13$),
-  -- f6: the line at t, ordered as the cursor orders it
+  -- f6: the line at t, ordered as the cursor orders it, with each owner's exchange
   (14, 'public.ottoq_charge_line_schedule(jsonb,jsonb,integer,text,boolean)'::regprocedure,
-   $o14$             CASE WHEN v_floor > 0 AND u.w >= v_floor THEN u.w END DESC NULLS LAST,
+   $o14$    -- the cars waiting at t, in the cursor's order at t
+    SELECT array_agg(u.i ORDER BY
+             u.imm DESC,
+             CASE WHEN v_live THEN u.w >= v_pin END DESC NULLS LAST,
+             CASE WHEN v_live AND NOT (u.w >= v_pin) THEN
+                    CASE WHEN u.rk IS NULL THEN 500
+                         ELSE u.rk + CASE WHEN v_mode = 'dcfc' AND u.ok = 'l2' THEN 1000
+                                          WHEN v_mode = 'l2' AND u.ok = 'dcfc' THEN 1000 ELSE 0 END END END ASC NULLS LAST,
+             -- 0642: the kernel's own keys after the agent's: the longest wait past the floor first, then the response
+             -- ratio in minutes of charge (NULL for every car in a state without them: 0641's order, key for key)
+             CASE WHEN v_floor > 0 AND u.w >= v_floor THEN u.w END DESC NULLS LAST,
+             CASE WHEN v_omon THEN (u.w + u.om) / u.om END DESC NULLS LAST,
+             (u.w + u.g) / u.g DESC, u.soc ASC, u.idr ASC)
+      INTO v_order
+      FROM (SELECT z3.i, c_imm[z3.i] AS imm,
+                   CASE WHEN c_inb[z3.i] THEN t - c_av[z3.i] ELSE c_w0[z3.i] + t END AS w,
+                   c_g[z3.i] AS g, c_soc[z3.i] AS soc, c_idr[z3.i] AS idr, c_rank[z3.i] AS rk, c_okind[z3.i] AS ok,
+                   GREATEST(COALESCE(c_om[z3.i], CASE WHEN c_dok[z3.i] AND NOT c_lok[z3.i] THEN c_md[z3.i]
+                                                      WHEN c_lok[z3.i] AND NOT c_dok[z3.i] THEN c_ml[z3.i]
+                                                      ELSE LEAST(c_md[z3.i], c_ml[z3.i]) END), 1) AS om      -- 0642
+              FROM generate_subscripts(c_ready, 1) AS z3(i)
+             WHERE z3.i <= n AND c_ready[z3.i] IS NULL AND c_gate[z3.i] <= t
+               AND c_vk[z3.i] < 2 AND NOT c_void[z3.i]) u;
 $o14$,
-   $n14$             CASE WHEN v_floor > 0 AND u.w >= v_floor THEN u.w END DESC NULLS LAST,
-             -- 0781 (G501): then a car whose charge is its exit before one whose turn in the bays is still its charge and
-             -- the margin away at t (NULL for every car in a state without the key: 0642's order, key for key)
-             CASE WHEN v_xon THEN CASE WHEN u.bx - t - u.om >= v_xm THEN 1 ELSE 0 END END ASC NULLS LAST,
+   $n14$    -- the cars waiting at t, in the cursor's order at t
+    IF v_xon THEN
+      -- 0781 (G501): the kernel's own order at t without the exit key (r0), and each car's place in it with its owner's
+      -- exchange made (xr): each owner's cars below the floor and not immediate reordered among the places that
+      -- owner's cars hold, its cars whose charge is their exit first (xk 0: no turn in the bays, or one its charge and
+      -- the margin do not reach by t), each group in r0. Sorted after the agent's keys, as the cursor sorts exit_rank.
+      SELECT array_agg(u.i ORDER BY
+               u.imm DESC,
+               CASE WHEN v_live THEN u.w >= v_pin END DESC NULLS LAST,
+               CASE WHEN v_live AND NOT (u.w >= v_pin) THEN
+                      CASE WHEN u.rk IS NULL THEN 500
+                           ELSE u.rk + CASE WHEN v_mode = 'dcfc' AND u.ok = 'l2' THEN 1000
+                                            WHEN v_mode = 'l2' AND u.ok = 'dcfc' THEN 1000 ELSE 0 END END END ASC NULLS LAST,
+               u.xr ASC)
+        INTO v_order
+        FROM (SELECT y.i, y.imm, y.w, y.rk, y.ok,
+                     CASE WHEN y.xch
+                          THEN (array_agg(y.r0) OVER (PARTITION BY y.xch, y.op ORDER BY y.r0
+                                                      ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING))
+                                 [row_number() OVER (PARTITION BY y.xch, y.op ORDER BY y.xk, y.r0)]
+                          ELSE y.r0 END AS xr
+                FROM (SELECT x.*,
+                             row_number() OVER (ORDER BY x.imm DESC,
+                                                         CASE WHEN v_floor > 0 AND x.w >= v_floor THEN x.w END DESC NULLS LAST,
+                                                         CASE WHEN v_omon THEN (x.w + x.om) / x.om END DESC NULLS LAST,
+                                                         (x.w + x.g) / x.g DESC, x.soc ASC, x.idr ASC) AS r0,
+                             (NOT x.imm AND NOT (v_floor > 0 AND x.w >= v_floor)) AS xch,
+                             CASE WHEN x.bx IS NOT NULL AND x.bx - t - x.om >= v_xm THEN 1 ELSE 0 END AS xk
+                        FROM (SELECT z3.i, c_imm[z3.i] AS imm,
+                                     CASE WHEN c_inb[z3.i] THEN t - c_av[z3.i] ELSE c_w0[z3.i] + t END AS w,
+                                     c_g[z3.i] AS g, c_soc[z3.i] AS soc, c_idr[z3.i] AS idr, c_rank[z3.i] AS rk,
+                                     c_okind[z3.i] AS ok, v_own ->> c_id[z3.i] AS op, c_bx[z3.i] AS bx,
+                                     GREATEST(COALESCE(c_om[z3.i], CASE WHEN c_dok[z3.i] AND NOT c_lok[z3.i] THEN c_md[z3.i]
+                                                                        WHEN c_lok[z3.i] AND NOT c_dok[z3.i] THEN c_ml[z3.i]
+                                                                        ELSE LEAST(c_md[z3.i], c_ml[z3.i]) END), 1) AS om
+                                FROM generate_subscripts(c_ready, 1) AS z3(i)
+                               WHERE z3.i <= n AND c_ready[z3.i] IS NULL AND c_gate[z3.i] <= t
+                                 AND c_vk[z3.i] < 2 AND NOT c_void[z3.i]) x) y) u;
+    ELSE
+      -- without the key, the statement before 0781, key for key
+      SELECT array_agg(u.i ORDER BY
+               u.imm DESC,
+               CASE WHEN v_live THEN u.w >= v_pin END DESC NULLS LAST,
+               CASE WHEN v_live AND NOT (u.w >= v_pin) THEN
+                      CASE WHEN u.rk IS NULL THEN 500
+                           ELSE u.rk + CASE WHEN v_mode = 'dcfc' AND u.ok = 'l2' THEN 1000
+                                            WHEN v_mode = 'l2' AND u.ok = 'dcfc' THEN 1000 ELSE 0 END END END ASC NULLS LAST,
+               -- 0642: the kernel's own keys after the agent's: the longest wait past the floor first, then the response
+               -- ratio in minutes of charge (NULL for every car in a state without them: 0641's order, key for key)
+               CASE WHEN v_floor > 0 AND u.w >= v_floor THEN u.w END DESC NULLS LAST,
+               CASE WHEN v_omon THEN (u.w + u.om) / u.om END DESC NULLS LAST,
+               (u.w + u.g) / u.g DESC, u.soc ASC, u.idr ASC)
+        INTO v_order
+        FROM (SELECT z3.i, c_imm[z3.i] AS imm,
+                     CASE WHEN c_inb[z3.i] THEN t - c_av[z3.i] ELSE c_w0[z3.i] + t END AS w,
+                     c_g[z3.i] AS g, c_soc[z3.i] AS soc, c_idr[z3.i] AS idr, c_rank[z3.i] AS rk, c_okind[z3.i] AS ok,
+                     GREATEST(COALESCE(c_om[z3.i], CASE WHEN c_dok[z3.i] AND NOT c_lok[z3.i] THEN c_md[z3.i]
+                                                        WHEN c_lok[z3.i] AND NOT c_dok[z3.i] THEN c_ml[z3.i]
+                                                        ELSE LEAST(c_md[z3.i], c_ml[z3.i]) END), 1) AS om      -- 0642
+                FROM generate_subscripts(c_ready, 1) AS z3(i)
+               WHERE z3.i <= n AND c_ready[z3.i] IS NULL AND c_gate[z3.i] <= t
+                 AND c_vk[z3.i] < 2 AND NOT c_void[z3.i]) u;
+    END IF;
 $n14$),
-  (15, 'public.ottoq_charge_line_schedule(jsonb,jsonb,integer,text,boolean)'::regprocedure,
-   $o15$                                                      ELSE LEAST(c_md[z3.i], c_ml[z3.i]) END), 1) AS om      -- 0642
-$o15$,
-   $n15$                                                      ELSE LEAST(c_md[z3.i], c_ml[z3.i]) END), 1) AS om,     -- 0642
-                   c_bx[z3.i] AS bx                                                                -- 0781
-$n15$),
   -- g1: the board says how the kernel orders
-  (16, 'public.ottoq_agent_charge_queue_board(uuid,uuid,timestamp with time zone)'::regprocedure,
-   $o16$      'by', CASE WHEN COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_order_minutes', 1), 1) >= 1
+  (15, 'public.ottoq_agent_charge_queue_board(uuid,uuid,timestamp with time zone)'::regprocedure,
+   $o15$      'by', CASE WHEN COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_order_minutes', 1), 1) >= 1
                  THEN 'charge_minutes' ELSE 'points' END),
-$o16$,
-   $n16$      'by', CASE WHEN COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_order_minutes', 1), 1) >= 1
+$o15$,
+   $n15$      'by', CASE WHEN COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_order_minutes', 1), 1) >= 1
                  THEN 'charge_minutes' ELSE 'points' END)
-      -- 0781 (G501): and, with the exit key on, after the floor a car whose charge is its exit before one whose turn in
-      -- the bays is its charge and exit_margin_min or more away
+      -- 0781 (G501): and, with the exit key on, below the floor each operator's cars whose charge is their exit go
+      -- before that operator's cars whose turn in the bays is their charge and exit_margin_min or more away, in the
+      -- places that operator's cars hold: a car yields only to its own operator's cars
       || CASE WHEN COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_order_exit_first', 0), 0) >= 1
-              THEN jsonb_build_object('exit_first', true, 'exit_margin_min',
+              THEN jsonb_build_object('exit_first', true, 'exit_yields_to', 'own_operator', 'exit_margin_min',
                      GREATEST(COALESCE(public.ottoq_policy_get(p_sim_run_id, 'charge_order_exit_margin_min', 30), 30), 0))
               ELSE '{}'::jsonb END,
-$n16$),
-  -- g2: each car the bays will hold says when its turn comes and whether it yields the line
-  (17, 'public.ottoq_agent_charge_queue_board(uuid,uuid,timestamp with time zone)'::regprocedure,
-   $o17$                        FROM pl WHERE pl.id = v.id::text)) AS j
-$o17$,
-   $n17$                        FROM pl WHERE pl.id = v.id::text))
+$n15$),
+  -- g2: each car the bays will hold says when its turn comes and whether it yields its place
+  (16, 'public.ottoq_agent_charge_queue_board(uuid,uuid,timestamp with time zone)'::regprocedure,
+   $o16$                        FROM pl WHERE pl.id = v.id::text)) AS j
+$o16$,
+   $n16$                        FROM pl WHERE pl.id = v.id::text))
              -- 0781 (G501): with the exit key on, the minutes until this car's turn in the bays (the state's bx), and
-             -- whether the kernel has it yield the line to the cars a charge sends home
-             || COALESCE((SELECT jsonb_build_object('bays_in_min', round((c.value ->> 'bx')::numeric, 0),
-                                                    'yields', (c.value ->> 'bx')::numeric - (c.value ->> 'om')::numeric
-                                                              >= COALESCE((ps.s ->> 'exit_margin_min')::numeric, 30))
+             -- whether the kernel has it yield its place to its own operator's cars a charge sends home (below the
+             -- floor, not an immediate dispatch, and its turn its charge and the margin or more away)
+             || COALESCE((SELECT jsonb_build_object(
+                                   'bays_in_min', round((c.value ->> 'bx')::numeric, 0),
+                                   'yields', NOT COALESCE((c.value ->> 'imm')::boolean, false)
+                                             AND NOT (COALESCE((ps.s ->> 'floor_min')::numeric, 0) > 0
+                                                      AND (c.value ->> 'w')::numeric >= (ps.s ->> 'floor_min')::numeric)
+                                             AND (c.value ->> 'bx')::numeric - (c.value ->> 'om')::numeric
+                                                 >= COALESCE((ps.s ->> 'exit_margin_min')::numeric, 30))
                             FROM ps, jsonb_array_elements(COALESCE(ps.s -> 'cars', '[]'::jsonb)) c
                            WHERE c.value ->> 'id' = v.id::text AND c.value ? 'bx' LIMIT 1), '{}'::jsonb) AS j
-$n17$);
+$n16$);
 
 DO $patch$
 DECLARE f regprocedure; p record; v_def text; n int;
@@ -584,7 +735,8 @@ END $v2$;
 
 -- ── V3: with the dial at 1, in a sub-block that rolls back ──
 DO $v3$
-DECLARE b record; v_msg text := NULL; v_timed int; v_keyed int; v_bad int; v_ones int; v_bx int; v_state jsonb;
+DECLARE b record; v_msg text := NULL; v_timed int; v_keyed int; v_bad int; v_ones int; v_ops int; v_bx int;
+        v_state jsonb;
 BEGIN
   SELECT * INTO b FROM _0781_before;
   IF NOT FOUND THEN
@@ -594,28 +746,56 @@ BEGIN
   BEGIN
     INSERT INTO public.ottoq_policy_params (scope_type, scope_id, param_key, param_value)
     VALUES ('run', b.sim_run_id, 'charge_order_exit_first', 1);
+    CREATE TEMP TABLE _0781_v3k ON COMMIT DROP AS
+    SELECT k.*, v.fleet_operator_id AS op
+      FROM public.ottoq_charge_order_keys(b.sim_run_id, b.depot_id, b.clock) k JOIN vehicles v ON v.id = k.vehicle_id;
+    CREATE TEMP TABLE _0781_v3o ON COMMIT DROP AS
+    SELECT o.vehicle_id, o.kernel_pos AS pos, o.immediate, w.pos AS pos0
+      FROM public.ottoq_charge_queue_kernel_order(b.sim_run_id, b.depot_id, b.clock) o
+      LEFT JOIN (SELECT (e ->> 0)::uuid AS vehicle_id, (e ->> 1)::int AS pos
+                   FROM jsonb_array_elements(b.kernel) e) w ON w.vehicle_id = o.vehicle_id;
     SELECT count(*) FILTER (WHERE k.minutes IS NOT NULL), count(*) FILTER (WHERE k.exit_key IS NOT NULL),
            count(*) FILTER (WHERE (k.minutes IS NOT NULL) <> (k.exit_key IS NOT NULL)),
-           count(*) FILTER (WHERE k.exit_key = 1)
-      INTO v_timed, v_keyed, v_bad, v_ones
-      FROM public.ottoq_charge_order_keys(b.sim_run_id, b.depot_id, b.clock) k;
+           count(*) FILTER (WHERE k.exit_key = 1), count(DISTINCT k.op)
+      INTO v_timed, v_keyed, v_bad, v_ones, v_ops
+      FROM _0781_v3k k;
     IF v_bad > 0 THEN
       v_msg := format('%s timed cars without an exit key, or keyed cars the clock cannot time', v_bad);
     END IF;
-    -- below the floor, no car the bays will hold before a car whose charge is its exit
+    -- the kernel's order is the rank, and holds the cars it held without the dial
+    IF v_msg IS NULL AND (EXISTS (SELECT 1 FROM _0781_v3o o LEFT JOIN _0781_v3k k ON k.vehicle_id = o.vehicle_id
+                                   WHERE k.exit_rank IS DISTINCT FROM o.pos OR o.pos0 IS NULL)
+                          OR (SELECT count(*) FROM _0781_v3o) <> jsonb_array_length(b.kernel)) THEN
+      v_msg := 'the kernel''s order is not each car''s exit_rank, or holds other cars than it did without the dial';
+    END IF;
+    -- each owner's cars hold the places they held without the dial; immediate dispatch and the floor do not move
     IF v_msg IS NULL AND EXISTS (
-         SELECT 1 FROM public.ottoq_charge_queue_kernel_order(b.sim_run_id, b.depot_id, b.clock) a
-           JOIN public.ottoq_charge_order_keys(b.sim_run_id, b.depot_id, b.clock) ka ON ka.vehicle_id = a.vehicle_id
-           JOIN public.ottoq_charge_queue_kernel_order(b.sim_run_id, b.depot_id, b.clock) c ON c.kernel_pos > a.kernel_pos
-           JOIN public.ottoq_charge_order_keys(b.sim_run_id, b.depot_id, b.clock) kc ON kc.vehicle_id = c.vehicle_id
-          WHERE NOT a.immediate AND NOT c.immediate AND ka.floor_key IS NULL AND kc.floor_key IS NULL
-            AND ka.exit_key = 1 AND kc.exit_key = 0) THEN
-      v_msg := 'the kernel''s order puts a car the bays will hold before a car whose charge is its exit';
+         SELECT 1 FROM (SELECT k.op, array_agg(o.pos ORDER BY o.pos) AS now_, array_agg(o.pos0 ORDER BY o.pos0) AS was
+                          FROM _0781_v3o o JOIN _0781_v3k k ON k.vehicle_id = o.vehicle_id
+                         GROUP BY k.op) z
+          WHERE z.now_ IS DISTINCT FROM z.was) THEN
+      v_msg := 'an owner''s cars hold other places than they held without the dial';
+    END IF;
+    IF v_msg IS NULL AND EXISTS (SELECT 1 FROM _0781_v3o o JOIN _0781_v3k k ON k.vehicle_id = o.vehicle_id
+                                  WHERE (o.immediate OR k.floor_key IS NOT NULL) AND o.pos <> o.pos0) THEN
+      v_msg := 'an immediate dispatch or a car past the floor moved';
+    END IF;
+    -- within an owner, below the floor, no car that yields ahead of one that does not
+    IF v_msg IS NULL AND EXISTS (
+         SELECT 1 FROM _0781_v3o a JOIN _0781_v3k ka ON ka.vehicle_id = a.vehicle_id
+           JOIN _0781_v3o c ON c.pos > a.pos JOIN _0781_v3k kc ON kc.vehicle_id = c.vehicle_id
+          WHERE ka.op IS NOT DISTINCT FROM kc.op AND NOT a.immediate AND NOT c.immediate
+            AND ka.floor_key IS NULL AND kc.floor_key IS NULL
+            AND ka.exit_key = 1 AND COALESCE(kc.exit_key, 0) = 0) THEN
+      v_msg := 'within an owner the kernel''s order puts a car the bays will hold before a car whose charge is its exit';
     END IF;
     v_state := public.ottoq_charge_line_state(b.sim_run_id, b.depot_id, b.clock);
     SELECT count(*) INTO v_bx FROM jsonb_array_elements(COALESCE(v_state -> 'cars', '[]'::jsonb)) c WHERE c.value ? 'bx';
-    IF v_msg IS NULL AND (v_state ->> 'exit_first' IS DISTINCT FROM 'true' OR (v_state ->> 'exit_margin_min')::numeric <> 30) THEN
-      v_msg := 'the state does not carry the exit key at its defaults';
+    IF v_msg IS NULL AND (v_state ->> 'exit_first' IS DISTINCT FROM 'true' OR (v_state ->> 'exit_margin_min')::numeric <> 30
+                          OR (SELECT count(*) FROM jsonb_object_keys(COALESCE(v_state -> 'owners', '{}'::jsonb)))
+                             <> (SELECT count(*) FROM vehicles v WHERE v.home_depot_id = b.depot_id
+                                                                   AND v.category = 'autonomous')) THEN
+      v_msg := 'the state does not carry the exit key at its defaults and every car''s owner';
     END IF;
     -- and the expected future runs on it (its seats against the kernel's order are the tests')
     IF v_msg IS NULL AND public.ottoq_charge_line_schedule(v_state, NULL, 0, 'v3', true) -> 'seats' IS NULL THEN
@@ -623,23 +803,25 @@ BEGIN
     END IF;
     RAISE EXCEPTION USING ERRCODE = 'P0781', MESSAGE = 'v3 done';
   EXCEPTION WHEN SQLSTATE 'P0781' THEN
-    NULL;   -- the dial row and anything read under it roll back here
+    NULL;   -- the dial row, the two scratch tables and anything read under them roll back here
   END;
   IF v_msg IS NOT NULL THEN
     RAISE EXCEPTION '0781 V3: %', v_msg;
   END IF;
-  RAISE NOTICE '0781 V3: with the dial at 1 on run %: % of % waiting cars timed, all keyed; % yield to the cars a charge sends home; the state carries the key and % turns in the bays',
-    left(b.sim_run_id::text, 8), v_keyed, v_timed, v_ones, v_bx;
+  RAISE NOTICE '0781 V3: with the dial at 1 on run %: % of % waiting cars timed, all keyed; % yield, each only to its own owner''s cars; every owner''s cars hold the places they held (% owners); the state carries the key and % turns in the bays',
+    left(b.sim_run_id::text, 8), v_keyed, v_timed, v_ones, v_ops, v_bx;
 END $v3$;
 
 INSERT INTO public.ottoq_cert_lineage (name, forces_recert, forces_dial_restart, note, classified_at)
 VALUES ('0781_the_charge_line_serves_first_the_cars_a_charge_sends_home', false, false,
         'Dials charge_order_exit_first (default 0) and charge_order_exit_margin_min (30); new public.ottoq_bay_line; '
-        'public.ottoq_charge_order_keys gains exit_key and bay_eta_min (NULL at the default); the same key after the floor '
-        'in the decide tick''s cursor, the kernel''s order, the cockpits'' queue, the learning read and the check''s '
-        'simulator, the state''s bx and the board''s fields only at 1 (V1: each body is its pre-image with its anchors '
-        'replaced; V2: at the defaults every reader reads as before). No certification arm, canon cell or dial experiment '
-        'sets the dial.',
+        'public.ottoq_charge_order_keys gains exit_key, bay_eta_min and exit_rank (NULL at the default): each car''s '
+        'place, each owner''s cars below the floor reordered among that owner''s own places, its cars whose charge is '
+        'their exit first. The rank leads the kernel''s keys in the decide tick''s cursor, the kernel''s order, the '
+        'cockpits'' queue and the learning read; the check''s simulator exchanges the same way at each minute; the state''s '
+        'bx and owners and the board''s fields only at 1 (V1: each body is its pre-image with its anchors replaced; V2: '
+        'at the defaults every reader reads as before; V3: every owner''s cars hold their places). No certification arm, '
+        'canon cell or dial experiment sets the dial.',
         now());
 
 COMMIT;

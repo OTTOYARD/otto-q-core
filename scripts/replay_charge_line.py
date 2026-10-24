@@ -7,12 +7,16 @@ Every order sees the same arrivals, minutes and repairs, so the orders differ on
 replay the bays (a car's first service seat is the run's own), the agent's orders, the gate or the ticks.
 
 Usage:
-  scripts/replay_charge_line.py EXTRACT.json [--margin 30]
+  scripts/replay_charge_line.py EXTRACT.json [--margin 30] [--owners OWNERS.csv]
 
 EXTRACT.json is the one row of db/checks/0471 query (1), saved as JSON ({"d": {...}} or the bare object). Prints, per
-run, the kernel's order today (0642: a car past 90 minutes first, then the response ratio in minutes) and 0781's (the
-same, with a car whose turn in the service bays is its charge and the margin away yielding to the cars a charge sends
-home), with hindsight's variant (each car's real first service seat as its turn) beside them.
+run, the kernel's order today (0642: a car past 90 minutes first, then the response ratio in minutes) and 0781's: the
+same, with each owner's cars below the floor reordered among the places that owner's cars hold, its cars whose turn in
+the service bays is their charge and the margin away after its cars a charge sends home. A car yields only to its own
+owner's cars (Chase, 2026-10-24: we manage cars for their owners). Beside them, for comparison and not built, the same
+key across owners, with the bay line read as 0781 reads it and with hindsight's turns (each car's real first service
+seat). Owners come from the extract's visits ('op', vehicles.fleet_operator_id), or from OWNERS.csv (asset_id and owner,
+or asset_class, whose first word is taken as the owner); with neither, 0781's row is left out.
 """
 import argparse
 import json
@@ -103,8 +107,10 @@ def bay_eta(jobs, d, run, t0, H, B=2):
     return eta
 
 
-def replay(jobs, down, posts, t0, H, gate):
-    """gate(j, t) -> True when the car yields (0781's exit key 1); None for today's order."""
+def replay(jobs, down, posts, t0, H, gate, owner_of=None):
+    """gate(j, t) -> True when the car yields (0781's exit key 1); None for today's order. With owner_of (car -> owner),
+    a car yields only to its own owner's cars: today's order is computed first, and each owner's cars below the floor
+    trade places only among the places that owner's cars already hold, the cars whose charge is their exit first."""
     for j in jobs:
         j["_r"] = max(mins(t0, j["arr"]), 0.0)
     dw = {p: [(mins(t0, a), mins(t0, b)) for a, b in down.get(p, [])] for p in posts}
@@ -119,9 +125,11 @@ def replay(jobs, down, posts, t0, H, gate):
             def key(j):
                 w = t - j["_r"]
                 fl = w if w >= FLOOR else None
-                x = 1 if (gate is not None and j["svc"] and gate(j, t)) else 0
+                x = 1 if (gate is not None and owner_of is None and j["svc"] and gate(j, t)) else 0
                 return (0 if fl is not None else 1, -(fl or 0), x, -(w + j["p"]) / max(j["p"], 1.0), j["car"])
             waiting.sort(key=key)
+            if owner_of is not None and gate is not None:
+                waiting = within_owner(waiting, t, gate, owner_of)
             for p in sorted(freep):
                 if not waiting:
                     break
@@ -133,6 +141,23 @@ def replay(jobs, down, posts, t0, H, gate):
     for j in jobs:
         s = start.get(j["visit"])
         out.append(dict(j=j, s=s, e=(s + j["p"]) if s is not None else None, w=(s if s is not None else H) - j["_r"]))
+    return out
+
+
+def within_owner(order, t, gate, owner_of):
+    """Today's order, with each owner's cars below the floor reordered among that owner's own places: the cars whose
+    charge is their exit first, then the cars the bays will hold, each group in today's order. No car moves to a place
+    another owner's car held."""
+    places = {}
+    for pos, j in enumerate(order):
+        if t - j["_r"] < FLOOR:
+            places.setdefault(owner_of.get(j["car"]), []).append(pos)
+    out = list(order)
+    for pos in places.values():
+        cars = sorted((order[p] for p in pos), key=lambda j, at={id(order[p]): p for p in pos}:
+                      (1 if (j["svc"] and gate(j, t)) else 0, at[id(j)]))
+        for p, j in zip(pos, cars):
+            out[p] = j
     return out
 
 
@@ -152,10 +177,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("extract")
     ap.add_argument("--margin", type=float, default=30.0)
+    ap.add_argument("--owners", help="CSV with asset_id and owner (or asset_class, whose first word is taken as the "
+                                     "owner), in place of the extract's 'op'")
     a = ap.parse_args()
+    owner_of = None
+    if a.owners:
+        import csv
+        owner_of = {}
+        with open(a.owners) as f:
+            for r in csv.DictReader(f):
+                owner_of[r["asset_id"]] = r.get("owner") or (r.get("asset_class") or "").split("_")[0]
     d = json.load(open(a.extract))
     d = d.get("d", d)
-    print(f"{'run':10} {'order':34} {'exit-bound wait / time':>24} {'bay-held wait':>14} {'seats before charged':>21} {'past 30 min':>12}")
+    if owner_of is None and any("op" in v for v in d["visits"]):
+        owner_of = {v["car"]: v.get("op") for v in d["visits"]}
+    print(f"{'run':10} {'order':44} {'exit-bound wait / time':>24} {'bay-held wait':>14} {'seats before charged':>21} {'past 30 min':>12}")
     for meta in d["runs"]:
         run, t0, t1 = meta["run"], P(meta["s"]), P(meta["e"])
         H = mins(t0, t1)
@@ -163,12 +199,16 @@ def main():
         down, posts = downtime(run, d, t1)
         eta = bay_eta(jobs, d, run, t0, H)
         hind = {j["visit"]: (mins(t0, j["seat"]) if j["seat"] else H + 600.0) for j in jobs if j["svc"]}
-        rules = [("today (floor 90, minutes)", None),
-                 (f"0781, margin {a.margin:g}", lambda j, t: (lambda e: e is not None and e - j["p"] >= a.margin)(eta(j["visit"], t))),
-                 (f"0781 with hindsight's bay turns", lambda j, t: hind[j["visit"]] - t - j["p"] >= a.margin)]
-        for name, gate in rules:
-            s = summary(replay(jobs, down, posts, t0, H, gate), t0, H)
-            print(f"{run:10} {name:34} {s['ex_wait']:10.1f} / {s['ex_flow']:9,.0f} {s['bg_wait']:14.1f} "
+        gate = lambda j, t: (lambda e: e is not None and e - j["p"] >= a.margin)(eta(j["visit"], t))  # noqa: E731
+        rules = [("today (floor 90, minutes)", None, None)]
+        if owner_of is not None:
+            rules.append((f"0781, each owner's own, margin {a.margin:g}", gate, owner_of))
+        rules += [(f"across owners, margin {a.margin:g} (not built)", gate, None),
+                  ("across owners, hindsight's turns (not built)",
+                   lambda j, t: hind[j["visit"]] - t - j["p"] >= a.margin, None)]
+        for name, gate, own in rules:
+            s = summary(replay(jobs, down, posts, t0, H, gate, own), t0, H)
+            print(f"{run:10} {name:44} {s['ex_wait']:10.1f} / {s['ex_flow']:9,.0f} {s['bg_wait']:14.1f} "
                   f"{s['miss']:10d} ({s['miss_min']:5.0f}) {s['breach']:12,.0f}")
     return 0
 

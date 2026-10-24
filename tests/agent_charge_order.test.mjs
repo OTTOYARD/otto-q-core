@@ -206,9 +206,11 @@ test("v31 / 0783: the prompt reads the depot's constraint and names the wall, ne
   assert.match(bullet, /^[^\n]*Never propose holding a vehicle back, shortening a charge or skipping a service because of the wall\./);
 });
 
-test("v31 / 0781: the charge-line section says how the kernel orders a car the bays hold", () => {
-  assert.match(CHARGE_ORDER_PROMPT, /When kernel_order\.exit_first is true, after the floor the kernel serves first the cars whose charge is their way out/);
-  assert.match(CHARGE_ORDER_PROMPT, /a car with yields true has its turn in the bays \(bays_in_min\) further off than its charge and kernel_order\.exit_margin_min/);
+test("v31 / 0781: the charge-line section says how the kernel orders a car the bays hold, within its own operator", () => {
+  assert.match(CHARGE_ORDER_PROMPT, /When kernel_order\.exit_first is true, after the floor the kernel serves first the cars whose charge is their way out, among each operator's own cars \(exit_yields_to own_operator\)/);
+  assert.match(CHARGE_ORDER_PROMPT, /a car with yields true has its turn in the bays \(bays_in_min\) further off than its charge and kernel_order\.exit_margin_min, so it waits behind its own operator's cars whose charge is their way out, never behind another operator's/);
+  // CLAUDE.md rule 14: we manage each car for its owner; no operator's car goes behind another's for a depot total
+  assert.match(CHARGE_ORDER_PROMPT, /rank each car by its own needs \(its due time, its contract wait, its battery\), and never put one operator's car behind another operator's only to raise a depot total\./);
   // it explains the order; it does not forbid an order (the check disposes)
   assert.doesNotMatch(CHARGE_ORDER_PROMPT, /never (move|name|rank) a car with yields/i);
 });

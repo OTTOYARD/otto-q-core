@@ -79,7 +79,7 @@ BEGIN
     RAISE EXCEPTION '0782 P1: 0780 is not applied (ottoq.ottoq_vehicle_owes_charge_now); apply it first';
   END IF;
   IF (SELECT pre FROM _0782_pre) IS DISTINCT FROM '2b3d0cbf5cdb13ca24f0de788073dc46'      -- live, 2026-10-24
-     AND (SELECT pre FROM _0782_pre) IS DISTINCT FROM '24a499cae2ecdc50add27fb563dfdb57' THEN -- after 0781
+     AND (SELECT pre FROM _0782_pre) IS DISTINCT FROM '30f727c4086cff7afa712145b4c38474' THEN -- after 0781
     RAISE EXCEPTION '0782 P1: the decide tick is not a body this file patches (md5 %)', left((SELECT pre FROM _0782_pre), 8);
   END IF;
   IF EXISTS (SELECT 1 FROM public.ottoq_policy_param_catalog WHERE param_key = 'bay_open_shop') THEN

@@ -34,7 +34,7 @@ NAME = "0782_when_every_post_is_taken_a_car_takes_a_free_bay_first"
 TICK = xf.TICK
 DEPOT, RUN, T = base.DEPOT, base.RUN, base.T
 LIVE_TICK = "2b3d0cbf5cdb13ca24f0de788073dc46"
-AFTER_0781_TICK = "24a499cae2ecdc50add27fb563dfdb57"
+AFTER_0781_TICK = "30f727c4086cff7afa712145b4c38474"
 
 pytestmark = pytest.mark.skipif(not base._server_up(),
                                 reason="no scratch PostgreSQL reachable (PGHOST or /var/tmp:55432)")
@@ -121,7 +121,7 @@ def test_0782_applies_after_0781_too(db):
     err = _apply(db)
     assert f"0782 V1: the decide tick less its four replacements is its pre-image ({AFTER_0781_TICK[:8]})" in err, err
     src = _src(db)
-    assert "(v_ok -> v.id::text ->> 2)::numeric ASC NULLS LAST" in src and "OR v_open_shop)" in src
+    assert "(v_ok -> v.id::text ->> 4)::numeric ASC NULLS LAST" in src and "OR v_open_shop)" in src
 
 
 def test_0782_refuses_a_decide_tick_it_was_not_written_against_and_a_world_without_0780(db):

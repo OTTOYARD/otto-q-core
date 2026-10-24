@@ -867,9 +867,10 @@ jobs:
           python3 -m pytest -q tests/test_bay_ready_reads_energy_sql.py
       # 0781 (G501), EXECUTED on the miniature depot carried through 0642 (its charge line the live bodies, md5 asserted)
       # with the live decide tick: the bay line; at the default 0642's keys and every reader as before; with the dial a
-      # car whose turn in the bays is its charge and the margin away yields, and rejoins once it is not; the kernel's
-      # order, the cockpits' queue, the learning read, the check's state and futures, and the board agree; the
-      # pre-images restore. 17 tests, about 50 seconds.
+      # car whose turn in the bays is its charge and the margin away yields to its own owner's cars, never another
+      # owner's, and rejoins once it is not; with two owners each owner's cars hold the places they held (CLAUDE.md rule
+      # 14); the kernel's order, the cockpits' queue, the learning read, the check's state and futures, and the board
+      # agree; the pre-images restore. 20 tests, about 50 seconds.
       - name: The charge line serves first the cars a charge sends home, executed (0781)
         env:
           PGHOST: localhost
