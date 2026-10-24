@@ -837,9 +837,11 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0763](db/migrations/0763_canopy_c_is_restriped_and_the_twin_depot_has_no_standard_chargers.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | **Canopy C is re-striped as canopies A and B: the twin depot is built with thirty robotic fast chargers and no |
 | [0764](db/migrations/0764_every_car_that_charges_gets_the_overhead_arms_cabin_clean.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | **Every car that charges on a robotic post has its cabin cleaned by the post's overhead arm, during the |
 | [0765](db/migrations/0765_every_charge_is_cleaned_however_short_and_a_topped_off_car_has_its_visit_as_it_plugs_in.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | **Every car that charges on a robotic post is cleaned by the post's overhead arm, however short the charge and |
+| [0766](db/migrations/0766_the_agents_board_reads_the_arrival_forecast_without_writing_it.sql) | `PENDING` | no — pending | **The agent's board reads the arrival forecast without writing it, so the agent's read takes no lock on the |
+| [0767](db/migrations/0767_a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_post.sql) | `PENDING` | no — pending | **A routine cabin clean that a charger fault cut short is done by the arm at the car's next post.** (G486) |
 | [0790](db/migrations/0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql) | `PENDING` | no — pending | **The stop door takes the live run's row before the run's proposals, the order the metronome's beat takes them |
 | [0791](db/migrations/0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql) | `PENDING` | no — pending | **A signed-in user can no longer pause, resume, start, reset or fast-forward a run through /rest/v1/rpc, and a |
 
-589 migrations indexed.
+591 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

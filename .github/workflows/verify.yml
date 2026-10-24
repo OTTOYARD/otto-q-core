@@ -795,6 +795,36 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_every_charge_is_cleaned_sql.py
 
+      # 0766 (G485), EXECUTED over the live agent board and the live arrival forecast (md5 asserted): before it, a board
+      # read held open with a car due home makes a world step's FOR UPDATE on the run's row wait out its lock timeout
+      # (the read's event insert holds the row by its key); after it, the same read takes the row at once, writes no event
+      # and takes no transaction id; the board's value and ottoq_predict_arrivals' outputs and event are byte for byte as
+      # before, and the new read equals it on every SoC band and window edge. 20 tests, about 20 seconds.
+      - name: The agent's board reads the arrival forecast without writing it, executed (0766)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_board_reads_without_writing_sql.py
+
+      # 0767 (G486), EXECUTED over 0765's test world with 0765 applied (the live starter and completion step, md5
+      # asserted): at 0 and 1 nothing moves; before it, at 2, a routine cabin clean a charger fault cut short is never
+      # begun again at the car's next post; after it, the completion step hands the car to the starter there, whose arm
+      # cleans it with its own leg, the hold and a record naming both posts, once; a needed tidy and an immediate
+      # turnaround are as before. 17 tests, about 25 seconds.
+      - name: A cabin clean a charger fault cut short is done at the car's next post, executed (0767)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_arm_clean_after_a_fault_sql.py
+
       # scripts/editor_paste.py, the text a person pastes into the Supabase SQL editor, EXECUTED as the editor sends it
       # (the whole paste as one simple query): a file whose anchor spans a line end fails as it is with CRLF (0765's
       # failure on 2026-10-23) and applies wrapped, with bare newlines or CRLF, byte for byte as psql applies the file; a
