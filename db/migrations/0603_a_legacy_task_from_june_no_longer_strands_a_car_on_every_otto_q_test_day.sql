@@ -1,5 +1,7 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_test_day
+-- (applied by Chase in the Supabase dashboard's SQL editor, which writes no supabase_migrations row; the APPLIED footer
+--  at the end of this file is the record. See task G18.)
 --
 -- 0603  **Two scheduler tasks left `in_progress` on 2026-06-04 make the L1 shield refuse every task one Zoox is offered,
 --       on every OTTO-Q test day, so that car waits all day at 24% and never charges; under the fifo and greedy seats the
@@ -131,3 +133,22 @@ VALUES ('0603_a_legacy_task_from_june_no_longer_strands_a_car_on_every_otto_q_te
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-24 01:24:45 UTC (8:24 PM CT on 2026-10-23), no ledger row ══════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor, one of five files in one paste that
+--   scripts/editor_paste.py made from the files as they stand at 8403fbc, in this order: 0603, 0714, 0738, 0749, then
+--   0755 with its switch after it (the paste's md5 c77bba758ad00d7c9e3bf4f33fc292b3, 54,662 bytes, from the step page
+--   "Five Ready Fixes"). The paste checked this file's text, less its BEGIN; and COMMIT; lines, at md5
+--   71e3a298b7e04925967f6e2aa6afaffb before it ran it (the file then, header PENDING: md5
+--   8dc58d9c9ae7f563b11f74668b2480af); the header's version and note and this footer are the only text added since.
+--   Each file was its own transaction. All five lineage rows carry 01:24:45.340543 UTC, because a transaction begun
+--   inside one query message takes that message's arrival as now(). Read back between 01:27 and 01:30 UTC (8:27 and
+--   8:30 PM CT; the last query's own now() 01:30:12 UTC). P0, P1, V1 and V2 passed inside its transaction: the four
+--   rows went to cancelled, each with its task.state_changed event written by migration_script/0603 under no run, and
+--   HW.005's evaluator passed the Zoox 229f655b. Read back: no active schedule task, and HW.005 passes 229f655b. A
+--   second run of the same paste at 01:25:45 UTC (8:25 PM CT) stopped at this file's P1 ("0603 P1: already applied")
+--   and ran nothing; it is the only error the server log holds between 01:23 and 01:27 UTC. On 2026-10-23 before it,
+--   HW.005 refused that car 982 times by 2:47 PM CT across the three demo runs (b5e80522, 3389e651, 67290d0a); on the
+--   last it waited in staging (NASH-STG-B006) from 11:16 AM CT with its mechanical PM not started. No demo run has
+--   started since the apply.

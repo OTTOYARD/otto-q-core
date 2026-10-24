@@ -1,5 +1,7 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    the_nightly_charge_clock_refit_gets_the_time_it_needs
+-- (applied by Chase in the Supabase dashboard's SQL editor, which writes no supabase_migrations row; the APPLIED footer
+--  at the end of this file is the record. See task G18.)
 --
 -- 0738  **The nightly charge-clock refit gets the time it needs (G451).** Cron job 789 (ottoq-learn-charge-clock-nightly,
 --       11:22 UTC) has failed three mornings running, 2026-10-15, -16 and -17, each cancelled at exactly two minutes by
@@ -93,3 +95,19 @@ VALUES ('0738_the_nightly_charge_clock_refit_gets_the_time_it_needs', false, fal
 ON CONFLICT (name) DO NOTHING;
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-24 01:24:45 UTC (8:24 PM CT on 2026-10-23), no ledger row ══════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor, one of five files in one paste that
+--   scripts/editor_paste.py made from the files as they stand at 8403fbc, in this order: 0603, 0714, 0738, 0749, then
+--   0755 with its switch after it (the paste's md5 c77bba758ad00d7c9e3bf4f33fc292b3, 54,662 bytes, from the step page
+--   "Five Ready Fixes"). The paste checked this file's text, less its BEGIN; and COMMIT; lines, at md5
+--   4df8236863bc7aaaaaf81699f71621fb before it ran it (the file then, header PENDING: md5
+--   6084d6f927d592a7b9564828f01fbe5b); the header's version and note and this footer are the only text added since.
+--   Each file was its own transaction. All five lineage rows carry 01:24:45.340543 UTC, because a transaction begun
+--   inside one query message takes that message's arrival as now(). Read back between 01:27 and 01:30 UTC (8:27 and
+--   8:30 PM CT; the last query's own now() 01:30:12 UTC). P0, P1, P2 and V1 passed. Read back: cron 789 runs its old
+--   command behind SET statement_timeout = '15min' (command md5 38ccf63e5081b6f677153ef096a0c5ec, the md5 the same
+--   apply left on a scratch copy of the job), schedule '22 11 * * *', active. Its first night under the new limit is
+--   11:22 UTC on 2026-10-24 (6:22 AM CT). Before it the job stopped at the 120-second limit on 10-16, 10-17, 10-18,
+--   10-19 and 10-21, and finished on 10-20, 10-22 and 10-23.

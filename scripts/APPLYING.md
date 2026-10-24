@@ -222,8 +222,11 @@ switched on under a person's name) after that file commits. The editor's scan fo
 created tables blanks dollar-quoted text first (Supabase Studio's
 `apps/studio/lib/sql-event-parser.ts`, read 2026-10-23 at
 https://github.com/supabase/supabase/blob/master/apps/studio/lib/sql-event-parser.ts),
-so a wrapped paste should get none of the appended lines above; that is the source
-read, not yet a paste seen. tests/test_editor_paste.py executes all of it as the
+so a wrapped paste gets none of the appended lines above. Seen on the first one:
+0603, 0714, 0738, 0749 and 0755 in one paste, committed 01:24:45 UTC on 2026-10-24,
+left no error in the server log after its COMMIT. A second run of that paste a minute
+later stopped at 0603's own `P1: already applied` and ran nothing, which is the
+other thing a paste should do. tests/test_editor_paste.py executes all of it as the
 editor sends it, one simple query. The APPLIED footer records the file's md5 and the
 md5 the paste checked (`python3 scripts/editor_paste.py FILE -v` prints both).
 
