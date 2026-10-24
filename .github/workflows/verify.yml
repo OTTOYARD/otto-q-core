@@ -852,6 +852,20 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_wake_seat_moments_sql.py
 
+      # 0780 (G500), EXECUTED over the live bay activation, reconcile and readiness (0743, 0755 and 0744 applied to the
+      # stubs; md5 asserted before and after): a full car with a leftover charge leg waits by its empty bay before 0780 and
+      # at the dial's default; with the dial it is seated the tick its bay frees and the reconcile leaves its hold alone; a
+      # car owing a charge and one on a charger are blocked as before. 12 tests, about 15 seconds.
+      - name: A car that owes no charge is ready for its bay, whatever its plan says, executed (0780)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_bay_ready_reads_energy_sql.py
+
       # scripts/editor_paste.py, the text a person pastes into the Supabase SQL editor, EXECUTED as the editor sends it
       # (the whole paste as one simple query): a file whose anchor spans a line end fails as it is with CRLF (0765's
       # failure on 2026-10-23) and applies wrapped, with bare newlines or CRLF, byte for byte as psql applies the file; a
