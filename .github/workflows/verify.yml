@@ -865,6 +865,20 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_bay_ready_reads_energy_sql.py
+      # 0781 (G501), EXECUTED on the miniature depot carried through 0642 (its charge line the live bodies, md5 asserted)
+      # with the live decide tick: the bay line; at the default 0642's keys and every reader as before; with the dial a
+      # car whose turn in the bays is its charge and the margin away yields, and rejoins once it is not; the kernel's
+      # order, the cockpits' queue, the learning read, the check's state and futures, and the board agree; the
+      # pre-images restore. 17 tests, about 50 seconds.
+      - name: The charge line serves first the cars a charge sends home, executed (0781)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_charge_order_exit_first_sql.py
 
       # scripts/editor_paste.py, the text a person pastes into the Supabase SQL editor, EXECUTED as the editor sends it
       # (the whole paste as one simple query): a file whose anchor spans a line end fails as it is with CRLF (0765's

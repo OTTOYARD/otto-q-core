@@ -847,9 +847,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0768](db/migrations/0768_the_demo_metronome_ticks_through_the_whole_minute.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | **The demo metronome ticks through the whole minute.** (G487) |
 | [0769](db/migrations/0769_the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due.sql) | `APPLIED-NO-LEDGER-ROW` | yes — file only | **The agent's wake gate also wakes it when a charger is free with a car waiting, or a car in the line's head |
 | [0780](db/migrations/0780_a_car_that_owes_no_charge_is_ready_for_its_bay_whatever_its_plan_says.sql) | `20261024163830` | yes — ledger | **A car that owes no charge is ready for its bay, whatever its plan says.** (G500; db/checks/0470 §2) |
+| [0781](db/migrations/0781_the_charge_line_serves_first_the_cars_a_charge_sends_home.sql) | `PENDING` | no — pending | **The charge line serves first the cars a charge sends home. A car whose turn in the bays is hours away yields |
 | [0790](db/migrations/0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql) | `PENDING` | no — pending | **The stop door takes the live run's row before the run's proposals, the order the metronome's beat takes them |
 | [0791](db/migrations/0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql) | `PENDING` | no — pending | **A signed-in user can no longer pause, resume, start, reset or fast-forward a run through /rest/v1/rpc, and a |
 
-594 migrations indexed.
+595 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->
