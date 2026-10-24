@@ -892,6 +892,20 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_bay_open_shop_sql.py
+      # 0783 (G503), EXECUTED on the same world carried through 0781, with 0780's helper, the live agent board
+      # (tests/fixtures/constraint_board_live.sql, md5 asserted) and stand-ins for what the board reads that the world
+      # lacks: the read model by hand (each resource's queue, hours to clear, idle units with a car ready, the cars whose
+      # exit it decides, the wall); the board carries it only with grounding and the dial; the pre-image restores.
+      # 7 tests, about 25 seconds.
+      - name: The agent's board says where the depot's wall is, executed (0783)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_depot_constraint_sql.py
 
       # scripts/editor_paste.py, the text a person pastes into the Supabase SQL editor, EXECUTED as the editor sends it
       # (the whole paste as one simple query): a file whose anchor spans a line end fails as it is with CRLF (0765's
