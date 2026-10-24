@@ -122,6 +122,27 @@
 --     0767 (G486): a cabin clean a charger fault cut short is done at the car's next post. 17 tests.
 --   Asked of Chase: itinerary_charge_on_clock on at the twin depot (§5); the metronome's 57-second budget (§6 (b));
 --   which of §7's items to build first.
+--
+-- ══ §9 AFTER CHASE'S "FIX AND BUILD" (2026-10-24, read on live 04:36-05:08 UTC, 11:36 PM-12:08 AM CT) ═══════════════════
+--
+--   Chase, about 11:40 PM CT on 10-23: "I need you to fix and give short answers why, if anything. Otherwise just build to
+--   completion as needed."
+--   0766 APPLIED through the connector at 04:45:03 UTC (version 20261024044503), the run still going. Of the next 37 world
+--   steps (5 agent passes), those that began within 9 s of a pass took a mean 979 ms against 983 for the rest; before it,
+--   6,360 against 1,303 (G485 fixed). 0767 held at the connector's confirmation, which timed out unanswered; nothing
+--   changed (its two pre-image md5s read back at 04:47 UTC).
+--   The charge line at sim 17:28 (04:38 UTC): 97 departures, none below target less one (lowest 99%); 142 charges closed,
+--   19 faulted; 47 cars waiting, a mean 102 minutes, the longest 158. Not a defect: 26 posts charging, 3 faulted, 1
+--   free; after a charge that ends normally the next car plugs in a median 1.1 minutes later (p90 under 2 every hour);
+--   the long gaps are fault repairs. Capacity and faults, as §2.
+--   The L2 plan (§5) is held off after all: the planner's L2 legs make each seat booking about 4.7 hours long (the seat
+--   window copies the L2 leg's) and put bay legs hours late, but the bays were 96-100% busy every hour from 13:00 except
+--   17:00, so the late plan cost no car a bay, and the check's futures ignore a charge under way's booking (0639). The
+--   dial's other effect, a fast charger held at arrival for every car above 45%, has not been measured on a busy day
+--   with a line, where it could hold posts ahead of the line's own order. Built later behind its own premise, not now.
+--   0768 (G487, the metronome's 57-second budget) and 0769 (G488, the wake gate's two moments) built and tested; the
+--   three go on in one paste. §7's "75 of 83 refused" counted echoes as refusals: of 131 orders by 04:40 UTC, 78 were
+--   the kernel's own order (reason same_as_kernel), 45 differed and lost, 8 differed and were taken.
 
 -- (1) rule 9 on every departure since the run began
 WITH r AS (SELECT sim_run_id, sim_clock_start FROM public.ottoq_sim_runs

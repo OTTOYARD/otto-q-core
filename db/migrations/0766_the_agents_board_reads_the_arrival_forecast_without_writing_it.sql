@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261024044503
 -- migration-name:    the_agents_board_reads_the_arrival_forecast_without_writing_it
 --
 -- 0766  **The agent's board reads the arrival forecast without writing it, so the agent's read takes no lock on the
