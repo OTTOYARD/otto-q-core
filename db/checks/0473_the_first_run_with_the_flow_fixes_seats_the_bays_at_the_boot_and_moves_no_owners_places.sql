@@ -2,14 +2,15 @@
 --        departure; the charge line equals its rank and no owner's cars changed places; at the boot every bay took a car
 --        that still owed a charge, where the run before left both service bays empty; and the owner guard refused 10 of
 --        the agent's 30 charge orders, none of which would have cleared the futures bar without it.**
---        -> G500 (not yet tested by the run), G501, G502, G504 (seen working, rule 12); G503 waits on agent v31's deploy.
+--        -> G500, G501, G502, G504 (seen working, rule 12); G505 (new, §8 (f): the bay yield trusts a phantom charge leg).
+--        G503 (agent v31) was deployed by another session during the run (PR #262); §8 (g) counts it.
 --        Chase, 2026-10-25: "Run started", after pasting 0781-0784 with the four dials on at the twin depot under his
 --        name (17:01:29 UTC, 12:01 PM CT).
 --        Run 763734d4-17dc-4f77-9cd6-effdd0bcafd0: busy_day at the twin depot (rule 8), seed 5923901848364930217, live
 --        playback at 3x, started 2026-10-25 18:49:54 UTC (1:49 PM CT) by operator_demo. Read against
 --        gxdrcyphqjzjsuhxuqtg, read-only, between 18:51:27 and 19:13:32 UTC (1:51 and 2:13 PM CT), from sim 13:04 to
---        sim 14:08. Every figure names the moment it was read; the run was still going at the last read. One run, its
---        first sim hour: single readings, not ranges.
+--        sim 14:08, and again after the run stopped, 22:36:32-22:42:13 UTC (5:36-5:42 PM CT), §8. Every figure names the
+--        moment it was read. One run: single readings, not ranges.
 --
 -- ══ §1 RULE 9 HELD (reproduce: (1)) ═════════════════════════════════════════════════════════════════════════════════════
 --
@@ -94,7 +95,60 @@
 --
 --   One more read near the run's end (its 240-minute cap is set to stop it about 5:49 PM CT): rule 9 over the day,
 --   0780's holds in the evening, the bays and the line under the evening return, and the guard over the day's orders,
---   with v31's read apart if it is deployed during the run.
+--   with v31's read apart if it is deployed during the run. Done: §8. The run stopped first, at its sim ceiling.
+
+-- ══ §8 THE WHOLE RUN (read 22:36:32-22:42:13 UTC, 5:36-5:42 PM CT; reproduce: (1), (2), (5)-(9)) ════════════════════════
+--
+--   The run stopped at 21:50:00 UTC (4:50 PM CT), sim 22:00:20, "run_governor: reached the 540 sim-minute ceiling". It
+--   was not purged, and no run had started since (read 22:36:32 UTC).
+--
+--   (a) Rule 9 held over the day: 121 departures, none below its target less one (the lowest 99%), 119 from a visit,
+--       none with a required service open.
+--   (b) 0781 (G501): 14,558 of 14,558 charge decisions carry the rank. 240 seated a car, 132 of them a car that had
+--       yielded its place, so the cars that yield are served. The line itself cannot be read after the stop (every car
+--       goes offline when a run stops); §2's two live reads are its evidence.
+--   (c) 0782 (G502): 99 bay seats over the day, the 7 ahead of a charge all at the boot. On 0470's measure (each seat to
+--       its release), NASH-SVC-01 was used 503.4 and NASH-SVC-02 532.3 of 540.3 minutes. Their only idle stretches
+--       longer than a minute came at the end, 21:24:02-22:00:20 and 21:52:57-22:00:20, and no car was refused a service
+--       bay in either. On 78c0624c the service bays stood idle 151.7 bay-minutes, 97.3 of them while a car was refused
+--       one (0470 §2 (a)).
+--   (d) 0780 (G500): no reconcile action was blocked by 'charging'. On 78c0624c there were 12, every one on a car at
+--       99-100% whose plan carried a charge leg the depot cannot run (0470 §2 (d)). The run's two reconcile actions were
+--       both the yield's (0553): (f) below, and a detail hold moved for a car that was in a service bay, as designed.
+--   (e) 0784 (G504): 128 orders, 127 judged per owner (the 128th was rejected before it was judged), none taken. 16 were
+--       refused 'worse_for_an_owner' (13 from v30, 3 from v31). One of the 16 won enough futures to have been taken
+--       without the guard: order 1972 at sim 16:32 (v31), 12 of its 12 futures, which would have cut Waymo Nashville's
+--       minutes past contract wait by 62.22 while adding 17.23 to Tesla Robotaxi TN's and 6.00 to Zoox Southeast's.
+--       That is the one outcome the guard changed on this run. Across the 16, Waymo's cars would have gained in 15; the
+--       owners who would have paid were Zoox in 11 orders, Tesla in 10 and Waymo in 1 (an order can cost two owners).
+--       v31 sent the kernel's own order back far more often: 71 of its 81 orders against 16 of v30's 47.
+--   (f) THE BAY YIELD TRUSTS A PHANTOM CHARGE LEG (G505, new). ottoq.ottoq_yield_bay_holds (0553) frees a bay for a car
+--       waiting now when every hold in the way belongs to a car that cannot be there before the waiting car finishes,
+--       moving each such hold to its car's ETA, or releasing it if no slot opens within 240 minutes. For a car in
+--       charging_dcfc or charging_l2, ottoq.ottoq_bay_hold_car_eta takes the latest planned_end_sim over the car's open
+--       charge legs: the plan, not the battery. At sim 13:40:58, car 7ec698b8-b6ac-4e77-b9f8-a3a42a34e2c7 (Tesla Robotaxi
+--       TN, a fault repair owed, held for NASH-SVC-01 14:00-15:29) was on a fast charger at 94%, its fast-charge leg
+--       planned to end 13:54. Its itinerary also carried a charge_l2 leg planned 21:40-22:31, by the fixed rule (G459)
+--       the 30-post depot can never serve (0763 left it no standard charger). So the yield read the car as unable to
+--       come before 22:34 and gave the bay to a car waiting now (a1111111-0001-0001-0001-000000000005, Waymo Nashville,
+--       13:40:58-14:20:58). No slot opened within 240 minutes of that ETA, so the hold was released
+--       ('replanned_no_window').
+--       The car was at 100% by 13:58:08 (a station fault had cut its first charge at 13:41:14; it was plugged in again at
+--       13:48:16). It then waited until the run stopped, held 244 times for "must_do_service_outstanding_bay_busy" and
+--       never booked into a service bay again, its fault repair still owed after 8 hours. Its real ETA, about 14:01,
+--       was before the waiting car would finish, so by 0553's own rule the hold should not have yielded.
+--       This is G500's family: a reader that trusts the plan's charge legs over the battery. 0780 patched two such
+--       readers; this is a third. It is a rule 14 matter too: one owner's car gave up its bay to another owner's car on a
+--       wrong estimate. One car on one run.
+--   (g) The agent (G503). v31 was deployed during the run by another session (PR #262: 19:23:50 UTC, 2:23 PM CT), and
+--       agent_constraint_board was set to 1 at the twin depot by Chase at 19:24:46 UTC (2:24 PM CT). The first v31
+--       directive came at 19:24:53 UTC. Over the day: v30, 47 passes with directives, 189 directives, none naming a bay;
+--       v31, 370 passes, 1,957 directives, 371 naming a bay.
+--   (h) At the stop, 112 cars were at the depot, and every one owed required work: readiness_check (all 112),
+--       mechanical_pm 96, sensor_calibration 30, fault_repair 6, interior_tidy 3, interior_deep_clean 2,
+--       cosmetic_repair 1, charge 1. busy_day compresses the maintenance intervals (pm_km_scale 0.01, calib_h_scale
+--       0.02), and two service bays cannot serve that much in a day. That is the capacity finding 0450 named: rule 9
+--       reports it and never lets a car leave around it.
 
 -- (1) rule 9 on every departure since the run began: below target less one, and required work open on its visit
 WITH r(id) AS (VALUES ('763734d4-17dc-4f77-9cd6-effdd0bcafd0'::uuid)),
@@ -214,3 +268,76 @@ SELECT o.order_id, to_char(o.sim_clock, 'HH24:MI') AS sim, o.projection ->> 'win
   FROM public.ottoq_agent_charge_orders o
  WHERE o.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND o.projection ->> 'reason' = 'worse_for_an_owner'
  ORDER BY o.recorded_at;
+
+-- (6) §8 (c): each service bay's used minutes and its idle stretches over the day, from the calendar's own seats (each
+--     seat to its release, as 0470 (3)-(4)), and the ticks in each stretch that refused a car a service bay
+WITH b AS (
+  SELECT b.stall_id, lower(b.during) s,
+         least(coalesce(b.released_at, upper(b.during)), '2026-10-25 22:00:20.833356+00'::timestamptz) e
+    FROM public.ottoq_stall_bookings b JOIN public.stalls st ON st.id = b.stall_id
+   WHERE b.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND st.stall_type = 'service_bay'
+     AND b.state IN ('done', 'active', 'interrupted')),
+used AS (SELECT stall_id, range_agg(tstzrange(s, e)) u FROM b WHERE e > s GROUP BY 1),
+idle AS (SELECT u.stall_id, r idle_r
+           FROM used u, unnest(tstzmultirange(tstzrange('2026-10-25 13:00:00+00', '2026-10-25 22:00:20.833356+00')) - u.u) r),
+cand AS (SELECT sim_clock FROM public.ottoq_decisions
+          WHERE sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND enacted_action ->> 'verb' = 'hold_no_space'
+            AND enacted_action ->> 'stall_type' = 'service_bay' AND enacted_action ->> 'reason' = 'no_free_space'
+          GROUP BY 1)
+SELECT s.stall_code, lower(i.idle_r) AS idle_from, upper(i.idle_r) AS idle_to,
+       round(extract(epoch FROM (upper(i.idle_r) - lower(i.idle_r))) / 60::numeric, 1) AS idle_min,
+       (SELECT count(*) FROM cand c WHERE c.sim_clock <@ i.idle_r) AS refused_ticks,
+       (SELECT round(sum(extract(epoch FROM (upper(r) - lower(r))) / 60)::numeric, 1)
+          FROM used u2, unnest(u2.u) r WHERE u2.stall_id = i.stall_id) AS used_min_bay
+  FROM idle i JOIN public.stalls s ON s.id = i.stall_id
+ WHERE upper(i.idle_r) - lower(i.idle_r) > interval '1 minute' ORDER BY s.stall_code, lower(i.idle_r);
+
+-- (7) §8 (d), (f): the reconcile's actions, the yield's events, and SVC-01's calendar as it stood at 13:40:58
+SELECT to_jsonb(rc) AS row FROM public.bay_reservation_reconcile_2026_08_02 rc
+ WHERE rc.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' ORDER BY rc.sim_clock;
+SELECT e.sim_clock_at, e.payload FROM public.ottoq_events e
+ WHERE e.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND e.event_type = 'ottoq.bay_hold_yielded' ORDER BY 1;
+SELECT left(b.vehicle_id::text, 8) AS car, b.purpose, b.state, lower(b.during) AS t0, upper(b.during) AS t1,
+       b.booked_at_sim, b.released_at, b.release_reason
+  FROM public.ottoq_stall_bookings b JOIN public.stalls s ON s.id = b.stall_id
+ WHERE b.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND s.stall_code = 'NASH-SVC-01'
+   AND b.booked_at_sim <= '2026-10-25 13:40:58.76403+00'
+   AND (b.released_at IS NULL OR b.released_at >= '2026-10-25 13:40:58.76403+00')
+   AND upper(b.during) > '2026-10-25 13:40:58.76403+00' AND lower(b.during) < '2026-10-25 18:30:00+00'
+ ORDER BY lower(b.during);
+
+-- (8) §8 (f): car 7ec698b8's legs, charges, bay bookings and decisions after its hold was released
+SELECT l.leg_type, l.status, l.planned_start_sim, l.planned_end_sim, l.actual_start_sim, l.actual_end_sim
+  FROM public.ottoq_itinerary_legs l
+ WHERE l.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND l.vehicle_id = '7ec698b8-b6ac-4e77-b9f8-a3a42a34e2c7'
+ ORDER BY l.planned_start_sim NULLS LAST;
+SELECT s.started_at, s.ended_at, s.status, s.stopped_reason, s.soc_start, s.soc_end, st.stall_code
+  FROM public.ocpp_sessions s LEFT JOIN public.stalls st ON st.id = s.stall_id
+ WHERE s.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND s.vehicle_id = '7ec698b8-b6ac-4e77-b9f8-a3a42a34e2c7'
+ ORDER BY s.started_at;
+SELECT d.action_context || ':' || COALESCE(d.enacted_action ->> 'verb', d.outcome_status) || ':'
+         || COALESCE(d.enacted_action ->> 'reason', '') AS what, count(*)
+  FROM public.ottoq_decisions d
+ WHERE d.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND d.entity_id = '7ec698b8-b6ac-4e77-b9f8-a3a42a34e2c7'
+   AND d.sim_clock > '2026-10-25 13:41:00+00'
+ GROUP BY 1 ORDER BY 2 DESC;
+
+-- (9) §8 (e), (g), (h): the orders by agent version and reason, the directives by version, and the work owed at the stop
+WITH o AS (SELECT o.*, (SELECT e.agent_version FROM public.ottoq_agent_pass_evidence e WHERE e.chain_id = o.chain_id LIMIT 1) AS v
+             FROM public.ottoq_agent_charge_orders o WHERE o.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0')
+SELECT COALESCE(v, '?') AS v, COALESCE(projection ->> 'reason', status) AS reason, count(*) AS orders,
+       count(*) FILTER (WHERE (projection ->> 'wins')::int >= (projection ->> 'need')::int) AS won_enough_futures
+  FROM o GROUP BY 1, 2 ORDER BY 1, 2;
+SELECT d.context_frame ->> 'agent_version' AS v, count(DISTINCT d.created_at) AS passes_with_directives, count(*) AS directives,
+       count(*) FILTER (WHERE a ->> 'text' ~* 'service[ _]bay|\mbays?\M') AS name_bays,
+       count(*) FILTER (WHERE a ->> 'text' ~* 'dcfc|charger') AS name_chargers
+  FROM public.ottoq_decisions d, jsonb_array_elements(d.proposed_action -> 'actions') a
+ WHERE d.sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND d.resolved_action_context = 'orchestrator_agent'
+   AND a ->> 'type' = 'directive'
+ GROUP BY 1 ORDER BY 1;
+WITH v AS (SELECT * FROM public.ottoq_visit_needs
+            WHERE sim_run_id = '763734d4-17dc-4f77-9cd6-effdd0bcafd0' AND meta ->> 'close_reason' = 'run_completed'),
+o AS (SELECT v.vehicle_id, a ->> 'svc' AS svc FROM v, jsonb_array_elements(v.atoms) a
+       WHERE COALESCE(a ->> 'must_do', 'false') = 'true' AND COALESCE(a ->> 'status', 'pending') <> 'done'
+         AND NOT (a ->> 'status' = 'cancelled' AND COALESCE(a ->> 'cleared_by_triage', 'false') = 'true'))
+SELECT svc, count(DISTINCT vehicle_id) AS cars FROM o GROUP BY 1 ORDER BY 2 DESC;
