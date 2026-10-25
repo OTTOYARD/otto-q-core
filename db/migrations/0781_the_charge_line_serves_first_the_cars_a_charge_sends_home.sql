@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    the_charge_line_serves_first_the_cars_a_charge_sends_home
 --
 -- 0781  **The charge line serves first the cars a charge sends home, among each owner's own cars only: a car whose turn
@@ -825,3 +825,16 @@ VALUES ('0781_the_charge_line_serves_first_the_cars_a_charge_sends_home', false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-25 17:01:29 UTC (12:01 PM CT), no ledger row ═══════════════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor as the first of four in one paste made by
+--   scripts/editor_paste.py from the files at 7989077 (this file md5 54fb818c, its part of the paste 116507fc; the
+--   paste aa85088d, 137,973 bytes), each file its own transaction once its text's md5 had been checked. The header's
+--   version and this footer are the only text added since. Its checks passed inside its transaction; its lineage row
+--   (FALSE/FALSE) and its '0781_pre' snapshots carry 17:01:29.826201 UTC (the paste's transactions share its start
+--   time, as one editor message). Read back at 17:02:57 UTC (12:02 PM CT): the keys at md5 65c8d535, the kernel's order
+--   at 3b03ee4d, the cockpits' queue at 5a66257a, the learning read at bf94627a and the bay line at 7c989348 (the
+--   state, simulator, board and decide tick carry 0782's and 0784's changes on top of this file's), each the md5
+--   the tests produced on a scratch database from the same paste; `charge_order_exit_first` 1 at the twin depot by
+--   Chase (the margin at its default 30). No run was live; not yet seen in a demo run.

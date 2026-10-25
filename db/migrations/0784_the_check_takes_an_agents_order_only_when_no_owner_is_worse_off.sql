@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    the_check_takes_an_agents_order_only_when_no_owner_is_worse_off
 --
 -- 0784  **The kernel takes an agent's charge order only when no owner is worse off. The check judged an order by the
@@ -470,3 +470,16 @@ VALUES ('0784_the_check_takes_an_agents_order_only_when_no_owner_is_worse_off', 
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-25 17:01:29 UTC (12:01 PM CT), no ledger row ═══════════════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor as the fourth of four in one paste made by
+--   scripts/editor_paste.py from the files at 7989077 (this file md5 885fb042, its part of the paste 28a350a3; the
+--   paste aa85088d, 137,973 bytes), each file its own transaction once its text's md5 had been checked. The header's
+--   version and this footer are the only text added since. Its checks passed inside its transaction; its lineage row
+--   (FALSE/FALSE) and its '0784_pre' snapshots carry 17:01:29.826201 UTC (the paste's transactions share its start
+--   time, as one editor message). Read back at 17:02:57 UTC (12:02 PM CT): the check's state at a75fa617, its simulator
+--   at f692be80, the verdict at 5f5e9c95 and the charge-queue board at 53c59c15, each with 0781's changes beneath, each
+--   the md5 the tests produced on a scratch database from the same paste; `agent_charge_order_owner_guard` 1 at the
+--   twin depot by Chase, in the statement the paste ran after this file committed. No run was live; not yet seen in a
+--   demo run.

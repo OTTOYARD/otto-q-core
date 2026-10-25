@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    when_every_post_is_taken_a_car_takes_a_free_bay_first
 --
 -- 0782  **When every post is taken, a car that owes bay work and whose energy is not critical takes a free bay first and
@@ -211,3 +211,15 @@ COMMIT;
 --                           AND (first_chg IS NULL OR first_chg > r0.s + interval '15 minutes')) candidates
 --   FROM v CROSS JOIN LATERAL (SELECT sim_clock_start s FROM ottoq_sim_runs WHERE sim_run_id = v.sim_run_id) r0
 --  GROUP BY 1, r0.s ORDER BY 1;
+
+-- ══ APPLIED 2026-10-25 17:01:29 UTC (12:01 PM CT), no ledger row ═══════════════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor as the second of four in one paste made by
+--   scripts/editor_paste.py from the files at 7989077 (this file md5 81e69756, its part of the paste a4148591; the
+--   paste aa85088d, 137,973 bytes), each file its own transaction once its text's md5 had been checked. The header's
+--   version and this footer are the only text added since. Its checks passed inside its transaction; its lineage row
+--   (FALSE/FALSE) and its '0782_pre' snapshots carry 17:01:29.826201 UTC (the paste's transactions share its start
+--   time, as one editor message). Read back at 17:02:57 UTC (12:02 PM CT): the decide tick at d2d32139, as 0781's and
+--   this file's tests produce it, each the md5 the tests produced on a scratch database from the same paste;
+--   `bay_open_shop` 1 and 0780's `bay_ready_reads_energy` 1 at the twin depot by Chase, in the statements the paste ran
+--   after this file committed. No run was live; not yet seen in a demo run.

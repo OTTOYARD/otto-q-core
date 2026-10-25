@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: APPLIED-NO-LEDGER-ROW
 -- migration-name:    the_agents_board_says_where_the_depots_wall_is
 --
 -- 0783  **The agent's board says where the depot's wall is: each resource's queued work against its units, the hours
@@ -337,3 +337,15 @@ VALUES ('0783_the_agents_board_says_where_the_depots_wall_is', false, false,
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-10-25 17:01:29 UTC (12:01 PM CT), no ledger row ═══════════════════════════════════════════════════
+--
+--   Chase ran this file in the Supabase dashboard's SQL editor as the third of four in one paste made by
+--   scripts/editor_paste.py from the files at 7989077 (this file md5 c4487b8d, its part of the paste 6717f7cf; the
+--   paste aa85088d, 137,973 bytes), each file its own transaction once its text's md5 had been checked. The header's
+--   version and this footer are the only text added since. Its checks passed inside its transaction; its lineage row
+--   (FALSE/FALSE) and its '0783_pre' snapshots carry 17:01:29.826201 UTC (the paste's transactions share its start
+--   time, as one editor message). Read back at 17:02:57 UTC (12:02 PM CT): the agent's board at 2ca12c61 and the
+--   constraint read model at af4cef03, each the md5 the tests produced on a scratch database from the same paste;
+--   `agent_constraint_board` left unset, so off: the deployed agent (v30) does not read 'constraint'; it goes on with
+--   v31's deploy. No run was live; not yet seen in a demo run.
