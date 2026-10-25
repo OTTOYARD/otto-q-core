@@ -852,6 +852,76 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_agent_wake_seat_moments_sql.py
 
+      # 0780 (G500), EXECUTED over the live bay activation, reconcile and readiness (0743, 0755 and 0744 applied to the
+      # stubs; md5 asserted before and after): a full car with a leftover charge leg waits by its empty bay before 0780 and
+      # at the dial's default; with the dial it is seated the tick its bay frees and the reconcile leaves its hold alone; a
+      # car owing a charge and one on a charger are blocked as before. 12 tests, about 15 seconds.
+      - name: A car that owes no charge is ready for its bay, whatever its plan says, executed (0780)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_bay_ready_reads_energy_sql.py
+      # 0781 (G501), EXECUTED on the miniature depot carried through 0642 (its charge line the live bodies, md5 asserted)
+      # with the live decide tick: the bay line; at the default 0642's keys and every reader as before; with the dial a
+      # car whose turn in the bays is its charge and the margin away yields to its own owner's cars, never another
+      # owner's, and rejoins once it is not; with two owners each owner's cars hold the places they held (CLAUDE.md rule
+      # 14); the kernel's order, the cockpits' queue, the learning read, the check's state and futures, and the board
+      # agree; the pre-images restore. 20 tests, about 50 seconds.
+      - name: The charge line serves first the cars a charge sends home, executed (0781)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_charge_order_exit_first_sql.py
+      # 0782 (G502), EXECUTED on the same world with 0780's helper: it applies on the live decide tick and on 0781's;
+      # the exception's predicate, cut from the patched decide tick and run over a stand-in needs card, admits at the
+      # default exactly the cars it did before and with the dial any car whose energy is not critical when no post is
+      # free; the seat records bay_before_charge only with the dial; the pre-image restores. 7 tests, about 20 seconds.
+      - name: When every post is taken a car takes a free bay first, executed (0782)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_bay_open_shop_sql.py
+      # 0783 (G503), EXECUTED on the same world carried through 0781, with 0780's helper, the live agent board
+      # (tests/fixtures/constraint_board_live.sql, md5 asserted) and stand-ins for what the board reads that the world
+      # lacks: the read model by hand (each resource's queue, hours to clear, idle units with a car ready, the cars whose
+      # exit it decides, the wall); the board carries it only with grounding and the dial; the pre-image restores.
+      # 7 tests, about 25 seconds.
+      - name: The agent's board says where the depot's wall is, executed (0783)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_depot_constraint_sql.py
+      # 0784 (G504), EXECUTED on the same world carried through 0781: at the default the state, the board, the simulator
+      # and the verdict read as before, key for key; with the dial the state carries every car's owner, the simulator's
+      # totals are the sums of its owners' over both visits, and an agent's order one fleet pays for is refused
+      # ('worse_for_an_owner') where 0620's verdict takes it, while an owner's trade inside its own cars is taken
+      # (CLAUDE.md rule 14); the pre-images restore. 10 tests, about 30 seconds.
+      - name: The check takes an agent's order only when no owner is worse off, executed (0784)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_owner_guard_sql.py
+
       # scripts/editor_paste.py, the text a person pastes into the Supabase SQL editor, EXECUTED as the editor sends it
       # (the whole paste as one simple query): a file whose anchor spans a line end fails as it is with CRLF (0765's
       # failure on 2026-10-23) and applies wrapped, with bare newlines or CRLF, byte for byte as psql applies the file; a

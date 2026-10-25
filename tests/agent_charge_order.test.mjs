@@ -179,17 +179,41 @@ test("v23: the order is recorded before the solver handoff, under the pass's cha
   assert.match(code, /charge_order: chargeOrder \}/);
 });
 
-test("v23-v30: the model call goes through the retry module, with the fallback model, and the row says v30", () => {
+test("v23-v31: the model call goes through the retry module, with the fallback model, and the row says v31", () => {
   assert.match(code, /await callModelWithRetry\(/);
   assert.match(code, /models: \[MODEL, FALLBACK_MODEL\]/);
   assert.match(code, /const FALLBACK_MODEL = "nvidia\/nemotron-3-super-120b-a12b";/);
   assert.match(code, /model_attempts: call\.attempts/);
-  assert.match(code, /agent_version: "v30"/);
-  assert.doesNotMatch(code, /agent_version: "v2[23456789]"/);
+  assert.match(code, /agent_version: "v31"/);
+  assert.doesNotMatch(code, /agent_version: "v(2[23456789]|30)"/);
   // the single-try key loop is gone
   assert.doesNotMatch(code, /for \(const candidate of keys\)/);
   // an accepted order is an enacted action
   assert.match(code, /applied\.length > 0 \|\| solverAccepted \|\| orderAccepted \? "enacted" : "noop_no_candidate"/);
   // the ledger capture reads the first parenthesised error of a fallback rationale; keep it first
   assert.match(code, /rationale: `fallback: model unavailable or unparseable \(\$\{raw \? raw\.slice\(0,40\) : "no key"\}\)/);
+});
+
+test("v31 / 0783: the prompt reads the depot's constraint and names the wall, never a held car or a shorter charge", () => {
+  assert.match(orchestrator, /LENS 1 — DEPOT ORCHESTRATION & FLOW: [^\n]*where the wall is \(constraint\)/);
+  const bullet = orchestrator.slice(orchestrator.indexOf('- "constraint" (when present)'));
+  assert.ok(bullet.length > 0 && orchestrator.indexOf('- "constraint" (when present)') > orchestrator.indexOf("READ THE BOARD THIS WAY:"));
+  for (const key of ["units_up", "busy_now", "queued_min", "in_progress_min", "hours_to_clear", "idle_with_car_ready",
+                     "exit_decided_by", "posts.queued_min_bays_decide", '"wall"', '"lesson"']) {
+    assert.ok(bullet.slice(0, bullet.indexOf("\n")).includes(key), key);
+  }
+  assert.match(bullet, /^[^\n]*name the wall with its numbers in a directive about capacity, not the chargers/);
+  assert.match(bullet, /^[^\n]*Never propose holding a vehicle back, shortening a charge or skipping a service because of the wall\./);
+});
+
+test("v31 / 0781: the charge-line section says how the kernel orders a car the bays hold, within its own operator", () => {
+  assert.match(CHARGE_ORDER_PROMPT, /When kernel_order\.exit_first is true, after the floor the kernel serves first the cars whose charge is their way out, among each operator's own cars \(exit_yields_to own_operator\)/);
+  assert.match(CHARGE_ORDER_PROMPT, /a car with yields true has its turn in the bays \(bays_in_min\) further off than its charge and kernel_order\.exit_margin_min, so it waits behind its own operator's cars whose charge is their way out, never behind another operator's/);
+  // CLAUDE.md rule 14: we manage each car for its owner; no operator's car goes behind another's for a depot total
+  assert.match(CHARGE_ORDER_PROMPT, /rank each car by its own needs \(its due time, its contract wait, its battery\), and never put one operator's car behind another operator's only to raise a depot total\./);
+  // 0784 (G504): the check refuses an order that leaves any operator worse off, and says which
+  assert.match(CHARGE_ORDER_PROMPT, /When check\.owner_guard is true, the kernel also refuses an order that leaves any operator's cars worse off than its own order would in the expected future/);
+  assert.match(CHARGE_ORDER_PROMPT, /last_order\.projection\.owners says which operator an order cost \(cmp -1\)/);
+  // it explains the order; it does not forbid an order (the check disposes)
+  assert.doesNotMatch(CHARGE_ORDER_PROMPT, /never (move|name|rank) a car with yields/i);
 });

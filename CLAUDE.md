@@ -339,6 +339,26 @@ When information is missing:
      draft had held it to 2,400 kW of shared cabinets (`db/checks/0460` §3). The held site stays a build-out
      (`dcfc30_cab2400`) for the margin work after a ceiling is set.
 
+**14. WE MANAGE CARS FOR THEIR OWNERS. NO OWNER'S CAR WAITS FOR ANOTHER OWNER'S CAR BECAUSE OF OUR ORDERING — added 2026-10-24 in Chase's words.**
+
+   *"Ultimately, all fleet owners will want their vehicle arriving to take precedence over any other vehicle (unless it
+   is a homogeneous fleet from an OEM or owner/management perspective. So As long as you're not assuming others will be
+   okay with their vehicle services/charges waiting for others in a curteous way, then that is your discretion to study
+   and determine based on fleet orchestration. Remember, we don't own our own vehicles, we manage for others- and ideally
+   multiple OEM's at the same depot eventually. So always base decisions off of that framing."*
+
+   - **The depot serves several owners at once, and owns none of the cars.** Every car is its owner's
+     (`vehicles.fleet_operator_id`), under its owner's contract. The twin depot already holds three: Waymo Nashville 46,
+     Tesla Robotaxi TN 36 and Zoox Southeast 34 of its 116 cars (read 2026-10-24).
+   - **The neutral order is the baseline.** The kernel's line (immediate dispatch, the 90-minute floor, then wait against
+     minutes of charge, `0642`) treats every car alike, whoever owns it. A rule added for the depot's sake starts from it
+     and may trade places only among one owner's own cars: each owner keeps the places its cars hold without the rule.
+   - **A site total is not a reason to move one owner's car behind another's.** Such a finding is reported with its cost
+     per owner and is not built as a default. First applied by `0781` (G501): reordering across owners would have given
+     back 136-539 more car-minutes a day, all of it by making one owner's cars wait for another's.
+   - **What an owner asks for is the owner's requirement** and is honored as asked (rule 9). When every car at a depot is
+     one owner's, the rule changes nothing.
+
 ---
 
 # PART 2 — THE KERNEL BRIEF

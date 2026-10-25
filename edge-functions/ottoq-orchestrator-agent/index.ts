@@ -10,6 +10,13 @@
 // (no action) — a failed model call never touches the depot. L1 shield still gates every
 // physical effect; vehicle-first inviolable.
 //
+// v31 (0783, 0781; db/checks/0470 §5, G503): THE BOARD SAYS WHERE THE WALL IS, AND THE AGENT IS TOLD TO READ IT.
+//      On run 78c0624c the agent was consulted 266 times and named the chargers as the depot's constraint while the two
+//      service bays were the wall at 6.9 times their capacity: nothing on its board compared a resource's queued work
+//      with its capacity. With agent_constraint_board on, the board carries 'constraint' (public.ottoq_depot_constraint):
+//      each resource's queued work, hours to clear, idle units with a car ready, and the cars whose exit it decides. The
+//      SYSTEM prompt reads it, and the charge-line section says how the kernel orders a car the bays hold (0781's
+//      exit_first: such a car yields until its turn in the bays comes near). Nothing else changes: the agent proposes.
 // v30 (the study of 2026-10-13, AV-9; CLAUDE.md rule 9): NO DIRECTIVE SETS A CHARGE TARGET UNDER 100%.
 //      On 2026-10-06 the agent told operators, 101 times on one run, to "charge to 80%+"; 114 distinct directives on
 //      record name an 80% target. The SYSTEM prompt now states the target (100% unless the owner set less) and that the
@@ -240,7 +247,7 @@ function extractJson(text: string): unknown {
 
 const SYSTEM = `You are OTTO-Q PRIME, the central orchestration intelligence of an autonomous-robotaxi depot. Review the BOARD DIGEST through three lenses and return STRICT JSON only — no prose, no explanation outside the JSON.
 
-LENS 1 — DEPOT ORCHESTRATION & FLOW: service backlog, inbound pressure, assignment health, plan-vs-actual deviation. Is throughput healthy? Is the depot releasing vehicles at the pace the work side wants?
+LENS 1 — DEPOT ORCHESTRATION & FLOW: service backlog, inbound pressure, assignment health, plan-vs-actual deviation, and where the wall is (constraint). Is throughput healthy? Is the depot releasing vehicles at the pace the work side wants?
 LENS 2 — RETURN-WAVE: inbound_60m vehicles have already COMMUNICATED needs. Is the depot postured for the wave (chargers, staging)?
 LENS 3 — ENERGY: grid draw vs forecast vs battery. Peak shaving comes ONLY from battery + timing — NEVER from holding vehicles.
 
@@ -256,6 +263,7 @@ READ THE BOARD THIS WAY:
 - grounding.energy_limits.battery_plan (when energy_reserve_shave = 1) is the battery's plan for the rest of the day: mode, the grid level it defends (level_kw), the billed peak (ratchet_kw), the DR reserve it holds (reserve_now_kwh), and whether it is charging and why.
 - "assets" (when present): SoC distribution, hard constraints with their causes (dcfc blocked by pack_temp_high clears by waiting; cell_balance_overdue needs service; soh_derate is permanent), deadline pressure, and a named attention list. Use it to choose the solver objective and to write directives about named vehicles.
 - grounding.planner_learning is what the planners learned in THIS run: free chargers by type, cars waiting for one, the solver's batch (it plans only as many cars as there are free chargers, in the kernel's own order), its recent offers by outcome (used, moved to an equal free charger, refused by reason) and lesson {code, text}. A refusal for stall_occupied or stall_reserved while lesson.code is more_cars_than_chargers is a capacity finding, not a planner fault: the charger went to a car ahead in line. Say so in one directive that cites the numbers; do not move an energy dial for it, and never hold a vehicle back or shorten a charge because of it. When lesson.code is offers_lost_their_charger, name it in a directive as well.
+- "constraint" (when present) says where the depot's wall is. For each resource (service_bay, wash_bay, posts): units_up and busy_now, the cars queued for it and the minutes of work they owe there (queued_min), the work under way (in_progress_min), hours_to_clear, and idle_with_car_ready (units standing idle while a car they could take waits). exit_decided_by counts the waiting cars by the resource their exit waits on longest; posts.queued_min_bays_decide is the minutes of charge the line owes to cars whose exit a bay decides; "wall" is the resource with the most hours to clear and "lesson" says it in one line. When the wall is not the posts, name the wall with its numbers in a directive about capacity, not the chargers: a charger does not move a car whose exit a bay decides. A unit idle with a car ready is a finding to name. Never propose holding a vehicle back, shortening a charge or skipping a service because of the wall.
 
 DIALS (the only keys set_policy accepts; value in [min, max]). Each grounding.actuators[dial].live says whether the dial does anything right now, and why not:
   energy_reserve_shave 0|1 — 1 = the battery follows its day plan (price- and demand-charge-aware to midnight, holding a demand-response reserve through the afternoon); 0 = a fixed grid-draw target set by the two factors below.
@@ -410,7 +418,7 @@ serve(async (req) => {
     async function recordPass(row: Record<string, unknown>): Promise<string | null> {
       try {
         const { error } = await sb.from("ottoq_agent_pass_evidence").insert({
-          chain_id: chainId, seat: "ottoq_prime", agent_version: "v30",
+          chain_id: chainId, seat: "ottoq_prime", agent_version: "v31",
           sim_run_id: run.sim_run_id, depot_id: depot, run_by: run.run_by ?? null,
           trigger_tick: chainTriggerTick, recorded_tick: run.tick_count, sim_clock: run.sim_clock_current,
           wake, ...row,
@@ -445,7 +453,7 @@ serve(async (req) => {
         depot_id: depot, action_context: "task_start", resolved_action_context: "orchestrator_agent",
         entity_type: "depot", entity_id: depot,
         context_frame: { lens: "wake_gate", fr4: true, agent_solver_chain_id: chainId,
-                         agent_chain_trigger_tick: chainTriggerTick, wake, agent_version: "v30" },
+                         agent_chain_trigger_tick: chainTriggerTick, wake, agent_version: "v31" },
         proposed_action: { actions: [], solver: solverDirective, model: "kernel_regime", agent_solver_chain_id: chainId },
         enacted_action: { verb: solverAccepted ? "solve_on_standing_objective" : "no_op", applied: [], queued: [],
                           rejected: [], rationale, solver_handoff: solverHandoff, outcome_class: "solver_only", wake,
@@ -689,7 +697,7 @@ serve(async (req) => {
                                        review: board.review != null, charge_queue: board.charge_queue != null },
                        // v23: how the model call went, attempt by attempt (model, status, ms, pause; never a key)
                        model_attempts: call.attempts,
-                       agent_version: "v30" },
+                       agent_version: "v31" },
       proposed_action: { actions: parsed.actions, solver: solverDirective, model: modelUsed,
                          agent_solver_chain_id: chainId,
                          // v23: the order as sent to the door, with any name the board did not hold
@@ -711,7 +719,7 @@ serve(async (req) => {
     // v29 (0703): the prompt by hash, once, and this pass's evidence row
     try {
       await sb.from("ottoq_agent_prompts").upsert(
-        { prompt_sha256: promptSha, agent_version: "v30", prompt_text: system },
+        { prompt_sha256: promptSha, agent_version: "v31", prompt_text: system },
         { onConflict: "prompt_sha256", ignoreDuplicates: true });
     } catch { /* the pass's row names the hash either way */ }
     const evidenceError = await recordPass({

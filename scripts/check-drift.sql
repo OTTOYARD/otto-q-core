@@ -823,6 +823,11 @@ repo_manifest(version, name, file) AS (
     ('APPLIED-NO-LEDGER-ROW'::text, 'a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_post'::text, '0767_a_cabin_clean_a_charger_fault_cut_short_is_done_at_the_cars_next_post.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'the_demo_metronome_ticks_through_the_whole_minute'::text, '0768_the_demo_metronome_ticks_through_the_whole_minute.sql'::text),
     ('APPLIED-NO-LEDGER-ROW'::text, 'the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due'::text, '0769_the_agent_wakes_when_a_charger_is_free_or_a_car_in_line_is_due.sql'::text),
+    ('20261024163830'::text, 'a_car_that_owes_no_charge_is_ready_for_its_bay_whatever_its_plan_says'::text, '0780_a_car_that_owes_no_charge_is_ready_for_its_bay_whatever_its_plan_says.sql'::text),
+    ('APPLIED-NO-LEDGER-ROW'::text, 'the_charge_line_serves_first_the_cars_a_charge_sends_home'::text, '0781_the_charge_line_serves_first_the_cars_a_charge_sends_home.sql'::text),
+    ('APPLIED-NO-LEDGER-ROW'::text, 'when_every_post_is_taken_a_car_takes_a_free_bay_first'::text, '0782_when_every_post_is_taken_a_car_takes_a_free_bay_first.sql'::text),
+    ('APPLIED-NO-LEDGER-ROW'::text, 'the_agents_board_says_where_the_depots_wall_is'::text, '0783_the_agents_board_says_where_the_depots_wall_is.sql'::text),
+    ('APPLIED-NO-LEDGER-ROW'::text, 'the_check_takes_an_agents_order_only_when_no_owner_is_worse_off'::text, '0784_the_check_takes_an_agents_order_only_when_no_owner_is_worse_off.sql'::text),
     ('PENDING'::text, 'the_stop_door_takes_the_runs_row_before_the_proposals'::text, '0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql'::text),
     ('PENDING'::text, 'a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run'::text, '0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql'::text)
 -- <<< END GENERATED MANIFEST
