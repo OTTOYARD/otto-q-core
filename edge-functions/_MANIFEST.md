@@ -12,7 +12,7 @@ Supabase project `gxdrcyphqjzjsuhxuqtg` (otto-q-core).
 - **Since the capture:** `otto-twin-control` v30 (footnote ¹), `ottoq-agent-gateway` v1, its first
   deploy (footnote ²), and `ottoq-cpsat-propose` v11 and `ottoq-orchestrator-agent` v34 (footnote ³), and
   `ottoq-orchestrator-agent` v35, agent v23 (footnote ⁴), v36, agent v24 (footnote ⁵), v37, agent v25
-  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰), and `ottoq-depot-v2` v1, its first deploy (footnote ¹¹). `otto-q-api`'s repo copy is ahead of what is deployed, on purpose, until someone can deploy it (footnote ¹²). `ottoq-csms-relay` is in the repo and not deployed: it is deployed after its database half, migration 0697, which holds a DROP a person approves (csms/README.md). And `ottoq-agent-gateway` v2, OTTOYARD sign-in (footnote ¹³).
+  (footnote ⁶), v38, agent v26 (footnote ⁷), v39, agent v27 (footnote ⁸), and v40, agent v28 (footnote ⁹), and `ottoq-ingest` v16, its v10 (footnote ¹⁰), and `ottoq-depot-v2` v1, its first deploy (footnote ¹¹). `otto-q-api`'s repo copy is ahead of what is deployed, on purpose, until someone can deploy it (footnote ¹²). `ottoq-csms-relay` is in the repo and not deployed: it is deployed after its database half, migration 0697, which holds a DROP a person approves (csms/README.md). And `ottoq-agent-gateway` v2, OTTOYARD sign-in (footnote ¹³). And `ottoq-orchestrator-agent` v43, agent v31, after v41 and v42, which were deployed without an entry here (footnote ¹⁵).
   30 ACTIVE functions.
 
 ## G67 IS CLOSED, AND THE PULL CORRECTED THE DRIFT LIST IT WAS BASED ON
@@ -128,7 +128,7 @@ against this table without trusting any metadata column.
 | ottoq-jobs-request | 6 | true | 2026-06-19 13:49 | yes | `d2b25506e078d7238a49939a17a6bc4faa15f0badbe26559a859b29d1be40b2f` |
 | ottoq-nemotron-copilot | 12 | true | 2026-06-06 15:41 | yes | `aca81d4358b9255508d3ca7f56a3190a117a7bafd7fd89649cfb5aa8798e155a` |
 | ottoq-orchestrate-tick | 12 | true | 2026-09-09 03:42 | yes | `47bc38feb463a9c103820d087c6a86f5856a3cdc049a73ab0a76387c1a73becf` |
-| ottoq-orchestrator-agent | 40 | true | 2026-10-09 12:38 | yes⁹ | `540a2062618508f81c9610118dca53255e9b514811d77684a872eb639bce982e` |
+| ottoq-orchestrator-agent | 43 | true | 2026-10-25 19:23 | yes¹⁵ | `5a1b6cb6a38f3c40371591702f65a25677665bc36e3a6d278bf579061e591259` |
 | ottoq-ottocommand | 8 | true | 2026-06-27 18:47 | yes | `dac7eca5d514286ddebb97c9ba096b22adff09d97f08ec485dcfc91f49e5761a` |
 | ottoq-progress | 9 | true | 2026-06-18 04:05 | yes | `eaced82147a69688e977ddede528272370c8facbe60de6787e525731090db0aa` |
 | ottoq-run-blackbox | 8 | false | 2026-10-14 16:35 | yes¹⁴ | `63656ff3aa443cf87b2e4197afe5c18b87279bb9580a12655fa892a91b2baee5` (repo file) |
@@ -263,6 +263,28 @@ answered a bad run with 500 from Postgres; OPTIONS allows `x-ottoq-export-token`
 Until the edge secret `OTTOQ_BLACKBOX_TOKEN` is set (64 random characters, by a person), only the service-role key opens
 it, and the twin app's Black Box button answers 401 until its branch `claude/blackbox-export-token` (ottoyarddepot-sim)
 merges.
+
+¹⁵ **`ottoq-orchestrator-agent` v43 (agent v31), 2026-10-25 at 2:23 PM CT (19:23:50 UTC), for 0783 and 0781 (G503).**
+Through the Supabase MCP `deploy_edge_function` with the seven files the live function held, `verify_jwt` true as before,
+no import map and no deno.json: `ottoq-orchestrator-agent/index.ts` and `_shared/agent_solver_chain.ts`,
+`agent_rule_nine.ts`, `agent_model_call.ts`, `agent_charge_order.ts`, `agent_pass_evidence.ts` and
+`agent_dial_discipline.ts`, each from `main` at `3ec2b0f` (`node --test tests/*.test.mjs` 289 of 289 on it at 2:17 PM
+CT). Read back with `get_edge_function`, the response saved to a file by the tool and hashed from that file: version
+43, all seven byte-identical to `main` (index.ts `5a1b6cb6`, `_shared/agent_charge_order.ts` `98ebb449`, and the
+unchanged `_shared/agent_solver_chain.ts` `7fae9d72`, `_shared/agent_rule_nine.ts` `5e844cbb`,
+`_shared/agent_model_call.ts` `210468d9`, `_shared/agent_pass_evidence.ts` `154112ed`,
+`_shared/agent_dial_discipline.ts` `e4944c72`; sha256 prefixes). **v41 and v42 never got an entry here.** v41 was agent
+v29 (`db/checks/0440`, migrations 0710 and 0711); v42 is agent v30, deployed 2026-10-13 at 3:06 PM CT (20:06:39 UTC,
+FINDINGS G434). v42, the version replaced, was read back before this deploy at 2:16 PM CT and hashed the same way: all
+seven files byte-identical to the repo at `25c56a2` (index.ts `30818d59`, `_shared/agent_charge_order.ts` `e0ee80bc`,
+the other five as above), so the deploy overwrote nothing that is not in the repo. The change is the prompt: the SYSTEM
+prompt reads the board's `constraint` (0783: each resource's queued work against its units, the hours to clear it, the
+units idle with a car ready, the cars whose exit it decides, and the wall) and asks for the wall by name, with its
+numbers, when it is not the posts; the charge-line section says how the kernel orders a car the bays hold (0781's
+`exit_first`, among each owner's own cars) and, from 0784, what the check's `owner_guard` refuses; and the version
+string. The board carries `constraint` only with `agent_constraint_board` on: 1 at the twin depot under Chase's name at
+2:24 PM CT (the policy row's `updated_at`, 19:24:46 UTC; Chase's decision, by the handoff, rule 12). The first v31 pass
+landed at 2:24 PM CT on demo run `763734d4`; what that run showed is FINDINGS G503.
 
 ## Committed, not deployed
 
