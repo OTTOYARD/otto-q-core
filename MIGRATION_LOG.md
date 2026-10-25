@@ -850,9 +850,10 @@ no `supabase_migrations` row for the file — see task G18 and Section E of
 | [0781](db/migrations/0781_the_charge_line_serves_first_the_cars_a_charge_sends_home.sql) | `PENDING` | no — pending | **The charge line serves first the cars a charge sends home, among each owner's own cars only: a car whose turn |
 | [0782](db/migrations/0782_when_every_post_is_taken_a_car_takes_a_free_bay_first.sql) | `PENDING` | no — pending | **When every post is taken, a car that owes bay work and whose energy is not critical takes a free bay first and |
 | [0783](db/migrations/0783_the_agents_board_says_where_the_depots_wall_is.sql) | `PENDING` | no — pending | **The agent's board says where the depot's wall is: each resource's queued work against its units, the hours |
+| [0784](db/migrations/0784_the_check_takes_an_agents_order_only_when_no_owner_is_worse_off.sql) | `PENDING` | no — pending | **The kernel takes an agent's charge order only when no owner is worse off. The check judged an order by the |
 | [0790](db/migrations/0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql) | `PENDING` | no — pending | **The stop door takes the live run's row before the run's proposals, the order the metronome's beat takes them |
 | [0791](db/migrations/0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql) | `PENDING` | no — pending | **A signed-in user can no longer pause, resume, start, reset or fast-forward a run through /rest/v1/rpc, and a |
 
-597 migrations indexed.
+598 migrations indexed.
 
 <!-- <<< END GENERATED INDEX -->

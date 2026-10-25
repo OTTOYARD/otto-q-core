@@ -907,6 +907,20 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_depot_constraint_sql.py
+      # 0784 (G504), EXECUTED on the same world carried through 0781: at the default the state, the board, the simulator
+      # and the verdict read as before, key for key; with the dial the state carries every car's owner, the simulator's
+      # totals are the sums of its owners' over both visits, and an agent's order one fleet pays for is refused
+      # ('worse_for_an_owner') where 0620's verdict takes it, while an owner's trade inside its own cars is taken
+      # (CLAUDE.md rule 14); the pre-images restore. 10 tests, about 30 seconds.
+      - name: The check takes an agent's order only when no owner is worse off, executed (0784)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_owner_guard_sql.py
 
       # scripts/editor_paste.py, the text a person pastes into the Supabase SQL editor, EXECUTED as the editor sends it
       # (the whole paste as one simple query): a file whose anchor spans a line end fails as it is with CRLF (0765's

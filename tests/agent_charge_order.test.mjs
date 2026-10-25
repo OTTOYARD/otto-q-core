@@ -211,6 +211,9 @@ test("v31 / 0781: the charge-line section says how the kernel orders a car the b
   assert.match(CHARGE_ORDER_PROMPT, /a car with yields true has its turn in the bays \(bays_in_min\) further off than its charge and kernel_order\.exit_margin_min, so it waits behind its own operator's cars whose charge is their way out, never behind another operator's/);
   // CLAUDE.md rule 14: we manage each car for its owner; no operator's car goes behind another's for a depot total
   assert.match(CHARGE_ORDER_PROMPT, /rank each car by its own needs \(its due time, its contract wait, its battery\), and never put one operator's car behind another operator's only to raise a depot total\./);
+  // 0784 (G504): the check refuses an order that leaves any operator worse off, and says which
+  assert.match(CHARGE_ORDER_PROMPT, /When check\.owner_guard is true, the kernel also refuses an order that leaves any operator's cars worse off than its own order would in the expected future/);
+  assert.match(CHARGE_ORDER_PROMPT, /last_order\.projection\.owners says which operator an order cost \(cmp -1\)/);
   // it explains the order; it does not forbid an order (the check disposes)
   assert.doesNotMatch(CHARGE_ORDER_PROMPT, /never (move|name|rank) a car with yields/i);
 });
