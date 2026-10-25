@@ -921,6 +921,21 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/test_owner_guard_sql.py
+      # 0785 (G505), EXECUTED over the live bay yield and its ETA (tests/fixtures/bay_hold_yield_stub.sql, md5 asserted)
+      # on the bay fixture's calendar: before 0785 and at the dial's default a car minutes from full on a fast charger,
+      # with a phantom standard leg in its plan, reads as due when that leg ends and gives its service-bay hold away (on a
+      # full calendar the hold is released); with the dial it is due when the charge it is on ends and keeps its hold, a
+      # leg of the other kind is never read, a charge that runs past the waiting car still gives way, and without a begun
+      # leg the session's pace answers as before; the pre-image restores. 13 tests, about 10 seconds.
+      - name: A car on a charger comes to its bay when the charge it is on ends, executed (0785)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_bay_hold_eta_reads_charge_sql.py
 
       # scripts/editor_paste.py, the text a person pastes into the Supabase SQL editor, EXECUTED as the editor sends it
       # (the whole paste as one simple query): a file whose anchor spans a line end fails as it is with CRLF (0765's
