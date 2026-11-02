@@ -1,4 +1,4 @@
--- migration-version: PENDING
+-- migration-version: 20261102140211
 -- migration-name:    a_car_on_a_charger_comes_to_its_bay_when_the_charge_it_is_on_ends
 --
 -- 0785  **A car on a charger comes to its bay when the charge it is on ends, not when its plan's last charge leg does.
@@ -252,3 +252,18 @@ VALUES ('0785_a_car_on_a_charger_comes_to_its_bay_when_the_charge_it_is_on_ends'
         now());
 
 COMMIT;
+
+-- ══ APPLIED 2026-11-02 14:02:11 UTC (8:02 AM CT), ledger version 20261102140211 ══════════════════════════════════════
+--
+--   Through apply_migration from a session whose connector now runs writes, after Chase merged #261 at 8:00 AM CT, with
+--   nothing in flight (P0 read 0 and no run live or paused at 14:01:29 UTC, and the file's own P0 at the apply). The text
+--   sent, BEGIN through COMMIT and one newline, is 9,570 characters, md5 36f486fc0c7bd2772e7316c4f8ad187d, equal to the
+--   ledger's statements[1] read back. Read back from the live catalog at 14:02:29 UTC (md5 of prosrc):
+--   ottoq.ottoq_bay_hold_car_eta f0d4f149f9c804615c8889e5885f4540, the body tests/test_bay_hold_eta_reads_charge_sql.py
+--   leaves on the scratch PostgreSQL; ottoq.ottoq_yield_bay_holds unchanged (fd2c5cfe). One pre-image under '0785_pre';
+--   the dial catalogued 0..1, default 0, not agent-writable, with no policy row; the lineage row false/false.
+--
+--   SWITCHED ON 2026-11-02 at 14:10:33 UTC (8:10 AM CT), on Chase's word in this session: "Switch on". By
+--   public.ottoq_policy_set('depot', '11111111-1111-1111-1111-111111111111', 'bay_hold_eta_reads_charge', 1, 'Chase'),
+--   which answered ok (applied 1, not clamped); read back at 14:10:42 UTC: the depot row 1 by Chase, no run or global
+--   row. Not yet seen in a demo run (rule 12).
