@@ -263,6 +263,7 @@ COMMIT;
 --   leaves on the scratch PostgreSQL; ottoq.ottoq_yield_bay_holds unchanged (fd2c5cfe). One pre-image under '0785_pre';
 --   the dial catalogued 0..1, default 0, not agent-writable, with no policy row; the lineage row false/false.
 --
---   NOT YET SWITCHED ON. The dial is a person's (rule 10), and rule 12 switches it on under the deciding person's name:
---   SELECT public.ottoq_policy_set('depot', '11111111-1111-1111-1111-111111111111', 'bay_hold_eta_reads_charge', 1,
---   'Chase'); then one demo run shows it working.
+--   SWITCHED ON 2026-11-02 at 14:10:33 UTC (8:10 AM CT), on Chase's word in this session: "Switch on". By
+--   public.ottoq_policy_set('depot', '11111111-1111-1111-1111-111111111111', 'bay_hold_eta_reads_charge', 1, 'Chase'),
+--   which answered ok (applied 1, not clamped); read back at 14:10:42 UTC: the depot row 1 by Chase, no run or global
+--   row. Not yet seen in a demo run (rule 12).
