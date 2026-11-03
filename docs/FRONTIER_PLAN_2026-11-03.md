@@ -571,7 +571,7 @@ decided them (rule 12).
 
 ### Phase 0: foundations. Needs only the go-ahead and D2.
 
-These run in parallel, and none needs a rule-12 exception:
+These run in parallel. None touches production. Building the Lab runs a few simulated days inside it, never in production; Chase's go-ahead of 2026-11-03 ("Okay BEGIN", after the question was put to him) covers those runs:
 
 0. **Re-read the promotion gate honestly.** Compute 0708's AUC interval clustered by (scenario, seed) key, by bootstrap
    over the 17 keys, and record it beside the independent-decision interval. Until then, the gate's condition 2 is
@@ -637,7 +637,7 @@ E8, E9 and E10, in that order. E8 can start earlier, because explanations and co
 | | Decision | Recommendation |
 |---|---|---|
 | D1 | **Go-ahead and order.** Phases 0→5 as above. | Start Phase 0 now. All three of its items stay out of production. |
-| D2 | **Where the Lab runs.** (a) Self-hosted Postgres replicas loaded with `pg_dump`. This needs a read-only connection string added as an environment secret. (b) The same replicas loaded by a catalog export through the existing Supabase access (`pg_get_functiondef` and the rest). This needs nothing new but takes longer to build. (c) A Supabase branch: hosted, billed per hour, one replica, cost not checked. | (a). (b) if adding a secret is unwelcome; I can start (b) without anything from you. |
+| D2 | **Where the Lab runs.** *Decided 2026-11-03: in the working session, at no extra database cost (Option 1).* How it is loaded, as measured that morning: the production Postgres port is not reachable from the session (a CONNECT to :5432 timed out), so `pg_dump` over a connection string is not available; the Supabase Management API is reachable over HTTPS. (a) A Supabase access token as the environment secret `SUPABASE_ACCESS_TOKEN` (scoped to reading otto-q-core's database where the account offers scoped tokens), read in a new session, exports schema and reference data straight to files. (b) Without it: the engine rebuilt from `db/baseline` plus the later migrations, checked against production function by function through the existing read access; no bulk data. (c) A separate Supabase project for unattended runs later: Small ~$15, Medium ~$60, Large ~$110 a month, billed hourly, nothing while paused ([Supabase compute pricing](https://supabase.com/docs/guides/platform/manage-your-usage/compute), read 2026-11-03). Note: a `SUPABASE_ACCESS_TOKEN` for CI was declined on 2026-09-21 by decision (verify.yml); the one asked for here is for the session environment. | (a) for the full copy; (b) started without waiting. |
 | D3 | **A rule-12 exception for the Lab only.** Unattended runs and pairs in the Lab database, never in production, for E1's acceptance tests, E6 and E9. Plus a compute and API budget for E6. | Yes, scoped to the Lab, with a monthly cap you set. |
 | D4 | **Owners' prices.** What a minute of lateness, a minute past the contract wait and a minute out at work are worth, per owner. The four SLAs carry none. | Set a default now (equal weights) for the Phase 0 replay, which reports the flips across prices. Then set real prices per owner, or have E8 draft them from contracts for you to confirm. |
 | D5 | **The agent's role.** Keep per-tick charge orders, or move the agent to exceptions, explanations, contracts and mutation (E8). | Move it, and keep the per-tick orders as a low-frequency challenger until E6 ships a better key. |
