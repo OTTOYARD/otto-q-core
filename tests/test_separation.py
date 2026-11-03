@@ -60,7 +60,9 @@ FORBIDDEN_IMPORTS = re.compile(
     #: live URL). A kernel module importing it would have a connection.
     #: `csms` and the WebSocket and OCPP libraries are on it for the same reason:
     #: the charger back end is a NETWORK service by design (csms/README.md).
-    r"httpx|urllib\.request|twin|load|bridge|csms|websockets|ocpp)\b", re.M)
+    #: `lab` is on it because the research wing's lab measures the engine from outside
+    #: (docs/FRONTIER_PLAN_2026-11-03.md): its results are recommendations a person ships (rule 10).
+    r"httpx|urllib\.request|twin|load|bridge|csms|websockets|ocpp|lab)\b", re.M)
 
 #: Identifiers of the production world. A kernel file that names them has been
 #: told which world it lives in.
@@ -154,6 +156,11 @@ NON_KERNEL_PACKAGES = {
                "built one to one from directive.charge.plan) and decides nothing, so "
                "FORBIDDEN_IMPORTS bans `import csms`, websockets and ocpp from the "
                "kernel as it bans load and bridge.",
+    "lab":     "the research wing's lab (docs/FRONTIER_PLAN_2026-11-03.md): models, monitors and "
+               "replays that measure the engine from outside, such as lab/safety's synthesized "
+               "post-cell supervisor and its trace monitor. It reads evidence and decides nothing "
+               "at a depot; a result is a recommendation a person ships (CLAUDE.md rule 10), so "
+               "FORBIDDEN_IMPORTS bans `import lab` from the kernel.",
 }
 
 
