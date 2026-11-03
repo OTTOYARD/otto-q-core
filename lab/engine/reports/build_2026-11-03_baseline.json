@@ -1,0 +1,82 @@
+{
+ "seconds": 0.8,
+ "sequences_created_from_nextval_defaults": 42,
+ "sequence_owned_by_failures": 0,
+ "rounds": [
+  {
+   "tried": 2146,
+   "ok": 2040
+  },
+  {
+   "tried": 106,
+   "ok": 103
+  },
+  {
+   "tried": 3,
+   "ok": 0
+  }
+ ],
+ "attempted": {
+  "table": 283,
+  "function": 455,
+  "constraint": 689,
+  "index": 382,
+  "view": 45,
+  "rls": 133,
+  "policy": 159
+ },
+ "ok": {
+  "table": 282,
+  "function": 455,
+  "constraint": 687,
+  "index": 382,
+  "view": 45,
+  "rls": 133,
+  "policy": 159
+ },
+ "failed": {
+  "table": 1,
+  "constraint": 2
+ },
+ "failed_by_cause": [
+  [
+   "relation \"spatial_ref_sys\" already exists",
+   1
+  ],
+  [
+   "multiple primary keys for table \"spatial_ref_sys\" are not allowed",
+   1
+  ],
+  [
+   "constraint \"spatial_ref_sys_srid_check\" for relation \"spatial_ref_sys\" already exists",
+   1
+  ]
+ ],
+ "cron": [
+  {
+   "jobid": 2,
+   "jobname": "ottoq-twin-ingest-weekly",
+   "loaded": true
+  },
+  {
+   "jobid": 10,
+   "jobname": "ottoq-depot-tick",
+   "loaded": true
+  },
+  {
+   "jobid": 11,
+   "jobname": "ottoq-retention-nightly",
+   "loaded": true
+  },
+  {
+   "jobid": 12,
+   "jobname": "ottoq-demo-metronome",
+   "loaded": true
+  },
+  {
+   "jobid": 13,
+   "jobname": "ottoq-cert-battery",
+   "loaded": true
+  }
+ ]
+}

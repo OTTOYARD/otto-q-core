@@ -1,0 +1,81 @@
+# Tables named in the bodies of the demo-run start and tick call closure, as the LAB copy has
+# them (232 routines reached from public.ottoq_start_demo_run, public.ottoq_cron_tick and
+# public.ottoq_demo_metronome; lab/engine/sql/reference_closure.sql), with production's size.
+# Read from production 2026-11-03 16:54:43 UTC (10:54 AM CST), read-only.
+# Columns: table | relkind | depot column | run-scoped (has sim_run_id) | rows | bytes (sum of
+# pg_column_size over those rows) | production row estimate, all depots (reltuples) |
+# production total relation size, all depots (bytes).
+# rows/bytes are counted only for tables WITHOUT sim_run_id (the reference-data candidates):
+# scoped to depot 11111111-1111-1111-1111-111111111111 when the table has a depot column,
+# else the whole table. Run-scoped tables are listed with sizes only and are NOT reference data.
+bay_reservation_reconcile_2026_08_02|r|-|run|129769|41975808
+bess_snapshots|r|depot_id|-|217410|37831624|217619|76734464
+cuopt_invocation_log|r|-|run|41289|13664256
+depots|r|-|-|5|7246|5|270336
+ocpp_sessions|r|depot_id|run|66774|72540160
+ottoq_approach_band|v|depot_id|run|-1|0
+ottoq_bess_units|r|depot_id|-|1|393|3|196608
+ottoq_calibration_distributions|r|-|-|41|56256|41|204800
+ottoq_calibration_profiles|r|-|-|8|3904|-1|49152
+ottoq_canopy_state|r|depot_id|-|4|413|5|122880
+ottoq_comms_messages|r|-|run|5753|1165811712
+ottoq_cuopt_deferrals|r|-|run|3393|4390912
+ottoq_cuopt_fire_log|r|-|run|12|81920
+ottoq_decision_snapshots|r|depot_id|run|42342|1641152512
+ottoq_decisions|r|depot_id|run|3019970|4555210752
+ottoq_depot_staffing|r|depot_id|-|3|616|6|65536
+ottoq_dr_calls|r|depot_id|run|5|81920
+ottoq_dtc_catalog|r|-|-|22|2878|-1|32768
+ottoq_energy_commands|r|depot_id|run|114954|166322176
+ottoq_energy_plan|r|depot_id|run|57460|139558912
+ottoq_event_types_catalog|r|-|-|155|29488|109|90112
+ottoq_events|r|depot_id|run|12227|2897010688
+ottoq_external_proposals|r|depot_id|run|26935|37281792
+ottoq_feed_plans|r|-|-|12|26184|-1|155648
+ottoq_fleet_operator_slas|r|-|-|4|2144|-1|65536
+ottoq_grid_snapshots|r|depot_id|run|67919|31760384
+ottoq_itinerary_legs|r|-|run|1053|296902656
+ottoq_ocpp_chargers|r|depot_id|-|45|18288|94|2482176
+ottoq_ocpp_messages|r|-|run|2193635|2431320064
+ottoq_oem_webhook_log|r|-|run|55989|48553984
+ottoq_oem_webhook_patterns|r|-|-|3|1646|-1|32768
+ottoq_ops_approvals|r|depot_id|run|26655|33153024
+ottoq_policy_param_catalog|r|-|-|252|124425|244|253952
+ottoq_policy_params|r|-|-|10849|1084173|10406|2252800
+ottoq_retention_policy|r|-|-|2|928|-1|32768
+ottoq_retention_state|r|-|-|2|125|2|65536
+ottoq_rule_evaluations|r|depot_id|run|17780|16123420672
+ottoq_rule_parameters|r|-|-|0|0|-1|32768
+ottoq_rules|r|-|-|54|37381|51|204800
+ottoq_run_archives|r|depot_id|run|3082|17522688
+ottoq_scenarios|r|depot_id|-|7|4668|14|147456
+ottoq_schema_snapshots|r|-|-|7831|8075773|7612|11108352
+ottoq_signing_keys|r|-|-|1|160|-1|49152
+ottoq_sim_runs|r|depot_id|run|364|5988352
+ottoq_sim_scenarios|r|-|-|10|5464|-1|49152
+ottoq_site_structures|r|depot_id|-|28|9440|54|122880
+ottoq_solar_output|r|depot_id|run|262132|93118464
+ottoq_stall_bookings|r|-|run|469|742014976
+ottoq_tariff_windows|r|depot_id|-|11|1125|18|65536
+ottoq_telemetry_packets|r|-|run|1622937|789061632
+ottoq_tick_clock_log|r|-|run|63489|16187392
+ottoq_tick_reservations|r|depot_id|run|67751|26877952
+ottoq_variability_cards|r|-|run|38624|670728192
+ottoq_variability_catalog|r|-|-|47|13405|37|81920
+ottoq_variability_profiles|r|-|run|170|172032
+ottoq_vehicle_commands|r|depot_id|run|228869|407879680
+ottoq_vehicle_dispatches|r|-|run|63347|100933632
+ottoq_vehicle_incidents|r|-|run|0|81920
+ottoq_vehicle_itineraries|r|depot_id|run|68126|37650432
+ottoq_vehicle_needs_card|v|depot_id|-|-1|0
+ottoq_vehicle_wear|r|-|run|36297|26755072
+ottoq_visit_needs|r|depot_id|run|63070|182763520
+ottoq_wear_tick_status|r|-|run|63503|9584640
+ottoq_weather_snapshots|r|depot_id|run|67933|24715264
+ottoq_write_slimming_policy|r|-|-|1|760|-1|32768
+service_cadence_policy|r|-|-|17|4824|-1|49152
+site_energy_snapshots|r|depot_id|run|72438|28442624
+space_conflict_ledger|r|depot_id|run|67012|45948928
+stalls|r|depot_id|-|158|54822|330|5144576
+vehicle_need_profile|r|-|-|220|76908|220|1105920
+vehicles|r|home_depot_id|-|120|204926|226|12468224
