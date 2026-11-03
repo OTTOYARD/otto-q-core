@@ -1,0 +1,4 @@
+kind	object	sqlstate	first_error	source	line
+table	public.spatial_ref_sys	42P07	relation "spatial_ref_sys" already exists	tables.sql	6934
+constraint	public.spatial_ref_sys.spatial_ref_sys_pkey	42P16	multiple primary keys for table "spatial_ref_sys" are not allowed	tables.sql	6941
+constraint	public.spatial_ref_sys.spatial_ref_sys_srid_check	42710	constraint "spatial_ref_sys_srid_check" for relation "spatial_ref_sys" already exists	tables.sql	6942
