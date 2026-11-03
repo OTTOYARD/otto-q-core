@@ -1,0 +1,12 @@
+seq,sim_time,event,vehicle_id,detail,source
+1,2026-11-02T14:03:27.554004Z,car_arrived,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,,ottoq_events#33845005
+2,2026-11-02T14:03:27.554004Z,mate_started,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,window_s=18.5;session=4349f014-48c3-4957-b4b5-9e9307768995,ottoq_events#33845178
+3,2026-11-02T14:03:27.554004Z,session_started,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,soc_start=97;soc_target=100;session=4349f014-48c3-4957-b4b5-9e9307768995,ottoq_events#33845179
+4,2026-11-02T14:03:53.527935Z,mate_latched,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,outcome=latched,ottoq_events#33845460
+5,2026-11-02T14:03:53.527935Z,clean_started,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,svc=interior_tidy;arm_routine=true,ottoq_visit_needs#71933947-b789-4161-8ece-ba0759416a3e
+6,2026-11-02T14:04:15.480651Z,charger_faulted,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,reason=fault.thermal_emergency;repair_minutes=94;soc_start=97;soc_end=97;session=4349f014-48c3-4957-b4b5-9e9307768995,ottoq_events#33845579
+7,2026-11-02T14:04:15.480651Z,demate_started,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,window_s=11.5;session=4349f014-48c3-4957-b4b5-9e9307768995,ottoq_events#33845576
+8,2026-11-02T14:04:37.354314Z,demate_cleared,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,outcome=cleared,ottoq_events#33845647
+9,2026-11-02T14:09:41.527935Z,clean_done,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,svc=interior_tidy,ottoq_visit_needs#71933947-b789-4161-8ece-ba0759416a3e
+10,2026-11-02T14:09:54.597624Z,car_left,2cd2cbf3-9de8-48c0-9bd8-935aedb744d7,to=none,ottoq_events#33847109
+11,2026-11-02T14:29:58.997055Z,run_stopped,,,ottoq_events#33853472
