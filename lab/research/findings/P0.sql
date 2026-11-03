@@ -34,12 +34,23 @@ VALUES
    'copy is being rebuilt from the repository and checked against production function by function; the full copy needs a '
    'Supabase access token in the environment.',
    '{}', 'otto-q-core lab/ (in progress)', '{}', NULL),
-  ('p0-safety-model-building', 'P0', 'E3', 'safety', 'in_progress',
+  ('p0-safety-model-building', 'P0', 'E3', 'safety', 'retracted',
    'A proven safety model of the faulted-charger post is being built',
-   'The charging post, its two robot arms, the car and the charger are being modelled so a tool can prove which states '
-   'are safe, then check last night''s run against the model. It must catch the two cars held on dead chargers '
-   '(DCFC-22 and DCFC-02) and nothing else.',
-   '{}', 'otto-q-core lab/safety (in progress)', '{8c0b2e04-8ea9-49a8-bfed-bed10ddfbc8b}', NULL)
+   'Superseded by p0-safety-model, which reports the built model.',
+   '{}', 'otto-q-core lab/safety', '{8c0b2e04-8ea9-49a8-bfed-bed10ddfbc8b}', NULL),
+  ('p0-safety-model', 'P0', 'E3', 'safety', 'built',
+   'A tool-proven safety model catches last night''s dead-charger holds, and only those',
+   'The charging post, its two robot arms, the car and the charger were modelled, and a synthesis tool computed every '
+   'safe move. Replayed on run 8c0b2e04, the model flags the two cars held on dead chargers (339 s and 309 s) and none '
+   'of the other four faulted posts. Without the 0792 rule the tool allows exactly 8 more moves, and each one is that '
+   'hold. It also shows a gap already on record. On 3 of the 6 faults the engine let the car leave at the instant of '
+   'the fault with the connector still latched. A real depot needs the robots'' own clear signal.',
+   '{"tool": "Eclipse ESCET 13.0", "states": 302, "transitions": 831, "transitions_without_0792_rule": 839,
+     "extra_moves_without_rule_all_g506_holds": 8, "posts_checked": 6, "posts_flagged": 2,
+     "held_s": {"DCFC-22": 339.1, "DCFC-02": 309.2}, "released_at_fault_with_connector_latched": 3,
+     "tests": 24}',
+   'otto-q-core lab/safety (README, synthesis/SUMMARY.md)', '{8c0b2e04-8ea9-49a8-bfed-bed10ddfbc8b}',
+   '2026-11-03 15:33:00+00')
 ON CONFLICT (depot_id, slug) DO UPDATE SET
   phase = EXCLUDED.phase, item = EXCLUDED.item, kind = EXCLUDED.kind, status = EXCLUDED.status,
   title = EXCLUDED.title, summary = EXCLUDED.summary, metrics = EXCLUDED.metrics, evidence = EXCLUDED.evidence,
