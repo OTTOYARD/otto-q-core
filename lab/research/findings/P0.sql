@@ -28,12 +28,21 @@ VALUES
    'does. A recommendation here changes nothing at the depot until a person ships it.',
    '{"migration": "0793", "ledger": "20261103155140"}',
    'otto-q-core db/migrations/0793', '{}', '2026-11-03 15:51:48+00'),
-  ('p0-lab-building', 'P0', 'E1', 'lab', 'in_progress',
+  ('p0-lab-building', 'P0', 'E1', 'lab', 'retracted',
    'The research lab is being built',
-   'A private copy of OTTO-Q that runs depot days fast and can rewind any moment to try a different decision. The first '
-   'copy is being rebuilt from the repository and checked against production function by function; the full copy needs a '
-   'Supabase access token in the environment.',
-   '{}', 'otto-q-core lab/ (in progress)', '{}', NULL),
+   'Superseded by p0-lab-repo-rebuild, which reports the first build.',
+   '{}', 'otto-q-core lab/engine', '{}', NULL),
+  ('p0-lab-repo-rebuild', 'P0', 'E1', 'lab', 'measured',
+   'The engine can''t be rebuilt from its own repository yet, so the lab will copy what production ran',
+   'Rebuilt from the repository alone, the lab''s copy matched production on 300 of 1,037 database functions and 177 '
+   'of 453 tables. Most migration files were changed after they ran, 84 applied changes have no file, and the old '
+   'snapshot has no triggers. A faithful lab copies production''s own migration record or a schema export. That needs '
+   'the Supabase access token in the session.',
+   '{"postgres": "17.11", "routines_identical": 300, "routines_total": 1037, "tables_identical": 177,
+     "tables_total": 453, "triggers_in_copy": 3, "triggers_total": 236, "migrations_tried": 718,
+     "migrations_applied": 77, "files_matching_ledger": 101, "files_with_ledger_copy": 586,
+     "ledger_rows_without_file": 84}',
+   'otto-q-core lab/engine/reports/fidelity_2026-11-03.md', '{}', '2026-11-03 16:54:00+00'),
   ('p0-safety-model-building', 'P0', 'E3', 'safety', 'retracted',
    'A proven safety model of the faulted-charger post is being built',
    'Superseded by p0-safety-model, which reports the built model.',
