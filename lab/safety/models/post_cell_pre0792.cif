@@ -1,0 +1,4 @@
+// lab/safety/models/post_cell_pre0792.cif -- the same cell WITHOUT R2: the requirement set before migration 0792,
+// when 0760's hold (keep an expired demate tether while the stall's cleaning arm is at work) did not ask why the charge
+// ended. Everything else is post_cell.cif's. Synthesizing both and comparing them shows what R2 alone disables.
+import "post_cell_requirements_base.cif";

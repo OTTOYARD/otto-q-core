@@ -29,8 +29,10 @@
 --   clean_cancelled    ...or cancelled (atom interrupted[] on this post)  (0758, 0764, 0767)
 --   session_ended_*    a session that ended with no charge.session_* event (here: cancelled when the run stopped)
 --   run_stopped        the end of the observation                         twin.sim_stopped_and_reset
--- Within one sim instant rows are ordered by the step that writes them (the charge ends, the arm demates, the arm
--- clears, the cleaning arm's step, the sweep releases, a car arrives, a mate starts), then by ottoq_events.event_seq.
+-- Within one sim instant rows are in a fixed LOGICAL order (the charge ends, the arm demates, the arm clears, the
+-- cleaning arm's step, the sweep releases, a car arrives, a mate starts), then by ottoq_events.event_seq. That is not
+-- always the write order: the stop path writes arm.demate_started / arm.emergency_release before
+-- charge.session_faulted. `source` carries event_seq, which is the write order. The monitor reads only times.
 
 -- ── Statement 1: the events of every faulted post ─────────────────────────────────────────────────────────────────────
 WITH r AS (SELECT '8c0b2e04-8ea9-49a8-bfed-bed10ddfbc8b'::uuid AS run),
@@ -137,9 +139,11 @@ SELECT stall_code AS post,
  ORDER BY post, seq;
 
 -- ── Statement 2: the run's tick clock (one twin.weather_tick per tick; 129 on this run, the same instants as
---    twin.bess_dispatch). public.ottoq_release_expired_tethers runs once per tick. ─────────────────────────────────────
+--    twin.bess_dispatch). public.ottoq_release_expired_tethers runs once per tick. wall_utc is the real time the tick
+--    ran (ottoq_events.occurred_at, the tick transaction's now(); one distinct value per tick on this run). ───────────
 SELECT row_number() OVER (ORDER BY e.sim_clock_at) AS tick,
        to_char(e.sim_clock_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS sim_time,
+       to_char(e.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS wall_utc,
        'ottoq_events#' || e.event_seq AS source
   FROM public.ottoq_events e
  WHERE e.sim_run_id = '8c0b2e04-8ea9-49a8-bfed-bed10ddfbc8b' AND e.event_type = 'twin.weather_tick'

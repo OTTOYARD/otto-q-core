@@ -1,0 +1,39 @@
+// lab/safety/models/post_cell_requirements_base.cif -- the requirements BOTH variants share: R1, R3, R4, R5.
+// R2 (G506) is added by post_cell.cif and left out of post_cell_pre0792.cif. R6 (nonblocking) is not written here:
+// data-based synthesis enforces it from the plant's marked locations (a car Ready or Requeued, both arms home, no tether).
+import "post_cell_plant.cif";
+
+// R1  No mate starts on an out-of-service charger.
+//     Engine: the candidate source offers no Faulted charger (0372); HW.002.charger_state_precondition at
+//     charge_session_start (enforcing since 0428); twin.ottoq_sim_recover_chargers keeps 'Faulted' until the repair ends.
+requirement R1_no_mate_on_out_of_service: c_mate_start needs not OutOfService;
+
+// R3  The two arms and the car move as the code's interlocks say (renderer ottoyarddepot-sim, read at 9c81f78; the
+//     engine enforces none of R3a-R3c, and R3d only through the tether window). Geometry is NOT modelled: the renderer's
+//     cleanArmClearance.test.ts reports >= 0.10 m between the arms "whatever either is doing", so these are ordering
+//     rules, not a collision proof.
+// R3a No mate starts while the cleaning arm is out over the car or withdrawing (roboticService.armSessionInput:
+//     cleanBlocksMate = cleanGate.blocksMate, "moving over or beside the car"; Returning also covers doors_close, which
+//     the renderer does not count, so this is slightly stricter than the code).
+requirement R3a_no_mate_while_clean_arm_out: c_mate_start needs CleanArm.Home or CleanArm.DoorsOpen;
+// R3b On a working charger a latched connector stays in until the cleaning arm is home (armSessionInput holdForClean,
+//     Chase 2026-10-19: "the doors close, the charge completes, then the charge arm retracts"); on a faulted charger it
+//     lets go (ottoyarddepot-sim 9c81f78, PR #154: chargerFaulted, "the two arms are clear of each other at every pose
+//     of the release"). The engine does not have this rule: its tether demates when the session ends.
+requirement R3b_no_unlatch_while_cleaning: c_unlatch needs CleanArm.Home or OutOfService;
+// R3c The cleaning arm leaves home for the car only while the charge arm is still: latched, or stowed
+//     (TwinMotionDriver: mayEnter = still; cleanSession waits at doors_open). The renderer also waits for a mate it
+//     knows is coming; this model does not (it has no "mate coming" signal).
+requirement R3c_no_clean_entry_while_charge_arm_moves: c_clean_enter needs ChargeArm.Stowed or ChargeArm.Latched;
+// R3d No car leaves the post with either arm at it: the charge arm stowed (armGate.ts, armStateMachine.vehicleMayMove)
+//     and the cleaning arm home with the doors shut (cleanGate.ts, cleanSession.cleanLetsCarMove).
+requirement R3d_release_needs_arms_home: c_release needs ChargeArm.Stowed and CleanArm.Home;
+requirement R3d_emergency_release_needs_arms_home: c_emergency_release needs ChargeArm.Stowed and CleanArm.Home;
+
+// R4  No car leaves ready for work with a needed service open (rule 9; public.ottoq_departure_clear, 0543). A car that
+//     is not ready is re-queued, not released to work.
+requirement R4_ready_only_when_served: c_depart_ready needs Battery.Full and Cabin.Clean;
+
+// R5  No charge ends short except on a fault (rule 9; 0539's one target). A session ends below target only by u_fault;
+//     the depot's own stop is allowed only at target, which the plant never offers, so it is never allowed.
+requirement R5_no_charge_stopped_short: c_stop_charge needs Battery.Full;

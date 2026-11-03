@@ -1,0 +1,1479 @@
+controllable c_admit;
+controllable c_mate_start;
+controllable c_mate_abort;
+controllable c_stop_charge;
+controllable c_unlatch;
+controllable c_emergency_release;
+controllable c_clean_start;
+controllable c_clean_enter;
+controllable c_clean_abort;
+controllable c_hold;
+controllable c_release;
+controllable c_depart_ready;
+controllable c_requeue;
+uncontrollable u_fault;
+uncontrollable u_repair_start;
+uncontrollable u_repaired;
+uncontrollable u_at_inlet;
+uncontrollable u_latched;
+uncontrollable u_charge_complete;
+uncontrollable u_unlatched;
+uncontrollable u_extracted;
+uncontrollable u_cleared;
+uncontrollable u_clean_finished;
+uncontrollable u_clean_home;
+uncontrollable u_tick;
+automaton statespace:
+  alphabet c_mate_start, c_mate_abort, u_fault, u_charge_complete, c_stop_charge, c_emergency_release, u_repair_start, u_repaired, u_at_inlet, u_latched, c_unlatch, u_unlatched, u_extracted, u_cleared, c_clean_start, c_clean_enter, c_clean_abort, u_clean_finished, u_clean_home, c_release, c_hold, u_tick, c_admit, c_depart_ready, c_requeue;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "Inbound", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc1:
+    initial;
+    edge u_fault goto loc2;
+    edge c_admit goto loc3;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "Inbound", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc2:
+    edge u_repair_start goto loc4;
+    edge c_admit goto loc5;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc3:
+    edge c_mate_start goto loc6;
+    edge u_fault goto loc5;
+    edge c_clean_start goto loc7;
+    edge c_release goto loc8;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "Inbound", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc4:
+    edge u_repaired goto loc1;
+    edge c_admit goto loc9;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc5:
+    edge u_repair_start goto loc9;
+    edge c_clean_start goto loc10;
+    edge c_release goto loc11;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "Occupied", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc6:
+    edge c_mate_abort goto loc12;
+    edge u_fault goto loc13;
+    edge u_at_inlet goto loc14;
+    edge c_clean_start goto loc15;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "None")
+  location loc7:
+    edge c_mate_start goto loc15;
+    edge u_fault goto loc10;
+    edge c_clean_enter goto loc16;
+    edge c_clean_abort goto loc17;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "Left", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc8:
+    edge u_fault goto loc11;
+    edge c_requeue goto loc18;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc9:
+    edge u_repaired goto loc3;
+    edge c_clean_start goto loc19;
+    edge c_release goto loc20;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "None")
+  location loc10:
+    edge u_repair_start goto loc19;
+    edge c_clean_enter goto loc21;
+    edge c_clean_abort goto loc22;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "Left", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc11:
+    edge u_repair_start goto loc20;
+    edge c_requeue goto loc23;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc12:
+    edge u_fault goto loc24;
+    edge u_cleared goto loc25;
+    edge c_clean_start goto loc26;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc13:
+    edge c_mate_abort goto loc24;
+    edge u_repair_start goto loc27;
+    edge u_at_inlet goto loc28;
+    edge c_clean_start goto loc29;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "Occupied", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc14:
+    edge c_mate_abort goto loc12;
+    edge u_fault goto loc28;
+    edge u_latched goto loc30;
+    edge c_clean_start goto loc31;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "Occupied", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc15:
+    edge c_mate_abort goto loc26;
+    edge u_fault goto loc29;
+    edge u_at_inlet goto loc31;
+    edge c_clean_abort goto loc32;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "None")
+  location loc16:
+    edge u_fault goto loc21;
+    edge c_clean_abort goto loc17;
+    edge u_clean_finished goto loc33;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "None")
+  location loc17:
+    edge u_fault goto loc22;
+    edge u_clean_home goto loc3;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "Requeued", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc18:
+    marked;
+    edge u_fault goto loc23;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "None")
+  location loc19:
+    edge u_repaired goto loc7;
+    edge c_clean_enter goto loc34;
+    edge c_clean_abort goto loc35;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "Left", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc20:
+    edge u_repaired goto loc8;
+    edge c_requeue goto loc36;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "None")
+  location loc21:
+    edge u_repair_start goto loc34;
+    edge c_clean_abort goto loc22;
+    edge u_clean_finished goto loc37;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "None")
+  location loc22:
+    edge u_repair_start goto loc35;
+    edge u_clean_home goto loc5;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "Requeued", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc23:
+    marked;
+    edge u_repair_start goto loc36;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc24:
+    edge u_repair_start goto loc38;
+    edge u_cleared goto loc39;
+    edge c_clean_start goto loc40;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc25:
+    edge c_clean_start goto loc41;
+    edge c_release goto loc8;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc26:
+    edge u_fault goto loc40;
+    edge u_cleared goto loc41;
+    edge c_clean_abort goto loc42;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc27:
+    edge c_mate_abort goto loc38;
+    edge u_repaired goto loc43;
+    edge u_at_inlet goto loc44;
+    edge c_clean_start goto loc45;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc28:
+    edge c_mate_abort goto loc24;
+    edge u_repair_start goto loc44;
+    edge u_latched goto loc46;
+    edge c_clean_start goto loc47;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc29:
+    edge c_mate_abort goto loc40;
+    edge u_repair_start goto loc45;
+    edge u_at_inlet goto loc47;
+    edge c_clean_abort goto loc48;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Occupied", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc30:
+    edge u_fault goto loc46;
+    edge u_charge_complete goto loc49;
+    edge c_clean_start goto loc50;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "Occupied", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc31:
+    edge c_mate_abort goto loc26;
+    edge u_fault goto loc47;
+    edge u_latched goto loc50;
+    edge c_clean_abort goto loc51;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "Occupied", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc32:
+    edge c_mate_abort goto loc42;
+    edge u_fault goto loc48;
+    edge u_at_inlet goto loc51;
+    edge u_clean_home goto loc6;
+  @state(Battery: "Below", Cabin: "Clean", Car: "AtPost", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "None")
+  location loc33:
+    edge u_fault goto loc37;
+    edge u_clean_home goto loc52;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "None")
+  location loc34:
+    edge u_repaired goto loc16;
+    edge c_clean_abort goto loc35;
+    edge u_clean_finished goto loc53;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "AtPost", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "None")
+  location loc35:
+    edge u_repaired goto loc17;
+    edge u_clean_home goto loc9;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "Requeued", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc36:
+    marked;
+    edge u_repaired goto loc18;
+  @state(Battery: "Below", Cabin: "Clean", Car: "AtPost", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "None")
+  location loc37:
+    edge u_repair_start goto loc53;
+    edge u_clean_home goto loc54;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc38:
+    edge u_repaired goto loc12;
+    edge u_cleared goto loc55;
+    edge c_clean_start goto loc56;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc39:
+    edge c_clean_start goto loc57;
+    edge c_release goto loc11;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc40:
+    edge u_repair_start goto loc56;
+    edge u_cleared goto loc57;
+    edge c_clean_abort goto loc58;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc41:
+    edge c_clean_enter goto loc59;
+    edge c_clean_abort goto loc60;
+    edge c_hold goto loc61;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc42:
+    edge u_fault goto loc58;
+    edge u_cleared goto loc60;
+    edge u_clean_home goto loc12;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc43:
+    edge c_mate_abort goto loc12;
+    edge u_fault goto loc13;
+    edge u_at_inlet goto loc62;
+    edge c_clean_start goto loc63;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc44:
+    edge c_mate_abort goto loc38;
+    edge u_repaired goto loc62;
+    edge u_latched goto loc64;
+    edge c_clean_start goto loc65;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc45:
+    edge c_mate_abort goto loc56;
+    edge u_repaired goto loc63;
+    edge u_at_inlet goto loc65;
+    edge c_clean_abort goto loc66;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc46:
+    edge u_repair_start goto loc64;
+    edge c_unlatch goto loc67;
+    edge c_clean_start goto loc68;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc47:
+    edge c_mate_abort goto loc40;
+    edge u_repair_start goto loc65;
+    edge u_latched goto loc68;
+    edge c_clean_abort goto loc69;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc48:
+    edge c_mate_abort goto loc58;
+    edge u_repair_start goto loc66;
+    edge u_at_inlet goto loc69;
+    edge u_clean_home goto loc13;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc49:
+    edge u_fault goto loc70;
+    edge c_unlatch goto loc71;
+    edge c_clean_start goto loc72;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Occupied", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc50:
+    edge u_fault goto loc68;
+    edge u_charge_complete goto loc72;
+    edge c_clean_enter goto loc73;
+    edge c_clean_abort goto loc74;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "Occupied", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc51:
+    edge c_mate_abort goto loc42;
+    edge u_fault goto loc69;
+    edge u_latched goto loc74;
+    edge u_clean_home goto loc14;
+  @state(Battery: "Below", Cabin: "Clean", Car: "AtPost", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc52:
+    edge c_mate_start goto loc75;
+    edge u_fault goto loc54;
+    edge c_release goto loc76;
+  @state(Battery: "Below", Cabin: "Clean", Car: "AtPost", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "None")
+  location loc53:
+    edge u_repaired goto loc33;
+    edge u_clean_home goto loc77;
+  @state(Battery: "Below", Cabin: "Clean", Car: "AtPost", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc54:
+    edge u_repair_start goto loc77;
+    edge c_release goto loc78;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc55:
+    edge c_clean_start goto loc79;
+    edge c_release goto loc20;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc56:
+    edge u_repaired goto loc26;
+    edge u_cleared goto loc79;
+    edge c_clean_abort goto loc80;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc57:
+    edge c_clean_enter goto loc81;
+    edge c_clean_abort goto loc82;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc58:
+    edge u_repair_start goto loc80;
+    edge u_cleared goto loc82;
+    edge u_clean_home goto loc24;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc59:
+    edge c_clean_abort goto loc60;
+    edge c_hold goto loc83;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc60:
+    edge c_hold goto loc84;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Held")
+  location loc61:
+    edge u_fault goto loc85;
+    edge c_clean_enter goto loc83;
+    edge c_clean_abort goto loc84;
+    edge u_tick goto loc41;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc62:
+    edge c_mate_abort goto loc12;
+    edge u_fault goto loc28;
+    edge u_latched goto loc86;
+    edge c_clean_start goto loc87;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc63:
+    edge c_mate_abort goto loc26;
+    edge u_fault goto loc29;
+    edge u_at_inlet goto loc87;
+    edge c_clean_abort goto loc88;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc64:
+    edge u_repaired goto loc86;
+    edge c_unlatch goto loc89;
+    edge c_clean_start goto loc90;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc65:
+    edge c_mate_abort goto loc56;
+    edge u_repaired goto loc87;
+    edge u_latched goto loc90;
+    edge c_clean_abort goto loc91;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc66:
+    edge c_mate_abort goto loc80;
+    edge u_repaired goto loc88;
+    edge u_at_inlet goto loc91;
+    edge u_clean_home goto loc27;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc67:
+    edge u_repair_start goto loc89;
+    edge u_unlatched goto loc92;
+    edge c_clean_start goto loc93;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc68:
+    edge u_repair_start goto loc90;
+    edge c_unlatch goto loc93;
+    edge c_clean_enter goto loc94;
+    edge c_clean_abort goto loc95;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc69:
+    edge c_mate_abort goto loc58;
+    edge u_repair_start goto loc91;
+    edge u_latched goto loc95;
+    edge u_clean_home goto loc28;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc70:
+    edge u_repair_start goto loc96;
+    edge c_unlatch goto loc97;
+    edge c_clean_start goto loc98;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc71:
+    edge u_fault goto loc97;
+    edge u_unlatched goto loc99;
+    edge c_clean_start goto loc100;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc72:
+    edge u_fault goto loc98;
+    edge c_clean_enter goto loc101;
+    edge c_clean_abort goto loc102;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Occupied", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc73:
+    edge u_fault goto loc94;
+    edge u_charge_complete goto loc101;
+    edge c_clean_abort goto loc74;
+    edge u_clean_finished goto loc103;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Occupied", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc74:
+    edge u_fault goto loc95;
+    edge u_charge_complete goto loc102;
+    edge u_clean_home goto loc30;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Approach", Charger: "Occupied", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc75:
+    edge c_mate_abort goto loc104;
+    edge u_fault goto loc105;
+    edge u_at_inlet goto loc106;
+  @state(Battery: "Below", Cabin: "Clean", Car: "Left", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc76:
+    edge u_fault goto loc78;
+    edge c_requeue goto loc107;
+  @state(Battery: "Below", Cabin: "Clean", Car: "AtPost", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc77:
+    edge u_repaired goto loc52;
+    edge c_release goto loc108;
+  @state(Battery: "Below", Cabin: "Clean", Car: "Left", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc78:
+    edge u_repair_start goto loc108;
+    edge c_requeue goto loc109;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc79:
+    edge c_clean_enter goto loc110;
+    edge c_clean_abort goto loc111;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc80:
+    edge u_repaired goto loc42;
+    edge u_cleared goto loc111;
+    edge u_clean_home goto loc38;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc81:
+    edge c_clean_abort goto loc82;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc82:
+    edge c_hold goto loc112;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Held")
+  location loc83:
+    edge u_fault goto loc113;
+    edge c_clean_abort goto loc84;
+    edge u_clean_finished goto loc114;
+    edge u_tick goto loc59;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc84:
+    edge u_fault goto loc112;
+    edge u_clean_home goto loc115;
+    edge u_tick goto loc60;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Held")
+  location loc85:
+    edge u_repair_start goto loc116;
+    edge c_clean_enter goto loc113;
+    edge c_clean_abort goto loc112;
+    edge u_tick goto loc57;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc86:
+    edge u_fault goto loc46;
+    edge c_unlatch goto loc117;
+    edge c_clean_start goto loc118;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc87:
+    edge c_mate_abort goto loc26;
+    edge u_fault goto loc47;
+    edge u_latched goto loc118;
+    edge c_clean_abort goto loc119;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Approach", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc88:
+    edge c_mate_abort goto loc42;
+    edge u_fault goto loc48;
+    edge u_at_inlet goto loc119;
+    edge u_clean_home goto loc43;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc89:
+    edge u_repaired goto loc117;
+    edge u_unlatched goto loc120;
+    edge c_clean_start goto loc121;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc90:
+    edge u_repaired goto loc118;
+    edge c_unlatch goto loc121;
+    edge c_clean_enter goto loc122;
+    edge c_clean_abort goto loc123;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc91:
+    edge c_mate_abort goto loc80;
+    edge u_repaired goto loc119;
+    edge u_latched goto loc123;
+    edge u_clean_home goto loc44;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc92:
+    edge u_repair_start goto loc120;
+    edge u_extracted goto loc24;
+    edge c_clean_start goto loc124;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc93:
+    edge u_repair_start goto loc121;
+    edge u_unlatched goto loc124;
+    edge c_clean_abort goto loc125;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc94:
+    edge u_repair_start goto loc122;
+    edge c_unlatch goto loc126;
+    edge c_clean_abort goto loc95;
+    edge u_clean_finished goto loc127;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc95:
+    edge u_repair_start goto loc123;
+    edge c_unlatch goto loc125;
+    edge u_clean_home goto loc46;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc96:
+    edge u_repaired goto loc49;
+    edge c_unlatch goto loc128;
+    edge c_clean_start goto loc129;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc97:
+    edge u_repair_start goto loc128;
+    edge u_unlatched goto loc130;
+    edge c_clean_start goto loc131;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc98:
+    edge u_repair_start goto loc129;
+    edge c_unlatch goto loc131;
+    edge c_clean_enter goto loc132;
+    edge c_clean_abort goto loc133;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc99:
+    edge u_fault goto loc130;
+    edge u_extracted goto loc134;
+    edge c_clean_start goto loc135;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc100:
+    edge u_fault goto loc131;
+    edge u_unlatched goto loc135;
+    edge c_clean_abort goto loc136;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc101:
+    edge u_fault goto loc132;
+    edge c_clean_abort goto loc102;
+    edge u_clean_finished goto loc137;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc102:
+    edge u_fault goto loc133;
+    edge u_clean_home goto loc49;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Occupied", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc103:
+    edge u_fault goto loc127;
+    edge u_charge_complete goto loc137;
+    edge u_clean_home goto loc138;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc104:
+    edge u_fault goto loc139;
+    edge u_cleared goto loc140;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Approach", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc105:
+    edge c_mate_abort goto loc139;
+    edge u_repair_start goto loc141;
+    edge u_at_inlet goto loc142;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Insert", Charger: "Occupied", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc106:
+    edge c_mate_abort goto loc104;
+    edge u_fault goto loc142;
+    edge u_latched goto loc138;
+  @state(Battery: "Below", Cabin: "Clean", Car: "Requeued", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc107:
+    marked;
+    edge u_fault goto loc109;
+  @state(Battery: "Below", Cabin: "Clean", Car: "Left", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc108:
+    edge u_repaired goto loc76;
+    edge c_requeue goto loc143;
+  @state(Battery: "Below", Cabin: "Clean", Car: "Requeued", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc109:
+    marked;
+    edge u_repair_start goto loc143;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc110:
+    edge c_clean_abort goto loc111;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc111:
+    edge c_hold goto loc144;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc112:
+    edge u_repair_start goto loc144;
+    edge u_clean_home goto loc145;
+    edge u_tick goto loc82;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Held")
+  location loc113:
+    edge u_repair_start goto loc146;
+    edge c_clean_abort goto loc112;
+    edge u_clean_finished goto loc147;
+    edge u_tick goto loc81;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc114:
+    edge u_fault goto loc147;
+    edge u_clean_home goto loc148;
+    edge u_tick goto loc149;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc115:
+    edge u_fault goto loc145;
+    edge c_clean_start goto loc61;
+    edge u_tick goto loc25;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Held")
+  location loc116:
+    edge u_repaired goto loc61;
+    edge c_clean_enter goto loc146;
+    edge c_clean_abort goto loc144;
+    edge u_tick goto loc79;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc117:
+    edge u_fault goto loc67;
+    edge u_unlatched goto loc150;
+    edge c_clean_start goto loc151;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc118:
+    edge u_fault goto loc68;
+    edge c_clean_enter goto loc152;
+    edge c_clean_abort goto loc153;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Insert", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc119:
+    edge c_mate_abort goto loc42;
+    edge u_fault goto loc69;
+    edge u_latched goto loc153;
+    edge u_clean_home goto loc62;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc120:
+    edge u_repaired goto loc150;
+    edge u_extracted goto loc38;
+    edge c_clean_start goto loc154;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc121:
+    edge u_repaired goto loc151;
+    edge u_unlatched goto loc154;
+    edge c_clean_abort goto loc155;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc122:
+    edge u_repaired goto loc152;
+    edge c_unlatch goto loc156;
+    edge c_clean_abort goto loc123;
+    edge u_clean_finished goto loc157;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc123:
+    edge u_repaired goto loc153;
+    edge c_unlatch goto loc155;
+    edge u_clean_home goto loc64;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc124:
+    edge u_repair_start goto loc154;
+    edge u_extracted goto loc40;
+    edge c_clean_abort goto loc158;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc125:
+    edge u_repair_start goto loc155;
+    edge u_unlatched goto loc158;
+    edge u_clean_home goto loc67;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc126:
+    edge u_repair_start goto loc156;
+    edge u_unlatched goto loc159;
+    edge c_clean_abort goto loc125;
+    edge u_clean_finished goto loc160;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc127:
+    edge u_repair_start goto loc157;
+    edge c_unlatch goto loc160;
+    edge u_clean_home goto loc161;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc128:
+    edge u_repaired goto loc71;
+    edge u_unlatched goto loc162;
+    edge c_clean_start goto loc163;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc129:
+    edge u_repaired goto loc72;
+    edge c_unlatch goto loc163;
+    edge c_clean_enter goto loc164;
+    edge c_clean_abort goto loc165;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc130:
+    edge u_repair_start goto loc162;
+    edge u_extracted goto loc166;
+    edge c_clean_start goto loc167;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc131:
+    edge u_repair_start goto loc163;
+    edge u_unlatched goto loc167;
+    edge c_clean_abort goto loc168;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc132:
+    edge u_repair_start goto loc164;
+    edge c_unlatch goto loc169;
+    edge c_clean_abort goto loc133;
+    edge u_clean_finished goto loc170;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc133:
+    edge u_repair_start goto loc165;
+    edge c_unlatch goto loc168;
+    edge u_clean_home goto loc70;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc134:
+    edge u_fault goto loc166;
+    edge u_cleared goto loc171;
+    edge c_clean_start goto loc172;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc135:
+    edge u_fault goto loc167;
+    edge u_extracted goto loc172;
+    edge c_clean_abort goto loc173;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc136:
+    edge u_fault goto loc168;
+    edge u_unlatched goto loc173;
+    edge u_clean_home goto loc71;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc137:
+    edge u_fault goto loc170;
+    edge u_clean_home goto loc174;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Occupied", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc138:
+    edge u_fault goto loc161;
+    edge u_charge_complete goto loc174;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc139:
+    edge u_repair_start goto loc175;
+    edge u_cleared goto loc176;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc140:
+    edge c_release goto loc76;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Approach", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc141:
+    edge c_mate_abort goto loc175;
+    edge u_repaired goto loc177;
+    edge u_at_inlet goto loc178;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Insert", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc142:
+    edge c_mate_abort goto loc139;
+    edge u_repair_start goto loc178;
+    edge u_latched goto loc161;
+  @state(Battery: "Below", Cabin: "Clean", Car: "Requeued", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc143:
+    marked;
+    edge u_repaired goto loc107;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc144:
+    edge u_repaired goto loc84;
+    edge u_clean_home goto loc179;
+    edge u_tick goto loc111;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc145:
+    edge u_repair_start goto loc179;
+    edge c_clean_start goto loc85;
+    edge u_tick goto loc39;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Held")
+  location loc146:
+    edge u_repaired goto loc83;
+    edge c_clean_abort goto loc144;
+    edge u_clean_finished goto loc180;
+    edge u_tick goto loc110;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc147:
+    edge u_repair_start goto loc180;
+    edge u_clean_home goto loc181;
+    edge u_tick goto loc182;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc148:
+    edge u_fault goto loc181;
+    edge u_tick goto loc140;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc149:
+    edge c_hold goto loc114;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc150:
+    edge u_fault goto loc92;
+    edge u_extracted goto loc12;
+    edge c_clean_start goto loc183;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc151:
+    edge u_fault goto loc93;
+    edge u_unlatched goto loc183;
+    edge c_clean_abort goto loc184;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc152:
+    edge u_fault goto loc94;
+    edge c_clean_abort goto loc153;
+    edge u_clean_finished goto loc185;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc153:
+    edge u_fault goto loc95;
+    edge u_clean_home goto loc86;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc154:
+    edge u_repaired goto loc183;
+    edge u_extracted goto loc56;
+    edge c_clean_abort goto loc186;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc155:
+    edge u_repaired goto loc184;
+    edge u_unlatched goto loc186;
+    edge u_clean_home goto loc89;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc156:
+    edge u_repaired goto loc187;
+    edge u_unlatched goto loc188;
+    edge c_clean_abort goto loc155;
+    edge u_clean_finished goto loc189;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc157:
+    edge u_repaired goto loc185;
+    edge c_unlatch goto loc189;
+    edge u_clean_home goto loc190;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc158:
+    edge u_repair_start goto loc186;
+    edge u_extracted goto loc58;
+    edge u_clean_home goto loc92;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc159:
+    edge u_repair_start goto loc188;
+    edge u_extracted goto loc191;
+    edge c_clean_abort goto loc158;
+    edge u_clean_finished goto loc192;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc160:
+    edge u_repair_start goto loc189;
+    edge u_unlatched goto loc192;
+    edge u_clean_home goto loc193;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc161:
+    edge u_repair_start goto loc190;
+    edge c_unlatch goto loc193;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc162:
+    edge u_repaired goto loc99;
+    edge u_extracted goto loc194;
+    edge c_clean_start goto loc195;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc163:
+    edge u_repaired goto loc100;
+    edge u_unlatched goto loc195;
+    edge c_clean_abort goto loc196;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc164:
+    edge u_repaired goto loc101;
+    edge c_unlatch goto loc197;
+    edge c_clean_abort goto loc165;
+    edge u_clean_finished goto loc198;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc165:
+    edge u_repaired goto loc102;
+    edge c_unlatch goto loc196;
+    edge u_clean_home goto loc96;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc166:
+    edge u_repair_start goto loc194;
+    edge u_cleared goto loc199;
+    edge c_clean_start goto loc200;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc167:
+    edge u_repair_start goto loc195;
+    edge u_extracted goto loc200;
+    edge c_clean_abort goto loc201;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc168:
+    edge u_repair_start goto loc196;
+    edge u_unlatched goto loc201;
+    edge u_clean_home goto loc97;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc169:
+    edge u_repair_start goto loc197;
+    edge u_unlatched goto loc202;
+    edge c_clean_abort goto loc168;
+    edge u_clean_finished goto loc203;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc170:
+    edge u_repair_start goto loc198;
+    edge c_unlatch goto loc203;
+    edge u_clean_home goto loc204;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc171:
+    edge c_clean_start goto loc205;
+    edge c_release goto loc206;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc172:
+    edge u_fault goto loc200;
+    edge u_cleared goto loc205;
+    edge c_clean_abort goto loc207;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc173:
+    edge u_fault goto loc201;
+    edge u_extracted goto loc207;
+    edge u_clean_home goto loc99;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc174:
+    edge u_fault goto loc204;
+    edge c_unlatch goto loc208;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc175:
+    edge u_repaired goto loc104;
+    edge u_cleared goto loc209;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc176:
+    edge c_release goto loc78;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Approach", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc177:
+    edge c_mate_abort goto loc104;
+    edge u_fault goto loc105;
+    edge u_at_inlet goto loc210;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Insert", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc178:
+    edge c_mate_abort goto loc175;
+    edge u_repaired goto loc210;
+    edge u_latched goto loc190;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc179:
+    edge u_repaired goto loc115;
+    edge c_clean_start goto loc116;
+    edge u_tick goto loc55;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc180:
+    edge u_repaired goto loc114;
+    edge u_clean_home goto loc211;
+    edge u_tick goto loc212;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc181:
+    edge u_repair_start goto loc211;
+    edge u_tick goto loc176;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc182:
+    edge c_hold goto loc147;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc183:
+    edge u_fault goto loc124;
+    edge u_extracted goto loc26;
+    edge c_clean_abort goto loc213;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc184:
+    edge u_fault goto loc125;
+    edge u_unlatched goto loc213;
+    edge u_clean_home goto loc117;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc185:
+    edge u_fault goto loc127;
+    edge u_clean_home goto loc214;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc186:
+    edge u_repaired goto loc213;
+    edge u_extracted goto loc80;
+    edge u_clean_home goto loc120;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc187:
+    edge u_fault goto loc126;
+    edge u_unlatched goto loc215;
+    edge c_clean_abort goto loc184;
+    edge u_clean_finished goto loc216;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc188:
+    edge u_repaired goto loc215;
+    edge u_extracted goto loc217;
+    edge c_clean_abort goto loc186;
+    edge u_clean_finished goto loc218;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc189:
+    edge u_repaired goto loc216;
+    edge u_unlatched goto loc218;
+    edge u_clean_home goto loc219;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc190:
+    edge u_repaired goto loc214;
+    edge c_unlatch goto loc219;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc191:
+    edge u_repair_start goto loc217;
+    edge u_cleared goto loc81;
+    edge c_clean_abort goto loc58;
+    edge u_clean_finished goto loc220;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc192:
+    edge u_repair_start goto loc218;
+    edge u_extracted goto loc220;
+    edge u_clean_home goto loc221;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc193:
+    edge u_repair_start goto loc219;
+    edge u_unlatched goto loc221;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc194:
+    edge u_repaired goto loc134;
+    edge u_cleared goto loc222;
+    edge c_clean_start goto loc223;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc195:
+    edge u_repaired goto loc135;
+    edge u_extracted goto loc223;
+    edge c_clean_abort goto loc224;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc196:
+    edge u_repaired goto loc136;
+    edge u_unlatched goto loc224;
+    edge u_clean_home goto loc128;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc197:
+    edge u_repaired goto loc225;
+    edge u_unlatched goto loc226;
+    edge c_clean_abort goto loc196;
+    edge u_clean_finished goto loc227;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc198:
+    edge u_repaired goto loc137;
+    edge c_unlatch goto loc227;
+    edge u_clean_home goto loc228;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc199:
+    edge c_clean_start goto loc229;
+    edge c_release goto loc230;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc200:
+    edge u_repair_start goto loc223;
+    edge u_cleared goto loc229;
+    edge c_clean_abort goto loc231;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc201:
+    edge u_repair_start goto loc224;
+    edge u_extracted goto loc231;
+    edge u_clean_home goto loc130;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc202:
+    edge u_repair_start goto loc226;
+    edge u_extracted goto loc232;
+    edge c_clean_abort goto loc201;
+    edge u_clean_finished goto loc233;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc203:
+    edge u_repair_start goto loc227;
+    edge u_unlatched goto loc233;
+    edge u_clean_home goto loc234;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc204:
+    edge u_repair_start goto loc228;
+    edge c_unlatch goto loc234;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc205:
+    edge c_clean_enter goto loc235;
+    edge c_clean_abort goto loc236;
+    edge c_hold goto loc237;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "Left", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc206:
+    edge u_fault goto loc230;
+    edge c_requeue goto loc238;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc207:
+    edge u_fault goto loc231;
+    edge u_cleared goto loc236;
+    edge u_clean_home goto loc134;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc208:
+    edge u_fault goto loc234;
+    edge u_unlatched goto loc239;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc209:
+    edge c_release goto loc108;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Insert", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Mate")
+  location loc210:
+    edge c_mate_abort goto loc104;
+    edge u_fault goto loc142;
+    edge u_latched goto loc214;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc211:
+    edge u_repaired goto loc148;
+    edge u_tick goto loc209;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc212:
+    edge c_hold goto loc180;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc213:
+    edge u_fault goto loc158;
+    edge u_extracted goto loc42;
+    edge u_clean_home goto loc150;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc214:
+    edge u_fault goto loc161;
+    edge c_unlatch goto loc240;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc215:
+    edge u_fault goto loc159;
+    edge u_extracted goto loc241;
+    edge c_clean_abort goto loc213;
+    edge u_clean_finished goto loc242;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc216:
+    edge u_fault goto loc160;
+    edge u_unlatched goto loc242;
+    edge u_clean_home goto loc240;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc217:
+    edge u_repaired goto loc241;
+    edge u_cleared goto loc110;
+    edge c_clean_abort goto loc80;
+    edge u_clean_finished goto loc243;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc218:
+    edge u_repaired goto loc242;
+    edge u_extracted goto loc243;
+    edge u_clean_home goto loc244;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc219:
+    edge u_repaired goto loc240;
+    edge u_unlatched goto loc244;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc220:
+    edge u_repair_start goto loc243;
+    edge u_cleared goto loc182;
+    edge u_clean_home goto loc139;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc221:
+    edge u_repair_start goto loc244;
+    edge u_extracted goto loc139;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc222:
+    edge c_clean_start goto loc245;
+    edge c_release goto loc246;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc223:
+    edge u_repaired goto loc172;
+    edge u_cleared goto loc245;
+    edge c_clean_abort goto loc247;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc224:
+    edge u_repaired goto loc173;
+    edge u_extracted goto loc247;
+    edge u_clean_home goto loc162;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc225:
+    edge u_fault goto loc169;
+    edge u_unlatched goto loc248;
+    edge c_clean_abort goto loc136;
+    edge u_clean_finished goto loc249;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc226:
+    edge u_repaired goto loc248;
+    edge u_extracted goto loc250;
+    edge c_clean_abort goto loc224;
+    edge u_clean_finished goto loc251;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc227:
+    edge u_repaired goto loc249;
+    edge u_unlatched goto loc251;
+    edge u_clean_home goto loc252;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Latched", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Charging")
+  location loc228:
+    edge u_repaired goto loc174;
+    edge c_unlatch goto loc252;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc229:
+    edge c_clean_enter goto loc253;
+    edge c_clean_abort goto loc254;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "Left", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc230:
+    edge u_repair_start goto loc246;
+    edge c_requeue goto loc255;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc231:
+    edge u_repair_start goto loc247;
+    edge u_cleared goto loc254;
+    edge u_clean_home goto loc166;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc232:
+    edge u_repair_start goto loc250;
+    edge u_cleared goto loc253;
+    edge c_clean_abort goto loc231;
+    edge u_clean_finished goto loc256;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc233:
+    edge u_repair_start goto loc251;
+    edge u_extracted goto loc256;
+    edge u_clean_home goto loc257;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc234:
+    edge u_repair_start goto loc252;
+    edge u_unlatched goto loc257;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc235:
+    edge c_clean_abort goto loc236;
+    edge c_hold goto loc258;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc236:
+    edge c_hold goto loc259;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Held")
+  location loc237:
+    edge u_fault goto loc260;
+    edge c_clean_enter goto loc258;
+    edge c_clean_abort goto loc259;
+    edge u_tick goto loc205;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "Requeued", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc238:
+    marked;
+    edge u_fault goto loc255;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc239:
+    edge u_fault goto loc257;
+    edge u_extracted goto loc261;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc240:
+    edge u_fault goto loc193;
+    edge u_unlatched goto loc262;
+  @state(Battery: "Below", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc241:
+    edge u_fault goto loc191;
+    edge u_cleared goto loc59;
+    edge c_clean_abort goto loc42;
+    edge u_clean_finished goto loc263;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc242:
+    edge u_fault goto loc192;
+    edge u_extracted goto loc263;
+    edge u_clean_home goto loc262;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc243:
+    edge u_repaired goto loc263;
+    edge u_cleared goto loc212;
+    edge u_clean_home goto loc175;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc244:
+    edge u_repaired goto loc262;
+    edge u_extracted goto loc175;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc245:
+    edge c_clean_enter goto loc264;
+    edge c_clean_abort goto loc265;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "Left", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc246:
+    edge u_repaired goto loc206;
+    edge c_requeue goto loc266;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc247:
+    edge u_repaired goto loc207;
+    edge u_cleared goto loc265;
+    edge u_clean_home goto loc194;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc248:
+    edge u_fault goto loc202;
+    edge u_extracted goto loc267;
+    edge c_clean_abort goto loc173;
+    edge u_clean_finished goto loc268;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc249:
+    edge u_fault goto loc203;
+    edge u_unlatched goto loc268;
+    edge u_clean_home goto loc208;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc250:
+    edge u_repaired goto loc267;
+    edge u_cleared goto loc264;
+    edge c_clean_abort goto loc247;
+    edge u_clean_finished goto loc269;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc251:
+    edge u_repaired goto loc268;
+    edge u_extracted goto loc269;
+    edge u_clean_home goto loc270;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Unlatch", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc252:
+    edge u_repaired goto loc208;
+    edge u_unlatched goto loc270;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc253:
+    edge c_clean_abort goto loc254;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc254:
+    edge c_hold goto loc271;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "Requeued", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc255:
+    marked;
+    edge u_repair_start goto loc266;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc256:
+    edge u_repair_start goto loc269;
+    edge u_cleared goto loc272;
+    edge u_clean_home goto loc273;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc257:
+    edge u_repair_start goto loc270;
+    edge u_extracted goto loc273;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Held")
+  location loc258:
+    edge u_fault goto loc274;
+    edge c_clean_abort goto loc259;
+    edge u_clean_finished goto loc275;
+    edge u_tick goto loc235;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc259:
+    edge u_fault goto loc271;
+    edge u_clean_home goto loc276;
+    edge u_tick goto loc236;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Held")
+  location loc260:
+    edge u_repair_start goto loc277;
+    edge c_clean_enter goto loc274;
+    edge c_clean_abort goto loc271;
+    edge u_tick goto loc229;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc261:
+    edge u_fault goto loc273;
+    edge u_cleared goto loc278;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc262:
+    edge u_fault goto loc221;
+    edge u_extracted goto loc104;
+  @state(Battery: "Below", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc263:
+    edge u_fault goto loc220;
+    edge u_cleared goto loc149;
+    edge u_clean_home goto loc104;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc264:
+    edge c_clean_abort goto loc265;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc265:
+    edge c_hold goto loc279;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "Requeued", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc266:
+    marked;
+    edge u_repaired goto loc238;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc267:
+    edge u_fault goto loc232;
+    edge u_cleared goto loc235;
+    edge c_clean_abort goto loc207;
+    edge u_clean_finished goto loc280;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc268:
+    edge u_fault goto loc233;
+    edge u_extracted goto loc280;
+    edge u_clean_home goto loc239;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc269:
+    edge u_repaired goto loc280;
+    edge u_cleared goto loc281;
+    edge u_clean_home goto loc282;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Extract", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc270:
+    edge u_repaired goto loc239;
+    edge u_extracted goto loc282;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc271:
+    edge u_repair_start goto loc279;
+    edge u_clean_home goto loc283;
+    edge u_tick goto loc254;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc272:
+    edge c_hold goto loc284;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc273:
+    edge u_repair_start goto loc282;
+    edge u_cleared goto loc285;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Held")
+  location loc274:
+    edge u_repair_start goto loc286;
+    edge c_clean_abort goto loc271;
+    edge u_clean_finished goto loc284;
+    edge u_tick goto loc253;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc275:
+    edge u_fault goto loc284;
+    edge u_clean_home goto loc287;
+    edge u_tick goto loc288;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc276:
+    edge u_fault goto loc283;
+    edge c_clean_start goto loc237;
+    edge u_tick goto loc171;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "DoorsOpen", sup: "*", Sweep: "*", Tether: "Held")
+  location loc277:
+    edge u_repaired goto loc237;
+    edge c_clean_enter goto loc286;
+    edge c_clean_abort goto loc279;
+    edge u_tick goto loc245;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc278:
+    edge c_release goto loc289;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc279:
+    edge u_repaired goto loc259;
+    edge u_clean_home goto loc290;
+    edge u_tick goto loc265;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc280:
+    edge u_fault goto loc256;
+    edge u_cleared goto loc288;
+    edge u_clean_home goto loc261;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc281:
+    edge c_hold goto loc291;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Retract", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Demate")
+  location loc282:
+    edge u_repaired goto loc261;
+    edge u_cleared goto loc292;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc283:
+    edge u_repair_start goto loc290;
+    edge c_clean_start goto loc260;
+    edge u_tick goto loc199;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc284:
+    edge u_repair_start goto loc291;
+    edge u_clean_home goto loc293;
+    edge u_tick goto loc272;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc285:
+    edge c_release goto loc294;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "OverCar", sup: "*", Sweep: "*", Tether: "Held")
+  location loc286:
+    edge u_repaired goto loc258;
+    edge c_clean_abort goto loc279;
+    edge u_clean_finished goto loc291;
+    edge u_tick goto loc264;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc287:
+    edge u_fault goto loc293;
+    edge u_tick goto loc278;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc288:
+    edge c_hold goto loc275;
+  @state(Battery: "Full", Cabin: "Clean", Car: "Left", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc289:
+    edge u_fault goto loc294;
+    edge c_depart_ready goto loc295;
+    edge c_requeue goto loc296;
+  @state(Battery: "Full", Cabin: "Dirty", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc290:
+    edge u_repaired goto loc276;
+    edge c_clean_start goto loc277;
+    edge u_tick goto loc222;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Returning", sup: "*", Sweep: "*", Tether: "Held")
+  location loc291:
+    edge u_repaired goto loc275;
+    edge u_clean_home goto loc297;
+    edge u_tick goto loc281;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Expired")
+  location loc292:
+    edge c_release goto loc298;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc293:
+    edge u_repair_start goto loc297;
+    edge u_tick goto loc285;
+  @state(Battery: "Full", Cabin: "Clean", Car: "Left", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc294:
+    edge u_repair_start goto loc298;
+    edge c_depart_ready goto loc299;
+    edge c_requeue goto loc300;
+  @state(Battery: "Full", Cabin: "Clean", Car: "Ready", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc295:
+    marked;
+    edge u_fault goto loc299;
+  @state(Battery: "Full", Cabin: "Clean", Car: "Requeued", ChargeArm: "Stowed", Charger: "Available", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc296:
+    marked;
+    edge u_fault goto loc300;
+  @state(Battery: "Full", Cabin: "Clean", Car: "OnCharger", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "Held")
+  location loc297:
+    edge u_repaired goto loc287;
+    edge u_tick goto loc292;
+  @state(Battery: "Full", Cabin: "Clean", Car: "Left", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc298:
+    edge u_repaired goto loc289;
+    edge c_depart_ready goto loc301;
+    edge c_requeue goto loc302;
+  @state(Battery: "Full", Cabin: "Clean", Car: "Ready", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc299:
+    marked;
+    edge u_repair_start goto loc301;
+  @state(Battery: "Full", Cabin: "Clean", Car: "Requeued", ChargeArm: "Stowed", Charger: "Faulted", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc300:
+    marked;
+    edge u_repair_start goto loc302;
+  @state(Battery: "Full", Cabin: "Clean", Car: "Ready", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc301:
+    marked;
+    edge u_repaired goto loc295;
+  @state(Battery: "Full", Cabin: "Clean", Car: "Requeued", ChargeArm: "Stowed", Charger: "UnderRepair", CleanArm: "Home", sup: "*", Sweep: "*", Tether: "None")
+  location loc302:
+    marked;
+    edge u_repaired goto loc296;
+end

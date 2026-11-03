@@ -1,0 +1,8 @@
+// lab/safety/models/post_cell_strict_r2.cif -- a SENSITIVITY variant, not a design. R2 read literally: on an
+// out-of-service post the sweep never holds the car at all, not even while the cleaning arm withdraws (post_cell.cif's
+// R2 allows that one hold, because R3d will not let the car move with the arm out). Synthesizing this variant shows
+// what the literal reading costs: the supervisor must then keep the demate from ever starting while the cleaning arm
+// is out, i.e. the connector stays in the car until the cleaning arm is home, fault or no fault.
+import "post_cell_requirements_base.cif";
+
+requirement R2_strict_no_hold_on_out_of_service: c_hold needs not OutOfService;

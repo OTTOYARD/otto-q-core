@@ -1,0 +1,5 @@
+WARNING: Event "c_stop_charge" is never enabled in the input specification, taking into account automaton guards, prevention of runtime errors, and invariants.
+WARNING: Event "c_emergency_release" is never enabled in the input specification, taking into account automaton guards, prevention of runtime errors, and invariants.
+Controlled system: exactly 170 states.
+WARNING: Event "c_hold" is disabled in the controlled system.
+WARNING: Event "u_tick" is disabled in the controlled system.
