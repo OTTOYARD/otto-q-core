@@ -750,6 +750,20 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q tests/test_cabin_arm_keeps_its_stall_sql.py
 
+      # 0792, G506, EXECUTED on the live tether sweep (0760's fixture with 0760 applied reproduces the live body, md5
+      # asserted): before it a car whose charger faulted while the stall's cleaning arm was in its cabin keeps the dead
+      # post until the clean is done; after it that car is released when its demate ends, and 0760's hold stands for a
+      # charger in any other state and a stall with no charger. 19 tests, about 6 seconds.
+      - name: A faulted post lets its car go, whatever the cleaning arm is doing, executed (0792)
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q tests/test_faulted_post_lets_its_car_go_sql.py
+
       # 0761, G479 and G472, EXECUTED on the live assignment, hold, tether test, interlock and dial reader
       # (tests/fixtures/held_car_passed_over_stub.sql, md5 asserted): the two bay doors' insertions, taken from the
       # migration, pass over a car its stall's cleaning arm or a data transfer holds, and with the dial a car the charge
