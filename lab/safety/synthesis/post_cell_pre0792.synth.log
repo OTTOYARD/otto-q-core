@@ -1,0 +1,3 @@
+WARNING: Event "c_stop_charge" is never enabled in the input specification, taking into account automaton guards, prevention of runtime errors, and invariants.
+WARNING: Event "c_emergency_release" is never enabled in the input specification, taking into account automaton guards, prevention of runtime errors, and invariants.
+Controlled system: exactly 302 states.

@@ -1,0 +1,176 @@
+controllable c_admit;
+controllable c_mate_start;
+controllable c_mate_abort;
+controllable c_stop_charge;
+controllable c_unlatch;
+controllable c_emergency_release;
+controllable c_clean_start;
+controllable c_clean_enter;
+controllable c_clean_abort;
+controllable c_hold;
+controllable c_release;
+controllable c_depart_ready;
+controllable c_requeue;
+uncontrollable u_fault;
+uncontrollable u_repair_start;
+uncontrollable u_repaired;
+uncontrollable u_at_inlet;
+uncontrollable u_latched;
+uncontrollable u_charge_complete;
+uncontrollable u_unlatched;
+uncontrollable u_extracted;
+uncontrollable u_cleared;
+uncontrollable u_clean_finished;
+uncontrollable u_clean_home;
+uncontrollable u_tick;
+alg bool OutOfService = Charger.Faulted or Charger.UnderRepair;
+plant automaton Charger:
+  location Available:
+    initial;
+    marked;
+    edge c_mate_start goto Occupied;
+    edge c_mate_abort;
+    edge u_fault goto Faulted;
+  location Occupied:
+    marked;
+    edge u_charge_complete, c_stop_charge, c_mate_abort goto Available;
+    edge u_fault goto Faulted;
+  location Faulted:
+    marked;
+    edge c_mate_start;
+    edge c_mate_abort, c_emergency_release;
+    edge u_repair_start goto UnderRepair;
+  location UnderRepair:
+    marked;
+    edge c_mate_start;
+    edge c_mate_abort, c_emergency_release;
+    edge u_repaired goto Available;
+end
+plant automaton ChargeArm:
+  location Stowed:
+    initial;
+    marked;
+    edge c_mate_start goto Approach;
+  location Approach:
+    edge u_at_inlet goto Insert;
+    edge c_mate_abort goto Retract;
+  location Insert:
+    edge u_latched goto Latched;
+    edge c_mate_abort goto Retract;
+  location Latched:
+    edge u_charge_complete, c_stop_charge;
+    edge c_unlatch when not Charger.Occupied goto Unlatch;
+    edge c_emergency_release goto Retract;
+  location Unlatch:
+    edge u_unlatched goto Extract;
+  location Extract:
+    edge u_extracted goto Retract;
+  location Retract:
+    edge u_cleared goto Stowed;
+end
+plant automaton CleanArm:
+  location Home:
+    initial;
+    marked;
+    edge c_clean_start goto DoorsOpen;
+  location DoorsOpen:
+    edge c_clean_enter goto OverCar;
+    edge c_clean_abort goto Returning;
+  location OverCar:
+    edge u_clean_finished goto Returning;
+    edge c_clean_abort goto Returning;
+  location Returning:
+    edge u_clean_home goto Home;
+end
+plant automaton Tether:
+  location None:
+    initial;
+    marked;
+    edge c_mate_start goto Mate;
+    edge c_release;
+    edge u_cleared;
+  location Mate:
+    edge u_latched goto Charging;
+    edge c_mate_abort goto Demate;
+  location Charging:
+    edge c_unlatch goto Demate;
+    edge c_emergency_release goto None;
+  location Demate:
+    edge u_cleared goto Expired;
+  location Expired:
+    edge c_release goto None;
+    edge c_hold when not CleanArm.Home goto Held;
+  location Held:
+    edge u_tick goto Expired;
+end
+plant automaton Sweep:
+  location:
+    initial;
+    marked;
+    edge u_fault, u_repair_start, u_repaired, u_at_inlet, u_latched, u_charge_complete, u_unlatched, u_extracted, u_cleared, u_clean_finished, u_clean_home, u_tick when not Tether.Expired;
+end
+plant automaton Car:
+  location Inbound:
+    initial;
+    edge c_admit goto AtPost;
+  location AtPost:
+    edge c_mate_start goto OnCharger;
+    edge c_clean_start, c_clean_enter;
+    edge c_release goto Left;
+  location OnCharger:
+    edge c_clean_start, c_clean_enter;
+    edge c_release, c_emergency_release goto Left;
+  location Left:
+    edge c_depart_ready goto Ready;
+    edge c_requeue goto Requeued;
+  location Ready:
+    marked;
+  location Requeued:
+    marked;
+end
+plant automaton Battery:
+  location Below:
+    initial;
+    marked;
+    edge u_charge_complete goto Full;
+    edge c_stop_charge;
+  location Full:
+    marked;
+end
+plant automaton Cabin:
+  location Dirty:
+    initial;
+    marked;
+    edge c_clean_start;
+    edge u_clean_finished goto Clean;
+  location Clean:
+    marked;
+end
+supervisor automaton sup:
+  alphabet c_mate_start, c_mate_abort, c_stop_charge, c_emergency_release, c_unlatch, c_clean_start, c_clean_enter, c_clean_abort, c_release, c_hold, c_admit, c_depart_ready, c_requeue;
+  location:
+    initial;
+    marked;
+    edge c_admit when true;
+    edge c_clean_abort when true;
+    edge c_clean_enter when true;
+    edge c_clean_start when (Battery.Full or Charger.Occupied or (Charger.UnderRepair or not Tether.Expired)) and ((Battery.Full or Charger.Occupied or (Charger.UnderRepair or not Tether.Demate)) and (Battery.Full or (not Charger.UnderRepair or not Tether.Expired))) and ((Battery.Full or (not Charger.UnderRepair or not Tether.Demate)) and ((Battery.Below or not Tether.None and not Tether.Expired) and (Battery.Below or Tether.None or (Tether.Charging or Tether.Expired))));
+    edge c_depart_ready when true;
+    edge c_emergency_release when true;
+    edge c_hold when true;
+    edge c_mate_abort when CleanArm.Home or CleanArm.OverCar;
+    edge c_mate_start when true;
+    edge c_release when true;
+    edge c_requeue when true;
+    edge c_stop_charge when true;
+    edge c_unlatch when CleanArm.Home;
+end
+supervisor invariant R2_strict_no_hold_on_out_of_service: c_hold needs not OutOfService;
+supervisor invariant R1_no_mate_on_out_of_service: c_mate_start needs not OutOfService;
+supervisor invariant R3a_no_mate_while_clean_arm_out: c_mate_start needs CleanArm.Home or CleanArm.DoorsOpen;
+supervisor invariant R3b_no_unlatch_while_cleaning: c_unlatch needs CleanArm.Home or OutOfService;
+supervisor invariant R3c_no_clean_entry_while_charge_arm_moves: c_clean_enter needs ChargeArm.Stowed or ChargeArm.Latched;
+supervisor invariant R3d_release_needs_arms_home: c_release needs ChargeArm.Stowed and CleanArm.Home;
+supervisor invariant R3d_emergency_release_needs_arms_home: c_emergency_release needs ChargeArm.Stowed and CleanArm.Home;
+supervisor invariant R4_ready_only_when_served: c_depart_ready needs Battery.Full and Cabin.Clean;
+supervisor invariant R5_no_charge_stopped_short: c_stop_charge needs Battery.Full;

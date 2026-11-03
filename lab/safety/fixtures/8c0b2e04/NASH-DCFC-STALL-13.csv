@@ -1,0 +1,11 @@
+seq,sim_time,event,vehicle_id,detail,source
+1,2026-11-02T14:03:27.554004Z,car_arrived,a1111111-0001-0001-0001-000000000003,,ottoq_events#33845079
+2,2026-11-02T14:03:27.554004Z,mate_started,a1111111-0001-0001-0001-000000000003,window_s=18.5;session=bed60dbf-aacf-4dd4-96fd-f9a71c4f12e1,ottoq_events#33845211
+3,2026-11-02T14:03:27.554004Z,session_started,a1111111-0001-0001-0001-000000000003,soc_start=83;soc_target=100;session=bed60dbf-aacf-4dd4-96fd-f9a71c4f12e1,ottoq_events#33845212
+4,2026-11-02T14:03:53.527935Z,mate_latched,a1111111-0001-0001-0001-000000000003,outcome=latched,ottoq_events#33845466
+5,2026-11-02T14:03:53.527935Z,clean_started,a1111111-0001-0001-0001-000000000003,svc=interior_tidy;arm_routine=true,ottoq_visit_needs#eab2aeb5-fb63-44f1-a9f3-da6241aa1fb1
+6,2026-11-02T14:09:41.527935Z,clean_done,a1111111-0001-0001-0001-000000000003,svc=interior_tidy,ottoq_visit_needs#eab2aeb5-fb63-44f1-a9f3-da6241aa1fb1
+7,2026-11-02T14:27:36.050718Z,charger_faulted,a1111111-0001-0001-0001-000000000003,reason=fault.connector_cable;repair_minutes=123;soc_start=83;soc_end=94;session=bed60dbf-aacf-4dd4-96fd-f9a71c4f12e1,ottoq_events#33852282
+8,2026-11-02T14:27:36.050718Z,emergency_release,a1111111-0001-0001-0001-000000000003,tether_phase=charging,ottoq_events#33852273
+9,2026-11-02T14:27:36.050718Z,car_left,a1111111-0001-0001-0001-000000000003,to=04d65645-3c56-493b-b745-d7c8e60695d0,ottoq_events#33852275
+10,2026-11-02T14:29:58.997055Z,run_stopped,,,ottoq_events#33853472

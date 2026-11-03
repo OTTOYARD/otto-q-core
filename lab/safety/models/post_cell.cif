@@ -1,0 +1,8 @@
+// lab/safety/models/post_cell.cif -- the post cell with R1-R6: the requirement set as built after migration 0792.
+import "post_cell_requirements_base.cif";
+
+// R2  (G506) A car on an out-of-service post is released when the demate ends: the sweep never keeps it for a clean
+//     still to be done. It keeps it only while the cleaning arm withdraws and the doors close, which R3d needs and which
+//     is bounded (renderer cleanGate CLEAN_HOLD_CAP_S). Engine: 0792's conjunct in 0760's predicate, "the hold applies
+//     only while the stall's charger is not Faulted" (public.ottoq_release_expired_tethers, prosrc md5 5a97f2dc).
+requirement R2_no_hold_for_clean_on_out_of_service: c_hold needs not OutOfService or CleanArm.Returning;
