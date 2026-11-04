@@ -1,0 +1,135 @@
+{
+ "by_kind": {
+  "acl": {
+   "ottoq": {
+    "identical": 90
+   },
+   "public": {
+    "identical": 1485
+   },
+   "twin": {
+    "identical": 118
+   }
+  },
+  "comment": {
+   "ottoq": {
+    "identical": 35
+   },
+   "public": {
+    "identical": 588
+   },
+   "twin": {
+    "identical": 23
+   }
+  },
+  "constraint": {
+   "public": {
+    "differs": 3,
+    "identical": 1129
+   },
+   "twin": {
+    "identical": 25
+   }
+  },
+  "cron_job": {
+   "cron": {
+    "identical": 24
+   }
+  },
+  "default_acl": {
+   "auth": {
+    "identical": 3
+   },
+   "cron": {
+    "identical": 3
+   },
+   "extensions": {
+    "identical": 3
+   },
+   "public": {
+    "identical": 6
+   },
+   "storage": {
+    "identical": 3
+   }
+  },
+  "index": {
+   "public": {
+    "identical": 873
+   },
+   "twin": {
+    "identical": 16
+   }
+  },
+  "ledger": {
+   "supabase_migrations": {
+    "identical": 1
+   }
+  },
+  "policy": {
+   "public": {
+    "identical": 206
+   },
+   "twin": {
+    "identical": 4
+   }
+  },
+  "rls": {
+   "public": {
+    "identical": 446
+   },
+   "twin": {
+    "identical": 7
+   }
+  },
+  "routine": {
+   "ottoq": {
+    "identical": 89
+   },
+   "public": {
+    "identical": 839
+   },
+   "twin": {
+    "identical": 109
+   }
+  },
+  "sequence": {
+   "public": {
+    "identical": 79
+   },
+   "twin": {
+    "identical": 1
+   }
+  },
+  "table": {
+   "public": {
+    "identical": 446
+   },
+   "twin": {
+    "identical": 7
+   }
+  },
+  "trigger": {
+   "public": {
+    "identical": 236
+   }
+  },
+  "type": {
+   "public": {
+    "identical": 30
+   }
+  },
+  "view": {
+   "public": {
+    "definition_differs": 3,
+    "identical": 87
+   }
+  }
+ },
+ "duplicate_keys": {
+  "lab": [],
+  "prod": []
+ },
+ "lab_read_at": "2026-11-04 21:45:13.235283+00",
+ "prod_read_at": "2026-11-04 21:45:14.216493+00"
+}

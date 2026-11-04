@@ -1,0 +1,237 @@
+{
+ "exported_by": "lab/engine/lib/export_prod.py",
+ "source": {
+  "project_ref": "gxdrcyphqjzjsuhxuqtg",
+  "endpoint": "POST /v1/projects/{ref}/database/query/read-only",
+  "role": "supabase_read_only_user"
+ },
+ "finished_at": "2026-11-04T21:43:47+00:00",
+ "production": {
+  "version": "PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
+  "server_version_num": "170006",
+  "extensions": {
+   "plpgsql": {
+    "version": "1.0",
+    "schema": "pg_catalog"
+   },
+   "pg_stat_statements": {
+    "version": "1.11",
+    "schema": "extensions"
+   },
+   "uuid-ossp": {
+    "version": "1.1",
+    "schema": "extensions"
+   },
+   "pgcrypto": {
+    "version": "1.3",
+    "schema": "extensions"
+   },
+   "supabase_vault": {
+    "version": "0.3.1",
+    "schema": "vault"
+   },
+   "postgis": {
+    "version": "3.3.7",
+    "schema": "public"
+   },
+   "http": {
+    "version": "1.6",
+    "schema": "extensions"
+   },
+   "pg_net": {
+    "version": "0.20.0",
+    "schema": "extensions"
+   },
+   "pg_cron": {
+    "version": "1.6.4",
+    "schema": "pg_catalog"
+   },
+   "btree_gist": {
+    "version": "1.7",
+    "schema": "extensions"
+   }
+  },
+  "ledger_rows": 1337,
+  "ledger_max_version": "20261103155140",
+  "engine_hash": "aae920a758777a3a3c5c9652f82c6cf0",
+  "database_locale": "en_US.UTF-8 / en_US.UTF-8 / i / en-US / 153.121"
+ },
+ "reads": {
+  "meta": "2026-11-04T21:43:39.998293+00:00",
+  "unsupported": "2026-11-04T21:43:40.242202+00:00",
+  "schemas": "2026-11-04T21:43:40.454299+00:00",
+  "enums": "2026-11-04T21:43:40.728801+00:00",
+  "composites": "2026-11-04T21:43:40.939527+00:00",
+  "sequences": "2026-11-04T21:43:41.218012+00:00",
+  "identity_seqs": "2026-11-04T21:43:41.491189+00:00",
+  "tables": "2026-11-04T21:43:41.708384+00:00",
+  "function_oids": "2026-11-04T21:43:42.336756+00:00",
+  "functions[0]": "2026-11-04T21:43:42.616302+00:00",
+  "functions[250]": "2026-11-04T21:43:42.920944+00:00",
+  "functions[500]": "2026-11-04T21:43:43.232192+00:00",
+  "functions[750]": "2026-11-04T21:43:43.531857+00:00",
+  "functions[1000]": "2026-11-04T21:43:43.85037+00:00",
+  "views": "2026-11-04T21:43:44.08193+00:00",
+  "constraints": "2026-11-04T21:43:44.369122+00:00",
+  "indexes": "2026-11-04T21:43:44.675665+00:00",
+  "triggers": "2026-11-04T21:43:45.026422+00:00",
+  "rules": "2026-11-04T21:43:45.251534+00:00",
+  "policies": "2026-11-04T21:43:45.462038+00:00",
+  "comments": "2026-11-04T21:43:45.69413+00:00",
+  "acls": "2026-11-04T21:43:45.979436+00:00",
+  "cron": "2026-11-04T21:43:46.394939+00:00",
+  "ledger": "2026-11-04T21:43:46.601494+00:00",
+  "default_acls": "2026-11-04T21:43:46.847137+00:00"
+ },
+ "counts": {
+  "meta": 1,
+  "unsupported": 7,
+  "schemas": 3,
+  "enums": 27,
+  "composites": 3,
+  "sequences": 80,
+  "identity_seqs": 16,
+  "tables": 453,
+  "function_oids": 1037,
+  "functions": 1037,
+  "views": 90,
+  "constraints": 1155,
+  "indexes": 889,
+  "triggers": 236,
+  "rules": 0,
+  "policies": 210,
+  "comments": 646,
+  "acls": 1629,
+  "cron": 24,
+  "ledger": 1337,
+  "default_acls": 18
+ },
+ "files": [
+  {
+   "file": "01_schemas.sql",
+   "statements": 2,
+   "bytes": 174,
+   "sha256": "7450133354a627de8bf1cdc380fae7dd999924c0aaab91f53a7ae8d05090058f"
+  },
+  {
+   "file": "02_types.sql",
+   "statements": 27,
+   "bytes": 4964,
+   "sha256": "df6b649adad3bb180b3c1c6d1a20bcaf6686ee5fe5ac4f3e981007db4aada12a"
+  },
+  {
+   "file": "03_sequences.sql",
+   "statements": 64,
+   "bytes": 13905,
+   "sha256": "0c536c2305a281340ac792b666c24627b983bd7d1aad1bcddf62ed2caa088530"
+  },
+  {
+   "file": "04_types_composite.sql",
+   "statements": 3,
+   "bytes": 917,
+   "sha256": "fb06963e2e2202b879f8a8d60713e7f12ece642461178a8108badd8d295ce2a3"
+  },
+  {
+   "file": "05_tables.sql",
+   "statements": 453,
+   "bytes": 258195,
+   "sha256": "baa6db2e9efe81bdd097febfabf2afc5c385e31867dfd5d885ac5cc26f89f285"
+  },
+  {
+   "file": "06_functions.sql",
+   "statements": 1037,
+   "bytes": 4183168,
+   "sha256": "99bf96eb03431fdcce6b15d44afdd4d7d06ee606d2ddf63f376ee62a5c52f98a"
+  },
+  {
+   "file": "07_defaults.sql",
+   "statements": 1469,
+   "bytes": 222225,
+   "sha256": "1115e4e6381e64be3164f5cfeda11a22117f720fcfe1ca31e4bb9a357fec8601"
+  },
+  {
+   "file": "08_sequence_owned_by.sql",
+   "statements": 63,
+   "bytes": 10842,
+   "sha256": "eac68519aa2278fa411171898b6042f9ae6726d08fb598500371e1c960e55a7d"
+  },
+  {
+   "file": "09_views.sql",
+   "statements": 90,
+   "bytes": 153004,
+   "sha256": "a3a54001c7e54ef27825b453b3934772478e33384183d53ed7d58a3c3c596d57"
+  },
+  {
+   "file": "10_constraints_keys.sql",
+   "statements": 399,
+   "bytes": 79728,
+   "sha256": "b42a0418b85eb952bfc151dbb4bb5ac21f36373ddf11f9b52035549984f423b8"
+  },
+  {
+   "file": "11_constraints_check.sql",
+   "statements": 411,
+   "bytes": 121774,
+   "sha256": "c943790bb70a07ad01002e88b0a252e137a1efd7af42d70b5a81d6f39948e37a"
+  },
+  {
+   "file": "12_constraints_fk.sql",
+   "statements": 345,
+   "bytes": 88088,
+   "sha256": "1dd9b9ac4be0318fbacf8aa19b6177e49e21fec00903d00f996fd55d20dedad7"
+  },
+  {
+   "file": "13_indexes.sql",
+   "statements": 490,
+   "bytes": 81986,
+   "sha256": "f5214fe86c293650d7c6dfe7f42995402d75b1d35ab47e5820086206ee66632e"
+  },
+  {
+   "file": "14_triggers.sql",
+   "statements": 237,
+   "bytes": 60931,
+   "sha256": "b4053fa7b4252c0b334e5899a11cfdfc97e6e524dabb9b664f2263a0a8214ab5"
+  },
+  {
+   "file": "16_rls.sql",
+   "statements": 413,
+   "bytes": 71078,
+   "sha256": "99027bdd4a9fda443e5218cdf9409e9e565977ca417b1a412cedafa93d9a3a43"
+  },
+  {
+   "file": "17_comments.sql",
+   "statements": 646,
+   "bytes": 331071,
+   "sha256": "59e7ce11c7befbc913db35ab333b0ec38fd16a0ca7a30c806c65c35024ec047d"
+  },
+  {
+   "file": "18_acl.sql",
+   "statements": 6757,
+   "bytes": 1538063,
+   "sha256": "9fc34ea561d067a1dc91b7e5cedd228d614668ce60c577381fdbbe45f0bea10d"
+  },
+  {
+   "file": "20_sequence_values.sql",
+   "statements": 74,
+   "bytes": 10622,
+   "sha256": "ebe8a08aaeb0a29439637c1be1c45b96aa9c45556baff69d405e61ae7f8631e7"
+  },
+  {
+   "file": "21_cron.sql",
+   "statements": 25,
+   "bytes": 10373,
+   "sha256": "7338b749ca52c04b3a4996b18597687d356b219e6bcca8e7adb0df901d517894"
+  },
+  {
+   "file": "22_ledger.sql",
+   "statements": 1337,
+   "bytes": 274222,
+   "sha256": "3262a8c15cea36ff671949f08c781a0f210199a0e134fe825b5b975f46b3c6fd"
+  },
+  {
+   "file": "23_default_privileges.sql",
+   "statements": 46,
+   "bytes": 7966,
+   "sha256": "cc619d070082a0b1fc70ba514778e7f8afb0619bcad01722c59a60b3f4fe5bc3"
+  }
+ ]
+}

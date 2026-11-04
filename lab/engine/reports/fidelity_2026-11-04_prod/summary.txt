@@ -1,0 +1,34 @@
+lab read 2026-11-04 21:45:13.235283+00; production read 2026-11-04 21:45:14.216493+00
+kind        schema                 definition_dif        differs      identical
+acl         ottoq                                                            90
+acl         public                                                         1485
+acl         twin                                                            118
+comment     ottoq                                                            35
+comment     public                                                          588
+comment     twin                                                             23
+constraint  public                                             3           1129
+constraint  twin                                                             25
+cron_job    cron                                                             24
+default_acl auth                                                              3
+default_acl cron                                                              3
+default_acl extensions                                                        3
+default_acl public                                                            6
+default_acl storage                                                           3
+index       public                                                          873
+index       twin                                                             16
+ledger      supabase_migrations                                               1
+policy      public                                                          206
+policy      twin                                                              4
+rls         public                                                          446
+rls         twin                                                              7
+routine     ottoq                                                            89
+routine     public                                                          839
+routine     twin                                                            109
+sequence    public                                                           79
+sequence    twin                                                              1
+table       public                                                          446
+table       twin                                                              7
+trigger     public                                                          236
+type        public                                                           30
+view        public                              3                            87
+6 objects not identical -> lab/engine/reports/fidelity_2026-11-04_prod/diff.tsv
