@@ -832,7 +832,8 @@ repo_manifest(version, name, file) AS (
     ('PENDING'::text, 'the_stop_door_takes_the_runs_row_before_the_proposals'::text, '0790_the_stop_door_takes_the_runs_row_before_the_proposals.sql'::text),
     ('PENDING'::text, 'a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run'::text, '0791_a_signed_in_user_cannot_pause_resume_start_or_stop_a_run_and_a_pause_or_resume_never_writes_over_a_stopped_run.sql'::text),
     ('20261103041827'::text, 'a_faulted_post_lets_its_car_go_whatever_the_cleaning_arm_is_doing'::text, '0792_a_faulted_post_lets_its_car_go_whatever_the_cleaning_arm_is_doing.sql'::text),
-    ('20261103155140'::text, 'the_research_wing_writes_its_findings_where_the_twin_can_read_them'::text, '0793_the_research_wing_writes_its_findings_where_the_twin_can_read_them.sql'::text)
+    ('20261103155140'::text, 'the_research_wing_writes_its_findings_where_the_twin_can_read_them'::text, '0793_the_research_wing_writes_its_findings_where_the_twin_can_read_them.sql'::text),
+    ('PENDING'::text, 'the_end_state_fingerprint_sets_aside_the_leg_id_the_cleaning_arm_mints'::text, '0794_the_end_state_fingerprint_sets_aside_the_leg_id_the_cleaning_arm_mints.sql'::text)
 -- <<< END GENERATED MANIFEST
 ),
 

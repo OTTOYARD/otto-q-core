@@ -1,0 +1,881 @@
+{
+ "test": "E1 acceptance 2: forks",
+ "started": "2026-11-04T23:33:01+00:00",
+ "finished": "2026-11-04T23:36:55+00:00",
+ "seed": 171717,
+ "scenario": "busy_day",
+ "ticks": 12,
+ "fork_tick": 6,
+ "changed_dial": {
+  "charge_order_minutes": "0"
+ },
+ "replay_vs_trunk": {
+  "disagreeing_atoms": [],
+  "end_state_sections": [],
+  "end_state_equal_without_robot_leg_id": true,
+  "arrivals_equal": true,
+  "first_tick_that_differs": null,
+  "ticks_compared": 12
+ },
+ "changed_vs_trunk": {
+  "disagreeing_atoms": [
+   "commands",
+   "decisions",
+   "events",
+   "bookings",
+   "energy",
+   "proposals",
+   "rules",
+   "recalls",
+   "sdrs",
+   "end_state"
+  ],
+  "end_state_sections": [
+   "bookings",
+   "chargers",
+   "dispatches",
+   "legs",
+   "visit_needs",
+   "world"
+  ],
+  "end_state_equal_without_robot_leg_id": false,
+  "arrivals_equal": true,
+  "first_tick_that_differs": 7,
+  "ticks_compared": 12
+ },
+ "verdict": {
+  "unchanged_branch_reproduces": true,
+  "unchanged_branch_reproduces_except_minted_robot_leg_id": true,
+  "changed_branch_differs_only_after_fork": true
+ },
+ "branches": {
+  "trunk": {
+   "fp": "a5e8cbbe5a62d0fadc7478aadaa08f83",
+   "end": {
+    "fleet": 116,
+    "by_state": {
+     "charging_dcfc": 11,
+     "in_detail_bay": 1,
+     "in_service_bay": 2,
+     "staged_for_departure": 43,
+     "staged_awaiting_service": 59
+    }
+   },
+   "run": "6e581452-0eb2-446f-b4e0-21bd8f868605",
+   "clock": "2026-09-01T08:00:00+00:00",
+   "endst": {
+    "legs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "c739e398db3cc6c57b3e2d7885ddeb6c",
+      "n": 980
+     }
+    },
+    "world": "b6f8dcfa18dbfaab6dd2511cacde34f1",
+    "bookings": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "3f57f401cc74b8090d09cfedc516ad08",
+      "n": 416
+     }
+    },
+    "chargers": {
+     "world": {
+      "h": "ccb84d4803c23e77761abfb84f80fad0",
+      "n": 45
+     }
+    },
+    "dispatches": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "63dd5bf44fd193b0377841b43a883d29",
+      "n": 116
+     }
+    },
+    "calibration": {
+     "h": "b72a0671daa8a992a9d3f88f52422a46"
+    },
+    "visit_needs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "4008877c4dda48273972e06416553fe8",
+      "n": 116
+     }
+    }
+   },
+   "h_arr": "826a3bbd42d7d953c415d100b3f4671b",
+   "h_bkg": "01d6e75faf95ea22c26cd06ad4ae1d64",
+   "h_cmd": "7f477766efb5d631860c67fcf6dea4ed",
+   "h_dec": "fcf0630feab97eef01227afdea15944a",
+   "h_evt": "86543fcce9445476fe9e0011083e64d4",
+   "h_nrg": "270d888a41afaa73d28ba20619a80c35",
+   "h_rcl": "a9286c2401a848eef58a30f20365880c",
+   "h_sdr": "faa8b6aaf5e5bfce31bb52ae0b2ce988",
+   "ticks": 12,
+   "h_defr": "d41d8cd98f00b204e9800998ecf8427e",
+   "h_prop": "2b55df5c917e2224bb80be0b49f4ae63",
+   "h_rule": "12d0e66c81a72afa4e713314d7106124",
+   "blocked": {},
+   "decisions": {
+    "task_start/enacted": 1103,
+    "redeployment/enacted": 1,
+    "bess_dispatch/enacted": 10,
+    "stall_assignment/enacted": 115,
+    "task_start/noop_no_candidate": 77,
+    "bess_dispatch/noop_no_candidate": 2,
+    "stall_assignment/noop_no_candidate": 305,
+    "stall_assignment/deferred_tick_budget": 75
+   },
+   "proposals": {
+    "ottoq_service_priority": 14
+   },
+   "n_arrivals": 116,
+   "stall_sources": {
+    "local_heuristic": 74,
+    "greedy_constrained": 1,
+    "reservation_honoured": 40
+   },
+   "boot": {
+    "legs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     }
+    },
+    "world": "4699cb98b454603b0e13fcb08a839097",
+    "bookings": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     }
+    },
+    "chargers": {
+     "world": {
+      "h": "ec81abdce0ee226fdf562e70c1937b1e",
+      "n": 45
+     }
+    },
+    "dispatches": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "ea8bf857c1aad8ddc56f1bb59dfcf3a8",
+      "n": 116
+     }
+    },
+    "calibration": {
+     "h": "b72a0671daa8a992a9d3f88f52422a46"
+    },
+    "visit_needs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     }
+    }
+   },
+   "h_cal": "b72a0671daa8a992a9d3f88f52422a46",
+   "vis_stripped": "4008877c4dda48273972e06416553fe8",
+   "per_tick": [
+    {
+     "tick": 1,
+     "clock": "2026-09-01 02:30:00+00:00",
+     "evt": "f70b640d2e2f6bf7fe11fb5338e625df",
+     "n_evt": 997,
+     "dec": "7e3c68649854850a0ca81d48b1af22f3",
+     "n_dec": 50,
+     "cmd": "9448b8f265f587c003896fa01522fff9",
+     "n_cmd": 58
+    },
+    {
+     "tick": 2,
+     "clock": "2026-09-01 03:00:00+00:00",
+     "evt": "4071182855d1bbc5dfa58f729126949d",
+     "n_evt": 844,
+     "dec": "4097e337ff26d47a012eb5ccd25d7daa",
+     "n_dec": 38,
+     "cmd": "9c3dc4bc25000a4b799336edb0bec7a5",
+     "n_cmd": 41
+    },
+    {
+     "tick": 3,
+     "clock": "2026-09-01 03:30:00+00:00",
+     "evt": "527d88bef75dc67c0a19fccb17e55e40",
+     "n_evt": 1217,
+     "dec": "76b4d13868e5ccecd263a9797333e123",
+     "n_dec": 137,
+     "cmd": "a412acf463a2fcd8b627d8b7cacd2695",
+     "n_cmd": 61
+    },
+    {
+     "tick": 4,
+     "clock": "2026-09-01 04:00:00+00:00",
+     "evt": "99df5304542188d07a10566821e26621",
+     "n_evt": 697,
+     "dec": "6638c7730d4c634f92b3a791c7b97180",
+     "n_dec": 193,
+     "cmd": "3d168882fc5923b3f44fa04b0877e456",
+     "n_cmd": 34
+    },
+    {
+     "tick": 5,
+     "clock": "2026-09-01 04:30:00+00:00",
+     "evt": "c97231327b1e6dc0ab1069d895b9ebf6",
+     "n_evt": 563,
+     "dec": "21bf6b6330d3675f260ff3d9eadfa2e1",
+     "n_dec": 176,
+     "cmd": "1ac3fb943d6d8f632df4bc2aaeaacdd1",
+     "n_cmd": 15
+    },
+    {
+     "tick": 6,
+     "clock": "2026-09-01 05:00:00+00:00",
+     "evt": "bbceac7d95db67755efdd69fa3360cc5",
+     "n_evt": 475,
+     "dec": "1d497d59fdb856cb4a8249864087c247",
+     "n_dec": 195,
+     "cmd": "bd29755df093e3e428e2a41155245813",
+     "n_cmd": 13
+    },
+    {
+     "tick": 7,
+     "clock": "2026-09-01 05:30:00+00:00",
+     "evt": "ffe16066b32c1cde7e30fe99eb7247cc",
+     "n_evt": 362,
+     "dec": "c8b1df20f0aee966651e9a45fc4169e7",
+     "n_dec": 165,
+     "cmd": "2a12d35779eb099bf958a160f3a0e0db",
+     "n_cmd": 7
+    },
+    {
+     "tick": 8,
+     "clock": "2026-09-01 06:00:00+00:00",
+     "evt": "2e0e79defd71185dacc6518907642510",
+     "n_evt": 428,
+     "dec": "25c8dc0b20a790f573b3cfda3c14b0d4",
+     "n_dec": 177,
+     "cmd": "2f5eb32e65b114e3122dcaf51c92cfe5",
+     "n_cmd": 12
+    },
+    {
+     "tick": 9,
+     "clock": "2026-09-01 06:30:00+00:00",
+     "evt": "31f52012e5ba41b3d0f89988e69dc5b9",
+     "n_evt": 339,
+     "dec": "57c29ebd48bb52cf1f56399eefda32a3",
+     "n_dec": 141,
+     "cmd": "6b12386c318e2c06311639089374290b",
+     "n_cmd": 9
+    },
+    {
+     "tick": 10,
+     "clock": "2026-09-01 07:00:00+00:00",
+     "evt": "52a38dc285d5779d6b106f8e4a30e68b",
+     "n_evt": 316,
+     "dec": "52ec32c3cbd4ede6b74afd5e93dea671",
+     "n_dec": 160,
+     "cmd": "a0a28a8cfa24a539d6d4d9ba966667ea",
+     "n_cmd": 5
+    },
+    {
+     "tick": 11,
+     "clock": "2026-09-01 07:30:00+00:00",
+     "evt": "fc0afb09ae042117361f9b2e53dac7d5",
+     "n_evt": 392,
+     "dec": "7a883f852101bfabfb76665f05d17179",
+     "n_dec": 122,
+     "cmd": "111023f548ef21ec74641a324015249a",
+     "n_cmd": 13
+    },
+    {
+     "tick": 12,
+     "clock": "2026-09-01 08:00:00+00:00",
+     "evt": "c17c419169814df16345375dd711b4d6",
+     "n_evt": 470,
+     "dec": "6f9ab774dab85d7cd5500cb233329ade",
+     "n_dec": 134,
+     "cmd": "e0e627d0860a21595be929b32b78d32e",
+     "n_cmd": 11
+    }
+   ],
+   "wall_seconds_after_fork": 58.05
+  },
+  "replay": {
+   "fp": "a5e8cbbe5a62d0fadc7478aadaa08f83",
+   "end": {
+    "fleet": 116,
+    "by_state": {
+     "charging_dcfc": 11,
+     "in_detail_bay": 1,
+     "in_service_bay": 2,
+     "staged_for_departure": 43,
+     "staged_awaiting_service": 59
+    }
+   },
+   "run": "6e581452-0eb2-446f-b4e0-21bd8f868605",
+   "clock": "2026-09-01T08:00:00+00:00",
+   "endst": {
+    "legs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "c739e398db3cc6c57b3e2d7885ddeb6c",
+      "n": 980
+     }
+    },
+    "world": "b6f8dcfa18dbfaab6dd2511cacde34f1",
+    "bookings": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "3f57f401cc74b8090d09cfedc516ad08",
+      "n": 416
+     }
+    },
+    "chargers": {
+     "world": {
+      "h": "ccb84d4803c23e77761abfb84f80fad0",
+      "n": 45
+     }
+    },
+    "dispatches": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "63dd5bf44fd193b0377841b43a883d29",
+      "n": 116
+     }
+    },
+    "calibration": {
+     "h": "b72a0671daa8a992a9d3f88f52422a46"
+    },
+    "visit_needs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "4008877c4dda48273972e06416553fe8",
+      "n": 116
+     }
+    }
+   },
+   "h_arr": "826a3bbd42d7d953c415d100b3f4671b",
+   "h_bkg": "01d6e75faf95ea22c26cd06ad4ae1d64",
+   "h_cmd": "7f477766efb5d631860c67fcf6dea4ed",
+   "h_dec": "fcf0630feab97eef01227afdea15944a",
+   "h_evt": "86543fcce9445476fe9e0011083e64d4",
+   "h_nrg": "270d888a41afaa73d28ba20619a80c35",
+   "h_rcl": "a9286c2401a848eef58a30f20365880c",
+   "h_sdr": "faa8b6aaf5e5bfce31bb52ae0b2ce988",
+   "ticks": 12,
+   "h_defr": "d41d8cd98f00b204e9800998ecf8427e",
+   "h_prop": "2b55df5c917e2224bb80be0b49f4ae63",
+   "h_rule": "12d0e66c81a72afa4e713314d7106124",
+   "blocked": {},
+   "decisions": {
+    "task_start/enacted": 1103,
+    "redeployment/enacted": 1,
+    "bess_dispatch/enacted": 10,
+    "stall_assignment/enacted": 115,
+    "task_start/noop_no_candidate": 77,
+    "bess_dispatch/noop_no_candidate": 2,
+    "stall_assignment/noop_no_candidate": 305,
+    "stall_assignment/deferred_tick_budget": 75
+   },
+   "proposals": {
+    "ottoq_service_priority": 14
+   },
+   "n_arrivals": 116,
+   "stall_sources": {
+    "local_heuristic": 74,
+    "greedy_constrained": 1,
+    "reservation_honoured": 40
+   },
+   "boot": {
+    "legs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     }
+    },
+    "world": "4699cb98b454603b0e13fcb08a839097",
+    "bookings": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     }
+    },
+    "chargers": {
+     "world": {
+      "h": "ec81abdce0ee226fdf562e70c1937b1e",
+      "n": 45
+     }
+    },
+    "dispatches": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "ea8bf857c1aad8ddc56f1bb59dfcf3a8",
+      "n": 116
+     }
+    },
+    "calibration": {
+     "h": "b72a0671daa8a992a9d3f88f52422a46"
+    },
+    "visit_needs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     }
+    }
+   },
+   "h_cal": "b72a0671daa8a992a9d3f88f52422a46",
+   "vis_stripped": "4008877c4dda48273972e06416553fe8",
+   "per_tick": [
+    {
+     "tick": 1,
+     "clock": "2026-09-01 02:30:00+00:00",
+     "evt": "f70b640d2e2f6bf7fe11fb5338e625df",
+     "n_evt": 997,
+     "dec": "7e3c68649854850a0ca81d48b1af22f3",
+     "n_dec": 50,
+     "cmd": "9448b8f265f587c003896fa01522fff9",
+     "n_cmd": 58
+    },
+    {
+     "tick": 2,
+     "clock": "2026-09-01 03:00:00+00:00",
+     "evt": "4071182855d1bbc5dfa58f729126949d",
+     "n_evt": 844,
+     "dec": "4097e337ff26d47a012eb5ccd25d7daa",
+     "n_dec": 38,
+     "cmd": "9c3dc4bc25000a4b799336edb0bec7a5",
+     "n_cmd": 41
+    },
+    {
+     "tick": 3,
+     "clock": "2026-09-01 03:30:00+00:00",
+     "evt": "527d88bef75dc67c0a19fccb17e55e40",
+     "n_evt": 1217,
+     "dec": "76b4d13868e5ccecd263a9797333e123",
+     "n_dec": 137,
+     "cmd": "a412acf463a2fcd8b627d8b7cacd2695",
+     "n_cmd": 61
+    },
+    {
+     "tick": 4,
+     "clock": "2026-09-01 04:00:00+00:00",
+     "evt": "99df5304542188d07a10566821e26621",
+     "n_evt": 697,
+     "dec": "6638c7730d4c634f92b3a791c7b97180",
+     "n_dec": 193,
+     "cmd": "3d168882fc5923b3f44fa04b0877e456",
+     "n_cmd": 34
+    },
+    {
+     "tick": 5,
+     "clock": "2026-09-01 04:30:00+00:00",
+     "evt": "c97231327b1e6dc0ab1069d895b9ebf6",
+     "n_evt": 563,
+     "dec": "21bf6b6330d3675f260ff3d9eadfa2e1",
+     "n_dec": 176,
+     "cmd": "1ac3fb943d6d8f632df4bc2aaeaacdd1",
+     "n_cmd": 15
+    },
+    {
+     "tick": 6,
+     "clock": "2026-09-01 05:00:00+00:00",
+     "evt": "bbceac7d95db67755efdd69fa3360cc5",
+     "n_evt": 475,
+     "dec": "1d497d59fdb856cb4a8249864087c247",
+     "n_dec": 195,
+     "cmd": "bd29755df093e3e428e2a41155245813",
+     "n_cmd": 13
+    },
+    {
+     "tick": 7,
+     "clock": "2026-09-01 05:30:00+00:00",
+     "evt": "ffe16066b32c1cde7e30fe99eb7247cc",
+     "n_evt": 362,
+     "dec": "c8b1df20f0aee966651e9a45fc4169e7",
+     "n_dec": 165,
+     "cmd": "2a12d35779eb099bf958a160f3a0e0db",
+     "n_cmd": 7
+    },
+    {
+     "tick": 8,
+     "clock": "2026-09-01 06:00:00+00:00",
+     "evt": "2e0e79defd71185dacc6518907642510",
+     "n_evt": 428,
+     "dec": "25c8dc0b20a790f573b3cfda3c14b0d4",
+     "n_dec": 177,
+     "cmd": "2f5eb32e65b114e3122dcaf51c92cfe5",
+     "n_cmd": 12
+    },
+    {
+     "tick": 9,
+     "clock": "2026-09-01 06:30:00+00:00",
+     "evt": "31f52012e5ba41b3d0f89988e69dc5b9",
+     "n_evt": 339,
+     "dec": "57c29ebd48bb52cf1f56399eefda32a3",
+     "n_dec": 141,
+     "cmd": "6b12386c318e2c06311639089374290b",
+     "n_cmd": 9
+    },
+    {
+     "tick": 10,
+     "clock": "2026-09-01 07:00:00+00:00",
+     "evt": "52a38dc285d5779d6b106f8e4a30e68b",
+     "n_evt": 316,
+     "dec": "52ec32c3cbd4ede6b74afd5e93dea671",
+     "n_dec": 160,
+     "cmd": "a0a28a8cfa24a539d6d4d9ba966667ea",
+     "n_cmd": 5
+    },
+    {
+     "tick": 11,
+     "clock": "2026-09-01 07:30:00+00:00",
+     "evt": "fc0afb09ae042117361f9b2e53dac7d5",
+     "n_evt": 392,
+     "dec": "7a883f852101bfabfb76665f05d17179",
+     "n_dec": 122,
+     "cmd": "111023f548ef21ec74641a324015249a",
+     "n_cmd": 13
+    },
+    {
+     "tick": 12,
+     "clock": "2026-09-01 08:00:00+00:00",
+     "evt": "c17c419169814df16345375dd711b4d6",
+     "n_evt": 470,
+     "dec": "6f9ab774dab85d7cd5500cb233329ade",
+     "n_dec": 134,
+     "cmd": "e0e627d0860a21595be929b32b78d32e",
+     "n_cmd": 11
+    }
+   ],
+   "wall_seconds_after_fork": 66.68
+  },
+  "changed": {
+   "fp": "a5e8cbbe5a62d0fadc7478aadaa08f83",
+   "end": {
+    "fleet": 116,
+    "by_state": {
+     "charging_dcfc": 11,
+     "in_detail_bay": 1,
+     "in_service_bay": 2,
+     "staged_for_departure": 44,
+     "staged_awaiting_service": 58
+    }
+   },
+   "run": "6e581452-0eb2-446f-b4e0-21bd8f868605",
+   "clock": "2026-09-01T08:00:00+00:00",
+   "endst": {
+    "legs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "b5e71a55e148cfa16c1b8e61ba40ced0",
+      "n": 980
+     }
+    },
+    "world": "8e3aab955fc023b791f82c75a7d0708b",
+    "bookings": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "8ae156f7fc59521dd855155a3fdd898a",
+      "n": 416
+     }
+    },
+    "chargers": {
+     "world": {
+      "h": "6ca436a026455f5bbe132517186a13c1",
+      "n": 45
+     }
+    },
+    "dispatches": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "c1543a9e97e384ed05ee5dd4337a4720",
+      "n": 116
+     }
+    },
+    "calibration": {
+     "h": "b72a0671daa8a992a9d3f88f52422a46"
+    },
+    "visit_needs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "7f57d01d69e8065b1d7aeed87a87cdf3",
+      "n": 116
+     }
+    }
+   },
+   "h_arr": "826a3bbd42d7d953c415d100b3f4671b",
+   "h_bkg": "a2d3417bdf9ec6a6db08c000122ae31a",
+   "h_cmd": "6c87ba9a3c118d39ba1af36dc7e3420d",
+   "h_dec": "2793f3a9767227ace239274e36d32b4a",
+   "h_evt": "cac6574374a1b15ba108e21e0a635d1d",
+   "h_nrg": "489d76ac98c513f874054b2bcc538ca6",
+   "h_rcl": "df7a2fa46f0035d363daf292c71e787a",
+   "h_sdr": "edf92698272e0ea251900c61cc82ade1",
+   "ticks": 12,
+   "h_defr": "d41d8cd98f00b204e9800998ecf8427e",
+   "h_prop": "ddcca1e1ff2744dd2679e371cc699eb8",
+   "h_rule": "b019c8fd958f2482327b7dcd67e9e8ce",
+   "blocked": {},
+   "decisions": {
+    "task_start/enacted": 1104,
+    "redeployment/enacted": 1,
+    "bess_dispatch/enacted": 11,
+    "stall_assignment/enacted": 114,
+    "task_start/noop_no_candidate": 78,
+    "bess_dispatch/noop_no_candidate": 1,
+    "stall_assignment/noop_no_candidate": 308,
+    "stall_assignment/deferred_tick_budget": 75
+   },
+   "proposals": {
+    "ottoq_service_priority": 14
+   },
+   "n_arrivals": 116,
+   "stall_sources": {
+    "local_heuristic": 73,
+    "greedy_constrained": 1,
+    "reservation_honoured": 40
+   },
+   "boot": {
+    "legs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     }
+    },
+    "world": "4699cb98b454603b0e13fcb08a839097",
+    "bookings": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     }
+    },
+    "chargers": {
+     "world": {
+      "h": "ec81abdce0ee226fdf562e70c1937b1e",
+      "n": 45
+     }
+    },
+    "dispatches": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "ea8bf857c1aad8ddc56f1bb59dfcf3a8",
+      "n": 116
+     }
+    },
+    "calibration": {
+     "h": "b72a0671daa8a992a9d3f88f52422a46"
+    },
+    "visit_needs": {
+     "fgn": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     },
+     "vis": {
+      "h": "d41d8cd98f00b204e9800998ecf8427e",
+      "n": 0
+     }
+    }
+   },
+   "h_cal": "b72a0671daa8a992a9d3f88f52422a46",
+   "vis_stripped": "7f57d01d69e8065b1d7aeed87a87cdf3",
+   "per_tick": [
+    {
+     "tick": 1,
+     "clock": "2026-09-01 02:30:00+00:00",
+     "evt": "f70b640d2e2f6bf7fe11fb5338e625df",
+     "n_evt": 997,
+     "dec": "7e3c68649854850a0ca81d48b1af22f3",
+     "n_dec": 50,
+     "cmd": "9448b8f265f587c003896fa01522fff9",
+     "n_cmd": 58
+    },
+    {
+     "tick": 2,
+     "clock": "2026-09-01 03:00:00+00:00",
+     "evt": "4071182855d1bbc5dfa58f729126949d",
+     "n_evt": 844,
+     "dec": "4097e337ff26d47a012eb5ccd25d7daa",
+     "n_dec": 38,
+     "cmd": "9c3dc4bc25000a4b799336edb0bec7a5",
+     "n_cmd": 41
+    },
+    {
+     "tick": 3,
+     "clock": "2026-09-01 03:30:00+00:00",
+     "evt": "527d88bef75dc67c0a19fccb17e55e40",
+     "n_evt": 1217,
+     "dec": "76b4d13868e5ccecd263a9797333e123",
+     "n_dec": 137,
+     "cmd": "a412acf463a2fcd8b627d8b7cacd2695",
+     "n_cmd": 61
+    },
+    {
+     "tick": 4,
+     "clock": "2026-09-01 04:00:00+00:00",
+     "evt": "99df5304542188d07a10566821e26621",
+     "n_evt": 697,
+     "dec": "6638c7730d4c634f92b3a791c7b97180",
+     "n_dec": 193,
+     "cmd": "3d168882fc5923b3f44fa04b0877e456",
+     "n_cmd": 34
+    },
+    {
+     "tick": 5,
+     "clock": "2026-09-01 04:30:00+00:00",
+     "evt": "c97231327b1e6dc0ab1069d895b9ebf6",
+     "n_evt": 563,
+     "dec": "21bf6b6330d3675f260ff3d9eadfa2e1",
+     "n_dec": 176,
+     "cmd": "1ac3fb943d6d8f632df4bc2aaeaacdd1",
+     "n_cmd": 15
+    },
+    {
+     "tick": 6,
+     "clock": "2026-09-01 05:00:00+00:00",
+     "evt": "bbceac7d95db67755efdd69fa3360cc5",
+     "n_evt": 475,
+     "dec": "1d497d59fdb856cb4a8249864087c247",
+     "n_dec": 195,
+     "cmd": "bd29755df093e3e428e2a41155245813",
+     "n_cmd": 13
+    },
+    {
+     "tick": 7,
+     "clock": "2026-09-01 05:30:00+00:00",
+     "evt": "9b8edddc1c425702ab2183581ff26204",
+     "n_evt": 362,
+     "dec": "b8cfc57db61aef9eb6044b56a8f46619",
+     "n_dec": 165,
+     "cmd": "56ec161d60532cc24eb57c50c69dba07",
+     "n_cmd": 7
+    },
+    {
+     "tick": 8,
+     "clock": "2026-09-01 06:00:00+00:00",
+     "evt": "7dad4bac0e7ee576a55fd6d930ecc601",
+     "n_evt": 410,
+     "dec": "f2d24b7effac4e7db8a6898024ce297b",
+     "n_dec": 179,
+     "cmd": "52c23c8cecd905c4d2807d01797a8144",
+     "n_cmd": 12
+    },
+    {
+     "tick": 9,
+     "clock": "2026-09-01 06:30:00+00:00",
+     "evt": "c03bbcd03c54081a1fdb308a6965c37a",
+     "n_evt": 348,
+     "dec": "eef71e299cfe3b2204c0aec6c02729ac",
+     "n_dec": 138,
+     "cmd": "470523266a0dd344cbd7745fc956a265",
+     "n_cmd": 10
+    },
+    {
+     "tick": 10,
+     "clock": "2026-09-01 07:00:00+00:00",
+     "evt": "8135f0432daeeb660dfb8293ff7942c1",
+     "n_evt": 376,
+     "dec": "2e9f08e5044cf09ca7fefadd8fa70762",
+     "n_dec": 161,
+     "cmd": "7e831a4e710ff57d317c85dfac517336",
+     "n_cmd": 7
+    },
+    {
+     "tick": 11,
+     "clock": "2026-09-01 07:30:00+00:00",
+     "evt": "5a3f282be85b644069afe9b8fa16d763",
+     "n_evt": 401,
+     "dec": "ac1cfa4d7384143f24c36e32a87056ae",
+     "n_dec": 120,
+     "cmd": "1a8d9935386209c99d6df57a73381ca6",
+     "n_cmd": 10
+    },
+    {
+     "tick": 12,
+     "clock": "2026-09-01 08:00:00+00:00",
+     "evt": "7f918f0d230bd4bdc027484c40393976",
+     "n_evt": 429,
+     "dec": "2951b9cebbed129a726212cea702535e",
+     "n_dec": 140,
+     "cmd": "63237a86ba61dfa9b49aafe5f359f333",
+     "n_cmd": 10
+    }
+   ],
+   "wall_seconds_after_fork": 66.03
+  }
+ }
+}
